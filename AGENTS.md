@@ -118,7 +118,7 @@ This workspace is part of a federation network (see `federation.yaml`). Key impl
 - **Agent runtimes**: openclaw-source (primary), regen_eliza-refi_dao (alternative)
 - **Knowledge infra**: koi-net, koi-net-integration — real-time federation sync
 - **Publishing**: quartz-refi-template — documentation sites
-- **Grants**: opengrants-os — grants platform
+- **Grants**: grants-os — grants platform
 
 **Related repos**: [dao-os](https://github.com/luizfernandosg/dao-os) (DAO extension), [regen-coordination-hub](https://github.com/regen-coordination/regen-coordination-hub) (federation hub), [ECOSYSTEM-MAP.md](https://github.com/luizfernandosg/Zettelkasten/blob/main/03%20Libraries/ECOSYSTEM-MAP.md) (full cross-repo map)
 
