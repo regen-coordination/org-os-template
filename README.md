@@ -2,6 +2,8 @@
 
 **GitHub-based operational workspace template with EIP-4824 compliance**
 
+> This repository is a standalone mirror of `packages/template` in the canonical [organizational-os monorepo](https://github.com/regen-coordination/organizational-os). For active development, use the monorepo.
+
 Transform your GitHub repository into a complete operational workspace for your organization (DAO, cooperative, nonprofit, project). Built on EIP-4824/DAOstar standards for organizational identity and interoperability.
 
 ---
