@@ -110,9 +110,9 @@ Linked repositories are defined in `repos.manifest.json`.
 
 ## Documentation
 
-- **[Setup Guide](docs/SETUP.md)** - Complete setup instructions
+- **[Setup Guide](03%20Libraries/org-os/docs/SETUP.md)** - Complete setup instructions
 - **[Operator Guidebook](docs/OPERATOR-GUIDEBOOK.md)** - How to operate your workspace
-- **[EIP-4824 Guide](docs/EIP4824-GUIDE.md)** - Standards compliance guide
+- **[EIP-4824 Guide](03%20Libraries/org-os/docs/EIP4824-GUIDE.md)** - Standards compliance guide
 - **[Packages](docs/PACKAGES.md)** - Package documentation
 
 ---

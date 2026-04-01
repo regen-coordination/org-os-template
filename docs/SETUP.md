@@ -160,7 +160,7 @@ This generates Cursor rules for AI-assisted development.
 
 - **Read Operator Guidebook**: [`OPERATOR-GUIDEBOOK.md`](OPERATOR-GUIDEBOOK.md)
 - **Explore Packages**: [`PACKAGES.md`](PACKAGES.md)
-- **Understand EIP-4824**: [`EIP4824-GUIDE.md`](EIP4824-GUIDE.md)
+- **Understand EIP-4824**: [`EIP4824-GUIDE.md`](03%20Libraries/org-os/docs/EIP4824-GUIDE.md)
 - **See Framework**: [`../../organizational-os/packages/framework/`](../../organizational-os/packages/framework/)
 
 ## Getting Help
