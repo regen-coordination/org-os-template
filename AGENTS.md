@@ -4,13 +4,13 @@ _Operating instructions for AI agents (OpenClaw, Cursor, or custom runtimes) wor
 
 ---
 
-## 🎯 START HERE: Read MASTERPROMPT.md
+## 🎯 START HERE: Read MASTERPLAN.md
 
 **For organization-specific agents**, the canonical source is:
 
-### **`MASTERPROMPT.md`** — Your Complete Operating Manual
+### **`MASTERPLAN.md`** — Your Strategic Vision & Operating Manual
 
-This file contains your mandate, architecture, workfronts, subagent patterns, safety boundaries, and success metrics. Read it fully before proceeding with AGENTS.md.
+This file contains your mandate, activations, research directions, success metrics, and boundaries. It's how operators steer your autonomous behavior. Read it fully before proceeding with AGENTS.md.
 
 ---
 
@@ -20,7 +20,7 @@ This file contains your mandate, architecture, workfronts, subagent patterns, sa
 
 At the start of every session, read these files in order:
 
-1. **`MASTERPROMPT.md`** — Your mandate, character, and operating context
+1. **`MASTERPLAN.md`** — Your mandate, character, and operating context
 2. **`SOUL.md`** — Organizational values, mission, voice (grounds your decisions)
 3. **`IDENTITY.md`** — Org name, type, chain addresses, network membership
 4. **`USER.md`** — Primary operator profile and preferences

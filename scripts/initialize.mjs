@@ -74,22 +74,18 @@ function extractCheckboxes(markdownContent) {
       const done = checkboxMatch[1] !== " ";
       let text = checkboxMatch[2].trim();
 
-      // Extract due date if present
       const dueMatch = text.match(/\(due:\s*(\d{4}-\d{2}-\d{2})\)/i);
       const due = dueMatch ? dueMatch[1] : null;
 
-      // Extract assignee if present
       const assigneeMatch = text.match(/@(\w+)/);
       const assignee = assigneeMatch ? assigneeMatch[1] : null;
 
-      // Clean up text
       text = text
         .replace(/\(due:\s*\d{4}-\d{2}-\d{2}\)/i, "")
         .replace(/@\w+/g, "")
         .replace(/\s+/g, " ")
         .trim();
 
-      // Skip template placeholders
       if (text.startsWith("_(") && text.endsWith(")_")) continue;
 
       items.push({
@@ -142,12 +138,10 @@ function daysUntil(dateStr) {
 
 function loadIdentity() {
   const federation = readYamlSafe(path.join(rootDir, "federation.yaml"));
-  const identityMd = readFileSafe(path.join(rootDir, "IDENTITY.md"));
   const soulMd = readFileSafe(path.join(rootDir, "SOUL.md"));
 
   const id = federation?.identity || {};
 
-  // Extract mission from SOUL.md (first line after "## Mission" or similar)
   let mission = "";
   if (soulMd) {
     const missionMatch = soulMd.match(/##\s*Mission[^\n]*\n+([^\n#]+)/i);
@@ -159,7 +153,6 @@ function loadIdentity() {
     }
   }
 
-  // Extract notion workspace URL from TOOLS.md
   const toolsMd = readFileSafe(path.join(rootDir, "TOOLS.md"));
   let notionWorkspaceUrl = null;
   if (toolsMd) {
@@ -192,7 +185,6 @@ function loadStatus() {
   const federation = readYamlSafe(path.join(rootDir, "federation.yaml"));
   const memoryDir = path.join(rootDir, "memory");
 
-  // Find most recent memory file
   let lastMemory = null;
   let lastMemoryAge = null;
   if (fs.existsSync(memoryDir)) {
@@ -207,25 +199,19 @@ function loadStatus() {
     }
   }
 
-  // Schema freshness
   const schemaAge = getFileModifiedAge(
     path.join(rootDir, ".well-known", "dao.json"),
   );
 
-  // Peer count
-  const peers = federation?.peers || [];
-
-  // Runtime
+  const peers = federation?.federation?.peers || federation?.peers || [];
   const runtime = federation?.agent?.runtime || "none";
-
-  // Skills count
   const skills = federation?.agent?.skills || [];
 
   return {
     lastMemory,
     lastMemoryAge,
     schemaAge,
-    peerCount: peers.length,
+    peerCount: Array.isArray(peers) ? peers.length : 0,
     runtime,
     skillCount: skills.length,
     skills: skills,
@@ -244,33 +230,35 @@ function loadProjects() {
   if (projectsData?.projects) {
     for (const p of projectsData.projects) {
       projects.push({
-        name: p.name || p.id,
-        stage: p.status || "Integrate",
+        name: p.title || p.name || p.id,
+        stage: p.status || "idea",
         lead: p.lead || null,
-        members: p.members || [],
-        startDate: p.startDate || null,
+        members: p.contributors || p.members || [],
+        startDate: p.started || p.startDate || null,
         notionUrl: p.notion_url || null,
         taskCount: 0,
       });
     }
   }
 
-  // From content/projects/*.md
-  const projectsDir = path.join(rootDir, "content", "projects");
-  if (fs.existsSync(projectsDir)) {
+  // From packages/operations/projects/*.md (canonical v2 path)
+  for (const projectsDir of [
+    path.join(rootDir, "packages", "operations", "projects"),
+    path.join(rootDir, "content", "projects"), // fallback for v1 instances
+  ]) {
+    if (!fs.existsSync(projectsDir)) continue;
     const files = fs.readdirSync(projectsDir).filter((f) => f.endsWith(".md"));
     for (const file of files) {
       const parsed = parseMarkdownFrontmatter(path.join(projectsDir, file));
       if (!parsed) continue;
       const { data, content } = parsed;
 
-      // Count tasks in the file
       const taskMatches = content.match(/- \[ \]/g);
       const taskCount = taskMatches ? taskMatches.length : 0;
 
-      // Check if already added from YAML (deduplicate by name)
+      const projName = data.title || data.name || file.replace(".md", "");
       const existing = projects.find(
-        (p) => p.name === (data.name || file.replace(".md", "")),
+        (p) => p.name.toLowerCase() === projName.toLowerCase(),
       );
       if (existing) {
         existing.taskCount = taskCount;
@@ -279,11 +267,11 @@ function loadProjects() {
       }
 
       projects.push({
-        name: data.name || file.replace(".md", ""),
-        stage: data.status || "Integrate",
+        name: projName,
+        stage: data.status || "idea",
         lead: data.lead || null,
-        members: data.members || [],
-        startDate: data.startDate || null,
+        members: data.contributors || data.members || [],
+        startDate: data.started || data.startDate || null,
         notionUrl: data.notion_url || null,
         taskCount,
       });
@@ -301,7 +289,6 @@ function loadTasks() {
     return { critical: [], urgent: [], upcoming: [], completed: [] };
 
   const items = extractCheckboxes(heartbeat);
-  const now = new Date();
 
   const critical = [];
   const urgent = [];
@@ -324,7 +311,6 @@ function loadTasks() {
         upcoming.push({ ...item, daysLeft: days });
       }
     } else {
-      // No due date — categorize by category keyword
       const cat = item.category.toLowerCase();
       if (cat.includes("fund") || cat.includes("governance")) {
         urgent.push({ ...item, daysLeft: null });
@@ -337,39 +323,105 @@ function loadTasks() {
   return { critical, urgent, upcoming, completed };
 }
 
-// ── Meetings (this week) ─────────────────────────────────────────────────────
+// ── Events (from data/events.yaml — v2) ─────────────────────────────────────
 
-function loadMeetings() {
-  const meetingsDir = path.join(rootDir, "content", "meetings");
-  const meetings = [];
+function loadEvents() {
+  const eventsData = readYamlSafe(path.join(rootDir, "data", "events.yaml"));
+  if (!eventsData?.events) return { thisWeek: [], upcoming: [] };
 
-  if (!fs.existsSync(meetingsDir)) return { thisWeek: [], upcoming: [] };
-
-  const files = fs.readdirSync(meetingsDir).filter((f) => f.endsWith(".md"));
-  for (const file of files) {
-    const parsed = parseMarkdownFrontmatter(path.join(meetingsDir, file));
-    if (!parsed) continue;
-    const { data } = parsed;
-
-    if (!data.date) continue;
-
-    meetings.push({
-      title: data.title || file.replace(".md", ""),
-      date: data.date,
-      type: data.type || "meeting",
-      status: data.status || "planned",
-      participants: data.participants || [],
-      notionUrl: data.notion_url || null,
-    });
-  }
-
-  // Sort by date
-  meetings.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  // Split into this week and upcoming
   const now = new Date();
   const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
+  weekStart.setDate(now.getDate() - now.getDay() + 1);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 7);
+
+  const events = (eventsData.events || [])
+    .filter((e) => e.status !== "cancelled")
+    .map((e) => ({
+      title: e.title || e.id,
+      date: e.date,
+      endDate: e.end_date || null,
+      type: e.type || "event",
+      location: e.location || null,
+      url: e.url || null,
+      relatedProject: e.related_project || null,
+      status: e.status || "upcoming",
+    }))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const thisWeek = events.filter((e) => {
+    const d = new Date(e.date);
+    return d >= weekStart && d < weekEnd;
+  });
+
+  const upcomingEvents = events
+    .filter((e) => new Date(e.date) >= weekEnd)
+    .slice(0, 5);
+
+  return { thisWeek, upcoming: upcomingEvents };
+}
+
+// ── Meetings ─────────────────────────────────────────────────────────────────
+
+function loadMeetings() {
+  const meetings = [];
+
+  // From data/meetings.yaml (canonical source)
+  const meetingsData = readYamlSafe(
+    path.join(rootDir, "data", "meetings.yaml"),
+  );
+  if (meetingsData?.meetings) {
+    for (const m of meetingsData.meetings) {
+      meetings.push({
+        title: m.title || m.id,
+        date: m.date,
+        type: m.type || "meeting",
+        status: "completed",
+        participants: m.participants || [],
+        notionUrl: null,
+      });
+    }
+  }
+
+  // From packages/operations/meetings/*.md (canonical v2 path)
+  for (const meetingsDir of [
+    path.join(rootDir, "packages", "operations", "meetings"),
+    path.join(rootDir, "content", "meetings"), // fallback for v1
+  ]) {
+    if (!fs.existsSync(meetingsDir)) continue;
+    const files = fs.readdirSync(meetingsDir).filter((f) => f.endsWith(".md"));
+    for (const file of files) {
+      const parsed = parseMarkdownFrontmatter(path.join(meetingsDir, file));
+      if (!parsed) continue;
+      const { data } = parsed;
+      if (!data.date) continue;
+
+      const mtgTitle = data.title || file.replace(".md", "");
+      const existing = meetings.find(
+        (m) => m.title.toLowerCase() === mtgTitle.toLowerCase(),
+      );
+      if (existing) {
+        if (data.notion_url) existing.notionUrl = data.notion_url;
+        continue;
+      }
+
+      meetings.push({
+        title: mtgTitle,
+        date: data.date,
+        type: data.type || "meeting",
+        status: data.status || "planned",
+        participants: data.participants || [],
+        notionUrl: data.notion_url || null,
+      });
+    }
+  }
+
+  meetings.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay() + 1);
   weekStart.setHours(0, 0, 0, 0);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 7);
@@ -379,14 +431,11 @@ function loadMeetings() {
     return d >= weekStart && d < weekEnd;
   });
 
-  const upcoming = meetings
-    .filter((m) => {
-      const d = new Date(m.date);
-      return d >= weekEnd;
-    })
+  const upcomingMeetings = meetings
+    .filter((m) => new Date(m.date) >= weekEnd)
     .slice(0, 5);
 
-  return { thisWeek, upcoming };
+  return { thisWeek, upcoming: upcomingMeetings };
 }
 
 // ── Members ──────────────────────────────────────────────────────────────────
@@ -396,6 +445,8 @@ function loadMembers() {
   return (membersData?.members || []).map((m) => ({
     name: m.name || m.id,
     role: m.role || "member",
+    layer: m.layer || null,
+    status: m.status || "active",
     joined: m.joined || null,
   }));
 }
@@ -406,22 +457,28 @@ function loadFunding() {
   const fundingData = readYamlSafe(
     path.join(rootDir, "data", "funding-opportunities.yaml"),
   );
-  const opportunities = fundingData?.opportunities || [];
+  // Support both v2 key (funding_opportunities) and v1 key (opportunities)
+  const opportunities =
+    fundingData?.funding_opportunities || fundingData?.opportunities || [];
 
   const upcoming = [];
   const active = [];
 
   for (const opp of opportunities) {
     if (!opp.deadline) {
-      if (opp.status === "active" || opp.status === "applied") {
+      if (
+        opp.status === "active" ||
+        opp.status === "applied" ||
+        opp.status === "open"
+      ) {
         active.push(opp);
       }
       continue;
     }
 
     const days = daysUntil(opp.deadline);
-    if (days < 0) continue; // expired
-    if (opp.status === "applied") {
+    if (days < 0) continue;
+    if (opp.status === "applied" || opp.status === "awarded") {
       active.push(opp);
     } else {
       upcoming.push({ ...opp, daysLeft: days });
@@ -451,7 +508,6 @@ function loadRecentMemory() {
     const content = readFileSafe(path.join(memoryDir, file));
     if (!content) continue;
 
-    // Extract first meaningful lines (skip headers and empty lines)
     const lines = content
       .split("\n")
       .filter((l) => l.trim() && !l.startsWith("#") && !l.startsWith("---"))
@@ -476,24 +532,33 @@ function loadFederation() {
   const federation = readYamlSafe(path.join(rootDir, "federation.yaml"));
   if (!federation) return null;
 
-  const peers = (federation.peers || []).map((p) => ({
-    name: p.name,
-    url: p.url || null,
+  // Support both v3 (federation.peers) and v1 (peers at root) structures
+  const fedSection = federation.federation || {};
+  const peers = (fedSection.peers || federation.peers || []).map((p) => ({
+    name: p.name || p.id,
+    url: p.url || p.repository || null,
+    role: p.role || null,
   }));
 
-  const upstream = (federation.upstream || []).map((u) => ({
-    repository: u.repository,
-    lastSync: u.last_sync || null,
-    syncFrequency: u.sync_frequency || null,
-  }));
+  const upstream = (fedSection.upstream || federation.upstream || []).map(
+    (u) => ({
+      repository: u.repository || u.url,
+      lastSync: u.last_sync || null,
+      syncFrequency: u.sync_frequency || null,
+    }),
+  );
+
+  const knowledgeCommons = federation["knowledge-commons"] || {};
+  const agentSection = federation.agent || {};
 
   return {
-    network: federation.network || null,
+    network: fedSection.network || federation.network || null,
+    role: fedSection.role || null,
     peers,
     upstream,
-    packages: federation.packages || {},
-    egregoreEnabled: federation.packages?.egregore || false,
-    knowledgeCommons: federation["knowledge-commons"]?.enabled || false,
+    packages: federation.packages || agentSection.packages || {},
+    knowledgeCommons: knowledgeCommons.enabled || false,
+    publishedDomains: knowledgeCommons.published_domains || [],
   };
 }
 
@@ -502,6 +567,7 @@ function loadFederation() {
 function loadKeyDocs() {
   const docs = [];
   const keyFiles = [
+    { path: "MASTERPLAN.md", label: "Strategic vision & agent activations" },
     { path: "HEARTBEAT.md", label: "Active tasks & system health" },
     { path: "MEMORY.md", label: "Key decisions & context index" },
     { path: "SOUL.md", label: "Values, mission & voice" },
@@ -511,7 +577,12 @@ function loadKeyDocs() {
     { path: "TOOLS.md", label: "Infrastructure & API endpoints" },
     { path: "data/projects.yaml", label: "Project registry" },
     { path: "data/members.yaml", label: "Member registry" },
-    { path: "data/funding-opportunities.yaml", label: "Funding tracker" },
+    {
+      path: "data/funding-opportunities.yaml",
+      label: "Funding tracker",
+    },
+    { path: "data/ideas.yaml", label: "Community ideas pipeline" },
+    { path: "data/events.yaml", label: "Events registry" },
   ];
 
   for (const doc of keyFiles) {
@@ -532,93 +603,74 @@ function loadKeyDocs() {
 
 function loadApps() {
   const federation = readYamlSafe(path.join(rootDir, "federation.yaml"));
-  const packages = federation?.packages || {};
+  const packages = federation?.packages || federation?.agent?.packages || {};
   const apps = [];
 
-  // Paperclip agent dashboard
-  const paperclipPkg = path.join(
-    rootDir,
-    "packages",
-    "paperclip-agents-app",
-    "package.json",
-  );
-  if (fs.existsSync(paperclipPkg)) {
-    apps.push({
-      id: "paperclip",
-      name: "Paperclip",
-      description: "Agent dashboard — tasks, coordination, monitoring",
-      command: "npm run paperclip",
-      url: "http://localhost:3100",
-      status: "available",
-      icon: "📋",
-    });
-  }
-
-  // Egregore shared memory
-  const egregorePath = path.join(rootDir, "packages", "egregore-core");
-  if (fs.existsSync(egregorePath) || packages.egregore) {
-    apps.push({
-      id: "egregore",
-      name: "Egregore",
-      description: "Shared AI memory — /reflect, /handoff, /quest",
-      command: "/reflect, /handoff, /quest",
-      url: null,
-      status: packages.egregore ? "enabled" : "available",
-      icon: "🧠",
-    });
-  }
-
-  // Agents app
-  const agentsAppPkg = path.join(
-    rootDir,
-    "packages",
-    "agents-app",
-    "package.json",
-  );
-  if (fs.existsSync(agentsAppPkg)) {
-    apps.push({
-      id: "agents-app",
-      name: "Agents App",
-      description: "Agent orchestration and visualization",
-      command: "cd packages/agents-app && pnpm dev",
-      url: "http://localhost:3100",
-      status: "available",
-      icon: "🤖",
-    });
-  }
-
-  // KOI bridge
-  const koiBridge = path.join(rootDir, "packages", "koi-opal-bridge");
-  if (fs.existsSync(koiBridge)) {
-    apps.push({
-      id: "koi-bridge",
-      name: "KOI Bridge",
-      description: "Knowledge network sync — OPAL + KOI federation",
-      command: "cd packages/koi-opal-bridge && npm start",
-      url: null,
-      status: "available",
-      icon: "🐟",
-    });
-  }
-
-  // Task Manager webapp
-  const taskManager = path.join(
-    rootDir,
-    "packages",
-    "webapps",
-    "task-manager",
-    "index.html",
-  );
-  if (fs.existsSync(taskManager)) {
-    apps.push({
+  // Check for standard org-os packages
+  const packageChecks = [
+    {
+      dir: "packages/dashboard",
+      id: "dashboard",
+      name: "Dashboard",
+      description: "Organizational health overview",
+      command: "cd packages/dashboard && npm run dev",
+      icon: "📊",
+    },
+    {
+      dir: "packages/ideation-board",
+      id: "ideation-board",
+      name: "Ideation Board",
+      description: "Community ideas pipeline & voting",
+      command: "cd packages/ideation-board && npm run dev",
+      icon: "💡",
+    },
+    {
+      dir: "packages/aggregator",
+      id: "aggregator",
+      name: "Aggregator",
+      description: "Content aggregation from sources",
+      command: "cd packages/aggregator && npm run dev",
+      icon: "📰",
+    },
+    {
+      dir: "packages/system-canvas",
+      id: "system-canvas",
+      name: "System Canvas",
+      description: "Obsidian canvas org visualization",
+      command: "npm run generate:canvas",
+      icon: "🗺️",
+    },
+    {
+      dir: "packages/knowledge-exchange",
+      id: "knowledge-exchange",
+      name: "Knowledge Exchange",
+      description: "Cross-org knowledge sync",
+      command: "cd packages/knowledge-exchange && npm run sync",
+      icon: "🔄",
+    },
+    {
+      dir: "packages/webapps/task-manager",
       id: "task-manager",
       name: "Task Manager",
       description: "Visual task board from HEARTBEAT.md",
       command: "open packages/webapps/task-manager/index.html",
-      url: null,
-      status: "available",
       icon: "✅",
-    });
+    },
+  ];
+
+  for (const pkg of packageChecks) {
+    const pkgPath = path.join(rootDir, pkg.dir);
+    if (fs.existsSync(pkgPath)) {
+      apps.push({
+        id: pkg.id,
+        name: pkg.name,
+        description: pkg.description,
+        command: pkg.command,
+        url: null,
+        status: "available",
+        icon: pkg.icon,
+      });
+    }
   }
 
   // Built-in skills as invokable agents
@@ -627,7 +679,7 @@ function loadApps() {
       id: "research",
       name: "Research",
       description:
-        "Deep research — competitive intelligence, ecosystem scanning",
+        "Deep research — ecosystem scanning, competitive intelligence",
       command: '@explore "Research [topic]"',
       icon: "🔍",
     },
@@ -720,7 +772,6 @@ async function fetchNotionData() {
   const apiKey = process.env.NOTION_API_KEY;
   if (!apiKey) return null;
 
-  // Parse Notion database IDs from TOOLS.md
   const toolsMd = readFileSafe(path.join(rootDir, "TOOLS.md"));
   if (!toolsMd) return null;
 
@@ -738,13 +789,11 @@ async function fetchNotionData() {
   if (Object.keys(dbIds).length === 0) return null;
 
   try {
-    // Dynamic import — @notionhq/client is optional
     const { Client } = await import("@notionhq/client");
     const notion = new Client({ auth: apiKey });
 
     const result = { projects: [], tasks: [], meetings: [], members: [] };
 
-    // Fetch projects
     if (dbIds.projects) {
       try {
         const response = await notion.databases.query({
@@ -757,7 +806,7 @@ async function fetchNotionData() {
           stage:
             extractNotionSelect(page, "Status") ||
             extractNotionSelect(page, "Stage") ||
-            "Integrate",
+            "idea",
           lead:
             extractNotionPerson(page, "Lead") ||
             extractNotionPerson(page, "Owner"),
@@ -767,7 +816,6 @@ async function fetchNotionData() {
       }
     }
 
-    // Fetch meetings
     if (dbIds.meetings) {
       try {
         const now = new Date();
@@ -800,7 +848,6 @@ async function fetchNotionData() {
 
     return result;
   } catch {
-    // @notionhq/client not installed — that's fine
     return null;
   }
 }
@@ -840,7 +887,6 @@ function extractNotionDate(page, propName) {
 function mergeData(local, notion) {
   if (!notion) return local;
 
-  // Merge projects: Notion takes precedence, local fills gaps
   if (notion.projects?.length > 0) {
     const merged = [...notion.projects];
     for (const localProj of local.projects) {
@@ -850,7 +896,6 @@ function mergeData(local, notion) {
       if (!exists) {
         merged.push(localProj);
       } else {
-        // Enrich Notion data with local data
         if (!exists.lead && localProj.lead) exists.lead = localProj.lead;
         if (localProj.taskCount) exists.taskCount = localProj.taskCount;
       }
@@ -858,7 +903,6 @@ function mergeData(local, notion) {
     local.projects = merged;
   }
 
-  // Merge meetings
   if (notion.meetings?.length > 0) {
     const merged = [...notion.meetings];
     for (const localMeeting of local.meetings.thisWeek) {
@@ -867,7 +911,6 @@ function mergeData(local, notion) {
       );
       if (!exists) merged.push(localMeeting);
     }
-    // Rebuild thisWeek/upcoming from merged
     const now = new Date();
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - now.getDay() + 1);
@@ -897,6 +940,7 @@ async function main() {
   const status = loadStatus();
   const projects = loadProjects();
   const tasks = loadTasks();
+  const events = loadEvents();
   const meetings = loadMeetings();
   const members = loadMembers();
   const funding = loadFunding();
@@ -913,6 +957,7 @@ async function main() {
     status,
     projects,
     tasks,
+    events,
     meetings,
     members,
     funding,
@@ -924,7 +969,6 @@ async function main() {
     git,
   };
 
-  // Try Notion enrichment
   const notionData = await fetchNotionData();
   if (notionData) {
     state = mergeData(state, notionData);
@@ -940,7 +984,7 @@ async function main() {
   }
 }
 
-// ── Markdown Renderer (standalone fallback) ──────────────────────────────────
+// ── Markdown Renderer ────────────────────────────────────────────────────────
 
 function renderMarkdown(state) {
   const {
@@ -948,6 +992,7 @@ function renderMarkdown(state) {
     status,
     projects,
     tasks,
+    events,
     meetings,
     members,
     funding,
@@ -962,7 +1007,7 @@ function renderMarkdown(state) {
 
   let out = "";
 
-  // ── Banner
+  // Banner
   const orgName = identity.name || "Org OS";
   const notionLink = identity.notionUrl
     ? ` [Notion](${identity.notionUrl})`
@@ -977,7 +1022,7 @@ function renderMarkdown(state) {
     out += `\n\n`;
   }
 
-  // ── Status bar
+  // Status bar
   const statusParts = [];
   if (status.lastMemoryAge) statusParts.push(`Memory: ${status.lastMemoryAge}`);
   else statusParts.push("Memory: no entries yet");
@@ -987,7 +1032,7 @@ function renderMarkdown(state) {
   if (status.notionConnected) statusParts.push("Notion: connected");
   out += `> ${statusParts.join(" · ")}\n\n`;
 
-  // ── Projects
+  // Projects
   out += `### Active Projects\n\n`;
   if (projects.length === 0) {
     out += `_No projects yet. Add to \`data/projects.yaml\` or run \`npm run setup\`._\n\n`;
@@ -995,7 +1040,8 @@ function renderMarkdown(state) {
     out += `| Project | Stage | Lead | Link |\n`;
     out += `|---------|-------|------|------|\n`;
     for (const p of projects) {
-      const stage = `\`[${p.stage[0]}]\` ${p.stage}`;
+      const stageChar = (p.stage || "idea")[0].toUpperCase();
+      const stage = `\`[${stageChar}]\` ${p.stage}`;
       const lead = p.lead || "—";
       const link = p.notionUrl ? `[open](${p.notionUrl})` : "—";
       out += `| ${p.name} | ${stage} | ${lead} | ${link} |\n`;
@@ -1003,7 +1049,7 @@ function renderMarkdown(state) {
     out += `\n`;
   }
 
-  // ── Tasks
+  // Tasks
   out += `### Tasks\n\n`;
   const allPending = [...tasks.critical, ...tasks.urgent, ...tasks.upcoming];
   if (allPending.length === 0 && tasks.completed.length === 0) {
@@ -1027,12 +1073,16 @@ function renderMarkdown(state) {
     out += `> ${allPending.length} pending · ${tasks.critical.length} critical · ${tasks.completed.length} done\n\n`;
   }
 
-  // ── This Week
+  // This Week (merged events + meetings)
   out += `### This Week\n\n`;
-  if (meetings.thisWeek.length === 0) {
-    out += `_No meetings scheduled this week._\n\n`;
+  const weekItems = [
+    ...meetings.thisWeek.map((m) => ({ ...m, source: "meeting" })),
+    ...(events?.thisWeek || []).map((e) => ({ ...e, source: "event" })),
+  ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (weekItems.length === 0) {
+    out += `_No meetings or events scheduled this week._\n\n`;
   } else {
-    // Build week grid
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - today.getDay() + 1);
 
@@ -1044,19 +1094,22 @@ function renderMarkdown(state) {
       const isToday = day.toDateString() === today.toDateString();
       const marker = isToday ? " **<-**" : "";
 
-      const dayMeetings = meetings.thisWeek.filter((m) => {
+      const dayItems = weekItems.filter((m) => {
         const md = new Date(m.date);
         return md.toDateString() === day.toDateString();
       });
 
-      if (dayMeetings.length > 0) {
-        for (const m of dayMeetings) {
+      if (dayItems.length > 0) {
+        for (const m of dayItems) {
           const time = new Date(m.date).toLocaleTimeString("en", {
             hour: "2-digit",
             minute: "2-digit",
             hour12: false,
           });
-          const link = m.notionUrl ? ` [link](${m.notionUrl})` : "";
+          const link =
+            m.notionUrl || m.url
+              ? ` [link](${m.notionUrl || m.url})`
+              : "";
           out += `- **${dayStr} ${dateNum}** — ${m.title} ${time}${link}${marker}\n`;
         }
       } else if (isToday) {
@@ -1066,18 +1119,19 @@ function renderMarkdown(state) {
     out += `\n`;
   }
 
-  // ── Funding
+  // Funding
   if (funding.upcoming.length > 0) {
     out += `### Funding Deadlines\n\n`;
     for (const f of funding.upcoming.slice(0, 5)) {
       const urgency = f.daysLeft <= 7 ? " **URGENT**" : "";
       const url = f.url ? ` [apply](${f.url})` : "";
-      out += `- ${f.fund || f.platform} — ${f.daysLeft}d left${urgency}${url}\n`;
+      const name = f.title || f.fund || f.platform || "Unknown";
+      out += `- ${name} — ${f.daysLeft}d left${urgency}${url}\n`;
     }
     out += `\n`;
   }
 
-  // ── Recent Context
+  // Recent Context
   if (recentMemory.length > 0) {
     out += `### Recent Context\n\n`;
     for (const entry of recentMemory) {
@@ -1086,26 +1140,27 @@ function renderMarkdown(state) {
     out += `\n`;
   }
 
-  // ── Cheatsheet
+  // Cheatsheet
   out += `### Cheatsheet\n\n`;
   out += `| Command | Purpose |\n`;
   out += `|---------|---------|\n`;
   out += `| \`npm run setup\` | Interactive org configuration |\n`;
-  out += `| \`npm run sync\` | Git sync (status/push/pull) |\n`;
-  out += `| \`npm run initialize\` | This dashboard |\n`;
   out += `| \`npm run generate:schemas\` | Regenerate EIP-4824 schemas |\n`;
-  out += `| \`/reflect\` | Save insight (egregore) |\n`;
-  out += `| \`/handoff\` | Leave notes for team |\n`;
+  out += `| \`npm run validate:schemas\` | Validate schema compliance |\n`;
+  out += `| \`npm run validate:structure\` | Check instance structure |\n`;
+  out += `| \`/initialize\` | Open session (this dashboard) |\n`;
+  out += `| \`/close\` | Wrap up, write memory & commit |\n`;
   out += `\n`;
 
   out += `**Agent tips:** `;
   const tips = [];
   if (tasks.critical.length > 0)
     tips.push(`"Help me with ${tasks.critical[0].text}"`);
-  if (meetings.thisWeek.length > 0)
-    tips.push(`"Prepare for ${meetings.thisWeek[0].title}"`);
+  if (weekItems.length > 0) tips.push(`"Prepare for ${weekItems[0].title}"`);
   if (funding.upcoming.length > 0)
-    tips.push(`"Review ${funding.upcoming[0].fund || "funding"} deadline"`);
+    tips.push(
+      `"Review ${funding.upcoming[0].title || funding.upcoming[0].fund || "funding"} deadline"`,
+    );
   if (tips.length === 0)
     tips.push(
       '"Review HEARTBEAT tasks"',
@@ -1114,7 +1169,7 @@ function renderMarkdown(state) {
     );
   out += tips.join(" · ") + "\n\n";
 
-  // ── Federation
+  // Federation
   if (federation) {
     out += `### Federation\n\n`;
     const parts = [];
@@ -1124,7 +1179,6 @@ function renderMarkdown(state) {
       parts.push(`Peers: ${federation.peers.map((p) => p.name).join(", ")}`);
     parts.push(`Skills: ${status.skillCount} active`);
     if (federation.knowledgeCommons) parts.push("Knowledge Commons: enabled");
-    if (federation.egregoreEnabled) parts.push("Egregore: enabled");
     out += `> ${parts.join(" · ")}\n\n`;
   }
 
@@ -1137,8 +1191,6 @@ function renderMarkdown(state) {
 // ── ASCII Banner Generator ───────────────────────────────────────────────────
 
 function generateAsciiBanner(name) {
-  // Simple block-letter ASCII art generator
-  // Uses a compact 5-high font for each character
   const font = {
     A: ["  █  ", " █ █ ", "█████", "█   █", "█   █"],
     B: ["████ ", "█   █", "████ ", "█   █", "████ "],
@@ -1183,19 +1235,16 @@ function generateAsciiBanner(name) {
     "/": ["    █", "   █ ", "  █  ", " █   ", "█    "],
   };
 
-  // For long names, generate an acronym from the words
   let displayName;
   if (name.length <= 14) {
     displayName = name;
   } else {
-    // Try acronym from capital letters or word initials
     const words = name.split(/[\s-]+/).filter((w) => w.length > 0);
     if (words.length >= 2) {
       displayName = words
         .map((w) => w[0])
         .join("")
         .toUpperCase();
-      // If acronym is too short, use first two words
       if (displayName.length < 2) {
         displayName = words.slice(0, 2).join(" ");
       }

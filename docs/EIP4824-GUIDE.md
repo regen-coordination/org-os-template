@@ -102,6 +102,6 @@ Your schemas enable:
 
 ## Related Documentation
 
-- Framework: [`../../organizational-os/packages/framework/docs/02-standards/eip-4824-integration.md`](../../organizational-os/packages/framework/docs/02-standards/eip-4824-integration.md)
-- Schemas: [`../../organizational-os/packages/framework/schemas/`](../../organizational-os/packages/framework/schemas/)
+- Framework: [`../../organizational-os-framework/docs/02-standards/eip-4824-integration.md`](../../organizational-os-framework/docs/02-standards/eip-4824-integration.md)
+- Schemas: [`../../organizational-os-framework/schemas/`](../../organizational-os-framework/schemas/)
 - Standard: https://eips.ethereum.org/EIPS/eip-4824

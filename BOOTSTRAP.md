@@ -1,82 +1,121 @@
 # BOOTSTRAP.md — First-Run Onboarding
 
-_Run this ritual when deploying an agent in this workspace for the first time. After completion, this file can be archived or left as documentation._
+_Run this when deploying org-os for a new organization. Bootstrapping has three phases: guided interview, source ingestion, and ongoing learning. After Phase 1 completes, this file can be archived._
 
 ---
 
-## Onboarding Checklist
+## Phase 1: Guided Interview
 
-### Step 1: Understand the Organization
+Use the `bootstrap-interviewer` skill to set up the workspace interactively. The agent asks questions and generates files automatically.
 
-- [ ] Read `SOUL.md` completely — internalize values and voice
-- [ ] Read `IDENTITY.md` — note org name, type, chain addresses
-- [ ] Read `USER.md` — understand the primary operator
-- [ ] Read `MEMORY.md` — check key decisions and active context
+### For New Workspaces (Empty Instance)
+
+Run the bootstrap interview:
+
+1. **Organization identity** — name, type, mission, values
+   → Generates: `SOUL.md`, `IDENTITY.md`
+
+2. **Team** — core members, roles, contact info
+   → Generates: `data/members.yaml`
+
+3. **Projects** — active initiatives, status, leads
+   → Generates: `data/projects.yaml`
+
+4. **Communication** — channels, platforms, purposes
+   → Generates: `data/channels.yaml`
+
+5. **Network** — federation membership, peers
+   → Generates: `federation.yaml` (identity + federation sections)
+
+6. **Data sources** — Notion, GitHub repos, websites, docs
+   → Populates: `TOOLS.md`, `data/sources.yaml`
+
+The interview works via CLI (Claude Code) or web form (for non-tech operators). See `docs/OPERATOR-GUIDE.md`.
+
+### For Existing Workspaces (Agent Joining)
+
+If the workspace already has files, skip the interview and run the standard onboarding:
+
+- [ ] Read `MASTERPLAN.md` — understand mandate and activations
+- [ ] Read `SOUL.md` — internalize values and voice
+- [ ] Read `IDENTITY.md` — note org identity, governance, addresses
+- [ ] Read `USER.md` — understand the operator
+- [ ] Read `MEMORY.md` — check key decisions
+- [ ] Read `memory/` (last 3-7 days) — recent context
 - [ ] Read `HEARTBEAT.md` — identify urgent tasks
+- [ ] Read `TOOLS.md` — available integrations
+- [ ] Read `federation.yaml` — network relationships
+- [ ] Run `npm run validate:schemas` — check system health
+- [ ] Create `memory/YYYY-MM-DD.md` with initialization note
+- [ ] Present summary to operator
 
-### Step 2: Understand the Workspace
+---
 
-- [ ] Review `federation.yaml` — understand network relationships, enabled skills, channels
-- [ ] Check `data/members.yaml` — who are the members?
-- [ ] Check `data/projects.yaml` — what projects are active?
-- [ ] Check `packages/operations/meetings/` — any recent meetings to process?
-- [ ] Check `skills/` — what capabilities are available?
+## Phase 2: Source Ingestion
 
-### Step 3: Check System Connections
+After the workspace has basic files, point the agent at existing knowledge sources:
 
-- [ ] Verify Telegram channel access (if configured)
-- [ ] Verify GitHub access (if configured)
-- [ ] Verify Safe API access (if treasury management enabled)
-- [ ] Check `.well-known/` — are schemas generated and current?
-
-### Step 4: Initialize Memory
-
-- [ ] Create today's memory file: `memory/YYYY-MM-DD.md`
-- [ ] Write a brief onboarding note to memory:
-  ```
-  # [DATE]
-  ## Agent Initialization
-  - First session in this workspace
-  - Org: [name from IDENTITY.md]
-  - Active projects: [count]
-  - Skills loaded: [list]
-  - Ready for operations
-  ```
-- [ ] Update `MEMORY.md` "Active Context" with onboarding complete
-
-### Step 5: Run First Heartbeat
-
-- [ ] Review `HEARTBEAT.md` tasks
-- [ ] Mark any already-completed tasks as done
-- [ ] Add any new tasks identified during onboarding
-- [ ] Notify operator that agent is operational
-
-### Step 6: Confirm with Operator
-
-Write a brief initialization summary to the operator:
-
+### GitHub Repositories
+```bash
+# Add repos to repos.manifest.json, then:
+npm run clone:repos
+npm run index:repos
 ```
-Initialization complete for [Org Name].
+→ Populates: `repos/`, `data/sources.yaml`
 
-I've read your organizational files and I'm ready to help with:
-- [List active skills]
+### Website / Blog
+Use the `knowledge-curator` skill to process articles:
+→ Populates: `knowledge/[domain]/`, `data/sources.yaml`
 
-I noticed:
-- [Key context from MEMORY.md]
-- [Urgent items from HEARTBEAT.md]
+### Podcast Episodes
+Use the `knowledge-curator` skill to process episodes:
+→ Populates: `knowledge/podcast/`, `data/sources.yaml`
 
-What would you like to work on first?
+### Notion Databases
+Configure Notion MCP (see `docs/TOOL-SETUP.md`), then:
+```bash
+npm run sync:notion
 ```
+→ Syncs: `data/*.yaml` ↔ Notion databases
+
+### Documents
+Process documents into appropriate locations:
+- Proposals, governance docs → `docs/`
+- Knowledge content → `knowledge/`
+- Meeting transcripts → `data/meetings.yaml` via `meeting-processor` skill
+
+### Generate Schemas
+After ingesting sources:
+```bash
+npm run generate:schemas
+npm run validate:schemas
+```
+
+---
+
+## Phase 3: Ongoing Learning
+
+After initial setup and ingestion, the workspace enters continuous improvement:
+
+- **Meeting processing** → Builds operational memory, extracts action items
+- **Heartbeat monitoring** → Tracks priorities, surfaces blocked tasks
+- **Knowledge curation** → Expands knowledge commons from new content
+- **Idea scouting** → Surfaces ecosystem gaps from knowledge analysis
+- **Workspace improvement** → Autonomous autoresearch loop (see `docs/AUTORESEARCH.md`)
+- **Feedback loop** → Agent behavior improves based on operator corrections
+
+The `workspace-improver` skill manages the autonomous improvement cycle. See `skills/workspace-improver/SKILL.md`.
 
 ---
 
 ## Post-Bootstrap
 
-Once initialization is complete:
-- This file can be archived (move to `docs/bootstrap-completed-YYYY-MM-DD.md`)
+Once Phase 1 is complete:
+- Archive this file: `mv BOOTSTRAP.md docs/bootstrap-completed-YYYY-MM-DD.md`
 - Future sessions use the standard startup sequence in `AGENTS.md`
-- Update `memory/YYYY-MM-DD.md` with "Bootstrap complete" entry
+- Log "Bootstrap complete" in `memory/YYYY-MM-DD.md`
+- Begin Phase 2 source ingestion when ready
 
 ---
 
-_Bootstrap is a one-time ritual. The standard session startup sequence (in AGENTS.md) handles all subsequent sessions._
+_Bootstrap is a one-time ritual for Phase 1. Phases 2 and 3 are ongoing. The standard session startup (AGENTS.md) handles all subsequent sessions._
