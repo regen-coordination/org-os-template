@@ -230,40 +230,178 @@ function generateFinances() {
   console.log(`✓ Generated finances.json`);
 }
 
-// Generate proposals.json (placeholder)
+// Generate proposals.json from governance.yaml
 function generateProposals() {
+  const govPath = path.join(rootDir, 'data', 'governance.yaml');
+  let decisions = [];
+
+  if (fs.existsSync(govPath)) {
+    const govData = yaml.load(fs.readFileSync(govPath, 'utf-8'));
+    decisions = (govData?.governance?.decisions || []).map(d => ({
+      id: d.id,
+      title: d.title,
+      type: d.type || "proposal",
+      status: d.status || "draft",
+      date: d.date || null,
+      summary: d.summary || ""
+    }));
+  }
+
   const schema = {
     "@context": "https://www.daostar.org/schemas",
-    "proposals": []
+    "type": "ProposalRegistry",
+    "proposals": decisions
   };
 
   const outputPath = path.join(rootDir, '.well-known', 'proposals.json');
   fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log('✓ Generated proposals.json');
+  console.log(`✓ Generated proposals.json (${decisions.length} proposals)`);
 }
 
-// Generate activities.json (placeholder)
+// Generate activities.json (from meetings + recent memory)
 function generateActivities() {
+  const activities = [];
+
+  // Pull from meetings
+  const meetingsPath = path.join(rootDir, 'data', 'meetings.yaml');
+  if (fs.existsSync(meetingsPath)) {
+    const meetingsData = yaml.load(fs.readFileSync(meetingsPath, 'utf-8'));
+    for (const m of (meetingsData?.meetings || []).slice(-20)) {
+      activities.push({
+        id: m.id,
+        type: "meeting",
+        title: m.title || m.id,
+        date: m.date,
+        summary: m.summary || null
+      });
+    }
+  }
+
   const schema = {
     "@context": "https://www.daostar.org/schemas",
-    "activities": []
+    "type": "ActivityLog",
+    "activities": activities
   };
 
   const outputPath = path.join(rootDir, '.well-known', 'activities.json');
   fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log('✓ Generated activities.json');
+  console.log(`✓ Generated activities.json (${activities.length} activities)`);
 }
 
-// Generate contracts.json (placeholder)
+// Generate contracts.json from IDENTITY.md
 function generateContracts() {
   const schema = {
     "@context": "https://www.daostar.org/schemas",
+    "type": "ContractRegistry",
     "contracts": []
   };
 
+  // Try to extract contract addresses from federation.yaml
+  if (fs.existsSync(federationPath)) {
+    const fed = yaml.load(federationContent);
+    const id = fed?.identity || {};
+    if (id.safe) {
+      schema.contracts.push({
+        type: "safe",
+        address: id.safe,
+        chain: id.chain || null
+      });
+    }
+    if (id.gardens) {
+      schema.contracts.push({
+        type: "gardens",
+        address: id.gardens,
+        chain: id.chain || null
+      });
+    }
+  }
+
   const outputPath = path.join(rootDir, '.well-known', 'contracts.json');
   fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log('✓ Generated contracts.json');
+  console.log(`✓ Generated contracts.json (${schema.contracts.length} contracts)`);
+}
+
+// Generate ideas.json from data/ideas.yaml (v2)
+function generateIdeas() {
+  const ideasPath = path.join(rootDir, 'data', 'ideas.yaml');
+  if (!fs.existsSync(ideasPath)) return;
+
+  const ideasData = yaml.load(fs.readFileSync(ideasPath, 'utf-8'));
+  const ideas = (ideasData?.ideas || []).map(i => ({
+    id: i.id,
+    title: i.title,
+    status: i.status || "proposed",
+    submitted_by: i.submitted_by || null,
+    champions: i.champions || [],
+    ecosystem_gap: i.ecosystem_gap || null,
+    description: i.description || "",
+    hatched_repo: i.hatched_repo || null,
+    skills_needed: i.skills_needed || [],
+    created: i.created || null,
+    votes: i.votes || 0
+  }));
+
+  const schema = {
+    "@context": "https://www.daostar.org/schemas",
+    "type": "IdeaRegistry",
+    "ideas": ideas
+  };
+
+  const outputPath = path.join(rootDir, '.well-known', 'ideas.json');
+  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
+  console.log(`✓ Generated ideas.json (${ideas.length} ideas)`);
+}
+
+// Generate knowledge.json from data/knowledge-manifest.yaml (v2)
+function generateKnowledge() {
+  const manifestPath = path.join(rootDir, 'data', 'knowledge-manifest.yaml');
+  if (!fs.existsSync(manifestPath)) return;
+
+  const manifestData = yaml.load(fs.readFileSync(manifestPath, 'utf-8'));
+  const km = manifestData?.knowledge_manifest || {};
+
+  const schema = {
+    "@context": "https://www.daostar.org/schemas",
+    "type": "KnowledgeManifest",
+    "domains": (km.domains || []).map(d => ({
+      id: d.id,
+      name: d.name,
+      description: d.description || "",
+      coverage: d.coverage || "none",
+      page_count: d.page_count || 0,
+      sources: d.sources || [],
+      last_updated: d.last_updated || null
+    })),
+    "exchange": {
+      published_domains: km.exchange?.published_domains || [],
+      subscribed_domains: km.exchange?.subscribed_domains || []
+    }
+  };
+
+  const outputPath = path.join(rootDir, '.well-known', 'knowledge.json');
+  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
+  console.log(`✓ Generated knowledge.json (${schema.domains.length} domains)`);
+}
+
+// Generate events.json from data/events.yaml (v2)
+function generateEvents() {
+  const eventsPath = path.join(rootDir, 'data', 'events.yaml');
+  if (!fs.existsSync(eventsPath)) return;
+
+  const eventsData = yaml.load(fs.readFileSync(eventsPath, 'utf-8'));
+  const events = (eventsData?.events || []).map(e => ({
+    id: e.id,
+    title: e.title,
+    type: e.type || "event",
+    date: e.date,
+    end_date: e.end_date || null,
+    location: e.location || null,
+    status: e.status || "upcoming",
+    related_project: e.related_project || null
+  }));
+
+  // Not written to .well-known/ (not EIP-4824), but available for dashboard
+  console.log(`✓ Processed events.yaml (${events.length} events)`);
 }
 
 // Run all generators
@@ -275,7 +413,10 @@ try {
   generateProposals();
   generateActivities();
   generateContracts();
-  
+  generateIdeas();
+  generateKnowledge();
+  generateEvents();
+
   console.log('\n✓ All schemas generated successfully!');
 } catch (error) {
   console.error('Error generating schemas:', error);

@@ -29,7 +29,8 @@
     "initialize:markdown": "node scripts/initialize.mjs --format=markdown",
     "paperclip": "cd packages/paperclip-agents-app && npm run dev",
     "paperclip:server": "cd packages/paperclip-agents-app && npm run dev:server",
-    "paperclip:build": "cd packages/paperclip-agents-app && npm run build:ui"
+    "paperclip:build": "cd packages/paperclip-agents-app && npm run build:ui",
+    "deploy:pages": "node scripts/deploy-pages.mjs"
   },
   "engines": {
     "npm": ">=10.9.2",
