@@ -132,6 +132,78 @@ If `federation.yaml` has `knowledge-commons.publish.meetings: true`:
 - After curation, copy to hub sync location
 - Follow hub contribution format in `federation.yaml`
 
+## ReFi BCN Implementation Runbook (Operational)
+
+### Weekly execution checklist
+
+1. **Collect sources (last 7 days):**
+   - `packages/operations/meetings/`
+   - `docs/` updates (especially process and system-map docs)
+   - Notion Notes & Documents database (`1386ed08-45cb-81ed-b055-000ba5b70a6b`) when accessible
+   - High-signal channel updates mapped in `docs/CHANNELS-AND-SYSTEMS-MAP.md`
+2. **Extract durable knowledge only:**
+   - Funding mechanisms and eligibility logic
+   - Governance/process decisions with operational consequences
+   - Partner and ecosystem shifts affecting ReFi BCN priorities
+3. **Publish curated artifact:**
+   - `knowledge/<domain>/YYYY-MM-DD-curation.md`
+4. **Operationalize key items:**
+   - If actionable in <30 days → add/refresh in `HEARTBEAT.md`
+   - If strategic/long-lived decision → update `MEMORY.md`
+   - Log execution summary in `memory/YYYY-MM-DD.md`
+
+### Quality gate (must pass)
+- [ ] Every key claim has a source ref (meeting/doc/url/date)
+- [ ] No duplicate of already-curated insight
+- [ ] At least one clear “so what” action or implication per section
+- [ ] Terminology aligned with ReFi BCN core docs (`SOUL.md`, `IDENTITY.md`, `README.md`)
+
+## Compilation Mode
+
+After running `npm run compile:knowledge`, compiled pages contain `<!-- LLM-SYNTHESIZE: description -->` markers where prose synthesis is needed.
+
+### When to use
+
+- After `npm run compile:knowledge` generates skeleton pages
+- When `npm run lint:knowledge` reports pages with LLM-SYNTHESIZE markers
+- During workspace-improver Priority 3 (Knowledge Gaps) cycles
+
+### Procedure
+
+1. Run `npm run compile:knowledge` to ensure pages are current
+2. For each page with `<!-- LLM-SYNTHESIZE -->` markers:
+   a. Read the page — structured data is already filled in (meeting outcomes, project status, funding details)
+   b. Read the marker description — it tells you what to synthesize
+   c. Replace the marker with 2-3 paragraphs of prose that synthesize the structured data
+   d. Follow curation principles: synthesize (don't copy), source everything, apply org voice
+3. After synthesis, run `npm run lint:knowledge` to verify no markers remain
+4. Log synthesis work to `memory/YYYY-MM-DD.md`
+
+### Example
+
+Before:
+```markdown
+## Summary
+
+<!-- LLM-SYNTHESIZE: Write a 2-3 paragraph synthesis of the key themes across all 15 meetings related to Regenerative Finance. -->
+```
+
+After:
+```markdown
+## Summary
+
+ReFi BCN's engagement with regenerative finance has evolved from exploratory discussions about Gitcoin participation into a structured multi-track funding strategy. Early meetings focused on understanding quadratic funding mechanics and Celo ecosystem requirements, while later sessions shifted toward strategic decisions about cooperative treasury management via Safe and multi-sig governance.
+
+The funding landscape has expanded significantly, with the team tracking 14+ opportunities across Celo Public Goods, EU LIFE programs, and community rounds. Key decisions include the Celo-first chain strategy and the separation of operational treasury from program-specific funds through Regenerant Catalunya.
+```
+
+### Quality gate
+
+- [ ] No `<!-- LLM-SYNTHESIZE -->` markers remain in the page
+- [ ] Synthesized text references specific meetings/dates where possible
+- [ ] Tone matches SOUL.md (plain, grounded, bridge-building)
+- [ ] No speculative claims — only what the source data supports
+
 ## Notes
 
 - This skill creates `knowledge/` directories if they don't exist

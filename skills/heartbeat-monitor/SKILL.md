@@ -1,7 +1,7 @@
 ---
 name: heartbeat-monitor
 version: 1.0.0
-description: Proactive organizational health monitoring and task tracking
+description: Monitor organizational health, deadlines, and operational load across HEARTBEAT.md, local data files, and ReFi BCN Notion task/project systems
 author: organizational-os
 category: infrastructure
 metadata:
@@ -17,6 +17,11 @@ metadata:
 ## What This Is
 
 Proactively monitors `HEARTBEAT.md` and organizational data for tasks requiring attention, system health checks, and upcoming deadlines. The heartbeat keeps the organization from dropping important balls.
+
+For ReFi BCN operations, include Notion workload signals from:
+- Projects (`1386ed08-45cb-8185-a48b-000bc4a72d53`)
+- Tasks (`1386ed08-45cb-8142-801b-000b2cb5c615`)
+- Notes & Documents (`1386ed08-45cb-81ed-b055-000ba5b70a6b`)
 
 ## When to Use
 
@@ -54,32 +59,53 @@ Report format:
 - Last hub sync: [date]
 ```
 
-### 2. Deadline Detection
+### 2. Notion Workload Snapshot (ReFi BCN)
+
+Query Notion project/task status counts and include them in heartbeat reports.
+
+Current known status taxonomies:
+- Projects: `Backlog`, `Planning`, `In Progress`, `On-going`, `Paused`, `Done`, `Canceled`
+- Tasks: `Backlog`, `Not Started`, `Icebox`, `In Progress`, `Done`, `Archived`
+- Notes: `Not Started`, `In Progress`, `Done`, `Archived`
+
+Flag conditions:
+- Task load risk if `In Progress` is high for team capacity (default watch threshold: 25+)
+- Planning debt if `Backlog + Icebox + Not Started` grows above 15
+- Meeting processing lag if Notes `Not Started + In Progress` remains high without local sync updates
+
+### 3. Deadline Detection
 
 Scan `data/funding-opportunities.yaml` for upcoming deadlines:
 - If deadline within 30 days → add to `HEARTBEAT.md` if not already there
 - If deadline within 7 days → flag as urgent in heartbeat report
 - If deadline passed → mark as expired; remove from active list
 
-### 3. System Health Checks
+### 4. System Health Checks
 
 Check:
 - `.well-known/` schemas last modified (alert if > 7 days without update when data changed)
 - `memory/` has recent entries (alert if > 3 days since last memory write)
 - `MEMORY.md` key decisions section has been updated recently
+- Notion integration still authenticated (when used in current workflow)
 
-### 4. Action Item Aging
+### 5. Action Item Aging
 
-Scan meeting notes in `packages/operations/meetings/` for unclaimed action items:
-- Items without owner: flag for assignment
-- Items > 14 days old without status update: flag for review
+Scan:
+- local meeting notes in `packages/operations/meetings/`
+- Notion Tasks for stale active items
 
-### 5. Proactive Alerts
+Flag:
+- Items without owner: assignment needed
+- Items > 14 days old without status update: review needed
+- Blocked chains (`Blocked by`/`Blocking`) with no movement: escalation candidate
+
+### 6. Proactive Alerts
 
 In messaging channels (if configured), surface:
 - Upcoming funding deadlines
-- Overdue action items
-- Governance votes approaching
+- Overdue/blocked action items
+- Governance/accounting blockers
+- Notion workload anomalies requiring replanning
 
 **Only send alerts when proactive mode is enabled in `federation.yaml`.**
 
@@ -114,7 +140,7 @@ Archive completed tasks to "Recently Completed" section; remove after 30 days.
 
 ## Notes
 
-- This skill is lightweight — it reads files, doesn't make external calls
-- Run it first to understand what needs attention, then activate other skills
-- The `HEARTBEAT.md` file is the organizational nervous system — keep it current
-- Delete stale tasks ruthlessly: a bloated HEARTBEAT is useless
+- Default mode is lightweight (local files), but ReFi BCN mode also checks Notion status snapshots when access is available.
+- Run it first to understand what needs attention, then activate other skills.
+- The `HEARTBEAT.md` file is the organizational nervous system — keep it current.
+- Delete stale tasks ruthlessly: a bloated HEARTBEAT is useless.

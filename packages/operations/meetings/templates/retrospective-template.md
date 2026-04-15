@@ -1,14 +1,14 @@
 ---
 id: retro-YYYYMMDD
 type: retrospective
-title: "Retrospective - YYYY-MM-DD"
+title: "ReFi BCN Retrospective - YYYY-MM-DD"
 date: YYYY-MM-DDTHH:MM:00Z
 participants:
-  - member-id-1
-  - member-id-2
+  - did:refibcn:luiz-fernando
+  - did:refibcn:giulio-quarta
+  - did:refibcn:andrea-farias
 status: completed
 duration: PT1H
-notion_url: "" # Notion page URL (optional)
 ---
 
 # {{title}}
@@ -30,9 +30,16 @@ notion_url: "" # Notion page URL (optional)
 
 ## Action Items
 
-- [ ] Action item 1 (@assignee, due: YYYY-MM-DD) #action-1
-- [ ] Action item 2 (@assignee, due: YYYY-MM-DD) #action-2
+- [ ] Action item 1 (@did:refibcn:luiz-fernando, due: YYYY-MM-DD) #action-1
+- [ ] Action item 2 (@did:refibcn:giulio-quarta, due: YYYY-MM-DD) #action-2
+
+## Alignment and Data Quality Checks
+
+- [ ] Stakeholder map still matches `data/relationships.yaml`
+- [ ] Funding values still match canonical values in `knowledge/normalization-log.md`
+- [ ] Source-of-truth links remain valid across upstream repositories
 
 ## Related
 
-- Related project: [[project-id]]
+- Related project: [[project-refi-bcn-core-coordination]]
+- Related project: [[project-regenerant-catalunya-2025]]

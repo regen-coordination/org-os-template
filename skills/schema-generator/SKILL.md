@@ -73,6 +73,32 @@ After successful regeneration:
 - Note in `memory/YYYY-MM-DD.md`: "Schemas regenerated — [date]"
 - If automated, check GitHub Actions ran successfully
 
+## ReFi BCN Implementation Runbook (Operational)
+
+### When data changes (required sequence)
+
+1. Confirm changed sources:
+   - `data/*.yaml`
+   - `packages/operations/meetings/`
+   - `packages/operations/projects/`
+2. Run generation + validation:
+   ```bash
+   npm run generate:schemas
+   npm run validate:schemas
+   ```
+3. Verify critical parity:
+   - `.well-known/dao.json` aligns with `IDENTITY.md`
+   - `.well-known/members.json` reflects current member scope
+   - `.well-known/projects.json` reflects latest project statuses
+4. Record run outcome in `memory/YYYY-MM-DD.md` (success/failure + affected files)
+5. If failure, open/refresh a blocker in `HEARTBEAT.md` with exact error and owner.
+
+### Quality gate (must pass)
+- [ ] Validation succeeded after generation
+- [ ] Generated files are included in working tree for commit
+- [ ] Any schema drift is documented with corrective action
+- [ ] Update summary added to memory log
+
 ## Notes
 
 - Schemas follow EIP-4824 standard (see framework docs: `docs/02-standards/eip-4824-integration.md`)

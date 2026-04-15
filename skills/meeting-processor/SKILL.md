@@ -1,7 +1,7 @@
 ---
 name: meeting-processor
 version: 1.0.0
-description: Process meeting transcripts into structured organizational records
+description: Process meeting transcripts and Notion meeting notes into structured organizational records, action items, and memory updates for ReFi BCN operations
 author: organizational-os
 category: operations
 metadata:
@@ -18,6 +18,8 @@ metadata:
 
 Processes meeting transcripts (from Granola, Google Meet, Otter.ai, Zoom, or manual notes) into structured meeting notes following Organizational OS conventions. Extracts action items, updates project pages, and writes entries to organizational memory.
 
+For ReFi BCN operations, this skill is also used to process records from Notion `Notes & Documents` into local structured artifacts.
+
 ## When to Use
 
 - When you receive a raw meeting transcript or recording
@@ -30,6 +32,18 @@ Processes meeting transcripts (from Granola, Google Meet, Otter.ai, Zoom, or man
 - For informal chat logs → use knowledge-curator instead
 - For async decisions (no meeting) → write directly to project page
 - For very short exchanges (< 5 min) → add directly to memory
+
+## ReFi BCN Notion Defaults
+
+When no transcript file is provided, check Notion first:
+
+- Root page: `ReFi Barcelona` (`1386ed08-45cb-80d9-9ab8-e7de7ad5fb16`)
+- Notes data source: `Notes & Documents` (`1386ed08-45cb-81ed-b055-000ba5b70a6b`)
+
+Prioritize records tagged or titled like:
+- weekly ops sync
+- work session
+- kickoff / planning
 
 ## Usage
 
@@ -84,7 +98,15 @@ Keep to 3-7 bullet points or a short paragraph per major topic.
 - Any follow-ups not captured in action items
 ```
 
-### Step 4: Update Memory
+### Step 4: Update Meeting Registry
+
+Add or update a structured entry in `data/meetings.yaml` with:
+- stable local meeting id (e.g., `meeting-refibcn-weekly-ops-YYMMDD`)
+- participants using local member IDs when available
+- key outcomes (2-5 bullets)
+- source refs including Notion page ID or source document
+
+### Step 5: Update Memory
 
 Append to `memory/YYYY-MM-DD.md`:
 ```markdown
@@ -92,13 +114,14 @@ Append to `memory/YYYY-MM-DD.md`:
 - Key decisions: [brief list]
 - Action items created: [count]
 - Related projects: [names]
+- Notion source: [page title / page id if applicable]
 ```
 
-### Step 5: Update HEARTBEAT.md
+### Step 6: Update HEARTBEAT.md
 
 For each action item with urgency or a due date, add to `HEARTBEAT.md` under the appropriate section.
 
-### Step 6: Update Project Pages
+### Step 7: Update Project Pages
 
 For any action item linked to a specific project, add `- [ ]` task to the project page in `packages/operations/projects/`.
 
