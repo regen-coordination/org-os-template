@@ -3,85 +3,102 @@ schema_version: "2.0"
 # Packages Matrix — FRAMEWORK-ONLY REGISTRY
 # Cross-instance catalog of every package across the federation.
 # Surfaces divergence and promotion candidates.
+#
+# lifecycle_status (required): one of {active, dormant, planned, retired}
+#   - active:  in_framework AND consumed by ≥1 instance, OR an instance package in real use
+#   - dormant: in_framework but no consuming instance (scaffolding kept warm)
+#   - planned: not yet in framework AND not yet consumed by any instance
+#   - retired: explicitly being phased out
 
 packages:
   # --- Framework packages (in org-os/packages/) ---
   - id: "agents-app"
     owner: "framework"
-    instances_using: []
+    instances_using: ["regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Agent control app. Bundled at framework; instances consume via federation.yaml toggles."
+    lifecycle_status: "active"
+    notes: "Agent control app. Bundled at framework; instances consume via federation.yaml toggles. Audit 2026-04-25 reclassified to active (regen-coordination-os adoption)."
 
   - id: "egregore-core"
     owner: "framework"
-    instances_using: []
+    instances_using: ["regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Collective intelligence core. Referenced by refi-bcn federation.yaml peers."
+    lifecycle_status: "active"
+    notes: "Collective intelligence core. Referenced by refi-bcn federation.yaml peers; consumed by regen-coordination-os."
 
   - id: "koi-bridge"
     owner: "framework"
-    instances_using: []
+    instances_using: ["regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "KOI-net integration bridge."
+    lifecycle_status: "active"
+    notes: "KOI-net integration bridge. Consumed by regen-coordination-os."
 
   - id: "koi-opal-bridge"
     owner: "framework"
-    instances_using: []
+    instances_using: ["regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "KOI-net ↔ OPAL bridge."
+    lifecycle_status: "active"
+    notes: "KOI-net ↔ OPAL bridge. Consumed by regen-coordination-os."
 
   - id: "opal-bridge"
     owner: "framework"
-    instances_using: []
+    instances_using: ["regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "OPAL meeting/transcript processing bridge. Rollout planned (opal-rollout workstream)."
+    lifecycle_status: "active"
+    notes: "OPAL meeting/transcript processing bridge. Rollout in progress (opal-rollout workstream); consumed by regen-coordination-os."
 
   - id: "operations"
     owner: "framework"
-    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    instances_using: ["refi-bcn-os", "refi-dao-os", "regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Operational layer. Active in both production instances."
+    lifecycle_status: "active"
+    notes: "Operational layer. Active in all three production instances."
 
   - id: "paperclip-agents-app"
     owner: "framework"
-    instances_using: []
+    instances_using: ["regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Paperclip agent control app variant."
+    lifecycle_status: "active"
+    notes: "Paperclip agent control app variant. Consumed by regen-coordination-os."
 
   - id: "regen-agents"
     owner: "framework"
-    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    instances_using: ["refi-bcn-os", "refi-dao-os", "regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Shared operational agents. Used by both production instances."
+    lifecycle_status: "active"
+    notes: "Shared operational agents. Used by all three production instances."
 
   - id: "webapps"
     owner: "framework"
-    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    instances_using: ["refi-bcn-os", "refi-dao-os", "regen-coordination-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Shared webapp scaffolding."
+    lifecycle_status: "active"
+    notes: "Shared webapp scaffolding. Used by all three production instances."
 
   # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
     owner: "refi-bcn-os"
-    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    instances_using: ["refi-bcn-os", "refi-dao-os", "regen-coordination-os"]
     in_framework: false
     promotion_status: "candidate"
-    notes: "Present in both production instances. Framework-dashboard-template scoping plan exists — promotion path already identified."
+    lifecycle_status: "active"
+    notes: "Present in all three production instances. Framework-dashboard-template scoping plan exists — promotion path already identified."
 
   - id: "governance"
     owner: "refi-dao-os"
     instances_using: ["refi-dao-os"]
     in_framework: false
     promotion_status: "evaluating"
+    lifecycle_status: "active"
     notes: "DAO-specific governance package. Overlaps with dao-os DAO-module skills — evaluate together."
 
   - id: "coordination"
@@ -89,6 +106,7 @@ packages:
     instances_using: ["refi-dao-os"]
     in_framework: false
     promotion_status: "evaluating"
+    lifecycle_status: "active"
     notes: "Network coordination package. Single instance; evaluate if generalizable."
 
   # --- DAO-OS platform-specific packages ---
@@ -97,6 +115,7 @@ packages:
     instances_using: ["dao-os"]
     in_framework: false
     promotion_status: "instance-specific"
+    lifecycle_status: "active"
     notes: "DAO-OS module connectors (Safe, Hats, Gardens, Karma, EIP-4824). Platform-specific; the DAO-module SKILLS are the promotion candidates, not the connector package."
 
   - id: "core"
@@ -104,4 +123,22 @@ packages:
     instances_using: ["dao-os"]
     in_framework: false
     promotion_status: "instance-specific"
+    lifecycle_status: "active"
     notes: "DAO-OS platform core (composer UI, module registry). Platform-specific."
+
+  # --- Instance-originated packages surfaced by 2026-04-25 audit ---
+  - id: "coop"
+    owner: "regen-coordination-os"
+    instances_using: ["regen-coordination-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "Cooperative-ops package owned by regen-coordination-os. Surfaced by 2026-04-25 audit as present in instance manifest but absent from matrix; minimal row added pending owner classification review."
+
+  - id: "regen-toolkit"
+    owner: "regen-coordination-os"
+    instances_using: ["regen-coordination-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "Regen-ecosystem toolkit owned by regen-coordination-os. Surfaced by 2026-04-25 audit as present in instance manifest but absent from matrix; minimal row added pending owner classification review."

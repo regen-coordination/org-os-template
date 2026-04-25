@@ -134,6 +134,38 @@ for (const file of optionalDataFiles) {
   }
 }
 
+// --- 3a. packages-matrix.yaml field integrity ---
+const ALLOWED_LIFECYCLE = ['active', 'dormant', 'planned', 'retired'];
+
+if (fileExists('data/packages-matrix.yaml')) {
+  console.log('\n3a. packages-matrix.yaml field integrity');
+  try {
+    const matrix = loadYaml(readFileSync(join(rootDir, 'data/packages-matrix.yaml'), 'utf-8'));
+    const pkgs = Array.isArray(matrix?.packages) ? matrix.packages : [];
+
+    check('packages-matrix.yaml has a packages list', pkgs.length > 0);
+
+    const offenders = [];
+    for (const pkg of pkgs) {
+      const id = pkg?.id ?? '<unknown>';
+      if (!('lifecycle_status' in (pkg || {}))) {
+        offenders.push(`${id} (missing lifecycle_status)`);
+      } else if (!ALLOWED_LIFECYCLE.includes(pkg.lifecycle_status)) {
+        offenders.push(`${id} (invalid lifecycle_status: ${pkg.lifecycle_status})`);
+      }
+    }
+    check(
+      `All ${pkgs.length} packages declare a valid lifecycle_status (one of: ${ALLOWED_LIFECYCLE.join(', ')})`,
+      offenders.length === 0
+    );
+    for (const offender of offenders) {
+      console.log(`    → ${offender}`);
+    }
+  } catch (e) {
+    check('packages-matrix.yaml is parseable YAML', false);
+  }
+}
+
 // --- 4. .well-known/ Schemas ---
 console.log('\n4. .well-known/ Schemas');
 
