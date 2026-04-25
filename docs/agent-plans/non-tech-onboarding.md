@@ -4,7 +4,7 @@ title: "Non-Tech Operator Onboarding"
 status: scoping
 priority: null
 scope: framework
-depends_on: [future-instance-specs]
+depends_on: [future-instance-specs, instance-bootstrap]
 created: 2026-04-06
 started: null
 completed: null

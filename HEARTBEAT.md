@@ -9,7 +9,10 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ### Technical
 - [ ] Complete `federation-protocol` end-to-end sync test (queued plan)
 - [ ] Write `future-instance-specs` for regen-coordination-os and regen-toolkit (queued plan)
-- [ ] Finalize `non-tech-onboarding` scoping — web wizard + GitHub Actions backend (scoping plan)
+- [ ] Activate `package-integration` plan phase 1 — inventory audit of `packages/` (queued plan)
+- [ ] Activate `system-reliability` plan phase 1 — inventory existing reliability infra (queued plan)
+- [ ] Activate `instance-bootstrap` plan phase 1 — resolve cloning mechanism open question (queued plan)
+- [ ] Finalize `non-tech-onboarding` scoping — narrowed to web UI + GHA glue over `instance-bootstrap` engine (scoping plan)
 - [ ] Finalize `framework-dashboard-template` scoping — reusable dashboard package (scoping plan)
 - [ ] Finalize `obsidian-interface` scoping — Obsidian as primary operator interface (scoping plan)
 - [ ] Finalize `obsidian-canvas-interface` scoping — Canvas as system overview + interface (scoping plan, depends on `obsidian-interface`)
@@ -37,8 +40,8 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## System Health
 
 ### Agent Runtime
-- [ ] Verify `/initialize` renders real content (no stub placeholders)
-- [ ] Verify `scripts/initialize.mjs` emits valid JSON with populated registries
+- [x] Verify `/initialize` renders real content (no stub placeholders) — verified 2026-04-25
+- [x] Verify `scripts/initialize.mjs` emits valid JSON with populated registries — verified 2026-04-25
 
 ### Data Integrity
 - [ ] `data/members.yaml` is up to date
@@ -70,10 +73,12 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 _(Move completed items here with date — keep for 30 days then remove)_
 
+- [2026-04-25] Three new workstreams scoped and queued — `package-integration`, `reliability`, `instance-bootstrap` (see `memory/2026-04-25.md` and DECISIONS entries)
+- [2026-04-25] Verified `/initialize` renders real content (no stubs) and `scripts/initialize.mjs` emits valid JSON
 - [2026-04-24] Versioning system — policy, CHANGELOG, migrations, version-consistency validator, v3.0.0 bump (see `docs/agent-plans/versioning-system.md`)
 - [2026-04-24] Self-hosting inauguration — stubs filled, instance registry introduced, all 5 instances mapped
 - [2026-04-06] v2.0.0 Phase 1 framework — docs, skills, data model, session lifecycle (see `docs/agent-plans/v2-phase1-framework.md`)
 
 ---
 
-_Last updated: 2026-04-24_
+_Last updated: 2026-04-25_

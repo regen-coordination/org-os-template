@@ -16,6 +16,32 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-04-25 · Instance bootstrap as engine; non-tech-onboarding as UI wrapper
+
+**Status:** active
+**Scope:** framework, agent-runtime, operator-ux
+
+**Decision** — A new `instance-bootstrap` workstream/plan defines the end-to-end mechanism for creating a new org-os instance: framework cloning + wizard with package/skill selection + knowledge bootstrap (one source ingested as proof-of-pipeline). The pre-existing `non-tech-onboarding` plan is narrowed to "web UI + GitHub Actions glue over the engine" and gains `depends_on: [instance-bootstrap]`.
+
+**Why** — Two alternatives lost: (a) absorbing `non-tech-onboarding` into one mega-plan would over-couple CLI-driven and web-driven concerns and produce a sprawling unshippable plan; (b) keeping them parallel-independent would risk divergent implementations of the same underlying mechanism (cloning, selection, ingestion). The engine-and-wrapper pattern creates a natural dependency, lets the engine be tested and shipped via CLI first, and shrinks `non-tech-onboarding` to a tighter, more focused plan that consumes a stable interface. Also creates a clean boundary with the existing `bootstrap-interviewer` skill, which gets extended in phase 2 of the engine plan rather than rewritten.
+
+**Refs** — `docs/agent-plans/instance-bootstrap.md`, `docs/agent-plans/non-tech-onboarding.md`, `data/projects.yaml`, `memory/2026-04-25.md`
+
+---
+
+## 2026-04-25 · Packages and reliability as first-class workstreams
+
+**Status:** active
+**Scope:** framework, data-model
+
+**Decision** — Three new workstreams introduced as parallel first-class concerns in `data/projects.yaml`: `package-integration`, `reliability`, and `instance-bootstrap`. Each has a single umbrella scoping plan with three phases and an explicit Splitting Criteria section that triggers decomposition into per-phase plans if execution exceeds three sessions.
+
+**Why** — Folding these into existing workstreams was rejected: `v2-stabilization` is meant to be closing down (not absorbing more); `skill-promotion` is too narrow (covers skills only, not packages or integration mechanisms); `framework-evolution` is the catchall and would bury the work. Packages already had a registry (`packages-matrix.yaml`) but no governing doc — the asymmetry with skills (which have `SKILL-PROMOTION.md`) needed correction. Reliability had no workstream at all despite four distinct failure modes (data integrity, agent runtime, federation drift, recovery) accumulating risk. The single-umbrella-with-splitting-criteria pattern lets work start without premature decomposition while preserving an exit ramp if the plan grows.
+
+**Refs** — `docs/agent-plans/package-integration.md`, `docs/agent-plans/system-reliability.md`, `docs/agent-plans/instance-bootstrap.md`, `data/projects.yaml`, `memory/2026-04-25.md`
+
+---
+
 ## 2026-04-24 · Versioning system
 
 **Status:** active
