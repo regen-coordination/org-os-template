@@ -1,8 +1,8 @@
-# org-os
+# {{ org.name }}{{ #if org.tagline }} — {{ org.tagline }}{{ /if }}
 
-> We build the shared operating system for a federation of regenerative organizations.
+> {{ org.short_description }}
 
-🧬 **Project** · framework + orchestration hub for the regen-coordination network.
+{{ org.emoji }} **{{ org.type }}** · framework + orchestration hub for the {{ federation.network }} network.
 
 ---
 
@@ -73,61 +73,43 @@ The case studies are the production instances listed below.
 | `npm run validate:schemas` | Verify schemas pass |
 | `npm run validate:structure` | Verify file structure is canonical |
 | `npm run selftest` | Run all reliability checks |
-
+{{ #if isFramework }}
 | `node scripts/clone-framework.mjs --target ../<name> --type <type>` | Create a new instance |
 | `npm run analyze:instances` | Cross-instance drift report (framework only) |
-
+{{ /if }}
 
 ## Federation
 
-- **Network:** regen-coordination (role: framework + orchestration hub)
-- **Upstream:** self (framework root) (framework version pinned: 3.5)
-
+- **Network:** {{ federation.network }}{{ #if federation.role }} (role: {{ federation.role }}){{ /if }}
+- **Upstream:** {{ federation.upstream }} (framework version pinned: {{ federation.framework_version }})
+{{ #if federation.peers }}
 - **Peers:**
-
-  - organizational-os-framework
-
-  - organizational-os
-
-
-
+{{ #each federation.peers }}
+  - {{ . }}
+{{ /each }}
+{{ /if }}
+{{ #if federation.downstream }}
 - **Downstream instances:**
-
-  - ReFi Barcelona (refi-bcn-os)
-
-  - ReFi DAO (refi-dao-os)
-
-  - DAO OS (dao-os)
-
-  - openclaw (openclaw)
-
-  - Regen Coordination (regen-coordination-os)
-
-
+{{ #each federation.downstream }}
+  - {{ . }}
+{{ /each }}
+{{ /if }}
 
 ## Active downstream instances
 
-
-- **** () — ,  · framework v · last sync 
-
-- **** () — ,  · framework v · last sync 
-
-- **** () — ,  · framework v · last sync 
-
-- **** () — ,  · framework v · last sync 
-
-- **** () — ,  · framework v · last sync 
-
+{{ #each instances }}
+- **{{ name }}** ({{ id }}) — {{ type }}, {{ maturity }} · framework v{{ framework_version }} · last sync {{ last_sync }}
+{{ /each }}
 
 ## Skills and packages
 
-**Canonical skills (10):** bootstrap-interviewer, capital-flow, funding-scout, heartbeat-monitor, idea-scout, knowledge-curator, meeting-processor, org-os-init, schema-generator, workspace-improver
+**Canonical skills ({{ skills.canonical_count }}):** {{ skills.canonical_list }}
 
-**Skill promotion candidates (6):** see `docs/SKILL-PROMOTION.md`
+**Skill promotion candidates ({{ skills.candidate_count }}):** see `docs/SKILL-PROMOTION.md`
 
-**Canonical packages (9):** agents-app, egregore-core, koi-bridge, koi-opal-bridge, opal-bridge, operations, paperclip-agents-app, regen-agents, webapps
+**Canonical packages ({{ packages.canonical_count }}):** {{ packages.canonical_list }}
 
-**Package promotion candidates (1):** see `docs/PACKAGE-LIFECYCLE.md`
+**Package promotion candidates ({{ packages.candidate_count }}):** see `docs/PACKAGE-LIFECYCLE.md`
 
 ## Documentation
 
@@ -149,8 +131,8 @@ The case studies are the production instances listed below.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+{{ license }} — see [LICENSE](LICENSE).
 
 ---
 
-_Built by the Regen Coordination community. v._
+_Built by the Regen Coordination community. v{{ framework_version }}._

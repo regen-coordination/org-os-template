@@ -22,80 +22,77 @@ identity:
     contract_address: ""
 
 # ── Federation Network ─────────────────────────────────────────────────────────
-network: "regen-coordination"
-hub: "github.com/regen-coordination/org-os-template"  # this repo — framework-upstream
+federation:
+  network: "regen-coordination"
+  hub: "github.com/regen-coordination/org-os-template"  # this repo — framework-upstream
 
-peers:
-  - name: "organizational-os-framework"
-    repo: "regen-coordination/organizational-os-framework"
-    url: "https://github.com/regen-coordination/organizational-os-framework"
-    trust: "full"
-  - name: "organizational-os"
-    repo: "regen-coordination/organizational-os"
-    url: "https://github.com/regen-coordination/organizational-os"
-    trust: "full"
+  peers:
+    - name: "organizational-os-framework"
+      repo: "regen-coordination/organizational-os-framework"
+      url: "https://github.com/regen-coordination/organizational-os-framework"
+      trust: "full"
+    - name: "organizational-os"
+      repo: "regen-coordination/organizational-os"
+      url: "https://github.com/regen-coordination/organizational-os"
+      trust: "full"
 
-upstream: []
-# org-os IS the template. No upstream at framework layer.
-# (Previous config pointed at luizfernandosg/organizational-os-template as a fork —
-#  cleared on 2026-04-24 self-hosting inauguration since this repo is the canonical source.)
+  upstream: []
+  # org-os IS the template. No upstream at framework layer.
 
-# ── Downstream Instances ───────────────────────────────────────────────────────
-# Populated and maintained alongside data/instances.yaml.
-# Run `npm run analyze:instances` to refresh drift status.
-downstream:
-  - name: "ReFi Barcelona"
-    id: "refi-bcn-os"
-    repo: "luizfernandosg/refi-bcn-os"
-    url: "https://github.com/luizfernandosg/refi-bcn-os"
-    type: "LocalNode"
-    trust: "full"
-    sync_direction: "framework→instance"
-    local_path: "../refi-bcn-os"
-    cloned: true
+  # ── Downstream Instances ─────────────────────────────────────────────────────
+  downstream:
+    - name: "ReFi Barcelona"
+      id: "refi-bcn-os"
+      repo: "luizfernandosg/refi-bcn-os"
+      url: "https://github.com/luizfernandosg/refi-bcn-os"
+      type: "LocalNode"
+      trust: "full"
+      sync_direction: "framework→instance"
+      local_path: "../refi-bcn-os"
+      cloned: true
 
-  - name: "ReFi DAO"
-    id: "refi-dao-os"
-    repo: "luizfernandosg/refi-dao-os"
-    url: "https://github.com/luizfernandosg/refi-dao-os"
-    type: "DAO"
-    trust: "full"
-    sync_direction: "framework→instance"
-    local_path: "../refi-dao-os"
-    cloned: true
+    - name: "ReFi DAO"
+      id: "refi-dao-os"
+      repo: "luizfernandosg/refi-dao-os"
+      url: "https://github.com/luizfernandosg/refi-dao-os"
+      type: "DAO"
+      trust: "full"
+      sync_direction: "framework→instance"
+      local_path: "../refi-dao-os"
+      cloned: true
 
-  - name: "DAO OS"
-    id: "dao-os"
-    repo: "regen-coordination/dao-os"
-    url: "https://github.com/regen-coordination/dao-os"
-    type: "Project"
-    trust: "full"
-    sync_direction: "framework→instance"
-    local_path: "../dao-os"
-    cloned: true
-    note: "DAO-module development platform, not an operational instance. Source of DAO-module skill promotion candidates."
+    - name: "DAO OS"
+      id: "dao-os"
+      repo: "regen-coordination/dao-os"
+      url: "https://github.com/regen-coordination/dao-os"
+      type: "Project"
+      trust: "full"
+      sync_direction: "framework→instance"
+      local_path: "../dao-os"
+      cloned: true
+      note: "DAO-module development platform, not an operational instance. Source of DAO-module skill promotion candidates."
 
-  - name: "openclaw"
-    id: "openclaw"
-    repo: ""
-    url: ""
-    type: "AgentRuntime"
-    trust: "full"
-    sync_direction: "none"
-    local_path: "../openclaw"
-    cloned: true
-    note: "Agent runtime, not a data instance."
+    - name: "openclaw"
+      id: "openclaw"
+      repo: ""
+      url: ""
+      type: "AgentRuntime"
+      trust: "full"
+      sync_direction: "none"
+      local_path: "../openclaw"
+      cloned: true
+      note: "Agent runtime, not a data instance."
 
-  - name: "Regen Coordination"
-    id: "regen-coordination-os"
-    repo: "regen-coordination/regen-coordination-os"
-    url: "https://github.com/regen-coordination/regen-coordination-os"
-    type: "Hub"
-    trust: "full"
-    sync_direction: "framework→instance"
-    local_path: "../regen-coordination-os"
-    cloned: true
-    note: "Synced to framework v3.0 on 2026-04-24 (full overlay incl. skills)."
+    - name: "Regen Coordination"
+      id: "regen-coordination-os"
+      repo: "regen-coordination/regen-coordination-os"
+      url: "https://github.com/regen-coordination/regen-coordination-os"
+      type: "Hub"
+      trust: "full"
+      sync_direction: "framework→instance"
+      local_path: "../regen-coordination-os"
+      cloned: true
+      note: "Synced to framework v3.0 on 2026-04-24 (full overlay incl. skills)."
 
 # ── Agent Configuration ────────────────────────────────────────────────────────
 agent:
