@@ -2,34 +2,31 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
-// NOTE on the happy-path test (option A from the v3.5 plan):
-// The framework currently has known structural drift that will cause `npm run selftest`
-// to exit non-zero today:
-//   - validate:structure has 2 pre-existing failures (.well-known/dao.json missing,
-//     federation section missing)
-//   - version:check is not implemented yet (Task 3 will add --check mode to update-version.mjs)
+// NOTE on the happy-path test (still INVERTED, new trigger):
+// The original two triggers for inverting this test (validate:structure pre-existing
+// failures AND missing version:check) have been resolved:
+//   - validate:structure was fixed by commit e1dd723 (Hermes)
+//   - version:check was implemented by Task 3 of v3.5
 //
-// Rather than skip the happy-path coverage entirely, we INVERT it: assert the aggregator
-// currently exits non-zero AND surfaces one of the known-broken steps in its output.
-// This keeps the aggregator under test today and turns into a clear breakage signal as soon
-// as the framework is healthy.
+// However, `npm run selftest` still exits non-zero because the aggregator runs
+// `analyze:instances --check-only`, which surfaces instance-side drift
+// (e.g. local_path_missing, regen-coordination-os structural issues) — not framework
+// drift. So we keep the assertion inverted, but point the TODO at the next real fix.
 //
-// TODO(after Task 3 + Phase 3 structural drift fixes): Once `npm run version:check`
-// is implemented (Task 3) AND framework's pre-existing structural drift is fixed
-// (.well-known/dao.json + federation.yaml federation section, addressed in Phase 3
-// instance re-validation), flip these assertions back to:
+// TODO(after Phase 3 Task 31 — instance re-validation): Once instances are clean
+// and `analyze:instances --check-only` returns zero, flip this test to strict:
 //
 //   assert.equal(result.status, 0, ...)
 //   assert.match(result.stdout, /selftest: PASS/)
-test('npm run selftest currently fails on known framework drift (Phase 3 will green this)', () => {
+test('npm run selftest currently fails on instance-side drift (Phase 3 Task 31 will green this)', () => {
   const result = spawnSync('node', ['scripts/selftest.mjs'], {
     encoding: 'utf-8',
     cwd: process.cwd()
   });
   assert.notEqual(result.status, 0, `expected selftest to FAIL today; stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
-  // At least one known-broken step should be flagged in the output.
+  // The aggregator should still surface a known-failing step in its output.
   const combined = result.stdout + result.stderr;
-  assert.match(combined, /validate:structure|version:check/);
+  assert.match(combined, /analyze:instances|validate:structure|version:check/);
   assert.match(result.stdout, /selftest: FAIL/);
 });
 
