@@ -21,6 +21,7 @@
     "generate:schemas": "node scripts/generate-all-schemas.mjs",
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
+    "install:hooks": "node scripts/install-hooks.mjs",
     "analyze:instances": "node scripts/analyze-instances.mjs",
     "version:update": "node scripts/update-version.mjs",
     "version:check": "node scripts/update-version.mjs --check",
