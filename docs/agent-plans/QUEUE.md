@@ -6,23 +6,26 @@
 
 _(none)_
 
-## Queued
+## Queued (v3.6 priority order)
 
-1. [tui-dashboard](tui-dashboard.md) — TUI dashboard (Ink) + agent-rendered pages, shared data layer · spec + 28-task implementation plan ([`tui-dashboard-implementation.md`](tui-dashboard-implementation.md)) ready · candidate packages `packages/tui-data/`, `packages/tui/` · workstream: operator-interfaces
-2. [future-instance-specs](future-instance-specs.md) — Write specs for regen-coordination-os and regen-toolkit  ·  workstream: framework-evolution
-3. [federation-protocol](federation-protocol.md) — End-to-end federation exchange testing and docs  ·  workstream: federation-protocol
-4. [package-integration](package-integration.md) — Audit packages/, define lifecycle (`docs/PACKAGE-LIFECYCLE.md`), resolve consumption mechanism  ·  workstream: package-integration  ·  est. 3 sessions
-5. [system-reliability](system-reliability.md) — Audit reliability infra, decide trigger layering (pre-commit / CI / scheduled), implement enforcement  ·  workstream: reliability  ·  est. 3 sessions
-6. [instance-bootstrap](instance-bootstrap.md) — Framework cloning + wizard with package/skill selection + knowledge bootstrap (one source). Engine for `non-tech-onboarding` web wrapper  ·  workstream: instance-bootstrap  ·  est. 4 sessions
+1. [obsidian-interface](obsidian-interface.md) — operator UX layer (was P1 candidate; promote to active for v3.6) · workstream: operator-interfaces
+2. [obsidian-canvas-interface](obsidian-canvas-interface.md) — depends on obsidian-interface · workstream: operator-interfaces
+3. [non-tech-onboarding](non-tech-onboarding.md) — web wrapper over the v3.5 cloning engine · workstream: non-tech-onboarding
 
-## Scoping
+## Scoping (deferred to v3.7+)
 
-- [non-tech-onboarding](non-tech-onboarding.md) — Web wizard bootstrap + GitHub Actions backend  ·  workstream: non-tech-onboarding  ·  depends on `instance-bootstrap`
-- [framework-dashboard-template](framework-dashboard-template.md) — Reusable dashboard package template  ·  workstream: v2-stabilization  ·  becomes thin renderer over `tui-data` after `tui-dashboard` lands
-- [obsidian-interface](obsidian-interface.md) — Obsidian as primary operator interface (candidate package `packages/obsidian-interface/`)  ·  workstream: operator-interfaces
-- [obsidian-canvas-interface](obsidian-canvas-interface.md) — Obsidian Canvas as system overview + operational interface (candidate package `packages/obsidian-canvas/`)  ·  workstream: operator-interfaces  ·  depends on `obsidian-interface`
+- [tui-dashboard](tui-dashboard.md) — Ink-based TUI (impl plan ready) · workstream: operator-interfaces
+- [framework-dashboard-template](framework-dashboard-template.md) — becomes thin renderer over tui-data · workstream: v2-stabilization
+- [federation-protocol](federation-protocol.md) — end-to-end federation test · workstream: federation-protocol
+- [future-instance-specs](future-instance-specs.md) — for new instance types if any surface · workstream: framework-evolution
 
 ## Completed
 
 - ~~[v2-phase1-framework](v2-phase1-framework.md)~~ — Framework standards, docs, skills, data model, session lifecycle
 - ~~[versioning-system](versioning-system.md)~~ — Reconciled versioning + migrations + changelog + policy · workstream: v2-stabilization · completed 2026-04-24
+- ~~[instance-bootstrap](instance-bootstrap.md)~~ — Framework cloning + wizard with package/skill selection · workstream: instance-bootstrap · completed 2026-04-25 (absorbed into v3.5)
+- ~~[package-integration](package-integration.md)~~ — Audit packages/, define lifecycle, resolve consumption mechanism · workstream: package-integration · completed 2026-04-25 (absorbed into v3.5)
+- ~~[system-reliability](system-reliability.md)~~ — Audit reliability infra, implement enforcement · workstream: reliability · completed 2026-04-25 (absorbed into v3.5)
+- ~~v3-5-release-implementation~~ — Full v3.5.0 release execution · completed 2026-04-25
+- ~~One-pager templates~~ — README.framework.md, README.instance.md, GETTING-STARTED.md, render engine · completed 2026-04-25 (absorbed into v3.5)
+- ~~bread-coop-os bootstrap~~ — New instance bootstrapped via cloning engine · completed 2026-04-25 (instance is live)
