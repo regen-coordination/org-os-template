@@ -1,145 +1,156 @@
-# Organizational OS Template
+# org-os
 
-**GitHub-based operational workspace template with EIP-4824 compliance**
+> We build the shared operating system for a federation of regenerative organizations.
 
-> This repository is a standalone mirror of `packages/template` in the canonical [organizational-os monorepo](https://github.com/regen-coordination/organizational-os). For active development, use the monorepo.
-
-Transform your GitHub repository into a complete operational workspace for your organization (DAO, cooperative, nonprofit, project). Built on EIP-4824/DAOstar standards for organizational identity and interoperability.
+🧬 **Project** · framework + orchestration hub for the regen-coordination network.
 
 ---
 
-## Quick Start
+## What this is
 
-### 1. Fork This Template
+org-os is a complete operating system for organizations — DAOs, cooperatives,
+nonprofits, networks, projects. It structures all organizational knowledge in a
+machine-readable, federated way; provides an agent runtime for autonomous
+operations; and serves human workflows.
 
-```bash
-# Fork this repository on GitHub, then clone
-git clone https://github.com/your-org/your-repo.git
-cd your-repo
-```
+This repo is **both** the framework template (the canonical source every instance
+forks from) **and** the orchestration hub (tracks all downstream instances, their
+drift, and skill/package promotion candidates).
 
-### 2. Run Setup
+## Quick navigation
 
-```bash
-npm install
-npm run setup
-```
+- 🚀 [Get started](GETTING-STARTED.md) — create your first instance in 30 minutes
+- 🎯 [What this is](#what-this-is)
+- 👥 [Who are you?](#who-are-you)
+- 🔧 [Common operations](#common-operations)
+- 🌐 [Federation](#federation)
+- 📋 [Active downstream instances](#active-downstream-instances)
+- 📚 [Skills + packages catalog](#skills-and-packages)
 
-The setup script will:
-- Collect organizational identity information
-- Configure EIP-4824 schemas
-- Let you select operational packages
-- Generate initial `.well-known/` schemas
-- Set up Cursor rules
+## Who are you?
 
-### 3. Deploy
+### You're an **operator** spinning up a new org
 
-```bash
-git add .
-git commit -m "Initial Organizational OS setup"
-git push origin main
-```
-
-GitHub Actions will automatically deploy to GitHub Pages.
-
----
-
-## Local clone workspace (visible `repos/` folder)
-
-To clone/update linked ecosystem repositories into a visible local `repos/` directory:
+You want to create your own instance. Two paths:
 
 ```bash
-pnpm run clone:repos
+# CLI path (what Luiz uses):
+git clone https://github.com/regen-coordination/org-os
+cd org-os
+node scripts/clone-framework.mjs --target ../my-org --type cooperative --interactive
 ```
 
-If you prefer npm:
+Or click **Use this template** on GitHub if you prefer the browser flow.
 
-```bash
-npm run clone:repos
-```
+Then read [GETTING-STARTED.md](GETTING-STARTED.md) in your new instance.
 
-Bootstrap local setup (clone repos + install dependencies):
+### You're a **contributor** to the framework
 
-```bash
-pnpm run bootstrap:local
-```
+- Read [`SOUL.md`](SOUL.md), [`IDENTITY.md`](IDENTITY.md), [`MASTERPLAN.md`](MASTERPLAN.md)
+- Check [`HEARTBEAT.md`](HEARTBEAT.md) for what's active
+- Browse [`docs/agent-plans/`](docs/agent-plans/) for the work pipeline
+- Plans you can pick up: anything in `scoping` status
 
-Dry run preview:
+### You're an **agent** opening a session
 
-```bash
-node scripts/clone-linked-repos.mjs --dry-run
-```
+Run `/initialize`. The dashboard renders org state, plans, instances, drift, and
+suggests next actions. Detailed protocol in [`AGENTS.md`](AGENTS.md).
 
-Linked repositories are defined in `repos.manifest.json`.
+### You're a **visitor** evaluating org-os
 
----
+Read [`SOUL.md`](SOUL.md) for the philosophy and [`docs/`](docs/) for the architecture.
+The case studies are the production instances listed below.
 
-## Features
+## Common operations
 
-### Organizational Identity (EIP-4824)
+| Command | What it does |
+|---|---|
+| `/initialize` | Open a session: dashboard + recent context |
+| `/close` | Wrap up session: write memory, commit, push |
+| `npm run sync:upstream` | Pull framework updates (skills, packages, schemas) |
+| `npm run sync:packages` | Re-materialize packages from framework |
+| `npm run generate:schemas` | Regenerate `.well-known/*.json` from `data/*.yaml` |
+| `npm run validate:schemas` | Verify schemas pass |
+| `npm run validate:structure` | Verify file structure is canonical |
+| `npm run selftest` | Run all reliability checks |
 
-- **daoURI**: Main organizational identity document
-- **membersURI**: Membership registry
-- **proposalsURI**: Governance proposals
-- **governanceURI**: Governance documentation
-- **contractsURI**: Smart contract registry
-- **Extended schemas**: Meetings, Projects, Finances
+| `node scripts/clone-framework.mjs --target ../<name> --type <type>` | Create a new instance |
+| `npm run analyze:instances` | Cross-instance drift report (framework only) |
 
-### Operational Packages
 
-- **Meetings**: Meeting management, notes, action items
-- **Projects**: Project tracking with IDEA framework
-- **Finances**: Budget and expense tracking
-- **Coordination**: Multi-organization coordination tools
+## Federation
 
-### Knowledge Base
+- **Network:** regen-coordination (role: framework + orchestration hub)
+- **Upstream:** self (framework root) (framework version pinned: 3.5)
 
-- **Quartz-based**: Markdown documentation system
-- **Searchable**: Full-text search
-- **Linked**: Internal linking and cross-references
-- **Publishable**: Deploy to GitHub Pages
+- **Peers:**
 
-### Interactive Webapps
+  - organizational-os-framework
 
-- **Task Manager**: View and manage tasks
-- **Budget Calculator**: Financial planning tools
-- **Stakeholder Map**: Relationship visualization
-- **Timeline Planner**: Project timeline visualization
+  - organizational-os
 
----
+
+
+- **Downstream instances:**
+
+  - ReFi Barcelona (refi-bcn-os)
+
+  - ReFi DAO (refi-dao-os)
+
+  - DAO OS (dao-os)
+
+  - openclaw (openclaw)
+
+  - Regen Coordination (regen-coordination-os)
+
+
+
+## Active downstream instances
+
+
+- **** () — ,  · framework v · last sync 
+
+- **** () — ,  · framework v · last sync 
+
+- **** () — ,  · framework v · last sync 
+
+- **** () — ,  · framework v · last sync 
+
+- **** () — ,  · framework v · last sync 
+
+
+## Skills and packages
+
+**Canonical skills (10):** bootstrap-interviewer, capital-flow, funding-scout, heartbeat-monitor, idea-scout, knowledge-curator, meeting-processor, org-os-init, schema-generator, workspace-improver
+
+**Skill promotion candidates (6):** see `docs/SKILL-PROMOTION.md`
+
+**Canonical packages (9):** agents-app, egregore-core, koi-bridge, koi-opal-bridge, opal-bridge, operations, paperclip-agents-app, regen-agents, webapps
+
+**Package promotion candidates (1):** see `docs/PACKAGE-LIFECYCLE.md`
 
 ## Documentation
 
-- **[Setup Guide](03%20Libraries/org-os/docs/SETUP.md)** - Complete setup instructions
-- **[Operator Guidebook](docs/OPERATOR-GUIDEBOOK.md)** - How to operate your workspace
-- **[EIP-4824 Guide](03%20Libraries/org-os/docs/EIP4824-GUIDE.md)** - Standards compliance guide
-- **[Packages](docs/PACKAGES.md)** - Package documentation
-
----
-
-## Framework Reference
-
-This template implements the **[Organizational OS Framework](../organizational-os/packages/framework/)**:
-
-- Standards and patterns: [`../organizational-os/packages/framework/docs/`](../organizational-os/packages/framework/docs/)
-- Schema definitions: [`../organizational-os/packages/framework/schemas/`](../organizational-os/packages/framework/schemas/)
-- Case studies: [`../organizational-os/packages/framework/docs/06-case-studies/`](../organizational-os/packages/framework/docs/06-case-studies/)
-
----
+- [`docs/FILE-STRUCTURE.md`](docs/FILE-STRUCTURE.md) — canonical directory spec
+- [`docs/DATA-MODEL.md`](docs/DATA-MODEL.md) — 13 registries, schemas
+- [`docs/AGENTIC-ARCHITECTURE.md`](docs/AGENTIC-ARCHITECTURE.md) — agent files, bootstrapping, skills
+- [`docs/SKILL-SPECIFICATION.md`](docs/SKILL-SPECIFICATION.md) — how to write and share skills
+- [`docs/PACKAGE-LIFECYCLE.md`](docs/PACKAGE-LIFECYCLE.md) — package promotion + retirement
+- [`docs/RELIABILITY.md`](docs/RELIABILITY.md) — failure modes, trigger layers, recovery
+- [`docs/FEDERATION.md`](docs/FEDERATION.md) — federation protocol spec
+- [`docs/VERSIONING.md`](docs/VERSIONING.md) — versioning + migrations
+- [`docs/SKILL-PROMOTION.md`](docs/SKILL-PROMOTION.md) — sister to PACKAGE-LIFECYCLE for skills
 
 ## Requirements
 
-- Node.js v22+
-- npm v10.9.2+
+- Node.js 22+
+- npm 10+
 - Git
-- GitHub account
-
----
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-*Built with 💚 by the Regen Coordination community*
+_Built by the Regen Coordination community. v._

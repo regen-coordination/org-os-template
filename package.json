@@ -32,6 +32,7 @@
     "paperclip": "cd packages/paperclip-agents-app && npm run dev",
     "paperclip:server": "cd packages/paperclip-agents-app && npm run dev:server",
     "paperclip:build": "cd packages/paperclip-agents-app && npm run build:ui",
+    "render:self": "node scripts/render-self.mjs",
     "deploy:pages": "node scripts/deploy-pages.mjs"
   },
   "engines": {
