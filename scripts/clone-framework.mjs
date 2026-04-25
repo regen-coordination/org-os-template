@@ -94,6 +94,7 @@ const STRIP_LIST = [
   'scripts/selftest.mjs',
   'templates/',
   'tests/fixtures/instance-config.yaml',
+  'tests/fixtures/bread-coop-os-config.yaml',
   // Framework-only docs that leaked into instances (surfaced by bread-coop-os bootstrap):
   'PAPERCLIP_DEPLOYMENT_GUIDE.md',
   'RESEARCH_INTELLIGENCE_PLAN.md',
@@ -111,6 +112,19 @@ const STRIP_LIST = [
   '.well-known/finances.json',
   '.well-known/ideas.json',
   '.well-known/knowledge.json',
+];
+
+// Directory-level strip targets — wipe everything inside (and the dir if EXCEPT
+// is empty). These are framework-scoped histories/specs that should never leak
+// into instances. resetMarkdown() rewrites a clean stub for files the
+// instance still needs (e.g. knowledge/INDEX.md).
+const STRIP_DIRS = [
+  // Framework's own audit + drift reports — instance starts with no audit history
+  { dir: 'memory/reports', except: [] },
+  // Framework's design specs — instances write their own under docs/superpowers/specs/
+  { dir: 'docs/superpowers/specs', except: [] },
+  // Framework's plans — keep README.md (the convention doc, generic) only
+  { dir: 'docs/agent-plans', except: ['README.md'] },
 ];
 
 // .well-known/ IS copied so generate:schemas has a target dir + dao.json templates
@@ -134,10 +148,35 @@ function stripPath(target, relPath) {
   fs.rmSync(full, { recursive: true, force: true });
 }
 
+function stripDirContents(target, relDir, except) {
+  const full = path.join(target, relDir);
+  if (!fs.existsSync(full)) return 0;
+  const keep = new Set(except || []);
+  let removed = 0;
+  for (const entry of fs.readdirSync(full)) {
+    if (keep.has(entry)) continue;
+    fs.rmSync(path.join(full, entry), { recursive: true, force: true });
+    removed++;
+  }
+  // If nothing kept, remove the dir itself so it doesn't sit empty in the instance
+  if (keep.size === 0) {
+    try {
+      fs.rmdirSync(full);
+    } catch {
+      /* dir may have re-populated / not exist; ignore */
+    }
+  }
+  return removed;
+}
+
 function copyAndStrip() {
   if (args.dryRun) {
     log(`copy ${FRAMEWORK_ROOT} → ${args.target}`);
     for (const p of STRIP_LIST) log(`strip ${p}`);
+    for (const s of STRIP_DIRS) {
+      const except = s.except.length ? ` (keep: ${s.except.join(', ')})` : '';
+      log(`strip dir ${s.dir}/${except}`);
+    }
     return;
   }
   if (args.force && fs.existsSync(args.target)) {
@@ -150,17 +189,37 @@ function copyAndStrip() {
     stripPath(args.target, p);
   }
   log(`stripped ${STRIP_LIST.length} framework-only artifacts`);
+  let dirRemoved = 0;
+  for (const s of STRIP_DIRS) {
+    dirRemoved += stripDirContents(args.target, s.dir, s.except);
+  }
+  log(`stripped ${dirRemoved} framework-scoped entries from ${STRIP_DIRS.length} dirs`);
 }
 
 copyAndStrip();
 
 // Stage 4: reset framework-specific markdown (Task 21)
-function resetMarkdown() {
+function resetMarkdown(answers) {
   if (args.dryRun) {
     log('reset MEMORY.md, HEARTBEAT.md, MASTERPLAN.md, DECISIONS.md, memory/');
+    log('reset IDENTITY.md, SOUL.md, USER.md, CLAUDE.md, CHANGELOG.md');
+    log('reset knowledge/INDEX.md, dashboard.yaml, repos.manifest.json');
     return;
   }
   const today = new Date().toISOString().slice(0, 10);
+
+  // Identity context (used by templates below). May be partial if called pre-answers.
+  const orgName = answers?.identity?.name || '{{ org.name }}';
+  const orgType = answers?.identity?.type || '{{ org.type }}';
+  const orgEmoji = answers?.identity?.emoji || '';
+  const orgShort = answers?.identity?.short_description || '';
+  const orgSlug = (answers?.identity?.name || 'instance')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const network = answers?.federation?.network || 'standalone';
+  const upstream = answers?.federation?.upstream || '../org-os';
+  const fwVer = answers?.federation?.framework_version || '3.5';
+  const operatorName = answers?.members?.[0]?.name || answers?.members?.[0]?.github || 'TBD';
+  const operatorGithub = answers?.members?.[0]?.github || 'TBD';
 
   // MEMORY.md: keep heading, empty Key Decisions
   const memoryPath = path.join(args.target, 'MEMORY.md');
@@ -240,6 +299,219 @@ _(what the agent should focus on right now — populate as priorities surface)_
 _This file evolves. The bootstrap-interviewer skill helps fill it in._
 `);
 
+  // IDENTITY.md: instance template (replaces framework-hub identity)
+  fs.writeFileSync(path.join(args.target, 'IDENTITY.md'), `# IDENTITY.md — Organizational Identity
+
+_Bridges agent identity with EIP-4824 organizational identity._
+
+---
+
+## Core Identity
+
+- **Name:** ${orgName}
+- **Type:** ${orgType}
+- **Emoji:** ${orgEmoji}
+- **Short description:** ${orgShort}
+
+---
+
+## On-Chain Identity
+
+- **daoURI:** _(populate when on-chain registration is set up)_
+- **Primary Chain:** _(populate when applicable)_
+
+---
+
+## Treasury
+
+- **Primary Safe:** _(populate when treasury is set up)_
+- **Operational Wallet:** _(populate)_
+
+---
+
+## Governance Infrastructure
+
+- **Decision Model:** _(e.g., majority-vote, consensus, founder-led)_
+- **Snapshot Space:** _(if applicable)_
+
+---
+
+## Federation Identity
+
+- **Network:** ${network}
+- **Node ID:** ${orgSlug}
+- **Upstream:** ${upstream}
+
+---
+
+## Contact
+
+- **GitHub:** _(populate)_
+- **Maintainer:** _(populate)_
+- **Telegram:** _(populate)_
+- **Website:** _(populate)_
+- **Email:** _(populate)_
+
+---
+
+_This file is read by agents at session startup. Keep it current as the organization evolves._
+`);
+
+  // SOUL.md: instance template
+  fs.writeFileSync(path.join(args.target, 'SOUL.md'), `# SOUL.md — Mission, Values, Voice
+
+_Read this first. It defines who we are and how we operate._
+
+---
+
+## Mission
+
+_(One paragraph. What does this organization exist to do?)_
+
+## Values
+
+_(3-5 core values, each with a short description.)_
+
+## Voice
+
+_(How we communicate, internally and externally. What we sound like.)_
+
+## Boundaries
+
+_(What this organization will and will not do. Hard lines.)_
+
+---
+
+_Last updated: ${today}_
+`);
+
+  // USER.md: instance template
+  fs.writeFileSync(path.join(args.target, 'USER.md'), `# USER.md — Operator Profile
+
+_Operator-specific context. Updated as the operator learns and the org evolves._
+
+---
+
+## Operator
+
+- **Name:** ${operatorName}
+- **GitHub:** ${operatorGithub}
+- **Role in this org:** _(maintainer, contributor, observer, etc.)_
+
+## Working style
+
+_(Populate as the operator establishes patterns: how they prefer to work, what they delegate, what they handle directly.)_
+
+## Active focus
+
+_(What the operator is currently driving in this org.)_
+
+---
+
+_Last updated: ${today}_
+`);
+
+  // CLAUDE.md: instance template (replaces framework-hub instructions)
+  fs.writeFileSync(path.join(args.target, 'CLAUDE.md'), `# CLAUDE.md — Claude Code Instructions
+
+This workspace is **${orgName}** — an instance of the org-os framework.
+
+## Quick Start
+
+Read these in order at session start:
+
+1. \`SOUL.md\` — values, mission, voice, boundaries
+2. \`IDENTITY.md\` — org identity, governance, federation
+3. \`USER.md\` — operator profile
+4. \`MEMORY.md\` — key decisions, active context
+5. \`memory/YYYY-MM-DD.md\` — latest daily log
+6. \`HEARTBEAT.md\` — active tasks (check urgency!)
+7. \`TOOLS.md\` — endpoints, addresses, channels
+8. \`federation.yaml\` — network peers and integrations
+
+## Key Rules
+
+- **Source of truth:** \`data/*.yaml\` for structured data, \`MEMORY.md\` for decisions
+- **After data changes:** Run \`npm run generate:schemas && npm run validate:schemas\`
+- **Memory:** Write daily logs to \`memory/YYYY-MM-DD.md\` (append, never overwrite)
+- **Safety:** Draft-and-present for external actions
+
+## Session Lifecycle
+
+Use \`/initialize\` to start a session and \`/close\` to end it.
+
+## Sync with framework
+
+\`\`\`
+npm run sync:upstream
+\`\`\`
+
+This pulls framework updates (skills, packages, schemas) while preserving instance-specific files.
+`);
+
+  // CHANGELOG.md: instance template (empty)
+  fs.writeFileSync(path.join(args.target, 'CHANGELOG.md'), `# Changelog
+
+All notable changes to this instance will be documented here.
+
+## [Unreleased]
+
+_Bootstrap entry — initial scaffolding from org-os v${fwVer}._
+`);
+
+  // knowledge/INDEX.md: minimal stub (replaces framework knowledge index)
+  const knowledgeDir = path.join(args.target, 'knowledge');
+  fs.mkdirSync(knowledgeDir, { recursive: true });
+  fs.writeFileSync(path.join(knowledgeDir, 'INDEX.md'), `# Knowledge Index
+
+This directory holds ${orgName}'s knowledge commons.
+
+## Sources
+
+_(Populate \`data/sources.yaml\` to register external sources, then run knowledge-curator skill to ingest.)_
+`);
+
+  // dashboard.yaml: instance template (no framework custom_sections)
+  fs.writeFileSync(path.join(args.target, 'dashboard.yaml'), `# dashboard.yaml — Controls what /initialize shows
+# See org-os/dashboard.yaml in the framework for reference + section options.
+
+schema_version: "2.0"
+
+sections:
+  header:
+    show: true
+    style: ascii
+  projects:
+    show: true
+  tasks:
+    show: true
+  calendar:
+    show: true
+    days: 7
+  funding:
+    show: true
+    horizon_days: 30
+  context:
+    show: true
+    max_entries: 3
+  plans:
+    show: true
+    queued_preview: 2
+  apps:
+    show: true
+  cheatsheet:
+    show: true
+  federation:
+    show: true
+  prompt:
+    show: true
+    suggestions: 3
+`);
+
+  // repos.manifest.json: empty (replaces framework's manifest of all org repos)
+  fs.writeFileSync(path.join(args.target, 'repos.manifest.json'),
+    JSON.stringify({ repositories: [] }, null, 2) + '\n');
+
   // memory/ — clear and add seed
   const memDir = path.join(args.target, 'memory');
   if (fs.existsSync(memDir)) {
@@ -247,12 +519,132 @@ _This file evolves. The bootstrap-interviewer skill helps fill it in._
   }
   fs.mkdirSync(memDir, { recursive: true });
   fs.writeFileSync(path.join(memDir, `${today}.md`),
-    `# ${today} — Bootstrap\n\n**Operator:** TBD\n**Session type:** initial bootstrap\n\n---\n\n## Welcome\n\nYour org-os instance is initialized. Run \`/initialize\` to start your first session.\n`);
+    `# ${today} — Bootstrap\n\n**Operator:** ${operatorName}\n**Session type:** initial bootstrap\n\n---\n\n## Welcome\n\nYour org-os instance is initialized. Run \`/initialize\` to start your first session.\n`);
 
-  log('reset MEMORY.md, HEARTBEAT.md, MASTERPLAN.md, DECISIONS.md, memory/');
+  log('reset markdown identity files (MEMORY, HEARTBEAT, MASTERPLAN, DECISIONS, IDENTITY, SOUL, USER, CLAUDE, CHANGELOG, knowledge/INDEX, dashboard.yaml, repos.manifest.json, memory/)');
 }
 
-resetMarkdown();
+// Stage 4b: reset framework data registries to empty seeds (Fix 3)
+// These are required by validate-structure (members, projects, governance, ideas) or
+// commonly referenced (relationships); they exist in the instance but start empty.
+function resetDataRegistries(answers) {
+  if (args.dryRun) {
+    log('reset data/projects.yaml, data/ideas.yaml, data/governance.yaml, data/relationships.yaml, data/members.yaml');
+    return;
+  }
+  const orgName = answers?.identity?.name || 'instance';
+  const dataDir = path.join(args.target, 'data');
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  // projects.yaml — empty list
+  fs.writeFileSync(path.join(dataDir, 'projects.yaml'), `schema_version: "2.0"
+
+# Projects Registry — ${orgName}
+# Long-lived workstreams. Specific implementation plans live in docs/agent-plans/
+# and reference their parent via \`workstream:\` frontmatter.
+
+projects: []
+`);
+
+  // ideas.yaml — empty list
+  fs.writeFileSync(path.join(dataDir, 'ideas.yaml'), `schema_version: "2.0"
+
+# Ideas Registry — ${orgName}
+# Lifecycle: surfaced → proposed → approved → developing → hatched → archived
+
+ideas: []
+`);
+
+  // governance.yaml — empty governance with no decisions
+  fs.writeFileSync(path.join(dataDir, 'governance.yaml'), `schema_version: "2.0"
+
+# Governance Registry — ${orgName}
+
+governance:
+  model: "solo-maintainer"     # solo-maintainer | steward-council | multisig | assembly | conviction
+  current_phase: "bootstrap"   # bootstrap | transition | active | sunset
+  infrastructure:
+    safe: null
+    hats_tree: null
+    gardens: null
+    snapshot: null
+  decisions: []
+  elections: []
+`);
+
+  // relationships.yaml — empty list
+  fs.writeFileSync(path.join(dataDir, 'relationships.yaml'), `schema_version: "2.0"
+
+# Relationships Registry — ${orgName}
+# Tracks relationships with peers, instances, and ecosystem collaborators.
+
+relationships: []
+`);
+
+  // members.yaml — operator from answers (if any), else empty
+  const seedMembers = (answers?.members || []).map((m) => {
+    const handle = m.github ? `github:${m.github}` : (m.handle || 'unknown');
+    return {
+      id: handle,
+      name: m.name || m.github || 'Operator',
+      role: m.role || 'maintainer',
+      joined: new Date().toISOString().slice(0, 10),
+      handles: m.github ? { github: m.github } : {},
+    };
+  });
+  fs.writeFileSync(path.join(dataDir, 'members.yaml'), `schema_version: "2.0"
+
+# Members Registry — ${orgName}
+
+${yaml.dump({ members: seedMembers })}`);
+
+  log(`reset data registries (projects, ideas, governance, relationships, members[${seedMembers.length}])`);
+}
+
+// Stage 4c: render a lean instance package.json (Fix 5, Option A)
+function renderInstancePackageJson(answers) {
+  if (args.dryRun) {
+    log('render lean instance package.json (drop framework-only scripts)');
+    return;
+  }
+  const orgSlug = (answers?.identity?.name || 'org-os-instance')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  // Read framework package.json so dependencies/engines stay in lockstep with
+  // what the instance actually needs (the script files copied across).
+  let fwPkg = {};
+  try {
+    fwPkg = JSON.parse(fs.readFileSync(path.join(FRAMEWORK_ROOT, 'package.json'), 'utf-8'));
+  } catch {}
+
+  const instancePkg = {
+    name: orgSlug || 'org-os-instance',
+    description: answers?.identity?.short_description || 'org-os instance',
+    private: true,
+    version: '0.1.0',
+    type: 'module',
+    license: fwPkg.license || 'MIT',
+    scripts: {
+      initialize: 'node scripts/initialize.mjs',
+      sync: 'node scripts/sync-github.mjs',
+      'sync:upstream': 'node scripts/sync-upstream.mjs',
+      'sync:packages': 'node scripts/sync-packages.mjs',
+      'generate:schemas': 'node scripts/generate-all-schemas.mjs',
+      'validate:schemas': 'node scripts/validate-identity.mjs',
+      'validate:structure': 'node scripts/validate-structure.mjs',
+      'clone:repos': 'node scripts/clone-linked-repos.mjs',
+      migrate: 'node scripts/migrate.mjs',
+      check: 'tsc --noEmit && npx prettier . --check',
+      format: 'npx prettier . --write',
+    },
+    engines: fwPkg.engines || { node: '>=22', npm: '>=10.9.2' },
+    dependencies: fwPkg.dependencies || {},
+    devDependencies: fwPkg.devDependencies || {},
+  };
+  fs.writeFileSync(path.join(args.target, 'package.json'),
+    JSON.stringify(instancePkg, null, 2) + '\n');
+  log(`rendered instance package.json (name=${instancePkg.name})`);
+}
 
 // Stage 5: collect bootstrap answers (Task 22)
 async function collectAnswers() {
@@ -275,6 +667,12 @@ if (!answers && !args.dryRun) {
   process.exit(1);
 }
 log(`bootstrap answers collected${answers?.identity?.name ? `: ${answers.identity.name}` : ''}`);
+
+// Stage 4 (deferred): identity-scoped resets need answers, so they run here
+// rather than immediately after copy/strip.
+resetMarkdown(answers);
+resetDataRegistries(answers);
+renderInstancePackageJson(answers);
 
 // Stage 6: render templates (Task 23)
 async function renderTemplates(answers) {

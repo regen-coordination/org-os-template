@@ -157,6 +157,169 @@ test('clone-framework writes federation.yaml with nested schema + selected packa
   }
 });
 
+test('clone-framework strips framework identity files (IDENTITY.md regenerated)', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-id-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
+
+    const id = readFileSync(path.join(target, 'IDENTITY.md'), 'utf-8');
+    assert.ok(!id.includes('framework + orchestration hub'),
+      'IDENTITY.md should not contain framework hub language');
+    assert.ok(!id.includes('refi-bcn-os') && !id.includes('refi-dao-os'),
+      'IDENTITY.md should not list framework downstream instances');
+    assert.match(id, /Selftest Instance/, 'IDENTITY.md should reflect instance name');
+
+    const soul = readFileSync(path.join(target, 'SOUL.md'), 'utf-8');
+    assert.ok(!soul.includes('federation of regenerative organizations'),
+      'SOUL.md should not contain framework mission language');
+    assert.match(soul, /Mission/, 'SOUL.md should be a fresh template');
+
+    const claudeMd = readFileSync(path.join(target, 'CLAUDE.md'), 'utf-8');
+    assert.ok(!claudeMd.includes('Framework thinking'),
+      'CLAUDE.md should not contain framework-only rules');
+    assert.match(claudeMd, /Selftest Instance/, 'CLAUDE.md should reference instance name');
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework strips framework data registries (projects.yaml empty seed)', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-data-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
+
+    const projContent = readFileSync(path.join(target, 'data/projects.yaml'), 'utf-8');
+    assert.ok(!projContent.includes('v2-stabilization'),
+      'data/projects.yaml should not contain framework workstreams');
+    assert.ok(!projContent.includes('Federation Protocol'),
+      'data/projects.yaml should not contain framework projects');
+    assert.match(projContent, /projects:\s*\[\]/, 'data/projects.yaml should be empty list seed');
+
+    const ideasContent = readFileSync(path.join(target, 'data/ideas.yaml'), 'utf-8');
+    assert.ok(!ideasContent.includes('idea-001-hatching-pipeline'),
+      'data/ideas.yaml should not contain framework ideas');
+
+    const govContent = readFileSync(path.join(target, 'data/governance.yaml'), 'utf-8');
+    assert.ok(!govContent.includes('Self-hosting inauguration'),
+      'data/governance.yaml should not contain framework decisions');
+    assert.match(govContent, /decisions:\s*\[\]/, 'governance.yaml decisions should be empty');
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework strips framework agent plans + bootstrap fixtures', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-plans-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
+
+    const planDir = path.join(target, 'docs/agent-plans');
+    if (existsSync(planDir)) {
+      const files = fs.readdirSync(planDir);
+      for (const f of files) {
+        if (f === 'README.md') continue;
+        assert.fail(`framework plan leaked into instance: ${f}`);
+      }
+    }
+    // Bootstrap fixtures should not leak
+    assert.ok(!existsSync(path.join(target, 'tests/fixtures/bread-coop-os-config.yaml')),
+      'tests/fixtures/bread-coop-os-config.yaml should be stripped');
+    assert.ok(!existsSync(path.join(target, 'tests/fixtures/instance-config.yaml')),
+      'tests/fixtures/instance-config.yaml should be stripped');
+    // Framework specs should not leak
+    const specsDir = path.join(target, 'docs/superpowers/specs');
+    if (existsSync(specsDir)) {
+      assert.equal(fs.readdirSync(specsDir).length, 0,
+        'docs/superpowers/specs should be empty in instance');
+    }
+    // memory/reports should not leak (framework-only audit history)
+    assert.ok(!existsSync(path.join(target, 'memory/reports')),
+      'memory/reports should not exist in instance (framework-only)');
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework strips framework knowledge index', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-know-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
+    const idxPath = path.join(target, 'knowledge/INDEX.md');
+    assert.ok(existsSync(idxPath), 'knowledge/INDEX.md should exist as instance stub');
+    const idx = readFileSync(idxPath, 'utf-8');
+    assert.ok(!idx.includes('Organizational OS Knowledge Commons'),
+      'knowledge/INDEX.md should not contain framework index content');
+    assert.match(idx, /Selftest Instance/, 'knowledge/INDEX.md should reference instance name');
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework writes lean instance package.json', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-pkg-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
+    const pkg = JSON.parse(readFileSync(path.join(target, 'package.json'), 'utf-8'));
+    assert.notEqual(pkg.name, 'organizational-os-template',
+      'package.json name should be instance slug, not framework template');
+    assert.equal(pkg.name, 'selftest-instance');
+    // Framework-only scripts should be gone
+    assert.ok(!pkg.scripts['clone:framework'], 'clone:framework should be stripped');
+    assert.ok(!pkg.scripts['analyze:instances'], 'analyze:instances should be stripped');
+    assert.ok(!pkg.scripts['render:self'], 'render:self should be stripped');
+    assert.ok(!pkg.scripts['install:hooks'], 'install:hooks should be stripped');
+    assert.ok(!pkg.scripts.selftest, 'selftest should be stripped');
+    // Essential instance scripts preserved
+    assert.ok(pkg.scripts['validate:schemas']);
+    assert.ok(pkg.scripts['generate:schemas']);
+    assert.ok(pkg.scripts['sync:upstream']);
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework strips framework repos manifest', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-repos-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
+    const manifest = JSON.parse(readFileSync(path.join(target, 'repos.manifest.json'), 'utf-8'));
+    assert.deepEqual(manifest.repositories, [],
+      'repos.manifest.json should be empty in instance');
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
 test('clone-framework dry-run completes all stages (Tasks 26-27)', () => {
   const target = mkdtempSync(path.join(tmpdir(), 'clone-dryrun-'));
   rmSync(target, { recursive: true, force: true });  // delete so it doesn't exist
