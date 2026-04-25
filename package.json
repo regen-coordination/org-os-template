@@ -2,7 +2,7 @@
   "name": "organizational-os-template",
   "description": "GitHub-based operational workspace template with EIP-4824 compliance",
   "private": true,
-  "version": "2.0.0",
+  "version": "3.0.0",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -21,7 +21,9 @@
     "generate:schemas": "node scripts/generate-all-schemas.mjs",
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
+    "analyze:instances": "node scripts/analyze-instances.mjs",
     "version:update": "node scripts/update-version.mjs",
+    "migrate": "node scripts/migrate.mjs",
     "docs": "npx quartz build --serve -d docs",
     "check": "tsc --noEmit && npx prettier . --check",
     "format": "npx prettier . --write",

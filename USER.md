@@ -1,40 +1,45 @@
 # USER.md — About Your Operator
 
-_Learn about the person you're helping. Update this as you learn their preferences._
+_The person you're helping. Update as preferences surface through working together._
 
 ---
 
-- **Name:** _(fill in)_
-- **What to call them:** _(preferred name)_
-- **Pronouns:** _(optional)_
-- **Timezone:** _(e.g., Europe/Barcelona, America/New_York)_
-- **Languages:** _(primary, secondary)_
+- **Name:** Luiz Fernando
+- **What to call them:** Luiz
+- **Pronouns:** he/him
+- **Timezone:** Europe/Madrid (Barcelona)
+- **Languages:** English (primary working), Portuguese (native), Spanish, Catalan (conversational)
 
 ---
 
 ## Working Preferences
 
-_(Fill in based on early interactions.)_
-
-- **Response style:** _(concise | thorough | mixed)_
-- **Autonomy level:** _(prefers agent to act first, or to ask first?)_
-- **Language:** _(respond in language of prompt, or always in English?)_
-- **Output format:** _(markdown, plain text, structured lists?)_
+- **Response style:** concise — direct updates, no trailing summaries
+- **Autonomy level:** act first on low-risk / reversible work; ask before destructive or shared-state changes
+- **Language:** respond in language of prompt (default English)
+- **Output format:** markdown with concrete file paths, commands, and file:line references
 
 ---
 
 ## Context
 
-- **Role in org:** _(coordinator, developer, founder, ...)_
-- **Active domains:** _(areas of focus)_
-- **Active projects:** _(link to project pages)_
-- **Communication channels:** _(Telegram, email, ...)_
+- **Role in org-os:** sole maintainer and architect
+- **Also operates:**
+  - **ReFi Barcelona** (`03 Libraries/refi-bcn-os/`) — Strategy Lead in a cooperative-in-formation
+  - **ReFi DAO** (`03 Libraries/refi-dao-os/`) — network coordination contributor
+  - **Zettelkasten hub** (`Desktop/Workspaces/Zettelkasten/`) — personal OS that federates with the above
+- **Active domains:** organizational OS, regenerative finance, federated knowledge, agent-native infrastructure, EIP-4824 standards
+- **Active projects (org-os scope):** v2 stabilization, federation protocol, non-tech onboarding, instance orchestration
+- **Communication channels:** GitHub (primary), Telegram (ReFi BCN + ReFi DAO channels), email
 
 ---
 
 ## Notes
 
-_(Any preferences or context discovered through working together.)_
+- Works across multiple federated instances simultaneously — context-switching is high. Default to naming the instance explicitly when giving updates.
+- Strong preference for patterns over one-offs: if a solution could serve ≥2 instances, surface the promotion candidate.
+- Values terse, evidence-based output. "Done" means verified (tests run, schemas validated), not claimed.
+- Treats `data/*.yaml` as source of truth; any change there should trigger `npm run generate:schemas`.
 
 ---
 

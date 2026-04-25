@@ -1,5 +1,125 @@
 {
   "@context": "https://www.daostar.org/schemas",
   "type": "IdeaRegistry",
-  "ideas": []
+  "ideas": [
+    {
+      "id": "idea-001-hatching-pipeline",
+      "title": "Idea hatching pipeline — knowledge → idea → hatched project repo",
+      "status": "surfaced",
+      "submitted_by": "github:luizfernandosg",
+      "champions": [
+        "github:luizfernandosg"
+      ],
+      "ecosystem_gap": "Knowledge processing surfaces ideas, but no systematic path from idea → scoped project → forked repo exists.",
+      "description": "Design the pipeline: idea-scout surfaces gaps → community champions emerge → idea becomes approved → dev repo hatches from template.",
+      "hatched_repo": null,
+      "skills_needed": [
+        "idea-scout",
+        "knowledge-curator"
+      ],
+      "created": "2026-04-24",
+      "votes": 0
+    },
+    {
+      "id": "idea-002-nontech-ux",
+      "title": "Non-tech operator UX — web + chat onboarding",
+      "status": "proposed",
+      "submitted_by": "github:luizfernandosg",
+      "champions": [
+        "github:luizfernandosg"
+      ],
+      "ecosystem_gap": "Current bootstrap requires CLI + GitHub literacy. Most regenerative org operators are not developers.",
+      "description": "Web-based wizard (GitHub Actions backend) + chat interface (Telegram bot) that wraps bootstrap-interviewer skill. Scoping plan exists at docs/agent-plans/non-tech-onboarding.md.",
+      "hatched_repo": null,
+      "skills_needed": [
+        "bootstrap-interviewer"
+      ],
+      "created": "2026-04-24",
+      "votes": 0
+    },
+    {
+      "id": "idea-003-notion-sync",
+      "title": "Bidirectional Notion ↔ YAML sync",
+      "status": "surfaced",
+      "submitted_by": "github:luizfernandosg",
+      "champions": [],
+      "ecosystem_gap": "Operators prefer editing in Notion; agents read YAML. Manual sync breaks quickly.",
+      "description": "Design bidirectional sync between Notion databases and data/*.yaml with conflict resolution and schema validation on both sides.",
+      "hatched_repo": null,
+      "skills_needed": [],
+      "created": "2026-04-24",
+      "votes": 0
+    },
+    {
+      "id": "idea-004-federation-at-scale",
+      "title": "Federation at scale — 10+ nodes with routing",
+      "status": "surfaced",
+      "submitted_by": "github:luizfernandosg",
+      "champions": [],
+      "ecosystem_gap": "Current federation.yaml handles small networks. 10+ nodes need skill-sharing protocols, knowledge routing, trust delegation.",
+      "description": "Design patterns for larger federations: namespace isolation, skill package registries, trust chains.",
+      "hatched_repo": null,
+      "skills_needed": [],
+      "created": "2026-04-24",
+      "votes": 0
+    },
+    {
+      "id": "idea-005-autoresearch-metrics",
+      "title": "Autoresearch evaluation metrics",
+      "status": "surfaced",
+      "submitted_by": "github:luizfernandosg",
+      "champions": [],
+      "ecosystem_gap": "workspace-improver runs an autonomous loop, but no objective criteria decide what counts as improvement.",
+      "description": "Define measurable metrics: schema validation pass rate, memory recency, HEARTBEAT completion rate, instance drift. Feed into workspace-improver's evaluation step.",
+      "hatched_repo": null,
+      "skills_needed": [],
+      "created": "2026-04-24",
+      "votes": 0
+    },
+    {
+      "id": "idea-006-promote-research-skill",
+      "title": "Promote `research` skill to framework",
+      "status": "approved",
+      "submitted_by": "agent",
+      "champions": [
+        "github:luizfernandosg"
+      ],
+      "ecosystem_gap": "`research` skill exists in refi-bcn-os and refi-dao-os but not in framework. Two instances validate the pattern — promotion criteria met.",
+      "description": "Reconcile the two implementations, extract the common core into skills/research/SKILL.md, instances migrate to framework version on next sync.",
+      "hatched_repo": null,
+      "skills_needed": [],
+      "created": "2026-04-24",
+      "votes": 0
+    },
+    {
+      "id": "idea-007-promote-dao-modules",
+      "title": "Promote DAO-module skills to framework",
+      "status": "proposed",
+      "submitted_by": "agent",
+      "champions": [
+        "github:luizfernandosg"
+      ],
+      "ecosystem_gap": "safe-treasury, hats-governance, gardens-governance, karma-reputation, eip4824-identity exist only in dao-os. Framework has no treasury/governance-protocol skills despite supporting DAO-type instances.",
+      "description": "Evaluate each skill for generality. Promote those that serve any DAO-type instance. Keep dao-os-specific composer logic in dao-os.",
+      "hatched_repo": null,
+      "skills_needed": [],
+      "created": "2026-04-24",
+      "votes": 0
+    },
+    {
+      "id": "idea-008-registry-extension-pattern",
+      "title": "Document cross-instance data-registry extension pattern",
+      "status": "surfaced",
+      "submitted_by": "agent",
+      "champions": [
+        "github:luizfernandosg"
+      ],
+      "ecosystem_gap": "refi-bcn-os adds tasks/pending-payouts/telegram-topic-routing; refi-dao-os adds blog-articles/entities/tasks/website-source-mapping. Instances extend the canonical 13 registries but the pattern isn't documented — new instances reinvent.",
+      "description": "Document in docs/DATA-MODEL.md how to add instance-specific registries without breaking framework validation. Consider: namespace prefix, validation opt-in, schema extension.",
+      "hatched_repo": null,
+      "skills_needed": [],
+      "created": "2026-04-24",
+      "votes": 0
+    }
+  ]
 }

@@ -451,6 +451,47 @@ function loadMembers() {
   }));
 }
 
+// ── Ideas ────────────────────────────────────────────────────────────────────
+
+function loadIdeas() {
+  const ideasData = readYamlSafe(path.join(rootDir, "data", "ideas.yaml"));
+  return (ideasData?.ideas || []).map((i) => ({
+    id: i.id,
+    title: i.title,
+    status: i.status,
+    champions: i.champions || [],
+  }));
+}
+
+// ── Instances (framework-only) ───────────────────────────────────────────────
+
+function loadInstances() {
+  const instData = readYamlSafe(path.join(rootDir, "data", "instances.yaml"));
+  return (instData?.instances || []).map((i) => ({
+    id: i.id,
+    name: i.name,
+    type: i.type,
+    maturity: i.maturity,
+    framework_version: i.framework_version,
+    last_sync: i.last_sync,
+    cloned: i.cloned,
+    drift_count: (i.drift || []).length,
+  }));
+}
+
+// ── Skill promotion candidates (framework-only) ──────────────────────────────
+
+function loadSkillCandidates() {
+  const matrix = readYamlSafe(path.join(rootDir, "data", "skills-matrix.yaml"));
+  return (matrix?.skills || [])
+    .filter((s) => s.promotion_status === "candidate")
+    .map((s) => ({
+      id: s.id,
+      owner: s.owner,
+      instances_using: s.instances_using || [],
+    }));
+}
+
 // ── Funding ──────────────────────────────────────────────────────────────────
 
 function loadFunding() {
@@ -943,6 +984,9 @@ async function main() {
   const events = loadEvents();
   const meetings = loadMeetings();
   const members = loadMembers();
+  const ideas = loadIdeas();
+  const instances = loadInstances();
+  const skillCandidates = loadSkillCandidates();
   const funding = loadFunding();
   const recentMemory = loadRecentMemory();
   const federation = loadFederation();
@@ -960,6 +1004,9 @@ async function main() {
     events,
     meetings,
     members,
+    ideas,
+    instances,
+    skillCandidates,
     funding,
     recentMemory,
     federation,

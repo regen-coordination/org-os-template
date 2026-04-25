@@ -1,0 +1,136 @@
+# DECISIONS.md — Key Decisions Log
+
+_Append-only log of significant decisions in this org. Most recent at top. Detailed session notes live in `memory/YYYY-MM-DD.md`. This file is the **authoritative source** for the agent's context on "what was decided and why" — `MEMORY.md` indexes; `DECISIONS.md` records._
+
+## Conventions
+
+Each decision is a section with these fields:
+
+- **Status** — `active` (in force) · `superseded` (replaced by a later decision) · `withdrawn` (rolled back) · `proposed` (under discussion, not yet ratified)
+- **Scope** — which area(s): framework / instances / governance / federation / data-model / agent-runtime / operator-ux / etc.
+- **Decision** — the call, in one or two sentences
+- **Why** — the rationale, including alternatives considered and what made them lose
+- **Refs** — commits, files, plans, related decisions, session memory
+
+When a decision is superseded, mark it `superseded` and add a `Superseded by:` link to the newer decision. Do not delete; the trail is the value.
+
+---
+
+## 2026-04-24 · Versioning system
+
+**Status:** active
+**Scope:** framework, data-model
+
+**Decision** — `package.json.version` is the single source of truth for framework version. Strict semver. Schema, framework, skill, and `MASTERPLAN.md` versions are decoupled — each can bump independently. Instance migrations are **pull-based**: the framework publishes migration scripts in `scripts/migrations/`; instances run `npm run migrate` when ready. Policy codified in `docs/VERSIONING.md`. v3.0.0 is the first tagged release.
+
+**Why** — Three versions disagreed (`package.json` said 2.0.0, `federation.yaml.metadata.framework_version` said 3.0, MASTERPLANs varied per file) with no migration path for breaking changes like the recent `workstream:` frontmatter addition. Coupling all versions would create false-positive bumps; decoupling lets each artifact evolve at its own cadence. Pull-based migration was chosen over push (framework opening PRs to instances) because instances have their own release cadences and can't always accept framework changes immediately. Strict semver was chosen over 0.x permissiveness because the framework already has production instances depending on it.
+
+**Refs** — `docs/VERSIONING.md`, `CHANGELOG.md`, `scripts/update-version.mjs`, `scripts/migrate.mjs`, `scripts/migrations/v2-to-v3-workstream-frontmatter.mjs`, `docs/migrations/v2-to-v3.md`, `docs/agent-plans/versioning-system.md`
+
+---
+
+## 2026-04-24 · Self-hosting inauguration
+
+**Status:** active
+**Scope:** framework, instances, data-model
+
+**Decision** — The org-os repo converts from a template-with-stubs into a **live self-hosting instance** that simultaneously operates as the **multi-instance orchestration hub** for all downstream instances.
+
+**Why** — Two separate shapes (a static framework template + a running hub repo) would mean duplicate canonical files, drift between "what the framework says" and "what the hub does", and no dogfooding loop. Self-hosting collapses both into one repo, gives the framework a living example, and makes hub-only registries (`instances.yaml`, `skills-matrix.yaml`, `packages-matrix.yaml`) first-class citizens of the framework. Cost: framework code now has to distinguish framework-generic from hub-only — handled via `dashboard.yaml` `custom_sections`.
+
+**Refs** — `memory/2026-04-24.md`, `data/instances.yaml`, `data/skills-matrix.yaml`, `data/packages-matrix.yaml`, `IDENTITY.md`, `federation.yaml`
+
+---
+
+## 2026-04-24 · Projects-vs-plans separation
+
+**Status:** active
+**Scope:** data-model, agent-runtime
+
+**Decision** — `data/projects.yaml` holds long-lived **workstreams** (multi-month, broad scope, owned). `docs/agent-plans/` holds specific **plans** that execute under a workstream. Plans carry a `workstream:` frontmatter field linking back to the parent project.
+
+**Why** — Conflating workstreams and plans in one registry forced a choice between "too many short-lived projects clogging the registry" or "plans living nowhere". Separation lets workstreams stay stable across many sessions while plans turn over rapidly through scoping → queued → active → completed. The `workstream` field keeps them joinable when needed (e.g., for the upcoming TUI's project entity page, which lists all plans under a project).
+
+**Refs** — `data/projects.yaml`, `docs/agent-plans/QUEUE.md`, `docs/agent-plans/README.md`, `memory/2026-04-24.md`
+
+---
+
+## 2026-04-24 · Identity trajectory: solo-maintainer → OSS → DAO
+
+**Status:** active
+**Scope:** governance, identity
+
+**Decision** — The org's identity evolves through three phases: solo-maintainer (now) → open-source project with external contributors → DAO with on-chain governance and treasury. Governance/treasury fields are kept present in `IDENTITY.md` but marked `N/A (solo phase)` rather than removed.
+
+**Why** — Removing fields that don't apply yet would force a bigger refactor when triggers fire (first external contributor, first treasury operation). Keeping them visible as `N/A` makes the upgrade path explicit and self-documenting. Triggers for each phase transition are spelled out in `IDENTITY.md` → Evolution Triggers so the agent knows when to prompt for the change.
+
+**Refs** — `IDENTITY.md`, `SOUL.md`, `memory/2026-04-24.md`
+
+---
+
+## 2026-04-24 · Framework-only registries
+
+**Status:** active
+**Scope:** data-model, framework
+
+**Decision** — `data/instances.yaml`, `data/skills-matrix.yaml`, `data/packages-matrix.yaml` are **framework-only** registries — only the framework/hub repo carries them. Individual instances do not.
+
+**Why** — Instances coordinate themselves; the hub coordinates the federation. Putting cross-instance catalogs in every instance would create N copies that drift instantly. Concentrating them in the hub gives one source of truth for cross-instance health (drift, sync, promotion candidates). Documented as an explicit registry-class distinction in `docs/DATA-MODEL.md` so future framework-only registries follow the same convention.
+
+**Refs** — `docs/DATA-MODEL.md` (Framework-only registries section), `data/instances.yaml`, `data/skills-matrix.yaml`, `data/packages-matrix.yaml`
+
+---
+
+## 2026-04-24 · Skill promotion policy
+
+**Status:** active
+**Scope:** framework, federation
+
+**Decision** — A skill becomes a candidate for framework canonization when it has been **independently validated in ≥2 instances**. Promotion involves reconciling implementations and extracting a common core to `skills/<id>/SKILL.md`. Single-instance skills stay instance-specific.
+
+**Why** — One instance proves nothing is impossible; two instances suggest it generalizes. Without a criterion, every clever instance-local skill would lobby for promotion and the framework would bloat. The ≥2-instance bar is the smallest gate that selects for genuinely shared patterns. `data/skills-matrix.yaml` tracks promotion status per skill.
+
+**Refs** — `docs/SKILL-PROMOTION.md`, `data/skills-matrix.yaml`
+
+---
+
+## 2026-04-15 · `/initialize` self-executing via `dashboard.yaml`
+
+**Status:** active
+**Scope:** agent-runtime, operator-ux
+
+**Decision** — The `/initialize` and `/close` slash commands are self-executing: each step in their definition is a concrete instruction the agent runs in order. Sections shown by `/initialize` are controlled by `dashboard.yaml` (`show:` flags + file order + per-section options).
+
+**Why** — Earlier `/initialize` definitions described what the dashboard *should* contain rather than what the agent should *do*, leaving execution ambiguous and the rendered output inconsistent across sessions. Step-by-step execution + a config file removes both ambiguities — the agent has a script, and the operator has one place to toggle sections without editing skill code.
+
+**Refs** — commits `0e383a6`, `1b2f7e4`, `dashboard.yaml`, `skills/org-os-init/SKILL.md`
+
+---
+
+## 2026-04-06 · Plans pipeline convention
+
+**Status:** active
+**Scope:** data-model, agent-runtime
+
+**Decision** — Plans live in `docs/agent-plans/` and move through a four-state pipeline: **scoping** → **queued** → **active** → **completed**. State is tracked in `docs/agent-plans/QUEUE.md`. Each plan is a single markdown file with frontmatter (`status`, `workstream`, `depends_on`, etc.).
+
+**Why** — Plans are short-lived and high-volume; a flat folder with state in frontmatter is lighter than a per-state directory or a database. The QUEUE.md index gives the agent and operator one place to see "what's active right now". Renaming/moving files on state transitions was rejected — it breaks links and history.
+
+**Refs** — commits `d1028ec`, `c80b3dc`, `docs/agent-plans/QUEUE.md`, `docs/agent-plans/README.md`
+
+---
+
+## 2026-04-05 · v2 data model complete
+
+**Status:** active
+**Scope:** data-model, framework
+
+**Decision** — org-os v2.0.0 ships with 13 canonical data registries, an EIP-4824 schema generator (`scripts/generate-schemas.mjs`), and a deploy script. Schema files in `.well-known/` are auto-generated from `data/*.yaml` — never hand-edited.
+
+**Why** — Federated organizations need machine-readable schemas to interoperate. EIP-4824 (DAO URI) is the existing standard for DAO identity and was extended for non-DAO org types. Auto-generation from YAML keeps `.well-known/` in sync with operational data without humans needing to remember to regenerate — `npm run generate:schemas` is the one command.
+
+**Refs** — commit `4dbd987`, `docs/DATA-MODEL.md`, `scripts/generate-schemas.mjs`, `.well-known/`
+
+---
+
+_End of log. Append new decisions above, most recent at top. When superseding an older decision, mark it `superseded` and link the newer entry._

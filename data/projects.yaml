@@ -1,14 +1,70 @@
 schema_version: "2.0"
 
-# Projects Registry
-# Projects are also tracked in content/projects/ as markdown files
-# This file provides structured data for schema generation
+# Projects Registry — org-os framework workstreams
+# Long-lived work streams. Specific implementation plans live in docs/agent-plans/
+# and reference their parent via `workstream:` frontmatter.
 
-projects: []
-  # Example:
-  # - id: "project-example"
-  #   name: "Example Project"
-  #   status: "Develop"
-  #   lead: "eip155:1:0x1234abcd"
-  #   members: []
-  #   startDate: "2026-01-01"
+projects:
+  - id: "v2-stabilization"
+    name: "v2.0.0 Stabilization"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "Complete v2.0.0 framework: docs suite, skills, validation scripts, lifecycle commands. Active plans feed here until all activations in MASTERPLAN.md §3 are cleared."
+
+  - id: "federation-protocol"
+    name: "Federation Protocol"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "End-to-end federation exchange — sync direction rules, trust levels, conflict resolution. Tests span framework ↔ instances."
+
+  - id: "non-tech-onboarding"
+    name: "Non-Tech Onboarding"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "Web wizard + GitHub Actions backend so non-technical operators can bootstrap an instance without CLI. Scoping stage."
+
+  - id: "instance-orchestration"
+    name: "Instance Orchestration"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "Track and orchestrate all downstream instances. Drift monitoring, cross-instance skill/package catalogs, promotion pipeline. New as of self-hosting inauguration."
+
+  - id: "skill-promotion"
+    name: "Skill Promotion"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "Promote skills validated across ≥2 instances to framework-canonical status. Current candidates: research (in refi-bcn-os + refi-dao-os), DAO-module skills (in dao-os)."
+
+  - id: "opal-rollout"
+    name: "OPAL Rollout"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "Roll production-ready OPAL integration (integrations/opal/) out to operational instances (refi-bcn-os, refi-dao-os) so meeting transcripts populate data/meetings.yaml automatically."
+
+  - id: "operator-interfaces"
+    name: "Operator Interfaces"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "How non-agent humans work with org-os day-to-day. Primary surface: Obsidian (the vault is already an Obsidian workspace). Secondary: Obsidian Canvas for system overview + live operation. Candidate packages: packages/obsidian-interface, packages/obsidian-canvas."
+
+  - id: "framework-evolution"
+    name: "Framework Evolution"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "Longer-horizon: new instance specs (regen-coordination-os, regen-toolkit), support for new org types (Fund, Initiative, Coalition), federation at scale (10+ nodes)."

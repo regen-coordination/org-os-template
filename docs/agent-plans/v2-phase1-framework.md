@@ -10,6 +10,7 @@ started: 2026-04-05
 completed: 2026-04-06
 estimated_sessions: 3
 tags: [v2, framework, standards]
+workstream: v2-stabilization
 ---
 
 ## Goal

@@ -308,11 +308,40 @@ assets:
 
 ---
 
+## Framework-Only Registries
+
+Some registries are only relevant for the **framework repo** (and potentially network hubs) — they track cross-instance state, not local organizational data. Individual instances do **not** need these files.
+
+### instances.yaml — Downstream Instance State
+
+Per-instance record of every downstream instance of this framework. Populated and updated by `npm run analyze:instances`.
+
+Fields: `id`, `name`, `type`, `maturity` (`alpha|beta|production`), `repo`, `local_path`, `cloned`, `federation_network`, `federation_role`, `masterplan_version`, `framework_version`, `last_sync`, `agent_runtime[]`, `skills_extra[]`, `packages[]`, `data_registries_extra[]`, `drift[]`, `notes`.
+
+### skills-matrix.yaml — Cross-Instance Skill Catalog
+
+Every skill across the federation, with `owner`, `instances_using[]`, `in_framework`, `promotion_status` (`canonical|candidate|evaluating|instance-specific`). Surfaces promotion candidates. See `docs/SKILL-PROMOTION.md`.
+
+### packages-matrix.yaml — Cross-Instance Package Catalog
+
+Same shape as `skills-matrix.yaml` but for packages. Surfaces package divergence across instances.
+
+### Extension Pattern for Instances
+
+Instances MAY add their own registries beyond the canonical 13 (e.g., `tasks.yaml`, `pending-payouts.yaml`, `blog-articles.yaml`). When they do:
+
+- Declare the extra registry in the framework's `data/instances.yaml` under `data_registries_extra[]` so drift monitoring knows about it.
+- Keep it out of `.well-known/` generation unless adding a `/well-known/` endpoint is intentional.
+- Follow canonical conventions (top-level key matches filename; `schema_version: "2.0"` header; entries with unique `id`).
+
+---
+
 ## Schema Generation
 
 ```bash
 npm run generate:schemas    # Generate .well-known/*.json from data/*.yaml
 npm run validate:schemas    # Validate EIP-4824 compliance
+npm run analyze:instances   # Framework-only — scan downstream instances and write drift report
 ```
 
 ## Notion Sync

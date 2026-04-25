@@ -1,11 +1,17 @@
 schema_version: "2.0"
 
-# Members Registry
-# Format: List of member objects with identifiers
+# Members Registry — org-os framework
+# Solo-maintainer phase. Additional contributors added when OSS phase begins.
 
-members: []
-  # Example:
-  # - id: "eip155:1:0x1234abcd"
-  #   name: "Member Name"
-  #   role: "member"
-  #   joined: "2026-01-01"
+members:
+  - id: "github:luizfernandosg"
+    name: "Luiz Fernando"
+    role: "maintainer"
+    joined: "2026-04-05"
+    pronouns: "he/him"
+    timezone: "Europe/Madrid"
+    handles:
+      github: "luizfernandosg"
+    also_operates:
+      - "refi-bcn-os"
+      - "refi-dao-os"

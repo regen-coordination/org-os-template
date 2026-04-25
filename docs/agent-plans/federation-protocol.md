@@ -10,6 +10,7 @@ started: null
 completed: null
 estimated_sessions: 2
 tags: [v2, federation, phase4]
+workstream: federation-protocol
 ---
 
 ## Goal

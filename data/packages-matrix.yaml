@@ -1,0 +1,107 @@
+schema_version: "2.0"
+
+# Packages Matrix — FRAMEWORK-ONLY REGISTRY
+# Cross-instance catalog of every package across the federation.
+# Surfaces divergence and promotion candidates.
+
+packages:
+  # --- Framework packages (in org-os/packages/) ---
+  - id: "agents-app"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Agent control app. Bundled at framework; instances consume via federation.yaml toggles."
+
+  - id: "egregore-core"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Collective intelligence core. Referenced by refi-bcn federation.yaml peers."
+
+  - id: "koi-bridge"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "KOI-net integration bridge."
+
+  - id: "koi-opal-bridge"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "KOI-net ↔ OPAL bridge."
+
+  - id: "opal-bridge"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "OPAL meeting/transcript processing bridge. Rollout planned (opal-rollout workstream)."
+
+  - id: "operations"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Operational layer. Active in both production instances."
+
+  - id: "paperclip-agents-app"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Paperclip agent control app variant."
+
+  - id: "regen-agents"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Shared operational agents. Used by both production instances."
+
+  - id: "webapps"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Shared webapp scaffolding."
+
+  # --- Instance-originated packages (promotion candidates) ---
+  - id: "dashboard"
+    owner: "refi-bcn-os"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "Present in both production instances. Framework-dashboard-template scoping plan exists — promotion path already identified."
+
+  - id: "governance"
+    owner: "refi-dao-os"
+    instances_using: ["refi-dao-os"]
+    in_framework: false
+    promotion_status: "evaluating"
+    notes: "DAO-specific governance package. Overlaps with dao-os DAO-module skills — evaluate together."
+
+  - id: "coordination"
+    owner: "refi-dao-os"
+    instances_using: ["refi-dao-os"]
+    in_framework: false
+    promotion_status: "evaluating"
+    notes: "Network coordination package. Single instance; evaluate if generalizable."
+
+  # --- DAO-OS platform-specific packages ---
+  - id: "connectors"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    notes: "DAO-OS module connectors (Safe, Hats, Gardens, Karma, EIP-4824). Platform-specific; the DAO-module SKILLS are the promotion candidates, not the connector package."
+
+  - id: "core"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    notes: "DAO-OS platform core (composer UI, module registry). Platform-specific."

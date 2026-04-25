@@ -10,6 +10,7 @@ started: null
 completed: null
 estimated_sessions: null
 tags: [v2, packages, dashboard]
+workstream: v2-stabilization
 ---
 
 ## Goal

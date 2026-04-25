@@ -1,0 +1,131 @@
+schema_version: "2.0"
+
+# Skills Matrix — FRAMEWORK-ONLY REGISTRY
+# Cross-instance catalog of every skill across the federation.
+# Surfaces promotion candidates: skills proven in ≥2 instances, ready to become framework-canonical.
+#
+# promotion_status: canonical (in framework) | candidate (promote next) | evaluating | instance-specific
+
+skills:
+  # --- Framework canonical skills (shipped in skills/) ---
+  - id: "bootstrap-interviewer"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Guided interview to generate initial org files."
+
+  - id: "capital-flow"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Queues capital movements. Not yet activated in production instances."
+
+  - id: "funding-scout"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Identifies funding opportunities, tracks grants."
+
+  - id: "heartbeat-monitor"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Proactive org health checks."
+
+  - id: "idea-scout"
+    owner: "framework"
+    instances_using: ["refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Scans knowledge commons for ecosystem gaps."
+
+  - id: "knowledge-curator"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Aggregates knowledge from sources."
+
+  - id: "meeting-processor"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Processes transcripts, extracts decisions and action items. OPAL integration planned."
+
+  - id: "org-os-init"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Session lifecycle: OPEN → PLAN → EXECUTE → CLOSE. Powers /initialize and /close."
+
+  - id: "schema-generator"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Generates EIP-4824 schemas from data/*.yaml."
+
+  - id: "workspace-improver"
+    owner: "framework"
+    instances_using: ["refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Autonomous improvement loop (autoresearch pattern)."
+
+  # --- Promotion candidates (validated in ≥2 instances, not yet in framework) ---
+  - id: "research"
+    owner: "refi-bcn-os"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "Present in two operational instances. Promotion criteria met (≥2 independent validations). Next: reconcile implementations, extract common core to skills/research/SKILL.md."
+
+  # --- Instance-specific or under evaluation ---
+  - id: "karpathy-guidelines"
+    owner: "refi-dao-os"
+    instances_using: ["refi-dao-os"]
+    in_framework: false
+    promotion_status: "evaluating"
+    notes: "Karpathy Scalable Oversight framework applied to DAO governance. Evaluate generalizability before promotion."
+
+  # --- DAO-module skills (candidates — framework lacks treasury/governance-protocol layer) ---
+  - id: "safe-treasury"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "Gnosis Safe treasury module. Framework has no treasury skill despite supporting DAO-type instances. High promotion priority."
+
+  - id: "hats-governance"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "Hats Protocol roles module. Framework gap."
+
+  - id: "gardens-governance"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "Gardens DAO governance module. Framework gap."
+
+  - id: "karma-reputation"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "Karma GAP reputation module. Framework gap."
+
+  - id: "eip4824-identity"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "EIP-4824 identity module. Framework has schema-generator but no identity module — potential overlap, evaluate first."

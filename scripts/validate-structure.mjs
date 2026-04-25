@@ -234,6 +234,48 @@ if (fileExists('package.json')) {
   }
 }
 
+// --- 8. Version Consistency ---
+console.log('\n8. Version Consistency');
+
+if (fileExists('package.json') && fileExists('federation.yaml')) {
+  try {
+    const pkg = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf-8'));
+    const fed = loadYaml(readFileSync(join(rootDir, 'federation.yaml'), 'utf-8'));
+
+    const pkgVersion = pkg.version;
+    const fedFrameworkVersion = fed?.metadata?.framework_version;
+
+    check('package.json has version field', !!pkgVersion);
+    check('federation.yaml has metadata.framework_version', !!fedFrameworkVersion);
+
+    if (pkgVersion && fedFrameworkVersion) {
+      const pkgMajorMinor = (pkgVersion.match(/^(\d+)\.(\d+)/) || [])[0];
+      check(
+        `package.json version (${pkgVersion}) major.minor matches federation.yaml framework_version (${fedFrameworkVersion})`,
+        pkgMajorMinor === fedFrameworkVersion
+      );
+    }
+
+    // CHANGELOG.md for the current version (optional — warn only)
+    if (fileExists('CHANGELOG.md')) {
+      const changelog = readFileSync(join(rootDir, 'CHANGELOG.md'), 'utf-8');
+      const hasCurrentVersion = new RegExp(`^## \\[${pkgVersion.replace(/\./g, '\\.')}\\]`, 'm').test(changelog);
+      if (!hasCurrentVersion) {
+        warn(`CHANGELOG.md has no entry for v${pkgVersion} (add one before tagging release)`);
+      }
+    } else {
+      warn('CHANGELOG.md not present (recommended)');
+    }
+
+    // VERSIONING.md (optional — warn only)
+    if (!fileExists('docs/VERSIONING.md')) {
+      warn('docs/VERSIONING.md not present (recommended — see framework repo for template)');
+    }
+  } catch {
+    check('version consistency check could be run', false);
+  }
+}
+
 // --- Summary ---
 console.log('\n' + '='.repeat(50));
 console.log(`Results: ${passed} passed, ${failed} failed, ${warnings} warnings`);

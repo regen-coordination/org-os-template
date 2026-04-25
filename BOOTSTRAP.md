@@ -2,6 +2,8 @@
 
 _Run this when deploying org-os for a new organization. Bootstrapping has three phases: guided interview, source ingestion, and ongoing learning. After Phase 1 completes, this file can be archived._
 
+> **Note:** The org-os repo itself is bootstrapped as of 2026-04-24. See `memory/2026-04-24.md` for the self-hosting inauguration notes. New instances (downstream of this framework) run the phases below.
+
 ---
 
 ## Phase 1: Guided Interview

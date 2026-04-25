@@ -1,63 +1,119 @@
 # Federation Manifest v3.0
-# Organizational OS — Agent-Native Workspace
-# Run `npm run setup` to configure this file interactively
+# org-os — Framework repo + multi-instance orchestration hub
+# This file describes how org-os positions itself in the federation.
 
 version: "3.0"
 spec: "organizational-os/3.0"
 
 # ── Identity ──────────────────────────────────────────────────────────────────
 identity:
-  name: "Your Organization Name"
-  type: "Organization"          # DAO | Cooperative | Foundation | Project | LocalNode | Hub
-  emoji: ""                     # e.g., 🌱 ⚡ 🌀
-  daoURI: "https://org.example.com/.well-known/dao.json"
-  chain: ""                     # e.g., eip155:100 (Gnosis Chain)
-  safe: ""                      # Gnosis Safe address
-  hats: null                    # Hats Protocol tree ID (integer)
-  gardens: ""                   # Gardens DAO contract address
+  name: "org-os"
+  type: "Project"                 # framework + orchestration hub (solo-maintainer phase)
+  emoji: "🧬"
+  role: "framework-upstream + orchestration-hub"
+  daoURI: ""                      # N/A (solo phase)
+  chain: ""                       # N/A (solo phase)
+  safe: ""                        # N/A (solo phase)
+  hats: null                      # N/A (solo phase)
+  gardens: ""                     # N/A (solo phase)
   onchain_registration:
     enabled: false
     chain: ""
     contract_address: ""
 
 # ── Federation Network ─────────────────────────────────────────────────────────
-network: ""                     # e.g., regen-coordination
-hub: ""                         # e.g., github.com/regen-coordination/hub
+network: "regen-coordination"
+hub: "github.com/regen-coordination/org-os-template"  # this repo — framework-upstream
 
-peers: []
-# peers:
-#   - name: "Partner Node"
-#     repo: "org/repo"
-#     url: "https://github.com/org/repo"
-#     trust: "read"             # full | read | none
+peers:
+  - name: "organizational-os-framework"
+    repo: "regen-coordination/organizational-os-framework"
+    url: "https://github.com/regen-coordination/organizational-os-framework"
+    trust: "full"
+  - name: "organizational-os"
+    repo: "regen-coordination/organizational-os"
+    url: "https://github.com/regen-coordination/organizational-os"
+    trust: "full"
 
-upstream:
-  - type: "template"
-    repository: "luizfernandosg/organizational-os-template"
-    url: "https://github.com/luizfernandosg/organizational-os-template"
-    relationship: "fork"
-    last_sync: ""
-    sync_frequency: "monthly"
-    remote_name: "upstream"
+upstream: []
+# org-os IS the template. No upstream at framework layer.
+# (Previous config pointed at luizfernandosg/organizational-os-template as a fork —
+#  cleared on 2026-04-24 self-hosting inauguration since this repo is the canonical source.)
 
-downstream: []
+# ── Downstream Instances ───────────────────────────────────────────────────────
+# Populated and maintained alongside data/instances.yaml.
+# Run `npm run analyze:instances` to refresh drift status.
+downstream:
+  - name: "ReFi Barcelona"
+    id: "refi-bcn-os"
+    repo: "luizfernandosg/refi-bcn-os"
+    url: "https://github.com/luizfernandosg/refi-bcn-os"
+    type: "LocalNode"
+    trust: "full"
+    sync_direction: "framework→instance"
+    local_path: "../refi-bcn-os"
+    cloned: true
+
+  - name: "ReFi DAO"
+    id: "refi-dao-os"
+    repo: "luizfernandosg/refi-dao-os"
+    url: "https://github.com/luizfernandosg/refi-dao-os"
+    type: "DAO"
+    trust: "full"
+    sync_direction: "framework→instance"
+    local_path: "../refi-dao-os"
+    cloned: true
+
+  - name: "DAO OS"
+    id: "dao-os"
+    repo: "regen-coordination/dao-os"
+    url: "https://github.com/regen-coordination/dao-os"
+    type: "Project"
+    trust: "full"
+    sync_direction: "framework→instance"
+    local_path: "../dao-os"
+    cloned: true
+    note: "DAO-module development platform, not an operational instance. Source of DAO-module skill promotion candidates."
+
+  - name: "openclaw"
+    id: "openclaw"
+    repo: ""
+    url: ""
+    type: "AgentRuntime"
+    trust: "full"
+    sync_direction: "none"
+    local_path: "../openclaw"
+    cloned: true
+    note: "Agent runtime, not a data instance."
+
+  - name: "Regen Coordination"
+    id: "regen-coordination-os"
+    repo: "regen-coordination/regen-coordination-os"
+    url: "https://github.com/regen-coordination/regen-coordination-os"
+    type: "Hub"
+    trust: "full"
+    sync_direction: "framework→instance"
+    local_path: "../regen-coordination-os"
+    cloned: true
+    note: "Synced to framework v3.0 on 2026-04-24 (full overlay incl. skills)."
 
 # ── Agent Configuration ────────────────────────────────────────────────────────
 agent:
-  runtime: "none"               # openclaw | cursor | custom | none
+  runtime: "claude-code"
   workspace: "."
   skills:
-    - meeting-processor
-    - funding-scout
-    - knowledge-curator
+    - bootstrap-interviewer
     - capital-flow
-    - schema-generator
+    - funding-scout
     - heartbeat-monitor
-  channels: []
-  # channels:
-  #   - telegram
-  #   - google-meet
-  #   - github
+    - idea-scout
+    - knowledge-curator
+    - meeting-processor
+    - org-os-init
+    - schema-generator
+    - workspace-improver
+  channels:
+    - github
   proactive: false
   heartbeat_interval: "1h"
 
@@ -65,10 +121,7 @@ agent:
 knowledge-commons:
   enabled: false
   shared-domains: []
-  # shared-domains:
-  #   - "regenerative-finance"
-  #   - "local-governance"
-  sync-protocol: "git"          # git | koi-net | manual
+  sync-protocol: "git"
   publish:
     meetings: false
     projects: false
@@ -76,7 +129,6 @@ knowledge-commons:
   subscribe: []
 
 # ── Cross-Repo Integrations ───────────────────────────────────────────────────
-# Repos this template integrates with (agent runtimes, knowledge infra, publishing, grants)
 integrations:
   agent_runtimes:
     - name: "openclaw"
@@ -96,6 +148,11 @@ integrations:
       repo: "organizational-os/koi-net-integration"
       url: "https://github.com/organizational-os/koi-net-integration"
       role: "typescript-bridge"
+  meeting_processing:
+    - name: "OPAL"
+      path: "integrations/opal/"
+      role: "transcript-to-schema extraction"
+      status: "production-ready; rollout pending (see opal-rollout workstream)"
   publishing:
     - name: "quartz-refi-template"
       repo: "organizational-os/quartz-refi-template"
@@ -107,7 +164,9 @@ integrations:
       url: "https://github.com/luizfernandosg/grants-os"
       role: "grants-platform"
 
-# ── Operational Packages ──────────────────────────────────────────────────────
+# ── Operational Packages (framework bundles) ─────────────────────────────────
+# Actual packages/ directory contains 11 entries; toggles below reflect framework
+# default for downstream template consumers.
 packages:
   knowledge_base: true
   meetings: false
@@ -116,48 +175,50 @@ packages:
   coordination: false
   webapps: false
   web3: false
-  egregore: false              # AI memory layer (Claude Code/opencode compatible)
+  egregore: false
 
 # ── Customizations ────────────────────────────────────────────────────────────
 customizations:
   - path: "SOUL.md"
-    reason: "Organization-specific values and mission"
+    reason: "Framework identity"
     type: "addition"
     maintain_on_sync: true
   - path: "IDENTITY.md"
-    reason: "Organization identity"
+    reason: "Framework identity + orchestration role"
     type: "addition"
     maintain_on_sync: true
   - path: "data/"
-    reason: "Operational data"
+    reason: "Operational data + framework-only registries (instances, skills-matrix, packages-matrix)"
     type: "addition"
     maintain_on_sync: true
   - path: "memory/"
-    reason: "Organizational memory"
+    reason: "Session memory + drift reports"
     type: "addition"
     maintain_on_sync: true
   - path: "skills/"
-    reason: "Organization-specific skills"
+    reason: "Framework canonical skills"
     type: "addition"
     maintain_on_sync: true
 
 # ── Governance ────────────────────────────────────────────────────────────────
 governance:
   maintainers:
-    - name: "Organization Team"
-      role: "owner"
-  decision_model: "consensus"   # consensus | voting | hierarchical | delegated
-  proposal_threshold: "Consensus required"
+    - name: "Luiz Fernando"
+      handle: "github:luizfernandosg"
+      role: "sole-maintainer"
+  decision_model: "solo-maintainer"  # evolves to consensus/voting at OSS phase
+  proposal_threshold: "maintainer decision"
 
 # ── Platforms ─────────────────────────────────────────────────────────────────
 platforms:
   primary: "github"
-  deployment: "github-pages"    # github-pages | railway | vercel | self-hosted
+  deployment: "github-pages"
   domain: ""
   mirrors: []
 
 # ── Metadata ─────────────────────────────────────────────────────────────────
 metadata:
-  created: ""
-  last_updated: ""
+  created: "2026-04-05"
+  last_updated: "2026-04-24"
   framework_version: "3.0"
+  self_hosting_since: "2026-04-24"

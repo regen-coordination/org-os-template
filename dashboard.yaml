@@ -4,6 +4,9 @@
 # Sections render in the order listed below.
 # Set `show: false` to hide a section. Set `show: true` (or omit) to show it.
 # Some sections accept extra options for fine-tuning.
+#
+# Tuned for the framework + orchestration hub role: instance health is the
+# headline; treasury/meetings/apps sections hidden in solo-maintainer phase.
 
 schema_version: "2.0"
 
@@ -13,48 +16,35 @@ sections:
 
   header:
     show: true
-    # style: "ascii" | "compact"
-    #   ascii   → full block-letter banner (default)
-    #   compact → single-line org name + status bar
     style: ascii
 
   projects:
     show: true
-    # max: how many projects to show (null = all)
     max: null
-    # stages: which IDEA stages to include (null = all)
-    # stages: [idea, develop, execute]
     stages: null
 
   tasks:
     show: true
-    # max: how many tasks per urgency tier (null = all)
     max: null
-    # show_completed: include recently completed tasks
     show_completed: true
 
   calendar:
-    show: true
-    # days: how many days to show (7 = this week, 14 = two weeks)
-    days: 7
+    show: false             # No formal meetings in solo phase
 
   funding:
-    show: true
-    # horizon_days: only show opportunities with deadlines within this window
+    show: false             # No treasury in solo phase
     horizon_days: 30
 
   context:
     show: true
-    # max_entries: how many recent memory entries to show
     max_entries: 3
 
   plans:
     show: true
-    # Show active + next N queued plans from docs/agent-plans/QUEUE.md
-    queued_preview: 2
+    queued_preview: 3       # Bumped from 2 — framework has several queued plans
 
   apps:
-    show: true
+    show: false             # No apps at framework level; instances turn on
 
   cheatsheet:
     show: true
@@ -64,22 +54,31 @@ sections:
 
   prompt:
     show: true
-    # suggestions: how many contextual suggestions to generate
     suggestions: 3
 
 # ─── Custom Sections ─────────────────────────────────────────────────────────
-# Add instance-specific sections here. The agent will render them after the
-# built-in sections (or in the position you place them above).
-#
-# custom_sections:
-#   - name: "Telegram Status"
-#     show: true
-#     source: "data/telegram-topic-routing.yaml"
-#     render: "table"       # table | list | summary
-#     description: "Active Telegram topics and routing"
-#
-#   - name: "Pending Payouts"
-#     show: true
-#     source: "data/pending-payouts.yaml"
-#     render: "list"
-#     description: "Outstanding cooperative payouts"
+# Framework-specific sections — orchestration hub view.
+
+custom_sections:
+  - name: "Instances"
+    show: true
+    source: "data/instances.yaml"
+    render: "table"
+    description: "Downstream instances with maturity, framework version, last sync, and drift"
+    columns: [id, name, type, maturity, framework_version, last_sync]
+
+  - name: "Skill Promotion Candidates"
+    show: true
+    source: "data/skills-matrix.yaml"
+    render: "list"
+    description: "Skills validated in ≥1 instance but not yet canonical — see docs/SKILL-PROMOTION.md"
+    filter:
+      promotion_status: candidate
+
+  - name: "Package Promotion Candidates"
+    show: true
+    source: "data/packages-matrix.yaml"
+    render: "list"
+    description: "Packages validated across instances, candidates for framework promotion"
+    filter:
+      promotion_status: candidate

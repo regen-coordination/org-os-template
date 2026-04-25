@@ -1,15 +1,71 @@
 schema_version: "2.0"
 
-# Relationships Registry
-# Inter-org partnerships and collaborations
+# Relationships Registry — org-os framework
+# Tracks relationships with downstream instances and ecosystem peers.
+# For detailed instance state (skills, packages, drift), see data/instances.yaml.
 
-relationships: []
-  # Example:
-  # - id: "rel-001"
-  #   partner: "Partner Org"
-  #   type: "alliance"         # alliance | collaboration | funding | advisory | peer
-  #   status: "active"         # active | dormant | completed | proposed
-  #   since: "2024-06-01"
-  #   contact: null
-  #   description: ""
-  #   touchpoints: []
+relationships:
+  # --- Downstream instances ---
+  - id: "rel-refi-bcn-os"
+    partner: "ReFi Barcelona (refi-bcn-os)"
+    type: "peer"              # framework ↔ instance
+    status: "active"
+    since: "2026-04-05"
+    contact: "github:luizfernandosg"
+    description: "LocalNode instance. Production. Framework sync downstream; operational learnings flow upstream. Luiz is Strategy Lead there."
+    touchpoints: ["federation.yaml", "data/instances.yaml"]
+
+  - id: "rel-refi-dao-os"
+    partner: "ReFi DAO (refi-dao-os)"
+    type: "peer"
+    status: "active"
+    since: "2026-04-05"
+    contact: "github:luizfernandosg"
+    description: "DAO instance, global ReFi coordination. Production, Phase 2. Governance patterns flow upstream; framework updates flow downstream."
+    touchpoints: ["federation.yaml", "data/instances.yaml"]
+
+  - id: "rel-dao-os"
+    partner: "DAO OS (dao-os)"
+    type: "peer"
+    status: "active"
+    since: "2026-04-02"
+    contact: "github:luizfernandosg"
+    description: "DAO-module development platform. Not an operational instance. Source of candidate skills (safe-treasury, hats-governance, gardens-governance, karma-reputation, eip4824-identity) for framework promotion."
+    touchpoints: ["federation.yaml", "data/instances.yaml", "data/skills-matrix.yaml"]
+
+  - id: "rel-openclaw"
+    partner: "openclaw (agent runtime)"
+    type: "alliance"          # tight integration, not downstream instance
+    status: "active"
+    since: "2026-04-01"
+    contact: "github:luizfernandosg"
+    description: "Agent runtime container referenced by instances. Alpha. Org-os provides the data schema; openclaw provides the agent substrate."
+    touchpoints: ["integrations/", "federation.yaml"]
+
+  - id: "rel-regen-coordination-os"
+    partner: "Regen Coordination (regen-coordination-os)"
+    type: "alliance"
+    status: "proposed"
+    since: null
+    contact: null
+    description: "Hub-level instance. Referenced in repos.manifest.json but not locally cloned. Resolution pending (clone vs deprecate)."
+    touchpoints: ["repos.manifest.json", "federation.yaml"]
+
+  # --- Network peers (supporting repos) ---
+  - id: "rel-refi-barcelona-kb"
+    partner: "ReFi-Barcelona (knowledge base)"
+    type: "collaboration"
+    status: "active"
+    since: "2026-04-05"
+    contact: "github:luizfernandosg"
+    description: "Knowledge base for refi-bcn-os. Federation peer, not a framework instance."
+    touchpoints: ["repos.manifest.json"]
+
+  - id: "rel-opal"
+    partner: "OPAL (meeting → schema extraction)"
+    type: "alliance"
+    status: "active"
+    since: "2026-04-05"
+    contact: null
+    description: "Production-ready integration at integrations/opal/. Bridges meeting transcripts to org-os data registries. Rollout to instances pending (see opal-rollout workstream)."
+    touchpoints: ["integrations/opal/"]

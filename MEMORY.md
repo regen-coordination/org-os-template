@@ -1,72 +1,74 @@
 # MEMORY.md — Organizational Memory Index
 
-_Lightweight index for persistent organizational memory. Detailed notes live in `memory/YYYY-MM-DD.md` as dated entries. Update this when key decisions are made._
+_Lightweight index for persistent organizational memory. Detailed notes live in `memory/YYYY-MM-DD.md` as dated entries. Update when key decisions are made._
 
 ---
 
 ## Quick Index
 
-- **Identity:** `IDENTITY.md`
+- **Identity:** `IDENTITY.md` (org-os framework + orchestration hub)
 - **Values:** `SOUL.md`
-- **Operator:** `USER.md`
+- **Operator:** `USER.md` (Luiz Fernando, solo maintainer)
+- **Mandate:** `MASTERPLAN.md` (v2.0.0)
+- **Decisions log:** `DECISIONS.md` (authoritative — what was decided and why)
 - **Active Tasks:** `HEARTBEAT.md`
-- **Session notes:** `memory/`
+- **Session notes:** `memory/YYYY-MM-DD.md`
 - **Members:** `data/members.yaml`
-- **Projects:** `data/projects.yaml`
-- **Finances:** `data/finances.yaml`
-- **Funding opportunities:** `data/funding-opportunities.yaml`
+- **Workstreams:** `data/projects.yaml`
+- **Instances (framework-only):** `data/instances.yaml`
+- **Skills catalog:** `data/skills-matrix.yaml`
+- **Packages catalog:** `data/packages-matrix.yaml`
+- **Queued plans:** `docs/agent-plans/QUEUE.md`
+- **Federation:** `federation.yaml`
 
 ---
 
 ## Key Decisions
 
-_(Append decisions with date as they are made — most recent at top.)_
-
-<!--
-Format:
-- [YYYY-MM-DD] Decision description (context/rationale)
--->
+→ See `DECISIONS.md` for the authoritative chronological log with full rationale and refs. New decisions are appended there, not here. This file (`MEMORY.md`) is the index over org memory; `DECISIONS.md` is the decision record.
 
 ---
 
 ## Active Context
 
-_(Things currently in flight — what the agent should be aware of.)_
-
-<!--
-Format:
-- [ongoing] Initiative description (owner if relevant)
-- [until DATE] Time-bound context
--->
+- **[ongoing]** `instance-orchestration` workstream — build drift monitoring, skill-promotion pipeline.
+- **[ongoing]** `federation-protocol` workstream — end-to-end sync exchange testing.
+- **[ongoing]** Multi-instance skill promotion review — `research` skill (2 instances), DAO modules (dao-os only).
+- **[ongoing]** Solo-maintainer phase — no treasury, no formal governance; adjust when first external contributor lands.
 
 ---
 
 ## Organizational History
 
-_(Milestones, major transitions — brief.)_
-
-- [DATE] Organization founded
-- [DATE] First funding received
-- [DATE] Joined regen-coordination network
-- _(Add milestones as they occur)_
+- **[2026-04-05]** org-os v2.0.0 framework published — 13 registries, 10 skills, EIP-4824 compliance
+- **[2026-04-24]** Self-hosting inauguration — framework repo becomes live instance
+- _(Future milestones: first external contributor, first promoted skill, first DAO-phase trigger)_
 
 ---
 
 ## Relationship Map
 
-_(Key external relationships to be aware of.)_
+### Upstream
+- **(self-referential at framework layer)** — `github.com/regen-coordination/org-os-template` is the template; this repo IS the template.
 
-```markdown
-### Network Partners
-- [Partner name]: [Brief description of relationship]
+### Downstream (instances)
+- **refi-bcn-os** — LocalNode (ReFi Barcelona, cooperative-in-formation). Production.
+- **refi-dao-os** — DAO (global ReFi coordination). Production, Phase 2.
+- **dao-os** — Project (DAO-module development platform). Beta.
+- **openclaw** — Agent runtime container. Alpha.
+- **regen-coordination-os** — Hub. Remote-only, not locally cloned.
 
-### Funding Relationships
-- [Platform]: [Account/project URL, current status]
+### Network Peers (related repos)
+- **ReFi-Barcelona** — knowledge base for refi-bcn-os
+- **ReFi-BCN-Website** — public site
+- **Regenerant-Catalunya** — flagship program
+- **Local-ReFi-Toolkit** — local node toolkit
+- **organizational-os-framework** — upstream sibling
+- **organizational-os** — upstream coordination
 
-### Community Ties
-- [Community]: [Connection nature]
-```
+### Integrations
+- **OPAL** — meeting transcript → schema extraction (at `integrations/opal/`, production-ready, pending rollout to instances)
 
 ---
 
-_This file is read on every agent session. Keep it current. Write detailed notes to `memory/YYYY-MM-DD.md`._
+_This file is read on every agent session. Keep it current. Write detailed session notes to `memory/YYYY-MM-DD.md`._
