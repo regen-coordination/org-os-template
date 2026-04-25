@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
   const args = { framework: null, target: '.', prune: false, check: false };
@@ -42,6 +39,14 @@ if (!fs.existsSync(fedPath)) {
 const fed = yaml.load(fs.readFileSync(fedPath, 'utf-8'));
 const toggles = fed.packages || {};
 
+// Validate toggle shape: each value must be a boolean
+for (const [pkgId, val] of Object.entries(toggles)) {
+  if (typeof val !== 'boolean') {
+    console.error(`sync-packages: federation.yaml packages.${pkgId} must be boolean (true/false), got ${typeof val}: ${JSON.stringify(val)}`);
+    process.exit(1);
+  }
+}
+
 const fwPkgs = path.join(args.framework, 'packages');
 if (!fs.existsSync(fwPkgs)) {
   console.error(`sync-packages: framework packages/ dir not found at ${fwPkgs}`);
@@ -63,6 +68,9 @@ for (const [pkgId, enabled] of Object.entries(toggles)) {
     if (args.check) {
       console.log(`[check] ${pkgId}: would sync (enabled)`);
       continue;
+    }
+    if (presentLocally) {
+      console.log(`[sync] ${pkgId}: replacing local copy at ${dst}`);
     }
     rmDirSync(dst);
     copyDirSync(src, dst);

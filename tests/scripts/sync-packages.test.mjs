@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -60,4 +60,24 @@ test('sync-packages --prune removes disabled-but-present packages', () => {
   ], { encoding: 'utf-8' });
   assert.equal(result.status, 0);
   assert.ok(!existsSync(path.join(instance, 'packages', 'webapps')));
+});
+
+test('sync-packages errors on non-boolean toggle value', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'sync-packages-bad-'));
+  const framework = path.join(root, 'framework');
+  mkdirSync(path.join(framework, 'packages'), { recursive: true });
+  const instance = path.join(root, 'instance');
+  mkdirSync(instance);
+  writeFileSync(path.join(instance, 'federation.yaml'), `
+packages:
+  dashboard:
+    enabled: true
+`);
+  const result = spawnSync('node', [
+    path.resolve('scripts/sync-packages.mjs'),
+    '--framework', framework,
+    '--target', instance
+  ], { encoding: 'utf-8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr + result.stdout, /must be boolean/);
 });
