@@ -84,14 +84,15 @@ packages:
     lifecycle_status: "active"
     notes: "Shared webapp scaffolding. Used by all three production instances."
 
-  # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
-    owner: "refi-bcn-os"
+    owner: "framework"
     instances_using: ["refi-bcn-os", "refi-dao-os", "regen-coordination-os"]
-    in_framework: false
-    promotion_status: "ready"
+    in_framework: true
+    promotion_status: "canonical"
     lifecycle_status: "active"
-    notes: "Promotion-ready: ≥2 instances (now 3), validated. Move source from refi-bcn-os/packages/dashboard/ to org-os/packages/dashboard/ during v3.5 cutover (Task 33)."
+    notes: "Promoted to framework 2026-04-25 (Task 33). Source physically moved from refi-bcn-os/packages/dashboard/ to org-os/packages/dashboard/. Consumed by all three production instances; bread-coop-os will pick it up via sync-packages."
+
+  # --- Instance-originated packages (promotion candidates) ---
 
   - id: "governance"
     owner: "refi-dao-os"

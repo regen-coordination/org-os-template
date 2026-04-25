@@ -1,0 +1,12 @@
+{
+  "name": "refi-bcn-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ReFi BCN organizational health dashboard",
+  "scripts": {
+    "dev": "node server.mjs",
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {}
+}

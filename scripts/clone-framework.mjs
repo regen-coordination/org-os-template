@@ -94,6 +94,10 @@ const STRIP_LIST = [
   'scripts/selftest.mjs',
   'templates/',
   'tests/fixtures/instance-config.yaml',
+  // Framework-only docs that leaked into instances (surfaced by bread-coop-os bootstrap):
+  'PAPERCLIP_DEPLOYMENT_GUIDE.md',
+  'RESEARCH_INTELLIGENCE_PLAN.md',
+  'SYNC-GUIDE.md',
   // Framework-specific .well-known/ artifacts; .template.json files are kept,
   // generate:schemas will (re)write the .json files post-bootstrap, and dao.json
   // is rendered explicitly from the dao.json.template later in this script.
