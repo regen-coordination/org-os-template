@@ -14,10 +14,13 @@ import { spawnSync } from 'node:child_process';
 // This keeps the aggregator under test today and turns into a clear breakage signal as soon
 // as the framework is healthy.
 //
-// TODO(Phase 3 cleanup): once validate:structure passes and version:check is implemented,
-// flip these assertions back to:
-//   assert.equal(result.status, 0);
-//   assert.match(result.stdout, /selftest: PASS/);
+// TODO(after Task 3 + Phase 3 structural drift fixes): Once `npm run version:check`
+// is implemented (Task 3) AND framework's pre-existing structural drift is fixed
+// (.well-known/dao.json + federation.yaml federation section, addressed in Phase 3
+// instance re-validation), flip these assertions back to:
+//
+//   assert.equal(result.status, 0, ...)
+//   assert.match(result.stdout, /selftest: PASS/)
 test('npm run selftest currently fails on known framework drift (Phase 3 will green this)', () => {
   const result = spawnSync('node', ['scripts/selftest.mjs'], {
     encoding: 'utf-8',

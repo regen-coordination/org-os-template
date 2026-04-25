@@ -29,7 +29,6 @@
     "docs": "npx quartz build --serve -d docs",
     "check": "tsc --noEmit && npx prettier . --check",
     "format": "npx prettier . --write",
-    "initialize": "node scripts/initialize.mjs",
     "initialize:markdown": "node scripts/initialize.mjs --format=markdown",
     "paperclip": "cd packages/paperclip-agents-app && npm run dev",
     "paperclip:server": "cd packages/paperclip-agents-app && npm run dev:server",
