@@ -10,16 +10,28 @@
  *
  * Usage: node scripts/analyze-instances.mjs [--json] [--check-only] [--report]
  *
+ * Output modes (mutually-exclusive in spirit; --json and --report take
+ * precedence over the default file-write mode if both are passed):
+ *
+ *   default      Write a dated markdown report to memory/reports/ and print
+ *                a console summary. Honors --check-only.
+ *   --json       Emit the full report as JSON to stdout (no file written).
+ *                Honors --check-only.
+ *   --report     Emit a compact markdown drift report to stdout (no file
+ *                written). Used by the scheduled drift workflow to redirect
+ *                into memory/reports/. INTENTIONALLY IGNORES --check-only —
+ *                the report's purpose is to surface drift, not to fail on it,
+ *                so this mode always exits 0 regardless of drift count.
+ *
  * Flags:
- *   --json         Emit the full report as JSON to stdout (no file written).
+ *   --json         See "Output modes" above.
  *   --check-only   CI mode: skip writing the markdown report, exit non-zero
- *                  if any drift is detected. Useful for failing PRs on drift.
- *   --report       Emit a compact markdown drift report to stdout (no file
- *                  written, no exit on drift). Used by the scheduled drift
- *                  workflow to redirect into memory/reports/.
+ *                  if any drift is detected. Honored under --json and the
+ *                  default file-write mode. Ignored under --report (see above).
+ *   --report       See "Output modes" above.
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { load as loadYaml } from 'js-yaml';
 
@@ -197,7 +209,7 @@ if (jsonMode) {
 
 if (reportMode) {
   const today = new Date().toISOString().slice(0, 10);
-  console.log(`# Instance drift report — ${today}`);
+  console.log(`# Instance Drift Report — ${today}`);
   console.log('');
   console.log(`**Generated:** ${report.generated_at}`);
   console.log(`**Framework version:** ${report.framework_version}`);
