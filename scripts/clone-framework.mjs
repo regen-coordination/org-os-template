@@ -2,6 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import yaml from 'js-yaml';
+import { render } from '../templates/render.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRAMEWORK_ROOT = path.resolve(__dirname, '..');
@@ -255,14 +258,127 @@ if (!answers && !args.dryRun) {
 }
 log(`bootstrap answers collected${answers?.identity?.name ? `: ${answers.identity.name}` : ''}`);
 
-// Stages 6-11 implemented in subsequent tasks (23-27).
-log('render templates (Task 23)');
-log('materialize packages (Task 24)');
-log('materialize skills (Task 24)');
-log('write federation.yaml (Task 25)');
+// Stage 6: render templates (Task 23)
+async function renderTemplates(answers) {
+  if (args.dryRun) {
+    log('render README + GETTING-STARTED');
+    return;
+  }
+  const orgType = (answers.identity?.type || 'project').toLowerCase();
+  const ctx = {
+    org: {
+      name: answers.identity.name,
+      type: answers.identity.type,
+      emoji: answers.identity.emoji,
+      short_description: answers.identity.short_description,
+      tagline: null,
+    },
+    federation: {
+      network: answers.federation.network,
+      role: 'standalone-instance',
+      upstream: answers.federation.upstream,
+      framework_version: answers.federation.framework_version,
+      peers: [],
+      downstream: [],
+    },
+    isFramework: false,
+    isCooperative: orgType === 'cooperative',
+    isDAO: orgType === 'dao',
+    isLocalNode: orgType === 'localnode',
+    isProject: orgType === 'project',
+    isHub: orgType === 'hub',
+    showCalendar: false,
+    showFunding: false,
+    today: new Date().toISOString().slice(0, 10),
+    license: 'MIT',
+    onchain: {}, treasury: {}, governance: {}, contact: {},
+  };
+
+  // Read templates from FRAMEWORK_ROOT (target's templates/ was stripped)
+  const readmeTmpl = fs.readFileSync(path.join(FRAMEWORK_ROOT, 'templates/README.instance.md'), 'utf-8');
+  const gsTmpl = fs.readFileSync(path.join(FRAMEWORK_ROOT, 'templates/GETTING-STARTED.md'), 'utf-8');
+  fs.writeFileSync(path.join(args.target, 'README.md'), render(readmeTmpl, ctx));
+  fs.writeFileSync(path.join(args.target, 'GETTING-STARTED.md'), render(gsTmpl, ctx));
+
+  log('rendered README.md + GETTING-STARTED.md');
+}
+
+await renderTemplates(answers);
+
+// Stage 7: materialize packages + skills (Task 24)
+function materializePackages(answers) {
+  if (args.dryRun) {
+    log('write federation.yaml.packages');
+    log('npm run sync:packages → materialize enabled packages');
+    return;
+  }
+  // federation.yaml is written in the next stage; sync-packages is invoked there.
+  log('packages selection captured (materialized in federation.yaml stage)');
+}
+
+function materializeSkills(answers) {
+  if (args.dryRun) {
+    log('strip skills not in answers.skills.enabled');
+    return;
+  }
+  const enabledSet = new Set(answers.skills?.enabled || []);
+  const skillsDir = path.join(args.target, 'skills');
+  if (!fs.existsSync(skillsDir)) {
+    log('skills/ dir not present in target — skipping');
+    return;
+  }
+  let removed = 0;
+  for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (!enabledSet.has(entry.name)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true, force: true });
+      removed++;
+    }
+  }
+  log(`materialized skills: ${enabledSet.size} kept, ${removed} removed`);
+}
+
+materializePackages(answers);
+materializeSkills(answers);
+
+// Stage 8: write federation.yaml + run sync-packages (Task 25)
+function writeFederation(answers) {
+  if (args.dryRun) {
+    log('write federation.yaml + run sync:packages');
+    return;
+  }
+  const fed = {
+    schema_version: '2.0',
+    network: answers.federation?.network || null,
+    upstream: answers.federation?.upstream || '../org-os',
+    framework_version: answers.federation?.framework_version || '3.5',
+    role: 'standalone-instance',
+    peers: [],
+    packages: answers.packages || {},
+    skills: { enabled: answers.skills?.enabled || [] },
+    knowledge_commons: false,
+  };
+  fs.writeFileSync(path.join(args.target, 'federation.yaml'), yaml.dump(fed));
+  log('wrote federation.yaml');
+
+  // Run sync-packages to materialize enabled packages from framework
+  const syncResult = spawnSync('node', [
+    path.join(FRAMEWORK_ROOT, 'scripts/sync-packages.mjs'),
+    '--framework', FRAMEWORK_ROOT,
+    '--target', args.target
+  ], { stdio: 'inherit' });
+  if (syncResult.status !== 0) {
+    console.error('sync-packages failed; instance left in inspectable state');
+    process.exit(syncResult.status || 1);
+  }
+}
+
+writeFederation(answers);
+
+// Stages 9-11 implemented in subsequent tasks (26-27).
 log('npm install + validate (Task 26)');
 log('git init + initial commit (Task 27)');
 log('print next-steps');
 
-console.log('\n[clone] dry-run complete' + (args.dryRun ? '' : ' (TODO: real impl in Task 22+)'));
+console.log('\n[clone] dry-run complete' + (args.dryRun ? '' : ' (TODO: real impl in Task 26+)'));
 process.exit(0);

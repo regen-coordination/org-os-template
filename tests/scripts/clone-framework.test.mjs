@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import yamlMod from 'js-yaml';
 
 test('clone-framework --help prints usage', () => {
   const r = spawnSync('node', ['scripts/clone-framework.mjs', '--help'], { encoding: 'utf-8' });
@@ -75,6 +76,59 @@ test('clone-framework resets framework-specific markdown (Task 21)', () => {
     const memDir = fs.readdirSync(path.join(target, 'memory'));
     assert.equal(memDir.length, 1, 'memory/ should contain exactly seed welcome note');
     assert.match(memDir[0], /^\d{4}-\d{2}-\d{2}\.md$/);
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework renders README + GETTING-STARTED into target (Task 23)', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-render-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8' });
+    const readme = readFileSync(path.join(target, 'README.md'), 'utf-8');
+    assert.match(readme, /Selftest Instance/, 'README rendered with org name from config');
+    assert.ok(!readme.includes('{{'), 'no template strings leaked');
+    const gs = readFileSync(path.join(target, 'GETTING-STARTED.md'), 'utf-8');
+    assert.match(gs, /Selftest Instance/);
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework materializes selected skills (Task 24)', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-skills-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8' });
+    // The fixture enables all 10 canonical skills
+    assert.ok(fs.existsSync(path.join(target, 'skills', 'bootstrap-interviewer')));
+    assert.ok(fs.existsSync(path.join(target, 'skills', 'org-os-init')));
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework writes federation.yaml with selected packages (Task 25)', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-fed-'));
+  try {
+    spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target, '--type', 'project',
+      '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
+      '--force'
+    ], { encoding: 'utf-8' });
+    const fed = yamlMod.load(readFileSync(path.join(target, 'federation.yaml'), 'utf-8'));
+    assert.equal(fed.framework_version, '3.5');
+    assert.equal(typeof fed.packages, 'object');
   } finally {
     rmSync(target, { recursive: true, force: true });
   }
