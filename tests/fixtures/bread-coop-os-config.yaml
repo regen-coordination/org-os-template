@@ -1,0 +1,49 @@
+identity:
+  name: "Bread Cooperative"
+  type: "Cooperative"
+  emoji: "🥖"
+  short_description: "Operational hub for the Bread Cooperative — humans and agents working from a shared source of truth."
+members:
+  - github: "luizfernandosg"
+    role: "maintainer"
+    layer: "operations"
+channels:
+  - name: "Telegram (primary)"
+    platform: "telegram"
+    purpose: "fast coordination + bot integration"
+  - name: "Discourse"
+    platform: "discourse"
+    purpose: "deliberation + governance"
+  - name: "Discord"
+    platform: "discord"
+    purpose: "private core team archive"
+federation:
+  network: null  # standalone for v3.5
+  upstream: "../org-os"
+  framework_version: "3.0"  # IMPORTANT: matches framework's package.json version, not "3.5"
+packages:
+  dashboard: true
+  operations: true
+  webapps: true
+  regen-agents: true
+  paperclip-agents-app: true
+  opal-bridge: false
+  koi-bridge: false
+  agents-app: false
+  egregore-core: false
+skills:
+  enabled:
+    - "bootstrap-interviewer"
+    - "capital-flow"
+    - "funding-scout"
+    - "heartbeat-monitor"
+    - "idea-scout"
+    - "knowledge-curator"
+    - "meeting-processor"
+    - "org-os-init"
+    - "schema-generator"
+    - "workspace-improver"
+knowledge_sources:
+  - name: "2026-04-23 meeting notes"
+    type: "meeting-transcript"
+    path: "../../260423 Opportunities with Unformal + agents for bread coop.md"
