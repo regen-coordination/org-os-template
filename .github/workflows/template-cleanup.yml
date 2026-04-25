@@ -1,0 +1,93 @@
+# Bootstrap-from-template workflow
+#
+# Triggered when an issue is opened with the `bootstrap` label (see the
+# `bootstrap-instance` Issue Form). Parses the issue body into a config file
+# and runs the cloning engine inside the runner.
+#
+# MANUAL SETUP (one-time, on the GitHub side):
+#   Settings -> General -> "Template repository" must be enabled so users
+#   can spin up fresh repos from this one. See
+#   `docs/github-template-setup.md` for the full operator walkthrough.
+#
+# v3.5 STATUS: best-effort. The workflow proves the wiring (issue form ->
+# parsed config -> clone-framework.mjs --non-interactive). It does NOT yet
+# push the bootstrapped instance to a fresh repo or open a PR; that arrives
+# in v3.6. The CLI path (`scripts/clone-framework.mjs`) remains the primary
+# release-blocker and is exercised by the automated test suite.
+name: Bootstrap from template
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  bootstrap:
+    if: contains(github.event.issue.labels.*.name, 'bootstrap')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Parse issue body into config
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+            // Issue Forms render each field as `### <Label>\n\n<value>` blocks.
+            function field(label) {
+              const re = new RegExp('### ' + label + '\\s*\\n([^\\n#]+)', 'i');
+              const m = body.match(re);
+              return m ? m[1].trim() : '';
+            }
+            const config = {
+              identity: {
+                name: field('Organization name') || 'Bootstrapped',
+                type: (field('Org type') || 'project').toLowerCase(),
+                emoji: field('Emoji') || '🌱',
+                short_description: field('Short description.*') || 'Auto-bootstrapped',
+              },
+              members: [{
+                github: field('Your GitHub handle') || 'unknown',
+                role: 'maintainer',
+                layer: null,
+              }],
+              channels: [],
+              federation: {
+                network: null,
+                upstream: '../org-os',
+                framework_version: '3.5',
+              },
+              packages: { dashboard: true, operations: true },
+              skills: { enabled: ['bootstrap-interviewer', 'org-os-init', 'meeting-processor'] },
+              knowledge_sources: [],
+            };
+            fs.writeFileSync('/tmp/bootstrap-config.yaml', yaml.dump(config));
+            console.log('Wrote /tmp/bootstrap-config.yaml');
+      - name: Run cloning engine
+        run: |
+          mkdir -p /tmp/new-instance
+          node scripts/clone-framework.mjs \
+            --target /tmp/new-instance \
+            --type project \
+            --non-interactive \
+            --config /tmp/bootstrap-config.yaml \
+            --force
+      - name: Comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: 'Bootstrap complete. (v3.5: inspect logs; v3.6 will push to a fresh repo.)'
+            });

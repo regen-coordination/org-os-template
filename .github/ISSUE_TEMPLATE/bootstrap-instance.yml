@@ -1,0 +1,50 @@
+name: Bootstrap a new instance
+description: Run the cloning engine to scaffold this template into a working org-os instance
+title: "[bootstrap] <org-name>"
+labels: ["bootstrap"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open this issue on a repository created from the org-os template to
+        kick off the cloning engine. See `docs/github-template-setup.md` for
+        the one-time repo-settings step that enables this flow.
+  - type: input
+    id: org_name
+    attributes:
+      label: Organization name
+      placeholder: "Bread Cooperative"
+    validations:
+      required: true
+  - type: dropdown
+    id: org_type
+    attributes:
+      label: Org type
+      options:
+        - cooperative
+        - dao
+        - localnode
+        - project
+        - hub
+    validations:
+      required: true
+  - type: input
+    id: short_description
+    attributes:
+      label: Short description (one sentence)
+    validations:
+      required: true
+  - type: input
+    id: emoji
+    attributes:
+      label: Emoji
+      placeholder: "🥖"
+    validations:
+      required: true
+  - type: input
+    id: operator_github
+    attributes:
+      label: Your GitHub handle
+      placeholder: luizfernandosg
+    validations:
+      required: true
