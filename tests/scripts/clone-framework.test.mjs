@@ -7,6 +7,11 @@ import path from 'node:path';
 import fs from 'node:fs';
 import yamlMod from 'js-yaml';
 
+// Skip the slow npm install + git init stages in tests that only verify
+// copy/strip/render/materialize on-disk state. The dedicated dry-run test
+// below exercises the full pipeline path.
+const SKIP_FINISH_ENV = { ...process.env, ORG_OS_CLONE_SKIP_FINISH: '1' };
+
 test('clone-framework --help prints usage', () => {
   const r = spawnSync('node', ['scripts/clone-framework.mjs', '--help'], { encoding: 'utf-8' });
   assert.equal(r.status, 0);
@@ -42,7 +47,7 @@ test('clone-framework copies framework files into target (Task 20)', () => {
       '--non-interactive',
       '--config', 'tests/fixtures/instance-config.yaml',
       '--force'
-    ], { encoding: 'utf-8' });
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
     assert.ok(existsSync(path.join(target, 'AGENTS.md')), 'AGENTS.md should be copied');
     assert.ok(existsSync(path.join(target, 'data')), 'data/ should be copied');
     assert.ok(!existsSync(path.join(target, 'data', 'instances.yaml')),
@@ -64,7 +69,7 @@ test('clone-framework resets framework-specific markdown (Task 21)', () => {
       '--target', target, '--type', 'project',
       '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
       '--force'
-    ], { encoding: 'utf-8' });
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
 
     const memContent = readFileSync(path.join(target, 'MEMORY.md'), 'utf-8');
     assert.ok(!memContent.includes('Self-hosting inauguration'),
@@ -89,7 +94,7 @@ test('clone-framework renders README + GETTING-STARTED into target (Task 23)', (
       '--target', target, '--type', 'project',
       '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
       '--force'
-    ], { encoding: 'utf-8' });
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
     const readme = readFileSync(path.join(target, 'README.md'), 'utf-8');
     assert.match(readme, /Selftest Instance/, 'README rendered with org name from config');
     assert.ok(!readme.includes('{{'), 'no template strings leaked');
@@ -108,7 +113,7 @@ test('clone-framework materializes selected skills (Task 24)', () => {
       '--target', target, '--type', 'project',
       '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
       '--force'
-    ], { encoding: 'utf-8' });
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
     // The fixture enables all 10 canonical skills
     assert.ok(fs.existsSync(path.join(target, 'skills', 'bootstrap-interviewer')));
     assert.ok(fs.existsSync(path.join(target, 'skills', 'org-os-init')));
@@ -125,10 +130,32 @@ test('clone-framework writes federation.yaml with selected packages (Task 25)', 
       '--target', target, '--type', 'project',
       '--non-interactive', '--config', 'tests/fixtures/instance-config.yaml',
       '--force'
-    ], { encoding: 'utf-8' });
+    ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
     const fed = yamlMod.load(readFileSync(path.join(target, 'federation.yaml'), 'utf-8'));
     assert.equal(fed.framework_version, '3.5');
     assert.equal(typeof fed.packages, 'object');
+  } finally {
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test('clone-framework dry-run completes all stages (Tasks 26-27)', () => {
+  const target = mkdtempSync(path.join(tmpdir(), 'clone-dryrun-'));
+  rmSync(target, { recursive: true, force: true });  // delete so it doesn't exist
+  try {
+    const r = spawnSync('node', [
+      'scripts/clone-framework.mjs',
+      '--target', target,
+      '--type', 'project',
+      '--non-interactive',
+      '--config', 'tests/fixtures/instance-config.yaml',
+      '--dry-run'
+    ], { encoding: 'utf-8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /\[dry-run\]/);
+    assert.match(r.stdout, /npm install \+ validate/);
+    assert.match(r.stdout, /git init \+ initial commit/);
+    assert.match(r.stdout, /clone\] complete \(dry-run\)/);
   } finally {
     rmSync(target, { recursive: true, force: true });
   }

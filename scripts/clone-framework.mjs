@@ -375,10 +375,80 @@ function writeFederation(answers) {
 
 writeFederation(answers);
 
-// Stages 9-11 implemented in subsequent tasks (26-27).
-log('npm install + validate (Task 26)');
-log('git init + initial commit (Task 27)');
-log('print next-steps');
+// Stage 9: npm install + validate (Task 26)
+function installAndValidate() {
+  if (args.dryRun) {
+    log('npm install + validate:schemas + validate:structure');
+    return;
+  }
+  log('npm install in target ...');
+  let r = spawnSync('npm', ['install'], { cwd: args.target, stdio: 'inherit' });
+  if (r.status !== 0) {
+    console.error('npm install failed; instance left in inspectable state');
+    process.exit(r.status || 1);
+  }
+  log('npm run validate:schemas ...');
+  r = spawnSync('npm', ['run', 'validate:schemas'], { cwd: args.target, stdio: 'inherit' });
+  if (r.status !== 0) {
+    console.error('validate:schemas failed; instance left in inspectable state');
+    process.exit(r.status || 1);
+  }
+  log('npm run validate:structure ...');
+  r = spawnSync('npm', ['run', 'validate:structure'], { cwd: args.target, stdio: 'inherit' });
+  if (r.status !== 0) {
+    console.error('validate:structure failed; instance left in inspectable state');
+    process.exit(r.status || 1);
+  }
+  log('validation PASS');
+}
 
-console.log('\n[clone] dry-run complete' + (args.dryRun ? '' : ' (TODO: real impl in Task 26+)'));
+// Stage 10-11: git init + initial commit + next-steps (Task 27)
+function gitInit(answers) {
+  if (args.dryRun) {
+    log('git init + initial commit');
+    log('print next-steps');
+    return;
+  }
+  let r = spawnSync('git', ['init', '-b', 'main'], { cwd: args.target, stdio: 'inherit' });
+  if (r.status !== 0) { console.error('git init failed'); process.exit(r.status || 1); }
+  spawnSync('git', ['add', '.'], { cwd: args.target, stdio: 'inherit' });
+  const fwVer = answers.federation?.framework_version || '3.5';
+  const msg = `bootstrap: initial scaffolding from org-os v${fwVer}`;
+  spawnSync('git', ['commit', '-m', msg], { cwd: args.target, stdio: 'inherit' });
+  log('git: initial commit made on main branch');
+
+  const relPath = path.relative(args.target, FRAMEWORK_ROOT);
+  console.log(`
+─────────────────────────────────────────────────────────────────
+  Instance ready at: ${args.target}
+─────────────────────────────────────────────────────────────────
+
+  Next steps:
+
+  1. Add this instance to the framework's data/instances.yaml:
+     ${relPath}/data/instances.yaml
+
+  2. Create a remote and push:
+     cd ${args.target}
+     gh repo create <owner>/<repo> --private --source=. --remote=origin
+     git push -u origin main
+
+  3. Run your first session:
+     cd ${args.target}
+     /initialize   (in your agent runtime)
+
+  4. Read GETTING-STARTED.md — your first 30 minutes are mapped out.
+`);
+}
+
+const SKIP_FINISH = process.env.ORG_OS_CLONE_SKIP_FINISH === '1';
+
+if (SKIP_FINISH) {
+  log('skipping install + git init (ORG_OS_CLONE_SKIP_FINISH=1)');
+} else {
+  installAndValidate();
+  gitInit(answers);
+}
+
+console.log('\n[clone] complete' + (args.dryRun ? ' (dry-run)' : ''));
 process.exit(0);
