@@ -1,0 +1,24 @@
+# Non-interactive bootstrap input for selftest's clone-engine dry-run
+identity:
+  name: "Selftest Instance"
+  type: "Project"
+  emoji: "🧪"
+  short_description: "Throwaway instance used by npm run selftest."
+members:
+  - github: "test-operator"
+    role: "maintainer"
+    layer: null
+channels: []
+federation:
+  network: null
+  upstream: "../org-os"
+  framework_version: "3.5"
+packages:
+  dashboard: false
+  operations: false
+  webapps: false
+skills:
+  enabled: ["bootstrap-interviewer", "capital-flow", "funding-scout", "heartbeat-monitor",
+            "idea-scout", "knowledge-curator", "meeting-processor", "org-os-init",
+            "schema-generator", "workspace-improver"]
+knowledge_sources: []
