@@ -8,7 +8,7 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land. On release, `npm run version:update <version>` promotes this to a versioned section.)_
 
-## [3.5.0] — 2026-04-XX
+## [3.5.0] — 2026-04-25
 
 > **Theme:** "Ready for Real Orgs" — instances can be cleanly cloned, packages
 > materialized, validators CI-enforced. Proven by `bread-coop-os` going live.

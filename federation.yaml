@@ -216,6 +216,6 @@ platforms:
 # ── Metadata ─────────────────────────────────────────────────────────────────
 metadata:
   created: "2026-04-05"
-  last_updated: "2026-04-24"
-  framework_version: "3.0"
+  last_updated: "2026-04-25"
+  framework_version: "3.5"
   self_hosting_since: "2026-04-24"
