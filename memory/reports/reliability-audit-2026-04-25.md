@@ -19,11 +19,11 @@
 | Federation drift | yes (`analyze:instances`) | N/A | NO | NO |
 | Recovery | undocumented | N/A | N/A | N/A |
 
-## Recent failures (from memory/)
+## Recent latent signals (from memory/)
 
 No reliability-incidents-as-such are recorded in the current memory log
 (`memory/2026-04-24.md`, `memory/2026-04-25.md`, `memory/reports/instances-drift-2026-04-24.md`),
-but two latent reliability signals surface:
+but three latent reliability signals surface:
 
 - **Stub-as-validator risk** — `scripts/validate-identity.mjs` was just stubbed in pre-flight as a "real-but-minimal JSON validator." Without a CI gate, future stubs can slip into `main` undetected.
 - **Non-clonable instance** — `regen-coordination-os` reported `not_cloned_locally` in the 2026-04-24 drift report and is still pending resolution per `2026-04-25.md`. This is the kind of drift that a scheduled `analyze:instances` run would surface automatically.

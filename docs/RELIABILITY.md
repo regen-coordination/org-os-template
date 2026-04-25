@@ -3,6 +3,11 @@
 This is the reliability contract of org-os. Every failure mode the framework
 promises to catch must be enforced by ≥1 trigger layer.
 
+> **Note (v3.5 in-progress):** Some procedures below reference `sync:packages` and
+> the cloning engine, which are being built during the v3.5 release (see
+> `docs/agent-plans/v3-5-release-implementation.md`). Until those land, the
+> referenced commands may not exist yet.
+
 ## Failure modes
 
 1. **Data integrity** — schema or structure violations in `data/*.yaml`, `federation.yaml`, `dashboard.yaml`
@@ -37,8 +42,13 @@ promises to catch must be enforced by ≥1 trigger layer.
 - Inspect what was partially written; fix root cause; re-run
 
 ### Broken migration
-- `npm run migrate -- --rollback` reverts the last applied migration
-- Investigate failure cause before re-applying
+1. `npm run migrate -- --dry` previews what a migration WOULD change before re-running.
+2. To revert a migration's effects, find its commit (`git log` for `migrate:` prefix or the migration script name).
+3. `git revert <sha>` to undo the migration's data changes.
+4. Re-run `npm run migrate` only after fixing the underlying cause.
+
+NOTE: An automated `--rollback` flag is planned for a future release; until then,
+recovery is git-based.
 
 ### Lost work (detached HEAD)
 - `git reflog` shows recent commits
