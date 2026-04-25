@@ -1,0 +1,25 @@
+name: validate
+on:
+  push:
+    branches: [main, "release/**"]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: validate:schemas
+        run: npm run validate:schemas
+      - name: validate:structure
+        run: npm run validate:structure
+      - name: analyze:instances --check-only
+        run: npm run analyze:instances -- --check-only
+      - name: selftest
+        run: npm run selftest

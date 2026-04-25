@@ -8,7 +8,12 @@
  * and against skills-matrix.yaml / packages-matrix.yaml. Writes a dated
  * drift report to memory/reports/.
  *
- * Usage: node scripts/analyze-instances.mjs [--json]
+ * Usage: node scripts/analyze-instances.mjs [--json] [--check-only]
+ *
+ * Flags:
+ *   --json         Emit the full report as JSON to stdout (no file written).
+ *   --check-only   CI mode: skip writing the markdown report, exit non-zero
+ *                  if any drift is detected. Useful for failing PRs on drift.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
@@ -18,6 +23,7 @@ import { load as loadYaml } from 'js-yaml';
 const frameworkRoot = resolve(process.argv[1], '../..');
 const dataDir = join(frameworkRoot, 'data');
 const jsonMode = process.argv.includes('--json');
+const checkOnly = process.argv.includes('--check-only');
 
 function readYaml(path) {
   if (!existsSync(path)) return null;
@@ -182,12 +188,12 @@ for (const inst of instancesFile.instances) {
 
 if (jsonMode) {
   console.log(JSON.stringify(report, null, 2));
-  process.exit(0);
+  process.exit(checkOnly && report.summary.drift_total > 0 ? 1 : 0);
 }
 
 const today = new Date().toISOString().slice(0, 10);
 const reportsDir = join(frameworkRoot, 'memory', 'reports');
-if (!existsSync(reportsDir)) mkdirSync(reportsDir, { recursive: true });
+if (!checkOnly && !existsSync(reportsDir)) mkdirSync(reportsDir, { recursive: true });
 
 const mdLines = [];
 mdLines.push(`# Instance Drift Report — ${today}`);
@@ -233,7 +239,9 @@ for (const inst of report.instances) {
 }
 
 const reportPath = join(reportsDir, `instances-drift-${today}.md`);
-writeFileSync(reportPath, mdLines.join('\n'), 'utf-8');
+if (!checkOnly) {
+  writeFileSync(reportPath, mdLines.join('\n'), 'utf-8');
+}
 
 // Console summary
 console.log(`\n📊 Instance Drift Report — ${today}`);
@@ -250,9 +258,18 @@ for (const inst of report.instances) {
   console.log(`  ${status.padEnd(5)} ${inst.id.padEnd(25)} ${inst.maturity}`);
 }
 console.log('');
-console.log(`Full report: ${reportPath.replace(frameworkRoot, '.')}`);
+if (checkOnly) {
+  console.log(`(check-only mode: report file not written)`);
+} else {
+  console.log(`Full report: ${reportPath.replace(frameworkRoot, '.')}`);
+}
 console.log('');
 
+if (checkOnly && report.summary.drift_total > 0) {
+  console.error(`✗ Drift detected (${report.summary.drift_total} items). Failing CI.`);
+  process.exit(1);
+}
+
 if (report.summary.drift_total > 0) {
-  process.exit(0); // drift is informational, not a failure
+  process.exit(0); // drift is informational, not a failure (non-CI mode)
 }
