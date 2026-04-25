@@ -22,11 +22,28 @@ import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 const frameworkRoot = resolve(process.argv[1], '../..');
-const newVersion = process.argv[2];
+const isCheck = process.argv.includes('--check');
+const newVersion = isCheck ? null : process.argv[2];
 
 function die(msg) {
   console.error(`✗ ${msg}`);
   process.exit(1);
+}
+
+// --- --check mode: verify CHANGELOG.md has entry for current package.json version ---
+
+if (isCheck) {
+  const pkgPath = resolve(frameworkRoot, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  const changelogPath = resolve(frameworkRoot, 'CHANGELOG.md');
+  const changelog = readFileSync(changelogPath, 'utf-8');
+  const expectedHeader = `## [${pkg.version}]`;
+  if (!changelog.includes(expectedHeader)) {
+    console.error(`version:check FAIL — CHANGELOG.md is missing entry for ${pkg.version}`);
+    process.exit(1);
+  }
+  console.log(`version:check PASS — CHANGELOG.md has entry for ${pkg.version}`);
+  process.exit(0);
 }
 
 if (!newVersion) {
