@@ -110,3 +110,22 @@ instances:
       - "missing_governance_yaml"
       - "missing_dao_json"
     notes: "Synced to framework v3.0 on 2026-04-24 — full overlay (skills, scripts, schemas, packages, framework docs). Instance identity files (SOUL, IDENTITY, USER, HEARTBEAT, MEMORY, TOOLS, README, federation.yaml, data/) preserved. Three pre-existing structural issues to resolve in next session."
+
+  - id: "bread-coop-os"
+    name: "Bread Cooperative"
+    type: "Cooperative"
+    maturity: "alpha"
+    repo: null  # not yet pushed to GitHub
+    local_path: "../bread-coop-os"
+    cloned: true
+    federation_network: null
+    federation_role: "standalone-instance"
+    masterplan_version: "1.0.0"
+    framework_version: "3.5"  # newly-bootstrapped against v3.5 work-in-progress
+    last_sync: "2026-04-25"  # bootstrap date
+    agent_runtime: ["claude-code", "openclaw"]
+    skills_extra: []
+    packages: ["dashboard", "operations", "webapps", "regen-agents", "paperclip-agents-app"]
+    data_registries_extra: ["proposals", "votes", "member-applications"]
+    drift: []
+    notes: "Bootstrapped from org-os v3.5 cloning engine (acceptance test). Cooperative with active governance. Telegram primary, Discourse forum, Discord private. v3.5 acceptance instance — proves the cloning engine end-to-end."
