@@ -8,12 +8,15 @@
  * and against skills-matrix.yaml / packages-matrix.yaml. Writes a dated
  * drift report to memory/reports/.
  *
- * Usage: node scripts/analyze-instances.mjs [--json] [--check-only]
+ * Usage: node scripts/analyze-instances.mjs [--json] [--check-only] [--report]
  *
  * Flags:
  *   --json         Emit the full report as JSON to stdout (no file written).
  *   --check-only   CI mode: skip writing the markdown report, exit non-zero
  *                  if any drift is detected. Useful for failing PRs on drift.
+ *   --report       Emit a compact markdown drift report to stdout (no file
+ *                  written, no exit on drift). Used by the scheduled drift
+ *                  workflow to redirect into memory/reports/.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
@@ -24,6 +27,7 @@ const frameworkRoot = resolve(process.argv[1], '../..');
 const dataDir = join(frameworkRoot, 'data');
 const jsonMode = process.argv.includes('--json');
 const checkOnly = process.argv.includes('--check-only');
+const reportMode = process.argv.includes('--report');
 
 function readYaml(path) {
   if (!existsSync(path)) return null;
@@ -189,6 +193,52 @@ for (const inst of instancesFile.instances) {
 if (jsonMode) {
   console.log(JSON.stringify(report, null, 2));
   process.exit(checkOnly && report.summary.drift_total > 0 ? 1 : 0);
+}
+
+if (reportMode) {
+  const today = new Date().toISOString().slice(0, 10);
+  console.log(`# Instance drift report — ${today}`);
+  console.log('');
+  console.log(`**Generated:** ${report.generated_at}`);
+  console.log(`**Framework version:** ${report.framework_version}`);
+  console.log('');
+  console.log('| Instance | Maturity | FW version | Last sync | Drift count | Status |');
+  console.log('|---|---|---|---|---|---|');
+  for (const inst of instancesFile.instances) {
+    const result = report.instances.find((r) => r.id === inst.id);
+    const driftCount = result?.drift?.length ?? 0;
+    const daysSync = inst.last_sync
+      ? Math.floor((Date.now() - new Date(inst.last_sync).getTime()) / 86400000)
+      : null;
+    const status = daysSync == null
+      ? '—'
+      : daysSync > 90
+        ? 'DORMANT'
+        : daysSync > 30
+          ? 'DRIFTED'
+          : 'ok';
+    const lastSyncCell = inst.last_sync
+      ? `${inst.last_sync} (${daysSync}d)`
+      : '— (—)';
+    console.log(`| ${inst.id} | ${inst.maturity} | ${inst.framework_version || '—'} | ${lastSyncCell} | ${driftCount} | ${status} |`);
+  }
+  console.log('');
+  console.log('## Drift detail');
+  console.log('');
+  let anyDrift = false;
+  for (const result of report.instances) {
+    if (!result.drift?.length) continue;
+    anyDrift = true;
+    console.log(`### ${result.id}`);
+    console.log('');
+    for (const d of result.drift) console.log(`- ${d}`);
+    console.log('');
+  }
+  if (!anyDrift) {
+    console.log('_No discovered drift across tracked instances._');
+    console.log('');
+  }
+  process.exit(0);
 }
 
 const today = new Date().toISOString().slice(0, 10);

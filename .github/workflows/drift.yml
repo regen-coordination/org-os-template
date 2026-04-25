@@ -1,0 +1,36 @@
+name: drift
+on:
+  schedule:
+    - cron: '0 4 * * 0'  # Sundays 04:00 UTC
+  workflow_dispatch:      # allow manual trigger from Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run drift report
+        id: drift
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          mkdir -p memory/reports
+          npm run analyze:instances -- --report > "memory/reports/instances-drift-${DATE}.md"
+          echo "report=memory/reports/instances-drift-${DATE}.md" >> $GITHUB_OUTPUT
+      - name: Commit report
+        run: |
+          git config user.name "org-os-drift-bot"
+          git config user.email "noreply@github.com"
+          git add memory/reports/
+          git diff --quiet --cached || git commit -m "drift: weekly instance report"
+          git push
