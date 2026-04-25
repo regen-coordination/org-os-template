@@ -35,6 +35,7 @@ _Lightweight index for persistent organizational memory. Detailed notes live in 
 - **[ongoing]** `federation-protocol` workstream — end-to-end sync exchange testing.
 - **[ongoing]** Multi-instance skill promotion review — `research` skill (2 instances), DAO modules (dao-os only).
 - **[ongoing]** Solo-maintainer phase — no treasury, no formal governance; adjust when first external contributor lands.
+- **[2026-04-25]** `multica-integration` spec + 25-task plan committed, execution deferred. Pilots the self-installing package pattern for the queued `package-integration` Phase 3. See `docs/superpowers/specs/2026-04-25-multica-integration-design.md` and `docs/superpowers/plans/2026-04-25-multica-integration.md`.
 
 ---
 

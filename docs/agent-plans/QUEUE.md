@@ -1,6 +1,6 @@
 # Plan Queue — org-os (framework)
 
-> Last updated: 2026-04-25
+> Last updated: 2026-04-25 (multica-integration spec + plan added)
 
 ## Active
 
@@ -8,12 +8,13 @@ _(none)_
 
 ## Queued
 
-1. [tui-dashboard](tui-dashboard.md) — TUI dashboard (Ink) + agent-rendered pages, shared data layer · spec + 28-task implementation plan ([`tui-dashboard-implementation.md`](tui-dashboard-implementation.md)) ready · candidate packages `packages/tui-data/`, `packages/tui/` · workstream: operator-interfaces
-2. [future-instance-specs](future-instance-specs.md) — Write specs for regen-coordination-os and regen-toolkit  ·  workstream: framework-evolution
-3. [federation-protocol](federation-protocol.md) — End-to-end federation exchange testing and docs  ·  workstream: federation-protocol
-4. [package-integration](package-integration.md) — Audit packages/, define lifecycle (`docs/PACKAGE-LIFECYCLE.md`), resolve consumption mechanism  ·  workstream: package-integration  ·  est. 3 sessions
-5. [system-reliability](system-reliability.md) — Audit reliability infra, decide trigger layering (pre-commit / CI / scheduled), implement enforcement  ·  workstream: reliability  ·  est. 3 sessions
-6. [instance-bootstrap](instance-bootstrap.md) — Framework cloning + wizard with package/skill selection + knowledge bootstrap (one source). Engine for `non-tech-onboarding` web wrapper  ·  workstream: instance-bootstrap  ·  est. 4 sessions
+1. **multica-integration** — Wire Multica (github.com/multica-ai/multica) as primary agent runtime; self-hosted server, slash commands, write-only HEARTBEAT bridge. Spec: [`2026-04-25-multica-integration-design.md`](../superpowers/specs/2026-04-25-multica-integration-design.md) · 25-task plan: [`2026-04-25-multica-integration.md`](../superpowers/plans/2026-04-25-multica-integration.md) · pilot for `package-integration` Phase 3 · workstream: package-integration · execution deferred 2026-04-25
+2. [tui-dashboard](tui-dashboard.md) — TUI dashboard (Ink) + agent-rendered pages, shared data layer · spec + 28-task implementation plan ([`tui-dashboard-implementation.md`](tui-dashboard-implementation.md)) ready · candidate packages `packages/tui-data/`, `packages/tui/` · workstream: operator-interfaces
+3. [future-instance-specs](future-instance-specs.md) — Write specs for regen-coordination-os and regen-toolkit  ·  workstream: framework-evolution
+4. [federation-protocol](federation-protocol.md) — End-to-end federation exchange testing and docs  ·  workstream: federation-protocol
+5. [package-integration](package-integration.md) — Audit packages/, define lifecycle (`docs/PACKAGE-LIFECYCLE.md`), resolve consumption mechanism  ·  workstream: package-integration  ·  est. 3 sessions  ·  parent of multica-integration
+6. [system-reliability](system-reliability.md) — Audit reliability infra, decide trigger layering (pre-commit / CI / scheduled), implement enforcement  ·  workstream: reliability  ·  est. 3 sessions
+7. [instance-bootstrap](instance-bootstrap.md) — Framework cloning + wizard with package/skill selection + knowledge bootstrap (one source). Engine for `non-tech-onboarding` web wrapper  ·  workstream: instance-bootstrap  ·  est. 4 sessions
 
 ## Scoping
 

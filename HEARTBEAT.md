@@ -7,9 +7,10 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## Active Tasks
 
 ### Technical
+- [ ] Execute `multica-integration` plan (25 tasks, spec + plan ready, execution deferred 2026-04-25 — recommend fresh worktree)
 - [ ] Complete `federation-protocol` end-to-end sync test (queued plan)
 - [ ] Write `future-instance-specs` for regen-coordination-os and regen-toolkit (queued plan)
-- [ ] Activate `package-integration` plan phase 1 — inventory audit of `packages/` (queued plan)
+- [ ] Activate `package-integration` plan phase 1 — inventory audit of `packages/` (queued plan; multica-integration is its pilot)
 - [ ] Activate `system-reliability` plan phase 1 — inventory existing reliability infra (queued plan)
 - [ ] Activate `instance-bootstrap` plan phase 1 — resolve cloning mechanism open question (queued plan)
 - [ ] Finalize `non-tech-onboarding` scoping — narrowed to web UI + GHA glue over `instance-bootstrap` engine (scoping plan)
