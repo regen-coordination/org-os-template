@@ -89,9 +89,9 @@ packages:
     owner: "refi-bcn-os"
     instances_using: ["refi-bcn-os", "refi-dao-os", "regen-coordination-os"]
     in_framework: false
-    promotion_status: "candidate"
+    promotion_status: "ready"
     lifecycle_status: "active"
-    notes: "Present in all three production instances. Framework-dashboard-template scoping plan exists — promotion path already identified."
+    notes: "Promotion-ready: ≥2 instances (now 3), validated. Move source from refi-bcn-os/packages/dashboard/ to org-os/packages/dashboard/ during v3.5 cutover (Task 33)."
 
   - id: "governance"
     owner: "refi-dao-os"
