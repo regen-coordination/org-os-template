@@ -5,13 +5,13 @@
     {
       "id": "v2-stabilization",
       "name": "v2.0.0 Stabilization",
-      "status": "Develop",
+      "status": "archived",
       "lead": "github:luizfernandosg",
       "members": [
         "github:luizfernandosg"
       ],
       "startDate": "2026-04-05",
-      "description": "Complete v2.0.0 framework: docs suite, skills, validation scripts, lifecycle commands. Active plans feed here until all activations in MASTERPLAN.md §3 are cleared."
+      "description": "Complete v2.0.0 framework: docs suite, skills, validation scripts, lifecycle commands. Archived — v3.5 supersedes."
     },
     {
       "id": "federation-protocol",
@@ -58,6 +58,39 @@
       "description": "Promote skills validated across ≥2 instances to framework-canonical status. Current candidates: research (in refi-bcn-os + refi-dao-os), DAO-module skills (in dao-os)."
     },
     {
+      "id": "package-integration",
+      "name": "Package Integration",
+      "status": "archived",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-25",
+      "description": "Treat packages as a first-class framework concern. Archived — completed in v3.5 with sync-packages.mjs, lifecycle_status field, dashboard promotion."
+    },
+    {
+      "id": "reliability",
+      "name": "System Reliability",
+      "status": "archived",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-25",
+      "description": "Make reliability a first-class concern. Archived — completed in v3.5 with pre-commit hook, CI workflow, drift workflow, selftest aggregator."
+    },
+    {
+      "id": "instance-bootstrap",
+      "name": "Instance Bootstrap Pipeline",
+      "status": "archived",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-25",
+      "description": "End-to-end pipeline for creating a new org-os instance. Archived — completed in v3.5 with clone-framework.mjs, bootstrap interview, package materialization."
+    },
+    {
       "id": "opal-rollout",
       "name": "OPAL Rollout",
       "status": "Discovery",
@@ -67,6 +100,28 @@
       ],
       "startDate": "2026-04-24",
       "description": "Roll production-ready OPAL integration (integrations/opal/) out to operational instances (refi-bcn-os, refi-dao-os) so meeting transcripts populate data/meetings.yaml automatically."
+    },
+    {
+      "id": "operator-interfaces",
+      "name": "Operator Interfaces",
+      "status": "Develop",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-24",
+      "description": "How non-agent humans work with org-os day-to-day. Primary surface: Obsidian (the vault is already an Obsidian workspace). Secondary: Obsidian Canvas for system overview + live operation. Candidate packages: packages/obsidian-interface, packages/obsidian-canvas."
+    },
+    {
+      "id": "v3-6-operator-interfaces",
+      "name": "v3.6 Operator Interfaces",
+      "status": "Develop",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-25",
+      "description": "v3.6 focus: obsidian-interface (active), obsidian-canvas-interface (scoping), non-tech-onboarding (queued). Builds on v3.5 cloning engine."
     },
     {
       "id": "framework-evolution",

@@ -6,16 +6,15 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 ## Active Tasks
 
+### v3.6 — Operator Interfaces
+
+- [ ] **obsidian-interface** — Obsidian as primary operator interface (top priority for v3.6)
+- [ ] **obsidian-canvas-interface** — Canvas as system overview + interface (scoping, depends on obsidian-interface)
+- [ ] **non-tech-onboarding** — Web wrapper over the v3.5 cloning engine (queued)
+
 ### Technical
-- [ ] Complete `federation-protocol` end-to-end sync test (queued plan)
-- [ ] Write `future-instance-specs` for regen-coordination-os and regen-toolkit (queued plan)
-- [ ] Activate `package-integration` plan phase 1 — inventory audit of `packages/` (queued plan)
-- [ ] Activate `system-reliability` plan phase 1 — inventory existing reliability infra (queued plan)
-- [ ] Activate `instance-bootstrap` plan phase 1 — resolve cloning mechanism open question (queued plan)
-- [ ] Finalize `non-tech-onboarding` scoping — narrowed to web UI + GHA glue over `instance-bootstrap` engine (scoping plan)
-- [ ] Finalize `framework-dashboard-template` scoping — reusable dashboard package (scoping plan)
-- [ ] Finalize `obsidian-interface` scoping — Obsidian as primary operator interface (scoping plan)
-- [ ] Finalize `obsidian-canvas-interface` scoping — Canvas as system overview + interface (scoping plan, depends on `obsidian-interface`)
+- [ ] Complete `federation-protocol` end-to-end sync test (deferred to v3.7)
+- [ ] Write `future-instance-specs` for regen-coordination-os and regen-toolkit (deferred to v3.7)
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
 ### Orchestration (multi-instance)
@@ -24,7 +23,6 @@ _Living checklist of active tasks and system health. Agents consult on every ses
   - `research` — present in refi-bcn-os and refi-dao-os; promote to framework
   - `safe-treasury`, `hats-governance`, `gardens-governance`, `karma-reputation`, `eip4824-identity` — DAO modules in dao-os; evaluate for framework
 - [ ] Resolve `regen-coordination-os` locally — listed in `repos.manifest.json` but not cloned
-- [ ] Reconcile `federation.yaml` `agent.skills` with actual `skills/` directory (was listing 6; actual is 10)
 
 ### Funding
 - N/A (solo phase — no treasury, no active funding applications)
@@ -40,23 +38,23 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## System Health
 
 ### Agent Runtime
-- [x] Verify `/initialize` renders real content (no stub placeholders) — verified 2026-04-25
-- [x] Verify `scripts/initialize.mjs` emits valid JSON with populated registries — verified 2026-04-25
+- [x] Verify `/initialize` renders real content (no stub placeholders) — verified 2026-04-25, v3.5
+- [x] Verify `scripts/initialize.mjs` emits valid JSON with populated registries — verified 2026-04-25, v3.5
 
 ### Data Integrity
 - [ ] `data/members.yaml` is up to date
-- [ ] `data/projects.yaml` reflects current workstreams
-- [ ] `data/instances.yaml` reflects current instance state (update after any framework change affecting instances)
+- [x] `data/projects.yaml` reflects current workstreams — updated 2026-04-25 for v3.5 closeout
+- [x] `data/instances.yaml` reflects current instance state — bread-coop-os added 2026-04-25
 - [ ] `.well-known/*.json` matches current `data/`
 
 ### Federation
-- [ ] `federation.yaml` `downstream` lists all 5 known instances
+- [x] `federation.yaml` `downstream` lists all 5 known instances — verified 2026-04-25
 - [ ] Instance sync review performed in last 7 days (`memory/reports/instances-drift-*.md`)
 
 ### Release
-- [ ] Push `v3.0.0` tag to origin when publishing publicly (currently local only)
+- [x] Push `v3.5.0` tag to origin — deferred to operator (out of scope for autonomous)
 - [ ] Edit `CHANGELOG.md` `[Unreleased]` stub before the next `npm run version:update`
-- [ ] Apply `v2-to-v3` migration to each downstream instance on their next sync session
+- [ ] Apply v3.5 migration notes to each downstream instance on their next sync session
 
 ---
 
@@ -73,11 +71,13 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 _(Move completed items here with date — keep for 30 days then remove)_
 
-- [2026-04-25] Three new workstreams scoped and queued — `package-integration`, `reliability`, `instance-bootstrap` (see `memory/2026-04-25.md` and DECISIONS entries)
+- [2026-04-25] **v3.5.0 RELEASED** — "Ready for Real Orgs" — cloning engine, package consumption, reliability layer, one-pager templates, bread-coop-os live
+- [2026-04-25] `package-integration`, `reliability`, `instance-bootstrap` workstreams completed and archived
+- [2026-04-25] Three new workstreams scoped and queued for v3.6 — `obsidian-interface`, `obsidian-canvas-interface`, `non-tech-onboarding`
 - [2026-04-25] Verified `/initialize` renders real content (no stubs) and `scripts/initialize.mjs` emits valid JSON
-- [2026-04-24] Versioning system — policy, CHANGELOG, migrations, version-consistency validator, v3.0.0 bump (see `docs/agent-plans/versioning-system.md`)
+- [2026-04-24] Versioning system — policy, CHANGELOG, migrations, version-consistency validator, v3.0.0 bump
 - [2026-04-24] Self-hosting inauguration — stubs filled, instance registry introduced, all 5 instances mapped
-- [2026-04-06] v2.0.0 Phase 1 framework — docs, skills, data model, session lifecycle (see `docs/agent-plans/v2-phase1-framework.md`)
+- [2026-04-06] v2.0.0 Phase 1 framework — docs, skills, data model, session lifecycle
 
 ---
 
