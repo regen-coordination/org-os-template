@@ -1,0 +1,13 @@
+{
+  "daoURI": "https://github.com/regen-coordination/org-os",
+  "name": "org-os",
+  "description": "Organizational OS framework template — a complete operating system for DAOs, cooperatives, nonprofits, networks, and projects. Structures organizational knowledge in a machine-readable, federated way.",
+  "membersURI": "./members.json",
+  "proposalsURI": "./proposals.json",
+  "activityLogURI": "./activities.json",
+  "governanceURI": "https://github.com/regen-coordination/org-os/blob/main/docs/GOVERNANCE.md",
+  "contracts": {
+    "registry": ""
+  },
+  "type": "Project"
+}
