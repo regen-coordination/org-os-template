@@ -184,3 +184,13 @@ A: Local sovereignty, regenerative economics, cooperative governance, open knowl
 
 → Generates SOUL.md, IDENTITY.md, data/members.yaml with provided info
 ```
+
+## Extension: package + skill selection (v3.5+)
+
+When invoked from `scripts/clone-framework.mjs`, the interviewer also asks:
+- Which canonical packages to enable (default: minimal set; opt-in per package)
+- Which canonical skills to opt OUT of (default: all enabled)
+
+Selections persist into `federation.yaml.packages` and `federation.yaml.skills`.
+The cloning engine materializes selections via `npm run sync:packages` and by
+copying skills from `skills/` per the enabled list.

@@ -2,7 +2,7 @@
   "name": "organizational-os-template",
   "description": "GitHub-based operational workspace template with EIP-4824 compliance",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.5.0",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -19,6 +19,7 @@
     "sync": "node scripts/sync-github.mjs",
     "sync:upstream": "node scripts/sync-upstream.mjs",
     "sync:packages": "node scripts/sync-packages.mjs",
+    "clone:framework": "node scripts/clone-framework.mjs",
     "generate:schemas": "node scripts/generate-all-schemas.mjs",
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
