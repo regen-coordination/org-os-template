@@ -8,6 +8,76 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land. On release, `npm run version:update <version>` promotes this to a versioned section.)_
 
+## [3.5.0] — 2026-04-XX
+
+> **Theme:** "Ready for Real Orgs" — instances can be cleanly cloned, packages
+> materialized, validators CI-enforced. Proven by `bread-coop-os` going live.
+
+### Added
+- **Cloning engine** (`scripts/clone-framework.mjs`) — single source of truth
+  for bootstrapping new instances; supports `--interactive`, `--non-interactive
+  --config`, `--dry-run`, `--force`
+- **Package consumption mechanism** (`scripts/sync-packages.mjs`,
+  `npm run sync:packages`) — vendored packages with framework_version pinning,
+  `--check` and `--prune` flags
+- **Reliability layer**:
+  - Pre-commit hook (`.github/hooks/pre-commit.sh` + `npm run install:hooks`)
+  - CI workflow (`.github/workflows/validate.yml`) — runs on push + PR
+  - Scheduled drift workflow (`.github/workflows/drift.yml`) — Sundays 04:00 UTC
+  - `npm run selftest` aggregator (validators + clone-engine dry-run + version:check)
+- **One-pager templates** in `templates/`:
+  - `README.framework.md`, `README.instance.md` — variant templates
+  - `GETTING-STARTED.md` — conversational onboarding (conditional by org type)
+  - `partials/` — shared cheatsheet + federation snippets
+  - `render.mjs` — minimal Mustache-style renderer (~80 lines)
+- **`docs/PACKAGE-LIFECYCLE.md`** — promotion + retirement workflow for packages
+  (mirrors `docs/SKILL-PROMOTION.md`)
+- **`docs/RELIABILITY.md`** — failure modes, trigger layers, recovery runbook
+- **`lifecycle_status` field** on `data/packages-matrix.yaml` (active/dormant/
+  planned/retired) + validator enforcement
+- **`bread-coop-os`** — new instance, bootstrapped via the cloning engine
+  (v3.5 acceptance test)
+- **GitHub Template wrapping** — Issue form + workflow for browser-based bootstrap
+- `--check` mode in `scripts/update-version.mjs` (verifies CHANGELOG sync)
+- `--check-only` and `--report` modes in `scripts/analyze-instances.mjs`
+- `version:check` npm script
+
+### Changed
+- **`README.md`** — replaced v1-era content with rendered framework template
+- **`GETTING-STARTED.md`** — new at repo root, rendered from template
+- **`BOOTSTRAP.md`** — rewrote to point at the cloning engine
+- **`bootstrap-interviewer` skill** — extended with package + skill selection
+- **`scripts/sync-upstream.mjs`** — now delegates to `sync-packages`
+- **`dashboard` package** — promoted to framework (was: refi-bcn-os origin),
+  used by 3 instances
+- **`packages-matrix.yaml`** — added `coop` and `regen-toolkit` entries
+  surfaced by audit; corrected `instances_using` for 10 packages to reflect
+  regen-coordination-os adoption
+
+### Fixed
+- `.well-known/dao.json` — added (was missing, blocking validate:structure)
+- `federation.yaml` — added required federation section wrapper
+- `package.json` — deduped `initialize` script entry
+
+### Reliability SLAs (new)
+- Drifted: `last_sync` > 30 days
+- Dormant: `last_sync` > 90 days
+
+### Migration
+- Additive release. No breaking changes for existing instances.
+- Existing instances pull v3.5 via `npm run sync:upstream`.
+- Run `npm run install:hooks` to enable the pre-commit hook locally.
+- v3.0 instances should run `npm run sync:upstream` after upgrade to pick up
+  the new templates, scripts, and workflows.
+
+### Known issues
+- Framework's own `federation.yaml.packages` block uses stale module-style
+  toggles (legacy v2 names) — does not block functionality but should be
+  migrated to v3.5 package IDs in v3.5.1.
+- Selftest's `analyze:instances` step exits non-zero from the framework
+  worktree due to instance `local_path_missing` items — will resolve once all
+  instances re-sync against v3.5 (Phase 3 of release plan).
+
 ## [3.0.0] — 2026-04-24
 
 First tagged release under the proper versioning system. Consolidates the work done since the v2.0.0 launch and inaugurates org-os as a self-hosting, multi-instance orchestration hub.
