@@ -94,10 +94,24 @@ const STRIP_LIST = [
   'scripts/selftest.mjs',
   'templates/',
   'tests/fixtures/instance-config.yaml',
+  // Framework-specific .well-known/ artifacts; .template.json files are kept,
+  // generate:schemas will (re)write the .json files post-bootstrap, and dao.json
+  // is rendered explicitly from the dao.json.template later in this script.
   '.well-known/instances.json',
+  '.well-known/dao.json',
+  '.well-known/members.json',
+  '.well-known/projects.json',
+  '.well-known/proposals.json',
+  '.well-known/activities.json',
+  '.well-known/contracts.json',
+  '.well-known/finances.json',
+  '.well-known/ideas.json',
+  '.well-known/knowledge.json',
 ];
 
-const SKIP_FROM_COPY = new Set(['.git', 'node_modules', '.claude', '.well-known', '.worktrees']);
+// .well-known/ IS copied so generate:schemas has a target dir + dao.json templates
+// available; framework-specific .json artifacts inside it are stripped via STRIP_LIST.
+const SKIP_FROM_COPY = new Set(['.git', 'node_modules', '.claude', '.worktrees']);
 
 function copyTree(src, dst) {
   fs.mkdirSync(dst, { recursive: true });
@@ -341,25 +355,102 @@ function materializeSkills(answers) {
 materializePackages(answers);
 materializeSkills(answers);
 
-// Stage 8: write federation.yaml + run sync-packages (Task 25)
+// Stage 8: write federation.yaml + render dao.json + run sync-packages (Task 25)
+function getFrameworkVersion() {
+  // Derive framework_version (major.minor) from the framework's package.json so
+  // it always matches what gets copied into the target — keeps validate-structure's
+  // version-consistency check happy.
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(FRAMEWORK_ROOT, 'package.json'), 'utf-8'));
+    const m = (pkg.version || '').match(/^(\d+)\.(\d+)/);
+    if (m) return `${m[1]}.${m[2]}`;
+  } catch {}
+  return answers?.federation?.framework_version || '3.0';
+}
+
 function writeFederation(answers) {
   if (args.dryRun) {
-    log('write federation.yaml + run sync:packages');
+    log('write federation.yaml + render dao.json + run sync:packages');
     return;
   }
+  const today = new Date().toISOString().slice(0, 10);
+  const frameworkVersion = getFrameworkVersion();
+  const network = answers.federation?.network || null;
+  const upstream = answers.federation?.upstream || '../org-os';
+
+  // Nested federation.yaml schema — matches validate-structure.mjs expectations
+  // (identity / federation / agent / metadata sections + metadata.framework_version).
   const fed = {
-    schema_version: '2.0',
-    network: answers.federation?.network || null,
-    upstream: answers.federation?.upstream || '../org-os',
-    framework_version: answers.federation?.framework_version || '3.5',
-    role: 'standalone-instance',
-    peers: [],
+    version: '3.0',
+    spec: 'organizational-os/3.0',
+
+    identity: {
+      name: answers.identity?.name || 'Unnamed Instance',
+      type: answers.identity?.type || 'Project',
+      emoji: answers.identity?.emoji || '',
+      short_description: answers.identity?.short_description || '',
+      daoURI: '',
+      onchain_registration: { enabled: false, chain: '', contract_address: '' },
+    },
+
+    federation: {
+      network,
+      upstream,
+      role: 'standalone-instance',
+      peers: [],
+      downstream: [],
+    },
+
+    agent: {
+      runtime: 'claude-code',
+      workspace: '.',
+      skills: answers.skills?.enabled || [],
+      channels: [],
+      proactive: false,
+      heartbeat_interval: '1h',
+    },
+
+    'knowledge-commons': {
+      enabled: false,
+      'shared-domains': [],
+      'sync-protocol': 'git',
+      publish: { meetings: false, projects: false, funding: false },
+      subscribe: [],
+    },
+
+    // Operational packages — sync-packages.mjs requires `packages` to be a flat
+    // map of { id: boolean }, so we keep that shape at the top level.
     packages: answers.packages || {},
-    skills: { enabled: answers.skills?.enabled || [] },
-    knowledge_commons: false,
+
+    governance: {
+      maintainers: (answers.members || []).map((m) => ({
+        handle: m.github ? `github:${m.github}` : (m.handle || 'unknown'),
+        role: m.role || 'maintainer',
+      })),
+      decision_model: 'solo-maintainer',
+      proposal_threshold: 'maintainer decision',
+    },
+
+    platforms: {
+      primary: 'github',
+      deployment: 'github-pages',
+      domain: '',
+      mirrors: [],
+    },
+
+    metadata: {
+      created: today,
+      last_updated: today,
+      framework_version: frameworkVersion,
+    },
   };
   fs.writeFileSync(path.join(args.target, 'federation.yaml'), yaml.dump(fed));
-  log('wrote federation.yaml');
+  log(`wrote federation.yaml (framework_version=${frameworkVersion})`);
+
+  // Render .well-known/dao.json from its template using bootstrap answers so
+  // generate:schemas (which only READS dao.json) and validate-structure both
+  // find a populated, parseable dao.json in the new instance.
+  renderDaoJson(answers);
 
   // Run sync-packages to materialize enabled packages from framework
   const syncResult = spawnSync('node', [
@@ -373,18 +464,54 @@ function writeFederation(answers) {
   }
 }
 
+function renderDaoJson(answers) {
+  const wellKnownDir = path.join(args.target, '.well-known');
+  fs.mkdirSync(wellKnownDir, { recursive: true });
+  const tmplPath = path.join(wellKnownDir, 'dao.json.template');
+  const orgName = answers.identity?.name || 'Unnamed Instance';
+  const orgDescription = answers.identity?.short_description || `${orgName} — org-os instance`;
+  // Sensible default base URL; instance owner can edit later.
+  const baseUrl = `${(orgName || 'instance').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.example.com`;
+
+  let dao;
+  if (fs.existsSync(tmplPath)) {
+    const raw = fs.readFileSync(tmplPath, 'utf-8')
+      .replace(/\{\{ORGANIZATION_NAME\}\}/g, orgName)
+      .replace(/\{\{ORGANIZATION_DESCRIPTION\}\}/g, orgDescription)
+      .replace(/\{\{BASE_URL\}\}/g, baseUrl);
+    dao = JSON.parse(raw);
+  } else {
+    dao = {
+      '@context': 'http://www.daostar.org/schemas',
+      type: answers.identity?.type || 'Organization',
+      name: orgName,
+      description: orgDescription,
+    };
+  }
+  fs.writeFileSync(path.join(wellKnownDir, 'dao.json'), JSON.stringify(dao, null, 2) + '\n');
+  log('rendered .well-known/dao.json from template');
+}
+
 writeFederation(answers);
 
-// Stage 9: npm install + validate (Task 26)
+// Stage 9: npm install + generate:schemas + validate (Task 26)
 function installAndValidate() {
   if (args.dryRun) {
-    log('npm install + validate:schemas + validate:structure');
+    log('npm install + generate:schemas + validate:schemas + validate:structure');
     return;
   }
   log('npm install in target ...');
   let r = spawnSync('npm', ['install'], { cwd: args.target, stdio: 'inherit' });
   if (r.status !== 0) {
     console.error('npm install failed; instance left in inspectable state');
+    process.exit(r.status || 1);
+  }
+  // generate:schemas must run AFTER npm install (needs node_modules) and BEFORE
+  // the validators (so .well-known/*.json files exist for validate-structure).
+  log('npm run generate:schemas ...');
+  r = spawnSync('npm', ['run', 'generate:schemas'], { cwd: args.target, stdio: 'inherit' });
+  if (r.status !== 0) {
+    console.error('generate:schemas failed; instance left in inspectable state');
     process.exit(r.status || 1);
   }
   log('npm run validate:schemas ...');

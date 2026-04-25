@@ -122,7 +122,7 @@ test('clone-framework materializes selected skills (Task 24)', () => {
   }
 });
 
-test('clone-framework writes federation.yaml with selected packages (Task 25)', () => {
+test('clone-framework writes federation.yaml with nested schema + selected packages (Task 25)', () => {
   const target = mkdtempSync(path.join(tmpdir(), 'clone-fed-'));
   try {
     spawnSync('node', [
@@ -132,8 +132,26 @@ test('clone-framework writes federation.yaml with selected packages (Task 25)', 
       '--force'
     ], { encoding: 'utf-8', env: SKIP_FINISH_ENV });
     const fed = yamlMod.load(readFileSync(path.join(target, 'federation.yaml'), 'utf-8'));
-    assert.equal(fed.framework_version, '3.5');
+
+    // Nested schema sections required by validate-structure.mjs
+    assert.ok(fed.identity, 'has identity section');
+    assert.equal(fed.identity.name, 'Selftest Instance');
+    assert.equal(fed.identity.type, 'Project');
+    assert.ok(fed.federation, 'has federation section');
+    assert.equal(fed.federation.role, 'standalone-instance');
+    assert.ok(fed.agent, 'has agent section');
+    assert.equal(fed.agent.runtime, 'claude-code');
+    assert.ok(fed.metadata, 'has metadata section');
+    assert.match(fed.metadata.framework_version, /^\d+\.\d+$/);
+
+    // Packages stay flat at top level (sync-packages.mjs requires this)
     assert.equal(typeof fed.packages, 'object');
+
+    // dao.json should be rendered into .well-known/ from the template
+    const daoRaw = readFileSync(path.join(target, '.well-known', 'dao.json'), 'utf-8');
+    const dao = JSON.parse(daoRaw);
+    assert.equal(dao.name, 'Selftest Instance');
+    assert.ok(!daoRaw.includes('{{'), 'dao.json template placeholders fully substituted');
   } finally {
     rmSync(target, { recursive: true, force: true });
   }
@@ -153,7 +171,7 @@ test('clone-framework dry-run completes all stages (Tasks 26-27)', () => {
     ], { encoding: 'utf-8' });
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /\[dry-run\]/);
-    assert.match(r.stdout, /npm install \+ validate/);
+    assert.match(r.stdout, /npm install \+ generate:schemas \+ validate/);
     assert.match(r.stdout, /git init \+ initial commit/);
     assert.match(r.stdout, /clone\] complete \(dry-run\)/);
   } finally {
