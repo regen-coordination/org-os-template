@@ -324,7 +324,7 @@ Every skill across the federation, with `owner`, `instances_using[]`, `in_framew
 
 ### packages-matrix.yaml — Cross-Instance Package Catalog
 
-Same shape as `skills-matrix.yaml` but for packages. Surfaces package divergence across instances.
+Same shape as `skills-matrix.yaml` but for packages. Adds `lifecycle_status` (`active|dormant|planned|retired`). Surfaces package divergence across instances. See `docs/PACKAGE-LIFECYCLE.md` for promotion, integration, and retirement workflow.
 
 ### Extension Pattern for Instances
 
