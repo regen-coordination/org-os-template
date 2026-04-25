@@ -8,6 +8,9 @@
 //   - submodules → <super>/.git/modules/<name>/hooks/
 //   - custom core.hooksPath → that path
 //
+// Works regardless of cwd (inside the repo): repo root is resolved via
+// `git rev-parse --show-toplevel` and the source path is anchored at that root.
+//
 // IMPORTANT: in a git worktree, hooks live in the COMMON gitdir and are shared
 // across every worktree of the repo. Installing here will make sibling worktrees
 // also run the hook. That's standard git behavior, not a bug — flag it for the
@@ -17,12 +20,24 @@ import { copyFileSync, chmodSync, existsSync, mkdirSync, statSync } from 'node:f
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 
-const SRC = '.github/hooks/pre-commit.sh';
-
-if (!existsSync('.git')) {
-  console.error('install-hooks: not a git repo (no .git entry in cwd)');
+// Resolve repo root via git itself (works from any cwd inside the repo).
+let repoRoot;
+try {
+  repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+} catch (err) {
+  console.error(
+    'install-hooks: not inside a git repo (git rev-parse --show-toplevel failed):',
+    err.message,
+  );
   process.exit(1);
 }
+
+if (!repoRoot) {
+  console.error('install-hooks: git returned empty repo root');
+  process.exit(1);
+}
+
+const SRC = path.join(repoRoot, '.github/hooks/pre-commit.sh');
 
 if (!existsSync(SRC)) {
   console.error(`install-hooks: ${SRC} missing`);
@@ -31,7 +46,10 @@ if (!existsSync(SRC)) {
 
 let hooksDir;
 try {
-  hooksDir = execSync('git rev-parse --git-path hooks', { encoding: 'utf8' }).trim();
+  hooksDir = execSync('git rev-parse --git-path hooks', {
+    encoding: 'utf8',
+    cwd: repoRoot,
+  }).trim();
 } catch (err) {
   console.error('install-hooks: failed to query git for hooks path:', err.message);
   process.exit(1);
@@ -40,6 +58,12 @@ try {
 if (!hooksDir) {
   console.error('install-hooks: git returned empty hooks path');
   process.exit(1);
+}
+
+// `git rev-parse --git-path hooks` may return a path relative to the repo root.
+// Anchor it at repoRoot to ensure we operate on an absolute path regardless of cwd.
+if (!path.isAbsolute(hooksDir)) {
+  hooksDir = path.join(repoRoot, hooksDir);
 }
 
 if (!existsSync(hooksDir)) {
@@ -54,7 +78,7 @@ chmodSync(dst, 0o755);
 // affects all sibling worktrees too (because hooks live in the common gitdir).
 let isWorktree = false;
 try {
-  const gitEntry = statSync('.git');
+  const gitEntry = statSync(path.join(repoRoot, '.git'));
   isWorktree = gitEntry.isFile();
 } catch {
   // ignore
