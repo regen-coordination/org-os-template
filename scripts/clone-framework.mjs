@@ -233,8 +233,29 @@ _This file evolves. The bootstrap-interviewer skill helps fill it in._
 
 resetMarkdown();
 
-// Stages 5-11 implemented in subsequent tasks (22-27).
-log('run bootstrap-interviewer (Task 22)');
+// Stage 5: collect bootstrap answers (Task 22)
+async function collectAnswers() {
+  if (args.dryRun) {
+    log('collect bootstrap answers (interactive or from --config)');
+    if (args.config) {
+      const mod = await import('./bootstrap-collect.mjs');
+      return mod.collectFromConfig(args.config);
+    }
+    return null;
+  }
+  const mod = await import('./bootstrap-collect.mjs');
+  if (args.nonInteractive) return mod.collectFromConfig(args.config);
+  return mod.collectInteractive(args.type || 'project');
+}
+
+const answers = await collectAnswers();
+if (!answers && !args.dryRun) {
+  console.error('Error: failed to collect bootstrap answers');
+  process.exit(1);
+}
+log(`bootstrap answers collected${answers?.identity?.name ? `: ${answers.identity.name}` : ''}`);
+
+// Stages 6-11 implemented in subsequent tasks (23-27).
 log('render templates (Task 23)');
 log('materialize packages (Task 24)');
 log('materialize skills (Task 24)');
