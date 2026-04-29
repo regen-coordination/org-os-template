@@ -58,6 +58,39 @@
       "description": "Promote skills validated across ≥2 instances to framework-canonical status. Current candidates: research (in refi-bcn-os + refi-dao-os), DAO-module skills (in dao-os)."
     },
     {
+      "id": "package-integration",
+      "name": "Package Integration",
+      "status": "Discovery",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-25",
+      "description": "Treat packages as a first-class framework concern, parallel to skills. Audit packages/, define lifecycle (promotion + retirement), and resolve the consumption mechanism (how instances activate framework packages). First end-to-end test: promoting the dashboard package."
+    },
+    {
+      "id": "reliability",
+      "name": "System Reliability",
+      "status": "Discovery",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-25",
+      "description": "Make reliability a first-class concern. Four failure modes (data integrity, agent runtime, federation drift, recovery) × four trigger layers (manual, pre-commit, CI, scheduled). Audit existing checks, decide the layering, implement enforcement. End state: every failure mode has ≥1 enforced trigger; recovery is a documented runbook."
+    },
+    {
+      "id": "instance-bootstrap",
+      "name": "Instance Bootstrap Pipeline",
+      "status": "Discovery",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-25",
+      "description": "End-to-end pipeline for creating a new org-os instance: framework cloning, wizard with package/skill selection, and knowledge bootstrap with one source ingested as proof-of-pipeline. The engine; non-tech-onboarding becomes the web UI wrapper on top."
+    },
+    {
       "id": "opal-rollout",
       "name": "OPAL Rollout",
       "status": "Discovery",
@@ -67,6 +100,17 @@
       ],
       "startDate": "2026-04-24",
       "description": "Roll production-ready OPAL integration (integrations/opal/) out to operational instances (refi-bcn-os, refi-dao-os) so meeting transcripts populate data/meetings.yaml automatically."
+    },
+    {
+      "id": "operator-interfaces",
+      "name": "Operator Interfaces",
+      "status": "Discovery",
+      "lead": "github:luizfernandosg",
+      "members": [
+        "github:luizfernandosg"
+      ],
+      "startDate": "2026-04-24",
+      "description": "How non-agent humans work with org-os day-to-day. Primary surface: Obsidian (the vault is already an Obsidian workspace). Secondary: Obsidian Canvas for system overview + live operation. Candidate packages: packages/obsidian-interface, packages/obsidian-canvas."
     },
     {
       "id": "framework-evolution",

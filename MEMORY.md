@@ -36,6 +36,7 @@ _Lightweight index for persistent organizational memory. Detailed notes live in 
 - **[ongoing]** Multi-instance skill promotion review — `research` skill (2 instances), DAO modules (dao-os only).
 - **[ongoing]** Solo-maintainer phase — no treasury, no formal governance; adjust when first external contributor lands.
 - **[2026-04-25]** `multica-integration` spec + 25-task plan committed, execution deferred. Pilots the self-installing package pattern for the queued `package-integration` Phase 3. See `docs/superpowers/specs/2026-04-25-multica-integration-design.md` and `docs/superpowers/plans/2026-04-25-multica-integration.md`.
+- **[2026-04-29]** New downstream instance scaffolded: `refi-med-os` (ReFi Mediterranean, LocalNode, alpha). Federated under the `refi-dao` network as a peer of refi-bcn-os and refi-dao-os. Hosted at `ReFiDAO/refi-med-os` (public). Public website + knowledge base (`ReFiDAO/ReFi-Mediterranean`) consolidated at `repos/refi-mediterranean/`. Instance is in pre-bootstrap state — operator runs `bootstrap-interviewer` from a one-pager. See `memory/2026-04-29.md`.
 
 ---
 
@@ -55,6 +56,7 @@ _Lightweight index for persistent organizational memory. Detailed notes live in 
 ### Downstream (instances)
 - **refi-bcn-os** — LocalNode (ReFi Barcelona, cooperative-in-formation). Production.
 - **refi-dao-os** — DAO (global ReFi coordination). Production, Phase 2.
+- **refi-med-os** — LocalNode (ReFi Mediterranean, Mediterranean bioregion). Alpha — bootstrap pending.
 - **dao-os** — Project (DAO-module development platform). Beta.
 - **openclaw** — Agent runtime container. Alpha.
 - **regen-coordination-os** — Hub. Remote-only, not locally cloned.

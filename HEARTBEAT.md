@@ -51,7 +51,8 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 - [ ] `.well-known/*.json` matches current `data/`
 
 ### Federation
-- [ ] `federation.yaml` `downstream` lists all 5 known instances
+- [ ] `federation.yaml` `downstream` lists all 6 known instances (refi-bcn-os, refi-dao-os, refi-med-os, dao-os, openclaw, regen-coordination-os) — verified 2026-04-29
+- [ ] Tell maintainers of refi-dao-os, refi-bcn-os, regen-coordination-os to add `refi-med-os` to their `federation.yaml peers:` lists on next sync
 - [ ] Instance sync review performed in last 7 days (`memory/reports/instances-drift-*.md`)
 
 ### Release
@@ -74,6 +75,8 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 _(Move completed items here with date — keep for 30 days then remove)_
 
+- [2026-04-29] **`refi-med-os` instance scaffolded + pushed live** to `ReFiDAO/refi-med-os` (public). Federated under `refi-dao` network as LocalNode peer. Public website + knowledge base consolidated at `repos/refi-mediterranean/`. Bootstrap pending — operator follows `BOOTSTRAP.md` + one-pager. Hub registered in `data/instances.yaml` + `federation.yaml`. See `memory/2026-04-29.md`.
+- [2026-04-29] Pre-existing framework bug surfaced (not fixed): `validate:schemas` script in framework `package.json` references missing `scripts/validate-identity.mjs`. Captured in 2026-04-29 memory.
 - [2026-04-25] Three new workstreams scoped and queued — `package-integration`, `reliability`, `instance-bootstrap` (see `memory/2026-04-25.md` and DECISIONS entries)
 - [2026-04-25] Verified `/initialize` renders real content (no stubs) and `scripts/initialize.mjs` emits valid JSON
 - [2026-04-24] Versioning system — policy, CHANGELOG, migrations, version-consistency validator, v3.0.0 bump (see `docs/agent-plans/versioning-system.md`)
@@ -82,4 +85,4 @@ _(Move completed items here with date — keep for 30 days then remove)_
 
 ---
 
-_Last updated: 2026-04-25_
+_Last updated: 2026-04-29_

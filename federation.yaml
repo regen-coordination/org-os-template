@@ -97,6 +97,17 @@ downstream:
     cloned: true
     note: "Synced to framework v3.0 on 2026-04-24 (full overlay incl. skills)."
 
+  - name: "ReFi Mediterranean"
+    id: "refi-med-os"
+    repo: "ReFiDAO/refi-med-os"
+    url: "https://github.com/ReFiDAO/refi-med-os"
+    type: "LocalNode"
+    trust: "full"
+    sync_direction: "framework→instance"
+    local_path: "../refi-med-os"
+    cloned: true
+    note: "Scaffolded 2026-04-28 from framework v3.0. Bootstrap pending — operator follows BOOTSTRAP.md + one-pager. Public website + knowledge base at repos/refi-mediterranean/ (ReFiDAO/ReFi-Mediterranean)."
+
 # ── Agent Configuration ────────────────────────────────────────────────────────
 agent:
   runtime: "claude-code"
@@ -104,13 +115,24 @@ agent:
   skills:
     - bootstrap-interviewer
     - capital-flow
+    - expert-feynman
     - funding-scout
     - heartbeat-monitor
     - idea-scout
+    - karpathy-guidelines
     - knowledge-curator
     - meeting-processor
     - org-os-init
     - schema-generator
+    - superpowers-brainstorming
+    - superpowers-executing-plans
+    - superpowers-finishing-a-development-branch
+    - superpowers-requesting-code-review
+    - superpowers-subagent-driven-development
+    - superpowers-systematic-debugging
+    - superpowers-test-driven-development
+    - superpowers-using-git-worktrees
+    - superpowers-writing-plans
     - workspace-improver
   channels:
     - github

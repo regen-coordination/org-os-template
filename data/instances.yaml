@@ -110,3 +110,22 @@ instances:
       - "missing_governance_yaml"
       - "missing_dao_json"
     notes: "Synced to framework v3.0 on 2026-04-24 — full overlay (skills, scripts, schemas, packages, framework docs). Instance identity files (SOUL, IDENTITY, USER, HEARTBEAT, MEMORY, TOOLS, README, federation.yaml, data/) preserved. Three pre-existing structural issues to resolve in next session."
+
+  - id: "refi-med-os"
+    name: "ReFi Mediterranean"
+    type: "LocalNode"
+    maturity: "alpha"
+    repo: "https://github.com/ReFiDAO/refi-med-os"
+    local_path: "../refi-med-os"
+    cloned: true
+    federation_network: "refi-dao"
+    federation_role: "spoke"
+    masterplan_version: "2.0.0"
+    framework_version: "3.0"
+    last_sync: "2026-04-28"
+    agent_runtime: ["claude-code"]
+    skills_extra: []
+    packages: []
+    data_registries_extra: []
+    drift: []
+    notes: "Scaffolded 2026-04-28 from framework v3.0. Bootstrap pending — identity/members/projects are TBD-stubs; operator follows BOOTSTRAP.md + one-pager to complete the bootstrap-interviewer flow. Public website + knowledge base mounted at repos/refi-mediterranean/ (independent remote at ReFiDAO/ReFi-Mediterranean)."
