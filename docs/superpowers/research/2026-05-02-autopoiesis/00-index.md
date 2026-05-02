@@ -5,7 +5,7 @@
 
 ## Status
 
-Phase 1 — Conceptual matrix · synthesis in progress.
+Phase 1 — Conceptual matrix · **complete, awaiting operator review at Phase 1 gate** (2026-05-02).
 
 ## Cell notes (instance-primary, framework-secondary)
 
@@ -23,7 +23,7 @@ Phase 1 — Conceptual matrix · synthesis in progress.
 
 ## Synthesis
 
-[SYNTHESIS.md](SYNTHESIS.md) — pending (written after all 9 cell notes complete).
+[SYNTHESIS.md](SYNTHESIS.md) — **done**. Recommends Loop C (Metabolism → Cognition → Federation, cascade closure) for Phase 2 pilot, overriding spec's default Loop A.
 
 ## Phase 2 / 3 outputs (later)
 
