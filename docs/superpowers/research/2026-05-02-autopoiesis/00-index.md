@@ -5,21 +5,21 @@
 
 ## Status
 
-Phase 1 — Conceptual matrix · in progress.
+Phase 1 — Conceptual matrix · synthesis in progress.
 
 ## Cell notes (instance-primary, framework-secondary)
 
 | # | Aspect | File | Status |
 |---|--------|------|--------|
-| 1 | Genesis | [01-genesis.md](01-genesis.md) | pending |
-| 2 | Identity & Continuity | [02-identity.md](02-identity.md) | pending |
-| 3 | Membrane | [03-membrane.md](03-membrane.md) | pending |
-| 4 | Structural coupling | [04-coupling.md](04-coupling.md) | pending |
-| 5 | Metabolism | [05-metabolism.md](05-metabolism.md) | pending |
-| 6 | Self-maintenance | [06-self-maintenance.md](06-self-maintenance.md) | pending |
-| 7 | Cognition / Evolution | [07-cognition.md](07-cognition.md) | pending |
-| 8 | Federation / Multicellularity | [08-federation.md](08-federation.md) | pending |
-| 9 | Volition / Decision | [09-volition.md](09-volition.md) | pending |
+| 1 | Genesis | [01-genesis.md](01-genesis.md) | done |
+| 2 | Identity & Continuity | [02-identity.md](02-identity.md) | done |
+| 3 | Membrane | [03-membrane.md](03-membrane.md) | done |
+| 4 | Structural coupling | [04-coupling.md](04-coupling.md) | done |
+| 5 | Metabolism | [05-metabolism.md](05-metabolism.md) | done |
+| 6 | Self-maintenance | [06-self-maintenance.md](06-self-maintenance.md) | done |
+| 7 | Cognition / Evolution | [07-cognition.md](07-cognition.md) | done |
+| 8 | Federation / Multicellularity | [08-federation.md](08-federation.md) | done |
+| 9 | Volition / Decision | [09-volition.md](09-volition.md) | done |
 
 ## Synthesis
 
