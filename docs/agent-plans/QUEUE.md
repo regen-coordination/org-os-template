@@ -1,14 +1,12 @@
 # Plan Queue — org-os (framework)
 
-> Last updated: 2026-05-02 (autopoiesis research spec + 3 phase plans added)
+> Last updated: 2026-05-02 (autopoiesis Phase 1 complete; pilot loop = C, Phase 2 replan)
 
 ## Active
 
-_(none)_
+1. **autopoiesis-research** — **Phase 1 complete 2026-05-02.** Pilot loop selected at gate: Loop C (Population learning — Metabolism → Cognition → Federation, cascade closure), overriding spec default Loop A. Closing edge: `scripts/sync-upstream.mjs` + `scripts/validate-identity.mjs` + lineage stamp in `federation.yaml.metadata`. Synthesis: [`SYNTHESIS.md`](../superpowers/research/2026-05-02-autopoiesis/SYNTHESIS.md). Phase 2 plan replanned for Loop C: [`2026-05-02-autopoiesis-phase2-pilot.md`](../superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md). Phase 3 plan: [`2026-05-02-autopoiesis-phase3-decisions.md`](../superpowers/plans/2026-05-02-autopoiesis-phase3-decisions.md). Spec: [`2026-05-02-org-os-autopoiesis-design.md`](../superpowers/specs/2026-05-02-org-os-autopoiesis-design.md) · workstream: framework-evolution
 
 ## Queued
-
-1. **autopoiesis-research** — Two-level autopoietic frame for org-os (instance-primary, framework-secondary). 9-aspect × 2-level matrix → framework-level pilot → decisions cascade. Informs `instance-bootstrap`, `obsidian-interface`, `federation-protocol`, `system-reliability`, `package-integration`, `non-tech-onboarding` rather than replacing them. Spec: [`2026-05-02-org-os-autopoiesis-design.md`](../superpowers/specs/2026-05-02-org-os-autopoiesis-design.md) · Phase 1 plan: [`2026-05-02-autopoiesis-phase1-conceptual.md`](../superpowers/plans/2026-05-02-autopoiesis-phase1-conceptual.md) · Phase 2 plan: [`2026-05-02-autopoiesis-phase2-pilot.md`](../superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md) · Phase 3 plan: [`2026-05-02-autopoiesis-phase3-decisions.md`](../superpowers/plans/2026-05-02-autopoiesis-phase3-decisions.md) · workstream: framework-evolution · est. 4–8 sessions, gated between phases
 2. **skills-section** — Dashboard Skills section + `/skills` command + generated `SKILLS.md` + `.well-known/skills.json` so operators can verify skills are loaded across workspace, user, and plugin sources. Spec: [`2026-04-27-skills-section-design.md`](../superpowers/specs/2026-04-27-skills-section-design.md) · 21-task plan: [`2026-04-27-skills-section.md`](../superpowers/plans/2026-04-27-skills-section.md) · workstream: operator-interfaces · TDD-driven, low-risk
 2. **multica-integration** — Wire Multica (github.com/multica-ai/multica) as primary agent runtime; self-hosted server, slash commands, write-only HEARTBEAT bridge. Spec: [`2026-04-25-multica-integration-design.md`](../superpowers/specs/2026-04-25-multica-integration-design.md) · 25-task plan: [`2026-04-25-multica-integration.md`](../superpowers/plans/2026-04-25-multica-integration.md) · pilot for `package-integration` Phase 3 · workstream: package-integration · execution deferred 2026-04-25
 2. [tui-dashboard](tui-dashboard.md) — TUI dashboard (Ink) + agent-rendered pages, shared data layer · spec + 28-task implementation plan ([`tui-dashboard-implementation.md`](tui-dashboard-implementation.md)) ready · candidate packages `packages/tui-data/`, `packages/tui/` · workstream: operator-interfaces
