@@ -147,4 +147,28 @@ MASTERPLAN.md says "where we're going." Plans say "how we get there, in what ord
 
 ---
 
+## Phase 0 — Skills Curation (Pre-Plan)
+
+Any non-trivial initiative that introduces **new domains** (frontend, design system, ML, data pipeline, etc.) runs a **Phase 0 skills curation** before the implementation plan is written.
+
+```
+brainstorming  →  design spec
+                      ↓
+              SKILLS-CURATOR  ← Phase 0 (this skill)
+                      ↓
+              writing-plans  →  implementation plan
+                      ↓
+              executing-plans → builds the thing
+                      ↓
+              retrospective  →  promote/improve/drop verdicts on chosen skills
+```
+
+**Skill:** [`skills/skills-curator/`](../skills/skills-curator/SKILL.md) — produces `docs/plans/YYYY-MM-DD-skills-curation.md` with installed / deferred / dropped skill candidates plus a promotion contract for the v1 retrospective.
+
+**When to skip:** routine work in an already-equipped project, or when the skill stack is locked by an existing convention.
+
+This is what makes "promote winning skills back to org-os" measurable rather than aspirational — every install has a verdict at v1.
+
+---
+
 _Part of org-os v2.0.0 — see [FILE-STRUCTURE.md](FILE-STRUCTURE.md) for the canonical directory spec._
