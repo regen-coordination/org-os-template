@@ -2,20 +2,20 @@
 description: Open org-os session — sync, render dashboard, plan work
 ---
 
-Load the **org-os-init** skill for the full session lifecycle instructions.
+Load the **org-os-init** skill (and the `initialize` skill for platform-specific handling) for the full session lifecycle instructions.
 
-First, sync the workspace to make sure we have the latest state:
+First, sync the workspace:
 
 ```
 !`git pull --rebase --quiet 2>&1 || echo "sync: no remote or offline — continuing with local state"`
 ```
 
-Here is the current organizational state:
+Then render the dashboard. The script outputs a fully-rendered ASCII dashboard — **print it verbatim**, do not reformat:
 
-```json
-!`node scripts/initialize.mjs`
+```
+!`node scripts/initialize.mjs --format=markdown`
 ```
 
-You are now in **Phase 1: OPEN**. Render the full initialization dashboard following the skill's visual language — ASCII block-letter banner, projects, tasks, calendar, apps & workspaces, cheatsheet, federation. End with 3 contextual suggestions.
+You are now in **Phase 1: OPEN**. The dashboard above is the org's current state — banner, projects, tasks, calendar, plans/pipelines, federation, and a session prompt with 3 contextual suggestions.
 
-After the operator picks what to work on, transition to **Phase 2: PLAN** — load context, analyze, and present a tight work plan. Then execute.
+After the operator picks what to work on, transition to **Phase 2: PLAN** — load context, analyze, present a tight 5–7 step work plan, then execute.
