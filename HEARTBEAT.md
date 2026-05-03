@@ -7,11 +7,13 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## Active Tasks
 
 ### Technical
+- [ ] Execute `autopoiesis-research` Phase 2 (12-task TDD plan; cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Plan: `docs/superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md`
+- [ ] Execute `autopoiesis-research` Phase 3 (decisions rollup + plan annotations + per-instance cascade) after Phase 2 gate
 - [ ] Execute `multica-integration` plan (25 tasks, spec + plan ready, execution deferred 2026-04-25 — recommend fresh worktree)
-- [ ] Complete `federation-protocol` end-to-end sync test (queued plan)
+- [ ] Complete `federation-protocol` end-to-end sync test (queued plan; will benefit from Phase 2 sync-upstream.mjs)
 - [ ] Write `future-instance-specs` for regen-coordination-os and regen-toolkit (queued plan)
 - [ ] Activate `package-integration` plan phase 1 — inventory audit of `packages/` (queued plan; multica-integration is its pilot)
-- [ ] Activate `system-reliability` plan phase 1 — inventory existing reliability infra (queued plan)
+- [ ] Activate `system-reliability` plan phase 1 — inventory existing reliability infra (queued plan; will absorb Phase 3 within-instance referential integrity findings)
 - [ ] Activate `instance-bootstrap` plan phase 1 — resolve cloning mechanism open question (queued plan)
 - [ ] Finalize `non-tech-onboarding` scoping — narrowed to web UI + GHA glue over `instance-bootstrap` engine (scoping plan)
 - [ ] Finalize `framework-dashboard-template` scoping — reusable dashboard package (scoping plan)
@@ -75,6 +77,7 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 _(Move completed items here with date — keep for 30 days then remove)_
 
+- [2026-05-03] **Autopoiesis research scoping + Phase 1 complete.** Spec + 3 phase plans + 9 aspect notes (Genesis, Identity, Membrane, Coupling, Metabolism, Self-maintenance, Cognition, Federation, Volition) + synthesis. Phase 1 gate passed; pilot loop = Loop C (Population learning — cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Phase 2 plan replanned for Loop C. Surfaced two phantom-script bugs in framework. See `memory/2026-05-03.md` and `docs/superpowers/research/2026-05-02-autopoiesis/SYNTHESIS.md`.
 - [2026-04-29] **`refi-med-os` instance scaffolded + pushed live** to `ReFiDAO/refi-med-os` (public). Federated under `refi-dao` network as LocalNode peer. Public website + knowledge base consolidated at `repos/refi-mediterranean/`. Bootstrap pending — operator follows `BOOTSTRAP.md` + one-pager. Hub registered in `data/instances.yaml` + `federation.yaml`. See `memory/2026-04-29.md`.
 - [2026-04-29] Pre-existing framework bug surfaced (not fixed): `validate:schemas` script in framework `package.json` references missing `scripts/validate-identity.mjs`. Captured in 2026-04-29 memory.
 - [2026-04-25] Three new workstreams scoped and queued — `package-integration`, `reliability`, `instance-bootstrap` (see `memory/2026-04-25.md` and DECISIONS entries)
@@ -85,4 +88,4 @@ _(Move completed items here with date — keep for 30 days then remove)_
 
 ---
 
-_Last updated: 2026-04-29_
+_Last updated: 2026-05-03_
