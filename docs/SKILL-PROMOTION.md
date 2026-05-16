@@ -46,3 +46,34 @@ See `data/skills-matrix.yaml` for the authoritative list. Candidates at inaugura
 ## Demotion
 
 Skills can also move the other way: if a canonical skill stops being used or diverges materially across instances, demote to `promotion_status: evaluating` and open an issue.
+
+---
+
+## Script-Level Reconciliation (added v3.5.0)
+
+The same promotion mechanism extends to **scripts**. The framework's `scripts/` directory grows by absorbing knowledge-pipeline and validation scripts proven across ≥2 instances.
+
+Use `npm run check:divergence` to compare every instance's `scripts/<name>` against the framework canonical. The script never modifies files — it's purely advisory. Output classifies each instance script as `IDENTICAL`, `DIVERGES`, or `MISSING`.
+
+### Known divergences (as of v3.5.0 release)
+
+| Script | Instance | Status | Notes |
+|---|---|---|---|
+| `compile-knowledge.mjs` | refi-dao-os | DIVERGES (`73f9b36d…` vs canonical `655f3015…`) | Same 744-line shape, refi-dao-os has local edits. Manual reconciliation deferred to refi-dao-os cascade (Phase 14, post-2026-05-19 Steward Council election). Origin: refi-bcn-os + regen-coordination-os byte-identical → adopted as canonical. |
+| `update-knowledge-index.mjs` | refi-dao-os | DIVERGES (`fd325a5c…` vs canonical `7ac0f0d4…`) | Same 257-line shape, refi-dao-os has local edits. Same reconciliation plan as above. |
+| `validate-structure.mjs` | refi-bcn-os, refi-dao-os | DIVERGES | Both share `22807921b28f` vs canonical `5265162ab3e5` — these instances are on older versions; framework has v3.5 enhancements. Auto-resolves on cascade. |
+| `setup-org-os.mjs` | refi-bcn-os, refi-dao-os | DIVERGES | Same as above — instances on older versions. Auto-resolves on cascade. |
+
+### Reconciliation procedure
+
+1. Run `npm run check:divergence` to enumerate.
+2. For each divergent script, `diff scripts/<name> ../<instance>/scripts/<name>` to classify the divergence:
+   - **(a) bug fix worth porting back to framework** — open a PR upstream
+   - **(b) instance-specific behavior to keep local** — note in this section
+   - **(c) drift to discard** — let the cascade overwrite (instance opts in)
+3. The operator chooses adopt/keep/merge per script during cascade. Never auto-resolve divergences.
+4. Anti-pattern to avoid: **do not** build three-way merge tooling for script reconciliation. The divergence count is small enough to handle manually; tooling adds maintenance debt for marginal benefit.
+
+### Normalizing per-instance configuration
+
+When a promoted script needs per-instance configuration (paths, terminology dictionaries, alias maps), externalize the configuration to a `data/*.yaml` file rather than editing the script. Example: `data/knowledge-aliases.yaml` consumed by `scripts/normalize-kb-frontmatter.mjs`. This keeps the framework version generic and lets instances configure without forking.
