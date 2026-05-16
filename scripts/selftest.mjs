@@ -96,7 +96,7 @@ run("clone:framework --dry", "node", [
 
 // Node test suites (if tests/ exists)
 if (existsSync(path.join(rootDir, "tests"))) {
-  run("node --test tests/", "node", ["--test", "tests/"], { optional: true, skipKey: "tests" });
+  run("node --test tests/", "node", ["--test", "tests/**/*.test.mjs"], { skipKey: "tests" });
 } else {
   results.push({ name: "node --test tests/", status: "SKIP", detail: "no tests/ directory" });
 }

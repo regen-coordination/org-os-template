@@ -34,6 +34,8 @@
     "selftest": "node scripts/selftest.mjs",
     "version:check": "node scripts/update-version.mjs --check",
     "install:hooks": "node scripts/install-hooks.mjs",
+    "generate:skills": "node scripts/generate-skills.mjs",
+    "test": "node --test \"tests/**/*.test.mjs\"",
     "docs": "npx quartz build --serve -d docs",
     "check": "tsc --noEmit && npx prettier . --check",
     "format": "npx prettier . --write",
