@@ -1,6 +1,6 @@
 # Instance Drift Report — 2026-05-16
 
-**Generated:** 2026-05-16T22:34:30.925Z
+**Generated:** 2026-05-16T22:37:30.272Z
 **Framework version:** 3.0
 
 ## Summary
@@ -8,7 +8,7 @@
 - Instances tracked: 6
 - Cloned locally: 6
 - Production: 2
-- Total drift items: 15
+- Total drift items: 17
 - Unmapped skills (not in skills-matrix): working-with-obsidian-canvas
 - Unmapped packages (not in packages-matrix): maps, coop, regen-toolkit
 
@@ -33,13 +33,15 @@
 
 - Type: DAO
 - Maturity: production
-- Skills: 13 (bootstrap-interviewer, capital-flow, funding-scout, heartbeat-monitor, idea-scout, karpathy-guidelines, knowledge-curator, meeting-notes-transcription-fixer, meeting-processor, org-os-init, research, schema-generator, workspace-improver)
+- Skills: 14 (bootstrap-interviewer, capital-flow, funding-scout, heartbeat-monitor, idea-scout, karpathy-guidelines, knowledge-curator, meeting-notes-transcription-fixer, meeting-processor, org-os-init, research, schema-generator, working-with-obsidian-canvas, workspace-improver)
 - Packages: 6 (coordination, dashboard, governance, operations, regen-agents, webapps)
 - Data registries: 19
 - MASTERPLAN: yes
 - federation.yaml: yes (v3.0)
 
-**Drift (2):**
+**Drift (4):**
+- ⚠ undeclared_skill:working-with-obsidian-canvas
+- ⚠ unmapped_skill:working-with-obsidian-canvas
 - ⚠ undeclared_data_registry:figma-assets
 - ⚠ undeclared_data_registry:hermes-cron
 

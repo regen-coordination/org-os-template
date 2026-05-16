@@ -293,6 +293,59 @@ if (fileExists('package.json') && fileExists('federation.yaml')) {
   }
 }
 
+// --- 9. Matrix files (v3.5) ---
+console.log('\n9. Matrix Files (skills + packages)');
+
+if (fileExists('data/packages-matrix.yaml')) {
+  try {
+    const pm = loadYaml(readFileSync(join(rootDir, 'data', 'packages-matrix.yaml'), 'utf-8'));
+    const ALLOWED_LIFECYCLE = ['active', 'dormant', 'planned', 'retired'];
+    let allOk = true;
+    for (const pkg of pm?.packages || []) {
+      if (!pkg.lifecycle_status) {
+        warn(`packages-matrix: ${pkg.id} missing lifecycle_status (allowed: ${ALLOWED_LIFECYCLE.join(', ')})`);
+        allOk = false;
+        continue;
+      }
+      if (!ALLOWED_LIFECYCLE.includes(pkg.lifecycle_status)) {
+        check(
+          `packages-matrix: ${pkg.id} has valid lifecycle_status`,
+          false,
+        );
+        allOk = false;
+      }
+    }
+    if (allOk) {
+      check(`packages-matrix: all ${pm?.packages?.length || 0} entries have valid lifecycle_status`, true);
+    }
+  } catch (e) {
+    check('packages-matrix.yaml is valid YAML', false);
+  }
+} else {
+  warn('data/packages-matrix.yaml not present (framework-only registry)');
+}
+
+if (fileExists('data/skills-matrix.yaml')) {
+  try {
+    const sm = loadYaml(readFileSync(join(rootDir, 'data', 'skills-matrix.yaml'), 'utf-8'));
+    const ALLOWED_STATUS = ['canonical', 'evaluating', 'candidate', 'instance-specific', 'deprecated'];
+    let allOk = true;
+    for (const sk of sm?.skills || []) {
+      if (sk.promotion_status && !ALLOWED_STATUS.includes(sk.promotion_status)) {
+        check(`skills-matrix: ${sk.id} has valid promotion_status`, false);
+        allOk = false;
+      }
+    }
+    if (allOk) {
+      check(`skills-matrix: all ${sm?.skills?.length || 0} entries have valid promotion_status`, true);
+    }
+  } catch {
+    check('skills-matrix.yaml is valid YAML', false);
+  }
+} else {
+  warn('data/skills-matrix.yaml not present (framework-only registry)');
+}
+
 // --- Summary ---
 console.log('\n' + '='.repeat(50));
 console.log(`Results: ${passed} passed, ${failed} failed, ${warnings} warnings`);
