@@ -1,0 +1,43 @@
+name: Scheduled Drift Report
+
+on:
+  schedule:
+    # Weekly Sun 04:00 UTC
+    - cron: "0 4 * * 0"
+  workflow_dispatch: {}
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Run analyze:instances
+        run: npm run analyze:instances
+
+      - name: Commit drift report if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain memory/reports/)" ]]; then
+            DATE=$(date -u +%Y-%m-%d)
+            git add memory/reports/
+            git commit -m "chore(drift): scheduled instance drift report ${DATE}"
+            git push
+          else
+            echo "No drift changes since last run."
+          fi

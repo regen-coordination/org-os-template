@@ -4,10 +4,13 @@
  * update-version.mjs — Bump the framework version across all sources of truth.
  *
  * Usage:
- *   node scripts/update-version.mjs <new-version>
+ *   node scripts/update-version.mjs <new-version>     # bump mode
  *   npm run version:update 3.1.0
  *
- * What it does:
+ *   node scripts/update-version.mjs --check           # check mode (v3.5+)
+ *   npm run version:check
+ *
+ * Bump mode:
  * 1. Validates the new version is a proper semver and higher than current.
  * 2. Updates package.json → version.
  * 3. Updates federation.yaml → metadata.framework_version (major.minor only).
@@ -16,21 +19,68 @@
  * 6. Promotes CHANGELOG.md [Unreleased] section to [<new-version>] — <date>.
  * 7. Inserts a new empty [Unreleased] section at the top.
  * 8. Does NOT commit, does NOT tag, does NOT push. Those are manual.
+ *
+ * Check mode:
+ * - Verifies package.json version, federation.yaml framework_version (major.minor),
+ *   and most-recent CHANGELOG.md [X.Y.Z] heading all agree.
+ * - Exit 0 if consistent; exit 1 with diff if not. No file modifications.
  */
 
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 const frameworkRoot = resolve(process.argv[1], '../..');
-const newVersion = process.argv[2];
+const arg = process.argv[2];
 
 function die(msg) {
   console.error(`✗ ${msg}`);
   process.exit(1);
 }
 
+// --- Check mode (v3.5+) — read all three sources and verify agreement ---
+if (arg === '--check') {
+  const pkg = JSON.parse(readFileSync(resolve(frameworkRoot, 'package.json'), 'utf-8'));
+  const pkgVersion = pkg.version;
+  const pkgMajorMinor = (pkgVersion.match(/^(\d+)\.(\d+)/) || [])[0];
+
+  const fedRaw = readFileSync(resolve(frameworkRoot, 'federation.yaml'), 'utf-8');
+  const fedFwMatch = fedRaw.match(/^\s*framework_version:\s*"?([\d.]+)"?$/m);
+  const fedFw = fedFwMatch ? fedFwMatch[1] : null;
+
+  const changelogRaw = readFileSync(resolve(frameworkRoot, 'CHANGELOG.md'), 'utf-8');
+  const clMatch = changelogRaw.match(/^##\s*\[(\d+\.\d+\.\d+)\]/m);
+  const clVersion = clMatch ? clMatch[1] : null;
+  const clMajorMinor = clVersion ? (clVersion.match(/^(\d+)\.(\d+)/) || [])[0] : null;
+
+  console.log('Version triplet check:');
+  console.log(`  package.json:                       ${pkgVersion}`);
+  console.log(`  federation.yaml framework_version:  ${fedFw}`);
+  console.log(`  CHANGELOG.md most-recent release:   ${clVersion}`);
+  console.log('');
+
+  const errors = [];
+  if (!fedFw) errors.push('federation.yaml is missing metadata.framework_version');
+  if (!clVersion) errors.push('CHANGELOG.md has no [X.Y.Z] release entry');
+  if (fedFw && pkgMajorMinor !== fedFw) {
+    errors.push(`major.minor mismatch: package.json ${pkgMajorMinor} ≠ federation.yaml ${fedFw}`);
+  }
+  if (clMajorMinor && pkgMajorMinor !== clMajorMinor) {
+    errors.push(`major.minor mismatch: package.json ${pkgMajorMinor} ≠ CHANGELOG.md ${clMajorMinor}`);
+  }
+
+  if (errors.length === 0) {
+    console.log('✓ All version sources agree.');
+    process.exit(0);
+  }
+  console.error('✗ Version triplet inconsistent:');
+  errors.forEach((e) => console.error(`  - ${e}`));
+  process.exit(1);
+}
+
+const newVersion = arg;
+
 if (!newVersion) {
-  die('Usage: node scripts/update-version.mjs <new-version> (e.g., 3.1.0)');
+  die('Usage: node scripts/update-version.mjs <new-version> | --check');
 }
 
 const semverRe = /^(\d+)\.(\d+)\.(\d+)(-[\w.]+)?(\+[\w.]+)?$/;

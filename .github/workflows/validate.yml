@@ -1,0 +1,38 @@
+name: Validate
+
+on:
+  push:
+    branches: [main, "release/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Validate structure
+        run: npm run validate:structure
+
+      - name: Validate schemas
+        run: npm run validate:schemas || echo "schemas validator not yet available (will land in v3.6 with autopoiesis)"
+
+      - name: Analyze instances
+        run: npm run analyze:instances
+
+      - name: Selftest (full reliability suite)
+        run: npm run selftest
+
+      - name: Check version triplet consistency
+        run: npm run version:check
