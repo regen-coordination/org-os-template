@@ -129,3 +129,22 @@ instances:
     data_registries_extra: []
     drift: []
     notes: "Scaffolded 2026-04-28 from framework v3.0. Bootstrap pending — identity/members/projects are TBD-stubs; operator follows BOOTSTRAP.md + one-pager to complete the bootstrap-interviewer flow. Public website + knowledge base mounted at repos/refi-mediterranean/ (independent remote at ReFiDAO/ReFi-Mediterranean)."
+
+  - id: "bread-coop-os"
+    name: "Bread Cooperative"
+    type: "Cooperative"
+    maturity: "alpha"
+    repo: null
+    local_path: "../bread-coop-os"
+    cloned: true
+    federation_network: "regen-coordination"
+    federation_role: "spoke"
+    masterplan_version: null
+    framework_version: "3.5"
+    last_sync: "2026-05-16"
+    agent_runtime: ["claude-code"]
+    skills_extra: []
+    packages: ["operations"]
+    data_registries_extra: []
+    drift: []
+    notes: "Acceptance-test instance for clone-framework.mjs (v3.5). Bootstrapped 2026-05-16 with config at tests/fixtures/bread-coop-config.yaml. Worker-owned bread cooperative (fictional/test). Lineage stamp populated. Not yet pushed to a remote."

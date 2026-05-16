@@ -8,6 +8,48 @@ _Run this when deploying org-os for a new organization. Bootstrapping has three 
 
 ---
 
+## Quick Path: Cloning Engine (v3.5+)
+
+For most new instances, prefer the cloning engine over the manual phases below. It's faster, idempotent, and produces a structurally-valid instance with a lineage stamp pointing back to this framework.
+
+```bash
+# 1. Write a config file describing the new org
+cat > /tmp/my-org-config.yaml <<'YAML'
+org:
+  name: "my-new-org"
+  type: "Cooperative"            # or DAO, LocalNode, Hub, Project
+  short_description: "What this org does in one sentence."
+  emoji: "🌱"
+operator:
+  name: "Your Name"
+  email: "you@example.com"
+network:
+  name: "regen-coordination"     # or whichever federation network
+packages:
+  operations: true               # which framework packages to materialize
+skills:
+  - bootstrap-interviewer        # which skills to include
+  - org-os-init
+  - heartbeat-monitor
+  - knowledge-curator
+YAML
+
+# 2. Clone into a sibling directory
+npm run clone:framework -- --target ../my-new-org --config /tmp/my-org-config.yaml
+
+# 3. Bootstrap-interviewer fills in remaining identity (Phase 1 below)
+cd ../my-new-org
+npm install
+npm run validate:structure
+npm run selftest
+```
+
+The reference acceptance-test instance bootstrapped this way is `bread-coop-os` (see `data/instances.yaml`). Its config lives at `tests/fixtures/bread-coop-config.yaml`.
+
+After cloning, the manual phases below still apply for filling in identity, ingesting sources, and ongoing learning — but the file scaffolding, package selection, federation lineage, and reset placeholders are done for you.
+
+---
+
 ## Phase 1: Guided Interview
 
 Use the `bootstrap-interviewer` skill to set up the workspace interactively. The agent asks questions and generates files automatically.

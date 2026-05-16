@@ -1,12 +1,12 @@
 # Instance Drift Report — 2026-05-16
 
-**Generated:** 2026-05-16T22:37:30.272Z
+**Generated:** 2026-05-16T22:49:16.777Z
 **Framework version:** 3.0
 
 ## Summary
 
-- Instances tracked: 6
-- Cloned locally: 6
+- Instances tracked: 7
+- Cloned locally: 7
 - Production: 2
 - Total drift items: 17
 - Unmapped skills (not in skills-matrix): working-with-obsidian-canvas
@@ -100,3 +100,15 @@
 
 **Drift (1):**
 - ⚠ undeclared_data_registry:tasks
+
+## Bread Cooperative (`bread-coop-os`)
+
+- Type: Cooperative
+- Maturity: alpha
+- Skills: 16 (bootstrap-interviewer, capital-flow, funding-scout, heartbeat-monitor, initialize, knowledge-curator, meeting-notes-transcription-fixer, meeting-processor, org-os-init, schema-generator, skill-creator, skills-curator, superpowers-brainstorming, superpowers-executing-plans, superpowers-writing-plans, workspace-improver)
+- Packages: 1 (operations)
+- Data registries: 13
+- MASTERPLAN: yes
+- federation.yaml: yes (v3.5)
+
+**Drift:** none ✓
