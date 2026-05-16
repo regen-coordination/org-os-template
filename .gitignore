@@ -33,3 +33,9 @@ __pycache__
 # Worktrees (isolation for parallel development)
 .worktrees/
 .claude/worktrees/
+
+# Scheduled-task lockfiles (per-machine state)
+.claude/scheduled_tasks.lock
+
+# Test gitignore fixtures
+.gitignore.test
