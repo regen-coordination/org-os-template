@@ -1,0 +1,28 @@
+# Non-interactive bootstrap config used by clone-framework.mjs + selftest dry-run.
+# Operators using --non-interactive provide this kind of file via --config.
+
+org:
+  name: "test-instance-os"
+  tagline: "Selftest fixture — not a real org"
+  type: "LocalNode"
+  short_description: "Selftest scaffold for the clone engine."
+  emoji: "🧪"
+  license: "MIT"
+
+operator:
+  name: "Test Operator"
+  email: "test@example.invalid"
+
+network:
+  name: "test-network"
+  upstream_url: "https://github.com/organizational-os/organizational-os-template.git"
+
+packages:
+  operations: true
+  webapps: false
+
+skills:
+  - bootstrap-interviewer
+  - org-os-init
+  - heartbeat-monitor
+  - knowledge-curator
