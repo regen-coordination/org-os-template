@@ -4,6 +4,8 @@ _Run this when deploying org-os for a new organization. Bootstrapping has three 
 
 > **Note:** The org-os repo itself is bootstrapped as of 2026-04-24. See `memory/2026-04-24.md` for the self-hosting inauguration notes. New instances (downstream of this framework) run the phases below.
 
+> **⚠️ Workspace Safety:** Before any destructive git operation (merge, rebase, pull, reset, checkout across branches, clean, stash), run `npm run vault:snapshot -- "<reason>"`. Never use `git stash` in a workspace with precious untracked content. See [docs/VAULT-SAFETY.md](docs/VAULT-SAFETY.md) for the full protocol and recovery runbook.
+
 ---
 
 ## Phase 1: Guided Interview
