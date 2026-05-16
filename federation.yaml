@@ -1,9 +1,9 @@
-# Federation Manifest v3.0
+# Federation Manifest v3.5
 # org-os — Framework repo + multi-instance orchestration hub
 # This file describes how org-os positions itself in the federation.
 
-version: "3.0"
-spec: "organizational-os/3.0"
+version: "3.5"
+spec: "organizational-os/3.5"
 
 # ── Identity ──────────────────────────────────────────────────────────────────
 identity:
@@ -241,8 +241,8 @@ platforms:
 # ── Metadata ─────────────────────────────────────────────────────────────────
 metadata:
   created: "2026-04-05"
-  last_updated: "2026-04-24"
-  framework_version: "3.0"
+  last_updated: "2026-05-16"
+  framework_version: "3.5"
   self_hosting_since: "2026-04-24"
   # Lineage stamp (v3.5 autopoiesis Phase 2)
   genesis_commit: "af8941a273a7588a8ba20209671ba26236c5549a"

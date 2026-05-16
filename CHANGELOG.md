@@ -6,7 +6,56 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
-_(Append changes here as they land. On release, `npm run version:update <version>` promotes this to a versioned section.)_
+_(Append changes here as they land.)_
+
+## [3.5.0] — 2026-05-16
+
+The "Consolidation + Ready for Real Orgs" release. Formalizes ~12 months of accreted skills, packages, scripts, and structural innovations across the framework and downstream instances into a single coherent release. Plus the missing machinery (reliability layer, package lifecycle, cloning engine, cascade closure) that makes the framework genuinely self-serve.
+
+### Consolidation backbone (Tier 1)
+- 9 superpowers-* skills (brainstorming, executing-plans, finishing-a-development-branch, requesting-code-review, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, writing-plans).
+- 3 expertise skills: expert-feynman, karpathy-guidelines, initialize.
+- 2 host-integration packages: hermes-integration (Hermes runtime tool + skill bundle), opencode-integration (npm plugin + 5 slash commands: /dashboard, /initialize, /org-projects, /org-decisions, /org-this-week).
+- 5 promoted P0 skills from instances (≥2 adoption): frontend-design, artifacts-builder, skill-creator, mcp-builder (Anthropic-vendored, generalized); meeting-notes-transcription-fixer (framework-authored).
+- 5 promoted P0 scripts (≥3 instance adoption, mostly byte-identical): compile-knowledge, index-linked-repos, lint-knowledge, normalize-kb-frontmatter (refactored to load aliases from data/knowledge-aliases.yaml), update-knowledge-index.
+- Hub vault-safety pattern promoted to framework: scripts/vault-snapshot.mjs, scripts/vault-audit.mjs, docs/VAULT-SAFETY.md (193 lines: iron rules + safe pattern + 7-layer recovery runbook + 2026-04-25 incident case study).
+- scripts/check-divergence.mjs — advisory md5 comparison across instances vs framework canonical.
+- scripts/page-shim.mjs — transitional bridge for `npm run page <id>` (renders 7 pages until TUI ships in v3.6+).
+- Matrix integrity pass: data/skills-matrix.yaml rewritten with honest promotion_status; data/packages-matrix.yaml extended with `lifecycle_status` field (active/dormant/planned/retired). docs/SKILL-PROMOTION.md extended with Script-Level Reconciliation section + Known Divergences table.
+
+### Operator-facing surface (Tier 2)
+- System reliability layer: docs/RELIABILITY.md, scripts/selftest.mjs aggregator, scripts/install-hooks.mjs + .github/hooks/pre-commit.sh, .github/workflows/{validate,drift}.yml.
+- Version triplet check: `npm run version:check` verifies package.json, federation.yaml, and CHANGELOG.md all agree.
+- Skills section: scripts/lib/discover-skills.mjs walker, scripts/generate-skills.mjs → SKILLS.md + .well-known/skills.json, /skills slash command.
+
+### Real-org-ready machinery (Tier 3)
+- Package integration: docs/PACKAGE-LIFECYCLE.md, scripts/sync-packages.mjs (TDD, 5 tests).
+- One-pager templates: templates/render.mjs (~95-LOC mustache renderer, 9 tests), templates/README.{framework,instance}.md, templates/GETTING-STARTED.md, templates/partials/{cheatsheet,federation}.md, scripts/render-templates.mjs.
+- Cloning engine: scripts/clone-framework.mjs (8-stage non-interactive bootstrap, 4 tests).
+- Acceptance test: bread-coop-os bootstrapped end-to-end (registered in data/instances.yaml as framework_version: "3.5").
+
+### Cascade machinery (Tier 4)
+- Autopoiesis Phase 2 (Loop C cascade closure): scripts/sync-upstream.mjs (10-stage pull-based sync with vault-safety + .sync-freeze guard + receipt logging), scripts/validate-identity.mjs (IDENTITY.md ↔ federation.yaml agreement + lineage stamp shape).
+- Lineage stamp in federation.yaml.metadata: `genesis_commit` (immutable, 40-hex SHA from framework's root commit) + `last_sync_commit` (mutable).
+
+### Changed
+- Validator: fixed long-standing bogus "federation section" check; added section 9 enforcing lifecycle_status + promotion_status enum values; pre-release version exemption.
+- IDENTITY.md type narrowed to controlled vocabulary "Project"; validate-identity now enforces agreement with federation.yaml.identity.type.
+- BOOTSTRAP.md gained "Quick Path: Cloning Engine (v3.5+)" section.
+- AGENTS.md gained top-level "Workspace Safety" section.
+- README.md regenerated from templates (replaces "GitHub-based operational workspace template" framing).
+- 28 skills now in framework (up from 11 in v3.0); 11 packages (up from 9).
+
+### Added (framework infrastructure)
+- .github/workflows/{validate,drift}.yml — CI on push/PR + weekly scheduled drift report.
+- .github/hooks/pre-commit.sh — installable via `npm run install:hooks`.
+- tests/ directory with 23 node:test cases.
+- npm scripts added: vault:snapshot, vault:audit, knowledge:{compile,index,lint,normalize,update-index}, check:divergence, selftest, version:check, install:hooks, generate:skills, sync:packages, render:templates, clone:framework, test.
+
+### Fixed
+- Duplicate `initialize` entry in package.json scripts.
+- Missing .well-known/dao.json (was only .template).
+- Pre-commit hook tolerates missing scripts/validate-identity.mjs (was hard-failing before P12 landed it).
 
 ## [3.0.0] — 2026-04-24
 
@@ -67,6 +116,7 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v3.5.0...HEAD
+[3.5.0]: https://github.com/regen-coordination/org-os-template/compare/v3.0.0...v3.5.0
 [3.0.0]: https://github.com/regen-coordination/org-os-template/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/regen-coordination/org-os-template/releases/tag/v2.0.0
