@@ -69,6 +69,21 @@ packages:
     promotion_status: "canonical"
     notes: "Shared webapp scaffolding."
 
+  # --- Framework canonical packages (v3.5 additions: host integrations) ---
+  - id: "hermes-integration"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    notes: "Hermes runtime integration: skill + Python tool that auto-invokes org_os_page when operator mentions org-os state. Awaiting instance adoption signal."
+
+  - id: "opencode-integration"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    notes: "opencode npm plugin: registers two tools (org_os_page, org_os_tui) + 5 slash-command templates (/dashboard, /initialize, /org-projects, /org-decisions, /org-this-week). Awaiting instance adoption signal."
+
   # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
     owner: "refi-bcn-os"

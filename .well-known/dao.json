@@ -1,0 +1,14 @@
+{
+  "@context": "http://www.daostar.org/schemas",
+  "type": "Organization",
+  "name": "org-os",
+  "description": "Shared operating system for a federation of regenerative organizations — template + standards + orchestration hub. Framework, not a DAO; daoURI included for EIP-4824 schema compliance.",
+  "membersURI": "https://organizational-os.github.io/.well-known/members.json",
+  "proposalsURI": "https://organizational-os.github.io/.well-known/proposals.json",
+  "activityLogURI": "https://organizational-os.github.io/.well-known/activities.json",
+  "governanceURI": "https://organizational-os.github.io/governance",
+  "contractsURI": "https://organizational-os.github.io/.well-known/contracts.json",
+  "meetingsURI": "https://organizational-os.github.io/.well-known/meetings.json",
+  "projectsURI": "https://organizational-os.github.io/.well-known/projects.json",
+  "financesURI": "https://organizational-os.github.io/.well-known/finances.json"
+}

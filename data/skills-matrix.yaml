@@ -4,10 +4,15 @@ schema_version: "2.0"
 # Cross-instance catalog of every skill across the federation.
 # Surfaces promotion candidates: skills proven in ≥2 instances, ready to become framework-canonical.
 #
-# promotion_status: canonical (in framework) | candidate (promote next) | evaluating | instance-specific
+# promotion_status:
+#   canonical        — shipped in framework AND adopted by ≥1 instance
+#   evaluating       — shipped in framework but no instance adoption yet (awaiting signal)
+#   candidate        — present in ≥2 instances, not yet in framework (promotion-ready)
+#   instance-specific — kept local to a specific instance, not generalizable
+#   deprecated       — superseded; kept for compatibility but not recommended
 
 skills:
-  # --- Framework canonical skills (shipped in skills/) ---
+  # --- Framework canonical skills (v2.0 lineage; adopted across instances) ---
   - id: "bootstrap-interviewer"
     owner: "framework"
     instances_using: ["refi-bcn-os", "refi-dao-os"]
@@ -19,8 +24,8 @@ skills:
     owner: "framework"
     instances_using: []
     in_framework: true
-    promotion_status: "canonical"
-    notes: "Queues capital movements. Not yet activated in production instances."
+    promotion_status: "evaluating"
+    notes: "Queues capital movements. Not yet activated in production instances; framework provides, awaiting adoption signal."
 
   - id: "funding-scout"
     owner: "framework"
@@ -55,14 +60,14 @@ skills:
     instances_using: ["refi-bcn-os", "refi-dao-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Processes transcripts, extracts decisions and action items. OPAL integration planned."
+    notes: "Processes transcripts, extracts decisions and action items. OPAL integration planned. Pairs with meeting-notes-transcription-fixer as pre-processor."
 
   - id: "org-os-init"
     owner: "framework"
     instances_using: ["refi-bcn-os", "refi-dao-os"]
     in_framework: true
     promotion_status: "canonical"
-    notes: "Session lifecycle: OPEN → PLAN → EXECUTE → CLOSE. Powers /initialize and /close."
+    notes: "Full session lifecycle: OPEN → PLAN → EXECUTE → CLOSE. Powers /initialize and /close in Claude Code CLI."
 
   - id: "schema-generator"
     owner: "framework"
@@ -78,54 +83,177 @@ skills:
     promotion_status: "canonical"
     notes: "Autonomous improvement loop (autoresearch pattern)."
 
-  # --- Promotion candidates (validated in ≥2 instances, not yet in framework) ---
+  # --- Framework canonical skills (v3.0 additions) ---
+  - id: "skills-curator"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    notes: "Curates right agent skills + libraries before building (Phase 0). Framework-internal; awaiting instance adoption signal."
+
+  # --- Framework canonical skills (v3.5 additions: expertise + cognitive aids) ---
+  - id: "expert-feynman"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Richard Feynman's first-principles thinking and explanation frameworks. For understanding complex systems and debugging."
+
+  - id: "karpathy-guidelines"
+    owner: "framework"
+    instances_using: ["refi-dao-os", "regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Behavioral guidelines to reduce LLM coding mistakes. Adapted from Andrej Karpathy's observations."
+
+  - id: "initialize"
+    owner: "framework"
+    instances_using: ["regen-coordination-os", "refi-med-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Focused init ritual (sync + dashboard + plan), distributable as user-level skill for clients that don't load project-level .claude/commands/ (e.g., Zed/claude-acp). Complements org-os-init (which is full lifecycle: OPEN/PLAN/EXECUTE/CLOSE)."
+
+  # --- Framework canonical skills (v3.5 additions: superpowers — process discipline) ---
+  - id: "superpowers-brainstorming"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Socratic design refinement before implementation. Mandatory before creative work."
+
+  - id: "superpowers-executing-plans"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Batch execution of implementation plans with review checkpoints."
+
+  - id: "superpowers-finishing-a-development-branch"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Merge/PR decision workflow after implementation completes."
+
+  - id: "superpowers-requesting-code-review"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Pre-merge code review dispatch and feedback handling."
+
+  - id: "superpowers-subagent-driven-development"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Fresh subagent per task with two-stage review (spec then quality)."
+
+  - id: "superpowers-systematic-debugging"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "4-phase root-cause debugging process. Never fix without investigation."
+
+  - id: "superpowers-test-driven-development"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "RED-GREEN-REFACTOR cycle. No production code without failing test first."
+
+  - id: "superpowers-using-git-worktrees"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Isolated git worktrees for feature development."
+
+  - id: "superpowers-writing-plans"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Comprehensive implementation plans with bite-sized tasks."
+
+  # --- Framework canonical skills (v3.5 promotions: Anthropic-vendored) ---
+  - id: "frontend-design"
+    owner: "anthropic-vendored"
+    instances_using: ["refi-bcn-os", "regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Distinctive, production-grade frontend interfaces (React, HTML/CSS, brutalist/refined/maximalist aesthetics). Promoted v3.5 from regen-coordination-os."
+
+  - id: "artifacts-builder"
+    owner: "anthropic-vendored"
+    instances_using: ["refi-bcn-os", "regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Elaborate multi-component HTML artifacts (React, Tailwind, shadcn/ui). Pairs with frontend-design. Promoted v3.5."
+
+  - id: "skill-creator"
+    owner: "anthropic-vendored"
+    instances_using: ["refi-bcn-os", "regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Meta-skill for authoring and evolving org-os skills. Promoted v3.5."
+
+  - id: "mcp-builder"
+    owner: "anthropic-vendored"
+    instances_using: ["refi-bcn-os", "regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Guide for creating high-quality MCP (Model Context Protocol) servers. Promoted v3.5."
+
+  # --- Framework canonical skills (v3.5 promotions: framework-authored) ---
+  - id: "meeting-notes-transcription-fixer"
+    owner: "framework"
+    instances_using: ["refi-dao-os", "regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Audits + repairs meeting transcripts before meeting-processor. Closes a real gap in the meeting pipeline. Ships with per-instance dictionary customization (see SKILL.md). Promoted v3.5."
+
+  # --- Promotion candidates (≥2 instances, not yet in framework) ---
   - id: "research"
     owner: "refi-bcn-os"
     instances_using: ["refi-bcn-os", "refi-dao-os"]
     in_framework: false
     promotion_status: "candidate"
-    notes: "Present in two operational instances. Promotion criteria met (≥2 independent validations). Next: reconcile implementations, extract common core to skills/research/SKILL.md."
+    notes: "Present in two operational instances. Promotion criteria met. Next: reconcile implementations, extract common core to skills/research/SKILL.md. Deferred from v3.5 pending reconciliation review."
 
-  # --- Instance-specific or under evaluation ---
-  - id: "karpathy-guidelines"
-    owner: "refi-dao-os"
-    instances_using: ["refi-dao-os"]
-    in_framework: false
-    promotion_status: "evaluating"
-    notes: "Karpathy Scalable Oversight framework applied to DAO governance. Evaluate generalizability before promotion."
-
-  # --- DAO-module skills (candidates — framework lacks treasury/governance-protocol layer) ---
+  # --- DAO-module skills (single-instance candidates — framework lacks treasury/governance-protocol layer) ---
   - id: "safe-treasury"
     owner: "dao-os"
     instances_using: ["dao-os"]
     in_framework: false
     promotion_status: "candidate"
-    notes: "Gnosis Safe treasury module. Framework has no treasury skill despite supporting DAO-type instances. High promotion priority."
+    notes: "Gnosis Safe treasury module. Framework has no treasury skill despite supporting DAO-type instances. Defer until non-dao-os instance needs it."
 
   - id: "hats-governance"
     owner: "dao-os"
     instances_using: ["dao-os"]
     in_framework: false
     promotion_status: "candidate"
-    notes: "Hats Protocol roles module. Framework gap."
+    notes: "Hats Protocol roles module. Framework gap. Defer until non-dao-os adopter."
 
   - id: "gardens-governance"
     owner: "dao-os"
     instances_using: ["dao-os"]
     in_framework: false
     promotion_status: "candidate"
-    notes: "Gardens DAO governance module. Framework gap."
+    notes: "Gardens DAO governance module. Framework gap. Defer."
 
   - id: "karma-reputation"
     owner: "dao-os"
     instances_using: ["dao-os"]
     in_framework: false
     promotion_status: "candidate"
-    notes: "Karma GAP reputation module. Framework gap."
+    notes: "Karma GAP reputation module. Framework gap. Defer."
 
   - id: "eip4824-identity"
     owner: "dao-os"
     instances_using: ["dao-os"]
     in_framework: false
     promotion_status: "candidate"
-    notes: "EIP-4824 identity module. Framework has schema-generator but no identity module — potential overlap, evaluate first."
+    notes: "EIP-4824 identity module. Framework has schema-generator but no identity module — potential overlap, evaluate first before promotion."
