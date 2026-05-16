@@ -1,16 +1,21 @@
 ---
 name: org-os-init
-description: Organizational OS session lifecycle — initialization dashboard, session planning, work execution, and session close. Renders rich ASCII visual overview, manages apps/skills/agents, and handles the full OPEN → PLAN → EXECUTE → CLOSE workflow.
-version: "2.0.0"
+description: Organizational OS session lifecycle — initialization dashboard, session planning, work execution, and session close. Handles the full OPEN → PLAN → EXECUTE → CLOSE workflow.
+version: "2.2.0"
 license: MIT
 tier: core
 triggers:
-  - /initialize
   - /close
-  - session start
+  - session planning
   - session end
+  - wrap up session
+platforms:
+  - hermes
+  - opencode
+  - claude-code
+  - cursor
 inputs:
-  - JSON payload from `node scripts/initialize.mjs`
+  - Pre-rendered markdown from `node scripts/initialize.mjs --format=markdown`
 outputs:
   - ASCII dashboard render
   - Session plan
@@ -18,6 +23,10 @@ outputs:
 metadata:
   audience: operators
   workflow: session-lifecycle
+  related_skills:
+    - initialize
+    - heartbeat-monitor
+    - funding-scout
 ---
 
 # Org-OS Session Lifecycle
@@ -26,22 +35,80 @@ You are the **operational agent** for an Organizational OS workspace. This skill
 
 The agent arrives already aware, already oriented. Not a blank slate — a living system showing its current state and ready to work.
 
+> **📘 Note:** For the `/initialize` command specifically, see the `initialize` skill which provides Hermes-optimized handling. This skill covers the full lifecycle including PLAN, EXECUTE, and CLOSE phases.
+
+---
+
+## Platform Support
+
+This skill works across agent runtimes with platform-specific considerations:
+
+| Platform | Notes |
+|----------|-------|
+| **Hermes** | Use `cd <workspace> && <command>` pattern. Preload with `/initialize` skill for dashboard. |
+| **OpenCode** | Similar to Hermes. Full terminal access available. |
+| **Claude Code** | Can run commands directly. May have better path resolution. |
+| **Cursor** | Same as Claude Code. |
+
+### Hermes-Specific Handling
+
+When running in Hermes (detected by `hermes` in runtime or platform context):
+
+1. **Always use absolute paths** — Hermes may not preserve working directory between tool calls
+2. **Use `cd <dir> && command`** pattern instead of `workdir` parameter
+3. **Check command output** — Hermes models (especially kimi-k2.6) may return empty output on first attempt
+4. **Print dashboard verbatim** — The `--format=markdown` output from initialize.mjs is pre-rendered ASCII
+
+Example Hermes terminal command:
+```bash
+cd "$(pwd)" && node scripts/initialize.mjs --format=markdown
+```
+
 ---
 
 ## Session Bookends: Auto-Sync
 
-Every session is bookended by git sync — the operator should never have to remember this:
+Every session is bookended by git sync — the operator should never have to remember this. This matters most for collaborators who use `/initialize` and `/close` as their only git interface:
 
-- **`/initialize`** runs `git pull --rebase` **before** loading data. The dashboard always shows the latest state.
+- **`/initialize`** fetches from origin, then rebases only when the working tree is clean and behind. Reports state explicitly in every case (up-to-date, ahead, dirty, behind+dirty, no remote, no upstream, embedded repo). Never blocks; never tries to rebase on a dirty tree.
 - **`/close`** commits memory + heartbeat changes and runs `git push` **after** writing session output.
 
-If the pull or push fails (offline, no remote), continue silently with local state. Never block the session on a sync failure.
+The sync is non-blocking by design. When behind + dirty, the operator gets an explicit instruction to commit or `/close` first — not a silent skip. **Vault-safe rule:** never `git stash`, `git clean`, or `git reset --hard` to clear a dirty tree before pulling. Where available, use `npm run vault:snapshot` first.
+
+See `skills/initialize/SKILL.md` for the canonical sync implementation.
 
 ---
 
 ## Phase 1: OPEN — Initialization Dashboard
 
-When `/initialize` is triggered, the workspace is synced first, then you receive a JSON payload from `node scripts/initialize.mjs`. Parse it and render the dashboard below.
+When the session starts (via `/initialize` or "initialize workspace"), run the initialization sequence:
+
+1. **Git sync** — Fetch + conditional rebase (non-blocking; reports state, never silently skips)
+2. **Generate dashboard** — Run `node scripts/initialize.mjs --format=markdown`
+3. **Output** — Print the pre-rendered markdown **verbatim** (do not reformat)
+4. **Context** — Note key state for the session
+
+> **📘 For Hermes agents:** Load the `initialize` skill for optimized handling. It includes platform-specific workarounds (absolute paths, cd patterns, error recovery).
+
+If the script fails, fall back to reading key files directly and produce a minimal status summary.
+
+### Dashboard Output Format
+
+The `--format=markdown` flag outputs pre-rendered markdown with:
+- ASCII banner (in code block)
+- Status bar (memory age, peers, runtime)
+- Projects table
+- Tasks list (critical, urgent, upcoming, completed)
+- This week's events/meetings
+- Funding deadlines
+- Recent memory context
+- Command cheatsheet
+
+**Print this output exactly as received** — do not wrap in additional markdown or reformat.
+
+---
+
+## Phase 2: PLAN — Session Work Planning
 
 ### Dashboard Configuration
 
