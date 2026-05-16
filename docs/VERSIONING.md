@@ -149,4 +149,38 @@ Not applicable. The framework is at `3.x`. If a future major rewrite justified i
 - [semver.org](https://semver.org) — semantic versioning spec.
 - [keepachangelog.com](https://keepachangelog.com) — CHANGELOG format.
 - `docs/SKILL-PROMOTION.md` — how instance skills become canonical.
+- `docs/PACKAGE-LIFECYCLE.md` — package lifecycle states + sync mechanism.
 - `docs/DATA-MODEL.md` — registry schemas and their `schema_version` fields.
+
+---
+
+## Lineage stamp (v3.5+)
+
+Every instance carries a **lineage stamp** in `federation.yaml.metadata`:
+
+```yaml
+metadata:
+  framework_version: "3.5"       # major.minor of the framework this instance is on
+  genesis_commit: "<40-hex SHA>" # framework commit at clone time; immutable
+  last_sync_commit: "<SHA>|null" # framework commit pinned at last sync-upstream run
+```
+
+- **`genesis_commit`** is set by `scripts/clone-framework.mjs` at bootstrap (from `git rev-list --max-parents=0 HEAD | tail -1` on the framework). It never changes for an instance.
+- **`last_sync_commit`** is updated by `scripts/sync-upstream.mjs` after every successful sync. `null` means "never synced" (either freshly cloned, or the framework itself, which is its own upstream).
+- `scripts/validate-identity.mjs` (run via `npm run validate:schemas`) checks shape: 40-hex SHA for genesis, 40-hex SHA or null for last_sync.
+
+## Version triplet sanity (v3.5+)
+
+Three sources must agree on framework version:
+
+1. `package.json` → `version` (semver, e.g., `3.5.0`)
+2. `federation.yaml` → `metadata.framework_version` (major.minor, e.g., `3.5`)
+3. `CHANGELOG.md` → most-recent `## [X.Y.Z]` heading
+
+Check via:
+
+```bash
+npm run version:check
+```
+
+Exit code 1 on any inconsistency. Run before tagging any release.

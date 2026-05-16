@@ -7,7 +7,8 @@ _Bridges agent identity with EIP-4824 organizational identity. This file describ
 ## Core Identity
 
 - **Name:** org-os
-- **Type:** Project (framework + orchestration hub)
+- **Type:** Project
+- **Sub-role:** Framework + orchestration hub
 - **Emoji:** 🧬
 - **Short description:** Shared operating system for a federation of regenerative organizations — template + standards + orchestration hub.
 

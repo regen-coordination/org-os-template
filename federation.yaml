@@ -244,3 +244,6 @@ metadata:
   last_updated: "2026-04-24"
   framework_version: "3.0"
   self_hosting_since: "2026-04-24"
+  # Lineage stamp (v3.5 autopoiesis Phase 2)
+  genesis_commit: "af8941a273a7588a8ba20209671ba26236c5549a"
+  last_sync_commit: null  # framework IS the upstream; null is correct here
