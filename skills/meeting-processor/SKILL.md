@@ -31,6 +31,10 @@ Processes meeting transcripts (from Granola, Google Meet, Otter.ai, Zoom, or man
 - For async decisions (no meeting) → write directly to project page
 - For very short exchanges (< 5 min) → add directly to memory
 
+## Recommended pre-processor: `meeting-notes-transcription-fixer`
+
+If raw notes contain transcription errors (misheard proper nouns, acronyms, project names that recur in your org), run `meeting-notes-transcription-fixer` first to normalize the corpus, then run this skill. The transcription-fixer maintains per-instance dictionaries of recurring corrections; meeting-processor consumes already-clean text.
+
 ## Usage
 
 ### Step 1: Receive Input
