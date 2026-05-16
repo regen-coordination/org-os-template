@@ -1,145 +1,132 @@
-# Organizational OS Template
+# org-os — shared operating system for a federation of regenerative organizations
 
-**GitHub-based operational workspace template with EIP-4824 compliance**
+> Framework + standards + orchestration hub.
 
-> This repository is a standalone mirror of `packages/template` in the canonical [organizational-os monorepo](https://github.com/regen-coordination/organizational-os). For active development, use the monorepo.
-
-Transform your GitHub repository into a complete operational workspace for your organization (DAO, cooperative, nonprofit, project). Built on EIP-4824/DAOstar standards for organizational identity and interoperability.
+**Type:** Framework + orchestration hub · **Version:** 3.0.0 · **Status:** active
 
 ---
 
-## Quick Start
+## What this is
 
-### 1. Fork This Template
+`org-os` is the canonical template + standards + orchestration hub for a federation of org-os instances. Downstream instances fork or sync from this repo. The framework itself is also an org-os instance (self-hosting since 2026-04-24).
+
+## Quick navigation
+
+- **Operators:** `BOOTSTRAP.md` → guided onboarding for a new instance
+- **Agents:** `AGENTS.md` → workspace startup protocol + memory model
+- **Contributors:** `docs/FILE-STRUCTURE.md`, `docs/DATA-MODEL.md`, `docs/SKILL-PROMOTION.md`, `docs/PACKAGE-LIFECYCLE.md`
+- **Operators of downstream instances:** `docs/OPERATOR-GUIDE.md`
+- **Reliability + safety:** `docs/RELIABILITY.md`, `docs/VAULT-SAFETY.md`
+
+## Who are you?
+
+### You're an **operator** spinning up a new org
 
 ```bash
-# Fork this repository on GitHub, then clone
-git clone https://github.com/your-org/your-repo.git
-cd your-repo
-```
+# Recommended: use the cloning engine (lands P10 of v3.5)
+node scripts/clone-framework.mjs --target ../my-new-org --config config.yaml
 
-### 2. Run Setup
-
-```bash
-npm install
+# Or: interactive guided interview
 npm run setup
 ```
 
-The setup script will:
-- Collect organizational identity information
-- Configure EIP-4824 schemas
-- Let you select operational packages
-- Generate initial `.well-known/` schemas
-- Set up Cursor rules
+See `BOOTSTRAP.md` for the full first-run sequence.
 
-### 3. Deploy
+### You're a **contributor** to the framework
 
 ```bash
-git add .
-git commit -m "Initial Organizational OS setup"
-git push origin main
+git clone <this-repo> && cd <repo>
+npm install
+npm run install:hooks    # pre-commit + advisory hooks
+npm run selftest         # full reliability check
 ```
 
-GitHub Actions will automatically deploy to GitHub Pages.
+### You're an **agent** opening a session
+
+Read `MASTERPLAN.md`, `SOUL.md`, `IDENTITY.md`, then run `/initialize`. See `AGENTS.md` for the deterministic startup sequence.
+
+### You're a **visitor** evaluating org-os
+
+Start with `SOUL.md` (mission + values), `IDENTITY.md` (what we are), and the [docs/](docs/) directory.
 
 ---
 
-## Local clone workspace (visible `repos/` folder)
+## Active downstream instances
 
-To clone/update linked ecosystem repositories into a visible local `repos/` directory:
 
-```bash
-pnpm run clone:repos
-```
 
-If you prefer npm:
+- **refi-bcn-os** (LocalNode) — unknown
 
-```bash
-npm run clone:repos
-```
+- **refi-dao-os** (DAO) — unknown
 
-Bootstrap local setup (clone repos + install dependencies):
+- **dao-os** (Project) — unknown
 
-```bash
-pnpm run bootstrap:local
-```
+- **openclaw** (AgentRuntime) — unknown
 
-Dry run preview:
+- **regen-coordination-os** (Hub) — unknown
 
-```bash
-node scripts/clone-linked-repos.mjs --dry-run
-```
+- **refi-med-os** (LocalNode) — unknown
 
-Linked repositories are defined in `repos.manifest.json`.
 
----
 
-## Features
+See `data/instances.yaml` for the authoritative registry. `npm run analyze:instances` for current drift state.
 
-### Organizational Identity (EIP-4824)
+## Skills and packages
 
-- **daoURI**: Main organizational identity document
-- **membersURI**: Membership registry
-- **proposalsURI**: Governance proposals
-- **governanceURI**: Governance documentation
-- **contractsURI**: Smart contract registry
-- **Extended schemas**: Meetings, Projects, Finances
+## Common operations
 
-### Operational Packages
+| Command | Purpose |
+|---|---|
+| `npm run initialize` | Open a session (sync + dashboard + plan) |
+| `/initialize` (Claude Code / Zed / OpenCode) | Same as above, via slash command |
+| `/close` | Wrap up: write memory, commit, push |
+| `npm run validate:structure` | Check instance against canonical spec |
+| `npm run validate:schemas` | Validate EIP-4824 + identity schemas |
+| `npm run analyze:instances` | Cross-instance drift report (framework only) |
+| `npm run selftest` | Run full reliability suite |
+| `npm run vault:snapshot -- "<reason>"` | Capture working tree to refs/snapshots/ before any risky git op |
+| `npm run vault:audit` | Verify no content lost since last snapshot |
+| `npm run check:divergence` | Compare instance scripts against framework canonical |
+| `/skills` | List skills across workspace + user + plugin sources |
 
-- **Meetings**: Meeting management, notes, action items
-- **Projects**: Project tracking with IDEA framework
-- **Finances**: Budget and expense tracking
-- **Coordination**: Multi-organization coordination tools
 
-### Knowledge Base
-
-- **Quartz-based**: Markdown documentation system
-- **Searchable**: Full-text search
-- **Linked**: Internal linking and cross-references
-- **Publishable**: Deploy to GitHub Pages
-
-### Interactive Webapps
-
-- **Task Manager**: View and manage tasks
-- **Budget Calculator**: Financial planning tools
-- **Stakeholder Map**: Relationship visualization
-- **Timeline Planner**: Project timeline visualization
-
----
+- **Skills:** 34 total — see `SKILLS.md` and `data/skills-matrix.yaml`
+- **Packages:** 16 total — see `data/packages-matrix.yaml` + `docs/PACKAGE-LIFECYCLE.md`
 
 ## Documentation
 
-- **[Setup Guide](03%20Libraries/org-os/docs/SETUP.md)** - Complete setup instructions
-- **[Operator Guidebook](docs/OPERATOR-GUIDEBOOK.md)** - How to operate your workspace
-- **[EIP-4824 Guide](03%20Libraries/org-os/docs/EIP4824-GUIDE.md)** - Standards compliance guide
-- **[Packages](docs/PACKAGES.md)** - Package documentation
 
----
+- [AGENT MODES](docs/AGENT-MODES.md) — 
 
-## Framework Reference
+- [AGENTIC ARCHITECTURE](docs/AGENTIC-ARCHITECTURE.md) — 
 
-This template implements the **[Organizational OS Framework](../organizational-os/packages/framework/)**:
+- [ARCHITECTURE](docs/ARCHITECTURE.md) — 
 
-- Standards and patterns: [`../organizational-os/packages/framework/docs/`](../organizational-os/packages/framework/docs/)
-- Schema definitions: [`../organizational-os/packages/framework/schemas/`](../organizational-os/packages/framework/schemas/)
-- Case studies: [`../organizational-os/packages/framework/docs/06-case-studies/`](../organizational-os/packages/framework/docs/06-case-studies/)
+- [AUTORESEARCH](docs/AUTORESEARCH.md) — 
 
----
+- [CHAT INTERFACE](docs/CHAT-INTERFACE.md) — 
+
+- [COMMANDS](docs/COMMANDS.md) — 
+
+- [DATA MODEL](docs/DATA-MODEL.md) — 
+
+- [ECOSYSTEM](docs/ECOSYSTEM.md) — 
+
+- [EIP4824 GUIDE](docs/EIP4824-GUIDE.md) — 
+
+- [FEDERATION](docs/FEDERATION.md) — 
+
+- [FILE STRUCTURE](docs/FILE-STRUCTURE.md) — 
+
+- [HOST INTEGRATION](docs/HOST-INTEGRATION.md) — 
+
 
 ## Requirements
 
-- Node.js v22+
-- npm v10.9.2+
-- Git
-- GitHub account
-
----
+- Node ≥22
+- npm ≥10.9.2
+- git
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-*Built with 💚 by the Regen Coordination community*
+MIT

@@ -36,6 +36,7 @@
     "install:hooks": "node scripts/install-hooks.mjs",
     "generate:skills": "node scripts/generate-skills.mjs",
     "sync:packages": "node scripts/sync-packages.mjs",
+    "render:templates": "node scripts/render-templates.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "docs": "npx quartz build --serve -d docs",
     "check": "tsc --noEmit && npx prettier . --check",
