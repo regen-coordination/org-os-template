@@ -1,0 +1,3 @@
+model:
+  provider: opencode-go
+  default: kimi-k2.6
