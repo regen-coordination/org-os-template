@@ -1,0 +1,13 @@
+---
+interface Props { href: string; variant?: "solid" | "ghost"; }
+const { href, variant = "solid" } = Astro.props;
+---
+<a href={href} class:list={["btn", variant]}><slot /></a>
+<style>
+.btn { display: inline-block; font-family: var(--font-mono); font-size: var(--text-sm);
+  font-weight: 600; padding: var(--space-2) var(--space-4); border-radius: var(--radius);
+  border: 1px solid var(--color-line); transition: background var(--t-fast); }
+.btn.solid { background: var(--color-accent); color: var(--color-accent-ink); border-color: var(--color-accent); }
+.btn.ghost { background: var(--color-surface); color: var(--color-ink); }
+.btn:hover { text-decoration: none; opacity: 0.92; }
+</style>
