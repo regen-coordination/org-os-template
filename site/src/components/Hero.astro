@@ -4,17 +4,39 @@ interface Cta { label: string; href: string; variant: "solid" | "ghost"; }
 interface Props { eyebrow: string; title: string; subtitle: string; ctas: Cta[]; statline?: string; }
 const { eyebrow, title, subtitle, ctas, statline } = Astro.props;
 ---
-<header class="hero">
-  <p class="eyebrow mono">~/org-os $ {eyebrow}</p>
-  <h1>{title}</h1>
-  <p class="subtitle prose">{subtitle}</p>
+<header class="hero stagger">
+  <p class="prompt mono">
+    <span class="path">~/org-os</span><span class="sym"> $ </span><span class="cmd">{eyebrow}</span>
+  </p>
+  <h1 class="headline">{title}</h1>
+  <p class="lead sub">{subtitle}</p>
   <div class="ctas">{ctas.map((c) => <Button href={c.href} variant={c.variant}>{c.label}</Button>)}</div>
-  {statline && <p class="mono statline">{statline}</p>}
+  {statline && (
+    <p class="statline mono" aria-label="status">
+      <span class="dot" aria-hidden="true"></span>{statline}
+    </p>
+  )}
 </header>
 <style>
-.hero { padding: var(--space-16) 0 var(--space-12); }
-.hero h1 { font-size: var(--text-4xl); margin: var(--space-4) 0; max-width: 16ch; }
-.subtitle { font-size: var(--text-md); color: var(--color-muted); }
-.ctas { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-6); }
-.statline { color: var(--color-faint); font-size: var(--text-sm); margin-top: var(--space-8); }
+.hero { padding: clamp(var(--space-16), 12vh, var(--space-32)) 0 var(--space-16); }
+.prompt { font-size: var(--text-sm); color: var(--color-muted); }
+.prompt .path { color: var(--color-accent); }
+.prompt .sym { color: var(--color-faint); }
+.headline {
+  font-size: var(--text-display); margin-top: var(--space-5);
+  max-width: 18ch; letter-spacing: var(--tracking-display);
+}
+.sub { margin-top: var(--space-6); max-width: 52ch; font-size: var(--text-md); }
+.ctas { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-8); }
+.statline {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  margin-top: var(--space-12); padding-top: var(--space-4);
+  border-top: var(--border-hair) dashed var(--color-line);
+  font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
+  color: var(--color-faint); text-transform: uppercase;
+}
+.statline .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent-soft);
+  box-shadow: 0 0 0 0 var(--color-accent-wash); animation: ping 2.4s var(--ease-out) infinite; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 var(--color-accent-wash); } 70%,100% { box-shadow: 0 0 0 9px transparent; } }
+@media (prefers-reduced-motion: reduce) { .statline .dot { animation: none; } }
 </style>

@@ -3,12 +3,20 @@ interface Props { status: "planned" | "in-dev" | "live"; }
 const { status } = Astro.props;
 const label = { planned: "Planned", "in-dev": "In dev", live: "Live" }[status];
 ---
-<span class:list={["badge", status]}>{label}</span>
+<span class:list={["badge", status]}><span class="pip" aria-hidden="true"></span>{label}</span>
 <style>
-.badge { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em;
-  text-transform: uppercase; padding: 2px var(--space-2); border-radius: var(--radius-sm);
-  border: 1px solid var(--color-line); }
+.badge {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500;
+  letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  padding: 0.2em 0.6em; border-radius: var(--radius-pill);
+  border: var(--border-hair) solid var(--color-line-2); color: var(--color-muted);
+  white-space: nowrap;
+}
+.pip { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge.live { background: var(--color-accent); color: var(--color-accent-ink); border-color: var(--color-accent); }
 .badge.in-dev { color: var(--color-accent); border-color: var(--color-accent); }
+.badge.in-dev .pip { box-shadow: 0 0 0 3px var(--color-accent-wash); }
 .badge.planned { color: var(--color-faint); }
+.badge.planned .pip { background: none; border: var(--border-hair) solid currentColor; }
 </style>

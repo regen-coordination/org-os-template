@@ -3,12 +3,15 @@ import type { FederationNode } from "../lib/federation";
 interface Props { node: FederationNode; }
 const { node } = Astro.props;
 ---
-<article class="surface card">
-  <header>
-    <span class="mono type">{node.type}</span>
-    <h3>{node.name}</h3>
-    <span class="mono id">{node.id}{!node.available && <em> · offline</em>}</span>
+<article class="surface card ticked">
+  <header class="head">
+    <span class="label type">{node.type}</span>
+    <span class:list={["status mono", node.available ? "live" : "offline"]}>
+      <span class="pip" aria-hidden="true"></span>{node.available ? "live" : "offline"}
+    </span>
   </header>
+  <h3 class="name">{node.name}</h3>
+  <p class="id mono">{node.id}</p>
   <p class="notes">{node.notes}</p>
   <dl class="meta mono">
     {node.network && node.role && <div><dt>network</dt><dd>{node.network} · {node.role}</dd></div>}
@@ -16,15 +19,36 @@ const { node } = Astro.props;
     {node.counts.members !== undefined && <div><dt>members</dt><dd>{node.counts.members}</dd></div>}
     {node.counts.projects !== undefined && <div><dt>projects</dt><dd>{node.counts.projects}</dd></div>}
   </dl>
-  {node.repo && <a href={node.repo} class="mono">repo →</a>}
+  {node.repo && <a class="repo mono link" href={node.repo}>repository<span class="arr"> →</span></a>}
 </article>
 <style>
-.card { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
-.card h3 { margin: var(--space-1) 0; }
-.card .type { font-size: var(--text-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); }
-.card .id { font-size: var(--text-sm); color: var(--color-faint); }
-.card .notes { font-size: var(--text-sm); color: var(--color-muted); margin: 0; }
-.meta { font-size: var(--text-sm); display: grid; gap: var(--space-1); margin: 0; }
-.meta div { display: flex; gap: var(--space-2); }
-.meta dt { color: var(--color-faint); min-width: 6rem; } .meta dd { margin: 0; }
+.card {
+  padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast);
+}
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); border-color: var(--color-line-2); }
+
+.head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+.type { color: var(--color-accent); }
+.status { display: inline-flex; align-items: center; gap: 0.4em; font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--color-muted); }
+.status .pip { width: 6px; height: 6px; border-radius: 50%; }
+.status.live .pip { background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-wash); }
+.status.offline { color: var(--color-faint); }
+.status.offline .pip { border: var(--border-hair) solid var(--color-faint); }
+
+.name { margin: 0; }
+.id { font-size: var(--text-sm); color: var(--color-faint); margin: 0; }
+.notes { font-size: var(--text-sm); color: var(--color-muted); margin: 0; line-height: var(--leading-snug);
+  display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+.meta { font-size: var(--text-sm); display: grid; gap: 0.3rem; margin: 0;
+  padding-top: var(--space-3); border-top: var(--border-hair) dashed var(--color-line); }
+.meta div { display: grid; grid-template-columns: 6.5rem 1fr; gap: var(--space-2); }
+.meta dt { color: var(--color-faint); } .meta dd { margin: 0; color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
+
+.repo { font-size: var(--text-sm); color: var(--color-accent); margin-top: auto; }
+.repo .arr { display: inline-block; transition: transform var(--t-fast); }
+.repo:hover .arr { transform: translateX(3px); }
 </style>

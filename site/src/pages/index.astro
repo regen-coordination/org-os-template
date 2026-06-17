@@ -18,13 +18,13 @@ const statline = `${federationData.nodes.length} instances · framework v0.5 · 
   <div class="container">
     <Hero eyebrow={landing.eyebrow} title={landing.title} subtitle={landing.subtitle} ctas={landing.ctas} statline={statline} />
   </div>
-  <SectionBlock eyebrow="Federation" title="One OS, many nodes" href="/federation" cta="Explore the network">
+  <SectionBlock index="01" eyebrow="Federation" title="One OS, many nodes" href="/federation" cta="Explore the network">
     <FederationGraph federation={federationData} />
   </SectionBlock>
-  <SectionBlock eyebrow="v0.5 roadmap" title="Modules" href="/modules" cta="See all modules">
+  <SectionBlock index="02" eyebrow="v0.5 roadmap" title="Modules" href="/modules" cta="See all modules">
     <div class="grid">{teaserModules.map((m: any) => <ModuleCard {...m} />)}</div>
   </SectionBlock>
 </Layout>
 <style>
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: var(--space-5); }
 </style>

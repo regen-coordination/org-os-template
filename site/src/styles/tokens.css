@@ -1,17 +1,59 @@
-/* tokens.css — STRUCTURAL tokens only. Palette/fonts/radius live in the active theme. */
+/* tokens.css — STRUCTURAL tokens only (theme-invariant).
+ * Palette, fonts, radius, and shadows live in the active theme. */
 :root {
-  /* Type scale (1.250 major third) */
-  --text-xs: 0.64rem; --text-sm: 0.8rem; --text-base: 1rem; --text-md: 1.25rem;
-  --text-lg: 1.563rem; --text-xl: 1.953rem; --text-2xl: 2.441rem; --text-3xl: 3.052rem;
-  --text-4xl: 3.815rem;
-  --leading-display: 1.08; --leading-heading: 1.2; --leading-body: 1.6; --leading-ui: 1.4;
+  /* Type scale — tuned for a monospace-forward technical-editorial voice.
+     Display steps are fluid; text steps are fixed for rhythm. */
+  --text-2xs: 0.6875rem;   /* 11px — micro labels, captions */
+  --text-xs:  0.75rem;     /* 12px — eyebrows, metadata */
+  --text-sm:  0.875rem;    /* 14px — UI, small body */
+  --text-base:1rem;
+  --text-md:  1.125rem;    /* lead paragraphs */
+  --text-lg:  1.375rem;
+  --text-xl:  1.75rem;
+  --text-2xl: 2.125rem;
+  --text-3xl: clamp(2.25rem, 4vw, 3rem);
+  --text-4xl: clamp(2.75rem, 6vw, 4rem);
+  --text-display: clamp(3rem, 8.5vw, 6.5rem);  /* hero */
+
+  --leading-display: 0.98;
+  --leading-heading: 1.1;
+  --leading-snug: 1.35;
+  --leading-body: 1.62;
+
+  --tracking-display: -0.035em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.06em;
+  --tracking-eyebrow: 0.24em;
+
   /* Spacing (4px base) */
-  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
-  --space-6: 1.5rem; --space-8: 2rem; --space-12: 3rem; --space-16: 4rem; --space-24: 6rem;
+  --space-1:.25rem;  --space-2:.5rem;   --space-3:.75rem;  --space-4:1rem;
+  --space-5:1.25rem; --space-6:1.5rem;  --space-8:2rem;    --space-10:2.5rem;
+  --space-12:3rem;   --space-16:4rem;   --space-20:5rem;   --space-24:6rem;
+  --space-32:8rem;
+
+  --border-hair: 1px;
   --radius-pill: 9999px;
-  --gutter: 1.5rem;
-  --container: min(1200px, 100% - 2 * var(--gutter));
-  --container-prose: 72ch;
-  --t-fast: 120ms ease; --t-med: 260ms ease;
+
+  /* Layout */
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+  --container: min(1180px, 100% - 2 * var(--gutter));
+  --container-wide: min(1380px, 100% - 2 * var(--gutter));
+  --container-prose: 68ch;
+
+  --grid-size: 32px;   /* atmospheric blueprint grid */
+  --tick: 5px;         /* corner-tick / crop-mark length */
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 0.68, 0.16, 1);
+  --ease-in-out: cubic-bezier(0.62, 0.04, 0.34, 1);
+  --t-fast: 140ms var(--ease-out);
+  --t-med: 320ms var(--ease-out);
+  --t-slow: 640ms var(--ease-in-out);
+
+  --z-nav: 50;
 }
-@media (prefers-reduced-motion: reduce) { :root { --t-fast: 0ms; --t-med: 0ms; } }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-fast: 0ms; --t-med: 0ms; --t-slow: 0ms; }
+}
