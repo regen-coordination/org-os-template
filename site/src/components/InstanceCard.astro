@@ -1,0 +1,30 @@
+---
+import type { FederationNode } from "../lib/federation";
+interface Props { node: FederationNode; }
+const { node } = Astro.props;
+---
+<article class="surface card">
+  <header>
+    <span class="mono type">{node.type}</span>
+    <h3>{node.name}</h3>
+    <span class="mono id">{node.id}{!node.available && <em> · offline</em>}</span>
+  </header>
+  <p class="notes">{node.notes}</p>
+  <dl class="meta mono">
+    {node.network && <div><dt>network</dt><dd>{node.network} · {node.role}</dd></div>}
+    {node.maturity && <div><dt>maturity</dt><dd>{node.maturity}</dd></div>}
+    {node.counts.members !== undefined && <div><dt>members</dt><dd>{node.counts.members}</dd></div>}
+    {node.counts.projects !== undefined && <div><dt>projects</dt><dd>{node.counts.projects}</dd></div>}
+  </dl>
+  {node.repo && <a href={node.repo} class="mono">repo →</a>}
+</article>
+<style>
+.card { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
+.card h3 { margin: var(--space-1) 0; }
+.card .type { font-size: var(--text-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); }
+.card .id { font-size: var(--text-sm); color: var(--color-faint); }
+.card .notes { font-size: var(--text-sm); color: var(--color-muted); margin: 0; }
+.meta { font-size: var(--text-sm); display: grid; gap: var(--space-1); margin: 0; }
+.meta div { display: flex; gap: var(--space-2); }
+.meta dt { color: var(--color-faint); min-width: 6rem; } .meta dd { margin: 0; }
+</style>

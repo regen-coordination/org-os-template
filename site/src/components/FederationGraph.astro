@@ -1,0 +1,43 @@
+---
+import type { Federation } from "../lib/federation";
+interface Props { federation: Federation; }
+const { federation } = Astro.props;
+
+const W = 640, H = 480, cx = W / 2, cy = H / 2;
+// Root at center; all other nodes evenly on a ring.
+const ring = [federation.root, ...federation.nodes];
+const pos = new Map<string, { x: number; y: number }>();
+pos.set(federation.root.id, { x: cx, y: cy });
+const others = federation.nodes;
+others.forEach((n, i) => {
+  const a = (i / others.length) * Math.PI * 2 - Math.PI / 2;
+  pos.set(n.id, { x: cx + Math.cos(a) * 190, y: cy + Math.sin(a) * 160 });
+});
+const edgeColor = (k: string) => (k === "federation" ? "var(--color-accent)" : "var(--color-faint)");
+---
+<svg class="fed-graph" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="org-os federation network">
+  {federation.edges.map((e) => {
+    const a = pos.get(e.from), b = pos.get(e.to);
+    return a && b ? (
+      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={edgeColor(e.kind)} stroke-width="1"
+            opacity={e.kind === "federation" ? "0.7" : "0.35"}
+            stroke-dasharray={e.kind === "framework" ? "3 3" : "0"} />
+    ) : null;
+  })}
+  {ring.map((n) => {
+    const p = pos.get(n.id)!;
+    const root = n.id === federation.root.id;
+    return (
+      <g>
+        <circle cx={p.x} cy={p.y} r={root ? 8 : 5}
+                fill={root || n.available ? "var(--color-accent)" : "var(--color-surface)"}
+                stroke="var(--color-accent)" stroke-width="1.5" />
+        <text x={p.x + 10} y={p.y + 3} class="fed-label">{n.id}</text>
+      </g>
+    );
+  })}
+</svg>
+<style>
+.fed-graph { width: 100%; height: auto; display: block; }
+.fed-label { font-family: var(--font-mono); font-size: 11px; fill: var(--color-muted); }
+</style>
