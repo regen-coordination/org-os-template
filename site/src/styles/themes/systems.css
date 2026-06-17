@@ -1,0 +1,20 @@
+/* themes/systems.css — light "systems/infrastructure" theme (primary). */
+:root {
+  --color-bg: #fbfbf9;
+  --color-surface: #ffffff;
+  --color-ink: #16191d;
+  --color-muted: #52575e;
+  --color-faint: #9aa0a6;
+  --color-line: #e6e7e2;       /* hairline grid + borders */
+  --color-accent: #1f883d;     /* regen green — swappable (spec §16) */
+  --color-accent-ink: #ffffff;
+
+  --font-display: "Geist Mono Variable", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-body: "Inter Variable", system-ui, sans-serif;
+
+  --radius: 4px;
+  --radius-sm: 3px;
+  --grid-size: 30px;
+  --grid-line: #ebece8;
+}
