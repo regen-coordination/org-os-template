@@ -14,6 +14,7 @@ const REQUIRED = [
   "about/index.html",
   "llms.txt",
   "federation.json",
+  ".well-known/members.json",   // surfaced EIP-4824 schema (copied by the aggregate step)
 ];
 let failed = false;
 for (const p of REQUIRED) {
