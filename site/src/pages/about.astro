@@ -1,0 +1,16 @@
+---
+import Layout from "../components/Layout.astro";
+---
+<Layout title="About" current="about" description="What org-os is, why it exists, and who builds it.">
+  <div class="container prose">
+    <p class="eyebrow">About</p>
+    <h1>The substrate beneath the regen federation</h1>
+    <p>org-os is a framework, a set of standards, and an orchestration hub for a federation of regenerative organizations. The framework is itself an org-os instance — self-hosting since 2026.</p>
+    <h2>Why</h2>
+    <p>Grassroots and regenerative orgs need operational infrastructure that is sovereign, agent-native, and interoperable. org-os gives each org a working operating system while keeping every instance independent and federated.</p>
+    <h2>How it federates</h2>
+    <p>Instances publish structured data (<code>data/*.yaml</code>) and EIP-4824 schemas (<code>.well-known/</code>). The framework tracks the network in a registry; this site aggregates it live at build. See <a href="/federation">Federation</a> and the <a href="/docs/federation">Federation docs</a>.</p>
+    <h2>License</h2>
+    <p>MIT. Source on <a href="https://github.com/regen-coordination/org-os-template">GitHub</a>.</p>
+  </div>
+</Layout>
