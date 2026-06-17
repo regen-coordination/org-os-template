@@ -1,0 +1,17 @@
+---
+import StatusBadge from "./StatusBadge.astro";
+interface Props { id: string; name: string; status: "planned" | "in-dev" | "live"; summary: string; link: string | null; }
+const { id, name, status, summary, link } = Astro.props;
+---
+<article class="surface card">
+  <header><span class="mono id">{id}</span><StatusBadge status={status} /></header>
+  <h3>{name}</h3>
+  <p>{summary}</p>
+  {link && <a href={link} class="mono">learn more →</a>}
+</article>
+<style>
+.card { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
+.card header { display: flex; justify-content: space-between; align-items: center; }
+.card .id { font-size: var(--text-xs); color: var(--color-faint); }
+.card h3 { margin: 0; } .card p { margin: 0; font-size: var(--text-sm); color: var(--color-muted); }
+</style>

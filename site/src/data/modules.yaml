@@ -1,0 +1,32 @@
+# v0.5 module roadmap. status: planned | in-dev | live
+modules:
+  - id: org-os-website-generator
+    name: Website Generator
+    status: in-dev
+    summary: Turn any instance's data + docs into a federated site. This very site is its first reference output.
+    link: /docs/architecture
+  - id: org-os-kms
+    name: Knowledge Management System
+    status: planned
+    summary: Compiled, indexed, linted knowledge commons across the federation.
+    link: null
+  - id: rad-org-os
+    name: rad-org-os
+    status: in-dev
+    summary: Radicle-native sovereign p2p infrastructure for grassroots orgs.
+    link: null
+  - id: org-os-hermes
+    name: Hermes Agent
+    status: in-dev
+    summary: Local agent runtime + Telegram gateway, replacing OpenClaw.
+    link: null
+  - id: org-os-members-hub
+    name: Members Hub
+    status: planned
+    summary: Membership, roles, and contribution surfaces for instances.
+    link: null
+  - id: org-os-ideation
+    name: Ideation System
+    status: planned
+    summary: Idea capture → triage → hatching pipeline, federated.
+    link: null

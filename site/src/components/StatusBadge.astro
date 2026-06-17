@@ -1,0 +1,14 @@
+---
+interface Props { status: "planned" | "in-dev" | "live"; }
+const { status } = Astro.props;
+const label = { planned: "Planned", "in-dev": "In dev", live: "Live" }[status];
+---
+<span class:list={["badge", status]}>{label}</span>
+<style>
+.badge { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 2px var(--space-2); border-radius: var(--radius-sm);
+  border: 1px solid var(--color-line); }
+.badge.live { background: var(--color-accent); color: var(--color-accent-ink); border-color: var(--color-accent); }
+.badge.in-dev { color: var(--color-accent); border-color: var(--color-accent); }
+.badge.planned { color: var(--color-faint); }
+</style>
