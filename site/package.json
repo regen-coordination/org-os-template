@@ -1,0 +1,25 @@
+{
+  "name": "org-os-site",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "org-os — the agent-native org operating system. Framework website + docs + live federation.",
+  "scripts": {
+    "aggregate": "node scripts/aggregate-federation.mjs",
+    "dev": "npm run aggregate && astro dev",
+    "build": "npm run aggregate && astro build && npm run verify",
+    "preview": "astro preview",
+    "verify": "node scripts/verify-build.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "@fontsource-variable/geist": "^5.0.0",
+    "@fontsource-variable/geist-mono": "^5.0.0",
+    "@fontsource-variable/inter": "^5.0.0",
+    "js-yaml": "^4.1.1",
+    "@types/js-yaml": "^4.0.9"
+  }
+}

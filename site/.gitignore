@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.astro/
+# generated at build
+src/data/federation.json
+public/.well-known/
