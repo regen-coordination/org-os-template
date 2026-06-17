@@ -1,0 +1,7 @@
+eyebrow: "Framework · standards · orchestration hub"
+title: "The agent-native org operating system"
+subtitle: "One OS, many nodes. Shared standards, sovereign instances — fork it, federate, run your org agent-natively."
+ctas:
+  - { label: "$ npm run setup", href: "/get-started", variant: "solid" }
+  - { label: "/docs", href: "/docs", variant: "ghost" }
+  - { label: "/federation", href: "/federation", variant: "ghost" }

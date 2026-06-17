@@ -1,4 +1,30 @@
 ---
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import yaml from "js-yaml";
 import Layout from "../components/Layout.astro";
+import Hero from "../components/Hero.astro";
+import SectionBlock from "../components/SectionBlock.astro";
+import FederationGraph from "../components/FederationGraph.astro";
+import ModuleCard from "../components/ModuleCard.astro";
+import { federationData } from "../lib/federation";
+
+const landing = yaml.load(readFileSync(resolve(process.cwd(), "src/data/landing.yaml"), "utf8")) as any;
+const mod = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as any;
+const teaserModules = mod.modules.slice(0, 3);
+const statline = `${federationData.nodes.length} instances · framework v3.x · EIP-4824`;
 ---
-<Layout title="Home"><div class="container"><h1>org-os</h1></div></Layout>
+<Layout title="Home" current="home">
+  <div class="container">
+    <Hero eyebrow={landing.eyebrow} title={landing.title} subtitle={landing.subtitle} ctas={landing.ctas} statline={statline} />
+  </div>
+  <SectionBlock eyebrow="Federation" title="One OS, many nodes" href="/federation" cta="Explore the network">
+    <FederationGraph federation={federationData} />
+  </SectionBlock>
+  <SectionBlock eyebrow="v0.5 roadmap" title="Modules" href="/modules" cta="See all modules">
+    <div class="grid">{teaserModules.map((m: any) => <ModuleCard {...m} />)}</div>
+  </SectionBlock>
+</Layout>
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
+</style>

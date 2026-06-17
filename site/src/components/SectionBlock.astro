@@ -1,0 +1,16 @@
+---
+interface Props { eyebrow?: string; title: string; href?: string; cta?: string; }
+const { eyebrow, title, href, cta } = Astro.props;
+---
+<section class="block container">
+  <div class="head">
+    <div>{eyebrow && <p class="eyebrow">{eyebrow}</p>}<h2>{title}</h2></div>
+    {href && cta && <a href={href} class="mono">{cta} →</a>}
+  </div>
+  <slot />
+</section>
+<style>
+.block { margin: var(--space-16) auto; }
+.head { display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-3); margin-bottom: var(--space-6); }
+</style>
