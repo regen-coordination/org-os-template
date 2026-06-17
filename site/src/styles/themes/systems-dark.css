@@ -1,0 +1,15 @@
+/* themes/systems-dark.css — dark variant. Same variable contract as systems.css. */
+:root {
+  --color-bg: #0d1117;
+  --color-surface: #11161d;
+  --color-ink: #e6edf3;
+  --color-muted: #8b949e;
+  --color-faint: #6e7681;
+  --color-line: #21262d;
+  --color-accent: #3fb950;
+  --color-accent-ink: #0d1117;
+  --font-display: "Geist Mono Variable", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-body: "Inter Variable", system-ui, sans-serif;
+  --radius: 4px; --radius-sm: 3px; --grid-size: 30px; --grid-line: #1b222c;
+}
