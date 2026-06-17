@@ -16,6 +16,8 @@ export function toNode(raw) {
     type: raw.type ?? "Instance",
     maturity: raw.maturity ?? null,
     role: raw.federation_role ?? null,
+    // `||` (not `??`) is intentional: the registry uses "" to mean "no network"
+    // (e.g. dao-os) — coerce empty string to null.
     network: raw.federation_network || null,
     frameworkVersion: raw.framework_version ?? null,
     packages: Array.isArray(raw.packages) ? raw.packages : [],
@@ -39,6 +41,10 @@ function safeCount(path, key) {
 }
 
 // Reads <instanceAbsPath>/.well-known/*.json defensively. Never throws.
+// `available` means "the instance's .well-known/ directory was found" (reachable),
+// NOT "has members/projects". `counts` is best-effort enrichment and may be empty
+// for a reachable instance that doesn't publish those schemas; consumers must treat
+// each count as optional (render only when defined) rather than as zero.
 export function enrichFromDisk(node, instanceAbsPath) {
   const wk = join(instanceAbsPath, ".well-known");
   if (!existsSync(wk)) return { ...node, available: false, counts: {} };

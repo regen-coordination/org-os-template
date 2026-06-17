@@ -27,6 +27,8 @@ test("enrichFromDisk sets available + counts when data is readable", () => {
   const enriched = enrichFromDisk(node, join(FIX, "present-instance"));
   assert.equal(enriched.available, true);
   assert.equal(enriched.counts.members, 3);
+  // sparse counts: present-instance has no projects.json → projects stays undefined (not 0)
+  assert.equal(enriched.counts.projects, undefined);
 });
 
 test("enrichFromDisk degrades gracefully when the path is absent", () => {
