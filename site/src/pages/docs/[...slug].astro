@@ -1,0 +1,31 @@
+---
+import { getCollection, render } from "astro:content";
+import Layout from "../../components/Layout.astro";
+import { DOCS_ALLOWLIST, docByFile } from "../../data/docs-allowlist";
+
+export async function getStaticPaths() {
+  const all = await getCollection("docs");
+  // Only emit routes for allowlisted files; map filename id → friendly slug.
+  return all
+    .filter((entry) => docByFile(entry.id))
+    .map((entry) => {
+      const meta = docByFile(entry.id)!;
+      return { params: { slug: meta.slug }, props: { entry, meta } };
+    });
+}
+const { entry, meta } = Astro.props;
+const { Content } = await render(entry);
+---
+<Layout title={meta.title} current="docs">
+  <div class="container prose">
+    <p class="eyebrow">{meta.group}</p>
+    <h1>{meta.title}</h1>
+    <article class="doc"><Content /></article>
+  </div>
+</Layout>
+<style>
+.doc :global(h2) { margin-top: var(--space-8); }
+.doc :global(pre) { background: var(--color-surface); border: 1px solid var(--color-line);
+  border-radius: var(--radius); padding: var(--space-4); overflow-x: auto; }
+.doc :global(code) { font-size: var(--text-sm); }
+</style>
