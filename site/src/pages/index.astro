@@ -12,7 +12,7 @@ import { federationData } from "../lib/federation";
 const landing = yaml.load(readFileSync(resolve(process.cwd(), "src/data/landing.yaml"), "utf8")) as any;
 const mod = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as any;
 const teaserModules = mod.modules.slice(0, 3);
-const statline = `${federationData.nodes.length} instances · framework v3.x · EIP-4824`;
+const statline = `${federationData.nodes.length} instances · framework v0.5 · EIP-4824`;
 ---
 <Layout title="Home" current="home">
   <div class="container">

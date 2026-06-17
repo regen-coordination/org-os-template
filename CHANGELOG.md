@@ -1,12 +1,27 @@
 # Changelog
 
-All notable changes to **org-os** (the framework) are documented here. This project follows [Semantic Versioning](https://semver.org) and the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+All notable changes to **org-os** (the framework) are documented here. The project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org) within a given line — but note the **2026-06-17 `0.x` pre-beta re-baseline** (see `[0.5.0]`), a one-time deliberate, non-SemVer renumbering of `3.5 → 0.5`.
 
 For the policy that governs what counts as a version bump, see [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
 ## [Unreleased]
 
 _(Append changes here as they land.)_
+
+## [0.5.0] — 2026-06-17
+
+**Version-scheme re-baseline (deliberate, non-SemVer).** org-os adopts a `0.x` **pre-beta** scheme to honestly signal pre-1.0 maturity. The line previously numbered `1.x → 2.x → 3.x → 3.5` (four milestones) is hereby designated **v0.5** — the fifth milestone — aligning the framework's own version with the public **"org-os v0.5"** surface: the new website at `site/` plus the v0.5 module constellation (website-generator, kms, hermes, rad-org-os, members-hub, ideation). `0.5 < 3.5` is intentional and reflects "pre-beta," not a regression; SemVer ordering does not apply across this re-baseline.
+
+### Changed
+- `package.json` version: `3.5.0` → `0.5.0`.
+- `federation.yaml` `metadata.framework_version`: `"3.5"` → `"0.5"`.
+- `README.md` version header → `0.5.0 (pre-beta)`.
+- Public site (`site/`): the v0.5 framework website ships as the first surface of this milestone; the home statline now reads `framework v0.5`.
+
+### Follow-ups (flagged, not done here)
+- `docs/VERSIONING.md` should formalize the `0.x` pre-beta policy (it still describes the `3.x` SemVer line).
+- Downstream instances in `data/instances.yaml` still record their last-synced `framework_version` (`3.0`/`3.5`) — historical sync records, to be reconciled in a later federation sync.
+- The in-flight `release/v3.5-*` branches predate this re-baseline and need separate reconciliation.
 
 ## [3.5.0] — 2026-05-16
 

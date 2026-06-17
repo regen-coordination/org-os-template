@@ -2,7 +2,7 @@
 
 > Framework + standards + orchestration hub.
 
-**Type:** Framework + orchestration hub · **Version:** 3.0.0 · **Status:** active
+**Type:** Framework + orchestration hub · **Version:** 0.5.0 (pre-beta) · **Status:** active
 
 ---
 
