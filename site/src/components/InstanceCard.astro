@@ -11,7 +11,7 @@ const { node } = Astro.props;
   </header>
   <p class="notes">{node.notes}</p>
   <dl class="meta mono">
-    {node.network && <div><dt>network</dt><dd>{node.network} · {node.role}</dd></div>}
+    {node.network && node.role && <div><dt>network</dt><dd>{node.network} · {node.role}</dd></div>}
     {node.maturity && <div><dt>maturity</dt><dd>{node.maturity}</dd></div>}
     {node.counts.members !== undefined && <div><dt>members</dt><dd>{node.counts.members}</dd></div>}
     {node.counts.projects !== undefined && <div><dt>projects</dt><dd>{node.counts.projects}</dd></div>}

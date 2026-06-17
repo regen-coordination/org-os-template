@@ -16,6 +16,7 @@ others.forEach((n, i) => {
 const edgeColor = (k: string) => (k === "federation" ? "var(--color-accent)" : "var(--color-faint)");
 ---
 <svg class="fed-graph" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="org-os federation network">
+  <title>org-os federation network</title>
   {federation.edges.map((e) => {
     const a = pos.get(e.from), b = pos.get(e.to);
     return a && b ? (
