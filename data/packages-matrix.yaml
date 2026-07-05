@@ -28,6 +28,22 @@ packages:
     lifecycle_status: "dormant"
     notes: "Collective intelligence core. Referenced by refi-bcn federation.yaml peers."
 
+  - id: "toolkit-framework"
+    owner: "framework"
+    instances_using: ["regen-toolkit", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@regen-commons/toolkit-framework — portable, org-os-agnostic knowledge commons framework (semantic kernel, 22 schemas, the machine, 7 skills, 3 adapters). Develops in regen-toolkit; promoted here 2026-07-05. Consumed via org-os-kms. 100/100 tests."
+
+  - id: "org-os-kms"
+    owner: "framework"
+    instances_using: ["regen-toolkit"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@org-os/kms — binds toolkit-framework into org-os (module src/bind.mjs + profile). Executable lifecycle, registry bridge, CLI, render, federation. Installed + activated in regen-toolkit 2026-07-05; refi-dao-os adopting. Depends on toolkit-framework. 44/44 tests."
+
   - id: "koi-bridge"
     owner: "framework"
     instances_using: []
