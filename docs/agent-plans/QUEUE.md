@@ -21,7 +21,7 @@
 
 ## Scoping
 
-- **commands-consolidation** — Document and consolidate `.claude/commands/`: inventory across instances, decide canonical set, build a `/commands` listing surface (dashboard section + `COMMANDS.md` + slash command), mirror the skills-section pattern · workstream: operator-interfaces · follow-up to `skills-section`
+- **commands-consolidation** — Document and consolidate `.claude/commands/`: inventory across instances, decide canonical set, build a `/commands` listing surface (dashboard section + `COMMANDS.md` + slash command), mirror the skills-section pattern · workstream: operator-interfaces · follow-up to `skills-section` · **largely advanced 2026-07-15**: inventory done (cross-instance audit), canonical set now 6 (`close initialize skills commit sync handoff`), `sync-commands.mjs` mirroring mechanism promoted from refi-bcn-os — remaining scope is the `/commands` listing surface
 - [non-tech-onboarding](non-tech-onboarding.md) — Web wizard bootstrap + GitHub Actions backend  ·  workstream: non-tech-onboarding  ·  depends on `instance-bootstrap`
 - [framework-dashboard-template](framework-dashboard-template.md) — Reusable dashboard package template  ·  workstream: v2-stabilization  ·  becomes thin renderer over `tui-data` after `tui-dashboard` lands
 - [obsidian-interface](obsidian-interface.md) — Obsidian as primary operator interface (candidate package `packages/obsidian-interface/`)  ·  workstream: operator-interfaces

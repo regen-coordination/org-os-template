@@ -86,6 +86,7 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 _(Move completed items here with date — keep for 30 days then remove)_
 
+- [2026-07-15] **v0.5 cross-instance consolidation complete** — drift 27→0 across all 7 instances. Promoted: `research` (3-way reconciled), `working-with-obsidian-canvas`, `web-browsing`, `notion-cli` skills; `/commit` `/sync` `/handoff` commands; `sync-commands.mjs` cross-editor mechanism; operator-trunk model (`operator-setup.sh` + pre-commit guard); `generate-all-schemas.mjs` merge + `clone-linked-repos.mjs` backport. federation.yaml 0.5 labels fixed, agent.skills 21→32, bread-coop-os in downstream. Matrices: 40 skills / 22 packages. Commit `177c2c8`. See `memory/2026-07-15.md` + DECISIONS.md entry.
 - [2026-05-03] **Autopoiesis research scoping + Phase 1 complete.** Spec + 3 phase plans + 9 aspect notes (Genesis, Identity, Membrane, Coupling, Metabolism, Self-maintenance, Cognition, Federation, Volition) + synthesis. Phase 1 gate passed; pilot loop = Loop C (Population learning — cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Phase 2 plan replanned for Loop C. Surfaced two phantom-script bugs in framework. See `memory/2026-05-03.md` and `docs/superpowers/research/2026-05-02-autopoiesis/SYNTHESIS.md`.
 - [2026-04-29] **`refi-med-os` instance scaffolded + pushed live** to `ReFiDAO/refi-med-os` (public). Federated under `refi-dao` network as LocalNode peer. Public website + knowledge base consolidated at `repos/refi-mediterranean/`. Bootstrap pending — operator follows `BOOTSTRAP.md` + one-pager. Hub registered in `data/instances.yaml` + `federation.yaml`. See `memory/2026-04-29.md`.
 - [2026-04-29] Pre-existing framework bug surfaced (not fixed): `validate:schemas` script in framework `package.json` references missing `scripts/validate-identity.mjs`. Captured in 2026-04-29 memory.
@@ -97,4 +98,4 @@ _(Move completed items here with date — keep for 30 days then remove)_
 
 ---
 
-_Last updated: 2026-05-03_
+_Last updated: 2026-07-15_
