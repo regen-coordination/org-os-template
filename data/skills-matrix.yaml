@@ -214,13 +214,56 @@ skills:
     promotion_status: "canonical"
     notes: "Audits + repairs meeting transcripts before meeting-processor. Closes a real gap in the meeting pipeline. Ships with per-instance dictionary customization (see SKILL.md). Promoted v3.5."
 
-  # --- Promotion candidates (≥2 instances, not yet in framework) ---
+  # --- Framework canonical skills (v0.5 promotions — consolidated 2026-07-15) ---
   - id: "research"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os", "regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Feynman-powered research harness (/deepresearch /lit /compare /autoresearch /watch /log → docs/research/ with provenance sidecars). Promoted v0.5: three instance copies were byte-identical (refi-bcn origin); reconciled + genericized, v1.1.0. Related: expert-feynman (persona module — name collision is coincidental)."
+
+  - id: "working-with-obsidian-canvas"
+    owner: "framework"
+    instances_using: ["refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Read/generate/edit/validate/merge Obsidian .canvas (JSONCanvas) files. Ships validate-canvas.mjs + diff-canvas.mjs (merge-intent classifier) + 3 reference docs. Stop-and-escalate on structural divergence. Promoted v0.5 from refi-dao-os, genericized."
+
+  - id: "web-browsing"
+    owner: "framework"
+    instances_using: ["refi-bcn-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Real-Chrome browsing via browse.sh CLI (Browserbase/Stagehand). Written portable by design; node-specific setup lives in TOOLS.md / docs/integrations/BROWSE-INTEGRATION.md. Pairs with scripts/browse-check.mjs. Promoted v0.5 from refi-bcn-os."
+
+  - id: "notion-cli"
+    owner: "makenotion-vendored"
+    instances_using: ["refi-bcn-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "Vendored MIT skill from makenotion/skills @423af2b — teaches the ntn CLI. Kept verbatim with LICENSE.txt. Promoted v0.5 from refi-bcn-os."
+
+  - id: "commands"
     owner: "refi-bcn-os"
-    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    instances_using: ["refi-bcn-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    notes: "GENERATED directory — thin command-skills mirrored from .claude/commands/ by scripts/sync-commands.mjs for cross-editor portability (OpenCode, Cursor, Hermes, Zed/ACP). Promote/edit the source commands, then npm run sync:commands; never edit generated files. Mechanism promoted v0.5."
+
+  # --- Instance-specific skills (registered, not promoted) ---
+  - id: "notion-sync"
+    owner: "refi-bcn-os"
+    instances_using: ["refi-bcn-os"]
     in_framework: false
-    promotion_status: "candidate"
-    notes: "Present in two operational instances. Promotion criteria met. Next: reconcile implementations, extract common core to skills/research/SKILL.md. Deferred from v3.5 pending reconciliation review."
+    promotion_status: "instance-specific"
+    notes: "YAML→Notion one-way sync contract bound to the ReFi BCN workspace (datasources, title props, retirement history). The PATTERN (local-YAML-is-source-of-truth push sync) is framework-worthy; the skill as written is instance-bound."
+
+  - id: "symbient"
+    owner: "refi-bcn-os"
+    instances_using: ["refi-bcn-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    notes: "Experimental persistent cultivated agent-identity practice (SEED/BECOMING/weave). Tier: experimental, operator-personal, design doc local-only. Watch as R&D; not generalizable in current form."
 
   # --- DAO-module skills (single-instance candidates — framework lacks treasury/governance-protocol layer) ---
   - id: "safe-treasury"

@@ -14,11 +14,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-// Read federation.yaml to get base URL
+// Read federation.yaml to get identity values
 const federationPath = path.join(rootDir, 'federation.yaml');
-const federationContent = fs.readFileSync(federationPath, 'utf-8');
-const baseUrlMatch = federationContent.match(/daoURI: "https:\/\/([^"]+)"/);
-const baseUrl = baseUrlMatch ? baseUrlMatch[1] : 'org.example.com';
+const federationRaw = fs.readFileSync(federationPath, 'utf-8');
+const federationContent = yaml.load(federationRaw);
+const daoURI = federationContent?.identity?.daoURI || 'https://org.example.com/.well-known/dao.json';
+let baseUrl = 'org.example.com';
+try {
+  const daoUrl = new URL(daoURI);
+  baseUrl = daoUrl.host;
+} catch {
+  baseUrl = 'org.example.com';
+}
+const orgName = federationContent?.identity?.name || 'Organization';
+const orgType = federationContent?.identity?.type || 'Organization';
 
 // Read dao.json to get organization info
 const daoJsonPath = path.join(rootDir, '.well-known', 'dao.json');
@@ -28,6 +37,37 @@ if (fs.existsSync(daoJsonPath)) {
 }
 
 console.log('Generating EIP-4824 schemas...');
+
+// Generate dao.json from .well-known/dao.json.template + federation identity
+function generateDao() {
+  const templatePath = path.join(rootDir, '.well-known', 'dao.json.template');
+  const outputPath = path.join(rootDir, '.well-known', 'dao.json');
+
+  if (!fs.existsSync(templatePath)) {
+    return;
+  }
+
+  // Only render when the identity block provides a daoURI — without it there is
+  // no real base URL, and rendering would overwrite a hand-curated dao.json
+  // with example.com placeholders.
+  if (!federationContent?.identity?.daoURI) {
+    console.log('· Skipped dao.json (identity.daoURI not set — keeping existing file)');
+    return;
+  }
+
+  const description =
+    federationContent?.identity?.description ||
+    `${orgName} operational identity surface for governance, members, projects, and coordination.`;
+  let template = fs.readFileSync(templatePath, 'utf-8');
+  template = template.replace(/{{ORGANIZATION_NAME}}/g, orgName);
+  template = template.replace(/{{ORGANIZATION_DESCRIPTION}}/g, description);
+  template = template.replace(/{{BASE_URL}}/g, baseUrl);
+
+  const generated = JSON.parse(template);
+  generated.type = orgType;
+  fs.writeFileSync(outputPath, JSON.stringify(generated, null, 2));
+  console.log('✓ Generated dao.json');
+}
 
 // Generate members.json
 function generateMembers() {
@@ -55,12 +95,20 @@ function generateMembers() {
 // Generate meetings.json
 function generateMeetings() {
   const meetingsDir = path.join(rootDir, 'content', 'meetings');
-  if (!fs.existsSync(meetingsDir)) {
-    return;
-  }
+  const meetingsYamlPath = path.join(rootDir, 'data', 'meetings.yaml');
 
   const meetings = [];
-  const files = fs.readdirSync(meetingsDir).filter(f => f.endsWith('.md'));
+
+  if (fs.existsSync(meetingsYamlPath)) {
+    const meetingsData = yaml.load(fs.readFileSync(meetingsYamlPath, 'utf-8'));
+    if (Array.isArray(meetingsData?.meetings)) {
+      meetings.push(...meetingsData.meetings);
+    }
+  }
+
+  const files = fs.existsSync(meetingsDir)
+    ? fs.readdirSync(meetingsDir).filter(f => f.endsWith('.md'))
+    : [];
 
   for (const file of files) {
     const filePath = path.join(meetingsDir, file);
@@ -71,7 +119,7 @@ function generateMeetings() {
 
     // Extract action items from content
     const actionItems = [];
-    const actionItemRegex = /- \[ \] (.+?)(?: \(@(\w+), due: (\d{4}-\d{2}-\d{2})\))?(?: #(\w+))?/g;
+    const actionItemRegex = /- \[ \] (.+?)(?: \(@([A-Za-z0-9:_.\/-]+)(?:, due: (\d{4}-\d{2}-\d{2}))?\))?(?: #([A-Za-z0-9:_./-]+))?/g;
     let match;
     while ((match = actionItemRegex.exec(content)) !== null) {
       actionItems.push({
@@ -85,7 +133,7 @@ function generateMeetings() {
 
     // Extract decisions
     const decisions = [];
-    const decisionRegex = /- \[ \] (.+?)(?: #(\w+))?/g;
+    const decisionRegex = /- \[ \] (.+?)(?: #([A-Za-z0-9:_./-]+))?/g;
     const decisionsSection = content.match(/## Decisions\s+([\s\S]*?)(?=##|$)/);
     if (decisionsSection) {
       let decisionMatch;
@@ -151,7 +199,7 @@ function generateProjects() {
 
       // Extract tasks
       const tasks = [];
-      const taskRegex = /- \[ \] (.+?)(?: \(@(\w+)\))?(?: #(\w+))?/g;
+      const taskRegex = /- \[ \] (.+?)(?: \(@([A-Za-z0-9:_.\/-]+)\))?(?: #([A-Za-z0-9:_./-]+))?/g;
       let taskMatch;
       while ((taskMatch = taskRegex.exec(content)) !== null) {
         tasks.push({
@@ -165,7 +213,7 @@ function generateProjects() {
 
       // Extract milestones
       const milestones = [];
-      const milestoneRegex = /- \[ \] (.+?) \(due: (\d{4}-\d{2}-\d{2})\)(?: #(\w+))?/g;
+      const milestoneRegex = /- \[ \] (.+?) \(due: (\d{4}-\d{2}-\d{2})\)(?: #([A-Za-z0-9:_./-]+))?/g;
       const milestonesSection = content.match(/### Milestones\s+([\s\S]*?)(?=###|$)/);
       if (milestonesSection) {
         let milestoneMatch;
@@ -298,8 +346,7 @@ function generateContracts() {
 
   // Try to extract contract addresses from federation.yaml
   if (fs.existsSync(federationPath)) {
-    const fed = yaml.load(federationContent);
-    const id = fed?.identity || {};
+    const id = federationContent?.identity || {};
     if (id.safe) {
       schema.contracts.push({
         type: "safe",
@@ -360,6 +407,11 @@ function generateKnowledge() {
   const manifestData = yaml.load(fs.readFileSync(manifestPath, 'utf-8'));
   const km = manifestData?.knowledge_manifest || {};
 
+  const sourcesPath = path.join(rootDir, 'data', 'sources.yaml');
+  const sourcesData = fs.existsSync(sourcesPath)
+    ? yaml.load(fs.readFileSync(sourcesPath, 'utf-8'))
+    : {};
+
   const schema = {
     "@context": "https://www.daostar.org/schemas",
     "type": "KnowledgeManifest",
@@ -375,7 +427,14 @@ function generateKnowledge() {
     "exchange": {
       published_domains: km.exchange?.published_domains || [],
       subscribed_domains: km.exchange?.subscribed_domains || []
-    }
+    },
+    "sources": (sourcesData?.sources || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      type: s.type,
+      url: s.url || s.feed_url || null,
+      status: s.status
+    }))
   };
 
   const outputPath = path.join(rootDir, '.well-known', 'knowledge.json');
@@ -406,6 +465,7 @@ function generateEvents() {
 
 // Run all generators
 try {
+  generateDao();
   generateMembers();
   generateMeetings();
   generateProjects();

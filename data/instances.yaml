@@ -22,9 +22,9 @@ instances:
     framework_version: "3.0"
     last_sync: "2026-03-19"
     agent_runtime: ["cursor", "claude"]
-    skills_extra: ["research"]
-    packages: ["dashboard", "operations", "webapps", "regen-agents"]
-    data_registries_extra: ["pending-payouts", "tasks", "telegram-topic-routing"]
+    skills_extra: ["notion-sync", "symbient"]
+    packages: ["dashboard", "maps", "operations", "webapps"]
+    data_registries_extra: ["catalunya-comarca-province", "hermes-cron", "orgs", "pending-payouts", "tasks", "telegram-topic-routing"]
     drift: []
     notes: "Cooperative-in-formation. Luiz is Strategy Lead. Operational maturity."
 
@@ -41,9 +41,9 @@ instances:
     framework_version: "3.0"
     last_sync: "2026-03-06"
     agent_runtime: ["claude-code"]
-    skills_extra: ["research", "karpathy-guidelines"]
-    packages: ["coordination", "dashboard", "governance", "operations", "regen-agents", "webapps"]
-    data_registries_extra: ["blog-articles", "entities", "tasks", "website-source-mapping"]
+    skills_extra: []
+    packages: ["coordination", "dashboard", "governance", "hub", "operations", "org-os-kms", "regen-agents", "toolkit-framework", "webapps"]
+    data_registries_extra: ["blog-articles", "entities", "figma-assets", "hermes-cron", "tasks", "website-source-mapping"]
     drift: []
     notes: "Phase 2 infrastructure deployment. Active governance, Gardens DAO and Karma GAP wired."
 
@@ -104,7 +104,7 @@ instances:
     agent_runtime: ["claude-code"]
     skills_extra: []
     packages: ["agents-app", "coop", "dashboard", "egregore-core", "koi-bridge", "koi-opal-bridge", "opal-bridge", "operations", "paperclip-agents-app", "regen-agents", "regen-toolkit", "webapps"]
-    data_registries_extra: ["deployment-requirements", "feedback-process", "ontology", "option-library"]
+    data_registries_extra: ["deployment-requirements", "feedback-process", "funds", "initiatives", "nodes", "ontology", "option-library", "programs"]
     drift:
       - "no_federation_section"
       - "missing_governance_yaml"
@@ -126,7 +126,7 @@ instances:
     agent_runtime: ["claude-code"]
     skills_extra: []
     packages: []
-    data_registries_extra: []
+    data_registries_extra: ["tasks"]
     drift: []
     notes: "Scaffolded 2026-04-28 from framework v3.0. Bootstrap pending — identity/members/projects are TBD-stubs; operator follows BOOTSTRAP.md + one-pager to complete the bootstrap-interviewer flow. Public website + knowledge base mounted at repos/refi-mediterranean/ (independent remote at ReFiDAO/ReFi-Mediterranean)."
 

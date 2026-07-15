@@ -17,6 +17,7 @@
     "setup:cursor": "node scripts/setup-cursor-rules.mjs",
     "sync": "node scripts/sync-github.mjs",
     "sync:upstream": "node scripts/sync-upstream.mjs",
+    "sync:commands": "node scripts/sync-commands.mjs",
     "generate:schemas": "node scripts/generate-all-schemas.mjs",
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",

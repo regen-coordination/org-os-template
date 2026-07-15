@@ -24,10 +24,19 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ### Orchestration (multi-instance)
 - [ ] Weekly: run `npm run analyze:instances` and review drift report
 - [ ] Review skill-promotion candidates (see `data/skills-matrix.yaml` where `promotion_status: candidate`)
-  - `research` — present in refi-bcn-os and refi-dao-os; promote to framework
   - `safe-treasury`, `hats-governance`, `gardens-governance`, `karma-reputation`, `eip4824-identity` — DAO modules in dao-os; evaluate for framework
-- [ ] Resolve `regen-coordination-os` locally — listed in `repos.manifest.json` but not cloned
-- [ ] Reconcile `federation.yaml` `agent.skills` with actual `skills/` directory (was listing 6; actual is 10)
+- [x] ~~`research` promotion — promoted to framework v0.5 (2026-07-15 consolidation; 3 instance copies reconciled)~~
+- [x] ~~Resolve `regen-coordination-os` locally — cloned and audited 2026-07-15~~
+- [x] ~~Reconcile `federation.yaml` `agent.skills` with actual `skills/` directory — done 2026-07-15 (32 skills listed; generated `skills/commands/` intentionally excluded)~~
+
+### Consolidation follow-ups (from 2026-07-15 instance audit — deferred)
+- [ ] Reconcile `initialize.mjs` — refi-bcn-os is +800 lines ahead (vault-safe trunk-aware sync, `--sync/--notion` flags, never-throws session-sync) but massively instance-diverged; needs a careful feature-level backport, not a copy
+- [ ] Review `paperclip-agents-app` backport — regen-coordination-os fork is ahead (org-os-bridge, memory/skill syncers, org_os_integration migrations); deep diff then merge
+- [ ] Evaluate regen-coordination-os Figma/OKLCH design-token scripts (`derive-{light,dark}-tokens.mjs`, `figma-{extract,render,deepfetch}.mjs`) for promotion as a design-system pipeline
+- [ ] Consider backporting refi-bcn-os `close.md`/`initialize.md` command-body improvements (richer than framework's; review after initialize.mjs reconciliation)
+- [ ] Document the hub data-bridge pattern (refi-dao `docs/HUB.md` module contract + allowlist→JSON snapshot) as a framework doc
+- [ ] coop-os hygiene: working tree contains a nested mirror of the whole `03 Libraries/` workspace (517 dirty files) — clean up separately, NOT with git clean (vault safety)
+- [ ] Propagate v0.5 consolidation downstream on each instance's next sync (new skills: research, web-browsing, notion-cli, working-with-obsidian-canvas; commands: /commit /sync /handoff; sync-commands mechanism)
 
 ### Funding
 - N/A (solo phase — no treasury, no active funding applications)

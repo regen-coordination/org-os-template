@@ -336,6 +336,78 @@ Instances MAY add their own registries beyond the canonical 13 (e.g., `tasks.yam
 
 ---
 
+## Recognized Extension Registries (Optional Patterns)
+
+Instance-proven registry shapes worth reusing. Not part of the canonical 13; adopt as needed. (Consolidated from instance audits, 2026-07-15.)
+
+### hermes-cron.yaml — Declarative Agent Cron Jobs
+
+Proven in refi-bcn-os + refi-dao-os alongside `packages/hermes-integration`. Declares scheduled proactive-agent jobs (a chat gateway reconciles them on boot — e.g. `infra/hermes/entrypoint.sh`):
+
+```yaml
+schema_version: "1.0"
+jobs:
+  - id: "heartbeat-6h"
+    schedule: "0 */6 * * *"      # cron, UTC
+    deliver: "telegram"          # delivery channel
+    channel: null                # channel/topic id (instance-specific)
+    prompt: |
+      Read HEARTBEAT.md and report anything urgent or overdue.
+```
+
+Keep channel ids and prompts instance-side; the registry shape + boot-reconciliation contract is the reusable part.
+
+### Hub-Type Federation Registries — nodes / funds / initiatives / programs
+
+Proven in regen-coordination-os (Hub-type instance). A network-of-networks graph for hubs coordinating multiple orgs — cross-referencing member nodes, on-chain treasuries, shared initiatives, and funding programs:
+
+```yaml
+# nodes.yaml — member/network node registry
+nodes:
+  - id: "node-example"
+    name: ""
+    network: ""                  # which federation/network it belongs to
+    type: "LocalNode"
+    location: ""
+    status: "active"
+    repo: null
+    website: null
+
+# funds.yaml — on-chain fund instances
+funds:
+  - id: "fund-example"
+    type: "safe"                 # safe | gardens-pool | octant-vault | …
+    network_chain: ""
+    address: ""
+    node: "node-example"         # → nodes.yaml
+    signers: []
+    status: "active"
+
+# initiatives.yaml — cross-network initiatives
+initiatives:
+  - id: "initiative-example"
+    name: ""
+    networks: []
+    status: "active"
+    description: ""
+
+# programs.yaml — funding/coordination programs
+programs:
+  - id: "program-example"
+    name: ""
+    category: "funding/artifact-based"   # funding/yield-protocol | funding/streaming | …
+    status: "active"
+```
+
+Cross-references: `funds.node → nodes.id`, `initiatives.networks[] → nodes.network`, `programs ↔ funds`.
+
+### Other observed instance extensions
+
+- **`orgs.yaml`** (refi-bcn-os) — external-org/stakeholder directory with rings/clusters + JSON compile step for viz. Candidate for a future canonical `orgs.yaml` registry (generic shape, minus geography).
+- **`figma-assets.yaml`** (refi-dao-os) — design-asset registry with `share_policy` permission governance (`public-view-no-duplication | duplicatable | private | tbd`) and commons-linkage fields.
+
+---
+
 ## Schema Generation
 
 ```bash

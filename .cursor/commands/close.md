@@ -1,6 +1,5 @@
 ---
 description: "Close org-os session — summarize, write memory, commit, push"
-agent: build
 ---
 <!-- GENERATED from .claude/commands/close.md by scripts/sync-commands.mjs — edit the source, then run: npm run sync:commands -->
 
@@ -65,5 +64,3 @@ git push
 If push fails (offline, no remote), note the commit is saved locally.
 
 Render the session summary, confirm the commit and push status.
-
-$ARGUMENTS

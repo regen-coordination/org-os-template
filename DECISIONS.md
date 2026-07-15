@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-07-15 · v0.5 cross-instance consolidation — diff-verified backports, generated artifacts registered by mechanism
+
+**Status:** active
+**Scope:** framework, instances, data-model, operator-ux
+
+**Decision** — The framework absorbed the instances' proven developments in one verified pass: 4 skills promoted (`research` reconciled from 3 copies, `working-with-obsidian-canvas`, `web-browsing`, `notion-cli`), the vault-safe multi-operator command set (`/commit` `/sync` `/handoff` + `operator-setup.sh` + pre-commit guard), the `sync-commands.mjs` cross-editor mirroring mechanism, two script backports (`generate-all-schemas.mjs` hand-merged, `clone-linked-repos.mjs` copied), and the hermes-cron + Hub-registry data shapes as documented extension patterns. Drift: 27 → 0 across 7 instances. Three governing rules established: (1) **backports are decided by content diff, never file dates** — `setup-org-os.mjs` looked instance-newer but the framework was ahead; (2) **generated artifacts (skills/commands/) are registered via their generator, not enumerated** — excluded from `federation.yaml agent.skills`, special-cased in `validate-structure.mjs`; (3) **instance data-model extensions promote as documented shapes** (DATA-MODEL.md "Recognized Extension Registries"), not as populated data files.
+
+**Why** — Instances (refi-bcn-os especially) had outpaced the framework for ~2 months; upstream-first only works if consolidation is periodic and verified. Straight file copies were rejected: the divergences were two-way (framework richer in some generators, instances richer in others), so date- or size-based sync would have caused regressions. Promoting Hub registries as populated templates was rejected — content is regen-specific, only the shape generalizes.
+
+**Refs** — `memory/2026-07-15.md`, `memory/reports/instances-drift-2026-07-15.md`, `data/skills-matrix.yaml` (40 entries), `data/packages-matrix.yaml` (22 entries), `docs/DATA-MODEL.md` §Recognized Extension Registries, HEARTBEAT §Consolidation follow-ups
+
+---
+
 ## 2026-04-25 · Instance bootstrap as engine; non-tech-onboarding as UI wrapper
 
 **Status:** active

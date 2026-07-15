@@ -176,6 +176,20 @@ if (dirExists('skills')) {
   for (const skillDir of skillDirs) {
     if (fileExists(`skills/${skillDir}/SKILL.md`)) {
       skillsWithSkillMd++;
+    } else if (skillDir === 'commands') {
+      // skills/commands/ is a generated CONTAINER of command-skills
+      // (skills/commands/<name>/SKILL.md, emitted by scripts/sync-commands.mjs).
+      const cmdDirs = readdirSync(join(rootDir, 'skills', 'commands'), { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name);
+      const allHaveSkillMd =
+        cmdDirs.length > 0 && cmdDirs.every(c => fileExists(`skills/commands/${c}/SKILL.md`));
+      if (allHaveSkillMd) {
+        skillsWithSkillMd++;
+        console.log(`  ✓ skills/commands/ is a generated command-skill container (${cmdDirs.length} command-skills)`);
+      } else {
+        warn(`skills/commands/ has entries missing SKILL.md`);
+      }
     } else {
       warn(`skills/${skillDir}/ missing SKILL.md`);
     }

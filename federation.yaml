@@ -1,9 +1,9 @@
-# Federation Manifest v3.5
+# Federation Manifest v0.5
 # org-os — Framework repo + multi-instance orchestration hub
 # This file describes how org-os positions itself in the federation.
 
-version: "3.5"
-spec: "organizational-os/3.5"
+version: "0.5"
+spec: "organizational-os/0.5"
 
 # ── Identity ──────────────────────────────────────────────────────────────────
 identity:
@@ -108,22 +108,44 @@ downstream:
     cloned: true
     note: "Scaffolded 2026-04-28 from framework v3.0. Bootstrap pending — operator follows BOOTSTRAP.md + one-pager. Public website + knowledge base at repos/refi-mediterranean/ (ReFiDAO/ReFi-Mediterranean)."
 
+  - name: "Bread Cooperative"
+    id: "bread-coop-os"
+    repo: ""
+    url: ""
+    type: "Cooperative"
+    trust: "full"
+    sync_direction: "framework→instance"
+    local_path: "../bread-coop-os"
+    cloned: true
+    note: "Acceptance-test instance for clone-framework.mjs (fictional/test). Bootstrapped 2026-05-16 from v3.5. Not yet pushed to a remote."
+
 # ── Agent Configuration ────────────────────────────────────────────────────────
 agent:
   runtime: "claude-code"
   workspace: "."
   skills:
+    # (generated command-skills under skills/commands/ are intentionally not listed —
+    #  they mirror .claude/commands/ via scripts/sync-commands.mjs)
+    - artifacts-builder
     - bootstrap-interviewer
     - capital-flow
     - expert-feynman
+    - frontend-design
     - funding-scout
     - heartbeat-monitor
     - idea-scout
+    - initialize
     - karpathy-guidelines
     - knowledge-curator
+    - mcp-builder
+    - meeting-notes-transcription-fixer
     - meeting-processor
+    - notion-cli
     - org-os-init
+    - research
     - schema-generator
+    - skill-creator
+    - skills-curator
     - superpowers-brainstorming
     - superpowers-executing-plans
     - superpowers-finishing-a-development-branch
@@ -133,6 +155,8 @@ agent:
     - superpowers-test-driven-development
     - superpowers-using-git-worktrees
     - superpowers-writing-plans
+    - web-browsing
+    - working-with-obsidian-canvas
     - workspace-improver
   channels:
     - github
@@ -241,7 +265,7 @@ platforms:
 # ── Metadata ─────────────────────────────────────────────────────────────────
 metadata:
   created: "2026-04-05"
-  last_updated: "2026-05-16"
+  last_updated: "2026-07-15"
   framework_version: "0.5"
   self_hosting_since: "2026-04-24"
   # Lineage stamp (v3.5 autopoiesis Phase 2)

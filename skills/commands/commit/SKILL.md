@@ -1,0 +1,49 @@
+---
+name: commit
+description: "Guided vault-safe commit — stage, write a conventional message, commit to your operator trunk (never main), push. Use when the user types /commit or says \"commit this\", \"save my work\", \"commit and push\"."
+---
+<!-- GENERATED from .claude/commands/commit.md by scripts/sync-commands.mjs — edit the source, then run: npm run sync:commands -->
+
+
+You are making a guided commit on this org-os clone. **Vault-safe: NEVER `git stash`, `git clean`, or `git reset --hard`.**
+
+## Step 1: Guard the branch
+
+```bash
+git rev-parse --abbrev-ref HEAD
+```
+
+If the branch is **`main`**: STOP. `main` is integration-only. Tell the operator to switch to their operator trunk first: `git switch <operator>` (their operator slug), or create it with `bash scripts/operator-setup.sh <operator>`. Do not commit to `main`.
+
+## Step 2: Show what will be committed
+
+```bash
+git status
+git diff --stat
+```
+
+Summarize the changes in plain language. If clearly-unrelated changes are bundled in (e.g. someone else's in-progress work), **flag it** and offer to stage selectively instead of `git add -A` — don't absorb another operator's scope into this commit.
+
+## Step 3: Stage + commit
+
+```bash
+git add -A          # or stage selectively per Step 2
+```
+
+Write a **conventional commit** message — `type(scope): summary` — that describes the real change. Types: `feat`, `fix`, `docs`, `session`, `data`, `design`, `chore`. Then:
+
+```bash
+git commit -m "<message>"
+```
+
+## Step 4: Push
+
+```bash
+git push 2>&1 || echo "push failed — if 'no upstream', run: git push -u origin $(git rev-parse --abbrev-ref HEAD)"
+```
+
+If push fails on auth/permissions, report it plainly (the operator may need write access to the repo).
+
+## Step 5: Report
+
+One line: what was committed (short hash + summary) and whether it pushed. If the commit touched **shared structural files** (`data/*.yaml`, `HEARTBEAT.md`, `MEMORY.md`, `federation.yaml`, `scripts/`, `.well-known/`, `docs/plans/`), remind: these are PR-gated — open a PR to `main` (or flag for the weekly merge-consolidation) rather than expecting them to auto-promote.

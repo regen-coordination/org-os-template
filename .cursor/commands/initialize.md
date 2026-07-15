@@ -1,6 +1,5 @@
 ---
 description: "Open org-os session — sync, gather state, render dashboard, plan work"
-agent: build
 ---
 <!-- GENERATED from .claude/commands/initialize.md by scripts/sync-commands.mjs — edit the source, then run: npm run sync:commands -->
 
@@ -44,5 +43,3 @@ Silently note for the rest of the session:
 End by displaying the **Session Prompt** with 3 contextual suggestions (already produced by the script), then wait for the operator to pick what to work on. Transition to **Phase 2: PLAN** — load context, analyze, present a tight 5–7 step work plan, then execute.
 
 For the full session lifecycle (PLAN → EXECUTE → CLOSE), see `skills/org-os-init/SKILL.md`. For platform-specific handling (Hermes, OpenCode), see `skills/initialize/SKILL.md`.
-
-$ARGUMENTS
