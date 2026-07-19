@@ -38,7 +38,27 @@ QUILT conventions honored: 28-char-wide panels (26 inner), single space between
 columns, no blank line between rows, box-drawing borders, a `#hashtag` patchnote
 (≤15 keyword-dense words) under every quilt, fenced code blocks only.
 
-## Quilt inventory
+## Revision 2026-07-19b — organic containment (approved, supersedes grid layout)
+
+Operator asked for smaller containers and a more organic/containerized whole. The five
+uniform 3×3 grids were replaced by **one organism** with four containment tiers:
+
+| Tier | Border | Meaning |
+|------|--------|---------|
+| organism | `╔═╗ ║` | the whole system — one outer membrane (`ORG-OS`) |
+| organ | `┏━┓ ┃` | a subsystem: CORE, DATA≡SCHEMAS, INTERFACES, INTEGRATIONS, AUTOMATION, FEDERATION, PACKAGES, SKILLS, PROJECTS |
+| patch | `╭─╮ │` | one living thing (instance, package, project…) — **width/height sized to its content: a thing earns its pixels** |
+| pod | `(…)` | small or dormant things, one breath each, wrapped in labeled clusters |
+
+Geometry: organism inner width 84; organs pack side by side when narrow (CORE+DATA,
+INTERFACES+INTEGRATIONS) via the same greedy packer that packs patches inside organs —
+containment is recursive, one `pack()` at every level. Ragged bottoms are kept (organic,
+not squared off). Stitch lines between organs narrate flow (`∴`, `↔`, `⊕`, `»`).
+Status grammar unchanged. Registered `org-os-federation-map` ("the torch") added to
+PACKAGES. Phase B generator inherits this composer (patch/pack/pods/organ/organism
+functions, prototyped at `/tmp/quilt-organism.mjs`).
+
+## Quilt inventory (superseded by 2026-07-19b — kept for lineage)
 
 | Quilt | Grid | Center panel | Panel unit |
 |-------|------|--------------|------------|
