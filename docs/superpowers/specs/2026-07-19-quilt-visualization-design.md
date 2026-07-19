@@ -1,7 +1,7 @@
 # QUILT Visualization of org-os — Design
 
 **Date:** 2026-07-19
-**Status:** Approved (Phase A shipped; Phase B queued)
+**Status:** Approved — Phase A shipped; **Phase B shipped 2026-07-19** (`npm run generate:quilt`)
 **Artifact:** `docs/QUILT.md`
 
 ## Goal
@@ -75,20 +75,19 @@ functions, prototyped at `/tmp/quilt-organism.mjs`).
 `data/projects.yaml` (stage), `federation.yaml` (peers, skills count), `HEARTBEAT.md`
 (open-task count, backlog items).
 
-## Phase B — generator outline (next: writing-plans)
+## Phase B — generator (shipped 2026-07-19)
 
-- `scripts/generate-quilt.mjs` — pure Node, no deps, mirrors other `scripts/*.mjs`.
-- Composer core proven in Phase A (panel/row/quilt/stitch functions with width
-  invariants — throwaway at `/tmp/quilt-compose.mjs`, to be rebuilt with TDD).
-- Panel **templates** per quilt; only status shades, counts, dates, and drift flags are
-  interpolated from `data/*.yaml`. Prose taglines stay hand-authored in the template —
-  that's the creative residue Phase A earned.
-- Output: rewrite `docs/QUILT.md` with a fresh `Woven <date>` stamp.
-- npm script `generate:quilt`; candidate hook: run after `analyze:instances`.
-- Self-check: every fenced line ≤86 chars; panel column alignment asserted.
-- Open question for planning: should the master FEDERATION panel's node art be
-  data-driven (nodes appear/disappear) or template-fixed with shade substitution only?
-  Lean: template-fixed until an 8th instance forces the issue.
+Shipped exactly as outlined, via TDD (plan: `docs/superpowers/plans/2026-07-19-generate-quilt.md`):
+
+- **`scripts/lib/quilt-compose.mjs`** — pure geometry: `patch`/`pack`/`pods`/`organ`/`organism`/`stitch`, code-point width, throw-on-overflow (content AND title). Tests: `tests/quilt-compose.test.mjs` (9).
+- **`scripts/lib/quilt-view.mjs`** — data→spec mappers: `instancePatch`/`syncLedger` (federation), `packageTiers`/`projectTiers` (tiering + `PKG_DETAIL`/`PROJECT_DETAIL` overrides), `skillCounts`/`GARDEN_GROUPS`. Warn-on-unknown so new registry rows never crash. Tests: `tests/quilt-view.test.mjs` (10).
+- **`scripts/generate-quilt.mjs`** — CLI (`--root`, `--stdout`), reads the 4 registries + HEARTBEAT/memory/.well-known/scripts/federation.yaml, weaves the organism, rewrites `docs/QUILT.md` with a fresh `Woven <date>` stamp. `wrapSeparated` wraps the sync-ledger to fit the federation organ. Tests: `tests/generate-quilt.test.mjs` (4, spawn-based).
+- **`npm run generate:quilt`** wired in `package.json`. 46/46 suite green.
+- Prose taglines/organ layout stay hand-authored in the generator + view constants — the creative residue Phase A earned; only shades, counts, dates, drift flags are data-interpolated.
+
+**Resolved open question:** the federation node art is fully **data-driven** — instances become patches (or a substrate pod for `federation_role: agent-runtime`), no 8th-instance limit; only the master CORE/interfaces/integrations/automation prose is template-fixed.
+
+**Deferred:** candidate hook to run after `analyze:instances` (left manual for now — regenerate on `data/` change per HEARTBEAT routine).
 
 ## Out of scope
 

@@ -76,6 +76,7 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## Reminders
 
 - [ ] After any `data/` change → `npm run generate:schemas && npm run validate:schemas`
+- [ ] After any `data/` change → `npm run generate:quilt` (`docs/QUILT.md` is generated — never hand-edit; edit `scripts/generate-quilt.mjs` / `scripts/lib/quilt-view.mjs`)
 - [ ] After any `federation.yaml` change → `npm run validate:structure`
 - [ ] Log key decisions to `DECISIONS.md` (authoritative decisions log)
 - [ ] Write detailed session notes to `memory/YYYY-MM-DD.md`
