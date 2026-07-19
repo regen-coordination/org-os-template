@@ -70,6 +70,12 @@ test("pack starts a new row when width is exceeded", () => {
 Run: `node --test tests/quilt-compose.test.mjs`
 Expected: FAIL — `Cannot find module '.../scripts/lib/quilt-compose.mjs'`
 
+> **Erratum (2026-07-19, post-implementation):** the Step 1 snippet's last assertion
+> `assert.match(lines[3], /^\s+│ z │$/)` is wrong — for the 2-content-line patch `b`,
+> `" z "` renders at line index 2 and the closing border `╰───╯` at index 3. The shipped
+> test asserts `/^\s+╰─+╯$/` instead (same intent: "a contributes nothing on line 4").
+> Verified by spec + code-quality review at commit `ca93b122`.
+
 - [ ] **Step 3: Implement `len`, `pad`, `patch`, `pack`**
 
 ```js
