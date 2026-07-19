@@ -87,6 +87,14 @@ const views = [
   .tt-svg :global(.edge-depends-on), .tt-svg :global(.edge-enables) { stroke-dasharray: 2 3; opacity: 0.7; }
   .tt-svg :global(.node) { cursor: pointer; outline: none; }
   .tt-svg :global(.label) { fill: var(--tt-label); font-family: var(--font-mono); font-size: 10px; }
+  .tt-svg :global(.tt-block-hdr) { font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+  .tt-svg :global(.tt-block-hdr.status-live) { fill: var(--tt-live); }
+  .tt-svg :global(.tt-block-hdr.status-in-dev) { fill: var(--tt-in-dev); }
+  .tt-svg :global(.tt-block-hdr.status-planned) { fill: var(--tt-planned); }
+  .tt-svg :global(.tt-block-hdr.status-ideation) { fill: var(--tt-ideation); }
+  .tt-svg :global(.tt-block-hdr.status-dormant) { fill: var(--tt-dormant); }
+  .tt-svg :global(.tt-block-hdr.status-retired) { fill: var(--tt-retired); }
   .tt-svg :global(.halo) { opacity: calc(var(--tt-glow) * 0.3); filter: blur(6px); }
   .tt-svg :global(.dot) { stroke-width: 2; }
   .tt-svg :global(.root .dot) { stroke-width: 3; }

@@ -76,6 +76,7 @@ export function mountTechTree(host, graph) {
       const pos = view === "techtree" ? techtreeLayout(data, width, height) : treeLayout(data, width, height, graph.meta.root);
       for (const n of nodes) Object.assign(n, pos.get(n.id) ?? { x: width / 2, y: height / 2 });
       place();
+      if (view === "techtree") drawBlockHeaders(nodes);
       sim = null;
     } else {
       const radius = Math.min(width, height) * 0.45;
@@ -154,6 +155,29 @@ export function mountTechTree(host, graph) {
       hidden.status.has(n.status) || hidden.type.has(n.type === "skill-cluster" ? "skill" : n.type);
     nodeSel.classed("hide", nodeHidden);
     edgeSel.classed("hide", (l) => nodeHidden(l.source) || nodeHidden(l.target));
+  }
+
+  // A status header above each block in the techtree view — derived from the
+  // laid-out node positions (min-x of each status block).
+  function drawBlockHeaders(nodes) {
+    const blocks = new Map(); // status → {minX, count}
+    for (const n of nodes) {
+      const b = blocks.get(n.status);
+      if (!b) blocks.set(n.status, { minX: n.x, count: 1 });
+      else {
+        b.minX = Math.min(b.minX, n.x);
+        b.count++;
+      }
+    }
+    const layer = g.append("g").attr("class", "tt-headers");
+    for (const [status, { minX, count }] of blocks) {
+      layer
+        .append("text")
+        .attr("class", `tt-block-hdr status-${status}`)
+        .attr("x", minX - 30)
+        .attr("y", 30)
+        .text(`${status} · ${count}`);
+    }
   }
 
   // Toolbar wiring

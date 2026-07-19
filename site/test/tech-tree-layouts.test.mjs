@@ -45,11 +45,14 @@ test("collapseSkills leaves expanded capabilities alone", () => {
   assert.ok(!g.nodes.some((n) => n.id === "cluster:cap"));
 });
 
-test("techtreeLayout: one column per status, tray at the bottom", () => {
+test("techtreeLayout: status blocks arranged left→right, all positioned", () => {
   const pos = techtreeLayout(graph, 800, 600);
-  assert.ok(pos.get("r").x < pos.get("s2").x); // live column left of in-dev
+  // blocks flow live → in-dev → planned → … → dormant
+  assert.ok(pos.get("r").x < pos.get("s2").x); // live block left of in-dev
   assert.ok(pos.get("s2").x < pos.get("m1").x); // in-dev left of planned
-  assert.equal(pos.get("d1").y, 600 - 24); // dormant in tray
+  assert.ok(pos.get("m1").x < pos.get("d1").x); // dormant block after planned
+  // same-status nodes share a sub-column (same x when they fit one column)
+  assert.equal(pos.get("r").x, pos.get("cap").x);
   for (const n of graph.nodes) assert.ok(pos.has(n.id));
 });
 
