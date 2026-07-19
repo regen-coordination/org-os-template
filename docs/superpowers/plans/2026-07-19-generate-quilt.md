@@ -204,6 +204,11 @@ export function pods(label, tokens, inner) {
   return lines;
 }
 
+> **Erratum (2026-07-19, post-review):** the shipped `organ`/`organism` also THROW on
+> title overflow (when the dash budget `< 1`), matching the content-overflow contract —
+> the `Math.max(1, …)` shown below would instead silently emit an over-width header.
+> See commit `fix(quilt): throw on title overflow`.
+
 /** Heavy-bordered subsystem container. Every output line is exactly `width`. */
 export function organ(title, contentLines, width) {
   const inner = width - 4;
