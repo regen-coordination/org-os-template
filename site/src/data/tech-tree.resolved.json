@@ -1,0 +1,1552 @@
+{
+  "meta": {
+    "root": "org-os",
+    "schema_version": "1.0",
+    "generated": "2026-07-19T14:45:17.507Z"
+  },
+  "nodes": [
+    {
+      "id": "org-os",
+      "type": "capability",
+      "label": "org-os",
+      "summary": "The agent-native organizational operating system.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": null
+    },
+    {
+      "id": "cap-identity",
+      "type": "capability",
+      "label": "Identity & Soul",
+      "summary": "MASTERPLAN, SOUL, IDENTITY, USER, AGENTS — the org's brain at repo root.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-memory",
+      "type": "capability",
+      "label": "Memory",
+      "summary": "MEMORY.md index, daily logs, DECISIONS.md, HEARTBEAT.md pulse.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-data",
+      "type": "capability",
+      "label": "Data & Schemas",
+      "summary": "13 YAML registries + EIP-4824 .well-known/ descriptors.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-skills",
+      "type": "capability",
+      "label": "Skills System",
+      "summary": "Portable agent capabilities; core/custom/shared tiers; promotion pipeline.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-session",
+      "type": "capability",
+      "label": "Session Lifecycle",
+      "summary": "/initialize dashboard → plan → execute → /close memory + commit.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-federation",
+      "type": "capability",
+      "label": "Federation",
+      "summary": "Hub/instance topology, trust levels, drift analysis, promotion.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-knowledge",
+      "type": "capability",
+      "label": "Knowledge & KMS",
+      "summary": "Knowledge commons, toolkit-framework, org-os-kms binding.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-safety",
+      "type": "capability",
+      "label": "Safety & Reliability",
+      "summary": "Vault-safety protocol, validators, snapshot/audit tooling.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "cap-interfaces",
+      "type": "capability",
+      "label": "Operator Interfaces",
+      "summary": "Site, dashboard, Obsidian, chat surfaces for non-CLI operators.",
+      "status": "live",
+      "statusSource": "rollup",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "org-os"
+    },
+    {
+      "id": "std-eip4824",
+      "type": "standard",
+      "label": "EIP-4824 schemas",
+      "summary": null,
+      "status": "live",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [
+        {
+          "label": "guide",
+          "href": "docs/EIP4824-GUIDE.md"
+        }
+      ],
+      "driving": [],
+      "parent": "cap-data"
+    },
+    {
+      "id": "std-file-structure",
+      "type": "standard",
+      "label": "File-structure spec",
+      "summary": null,
+      "status": "live",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [
+        {
+          "label": "spec",
+          "href": "docs/FILE-STRUCTURE.md"
+        }
+      ],
+      "driving": [],
+      "parent": "cap-data"
+    },
+    {
+      "id": "std-federation-protocol",
+      "type": "standard",
+      "label": "Federation protocol",
+      "summary": null,
+      "status": "in-dev",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [
+        {
+          "label": "spec",
+          "href": "docs/FEDERATION.md"
+        }
+      ],
+      "driving": [
+        "project:federation-protocol"
+      ],
+      "parent": "cap-federation"
+    },
+    {
+      "id": "std-skill-spec",
+      "type": "standard",
+      "label": "Skill specification",
+      "summary": null,
+      "status": "live",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [
+        {
+          "label": "spec",
+          "href": "docs/SKILL-SPECIFICATION.md"
+        }
+      ],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "std-vault-safety",
+      "type": "standard",
+      "label": "Vault-safety protocol",
+      "summary": null,
+      "status": "live",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [
+        {
+          "label": "runbook",
+          "href": "docs/VAULT-SAFETY.md"
+        }
+      ],
+      "driving": [],
+      "parent": "cap-safety"
+    },
+    {
+      "id": "int-obsidian",
+      "type": "integration",
+      "label": "Obsidian",
+      "summary": null,
+      "status": "live",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [],
+      "driving": [
+        "plan:obsidian-interface"
+      ],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "int-notion",
+      "type": "integration",
+      "label": "Notion",
+      "summary": null,
+      "status": "live",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "int-github",
+      "type": "integration",
+      "label": "GitHub",
+      "summary": null,
+      "status": "live",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "int-telegram",
+      "type": "integration",
+      "label": "Telegram",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "int-koi",
+      "type": "integration",
+      "label": "KOI network",
+      "summary": null,
+      "status": "in-dev",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "int-opal",
+      "type": "integration",
+      "label": "OPAL",
+      "summary": null,
+      "status": "planned",
+      "statusSource": "declared",
+      "ref": null,
+      "links": [],
+      "driving": [
+        "project:opal-rollout"
+      ],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-toolkit-framework",
+      "type": "module",
+      "label": "toolkit-framework",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:toolkit-framework",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-kms",
+      "type": "module",
+      "label": "org-os-kms",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:org-os-kms",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-agents-app",
+      "type": "module",
+      "label": "agents-app",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "package-registry",
+      "ref": "package:agents-app",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-egregore-core",
+      "type": "module",
+      "label": "egregore-core",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "package-registry",
+      "ref": "package:egregore-core",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-org-os-federation-map",
+      "type": "module",
+      "label": "org-os-federation-map",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:org-os-federation-map",
+      "links": [],
+      "driving": [],
+      "parent": "cap-federation"
+    },
+    {
+      "id": "mod-koi-bridge",
+      "type": "module",
+      "label": "koi-bridge",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "package-registry",
+      "ref": "package:koi-bridge",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-koi-opal-bridge",
+      "type": "module",
+      "label": "koi-opal-bridge",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "package-registry",
+      "ref": "package:koi-opal-bridge",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-opal-bridge",
+      "type": "module",
+      "label": "opal-bridge",
+      "summary": null,
+      "status": "planned",
+      "statusSource": "package-registry",
+      "ref": "package:opal-bridge",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-operations",
+      "type": "module",
+      "label": "operations",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:operations",
+      "links": [],
+      "driving": [],
+      "parent": "cap-session"
+    },
+    {
+      "id": "mod-paperclip-agents-app",
+      "type": "module",
+      "label": "paperclip-agents-app",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "package-registry",
+      "ref": "package:paperclip-agents-app",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-regen-agents",
+      "type": "module",
+      "label": "regen-agents",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:regen-agents",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-webapps",
+      "type": "module",
+      "label": "webapps",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:webapps",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-hermes-integration",
+      "type": "module",
+      "label": "hermes-integration",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:hermes-integration",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-opencode-integration",
+      "type": "module",
+      "label": "opencode-integration",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:opencode-integration",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-dashboard",
+      "type": "module",
+      "label": "dashboard",
+      "summary": null,
+      "status": "planned",
+      "statusSource": "package-registry",
+      "ref": "package:dashboard",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-governance",
+      "type": "module",
+      "label": "governance",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:governance",
+      "links": [],
+      "driving": [],
+      "parent": "cap-identity"
+    },
+    {
+      "id": "mod-coordination",
+      "type": "module",
+      "label": "coordination",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:coordination",
+      "links": [],
+      "driving": [],
+      "parent": "cap-federation"
+    },
+    {
+      "id": "mod-connectors",
+      "type": "module",
+      "label": "connectors",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:connectors",
+      "links": [],
+      "driving": [],
+      "parent": "cap-data"
+    },
+    {
+      "id": "mod-core",
+      "type": "module",
+      "label": "core",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:core",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-maps",
+      "type": "module",
+      "label": "maps",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:maps",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-hub",
+      "type": "module",
+      "label": "hub",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:hub",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "mod-coop",
+      "type": "module",
+      "label": "coop",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:coop",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "mod-regen-toolkit",
+      "type": "module",
+      "label": "regen-toolkit",
+      "summary": null,
+      "status": "live",
+      "statusSource": "package-registry",
+      "ref": "package:regen-toolkit",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "skl-bootstrap-interviewer",
+      "type": "skill",
+      "label": "bootstrap-interviewer",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:bootstrap-interviewer",
+      "links": [],
+      "driving": [],
+      "parent": "cap-identity"
+    },
+    {
+      "id": "skl-capital-flow",
+      "type": "skill",
+      "label": "capital-flow",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "skill-registry",
+      "ref": "skill:capital-flow",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-funding-scout",
+      "type": "skill",
+      "label": "funding-scout",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:funding-scout",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "skl-heartbeat-monitor",
+      "type": "skill",
+      "label": "heartbeat-monitor",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:heartbeat-monitor",
+      "links": [],
+      "driving": [],
+      "parent": "cap-memory"
+    },
+    {
+      "id": "skl-idea-scout",
+      "type": "skill",
+      "label": "idea-scout",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:idea-scout",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "skl-knowledge-curator",
+      "type": "skill",
+      "label": "knowledge-curator",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:knowledge-curator",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "skl-meeting-processor",
+      "type": "skill",
+      "label": "meeting-processor",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:meeting-processor",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "skl-org-os-init",
+      "type": "skill",
+      "label": "org-os-init",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:org-os-init",
+      "links": [],
+      "driving": [],
+      "parent": "cap-session"
+    },
+    {
+      "id": "skl-schema-generator",
+      "type": "skill",
+      "label": "schema-generator",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:schema-generator",
+      "links": [],
+      "driving": [],
+      "parent": "cap-data"
+    },
+    {
+      "id": "skl-workspace-improver",
+      "type": "skill",
+      "label": "workspace-improver",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:workspace-improver",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-skills-curator",
+      "type": "skill",
+      "label": "skills-curator",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "skill-registry",
+      "ref": "skill:skills-curator",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-expert-feynman",
+      "type": "skill",
+      "label": "expert-feynman",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:expert-feynman",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-karpathy-guidelines",
+      "type": "skill",
+      "label": "karpathy-guidelines",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:karpathy-guidelines",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-initialize",
+      "type": "skill",
+      "label": "initialize",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:initialize",
+      "links": [],
+      "driving": [],
+      "parent": "cap-session"
+    },
+    {
+      "id": "skl-superpowers-brainstorming",
+      "type": "skill",
+      "label": "superpowers-brainstorming",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-brainstorming",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-executing-plans",
+      "type": "skill",
+      "label": "superpowers-executing-plans",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-executing-plans",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-finishing-a-development-branch",
+      "type": "skill",
+      "label": "superpowers-finishing-a-development-branch",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-finishing-a-development-branch",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-requesting-code-review",
+      "type": "skill",
+      "label": "superpowers-requesting-code-review",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-requesting-code-review",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-subagent-driven-development",
+      "type": "skill",
+      "label": "superpowers-subagent-driven-development",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-subagent-driven-development",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-systematic-debugging",
+      "type": "skill",
+      "label": "superpowers-systematic-debugging",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-systematic-debugging",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-test-driven-development",
+      "type": "skill",
+      "label": "superpowers-test-driven-development",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-test-driven-development",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-using-git-worktrees",
+      "type": "skill",
+      "label": "superpowers-using-git-worktrees",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-using-git-worktrees",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-superpowers-writing-plans",
+      "type": "skill",
+      "label": "superpowers-writing-plans",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:superpowers-writing-plans",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-frontend-design",
+      "type": "skill",
+      "label": "frontend-design",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:frontend-design",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "skl-artifacts-builder",
+      "type": "skill",
+      "label": "artifacts-builder",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:artifacts-builder",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "skl-skill-creator",
+      "type": "skill",
+      "label": "skill-creator",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:skill-creator",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-mcp-builder",
+      "type": "skill",
+      "label": "mcp-builder",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:mcp-builder",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-meeting-notes-transcription-fixer",
+      "type": "skill",
+      "label": "meeting-notes-transcription-fixer",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:meeting-notes-transcription-fixer",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "skl-research",
+      "type": "skill",
+      "label": "research",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:research",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "skl-working-with-obsidian-canvas",
+      "type": "skill",
+      "label": "working-with-obsidian-canvas",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:working-with-obsidian-canvas",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "skl-web-browsing",
+      "type": "skill",
+      "label": "web-browsing",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:web-browsing",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "skl-notion-cli",
+      "type": "skill",
+      "label": "notion-cli",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:notion-cli",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "skl-commands",
+      "type": "skill",
+      "label": "commands",
+      "summary": null,
+      "status": "live",
+      "statusSource": "skill-registry",
+      "ref": "skill:commands",
+      "links": [],
+      "driving": [],
+      "parent": "cap-session"
+    },
+    {
+      "id": "idea-hatching-pipeline",
+      "type": "idea",
+      "label": "Idea hatching pipeline",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-001-hatching-pipeline",
+      "links": [],
+      "driving": [],
+      "parent": "cap-knowledge"
+    },
+    {
+      "id": "idea-nontech-ux",
+      "type": "idea",
+      "label": "Non-tech operator UX",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-002-nontech-ux",
+      "links": [],
+      "driving": [],
+      "parent": "cap-interfaces"
+    },
+    {
+      "id": "idea-notion-sync",
+      "type": "idea",
+      "label": "Bidirectional Notion ↔ YAML sync",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-003-notion-sync",
+      "links": [],
+      "driving": [],
+      "parent": "cap-data"
+    },
+    {
+      "id": "idea-federation-scale",
+      "type": "idea",
+      "label": "Federation at scale",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-004-federation-at-scale",
+      "links": [],
+      "driving": [],
+      "parent": "cap-federation"
+    },
+    {
+      "id": "idea-autoresearch-metrics",
+      "type": "idea",
+      "label": "Autoresearch evaluation metrics",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-005-autoresearch-metrics",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "idea-promote-research",
+      "type": "idea",
+      "label": "Promote research skill to framework",
+      "summary": null,
+      "status": "planned",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-006-promote-research-skill",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "idea-promote-dao-modules",
+      "type": "idea",
+      "label": "Promote DAO-module skills",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-007-promote-dao-modules",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
+      "id": "idea-registry-extension",
+      "type": "idea",
+      "label": "Cross-instance registry extension pattern",
+      "summary": null,
+      "status": "ideation",
+      "statusSource": "idea-registry",
+      "ref": "idea:idea-008-registry-extension-pattern",
+      "links": [],
+      "driving": [],
+      "parent": "cap-data"
+    }
+  ],
+  "edges": [
+    {
+      "from": "cap-identity",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-memory",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-data",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-skills",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-session",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-federation",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-knowledge",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-safety",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "cap-interfaces",
+      "to": "org-os",
+      "kind": "part-of"
+    },
+    {
+      "from": "std-eip4824",
+      "to": "cap-data",
+      "kind": "part-of"
+    },
+    {
+      "from": "std-file-structure",
+      "to": "cap-data",
+      "kind": "part-of"
+    },
+    {
+      "from": "std-federation-protocol",
+      "to": "cap-federation",
+      "kind": "part-of"
+    },
+    {
+      "from": "std-skill-spec",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "std-vault-safety",
+      "to": "cap-safety",
+      "kind": "part-of"
+    },
+    {
+      "from": "int-obsidian",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "int-notion",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "int-github",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "int-telegram",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "int-koi",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "int-opal",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-toolkit-framework",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-kms",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-kms",
+      "to": "mod-toolkit-framework",
+      "kind": "depends-on"
+    },
+    {
+      "from": "mod-agents-app",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-egregore-core",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-org-os-federation-map",
+      "to": "cap-federation",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-koi-bridge",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-koi-opal-bridge",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-opal-bridge",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-operations",
+      "to": "cap-session",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-paperclip-agents-app",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-regen-agents",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-webapps",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-hermes-integration",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-opencode-integration",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-dashboard",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-governance",
+      "to": "cap-identity",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-coordination",
+      "to": "cap-federation",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-connectors",
+      "to": "cap-data",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-core",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-maps",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-hub",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-coop",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "mod-regen-toolkit",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-bootstrap-interviewer",
+      "to": "cap-identity",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-capital-flow",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-funding-scout",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-heartbeat-monitor",
+      "to": "cap-memory",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-idea-scout",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-knowledge-curator",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-meeting-processor",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-org-os-init",
+      "to": "cap-session",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-schema-generator",
+      "to": "cap-data",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-workspace-improver",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-skills-curator",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-expert-feynman",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-karpathy-guidelines",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-initialize",
+      "to": "cap-session",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-brainstorming",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-executing-plans",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-finishing-a-development-branch",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-requesting-code-review",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-subagent-driven-development",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-systematic-debugging",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-test-driven-development",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-using-git-worktrees",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-superpowers-writing-plans",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-frontend-design",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-artifacts-builder",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-skill-creator",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-mcp-builder",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-meeting-notes-transcription-fixer",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-research",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-working-with-obsidian-canvas",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-web-browsing",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-notion-cli",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "skl-commands",
+      "to": "cap-session",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-hatching-pipeline",
+      "to": "cap-knowledge",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-nontech-ux",
+      "to": "cap-interfaces",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-notion-sync",
+      "to": "cap-data",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-federation-scale",
+      "to": "cap-federation",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-autoresearch-metrics",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-promote-research",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-promote-dao-modules",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
+      "from": "idea-registry-extension",
+      "to": "cap-data",
+      "kind": "part-of"
+    }
+  ],
+  "stats": {
+    "total": 85,
+    "byStatus": {
+      "live": 64,
+      "in-dev": 2,
+      "ideation": 8,
+      "planned": 4,
+      "dormant": 7
+    },
+    "byType": {
+      "capability": 10,
+      "standard": 5,
+      "integration": 6,
+      "module": 23,
+      "skill": 33,
+      "idea": 8
+    },
+    "moved": []
+  },
+  "frontier": {
+    "clusters": [
+      {
+        "capability": "cap-interfaces",
+        "items": [
+          "int-telegram",
+          "mod-dashboard",
+          "idea-nontech-ux"
+        ]
+      },
+      {
+        "capability": "cap-knowledge",
+        "items": [
+          "int-opal",
+          "mod-opal-bridge",
+          "idea-hatching-pipeline"
+        ]
+      },
+      {
+        "capability": "cap-data",
+        "items": [
+          "idea-notion-sync",
+          "idea-registry-extension"
+        ]
+      },
+      {
+        "capability": "cap-federation",
+        "items": [
+          "idea-federation-scale"
+        ]
+      },
+      {
+        "capability": "cap-skills",
+        "items": [
+          "idea-autoresearch-metrics",
+          "idea-promote-research",
+          "idea-promote-dao-modules"
+        ]
+      }
+    ],
+    "gaps": [
+      "cap-interfaces: 3 frontier node(s) but no in-dev child",
+      "cap-data: 2 frontier node(s) but no in-dev child",
+      "cap-skills: 3 frontier node(s) but no in-dev child"
+    ]
+  }
+}

@@ -1,0 +1,468 @@
+schema_version: "1.0"
+
+# Tech Tree — overlay registry (spec: docs/superpowers/specs/2026-07-19-tech-tree-design.md)
+# Structure + native-node status live HERE. Ref-backed status lives in the source
+# registries (packages-matrix / skills-matrix / ideas) — never duplicate it here.
+# Edit via the tech-tree skill; validate with `npm run validate:tech-tree`.
+
+meta:
+  root: "org-os"
+
+nodes:
+  # ── Root ──
+  - id: "org-os"
+    type: "capability"
+    label: "org-os"
+    summary: "The agent-native organizational operating system."
+
+  # ── Capability spine ──
+  - id: "cap-identity"
+    type: "capability"
+    label: "Identity & Soul"
+    summary: "MASTERPLAN, SOUL, IDENTITY, USER, AGENTS — the org's brain at repo root."
+  - id: "cap-memory"
+    type: "capability"
+    label: "Memory"
+    summary: "MEMORY.md index, daily logs, DECISIONS.md, HEARTBEAT.md pulse."
+  - id: "cap-data"
+    type: "capability"
+    label: "Data & Schemas"
+    summary: "13 YAML registries + EIP-4824 .well-known/ descriptors."
+  - id: "cap-skills"
+    type: "capability"
+    label: "Skills System"
+    summary: "Portable agent capabilities; core/custom/shared tiers; promotion pipeline."
+  - id: "cap-session"
+    type: "capability"
+    label: "Session Lifecycle"
+    summary: "/initialize dashboard → plan → execute → /close memory + commit."
+  - id: "cap-federation"
+    type: "capability"
+    label: "Federation"
+    summary: "Hub/instance topology, trust levels, drift analysis, promotion."
+  - id: "cap-knowledge"
+    type: "capability"
+    label: "Knowledge & KMS"
+    summary: "Knowledge commons, toolkit-framework, org-os-kms binding."
+  - id: "cap-safety"
+    type: "capability"
+    label: "Safety & Reliability"
+    summary: "Vault-safety protocol, validators, snapshot/audit tooling."
+  - id: "cap-interfaces"
+    type: "capability"
+    label: "Operator Interfaces"
+    summary: "Site, dashboard, Obsidian, chat surfaces for non-CLI operators."
+
+  # ── Standards (native) ──
+  - id: "std-eip4824"
+    type: "standard"
+    label: "EIP-4824 schemas"
+    status: "live"
+    links: [{ label: "guide", href: "docs/EIP4824-GUIDE.md" }]
+  - id: "std-file-structure"
+    type: "standard"
+    label: "File-structure spec"
+    status: "live"
+    links: [{ label: "spec", href: "docs/FILE-STRUCTURE.md" }]
+  - id: "std-federation-protocol"
+    type: "standard"
+    label: "Federation protocol"
+    status: "in-dev"
+    links: [{ label: "spec", href: "docs/FEDERATION.md" }]
+    driving: ["project:federation-protocol"]
+  - id: "std-skill-spec"
+    type: "standard"
+    label: "Skill specification"
+    status: "live"
+    links: [{ label: "spec", href: "docs/SKILL-SPECIFICATION.md" }]
+  - id: "std-vault-safety"
+    type: "standard"
+    label: "Vault-safety protocol"
+    status: "live"
+    links: [{ label: "runbook", href: "docs/VAULT-SAFETY.md" }]
+
+  # ── Integrations (native) ──
+  - id: "int-obsidian"
+    type: "integration"
+    label: "Obsidian"
+    status: "live"
+    driving: ["plan:obsidian-interface"]
+  - id: "int-notion"
+    type: "integration"
+    label: "Notion"
+    status: "live"
+  - id: "int-github"
+    type: "integration"
+    label: "GitHub"
+    status: "live"
+  - id: "int-telegram"
+    type: "integration"
+    label: "Telegram"
+    status: "ideation"
+  - id: "int-koi"
+    type: "integration"
+    label: "KOI network"
+    status: "in-dev"
+  - id: "int-opal"
+    type: "integration"
+    label: "OPAL"
+    status: "planned"
+    driving: ["project:opal-rollout"]
+
+  # ── Starter refs (completed via coverage warnings in Step 2) ──
+  - id: "mod-toolkit-framework"
+    type: "module"
+    label: "toolkit-framework"
+    ref: "package:toolkit-framework"
+  - id: "mod-kms"
+    type: "module"
+    label: "org-os-kms"
+    ref: "package:org-os-kms"
+
+  # ── Modules (coverage) ──
+  - id: "mod-agents-app"
+    type: "module"
+    label: "agents-app"
+    ref: "package:agents-app"
+  - id: "mod-egregore-core"
+    type: "module"
+    label: "egregore-core"
+    ref: "package:egregore-core"
+  - id: "mod-org-os-federation-map"
+    type: "module"
+    label: "org-os-federation-map"
+    ref: "package:org-os-federation-map"
+  - id: "mod-koi-bridge"
+    type: "module"
+    label: "koi-bridge"
+    ref: "package:koi-bridge"
+  - id: "mod-koi-opal-bridge"
+    type: "module"
+    label: "koi-opal-bridge"
+    ref: "package:koi-opal-bridge"
+  - id: "mod-opal-bridge"
+    type: "module"
+    label: "opal-bridge"
+    ref: "package:opal-bridge"
+  - id: "mod-operations"
+    type: "module"
+    label: "operations"
+    ref: "package:operations"
+  - id: "mod-paperclip-agents-app"
+    type: "module"
+    label: "paperclip-agents-app"
+    ref: "package:paperclip-agents-app"
+  - id: "mod-regen-agents"
+    type: "module"
+    label: "regen-agents"
+    ref: "package:regen-agents"
+  - id: "mod-webapps"
+    type: "module"
+    label: "webapps"
+    ref: "package:webapps"
+  - id: "mod-hermes-integration"
+    type: "module"
+    label: "hermes-integration"
+    ref: "package:hermes-integration"
+  - id: "mod-opencode-integration"
+    type: "module"
+    label: "opencode-integration"
+    ref: "package:opencode-integration"
+  - id: "mod-dashboard"
+    type: "module"
+    label: "dashboard"
+    ref: "package:dashboard"
+  - id: "mod-governance"
+    type: "module"
+    label: "governance"
+    ref: "package:governance"
+  - id: "mod-coordination"
+    type: "module"
+    label: "coordination"
+    ref: "package:coordination"
+  - id: "mod-connectors"
+    type: "module"
+    label: "connectors"
+    ref: "package:connectors"
+  - id: "mod-core"
+    type: "module"
+    label: "core"
+    ref: "package:core"
+  - id: "mod-maps"
+    type: "module"
+    label: "maps"
+    ref: "package:maps"
+  - id: "mod-hub"
+    type: "module"
+    label: "hub"
+    ref: "package:hub"
+  - id: "mod-coop"
+    type: "module"
+    label: "coop"
+    ref: "package:coop"
+  - id: "mod-regen-toolkit"
+    type: "module"
+    label: "regen-toolkit"
+    ref: "package:regen-toolkit"
+
+  # ── Skills (coverage) ──
+  - id: "skl-bootstrap-interviewer"
+    type: "skill"
+    label: "bootstrap-interviewer"
+    ref: "skill:bootstrap-interviewer"
+  - id: "skl-capital-flow"
+    type: "skill"
+    label: "capital-flow"
+    ref: "skill:capital-flow"
+  - id: "skl-funding-scout"
+    type: "skill"
+    label: "funding-scout"
+    ref: "skill:funding-scout"
+  - id: "skl-heartbeat-monitor"
+    type: "skill"
+    label: "heartbeat-monitor"
+    ref: "skill:heartbeat-monitor"
+  - id: "skl-idea-scout"
+    type: "skill"
+    label: "idea-scout"
+    ref: "skill:idea-scout"
+  - id: "skl-knowledge-curator"
+    type: "skill"
+    label: "knowledge-curator"
+    ref: "skill:knowledge-curator"
+  - id: "skl-meeting-processor"
+    type: "skill"
+    label: "meeting-processor"
+    ref: "skill:meeting-processor"
+  - id: "skl-org-os-init"
+    type: "skill"
+    label: "org-os-init"
+    ref: "skill:org-os-init"
+  - id: "skl-schema-generator"
+    type: "skill"
+    label: "schema-generator"
+    ref: "skill:schema-generator"
+  - id: "skl-workspace-improver"
+    type: "skill"
+    label: "workspace-improver"
+    ref: "skill:workspace-improver"
+  - id: "skl-skills-curator"
+    type: "skill"
+    label: "skills-curator"
+    ref: "skill:skills-curator"
+  - id: "skl-expert-feynman"
+    type: "skill"
+    label: "expert-feynman"
+    ref: "skill:expert-feynman"
+  - id: "skl-karpathy-guidelines"
+    type: "skill"
+    label: "karpathy-guidelines"
+    ref: "skill:karpathy-guidelines"
+  - id: "skl-initialize"
+    type: "skill"
+    label: "initialize"
+    ref: "skill:initialize"
+  - id: "skl-superpowers-brainstorming"
+    type: "skill"
+    label: "superpowers-brainstorming"
+    ref: "skill:superpowers-brainstorming"
+  - id: "skl-superpowers-executing-plans"
+    type: "skill"
+    label: "superpowers-executing-plans"
+    ref: "skill:superpowers-executing-plans"
+  - id: "skl-superpowers-finishing-a-development-branch"
+    type: "skill"
+    label: "superpowers-finishing-a-development-branch"
+    ref: "skill:superpowers-finishing-a-development-branch"
+  - id: "skl-superpowers-requesting-code-review"
+    type: "skill"
+    label: "superpowers-requesting-code-review"
+    ref: "skill:superpowers-requesting-code-review"
+  - id: "skl-superpowers-subagent-driven-development"
+    type: "skill"
+    label: "superpowers-subagent-driven-development"
+    ref: "skill:superpowers-subagent-driven-development"
+  - id: "skl-superpowers-systematic-debugging"
+    type: "skill"
+    label: "superpowers-systematic-debugging"
+    ref: "skill:superpowers-systematic-debugging"
+  - id: "skl-superpowers-test-driven-development"
+    type: "skill"
+    label: "superpowers-test-driven-development"
+    ref: "skill:superpowers-test-driven-development"
+  - id: "skl-superpowers-using-git-worktrees"
+    type: "skill"
+    label: "superpowers-using-git-worktrees"
+    ref: "skill:superpowers-using-git-worktrees"
+  - id: "skl-superpowers-writing-plans"
+    type: "skill"
+    label: "superpowers-writing-plans"
+    ref: "skill:superpowers-writing-plans"
+  - id: "skl-frontend-design"
+    type: "skill"
+    label: "frontend-design"
+    ref: "skill:frontend-design"
+  - id: "skl-artifacts-builder"
+    type: "skill"
+    label: "artifacts-builder"
+    ref: "skill:artifacts-builder"
+  - id: "skl-skill-creator"
+    type: "skill"
+    label: "skill-creator"
+    ref: "skill:skill-creator"
+  - id: "skl-mcp-builder"
+    type: "skill"
+    label: "mcp-builder"
+    ref: "skill:mcp-builder"
+  - id: "skl-meeting-notes-transcription-fixer"
+    type: "skill"
+    label: "meeting-notes-transcription-fixer"
+    ref: "skill:meeting-notes-transcription-fixer"
+  - id: "skl-research"
+    type: "skill"
+    label: "research"
+    ref: "skill:research"
+  - id: "skl-working-with-obsidian-canvas"
+    type: "skill"
+    label: "working-with-obsidian-canvas"
+    ref: "skill:working-with-obsidian-canvas"
+  - id: "skl-web-browsing"
+    type: "skill"
+    label: "web-browsing"
+    ref: "skill:web-browsing"
+  - id: "skl-notion-cli"
+    type: "skill"
+    label: "notion-cli"
+    ref: "skill:notion-cli"
+  - id: "skl-commands"
+    type: "skill"
+    label: "commands"
+    ref: "skill:commands"
+
+  # ── Ideas (coverage) ──
+  - id: "idea-hatching-pipeline"
+    type: "idea"
+    label: "Idea hatching pipeline"
+    ref: "idea:idea-001-hatching-pipeline"
+  - id: "idea-nontech-ux"
+    type: "idea"
+    label: "Non-tech operator UX"
+    ref: "idea:idea-002-nontech-ux"
+  - id: "idea-notion-sync"
+    type: "idea"
+    label: "Bidirectional Notion ↔ YAML sync"
+    ref: "idea:idea-003-notion-sync"
+  - id: "idea-federation-scale"
+    type: "idea"
+    label: "Federation at scale"
+    ref: "idea:idea-004-federation-at-scale"
+  - id: "idea-autoresearch-metrics"
+    type: "idea"
+    label: "Autoresearch evaluation metrics"
+    ref: "idea:idea-005-autoresearch-metrics"
+  - id: "idea-promote-research"
+    type: "idea"
+    label: "Promote research skill to framework"
+    ref: "idea:idea-006-promote-research-skill"
+  - id: "idea-promote-dao-modules"
+    type: "idea"
+    label: "Promote DAO-module skills"
+    ref: "idea:idea-007-promote-dao-modules"
+  - id: "idea-registry-extension"
+    type: "idea"
+    label: "Cross-instance registry extension pattern"
+    ref: "idea:idea-008-registry-extension-pattern"
+
+edges:
+  # spine
+  - { from: "cap-identity", to: "org-os", kind: "part-of" }
+  - { from: "cap-memory", to: "org-os", kind: "part-of" }
+  - { from: "cap-data", to: "org-os", kind: "part-of" }
+  - { from: "cap-skills", to: "org-os", kind: "part-of" }
+  - { from: "cap-session", to: "org-os", kind: "part-of" }
+  - { from: "cap-federation", to: "org-os", kind: "part-of" }
+  - { from: "cap-knowledge", to: "org-os", kind: "part-of" }
+  - { from: "cap-safety", to: "org-os", kind: "part-of" }
+  - { from: "cap-interfaces", to: "org-os", kind: "part-of" }
+  # standards
+  - { from: "std-eip4824", to: "cap-data", kind: "part-of" }
+  - { from: "std-file-structure", to: "cap-data", kind: "part-of" }
+  - { from: "std-federation-protocol", to: "cap-federation", kind: "part-of" }
+  - { from: "std-skill-spec", to: "cap-skills", kind: "part-of" }
+  - { from: "std-vault-safety", to: "cap-safety", kind: "part-of" }
+  # integrations
+  - { from: "int-obsidian", to: "cap-interfaces", kind: "part-of" }
+  - { from: "int-notion", to: "cap-interfaces", kind: "part-of" }
+  - { from: "int-github", to: "cap-interfaces", kind: "part-of" }
+  - { from: "int-telegram", to: "cap-interfaces", kind: "part-of" }
+  - { from: "int-koi", to: "cap-knowledge", kind: "part-of" }
+  - { from: "int-opal", to: "cap-knowledge", kind: "part-of" }
+  # modules
+  - { from: "mod-toolkit-framework", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-kms", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-kms", to: "mod-toolkit-framework", kind: "depends-on" }
+  # modules (coverage)
+  - { from: "mod-agents-app", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-egregore-core", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-org-os-federation-map", to: "cap-federation", kind: "part-of" }
+  - { from: "mod-koi-bridge", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-koi-opal-bridge", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-opal-bridge", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-operations", to: "cap-session", kind: "part-of" }
+  - { from: "mod-paperclip-agents-app", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-regen-agents", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-webapps", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-hermes-integration", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-opencode-integration", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-dashboard", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-governance", to: "cap-identity", kind: "part-of" }
+  - { from: "mod-coordination", to: "cap-federation", kind: "part-of" }
+  - { from: "mod-connectors", to: "cap-data", kind: "part-of" }
+  - { from: "mod-core", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-maps", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-hub", to: "cap-interfaces", kind: "part-of" }
+  - { from: "mod-coop", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-regen-toolkit", to: "cap-knowledge", kind: "part-of" }
+  # skills (coverage)
+  - { from: "skl-bootstrap-interviewer", to: "cap-identity", kind: "part-of" }
+  - { from: "skl-capital-flow", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-funding-scout", to: "cap-knowledge", kind: "part-of" }
+  - { from: "skl-heartbeat-monitor", to: "cap-memory", kind: "part-of" }
+  - { from: "skl-idea-scout", to: "cap-knowledge", kind: "part-of" }
+  - { from: "skl-knowledge-curator", to: "cap-knowledge", kind: "part-of" }
+  - { from: "skl-meeting-processor", to: "cap-knowledge", kind: "part-of" }
+  - { from: "skl-org-os-init", to: "cap-session", kind: "part-of" }
+  - { from: "skl-schema-generator", to: "cap-data", kind: "part-of" }
+  - { from: "skl-workspace-improver", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-skills-curator", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-expert-feynman", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-karpathy-guidelines", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-initialize", to: "cap-session", kind: "part-of" }
+  - { from: "skl-superpowers-brainstorming", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-executing-plans", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-finishing-a-development-branch", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-requesting-code-review", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-subagent-driven-development", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-systematic-debugging", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-test-driven-development", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-using-git-worktrees", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-superpowers-writing-plans", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-frontend-design", to: "cap-interfaces", kind: "part-of" }
+  - { from: "skl-artifacts-builder", to: "cap-interfaces", kind: "part-of" }
+  - { from: "skl-skill-creator", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-mcp-builder", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-meeting-notes-transcription-fixer", to: "cap-knowledge", kind: "part-of" }
+  - { from: "skl-research", to: "cap-knowledge", kind: "part-of" }
+  - { from: "skl-working-with-obsidian-canvas", to: "cap-interfaces", kind: "part-of" }
+  - { from: "skl-web-browsing", to: "cap-skills", kind: "part-of" }
+  - { from: "skl-notion-cli", to: "cap-interfaces", kind: "part-of" }
+  - { from: "skl-commands", to: "cap-session", kind: "part-of" }
+  # ideas (coverage)
+  - { from: "idea-hatching-pipeline", to: "cap-knowledge", kind: "part-of" }
+  - { from: "idea-nontech-ux", to: "cap-interfaces", kind: "part-of" }
+  - { from: "idea-notion-sync", to: "cap-data", kind: "part-of" }
+  - { from: "idea-federation-scale", to: "cap-federation", kind: "part-of" }
+  - { from: "idea-autoresearch-metrics", to: "cap-skills", kind: "part-of" }
+  - { from: "idea-promote-research", to: "cap-skills", kind: "part-of" }
+  - { from: "idea-promote-dao-modules", to: "cap-skills", kind: "part-of" }
+  - { from: "idea-registry-extension", to: "cap-data", kind: "part-of" }
