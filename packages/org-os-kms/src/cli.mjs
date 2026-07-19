@@ -8,9 +8,11 @@ import { renderDashboardSection, renderSiteData } from './render.mjs';
 import { addPeer, checkPeers, contribute } from './federate.mjs';
 import { promote } from './promote.mjs';
 import { loadKmsConfig } from './config.mjs';
+import { buildMap } from './map.mjs';
 import * as fw from './framework.mjs';
 import { fileURLToPath } from 'node:url';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname as pathDirname } from 'node:path';
+import { writeFileSync, mkdirSync } from 'node:fs';
 
 const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init']);
 
@@ -35,6 +37,14 @@ export function dispatch(argv, opts = {}) {
     case 'lifecycle': return runLifecycle(args[0], { dir });
     case 'bridge':    return bridge({ dir, config: loadKmsConfig(dir) });
     case 'render': {
+      if (args[0] === 'map') {
+        // No loadKmsConfig here — the map degrades gracefully without kms.yaml (spec §6).
+        const map = buildMap({ dir, surface: flags.surface || 'web' });
+        const out = join(dir, flags.out || 'data/kb/map.json');
+        mkdirSync(pathDirname(out), { recursive: true });
+        writeFileSync(out, JSON.stringify(map, null, 2));
+        return { ok: true, report: { wrote: out, nodes: map.nodes.length, edges: map.edges.length } };
+      }
       const cfg = loadKmsConfig(dir);
       if (args[0] === 'site') return renderSiteData({ dir, target: cfg.target, outPath: (cfg.render && cfg.render.site_data) || 'src/data/kms-index.json' });
       const a = fw.getAdapter(cfg.adapter);
