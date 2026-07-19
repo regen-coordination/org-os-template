@@ -5,7 +5,7 @@
 // Deep-link: #node=<id> focuses + lights a node on load.
 // Guarded so the module imports cleanly in node (no DOM at top level).
 import { normalizeMap } from './parse.mjs';
-import { buildLayout } from './sim.mjs';
+import { buildLayout, nodeRadius } from './sim.mjs';
 import { renderSVG } from './svg.mjs';
 
 const Base = typeof HTMLElement === 'undefined' ? class {} : HTMLElement;
@@ -13,7 +13,7 @@ const Base = typeof HTMLElement === 'undefined' ? class {} : HTMLElement;
 const STYLES = /* css */ `
 :host { display: block; position: relative; background: var(--fedmap-bg, #0a0d13);
   border-radius: 8px; overflow: hidden; font-family: var(--fedmap-font, ui-monospace, monospace); }
-svg { display: block; width: 100%; height: auto; cursor: grab; }
+svg { display: block; width: 100%; height: auto; cursor: grab; touch-action: none; }
 svg.panning { cursor: grabbing; }
 .ring-guide { fill: none; stroke: var(--fedmap-text, #9aa4b2); stroke-opacity: 0.08; stroke-dasharray: 2 5; }
 .edge { stroke: var(--fedmap-instance, #2dd4a8); stroke-width: 1; stroke-opacity: 0.35; }
@@ -88,11 +88,31 @@ export class FederationMap extends Base {
     root.appendChild(wrap);
     this.svg = root.querySelector('svg');
     this.mini = this.getAttribute('mode') === 'mini';
+    this.#cacheEls();
+    this.layout.sim.on('tick', () => this.#scheduleUpdate()); // only fires while reheated (drag)
     this.#wireHover();
-    if (!this.mini) { this.#wireClick(); this.#wirePanZoom(); this.#wireDrag(); this.#focusFromHash(); }
+    if (!this.mini) { this.#wireClick(); this.#wirePointer(); this.#focusFromHash(); }
   }
 
-  #byId(id) { return this.layout.nodes.find((n) => n.id === id); }
+  // Cache element refs + a node-by-id map once, so per-tick updates are a tight loop
+  // with zero DOM queries (the old per-tick querySelector storm was a big clunk source).
+  #cacheEls() {
+    this.nodeById = new Map(this.layout.nodes.map((n) => [n.id, n]));
+    this.nodeEls = new Map();
+    for (const g of this.shadowRoot.querySelectorAll('.node')) {
+      this.nodeEls.set(g.dataset.id, { circles: g.querySelectorAll('circle'), text: g.querySelector('text') });
+    }
+    this.edgeEls = [...this.shadowRoot.querySelectorAll('.edge')].map((e) => ({
+      e, s: this.nodeById.get(e.dataset.from), t: this.nodeById.get(e.dataset.to),
+    }));
+  }
+
+  #scheduleUpdate() {
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => { this._raf = null; this.#updatePositions(); });
+  }
+
+  #byId(id) { return this.nodeById ? this.nodeById.get(id) : this.layout.nodes.find((n) => n.id === id); }
   #neighbors(id) {
     const lit = new Set([id]);
     for (const l of this.layout.links) {
@@ -158,62 +178,74 @@ export class FederationMap extends Base {
     panel.querySelector('.close').addEventListener('click', () => panel.classList.remove('open'));
   }
 
-  #wirePanZoom() {
-    let vb = this.svg.viewBox.baseVal;
-    this.svg.addEventListener('wheel', (ev) => {
-      ev.preventDefault();
-      const k = ev.deltaY > 0 ? 1.1 : 0.9;
-      const nw = Math.min(Math.max(vb.width * k, 220), 2200);
-      vb.x += (vb.width - nw) / 2; vb.y += (vb.height - nw * (vb.height / vb.width)) / 2;
-      vb.height *= nw / vb.width; vb.width = nw;
-    }, { passive: false });
-    let pan = null;
-    this.svg.addEventListener('pointerdown', (ev) => {
-      if (ev.target.closest('.node')) return;
-      pan = { x: ev.clientX, y: ev.clientY }; this.svg.classList.add('panning');
-    });
-    this.svg.addEventListener('pointermove', (ev) => {
-      if (!pan) return;
-      const scale = vb.width / this.svg.clientWidth;
-      vb.x -= (ev.clientX - pan.x) * scale; vb.y -= (ev.clientY - pan.y) * scale;
-      pan = { x: ev.clientX, y: ev.clientY };
-    });
-    this.svg.addEventListener('pointerup', () => { pan = null; this.svg.classList.remove('panning'); });
-  }
+  // One capture-based pointer handler for pan + drag + zoom. Pointer capture keeps
+  // tracking even when the cursor leaves the SVG; a movement threshold means a plain
+  // click never engages a drag (so it never reheats the sim → clicks feel instant).
+  #wirePointer() {
+    const svg = this.svg;
+    const vb = svg.viewBox.baseVal;
+    const THRESH = 4; // px of travel before a node-press promotes to a drag
+    const toSvg = (ev) => new DOMPoint(ev.clientX, ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
+    let mode = null;             // 'pan' | 'pending' | 'drag'
+    let startX = 0, startY = 0, lastX = 0, lastY = 0, dragNode = null;
 
-  #wireDrag() {
-    let drag = null;
-    this.svg.addEventListener('pointerdown', (ev) => {
-      const g = ev.target.closest('.node'); if (!g || g.dataset.id === this.map.self.id) return;
-      drag = this.#byId(g.dataset.id);
-      this.layout.sim.alphaTarget(0.25).restart();
-      this.layout.sim.on('tick', () => this.#updatePositions());
-      ev.stopPropagation();
+    // Zoom anchored on the cursor: the SVG point under the pointer stays put.
+    svg.addEventListener('wheel', (ev) => {
+      ev.preventDefault();
+      const k = ev.deltaY > 0 ? 1.12 : 0.89;
+      const nw = Math.min(Math.max(vb.width * k, 200), 2400);
+      const nh = nw * (vb.height / vb.width);
+      const p = toSvg(ev);
+      const fx = (p.x - vb.x) / vb.width, fy = (p.y - vb.y) / vb.height;
+      vb.x = p.x - fx * nw; vb.y = p.y - fy * nh; vb.width = nw; vb.height = nh;
+    }, { passive: false });
+
+    svg.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0) return;
+      const g = ev.target.closest('.node');
+      startX = lastX = ev.clientX; startY = lastY = ev.clientY;
+      svg.setPointerCapture(ev.pointerId);
+      if (g && g.dataset.id !== this.map.self.id) { mode = 'pending'; dragNode = this.#byId(g.dataset.id); }
+      else if (!g) { mode = 'pan'; svg.classList.add('panning'); }
+      else { mode = null; } // self is pinned — no drag, no pan; click still opens its panel
     });
-    this.svg.addEventListener('pointermove', (ev) => {
-      if (!drag) return;
-      const pt = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(this.svg.getScreenCTM().inverse());
-      drag.fx = pt.x; drag.fy = pt.y;
+
+    svg.addEventListener('pointermove', (ev) => {
+      if (!mode) return;
+      if (mode === 'pan') {
+        const scale = vb.width / svg.clientWidth;
+        vb.x -= (ev.clientX - lastX) * scale; vb.y -= (ev.clientY - lastY) * scale;
+        lastX = ev.clientX; lastY = ev.clientY; return;
+      }
+      if (mode === 'pending' && Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) >= THRESH) {
+        mode = 'drag'; this.layout.sim.alphaTarget(0.12).restart(); // gentle reheat, neighbours ease
+      }
+      if (mode === 'drag' && dragNode) {
+        const p = toSvg(ev); dragNode.fx = p.x; dragNode.fy = p.y; this.#scheduleUpdate();
+      }
     });
-    this.svg.addEventListener('pointerup', () => {
-      if (!drag) return;
-      drag.fx = null; drag.fy = null; drag = null;
-      this.layout.sim.alphaTarget(0);
-    });
+
+    const end = (ev) => {
+      if (mode === 'pan') svg.classList.remove('panning');
+      if (mode === 'drag' && dragNode) { dragNode.fx = null; dragNode.fy = null; this.layout.sim.alphaTarget(0); }
+      try { svg.releasePointerCapture(ev.pointerId); } catch { /* already released */ }
+      mode = null; dragNode = null;
+    };
+    svg.addEventListener('pointerup', end);
+    svg.addEventListener('pointercancel', end);
   }
 
   #updatePositions() {
     for (const n of this.layout.nodes) {
-      const g = this.shadowRoot.querySelector(`.node[data-id="${CSS.escape(n.id)}"]`); if (!g) continue;
-      g.querySelectorAll('circle').forEach((c) => { c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); });
-      const t = g.querySelector('text');
-      t.setAttribute('x', n.x + 10); t.setAttribute('y', n.y + 3);
+      const c = this.nodeEls.get(n.id); if (!c) continue;
+      const r = nodeRadius(n);
+      for (const el of c.circles) { el.setAttribute('cx', n.x); el.setAttribute('cy', n.y); }
+      if (c.text) { c.text.setAttribute('x', n.x + r + 4); c.text.setAttribute('y', n.y + 3); }
     }
-    this.shadowRoot.querySelectorAll('.edge').forEach((e) => {
-      const s = this.#byId(e.dataset.from), t = this.#byId(e.dataset.to);
+    for (const { e, s, t } of this.edgeEls) {
       e.setAttribute('x1', s.x); e.setAttribute('y1', s.y);
       e.setAttribute('x2', t.x); e.setAttribute('y2', t.y);
-    });
+    }
   }
 
   #focusFromHash() {
