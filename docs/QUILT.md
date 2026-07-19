@@ -5,7 +5,8 @@
 > containers, shaded by live status.
 >
 > Woven **2026-07-19** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
-> hand; edit the view templates in `scripts/lib/quilt-view.mjs`.
+> hand. Edit prose in the generator `scripts/generate-quilt.mjs` (organ layout/taglines)
+> or per-entry detail in `scripts/lib/quilt-view.mjs` (PKG_DETAIL, GARDEN_GROUPS, …).
 
 ## Legend
 

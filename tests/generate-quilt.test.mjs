@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -137,4 +137,21 @@ test("--stdout prints instead of writing", () => {
   const res = spawnSync("node", [scriptPath, "--root", root, "--stdout"], { encoding: "utf8" });
   assert.equal(res.status, 0, res.stderr);
   assert.ok(res.stdout.includes("╔═ ORG-OS"));
+});
+
+test("--stdout does not write docs/QUILT.md", () => {
+  const root = setup();
+  const res = spawnSync("node", [scriptPath, "--root", root, "--stdout"], { encoding: "utf8" });
+  assert.equal(res.status, 0, res.stderr);
+  assert.ok(res.stdout.includes("╔═ ORG-OS"));
+  assert.ok(!existsSync(path.join(root, "docs", "QUILT.md")), "--stdout must not write the file");
+});
+
+test("degrades when memory/ is absent", () => {
+  const root = setup();
+  rmSync(path.join(root, "memory"), { recursive: true });
+  const res = spawnSync("node", [scriptPath, "--root", root], { encoding: "utf8" });
+  assert.equal(res.status, 0, res.stderr);
+  const doc = readFileSync(path.join(root, "docs", "QUILT.md"), "utf8");
+  assert.ok(doc.includes("╔═ ORG-OS"));  // no crash; memory age falls back to ∅
 });

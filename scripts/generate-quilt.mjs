@@ -19,6 +19,13 @@ import {
 const args = process.argv.slice(2);
 const root = args.includes("--root") ? args[args.indexOf("--root") + 1] : process.cwd();
 const toStdout = args.includes("--stdout");
+if (args.includes("--root")) {
+  const v = args[args.indexOf("--root") + 1];
+  if (!v || v.startsWith("--")) {
+    console.error("generate-quilt: --root requires a directory path");
+    process.exit(2);
+  }
+}
 const today = new Date().toISOString().slice(0, 10);
 
 const yaml = (rel) => loadYaml(readFileSync(path.join(root, rel), "utf8"));
@@ -31,13 +38,16 @@ const heartbeat = existsSync(path.join(root, "HEARTBEAT.md"))
   ? readFileSync(path.join(root, "HEARTBEAT.md"), "utf8") : "";
 const openTasks = (heartbeat.match(/^- \[ \]/gm) ?? []).length;
 
-const memDates = readdirSync(path.join(root, "memory"))
-  .filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort();
+const memDates = existsSync(path.join(root, "memory"))
+  ? readdirSync(path.join(root, "memory")).filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort()
+  : [];
 const memAge = memDates.length
   ? `${Math.max(0, Math.round((new Date(today) - new Date(memDates.at(-1).slice(0, 10))) / 86400000))}d ago`
   : "∅";
 
 /** Break a » -separated line into rows that fit `width`, hanging-indented. */
+// NOTE: only breaks at `sep`; a single token wider than `width` will still overflow
+// and the enclosing organ() will throw — fine for short ledger ids.
 function wrapSeparated(str, width, sep = " » ", indent = "  ") {
   const parts = str.split(sep);
   const lines = [];
@@ -161,7 +171,8 @@ const doc = `# org-os · QUILT
 > containers, shaded by live status.
 >
 > Woven **${today}** by \`npm run generate:quilt\` from \`data/*.yaml\` — do not edit by
-> hand; edit the view templates in \`scripts/lib/quilt-view.mjs\`.
+> hand. Edit prose in the generator \`scripts/generate-quilt.mjs\` (organ layout/taglines)
+> or per-entry detail in \`scripts/lib/quilt-view.mjs\` (PKG_DETAIL, GARDEN_GROUPS, …).
 
 ## Legend
 
