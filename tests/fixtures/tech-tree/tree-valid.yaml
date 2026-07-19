@@ -1,0 +1,39 @@
+schema_version: "1.0"
+meta:
+  root: "org-os"
+nodes:
+  - id: "org-os"
+    type: "capability"
+    label: "org-os"
+  - id: "cap-knowledge"
+    type: "capability"
+    label: "Knowledge"
+  - id: "cap-empty"
+    type: "capability"
+    label: "Empty Cap"
+    status: "planned"
+  - id: "mod-kms"
+    type: "module"
+    label: "org-os-kms"
+    ref: "package:org-os-kms"
+  - id: "skl-research"
+    type: "skill"
+    label: "research"
+    ref: "skill:research"
+  - id: "idea-hatch"
+    type: "idea"
+    label: "Hatching pipeline"
+    ref: "idea:idea-001"
+  - id: "int-notion"
+    type: "integration"
+    label: "Notion"
+    status: "live"
+    driving: ["project:federation-protocol"]
+edges:
+  - { from: "cap-knowledge", to: "org-os", kind: "part-of" }
+  - { from: "cap-empty", to: "org-os", kind: "part-of" }
+  - { from: "mod-kms", to: "cap-knowledge", kind: "part-of" }
+  - { from: "skl-research", to: "cap-knowledge", kind: "part-of" }
+  - { from: "idea-hatch", to: "cap-knowledge", kind: "part-of" }
+  - { from: "int-notion", to: "cap-knowledge", kind: "part-of" }
+  - { from: "mod-kms", to: "int-notion", kind: "depends-on" }

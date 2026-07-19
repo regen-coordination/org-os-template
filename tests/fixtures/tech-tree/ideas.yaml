@@ -1,0 +1,8 @@
+schema_version: "2.0"
+ideas:
+  - id: "idea-001"
+    status: "surfaced"
+  - id: "idea-002"
+    status: "developing"
+  - id: "idea-003"
+    status: "archived"
