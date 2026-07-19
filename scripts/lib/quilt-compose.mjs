@@ -46,7 +46,11 @@ export function pack(blocks, width, gap = 1) {
 
 export const ORGANISM_INNER = 84;
 
-/** Single-breath tokens wrapped under a hanging label: `label ─ (a) (b)…` */
+/**
+ * Single-breath tokens wrapped under a hanging label: `label ─ (a) (b)…`
+ * Assumes label + individual tokens fit within `inner` (caller's responsibility;
+ * no overflow guard here, unlike organ/organism).
+ */
 export function pods(label, tokens, inner) {
   const lines = [];
   let cur = label + " ─";
@@ -62,7 +66,9 @@ export function pods(label, tokens, inner) {
 /** Heavy-bordered subsystem container. Every output line is exactly `width`. */
 export function organ(title, contentLines, width) {
   const inner = width - 4;
-  const out = ["┏━ " + title + " " + "━".repeat(Math.max(1, width - 6 - len(title))) + "━┓"];
+  const dashes = width - 6 - len(title);
+  if (dashes < 1) throw new Error(`organ "${title}" title overflow (${len(title)} too long for width ${width})`);
+  const out = ["┏━ " + title + " " + "━".repeat(dashes) + "━┓"];
   for (const l of contentLines) {
     if (len(l) > inner) throw new Error(`organ "${title}" overflow (${len(l)}>${inner}): ${l}`);
     out.push("┃ " + pad(l, inner) + " ┃");
@@ -82,7 +88,9 @@ export const stitch = (s) =>
  */
 export function organism(title, rows) {
   const OW = ORGANISM_INNER;
-  const out = ["╔═ " + title + " " + "═".repeat(Math.max(1, OW + 3 - 5 - len(title))) + "═╗"];
+  const dashes = OW - 2 - len(title);
+  if (dashes < 1) throw new Error(`organism title overflow (${len(title)} too long)`);
+  const out = ["╔═ " + title + " " + "═".repeat(dashes) + "═╗"];
   for (const r of rows) {
     const lines = Array.isArray(r) ? pack(r, OW, 1) : [r];
     for (const l of lines) {

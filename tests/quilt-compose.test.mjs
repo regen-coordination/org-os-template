@@ -42,11 +42,19 @@ test("pods wraps tokens under a hanging label indent", () => {
 
 test("organ borders content and throws on overflow", () => {
   const o = organ("CORE", ["hello"], 20);
-  assert.equal(o[0].length === undefined, false); // array of strings
+  assert.ok(Array.isArray(o));
   assert.ok(o.every((l) => len(l) === 20));
   assert.match(o[0], /^┏━ CORE ━+┓$/);
   assert.match(o[1], /^┃ hello\s+┃$/);
   assert.throws(() => organ("X", ["y".repeat(17)], 20), /overflow/);
+});
+
+test("organ throws on title overflow", () => {
+  assert.throws(() => organ("X".repeat(40), ["y"], 20), /title overflow/);
+});
+
+test("organism throws on title overflow", () => {
+  assert.throws(() => organism("T".repeat(85), []), /title overflow/);
 });
 
 test("organism packs organs side by side and throws on overflow", () => {
