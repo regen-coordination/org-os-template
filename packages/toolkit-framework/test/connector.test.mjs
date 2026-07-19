@@ -49,3 +49,17 @@ test('runConnector rejects a describe() that is not a valid source-system', asyn
   const bad = { name: 'bad', protocol: 'Bad', capabilities: { ingest: true }, describe: () => ({ title: 'no type' }), pull: async () => ({ records: [] }), map: () => [] };
   await assert.rejects(() => runConnector(bad, { adapter: memAdapter(), target: '.' }), /source-system/);
 });
+
+test('runConnector forces maturity:raw even if map emits a different maturity', async () => {
+  const stored = [];
+  const a = { name: 'mem', store(_t, e) { stored.push(...e); return { stored: e.map((_x, i) => `r${i}`) }; } };
+  const conn = {
+    name: 'x', protocol: 'X', capabilities: { ingest: true },
+    describe: () => ({ title: 'X', type: 'repo', steward: 't', return_path: 'https://x.org' }),
+    pull: async () => ({ records: [{}], cursor: null }),
+    map: () => [{ schema: 'signal', object: { title: 'canon', type: 'signal', signal_type: 'content', maturity: 'canonical' } }],
+  };
+  await runConnector(conn, { adapter: a, target: '.' });
+  const sig = stored.find((e) => e.schema === 'signal');
+  assert.equal(sig.object.maturity, 'raw');
+});

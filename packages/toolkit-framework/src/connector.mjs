@@ -57,7 +57,7 @@ export async function runConnector(connector, ctx = {}) {
     if (!known.has(c.schema)) { errors.push(`unknown schema "${c.schema}"`); continue; }
     const object = { ...c.object };
     if ('maturity' in schemaFields(c.schema)) {
-      if (object.maturity == null) object.maturity = 'raw';
+      object.maturity = 'raw';   // connectors ingest RAW candidates; review promotes. map must not self-canonicalize.
       if (!object.provenance) object.provenance = { origin: card.title };
     }
     const v = validateObject(c.schema, object);

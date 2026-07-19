@@ -42,8 +42,9 @@ export const OPS = {
       outPath: (ctx.config.render && ctx.config.render.site_data) || 'src/data/kms-index.json' });
   } },
 
-  // Pull knowledge from declared connectors into the KB. write:true → fail-hard on a real
-  // error; a stub's NOT_IMPLEMENTED is reported+skipped so it never aborts a live connector.
+  // Pull knowledge from declared connectors into the KB. write:true → fail-hard ONLY on a
+  // connector-level failure (pull threw). Per-record map/validation errors are reported but
+  // do NOT halt the close lifecycle. A stub's NOT_IMPLEMENTED is reported+skipped.
   'ingest.pull': { kind: 'exec', write: true, run: async (ctx) => {
     const getConn = ctx.getConnector || defaultGetConnector;
     const adapter = ctx.getAdapter ? ctx.getAdapter(ctx.config.adapter) : fw.getAdapter(ctx.config.adapter);
@@ -55,9 +56,13 @@ export const OPS = {
       try {
         const conn = getConn(decl.name);
         const res = await fw.runConnector(conn, { config: decl.config || {}, cursor: decl.cursor ?? null, adapter, target });
-        decl.cursor = res.cursor;
-        report.pulled.push({ name: decl.name, stored: res.stored, candidates: res.candidates, errors: res.errors });
-        if (res.errors.length) report.errors.push(...res.errors.map((e) => `${decl.name}: ${e}`));
+        // Advance the cursor ONLY when every record ingested cleanly. A soft error means some
+        // records were skipped, so re-fetch from the prior cursor next time (at-least-once;
+        // store is idempotent by slug). Per-record errors are reported, not fatal — one bad
+        // upstream record must not halt the whole close lifecycle.
+        const clean = res.errors.length === 0;
+        if (clean) decl.cursor = res.cursor;
+        report.pulled.push({ name: decl.name, stored: res.stored, candidates: res.candidates, errors: res.errors, cursor_advanced: clean });
       } catch (e) {
         if (/NOT_IMPLEMENTED/.test(e.message)) { report.pulled.push({ name: decl.name, skipped: 'NOT_IMPLEMENTED' }); continue; }
         report.errors.push(`${decl.name}: ${e.message}`);
