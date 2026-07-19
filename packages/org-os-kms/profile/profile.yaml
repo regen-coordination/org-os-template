@@ -32,5 +32,15 @@ lifecycle_bindings:
   initialize: [config.load, index.rebuild, review.list, render.dashboard, render.site]
   close: [ingest.pull, csis-review, bridge, emit-contributions, federate.check, index.rebuild, render.site, render.dashboard, sync.push]
 
+# Available connectors (composition surface). Mirror src/bind.mjs CONNECTOR_DEFAULTS.
+# An instance declares which of these it composes in its own kms.yaml `connectors:` list.
+connectors:
+  github:   { status: active, protocol: "GitHub (gh CLI)" }
+  koi:      { status: active, protocol: "KOI-net" }
+  geo:      { status: stub,   protocol: "Geo (IPFS + The Graph)" }
+  radicle:  { status: stub,   protocol: "Radicle (p2p git COBs)" }
+  atproto:  { status: stub,   protocol: "AT Protocol (Bluesky)" }
+  synthefy: { status: stub,   protocol: "Synthefy" }
+
 federation: RegenOS (upstream/downstream; knowledge-source + organizational; self-qualifying adoption)
 replaceable: true             # swap this host without touching the framework

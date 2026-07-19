@@ -22,3 +22,9 @@ toOrgOsRegistries(frameworkObjects);           // { 'data/resources.yaml': [...]
 5. Federate via RegenOS (upstream/downstream; self-qualifying adoption).
 
 This is the adoption vehicle for ReFi DAO / ReFi BCN / future communities (build-plan SP11 / pipeline P9–P10). See `../toolkit-framework/framework`-side docs: PLACEMENT, FEEDBACK-LOOPS.
+
+## Connectors
+
+`@org-os/kms` composes external protocols into a knowledge base. Declare them in `kms.yaml`
+`connectors:`; they feed the framework's ingest → store → review pipeline. GitHub and KOI are
+live; Geo, Radicle, atproto, and Synthefy are specced stubs. See `docs/CONNECTORS.md`.
