@@ -2,7 +2,7 @@
   "meta": {
     "root": "org-os",
     "schema_version": "1.0",
-    "generated": "2026-07-19T14:45:17.507Z"
+    "generated": "2026-07-19T15:09:00.697Z"
   },
   "nodes": [
     {
@@ -961,6 +961,18 @@
       "parent": "cap-session"
     },
     {
+      "id": "skl-tech-tree",
+      "type": "skill",
+      "label": "tech-tree",
+      "summary": null,
+      "status": "dormant",
+      "statusSource": "skill-registry",
+      "ref": "skill:tech-tree",
+      "links": [],
+      "driving": [],
+      "parent": "cap-skills"
+    },
+    {
       "id": "idea-hatching-pipeline",
       "type": "idea",
       "label": "Idea hatching pipeline",
@@ -1444,6 +1456,11 @@
       "kind": "part-of"
     },
     {
+      "from": "skl-tech-tree",
+      "to": "cap-skills",
+      "kind": "part-of"
+    },
+    {
       "from": "idea-hatching-pipeline",
       "to": "cap-knowledge",
       "kind": "part-of"
@@ -1485,23 +1502,29 @@
     }
   ],
   "stats": {
-    "total": 85,
+    "total": 86,
     "byStatus": {
       "live": 64,
       "in-dev": 2,
       "ideation": 8,
       "planned": 4,
-      "dormant": 7
+      "dormant": 8
     },
     "byType": {
       "capability": 10,
       "standard": 5,
       "integration": 6,
       "module": 23,
-      "skill": 33,
+      "skill": 34,
       "idea": 8
     },
-    "moved": []
+    "moved": [
+      {
+        "id": "skl-tech-tree",
+        "from": null,
+        "to": "dormant"
+      }
+    ]
   },
   "frontier": {
     "clusters": [

@@ -250,6 +250,13 @@ skills:
     promotion_status: "canonical"
     notes: "GENERATED directory — thin command-skills mirrored from .claude/commands/ by scripts/sync-commands.mjs for cross-editor portability (OpenCode, Cursor, Hermes, Zed/ACP). Promote/edit the source commands, then npm run sync:commands; never edit generated files. Mechanism promoted v0.5."
 
+  - id: "tech-tree"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    notes: "Dialectical development graph ops: add/promote/connect/audit/render over data/tech-tree.yaml. Shipped with the /tech-tree site page."
+
   # --- Instance-specific skills (registered, not promoted) ---
   - id: "notion-sync"
     owner: "refi-bcn-os"

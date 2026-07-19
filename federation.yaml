@@ -155,6 +155,7 @@ agent:
     - superpowers-test-driven-development
     - superpowers-using-git-worktrees
     - superpowers-writing-plans
+    - tech-tree
     - web-browsing
     - working-with-obsidian-canvas
     - workspace-improver
