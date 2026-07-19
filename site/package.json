@@ -8,7 +8,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "aggregate": "node scripts/aggregate-federation.mjs",
+    "aggregate": "node scripts/aggregate-federation.mjs && node ../scripts/resolve-tech-tree.mjs",
     "dev": "npm run aggregate && astro dev",
     "build": "npm run aggregate && astro build && npm run verify",
     "preview": "astro preview",

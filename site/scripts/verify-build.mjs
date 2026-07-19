@@ -6,6 +6,7 @@ const DIST = "dist";
 const REQUIRED = [
   "index.html",
   "modules/index.html",
+  "tech-tree/index.html",
   "federation/index.html",
   "docs/index.html",
   "docs/architecture/index.html",
