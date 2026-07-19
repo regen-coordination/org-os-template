@@ -39,3 +39,6 @@ __pycache__
 
 # Test gitignore fixtures
 .gitignore.test
+
+# Visual brainstorming sessions
+.superpowers/
