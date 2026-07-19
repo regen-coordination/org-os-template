@@ -1,0 +1,113 @@
+---
+// Reads the build-time resolved graph (written by scripts/resolve-tech-tree.mjs
+// via the aggregate step) and mounts the interactive island.
+const statuses = ["live", "in-dev", "planned", "ideation", "dormant", "retired"];
+const types = ["capability", "module", "skill", "integration", "standard", "idea"];
+const views = [
+  ["hybrid", "Hybrid"],
+  ["constellation", "Constellation"],
+  ["techtree", "Tech tree"],
+  ["tree", "Living tree"],
+];
+---
+
+<div class="tt" data-tech-tree>
+  <div class="tt-toolbar">
+    <div class="tt-views" role="tablist" aria-label="Layout">
+      {views.map(([id, label]) => <button data-view={id} class="tt-btn">{label}</button>)}
+    </div>
+    <div class="tt-chips" aria-label="Filter by status">
+      {statuses.map((s) => (
+        <button data-filter-status={s} class:list={["tt-chip", `status-${s}`]}>
+          <span class="pip" aria-hidden="true"></span>{s}
+        </button>
+      ))}
+    </div>
+    <div class="tt-chips" aria-label="Filter by type">
+      {types.map((t) => <button data-filter-type={t} class="tt-chip">{t}</button>)}
+    </div>
+  </div>
+  <svg class="tt-svg" role="img" aria-label="org-os tech tree graph"></svg>
+  <aside class="tt-panel" data-panel hidden></aside>
+</div>
+
+<script>
+  import graph from "../data/tech-tree.resolved.json";
+  import { mountTechTree } from "../scripts/tech-tree/app.mjs";
+  mountTechTree(document.querySelector("[data-tech-tree]"), graph);
+</script>
+
+<style>
+  .tt { position: relative; height: calc(100vh - 3.75rem); display: flex; flex-direction: column; }
+  .tt-svg { flex: 1; width: 100%; background:
+    linear-gradient(var(--color-grid) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    var(--color-bg); cursor: grab; }
+  .tt-svg:active { cursor: grabbing; }
+
+  .tt-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center;
+    padding: var(--space-3) var(--gutter); border-bottom: var(--border-hair) solid var(--color-line);
+    font-family: var(--font-mono); font-size: var(--text-xs); }
+  .tt-btn { padding: 0.3em 0.8em; border: var(--border-hair) solid var(--color-line-2);
+    border-radius: var(--radius-sm); color: var(--color-muted); background: none; cursor: pointer; }
+  .tt-btn.active { color: var(--color-accent); border-color: var(--color-accent); }
+  .tt-chip { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.2em 0.6em;
+    border: var(--border-hair) solid var(--color-line); border-radius: var(--radius-pill);
+    color: var(--color-muted); background: none; cursor: pointer; text-transform: uppercase;
+    letter-spacing: var(--tracking-wide); font-size: var(--text-2xs); }
+  .tt-chip.off { opacity: 0.35; }
+  .tt-chip .pip { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .tt-chip.status-live { color: var(--tt-live); }
+  .tt-chip.status-in-dev { color: var(--tt-in-dev); }
+  .tt-chip.status-planned { color: var(--tt-planned); }
+  .tt-chip.status-ideation { color: var(--tt-ideation); }
+  .tt-chip.status-dormant { color: var(--tt-dormant); }
+  .tt-chip.status-retired { color: var(--tt-retired); }
+
+  .tt-panel { position: absolute; right: var(--gutter); top: 5.5rem; width: min(340px, 85vw);
+    background: var(--color-surface); border: var(--border-hair) solid var(--color-line-2);
+    border-radius: var(--radius); box-shadow: var(--shadow-2); padding: var(--space-5);
+    z-index: 5; max-height: 60vh; overflow: auto; }
+  .tt-panel :global(h2) { font-size: var(--text-lg); margin: 0 0 var(--space-2); }
+  .tt-panel :global(.tt-type) { font-size: var(--text-2xs); text-transform: uppercase;
+    letter-spacing: var(--tracking-eyebrow); color: var(--color-faint); margin: 0; }
+  .tt-panel :global(.src) { color: var(--color-faint); font-size: var(--text-xs); }
+  .tt-panel :global([data-close]) { position: absolute; top: var(--space-2); right: var(--space-3);
+    background: none; border: none; font-size: var(--text-lg); color: var(--color-muted); cursor: pointer; }
+  .tt-panel :global(.pip) { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .tt-panel :global(.pip.status-live) { background: var(--tt-live); }
+  .tt-panel :global(.pip.status-in-dev) { background: var(--tt-in-dev); }
+  .tt-panel :global(.pip.status-planned) { background: var(--tt-planned); }
+  .tt-panel :global(.pip.status-ideation) { background: var(--tt-ideation); }
+  .tt-panel :global(.pip.status-dormant) { background: var(--tt-dormant); }
+  .tt-panel :global(.pip.status-retired) { background: var(--tt-retired); }
+
+  /* Graph marks — status personality comes entirely from theme tokens */
+  .tt-svg :global(.edge) { stroke: var(--tt-edge); stroke-width: 1; }
+  .tt-svg :global(.edge-depends-on), .tt-svg :global(.edge-enables) { stroke-dasharray: 2 3; opacity: 0.7; }
+  .tt-svg :global(.node) { cursor: pointer; outline: none; }
+  .tt-svg :global(.label) { fill: var(--tt-label); font-family: var(--font-mono); font-size: 10px; }
+  .tt-svg :global(.halo) { opacity: calc(var(--tt-glow) * 0.3); filter: blur(6px); }
+  .tt-svg :global(.dot) { stroke-width: 2; }
+  .tt-svg :global(.root .dot) { stroke-width: 3; }
+  .tt-svg :global(.status-live .dot) { fill: var(--tt-fill-live); stroke: var(--tt-live); }
+  .tt-svg :global(.status-live .halo) { fill: var(--tt-live); }
+  .tt-svg :global(.status-in-dev .dot) { fill: var(--tt-fill-in-dev); stroke: var(--tt-in-dev); }
+  .tt-svg :global(.status-in-dev .halo) { fill: var(--tt-in-dev); }
+  .tt-svg :global(.status-planned .dot) { fill: var(--tt-fill-planned); stroke: var(--tt-planned); }
+  .tt-svg :global(.status-planned .halo) { fill: var(--tt-planned); }
+  .tt-svg :global(.status-ideation .dot) { fill: var(--tt-fill-ideation); stroke: var(--tt-ideation); stroke-dasharray: 4 3; }
+  .tt-svg :global(.status-ideation .halo) { fill: var(--tt-ideation); }
+  .tt-svg :global(.status-dormant .dot) { fill: var(--tt-fill-dormant); stroke: var(--tt-dormant); opacity: 0.6; }
+  .tt-svg :global(.status-dormant .halo) { fill: var(--tt-dormant); }
+  .tt-svg :global(.status-retired .dot) { fill: var(--tt-fill-retired); stroke: var(--tt-retired); opacity: 0.45; }
+  .tt-svg :global(.status-retired .halo) { fill: var(--tt-retired); }
+  .tt-svg :global(.type-skill-cluster .dot) { stroke-dasharray: 1 2; }
+  .tt-svg :global(.dim) { opacity: 0.15; transition: opacity var(--t-fast); }
+  .tt-svg :global(.hide) { display: none; }
+
+  @media (max-width: 640px) {
+    .tt-panel { right: 0; left: 0; top: auto; bottom: 0; width: auto; max-height: 45vh;
+      border-radius: var(--radius) var(--radius) 0 0; }
+  }
+</style>
