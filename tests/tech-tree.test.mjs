@@ -64,6 +64,35 @@ edges: []
   assert.ok(errors.some((e) => e.includes('unknown ref kind "gadget"')));
 });
 
+test("validateTree: malformed ref missing colon", () => {
+  const bad = `
+meta: { root: "a" }
+nodes:
+  - { id: "a", type: "capability", label: "A", status: "live" }
+  - { id: "b", type: "module", label: "B", ref: "packageorgoskms" }
+edges: []
+`;
+  const { errors } = validateTree({ treeYaml: bad, registries: registries() });
+  assert.ok(errors.some((e) => e.includes('b: malformed ref "packageorgoskms" (missing ":")')));
+  // kind/registry checks are skipped for a malformed ref
+  assert.ok(!errors.some((e) => e.includes("unknown ref kind")));
+});
+
+test("validateTree: node with multiple part-of parents errors", () => {
+  const bad = `
+meta: { root: "a" }
+nodes:
+  - { id: "a", type: "capability", label: "A", status: "live" }
+  - { id: "b", type: "capability", label: "B", status: "live" }
+  - { id: "c", type: "capability", label: "C", status: "live" }
+edges:
+  - { from: "c", to: "a", kind: "part-of" }
+  - { from: "c", to: "b", kind: "part-of" }
+`;
+  const { errors } = validateTree({ treeYaml: bad, registries: registries() });
+  assert.ok(errors.some((e) => e.includes("c: multiple part-of parents")));
+});
+
 test("validateTree: native non-capability without status errors; rollup capability does not", () => {
   const bad = `
 meta: { root: "a" }
@@ -89,12 +118,14 @@ nodes:
   - { id: "b", type: "capability", label: "B", status: "live" }
 edges:
   - { from: "a", to: "zzz", kind: "part-of" }
+  - { from: "nope", to: "a", kind: "part-of" }
   - { from: "a", to: "b", kind: "vibes" }
   - { from: "a", to: "b", kind: "part-of" }
   - { from: "b", to: "a", kind: "part-of" }
 `;
   const { errors } = validateTree({ treeYaml: bad, registries: registries() });
   assert.ok(errors.some((e) => e.includes('unknown "to"')));
+  assert.ok(errors.some((e) => e.includes('unknown "from"')));
   assert.ok(errors.some((e) => e.includes('unknown kind "vibes"')));
   assert.ok(errors.some((e) => e.includes("part-of cycle")));
   assert.ok(errors.some((e) => e.includes('meta.root "ghost" is not a node')));

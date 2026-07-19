@@ -67,9 +67,13 @@ export function validateTree({ treeYaml, registries }) {
     if (!NODE_TYPES.includes(n.type)) errors.push(`${n.id}: unknown type "${n.type}"`);
     if (n.status && !STATUSES.includes(n.status)) errors.push(`${n.id}: invalid status "${n.status}"`);
     if (n.ref) {
-      const [kind, id] = refParts(n.ref);
-      if (!REF_MAPS[kind]) errors.push(`${n.id}: unknown ref kind "${kind}"`);
-      else if (!registries[kind].has(id)) errors.push(`${n.id}: ref "${n.ref}" not found in ${kind} registry`);
+      if (!n.ref.includes(":")) {
+        errors.push(`${n.id}: malformed ref "${n.ref}" (missing ":")`);
+      } else {
+        const [kind, id] = refParts(n.ref);
+        if (!REF_MAPS[kind]) errors.push(`${n.id}: unknown ref kind "${kind}"`);
+        else if (!registries[kind].has(id)) errors.push(`${n.id}: ref "${n.ref}" not found in ${kind} registry`);
+      }
       if (n.status) errors.push(`${n.id}: ref-backed node must not declare status`);
     } else if (!n.status && n.id !== root && !(n.type === "capability" && n.rollup !== false)) {
       // Native nodes need a status — except capabilities left to rollup, and the root.
@@ -84,8 +88,17 @@ export function validateTree({ treeYaml, registries }) {
     if (!EDGE_KINDS.includes(e.kind)) errors.push(`edge ${e.from}→${e.to}: unknown kind "${e.kind}"`);
   }
 
+  // part-of is a tree hierarchy: each node has ≤1 parent (spec §3).
+  const parentOf = new Map();
+  const multiParent = new Set();
+  for (const e of edges.filter((e) => e.kind === "part-of")) {
+    if (parentOf.has(e.from) && !multiParent.has(e.from)) {
+      errors.push(`${e.from}: multiple part-of parents`);
+      multiParent.add(e.from);
+    }
+    parentOf.set(e.from, e.to);
+  }
   // part-of must be acyclic (child --part-of--> parent chains).
-  const parentOf = new Map(edges.filter((e) => e.kind === "part-of").map((e) => [e.from, e.to]));
   for (const start of parentOf.keys()) {
     const seen = new Set([start]);
     let cur = parentOf.get(start);
