@@ -29,6 +29,11 @@ test('dispatch dry-routes render map', () => {
   assert.deepEqual(r, { verb: 'render', args: ['map'], flags: { out: 'x.json' } });
 });
 
+test('dispatch dry-routes federate frontier', () => {
+  const r = dispatch(['federate', 'frontier'], { dry: true });
+  assert.deepEqual(r, { verb: 'federate', args: ['frontier'], flags: {} });
+});
+
 test('render map builds map.json from federation.yaml (no kms.yaml needed)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'kms-map-'));
   wf(join(dir, 'federation.yaml'), 'identity:\n  name: tmp-os\n  type: Project\ndownstream:\n  - id: kid\n    name: Kid\n');

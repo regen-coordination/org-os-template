@@ -9,6 +9,7 @@ import { addPeer, checkPeers, contribute } from './federate.mjs';
 import { promote } from './promote.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { buildMap } from './map.mjs';
+import { fetchFrontier } from './frontier.mjs';
 import * as fw from './framework.mjs';
 import { fileURLToPath } from 'node:url';
 import { resolve, join, dirname as pathDirname } from 'node:path';
@@ -54,6 +55,7 @@ export function dispatch(argv, opts = {}) {
       if (args[0] === 'add')      return addPeer({ dir, cardPath: flags.card });
       if (args[0] === 'check')    return checkPeers({ dir, config: loadKmsConfig(dir) });
       if (args[0] === 'contribute') return contribute({ dir, slug: flags.peer });
+      if (args[0] === 'frontier') return fetchFrontier({ dir });
       return { error: `federate: unknown subcommand ${args[0]}` };
     }
     case 'promote':   return promote({ from: flags.from || '.', to: flags.to });
@@ -64,7 +66,7 @@ export function dispatch(argv, opts = {}) {
 // Entry point when run directly (robust to relative argv + spaces/encoding in the path).
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const result = dispatch(process.argv.slice(2));
+    const result = await dispatch(process.argv.slice(2));
     console.log(JSON.stringify(result, null, 2));
     if (result && result.error) process.exit(1); // unknown verb / bad subcommand
   } catch (e) {
