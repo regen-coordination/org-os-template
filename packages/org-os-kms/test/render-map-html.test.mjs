@@ -5,7 +5,7 @@ import { mkdtempSync, cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderMapHtml } from '../src/render-map-html.mjs';
+import { renderMapHtml, renderPortalIndex } from '../src/render-map-html.mjs';
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'map', 'full');
 const FAKE_BUNDLE = 'customElements.define("federation-map",class extends HTMLElement{});';
@@ -48,4 +48,23 @@ test('uses vault surface: builder runs with surface=vault', () => {
   const html = readFileSync(join(dir, 'renders', 'federation-map.html'), 'utf8');
   assert.ok(html.includes('obsidian://open?file=koi'));
   assert.ok(!html.includes('/docs/koi'));
+});
+
+test('portal index lists every node with a deep-link into the vault artifact', () => {
+  const { dir } = scratch();
+  const r = renderPortalIndex({ dir, now: '2026-07-19T12:00:00Z' });
+  assert.equal(r.ok, true);
+  const md = readFileSync(join(dir, 'renders', 'federation-portals.md'), 'utf8');
+  assert.ok(md.includes('[Child](federation-map.html#node=child-os)'));
+  assert.ok(md.includes('[KOI Network](federation-map.html#node=koi-network)') || md.includes('#node=koi-network'));
+  assert.ok(md.includes('## Instances'), 'grouped by kind');
+});
+
+test('portal index is deterministic for fixed now (safe to regenerate)', () => {
+  const { dir } = scratch();
+  renderPortalIndex({ dir, now: 'T' });
+  const a = readFileSync(join(dir, 'renders', 'federation-portals.md'), 'utf8');
+  renderPortalIndex({ dir, now: 'T' });
+  const b = readFileSync(join(dir, 'renders', 'federation-portals.md'), 'utf8');
+  assert.equal(a, b);
 });

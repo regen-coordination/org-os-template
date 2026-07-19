@@ -34,3 +34,27 @@ h1{color:#f5c04e;font-size:15px;font-weight:normal}p{color:#5b6472;font-size:11p
   writeFileSync(outPath, html);
   return { ok: true, report: { wrote: outPath, nodes: map.nodes.length, edges: map.edges.length } };
 }
+
+const KIND_HEADINGS = [['instance', 'Instances'], ['frontier', 'Frontier'], ['source', 'Sources'], ['ecosystem', 'Ecosystems']];
+
+export function renderPortalIndex({ dir = '.', out = 'renders/federation-portals.md', now = new Date().toISOString() } = {}) {
+  const map = buildMap({ dir, surface: 'vault', now });
+  const lines = [
+    `# Federation portals — ${map.self.name}`,
+    '',
+    `> Doors between the internal note graph and [the torch](federation-map.html). Generated ${now} — regenerate with \`org-os-kms render map html\`. Link to these anchors from any note.`,
+  ];
+  for (const [kind, heading] of KIND_HEADINGS) {
+    const group = map.nodes.filter((n) => n.kind === kind).sort((a, b) => a.id.localeCompare(b.id));
+    if (!group.length) continue;
+    lines.push('', `## ${heading}`, '');
+    for (const n of group) {
+      const extras = [n.type, n.live === false && n.kind === 'instance' ? 'unreached' : null].filter(Boolean).join(' · ');
+      lines.push(`- [${n.name || n.id}](federation-map.html#node=${encodeURIComponent(n.id)})${extras ? ` — ${extras}` : ''}`);
+    }
+  }
+  const outPath = join(dir, out);
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, lines.join('\n') + '\n');
+  return { ok: true, report: { wrote: outPath, portals: map.nodes.length } };
+}
