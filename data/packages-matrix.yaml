@@ -44,6 +44,14 @@ packages:
     lifecycle_status: "active"
     notes: "@org-os/kms — binds toolkit-framework into org-os (module src/bind.mjs + profile). Executable lifecycle, registry bridge, CLI, render, federation. Installed + activated in regen-toolkit 2026-07-05; refi-dao-os adopting. Depends on toolkit-framework. 44/44 tests."
 
+  - id: "org-os-federation-map"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@org-os/federation-map — 'the torch'. View-plane web component for the federation/provenance map (d3-force only dep). Data plane is org-os-kms `render map`. Spec: docs/superpowers/specs/2026-07-19-federation-map-design.md."
+
   - id: "koi-bridge"
     owner: "framework"
     instances_using: []

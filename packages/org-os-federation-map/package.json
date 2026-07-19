@@ -1,0 +1,15 @@
+{
+  "name": "@org-os/federation-map",
+  "version": "0.1.0",
+  "description": "org-os federation map — 'the torch'. Framework-agnostic <federation-map> custom element rendering an instance's external world (federated instances, frontier, sources/provenance, ecosystems) as an interactive orbital-constellation with torchlight styling. Consumes map.json produced by @org-os/kms `render map`; never reads YAML itself.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "d3-force": "^3.0.0"
+  },
+  "license": "MIT",
+  "keywords": ["org-os", "federation", "graph", "provenance", "web-component", "d3-force"]
+}
