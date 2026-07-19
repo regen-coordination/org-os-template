@@ -468,7 +468,7 @@ test("projectTiers — Develop → patches, Discovery → pods", () => {
   ]);
   assert.equal(t.patches[0].title, "v2-stab ▓");
   assert.equal(t.patches[1].title, "brand-new-thing ▓"); // unknown id still renders
-  assert.deepEqual(t.discovery, ["(opal-rollout)"]);
+  assert.deepEqual(t.discovery, ["(opal)"]); // pods use PROJECT_SHORT too (opal-rollout → opal)
 });
 ```
 
