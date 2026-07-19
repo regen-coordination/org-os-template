@@ -227,7 +227,8 @@ export const stitch = (s) =>
  */
 export function organism(title, rows) {
   const OW = ORGANISM_INNER;
-  const out = ["╔═ " + title + " " + "═".repeat(Math.max(1, OW + 2 - 5 - len(title))) + "═╗"];
+  // total output width is OW+4 (║ + space + OW + space + ║); header must match it.
+  const out = ["╔═ " + title + " " + "═".repeat(Math.max(1, OW - 2 - len(title))) + "═╗"];
   for (const r of rows) {
     const lines = Array.isArray(r) ? pack(r, OW, 1) : [r];
     for (const l of lines) {
