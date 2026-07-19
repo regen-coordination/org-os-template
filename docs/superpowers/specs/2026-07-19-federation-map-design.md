@@ -2,7 +2,7 @@
 id: federation-map
 title: "org-os Federation Map — 'The Torch' (Design)"
 date: 2026-07-19
-status: approved-design
+status: implemented
 location: packages/org-os-federation-map/ + packages/org-os-kms/ + site/
 ---
 

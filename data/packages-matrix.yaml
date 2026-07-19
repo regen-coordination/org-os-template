@@ -42,11 +42,11 @@ packages:
     in_framework: true
     promotion_status: "canonical"
     lifecycle_status: "active"
-    notes: "@org-os/kms — binds toolkit-framework into org-os (module src/bind.mjs + profile). Executable lifecycle, registry bridge, CLI, render, federation. Installed + activated in regen-toolkit 2026-07-05; refi-dao-os adopting. Depends on toolkit-framework. 44/44 tests."
+    notes: "@org-os/kms — binds toolkit-framework into org-os (module src/bind.mjs + profile). Executable lifecycle, registry bridge, CLI, render, federation. Installed + activated in regen-toolkit 2026-07-05; refi-dao-os adopting. Depends on toolkit-framework. 44/44 tests. + map builder/frontier/vault-artifact (federation map, 2026-07)"
 
   - id: "org-os-federation-map"
     owner: "framework"
-    instances_using: []
+    instances_using: ["org-os"]
     in_framework: true
     promotion_status: "canonical"
     lifecycle_status: "active"

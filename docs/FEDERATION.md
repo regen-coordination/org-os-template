@@ -848,3 +848,21 @@ metadata:
 ```
 
 From here, enable features incrementally as needed.
+
+## The Federation Map ("the torch")
+
+Every instance can render an interactive map of its external world — federated
+instances (ring 1), frontier peers-of-peers (ring 2), knowledge sources and
+ecosystems (ring 3) — the counterpart of the internal note graph.
+
+- **Data:** `org-os-kms render map` → `map.json` (aggregates `federation.yaml`,
+  `kms.yaml` peers, KB source-systems, `data/ecosystems.yaml`, frontier cache).
+- **Frontier:** `org-os-kms federate frontier` fetches each peer's
+  `federation.yaml` (local clone first, raw-GitHub fallback) one hop out into
+  `data/federation/frontier/`. Fetch failures keep the stale cache; builds never break.
+- **View:** `@org-os/federation-map` — `<federation-map>` web component
+  (packages/org-os-federation-map). Embedded on the site (`/federation` + home mini).
+- **Vault:** `org-os-kms render map html` → `renders/federation-map.html`
+  (self-contained, offline) + `renders/federation-portals.md` (note-graph doors).
+
+Design spec: `docs/superpowers/specs/2026-07-19-federation-map-design.md`.
