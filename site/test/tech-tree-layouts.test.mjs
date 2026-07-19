@@ -53,9 +53,13 @@ test("techtreeLayout: one column per status, tray at the bottom", () => {
   for (const n of graph.nodes) assert.ok(pos.has(n.id));
 });
 
-test("treeLayout: root at the bottom, depth rises", () => {
+test("treeLayout: radial — root at centre, deeper nodes farther out", () => {
   const pos = treeLayout(graph, 800, 600, "r");
-  assert.ok(pos.get("r").y > pos.get("cap").y);
-  assert.ok(pos.get("cap").y > pos.get("s1").y);
+  const cx = 400;
+  const cy = 300;
+  const dist = (id) => Math.hypot(pos.get(id).x - cx, pos.get(id).y - cy);
+  assert.ok(dist("r") < 1); // root sits at the centre
+  assert.ok(dist("cap") > 1); // depth-1 node is off-centre
+  assert.ok(dist("s1") > dist("cap")); // depth-2 node is farther out than depth-1
   for (const n of graph.nodes) assert.ok(pos.has(n.id));
 });

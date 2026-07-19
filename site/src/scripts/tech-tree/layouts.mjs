@@ -72,36 +72,68 @@ export function techtreeLayout(graph, width, height) {
   return pos;
 }
 
-// Trunk-up hierarchy from part-of parents: root at the bottom, children rise.
+// Radial hierarchy from part-of parents: root at the centre, depth → radius
+// (growth rings), each subtree owning an angular wedge sized by its leaf count.
 // Returns Map id → {x, y}.
 export function treeLayout(graph, width, height, rootId) {
-  const depth = new Map([[rootId, 0]]);
-  const resolveDepth = (id, seen = new Set()) => {
-    if (depth.has(id)) return depth.get(id);
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const childrenOf = new Map();
+  for (const n of graph.nodes) {
+    if (!n.parent) continue;
+    if (!childrenOf.has(n.parent)) childrenOf.set(n.parent, []);
+    childrenOf.get(n.parent).push(n.id);
+  }
+  for (const kids of childrenOf.values()) {
+    kids.sort((a, b) => byId.get(a).label.localeCompare(byId.get(b).label));
+  }
+
+  // Leaf count per subtree drives each child's share of its parent's wedge.
+  const leaves = new Map();
+  const countLeaves = (id, seen = new Set()) => {
+    if (leaves.has(id)) return leaves.get(id);
     if (seen.has(id)) return 1; // defensive; part-of is validated acyclic upstream
     seen.add(id);
-    const n = graph.nodes.find((x) => x.id === id);
-    const d = n?.parent ? resolveDepth(n.parent, seen) + 1 : 1;
-    depth.set(id, d);
-    return d;
+    const kids = childrenOf.get(id) ?? [];
+    const c = kids.length ? kids.reduce((s, k) => s + countLeaves(k, seen), 0) : 1;
+    leaves.set(id, c);
+    return c;
   };
-  for (const n of graph.nodes) resolveDepth(n.id);
-  const maxDepth = Math.max(...depth.values());
-  const rows = new Map();
-  for (const n of graph.nodes) {
-    const d = depth.get(n.id);
-    if (!rows.has(d)) rows.set(d, []);
-    rows.get(d).push(n);
-  }
+  countLeaves(rootId);
+
+  // Depth per node (radius ring); track the deepest to scale the rings.
+  const depth = new Map();
+  const setDepth = (id, d, seen = new Set()) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    depth.set(id, d);
+    for (const k of childrenOf.get(id) ?? []) setDepth(k, d + 1, seen);
+  };
+  setDepth(rootId, 0);
+  const maxDepth = Math.max(1, ...depth.values());
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const ring = (Math.min(width, height) / 2 - 40) / maxDepth;
   const pos = new Map();
-  for (const [d, row] of rows) {
-    row.sort((a, b) => (a.parent ?? "").localeCompare(b.parent ?? "") || a.label.localeCompare(b.label));
-    row.forEach((n, i) =>
-      pos.set(n.id, {
-        x: ((i + 1) * width) / (row.length + 1),
-        y: height - ((d + 0.5) * height) / (maxDepth + 1),
-      }),
-    );
-  }
+
+  const assign = (id, a0, a1, seen = new Set()) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const angle = (a0 + a1) / 2;
+    const r = (depth.get(id) ?? 0) * ring;
+    pos.set(id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+    const kids = childrenOf.get(id) ?? [];
+    const total = kids.reduce((s, k) => s + (leaves.get(k) ?? 1), 0) || 1;
+    let a = a0;
+    for (const k of kids) {
+      const span = (a1 - a0) * ((leaves.get(k) ?? 1) / total);
+      assign(k, a, a + span, seen);
+      a += span;
+    }
+  };
+  assign(rootId, -Math.PI / 2, (3 * Math.PI) / 2); // start straight up
+
+  // Any node not reached from the root (orphan) falls back to the centre.
+  for (const n of graph.nodes) if (!pos.has(n.id)) pos.set(n.id, { x: cx, y: cy });
   return pos;
 }
