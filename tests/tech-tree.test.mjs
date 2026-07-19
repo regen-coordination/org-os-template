@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseRegistries, validateTree } from "../scripts/lib/tech-tree.mjs";
+import { parseRegistries, validateTree, resolveTree } from "../scripts/lib/tech-tree.mjs";
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "tech-tree");
 const read = (f) => readFileSync(path.join(FIX, f), "utf8");
@@ -153,4 +153,103 @@ test("validateTree warns on coverage drift, honoring coverageIds filters", () =>
   // NOT warned: in_framework:false skill and archived idea
   assert.ok(!warnings.some((w) => w.includes("dao-module")));
   assert.ok(!warnings.some((w) => w.includes("idea-003")));
+});
+
+test("resolveTree maps ref-backed statuses per spec §4", () => {
+  const g = resolveTree({ treeYaml: validYaml, registries: registries() });
+  const byId = new Map(g.nodes.map((n) => [n.id, n]));
+  assert.equal(byId.get("mod-kms").status, "live"); // package active → live
+  assert.equal(byId.get("mod-kms").statusSource, "package-registry");
+  assert.equal(byId.get("skl-research").status, "live"); // skill canonical → live
+  assert.equal(byId.get("idea-hatch").status, "ideation"); // idea surfaced → ideation
+  assert.equal(byId.get("int-notion").status, "live");
+  assert.equal(byId.get("int-notion").statusSource, "declared");
+});
+
+test("resolveTree rollup: capability takes most-advanced child; explicit status overrides", () => {
+  const g = resolveTree({ treeYaml: validYaml, registries: registries() });
+  const byId = new Map(g.nodes.map((n) => [n.id, n]));
+  // cap-knowledge children: live, live, ideation, live → live
+  assert.equal(byId.get("cap-knowledge").status, "live");
+  assert.equal(byId.get("cap-knowledge").statusSource, "rollup");
+  // explicit status wins over rollup
+  assert.equal(byId.get("cap-empty").status, "planned");
+  assert.equal(byId.get("cap-empty").statusSource, "declared");
+  // root rolls up through capabilities
+  assert.equal(byId.get("org-os").status, "live");
+});
+
+test("resolveTree rollup ignores dormant/retired children", () => {
+  const treeYaml = `
+meta: { root: "r" }
+nodes:
+  - { id: "r", type: "capability", label: "R" }
+  - { id: "cap", type: "capability", label: "Cap" }
+  - { id: "m1", type: "module", label: "M1", ref: "package:agents-app" }
+  - { id: "i1", type: "idea", label: "I1", ref: "idea:idea-001" }
+edges:
+  - { from: "cap", to: "r", kind: "part-of" }
+  - { from: "m1", to: "cap", kind: "part-of" }
+  - { from: "i1", to: "cap", kind: "part-of" }
+`;
+  const g = resolveTree({ treeYaml, registries: registries() });
+  const cap = g.nodes.find((n) => n.id === "cap");
+  assert.equal(cap.status, "ideation"); // dormant m1 excluded; ideation i1 wins
+});
+
+test("resolveTree throws on invalid tree and on rollup with no rankable children", () => {
+  assert.throws(
+    () => resolveTree({ treeYaml: `meta: { root: "x" }\nnodes: []\nedges: []`, registries: registries() }),
+    /tech-tree invalid/,
+  );
+  const treeYaml = `
+meta: { root: "r" }
+nodes:
+  - { id: "r", type: "capability", label: "R" }
+  - { id: "cap", type: "capability", label: "Cap" }
+  - { id: "m1", type: "module", label: "M1", ref: "package:agents-app" }
+edges:
+  - { from: "cap", to: "r", kind: "part-of" }
+  - { from: "m1", to: "cap", kind: "part-of" }
+`;
+  assert.throws(() => resolveTree({ treeYaml, registries: registries() }), /no rankable children/);
+});
+
+test("resolveTree stats: counts, and moved vs previous output", () => {
+  const g1 = resolveTree({ treeYaml: validYaml, registries: registries() });
+  assert.equal(g1.stats.total, 7);
+  assert.equal(g1.stats.byStatus.live, 5);
+  assert.equal(g1.stats.byStatus.ideation, 1);
+  assert.equal(g1.stats.byType.capability, 3);
+  assert.deepEqual(g1.stats.moved, []); // no previous
+  const previous = {
+    nodes: g1.nodes.map((n) => (n.id === "mod-kms" ? { ...n, status: "in-dev" } : n)).filter((n) => n.id !== "int-notion"),
+  };
+  const g2 = resolveTree({ treeYaml: validYaml, registries: registries(), previous });
+  assert.deepEqual(
+    g2.stats.moved.sort((a, b) => a.id.localeCompare(b.id)),
+    [
+      { id: "int-notion", from: null, to: "live" },
+      { id: "mod-kms", from: "in-dev", to: "live" },
+    ],
+  );
+});
+
+test("resolveTree frontier: clusters by capability ancestor + gap notes", () => {
+  const g = resolveTree({ treeYaml: validYaml, registries: registries() });
+  const cluster = g.frontier.clusters.find((c) => c.capability === "cap-knowledge");
+  assert.deepEqual(cluster.items, ["idea-hatch"]);
+  // cap-knowledge has no in-dev child → gap
+  assert.ok(g.frontier.gaps.some((gap) => gap.includes("cap-knowledge") && gap.includes("no in-dev child")));
+  // cap-empty is itself planned → frontier under its ancestor org-os
+  const rootCluster = g.frontier.clusters.find((c) => c.capability === "org-os");
+  assert.deepEqual(rootCluster.items, ["cap-empty"]);
+});
+
+test("resolveTree output nodes carry parent, ref, links, driving", () => {
+  const g = resolveTree({ treeYaml: validYaml, registries: registries() });
+  const notion = g.nodes.find((n) => n.id === "int-notion");
+  assert.equal(notion.parent, "cap-knowledge");
+  assert.deepEqual(notion.driving, ["project:federation-protocol"]);
+  assert.equal(g.meta.root, "org-os");
 });

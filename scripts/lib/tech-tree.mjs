@@ -140,3 +140,113 @@ export function validateTree({ treeYaml, registries }) {
 
   return { errors, warnings };
 }
+
+export function resolveTree({ treeYaml, registries, previous = null }) {
+  const { errors } = validateTree({ treeYaml, registries });
+  if (errors.length) throw new Error(`tech-tree invalid:\n  ${errors.join("\n  ")}`);
+
+  const doc = yaml.load(treeYaml);
+  const nodes = doc.nodes ?? [];
+  const edges = doc.edges ?? [];
+  const root = doc.meta.root;
+
+  const childrenOf = new Map();
+  const parentOf = new Map();
+  for (const e of edges) {
+    if (e.kind !== "part-of") continue;
+    parentOf.set(e.from, e.to);
+    if (!childrenOf.has(e.to)) childrenOf.set(e.to, []);
+    childrenOf.get(e.to).push(e.from);
+  }
+
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const cache = new Map();
+
+  function resolveStatus(id) {
+    if (cache.has(id)) return cache.get(id);
+    const n = byId.get(id);
+    let out;
+    if (n.ref) {
+      const [kind, rid] = refParts(n.ref);
+      const raw = registries[kind].get(rid);
+      const status = REF_MAPS[kind][raw];
+      if (!status) throw new Error(`${id}: unmappable ${kind} status "${raw}"`);
+      out = { status, statusSource: `${kind}-registry` };
+    } else if (n.status) {
+      out = { status: n.status, statusSource: "declared" };
+    } else {
+      // Capability (or root) rollup — part-of is acyclic (validated), so this terminates.
+      const ranked = (childrenOf.get(id) ?? [])
+        .map((k) => resolveStatus(k).status)
+        .filter((s) => s in ROLLUP_RANK)
+        .sort((a, b) => ROLLUP_RANK[a] - ROLLUP_RANK[b]);
+      if (!ranked.length) throw new Error(`${id}: rollup found no rankable children and no explicit status`);
+      out = { status: ranked[0], statusSource: "rollup" };
+    }
+    cache.set(id, out);
+    return out;
+  }
+
+  const outNodes = nodes.map((n) => {
+    const { status, statusSource } = resolveStatus(n.id);
+    return {
+      id: n.id,
+      type: n.type,
+      label: n.label,
+      summary: n.summary ?? null,
+      status,
+      statusSource,
+      ref: n.ref ?? null,
+      links: n.links ?? [],
+      driving: n.driving ?? [],
+      parent: parentOf.get(n.id) ?? null,
+    };
+  });
+
+  const byStatus = {};
+  const byType = {};
+  for (const n of outNodes) {
+    byStatus[n.status] = (byStatus[n.status] ?? 0) + 1;
+    byType[n.type] = (byType[n.type] ?? 0) + 1;
+  }
+  const moved = [];
+  if (previous?.nodes) {
+    const prev = new Map(previous.nodes.map((n) => [n.id, n.status]));
+    for (const n of outNodes) {
+      const was = prev.get(n.id);
+      if (was === undefined) moved.push({ id: n.id, from: null, to: n.status });
+      else if (was !== n.status) moved.push({ id: n.id, from: was, to: n.status });
+    }
+  }
+
+  // Frontier: ideation/planned nodes clustered by nearest capability ancestor.
+  const capAncestor = (id) => {
+    let cur = parentOf.get(id);
+    while (cur && cur !== root && byId.get(cur)?.type !== "capability") cur = parentOf.get(cur);
+    return cur ?? root;
+  };
+  const clusterMap = new Map();
+  for (const n of outNodes) {
+    if (n.status !== "ideation" && n.status !== "planned") continue;
+    const cap = capAncestor(n.id);
+    if (!clusterMap.has(cap)) clusterMap.set(cap, []);
+    clusterMap.get(cap).push(n.id);
+  }
+  const gaps = [];
+  for (const [cap, items] of clusterMap) {
+    const kids = childrenOf.get(cap) ?? [];
+    const hasInDev = kids.some((k) => cache.get(k)?.status === "in-dev");
+    if (!hasInDev) gaps.push(`${cap}: ${items.length} frontier node(s) but no in-dev child`);
+  }
+
+  return {
+    meta: { root, schema_version: doc.schema_version ?? "1.0" },
+    nodes: outNodes,
+    edges,
+    stats: { total: outNodes.length, byStatus, byType, moved },
+    frontier: {
+      clusters: [...clusterMap.entries()].map(([capability, items]) => ({ capability, items })),
+      gaps,
+    },
+  };
+}
