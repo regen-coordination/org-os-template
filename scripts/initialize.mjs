@@ -18,6 +18,7 @@ import yaml from "js-yaml";
 import matter from "gray-matter";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
+import { parseRegistries, resolveTree } from "./lib/tech-tree.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -611,6 +612,32 @@ function loadFederation() {
   };
 }
 
+// ── Tech Tree ────────────────────────────────────────────────────────────────
+
+function loadTechTree() {
+  try {
+    const treePath = path.join(rootDir, "data", "tech-tree.yaml");
+    if (!fs.existsSync(treePath)) return null;
+    const read = (...p) => fs.readFileSync(path.join(rootDir, ...p), "utf-8");
+    const registries = parseRegistries({
+      packagesYaml: read("data", "packages-matrix.yaml"),
+      skillsYaml: read("data", "skills-matrix.yaml"),
+      ideasYaml: read("data", "ideas.yaml"),
+    });
+    const prevPath = path.join(rootDir, "site", "src", "data", "tech-tree.resolved.json");
+    const previous = fs.existsSync(prevPath) ? JSON.parse(fs.readFileSync(prevPath, "utf-8")) : null;
+    const { stats, frontier } = resolveTree({ treeYaml: read("data", "tech-tree.yaml"), registries, previous });
+    return {
+      total: stats.total,
+      inDev: stats.byStatus["in-dev"] ?? 0,
+      frontier: frontier.clusters.reduce((a, c) => a + c.items.length, 0),
+      moved: stats.moved.length,
+    };
+  } catch {
+    return null; // never block the dashboard
+  }
+}
+
 // ── Key Docs ─────────────────────────────────────────────────────────────────
 
 function loadKeyDocs() {
@@ -998,6 +1025,7 @@ async function main() {
   const funding = loadFunding();
   const recentMemory = loadRecentMemory();
   const federation = loadFederation();
+  const techTree = loadTechTree();
   const docs = loadKeyDocs();
   const skills = loadSkills();
   const apps = loadApps();
@@ -1018,6 +1046,7 @@ async function main() {
     funding,
     recentMemory,
     federation,
+    techTree,
     docs,
     skills,
     apps,
@@ -1086,6 +1115,12 @@ function renderMarkdown(state) {
   if (status.schemaAge) statusParts.push(`Schemas: ${status.schemaAge}`);
   if (status.notionConnected) statusParts.push("Notion: connected");
   out += `> ${statusParts.join(" · ")}\n\n`;
+
+  // Tech tree pulse
+  if (state.techTree) {
+    const t = state.techTree;
+    out += `> Tech tree: ${t.total} nodes · ${t.inDev} in-dev · ${t.frontier} frontier · ${t.moved} moved since last resolve\n\n`;
+  }
 
   // Projects
   out += `### Active Projects\n\n`;
