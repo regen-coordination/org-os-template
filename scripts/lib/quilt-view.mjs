@@ -41,6 +41,8 @@ export function instancePatch(inst) {
     ` pkgs ×${(inst.packages ?? []).length}` +
     ((inst.skills_extra ?? []).length ? ` · +${inst.skills_extra.length} skills` : "") + " ";
   const drift = (inst.drift ?? []).length ? `drift ☓${inst.drift.length}` : "drift ✓";
+  // alpha instances aren't meaningfully drift-tracked yet, so a clean alpha omits
+  // the "drift ✓" segment entirely (drift ☓n still shows if flags exist).
   const syncLine = inst.maturity === "alpha" && !(inst.drift ?? []).length
     ? ` sync ${inst.last_sync ? mmdd(inst.last_sync) : "∅"} `
     : ` sync ${inst.last_sync ? mmdd(inst.last_sync) : "∅"} · ${drift} `;
@@ -57,4 +59,89 @@ export function syncLedger(instances, now) {
     .sort((a, b) => (a.m ?? Infinity) - (b.m ?? Infinity))
     .map((x) => `${x.id} ${fmtAge(x.m)}`);
   return "ledger: " + parts.join(" » ");
+}
+
+/** Hand-authored patch detail lines (creative residue). Derived default otherwise. */
+export const PKG_DETAIL = {
+  "toolkit-framework": [" 100/100 ✓ "],
+  "org-os-kms": [" 44/44 ✓ "],
+  "org-os-federation-map": [" the torch·d3 "],
+  operations: [" bcn·dao "],
+  "regen-agents": [" bcn·dao "],
+  webapps: [" bcn·dao "],
+  "hermes-integration": [" page auto-tool "],
+  "opencode-integration": [" 2 tools·5 cmds "],
+  "paperclip-agents-app": [" rgc fork AHEAD ", " backport pending "],
+  dashboard: [" bcn+dao ", " » fw template "],
+};
+
+export const PKG_SHORT = {
+  "toolkit-framework": "toolkit", "org-os-kms": "kms",
+  "org-os-federation-map": "fed-map", "hermes-integration": "hermes",
+  "opencode-integration": "opencode", "paperclip-agents-app": "paperclip",
+};
+
+const pkgShort = (id) => PKG_SHORT[id] ?? id;
+const instShort = (id) => id.replace(/-os$/, "");
+
+function pkgShade(p) {
+  if (/AHEAD|⚠/.test(p.notes ?? "")) return "☓";
+  if (p.promotion_status === "candidate") return "⊕";
+  if (p.promotion_status === "evaluating") return "▓";
+  return "█";
+}
+
+/** Route packages-matrix entries into { patches, sleeping, away }. */
+export function packageTiers(pkgs) {
+  const patches = [], sleeping = [], away = [];
+  for (const p of pkgs) {
+    const shade = pkgShade(p);
+    if (!p.in_framework) {
+      away.push(`(${pkgShort(p.id)}${shade !== "█" ? ` ${shade}` : ""})`);
+    } else if (p.lifecycle_status === "active" || shade === "☓" || shade === "⊕") {
+      const lines = PKG_DETAIL[p.id] ??
+        [` ${(p.instances_using ?? []).map(instShort).join("·") || p.lifecycle_status} `];
+      if (!PKG_DETAIL[p.id]) console.warn(`quilt: no PKG_DETAIL for "${p.id}" — derived line used`);
+      patches.push({ title: `${pkgShort(p.id)} ${shade}`, lines });
+    } else {
+      sleeping.push(
+        p.lifecycle_status === "planned" ? `(${pkgShort(p.id)} » planned)` : `(${pkgShort(p.id)})`,
+      );
+    }
+  }
+  return { patches, sleeping, away };
+}
+
+/** Hand-authored Develop-project patch lines. */
+export const PROJECT_DETAIL = {
+  "v2-stabilization": [" v3 tag local only ", " changelog pending "],
+  "federation-protocol": [" e2e sync queued ", " » autopoiesis p2 "],
+  "instance-orchestration": [" drift 27»0 ✓ ", " backports ×3 "],
+  "skill-promotion": [" v0.5 wave ✓ ", " dao-wave next "],
+};
+
+export const PROJECT_SHORT = {
+  "v2-stabilization": "v2-stab", "federation-protocol": "federation",
+  "instance-orchestration": "orchestration", "skill-promotion": "skill-promo",
+  "package-integration": "pkg-integration·multica", "non-tech-onboarding": "onboarding",
+  "instance-bootstrap": "bootstrap", "opal-rollout": "opal",
+  "operator-interfaces": "operator-interfaces", "framework-evolution": "evolution » autopoiesis",
+  reliability: "reliability",
+};
+
+const projShort = (id) => PROJECT_SHORT[id] ?? id;
+
+/** Route projects.yaml entries into { patches, discovery }. */
+export function projectTiers(projects) {
+  const patches = [], discovery = [];
+  for (const p of projects) {
+    if (p.status === "Develop") {
+      const lines = PROJECT_DETAIL[p.id] ?? [" develop "];
+      if (!PROJECT_DETAIL[p.id]) console.warn(`quilt: no PROJECT_DETAIL for "${p.id}"`);
+      patches.push({ title: `${projShort(p.id)} ${SHADE_PROJECT.Develop}`, lines });
+    } else {
+      discovery.push(`(${projShort(p.id)})`);
+    }
+  }
+  return { patches, discovery };
 }
