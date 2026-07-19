@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { toOrgOsRegistries, profileManifest, REGISTRY_BINDINGS, LIFECYCLE_BINDINGS } from '../src/bind.mjs';
+import { toOrgOsRegistries, profileManifest, REGISTRY_BINDINGS, LIFECYCLE_BINDINGS, CONNECTOR_DEFAULTS } from '../src/bind.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -33,7 +33,7 @@ test('lifecycle bindings are canonical op-names (initialize/close)', () => {
   assert.deepEqual(LIFECYCLE_BINDINGS.initialize,
     ['config.load', 'index.rebuild', 'review.list', 'render.dashboard', 'render.site']);
   assert.deepEqual(LIFECYCLE_BINDINGS.close,
-    ['csis-review', 'bridge', 'emit-contributions', 'federate.check', 'index.rebuild', 'render.site', 'render.dashboard', 'sync.push']);
+    ['ingest.pull', 'csis-review', 'bridge', 'emit-contributions', 'federate.check', 'index.rebuild', 'render.site', 'render.dashboard', 'sync.push']);
 });
 
 test('REGISTRY_BINDINGS keeps all 10 schema targets', () => {
@@ -45,4 +45,17 @@ test('profile.yaml stays in sync with bind.mjs (no drift)', () => {
   const profile = yaml.load(readFileSync(join(here, '../profile/profile.yaml'), 'utf8'));
   assert.deepEqual(profile.registry_bindings, REGISTRY_BINDINGS);
   assert.deepEqual(profile.lifecycle_bindings, LIFECYCLE_BINDINGS);
+});
+
+test('close lifecycle runs ingest.pull first, then csis-review, then bridge', () => {
+  const close = LIFECYCLE_BINDINGS.close;
+  assert.equal(close[0], 'ingest.pull');
+  assert.ok(close.indexOf('ingest.pull') < close.indexOf('csis-review'));
+  assert.ok(close.indexOf('csis-review') < close.indexOf('bridge'));
+});
+
+test('CONNECTOR_DEFAULTS documents the available connectors', () => {
+  assert.deepEqual(Object.keys(CONNECTOR_DEFAULTS).sort(), ['atproto', 'geo', 'github', 'koi', 'radicle', 'synthefy']);
+  assert.equal(CONNECTOR_DEFAULTS.github.status, 'active');
+  assert.equal(CONNECTOR_DEFAULTS.geo.status, 'stub');
 });
