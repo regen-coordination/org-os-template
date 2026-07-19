@@ -89,6 +89,21 @@ Shipped exactly as outlined, via TDD (plan: `docs/superpowers/plans/2026-07-19-g
 
 **Deferred:** candidate hook to run after `analyze:instances` (left manual for now — regenerate on `data/` change per HEARTBEAT routine).
 
+## Known manual-maintenance points & follow-ups (from final review)
+
+- **Garden-group drift:** `GARDEN_GROUPS` (skill membership) and the DAO-wave/interfaces/
+  integrations/automation/QUEUE organs are hand-authored prose. The skill *counts* are
+  data-driven, but a newly-added skill won't appear in a garden group until someone edits
+  `scripts/lib/quilt-view.mjs`. This is intentional ("membership is prose, counts are
+  data") but is the one spot where `docs/QUILT.md`'s "do not edit by hand" isn't the whole
+  story — the generator's editing note names both files for this reason.
+- **Regenerate on HEARTBEAT change too:** `docs/QUILT.md` embeds the open-task count, so it
+  goes stale when `HEARTBEAT.md` changes, not just `data/`. Re-run `npm run generate:quilt`.
+- **Deferred cleanups (non-blocking):** move `wrapSeparated` into `quilt-compose.mjs` (it's
+  pure geometry, currently only integration-tested); fold the double `--root` parse into
+  one; drop the unused `SHADE_PROJECT.Discovery` key (Discovery renders as an unshaded pod);
+  reuse `monthsAgo`/`fmtAge` for the inline memory-age math.
+
 ## Out of scope
 
 - Color/HTML rendering (a Canvas/Obsidian view could come via the

@@ -28,7 +28,7 @@ live patches get room, dormant things shrink to pods.
 ╔═ ORG-OS · framework v0.5 · woven 2026-07-19 ═════════════════════════════════════════╗
 ║ ┏━ CORE · nucleus ━━━━━━━━━━━━━━━━━━━┓ ┏━ DATA ≡ SCHEMAS ━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─HEARTBEAT █─╮ ╭─MEMORY █─╮       ┃ ┃ ╭─data/*.yaml █──╮ ╭─.well-known █─╮      ┃ ║
-║ ┃ │ 36 open     │ │ 4d ago   │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
+║ ┃ │ 37 open     │ │ 4d ago   │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
 ║ ┃ ╰─────────────╯ ╰──────────╯       ┃ ┃ ╰────────────────╯ ╰───────────────╯      ┃ ║
 ║ ┃ █ spine ─ (SOUL) (IDENTITY) (USER) ┃ ┃ ≡ generate ⇄ validate ✓                   ┃ ║
 ║ ┃           (TOOLS)                  ┃ ┃   yaml is truth, schema is face           ┃ ║
