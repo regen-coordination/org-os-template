@@ -44,12 +44,25 @@ If key decisions were made, append to the Key Decisions section (most recent fir
 
 If any plan in `docs/agent-plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/agent-plans/QUEUE.md`.
 
+## 5b. Update Tech Tree
+
+Did anything ship, start, or die this session? If yes:
+- Native nodes (capability/integration/standard): update `status` in `data/tech-tree.yaml`.
+- Ref-backed nodes (module/skill/idea): update the **source registry** (`packages-matrix.yaml` / `skills-matrix.yaml` / `ideas.yaml`) — never the tree.
+- New work with no node yet: add the node + a `part-of` edge.
+
+Then:
+
+```bash
+npm run validate:tech-tree && npm run resolve:tech-tree
+```
+
 ## 6. Commit
 
 Stage all changed files and commit:
 
 ```bash
-git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/
+git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/ site/src/data/
 git commit -m "session: [concise description of what was done]"
 ```
 
