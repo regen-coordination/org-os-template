@@ -1,0 +1,62 @@
+{
+  "fetched_at": "2026-07-19T15:01:24.229Z",
+  "source": "local",
+  "peers": [
+    {
+      "id": "ReFi DAO",
+      "name": "ReFi DAO",
+      "repo": "03 Libraries/ReFi DAO",
+      "url": "https://github.com/luizfernandosg/Zettelkasten/tree/main/03%20Libraries/ReFi%20DAO",
+      "type": null
+    },
+    {
+      "id": "egregore",
+      "name": "egregore",
+      "repo": "repos/egregore",
+      "url": "https://github.com/refibcn/refi-bcn",
+      "type": null
+    },
+    {
+      "id": "ReFi-BCN-Website",
+      "name": "ReFi-BCN-Website",
+      "repo": "repos/ReFi-BCN-Website",
+      "url": "https://github.com/refibcn/ReFi-BCN-Website",
+      "type": null
+    },
+    {
+      "id": "Regenerant-Catalunya",
+      "name": "Regenerant-Catalunya",
+      "repo": "repos/Regenerant-Catalunya",
+      "url": "https://github.com/refibcn/Regenerant-Catalunya",
+      "type": null
+    },
+    {
+      "id": "refi-bcn-knowledge",
+      "name": "refi-bcn-knowledge",
+      "repo": "repos/refi-bcn-knowledge",
+      "url": "https://github.com/luizfernandosg/ReFi-Barcelona",
+      "type": null
+    },
+    {
+      "id": "bioregional-garden",
+      "name": "bioregional-garden",
+      "repo": "repos/bioregional-garden",
+      "url": "https://github.com/andrea-diome/bioregional-garden",
+      "type": null
+    },
+    {
+      "id": "altiplano-estepario",
+      "name": "altiplano-estepario",
+      "repo": "repos/altiplano-estepario",
+      "url": "https://github.com/andrea-diome/altiplano-estepario",
+      "type": null
+    },
+    {
+      "id": "regen-coordination-os",
+      "name": "regen-coordination-os",
+      "repo": "03 Libraries/regen-coordination-os",
+      "url": "https://github.com/luizfernandosg/Zettelkasten/tree/main/03%20Libraries/regen-coordination-os",
+      "type": null
+    }
+  ]
+}

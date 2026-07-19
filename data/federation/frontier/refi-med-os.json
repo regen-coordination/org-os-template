@@ -1,0 +1,34 @@
+{
+  "fetched_at": "2026-07-19T15:01:24.229Z",
+  "source": "local",
+  "peers": [
+    {
+      "id": "ReFi DAO",
+      "name": "ReFi DAO",
+      "repo": "ReFiDAO/refi-dao-os",
+      "url": "https://github.com/ReFiDAO/refi-dao-os",
+      "type": null
+    },
+    {
+      "id": "ReFi Barcelona",
+      "name": "ReFi Barcelona",
+      "repo": "refibcn/refi-bcn-os",
+      "url": "https://github.com/refibcn/refi-bcn-os",
+      "type": null
+    },
+    {
+      "id": "Regen Coordination",
+      "name": "Regen Coordination",
+      "repo": "regen-coordination/regen-coordination-os",
+      "url": "https://github.com/regen-coordination/regen-coordination-os",
+      "type": null
+    },
+    {
+      "id": "ReFi Mediterranean (knowledge base)",
+      "name": "ReFi Mediterranean (knowledge base)",
+      "repo": "repos/refi-mediterranean",
+      "url": "https://github.com/ReFiDAO/ReFi-Mediterranean",
+      "type": null
+    }
+  ]
+}

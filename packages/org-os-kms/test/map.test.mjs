@@ -58,3 +58,23 @@ test('duplicate ids across sections keep one node, both edges', () => {
   const m = buildMap({ dir: join(FIX, 'full'), now: NOW });
   assert.equal(m.nodes.filter((n) => n.id === 'sibling-os').length, 1);
 });
+
+test('frontier snapshots become ring-2 nodes; ring-1 dups keep edge only (spec §3 dedup)', () => {
+  const m = buildMap({ dir: join(FIX, 'full'), now: NOW });
+  const grand = m.nodes.find((n) => n.id === 'grand-peer');
+  assert.equal(grand.kind, 'frontier');
+  assert.equal(grand.ring, 2);
+  assert.ok(m.edges.some((e) => e.from === 'child-os' && e.to === 'grand-peer' && e.kind === 'frontier'));
+  // sibling-os is already ring 1 → stays a single instance node, frontier edge retargets it
+  assert.equal(m.nodes.filter((n) => n.id === 'sibling-os').length, 1);
+  assert.equal(m.nodes.find((n) => n.id === 'sibling-os').kind, 'instance');
+  assert.ok(m.edges.some((e) => e.from === 'child-os' && e.to === 'sibling-os' && e.kind === 'frontier'));
+});
+
+test('ecosystems: node added, sources tagged + edged', () => {
+  const m = buildMap({ dir: join(FIX, 'full'), now: NOW });
+  const eco = m.nodes.find((n) => n.id === 'regen-commons');
+  assert.equal(eco.kind, 'ecosystem');
+  assert.equal(m.nodes.find((n) => n.id === 'koi-network').ecosystem, 'regen-commons');
+  assert.ok(m.edges.some((e) => e.from === 'regen-commons' && e.to === 'koi-network' && e.kind === 'provenance'));
+});

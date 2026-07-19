@@ -1,0 +1,55 @@
+{
+  "fetched_at": "2026-07-19T15:01:24.229Z",
+  "source": "local",
+  "peers": [
+    {
+      "id": "ReFi BCN",
+      "name": "ReFi BCN",
+      "repo": "regen-coordination/refi-bcn",
+      "url": "https://github.com/regen-coordination/refi-bcn",
+      "type": "implementation"
+    },
+    {
+      "id": "NYC Node",
+      "name": "NYC Node",
+      "repo": "regen-coordination/nyc-node",
+      "url": "https://github.com/regen-coordination/nyc-node",
+      "type": "implementation"
+    },
+    {
+      "id": "Bloom",
+      "name": "Bloom",
+      "repo": "regen-coordination/bloom",
+      "url": "https://github.com/regen-coordination/bloom",
+      "type": "implementation"
+    },
+    {
+      "id": "GreenPill Network",
+      "name": "GreenPill Network",
+      "repo": "regen-coordination/greenpill",
+      "url": "https://github.com/regen-coordination/greenpill",
+      "type": "implementation"
+    },
+    {
+      "id": "Regenerant Catalunya",
+      "name": "Regenerant Catalunya",
+      "repo": "regen-coordination/regenerant-catalunya",
+      "url": "https://github.com/regen-coordination/regenerant-catalunya",
+      "type": "program-node"
+    },
+    {
+      "id": "Local ReFi Toolkit",
+      "name": "Local ReFi Toolkit",
+      "repo": "regen-coordination/local-refi-toolkit",
+      "url": "https://github.com/regen-coordination/local-refi-toolkit",
+      "type": "resource-node"
+    },
+    {
+      "id": "Coop",
+      "name": "Coop",
+      "repo": "regen-coordination/coop",
+      "url": "https://github.com/regen-coordination/coop",
+      "type": "product-node"
+    }
+  ]
+}

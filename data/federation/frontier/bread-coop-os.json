@@ -1,0 +1,13 @@
+{
+  "fetched_at": "2026-07-19T15:01:24.229Z",
+  "source": "local",
+  "peers": [
+    {
+      "id": "org-os-framework",
+      "name": "org-os-framework",
+      "repo": null,
+      "url": "https://github.com/organizational-os/organizational-os-template.git",
+      "type": null
+    }
+  ]
+}

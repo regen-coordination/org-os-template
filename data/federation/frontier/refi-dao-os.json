@@ -1,0 +1,55 @@
+{
+  "fetched_at": "2026-07-19T15:01:24.229Z",
+  "source": "local",
+  "peers": [
+    {
+      "id": "Regen Coordination",
+      "name": "Regen Coordination",
+      "repo": "03 Libraries/regen-coordination-os",
+      "url": "https://hub.regencoordination.xyz/",
+      "type": null
+    },
+    {
+      "id": "Local ReFi Toolkit",
+      "name": "Local ReFi Toolkit",
+      "repo": "03 Libraries/Local-ReFi-Toolkit",
+      "url": "https://github.com/regencoordination/local-refi-toolkit",
+      "type": null
+    },
+    {
+      "id": "ReFi DAO Website",
+      "name": "ReFi DAO Website",
+      "repo": "repos/ReFi-DAO-Website",
+      "url": "https://refidao.com",
+      "type": null
+    },
+    {
+      "id": "ReFi-Barcelona",
+      "name": "ReFi-Barcelona",
+      "repo": "03 Libraries/ReFi-Barcelona",
+      "url": "https://github.com/luizfernandosg/Zettelkasten/tree/main/03%20Libraries/ReFi-Barcelona",
+      "type": null
+    },
+    {
+      "id": "ReFi-BCN-Website",
+      "name": "ReFi-BCN-Website",
+      "repo": "03 Libraries/ReFi-BCN-Website",
+      "url": "https://refibcn.cat",
+      "type": null
+    },
+    {
+      "id": "Regenerant-Catalunya",
+      "name": "Regenerant-Catalunya",
+      "repo": "03 Libraries/Regenerant-Catalunya",
+      "url": "https://regenerant.refibcn.cat",
+      "type": null
+    },
+    {
+      "id": "Regen KOI Federation",
+      "name": "Regen KOI Federation",
+      "repo": "https://github.com/gaiaaiagent/regen-koi-mcp",
+      "url": "https://regen.gaiaai.xyz/api/koi",
+      "type": "knowledge-graph"
+    }
+  ]
+}
