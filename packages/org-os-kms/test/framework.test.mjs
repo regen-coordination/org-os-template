@@ -14,3 +14,8 @@ test('framework shim resolves live schemas (binding actually reaches the framewo
   assert.ok(fw.listSchemas().includes('source-system'));
   assert.ok(fw.listSchemas().includes('review-maturity'));
 });
+
+test('framework re-exports runConnector and NOT_IMPLEMENTED', () => {
+  assert.equal(typeof fw.runConnector, 'function');
+  assert.equal(fw.NOT_IMPLEMENTED, 'NOT_IMPLEMENTED');
+});

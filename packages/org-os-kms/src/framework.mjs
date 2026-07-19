@@ -17,3 +17,4 @@ export {
 export {
   prepare, acceptWorkOrder, classifySource, suggestSchemas,
 } from '../../toolkit-framework/src/ingest.mjs';
+export { runConnector, NOT_IMPLEMENTED } from '../../toolkit-framework/src/connector.mjs';
