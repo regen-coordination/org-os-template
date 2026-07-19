@@ -42,3 +42,6 @@ __pycache__
 
 # Visual brainstorming sessions
 .superpowers/
+
+# Git worktrees (isolated workspaces)
+.worktrees/
