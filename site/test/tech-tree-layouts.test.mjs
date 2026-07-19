@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { collapseSkills, dominantStatus, techtreeLayout, treeLayout } from "../src/scripts/tech-tree/layouts.mjs";
+import { collapseSkills, dominantStatus, treeLayout } from "../src/scripts/tech-tree/layouts.mjs";
 
 const graph = {
   meta: { root: "r" },
@@ -43,17 +43,6 @@ test("collapseSkills leaves expanded capabilities alone", () => {
   const g = collapseSkills(graph, new Set(["cap"]));
   assert.ok(g.nodes.some((n) => n.id === "s1"));
   assert.ok(!g.nodes.some((n) => n.id === "cluster:cap"));
-});
-
-test("techtreeLayout: status blocks arranged left→right, all positioned", () => {
-  const pos = techtreeLayout(graph, 800, 600);
-  // blocks flow live → in-dev → planned → … → dormant
-  assert.ok(pos.get("r").x < pos.get("s2").x); // live block left of in-dev
-  assert.ok(pos.get("s2").x < pos.get("m1").x); // in-dev left of planned
-  assert.ok(pos.get("m1").x < pos.get("d1").x); // dormant block after planned
-  // same-status nodes share a sub-column (same x when they fit one column)
-  assert.equal(pos.get("r").x, pos.get("cap").x);
-  for (const n of graph.nodes) assert.ok(pos.has(n.id));
 });
 
 test("treeLayout: radial — root at centre, deeper nodes farther out", () => {

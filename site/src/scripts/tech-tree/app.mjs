@@ -3,13 +3,17 @@
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceRadial, forceSimulation } from "d3-force";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity } from "d3-zoom";
-import { STATUS_RADIUS, collapseSkills, techtreeLayout, treeLayout } from "./layouts.mjs";
+import { STATUS_ORDER, STATUS_RADIUS, TRAY, collapseSkills, treeLayout } from "./layouts.mjs";
 
 const R = { capability: 16, "skill-cluster": 11, module: 10, integration: 9, standard: 9, skill: 7, idea: 7 };
 const VIEWS = ["hybrid", "constellation", "techtree", "tree"];
+const BLOCK_ORDER = [...STATUS_ORDER, ...TRAY]; // status blocks, roadmap order
+const byParentLabel = (a, b) =>
+  (a.parent ?? "").localeCompare(b.parent ?? "") || a.label.localeCompare(b.label);
 
 export function mountTechTree(host, graph) {
   const svgEl = host.querySelector("svg");
+  const blocksEl = host.querySelector("[data-blocks]");
   const panel = host.querySelector("[data-panel]");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const expanded = new Set();
@@ -27,8 +31,18 @@ export function mountTechTree(host, graph) {
   svg.call(zoomBehavior);
 
   function render() {
-    const { width, height } = svgEl.getBoundingClientRect();
     const data = collapseSkills(graph, expanded);
+    if (view === "techtree") {
+      renderBlocks(data);
+      return;
+    }
+    renderGraph(data);
+  }
+
+  function renderGraph(data) {
+    blocksEl.hidden = true;
+    svgEl.style.display = "";
+    const { width, height } = svgEl.getBoundingClientRect();
     const nodes = data.nodes.map((n) => ({ ...n }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
     links = data.edges
@@ -72,11 +86,10 @@ export function mountTechTree(host, graph) {
       nodeSel.attr("transform", (d) => `translate(${d.x},${d.y})`);
     };
 
-    if (view === "techtree" || view === "tree") {
-      const pos = view === "techtree" ? techtreeLayout(data, width, height) : treeLayout(data, width, height, graph.meta.root);
+    if (view === "tree") {
+      const pos = treeLayout(data, width, height, graph.meta.root);
       for (const n of nodes) Object.assign(n, pos.get(n.id) ?? { x: width / 2, y: height / 2 });
       place();
-      if (view === "techtree") drawBlockHeaders(nodes);
       sim = null;
     } else {
       const radius = Math.min(width, height) * 0.45;
@@ -103,7 +116,58 @@ export function mountTechTree(host, graph) {
         sim.on("tick", place);
       }
     }
-    applyFilters();
+    applyGraphFilters();
+  }
+
+  // Modular blocks view: a responsive HTML card grid, grouped by status.
+  function renderBlocks(data) {
+    sim?.stop();
+    sim = null;
+    svgEl.style.display = "none";
+    blocksEl.hidden = false;
+    const byId = new Map(data.nodes.map((n) => [n.id, n]));
+    links = data.edges
+      .filter((e) => byId.has(e.from) && byId.has(e.to))
+      .map((e) => ({ kind: e.kind, source: byId.get(e.from), target: byId.get(e.to) }));
+    const groups = BLOCK_ORDER.map((status) => ({
+      status,
+      nodes: data.nodes.filter((n) => n.status === status).sort(byParentLabel),
+    })).filter((grp) => grp.nodes.length);
+
+    // Trusted build-time data from data/tech-tree.yaml — no user-supplied content flows here.
+    blocksEl.innerHTML = groups
+      .map(
+        (grp) => `
+      <section class="tt-block status-${grp.status}">
+        <header class="tt-block-head"><span class="pip" aria-hidden="true"></span>${grp.status}<span class="tt-block-count">${grp.nodes.length}</span></header>
+        <div class="tt-grid">
+          ${grp.nodes
+            .map((n) => {
+              const type = n.type === "skill-cluster" ? "skills" : n.type;
+              return `<button class="tt-card status-${n.status} type-${n.type}" data-id="${n.id}" data-status="${n.status}" data-type="${n.type === "skill-cluster" ? "skill" : n.type}">
+              <span class="tt-card-type">${type}</span>
+              <span class="tt-card-label">${n.label}</span>
+            </button>`;
+            })
+            .join("")}
+        </div>
+      </section>`,
+      )
+      .join("");
+
+    for (const card of blocksEl.querySelectorAll("[data-id]")) {
+      card.addEventListener("click", () => onSelect(byId.get(card.dataset.id)));
+    }
+    applyBlockFilters();
+  }
+
+  function applyBlockFilters() {
+    for (const card of blocksEl.querySelectorAll(".tt-card")) {
+      card.hidden = hidden.status.has(card.dataset.status) || hidden.type.has(card.dataset.type);
+    }
+    for (const sec of blocksEl.querySelectorAll(".tt-block")) {
+      sec.hidden = ![...sec.querySelectorAll(".tt-card")].some((c) => !c.hidden);
+    }
   }
 
   function onSelect(d) {
@@ -150,34 +214,17 @@ export function mountTechTree(host, graph) {
     edgeSel.classed("dim", (l) => l.source.id !== d.id && l.target.id !== d.id);
   }
 
-  function applyFilters() {
+  function applyGraphFilters() {
     const nodeHidden = (n) =>
       hidden.status.has(n.status) || hidden.type.has(n.type === "skill-cluster" ? "skill" : n.type);
     nodeSel.classed("hide", nodeHidden);
     edgeSel.classed("hide", (l) => nodeHidden(l.source) || nodeHidden(l.target));
   }
 
-  // A status header above each block in the techtree view — derived from the
-  // laid-out node positions (min-x of each status block).
-  function drawBlockHeaders(nodes) {
-    const blocks = new Map(); // status → {minX, count}
-    for (const n of nodes) {
-      const b = blocks.get(n.status);
-      if (!b) blocks.set(n.status, { minX: n.x, count: 1 });
-      else {
-        b.minX = Math.min(b.minX, n.x);
-        b.count++;
-      }
-    }
-    const layer = g.append("g").attr("class", "tt-headers");
-    for (const [status, { minX, count }] of blocks) {
-      layer
-        .append("text")
-        .attr("class", `tt-block-hdr status-${status}`)
-        .attr("x", minX - 30)
-        .attr("y", 30)
-        .text(`${status} · ${count}`);
-    }
+  // Chip toggles route to whichever view is live.
+  function applyFilters() {
+    if (view === "techtree") applyBlockFilters();
+    else applyGraphFilters();
   }
 
   // Toolbar wiring

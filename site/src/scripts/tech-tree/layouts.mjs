@@ -56,37 +56,6 @@ export function collapseSkills(graph, expanded = new Set()) {
   return { ...graph, nodes, edges };
 }
 
-// Roadmap of status blocks: live → in-dev → planned → ideation → dormant → retired.
-// Each status is a compact grid ("block") that wraps into sub-columns when tall,
-// blocks flow left→right. Returns Map id → {x, y}. Block header positions are
-// derived by the renderer from the per-status min-x.
-export const TT_BLOCK_ORDER = [...STATUS_ORDER, ...TRAY];
-const TT_CELL_W = 96;
-const TT_CELL_H = 46;
-const TT_TOP_PAD = 60;
-
-export function techtreeLayout(graph, width, height) {
-  const pos = new Map();
-  const rowsPerCol = Math.max(3, Math.floor((height - TT_TOP_PAD - 20) / TT_CELL_H));
-  let x = 48;
-  for (const status of TT_BLOCK_ORDER) {
-    const block = graph.nodes
-      .filter((n) => n.status === status)
-      .sort((a, b) => (a.parent ?? "").localeCompare(b.parent ?? "") || a.label.localeCompare(b.label));
-    if (!block.length) continue;
-    const cols = Math.ceil(block.length / rowsPerCol);
-    const rows = Math.min(block.length, rowsPerCol);
-    const startY = Math.max(TT_TOP_PAD, (height - rows * TT_CELL_H) / 2);
-    block.forEach((n, i) => {
-      const col = Math.floor(i / rowsPerCol);
-      const row = i % rowsPerCol;
-      pos.set(n.id, { x: x + col * TT_CELL_W + TT_CELL_W / 2, y: startY + row * TT_CELL_H + TT_CELL_H / 2 });
-    });
-    x += cols * TT_CELL_W + 56; // gap between blocks
-  }
-  return pos;
-}
-
 // Radial hierarchy from part-of parents: root at the centre, depth → radius
 // (growth rings), each subtree owning an angular wedge sized by its leaf count.
 // Returns Map id → {x, y}.
