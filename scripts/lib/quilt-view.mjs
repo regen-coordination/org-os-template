@@ -146,3 +146,27 @@ export function projectTiers(projects) {
   }
   return { patches, discovery };
 }
+
+/** Tally skills-matrix promotion_status values. */
+export function skillCounts(skills) {
+  const c = { canonical: 0, evaluating: 0, candidate: 0, "instance-specific": 0, total: 0 };
+  for (const s of skills) {
+    c.total++;
+    if (c[s.promotion_status] == null) {
+      console.warn(`quilt: unknown promotion_status "${s.promotion_status}" (${s.id})`);
+      continue;
+    }
+    c[s.promotion_status]++;
+  }
+  return c;
+}
+
+/** Hand-curated garden domains (template). Membership is prose, counts are data. */
+export const GARDEN_GROUPS = {
+  "█ lifecycle": ["(initialize)", "(org-os-init)", "(bootstrap-interviewer)", "(commands)"],
+  "█ discipline": ["(superpowers ×9 · tdd·debug·plans·worktrees·reviews)"],
+  "█ org-ops": ["(heartbeat)", "(meetings)", "(funding)", "(ideas)"],
+  "█ knowledge": ["(curator)", "(research)", "(web-browsing)", "(notion-cli)", "(canvas)"],
+  "█ builders": ["(skill-creator)", "(mcp)", "(frontend)", "(artifacts)", "(schema-gen)"],
+  "█ mentors": ["(feynman)", "(karpathy)", "(workspace)", "(transcription)"],
+};

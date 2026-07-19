@@ -4,6 +4,7 @@ import {
   instanceShade, monthsAgo, fmtAge, instancePatch, syncLedger,
 } from "../scripts/lib/quilt-view.mjs";
 import { packageTiers, projectTiers, PKG_DETAIL } from "../scripts/lib/quilt-view.mjs";
+import { skillCounts, GARDEN_GROUPS } from "../scripts/lib/quilt-view.mjs";
 
 const NOW = new Date("2026-07-19");
 
@@ -105,4 +106,20 @@ test("projectTiers — Develop → patches, Discovery → pods", () => {
   assert.equal(t.patches[0].title, "v2-stab ▓");
   assert.equal(t.patches[1].title, "brand-new-thing ▓"); // unknown id still renders
   assert.deepEqual(t.discovery, ["(opal)"]); // pods use PROJECT_SHORT id too
+});
+
+test("skillCounts tallies promotion pipeline from the matrix", () => {
+  const c = skillCounts([
+    { id: "a", promotion_status: "canonical" },
+    { id: "b", promotion_status: "canonical" },
+    { id: "c", promotion_status: "evaluating" },
+    { id: "d", promotion_status: "candidate" },
+    { id: "e", promotion_status: "instance-specific" },
+  ]);
+  assert.deepEqual(c, { canonical: 2, evaluating: 1, candidate: 1, "instance-specific": 1, total: 5 });
+});
+
+test("GARDEN_GROUPS is label → pod tokens", () => {
+  assert.ok(GARDEN_GROUPS["█ lifecycle"].includes("(initialize)"));
+  assert.ok(GARDEN_GROUPS["█ builders"].includes("(mcp)"));
 });
