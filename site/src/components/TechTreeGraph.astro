@@ -95,39 +95,40 @@ const views = [
     linear-gradient(var(--color-grid) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
     linear-gradient(90deg, var(--color-grid) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
     var(--color-bg); }
-  .tt-block[hidden] { display: none; }
-  .tt-block-head { display: flex; align-items: center; gap: 0.5em; margin-bottom: var(--space-3);
+  /* Cards + sections are injected at runtime → target with :global (like the SVG marks) */
+  .tt-blocks :global(.tt-block[hidden]) { display: none; }
+  .tt-blocks :global(.tt-block-head) { display: flex; align-items: center; gap: 0.5em; margin-bottom: var(--space-3);
     font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600; text-transform: uppercase;
     letter-spacing: var(--tracking-wide); color: var(--tt-hdr, var(--color-ink-2)); }
-  .tt-block-head .pip { width: 9px; height: 9px; border-radius: 50%; background: var(--tt-hdr); }
-  .tt-block-head .tt-block-count { color: var(--color-faint); font-weight: 500; }
-  .tt-block.status-live { --tt-hdr: var(--tt-live); }
-  .tt-block.status-in-dev { --tt-hdr: var(--tt-in-dev); }
-  .tt-block.status-planned { --tt-hdr: var(--tt-planned); }
-  .tt-block.status-ideation { --tt-hdr: var(--tt-ideation); }
-  .tt-block.status-dormant { --tt-hdr: var(--tt-dormant); }
-  .tt-block.status-retired { --tt-hdr: var(--tt-retired); }
+  .tt-blocks :global(.tt-block-head .pip) { width: 9px; height: 9px; border-radius: 50%; background: var(--tt-hdr); }
+  .tt-blocks :global(.tt-block-head .tt-block-count) { color: var(--color-faint); font-weight: 500; }
+  .tt-blocks :global(.tt-block.status-live) { --tt-hdr: var(--tt-live); }
+  .tt-blocks :global(.tt-block.status-in-dev) { --tt-hdr: var(--tt-in-dev); }
+  .tt-blocks :global(.tt-block.status-planned) { --tt-hdr: var(--tt-planned); }
+  .tt-blocks :global(.tt-block.status-ideation) { --tt-hdr: var(--tt-ideation); }
+  .tt-blocks :global(.tt-block.status-dormant) { --tt-hdr: var(--tt-dormant); }
+  .tt-blocks :global(.tt-block.status-retired) { --tt-hdr: var(--tt-retired); }
 
-  .tt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--space-3); }
-  .tt-card { --c: var(--color-line-2); position: relative; text-align: left; cursor: pointer;
+  .tt-blocks :global(.tt-grid) { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--space-3); }
+  .tt-blocks :global(.tt-card) { --c: var(--color-line-2); position: relative; text-align: left; cursor: pointer;
     display: flex; flex-direction: column; gap: 0.35em; padding: var(--space-3) var(--space-4);
     background: var(--color-surface); border: var(--border-hair) solid var(--color-line);
     border-left: 3px solid var(--c); border-radius: var(--radius); color: var(--color-ink);
     transition: transform var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast); }
-  .tt-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--c); }
-  .tt-card:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
-  .tt-card[hidden] { display: none; }
-  .tt-card-type { font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase;
+  .tt-blocks :global(.tt-card:hover) { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--c); }
+  .tt-blocks :global(.tt-card:focus-visible) { outline: 2px solid var(--c); outline-offset: 2px; }
+  .tt-blocks :global(.tt-card[hidden]) { display: none; }
+  .tt-blocks :global(.tt-card-type) { font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase;
     letter-spacing: var(--tracking-wide); color: var(--color-faint); }
-  .tt-card-label { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug);
+  .tt-blocks :global(.tt-card-label) { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-snug);
     word-break: break-word; }
-  .tt-card.status-live { --c: var(--tt-live); }
-  .tt-card.status-in-dev { --c: var(--tt-in-dev); }
-  .tt-card.status-planned { --c: var(--tt-planned); }
-  .tt-card.status-ideation { --c: var(--tt-ideation); border-style: dashed; }
-  .tt-card.status-dormant { --c: var(--tt-dormant); opacity: 0.72; }
-  .tt-card.status-retired { --c: var(--tt-retired); opacity: 0.6; }
-  .tt-card.type-skill-cluster { border-style: dashed; background: var(--color-bg-2); }
+  .tt-blocks :global(.tt-card.status-live) { --c: var(--tt-live); }
+  .tt-blocks :global(.tt-card.status-in-dev) { --c: var(--tt-in-dev); }
+  .tt-blocks :global(.tt-card.status-planned) { --c: var(--tt-planned); }
+  .tt-blocks :global(.tt-card.status-ideation) { --c: var(--tt-ideation); border-style: dashed; }
+  .tt-blocks :global(.tt-card.status-dormant) { --c: var(--tt-dormant); opacity: 0.72; }
+  .tt-blocks :global(.tt-card.status-retired) { --c: var(--tt-retired); opacity: 0.6; }
+  .tt-blocks :global(.tt-card.type-skill-cluster) { border-style: dashed; background: var(--color-bg-2); }
   .tt-svg :global(.halo) { opacity: calc(var(--tt-glow) * 0.3); filter: blur(6px); }
   .tt-svg :global(.dot) { stroke-width: 2; }
   .tt-svg :global(.root .dot) { stroke-width: 3; }
