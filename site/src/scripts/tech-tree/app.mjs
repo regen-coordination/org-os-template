@@ -2,8 +2,8 @@
 // layouts. Mounted by TechTreeGraph.astro with the build-time resolved graph.
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceRadial, forceSimulation } from "d3-force";
 import { select } from "d3-selection";
-import { zoom } from "d3-zoom";
-import { STATUS_ORDER, STATUS_RADIUS, TRAY, collapseSkills, techtreeLayout, treeLayout } from "./layouts.mjs";
+import { zoom, zoomIdentity } from "d3-zoom";
+import { STATUS_RADIUS, collapseSkills, techtreeLayout, treeLayout } from "./layouts.mjs";
 
 const R = { capability: 16, "skill-cluster": 11, module: 10, integration: 9, standard: 9, skill: 7, idea: 7 };
 const VIEWS = ["hybrid", "constellation", "techtree", "tree"];
@@ -23,14 +23,17 @@ export function mountTechTree(host, graph) {
 
   const svg = select(svgEl);
   const g = svg.append("g");
-  svg.call(zoom().scaleExtent([0.3, 4]).on("zoom", (ev) => g.attr("transform", ev.transform)));
+  const zoomBehavior = zoom().scaleExtent([0.3, 4]).on("zoom", (ev) => g.attr("transform", ev.transform));
+  svg.call(zoomBehavior);
 
   function render() {
     const { width, height } = svgEl.getBoundingClientRect();
     const data = collapseSkills(graph, expanded);
     const nodes = data.nodes.map((n) => ({ ...n }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
-    links = data.edges.map((e) => ({ kind: e.kind, source: byId.get(e.from), target: byId.get(e.to) }));
+    links = data.edges
+      .filter((e) => byId.has(e.from) && byId.has(e.to))
+      .map((e) => ({ kind: e.kind, source: byId.get(e.from), target: byId.get(e.to) }));
     sim?.stop();
     g.selectAll("*").remove();
 
@@ -73,6 +76,7 @@ export function mountTechTree(host, graph) {
       const pos = view === "techtree" ? techtreeLayout(data, width, height) : treeLayout(data, width, height, graph.meta.root);
       for (const n of nodes) Object.assign(n, pos.get(n.id) ?? { x: width / 2, y: height / 2 });
       place();
+      sim = null;
     } else {
       const radius = Math.min(width, height) * 0.45;
       sim = forceSimulation(nodes)
@@ -107,13 +111,15 @@ export function mountTechTree(host, graph) {
       render();
       return;
     }
+    const nbrs = neighbors(d);
     const rows = [
       `<p class="tt-status"><span class="pip status-${d.status}"></span>${d.status} <span class="src">via ${d.statusSource}</span></p>`,
       d.summary ? `<p>${d.summary}</p>` : "",
-      d.links.length ? `<p>${d.links.map((l) => `<a href="${l.href}">${l.label}</a>`).join(" · ")}</p>` : "",
-      d.driving.length ? `<p class="src">driving: ${d.driving.join(", ")}</p>` : "",
-      neighbors(d).length ? `<p class="src">connected: ${neighbors(d).join(", ")}</p>` : "",
+      d.links?.length ? `<p>${(d.links ?? []).map((l) => `<a href="${l.href}">${l.label}</a>`).join(" · ")}</p>` : "",
+      d.driving?.length ? `<p class="src">driving: ${(d.driving ?? []).join(", ")}</p>` : "",
+      nbrs.length ? `<p class="src">connected: ${nbrs.join(", ")}</p>` : "",
     ];
+    // Trusted build-time data from data/tech-tree.yaml — do NOT route user-supplied content through this innerHTML.
     panel.innerHTML = `<button data-close>×</button><p class="tt-type">${d.type}</p><h2>${d.label}</h2>${rows.join("")}`;
     panel.hidden = false;
     panel.querySelector("[data-close]").addEventListener("click", () => (panel.hidden = true));
@@ -156,6 +162,7 @@ export function mountTechTree(host, graph) {
       view = btn.dataset.view;
       for (const b of host.querySelectorAll("[data-view]")) b.classList.toggle("active", b === btn);
       history.replaceState(null, "", `?view=${view}`);
+      svg.call(zoomBehavior.transform, zoomIdentity);
       render();
     });
     btn.classList.toggle("active", btn.dataset.view === view);
@@ -171,6 +178,10 @@ export function mountTechTree(host, graph) {
     });
   }
 
-  addEventListener("resize", () => render());
+  let resizeTimer;
+  addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => render(), 150);
+  });
   render();
 }
