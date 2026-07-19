@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadKmsConfig } from '../src/config.mjs';
+import yaml from 'js-yaml';
+import { loadKmsConfig, persistConnectorCursors } from '../src/config.mjs';
 
 function tmpInstance(yamlText) {
   const dir = mkdtempSync(join(tmpdir(), 'kms-config-'));
@@ -32,4 +33,16 @@ test('throws when adapter or target is missing', () => {
 test('throws when target is missing but adapter is present', () => {
   const dir = tmpInstance('instance: t\nadapter: repo-data\n');
   assert.throws(() => loadKmsConfig(dir), /missing "target"/);
+});
+
+test('persistConnectorCursors updates connector cursors in kms.yaml without clobbering other keys', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-cfg-'));
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({
+    instance: 'test', adapter: 'repo-data', target: '.',
+    connectors: [{ name: 'github', config: { repos: ['a/b'] }, cursor: null }],
+  }));
+  persistConnectorCursors(dir, [{ name: 'github', config: { repos: ['a/b'] }, cursor: '2026-07-01T00:00:00Z' }]);
+  const doc = yaml.load(readFileSync(join(dir, 'kms.yaml'), 'utf8'));
+  assert.equal(doc.instance, 'test');
+  assert.equal(doc.connectors[0].cursor, '2026-07-01T00:00:00Z');
 });
