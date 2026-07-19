@@ -9,6 +9,7 @@ import { addPeer, checkPeers, contribute } from './federate.mjs';
 import { promote } from './promote.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { buildMap } from './map.mjs';
+import { renderMapHtml } from './render-map-html.mjs';
 import { fetchFrontier } from './frontier.mjs';
 import * as fw from './framework.mjs';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +40,9 @@ export function dispatch(argv, opts = {}) {
     case 'bridge':    return bridge({ dir, config: loadKmsConfig(dir) });
     case 'render': {
       if (args[0] === 'map') {
+        if (args[1] === 'html') {
+          return renderMapHtml({ dir, out: flags.out || 'renders/federation-map.html' });
+        }
         // No loadKmsConfig here — the map degrades gracefully without kms.yaml (spec §6).
         const map = buildMap({ dir, surface: flags.surface || 'web' });
         const out = join(dir, flags.out || 'data/kb/map.json');

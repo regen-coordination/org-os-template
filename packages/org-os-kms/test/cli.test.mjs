@@ -29,6 +29,11 @@ test('dispatch dry-routes render map', () => {
   assert.deepEqual(r, { verb: 'render', args: ['map'], flags: { out: 'x.json' } });
 });
 
+test('dispatch dry-routes render map html', () => {
+  const r = dispatch(['render', 'map', 'html'], { dry: true });
+  assert.deepEqual(r, { verb: 'render', args: ['map', 'html'], flags: {} });
+});
+
 test('dispatch dry-routes federate frontier', () => {
   const r = dispatch(['federate', 'frontier'], { dry: true });
   assert.deepEqual(r, { verb: 'federate', args: ['frontier'], flags: {} });
