@@ -247,7 +247,11 @@ function loadProjects() {
     path.join(rootDir, "content", "projects"), // fallback for v1 instances
   ]) {
     if (!fs.existsSync(projectsDir)) continue;
-    const files = fs.readdirSync(projectsDir).filter((f) => f.endsWith(".md"));
+    const files = fs
+      .readdirSync(projectsDir)
+      .filter((f) => f.endsWith(".md"))
+      // Skip package docs / templates, not actual projects
+      .filter((f) => f.toLowerCase() !== "readme.md" && !f.startsWith("_"));
     for (const file of files) {
       const parsed = parseMarkdownFrontmatter(path.join(projectsDir, file));
       if (!parsed) continue;
@@ -554,6 +558,10 @@ function loadRecentMemory() {
       .filter((l) => l.trim() && !l.startsWith("#") && !l.startsWith("---"))
       .slice(0, 2)
       .join(" ")
+      // Strip markdown emphasis/quote/code markers so the summary reads clean
+      .replace(/[*_`]+/g, "")
+      .replace(/^\s*>\s*/g, "")
+      .replace(/\s+/g, " ")
       .trim();
 
     if (lines) {
@@ -1299,7 +1307,10 @@ function generateAsciiBanner(name) {
       displayName = name.substring(0, 12).trim();
     }
   }
-  const fullText = displayName.toUpperCase() + " OS";
+  // Append " OS" only when the name doesn't already end in OS
+  // (e.g. "org-os" → "ORG-OS", not "ORG-OS OS").
+  const base = displayName.toUpperCase();
+  const fullText = /(^|[\s-])OS$/.test(base) ? base : base + " OS";
 
   const lines = ["", "", "", "", ""];
   for (const char of fullText) {
