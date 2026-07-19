@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "generated_at": "2026-07-19T00:00:00Z",
+  "self": { "id": "org-os", "name": "org-os", "type": "Project", "emoji": "🧬" },
+  "nodes": [
+    { "id": "refi-bcn-os", "kind": "instance", "name": "ReFi Barcelona", "type": "LocalNode", "ring": 1, "trust": "full", "live": true, "url": "https://github.com/luizfernandosg/refi-bcn-os", "counts": { "members": 3, "projects": 26 } },
+    { "id": "refi-dao-os", "kind": "instance", "name": "ReFi DAO", "type": "DAO", "ring": 1, "trust": "full", "live": true, "counts": { "projects": 12 } },
+    { "id": "regen-coordination-os", "kind": "instance", "name": "Regen Coordination", "type": "Hub", "ring": 1, "trust": "full", "live": false },
+    { "id": "refi-lisboa", "kind": "frontier", "name": "ReFi Lisboa", "ring": 2 },
+    { "id": "refi-medellin", "kind": "frontier", "name": "ReFi Medellín", "ring": 2 },
+    { "id": "celo-eco", "kind": "frontier", "name": "Celo Ecosystem", "ring": 2 },
+    { "id": "koi-network", "kind": "source", "name": "KOI Network", "ring": 3, "ecosystem": "regen-commons", "counts": { "objects": 14 } },
+    { "id": "regen-registry", "kind": "source", "name": "Regen Registry", "ring": 3, "ecosystem": "regen-commons" },
+    { "id": "regen-commons", "kind": "ecosystem", "name": "Regen Commons", "ring": 3, "url": "https://example.org" }
+  ],
+  "edges": [
+    { "from": "org-os", "to": "refi-bcn-os", "kind": "downstream" },
+    { "from": "org-os", "to": "refi-dao-os", "kind": "downstream" },
+    { "from": "org-os", "to": "regen-coordination-os", "kind": "downstream" },
+    { "from": "refi-dao-os", "to": "refi-lisboa", "kind": "frontier" },
+    { "from": "refi-dao-os", "to": "refi-medellin", "kind": "frontier" },
+    { "from": "refi-bcn-os", "to": "celo-eco", "kind": "frontier" },
+    { "from": "koi-network", "to": "org-os", "kind": "provenance" },
+    { "from": "regen-registry", "to": "org-os", "kind": "provenance" },
+    { "from": "regen-commons", "to": "koi-network", "kind": "provenance" },
+    { "from": "regen-commons", "to": "regen-registry", "kind": "provenance" }
+  ]
+}
