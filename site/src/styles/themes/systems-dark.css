@@ -30,5 +30,22 @@
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -20px rgba(0, 0, 0, 0.7);
 
+  /* Tech-tree graph — observatory personality: solid status fill + glow */
+  --tt-live:     #46c46a;
+  --tt-in-dev:   #60a5fa;
+  --tt-planned:  #fbbf24;
+  --tt-ideation: #8b949e;
+  --tt-dormant:  #646c75;
+  --tt-retired:  #f87171;
+  --tt-fill-live:     var(--tt-live);
+  --tt-fill-in-dev:   var(--tt-in-dev);
+  --tt-fill-planned:  var(--tt-planned);
+  --tt-fill-ideation: transparent;
+  --tt-fill-dormant:  var(--tt-dormant);
+  --tt-fill-retired:  var(--tt-retired);
+  --tt-edge:  var(--color-line-2);
+  --tt-label: var(--color-ink-2);
+  --tt-glow: 1;
+
   color-scheme: dark;
 }
