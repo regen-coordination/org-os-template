@@ -63,3 +63,11 @@ test('runConnector forces maturity:raw even if map emits a different maturity', 
   const sig = stored.find((e) => e.schema === 'signal');
   assert.equal(sig.object.maturity, 'raw');
 });
+
+test('runConnector dry mode reports candidates without calling adapter.store', async () => {
+  const a = { name: 'mem', store() { throw new Error('adapter.store must not be called in dry mode'); } };
+  const res = await runConnector(fakeConnector, { config: {}, cursor: null, adapter: a, target: '.', dry: true });
+  assert.equal(res.dry, true);
+  assert.equal(res.candidates, 2);
+  assert.equal(res.stored, 3); // card + 2 signals = would-store count
+});

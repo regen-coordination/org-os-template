@@ -41,7 +41,8 @@ export async function dispatch(argv, opts = {}) {
     case 'ingest': {
       const cfg = loadKmsConfig(dir);
       if (flags.connector) cfg.connectors = (cfg.connectors || []).filter((c) => c.name === flags.connector);
-      return await OPS['ingest.pull'].run({ dir, config: cfg });
+      const dry = Object.prototype.hasOwnProperty.call(flags, 'dry');
+      return await OPS['ingest.pull'].run({ dir, config: cfg, dry });
     }
     case 'bridge':    return bridge({ dir, config: loadKmsConfig(dir) });
     case 'render': {

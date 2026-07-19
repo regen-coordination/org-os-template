@@ -28,7 +28,7 @@ export const NOT_IMPLEMENTED = 'NOT_IMPLEMENTED';
  * Returns { source, stored, candidates, cursor, errors }.
  */
 export async function runConnector(connector, ctx = {}) {
-  const { config = {}, cursor = null, adapter, target } = ctx;
+  const { config = {}, cursor = null, adapter, target, dry = false } = ctx;
   if (!adapter) throw new Error('runConnector: adapter required');
   const errors = [];
 
@@ -67,6 +67,9 @@ export async function runConnector(connector, ctx = {}) {
     toStore.push({ schema: c.schema, object });
   }
 
-  const { stored } = adapter.store(target, toStore);
-  return { source: card.title, stored: stored.length, candidates: candidates.length, cursor: nextCursor, errors };
+  // dry: report what WOULD be stored without touching the adapter (spec: pull+map+report only).
+  const stored = dry
+    ? toStore.map((e, i) => `dry:${e.object.title}#${i}`)
+    : adapter.store(target, toStore).stored;
+  return { source: card.title, stored: stored.length, candidates: candidates.length, cursor: nextCursor, errors, dry: !!dry };
 }

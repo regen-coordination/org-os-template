@@ -4,6 +4,7 @@ import { dispatch } from '../src/cli.mjs';
 import { join } from 'node:path';
 import { mkdtempSync, writeFileSync as wf, readFileSync as rf } from 'node:fs';
 import { tmpdir } from 'node:os';
+import yaml from 'js-yaml';
 
 test('parses "lifecycle initialize --dir X" into a verb + flags', async () => {
   const r = await dispatch(['lifecycle', 'initialize', '--dir', '/tmp/x'], { dry: true });
@@ -58,4 +59,12 @@ test('ingest is a known verb (dry parse)', async () => {
 
 test('unknown verb still rejected', async () => {
   assert.equal((await dispatch(['frobnicate'], { dry: true })).error, 'unknown verb: frobnicate');
+});
+
+test('ingest --dry runs the dry path (executes, does not store)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-cli-'));
+  wf(join(dir, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', connectors: [] }));
+  const r = await dispatch(['ingest', '--dir', dir, '--dry']);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.report.pulled, []); // no connectors declared → empty, but the dry path ran
 });

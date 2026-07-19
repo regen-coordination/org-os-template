@@ -104,3 +104,24 @@ test('ingest.pull: a thrown pull (not NOT_IMPLEMENTED) fails the op hard', async
   assert.equal(res.ok, false);
   assert.match(res.report.errors[0], /boom: network down/);
 });
+
+test('ingest.pull dry mode does not store, persist, or advance the cursor', async () => {
+  let persisted = false;
+  const decl = { name: 'good', config: {}, cursor: 'OLD' };
+  const good = {
+    name: 'good', protocol: 'G', capabilities: { ingest: true },
+    describe: () => ({ title: 'G', type: 'repo', steward: 't', return_path: 'https://x.org' }),
+    pull: async () => ({ records: [{ t: 'A' }], cursor: 'NEW' }),
+    map: (r) => [{ schema: 'signal', object: { title: r.t, type: 'signal', signal_type: 'content' } }],
+  };
+  const res = await OPS['ingest.pull'].run({
+    dir: '/tmp/none', dry: true,
+    config: { adapter: 'x', target: '.', connectors: [decl] },
+    getConnector: () => good,
+    getAdapter: () => ({ name: 'mem', store() { throw new Error('stored in dry'); } }),
+    persistCursors: () => { persisted = true; },
+  });
+  assert.equal(res.ok, true);
+  assert.equal(decl.cursor, 'OLD');   // not advanced
+  assert.equal(persisted, false);     // not persisted
+});

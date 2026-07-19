@@ -55,20 +55,20 @@ export const OPS = {
     for (const decl of connectors) {
       try {
         const conn = getConn(decl.name);
-        const res = await fw.runConnector(conn, { config: decl.config || {}, cursor: decl.cursor ?? null, adapter, target });
+        const res = await fw.runConnector(conn, { config: decl.config || {}, cursor: decl.cursor ?? null, adapter, target, dry: ctx.dry });
         // Advance the cursor ONLY when every record ingested cleanly. A soft error means some
         // records were skipped, so re-fetch from the prior cursor next time (at-least-once;
         // store is idempotent by slug). Per-record errors are reported, not fatal — one bad
         // upstream record must not halt the whole close lifecycle.
         const clean = res.errors.length === 0;
-        if (clean) decl.cursor = res.cursor;
+        if (clean && !ctx.dry) decl.cursor = res.cursor;
         report.pulled.push({ name: decl.name, stored: res.stored, candidates: res.candidates, errors: res.errors, cursor_advanced: clean });
       } catch (e) {
         if (/NOT_IMPLEMENTED/.test(e.message)) { report.pulled.push({ name: decl.name, skipped: 'NOT_IMPLEMENTED' }); continue; }
         report.errors.push(`${decl.name}: ${e.message}`);
       }
     }
-    persist(ctx.dir, connectors);
+    if (!ctx.dry) persist(ctx.dir, connectors);
     return { ok: report.errors.length === 0, report };
   } },
 
