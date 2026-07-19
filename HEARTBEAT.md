@@ -19,6 +19,8 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 - [ ] Finalize `framework-dashboard-template` scoping — reusable dashboard package (scoping plan)
 - [ ] Finalize `obsidian-interface` scoping — Obsidian as primary operator interface (scoping plan)
 - [ ] Finalize `obsidian-canvas-interface` scoping — Canvas as system overview + interface (scoping plan, depends on `obsidian-interface`)
+- [ ] Fast follow: `report:frontier` command — render the resolver's `frontier` block into `memory/reports/` and propose QUEUE candidates (seam already emitted by resolve-tech-tree)
+- [ ] Propagate the `tech-tree` skill + `/tech-tree` page downstream on each instance's next sync
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
 ### Orchestration (multi-instance)
