@@ -8,6 +8,7 @@ import { renderDashboardSection, renderSiteData } from './render.mjs';
 import { addPeer, checkPeers, contribute } from './federate.mjs';
 import { promote } from './promote.mjs';
 import { loadKmsConfig } from './config.mjs';
+import { OPS } from './ops.mjs';
 import { buildMap } from './map.mjs';
 import { renderMapHtml, renderPortalIndex } from './render-map-html.mjs';
 import { fetchFrontier } from './frontier.mjs';
@@ -16,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, join, dirname as pathDirname } from 'node:path';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init']);
+const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init', 'ingest']);
 
 function parseFlags(argv) {
   const args = [], flags = {};
@@ -37,6 +38,11 @@ export async function dispatch(argv, opts = {}) {
   const dir = flags.dir || '.';
   switch (verb) {
     case 'lifecycle': return await runLifecycle(args[0], { dir });
+    case 'ingest': {
+      const cfg = loadKmsConfig(dir);
+      if (flags.connector) cfg.connectors = (cfg.connectors || []).filter((c) => c.name === flags.connector);
+      return await OPS['ingest.pull'].run({ dir, config: cfg });
+    }
     case 'bridge':    return bridge({ dir, config: loadKmsConfig(dir) });
     case 'render': {
       if (args[0] === 'map') {

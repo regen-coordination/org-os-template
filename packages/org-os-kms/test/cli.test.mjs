@@ -48,3 +48,14 @@ test('render map builds map.json from federation.yaml (no kms.yaml needed)', asy
   assert.equal(written.self.id, 'tmp-os');
   assert.equal(written.nodes.length, 1);
 });
+
+test('ingest is a known verb (dry parse)', async () => {
+  const r = await dispatch(['ingest', '--connector', 'github', '--dir', '/tmp/x'], { dry: true });
+  assert.equal(r.verb, 'ingest');
+  assert.equal(r.flags.connector, 'github');
+  assert.equal(r.flags.dir, '/tmp/x');
+});
+
+test('unknown verb still rejected', async () => {
+  assert.equal((await dispatch(['frobnicate'], { dry: true })).error, 'unknown verb: frobnicate');
+});
