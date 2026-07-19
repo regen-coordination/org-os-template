@@ -24,34 +24,47 @@ export const githubConnector = {
     };
   },
 
-  async pull(config = {}, { cursor } = {}) {
+  async pull(config = {}, { cursor } = {}, deps = {}) {
+    const gh = deps.ghJSON || ghJSON;
     const repos = config.repos || [];
     const include = config.include || ['issues'];
-    const since = cursor || config.since || null;
+    const cur = cursor || {};                 // per-stream watermarks: { issues, releases }
+    const sinceIssues = cur.issues || config.since || null;
+    const sinceReleases = cur.releases || config.since || null;
+    const ISSUE_LIMIT = 500, RELEASE_LIMIT = 200;
     const records = [];
-    let high = since;
-    const bump = (ts) => { if (ts && (!high || ts > high)) high = ts; };
+    const warnings = [];
+    let hiIssues = sinceIssues, hiReleases = sinceReleases;
+    const bumpI = (ts) => { if (ts && (!hiIssues || ts > hiIssues)) hiIssues = ts; };
+    const bumpR = (ts) => { if (ts && (!hiReleases || ts > hiReleases)) hiReleases = ts; };
+    const HANDLED = new Set(['issues', 'releases']);
+    for (const t of include) if (!HANDLED.has(t)) warnings.push(`github: unhandled include type "${t}" (only issues, releases are implemented)`);
 
     for (const repo of repos) {
       if (include.includes('issues')) {
-        const issues = ghJSON(['issue', 'list', '--repo', repo, '--state', 'all', '--limit', '200',
-          '--json', 'number,title,body,url,updatedAt,author']);
+        const args = ['issue', 'list', '--repo', repo, '--state', 'all', '--limit', String(ISSUE_LIMIT),
+          '--json', 'number,title,body,url,updatedAt,author'];
+        if (sinceIssues) args.push('--search', `updated:>=${String(sinceIssues).slice(0, 10)}`);
+        const issues = gh(args);
+        if (issues.length >= ISSUE_LIMIT) warnings.push(`github ${repo}: issue window saturated at ${ISSUE_LIMIT}; updates older than the window may be missed (follow-on: server-side pagination)`);
         for (const it of issues) {
-          if (since && it.updatedAt <= since) continue;
+          if (sinceIssues && it.updatedAt <= sinceIssues) continue;
           records.push({ kind: 'issue', repo, ...it });
-          bump(it.updatedAt);
+          bumpI(it.updatedAt);
         }
       }
       if (include.includes('releases')) {
-        const rels = ghJSON(['release', 'list', '--repo', repo, '--limit', '100', '--json', 'name,tagName,url,publishedAt']);
+        const rels = gh(['release', 'list', '--repo', repo, '--limit', String(RELEASE_LIMIT), '--json', 'name,tagName,url,publishedAt']);
+        if (rels.length >= RELEASE_LIMIT) warnings.push(`github ${repo}: release window saturated at ${RELEASE_LIMIT}`);
         for (const r of rels) {
-          if (since && r.publishedAt <= since) continue;
+          if (sinceReleases && r.publishedAt <= sinceReleases) continue;
           records.push({ kind: 'release', repo, name: r.name || r.tagName, url: r.url, publishedAt: r.publishedAt, body: '' });
-          bump(r.publishedAt);
+          bumpR(r.publishedAt);
         }
       }
     }
-    return { records, cursor: high };
+    for (const w of warnings) console.warn(`⚠ ${w}`);
+    return { records, cursor: { issues: hiIssues, releases: hiReleases }, warnings };
   },
 
   map(record, _config = {}) {

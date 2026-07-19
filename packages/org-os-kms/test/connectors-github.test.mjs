@@ -39,3 +39,38 @@ test('github maps a release record to a valid resource', () => {
 test('github map returns [] for an unknown record kind', () => {
   assert.deepEqual(githubConnector.map({ kind: 'label' }, {}), []);
 });
+
+test('github pull keeps per-stream cursors (issue + release watermarks tracked separately)', async () => {
+  const fake = (args) => {
+    if (args[0] === 'issue') return [{ number: 1, title: 'I', body: '', url: 'u1', updatedAt: '2026-07-10T00:00:00Z', author: { login: 'a' } }];
+    if (args[0] === 'release') return [{ name: 'v1', tagName: 'v1', url: 'r1', publishedAt: '2026-06-01T00:00:00Z' }];
+    return [];
+  };
+  const { records, cursor } = await githubConnector.pull(
+    { repos: ['o/r'], include: ['issues', 'releases'] }, { cursor: null }, { ghJSON: fake });
+  assert.equal(records.length, 2);
+  assert.equal(cursor.issues, '2026-07-10T00:00:00Z');
+  assert.equal(cursor.releases, '2026-06-01T00:00:00Z');
+});
+
+test('github pull: a newer issue does NOT cause a newer release to be skipped (per-stream filtering)', async () => {
+  const fake = (args) => {
+    if (args[0] === 'issue') return [{ number: 2, title: 'I2', body: '', url: 'u2', updatedAt: '2026-07-15T00:00:00Z', author: { login: 'a' } }];
+    if (args[0] === 'release') return [{ name: 'v2', tagName: 'v2', url: 'r2', publishedAt: '2026-07-05T00:00:00Z' }];
+    return [];
+  };
+  const { records } = await githubConnector.pull(
+    { repos: ['o/r'], include: ['issues', 'releases'] },
+    { cursor: { issues: '2026-07-10T00:00:00Z', releases: '2026-06-01T00:00:00Z' } },
+    { ghJSON: fake });
+  // issue 07-15 > 07-10 → in; release 07-05 > 06-01 → in (NOT filtered by the issue watermark)
+  assert.equal(records.length, 2);
+  assert.ok(records.some((r) => r.kind === 'release'));
+});
+
+test('github pull warns on an unhandled include type', async () => {
+  const fake = () => [];
+  const { warnings } = await githubConnector.pull(
+    { repos: ['o/r'], include: ['discussions'] }, { cursor: null }, { ghJSON: fake });
+  assert.ok(warnings.some((w) => /unhandled include type "discussions"/.test(w)));
+});

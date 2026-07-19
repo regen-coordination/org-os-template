@@ -57,3 +57,11 @@ Outbound (`publish`) is draft-and-present only.
 
 Stubs are registered and discoverable; their `pull` throws `NOT_IMPLEMENTED` and the docstring
 is the implementation spec. Building one = fill in `pull`/`map`, flip status to active.
+
+## Known limitations (follow-ons)
+
+- **GitHub incremental pull** uses a bounded window (issues 500, releases 200) with a server-side
+  `updated:>=` date filter. Repos with more changed items than the window between pulls may miss the
+  tail; a saturation warning is emitted when a window fills. Full server-side pagination is a follow-on.
+- **KOI** maps every non-FORGET bundle to `resource` (schema-by-RID-type is a follow-on).
+- `subscribe` (live events) and `publish` (contribute-back) are declared but not implemented.
