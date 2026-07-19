@@ -28,7 +28,7 @@ function parseFlags(argv) {
   return { args, flags };
 }
 
-export function dispatch(argv, opts = {}) {
+export async function dispatch(argv, opts = {}) {
   const [verb, ...rest] = argv;
   const { args, flags } = parseFlags(rest);
   if (!VERBS.has(verb)) return { error: `unknown verb: ${verb}` };
@@ -36,7 +36,7 @@ export function dispatch(argv, opts = {}) {
 
   const dir = flags.dir || '.';
   switch (verb) {
-    case 'lifecycle': return runLifecycle(args[0], { dir });
+    case 'lifecycle': return await runLifecycle(args[0], { dir });
     case 'bridge':    return bridge({ dir, config: loadKmsConfig(dir) });
     case 'render': {
       if (args[0] === 'map') {

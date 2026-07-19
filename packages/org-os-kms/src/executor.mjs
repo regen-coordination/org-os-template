@@ -5,7 +5,7 @@
 import { LIFECYCLE_BINDINGS } from './bind.mjs';
 import { OPS as DEFAULT_OPS } from './ops.mjs';
 
-export function runLifecycle(event, ctx = {}, deps = {}) {
+export async function runLifecycle(event, ctx = {}, deps = {}) {
   const events = deps.events || LIFECYCLE_BINDINGS;
   const ops = deps.ops || DEFAULT_OPS;
   const names = events[event];
@@ -17,7 +17,7 @@ export function runLifecycle(event, ctx = {}, deps = {}) {
     if (!op) { report.errors.push(`unregistered op: ${name}`); return report; } // config error → fail-hard
     if (op.kind === 'skill') { report.skills.push(op.skill); continue; }
     try {
-      const res = op.run(ctx) || {};
+      const res = (await op.run(ctx)) || {};
       const ok = res.ok !== false;
       report.ran.push({ op: name, ok, report: res.report });
       // A write op that REPORTS failure (without throwing) is also fail-hard: the real write

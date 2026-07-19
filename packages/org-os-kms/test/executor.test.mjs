@@ -14,38 +14,38 @@ function stubOps(order) {
   };
 }
 
-test('runs exec ops in order, collects skill directives', () => {
+test('runs exec ops in order, collects skill directives', async () => {
   const order = [];
-  const r = runLifecycle('initialize', { dir: '.' },
+  const r = await runLifecycle('initialize', { dir: '.' },
     { events: { initialize: ['a.read', 'a.skill', 'a.write'] }, ops: stubOps(order) });
   assert.deepEqual(order, ['a.read', 'a.write']);
   assert.deepEqual(r.skills, ['demo-skill']);
   assert.equal(r.errors.length, 0);
 });
 
-test('fail-soft: a render/read op error is logged but the run continues', () => {
+test('fail-soft: a render/read op error is logged but the run continues', async () => {
   const order = [];
-  const r = runLifecycle('initialize', { dir: '.' },
+  const r = await runLifecycle('initialize', { dir: '.' },
     { events: { initialize: ['a.render', 'a.read'] }, ops: stubOps(order) });
   assert.deepEqual(order, ['a.render', 'a.read']);
   assert.match(r.errors[0], /render boom/);
 });
 
-test('fail-hard: a write op error stops the run', () => {
+test('fail-hard: a write op error stops the run', async () => {
   const order = [];
-  const r = runLifecycle('initialize', { dir: '.' },
+  const r = await runLifecycle('initialize', { dir: '.' },
     { events: { initialize: ['a.crash', 'a.read'] }, ops: stubOps(order) });
   assert.deepEqual(order, ['a.crash']); // a.read never runs
   assert.match(r.errors[0], /write boom/);
 });
 
-test('fail-hard: a write op that returns {ok:false} (no throw) stops the run', () => {
+test('fail-hard: a write op that returns {ok:false} (no throw) stops the run', async () => {
   const order = [];
   const ops = {
     'a.softfail': { kind: 'exec', write: true, run: () => { order.push('a.softfail'); return { ok: false }; } },
     'a.read': { kind: 'exec', write: false, run: () => { order.push('a.read'); return { ok: true }; } },
   };
-  const r = runLifecycle('initialize', { dir: '.' },
+  const r = await runLifecycle('initialize', { dir: '.' },
     { events: { initialize: ['a.softfail', 'a.read'] }, ops });
   assert.deepEqual(order, ['a.softfail']); // a.read never runs
   assert.match(r.errors[0], /a.softfail: reported failure/);
@@ -55,15 +55,34 @@ test('op registry is importable and wired (import sanity)', () => {
   assert.ok(OPS['config.load']); // sanity: real registry wired
 });
 
-test('fail-hard: an unregistered op-name halts the run', () => {
+test('fail-hard: an unregistered op-name halts the run', async () => {
   const order = [];
-  const r = runLifecycle('initialize', { dir: '.' },
+  const r = await runLifecycle('initialize', { dir: '.' },
     { events: { initialize: ['a.read', 'a.ghost', 'a.read'] },
       ops: { 'a.read': { kind: 'exec', write: false, run: () => { order.push('a.read'); return { ok: true }; } } } });
   assert.deepEqual(order, ['a.read']); // stops at the unregistered op; the second a.read never runs
   assert.match(r.errors[0], /unregistered op: a.ghost/);
 });
 
-test('throws on an unknown lifecycle event', () => {
-  assert.throws(() => runLifecycle('nope', {}, { events: {} }), /unknown lifecycle event/);
+test('throws on an unknown lifecycle event', async () => {
+  await assert.rejects(() => runLifecycle('nope', {}, { events: {} }), /unknown lifecycle event/);
+});
+
+test('runLifecycle awaits async exec ops', async () => {
+  const ops = {
+    'async.op': { kind: 'exec', write: true, run: async () => {
+      await Promise.resolve();
+      return { ok: true, report: { did: 'async-work' } };
+    } },
+  };
+  const events = { close: ['async.op'] };
+  const report = await runLifecycle('close', {}, { ops, events });
+  assert.equal(report.errors.length, 0);
+  assert.deepEqual(report.ran[0].report, { did: 'async-work' });
+});
+
+test('runLifecycle fail-hard on an async write op that rejects', async () => {
+  const ops = { 'boom': { kind: 'exec', write: true, run: async () => { throw new Error('kaboom'); } } };
+  const report = await runLifecycle('close', {}, { ops, events: { close: ['boom'] } });
+  assert.match(report.errors[0], /boom: kaboom/);
 });
