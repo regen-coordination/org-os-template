@@ -21,6 +21,8 @@
     "generate:schemas": "node scripts/generate-all-schemas.mjs",
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
+    "resolve:tech-tree": "node scripts/resolve-tech-tree.mjs",
+    "validate:tech-tree": "node scripts/validate-tech-tree.mjs",
     "analyze:instances": "node scripts/analyze-instances.mjs",
     "version:update": "node scripts/update-version.mjs",
     "migrate": "node scripts/migrate.mjs",
