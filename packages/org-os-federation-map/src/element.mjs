@@ -6,7 +6,7 @@
 // Guarded so the module imports cleanly in node (no DOM at top level).
 import { normalizeMap } from './parse.mjs';
 import { buildLayout, nodeRadius } from './sim.mjs';
-import { renderSVG } from './svg.mjs';
+import { renderSVG, esc } from './svg.mjs';
 
 const Base = typeof HTMLElement === 'undefined' ? class {} : HTMLElement;
 
@@ -56,9 +56,39 @@ svg.panning { cursor: grabbing; }
 :host([mode="mini"]) .node.self .label, :host([mode="mini"]) .node.instance .label { display: block; }
 `;
 
+// Node fields (name/url/repo/portal/type) can originate from REMOTE peer manifests
+// (fetchFrontier → buildMap → map.json), so the panel is untrusted HTML. safeUrl
+// allow-lists link schemes (blocks javascript:/data:) and nodePanelHTML escapes every
+// interpolation — both pure + exported so they're unit-tested without a DOM.
+const SAFE_SCHEME = /^(https?:|obsidian:)/i;
+export function safeUrl(u) {
+  if (typeof u !== 'string') return null;
+  const s = u.trim();
+  if (/^[/#]/.test(s)) return s;           // same-origin relative links are safe
+  return SAFE_SCHEME.test(s) ? s : null;   // otherwise only http(s)/obsidian
+}
+
+export function nodePanelHTML(n) {
+  const link = (href, label) => {
+    const s = safeUrl(href);
+    return s ? `<a href="${esc(s)}" target="_blank" rel="noopener">${esc(label)}</a>` : '';
+  };
+  const links = [
+    link(n.url, 'visit ↗'),
+    link(n.repo, 'repository ↗'),
+    n.url && n.kind === 'instance' ? link(`${String(n.url).replace(/\/$/, '')}/federation.json`, 'federation.json ↗') : '',
+    link(n.portal, '→ view inside (portal)'),
+  ].filter(Boolean).join('');
+  const dl = [['kind', n.kind], ['type', n.type], ['ring', n.ring], ['trust', n.trust],
+    ['ecosystem', n.ecosystem], ['last seen', n.last_seen]]
+    .filter(([, v]) => v != null)
+    .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  return `<h3>${esc(n.name || n.id)}</h3><dl>${dl}</dl>${links}`;
+}
+
 export class FederationMap extends Base {
   async connectedCallback() {
-    this.attachShadow({ mode: 'open' });
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' }); // re-entrant safe
     const data = await this.#loadData();
     this.map = normalizeMap(data);
     this.#render();
@@ -161,18 +191,7 @@ export class FederationMap extends Base {
     const body = panel.querySelector('.panel-body');
     this.svg.addEventListener('click', (ev) => {
       const g = ev.target.closest('.node'); if (!g) return;
-      const n = this.#byId(g.dataset.id);
-      const links = [
-        n.url && `<a href="${n.url}" target="_blank" rel="noopener">visit ↗</a>`,
-        n.repo && `<a href="${n.repo}" target="_blank" rel="noopener">repository ↗</a>`,
-        n.url && n.kind === 'instance' && `<a href="${n.url.replace(/\/$/, '')}/federation.json" target="_blank" rel="noopener">federation.json ↗</a>`,
-        n.portal && `<a href="${n.portal}">→ view inside (portal)</a>`,
-      ].filter(Boolean).join('');
-      const dl = [['kind', n.kind], ['type', n.type], ['ring', n.ring], ['trust', n.trust],
-        ['ecosystem', n.ecosystem], ['last seen', n.last_seen]]
-        .filter(([, v]) => v != null)
-        .map(([k, v]) => `<dt>${k}</dt><dd>${String(v)}</dd>`).join('');
-      body.innerHTML = `<h3>${n.name || n.id}</h3><dl>${dl}</dl>${links}`;
+      body.innerHTML = nodePanelHTML(this.#byId(g.dataset.id)); // escaped + scheme-allowlisted
       panel.classList.add('open');
     });
     panel.querySelector('.close').addEventListener('click', () => panel.classList.remove('open'));
@@ -251,13 +270,16 @@ export class FederationMap extends Base {
   #focusFromHash() {
     const m = (location.hash || '').match(/node=([^&]+)/);
     if (!m) return;
-    const id = decodeURIComponent(m[1]);
-    if (this.#byId(id)) this.#light(id);
+    const n = this.#byId(decodeURIComponent(m[1]));
+    if (!n) return;
+    this.#light(n.id);
+    const vb = this.svg.viewBox.baseVal; // walk toward it: centre the viewBox on the node
+    vb.x = n.x - vb.width / 2; vb.y = n.y - vb.height / 2;
   }
 
   #srTable() {
     const rows = this.layout.nodes.map((n) =>
-      `<tr><td>${n.name || n.id}</td><td>${n.kind}</td><td>${n.ring}</td></tr>`).join('');
+      `<tr><td>${esc(n.name || n.id)}</td><td>${esc(n.kind)}</td><td>${esc(n.ring)}</td></tr>`).join('');
     return `<table class="sr-only"><caption>Federation map nodes</caption>` +
       `<thead><tr><th>name</th><th>kind</th><th>ring</th></tr></thead><tbody>${rows}</tbody></table>`;
   }

@@ -41,8 +41,9 @@ export function dispatch(argv, opts = {}) {
     case 'render': {
       if (args[0] === 'map') {
         if (args[1] === 'html') {
-          const html = renderMapHtml({ dir, out: flags.out || 'renders/federation-map.html' });
-          const portals = renderPortalIndex({ dir });
+          const now = new Date().toISOString(); // one timestamp → artifact + index stay in sync
+          const html = renderMapHtml({ dir, out: flags.out || 'renders/federation-map.html', now });
+          const portals = renderPortalIndex({ dir, now });
           return { ok: true, report: { ...html.report, portals: portals.report.wrote } };
         }
         // No loadKmsConfig here — the map degrades gracefully without kms.yaml (spec §6).

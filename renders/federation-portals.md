@@ -1,6 +1,6 @@
 # Federation portals — org-os
 
-> Doors between the internal note graph and [the torch](federation-map.html). Generated 2026-07-19T15:16:46.909Z — regenerate with `org-os-kms render map html`. Link to these anchors from any note.
+> Doors between the internal note graph and [the torch](federation-map.html). Generated 2026-07-19T15:33:11.058Z — regenerate with `org-os-kms render map html`. Link to these anchors from any note.
 
 ## Instances
 

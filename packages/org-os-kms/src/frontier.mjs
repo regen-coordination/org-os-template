@@ -36,8 +36,14 @@ export async function fetchFrontier({ dir = '.', fetchFn = globalThis.fetch, now
         source = 'local';
       } else if (entry.repo) {
         const url = `https://raw.githubusercontent.com/${entry.repo}/HEAD/federation.yaml`;
-        const res = await fetchFn(url);
-        if (res.ok) { manifest = yaml.load(await res.text()); source = url; }
+        // Abort a hung host so one slow peer can't stall the whole sequential sweep;
+        // a timeout lands in the catch below, which preserves any existing cache.
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const res = await fetchFn(url, { signal: ctrl.signal });
+          if (res.ok) { manifest = yaml.load(await res.text()); source = url; }
+        } finally { clearTimeout(timer); }
       } else {
         report.push({ id, skipped: 'no local_path or repo' });
         continue;
