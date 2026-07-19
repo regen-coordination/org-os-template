@@ -74,12 +74,17 @@ test("packageTiers routes packages to patch / sleeping / away", () => {
     { id: "paperclip-agents-app", in_framework: true, lifecycle_status: "dormant",
       promotion_status: "canonical", instances_using: ["regen-coordination-os"],
       notes: "⚠ fork is AHEAD" },
+    { id: "dashboard", in_framework: false, lifecycle_status: "planned",
+      promotion_status: "candidate", instances_using: ["refi-bcn-os", "refi-dao-os"],
+      notes: "" },
   ]);
-  assert.equal(tiers.patches.length, 2); // toolkit + paperclip (☓ promotes to patch)
+  assert.equal(tiers.patches.length, 3); // toolkit + paperclip (☓) + dashboard (⊕) promote to patch
   assert.equal(tiers.patches[0].title, "toolkit █");
   assert.equal(tiers.patches[1].title, "paperclip ☓");
+  assert.equal(tiers.patches[2].title, "dashboard ⊕"); // ⊕ traveler patches even out-of-framework
+  assert.deepEqual(tiers.patches[2].lines, PKG_DETAIL["dashboard"]);
   assert.deepEqual(tiers.sleeping, ["(koi-bridge)", "(opal-bridge » planned)"]);
-  assert.deepEqual(tiers.away, ["(governance ▓)"]);
+  assert.deepEqual(tiers.away, ["(governance ▓)"]); // dashboard is NOT here
 });
 
 test("packageTiers uses PKG_DETAIL override, else derives from instances_using", () => {
