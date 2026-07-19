@@ -503,7 +503,6 @@ export const PKG_SHORT = {
 };
 
 const pkgShort = (id) => PKG_SHORT[id] ?? id;
-const instShort = (id) => id.replace(/-os$/, "");
 
 function pkgShade(p) {
   if (/AHEAD|⚠/.test(p.notes ?? "")) return "☓";
@@ -517,13 +516,15 @@ export function packageTiers(pkgs) {
   const patches = [], sleeping = [], away = [];
   for (const p of pkgs) {
     const shade = pkgShade(p);
-    if (!p.in_framework) {
-      away.push(`(${pkgShort(p.id)}${shade !== "█" ? ` ${shade}` : ""})`);
-    } else if (p.lifecycle_status === "active" || shade === "☓" || shade === "⊕") {
+    // ☓ (fork-ahead) and ⊕ (promotion candidate) are important travelers —
+    // always a patch, even when out-of-framework (e.g. dashboard).
+    if (shade === "☓" || shade === "⊕" || (p.in_framework && p.lifecycle_status === "active")) {
       const lines = PKG_DETAIL[p.id] ??
-        [` ${(p.instances_using ?? []).map(instShort).join("·") || p.lifecycle_status} `];
+        [` ${(p.instances_using ?? []).map(shortId).join("·") || p.lifecycle_status} `];
       if (!PKG_DETAIL[p.id]) console.warn(`quilt: no PKG_DETAIL for "${p.id}" — derived line used`);
       patches.push({ title: `${pkgShort(p.id)} ${shade}`, lines });
+    } else if (!p.in_framework) {
+      away.push(`(${pkgShort(p.id)}${shade !== "█" ? ` ${shade}` : ""})`);
     } else {
       sleeping.push(
         p.lifecycle_status === "planned" ? `(${pkgShort(p.id)} » planned)` : `(${pkgShort(p.id)})`,
