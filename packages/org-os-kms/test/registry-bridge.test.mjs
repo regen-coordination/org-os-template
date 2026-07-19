@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
 import { bridge } from '../src/registry-bridge.mjs';
+import { effectiveBindings } from '../src/bind.mjs';
 import * as fw from '../src/framework.mjs';
 
 // Seed a temp instance's framework KB (<dir>/data/kb/) via the repo-data adapter, then bridge.
@@ -92,4 +93,15 @@ test('bridge does not line-fold long scalars (diff-clean YAML, lineWidth:-1)', (
   bridge({ dir, config: { adapter: 'repo-data', target: '.' } });
   const raw = readFileSync(join(dir, 'data/resources.yaml'), 'utf8');
   assert.ok(raw.includes(longVal), 'the long scalar stays on one line (not folded)');
+});
+
+test('effectiveBindings overlays kms.yaml registry_bindings over the defaults', () => {
+  const eff = effectiveBindings({ registry_bindings: { 'encyclopedia-entry': 'content/kb/' } });
+  assert.equal(eff['encyclopedia-entry'], 'content/kb/');
+  assert.equal(eff.resource, 'data/resources.yaml');
+});
+
+test('effectiveBindings returns the defaults when no override is present', () => {
+  const eff = effectiveBindings({});
+  assert.equal(eff['encyclopedia-entry'], 'src/content/docs/kb/');
 });

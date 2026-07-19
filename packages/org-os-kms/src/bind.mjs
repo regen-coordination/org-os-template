@@ -21,6 +21,12 @@ export const REGISTRY_BINDINGS = {
   'encyclopedia-entry': 'src/content/docs/kb/',
 };
 
+/** The registry bindings a given instance uses: defaults overlaid with kms.yaml overrides.
+ *  Lets an instance repoint a target (e.g. a Quartz content dir) via config, not code edits. */
+export function effectiveBindings(config = {}) {
+  return { ...REGISTRY_BINDINGS, ...(config.registry_bindings || {}) };
+}
+
 /** org-os session lifecycle -> ordered framework op-names (resolved by src/ops.mjs). */
 export const LIFECYCLE_BINDINGS = {
   initialize: ['config.load', 'index.rebuild', 'review.list', 'render.dashboard', 'render.site'],

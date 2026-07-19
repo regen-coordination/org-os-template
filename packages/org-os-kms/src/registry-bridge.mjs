@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from '
 import { join, dirname } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
-import { REGISTRY_BINDINGS } from './bind.mjs';
+import { REGISTRY_BINDINGS, effectiveBindings } from './bind.mjs';
 
 function atomicWrite(absPath, text) {
   mkdirSync(dirname(absPath), { recursive: true });
@@ -49,12 +49,13 @@ function writeMarkdownDoc(absPath, obj) {
 
 export function bridge(ctx) {
   const { dir, config } = ctx;
+  const bindings = effectiveBindings(config);
   const items = fw.getAdapter(config.adapter).list(join(dir, config.target));
   const report = { bridged: [], docs: [], skipped: [], errors: [] };
   const byRegistry = new Map(); // registryPath -> [objects]
 
   for (const { schema, object } of items) {
-    const registry = REGISTRY_BINDINGS[schema];
+    const registry = bindings[schema];
     if (!registry) { if (!report.skipped.includes(schema)) report.skipped.push(schema); continue; }
     if (registry.endsWith('/')) {
       try {
