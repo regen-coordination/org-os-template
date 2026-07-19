@@ -5,4 +5,5 @@ export default defineConfig({
   site: "https://org-os.dev",
   output: "static",
   build: { format: "directory" },
+  vite: { server: { fs: { allow: [".."] } } },  // dev server may import ../packages/*
 });

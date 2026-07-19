@@ -1,6 +1,6 @@
 ---
 import Layout from "../components/Layout.astro";
-import FederationGraph from "../components/FederationGraph.astro";
+import FederationMapIsland from "../components/FederationMapIsland.astro";
 import InstanceCard from "../components/InstanceCard.astro";
 import { federationData } from "../lib/federation";
 ---
@@ -9,7 +9,7 @@ import { federationData } from "../lib/federation";
     <p class="eyebrow">Federation</p>
     <h1>One OS, many nodes</h1>
     <p class="prose">Each node is a sovereign org-os instance. Edges show framework lineage (dashed) and federation membership (solid). State is aggregated at build from each instance's <code>.well-known/</code>.</p>
-    <FederationGraph federation={federationData} />
+    <FederationMapIsland />
     <p class="mono faint">Generated {federationData.generatedAt}</p>
     <div class="grid">
       {federationData.nodes.map((node) => <InstanceCard node={node} />)}

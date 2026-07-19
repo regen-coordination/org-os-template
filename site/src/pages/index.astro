@@ -5,7 +5,7 @@ import yaml from "js-yaml";
 import Layout from "../components/Layout.astro";
 import Hero from "../components/Hero.astro";
 import SectionBlock from "../components/SectionBlock.astro";
-import FederationGraph from "../components/FederationGraph.astro";
+import FederationMapIsland from "../components/FederationMapIsland.astro";
 import ModuleCard from "../components/ModuleCard.astro";
 import { federationData } from "../lib/federation";
 
@@ -19,7 +19,7 @@ const statline = `${federationData.nodes.length} instances · framework v0.5 · 
     <Hero eyebrow={landing.eyebrow} title={landing.title} subtitle={landing.subtitle} ctas={landing.ctas} statline={statline} />
   </div>
   <SectionBlock index="01" eyebrow="Federation" title="One OS, many nodes" href="/federation" cta="Explore the network">
-    <FederationGraph federation={federationData} />
+    <FederationMapIsland mode="mini" />
   </SectionBlock>
   <SectionBlock index="02" eyebrow="v0.5 roadmap" title="Modules" href="/modules" cta="See all modules">
     <div class="grid">{teaserModules.map((m: any) => <ModuleCard {...m} />)}</div>

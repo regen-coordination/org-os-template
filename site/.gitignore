@@ -3,4 +3,6 @@ dist/
 .astro/
 # generated at build
 src/data/federation.json
+src/data/map.json
+public/map.json
 public/.well-known/

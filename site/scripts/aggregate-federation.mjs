@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, copyFi
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { aggregate } from "./federation-aggregate.mjs";
+import { buildMap } from "../../packages/org-os-kms/src/map.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));   // org-os/site/scripts
 const siteRoot = resolve(scriptDir, "..");                   // org-os/site
@@ -21,6 +22,13 @@ const outDir = join(siteRoot, "src", "data");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "federation.json"), JSON.stringify(fed, null, 2));
 console.log(`federation.json: ${fed.nodes.length} nodes, ${fed.edges.length} edges (${fed.nodes.filter((n) => n.available).length} enriched)`);
+
+const map = buildMap({ dir: orgOsRoot, surface: "web", now: new Date().toISOString() });
+const mapJson = JSON.stringify(map, null, 2);
+writeFileSync(join(outDir, "map.json"), mapJson);
+mkdirSync(join(siteRoot, "public"), { recursive: true });
+writeFileSync(join(siteRoot, "public", "map.json"), mapJson);   // fetched at runtime by <federation-map src="/map.json">
+console.log(`map.json: ${map.nodes.length} nodes, ${map.edges.length} edges`);
 
 // Surface org-os's own .well-known into the static output.
 const wkSrc = join(orgOsRoot, ".well-known");
