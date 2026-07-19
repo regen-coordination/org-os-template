@@ -6,7 +6,8 @@
 // run (fail-hard); reads/renders are fail-soft.
 import { join } from 'node:path';
 import * as fw from './framework.mjs';
-import { loadKmsConfig } from './config.mjs';
+import { loadKmsConfig, persistConnectorCursors } from './config.mjs';
+import { getConnector as defaultGetConnector } from './connectors/index.mjs';
 import { bridge } from './registry-bridge.mjs';
 import { renderDashboardSection, renderSiteData } from './render.mjs';
 import { checkPeers } from './federate.mjs';
@@ -39,6 +40,31 @@ export const OPS = {
   'render.site': { kind: 'exec', write: false, run: (ctx) => {
     return renderSiteData({ dir: ctx.dir, target: ctx.config.target,
       outPath: (ctx.config.render && ctx.config.render.site_data) || 'src/data/kms-index.json' });
+  } },
+
+  // Pull knowledge from declared connectors into the KB. write:true → fail-hard on a real
+  // error; a stub's NOT_IMPLEMENTED is reported+skipped so it never aborts a live connector.
+  'ingest.pull': { kind: 'exec', write: true, run: async (ctx) => {
+    const getConn = ctx.getConnector || defaultGetConnector;
+    const adapter = ctx.getAdapter ? ctx.getAdapter(ctx.config.adapter) : fw.getAdapter(ctx.config.adapter);
+    const persist = ctx.persistCursors || persistConnectorCursors;
+    const target = ctx.config.target === '.' ? ctx.dir : join(ctx.dir, ctx.config.target);
+    const connectors = ctx.config.connectors || [];
+    const report = { pulled: [], errors: [] };
+    for (const decl of connectors) {
+      try {
+        const conn = getConn(decl.name);
+        const res = await fw.runConnector(conn, { config: decl.config || {}, cursor: decl.cursor ?? null, adapter, target });
+        decl.cursor = res.cursor;
+        report.pulled.push({ name: decl.name, stored: res.stored, candidates: res.candidates, errors: res.errors });
+        if (res.errors.length) report.errors.push(...res.errors.map((e) => `${decl.name}: ${e}`));
+      } catch (e) {
+        if (/NOT_IMPLEMENTED/.test(e.message)) { report.pulled.push({ name: decl.name, skipped: 'NOT_IMPLEMENTED' }); continue; }
+        report.errors.push(`${decl.name}: ${e.message}`);
+      }
+    }
+    persist(ctx.dir, connectors);
+    return { ok: report.errors.length === 0, report };
   } },
 
   'bridge': { kind: 'exec', write: true, run: (ctx) => bridge(ctx) },
