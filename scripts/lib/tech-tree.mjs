@@ -112,5 +112,31 @@ export function validateTree({ treeYaml, registries }) {
     }
   }
 
+  // Reachability warning: every node should hang off the root via part-of.
+  if (root && byId.has(root)) {
+    for (const n of nodes) {
+      if (n.id === root) continue;
+      let cur = n.id;
+      let hops = 0;
+      let reached = false;
+      while (parentOf.has(cur) && hops++ < nodes.length) {
+        cur = parentOf.get(cur);
+        if (cur === root) {
+          reached = true;
+          break;
+        }
+      }
+      if (!reached) warnings.push(`${n.id}: not connected to root via part-of`);
+    }
+  }
+
+  // Coverage drift: registry entries that exist but were never placed in the tree.
+  const referenced = new Set(nodes.filter((n) => n.ref).map((n) => n.ref));
+  for (const [kind, ids] of Object.entries(registries.coverageIds ?? {})) {
+    for (const id of ids) {
+      if (!referenced.has(`${kind}:${id}`)) warnings.push(`coverage: ${kind}:${id} not placed in tree`);
+    }
+  }
+
   return { errors, warnings };
 }

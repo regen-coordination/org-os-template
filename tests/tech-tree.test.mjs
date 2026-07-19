@@ -130,3 +130,27 @@ edges:
   assert.ok(errors.some((e) => e.includes("part-of cycle")));
   assert.ok(errors.some((e) => e.includes('meta.root "ghost" is not a node')));
 });
+
+test("validateTree warns on nodes unreachable from root via part-of", () => {
+  const treeYaml = `
+meta: { root: "a" }
+nodes:
+  - { id: "a", type: "capability", label: "A", status: "live" }
+  - { id: "b", type: "integration", label: "B", status: "live" }
+edges: []
+`;
+  const { errors, warnings } = validateTree({ treeYaml, registries: registries() });
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some((w) => w.includes("b: not connected to root via part-of")));
+});
+
+test("validateTree warns on coverage drift, honoring coverageIds filters", () => {
+  const { warnings } = validateTree({ treeYaml: validYaml, registries: registries() });
+  // valid fixture places org-os-kms, research, idea-001 — the rest of the worklist drifts:
+  assert.ok(warnings.some((w) => w.includes("coverage: package:agents-app not placed in tree")));
+  assert.ok(warnings.some((w) => w.includes("coverage: skill:capital-flow not placed in tree")));
+  assert.ok(warnings.some((w) => w.includes("coverage: idea:idea-002 not placed in tree")));
+  // NOT warned: in_framework:false skill and archived idea
+  assert.ok(!warnings.some((w) => w.includes("dao-module")));
+  assert.ok(!warnings.some((w) => w.includes("idea-003")));
+});
