@@ -5,10 +5,14 @@
   "type": "module",
   "main": "src/index.mjs",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "esbuild src/index.mjs --bundle --minify --format=iife --outfile=dist/federation-map.iife.js"
   },
   "dependencies": {
     "d3-force": "^3.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
   },
   "license": "MIT",
   "keywords": ["org-os", "federation", "graph", "provenance", "web-component", "d3-force"]
