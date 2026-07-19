@@ -3,4 +3,5 @@ dist/
 .astro/
 # generated at build
 src/data/federation.json
+src/data/tech-tree.resolved.json
 public/.well-known/
