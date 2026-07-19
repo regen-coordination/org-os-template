@@ -4,8 +4,8 @@
 > system as **one organism** — modules, integrations, and federation as nested
 > containers, shaded by live status.
 >
-> Woven **2026-07-19** · framework **v3.5** · branch `v0.5` · hand-crafted (Phase A);
-> `scripts/generate-quilt.mjs` (Phase B) will re-weave this from `data/*.yaml`.
+> Woven **2026-07-19** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
+> hand; edit the view templates in `scripts/lib/quilt-view.mjs`.
 
 ## Legend
 
@@ -24,12 +24,12 @@ live patches get room, dormant things shrink to pods.
 ## The organism
 
 ```
-╔═ ORG-OS · framework v3.5 · branch v0.5 · woven 2026-07-19 ══════════════════════════╗
+╔═ ORG-OS · framework v0.5 · woven 2026-07-19 ═════════════════════════════════════════╗
 ║ ┏━ CORE · nucleus ━━━━━━━━━━━━━━━━━━━┓ ┏━ DATA ≡ SCHEMAS ━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
-║ ┃ ╭─HEARTBEAT █──────╮ ╭─MEMORY █─╮  ┃ ┃ ╭─data/*.yaml █──╮ ╭─.well-known █─╮      ┃ ║
-║ ┃ │ 36 open · 0 crit │ │ 3d ago   │  ┃ ┃ │ ×16 registries │ │ EIP-4824 ×12  │      ┃ ║
-║ ┃ ╰──────────────────╯ ╰──────────╯  ┃ ┃ ╰────────────────╯ ╰───────────────╯      ┃ ║
-║ ┃ █ spine ─ (SOUL) (IDENTITY) (USER) ┃ ┃ ≡ generate ⇄ validate ✓ · 3d ago          ┃ ║
+║ ┃ ╭─HEARTBEAT █─╮ ╭─MEMORY █─╮       ┃ ┃ ╭─data/*.yaml █──╮ ╭─.well-known █─╮      ┃ ║
+║ ┃ │ 36 open     │ │ 4d ago   │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
+║ ┃ ╰─────────────╯ ╰──────────╯       ┃ ┃ ╰────────────────╯ ╰───────────────╯      ┃ ║
+║ ┃ █ spine ─ (SOUL) (IDENTITY) (USER) ┃ ┃ ≡ generate ⇄ validate ✓                   ┃ ║
 ║ ┃           (TOOLS)                  ┃ ┃   yaml is truth, schema is face           ┃ ║
 ║ ┃ ▓ MASTERPLAN · the mandate         ┃ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                               ║
@@ -42,56 +42,56 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ ~ many doors, one house               ┃ ┃ ~ where the world plugs in             ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ↕                                           ║
-║ ┏━ AUTOMATION · metabolism · scripts ×24 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
+║ ┏━ AUTOMATION · metabolism · scripts ×30 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ loop ─ (initialize » dashboard) (generate ⇄ validate) (sync-upstream ↔ spokes)   ┃ ║
 ║ ┃        (analyze » drift-report) (clone-framework » birth)                        ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║           ↔ the membrane breathes: sync-upstream out, promotion ⊕ back in            ║
 ║ ┏━ FEDERATION · the membrane · ◉ hub ↔ 7 · 2 networks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
-║ ┃ ╭─refi-bcn █───────────╮ ╭─refi-dao █───────────╮ ╭─regen-coord ▓─────────╮      ┃ ║
-║ ┃ │ LocalNode·production │ │ DAO·production·hub   │ │ Hub·beta · pkgs ×12   │      ┃ ║
-║ ┃ │ pkgs ×4 · +2 skills  │ │ pkgs ×9 · governance │ │ paperclip fork ☓      │      ┃ ║
-║ ┃ │ sync 03-19 · drift ✓ │ │ sync 03-06 · drift ✓ │ │ sync 04-24 · drift ☓3 │      ┃ ║
-║ ┃ ╰──────────────────────╯ ╰──────────────────────╯ ╰───────────────────────╯      ┃ ║
-║ ┃ ╭─dao-os ▓─────────────────╮ ╭─refi-med ▒────────────╮ ╭─bread-coop ▒─────────╮  ┃ ║
-║ ┃ │ module forge · skills ⊕5 │ │ alpha · bootstrap TBD │ │ born of clone ✓ test │  ┃ ║
-║ ┃ │ sync 04-02 · ☓ no mplan  │ │ sync 04-28            │ │ sync 05-16           │  ┃ ║
-║ ┃ ╰──────────────────────────╯ ╰───────────────────────╯ ╰──────────────────────╯  ┃ ║
-║ ┃ ▒☓ substrate ─ (openclaw · agent runtime · sync ∅ · stub identity)               ┃ ║
-║ ┃ ledger: bread 2mo » rgc·med 3mo » dao-os 3.5 » bcn 4 » dao 4.5 » claw ∅ · ☓7     ┃ ║
+║ ┃ ╭─refi-bcn █───────────╮ ╭─refi-dao █───────────╮ ╭─dao ▓─────────────────╮      ┃ ║
+║ ┃ │ LocalNode·production │ │ DAO·production·hub   │ │ Project·beta          │      ┃ ║
+║ ┃ │ pkgs ×4 · +2 skills  │ │ pkgs ×9              │ │ sync 04-02 · drift ☓1 │      ┃ ║
+║ ┃ │ sync 03-19 · drift ✓ │ │ sync 03-06 · drift ✓ │ ╰───────────────────────╯      ┃ ║
+║ ┃ ╰──────────────────────╯ ╰──────────────────────╯                                ┃ ║
+║ ┃ ╭─regen-coord ▓─────────╮ ╭─refi-med ▒──────╮ ╭─bread-coop ▒──────╮              ┃ ║
+║ ┃ │ Hub·beta·hub          │ │ LocalNode·alpha │ │ Cooperative·alpha │              ┃ ║
+║ ┃ │ sync 04-24 · drift ☓3 │ │ sync 04-28      │ │ sync 05-16        │              ┃ ║
+║ ┃ ╰───────────────────────╯ ╰─────────────────╯ ╰───────────────────╯              ┃ ║
+║ ┃ ▒☓ substrate ─ (openclaw · agent runtime · sync ∅ · 3 drift)                     ┃ ║
+║ ┃ ledger: bread-coop 2mo » refi-med 2.5mo » regen-coord 3mo » dao 3.5mo            ┃ ║
+║ ┃   refi-bcn 4mo » refi-dao 4.5mo » openclaw ∅ · ☓7                                ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ⊕                                           ║
 ║ ┏━ PACKAGES · travelers · matrix ×23 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
-║ ┃ ╭─toolkit █─╮ ╭─kms █───╮ ╭─fed-map █────╮ ╭─operations █─╮ ╭─regen-agents █─╮   ┃ ║
-║ ┃ │ 100/100 ✓ │ │ 44/44 ✓ │ │ the torch·d3 │ │ bcn·dao      │ │ bcn·dao        │   ┃ ║
-║ ┃ ╰───────────╯ ╰─────────╯ ╰──────────────╯ ╰──────────────╯ ╰────────────────╯   ┃ ║
-║ ┃ ╭─webapps █─╮ ╭─hermes ▓───────╮ ╭─opencode ▓─────╮ ╭─paperclip ☓──────╮         ┃ ║
-║ ┃ │ bcn·dao   │ │ page auto-tool │ │ 2 tools·5 cmds │ │ rgc fork AHEAD   │         ┃ ║
-║ ┃ ╰───────────╯ ╰────────────────╯ ╰────────────────╯ │ backport pending │         ┃ ║
-║ ┃                                                     ╰──────────────────╯         ┃ ║
+║ ┃ ╭─toolkit █─╮ ╭─kms █───╮ ╭─fed-map █────╮ ╭─operations █─╮ ╭─paperclip ☓──────╮ ┃ ║
+║ ┃ │ 100/100 ✓ │ │ 44/44 ✓ │ │ the torch·d3 │ │ bcn·dao      │ │ rgc fork AHEAD   │ ┃ ║
+║ ┃ ╰───────────╯ ╰─────────╯ ╰──────────────╯ ╰──────────────╯ │ backport pending │ ┃ ║
+║ ┃                                                             ╰──────────────────╯ ┃ ║
+║ ┃ ╭─regen-agents █─╮ ╭─webapps █─╮ ╭─hermes ▓───────╮ ╭─opencode ▓─────╮           ┃ ║
+║ ┃ │ bcn·dao        │ │ bcn·dao   │ │ page auto-tool │ │ 2 tools·5 cmds │           ┃ ║
+║ ┃ ╰────────────────╯ ╰───────────╯ ╰────────────────╯ ╰────────────────╯           ┃ ║
 ║ ┃ ╭─dashboard ⊕───╮                                                                ┃ ║
 ║ ┃ │ bcn+dao       │                                                                ┃ ║
 ║ ┃ │ » fw template │                                                                ┃ ║
 ║ ┃ ╰───────────────╯                                                                ┃ ║
-║ ┃ ░ sleeping ─ (agents-app) (egregore-core) (koi-bridge) (koi-opal)                ┃ ║
-║ ┃              (opal » rollout)                                                    ┃ ║
-║ ┃ ~ away, instance-owned ─ (governance ▓) (coordination ▓) (connectors·core)       ┃ ║
+║ ┃ ░ sleeping ─ (agents-app) (egregore-core) (koi-bridge) (koi-opal-bridge)         ┃ ║
+║ ┃              (opal-bridge » planned)                                             ┃ ║
+║ ┃ ~ away, instance-owned ─ (governance ▓) (coordination ▓) (connectors) (core)     ┃ ║
 ║ ┃                          (maps) (hub) (coop) (regen-toolkit)                     ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ⊕                                           ║
 ║ ┏━ SKILLS · the garden · matrix ×40 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
-║ ┃ ╭─PIPELINE ⊕─────────────╮ ╭─DAO WAVE ▒⊕──────────╮ ╭─▓ evaluating───╮           ┃ ║
-║ ┃ │ ▒×5 → ▓×2 → █×31       │ │ safe·hats·gardens    │ │ capital-flow   │           ┃ ║
-║ ┃ │ promotion is the pulse │ │ karma·eip4824 » next │ │ skills-curator │           ┃ ║
-║ ┃ ╰────────────────────────╯ ╰──────────────────────╯ ╰────────────────╯           ┃ ║
+║ ┃ ╭─PIPELINE ⊕─────────────╮ ╭─DAO WAVE ▒⊕──────────╮                              ┃ ║
+║ ┃ │ ▒×5 → ▓×2 → █×31       │ │ safe·hats·gardens    │                              ┃ ║
+║ ┃ │ promotion is the pulse │ │ karma·eip4824 » next │                              ┃ ║
+║ ┃ ╰────────────────────────╯ ╰──────────────────────╯                              ┃ ║
 ║ ┃ █ lifecycle ─ (initialize) (org-os-init) (bootstrap-interviewer) (commands)      ┃ ║
 ║ ┃ █ discipline ─ (superpowers ×9 · tdd·debug·plans·worktrees·reviews)              ┃ ║
 ║ ┃ █ org-ops ─ (heartbeat) (meetings) (funding) (ideas)                             ┃ ║
 ║ ┃ █ knowledge ─ (curator) (research) (web-browsing) (notion-cli) (canvas)          ┃ ║
 ║ ┃ █ builders ─ (skill-creator) (mcp) (frontend) (artifacts) (schema-gen)           ┃ ║
 ║ ┃ █ mentors ─ (feynman) (karpathy) (workspace) (transcription)                     ┃ ║
-║ ┃ ▒ local color ─ (notion-sync·bcn) (symbient·bcn)                                 ┃ ║
-║ ┃                 — stays local until it proves general                            ┃ ║
+║ ┃ ▒ local color ─ (instance-specific ×2) — stays local until it proves general     ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          »                                           ║
 ║ ┏━ PROJECTS · the field · ×11 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
@@ -113,5 +113,4 @@ live patches get room, dormant things shrink to pods.
 ---
 
 *Sources: `data/instances.yaml`, `data/packages-matrix.yaml`, `data/skills-matrix.yaml`,*
-*`data/projects.yaml`, `federation.yaml`, `HEARTBEAT.md`. Re-weave on state change until*
-*Phase B automates it.*
+*`data/projects.yaml`, `federation.yaml`, `HEARTBEAT.md`. Regenerate: `npm run generate:quilt`.*
