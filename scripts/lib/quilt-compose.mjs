@@ -4,6 +4,8 @@
  * Spec: docs/superpowers/specs/2026-07-19-quilt-visualization-design.md (rev b).
  */
 
+// Display width = code-point count. Assumes single-column BMP glyphs (box-drawing,
+// shade blocks █▓▒░, ⊕ ☓ ✓); NOT full wcwidth-aware (wide/emoji chars would misalign).
 export const len = (s) => [...s].length;
 export const pad = (s, w) => s + " ".repeat(Math.max(0, w - len(s)));
 
@@ -40,4 +42,54 @@ export function pack(blocks, width, gap = 1) {
       );
   }
   return lines;
+}
+
+export const ORGANISM_INNER = 84;
+
+/** Single-breath tokens wrapped under a hanging label: `label ─ (a) (b)…` */
+export function pods(label, tokens, inner) {
+  const lines = [];
+  let cur = label + " ─";
+  const indent = " ".repeat(len(label) + 2);
+  for (const t of tokens) {
+    if (len(cur) + 1 + len(t) > inner) { lines.push(cur); cur = indent; }
+    cur += " " + t;
+  }
+  lines.push(cur);
+  return lines;
+}
+
+/** Heavy-bordered subsystem container. Every output line is exactly `width`. */
+export function organ(title, contentLines, width) {
+  const inner = width - 4;
+  const out = ["┏━ " + title + " " + "━".repeat(Math.max(1, width - 6 - len(title))) + "━┓"];
+  for (const l of contentLines) {
+    if (len(l) > inner) throw new Error(`organ "${title}" overflow (${len(l)}>${inner}): ${l}`);
+    out.push("┃ " + pad(l, inner) + " ┃");
+  }
+  out.push("┗" + "━".repeat(width - 2) + "┛");
+  return out;
+}
+
+/** Center a stitch/narration line within the organism. */
+export const stitch = (s) =>
+  " ".repeat(Math.max(0, Math.floor((ORGANISM_INNER - len(s)) / 2))) + s;
+
+/**
+ * Outer membrane. `rows` entries are either an array of organ blocks
+ * (packed side by side with the same packer patches use) or a raw string.
+ * Returns the full quilt as one string.
+ */
+export function organism(title, rows) {
+  const OW = ORGANISM_INNER;
+  const out = ["╔═ " + title + " " + "═".repeat(Math.max(1, OW + 3 - 5 - len(title))) + "═╗"];
+  for (const r of rows) {
+    const lines = Array.isArray(r) ? pack(r, OW, 1) : [r];
+    for (const l of lines) {
+      if (len(l) > OW) throw new Error(`organism overflow (${len(l)}>${OW}): ${l}`);
+      out.push("║ " + pad(l, OW) + " ║");
+    }
+  }
+  out.push("╚" + "═".repeat(OW + 2) + "╝");
+  return out.join("\n");
 }

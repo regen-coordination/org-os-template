@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { len, patch, pack } from "../scripts/lib/quilt-compose.mjs";
+import { pods, organ, organism, stitch, ORGANISM_INNER } from "../scripts/lib/quilt-compose.mjs";
 
 test("patch sizes itself to its widest content line", () => {
   const p = patch("kms █", [" 44/44 ✓ "]);
@@ -31,4 +32,31 @@ test("pack starts a new row when width is exceeded", () => {
   const blocks = [patch("one", [" .. "]), patch("two", [" .. "])];
   const lines = pack(blocks, 12, 1); // too narrow for both side by side
   assert.equal(lines.length, 6); // two stacked 3-line rows
+});
+
+test("pods wraps tokens under a hanging label indent", () => {
+  const lines = pods("░ sleeping", ["(a)", "(b)", "(c)"], 20);
+  assert.equal(lines[0], "░ sleeping ─ (a) (b)");
+  assert.equal(lines[1], "             (c)");
+});
+
+test("organ borders content and throws on overflow", () => {
+  const o = organ("CORE", ["hello"], 20);
+  assert.equal(o[0].length === undefined, false); // array of strings
+  assert.ok(o.every((l) => len(l) === 20));
+  assert.match(o[0], /^┏━ CORE ━+┓$/);
+  assert.match(o[1], /^┃ hello\s+┃$/);
+  assert.throws(() => organ("X", ["y".repeat(17)], 20), /overflow/);
+});
+
+test("organism packs organs side by side and throws on overflow", () => {
+  const a = organ("A", ["1"], 40);
+  const b = organ("B", ["2"], 43); // 40+1+43 = 84 = ORGANISM_INNER
+  const body = organism("TEST", [[a, b], stitch("∴ flow")]);
+  const lines = body.split("\n");
+  assert.ok(lines.every((l) => len(l) === ORGANISM_INNER + 4));
+  assert.match(lines[0], /^╔═ TEST ═+═╗$/);
+  assert.match(lines[1], /┏━ A ━+┓ ┏━ B ━+┓/);
+  assert.ok(body.includes("∴ flow"));
+  assert.throws(() => organism("T", ["x".repeat(85)]), /overflow/);
 });
