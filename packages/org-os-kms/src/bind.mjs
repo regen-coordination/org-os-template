@@ -30,7 +30,7 @@ export function effectiveBindings(config = {}) {
 /** org-os session lifecycle -> ordered framework op-names (resolved by src/ops.mjs). */
 export const LIFECYCLE_BINDINGS = {
   initialize: ['config.load', 'index.rebuild', 'review.list', 'render.dashboard', 'render.site'],
-  close: ['ingest.pull', 'csis-review', 'bridge', 'emit-contributions', 'federate.check', 'index.rebuild', 'render.site', 'render.dashboard', 'sync.push'],
+  close: ['config.load', 'ingest.pull', 'csis-review', 'bridge', 'emit-contributions', 'federate.check', 'index.rebuild', 'render.site', 'render.dashboard', 'sync.push'],
 };
 
 /** Available connectors + build status (the profile twin — mirror in profile/profile.yaml). */

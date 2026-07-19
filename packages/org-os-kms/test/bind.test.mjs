@@ -33,7 +33,7 @@ test('lifecycle bindings are canonical op-names (initialize/close)', () => {
   assert.deepEqual(LIFECYCLE_BINDINGS.initialize,
     ['config.load', 'index.rebuild', 'review.list', 'render.dashboard', 'render.site']);
   assert.deepEqual(LIFECYCLE_BINDINGS.close,
-    ['ingest.pull', 'csis-review', 'bridge', 'emit-contributions', 'federate.check', 'index.rebuild', 'render.site', 'render.dashboard', 'sync.push']);
+    ['config.load', 'ingest.pull', 'csis-review', 'bridge', 'emit-contributions', 'federate.check', 'index.rebuild', 'render.site', 'render.dashboard', 'sync.push']);
 });
 
 test('REGISTRY_BINDINGS keeps all 10 schema targets', () => {
@@ -47,9 +47,10 @@ test('profile.yaml stays in sync with bind.mjs (no drift)', () => {
   assert.deepEqual(profile.lifecycle_bindings, LIFECYCLE_BINDINGS);
 });
 
-test('close lifecycle runs ingest.pull first, then csis-review, then bridge', () => {
+test('close lifecycle loads config first, then pulls, reviews, bridges in order', () => {
   const close = LIFECYCLE_BINDINGS.close;
-  assert.equal(close[0], 'ingest.pull');
+  assert.equal(close[0], 'config.load');
+  assert.ok(close.indexOf('config.load') < close.indexOf('ingest.pull'));
   assert.ok(close.indexOf('ingest.pull') < close.indexOf('csis-review'));
   assert.ok(close.indexOf('csis-review') < close.indexOf('bridge'));
 });

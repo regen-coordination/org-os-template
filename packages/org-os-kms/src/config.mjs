@@ -15,12 +15,19 @@ export function loadKmsConfig(dir = '.') {
   return { render: {}, peers: {}, connectors: [], ...cfg };
 }
 
-/** Write advanced cursors back into kms.yaml. Reads the file, replaces the `connectors`
- *  list with the passed-in one (cursors updated), writes once. Other keys are preserved. */
+/** Write advanced cursors back into kms.yaml. MERGES by connector name: matched on-disk
+ *  entries are updated (cursor advanced), unlisted connectors are preserved, genuinely new
+ *  ones are appended. This makes a filtered run (`ingest --connector X`) safe — it never
+ *  drops the other declared connectors. Other top-level keys are untouched. */
 export function persistConnectorCursors(dir, connectors) {
   const path = join(dir, 'kms.yaml');
   const doc = yaml.load(readFileSync(path, 'utf8')) || {};
-  doc.connectors = connectors;
+  const onDisk = Array.isArray(doc.connectors) ? doc.connectors : [];
+  const updates = new Map(connectors.map((c) => [c.name, c]));
+  const merged = onDisk.map((c) => (updates.has(c.name) ? updates.get(c.name) : c));
+  const seen = new Set(onDisk.map((c) => c.name));
+  for (const c of connectors) if (!seen.has(c.name)) merged.push(c);
+  doc.connectors = merged;
   writeFileSync(path, yaml.dump(doc, { lineWidth: -1 }));
-  return { path, connectors: connectors.length };
+  return { path, connectors: merged.length };
 }

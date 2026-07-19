@@ -46,3 +46,21 @@ test('persistConnectorCursors updates connector cursors in kms.yaml without clob
   assert.equal(doc.instance, 'test');
   assert.equal(doc.connectors[0].cursor, '2026-07-01T00:00:00Z');
 });
+
+test('persistConnectorCursors merges by name — unlisted connectors survive a filtered persist', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-cfg-'));
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({
+    instance: 'test', adapter: 'repo-data', target: '.',
+    connectors: [
+      { name: 'github', config: { repos: ['a/b'] }, cursor: null },
+      { name: 'koi', config: { coordinator: 'x' }, cursor: 'koi-old' },
+    ],
+  }));
+  // simulate `ingest --connector github`: only github passed, cursor advanced
+  persistConnectorCursors(dir, [{ name: 'github', config: { repos: ['a/b'] }, cursor: 'gh-new' }]);
+  const doc = yaml.load(readFileSync(join(dir, 'kms.yaml'), 'utf8'));
+  const byName = Object.fromEntries(doc.connectors.map((c) => [c.name, c]));
+  assert.equal(byName.github.cursor, 'gh-new');   // updated
+  assert.ok(byName.koi, 'koi connector must survive a filtered persist');
+  assert.equal(byName.koi.cursor, 'koi-old');     // untouched
+});

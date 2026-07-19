@@ -30,7 +30,7 @@ registry_bindings:            # framework schema -> org-os registry (must match 
 
 lifecycle_bindings:
   initialize: [config.load, index.rebuild, review.list, render.dashboard, render.site]
-  close: [ingest.pull, csis-review, bridge, emit-contributions, federate.check, index.rebuild, render.site, render.dashboard, sync.push]
+  close: [config.load, ingest.pull, csis-review, bridge, emit-contributions, federate.check, index.rebuild, render.site, render.dashboard, sync.push]
 
 # Available connectors (composition surface). Mirror src/bind.mjs CONNECTOR_DEFAULTS.
 # An instance declares which of these it composes in its own kms.yaml `connectors:` list.
