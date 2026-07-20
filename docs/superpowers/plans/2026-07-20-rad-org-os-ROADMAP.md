@@ -18,6 +18,18 @@
 - **Tier 3** — replace the 3 GitHub Actions workflows with `radicle-ci-broker` adapters; full GitHub-Pages → node hosting rebuild. Designed in the spec, built later; lands on the seed-node recipe from Plan 3.
 - **Local-LLM runtime** — separate module near `org-os-hermes`. Plan 4 only guarantees runtime-agnosticism, not the runtime itself.
 
+## Plan 2 prerequisites (carried over from Plan 1's final review)
+
+Plan 1 shipped and merged; its final code review surfaced items to resolve **at the start of Plan 2**, when the second (`radicle`) driver actually exists to validate against:
+
+1. **Per-entry driver routing in the frontier crawl.** `frontier.mjs` currently calls `resolveDriver(fed, …)` keyed on the *hub's* `platforms.canonical`, then fetches each peer with that one driver. Once a `radicle` driver is registered, a github-canonical hub crawling a `rid`-only peer (or vice-versa) would silently degrade to `unreached`. Fix: select per-entry by the peer's scheme (`resolveRemoteScheme(entry.rid || entry.repo)`), not the hub's canonical. (Inert today — only `github` is registered.)
+2. **Uniform `cwd` + `local_path` composition.** `fetchFile` resolves `join(cwd, entry.local_path, path)` while `getCanonical`/`getDrift` pass `{ cwd: entry.local_path }` (which *replaces* the driver's base `cwd` via `callCwd ?? cwd`). Aligned only because frontier runs with `cwd:'.'`. Make the composition uniform before other call sites use a non-`.` driver cwd.
+3. **`fetchFile`'s `ref` arg is ignored when `local_path` is present** (returns the working-tree file regardless of requested ref). Document this as the contract's intended semantics so the `radicle` driver's `fetchFile` matches rather than diverges.
+4. **`whoami()` returns real identity in the radicle driver.** github's `whoami` returns `{ id: null, handle: null }` (no shell-out); the radicle driver's `whoami` should return the node's real `did:key`. The strengthened contract only requires an `id` property to exist.
+5. **github `resolveRemote('rad:…')` mislabels a rad id as github** (`{scheme:'github', fetchUrl:'…/rad:z…'}`). Inert (the resolver never routes a rad id to the github driver), but add a guard for robustness.
+
+Already resolved in Plan 1 (do not redo): typed-errors export; per-call `cwd` forwarding in `exec`; null-slug guards in `clone`/`webUrl`; the approved `skipped:'unreached'` frontier diagnostic on degraded reads; and the contract suite now asserts write-path shape + fail-loudly against both the reference and github drivers.
+
 ## Cross-cutting rules (all plans)
 
 - **Vault safety** (root `CLAUDE.md`): never `git stash`/`clean`/`reset --hard`; `npm run vault:snapshot` before large ops. The driver must never introduce a destructive git op.
