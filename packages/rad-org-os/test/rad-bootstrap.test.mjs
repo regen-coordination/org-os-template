@@ -90,3 +90,18 @@ test('bootstrap fails loudly (WriteUnavailableError) when the node is down', asy
     WriteUnavailableError,
   );
 });
+
+test('bootstrap stamps the genesis commit oid into federation.yaml metadata', async () => {
+  const writes = {};
+  const exec = async (bin, args) => {
+    if (bin === 'rad' && args[0] === 'self') return { code: 0, stdout: 'DID did:key:z6MkXY\n', stderr: '' };
+    if (bin === 'rad' && args[0] === 'init') return { code: 0, stdout: 'Initialized private repository rad:z3NEW\n', stderr: '' };
+    if (bin === 'git' && args[0] === 'rev-list') return { code: 0, stdout: 'a'.repeat(40) + '\n', stderr: '' };
+    return { code: 0, stdout: '', stderr: '' };
+  };
+  const fs = { mkdir: async () => {}, writeFile: async (p, c) => { writes[p] = c; } };
+  await bootstrap({ targetDir: '/tmp/o', name: 'o', alias: 'a', visibility: 'private', seed: 's', exec, fs, scaffold: async () => {}, now: '2026-07-20T00:00:00Z' });
+  const fedPath = Object.keys(writes).find((p) => p.endsWith('federation.yaml'));
+  const fed = (await import('js-yaml')).default.load(writes[fedPath]);
+  assert.equal(fed.metadata.genesis_commit, 'a'.repeat(40));
+});

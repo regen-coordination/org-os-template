@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import yaml from 'js-yaml';
 import { defaultExec } from '../src/rad-cli.mjs';
 import { WriteUnavailableError } from '../../org-os-host/src/errors.mjs';
 import { buildMembersYaml, buildFederationYaml } from './generate.mjs';
@@ -32,11 +33,8 @@ export async function bootstrap({
     return res.stdout;
   };
 
-  // Note: only the genesis-stamp PERSISTENCE (buildGenesisStamp -> federation.yaml
-  // metadata.genesis_commit) is deferred to Plan 4 (the /commit + governance wiring);
-  // the currently-unused `buildGenesisStamp`/`now` are intentional forward scaffolding.
-  // The git init + genesis commit below are NOT deferred — `rad init` hard-requires a
-  // committable repo on the default branch, so they are required and present here.
+  // The git init + genesis commit below are required — `rad init` hard-requires a
+  // committable repo on the default branch.
 
   // 1. identity (idempotent for an existing key)
   await run('rad', ['auth', '--alias', alias]);
@@ -58,10 +56,16 @@ export async function bootstrap({
   const rid = parseRid(await run('rad', initArgs));
   if (!rid) throw new Error('rad init did not return an RID');
 
-  // 5. write federation.yaml (needs rid) + commit it
-  await fs.writeFile(join(targetDir, 'federation.yaml'), buildFederationYaml({ rid, seed, name, threshold: 1 }));
+  // 5. write federation.yaml (needs rid), commit, then stamp the genesis commit oid
+  const fedPath = join(targetDir, 'federation.yaml');
+  await fs.writeFile(fedPath, buildFederationYaml({ rid, seed, name, threshold: 1 }));
   await run('git', ['add', 'federation.yaml']);
   await run('git', ['-c', 'user.name=org-os', '-c', 'user.email=genesis@org-os', 'commit', '-q', '-m', 'genesis: federation']);
+  const genesisOid = (await run('git', ['rev-list', '--max-parents=0', 'HEAD'])).trim().split('\n')[0];
+  const stamped = buildFederationYaml({ rid, seed, name, threshold: 1 });
+  const doc = yaml.load(stamped);
+  doc.metadata = { ...doc.metadata, created: now, genesis_commit: genesisOid };
+  await fs.writeFile(fedPath, yaml.dump(doc));
 
   return { rid, did, visibility, seed: seed || null };
 }

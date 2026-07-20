@@ -17,7 +17,7 @@ export function buildFederationYaml({ rid, seed, name, threshold = 1 } = {}) {
     agent: { runtime: 'open-model', workspace: '.' },
     governance: { proposal_threshold: threshold, decision_model: 'delegate-quorum' },
     peers: [],
-    metadata: { framework_version: '0.5' },
+    metadata: { framework_version: '0.5', created: null, genesis_commit: null, last_sync_commit: null },
   });
 }
 

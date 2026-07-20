@@ -30,3 +30,9 @@ test('buildGenesisStamp returns a metadata block with the genesis commit oid', (
   assert.equal(meta.last_sync_commit, null);
   assert.equal(meta.created, '2026-07-20T00:00:00Z');
 });
+
+test('buildFederationYaml embeds a metadata block with a null genesis stamp by default', () => {
+  const doc = yaml.load(buildFederationYaml({ rid: 'rad:z', seed: 's', name: 'n', threshold: 1 }));
+  assert.equal(doc.metadata.genesis_commit ?? null, null);   // stamped later by bootstrap
+  assert.equal(doc.metadata.framework_version, '0.5');
+});
