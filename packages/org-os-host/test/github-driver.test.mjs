@@ -133,3 +133,11 @@ test('github driver satisfies the HostDriver contract suite', async () => {
   const fetchFn = async () => { throw new Error('offline'); }; // fetchFile → null, allowed
   await runHostDriverContract(() => makeGithubDriver({ exec, fetchFn }), { assert });
 });
+
+test('github resolveRemote flags a rad: id as not-mine (scheme radicle, no github URL)', () => {
+  const d = makeGithubDriver({ exec: fakeExec([]) });
+  const r = d.resolveRemote('rad:z3gqcJUoA1n9HaHKufZs5FCSGazv5');
+  assert.equal(r.scheme, 'radicle');
+  assert.equal(r.canonical, false);
+  assert.equal(r.fetchUrl, null);
+});

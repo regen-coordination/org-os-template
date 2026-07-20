@@ -17,6 +17,9 @@ export function makeGithubDriver({ exec, fetchFn = globalThis.fetch, readLocal, 
 
   return {
     resolveRemote(idOrUrl) {
+      if (typeof idOrUrl === 'string' && idOrUrl.startsWith('rad:')) {
+        return { scheme: 'radicle', fetchUrl: null, canonical: false }; // not a github remote
+      }
       const slug = repoSlug(idOrUrl);
       return { scheme: 'github', fetchUrl: slug ? `https://github.com/${slug}` : null, canonical: true };
     },

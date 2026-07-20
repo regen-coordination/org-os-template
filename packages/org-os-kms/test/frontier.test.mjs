@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchFrontier } from '../src/frontier.mjs';
+import { registerDriver } from '../../org-os-host/src/index.mjs';
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'map', 'full');
 const NOW = '2026-07-19T12:00:00Z';
@@ -60,4 +61,23 @@ test('peer with no local_path and no repo is reported skipped', async () => {
   writeFileSync(join(dir, 'federation.yaml'), 'identity:\n  name: x\npeers:\n  - id: ghost\n    name: Ghost\n');
   const r = await fetchFrontier({ dir, fetchFn: noFetch, now: NOW });
   assert.equal(r.report[0].skipped, 'no local_path or repo');
+});
+
+test('frontier routes a rid-only peer to the radicle driver (per-entry scheme)', async () => {
+  registerDriver('radicle', () => ({
+    resolveRemote: (x) => ({ scheme: 'radicle', fetchUrl: x, canonical: true }),
+    whoami: () => ({ id: null }), clone: async () => ({ ok: true }),
+    fetchFile: async (_e, p) => (p === 'federation.yaml' ? 'name: rad-peer\npeers: []\n' : null),
+    listPeers: async () => [], getCanonical: async () => ({ defaultBranch: 'main', threshold: 1, delegates: [] }),
+    getDrift: async () => ({ behind: 0, ahead: 0, canonicalRef: 'main' }),
+    push: async () => ({ ok: true }), openChange: async () => ({ id: 'x', ok: true }),
+    createIssue: async () => ({ id: 'y', ok: true }), commentIssue: async () => ({ ok: true }),
+    syncUpstream: async () => ({ ok: true }), webUrl: (_e, p) => `rad://${p}`,
+  }));
+  // scratch dir with a rid-only peer, github-canonical hub:
+  const dir = mkdtempSync(join(tmpdir(), 'frontier-rad-'));
+  writeFileSync(join(dir, 'federation.yaml'), 'platforms:\n  canonical: github\npeers:\n  - id: rad-peer\n    rid: rad:zAbC\n');
+  const res = await fetchFrontier({ dir });
+  assert.equal(res.ok, true);
+  assert.ok(existsSync(join(dir, 'data', 'federation', 'frontier', 'rad-peer.json')));
 });

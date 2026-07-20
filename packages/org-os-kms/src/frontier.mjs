@@ -9,7 +9,7 @@ import yaml from 'js-yaml';
 // Resolved by RELATIVE sibling path (see src/framework.mjs) — this repo has no npm
 // workspaces and no linked node_modules. If org-os-kms is ever published, change ONLY
 // this specifier to the bare package name.
-import { resolveDriver } from '../../org-os-host/src/index.mjs';
+import { resolveDriver, resolveRemoteScheme } from '../../org-os-host/src/index.mjs';
 
 function normalizePeers(manifest) {
   const out = [];
@@ -39,10 +39,11 @@ export async function fetchFrontier({ dir = '.', fetchFn = globalThis.fetch, now
         manifest = yaml.load(readFileSync(localFed, 'utf8'));
         source = 'local';
       } else if (entry.repo || entry.rid) {
-        // Route through the host driver: github → raw.githubusercontent, radicle → httpd.
-        const driver = resolveDriver(fed, { fetchFn });
+        const scheme = resolveRemoteScheme(entry.rid || entry.repo);
+        // select the driver for THIS peer's scheme, not the hub's canonical
+        const driver = resolveDriver({ platforms: { canonical: scheme } }, { fetchFn, seed: fed?.platforms?.seed_node });
         const text = await driver.fetchFile(entry, 'federation.yaml');
-        if (text != null) { manifest = yaml.load(text); source = entry.rid ? 'radicle' : 'github'; }
+        if (text != null) { manifest = yaml.load(text); source = scheme; }
       } else {
         report.push({ id, skipped: 'no local_path or repo' });
         continue;

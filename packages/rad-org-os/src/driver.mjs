@@ -20,6 +20,7 @@ export function makeRadicleDriver({ seed, fetchFn, exec, cwd = '.' } = {}) {
       const isRad = typeof idOrUrl === 'string' && idOrUrl.startsWith('rad:');
       return { scheme: isRad ? 'radicle' : 'github', fetchUrl: idOrUrl, canonical: isRad };
     },
+    // whoami() returns the local node's real did:key (via `rad self`), not a placeholder.
     whoami: () => identity.whoami(),
 
     // ---- read path (httpd; degrade, never throw) ----
