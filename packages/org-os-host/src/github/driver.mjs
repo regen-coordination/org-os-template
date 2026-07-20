@@ -81,6 +81,36 @@ export function makeGithubDriver({ exec, fetchFn = globalThis.fetch, readLocal, 
       return { behind, ahead, canonicalRef };
     },
 
-    // ---- write path added in Task 7 ----
+    async push({ branch, remote = 'origin' } = {}) {
+      const { code, stderr } = await git(['push', remote, branch]);
+      return { ok: code === 0, error: code === 0 ? null : stderr };
+    },
+
+    async openChange({ title, body = '', base = 'main' } = {}) {
+      const { code, stdout, stderr } = await exec('gh', ['pr', 'create', '--title', title, '--body', body, '--base', base]);
+      return { id: code === 0 ? stdout.trim() : null, ok: code === 0, error: code === 0 ? null : stderr };
+    },
+
+    async createIssue({ title, body = '' } = {}) {
+      const { code, stdout, stderr } = await exec('gh', ['issue', 'create', '--title', title, '--body', body]);
+      return { id: code === 0 ? stdout.trim() : null, ok: code === 0, error: code === 0 ? null : stderr };
+    },
+
+    async commentIssue({ id, body } = {}) {
+      const { code, stderr } = await exec('gh', ['issue', 'comment', id, '--body', body]);
+      return { ok: code === 0, error: code === 0 ? null : stderr };
+    },
+
+    async syncUpstream({ remote = 'upstream', branch = 'main' } = {}) {
+      const fetch = await git(['fetch', remote]);
+      if (fetch.code !== 0) return { ok: false, error: fetch.stderr };
+      const pull = await git(['pull', '--rebase', remote, branch]);
+      return { ok: pull.code === 0, error: pull.code === 0 ? null : pull.stderr };
+    },
+
+    webUrl(entry, path, ref = 'main') {
+      const slug = repoSlug(entry);
+      return `https://github.com/${slug}/blob/${ref}/${path}`;
+    },
   };
 }

@@ -71,3 +71,47 @@ test('getDrift: parses ahead/behind from rev-list --left-right --count', async (
   assert.equal(drift.ahead, 2);
   assert.equal(drift.canonicalRef, 'main');
 });
+
+import { runHostDriverContract } from './contract.mjs';
+
+test('push: runs git push origin <branch>', async () => {
+  const exec = fakeExec([['push origin', { code: 0, stdout: '', stderr: '' }]]);
+  const d = makeGithubDriver({ exec });
+  const res = await d.push({ branch: 'luizfernando' });
+  assert.equal(res.ok, true);
+  assert.ok(exec.calls.some((c) => c.args.join(' ') === 'push origin luizfernando'));
+});
+
+test('openChange: calls gh pr create with title and base', async () => {
+  const exec = fakeExec([['pr create', { code: 0, stdout: 'https://github.com/x/y/pull/7\n', stderr: '' }]]);
+  const d = makeGithubDriver({ exec });
+  const ref = await d.openChange({ title: 'T', body: 'B', base: 'main' });
+  assert.match(ref.id, /pull\/7/);
+  const call = exec.calls.find((c) => c.bin === 'gh');
+  assert.ok(call.args.includes('--title') && call.args.includes('T'));
+  assert.ok(call.args.includes('--base') && call.args.includes('main'));
+});
+
+test('createIssue: calls gh issue create with title', async () => {
+  const exec = fakeExec([['issue create', { code: 0, stdout: 'https://github.com/x/y/issues/3\n', stderr: '' }]]);
+  const d = makeGithubDriver({ exec });
+  const issue = await d.createIssue({ title: 'Bug', body: 'desc' });
+  assert.match(issue.id, /issues\/3/);
+});
+
+test('webUrl: builds github blob URL from repo + path', () => {
+  const d = makeGithubDriver({ exec: fakeExec([]) });
+  const url = d.webUrl({ repo: 'regen-coordination/org-os' }, 'BOOTSTRAP.md');
+  assert.equal(url, 'https://github.com/regen-coordination/org-os/blob/main/BOOTSTRAP.md');
+});
+
+test('github driver satisfies the HostDriver contract suite', async () => {
+  // Provide fakes that make read calls return contract-valid shapes.
+  const exec = fakeExec([
+    ['symbolic-ref', { code: 0, stdout: 'refs/remotes/origin/main\n', stderr: '' }],
+    ['rev-parse --abbrev-ref', { code: 0, stdout: 'main\n', stderr: '' }],
+    ['rev-list', { code: 0, stdout: '0\t0\n', stderr: '' }],
+  ]);
+  const fetchFn = async () => { throw new Error('offline'); }; // fetchFile → null, allowed
+  await runHostDriverContract(() => makeGithubDriver({ exec, fetchFn }), { assert });
+});
