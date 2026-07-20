@@ -60,6 +60,14 @@ packages:
     lifecycle_status: "active"
     notes: "@org-os/host (packages/org-os-host) — Host-provider abstraction: one HostDriver interface, github/radicle drivers, selected by platforms.canonical. github driver + contract suite shipped; frontier.mjs routed through the seam. 25/25 tests. Awaiting instance adoption signal."
 
+  - id: "rad-org-os"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@org-os/rad (packages/rad-org-os) — Radicle driver for @org-os/host: radicle-httpd reads + rad CLI writes (fail-loudly), did:key identity, COB issue/patch mapping. Passes the HostDriver contract. Write-flag pinning + bootstrap/seed-node in Plans 3-4."
+
   - id: "koi-bridge"
     owner: "framework"
     instances_using: []
