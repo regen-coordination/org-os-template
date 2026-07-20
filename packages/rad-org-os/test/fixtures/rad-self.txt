@@ -1,0 +1,11 @@
+Alias        luizfernando
+DID          did:key:z6Mkvyj7aB29JXhP9YztVCDdXNksQ2WSySvkP3hd7iRMdd19
+Node         not running
+SSH          not running
+├╴Key (hash) SHA256:sNPyV+Zhak+rppDrS74I7uQUaiCE4hVfvaAbEuDV21s
+└╴Key (full) ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPWJBY7L2h4+p4+fdkITIhHmFHXxNeGeiMuNmN3bDy44
+Home         /Users/luizfernando/.radicle
+├╴Config     /Users/luizfernando/.radicle/config.json
+├╴Storage    /Users/luizfernando/.radicle/storage
+├╴Keys       /Users/luizfernando/.radicle/keys
+└╴Node       /Users/luizfernando/.radicle/node
