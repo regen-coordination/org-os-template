@@ -4,5 +4,6 @@
   "type": "module",
   "description": "Radicle (Heartwood) driver for @org-os/host: reads via radicle-httpd, writes via the rad CLI.",
   "main": "src/index.mjs",
+  "bin": { "rad-bootstrap": "bootstrap/cli.mjs" },
   "scripts": { "test": "node --test" }
 }
