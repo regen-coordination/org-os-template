@@ -51,6 +51,6 @@ Everything above is the **github-canonical (default)** path — unchanged. If `f
 
 - **Step 1 (sync):** `rad sync` (via the driver's `syncUpstream()`) instead of `git pull --rebase --quiet`; same non-blocking behavior — if the node isn't running, that's the normal (soft) offline state, continue with local state exactly as the github path does for "no remote".
 - **Step 2 (dashboard):** unchanged — `node scripts/initialize.mjs` still renders from local files; it doesn't need network access either way.
-- **Step 3 (session context):** in addition to the existing notes, silently note the peers panel via `driver.listPeers(rid)` (the identity doc's delegates) instead of a GitHub collaborators list, and drift via `driver.getDrift(rid)` instead of `@{u}`.
+- **Step 3 (session context):** in addition to the existing notes, silently note the peers panel via `driver.listPeers(rid)` (the identity doc's delegates) instead of a GitHub collaborators list. For drift, `driver.getDrift(rid)` supplies the canonical branch *name* (`canonicalRef`, e.g. `rad/main`); the actual ahead/behind is a local `git rev-list` against that branch in your checkout (same computation as `scripts/sync-upstream.mjs`), not a live count from `getDrift` — it has no working copy, so its counts are always 0.
 
 $ARGUMENTS

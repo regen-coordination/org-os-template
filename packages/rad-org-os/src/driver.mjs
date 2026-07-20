@@ -42,10 +42,15 @@ export function makeRadicleDriver({ seed, fetchFn, exec, cwd = '.' } = {}) {
       return { defaultBranch: repo.defaultBranch, threshold: repo.threshold, delegates: repo.delegates };
     },
     async getDrift(rid) {
-      // Local git drift vs the canonical branch; radicle repos are normal git repos.
+      // Deliberate stub: this returns the canonical branch NAME (from httpd) but
+      // ahead/behind are 0 because the driver only has an rid — it has no working
+      // copy to diff against. Real drift for a radicle-canonical instance is computed
+      // by scripts/sync-upstream.mjs (via `git rev-list` against the local checkout's
+      // `rad/<branch>`), which is the only layer that holds the working copy. Callers
+      // must not treat these counts as live; use getDrift ONLY for `canonicalRef`.
       const repo = await httpd.getRepo(ridOf(rid));
       const canonicalRef = repo?.defaultBranch || 'main';
-      return { behind: 0, ahead: 0, canonicalRef }; // refined against a working copy in Plan 4's /sync wiring
+      return { behind: 0, ahead: 0, canonicalRef };
     },
 
     // ---- write path (rad CLI; fail loudly) ----

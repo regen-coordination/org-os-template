@@ -107,7 +107,11 @@ for (const repo of repositories) {
     }
   } catch (err) {
     const message = err.message.split('\n')[0];
-    if (isRadicle && /ENOENT|command not found|rad: not found/i.test(err.message)) {
+    // run() uses execSync with stdio:'inherit', so a missing `rad` binary's stderr
+    // goes to the terminal, NOT err.message — the shell's "command not found" surfaces
+    // as exit code 127. Match that (plus the spawn-level ENOENT for completeness) so a
+    // rid entry gets the actionable install hint instead of the generic hard-fail.
+    if (isRadicle && (err.status === 127 || /ENOENT|command not found|rad: not found/i.test(err.message))) {
       console.warn(`Skipping ${name}: 'rad' CLI not available — install it: curl -sSf https://radicle.dev/install | sh`);
       continue;
     }
