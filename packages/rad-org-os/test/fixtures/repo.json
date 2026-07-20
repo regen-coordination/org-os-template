@@ -1,0 +1,361 @@
+{
+  "payloads": {
+    "xyz.radicle.crefs": {
+      "data": {
+        "rules": {
+          "refs/tags/releases/*": {
+            "allow": [
+              "did:key:z6MkkPvBfjP4bQmco5Dm7UGsX2ruDBieEHi8n9DVJWX5sTEz",
+              "did:key:z6MkgFq6z5fkF2hioLLSNu1zP2qEL1aHXHZzGH1FLFGAnBGz",
+              "did:key:z6MkireRatUThvd3qzfKht1S44wpm4FEWSSa4PRMTSQZ3voM"
+            ],
+            "threshold": 2
+          }
+        }
+      }
+    },
+    "xyz.radicle.project": {
+      "data": {
+        "defaultBranch": "master",
+        "description": "Radicle Heartwood Protocol & Stack",
+        "name": "heartwood"
+      },
+      "meta": {
+        "head": "66ab7f35c933278b932657936ce0c52a02962302",
+        "issues": {
+          "open": 183,
+          "closed": 58
+        },
+        "patches": {
+          "open": 34,
+          "draft": 32,
+          "archived": 83,
+          "merged": 689
+        }
+      }
+    }
+  },
+  "delegates": [
+    {
+      "id": "did:key:z6MksFqXN3Yhqk8pTJdUGLwATkRfQvwZXPqR2qMEhbS9wzpT",
+      "alias": "cloudhead"
+    },
+    {
+      "id": "did:key:z6MktaNvN1KVFMkSRAiN4qK5yvX1zuEEaseeX5sffhzPZRZW",
+      "alias": "cloudhead"
+    },
+    {
+      "id": "did:key:z6MkireRatUThvd3qzfKht1S44wpm4FEWSSa4PRMTSQZ3voM",
+      "alias": "fintohaps"
+    },
+    {
+      "id": "did:key:z6MkgFq6z5fkF2hioLLSNu1zP2qEL1aHXHZzGH1FLFGAnBGz",
+      "alias": "erikli"
+    },
+    {
+      "id": "did:key:z6MkkPvBfjP4bQmco5Dm7UGsX2ruDBieEHi8n9DVJWX5sTEz",
+      "alias": "lorenz"
+    }
+  ],
+  "threshold": 1,
+  "visibility": {
+    "type": "public"
+  },
+  "rid": "rad:z3gqcJUoA1n9HaHKufZs5FCSGazv5",
+  "seeding": 277,
+  "refs": {
+    "tags": {
+      "refs/tags/releases/0.9.0": {
+        "commit": "7b1847d8ad165599c177aa33a68b1fd98164def9",
+        "tagger": {
+          "name": "cloudhead",
+          "email": "cloudhead@radicle.xyz",
+          "timestamp": 1711442354
+        },
+        "message": "Release 0.9.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgvjrQogRxxLjzzWns8+mKJAGzEX\n4fm2ALoN7pyvD2ttQAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQMMWe1PCwSA4VoqJFvxqQPFuAL5UXUofx6xXK7LMOPXqp3xDU0Ldd4EqRS9lyp4U9q\n1wktSKFDTw9sc907RZgwQ=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.0.0": {
+        "commit": "d39ba83cfc7c7685548d18652fef039e25b19276",
+        "tagger": {
+          "name": "cloudhead",
+          "email": "cloudhead@radicle.xyz",
+          "timestamp": 1725961509
+        },
+        "message": "Release 1.0.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgvjrQogRxxLjzzWns8+mKJAGzEX\n4fm2ALoN7pyvD2ttQAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQG3wNeYDWLvHhePfGCpV4FbwLqrcXVYCBCICkTDG/eUa3whp5SwmLMgj8tKPSupuU8\nFtWwijc0i9uNKAoC8ozAU=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.1.0": {
+        "commit": "70f0cc354dee34fc5efaa593a4166872f4089097",
+        "tagger": {
+          "name": "cloudhead",
+          "email": "cloudhead@radicle.xyz",
+          "timestamp": 1733404216
+        },
+        "message": "Release 1.1.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgvjrQogRxxLjzzWns8+mKJAGzEX\n4fm2ALoN7pyvD2ttQAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQKFcFo001WNMWZrzWMvsow4ftEeU97Absd3KWLheyTgJSOy1FD88J+vOItN4q6f1rM\nNhsKpxcxbQx22AGwf8pw4=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.10.0-rc.1": {
+        "commit": "fb80d58af750d525fc2bd8081e5612a3c2726d4c",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1783590248
+        },
+        "message": "Release 1.10.0-rc.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQB6qzAigT5do3JGvT+xzr7KcWk8whm1E+Vxj19QS2rbvvxINChwkNqR2sAQSo1LYGt\n/yUQoto1TWmmOpzxOS9Q0=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.2.0": {
+        "commit": "6f25d73d3df062e7b49df4b2e9dd7cb5aa3a98ca",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1748862232
+        },
+        "message": "Release 1.2.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQJdTObvxlxxu0Akz+Nvf8nfAzOq19LkoeWRTkzo+9nqDJTgd+dQA4vxuBfI3Ae+iLS\nMw8HlHTG5vfPOH2vkp9AY=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.2.1": {
+        "commit": "29043134a361aa8931cd069a1c72e3d2e8deae97",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1752734717
+        },
+        "message": "Release 1.2.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQJ5Va8tlfk0hO8+dFh5mmdwapZoJNYM3BfJFi2IllkQWMkBCCNPz1UfjhPl6C8oFfJ\nYhmcukNc+yijCcTBbtzgA=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.3.0": {
+        "commit": "0e48723b419be95340a5d9858d76963e8e97137b",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1754993810
+        },
+        "message": "Release 1.3.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQGiVUx7lBWK8RD9O57TbfZMiXOu5q+IMXuCUtQdXVsDuNp0wCMvX5BBvpjw9L7giNH\nrBVOY8AppoxefyV1f7IQo=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.4.0": {
+        "commit": "bbd1e2cff60cb8086617251adc0c41d0847fe303",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1756878297
+        },
+        "message": "Release 1.4.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQHlCh1pcoSAF1ff6nWw40UB1eLNHRf80LhxJDuP81tq4OlJQyXLpEpmMsn8GLPZPyN\n/JaqgXw8op8t/V5Wj9Igk=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.4.0-rc.1": {
+        "commit": "675ef6f3293334a2fbe9e9712ab15b457736fb20",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1756145470
+        },
+        "message": "Release 1.4.0-rc.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQHs/mvWzMLyPPJ6v8OQIZj4nMCD7GsF2VLxFYTGsjV7vqIpoh8k30Q8vGwgfVpD0sz\n/BGxI0AxobwXSeJcSXCQM=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.4.0-rc.2": {
+        "commit": "bbd1e2cff60cb8086617251adc0c41d0847fe303",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1756287662
+        },
+        "message": "Release 1.4.0-rc.2\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQNH5GVVWkUKkbR15o8XJwDLidKZte3gI4fjq8mYnU/3/L5OyF08ylxqFAsqQbG2b1z\nr6aV0sndW/C12yRQ6KaQo=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.5.0": {
+        "commit": "5fea9ac05c7296dce3f8dec363b7442bec929c55",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1759156348
+        },
+        "message": "Release 1.5.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQIKi9MOXjWkdspfzMY9RwWiYlfqc1hWDu31fjw/tlfTOb9nNNx/Z241Q7b+6O7HTWt\nH+O43EeiJCgXBI5veENwg=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.5.0-rc.2": {
+        "commit": "7b00bf2e3ac5e83eab262182bf51a5ede656145c",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1758208683
+        },
+        "message": "Release 1.5.0-rc.2\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQNgES4QbhWY3ZlVA2aFf1VuILbkbl+M12+u6O4tpwu2DlE7alW8MzPhMUOy1hsyE9d\n6PmXXfCPWUu8GbpLyfJwo=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.6.0": {
+        "commit": "4a5a51e6e550456c75d1a2182b0eafb9c3033ec0",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1767778896
+        },
+        "message": "Release 1.6.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQEl1/jOp36YaKzZJssnqUMJcjwpy3m31c0BncDx7DBbIiGZFR/iJPdOdcivdHjLtpd\nMvxNbFiWs+a+G0QH5tCAw=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.6.0-alpha.1": {
+        "commit": "efe10f95be9fde1cda84f0631ec8f6546ac7228d",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1760367819
+        },
+        "message": "Release 1.6.0-alpha.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQE07gC3TVHHkfDW5eLPbTHhcLKeMphUM0WWBFPljvTFdVLu09vikZ7NUeHUCZ4eL0U\nCCubh/CXJdsg9DGdlyBQk=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.6.0-alpha.2": {
+        "commit": "0b3424857ec1c5b57d6778f2bf6f379685e7f073",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1760525185
+        },
+        "message": "Release 1.6.0-alpha.2\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQPwbdwPntLgwu3pgxsi7DkVxLlrPa2xa9wyZ4q7axU3yS+SRcK5jiIUKhqf8rlx1H5\njqEej/gSLNQ2jXf+v3FQc=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.6.0-alpha.3": {
+        "commit": "38ca038a0d695875bc6ea73ae88e048622dbc846",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1760717040
+        },
+        "message": "Release 1.6.0-alpha.3\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQPhUKiBSx58mj5ImNNje1mHuXmux+TbDMj3BbohDgU4RiDb8j50sbF69Yi5UKLDIUF\nOz5VpMScskJcFnFtry5AM=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.6.0-rc.1": {
+        "commit": "7ccdd4c810355ca2fe50243f1074229ccc191032",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1762187647
+        },
+        "message": "Release 1.6.0-rc.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQCZY/HhqXLqjN/DW5mw6lqCVOpCkGNqiRBrfe/Bux8dwHWX4j7KbtW3iSBYyqv6G2T\n/9Hqj70NsRiMBYKYoMgQs=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.6.0-rc.2": {
+        "commit": "37d4ae4a9f2527a6f4922bf10a68b49ba67b0204",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1764606010
+        },
+        "message": "Release 1.6.0-rc.2\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQIJQYzBIrdYywotkLcrx8NLrwtMjlyQrUEP4GkjfrwHVF8Tu1UyZ53gHGM5vkDGCAS\njUlaQqXtqOKfSM2X6nggs=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.6.1": {
+        "commit": "48582815c27aa5bc23f7a53f9b2ac93469c5ea83",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1769001601
+        },
+        "message": "Release 1.6.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQEW0+c7Yil/+r/JDCg5NOBpFs1+FZVCK4RO/sMGU7v6N/ktv0IodVmaZ6QPw2ZcgVN\ns/Y/jWJv2hPVsxwtBngAY=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.7.0": {
+        "commit": "748ddade2feb6f00245c2ba878bd54842dc57506",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1773829838
+        },
+        "message": "Release 1.7.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQBvtU6HxvSIhvvaCRIra/e3WqZxwgL16ZHySA2kPXb/x7LOqKY1F6VMXM+y4Ixi8qM\nzyzACXp0Xor3q9Eobk9gY=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.7.0-rc.0": {
+        "commit": "ebf7d876b4d7fc41775febfe49cb0a702f266e53",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1770895038
+        },
+        "message": "Release 1.7.0-rc.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQD0+Zql5kCNZXtbGayemqsCRUdbf2q+yjRCWnJp0oTSGIRM0k2I52zzl81U482fZtq\nTu/RgGH5zkdWSSiI5Nxwc=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.7.0-rc.1": {
+        "commit": "18d6ce94776b410ab5377ac49f5e545ba363bf21",
+        "tagger": {
+          "name": "Lorenz Leutgeb",
+          "email": "lorenz.leutgeb@radicle.xyz",
+          "timestamp": 1771532099
+        },
+        "message": "Release 1.7.0-rc.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWErsKqAghtK2Gg2fx5rfaSs6cz\nMLzTtn4+kGRHZg5WMAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQKXFSdlz1p6uSDTWf89IN9+UQ45+NBFTVo7R3rJSZd+u32oAGjDihck5zT/J2MF8KP\nvpXYPT4SenPtcWaQSlbgo=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.7.1": {
+        "commit": "d9915d275fd07d20db08cf7d3488f8650e66b88a",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1773954606
+        },
+        "message": "Release 1.7.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQEbkxtHKcmJxz/9LMsZD7QNi3Z4kMPg2fM3hcpAOdS6xEyRTtyFhounY9vpII2NkTf\n06d2f+S9YYJWoLVxFcQAc=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.8.0": {
+        "commit": "edde15d9ea700a70de04558fafc0b55360e9f5d2",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1774539586
+        },
+        "message": "Release 1.8.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQG6Rz7pK61HZV8ed8uFRsao9gE/dvPrwuM/MC1bsHarAKTljLs8GUkNXMku1El5nOg\nn24E4PrMnCd2ZSD7PiDAw=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.8.0-rc.1": {
+        "commit": "33db6637b437cd4d55b614a6a5b8292c0678a583",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1774365210
+        },
+        "message": "Release 1.8.0-rc.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQNYCZ70qmyQoo0R2ZQlDz9jCaIg+tNO6DOw9fVf6xJftwP1xNUZKP/N3yPXpOKv8Sj\nqFumschpKTjhLjaljAow0=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.8.0-rc.2": {
+        "commit": "e7467fb15ff6d679d710c0ee9b6f6d2b94d4c69d",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1774426879
+        },
+        "message": "Release 1.8.0-rc.2\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQLCZFjTWpzYKVJXSwbZ/Sz2larXHPitbgeik53bpGXTPtPp+rhl2kOW7PDfgSnu37O\nmZU2kDdVMmG/v+QsrTHw4=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.8.0-rc.3": {
+        "commit": "46f4c0f38ffb181f6e5787997c6153f18ab22902",
+        "tagger": {
+          "name": "Lorenz Leutgeb",
+          "email": "lorenz.leutgeb@radicle.xyz",
+          "timestamp": 1774464756
+        },
+        "message": "Release 1.8.0-rc.3\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWErsKqAghtK2Gg2fx5rfaSs6cz\nMLzTtn4+kGRHZg5WMAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQOzns1+MclVDjx8q3/OvLg0h3BusyqmTU/loOvq7p3Y+JXWvvJjKitJH5g8dZGzZ5w\nz05PnW1D3tuO21F2MwCwY=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.9.0": {
+        "commit": "10004025367e26a51125613691177d38335fc6c0",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1779119810
+        },
+        "message": "Release 1.9.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQCynE45TvLqeEee5zUnoaUfDPDsEx+RSy0OQEXvXEtuInK+jemR9E4ufAsVr70Hvo3\nq5Y1Fi0yjvWJiteUmDUQM=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.9.0-rc.1": {
+        "commit": "099722dd0893559891a80a9d84334bf7573db1e8",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1777290700
+        },
+        "message": "Release 1.9.0-rc.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQElGxmyIoflSolFyuyUzz399nfY6i5JSqp0hsocHYoceWZzrV9omabFLFjVT/h67o7\ngvm/3Tt8WIfdBuBZnOIA8=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.9.0-rc.2": {
+        "commit": "53db9941460438579219d3e74ea39dcb49294d6b",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1778142873
+        },
+        "message": "Release 1.9.0-rc.2\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQE8LCKeEwpfuwr+61kShjpxIFlshbwAO54FnEmthdFJ1/UKbi0BpThmUgSjrZ1cHeA\n6c3QKJAGGm/FCMzHR0Rwg=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.9.0-rc.3": {
+        "commit": "420af3b710bfd0663e9ad6220cb10910580bde2f",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1778498235
+        },
+        "message": "Release 1.9.0-rc.3\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQBu3BmBKUFeiHICO4b1kUS0NZTiB3KCGs9EI79yJGtraidYWQqXDWSMIDb4MNdj1Q5\n9PlguRbMrW9rVK0/0Mtwk=\n-----END SSH SIGNATURE-----\n"
+      },
+      "refs/tags/releases/1.9.1": {
+        "commit": "5bd3569e120a6172d9df68e1d1d0eed15e8104b1",
+        "tagger": {
+          "name": "Fintan Halpenny",
+          "email": "fintan.halpenny@gmail.com",
+          "timestamp": 1779377691
+        },
+        "message": "Release 1.9.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgQWxpGoAnWvpsEXCVxbMko3sN2M\ni1AO6YI1zTCrDoO+QAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQLCMocNO1Mjnq+eKT5SItd9kVo0JZOnUvLyKtyCnnYma4ayI3w+nb2I3fV8UsAlqWg\nBWjjAhJWnhdyb01WaeqAY=\n-----END SSH SIGNATURE-----\n"
+      }
+    },
+    "refs": {
+      "refs/heads/master": "66ab7f35c933278b932657936ce0c52a02962302"
+    }
+  }
+}

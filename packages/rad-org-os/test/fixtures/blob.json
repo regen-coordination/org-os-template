@@ -1,0 +1,23 @@
+{
+  "binary": false,
+  "name": "README.md",
+  "content": "# ❤️🪵\n\n*Radicle Heartwood Protocol & Stack*\n\nHeartwood is the third iteration of the Radicle Protocol, a powerful\npeer-to-peer code collaboration and publishing stack. The repository contains a\nfull implementation of Heartwood, complete with a user-friendly command-line\ninterface (`rad`) and network daemon (`radicle-node`).\n\nRadicle was designed to be a secure, decentralized and powerful alternative to\ncode forges such as GitHub and GitLab that preserves user sovereignty\nand freedom.\n\nSee the [Radicle home page](https://radicle.dev/) for general\ninformation, and the [Zulip chat](https://radicle.zulipchat.com/) to\ntalk to the project.\n\nSee the [Protocol Guide](https://radicle.dev/guides/protocol) for an\nin-depth description of how Radicle works.\n\n## Installation\n\n**Requirements**\n\n* *Linux* or *Unix* based operating system.\n* Git 2.34 or later\n* OpenSSH 9.1 or later with `ssh-agent`\n\n### 📀 From binaries\n\n> Requires `curl` and `tar`.\n\nRun the following command to install the latest binary release:\n\n    curl -sSf https://radicle.dev/install | sh\n\nOr visit our [download](https://radicle.dev/download) page.\n\n### 📦 From source\n\n> Requires the Rust toolchain.\n\nYou can install the Radicle stack from source, by running the following\ncommands from inside this repository:\n\n    cargo install --path crates/radicle-cli --force --locked --root ~/.radicle\n    cargo install --path crates/radicle-node --force --locked --root ~/.radicle\n    cargo install --path crates/radicle-remote-helper --force --locked --root ~/.radicle\n\nOr directly from our seed node:\n\n    cargo install --force --locked --root ~/.radicle \\\n        --git https://seed.radicle.dev/z3gqcJUoA1n9HaHKufZs5FCSGazv5.git \\\n        crates/radicle-cli crates/radicle-node crates/radicle-remote-helper\n\n## Running\n\n*Systemd* unit files are provided for the node under the `/systemd` folder.\nThey can be used as a starting point for further customization.\n\nFor running in debug mode, see [HACKING.md](HACKING.md).\n\n## Feedback\n\nIf you have feedback, feel free to create issues using `rad issue`, join\n[our Zulip][zulip], or email [feedback@radicle.dev][mail-feedback].\nEmails sent to this address are [automatically posted][zulip-help-email] to\n[our **public** #feedback channel on Zulip][zulip-feedback], revealing the\n[`From` header][rfc2822s3.6.2] (which usually contains your name and email\naddress). This allows us to discuss your feedback on Zulip, and, if necessary,\nrespond to you via email.\n\n## Contributing\n\nSee [CONTRIBUTING.md](CONTRIBUTING.md) and [HACKING.md](HACKING.md) for an\nintroduction to contributing to Radicle.\n\n## License\n\nRadicle is distributed under the terms of both the MIT license and the Apache License (Version 2.0).\n\nSee [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for details.\n\n[zulip]: https://radicle.zulipchat.com/\n[zulip-feedback]: https://radicle.zulipchat.com/#narrow/channel/392584-feedback\n[zulip-help-email]: https://talently.zulip.com/help/message-a-channel-by-email\n[mail-feedback]: mailto:feedback@radicle.dev\n[rfc2822s3.6.2]: https://datatracker.ietf.org/doc/html/rfc2822#section-3.6.2\n",
+  "path": "README.md",
+  "lastCommit": {
+    "id": "aa177b040037f399312c5f21841f28910a07ce2f",
+    "author": {
+      "name": "Lorenz Leutgeb",
+      "email": "lorenz.leutgeb@radicle.dev"
+    },
+    "summary": "treewide: radicle.{xyz → dev,network}",
+    "description": "We have moved to radicle.dev, so adjust the domain name in various\nplaces.\n\nNot changed:\n - COB type names\n - systemd secret identifiers",
+    "parents": [
+      "cb57e6560fe7767e79b87473a11261fbb82ce84c"
+    ],
+    "committer": {
+      "name": "Lorenz Leutgeb",
+      "email": "lorenz.leutgeb@radicle.dev",
+      "time": 1777307670
+    }
+  }
+}

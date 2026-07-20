@@ -1,0 +1,40 @@
+{
+  "message": "Welcome!",
+  "service": "radicle-httpd",
+  "version": "0.25.0-unknown",
+  "apiVersion": "6.1.0",
+  "nid": "z6MksmpU5b1dS7oaqF2bHXhQi1DWy2hB7Mh9CuN7y1DN6QSz",
+  "path": "/api/v1",
+  "links": [
+    {
+      "href": "/repos",
+      "rel": "repos",
+      "type": "GET"
+    },
+    {
+      "href": "/repos/:rid",
+      "rel": "repo",
+      "type": "GET"
+    },
+    {
+      "href": "/node",
+      "rel": "node",
+      "type": "GET"
+    },
+    {
+      "href": "/nodes/:nid",
+      "rel": "node",
+      "type": "GET"
+    },
+    {
+      "href": "/delegates/:did/repos",
+      "rel": "repos",
+      "type": "GET"
+    },
+    {
+      "href": "/stats",
+      "rel": "stats",
+      "type": "GET"
+    }
+  ]
+}
