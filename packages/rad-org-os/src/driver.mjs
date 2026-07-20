@@ -1,5 +1,5 @@
 import { makeHttpd } from './httpd.mjs';
-import { makeRadCli } from './rad-cli.mjs';
+import { makeRadCli, defaultExec } from './rad-cli.mjs';
 import { makeIdentity } from './identity.mjs';
 import { parsePatchId, parseIssueId } from './cob.mjs';
 import { WriteUnavailableError } from '../../org-os-host/src/errors.mjs';
@@ -8,12 +8,14 @@ import { WriteUnavailableError } from '../../org-os-host/src/errors.mjs';
 // (fail loudly through radCli). Accepts injected fetchFn/exec for testing; in
 // production makeHttpd/makeRadCli supply real fetch/spawn.
 export function makeRadicleDriver({ seed, fetchFn, exec, cwd = '.' } = {}) {
+  const runExec = exec || defaultExec(); // real spawn when not injected (never a silent no-op)
   const httpd = makeHttpd({ seed, fetchFn });
-  const radCli = makeRadCli({ exec, cwd });
+  const radCli = makeRadCli({ exec: runExec, cwd });
   const identity = makeIdentity({ radCli, httpd });
   // Patches are git pushes to refs/patches (there is no `rad patch open`), so the
-  // driver needs raw git access alongside the rad CLI. Reuse the same injected exec.
-  const git = (args) => (exec || (() => ({ code: 0, stdout: '', stderr: '' })))('git', args, { cwd });
+  // driver needs raw git access alongside the rad CLI. Share the ONE real executor —
+  // an unset exec must not degrade git into a no-op that fakes a write success.
+  const git = (args) => runExec('git', args, { cwd });
 
   return {
     resolveRemote(idOrUrl) {
@@ -47,6 +49,9 @@ export function makeRadicleDriver({ seed, fetchFn, exec, cwd = '.' } = {}) {
     },
 
     // ---- write path (rad CLI; fail loudly) ----
+    // Announce-only: `rad sync --announce` publishes local refs to seeds; it does NOT
+    // push commits. Commit-push wiring (git push rad <branch>) is Plan 4's /sync work —
+    // a caller must not assume this publishes new commits.
     async push({ branch } = {}) {
       await radCli.run(['sync', '--announce']);
       return { ok: true, error: null };
@@ -58,6 +63,9 @@ export function makeRadicleDriver({ seed, fetchFn, exec, cwd = '.' } = {}) {
       const opts = ['-o', `patch.message=${title}`, ...(body ? ['-o', `patch.message=${body}`] : [])];
       const res = await git(['push', 'rad', 'HEAD:refs/patches', ...opts]);
       if (res.code !== 0) {
+        if (res.code === -1 || /ENOENT|command not found/i.test(res.stderr || '')) {
+          throw new WriteUnavailableError('git is not available', { hint: 'install git' });
+        }
         if (/node is not running|connection refused|not running/i.test(res.stderr || '')) {
           throw new WriteUnavailableError('the local Radicle node is not reachable', { hint: 'start your node: rad node start' });
         }

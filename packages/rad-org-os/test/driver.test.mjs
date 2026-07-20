@@ -62,3 +62,12 @@ test('openChange returns the patch COB id', async () => {
   assert.equal(ref.id, '0a1b2c3d4e5f60718293a4b5c6d7e8f901234567');
   assert.equal(ref.ok, true);
 });
+
+test('openChange fails loudly (never silent success) on the real no-injection path', async () => {
+  const d = makeRadicleDriver({ seed: 'https://seed.example', fetchFn: fakeFetch() }); // no exec injected
+  let result, threw = null;
+  try { result = await d.openChange({ title: 'X', body: 'Y', base: 'main' }); }
+  catch (e) { threw = e; }
+  if (threw) assert.ok(threw instanceof Error);
+  else assert.equal(result.ok, false, 'must not silently succeed without a real patch');
+});

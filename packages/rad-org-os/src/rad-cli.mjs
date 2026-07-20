@@ -27,7 +27,7 @@ export function makeRadCli({ exec = defaultExec(), cwd = '.' } = {}) {
   return { run };
 }
 
-function defaultExec() {
+export function defaultExec() {
   return (bin, args, { input, cwd = '.' } = {}) =>
     new Promise((resolve) => {
       const child = spawn(bin, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
