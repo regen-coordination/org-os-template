@@ -15,6 +15,8 @@
 
 **✅ Tiers 1+2 COMPLETE** (Plans 1–4 shipped to `v0.5`). org-os can now run fully on Radicle: host abstraction, Radicle driver (httpd reads + fail-loud rad writes), zero→live bootstrap + seed-node recipe, did:key identity + quorum governance, and canonical-aware commands — GitHub cohort unchanged throughout.
 
+**✅ Live-verified end to end (2026-07-20):** the read path runs keyless against `seed.radicle.xyz` (getCanonical/fetchFile); the write path was proven by running the gated bootstrap integration against a **disposable throwaway identity** (isolated `RAD_HOME`, torn down after) — real `rad auth` → git-init genesis → `rad init` → members/federation succeeded (`✔ 814ms`), confirming `parseRid`/`parseDid` match real `rad 1.8.0` output. **No live-verification debt remains.** The only operator action left is the *interactive* `rad id update` to apply a `threshold`/`crefs` change on a real repo (genesis sets threshold 1; `buildCrefs()` generates the payload). Runner: `packages/rad-org-os/scripts/live-verify.sh`.
+
 ## Deferred (not in this roadmap)
 
 - **Tier 3** — replace the 3 GitHub Actions workflows with `radicle-ci-broker` adapters; full GitHub-Pages → node hosting rebuild. Designed in the spec, built later; lands on the seed-node recipe from Plan 3.
