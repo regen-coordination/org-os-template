@@ -33,6 +33,7 @@ import { execSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
+import { resolveRemoteScheme } from "../packages/org-os-host/src/index.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,39 +97,71 @@ const customizations = fed.customizations || [];
 const lastSyncCommit = fed.metadata?.last_sync_commit || null;
 const upstream = (fed.upstream || [])[0];
 
-if (!upstream || !upstream.url) {
-  console.error("✗ No upstream defined in federation.yaml.upstream[0].url");
+if (!upstream || !(upstream.url || upstream.rid)) {
+  console.error("✗ No upstream defined in federation.yaml.upstream[0].url (or .rid)");
   process.exit(1);
 }
+
+// A rid-bearing upstream entry (explicit `rid`, or a `url` that IS a rad: rid) syncs
+// through the radicle driver; every existing github url keeps the plain-git path
+// below unchanged. `platforms.canonical: radicle` is a secondary signal for
+// instances that haven't yet annotated the upstream entry itself.
+const isRadicleUpstream =
+  resolveRemoteScheme(upstream.rid || upstream.url) === "radicle" ||
+  fed.platforms?.canonical === "radicle";
+const upstreamRid = upstream.rid || (isRadicleUpstream ? upstream.url : null);
+const upstreamBranch = upstream.branch || "main";
+const upstreamLabel = upstream.url || upstream.rid;
 
 if (customizations.length > 0) {
   log("stage 3", `${customizations.length} customization(s) flagged as maintain_on_sync`);
 }
 
 // === Stage 4: fetch + identify new commits ===
-log("stage 4", "git fetch upstream");
-if (!gitOk("remote get-url upstream")) {
-  log("stage 4", `adding upstream remote: ${upstream.url}`);
-  if (!dry) git(`remote add upstream ${upstream.url}`);
+let remoteName;
+if (isRadicleUpstream) {
+  // Radicle: `rad sync` exchanges refs with seeds at the network layer; the working
+  // copy's "rad" git remote (set up by `rad clone <rid>`) then needs an ordinary
+  // `git fetch` to pull those refs into local remote-tracking branches.
+  remoteName = "rad";
+  log("stage 4", `rad sync (radicle canonical, rid ${upstreamRid})`);
+  if (!dry) {
+    const r = spawnSync("rad", ["sync"], { cwd: rootDir, encoding: "utf-8", stdio: "inherit" });
+    if (r.status !== 0) {
+      console.warn("⚠ rad sync failed or the local node is unreachable (start it: rad node start) — continuing with locally cached refs");
+    }
+  }
+  if (!gitOk(`remote get-url ${remoteName}`)) {
+    console.error(`✗ No '${remoteName}' git remote configured — this instance doesn't look rad-cloned (expected from \`rad clone ${upstreamRid || "<rid>"}\`).`);
+    process.exit(1);
+  }
+  if (!dry) git(`fetch ${remoteName} --quiet`);
+} else {
+  remoteName = "upstream";
+  log("stage 4", "git fetch upstream");
+  if (!gitOk(`remote get-url ${remoteName}`)) {
+    log("stage 4", `adding upstream remote: ${upstream.url}`);
+    if (!dry) git(`remote add ${remoteName} ${upstream.url}`);
+  }
+  if (!dry) git(`fetch ${remoteName} --quiet`);
 }
-if (!dry) git("fetch upstream --quiet");
 
 let newCommitCount = 0;
 let newHead = null;
 try {
-  newHead = git("rev-parse upstream/main");
+  newHead = git(`rev-parse ${remoteName}/${upstreamBranch}`);
   if (lastSyncCommit) {
     const range = `${lastSyncCommit}..${newHead}`;
     newCommitCount = parseInt(git(`rev-list --count ${range}`).trim() || "0", 10);
   } else {
-    newCommitCount = parseInt(git(`rev-list --count upstream/main`).trim() || "0", 10);
+    newCommitCount = parseInt(git(`rev-list --count ${remoteName}/${upstreamBranch}`).trim() || "0", 10);
   }
 } catch (e) {
-  console.error(`✗ Could not read upstream/main: ${e.message}`);
+  console.error(`✗ Could not read ${remoteName}/${upstreamBranch}: ${e.message}`);
   process.exit(1);
 }
 
-log("stage 4", `${newCommitCount} new commit(s) on upstream/main since ${lastSyncCommit?.slice(0, 12) || "(no last_sync_commit)"}`);
+log("stage 4", `${newCommitCount} new commit(s) on ${remoteName}/${upstreamBranch} since ${lastSyncCommit?.slice(0, 12) || "(no last_sync_commit)"}`);
 
 if (newCommitCount === 0) {
   console.log("\n✓ Already up to date with upstream.");
@@ -143,10 +176,10 @@ if (!yes && !dry) {
 }
 
 // === Stage 5: git pull ===
-log("stage 5", "git pull --rebase upstream main");
+log("stage 5", `git pull --rebase ${remoteName} ${upstreamBranch}`);
 if (!dry) {
   try {
-    git("pull --rebase upstream main", { stdio: "inherit" });
+    git(`pull --rebase ${remoteName} ${upstreamBranch}`, { stdio: "inherit" });
   } catch (e) {
     console.error(`✗ Pull failed: ${e.message}`);
     console.error(`  Working tree may be in conflict state. Resolve manually.`);
@@ -218,7 +251,7 @@ if (!dry) {
   const receiptPath = path.join(rootDir, "memory", `sync-${today}.md`);
   const receipt = `# Sync receipt — ${today}
 
-- **Upstream:** ${upstream.url}
+- **Upstream:** ${upstreamLabel}
 - **Previous last_sync_commit:** ${lastSyncCommit || "(none)"}
 - **New last_sync_commit:** ${newHead}
 - **Commits applied:** ${newCommitCount}

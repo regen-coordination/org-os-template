@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { resolveRemoteScheme } from '../packages/org-os-host/src/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,12 +52,16 @@ const errors = [];
 for (const repo of repositories) {
   const name = repo.name;
   const url = repo.url;
+  const rid = repo.rid || (typeof url === 'string' && url.startsWith('rad:') ? url : null);
+  // A rad: entry addresses via RID through the radicle driver's `rad` CLI; every
+  // existing github entry (url is an https/git url, no rid) keeps the plain-git path.
+  const isRadicle = resolveRemoteScheme(rid || url) === 'radicle';
   const branch = repo.branch || 'main';
   const targetPath = path.join(reposDir, name);
   const relativeTargetPath = path.relative(rootDir, targetPath);
   const gitDir = path.join(targetPath, '.git');
 
-  if (!name || !url) {
+  if (!name || !(url || rid)) {
     console.warn('Skipping invalid manifest entry:', repo);
     continue;
   }
@@ -69,9 +74,17 @@ for (const repo of repositories) {
   try {
     if (fs.existsSync(gitDir)) {
       console.log(`Updating ${name}...`);
-      run('git fetch --all --prune', targetPath);
-      run(`git checkout ${branch}`, targetPath);
-      run(`git pull origin ${branch}`, targetPath);
+      if (isRadicle) {
+        // Radicle repos are normal git repos once cloned; `rad sync` pulls in new
+        // refs from seeds before we fast-forward the working branch.
+        run('rad sync', targetPath);
+        run(`git checkout ${branch}`, targetPath);
+        run(`git pull rad ${branch}`, targetPath);
+      } else {
+        run('git fetch --all --prune', targetPath);
+        run(`git checkout ${branch}`, targetPath);
+        run(`git pull origin ${branch}`, targetPath);
+      }
       continue;
     }
 
@@ -87,10 +100,19 @@ for (const repo of repositories) {
     }
 
     console.log(`Cloning ${name}...`);
-    run(`git clone --branch ${branch} "${url}" "${targetPath}"`, rootDir);
+    if (isRadicle) {
+      run(`rad clone ${rid} "${targetPath}"`, rootDir);
+    } else {
+      run(`git clone --branch ${branch} "${url}" "${targetPath}"`, rootDir);
+    }
   } catch (err) {
+    const message = err.message.split('\n')[0];
+    if (isRadicle && /ENOENT|command not found|rad: not found/i.test(err.message)) {
+      console.warn(`Skipping ${name}: 'rad' CLI not available — install it: curl -sSf https://radicle.dev/install | sh`);
+      continue;
+    }
     if (repo.optional) {
-      console.warn(`Skipping optional ${name}: ${err.message.split('\n')[0]}`);
+      console.warn(`Skipping optional ${name}: ${message}`);
       continue;
     }
     console.error(`Failed to clone/update ${name}: ${err.message}`);
