@@ -32,6 +32,7 @@ From a full codebase sweep, the GitHub coupling is not just hosting — it is al
 - **Automation & hosting.** Three GitHub Actions workflows (`validate.yml`, `drift.yml` auto-commit, `generate-schemas.yml` auto-commit); `.well-known/dao.json` hardcodes `organizational-os.github.io` URIs; `federation.yaml platforms.deployment: github-pages`.
 - **Provenance.** The lineage stamp (`federation.yaml.metadata.genesis_commit` / `last_sync_commit`, plain SHAs) is validated for *shape* by `scripts/validate-identity.mjs` — no signatures.
 - **Prior art in-repo.** The KMS connector-layer plan (`docs/superpowers/plans/2026-07-19-org-os-kms-connector-layer.md`) already specs a **stub Radicle connector** in `@org-os/kms` — but scoped to *knowledge ingestion* (COB → signal). This spec keeps that connector read-only/ingestion-side and does **not** fuse hosting/collaboration into it.
+- **Prior art, external — `rad-skill`.** A Claude Code plugin, *"guidance for Radicle — a peer-to-peer code collaboration protocol"* (RID `rad:zvBj4kByGeQSrSy2c4H7fyK42cS8`, delegate `hdh` / did:key `z6Mkfu…qT9n`, public, threshold 1), itself **distributed over Radicle** (seeded on `iris.radicle.network`) rather than a GitHub marketplace. It is exactly the agent-facing `rad`-CLI guidance layer rad-org-os needs, and a live proof-of-thesis for agent tooling shipped over Radicle. Identity/metadata confirmed via the live `iris.radicle.network` httpd API on 2026-07-20; full file tree not retrieved (blob/tree endpoints required a commit SHA; the web explorer is a JS SPA). See "Agent-integration & sovereign-runtime" below and Open Decision 5.
 
 ## Research basis (Radicle, 2025–2026 — adversarially verified)
 
@@ -207,7 +208,17 @@ All additive — no registry rewrite:
 - **`.well-known/dao.json`:** the hardcoded `github.io` URIs become templated off `platforms.seed_node`, so a Radicle-canonical org serves discovery from its own node (`GET /api/v1/repos/:rid/blob/HEAD/.well-known/…`). This is the one Tier-3-adjacent piece done in v1 — a URI-template change, because discovery can't depend on GitHub Pages for a GitHub-free cohort. The full hosting rebuild stays Tier 3.
 - **Validation/generation:** `validate-identity.mjs` + `validate-structure.mjs` gain Radicle-aware checks; `generate:schemas` / `generate:quilt` read the canonical scheme.
 
-## Sovereign-runtime compat layer (thin — the "B" half of Q2)
+## Agent-integration & sovereign-runtime compat layer (thin — the "B" half of Q2)
+
+### Agent-facing `rad` guidance (build on `rad-skill`)
+
+rad-org-os's command skills drive the `rad` CLI, so an org-os agent needs guidance on `rad` workflows (`rad issue`, `rad patch`, `rad sync`, `rad id`, seeding). Rather than author this from scratch, **build on the external `rad-skill` plugin** (Context above):
+
+- **Reuse its content, keep our skills runtime-neutral.** `rad-skill` is Claude-Code-specific, which tensions with our runtime-agnostic goal — so we treat its `rad`-workflow *content* as the reusable asset and express it as a runtime-neutral org-os skill under `skills/`, not vendored wholesale.
+- **Distribution dogfooding.** rad-org-os seeds `rad-skill` from the federation node and references it as the canonical example of agent tooling delivered over Radicle (no GitHub marketplace) — the sovereign-runtime story end-to-end.
+- **Attribution & currency.** Single-delegate community repo; we evaluate before adopting, credit `hdh`, and pin to a reviewed commit rather than tracking HEAD.
+
+### Runtime-agnosticism
 
 - **Runtime-agnostic audit:** verify skills and command bodies don't hard-assume Claude/Anthropic; fix any Claude-only assumptions found on the Radicle-native command paths. `federation.yaml agent.runtime` already exists.
 - **Bootstrap default:** `rad-bootstrap` writes `agent.runtime` to an open-model option by default in the Radicle-first path, so a new group's stack is Radicle + open-model end-to-end — while an operator may still choose Claude.
@@ -242,6 +253,7 @@ All additive — no registry rewrite:
 2. **CI for integration tests:** whether to run a real `radicle-node` in GitHub Actions during the dual-stack period, or gate integration tests behind the seed-node compose only.
 3. **Open-model CLI target** for the sovereign-runtime default (OpenCode + Ollama vs. another) — pick during the runtime-agnostic audit.
 4. **First dogfood instance:** which repo flips to `platforms.canonical: radicle` first (recommend a fresh Radicle-first pilot rather than migrating a live instance).
+5. **`rad-skill` adoption mode:** adopt (re-express content as a runtime-neutral org-os skill) vs. vendor (import as-is) vs. align (link + mirror our own). Recommendation leans *adopt*; requires retrieving its full contents first (fetch its tree via the httpd API with a resolved commit SHA, or `rad clone rad:zvBj4kByGeQSrSy2c4H7fyK42cS8`) and a licence check.
 
 ## Appendix A — Verified research claims (source + adversarial vote)
 
