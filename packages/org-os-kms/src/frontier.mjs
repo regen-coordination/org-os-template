@@ -6,6 +6,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
+// Resolved by RELATIVE sibling path (see src/framework.mjs) — this repo has no npm
+// workspaces and no linked node_modules. If org-os-kms is ever published, change ONLY
+// this specifier to the bare package name.
+import { resolveDriver } from '../../org-os-host/src/index.mjs';
 
 function normalizePeers(manifest) {
   const out = [];
@@ -34,16 +38,11 @@ export async function fetchFrontier({ dir = '.', fetchFn = globalThis.fetch, now
       if (localFed && existsSync(localFed)) {
         manifest = yaml.load(readFileSync(localFed, 'utf8'));
         source = 'local';
-      } else if (entry.repo) {
-        const url = `https://raw.githubusercontent.com/${entry.repo}/HEAD/federation.yaml`;
-        // Abort a hung host so one slow peer can't stall the whole sequential sweep;
-        // a timeout lands in the catch below, which preserves any existing cache.
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 8000);
-        try {
-          const res = await fetchFn(url, { signal: ctrl.signal });
-          if (res.ok) { manifest = yaml.load(await res.text()); source = url; }
-        } finally { clearTimeout(timer); }
+      } else if (entry.repo || entry.rid) {
+        // Route through the host driver: github → raw.githubusercontent, radicle → httpd.
+        const driver = resolveDriver(fed, { fetchFn });
+        const text = await driver.fetchFile(entry, 'federation.yaml');
+        if (text != null) { manifest = yaml.load(text); source = entry.rid ? 'radicle' : 'github'; }
       } else {
         report.push({ id, skipped: 'no local_path or repo' });
         continue;

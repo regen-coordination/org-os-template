@@ -39,14 +39,17 @@ test('remote peer: fetches raw-GitHub federation.yaml via injected fetchFn', asy
   assert.deepEqual(snap.peers.map((p) => p.id), ['remote-friend']);
 });
 
-test('fetch failure: reports error, keeps the stale cache (never deletes)', async () => {
+// The host driver degrades ALL read failures to null uniformly (the read-path
+// contract: reads degrade quietly, only writes fail loudly), so a thrown/unreachable
+// fetch surfaces as an unreached peer with its cache intact — not a raw error string.
+test('fetch failure: reports unreached, keeps the stale cache (never deletes)', async () => {
   const dir = scratch();
   const cacheDir = join(dir, 'data', 'federation', 'frontier');
   mkdirSync(cacheDir, { recursive: true });
   writeFileSync(join(cacheDir, 'sibling-os.json'), JSON.stringify({ fetched_at: 'old', peers: [] }));
   const r = await fetchFrontier({ dir, fetchFn: noFetch, now: NOW });
   const sib = r.report.find((x) => x.id === 'sibling-os');
-  assert.ok(sib.error);
+  assert.equal(sib.skipped, 'unreached');
   assert.equal(sib.cached, true);
   const snap = JSON.parse(readFileSync(join(cacheDir, 'sibling-os.json'), 'utf8'));
   assert.equal(snap.fetched_at, 'old', 'stale cache untouched');
