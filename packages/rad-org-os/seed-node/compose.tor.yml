@@ -1,0 +1,15 @@
+# High-threat / no-trusted-seed profile: reach the node over Tor so a private repo's
+# only replica is the org's own node. Compose overlay: `docker compose -f compose.yml -f compose.tor.yml up -d`.
+services:
+  tor:
+    image: dperson/torproxy
+    restart: unless-stopped
+    volumes:
+      - tor:/var/lib/tor
+  node:
+    environment:
+      # Route node connections through the Tor SOCKS proxy sidecar.
+      ALL_PROXY: socks5://tor:9050
+    depends_on: [tor]
+volumes:
+  tor:

@@ -1,0 +1,24 @@
+# Self-hosted seed node — the default availability tier. `docker compose up -d`.
+services:
+  node:
+    # Runs the radicle-node daemon (Dockerfile's default CMD: `rad node start --foreground`).
+    build: .
+    restart: unless-stopped
+    environment:
+      RAD_ALIAS: ${RAD_ALIAS:-org-seed}
+      RAD_PASSPHRASE: ${RAD_PASSPHRASE:?set a passphrase in .env}
+    ports:
+      - "8776:8776"        # p2p gossip
+    volumes:
+      - radicle:/root/.radicle
+  httpd:
+    build: .
+    restart: unless-stopped
+    command: ["radicle-httpd", "--listen", "0.0.0.0:8080"]
+    ports:
+      - "8080:8080"        # read-only JSON API (serves the frontier crawl + dashboards)
+    volumes:
+      - radicle:/root/.radicle
+    depends_on: [node]
+volumes:
+  radicle:
