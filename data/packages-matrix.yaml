@@ -52,6 +52,14 @@ packages:
     lifecycle_status: "active"
     notes: "@org-os/federation-map — 'the torch'. View-plane web component for the federation/provenance map (d3-force only dep). Data plane is org-os-kms `render map`. Spec: docs/superpowers/specs/2026-07-19-federation-map-design.md."
 
+  - id: "org-os-host"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@org-os/host (packages/org-os-host) — Host-provider abstraction: one HostDriver interface, github/radicle drivers, selected by platforms.canonical. github driver + contract suite shipped; frontier.mjs routed through the seam. 25/25 tests. Awaiting instance adoption signal."
+
   - id: "koi-bridge"
     owner: "framework"
     instances_using: []
