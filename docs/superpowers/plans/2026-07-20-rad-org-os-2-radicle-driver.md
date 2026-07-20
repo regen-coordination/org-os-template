@@ -17,7 +17,15 @@
 - `GET /api/v1/repos/:rid` → top-level keys `payloads, delegates, threshold, visibility, rid, seeding, refs`. `payloads["xyz.radicle.project"].data` = `{ defaultBranch, name, description }`; `payloads["xyz.radicle.project"].meta` contains the canonical head commit SHA; `delegates` = array of `{ id, alias }`; `threshold` = number; `visibility` = `{ type: "public"|"private" }`; `seeding` = seed count.
 - `GET /api/v1/repos/:rid/blob/:sha/:path` → `{ binary, name, content, path, lastCommit }`; `content` is **plain UTF-8 text** when `binary === false`. **The `:ref` segment must be a commit SHA, not a branch name** (branch names 404). So `fetchFile` resolves the head SHA from the repo response first, then fetches the blob by SHA.
 
-**Fixture discipline (IMPORTANT):** exact `rad` CLI stdout formats and some httpd nested shapes are pinned by **capturing real output into committed fixtures**, never by guessing. Read-path fixtures come from the live public seed (no local node needed). Write-path fixtures require a local `rad`; if `rad` is unavailable in the environment, the write tasks capture fixtures from the Radicle docs' documented output and mark them `@needs-live-verification` in a comment, and the integration task (Task 9) re-verifies against a real node. Parsers are pure functions tested against fixtures; command wiring is thin.
+**Fixture discipline (IMPORTANT):** exact `rad` CLI stdout formats and some httpd nested shapes are pinned by **capturing real output into committed fixtures**, never by guessing. Read-path fixtures come from the live public seed (no local node needed). Parsers are pure functions tested against fixtures; command wiring is thin.
+
+**Verified against live `rad 1.8.0` (macOS arm64, 2026-07-20) — the write-path surface is pinned, not guessed:**
+- **Patches have NO `rad patch open`.** A patch is opened by **`git push rad HEAD:refs/patches`** (the message/cover-letter is set with git push options `-o patch.message=<subject>` and additional `-o patch.message=<body>` lines). `rad patch` subcommands are: list, show, diff, archive, update, checkout, review, resolve, delete, redact, react, assign, label, ready, edit, set, comment, cache. So `openChange` shells **git**, not `rad`.
+- **`rad issue open`** flags (confirmed): `-t/--title <TITLE>`, `-d/--description <DESCRIPTION>`, `-r/--repo <RID>`, `--no-announce`. `rad issue comment` and `rad issue state` exist (comment-body flag pinned in Task 3's capture).
+- **`rad self`** prints an `Alias`, a `DID  did:key:z6Mk…` line, `Node`, SSH keys, and `Home` — the `did:key:` regex in `parseRadSelf` matches.
+- **`rad sync`** synchronizes both ways by default (fetch from seeds, then announce local refs) — so `push`/`syncUpstream` use `rad sync` (announce is implicit; `--announce`/`--fetch` are opt-in modifiers).
+- **`rad id`** manages the identity doc via `update` (proposes a revision), `accept`, `reject`, `edit`, `list`, `show`; options `--repo <RID>`, `--no-confirm`. The `addDelegate`/`setThreshold` helpers in `identity.mjs` are the ONE surface still needing a running-node round-trip to pin exact argument form (Task 9) — `rad id update` is interactive/editor-driven by default, so these may become "propose a doc edit" rather than flag-driven; treat as tracked debt.
+- Environment has an existing identity (`did:key:z6Mkvyj7aB29JXhP9YztVCDdXNksQ2WSySvkP3hd7iRMdd19`); the node is **stopped** (`rad node start` needed for a real write round-trip). Task 9's live read-path checks run now; a real patch/issue creation round-trip needs `rad node start` + a scratch repo.
 
 ---
 
@@ -771,8 +779,11 @@ function fakeFetch() {
 // fake exec: writes succeed with a parseable id line; reads not used here.
 const fakeExec = async (bin, args) => {
   const key = args.join(' ');
+  if (bin === 'git' && key.includes('refs/patches')) {
+    // patch-open prints the new patch id on stderr in real rad
+    return { code: 0, stdout: '', stderr: '✓ Patch 0a1b2c3d4e5f60718293a4b5c6d7e8f901234567 opened\n' };
+  }
   if (key.includes('self')) return { code: 0, stdout: 'DID did:key:z6MkLOCALxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n', stderr: '' };
-  if (key.includes('patch')) return { code: 0, stdout: '✓ Patch 0a1b2c3d4e5f60718293a4b5c6d7e8f901234567 opened\n', stderr: '' };
   if (key.includes('issue')) return { code: 0, stdout: '✓ Issue 1122334455667788990011223344556677889900 opened\n', stderr: '' };
   return { code: 0, stdout: '', stderr: '' };
 };
@@ -821,6 +832,7 @@ import { makeHttpd } from './httpd.mjs';
 import { makeRadCli } from './rad-cli.mjs';
 import { makeIdentity } from './identity.mjs';
 import { parsePatchId, parseIssueId } from './cob.mjs';
+import { WriteUnavailableError } from '../../org-os-host/src/errors.mjs';
 
 // The radicle HostDriver. Reads via httpd (degrade to null/[]), writes via rad CLI
 // (fail loudly through radCli). Accepts injected fetchFn/exec for testing; in
@@ -829,6 +841,9 @@ export function makeRadicleDriver({ seed, fetchFn, exec, cwd = '.' } = {}) {
   const httpd = makeHttpd({ seed, fetchFn });
   const radCli = makeRadCli({ exec, cwd });
   const identity = makeIdentity({ radCli, httpd });
+  // Patches are git pushes to refs/patches (there is no `rad patch open`), so the
+  // driver needs raw git access alongside the rad CLI. Reuse the same injected exec.
+  const git = (args) => (exec || (() => ({ code: 0, stdout: '', stderr: '' })))('git', args, { cwd });
 
   return {
     resolveRemote(idOrUrl) {
@@ -865,9 +880,19 @@ export function makeRadicleDriver({ seed, fetchFn, exec, cwd = '.' } = {}) {
       await radCli.run(['sync', '--announce']);
       return { ok: true, error: null };
     },
+    // A patch IS a git push to refs/patches (verified: rad 1.8.0 has no `rad patch open`).
+    // The subject/body are carried as `-o patch.message=` push options; the new patch
+    // id is printed on the push's stderr ("✓ Patch <oid> opened" / hint line).
     async openChange({ title, body = '', base = 'main' } = {}) {
-      const out = await radCli.run(['patch', 'open', '--message', title, ...(body ? ['--message', body] : [])]);
-      return { id: parsePatchId(out), ok: true, error: null };
+      const opts = ['-o', `patch.message=${title}`, ...(body ? ['-o', `patch.message=${body}`] : [])];
+      const res = await git(['push', 'rad', 'HEAD:refs/patches', ...opts]);
+      if (res.code !== 0) {
+        if (/node is not running|connection refused|not running/i.test(res.stderr || '')) {
+          throw new WriteUnavailableError('the local Radicle node is not reachable', { hint: 'start your node: rad node start' });
+        }
+        return { id: null, ok: false, error: (res.stderr || '').trim() };
+      }
+      return { id: parsePatchId(`${res.stdout}\n${res.stderr}`), ok: true, error: null };
     },
     async createIssue({ title, body = '' } = {}) {
       const out = await radCli.run(['issue', 'open', '--title', title, '--description', body]);
@@ -893,7 +918,7 @@ function ridOf(x) {
   return x?.rid || x?.repo || x?.id || '';
 }
 ```
-Note: `rad patch open` / `rad issue open` flag names (`--message`, `--title`, `--description`) are the documented forms; Task 9 pins them against a live `rad` and corrects here if they differ. The contract test uses a fake exec keyed on `patch`/`issue` substrings, so it is robust to exact flag names.
+Note: patch-open (`git push rad HEAD:refs/patches -o patch.message=…`) and `rad issue open --title/--description` are **verified against live rad 1.8.0** (see the verified-facts block above). The only write surface still needing a running-node round-trip is `rad id update` (identity edits in `identity.mjs`), pinned in Task 9. The contract test's fake exec keys on `refs/patches`/`issue`/`self`, robust to exact flag details.
 
 - [ ] **Step 4: Run driver tests to verify pass**
 
