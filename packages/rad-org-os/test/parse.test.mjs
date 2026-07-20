@@ -23,3 +23,15 @@ test('parseBlob returns text content only for non-binary blobs', () => {
   assert.equal(typeof parseBlob(blob), 'string');
   assert.equal(parseBlob({ binary: true, content: 'x' }), null);
 });
+
+import { parseRadSelf } from '../src/parse.mjs';
+
+test('parseRadSelf extracts the did:key from rad self output', () => {
+  const out = 'DID    did:key:z6MkfuXgBSe5G8U6d5NuVbvrbuXRwzYjKJWPPddXgbVjqT9n\nNode ID (NID)   z6MkfuXg...\n';
+  const id = parseRadSelf(out);
+  assert.equal(id.did, 'did:key:z6MkfuXgBSe5G8U6d5NuVbvrbuXRwzYjKJWPPddXgbVjqT9n');
+});
+
+test('parseRadSelf returns null did when absent', () => {
+  assert.equal(parseRadSelf('nothing here').did, null);
+});

@@ -38,3 +38,9 @@ export function parseBlob(blob) {
   if (!blob || blob.binary) return null;
   return typeof blob.content === 'string' ? blob.content : null;
 }
+
+// `rad self` prints a "DID  did:key:z6Mk..." line among others.
+export function parseRadSelf(stdout) {
+  const m = /did:key:z6[1-9A-HJ-NP-Za-km-z]+/.exec(stdout || '');
+  return { did: m ? m[0] : null };
+}
