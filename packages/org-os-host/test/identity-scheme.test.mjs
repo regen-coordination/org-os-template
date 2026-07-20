@@ -18,3 +18,9 @@ test('github-canonical requires github: member ids', () => {
 test('empty members list is ok', () => {
   assert.equal(validateMemberIdScheme([], 'radicle').ok, true);
 });
+
+test('unknown canonical platform fails with an explicit error', () => {
+  const r = validateMemberIdScheme([{ id: 'did:key:z6MkA' }], 'radicel');
+  assert.equal(r.ok, false);
+  assert.match(r.errors[0], /unknown canonical platform: radicel/);
+});

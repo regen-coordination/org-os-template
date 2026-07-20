@@ -3,7 +3,10 @@
 const SCHEME_FOR = { github: 'github:', radicle: 'did:' };
 
 export function validateMemberIdScheme(members = [], canonical = 'github') {
-  const wanted = SCHEME_FOR[canonical] || 'github:';
+  if (!Object.prototype.hasOwnProperty.call(SCHEME_FOR, canonical)) {
+    return { ok: false, errors: [`unknown canonical platform: ${canonical}`] };
+  }
+  const wanted = SCHEME_FOR[canonical];
   const errors = [];
   for (const m of members) {
     if (typeof m?.id !== 'string' || !m.id.startsWith(wanted)) {

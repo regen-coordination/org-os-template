@@ -56,16 +56,18 @@ export async function bootstrap({
   const rid = parseRid(await run('rad', initArgs));
   if (!rid) throw new Error('rad init did not return an RID');
 
-  // 5. write federation.yaml (needs rid), commit, then stamp the genesis commit oid
+  // 5. write federation.yaml (needs rid) with the genesis stamp BAKED IN, then commit.
+  // genesis_commit is the ROOT commit (the members/genesis commit C1 above), which
+  // already exists — so we resolve it, stamp it into federation.yaml, and commit the
+  // stamped file. This keeps the stamp in git history (peers see it), not just the
+  // working tree.
   const fedPath = join(targetDir, 'federation.yaml');
-  await fs.writeFile(fedPath, buildFederationYaml({ rid, seed, name, threshold: 1 }));
-  await run('git', ['add', 'federation.yaml']);
-  await run('git', ['-c', 'user.name=org-os', '-c', 'user.email=genesis@org-os', 'commit', '-q', '-m', 'genesis: federation']);
   const genesisOid = (await run('git', ['rev-list', '--max-parents=0', 'HEAD'])).trim().split('\n')[0];
-  const stamped = buildFederationYaml({ rid, seed, name, threshold: 1 });
-  const doc = yaml.load(stamped);
+  const doc = yaml.load(buildFederationYaml({ rid, seed, name, threshold: 1 }));
   doc.metadata = { ...doc.metadata, created: now, genesis_commit: genesisOid };
   await fs.writeFile(fedPath, yaml.dump(doc));
+  await run('git', ['add', 'federation.yaml']);
+  await run('git', ['-c', 'user.name=org-os', '-c', 'user.email=genesis@org-os', 'commit', '-q', '-m', 'genesis: federation']);
 
   return { rid, did, visibility, seed: seed || null };
 }

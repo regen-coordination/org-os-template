@@ -7,6 +7,9 @@
 // `rad id update --repo <RID> --no-confirm` against a running node with RAD_PASSPHRASE
 // set (editor/quorum-driven identity-doc revision). These generators are pure and
 // tested; the apply step is a documented operator action, not run here.
+// The default-branch guard below is exact-match on `refs/heads/main`/`refs/heads/master`
+// only — a glob like `refs/heads/*` or a repo with a custom default branch is not caught
+// here and is left to `rad id update` to reject at apply time.
 const DEFAULT_BRANCH_PATTERNS = new Set(['refs/heads/main', 'refs/heads/master']);
 
 export function mainQuorum(federation) {
@@ -23,6 +26,9 @@ export function buildCrefs(rules = []) {
   for (const r of rules) {
     if (DEFAULT_BRANCH_PATTERNS.has(r.pattern)) {
       throw new Error(`crefs rule for the default branch (${r.pattern}) is disallowed by Radicle; main is governed by the identity threshold`);
+    }
+    if (!Array.isArray(r.allow) || r.allow.length === 0 || typeof r.threshold !== 'number' || r.threshold <= 0) {
+      throw new Error('crefs rule requires allow[] and a positive threshold');
     }
     out[r.pattern] = { allow: r.allow, threshold: r.threshold };
   }

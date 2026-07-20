@@ -22,3 +22,10 @@ test('buildCrefs rejects a rule targeting the default branch (Radicle disallows 
   assert.throws(() => buildCrefs([{ pattern: 'refs/heads/main', allow: ['did:key:z6MkA'], threshold: 1 }]),
     /default branch.*disallowed|refs\/heads\/main/);
 });
+
+test('buildCrefs rejects a malformed rule (empty allow or non-positive threshold)', () => {
+  assert.throws(() => buildCrefs([{ pattern: 'refs/tags/releases/*', allow: [], threshold: 2 }]),
+    /allow\[\] and a positive threshold/);
+  assert.throws(() => buildCrefs([{ pattern: 'refs/tags/releases/*', allow: ['did:key:z6MkA'], threshold: 0 }]),
+    /allow\[\] and a positive threshold/);
+});
