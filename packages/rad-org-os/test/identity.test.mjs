@@ -24,3 +24,15 @@ test('delegatesOf reads delegates + threshold from the httpd repo doc', async ()
   assert.equal(typeof gov.threshold, 'number');
   assert.ok(gov.delegates.every((d) => d.id.startsWith('did:key:')));
 });
+
+test('addDelegate / setThreshold forward to radCli.run with the rid', async () => {
+  const calls = [];
+  const radCli = { run: async (args) => { calls.push(args); return ''; } };
+  const id = makeIdentity({ radCli });
+
+  await id.addDelegate('rad:zX', 'did:key:zY');
+  assert.ok(calls.some((args) => args.includes('id') && args.includes('update') && args.includes('rad:zX')));
+
+  await id.setThreshold('rad:zX', 2);
+  assert.ok(calls.some((args) => args.includes('id') && args.includes('update') && args.includes('rad:zX')));
+});

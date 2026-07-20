@@ -1,6 +1,6 @@
 // COB <-> org-os record mapping. Preserves the COB oid in source_lineage so
 // provenance survives round-trips (spec). Distinct from the KMS ingestion connector.
-const HEX40 = /[0-9a-f]{40}/;
+const HEX40 = /\b[0-9a-f]{40}\b/;
 
 export function issueCobToRecord(cob) {
   return {

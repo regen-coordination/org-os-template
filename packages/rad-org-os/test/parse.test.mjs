@@ -35,3 +35,8 @@ test('parseRadSelf extracts the did:key from rad self output', () => {
 test('parseRadSelf returns null did when absent', () => {
   assert.equal(parseRadSelf('nothing here').did, null);
 });
+
+test('parseRadSelf extracts the did from the real captured rad-self.txt fixture', () => {
+  const raw = readFileSync(join(here, 'fixtures/rad-self.txt'), 'utf8');
+  assert.equal(parseRadSelf(raw).did, 'did:key:z6Mkvyj7aB29JXhP9YztVCDdXNksQ2WSySvkP3hd7iRMdd19');
+});

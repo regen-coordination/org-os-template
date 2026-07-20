@@ -7,7 +7,7 @@ function nodeDown(stderr) {
   return /node is not running|connection refused|failed to connect|no such file|not running/i.test(stderr || '');
 }
 function radMissing(res) {
-  return res.code === -1 || /ENOENT|command not found|not found/i.test(res.stderr || '');
+  return res.code === -1 || (res.code !== 0 && /ENOENT|command not found/i.test(res.stderr || ''));
 }
 
 export function makeRadCli({ exec = defaultExec(), cwd = '.' } = {}) {
