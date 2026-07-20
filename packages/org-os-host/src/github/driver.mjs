@@ -1,0 +1,86 @@
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+// makeGithubDriver: behavior-preserving wrapper of org-os's current git/gh usage.
+// Dependencies are injected so every method is unit-testable without git/gh/network:
+//   exec(bin,args,{input}) -> { code, stdout, stderr }   (Task 5 chokepoint)
+//   fetchFn(url,opts) -> Response-like                    (defaults to global fetch)
+//   readLocal(path) -> string|null                        (defaults to fs read)
+export function makeGithubDriver({ exec, fetchFn = globalThis.fetch, readLocal, cwd = '.' } = {}) {
+  const readFile = readLocal || ((p) => (existsSync(p) ? readFileSync(p, 'utf8') : null));
+  const git = (args, opts) => exec('git', args, opts);
+
+  function repoSlug(entry) {
+    if (typeof entry === 'string') return entry.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
+    return (entry?.repo) || (entry?.url ? entry.url.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '') : null);
+  }
+
+  return {
+    resolveRemote(idOrUrl) {
+      const slug = repoSlug(idOrUrl);
+      return { scheme: 'github', fetchUrl: slug ? `https://github.com/${slug}` : null, canonical: true };
+    },
+
+    whoami() {
+      // org-os identities are github handles today; the driver does not shell out for this.
+      return { id: null, handle: null };
+    },
+
+    async clone(entry, dest) {
+      const slug = repoSlug(entry);
+      const { code, stderr } = await git(['clone', `https://github.com/${slug}.git`, dest]);
+      return { ok: code === 0, error: code === 0 ? null : stderr };
+    },
+
+    // Local clone first (offline, authoritative), then raw.githubusercontent. Never throws.
+    async fetchFile(entry, path, ref = 'HEAD') {
+      const localBase = entry?.local_path ? join(cwd, entry.local_path, path) : null;
+      if (localBase) {
+        const local = readFile(localBase);
+        if (local != null) return local;
+      }
+      const slug = repoSlug(entry);
+      if (!slug) return null;
+      const url = `https://raw.githubusercontent.com/${slug}/${ref}/${path}`;
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const res = await fetchFn(url, { signal: ctrl.signal });
+          if (res && res.ok) return await res.text();
+          return null;
+        } finally { clearTimeout(timer); }
+      } catch {
+        return null; // unreachable/timeout → null, matches frontier's "stale beats broken"
+      }
+    },
+
+    async listPeers(entry) {
+      // github has no delegate/seed concept; peers come from config, not the host.
+      return Array.isArray(entry?.peers) ? entry.peers : [];
+    },
+
+    async getCanonical(entry) {
+      const opts = entry?.local_path ? { cwd: entry.local_path } : undefined;
+      const { code, stdout } = await exec('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'], opts);
+      let defaultBranch = 'main';
+      if (code === 0 && stdout.trim()) defaultBranch = stdout.trim().split('/').pop();
+      return { defaultBranch, threshold: 1, delegates: [] };
+    },
+
+    async getDrift(entry) {
+      const opts = entry?.local_path ? { cwd: entry.local_path } : undefined;
+      const br = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], opts);
+      const canonicalRef = br.code === 0 ? br.stdout.trim() : 'main';
+      const rl = await exec('git', ['rev-list', '--left-right', '--count', `HEAD...@{u}`], opts);
+      let ahead = 0, behind = 0;
+      if (rl.code === 0) {
+        const [a, b] = rl.stdout.trim().split(/\s+/).map((n) => parseInt(n, 10) || 0);
+        ahead = a; behind = b;
+      }
+      return { behind, ahead, canonicalRef };
+    },
+
+    // ---- write path added in Task 7 ----
+  };
+}
