@@ -43,3 +43,18 @@ test('bootstrap runs auth → init → writes members/federation, returns rid + 
 test('bootstrap rejects an invalid visibility', async () => {
   await assert.rejects(() => bootstrap({ targetDir: '/x', name: 'n', visibility: 'secret', exec: async () => ({ code: 0, stdout: '', stderr: '' }), fs: {}, scaffold: async () => {} }), /visibility must be/);
 });
+
+test('bootstrap rejects when rad self returns an unparseable did (no malformed genesis)', async () => {
+  const exec = async (bin, args) => {
+    if (bin === 'rad' && args[0] === 'self') return { code: 0, stdout: 'no did here\n', stderr: '' };
+    if (bin === 'rad' && args[0] === 'auth') return { code: 0, stdout: '', stderr: '' };
+    if (bin === 'rad' && args[0] === 'init') return { code: 0, stdout: 'Initialized private repository rad:z3NEW\n', stderr: '' };
+    if (bin === 'git' && args[0] === 'rev-list') return { code: 0, stdout: 'f'.repeat(40) + '\n', stderr: '' };
+    return { code: 0, stdout: '', stderr: '' };
+  };
+  const fs = { mkdir: async () => {}, writeFile: async () => {} };
+  await assert.rejects(
+    () => bootstrap({ targetDir: '/tmp/neworg', name: 'my-org', alias: 'luiz', visibility: 'private', exec, fs, scaffold: async () => {} }),
+    /did:key/,
+  );
+});

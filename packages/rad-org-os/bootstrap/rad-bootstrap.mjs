@@ -32,9 +32,15 @@ export async function bootstrap({
     return res.stdout;
   };
 
+  // Note: the git genesis commit + persisting the genesis stamp (buildGenesisStamp ->
+  // federation.yaml metadata.genesis_commit) are deferred to Plan 4 (the /commit +
+  // governance wiring). The currently-unused `buildGenesisStamp`/`now` are intentional
+  // forward scaffolding, not dead code.
+
   // 1. identity (idempotent for an existing key)
   await run('rad', ['auth', '--alias', alias]);
   const did = parseDid(await run('rad', ['self']));
+  if (!did) throw new Error('rad self did not return a did:key');
 
   // 2. scaffold org-os framework files into targetDir
   await fs.mkdir(targetDir, { recursive: true });
