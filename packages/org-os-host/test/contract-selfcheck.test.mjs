@@ -9,16 +9,16 @@ function makeMemoryDriver() {
   return {
     resolveRemote: (id) => ({ scheme: id?.startsWith('rad:') ? 'radicle' : 'github', fetchUrl: id, canonical: true }),
     whoami: () => ({ id: 'github:tester' }),
-    clone: async () => ({ ok: true }),
+    clone: async () => ({ ok: true, error: null }),
     fetchFile: async (_remote, path) => (path === 'federation.yaml' ? 'name: x' : null),
     listPeers: async () => [],
     getCanonical: async () => ({ defaultBranch: 'main', threshold: 1, delegates: [] }),
     getDrift: async () => ({ behind: 0, ahead: 0, canonicalRef: 'main' }),
-    push: async () => ({ ok: true }),
-    openChange: async () => ({ id: 'change-1' }),
-    createIssue: async () => ({ id: 'issue-1' }),
-    commentIssue: async () => ({ ok: true }),
-    syncUpstream: async () => ({ ok: true }),
+    push: async () => ({ ok: true, error: null }),
+    openChange: async () => ({ id: 'change-1', ok: true, error: null }),
+    createIssue: async () => ({ id: 'issue-1', ok: true, error: null }),
+    commentIssue: async () => ({ ok: true, error: null }),
+    syncUpstream: async () => ({ ok: true, error: null }),
     webUrl: (_remote, path) => `https://example/${path}`,
   };
 }
