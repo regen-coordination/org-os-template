@@ -137,6 +137,29 @@ rather than vendoring it wholesale. It's registered as a `candidate` in
 `rad clone rad:zvBj4kByGeQSrSy2c4H7fyK42cS8` or the httpd tree API, plus a licence
 check, before the runtime-neutral skill can be authored).
 
+## Live verification (operator-gated)
+
+The **read** path needs no key and is verified against a public seed any time:
+
+```bash
+cd packages/rad-org-os && RAD_INTEGRATION=1 node --test test/integration.test.mjs
+```
+
+The **write** path (bootstrap-create, `rad id update`) signs with your Radicle key, so
+it needs your passphrase — supplied via the environment so it never lands in the repo:
+
+```bash
+RAD_PASSPHRASE='…' bash packages/rad-org-os/scripts/live-verify.sh
+```
+
+That runner starts your node, runs the gated bootstrap end-to-end (creating a private
+scratch repo in `~/.radicle` storage — unannounced, harmless), prints the governance
+apply commands, and stops the node. Governance (`threshold` / `crefs`) is applied
+interactively via `rad id update`; `main`'s quorum *is* the identity `threshold`
+(Radicle disallows an explicit `crefs` rule for the default branch), and `buildCrefs()`
+in `src/governance.mjs` generates the `xyz.radicle.crefs` payload for additional
+protected ref patterns (e.g. release tags).
+
 ## Cross-references
 
 - Design spec: [`docs/superpowers/specs/2026-07-20-rad-org-os-design.md`](superpowers/specs/2026-07-20-rad-org-os-design.md)
