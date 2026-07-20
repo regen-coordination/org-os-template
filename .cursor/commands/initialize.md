@@ -43,3 +43,11 @@ Silently note for the rest of the session:
 End by displaying the **Session Prompt** with 3 contextual suggestions (already produced by the script), then wait for the operator to pick what to work on. Transition to **Phase 2: PLAN** — load context, analyze, present a tight 5–7 step work plan, then execute.
 
 For the full session lifecycle (PLAN → EXECUTE → CLOSE), see `skills/org-os-init/SKILL.md`. For platform-specific handling (Hermes, OpenCode), see `skills/initialize/SKILL.md`.
+
+## Radicle-canonical variant
+
+Everything above is the **github-canonical (default)** path — unchanged. If `federation.yaml` has `platforms.canonical: radicle`, branch instead:
+
+- **Step 1 (sync):** `rad sync` (via the driver's `syncUpstream()`) instead of `git pull --rebase --quiet`; same non-blocking behavior — if the node isn't running, that's the normal (soft) offline state, continue with local state exactly as the github path does for "no remote".
+- **Step 2 (dashboard):** unchanged — `node scripts/initialize.mjs` still renders from local files; it doesn't need network access either way.
+- **Step 3 (session context):** in addition to the existing notes, silently note the peers panel via `driver.listPeers(rid)` (the identity doc's delegates) instead of a GitHub collaborators list, and drift via `driver.getDrift(rid)` instead of `@{u}`.

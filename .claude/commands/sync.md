@@ -48,4 +48,12 @@ node scripts/vault-snapshot.mjs "before merging origin/main into $(git rev-parse
 git merge origin/main
 ```
 
+## Radicle-canonical variant
+
+Everything above is the **github-canonical (default)** path — unchanged. If `federation.yaml` has `platforms.canonical: radicle`, branch instead:
+
+- **Step 1 (read state):** replace `git fetch origin` with the radicle driver's sync — `driver.syncUpstream()` (i.e. `rad sync`), which exchanges refs with the node's seeds. If the node isn't reachable, that's the normal offline case (see Step 2 of `/initialize`'s radicle variant) — report "offline — local state only", not an error.
+- **Step 2/3 (branch logic + fast-forward):** unchanged in spirit — still never fast-forward over uncommitted changes. Where github compares against `@{u}`/`origin/main`, radicle compares against the canonical branch reported by `driver.getDrift(rid)` (`{ behind, ahead, canonicalRef }`).
+- **Step 4 (drift vs main):** replace the `origin/main` rev-list/diff with `driver.getDrift(rid)` for the ahead/behind counts, and `driver.webUrl(rid, path)` links (instead of a `github.com/.../blob/main/...` URL) when naming which shared files the canonical branch has that this trunk lacks. A merge of the canonical branch in, when behind, still needs explicit operator consent and a vault snapshot first — same as the github path.
+
 $ARGUMENTS

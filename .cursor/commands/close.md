@@ -64,3 +64,9 @@ git push
 If push fails (offline, no remote), note the commit is saved locally.
 
 Render the session summary, confirm the commit and push status.
+
+## Radicle-canonical variant
+
+Everything above is the **github-canonical (default)** path — unchanged. If `federation.yaml` has `platforms.canonical: radicle`, replace Step 7 only:
+
+- **Step 7 (push):** `git push rad` instead of `git push`. Memory/session-log commits are a normal signed push to the operator's own branch — not a patch — so this stays a one-line push, no `refs/patches` involved. If the push fails because the local node isn't running, that's the normal (soft) offline case — note the commit is saved locally, same as the github "no remote" case, and suggest `rad node start`.

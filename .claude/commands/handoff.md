@@ -33,4 +33,11 @@ Rules:
 
 **Why it's portable:** the sync is described as plain git, so the agent runs it identically regardless of which slash-commands that clone has. After it, the operator's trunk ⊇ `main`, so their PR merges cleanly — and for a badly-behind trunk it doubles as the catch-up.
 
+## Radicle-canonical variant
+
+Everything above is the **github-canonical (default)** path — unchanged. If `federation.yaml` has `platforms.canonical: radicle`, branch instead:
+
+- **Step 2 (resolve link):** the doc link comes from `driver.webUrl(rid, path)` — an `app.radicle.xyz/nodes/<seed>/<rid>/tree/<ref>/<path>` URL — instead of deriving `https://github.com/<org>/<repo>/blob/main/<docpath>` from `git remote get-url origin`. `rid` is `federation.yaml identity.rid` (or the target instance's `data/instances.yaml` `rid` field).
+- **Step 3 (emit the prompt):** the paste-prompt's sync clause becomes `rad clone <rid>` (first time) or `rad sync` + pull from the canonical branch (already have it) instead of `fetch`/`merge origin/main`; the PR-to-main close reads as opening a **patch** — `git push rad HEAD:refs/patches` — against the identity-threshold-governed main, not a GitHub PR.
+
 $ARGUMENTS

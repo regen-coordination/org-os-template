@@ -46,3 +46,12 @@ If push fails on auth/permissions, report it plainly (the operator may need writ
 ## Step 5: Report
 
 One line: what was committed (short hash + summary) and whether it pushed. If the commit touched **shared structural files** (`data/*.yaml`, `HEARTBEAT.md`, `MEMORY.md`, `federation.yaml`, `scripts/`, `.well-known/`, `docs/plans/`), remind: these are PR-gated — open a PR to `main` (or flag for the weekly merge-consolidation) rather than expecting them to auto-promote.
+
+## Radicle-canonical variant
+
+Everything above is the **github-canonical (default)** path — unchanged, and what every existing clone uses. If `federation.yaml` has `platforms.canonical: radicle`, branch instead:
+
+- **Step 1 (guard):** same idea, different name — there's no `main` PR-gate; the guard is the identity-doc quorum. Structural/shared-file changes still shouldn't land as a direct push to the canonical branch without review.
+- **Step 3 (stage + commit):** unchanged — `git add` + a conventional commit message, committed locally exactly as above.
+- **Step 4 (push):** structural changes (touching the identity-threshold-governed main) go out as a **patch**, not a branch push: `git push rad HEAD:refs/patches -o patch.message="<summary>"` (this is how `openChange` in `@org-os/rad`'s driver opens a patch — there is no `rad patch open`). A personal/operator branch that isn't targeting main can still `git push rad <branch>`.
+- **Step 5 (report):** report the patch id (parsed from the push's stderr, e.g. "✓ Patch <oid> opened") instead of a PR link; note it awaits the identity-doc `threshold` of delegate signatures rather than a GitHub review.
