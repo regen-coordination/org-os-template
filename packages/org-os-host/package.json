@@ -1,0 +1,10 @@
+{
+  "name": "@org-os/host",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Host-provider abstraction for org-os: one HostDriver interface, pluggable github/radicle drivers.",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test"
+  }
+}
