@@ -300,3 +300,11 @@ skills:
     in_framework: false
     promotion_status: "candidate"
     notes: "EIP-4824 identity module. Framework has schema-generator but no identity module — potential overlap, evaluate first before promotion."
+
+  # --- External candidates (rad-org-os, v0.5 Plan 4) ---
+  - id: "rad-skill"
+    owner: "external (hdh, RID rad:zvBj4kByGeQSrSy2c4H7fyK42cS8)"
+    instances_using: []
+    in_framework: false
+    promotion_status: "candidate"
+    notes: "Agent-facing `rad`-CLI guidance (issue/patch/sync/id/seeding workflows), itself distributed over Radicle (seeded on iris.radicle.network) rather than a GitHub marketplace — proof-of-thesis for sovereign agent-tooling distribution. Claude-Code-specific as shipped; adoption mode is 'adopt' — re-express its rad-workflow content as a runtime-neutral org-os skill under skills/, not vendor wholesale. See docs/RADICLE.md and Open Decision 5 in docs/superpowers/specs/2026-07-20-rad-org-os-design.md; adoption still needs the plugin's full contents retrieved (rad clone rad:zvBj4kByGeQSrSy2c4H7fyK42cS8) + a licence check before the runtime-neutral skill is authored."

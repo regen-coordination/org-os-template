@@ -40,6 +40,17 @@ members:
     affiliations: []
 ```
 
+**Additive: `did` + id-scheme coherence (rad-org-os).** A member's `id` is a URI whose
+scheme tracks the instance's `platforms.canonical` (`federation.yaml`): a
+`github`-canonical instance uses `github:<handle>` ids (as above); a
+`radicle`-canonical instance uses `did:<method>` ids (e.g.
+`did:key:z6MkfuqQKjFxYuoNGpBBmQ6z9c...`) instead — the operator's did:key IS their
+member id, since identity sovereignty tracks hosting sovereignty. Both forms are
+backward-compatible with the existing `id` field; no new field is required for
+github-canonical members. Enforced by `validateMemberIdScheme(members, canonical)`
+in `packages/org-os-host/src/identity-scheme.mjs` — a member id whose scheme doesn't
+match `platforms.canonical` fails validation.
+
 ### 2. projects.yaml — Initiatives (Required)
 
 Uses the IDEA lifecycle: Idea → Develop → Execute → Archive
@@ -318,9 +329,43 @@ Per-instance record of every downstream instance of this framework. Populated an
 
 Fields: `id`, `name`, `type`, `maturity` (`alpha|beta|production`), `repo`, `local_path`, `cloned`, `federation_network`, `federation_role`, `masterplan_version`, `framework_version`, `last_sync`, `agent_runtime[]`, `skills_extra[]`, `packages[]`, `data_registries_extra[]`, `drift[]`, `notes`.
 
+**Additive: `rid` + `canonical` (rad-org-os).** For a Radicle-hosted downstream
+instance, `rid` records its Radicle repository id (`rad:z...`, the address `rad
+clone`/`resolveRemoteScheme` key off), and `canonical` mirrors that instance's own
+`federation.yaml platforms.canonical` (`github|radicle`) so the framework's
+cross-instance tooling (`clone-linked-repos.mjs`, `sync-upstream.mjs`, the frontier
+crawl) can route per-instance without opening each instance's `federation.yaml`
+first. Both fields are optional and absent for every existing (github) instance —
+purely additive.
+
 ### skills-matrix.yaml — Cross-Instance Skill Catalog
 
 Every skill across the federation, with `owner`, `instances_using[]`, `in_framework`, `promotion_status` (`canonical|candidate|evaluating|instance-specific`). Surfaces promotion candidates. See `docs/SKILL-PROMOTION.md`.
+
+### federation.yaml — Additive Radicle Fields (identity, hosting, peers)
+
+`federation.yaml` (every instance has one; see `docs/FEDERATION.md` for its full,
+pre-existing shape) gains a small set of additive, backward-compatible fields for a
+Radicle-canonical instance — every existing github-canonical `federation.yaml` is
+valid as-is with none of these present:
+
+- **`platforms.canonical`** (`github|radicle`, default `github` when absent) — which
+  `@org-os/host` driver `resolveDriver(federation)` picks. Sits alongside the
+  existing `platforms.primary`/`deployment`/`domain`/`mirrors` fields (`docs/FEDERATION.md` §platforms); `primary` stays a human-facing label, `canonical` is what the
+  driver resolver actually reads.
+- **`platforms.seed_node`** — the Radicle seed URL this instance's `rad clone`/`rad
+  sync` announce to and read from (e.g. a self-hosted seed or `radicle.garden`; see
+  `docs/RADICLE.md` for the availability tiers). Only meaningful when
+  `platforms.canonical: radicle`.
+- **`identity.rid`** — this instance's own Radicle repository id (`rad:z...`), the
+  radicle analogue of a github `repo` slug. Written by `rad-bootstrap` (`packages/rad-org-os/bootstrap/generate.mjs` `buildFederationYaml`).
+- **Per-peer `rid`** — a `peers[]`/`upstream[]`/`downstream[]` entry may carry a
+  `rid` field addressing that peer over Radicle instead of (or in addition to) its
+  `url`. `resolveRemoteScheme(entry.rid || entry.url)` (`packages/org-os-host/src/resolve.mjs`) picks the scheme per-entry, so a github hub can federate with a
+  radicle peer (and vice versa) in the same `peers[]`/`upstream[]` list — see
+  `scripts/clone-linked-repos.mjs` and `scripts/sync-upstream.mjs` for the routing.
+- **`metadata.genesis_commit`** — the oid of the instance's first commit, stamped by
+  `rad-bootstrap` after the genesis commit exists (`packages/rad-org-os/bootstrap/rad-bootstrap.mjs`). Sits alongside the existing `metadata.last_sync_commit` (already used by the github sync path) as a Radicle-native lineage anchor.
 
 ### packages-matrix.yaml — Cross-Instance Package Catalog
 
