@@ -14,6 +14,7 @@ EXPOSE 8776
 # The read-only HTTP JSON API gateway.
 EXPOSE 8080
 
-# An identity must be provisioned on first run (rad auth) with a passphrase from the
-# environment; then the node runs in the foreground.
-CMD ["sh", "-c", "rad auth --alias \"${RAD_ALIAS:-org-seed}\" --stdin <<<\"${RAD_PASSPHRASE}\" || true; rad node start --foreground"]
+# An identity must be provisioned on first run (rad auth). rad reads the passphrase
+# from RAD_PASSPHRASE in the environment directly — no --stdin here-string, since
+# debian's /bin/sh is dash and rejects `<<<`. Then the node runs in the foreground.
+CMD ["sh", "-c", "rad auth --alias \"${RAD_ALIAS:-org-seed}\" || true; rad node start --foreground"]

@@ -25,35 +25,43 @@ export async function bootstrap({
   const run = async (bin, args) => {
     const res = await exec(bin, args, { cwd: targetDir });
     if (res.code === -1) throw new WriteUnavailableError(`${bin} is not available`, { hint: `install ${bin}` });
-    if (res.code !== 0 && /node is not running|not running/i.test(res.stderr || '')) {
+    if (res.code !== 0 && /node is not running|not running|connection refused|failed to connect/i.test(res.stderr || '')) {
       throw new WriteUnavailableError('the local Radicle node is not reachable', { hint: 'start your node: rad node start' });
     }
     if (res.code !== 0) throw new Error(`${bin} ${args.join(' ')} failed: ${res.stderr.trim() || res.code}`);
     return res.stdout;
   };
 
-  // Note: the git genesis commit + persisting the genesis stamp (buildGenesisStamp ->
-  // federation.yaml metadata.genesis_commit) are deferred to Plan 4 (the /commit +
-  // governance wiring). The currently-unused `buildGenesisStamp`/`now` are intentional
-  // forward scaffolding, not dead code.
+  // Note: only the genesis-stamp PERSISTENCE (buildGenesisStamp -> federation.yaml
+  // metadata.genesis_commit) is deferred to Plan 4 (the /commit + governance wiring);
+  // the currently-unused `buildGenesisStamp`/`now` are intentional forward scaffolding.
+  // The git init + genesis commit below are NOT deferred — `rad init` hard-requires a
+  // committable repo on the default branch, so they are required and present here.
 
   // 1. identity (idempotent for an existing key)
   await run('rad', ['auth', '--alias', alias]);
   const did = parseDid(await run('rad', ['self']));
   if (!did) throw new Error('rad self did not return a did:key');
 
-  // 2. scaffold org-os framework files into targetDir
+  // 2. scaffold + write members.yaml FIRST (committable genesis content; needs did)
   await fs.mkdir(targetDir, { recursive: true });
   await scaffold(targetDir, fs);
+  await fs.writeFile(join(targetDir, 'data/members.yaml'), buildMembersYaml({ did, alias, github }));
 
-  // 3. rad init -> RID + rad remote + identity doc (creator = sole delegate, threshold 1)
+  // 3. git init + genesis commit — rad init hard-requires a commit on the default branch
+  await run('git', ['init', '-b', 'main']);
+  await run('git', ['add', '-A']);
+  await run('git', ['-c', 'user.name=org-os', '-c', 'user.email=genesis@org-os', 'commit', '-q', '-m', 'genesis']);
+
+  // 4. rad init -> RID + rad remote + identity doc (creator = sole delegate, threshold 1)
   const initArgs = ['init', targetDir, '--name', name, '--default-branch', 'main', `--${visibility}`, '--scope', 'all'];
   const rid = parseRid(await run('rad', initArgs));
   if (!rid) throw new Error('rad init did not return an RID');
 
-  // 4-5. genesis data files
-  await fs.writeFile(join(targetDir, 'data/members.yaml'), buildMembersYaml({ did, alias, github }));
+  // 5. write federation.yaml (needs rid) + commit it
   await fs.writeFile(join(targetDir, 'federation.yaml'), buildFederationYaml({ rid, seed, name, threshold: 1 }));
+  await run('git', ['add', 'federation.yaml']);
+  await run('git', ['-c', 'user.name=org-os', '-c', 'user.email=genesis@org-os', 'commit', '-q', '-m', 'genesis: federation']);
 
   return { rid, did, visibility, seed: seed || null };
 }

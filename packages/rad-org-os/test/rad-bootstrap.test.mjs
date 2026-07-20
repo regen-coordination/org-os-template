@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bootstrap, parseRid, parseDid } from '../bootstrap/rad-bootstrap.mjs';
+import { WriteUnavailableError } from '../../org-os-host/src/errors.mjs';
 
 test('parseRid extracts a rad: RID from rad init output', () => {
   assert.equal(parseRid('Initialized public repository rad:z3gqcJUoA1n9HaHKufZs5FCSGazv5\n'), 'rad:z3gqcJUoA1n9HaHKufZs5FCSGazv5');
@@ -35,6 +36,11 @@ test('bootstrap runs auth → init → writes members/federation, returns rid + 
   // used the verified flags:
   assert.ok(calls.some((c) => c.startsWith('rad auth --alias luiz')));
   assert.ok(calls.some((c) => c.includes('rad init') && c.includes('--private') && c.includes('--name my-org')));
+  // git init + genesis commit must happen BEFORE rad init (rad init requires a commit on the default branch):
+  const gitInitIdx = calls.findIndex((c) => c.startsWith('git init -b main'));
+  const radInitIdx = calls.findIndex((c) => c.startsWith('rad init'));
+  assert.ok(gitInitIdx !== -1, 'git init -b main was called');
+  assert.ok(gitInitIdx < radInitIdx, 'git init happens before rad init');
   // wrote genesis files:
   assert.ok(Object.keys(writes).some((p) => p.endsWith('data/members.yaml')));
   assert.ok(Object.keys(writes).some((p) => p.endsWith('federation.yaml')));
@@ -56,5 +62,31 @@ test('bootstrap rejects when rad self returns an unparseable did (no malformed g
   await assert.rejects(
     () => bootstrap({ targetDir: '/tmp/neworg', name: 'my-org', alias: 'luiz', visibility: 'private', exec, fs, scaffold: async () => {} }),
     /did:key/,
+  );
+});
+
+test('bootstrap fails loudly (WriteUnavailableError) when rad is not installed', async () => {
+  const exec = async (bin, args) => {
+    if (bin === 'rad' && args[0] === 'auth') return { code: -1, stdout: '', stderr: 'spawn rad ENOENT' };
+    return { code: 0, stdout: '', stderr: '' };
+  };
+  const fs = { mkdir: async () => {}, writeFile: async () => {} };
+  await assert.rejects(
+    () => bootstrap({ targetDir: '/tmp/neworg', name: 'my-org', alias: 'luiz', visibility: 'private', exec, fs, scaffold: async () => {} }),
+    WriteUnavailableError,
+  );
+});
+
+test('bootstrap fails loudly (WriteUnavailableError) when the node is down', async () => {
+  const exec = async (bin, args) => {
+    if (bin === 'rad' && args[0] === 'self') return { code: 0, stdout: 'DID did:key:z6MkXY\n', stderr: '' };
+    if (bin === 'rad' && args[0] === 'auth') return { code: 0, stdout: '', stderr: '' };
+    if (bin === 'rad' && args[0] === 'init') return { code: 1, stdout: '', stderr: 'error: connection refused' };
+    return { code: 0, stdout: '', stderr: '' };
+  };
+  const fs = { mkdir: async () => {}, writeFile: async () => {} };
+  await assert.rejects(
+    () => bootstrap({ targetDir: '/tmp/neworg', name: 'my-org', alias: 'luiz', visibility: 'private', exec, fs, scaffold: async () => {} }),
+    WriteUnavailableError,
   );
 });

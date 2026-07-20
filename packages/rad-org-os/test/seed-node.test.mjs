@@ -20,8 +20,12 @@ test('Dockerfile installs radicle and the node listens on 8776', () => {
 });
 
 test('compose runs a node and an httpd read gateway', () => {
+  // Assert real structure, not a comment: the node daemon is started by the Dockerfile,
+  // and compose.yml wires a `node:` service that builds it plus an httpd gateway.
+  assert.match(read('Dockerfile'), /rad node start/);
   const c = read('compose.yml');
-  assert.match(c, /radicle-node|rad node/i);
+  assert.match(c, /^\s*node:/m);
+  assert.match(c, /^\s*node:[\s\S]*?\n\s*build:/m);
   assert.match(c, /radicle-httpd|httpd/i);
 });
 
