@@ -25,5 +25,5 @@ function makeMemoryDriver() {
 
 test('contract suite passes for a compliant in-memory driver', async () => {
   assertDriver(makeMemoryDriver(), 'memory');
-  await runHostDriverContract(makeMemoryDriver, { assert, test: null });
+  await runHostDriverContract(makeMemoryDriver, { assert });
 });
