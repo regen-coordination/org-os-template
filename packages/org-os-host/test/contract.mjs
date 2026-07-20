@@ -38,7 +38,7 @@ export async function runHostDriverContract(makeDriver, { assert } = {}) {
   assert.match(url, /BOOTSTRAP\.md/);
 
   // 7. whoami returns an object with an `id` property (may be null, but the shape exists).
-  const who = driver.whoami();
+  const who = await driver.whoami();
   assert.ok(who && typeof who === 'object', 'whoami returns an object');
   assert.ok('id' in who, 'whoami result has an id property');
 
