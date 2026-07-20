@@ -28,6 +28,7 @@ export function makeGithubDriver({ exec, fetchFn = globalThis.fetch, readLocal, 
 
     async clone(entry, dest) {
       const slug = repoSlug(entry);
+      if (!slug) return { ok: false, error: 'no repo slug' };
       const { code, stderr } = await git(['clone', `https://github.com/${slug}.git`, dest]);
       return { ok: code === 0, error: code === 0 ? null : stderr };
     },
@@ -110,6 +111,7 @@ export function makeGithubDriver({ exec, fetchFn = globalThis.fetch, readLocal, 
 
     webUrl(entry, path, ref = 'main') {
       const slug = repoSlug(entry);
+      if (!slug) return null;
       return `https://github.com/${slug}/blob/${ref}/${path}`;
     },
   };

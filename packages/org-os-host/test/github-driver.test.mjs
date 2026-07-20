@@ -5,8 +5,8 @@ import { makeGithubDriver } from '../src/github/driver.mjs';
 // A recording fake exec: returns queued responses by matched command.
 function fakeExec(responses) {
   const calls = [];
-  const exec = async (bin, args) => {
-    calls.push({ bin, args });
+  const exec = async (bin, args, opts) => {
+    calls.push({ bin, args, opts });
     const key = `${bin} ${args.join(' ')}`;
     for (const [pattern, res] of responses) if (key.includes(pattern)) return res;
     return { code: 0, stdout: '', stderr: '' };
@@ -49,6 +49,11 @@ test('fetchFile: returns null (never throws) when unreachable', async () => {
   assert.equal(out, null);
 });
 
+test('fetchFile: returns null on non-ok HTTP response', async () => {
+  const d = makeGithubDriver({ exec: fakeExec([]), fetchFn: async () => ({ ok: false, text: async () => 'nope' }) });
+  assert.equal(await d.fetchFile({ repo: 'x/y' }, 'federation.yaml'), null);
+});
+
 test('getCanonical: reads default branch from git', async () => {
   const exec = fakeExec([
     ['symbolic-ref', { code: 0, stdout: 'refs/remotes/origin/main\n', stderr: '' }],
@@ -70,6 +75,19 @@ test('getDrift: parses ahead/behind from rev-list --left-right --count', async (
   assert.equal(drift.behind, 3);
   assert.equal(drift.ahead, 2);
   assert.equal(drift.canonicalRef, 'main');
+});
+
+test('getCanonical/getDrift run git in the peer local_path (cwd threaded)', async () => {
+  const exec = fakeExec([
+    ['symbolic-ref', { code: 0, stdout: 'refs/remotes/origin/main\n', stderr: '' }],
+    ['rev-parse --abbrev-ref', { code: 0, stdout: 'main\n', stderr: '' }],
+    ['rev-list', { code: 0, stdout: '0\t0\n', stderr: '' }],
+  ]);
+  const d = makeGithubDriver({ exec });
+  await d.getCanonical({ local_path: '../refi-bcn-os' });
+  await d.getDrift({ local_path: '../refi-bcn-os' });
+  assert.ok(exec.calls.every((c) => c.bin !== 'git' || c.opts?.cwd === '../refi-bcn-os'),
+    'every git call for a peer entry threads cwd = local_path');
 });
 
 import { runHostDriverContract } from './contract.mjs';
