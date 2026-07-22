@@ -6,7 +6,6 @@ export { buildSlugIndex, resolveLink } from './resolver.ts'
 export { renderNote } from './markdown.ts'
 export { buildBacklinkIndex, buildLinkReport } from './backlinks.ts'
 export { convertNetworkx } from './graph/convert.ts'
-// TODO(task 10): uncomment
-// export { buildWikilinkGraph, mergeGraphs } from './graph/merge.ts'
+export { buildWikilinkGraph, mergeGraphs } from './graph/merge.ts'
 // TODO(task 11): uncomment
 // export { layoutGraph, serializeArtifact } from './graph/layout.ts'
