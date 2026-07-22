@@ -2,8 +2,7 @@ export { defineKmsConfig } from './config.ts'
 export type { KmsConfig, KmsSource } from './config.ts'
 export { scanSources } from './scan.ts'
 export { extractWikilinks } from './wikilinks.ts'
-// TODO(task 6): uncomment
-// export { buildSlugIndex, resolveLink } from './resolver.ts'
+export { buildSlugIndex, resolveLink } from './resolver.ts'
 // TODO(task 7): uncomment
 // export { renderNote } from './markdown.ts'
 // TODO(task 8): uncomment
