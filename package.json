@@ -25,6 +25,8 @@
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
     "graph:status": "node scripts/graph-status.mjs --format=markdown",
+    "graph:gaps": "node scripts/graph-gaps.mjs",
+    "graph:update": "graphify . --update || echo 'graph: CLI not installed — see docs/integrations/graphify.md'",
     "deploy:pages": "node scripts/deploy-pages.mjs",
     "generate:dashboard": "node packages/dashboard/generate.mjs",
     "build:site": "cd repos/refi-bcn-knowledge && npx quartz build",
