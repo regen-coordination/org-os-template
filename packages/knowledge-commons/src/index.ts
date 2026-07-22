@@ -1,7 +1,6 @@
 export { defineKmsConfig } from './config.ts'
 export type { KmsConfig, KmsSource } from './config.ts'
-// TODO(task 4): uncomment
-// export { scanSources } from './scan.ts'
+export { scanSources } from './scan.ts'
 // TODO(task 5): uncomment
 // export { extractWikilinks } from './wikilinks.ts'
 // TODO(task 6): uncomment
