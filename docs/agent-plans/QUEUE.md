@@ -1,10 +1,10 @@
 # Plan Queue — org-os (framework)
 
-> Last updated: 2026-04-06
+> Last updated: 2026-07-23
 
 ## Active
 
-_(none — framework Phase 1 complete, instance work is tracked per-instance)_
+1. [v0.5-release](v0.5-release.md) — Trunk repair (~230 unmerged commits), identity de-contamination, dashboard fix, green validators, v0.5.0 tag. Absorbs queue item 6 (repo-check-health) as Phase 4.
 
 ## Queued
 1. [future-instance-specs](future-instance-specs.md) — Write specs for regen-coordination-os and regen-toolkit
