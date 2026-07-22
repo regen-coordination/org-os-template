@@ -32,7 +32,7 @@
     "build:site": "cd repos/refi-bcn-knowledge && npx quartz build",
     "serve:site": "cd repos/refi-bcn-knowledge && npx quartz build --serve",
     "docs": "npx quartz build --serve -d docs",
-    "check": "tsc --noEmit && npx prettier . --check && node scripts/graph-status.mjs --test && node scripts/graph-gaps.mjs --test",
+    "check": "node scripts/graph-status.mjs --test && node scripts/graph-gaps.mjs --test && tsc --noEmit && npx prettier . --check",
     "format": "npx prettier . --write"
   },
   "engines": {
