@@ -5,8 +5,7 @@ export { extractWikilinks } from './wikilinks.ts'
 export { buildSlugIndex, resolveLink } from './resolver.ts'
 export { renderNote } from './markdown.ts'
 export { buildBacklinkIndex, buildLinkReport } from './backlinks.ts'
-// TODO(task 9): uncomment
-// export { convertNetworkx } from './graph/convert.ts'
+export { convertNetworkx } from './graph/convert.ts'
 // TODO(task 10): uncomment
 // export { buildWikilinkGraph, mergeGraphs } from './graph/merge.ts'
 // TODO(task 11): uncomment
