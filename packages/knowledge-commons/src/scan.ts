@@ -36,7 +36,17 @@ export async function scanSources(config: KmsConfig, rootDir: string): Promise<N
     const files = await fg(src.content, { cwd: base, ignore: src.exclude, absolute: false })
     for (const relPath of files.sort()) {
       const raw = await fs.readFile(path.join(base, relPath), 'utf8')
-      const { data, content } = matter(raw)
+      let data: Record<string, unknown>, content: string
+      try {
+        ;({ data, content } = matter(raw))
+      } catch (err) {
+        // malformed frontmatter (e.g. duplicate keys, bad YAML): quarantine the
+        // page, warn, and keep the build going (spec §8 — nothing content-shaped
+        // ever fails the build)
+        const message = err instanceof Error ? err.message.split('\n')[0] : String(err)
+        console.warn(`[kms] malformed frontmatter, quarantining ${src.id}/${relPath}: ${message}`)
+        continue
+      }
       const fmTitle = typeof data.title === 'string' ? data.title : null
       const fallback = path.basename(relPath).replace(/\.mdx?$/i, '').replace(/[-_]+/g, ' ')
       notes.push({
