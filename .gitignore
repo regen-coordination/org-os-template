@@ -25,7 +25,8 @@ out
 .env*.local
 
 # Superpowers plugin ephemeral plans
-docs/superpowers/
+docs/superpowers/*
+!docs/superpowers/specs/
 
 # Editor
 .vscode/*
