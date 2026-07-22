@@ -19,6 +19,7 @@ import yaml from "js-yaml";
 import matter from "gray-matter";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
+import { readGraphStatus, renderStatusMarkdown } from "./graph-status.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1655,6 +1656,21 @@ function renderMarkdown(state) {
       out += renderPipelineBar(pipelines[i]);
       if (i < pipelines.length - 1) out += "\n";
     }
+  }
+
+  // ── Knowledge Graph ──────────────────────────────────────────────────
+  if (config.knowledge_graph?.show !== false) {
+    const gs = readGraphStatus();
+    if (gs.available) {
+      out += sectionHeader("Knowledge Graph");
+      out += renderStatusMarkdown(gs) + "\n\n";
+      const gapsDoc = readYamlSafe(path.join(rootDir, "data", "knowledge-gaps.yaml"));
+      const openGaps = (gapsDoc?.gaps || []).filter((x) => x.status === "open").length;
+      if (openGaps > 0) {
+        out += `  ${openGaps} open knowledge gap(s) — data/knowledge-gaps.yaml\n\n`;
+      }
+    }
+    // graph absent → section self-hides (graceful degradation)
   }
 
   // ── Apps & Workspaces ───────────────────────────────────────────────────

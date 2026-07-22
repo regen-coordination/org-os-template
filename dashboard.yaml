@@ -58,6 +58,9 @@ sections:
         label: "Plans"
         stages: [backlog, queued, active, completed]
 
+  knowledge_graph:
+    show: true
+
   apps:
     show: true
     hide:
