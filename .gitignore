@@ -42,3 +42,4 @@ docs/superpowers/*
 graphify-out/graph.html
 graphify-out/.graphify_python
 graphify-out/.graphify_root
+.superpowers/
