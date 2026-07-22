@@ -198,7 +198,14 @@ if (fileExists('federation.yaml')) {
     check('federation.yaml has identity section', !!fed?.identity);
     check('federation.yaml has identity.name', !!fed?.identity?.name);
     check('federation.yaml has identity.type', !!fed?.identity?.type);
-    check('federation.yaml has federation section', !!fed?.federation);
+    // v3.0 flat manifest: network/hub/peers/upstream at top level.
+    // Legacy v2: grouped under a `federation:` key. Accept either.
+    const hasV3 = fed && ('peers' in fed || 'upstream' in fed || 'network' in fed);
+    const hasLegacy = fed && typeof fed.federation === 'object' && fed.federation !== null;
+    check(
+      'federation.yaml has federation config (v3.0 flat or legacy section)',
+      hasV3 || hasLegacy
+    );
     check('federation.yaml has agent section', !!fed?.agent);
 
     if (!fed?.['knowledge-commons']) {
