@@ -8,8 +8,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -30,7 +30,7 @@ export function readGraphStatus(dir = path.join(rootDir, "graphify-out"), opts =
     return { available: false, hint: "graph: invalid graph.json — re-run /graphify ." };
   }
 
-  const communities = new Set(g.nodes.map((n) => n.community).filter((c) => c !== undefined));
+  const communities = new Set(g.nodes.map((n) => n.community).filter((c) => c != null));
   const ambiguous = g.links.filter((l) => l.confidence === "AMBIGUOUS").length;
 
   // Staleness: commits since the last run's timestamp (spec: git rev-list --count --since)
@@ -38,8 +38,8 @@ export function readGraphStatus(dir = path.join(rootDir, "graphify-out"), opts =
   try {
     const cost = JSON.parse(fs.readFileSync(costPath, "utf8"));
     const lastRun = cost.runs?.[cost.runs.length - 1]?.date;
-    if (lastRun && !opts.noGit) {
-      const n = execSync(`git rev-list --count --since="${lastRun}" HEAD`, {
+    if (lastRun && typeof lastRun === "string" && !opts.noGit) {
+      const n = execFileSync("git", ["rev-list", "--count", "--since", lastRun, "HEAD"], {
         cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
       }).trim();
       staleness = { commitsBehind: parseInt(n, 10) || 0, lastBuilt: lastRun };
@@ -65,7 +65,7 @@ export function renderStatusMarkdown(s) {
   if (s.staleness && s.staleness.commitsBehind > 0) {
     lines.push(`  ⚠ graph is ${s.staleness.commitsBehind} commit(s) behind — /close will update it`);
   } else if (s.staleness) {
-    lines.push(`  graph is current (built ${s.staleness.lastBuilt.split("T")[0]})`);
+    lines.push(`  graph is current (built ${String(s.staleness.lastBuilt).split("T")[0]})`);
   }
   return lines.join("\n");
 }
@@ -99,12 +99,15 @@ function runTests() {
   process.exit(failures === 0 ? 0 : 1);
 }
 
-const args = process.argv.slice(2);
-if (args.includes("--test")) {
-  runTests();
-} else {
-  const status = readGraphStatus();
-  if (args.includes("--format=markdown")) console.log(renderStatusMarkdown(status));
-  else console.log(JSON.stringify(status, null, 2));
-  process.exit(0);
+const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  const args = process.argv.slice(2);
+  if (args.includes("--test")) {
+    runTests();
+  } else {
+    const status = readGraphStatus();
+    if (args.includes("--format=markdown")) console.log(renderStatusMarkdown(status));
+    else console.log(JSON.stringify(status, null, 2));
+    process.exit(0);
+  }
 }
