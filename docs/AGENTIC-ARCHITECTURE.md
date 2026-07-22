@@ -201,6 +201,16 @@ dependencies:
 
 See `docs/SKILL-SPECIFICATION.md` for the complete spec.
 
+## Knowledge Graph (Graphify)
+
+`graphify-out/graph.json` is a canonical data file (like `data/*.yaml`) built by
+the upstream `graphify` CLI at session close. Three read-only consumers:
+`scripts/graph-status.mjs` (dashboard), `scripts/graph-gaps.mjs`
+(`data/knowledge-gaps.yaml` → knowledge-curator), and `graphify query` (agents).
+org-os never writes into the graph. Full design:
+`docs/superpowers/specs/2026-07-22-graphify-kms-integration-design.md`;
+integration doc: `docs/integrations/graphify.md`.
+
 ## Autoresearch Pattern — Autonomous Improvement
 
 Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch), org-os agents don't just operate within the workspace — they improve it.
