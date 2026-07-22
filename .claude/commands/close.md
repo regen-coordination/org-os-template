@@ -44,16 +44,27 @@ If key decisions were made, append to the Key Decisions section (most recent fir
 
 If any plan in `docs/plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/plans/QUEUE.md`.
 
-## 6. Commit
+## 6. Update Knowledge Graph
+
+If the `graphify` CLI is installed and `graphify-out/graph.json` exists, refresh the graph so it travels in the same commit as this session's changes:
+
+```bash
+command -v graphify >/dev/null 2>&1 && graphify . --update || echo "graph: CLI not installed — see docs/integrations/graphify.md"
+npm run graph:gaps 2>/dev/null || true
+```
+
+This is incremental (seconds for code-only changes). If the update fails, report the error but continue the close — the graph retries next session. Never block the close on graph tooling.
+
+## 7. Commit
 
 Stage all changed files and commit:
 
 ```bash
-git add memory/ HEARTBEAT.md MEMORY.md data/ docs/plans/
+git add memory/ HEARTBEAT.md MEMORY.md data/ docs/plans/ graphify-out/
 git commit -m "session: [concise description of what was done]"
 ```
 
-## 7. Push
+## 8. Push
 
 ```bash
 git push
