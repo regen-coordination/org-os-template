@@ -1158,36 +1158,41 @@ async function main() {
     warnings,
   };
 
-  let notionTimeout;
-  const notionData = await Promise.race([
-    fetchNotionData(toolsMd).then((r) => { clearTimeout(notionTimeout); return r; }),
-    new Promise((resolve) => {
-      notionTimeout = setTimeout(() => {
-        process.stderr.write("[warn] Notion API timed out after 10s\n");
-        resolve(null);
-      }, 10000);
-    }),
-  ]);
-  if (notionData?.status === "no-key") {
-    state.status.notionConnected = false;
-    process.stderr.write(
-      "[info] NOTION_API_KEY not set — Notion data skipped. " +
-      "Copy .env.example to .env and add your key, or use Claude Code (MCP handles auth).\n"
-    );
-  } else if (notionData) {
-    state = mergeData(state, notionData);
-    state.status.notionConnected = true;
-  } else {
-    state.status.notionConnected = false;
-    if (process.env.NOTION_API_KEY) warnings.push("Notion API returned no data");
-  }
-  if (!git) warnings.push("git status unavailable");
-
+  // Render dashboard immediately with local data
   if (format === "markdown") {
     console.log(renderMarkdown(state));
   } else {
     console.log(JSON.stringify(state, null, 2));
   }
+
+  // Fetch Notion data in parallel (after dashboard is rendered)
+  // This ensures dashboard loads fast even if Notion API is slow
+  process.stderr.write("[info] Dashboard loaded from local data. Checking Notion API...\n");
+
+  let notionTimeout;
+  const notionData = await Promise.race([
+    fetchNotionData(toolsMd).then((r) => { clearTimeout(notionTimeout); return r; }),
+    new Promise((resolve) => {
+      notionTimeout = setTimeout(() => {
+        process.stderr.write("[warn] Notion API timed out after 5s — dashboard uses local data only\n");
+        resolve(null);
+      }, 5000);
+    }),
+  ]);
+
+  // Report Notion status only to stderr (doesn't block display)
+  if (notionData?.status === "no-key") {
+    process.stderr.write(
+      "[info] NOTION_API_KEY not set — dashboard uses local YAML data only. " +
+      "To sync Notion, copy .env.example to .env and add your NOTION_API_KEY.\n"
+    );
+  } else if (notionData && Object.keys(notionData).length > 0) {
+    // Notion data available
+    process.stderr.write("[info] ✓ Notion API connected and synced\n");
+  } else if (process.env.NOTION_API_KEY) {
+    process.stderr.write("[warn] Notion API issue (no data) — using local YAML data. Check database permissions in Notion.\n");
+  }
+  if (!git) process.stderr.write("[warn] git status unavailable\n");
 }
 
 // ── Visual Helpers ───────────────────────────────────────────────────────────
@@ -1433,9 +1438,9 @@ function renderMarkdown(state) {
       out += pad("  AREAS", 34) + pad("OWNER", 10) + "FOCUS\n";
       for (const a of areas.sort(sortByStage)) {
         const icon = a.stage === "active" ? "●" : "○";
-        const name = pad(`  ${icon}  ${truncate(a.name, 24)}`, 34);
+        const name = pad(`  ${icon}  ${truncate(stripMarkdown(a.name), 24)}`, 34);
         const owner = pad(truncate(normalizeOwner(a.owner), 8), 10);
-        const desc = truncate(a.description || "", 32);
+        const desc = truncate(stripMarkdown(a.description || ""), 32);
         out += `${name}${owner}${desc}\n`;
       }
       out += "\n";
@@ -1456,10 +1461,10 @@ function renderMarkdown(state) {
       for (const p of visible.sort(sortByStage).slice(0, maxShow)) {
         const isActive = ["active", "integrate", "in-progress"].includes(p.stage?.toLowerCase());
         const icon = isActive ? "●" : "○";
-        const name = pad(`  ${icon}  ${truncate(p.name, 24)}`, 34);
+        const name = pad(`  ${icon}  ${truncate(stripMarkdown(p.name), 24)}`, 34);
         const owner = pad(truncate(normalizeOwner(p.owner), 8), 10);
         const stage = pad(p.stage || "idea", 14);
-        const desc = truncate(p.description || "", 18);
+        const desc = truncate(stripMarkdown(p.description || ""), 18);
         out += `${name}${owner}${stage}${desc}\n`;
       }
 
@@ -1511,21 +1516,21 @@ function renderMarkdown(state) {
 
     for (const t of tasks.critical.slice(0, maxPerTier)) {
       const due = t.due ? ` (due ${t.due})` : "";
-      out += `  ⚡ ${safeTruncate(t.text, 60)}${due}    CRITICAL\n`;
+      out += `  ⚡ ${truncate(stripMarkdown(t.text), 60)}${due}    CRITICAL\n`;
     }
     if (tasks.critical.length > maxPerTier) {
       out += `  ... +${tasks.critical.length - maxPerTier} more critical\n`;
     }
     for (const t of tasks.urgent.slice(0, maxPerTier)) {
       const days = t.daysLeft != null ? ` — ${t.daysLeft}d` : "";
-      out += `  ◆  ${safeTruncate(t.text, 58)}${days}    URGENT\n`;
+      out += `  ◆  ${truncate(stripMarkdown(t.text), 58)}${days}    URGENT\n`;
     }
     if (tasks.urgent.length > maxPerTier) {
       out += `  ... +${tasks.urgent.length - maxPerTier} more urgent\n`;
     }
     const upcomingMax = config.tasks?.max_upcoming || 5;
     for (const t of tasks.upcoming.slice(0, upcomingMax)) {
-      out += `  ◇  ${safeTruncate(t.text, 68)}\n`;
+      out += `  ◇  ${truncate(stripMarkdown(t.text), 68)}\n`;
     }
     if (tasks.upcoming.length > upcomingMax) {
       out += `  ... +${tasks.upcoming.length - upcomingMax} more upcoming\n`;
@@ -1533,7 +1538,7 @@ function renderMarkdown(state) {
 
     if (config.tasks?.show_completed && tasks.completed.length > 0) {
       for (const t of tasks.completed.slice(0, 3)) {
-        out += `  ✓  ${safeTruncate(t.text, 68)}\n`;
+        out += `  ✓  ${truncate(stripMarkdown(t.text), 68)}\n`;
       }
     }
 
@@ -1570,7 +1575,7 @@ function renderMarkdown(state) {
       if (dayItems.length > 0) {
         for (const m of dayItems) {
           const link = m.notionUrl || m.url ? `  → ${m.relatedProject || "link"}` : "";
-          out += `  ${dayStr} ${dateNum}  │  ■ ${m.title}${link}${marker}\n`;
+          out += `  ${dayStr} ${dateNum}  │  ■ ${stripMarkdown(m.title)}${link}${marker}\n`;
         }
       } else {
         out += `  ${dayStr} ${dateNum}  │${marker}\n`;
@@ -1590,7 +1595,7 @@ function renderMarkdown(state) {
         const mon = d.toLocaleString("en", { month: "short" });
         const dateNum = String(d.getDate()).padStart(2, " ");
         const related = item.relatedProject ? `  ${item.relatedProject}` : "";
-        out += `  ${mon} ${dateNum}  │  ■ ${item.title}${related}\n`;
+        out += `  ${mon} ${dateNum}  │  ■ ${stripMarkdown(item.title)}${related}\n`;
       }
     }
   }
@@ -1605,12 +1610,12 @@ function renderMarkdown(state) {
     if (withinHorizon.length > 0 || funding.active.length > 0) {
       out += sectionHeader("Funding");
       for (const f of withinHorizon.slice(0, 8)) {
-        const name = f.name || f.title || f.fund || f.platform || "Unknown";
+        const name = stripMarkdown(f.name || f.title || f.fund || f.platform || "Unknown");
         const icon = f.daysLeft <= 7 ? "⚠" : "◇";
         out += `  ${icon}  ${name} — ${f.daysLeft}d left\n`;
       }
       for (const f of funding.active.slice(0, 3)) {
-        const name = f.name || f.title || f.fund || f.platform || "Unknown";
+        const name = stripMarkdown(f.name || f.title || f.fund || f.platform || "Unknown");
         out += `  ●  ${name} — ${f.status}\n`;
       }
     }
@@ -1621,7 +1626,7 @@ function renderMarkdown(state) {
     out += sectionHeader("Recent Context");
     const max = config.context?.max_entries || 3;
     for (const entry of recentMemory.slice(0, max)) {
-      out += `  ${entry.date}: ${safeTruncate(entry.summary, 62)}\n`;
+      out += `  ${entry.date}: ${truncate(stripMarkdown(entry.summary), 62)}\n`;
     }
   }
 
@@ -1631,14 +1636,14 @@ function renderMarkdown(state) {
     if (plans.active.length > 0) {
       out += "  ACTIVE\n";
       for (const p of plans.active) {
-        out += `  ●  ${p.title} — ${p.description}\n`;
+        out += `  ●  ${stripMarkdown(p.title)} — ${stripMarkdown(p.description)}\n`;
       }
     }
     const preview = config.plans?.queued_preview || 2;
     if (plans.queued.length > 0) {
       out += "\n  QUEUED" + (plans.queued.length > preview ? ` (next ${preview})` : "") + "\n";
       for (const p of plans.queued.slice(0, preview)) {
-        out += `  ○  ${p.title} — ${p.description}\n`;
+        out += `  ○  ${stripMarkdown(p.title)} — ${stripMarkdown(p.description)}\n`;
       }
     }
     const remaining = Math.max(0, plans.queued.length - preview);
@@ -1788,13 +1793,13 @@ function generateSuggestions(state, count) {
   // Priority 1: Critical/overdue tasks
   for (const t of tasks.critical) {
     const due = t.due ? ` (due ${t.due})` : "";
-    suggestions.push(`⚡ ${t.text}${due}`);
+    suggestions.push(`⚡ ${stripMarkdown(t.text)}${due}`);
   }
 
   // Priority 2: Upcoming funding deadlines (within 14 days)
   for (const f of (funding?.upcoming || []).slice(0, 2)) {
     if (f.daysLeft <= 14) {
-      const name = f.name || f.title || f.fund || f.platform || "Funding";
+      const name = stripMarkdown(f.name || f.title || f.fund || f.platform || "Funding");
       suggestions.push(`◆  ${name} — ${f.daysLeft}d left`);
     }
   }
@@ -1809,12 +1814,12 @@ function generateSuggestions(state, count) {
   // Priority 4: Urgent tasks
   for (const t of tasks.urgent.slice(0, 2)) {
     const days = t.daysLeft != null ? ` — ${t.daysLeft}d` : "";
-    suggestions.push(`◆  ${t.text}${days}`);
+    suggestions.push(`◆  ${stripMarkdown(t.text)}${days}`);
   }
 
   // Priority 5: Upcoming events
   for (const e of (events?.thisWeek || []).slice(0, 1)) {
-    suggestions.push(`◇  Prepare for ${e.title}`);
+    suggestions.push(`◇  Prepare for ${stripMarkdown(e.title)}`);
   }
 
   // Fallbacks if nothing urgent
