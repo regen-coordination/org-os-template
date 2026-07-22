@@ -36,3 +36,9 @@ docs/superpowers/*
 *.swo
 *~
 .claude/worktrees/
+
+# Graphify — commit data (graph.json, cache/, manifest.json, GRAPH_REPORT.md, cost.json),
+# ignore renderings and machine-local files
+graphify-out/graph.html
+graphify-out/.graphify_python
+graphify-out/.graphify_root
