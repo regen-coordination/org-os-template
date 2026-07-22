@@ -95,7 +95,7 @@ for (const dir of requiredDirs) {
 }
 
 // Optional directories
-const optionalDirs = ['knowledge', 'ideas', 'docs', 'repos', '.claude'];
+const optionalDirs = ['knowledge', 'ideas', 'docs', 'repos', '.claude', 'graphify-out'];
 for (const dir of optionalDirs) {
   if (!dirExists(dir)) {
     warn(`${dir}/ not present (optional)`);
@@ -122,6 +122,7 @@ const optionalDataFiles = [
   'events.yaml',
   'channels.yaml',
   'assets.yaml',
+  'knowledge-gaps.yaml',
 ];
 
 for (const file of requiredDataFiles) {
