@@ -24,6 +24,7 @@
     "generate:schemas": "node scripts/generate-all-schemas.mjs",
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
+    "graph:status": "node scripts/graph-status.mjs --format=markdown",
     "deploy:pages": "node scripts/deploy-pages.mjs",
     "generate:dashboard": "node packages/dashboard/generate.mjs",
     "build:site": "cd repos/refi-bcn-knowledge && npx quartz build",
