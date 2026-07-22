@@ -1,0 +1,9 @@
+{
+  "directed": false, "multigraph": false, "graph": {}, "built_at_commit": "abc1234",
+  "nodes": [
+    { "id": "commitment-pooling", "label": "Commitment Pooling", "community": 1, "source_file": "docs/pooling.md" },
+    { "id": "grassroots-economics", "label": "Grassroots Economics", "community": 2, "source_file": null }
+  ],
+  "links": [ { "source": "commitment-pooling", "target": "grassroots-economics" } ],
+  "hyperedges": []
+}
