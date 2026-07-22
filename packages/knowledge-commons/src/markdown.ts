@@ -6,9 +6,9 @@ import rehypeSlug from 'rehype-slug'
 import rehypeStringify from 'rehype-stringify'
 import { visit } from 'unist-util-visit'
 import { toString } from 'mdast-util-to-string'
+import GithubSlugger from 'github-slugger'
 import { extractWikilinks, type Wikilink } from './wikilinks.ts'
 import { resolveLink, type SlugIndex, type Resolution } from './resolver.ts'
-import { slugifySegment } from './scan.ts'
 import type { NoteFile } from './scan.ts'
 
 export interface RenderedLink extends Wikilink { status: Resolution['status']; to: string | null; candidates: string[] }
@@ -20,7 +20,9 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 function wikilinkHtml(link: Wikilink, res: Resolution, base: string): string {
   const text = esc(link.alias ?? link.target)
   if (res.status === 'ok') {
-    const anchor = link.heading ? `#${slugifySegment(link.heading)}` : ''
+    // Fresh slugger: cross-document anchor to the first occurrence of the heading in the
+    // target note (no dedup state available). Matches rehype-slug's github-slugger algorithm.
+    const anchor = link.heading ? `#${new GithubSlugger().slug(link.heading)}` : ''
     const slug = res.note!.slug
     return `<a href="${base}${slug}${anchor}" class="kc-wikilink" data-slug="${slug}">${text}</a>`
   }
@@ -57,9 +59,12 @@ function remarkWikilinks(note: NoteFile, index: SlugIndex, base: string, out: Re
 
 function collectHeadings(tree: any): Heading[] {
   const out: Heading[] = []
+  // One slugger per document so repeated headings dedupe (`foo`, `foo-1`) exactly like
+  // rehype-slug does within the same doc. visit walks headings in document order.
+  const slugger = new GithubSlugger()
   visit(tree, 'heading', (node: any) => {
     const text = toString(node)
-    out.push({ depth: node.depth, text, id: slugifySegment(text) })
+    out.push({ depth: node.depth, text, id: slugger.slug(text) })
   })
   return out.filter(h => h.depth >= 2)
 }

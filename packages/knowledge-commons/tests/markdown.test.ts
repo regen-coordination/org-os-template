@@ -28,4 +28,23 @@ describe('renderNote', () => {
     const pooling = await renderNote(notes.find(n => n.slug === 'alpha/pooling')!, index, { base: '/' })
     expect(pooling.excerpt.startsWith('A protocol built on Mutual Credit')).toBe(true)
   })
+  it('heading ToC ids match the rendered heading ids (github-slugger)', async () => {
+    const note: NoteFile = {
+      source: 'alpha', slug: 'alpha/gh-slug', relPath: 'gh-slug.md',
+      title: 'GH Slug', tags: [], date: null, frontmatter: {},
+      body: '## Node.js Basics\n\ntext',
+    }
+    const r = await renderNote(note, index, { base: '/' })
+    expect(r.headings[0].id).toBe('nodejs-basics')
+    expect(r.html).toContain('id="nodejs-basics"')
+  })
+  it('wikilink heading anchors match rendered heading ids (github-slugger)', async () => {
+    const note: NoteFile = {
+      source: 'alpha', slug: 'alpha/gh-anchor', relPath: 'gh-anchor.md',
+      title: 'GH Anchor', tags: [], date: null, frontmatter: {},
+      body: 'See [[Reserve Ratio#Node.js Basics|there]].',
+    }
+    const r = await renderNote(note, index, { base: '/' })
+    expect(r.html).toContain('href="/alpha/guide/reserve-ratio#nodejs-basics"')
+  })
 })
