@@ -1,0 +1,21 @@
+{
+  "name": "org-os-commons-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "node scripts/sync-wellknown.mjs && astro build",
+    "preview": "astro preview",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "astro": "^6.0.0",
+    "@org-os/knowledge-commons": "file:../packages/knowledge-commons",
+    "@astrojs/rss": "^4.0.0",
+    "@astrojs/sitemap": "^3.2.0",
+    "astro-pagefind": "^1.8.0",
+    "sigma": "^3.0.0",
+    "graphology": "^0.26.0"
+  },
+  "devDependencies": { "@playwright/test": "^1.50.0" }
+}
