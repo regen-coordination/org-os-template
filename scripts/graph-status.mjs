@@ -60,7 +60,7 @@ export function readGraphStatus(dir = path.join(rootDir, "graphify-out"), opts =
 export function renderStatusMarkdown(s) {
   if (!s.available) return `  ${s.hint}`;
   const lines = [
-    `  ${s.nodes.toLocaleString("en-US")} nodes · ${s.edges.toLocaleString("en-US")} edges · ${s.communities} communities · ${s.ambiguousEdges} ambiguous edges`,
+    `  ${s.nodes.toLocaleString("en-US")} nodes · ${s.edges.toLocaleString("en-US")} edges · ${s.communities} communities · ${s.ambiguousEdges} ambiguous edge${s.ambiguousEdges === 1 ? "" : "s"}`,
   ];
   if (s.staleness && s.staleness.commitsBehind > 0) {
     lines.push(`  ⚠ graph is ${s.staleness.commitsBehind} commit(s) behind — /close will update it`);

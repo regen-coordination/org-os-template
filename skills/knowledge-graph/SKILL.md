@@ -29,6 +29,7 @@ never auto-install). Everything below degrades to a one-line hint without it.
 |---|---|
 | Question about org structure/code/docs | `graphify query "<question>"` — answer from the graph, cite `source_location` |
 | Session close | `graphify . --update` then `npm run graph:gaps` (bookend in `/close`) |
+| Manual graph refresh (non-Claude operator) | `npm run graph:update` (guarded; hints if CLI absent) |
 | First-time setup | `/graphify .` (full build; semantic extraction runs via subagents) |
 | Dashboard stats | `npm run graph:status` |
 | Gap triage | Work `data/knowledge-gaps.yaml` `open` entries (below) |

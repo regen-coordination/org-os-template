@@ -38,6 +38,7 @@ Monitors organizational channels (Telegram, GitHub, meeting notes) for meaningfu
 - Meeting notes in `packages/operations/meetings/`
 - GitHub activity from monitored repos (configured in `TOOLS.md`)
 - Direct content pasted by operator
+- Knowledge gaps flagged by the graph in `data/knowledge-gaps.yaml` (triage workflow in `skills/knowledge-graph/SKILL.md`)
 
 ## Outputs
 
