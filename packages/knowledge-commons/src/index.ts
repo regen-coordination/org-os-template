@@ -3,8 +3,7 @@ export type { KmsConfig, KmsSource } from './config.ts'
 export { scanSources } from './scan.ts'
 export { extractWikilinks } from './wikilinks.ts'
 export { buildSlugIndex, resolveLink } from './resolver.ts'
-// TODO(task 7): uncomment
-// export { renderNote } from './markdown.ts'
+export { renderNote } from './markdown.ts'
 // TODO(task 8): uncomment
 // export { buildBacklinkIndex, buildLinkReport } from './backlinks.ts'
 // TODO(task 9): uncomment
