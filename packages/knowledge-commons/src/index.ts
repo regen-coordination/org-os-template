@@ -4,8 +4,7 @@ export { scanSources } from './scan.ts'
 export { extractWikilinks } from './wikilinks.ts'
 export { buildSlugIndex, resolveLink } from './resolver.ts'
 export { renderNote } from './markdown.ts'
-// TODO(task 8): uncomment
-// export { buildBacklinkIndex, buildLinkReport } from './backlinks.ts'
+export { buildBacklinkIndex, buildLinkReport } from './backlinks.ts'
 // TODO(task 9): uncomment
 // export { convertNetworkx } from './graph/convert.ts'
 // TODO(task 10): uncomment
