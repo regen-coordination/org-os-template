@@ -96,9 +96,28 @@ export function detectGaps(g) {
     }
   }
 
-  // Rank: weak communities first (structural), then orphan groups by size desc, then ambiguous
+  // Weight knowledge over code structure: a gap whose nodes are mostly code is
+  // usually normal code sparsity, not a knowledge gap. Compute each gap's non-code
+  // fraction and float knowledge-heavy gaps (docs/concepts/rationale/papers) to the
+  // top. Nodes with file_type "code" are code; everything else counts as knowledge.
+  const knowledgeFrac = (gap) => {
+    const ids = gap.node_ids;
+    if (!ids.length) return 0;
+    const nonCode = ids.filter((id) => {
+      const ft = nodeById.get(id)?.file_type;
+      return ft !== undefined && ft !== "code";
+    }).length;
+    return nonCode / ids.length;
+  };
+  // Tier 0 = knowledge gap (>=50% non-code nodes); Tier 1 = code-structure gap.
+  const tier = (gap) => (knowledgeFrac(gap) >= 0.5 ? 0 : 1);
   const kindOrder = { "weak-community": 0, orphan: 1, "ambiguous-edge": 2 };
-  gaps.sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind] || b.node_ids.length - a.node_ids.length);
+  gaps.sort(
+    (a, b) =>
+      tier(a) - tier(b) ||
+      kindOrder[a.kind] - kindOrder[b.kind] ||
+      b.node_ids.length - a.node_ids.length,
+  );
   // Dedupe by id: distinct AMBIGUOUS links between the same node pair collapse to
   // one gap, preserving the unique-key invariant mergeGaps and the curator rely on.
   // Map keeps insertion order, so the sort above is preserved.
@@ -211,6 +230,23 @@ function runTests() {
   const r2 = run({ graphDir: tmp, registryPath: "/dev/null", write: false, today: "2026-07-22" });
   fs.rmSync(tmp, { recursive: true, force: true });
   assert(r2.ok === false, "corrupt graph degrades");
+
+  // Docs-over-code: a doc/knowledge gap outranks a code-structure gap (Task: gap-ranking)
+  const rankG = {
+    nodes: [
+      { id: "c1", community: 10, source_file: "a.ts", file_type: "code" },
+      { id: "c2", community: 10, source_file: "a.ts", file_type: "code" },
+      { id: "c3", community: 10, source_file: "a.ts", file_type: "code" },
+      { id: "c4", community: 10, source_file: "a.ts", file_type: "code" },
+      { id: "c5", community: 10, source_file: "a.ts", file_type: "code" },
+      { id: "d1", community: 11, source_file: "a.md", file_type: "document" },
+    ],
+    links: [
+      { source: "c1", target: "c2", relation: "calls", confidence: "EXTRACTED", confidence_score: 1.0 },
+    ],
+  };
+  const rankGaps = detectGaps(rankG);
+  assert(rankGaps[0].node_ids.includes("d1"), "doc/knowledge gap outranks code-structure gaps");
 
   // Duplicate AMBIGUOUS edges between the same pair collapse to one gap (Fix B)
   const dupG = {
