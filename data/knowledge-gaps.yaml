@@ -6,6 +6,1028 @@ schema_version: "2.0"
 # Managed by: skills/knowledge-graph · Consumed by: skills/knowledge-curator
 
 gaps:
+  - id: ba50310ade6e
+    kind: weak-community
+    node_ids:
+      - _claude_commands_close_close_command
+      - _claude_commands_initialize_initialize_command
+      - _github_workflows_generate_schemas_workflow
+      - _opencode_agents_build_build_agent
+      - agents_agent_dojo
+      - agents_agent_guide
+      - agents_autopoietic_coordination
+      - agents_knowledge_commons
+      - agents_memory_system
+      - agents_safety_policy
+      - agents_session_startup_sequence
+      - bootstrap_first_run_onboarding
+      - bootstrap_guided_interview
+      - bootstrap_ongoing_learning
+      - changelog_change_history
+      - claude_claude_code_instructions
+      - dashboard_dashboard_config
+      - federation_federation_manifest
+      - heartbeat_active_monitoring
+      - identity_organizational_identity
+      - masterplan_boundaries
+      - masterplan_development_flow
+      - masterplan_eip_4824
+      - masterplan_framework_instance_feedback_loop
+      - masterplan_framework_masterplan
+      - masterplan_refi_bcn_os
+      - masterplan_refi_dao_os
+      - masterplan_regen_coordination_os
+      - memory_memory_index
+      - paperclip_deployment_guide_deployment_guide
+      - paperclip_deployment_guide_paperclip_agents_app
+      - paperclip_deployment_guide_real_time_sync
+      - readme_org_os_template
+      - research_intelligence_plan_bread_coop
+      - research_intelligence_plan_coordinape
+      - research_intelligence_plan_discourse
+      - research_intelligence_plan_egregore
+      - research_intelligence_plan_gitcoin
+      - research_intelligence_plan_radicle
+      - research_intelligence_plan_regen_commons
+      - research_intelligence_plan_research_plan
+      - soul_core_values
+      - soul_organizational_soul
+      - sync_guide_github_sync_guide
+      - sync_guide_npm_run_sync
+      - tools_local_tool_notes
+      - user_operator_profile
+      - version_semantic_versioning
+      - version_version_tracking
+    summary: 'community 4: 49 nodes, cohesion 0.070 < 0.15'
+    status: open
+    detected: '2026-07-22'
+  - id: 093cc3741b21
+    kind: weak-community
+    node_ids:
+      - integrations_opal_docs_api_reference_api_reference
+      - integrations_opal_docs_api_reference_extractedentity
+      - integrations_opal_docs_api_reference_funding_scout_skill
+      - integrations_opal_docs_api_reference_knowledge_curator_skill
+      - integrations_opal_docs_api_reference_meeting_processor_skill
+      - integrations_opal_docs_api_reference_opal_bridge_cli
+      - integrations_opal_docs_api_reference_opaladapter
+      - integrations_opal_docs_architecture_commons_mode
+      - integrations_opal_docs_architecture_entitymapper
+      - integrations_opal_docs_architecture_gitsync
+      - integrations_opal_docs_architecture_human_review_queue
+      - integrations_opal_docs_architecture_koi
+      - integrations_opal_docs_architecture_meetingpipeline
+      - integrations_opal_docs_architecture_opal
+      - integrations_opal_docs_architecture_opal_bridge
+      - integrations_opal_docs_architecture_solo_mode
+      - integrations_opal_docs_architecture_system_architecture
+      - integrations_opal_docs_faq_faq
+      - integrations_opal_docs_setup_guide_setup_guide
+      - integrations_opal_docs_workflows_federation_sync
+      - integrations_opal_docs_workflows_research_quest
+      - integrations_opal_docs_workflows_team_handoff
+      - integrations_opal_docs_workflows_workflows
+      - integrations_opal_testing_summary_opal_bridge_testing_validation
+      - integrations_opal_tests_fixtures_opal_config_mock_opal_configuration
+      - integrations_opal_tests_fixtures_org_os_data_structures_org_os_data_structures
+      - integrations_opal_tests_fixtures_sample_meeting_transcript_circular_funding_models
+      - integrations_opal_tests_fixtures_sample_meeting_transcript_distributed_coordination
+      - integrations_opal_tests_fixtures_sample_meeting_transcript_quadratic_voting
+      - integrations_opal_tests_fixtures_sample_meeting_transcript_sample_meeting_transcript
+      - integrations_opal_tests_readme_opal_bridge_test_suite
+      - knowledge_index_agent_dojo
+      - knowledge_index_knowledge_commons_index
+      - memory_readme_memory_directory
+      - packages_agents_app__paperclip_config_paperclip_configuration
+      - packages_agents_app__paperclip_templates_agent_agent_template
+      - packages_agents_app__paperclip_templates_task_task_template
+      - packages_agents_app_agents_agents_application_for_refi_barcelona
+      - packages_agents_app_docs_api_reference_agents_app_api_reference
+      - packages_agents_app_docs_implementation_checklist_implementation_checklist
+      - packages_agents_app_federation_agents_app_federation_config
+      - packages_agents_app_readme_agents_app
+      - packages_agents_app_readme_paperclip
+      - packages_agents_app_src_ui_index_agents_app_ui_shell
+      - packages_dashboard_dashboard_refi_bcn_dashboard
+    summary: 'community 10: 45 nodes, cohesion 0.073 < 0.15'
+    status: open
+    detected: '2026-07-22'
+  - id: 99245b78949a
+    kind: weak-community
+    node_ids:
+      - packages_egregore_core_opencode_adapter_readme_command_mapping
+      - packages_egregore_core_opencode_adapter_readme_opencode_adapter
+      - packages_egregore_core_readme_curve_labs
+      - packages_egregore_core_readme_egregore
+      - packages_koi_bridge_readme_koi_bridge
+      - packages_koi_bridge_readme_koi_coordinator
+      - packages_koi_bridge_readme_koi_net
+      - packages_koi_opal_bridge_readme_agent_dojo
+      - packages_koi_opal_bridge_readme_copyfair
+      - packages_koi_opal_bridge_readme_cosmo_local_knowledge
+      - packages_koi_opal_bridge_readme_human_in_the_loop_review
+      - packages_koi_opal_bridge_readme_koi_opal_bridge
+      - packages_koi_opal_bridge_readme_opal
+      - packages_koi_opal_bridge_readme_regen_agency
+      - packages_koi_opal_bridge_readme_rid
+      - packages_opal_bridge__github_workflows_opal_bridge_federated_deployment
+      - packages_opal_bridge__github_workflows_opal_bridge_opal_bridge_ci_cd
+      - packages_paperclip_agents_app_federation_federation_config
+      - packages_paperclip_agents_app_implementation_complete_file_watcher
+      - packages_paperclip_agents_app_implementation_complete_para_method
+      - packages_paperclip_agents_app_implementation_complete_sync_orchestrator
+      - packages_paperclip_agents_app_implementation_complete_websocket_server
+      - packages_paperclip_agents_app_packages_org_os_bridge_readme_org_os_bridge
+      - packages_paperclip_agents_app_packages_org_os_bridge_readme_sync_service
+      - packages_paperclip_agents_app_phase1_complete_org_os_adapter
+      - packages_paperclip_agents_app_readme_paperclip_agents_app
+      - packages_paperclip_agents_app_templates_docker_compose_docker_compose
+      - packages_regen_agents_implementation_summary_bioregional_intelligence_agent
+      - packages_regen_agents_implementation_summary_commons_governance_specialist
+      - packages_regen_agents_implementation_summary_impact_measurement_analyst
+      - packages_regen_agents_implementation_summary_iris_plus
+      - packages_regen_agents_implementation_summary_ostrom_principles
+      - packages_regen_agents_readme_funding_scout
+      - packages_regen_agents_readme_knowledge_curator
+      - packages_regen_agents_readme_meeting_processor
+      - packages_regen_agents_readme_regen_agents
+      - packages_regen_agents_readme_super_agent
+      - packages_regen_agents_src_agents_agriculture_researcher_agent_regenerative_agriculture_researcher
+      - packages_regen_agents_src_agents_agriculture_researcher_src_prompts_system_evidence_hierarchy
+      - packages_regen_agents_src_agents_agriculture_researcher_src_prompts_system_system_prompt
+    summary: 'community 16: 40 nodes, cohesion 0.063 < 0.15'
+    status: open
+    detected: '2026-07-22'
+  - id: 405c1a61cde7
+    kind: weak-community
+    node_ids:
+      - docs_agent_plans_federation_protocol_federation_protocol
+      - docs_agent_plans_framework_dashboard_template_reusable_dashboard_package_template
+      - docs_agent_plans_future_instance_specs_future_instance_specs
+      - docs_agent_plans_non_tech_onboarding_non_tech_onboarding
+      - docs_agent_plans_queue_plan_queue
+      - docs_agent_plans_v2_phase1_framework_v2_phase1_framework
+      - docs_patterns_nine_step_deterministic_startup_sequence
+      - docs_plans_plan_lifecycle
+      - docs_plans_plan_management_convention
+      - docs_setup_eip_4824
+      - docs_setup_setup_guide
+      - docs_skill_specification_bootstrap_interviewer
+      - docs_skill_specification_capital_flow
+      - docs_skill_specification_funding_scout
+      - docs_skill_specification_heartbeat_monitor
+      - docs_skill_specification_idea_scout
+      - docs_skill_specification_knowledge_curator
+      - docs_skill_specification_meeting_processor
+      - docs_skill_specification_schema_generator
+      - docs_skill_specification_skill_discovery
+      - docs_skill_specification_skill_promotion_protocol
+      - docs_skill_specification_skill_specification
+      - docs_skill_specification_three_tier_skill_model
+      - docs_skill_specification_workspace_improver
+      - docs_tool_setup_github_mcp
+      - docs_tool_setup_notion_mcp_configuration
+      - docs_tool_setup_notion_yaml_sync
+      - docs_tool_setup_tool_setup
+      - docs_v2_development_plan_autoresearch_pattern
+      - docs_v2_development_plan_idea_hatching_pipeline
+      - docs_v2_development_plan_karpathy_autoresearch
+      - docs_v2_development_plan_masterplan_md
+      - docs_v2_development_plan_notion_integration
+      - docs_v2_development_plan_progressive_disclosure
+      - docs_v2_development_plan_repo_consolidation
+      - docs_v2_development_plan_subproject_matrix
+      - docs_v2_development_plan_v2_development_plan
+    summary: 'community 18: 37 nodes, cohesion 0.077 < 0.15'
+    status: open
+    detected: '2026-07-22'
+  - id: 72c79f3a1f01
+    kind: weak-community
+    node_ids:
+      - docs_integrations_egregore_curve_labs
+      - docs_integrations_egregore_egregore
+      - docs_integrations_egregore_egregore_memory
+      - docs_integrations_egregore_opencode_adapter
+      - docs_integrations_knowledge_knowledge_commons_three_layer_architecture
+      - docs_integrations_knowledge_knowledge_directory
+      - docs_integrations_knowledge_sync_protocols
+      - docs_integrations_koi_blockscience
+      - docs_integrations_koi_koi_bridge
+      - docs_integrations_koi_koi_network
+      - docs_integrations_koi_rid
+      - docs_integrations_opal_human_in_the_loop_review
+      - docs_integrations_opal_meeting_pipeline
+      - docs_integrations_opal_omniharmonic
+      - docs_integrations_opal_opal
+      - docs_integrations_opal_opal_bridge
+      - docs_knowledge_commons_quickref_knowledge_commons_quickref
+      - docs_patterns_autopoietic_agent_coordination
+      - docs_patterns_daily_memory_auto_commit
+      - docs_patterns_federation_through_shared_data
+      - docs_patterns_organizational_os_as_living_system
+      - docs_patterns_two_tier_safety_boundaries
+      - docs_patterns_workfront_based_priority_tracking
+      - docs_practical_knowledge_commons_decision_documentation
+      - docs_practical_knowledge_commons_knowledge_lifecycle
+      - docs_practical_knowledge_commons_practical_knowledge_commons
+      - docs_practical_knowledge_commons_research_quests
+      - docs_practical_knowledge_commons_weekly_knowledge_review
+      - docs_queue_pull_based_task_management
+      - docs_queue_task_queue
+      - docs_setup_paths_egregore_assisted_path
+      - docs_setup_paths_filesystem_native_path
+      - docs_setup_paths_hybrid_path
+      - integrations_opal_changelog_opal_bridge_changelog
+      - integrations_opal_readme_opal_adapter
+      - integrations_opal_readme_opal_integration
+    summary: 'community 19: 36 nodes, cohesion 0.084 < 0.15'
+    status: open
+    detected: '2026-07-22'
+  - id: 172c91327eba
+    kind: weak-community
+    node_ids:
+      - packages_regen_agents_src_agents_bioregional_intelligence_agent_bioregional_intelligence_agent
+      - packages_regen_agents_src_agents_bioregional_intelligence_src_prompts_system_bioregion
+      - >-
+        packages_regen_agents_src_agents_bioregional_intelligence_src_prompts_system_bioregional_intelligence_system_prompt
+      - packages_regen_agents_src_agents_commons_governance_agent_commons_governance_specialist_agent
+      - packages_regen_agents_src_agents_commons_governance_src_prompts_system_commons_governance_system_prompt
+      - packages_regen_agents_src_agents_commons_governance_src_prompts_system_ostrom_design_principles
+      - packages_regen_agents_src_agents_impact_measurement_agent_impact_measurement_analyst_agent
+      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_giin
+      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_impact_measurement_system_prompt
+      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_iris_plus
+      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_sustainable_development_goals
+      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_theory_of_change
+      - packages_webapps_task_manager_index_task_manager_ui
+      - packages_webapps_task_manager_spec_task_manager
+      - repos_readme_linked_repositories
+      - schemas_federation_agent_configuration
+      - schemas_federation_eip_4824
+      - schemas_federation_federation_manifest_v3
+      - schemas_federation_knowledge_commons
+      - skills_bootstrap_interviewer_skill_bootstrap_interviewer
+      - skills_capital_flow_skill_approval_required_mode
+      - skills_capital_flow_skill_capital_flow
+      - skills_funding_scout_references_funding_platforms_funding_platforms_reference
+      - skills_funding_scout_skill_funding_scout
+      - skills_heartbeat_monitor_skill_heartbeat_monitor
+      - skills_idea_scout_skill_idea_lifecycle
+      - skills_idea_scout_skill_idea_scout
+      - skills_knowledge_curator_skill_knowledge_curator
+      - skills_meeting_processor_skill_meeting_processor
+      - skills_org_os_init_skill_org_os_session_lifecycle
+      - skills_research_skill_feynman
+      - skills_research_skill_research
+      - skills_schema_generator_skill_schema_generator
+      - skills_workspace_improver_skill_autoresearch_pattern
+      - skills_workspace_improver_skill_workspace_improver
+    summary: 'community 21: 35 nodes, cohesion 0.097 < 0.15'
+    status: open
+    detected: '2026-07-22'
+  - id: 3322fae4381e
+    kind: weak-community
+    node_ids:
+      - _opencode_command_close_close_command
+      - _opencode_command_initialize_initialize_command
+      - _opencode_commands_close_close_command
+      - _opencode_commands_initialize_initialize_command
+      - _opencode_skills_org_os_init_skill_auto_sync_bookends
+      - _opencode_skills_org_os_init_skill_close_protocol
+      - _opencode_skills_org_os_init_skill_egregore
+      - _opencode_skills_org_os_init_skill_initialization_dashboard
+      - _opencode_skills_org_os_init_skill_org_os_init_skill
+      - _opencode_skills_org_os_init_skill_session_lifecycle
+      - _opencode_skills_org_os_init_skill_visual_language
+      - _superpowers_brainstorm_92907_1784468044_content_aesthetic_adaptive_token_native
+      - _superpowers_brainstorm_92907_1784468044_content_aesthetic_blueprint_schematic
+      - _superpowers_brainstorm_92907_1784468044_content_aesthetic_dark_observatory
+      - _superpowers_brainstorm_92907_1784468044_content_form_constellation_layout
+      - _superpowers_brainstorm_92907_1784468044_content_form_living_tree_layout
+      - _superpowers_brainstorm_92907_1784468044_content_form_tech_tree_layout
+      - _superpowers_brainstorm_92949_1784468050_content_scope_continuum_boundary_notes
+      - _superpowers_brainstorm_92949_1784468050_content_scope_external_only_map
+      - _superpowers_brainstorm_92949_1784468050_content_scope_obsidian_internal_graph
+      - _superpowers_brainstorm_92949_1784468050_content_scope_two_linked_views
+      - _superpowers_brainstorm_92949_1784468050_content_visual_style_constellation_style
+      - _superpowers_brainstorm_92949_1784468050_content_visual_style_orbital_observatory
+      - _superpowers_brainstorm_92949_1784468050_content_visual_style_torchlight_style
+      - data_events_events_registry
+      - data_finances_financial_registry
+      - data_funding_opportunities_funding_opportunities_registry
+      - scripts_initialize_initialize_script
+      - site_src_components_federationgraph_federation_graph_component
+      - skills_funding_scout_funding_scout_skill
+    summary: 'community 31: 30 nodes, cohesion 0.099 < 0.15'
+    status: open
+    detected: '2026-07-22'
+  - id: c9354ee06a85
+    kind: orphan
+    node_ids:
+      - concurrently
+      - inquirer
+      - packages_agents_app_package_bin_org_os_agents
+      - packages_agents_app_package_description
+      - packages_agents_app_package_engines_node
+      - packages_agents_app_package_engines_pnpm
+      - packages_agents_app_package_json_eslint
+      - packages_agents_app_package_json_fastify
+      - packages_agents_app_package_json_fastify_cors
+      - packages_agents_app_package_json_fastify_static
+      - packages_agents_app_package_json_fastify_websocket
+      - packages_agents_app_package_json_glob
+      - packages_agents_app_package_json_js_yaml
+      - packages_agents_app_package_json_pg
+      - packages_agents_app_package_json_prettier
+      - packages_agents_app_package_json_ref_agents
+      - packages_agents_app_package_json_ref_coordination
+      - packages_agents_app_package_json_ref_org_os
+      - packages_agents_app_package_json_ref_paperclip
+      - packages_agents_app_package_json_tsx
+      - packages_agents_app_package_json_types_node
+      - packages_agents_app_package_json_types_pg
+      - packages_agents_app_package_json_typescript
+      - packages_agents_app_package_json_zod
+      - packages_agents_app_package_license
+      - packages_agents_app_package_main
+      - packages_agents_app_package_name
+      - packages_agents_app_package_repository_directory
+      - packages_agents_app_package_repository_type
+      - packages_agents_app_package_repository_url
+      - packages_agents_app_package_scripts_build
+      - packages_agents_app_package_scripts_dev
+      - packages_agents_app_package_scripts_dev_server
+      - packages_agents_app_package_scripts_dev_ui
+      - packages_agents_app_package_scripts_format
+      - packages_agents_app_package_scripts_lint
+      - packages_agents_app_package_scripts_setup
+      - packages_agents_app_package_scripts_sync
+      - packages_agents_app_package_type
+      - packages_agents_app_package_types
+      - packages_agents_app_package_version
+      - react
+      - react_dom
+      - react_router_dom
+      - ref_ai
+      - ref_dashboard
+      - ref_orchestration
+      - types_inquirer
+      - types_js_yaml
+      - types_react
+      - types_react_dom
+      - types_ws
+      - vite
+      - vitejs_plugin_react
+      - ws
+      - zustand
+    summary: 'packages/agents-app/package.json: 56 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 7d3d735f059e
+    kind: orphan
+    node_ids:
+      - koi_net_integration_knowledge_api
+      - koi_net_integration_koi_bridge
+      - packages_koi_opal_bridge_package_author
+      - packages_koi_opal_bridge_package_bin_koi_opal
+      - packages_koi_opal_bridge_package_description
+      - packages_koi_opal_bridge_package_json_chalk
+      - packages_koi_opal_bridge_package_json_commander
+      - packages_koi_opal_bridge_package_json_eslint
+      - packages_koi_opal_bridge_package_json_jest
+      - packages_koi_opal_bridge_package_json_node_fetch
+      - packages_koi_opal_bridge_package_json_ora
+      - packages_koi_opal_bridge_package_json_ref_ai_librarian
+      - packages_koi_opal_bridge_package_json_ref_federation
+      - packages_koi_opal_bridge_package_json_ref_knowledge_graph
+      - packages_koi_opal_bridge_package_json_ref_koi
+      - packages_koi_opal_bridge_package_json_ref_opal
+      - packages_koi_opal_bridge_package_json_ref_organizational_os
+      - packages_koi_opal_bridge_package_json_types_jest
+      - packages_koi_opal_bridge_package_json_types_node
+      - packages_koi_opal_bridge_package_json_typescript
+      - packages_koi_opal_bridge_package_json_yaml
+      - packages_koi_opal_bridge_package_license
+      - packages_koi_opal_bridge_package_main
+      - packages_koi_opal_bridge_package_name
+      - packages_koi_opal_bridge_package_repository_directory
+      - packages_koi_opal_bridge_package_repository_type
+      - packages_koi_opal_bridge_package_repository_url
+      - packages_koi_opal_bridge_package_scripts_build
+      - packages_koi_opal_bridge_package_scripts_dev
+      - packages_koi_opal_bridge_package_scripts_lint
+      - packages_koi_opal_bridge_package_scripts_setup
+      - packages_koi_opal_bridge_package_scripts_sync_loop
+      - packages_koi_opal_bridge_package_scripts_test
+      - packages_koi_opal_bridge_package_scripts_test_integration
+      - packages_koi_opal_bridge_package_types
+      - packages_koi_opal_bridge_package_version
+      - ref_knowledge_commons
+      - ref_regen_agency
+      - typescript_eslint_eslint_plugin
+      - typescript_eslint_parser
+    summary: 'packages/koi-opal-bridge/package.json: 40 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 979c559923c9
+    kind: orphan
+    node_ids:
+      - packages_paperclip_agents_app_package_bin_paperclip_setup
+      - packages_paperclip_agents_app_package_description
+      - packages_paperclip_agents_app_package_engines_node
+      - packages_paperclip_agents_app_package_json_eslint
+      - packages_paperclip_agents_app_package_json_fastify
+      - packages_paperclip_agents_app_package_json_fastify_cors
+      - packages_paperclip_agents_app_package_json_fastify_static
+      - packages_paperclip_agents_app_package_json_fastify_websocket
+      - packages_paperclip_agents_app_package_json_glob
+      - packages_paperclip_agents_app_package_json_js_yaml
+      - packages_paperclip_agents_app_package_json_pg
+      - packages_paperclip_agents_app_package_json_pino
+      - packages_paperclip_agents_app_package_json_prettier
+      - packages_paperclip_agents_app_package_json_ref_agents
+      - packages_paperclip_agents_app_package_json_ref_coordination
+      - packages_paperclip_agents_app_package_json_ref_org_os
+      - packages_paperclip_agents_app_package_json_ref_paperclip
+      - packages_paperclip_agents_app_package_json_tsx
+      - packages_paperclip_agents_app_package_json_types_node
+      - packages_paperclip_agents_app_package_json_types_pg
+      - packages_paperclip_agents_app_package_json_typescript
+      - packages_paperclip_agents_app_package_json_vitest
+      - packages_paperclip_agents_app_package_json_zod
+      - packages_paperclip_agents_app_package_license
+      - packages_paperclip_agents_app_package_main
+      - packages_paperclip_agents_app_package_name
+      - packages_paperclip_agents_app_package_scripts_build
+      - packages_paperclip_agents_app_package_scripts_dev
+      - packages_paperclip_agents_app_package_scripts_format
+      - packages_paperclip_agents_app_package_scripts_lint
+      - packages_paperclip_agents_app_package_scripts_setup
+      - packages_paperclip_agents_app_package_scripts_start
+      - packages_paperclip_agents_app_package_scripts_test
+      - packages_paperclip_agents_app_package_type
+      - packages_paperclip_agents_app_package_types
+      - packages_paperclip_agents_app_package_version
+      - ref_organizations
+    summary: 'packages/paperclip-agents-app/package.json: 37 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 3e1d66a329ba
+    kind: orphan
+    node_ids:
+      - chokidar
+      - diff
+      - org_os_paperclip_types
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_adapter_import
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_adapter_types
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_description
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_engines_node
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_eslint
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_glob
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_js_yaml
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_pino
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_ref_agents
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_ref_federation
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_ref_org_os
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_types_node
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_typescript
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_vitest
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_zod
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_license
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_main
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_name
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_build
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_clean
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_dev
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_lint
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_test
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_sync_import
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_sync_types
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_type
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_types
+      - packages_paperclip_agents_app_packages_org_os_bridge_package_version
+      - ref_bridge
+      - ref_sync
+      - xxhash_wasm
+    summary: 'packages/paperclip-agents-app/packages/org-os-bridge/package.json: 34 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 3b494f57e4f8
+    kind: orphan
+    node_ids:
+      - packages_koi_bridge_package_bin_koi_bridge
+      - packages_koi_bridge_package_description
+      - packages_koi_bridge_package_json_commander
+      - packages_koi_bridge_package_json_jest
+      - packages_koi_bridge_package_json_node_fetch
+      - packages_koi_bridge_package_json_ref_federation
+      - packages_koi_bridge_package_json_ref_knowledge_graph
+      - packages_koi_bridge_package_json_ref_koi
+      - packages_koi_bridge_package_json_ref_organizational_os
+      - packages_koi_bridge_package_json_types_node
+      - packages_koi_bridge_package_json_typescript
+      - packages_koi_bridge_package_license
+      - packages_koi_bridge_package_main
+      - packages_koi_bridge_package_name
+      - packages_koi_bridge_package_scripts_build
+      - packages_koi_bridge_package_scripts_setup
+      - packages_koi_bridge_package_scripts_test
+      - packages_koi_bridge_package_types
+      - packages_koi_bridge_package_version
+      - ref_distributed
+      - ref_koi_net
+    summary: 'packages/koi-bridge/package.json: 21 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 7d579fa8fbf0
+    kind: orphan
+    node_ids:
+      - skills_funding_scout_references_funding_platforms_arbitrum_grants
+      - skills_funding_scout_references_funding_platforms_artisan
+      - skills_funding_scout_references_funding_platforms_celo_pg
+      - skills_funding_scout_references_funding_platforms_funding_platforms_reference
+      - skills_funding_scout_references_funding_platforms_gitcoin
+      - skills_funding_scout_references_funding_platforms_impact_stake
+      - skills_funding_scout_references_funding_platforms_octant
+      - skills_funding_scout_references_funding_platforms_spinach
+      - skills_funding_scout_references_funding_platforms_stream_vote
+      - skills_funding_scout_references_funding_platforms_superfluid_campaigns
+    summary: 'skills/funding-scout/references/funding-platforms.yaml: 10 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 6f735c3516cc
+    kind: orphan
+    node_ids:
+      - docs_patterns_autopoietic_agent_coordination
+      - docs_patterns_daily_memory_auto_commit
+      - docs_patterns_nine_step_deterministic_startup_sequence
+      - docs_patterns_subagent_delegation_with_model_tiers
+      - docs_patterns_success_metrics_next_actions
+      - docs_patterns_two_tier_safety_boundaries
+      - docs_patterns_workfront_based_priority_tracking
+    summary: 'docs/PATTERNS.md: 7 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: dbbddc37feca
+    kind: orphan
+    node_ids:
+      - research_intelligence_plan_bread_coop
+      - research_intelligence_plan_coordinape
+      - research_intelligence_plan_cost_tiered_model_allocation
+      - research_intelligence_plan_discourse
+      - research_intelligence_plan_gitcoin
+      - research_intelligence_plan_research_swarms
+    summary: 'RESEARCH_INTELLIGENCE_PLAN.md: 6 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 2fdb37521daf
+    kind: orphan
+    node_ids:
+      - docs_skill_specification_bootstrap_interviewer
+      - docs_skill_specification_capital_flow
+      - docs_skill_specification_funding_scout
+      - docs_skill_specification_meeting_processor
+      - docs_skill_specification_skill_promotion_protocol
+    summary: 'docs/SKILL-SPECIFICATION.md: 5 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: f6dc64b25d4c
+    kind: orphan
+    node_ids:
+      - opencode_opencode_schema
+      - ref_agents_md
+      - ref_masterprompt_md
+      - ref_skills_skill_md
+    summary: '.opencode/opencode.json: 4 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: adf3f645f074
+    kind: orphan
+    node_ids:
+      - masterplan_boundaries
+      - masterplan_development_flow
+      - masterplan_regen_toolkit
+    summary: 'MASTERPLAN.md: 3 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 463871cf198a
+    kind: orphan
+    node_ids:
+      - docs_architecture_agent_layer
+      - docs_architecture_federation_layer
+      - docs_architecture_integration_layer
+    summary: 'docs/ARCHITECTURE.md: 3 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 66820f6fa0d6
+    kind: orphan
+    node_ids:
+      - docs_v2_development_plan_karpathy_autoresearch
+      - docs_v2_development_plan_repo_consolidation
+      - docs_v2_development_plan_subproject_matrix
+    summary: 'docs/V2-DEVELOPMENT-PLAN.md: 3 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: d8663625d23c
+    kind: orphan
+    node_ids:
+      - docs_integrations_egregore_curve_labs
+      - docs_integrations_egregore_egregore_memory
+      - docs_integrations_egregore_opencode_adapter
+    summary: 'docs/integrations/egregore.md: 3 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 4cda76171b44
+    kind: orphan
+    node_ids:
+      - integrations_opal_docs_api_reference_knowledge_curator_skill
+      - integrations_opal_docs_api_reference_meeting_processor_skill
+      - integrations_opal_docs_api_reference_opal_bridge_cli
+    summary: 'integrations/opal/docs/API-REFERENCE.md: 3 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: c91f73c75be4
+    kind: orphan
+    node_ids:
+      - packages_koi_opal_bridge_readme_copyfair
+      - packages_koi_opal_bridge_readme_cosmo_local_knowledge
+      - packages_koi_opal_bridge_readme_human_in_the_loop_review
+    summary: 'packages/koi-opal-bridge/README.md: 3 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: c7f365f022a6
+    kind: orphan
+    node_ids:
+      - packages_agents_app_scripts_cli_rationale_43
+      - packages_agents_app_scripts_cli_rationale_53
+    summary: 'packages/agents-app/scripts/cli.mjs: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 14363b35e1e1
+    kind: orphan
+    node_ids:
+      - bootstrap_ongoing_learning
+      - bootstrap_source_ingestion
+    summary: 'BOOTSTRAP.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: eb36531a5ad8
+    kind: orphan
+    node_ids:
+      - data_governance_governance_infrastructure
+      - data_governance_governance_registry
+    summary: 'data/governance.yaml: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: bf56e712cf7f
+    kind: orphan
+    node_ids:
+      - _superpowers_brainstorm_92907_1784468044_content_form_living_tree_layout
+      - _superpowers_brainstorm_92907_1784468044_content_form_tech_tree_layout
+    summary: '.superpowers/brainstorm/92907-1784468044/content/form.html: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 66c33a8b9c86
+    kind: orphan
+    node_ids:
+      - _superpowers_brainstorm_92949_1784468050_content_scope_continuum_boundary_notes
+      - _superpowers_brainstorm_92949_1784468050_content_scope_external_only_map
+    summary: '.superpowers/brainstorm/92949-1784468050/content/scope.html: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 4cf04afbabc7
+    kind: orphan
+    node_ids:
+      - docs_agentic_architecture_safety_policy
+      - docs_agentic_architecture_startup_sequence
+    summary: 'docs/AGENTIC-ARCHITECTURE.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: ab37b3a72d14
+    kind: orphan
+    node_ids:
+      - docs_autoresearch_editable_surface
+      - docs_autoresearch_experiment_logging
+    summary: 'docs/AUTORESEARCH.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: bd0249669615
+    kind: orphan
+    node_ids:
+      - docs_commands_sync_command
+      - docs_commands_validate_schemas_command
+    summary: 'docs/COMMANDS.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: e6dbccc914b9
+    kind: orphan
+    node_ids:
+      - docs_packages_coordination_package
+      - docs_packages_finances_package
+    summary: 'docs/PACKAGES.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 94b8651fb2e5
+    kind: orphan
+    node_ids:
+      - docs_integrations_koi_blockscience
+      - docs_integrations_koi_rid
+    summary: 'docs/integrations/koi.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 78b18a06dbdf
+    kind: orphan
+    node_ids:
+      - docs_integrations_opal_meeting_pipeline
+      - docs_integrations_opal_omniharmonic
+    summary: 'docs/integrations/opal.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 7efa89c4a2a4
+    kind: orphan
+    node_ids:
+      - integrations_opal_docs_architecture_meetingpipeline
+      - integrations_opal_docs_architecture_solo_mode
+    summary: 'integrations/opal/docs/ARCHITECTURE.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 7ae55d402c7f
+    kind: orphan
+    node_ids:
+      - packages_regen_agents_readme_funding_scout
+      - packages_regen_agents_readme_super_agent
+    summary: 'packages/regen-agents/README.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 2b26ff835dfc
+    kind: orphan
+    node_ids:
+      - packages_regen_agents_implementation_summary_iris_plus
+      - packages_regen_agents_implementation_summary_ostrom_principles
+    summary: 'packages/regen-agents/IMPLEMENTATION_SUMMARY.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 5357cb5c23ca
+    kind: orphan
+    node_ids:
+      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_sustainable_development_goals
+      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_theory_of_change
+    summary: 'packages/regen-agents/src/agents/impact-measurement/src/prompts/system.md: 2 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 0b17935655ad
+    kind: orphan
+    node_ids:
+      - agents_knowledge_commons
+    summary: 'AGENTS.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 206954674f32
+    kind: orphan
+    node_ids:
+      - paperclip_deployment_guide_deployment_guide
+    summary: 'PAPERCLIP_DEPLOYMENT_GUIDE.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 9a756f82dad9
+    kind: orphan
+    node_ids:
+      - version_semantic_versioning
+    summary: 'VERSION.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 093b10f56f54
+    kind: orphan
+    node_ids:
+      - _opencode_agents_build_build_agent
+    summary: '.opencode/agents/build.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: bc55bd3d2264
+    kind: orphan
+    node_ids:
+      - _opencode_agents_intake_routing_map
+    summary: '.opencode/agents/intake.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: ea30abcfdd5a
+    kind: orphan
+    node_ids:
+      - skills_funding_scout_funding_scout_skill
+    summary: 'data/funding-opportunities.yaml: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: a7bfd3e74af1
+    kind: orphan
+    node_ids:
+      - data_assets_assets_registry
+    summary: 'data/assets.yaml: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 067cb5f4af02
+    kind: orphan
+    node_ids:
+      - data_channels_channels_registry
+    summary: 'data/channels.yaml: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 1a33a113e5e8
+    kind: orphan
+    node_ids:
+      - data_events_events_registry
+    summary: 'data/events.yaml: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: efb0f063310a
+    kind: orphan
+    node_ids:
+      - data_finances_financial_registry
+    summary: 'data/finances.yaml: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 128532bf4f9d
+    kind: orphan
+    node_ids:
+      - docs_agent_modes_default_mode
+    summary: 'docs/AGENT-MODES.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 58132b92ecae
+    kind: orphan
+    node_ids:
+      - docs_chat_interface_privacy_rules
+    summary: 'docs/CHAT-INTERFACE.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 499d97ad77d7
+    kind: orphan
+    node_ids:
+      - docs_eip4824_guide_daouri
+    summary: 'docs/EIP4824-GUIDE.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: b2cec9fb606d
+    kind: orphan
+    node_ids:
+      - docs_federation_hub_role
+    summary: 'docs/FEDERATION.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: bb3b9f60fcc3
+    kind: orphan
+    node_ids:
+      - docs_file_structure_validate_structure
+    summary: 'docs/FILE-STRUCTURE.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 4c66f9482668
+    kind: orphan
+    node_ids:
+      - docs_idea_hatching_compensation_models
+    summary: 'docs/IDEA-HATCHING.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 2d3414a77e58
+    kind: orphan
+    node_ids:
+      - docs_knowledge_initiation_knowledge_audit
+    summary: 'docs/KNOWLEDGE-INITIATION.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 6fc6194e7824
+    kind: orphan
+    node_ids:
+      - docs_plans_plan_lifecycle
+    summary: 'docs/PLANS.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 85615c695f0e
+    kind: orphan
+    node_ids:
+      - docs_queue_pull_based_task_management
+    summary: 'docs/QUEUE.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 027ec22eeea1
+    kind: orphan
+    node_ids:
+      - docs_setup_paths_filesystem_native_path
+    summary: 'docs/SETUP-PATHS.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: d9e99728a44c
+    kind: orphan
+    node_ids:
+      - docs_tool_setup_github_mcp
+    summary: 'docs/TOOL-SETUP.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 794992b97e00
+    kind: orphan
+    node_ids:
+      - integrations_opal_tests_fixtures_sample_meeting_transcript_distributed_coordination
+    summary: 'integrations/opal/tests/fixtures/sample-meeting-transcript.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: c8795031738f
+    kind: orphan
+    node_ids:
+      - packages_egregore_core_readme_curve_labs
+    summary: 'packages/egregore-core/README.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 0ba0702c786a
+    kind: orphan
+    node_ids:
+      - packages_egregore_core_opencode_adapter_readme_command_mapping
+    summary: 'packages/egregore-core/opencode-adapter/README.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: e2495b3c48dc
+    kind: orphan
+    node_ids:
+      - packages_koi_bridge_readme_koi_coordinator
+    summary: 'packages/koi-bridge/README.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 98fc9b58c6f6
+    kind: orphan
+    node_ids:
+      - packages_opal_bridge__github_workflows_opal_bridge_federated_deployment
+    summary: 'packages/opal-bridge/.github/workflows/opal-bridge.yml: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 9eb4c020c48d
+    kind: orphan
+    node_ids:
+      - packages_operations_meetings_readme_action_item_format
+    summary: 'packages/operations/meetings/README.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: c8719082b167
+    kind: orphan
+    node_ids:
+      - packages_operations_meetings_templates_retrospective_template_retrospective_template
+    summary: 'packages/operations/meetings/templates/retrospective-template.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: a6769fd0e223
+    kind: orphan
+    node_ids:
+      - packages_operations_meetings_templates_standup_template_standup_template
+    summary: 'packages/operations/meetings/templates/standup-template.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 7b659af9c033
+    kind: orphan
+    node_ids:
+      - packages_regen_agents_src_agents_agriculture_researcher_src_prompts_system_evidence_hierarchy
+    summary: 'packages/regen-agents/src/agents/agriculture-researcher/src/prompts/system.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 41e835e0611e
+    kind: orphan
+    node_ids:
+      - packages_regen_agents_src_agents_bioregional_intelligence_src_prompts_system_bioregion
+    summary: 'packages/regen-agents/src/agents/bioregional-intelligence/src/prompts/system.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: a3d8ce1f1dca
+    kind: orphan
+    node_ids:
+      - repos_readme_linked_repositories
+    summary: 'repos/README.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 77e6dffc8b71
+    kind: orphan
+    node_ids:
+      - skills_idea_scout_skill_idea_lifecycle
+    summary: 'skills/idea-scout/SKILL.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: e1696452c54f
+    kind: orphan
+    node_ids:
+      - skills_research_skill_feynman
+    summary: 'skills/research/SKILL.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: ccca623b6466
+    kind: orphan
+    node_ids:
+      - skills_workspace_improver_skill_autoresearch_pattern
+    summary: 'skills/workspace-improver/SKILL.md: 1 weakly-connected node(s)'
+    status: open
+    detected: '2026-07-22'
+  - id: 3b7a644e4701
+    kind: ambiguous-edge
+    node_ids:
+      - _opencode_agents_build_build_agent
+      - agents_agent_guide
+    summary: _opencode_agents_build_build_agent —references→ agents_agent_guide is AMBIGUOUS (score 0.3)
+    status: open
+    detected: '2026-07-22'
   - id: da010e9917e8
     kind: weak-community
     node_ids:
@@ -417,61 +1439,6 @@ gaps:
     summary: 'community 5: 49 nodes, cohesion 0.073 < 0.15'
     status: open
     detected: '2026-07-22'
-  - id: ba50310ade6e
-    kind: weak-community
-    node_ids:
-      - _claude_commands_close_close_command
-      - _claude_commands_initialize_initialize_command
-      - _github_workflows_generate_schemas_workflow
-      - _opencode_agents_build_build_agent
-      - agents_agent_dojo
-      - agents_agent_guide
-      - agents_autopoietic_coordination
-      - agents_knowledge_commons
-      - agents_memory_system
-      - agents_safety_policy
-      - agents_session_startup_sequence
-      - bootstrap_first_run_onboarding
-      - bootstrap_guided_interview
-      - bootstrap_ongoing_learning
-      - changelog_change_history
-      - claude_claude_code_instructions
-      - dashboard_dashboard_config
-      - federation_federation_manifest
-      - heartbeat_active_monitoring
-      - identity_organizational_identity
-      - masterplan_boundaries
-      - masterplan_development_flow
-      - masterplan_eip_4824
-      - masterplan_framework_instance_feedback_loop
-      - masterplan_framework_masterplan
-      - masterplan_refi_bcn_os
-      - masterplan_refi_dao_os
-      - masterplan_regen_coordination_os
-      - memory_memory_index
-      - paperclip_deployment_guide_deployment_guide
-      - paperclip_deployment_guide_paperclip_agents_app
-      - paperclip_deployment_guide_real_time_sync
-      - readme_org_os_template
-      - research_intelligence_plan_bread_coop
-      - research_intelligence_plan_coordinape
-      - research_intelligence_plan_discourse
-      - research_intelligence_plan_egregore
-      - research_intelligence_plan_gitcoin
-      - research_intelligence_plan_radicle
-      - research_intelligence_plan_regen_commons
-      - research_intelligence_plan_research_plan
-      - soul_core_values
-      - soul_organizational_soul
-      - sync_guide_github_sync_guide
-      - sync_guide_npm_run_sync
-      - tools_local_tool_notes
-      - user_operator_profile
-      - version_semantic_versioning
-      - version_version_tracking
-    summary: 'community 4: 49 nodes, cohesion 0.070 < 0.15'
-    status: open
-    detected: '2026-07-22'
   - id: f9bbd07e887b
     kind: weak-community
     node_ids:
@@ -717,57 +1684,6 @@ gaps:
       - packages_paperclip_agents_app_src_types_updatetaskdto
       - packages_paperclip_agents_app_src_types_upstreamsource
     summary: 'community 9: 46 nodes, cohesion 0.049 < 0.15'
-    status: open
-    detected: '2026-07-22'
-  - id: 093cc3741b21
-    kind: weak-community
-    node_ids:
-      - integrations_opal_docs_api_reference_api_reference
-      - integrations_opal_docs_api_reference_extractedentity
-      - integrations_opal_docs_api_reference_funding_scout_skill
-      - integrations_opal_docs_api_reference_knowledge_curator_skill
-      - integrations_opal_docs_api_reference_meeting_processor_skill
-      - integrations_opal_docs_api_reference_opal_bridge_cli
-      - integrations_opal_docs_api_reference_opaladapter
-      - integrations_opal_docs_architecture_commons_mode
-      - integrations_opal_docs_architecture_entitymapper
-      - integrations_opal_docs_architecture_gitsync
-      - integrations_opal_docs_architecture_human_review_queue
-      - integrations_opal_docs_architecture_koi
-      - integrations_opal_docs_architecture_meetingpipeline
-      - integrations_opal_docs_architecture_opal
-      - integrations_opal_docs_architecture_opal_bridge
-      - integrations_opal_docs_architecture_solo_mode
-      - integrations_opal_docs_architecture_system_architecture
-      - integrations_opal_docs_faq_faq
-      - integrations_opal_docs_setup_guide_setup_guide
-      - integrations_opal_docs_workflows_federation_sync
-      - integrations_opal_docs_workflows_research_quest
-      - integrations_opal_docs_workflows_team_handoff
-      - integrations_opal_docs_workflows_workflows
-      - integrations_opal_testing_summary_opal_bridge_testing_validation
-      - integrations_opal_tests_fixtures_opal_config_mock_opal_configuration
-      - integrations_opal_tests_fixtures_org_os_data_structures_org_os_data_structures
-      - integrations_opal_tests_fixtures_sample_meeting_transcript_circular_funding_models
-      - integrations_opal_tests_fixtures_sample_meeting_transcript_distributed_coordination
-      - integrations_opal_tests_fixtures_sample_meeting_transcript_quadratic_voting
-      - integrations_opal_tests_fixtures_sample_meeting_transcript_sample_meeting_transcript
-      - integrations_opal_tests_readme_opal_bridge_test_suite
-      - knowledge_index_agent_dojo
-      - knowledge_index_knowledge_commons_index
-      - memory_readme_memory_directory
-      - packages_agents_app__paperclip_config_paperclip_configuration
-      - packages_agents_app__paperclip_templates_agent_agent_template
-      - packages_agents_app__paperclip_templates_task_task_template
-      - packages_agents_app_agents_agents_application_for_refi_barcelona
-      - packages_agents_app_docs_api_reference_agents_app_api_reference
-      - packages_agents_app_docs_implementation_checklist_implementation_checklist
-      - packages_agents_app_federation_agents_app_federation_config
-      - packages_agents_app_readme_agents_app
-      - packages_agents_app_readme_paperclip
-      - packages_agents_app_src_ui_index_agents_app_ui_shell
-      - packages_dashboard_dashboard_refi_bcn_dashboard
-    summary: 'community 10: 45 nodes, cohesion 0.073 < 0.15'
     status: open
     detected: '2026-07-22'
   - id: a51c46322ae2
@@ -1040,52 +1956,6 @@ gaps:
     summary: 'community 15: 40 nodes, cohesion 0.072 < 0.15'
     status: open
     detected: '2026-07-22'
-  - id: 99245b78949a
-    kind: weak-community
-    node_ids:
-      - packages_egregore_core_opencode_adapter_readme_command_mapping
-      - packages_egregore_core_opencode_adapter_readme_opencode_adapter
-      - packages_egregore_core_readme_curve_labs
-      - packages_egregore_core_readme_egregore
-      - packages_koi_bridge_readme_koi_bridge
-      - packages_koi_bridge_readme_koi_coordinator
-      - packages_koi_bridge_readme_koi_net
-      - packages_koi_opal_bridge_readme_agent_dojo
-      - packages_koi_opal_bridge_readme_copyfair
-      - packages_koi_opal_bridge_readme_cosmo_local_knowledge
-      - packages_koi_opal_bridge_readme_human_in_the_loop_review
-      - packages_koi_opal_bridge_readme_koi_opal_bridge
-      - packages_koi_opal_bridge_readme_opal
-      - packages_koi_opal_bridge_readme_regen_agency
-      - packages_koi_opal_bridge_readme_rid
-      - packages_opal_bridge__github_workflows_opal_bridge_federated_deployment
-      - packages_opal_bridge__github_workflows_opal_bridge_opal_bridge_ci_cd
-      - packages_paperclip_agents_app_federation_federation_config
-      - packages_paperclip_agents_app_implementation_complete_file_watcher
-      - packages_paperclip_agents_app_implementation_complete_para_method
-      - packages_paperclip_agents_app_implementation_complete_sync_orchestrator
-      - packages_paperclip_agents_app_implementation_complete_websocket_server
-      - packages_paperclip_agents_app_packages_org_os_bridge_readme_org_os_bridge
-      - packages_paperclip_agents_app_packages_org_os_bridge_readme_sync_service
-      - packages_paperclip_agents_app_phase1_complete_org_os_adapter
-      - packages_paperclip_agents_app_readme_paperclip_agents_app
-      - packages_paperclip_agents_app_templates_docker_compose_docker_compose
-      - packages_regen_agents_implementation_summary_bioregional_intelligence_agent
-      - packages_regen_agents_implementation_summary_commons_governance_specialist
-      - packages_regen_agents_implementation_summary_impact_measurement_analyst
-      - packages_regen_agents_implementation_summary_iris_plus
-      - packages_regen_agents_implementation_summary_ostrom_principles
-      - packages_regen_agents_readme_funding_scout
-      - packages_regen_agents_readme_knowledge_curator
-      - packages_regen_agents_readme_meeting_processor
-      - packages_regen_agents_readme_regen_agents
-      - packages_regen_agents_readme_super_agent
-      - packages_regen_agents_src_agents_agriculture_researcher_agent_regenerative_agriculture_researcher
-      - packages_regen_agents_src_agents_agriculture_researcher_src_prompts_system_evidence_hierarchy
-      - packages_regen_agents_src_agents_agriculture_researcher_src_prompts_system_system_prompt
-    summary: 'community 16: 40 nodes, cohesion 0.063 < 0.15'
-    status: open
-    detected: '2026-07-22'
   - id: 7890c06d3013
     kind: weak-community
     node_ids:
@@ -1143,91 +2013,6 @@ gaps:
     summary: 'community 17: 38 nodes, cohesion 0.110 < 0.15'
     status: open
     detected: '2026-07-22'
-  - id: 405c1a61cde7
-    kind: weak-community
-    node_ids:
-      - docs_agent_plans_federation_protocol_federation_protocol
-      - docs_agent_plans_framework_dashboard_template_reusable_dashboard_package_template
-      - docs_agent_plans_future_instance_specs_future_instance_specs
-      - docs_agent_plans_non_tech_onboarding_non_tech_onboarding
-      - docs_agent_plans_queue_plan_queue
-      - docs_agent_plans_v2_phase1_framework_v2_phase1_framework
-      - docs_patterns_nine_step_deterministic_startup_sequence
-      - docs_plans_plan_lifecycle
-      - docs_plans_plan_management_convention
-      - docs_setup_eip_4824
-      - docs_setup_setup_guide
-      - docs_skill_specification_bootstrap_interviewer
-      - docs_skill_specification_capital_flow
-      - docs_skill_specification_funding_scout
-      - docs_skill_specification_heartbeat_monitor
-      - docs_skill_specification_idea_scout
-      - docs_skill_specification_knowledge_curator
-      - docs_skill_specification_meeting_processor
-      - docs_skill_specification_schema_generator
-      - docs_skill_specification_skill_discovery
-      - docs_skill_specification_skill_promotion_protocol
-      - docs_skill_specification_skill_specification
-      - docs_skill_specification_three_tier_skill_model
-      - docs_skill_specification_workspace_improver
-      - docs_tool_setup_github_mcp
-      - docs_tool_setup_notion_mcp_configuration
-      - docs_tool_setup_notion_yaml_sync
-      - docs_tool_setup_tool_setup
-      - docs_v2_development_plan_autoresearch_pattern
-      - docs_v2_development_plan_idea_hatching_pipeline
-      - docs_v2_development_plan_karpathy_autoresearch
-      - docs_v2_development_plan_masterplan_md
-      - docs_v2_development_plan_notion_integration
-      - docs_v2_development_plan_progressive_disclosure
-      - docs_v2_development_plan_repo_consolidation
-      - docs_v2_development_plan_subproject_matrix
-      - docs_v2_development_plan_v2_development_plan
-    summary: 'community 18: 37 nodes, cohesion 0.077 < 0.15'
-    status: open
-    detected: '2026-07-22'
-  - id: 72c79f3a1f01
-    kind: weak-community
-    node_ids:
-      - docs_integrations_egregore_curve_labs
-      - docs_integrations_egregore_egregore
-      - docs_integrations_egregore_egregore_memory
-      - docs_integrations_egregore_opencode_adapter
-      - docs_integrations_knowledge_knowledge_commons_three_layer_architecture
-      - docs_integrations_knowledge_knowledge_directory
-      - docs_integrations_knowledge_sync_protocols
-      - docs_integrations_koi_blockscience
-      - docs_integrations_koi_koi_bridge
-      - docs_integrations_koi_koi_network
-      - docs_integrations_koi_rid
-      - docs_integrations_opal_human_in_the_loop_review
-      - docs_integrations_opal_meeting_pipeline
-      - docs_integrations_opal_omniharmonic
-      - docs_integrations_opal_opal
-      - docs_integrations_opal_opal_bridge
-      - docs_knowledge_commons_quickref_knowledge_commons_quickref
-      - docs_patterns_autopoietic_agent_coordination
-      - docs_patterns_daily_memory_auto_commit
-      - docs_patterns_federation_through_shared_data
-      - docs_patterns_organizational_os_as_living_system
-      - docs_patterns_two_tier_safety_boundaries
-      - docs_patterns_workfront_based_priority_tracking
-      - docs_practical_knowledge_commons_decision_documentation
-      - docs_practical_knowledge_commons_knowledge_lifecycle
-      - docs_practical_knowledge_commons_practical_knowledge_commons
-      - docs_practical_knowledge_commons_research_quests
-      - docs_practical_knowledge_commons_weekly_knowledge_review
-      - docs_queue_pull_based_task_management
-      - docs_queue_task_queue
-      - docs_setup_paths_egregore_assisted_path
-      - docs_setup_paths_filesystem_native_path
-      - docs_setup_paths_hybrid_path
-      - integrations_opal_changelog_opal_bridge_changelog
-      - integrations_opal_readme_opal_adapter
-      - integrations_opal_readme_opal_integration
-    summary: 'community 19: 36 nodes, cohesion 0.084 < 0.15'
-    status: open
-    detected: '2026-07-22'
   - id: c0a7ecf81484
     kind: weak-community
     node_ids:
@@ -1267,48 +2052,6 @@ gaps:
       - packages_paperclip_agents_app_packages_org_os_bridge_tsconfig_paths_org_os_org_os_bridge
       - packages_paperclip_agents_app_packages_org_os_bridge_tsconfig_references
     summary: 'community 20: 35 nodes, cohesion 0.059 < 0.15'
-    status: open
-    detected: '2026-07-22'
-  - id: 172c91327eba
-    kind: weak-community
-    node_ids:
-      - packages_regen_agents_src_agents_bioregional_intelligence_agent_bioregional_intelligence_agent
-      - packages_regen_agents_src_agents_bioregional_intelligence_src_prompts_system_bioregion
-      - >-
-        packages_regen_agents_src_agents_bioregional_intelligence_src_prompts_system_bioregional_intelligence_system_prompt
-      - packages_regen_agents_src_agents_commons_governance_agent_commons_governance_specialist_agent
-      - packages_regen_agents_src_agents_commons_governance_src_prompts_system_commons_governance_system_prompt
-      - packages_regen_agents_src_agents_commons_governance_src_prompts_system_ostrom_design_principles
-      - packages_regen_agents_src_agents_impact_measurement_agent_impact_measurement_analyst_agent
-      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_giin
-      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_impact_measurement_system_prompt
-      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_iris_plus
-      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_sustainable_development_goals
-      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_theory_of_change
-      - packages_webapps_task_manager_index_task_manager_ui
-      - packages_webapps_task_manager_spec_task_manager
-      - repos_readme_linked_repositories
-      - schemas_federation_agent_configuration
-      - schemas_federation_eip_4824
-      - schemas_federation_federation_manifest_v3
-      - schemas_federation_knowledge_commons
-      - skills_bootstrap_interviewer_skill_bootstrap_interviewer
-      - skills_capital_flow_skill_approval_required_mode
-      - skills_capital_flow_skill_capital_flow
-      - skills_funding_scout_references_funding_platforms_funding_platforms_reference
-      - skills_funding_scout_skill_funding_scout
-      - skills_heartbeat_monitor_skill_heartbeat_monitor
-      - skills_idea_scout_skill_idea_lifecycle
-      - skills_idea_scout_skill_idea_scout
-      - skills_knowledge_curator_skill_knowledge_curator
-      - skills_meeting_processor_skill_meeting_processor
-      - skills_org_os_init_skill_org_os_session_lifecycle
-      - skills_research_skill_feynman
-      - skills_research_skill_research
-      - skills_schema_generator_skill_schema_generator
-      - skills_workspace_improver_skill_autoresearch_pattern
-      - skills_workspace_improver_skill_workspace_improver
-    summary: 'community 21: 35 nodes, cohesion 0.097 < 0.15'
     status: open
     detected: '2026-07-22'
   - id: 15b8e7092680
@@ -1739,42 +2482,6 @@ gaps:
       - packages_paperclip_agents_app_src_server_sync_orchestrator_syncorchestrator_syncfromapi
       - packages_paperclip_agents_app_src_server_sync_orchestrator_syncorchestratorconfig
     summary: 'community 33: 30 nodes, cohesion 0.094 < 0.15'
-    status: open
-    detected: '2026-07-22'
-  - id: 3322fae4381e
-    kind: weak-community
-    node_ids:
-      - _opencode_command_close_close_command
-      - _opencode_command_initialize_initialize_command
-      - _opencode_commands_close_close_command
-      - _opencode_commands_initialize_initialize_command
-      - _opencode_skills_org_os_init_skill_auto_sync_bookends
-      - _opencode_skills_org_os_init_skill_close_protocol
-      - _opencode_skills_org_os_init_skill_egregore
-      - _opencode_skills_org_os_init_skill_initialization_dashboard
-      - _opencode_skills_org_os_init_skill_org_os_init_skill
-      - _opencode_skills_org_os_init_skill_session_lifecycle
-      - _opencode_skills_org_os_init_skill_visual_language
-      - _superpowers_brainstorm_92907_1784468044_content_aesthetic_adaptive_token_native
-      - _superpowers_brainstorm_92907_1784468044_content_aesthetic_blueprint_schematic
-      - _superpowers_brainstorm_92907_1784468044_content_aesthetic_dark_observatory
-      - _superpowers_brainstorm_92907_1784468044_content_form_constellation_layout
-      - _superpowers_brainstorm_92907_1784468044_content_form_living_tree_layout
-      - _superpowers_brainstorm_92907_1784468044_content_form_tech_tree_layout
-      - _superpowers_brainstorm_92949_1784468050_content_scope_continuum_boundary_notes
-      - _superpowers_brainstorm_92949_1784468050_content_scope_external_only_map
-      - _superpowers_brainstorm_92949_1784468050_content_scope_obsidian_internal_graph
-      - _superpowers_brainstorm_92949_1784468050_content_scope_two_linked_views
-      - _superpowers_brainstorm_92949_1784468050_content_visual_style_constellation_style
-      - _superpowers_brainstorm_92949_1784468050_content_visual_style_orbital_observatory
-      - _superpowers_brainstorm_92949_1784468050_content_visual_style_torchlight_style
-      - data_events_events_registry
-      - data_finances_financial_registry
-      - data_funding_opportunities_funding_opportunities_registry
-      - scripts_initialize_initialize_script
-      - site_src_components_federationgraph_federation_graph_component
-      - skills_funding_scout_funding_scout_skill
-    summary: 'community 31: 30 nodes, cohesion 0.099 < 0.15'
     status: open
     detected: '2026-07-22'
   - id: 9c1b738ccc07
@@ -2497,68 +3204,6 @@ gaps:
     summary: 'community 69: 15 nodes, cohesion 0.133 < 0.15'
     status: open
     detected: '2026-07-22'
-  - id: c9354ee06a85
-    kind: orphan
-    node_ids:
-      - concurrently
-      - inquirer
-      - packages_agents_app_package_bin_org_os_agents
-      - packages_agents_app_package_description
-      - packages_agents_app_package_engines_node
-      - packages_agents_app_package_engines_pnpm
-      - packages_agents_app_package_json_eslint
-      - packages_agents_app_package_json_fastify
-      - packages_agents_app_package_json_fastify_cors
-      - packages_agents_app_package_json_fastify_static
-      - packages_agents_app_package_json_fastify_websocket
-      - packages_agents_app_package_json_glob
-      - packages_agents_app_package_json_js_yaml
-      - packages_agents_app_package_json_pg
-      - packages_agents_app_package_json_prettier
-      - packages_agents_app_package_json_ref_agents
-      - packages_agents_app_package_json_ref_coordination
-      - packages_agents_app_package_json_ref_org_os
-      - packages_agents_app_package_json_ref_paperclip
-      - packages_agents_app_package_json_tsx
-      - packages_agents_app_package_json_types_node
-      - packages_agents_app_package_json_types_pg
-      - packages_agents_app_package_json_typescript
-      - packages_agents_app_package_json_zod
-      - packages_agents_app_package_license
-      - packages_agents_app_package_main
-      - packages_agents_app_package_name
-      - packages_agents_app_package_repository_directory
-      - packages_agents_app_package_repository_type
-      - packages_agents_app_package_repository_url
-      - packages_agents_app_package_scripts_build
-      - packages_agents_app_package_scripts_dev
-      - packages_agents_app_package_scripts_dev_server
-      - packages_agents_app_package_scripts_dev_ui
-      - packages_agents_app_package_scripts_format
-      - packages_agents_app_package_scripts_lint
-      - packages_agents_app_package_scripts_setup
-      - packages_agents_app_package_scripts_sync
-      - packages_agents_app_package_type
-      - packages_agents_app_package_types
-      - packages_agents_app_package_version
-      - react
-      - react_dom
-      - react_router_dom
-      - ref_ai
-      - ref_dashboard
-      - ref_orchestration
-      - types_inquirer
-      - types_js_yaml
-      - types_react
-      - types_react_dom
-      - types_ws
-      - vite
-      - vitejs_plugin_react
-      - ws
-      - zustand
-    summary: 'packages/agents-app/package.json: 56 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
   - id: e96ad1b0c3d6
     kind: orphan
     node_ids:
@@ -2655,135 +3300,6 @@ gaps:
       - ref_semantic_search
       - ts_jest
     summary: 'integrations/opal/package.json: 40 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 7d3d735f059e
-    kind: orphan
-    node_ids:
-      - koi_net_integration_knowledge_api
-      - koi_net_integration_koi_bridge
-      - packages_koi_opal_bridge_package_author
-      - packages_koi_opal_bridge_package_bin_koi_opal
-      - packages_koi_opal_bridge_package_description
-      - packages_koi_opal_bridge_package_json_chalk
-      - packages_koi_opal_bridge_package_json_commander
-      - packages_koi_opal_bridge_package_json_eslint
-      - packages_koi_opal_bridge_package_json_jest
-      - packages_koi_opal_bridge_package_json_node_fetch
-      - packages_koi_opal_bridge_package_json_ora
-      - packages_koi_opal_bridge_package_json_ref_ai_librarian
-      - packages_koi_opal_bridge_package_json_ref_federation
-      - packages_koi_opal_bridge_package_json_ref_knowledge_graph
-      - packages_koi_opal_bridge_package_json_ref_koi
-      - packages_koi_opal_bridge_package_json_ref_opal
-      - packages_koi_opal_bridge_package_json_ref_organizational_os
-      - packages_koi_opal_bridge_package_json_types_jest
-      - packages_koi_opal_bridge_package_json_types_node
-      - packages_koi_opal_bridge_package_json_typescript
-      - packages_koi_opal_bridge_package_json_yaml
-      - packages_koi_opal_bridge_package_license
-      - packages_koi_opal_bridge_package_main
-      - packages_koi_opal_bridge_package_name
-      - packages_koi_opal_bridge_package_repository_directory
-      - packages_koi_opal_bridge_package_repository_type
-      - packages_koi_opal_bridge_package_repository_url
-      - packages_koi_opal_bridge_package_scripts_build
-      - packages_koi_opal_bridge_package_scripts_dev
-      - packages_koi_opal_bridge_package_scripts_lint
-      - packages_koi_opal_bridge_package_scripts_setup
-      - packages_koi_opal_bridge_package_scripts_sync_loop
-      - packages_koi_opal_bridge_package_scripts_test
-      - packages_koi_opal_bridge_package_scripts_test_integration
-      - packages_koi_opal_bridge_package_types
-      - packages_koi_opal_bridge_package_version
-      - ref_knowledge_commons
-      - ref_regen_agency
-      - typescript_eslint_eslint_plugin
-      - typescript_eslint_parser
-    summary: 'packages/koi-opal-bridge/package.json: 40 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 979c559923c9
-    kind: orphan
-    node_ids:
-      - packages_paperclip_agents_app_package_bin_paperclip_setup
-      - packages_paperclip_agents_app_package_description
-      - packages_paperclip_agents_app_package_engines_node
-      - packages_paperclip_agents_app_package_json_eslint
-      - packages_paperclip_agents_app_package_json_fastify
-      - packages_paperclip_agents_app_package_json_fastify_cors
-      - packages_paperclip_agents_app_package_json_fastify_static
-      - packages_paperclip_agents_app_package_json_fastify_websocket
-      - packages_paperclip_agents_app_package_json_glob
-      - packages_paperclip_agents_app_package_json_js_yaml
-      - packages_paperclip_agents_app_package_json_pg
-      - packages_paperclip_agents_app_package_json_pino
-      - packages_paperclip_agents_app_package_json_prettier
-      - packages_paperclip_agents_app_package_json_ref_agents
-      - packages_paperclip_agents_app_package_json_ref_coordination
-      - packages_paperclip_agents_app_package_json_ref_org_os
-      - packages_paperclip_agents_app_package_json_ref_paperclip
-      - packages_paperclip_agents_app_package_json_tsx
-      - packages_paperclip_agents_app_package_json_types_node
-      - packages_paperclip_agents_app_package_json_types_pg
-      - packages_paperclip_agents_app_package_json_typescript
-      - packages_paperclip_agents_app_package_json_vitest
-      - packages_paperclip_agents_app_package_json_zod
-      - packages_paperclip_agents_app_package_license
-      - packages_paperclip_agents_app_package_main
-      - packages_paperclip_agents_app_package_name
-      - packages_paperclip_agents_app_package_scripts_build
-      - packages_paperclip_agents_app_package_scripts_dev
-      - packages_paperclip_agents_app_package_scripts_format
-      - packages_paperclip_agents_app_package_scripts_lint
-      - packages_paperclip_agents_app_package_scripts_setup
-      - packages_paperclip_agents_app_package_scripts_start
-      - packages_paperclip_agents_app_package_scripts_test
-      - packages_paperclip_agents_app_package_type
-      - packages_paperclip_agents_app_package_types
-      - packages_paperclip_agents_app_package_version
-      - ref_organizations
-    summary: 'packages/paperclip-agents-app/package.json: 37 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 3e1d66a329ba
-    kind: orphan
-    node_ids:
-      - chokidar
-      - diff
-      - org_os_paperclip_types
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_adapter_import
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_adapter_types
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_description
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_engines_node
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_eslint
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_glob
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_js_yaml
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_pino
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_ref_agents
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_ref_federation
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_ref_org_os
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_types_node
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_typescript
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_vitest
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_json_zod
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_license
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_main
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_name
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_build
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_clean
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_dev
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_lint
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_scripts_test
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_sync_import
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_sync_types
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_type
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_types
-      - packages_paperclip_agents_app_packages_org_os_bridge_package_version
-      - ref_bridge
-      - ref_sync
-      - xxhash_wasm
-    summary: 'packages/paperclip-agents-app/packages/org-os-bridge/package.json: 34 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
   - id: 84a266594267
@@ -3048,33 +3564,6 @@ gaps:
       - ref_dom
       - ref_dom_iterable
     summary: 'packages/agents-app/tsconfig.json: 22 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 3b494f57e4f8
-    kind: orphan
-    node_ids:
-      - packages_koi_bridge_package_bin_koi_bridge
-      - packages_koi_bridge_package_description
-      - packages_koi_bridge_package_json_commander
-      - packages_koi_bridge_package_json_jest
-      - packages_koi_bridge_package_json_node_fetch
-      - packages_koi_bridge_package_json_ref_federation
-      - packages_koi_bridge_package_json_ref_knowledge_graph
-      - packages_koi_bridge_package_json_ref_koi
-      - packages_koi_bridge_package_json_ref_organizational_os
-      - packages_koi_bridge_package_json_types_node
-      - packages_koi_bridge_package_json_typescript
-      - packages_koi_bridge_package_license
-      - packages_koi_bridge_package_main
-      - packages_koi_bridge_package_name
-      - packages_koi_bridge_package_scripts_build
-      - packages_koi_bridge_package_scripts_setup
-      - packages_koi_bridge_package_scripts_test
-      - packages_koi_bridge_package_types
-      - packages_koi_bridge_package_version
-      - ref_distributed
-      - ref_koi_net
-    summary: 'packages/koi-bridge/package.json: 21 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
   - id: e6523a8936a0
@@ -3398,22 +3887,6 @@ gaps:
       node(s)
     status: open
     detected: '2026-07-22'
-  - id: 7d579fa8fbf0
-    kind: orphan
-    node_ids:
-      - skills_funding_scout_references_funding_platforms_arbitrum_grants
-      - skills_funding_scout_references_funding_platforms_artisan
-      - skills_funding_scout_references_funding_platforms_celo_pg
-      - skills_funding_scout_references_funding_platforms_funding_platforms_reference
-      - skills_funding_scout_references_funding_platforms_gitcoin
-      - skills_funding_scout_references_funding_platforms_impact_stake
-      - skills_funding_scout_references_funding_platforms_octant
-      - skills_funding_scout_references_funding_platforms_spinach
-      - skills_funding_scout_references_funding_platforms_stream_vote
-      - skills_funding_scout_references_funding_platforms_superfluid_campaigns
-    summary: 'skills/funding-scout/references/funding-platforms.yaml: 10 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
   - id: c1a2f0e630e0
     kind: orphan
     node_ids:
@@ -3596,19 +4069,6 @@ gaps:
     summary: 'scripts/deploy-pages.mjs: 7 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
-  - id: 6f735c3516cc
-    kind: orphan
-    node_ids:
-      - docs_patterns_autopoietic_agent_coordination
-      - docs_patterns_daily_memory_auto_commit
-      - docs_patterns_nine_step_deterministic_startup_sequence
-      - docs_patterns_subagent_delegation_with_model_tiers
-      - docs_patterns_success_metrics_next_actions
-      - docs_patterns_two_tier_safety_boundaries
-      - docs_patterns_workfront_based_priority_tracking
-    summary: 'docs/PATTERNS.md: 7 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
   - id: e2f226cb3113
     kind: orphan
     node_ids:
@@ -3655,18 +4115,6 @@ gaps:
       - packages_regen_agents_src_agents_commons_governance_index_legalwrapperoption
       - packages_regen_agents_src_agents_commons_governance_index_memberrights
     summary: 'packages/regen-agents/src/agents/commons-governance/index.ts: 6 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: dbbddc37feca
-    kind: orphan
-    node_ids:
-      - research_intelligence_plan_bread_coop
-      - research_intelligence_plan_coordinape
-      - research_intelligence_plan_cost_tiered_model_allocation
-      - research_intelligence_plan_discourse
-      - research_intelligence_plan_gitcoin
-      - research_intelligence_plan_research_swarms
-    summary: 'RESEARCH_INTELLIGENCE_PLAN.md: 6 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
   - id: 7a59ed2f099d
@@ -3755,27 +4203,6 @@ gaps:
       - scripts_initialize_formatarg
       - scripts_initialize_rootdir
     summary: 'scripts/initialize.mjs: 5 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 2fdb37521daf
-    kind: orphan
-    node_ids:
-      - docs_skill_specification_bootstrap_interviewer
-      - docs_skill_specification_capital_flow
-      - docs_skill_specification_funding_scout
-      - docs_skill_specification_meeting_processor
-      - docs_skill_specification_skill_promotion_protocol
-    summary: 'docs/SKILL-SPECIFICATION.md: 5 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: f6dc64b25d4c
-    kind: orphan
-    node_ids:
-      - opencode_opencode_schema
-      - ref_agents_md
-      - ref_masterprompt_md
-      - ref_skills_skill_md
-    summary: '.opencode/opencode.json: 4 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
   - id: 7880a81bd3ac
@@ -4079,60 +4506,6 @@ gaps:
     summary: 'packages/regen-agents/src/integrations/knowledge-curator.ts: 3 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
-  - id: adf3f645f074
-    kind: orphan
-    node_ids:
-      - masterplan_boundaries
-      - masterplan_development_flow
-      - masterplan_regen_toolkit
-    summary: 'MASTERPLAN.md: 3 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 463871cf198a
-    kind: orphan
-    node_ids:
-      - docs_architecture_agent_layer
-      - docs_architecture_federation_layer
-      - docs_architecture_integration_layer
-    summary: 'docs/ARCHITECTURE.md: 3 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 66820f6fa0d6
-    kind: orphan
-    node_ids:
-      - docs_v2_development_plan_karpathy_autoresearch
-      - docs_v2_development_plan_repo_consolidation
-      - docs_v2_development_plan_subproject_matrix
-    summary: 'docs/V2-DEVELOPMENT-PLAN.md: 3 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: d8663625d23c
-    kind: orphan
-    node_ids:
-      - docs_integrations_egregore_curve_labs
-      - docs_integrations_egregore_egregore_memory
-      - docs_integrations_egregore_opencode_adapter
-    summary: 'docs/integrations/egregore.md: 3 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 4cda76171b44
-    kind: orphan
-    node_ids:
-      - integrations_opal_docs_api_reference_knowledge_curator_skill
-      - integrations_opal_docs_api_reference_meeting_processor_skill
-      - integrations_opal_docs_api_reference_opal_bridge_cli
-    summary: 'integrations/opal/docs/API-REFERENCE.md: 3 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: c91f73c75be4
-    kind: orphan
-    node_ids:
-      - packages_koi_opal_bridge_readme_copyfair
-      - packages_koi_opal_bridge_readme_cosmo_local_knowledge
-      - packages_koi_opal_bridge_readme_human_in_the_loop_review
-    summary: 'packages/koi-opal-bridge/README.md: 3 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
   - id: fe3528065767
     kind: orphan
     node_ids:
@@ -4148,14 +4521,6 @@ gaps:
       - integrations_opal_tests_opal_adapter_test_mockexecsync
       - integrations_opal_tests_opal_adapter_test_mockspawn
     summary: 'integrations/opal/tests/opal-adapter.test.ts: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: c7f365f022a6
-    kind: orphan
-    node_ids:
-      - packages_agents_app_scripts_cli_rationale_43
-      - packages_agents_app_scripts_cli_rationale_53
-    summary: 'packages/agents-app/scripts/cli.mjs: 2 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
   - id: 86069fb8fa41
@@ -4316,118 +4681,6 @@ gaps:
       - packages_regen_agents_src_integrations_funding_scout_fundingscout_removeopportunity
       - packages_regen_agents_src_integrations_funding_scout_fundingscout_updatematchscore
     summary: 'packages/regen-agents/src/integrations/funding-scout.ts: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 14363b35e1e1
-    kind: orphan
-    node_ids:
-      - bootstrap_ongoing_learning
-      - bootstrap_source_ingestion
-    summary: 'BOOTSTRAP.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: eb36531a5ad8
-    kind: orphan
-    node_ids:
-      - data_governance_governance_infrastructure
-      - data_governance_governance_registry
-    summary: 'data/governance.yaml: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: bf56e712cf7f
-    kind: orphan
-    node_ids:
-      - _superpowers_brainstorm_92907_1784468044_content_form_living_tree_layout
-      - _superpowers_brainstorm_92907_1784468044_content_form_tech_tree_layout
-    summary: '.superpowers/brainstorm/92907-1784468044/content/form.html: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 66c33a8b9c86
-    kind: orphan
-    node_ids:
-      - _superpowers_brainstorm_92949_1784468050_content_scope_continuum_boundary_notes
-      - _superpowers_brainstorm_92949_1784468050_content_scope_external_only_map
-    summary: '.superpowers/brainstorm/92949-1784468050/content/scope.html: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 4cf04afbabc7
-    kind: orphan
-    node_ids:
-      - docs_agentic_architecture_safety_policy
-      - docs_agentic_architecture_startup_sequence
-    summary: 'docs/AGENTIC-ARCHITECTURE.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: ab37b3a72d14
-    kind: orphan
-    node_ids:
-      - docs_autoresearch_editable_surface
-      - docs_autoresearch_experiment_logging
-    summary: 'docs/AUTORESEARCH.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: bd0249669615
-    kind: orphan
-    node_ids:
-      - docs_commands_sync_command
-      - docs_commands_validate_schemas_command
-    summary: 'docs/COMMANDS.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: e6dbccc914b9
-    kind: orphan
-    node_ids:
-      - docs_packages_coordination_package
-      - docs_packages_finances_package
-    summary: 'docs/PACKAGES.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 94b8651fb2e5
-    kind: orphan
-    node_ids:
-      - docs_integrations_koi_blockscience
-      - docs_integrations_koi_rid
-    summary: 'docs/integrations/koi.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 78b18a06dbdf
-    kind: orphan
-    node_ids:
-      - docs_integrations_opal_meeting_pipeline
-      - docs_integrations_opal_omniharmonic
-    summary: 'docs/integrations/opal.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 7efa89c4a2a4
-    kind: orphan
-    node_ids:
-      - integrations_opal_docs_architecture_meetingpipeline
-      - integrations_opal_docs_architecture_solo_mode
-    summary: 'integrations/opal/docs/ARCHITECTURE.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 7ae55d402c7f
-    kind: orphan
-    node_ids:
-      - packages_regen_agents_readme_funding_scout
-      - packages_regen_agents_readme_super_agent
-    summary: 'packages/regen-agents/README.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 2b26ff835dfc
-    kind: orphan
-    node_ids:
-      - packages_regen_agents_implementation_summary_iris_plus
-      - packages_regen_agents_implementation_summary_ostrom_principles
-    summary: 'packages/regen-agents/IMPLEMENTATION_SUMMARY.md: 2 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 5357cb5c23ca
-    kind: orphan
-    node_ids:
-      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_sustainable_development_goals
-      - packages_regen_agents_src_agents_impact_measurement_src_prompts_system_theory_of_change
-    summary: 'packages/regen-agents/src/agents/impact-measurement/src/prompts/system.md: 2 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
   - id: a5dad03046e5
@@ -4666,76 +4919,6 @@ gaps:
     summary: 'site/.astro/types.d.ts: 1 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
-  - id: 0b17935655ad
-    kind: orphan
-    node_ids:
-      - agents_knowledge_commons
-    summary: 'AGENTS.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 206954674f32
-    kind: orphan
-    node_ids:
-      - paperclip_deployment_guide_deployment_guide
-    summary: 'PAPERCLIP_DEPLOYMENT_GUIDE.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 9a756f82dad9
-    kind: orphan
-    node_ids:
-      - version_semantic_versioning
-    summary: 'VERSION.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 093b10f56f54
-    kind: orphan
-    node_ids:
-      - _opencode_agents_build_build_agent
-    summary: '.opencode/agents/build.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: bc55bd3d2264
-    kind: orphan
-    node_ids:
-      - _opencode_agents_intake_routing_map
-    summary: '.opencode/agents/intake.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: ea30abcfdd5a
-    kind: orphan
-    node_ids:
-      - skills_funding_scout_funding_scout_skill
-    summary: 'data/funding-opportunities.yaml: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: a7bfd3e74af1
-    kind: orphan
-    node_ids:
-      - data_assets_assets_registry
-    summary: 'data/assets.yaml: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 067cb5f4af02
-    kind: orphan
-    node_ids:
-      - data_channels_channels_registry
-    summary: 'data/channels.yaml: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 1a33a113e5e8
-    kind: orphan
-    node_ids:
-      - data_events_events_registry
-    summary: 'data/events.yaml: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: efb0f063310a
-    kind: orphan
-    node_ids:
-      - data_finances_financial_registry
-    summary: 'data/finances.yaml: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
   - id: 3beeae22dc5b
     kind: orphan
     node_ids:
@@ -4748,90 +4931,6 @@ gaps:
     node_ids:
       - data_relationships_relationships_registry
     summary: 'data/relationships.yaml: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 128532bf4f9d
-    kind: orphan
-    node_ids:
-      - docs_agent_modes_default_mode
-    summary: 'docs/AGENT-MODES.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 58132b92ecae
-    kind: orphan
-    node_ids:
-      - docs_chat_interface_privacy_rules
-    summary: 'docs/CHAT-INTERFACE.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 499d97ad77d7
-    kind: orphan
-    node_ids:
-      - docs_eip4824_guide_daouri
-    summary: 'docs/EIP4824-GUIDE.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: b2cec9fb606d
-    kind: orphan
-    node_ids:
-      - docs_federation_hub_role
-    summary: 'docs/FEDERATION.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: bb3b9f60fcc3
-    kind: orphan
-    node_ids:
-      - docs_file_structure_validate_structure
-    summary: 'docs/FILE-STRUCTURE.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 4c66f9482668
-    kind: orphan
-    node_ids:
-      - docs_idea_hatching_compensation_models
-    summary: 'docs/IDEA-HATCHING.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 2d3414a77e58
-    kind: orphan
-    node_ids:
-      - docs_knowledge_initiation_knowledge_audit
-    summary: 'docs/KNOWLEDGE-INITIATION.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 6fc6194e7824
-    kind: orphan
-    node_ids:
-      - docs_plans_plan_lifecycle
-    summary: 'docs/PLANS.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 85615c695f0e
-    kind: orphan
-    node_ids:
-      - docs_queue_pull_based_task_management
-    summary: 'docs/QUEUE.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 027ec22eeea1
-    kind: orphan
-    node_ids:
-      - docs_setup_paths_filesystem_native_path
-    summary: 'docs/SETUP-PATHS.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: d9e99728a44c
-    kind: orphan
-    node_ids:
-      - docs_tool_setup_github_mcp
-    summary: 'docs/TOOL-SETUP.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 794992b97e00
-    kind: orphan
-    node_ids:
-      - integrations_opal_tests_fixtures_sample_meeting_transcript_distributed_coordination
-    summary: 'integrations/opal/tests/fixtures/sample-meeting-transcript.md: 1 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
   - id: b21a00d7b988
@@ -4848,55 +4947,6 @@ gaps:
     summary: 'packages/agents-app/src/ui/index.html: 1 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
-  - id: c8795031738f
-    kind: orphan
-    node_ids:
-      - packages_egregore_core_readme_curve_labs
-    summary: 'packages/egregore-core/README.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 0ba0702c786a
-    kind: orphan
-    node_ids:
-      - packages_egregore_core_opencode_adapter_readme_command_mapping
-    summary: 'packages/egregore-core/opencode-adapter/README.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: e2495b3c48dc
-    kind: orphan
-    node_ids:
-      - packages_koi_bridge_readme_koi_coordinator
-    summary: 'packages/koi-bridge/README.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 98fc9b58c6f6
-    kind: orphan
-    node_ids:
-      - packages_opal_bridge__github_workflows_opal_bridge_federated_deployment
-    summary: 'packages/opal-bridge/.github/workflows/opal-bridge.yml: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 9eb4c020c48d
-    kind: orphan
-    node_ids:
-      - packages_operations_meetings_readme_action_item_format
-    summary: 'packages/operations/meetings/README.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: c8719082b167
-    kind: orphan
-    node_ids:
-      - packages_operations_meetings_templates_retrospective_template_retrospective_template
-    summary: 'packages/operations/meetings/templates/retrospective-template.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: a6769fd0e223
-    kind: orphan
-    node_ids:
-      - packages_operations_meetings_templates_standup_template_standup_template
-    summary: 'packages/operations/meetings/templates/standup-template.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
   - id: ce72bf9c91e1
     kind: orphan
     node_ids:
@@ -4904,60 +4954,10 @@ gaps:
     summary: 'packages/paperclip-agents-app/templates/docker-compose.yml: 1 weakly-connected node(s)'
     status: open
     detected: '2026-07-22'
-  - id: 7b659af9c033
-    kind: orphan
-    node_ids:
-      - packages_regen_agents_src_agents_agriculture_researcher_src_prompts_system_evidence_hierarchy
-    summary: 'packages/regen-agents/src/agents/agriculture-researcher/src/prompts/system.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 41e835e0611e
-    kind: orphan
-    node_ids:
-      - packages_regen_agents_src_agents_bioregional_intelligence_src_prompts_system_bioregion
-    summary: 'packages/regen-agents/src/agents/bioregional-intelligence/src/prompts/system.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
   - id: 84af664447da
     kind: orphan
     node_ids:
       - packages_webapps_task_manager_index_task_manager_ui
     summary: 'packages/webapps/task-manager/index.html: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: a3d8ce1f1dca
-    kind: orphan
-    node_ids:
-      - repos_readme_linked_repositories
-    summary: 'repos/README.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 77e6dffc8b71
-    kind: orphan
-    node_ids:
-      - skills_idea_scout_skill_idea_lifecycle
-    summary: 'skills/idea-scout/SKILL.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: e1696452c54f
-    kind: orphan
-    node_ids:
-      - skills_research_skill_feynman
-    summary: 'skills/research/SKILL.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: ccca623b6466
-    kind: orphan
-    node_ids:
-      - skills_workspace_improver_skill_autoresearch_pattern
-    summary: 'skills/workspace-improver/SKILL.md: 1 weakly-connected node(s)'
-    status: open
-    detected: '2026-07-22'
-  - id: 3b7a644e4701
-    kind: ambiguous-edge
-    node_ids:
-      - _opencode_agents_build_build_agent
-      - agents_agent_guide
-    summary: _opencode_agents_build_build_agent —references→ agents_agent_guide is AMBIGUOUS (score 0.3)
     status: open
     detected: '2026-07-22'
