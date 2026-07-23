@@ -13,7 +13,7 @@ const cut = kmsConfig.features.deepCut ? deepCut(notes) : null
 const gaps = await loadGaps(kmsConfig, ROOT)
 const trails = kmsConfig.features.trails ? (await loadTrails(kmsConfig, ROOT)).slice(0, 4) : []
 const maxCount = Math.max(1, ...Object.values(bySource).map(v => v.length))
-const bar = (n: number) => '▆'.repeat(Math.max(0, Math.round((n / maxCount) * 4))) + '▍'
+const pct = (n: number) => Math.max(4, Math.round((n / maxCount) * 100))
 ---
 <Shell title={kmsConfig.identity.name} identity={kmsConfig.identity}>
   <div class="home">
@@ -45,7 +45,7 @@ const bar = (n: number) => '▆'.repeat(Math.max(0, Math.round((n / maxCount) * 
         {kmsConfig.sources.map(s => (
           <div class="biome">
             <span><b>{s.emoji} {s.label}</b><br /><span class="tagline">{s.tagline}</span></span>
-            <span class="kc-mono count">{bar(bySource[s.id].length)} {bySource[s.id].length}
+            <span class="kc-mono count"><span class="meter"><i style={`width:${pct(bySource[s.id].length)}%`}></i></span> {bySource[s.id].length}
               <a href={`/${s.id}/`} class="enter">→</a></span>
           </div>))}
       </KBox>
@@ -108,7 +108,10 @@ const bar = (n: number) => '▆'.repeat(Math.max(0, Math.round((n / maxCount) * 
            border-bottom: 1px solid var(--kc-hairline-soft); padding: .45rem 0; font-size: .8rem }
   .biome:last-child { border-bottom: 0 }
   .tagline { color: var(--kc-faint); font-size: .62rem }
-  .count { color: var(--kc-muted); font-size: .62rem } .enter { color: var(--kc-accent); text-decoration: none }
+  .count { color: var(--kc-muted); font-size: .62rem; display: flex; align-items: center; gap: .45rem }
+  .meter { display: inline-block; width: 52px; height: 4px; background: var(--kc-hairline-soft); border-radius: 2px; overflow: hidden }
+  .meter i { display: block; height: 100%; background: var(--kc-accent); opacity: .55; border-radius: 2px }
+  .enter { color: var(--kc-accent); text-decoration: none }
   .tended { font-size: .78rem; margin: .3rem 0; border-bottom: 1px solid var(--kc-hairline-soft); padding-bottom: .3rem }
   .tended a { color: var(--kc-ink); text-decoration: none }
   .when { color: var(--kc-faint); font-size: .55rem; float: right }

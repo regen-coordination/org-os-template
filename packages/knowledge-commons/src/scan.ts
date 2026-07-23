@@ -47,6 +47,23 @@ export async function scanSources(config: KmsConfig, rootDir: string): Promise<N
         console.warn(`[kms] malformed frontmatter, quarantining ${src.id}/${relPath}: ${message}`)
         continue
       }
+      // Some sources carry duplicated frontmatter: a second `--- … ---` block at
+      // the top of the body (123/267 regen-toolkit notes). Strip repeated blocks,
+      // merging keys — the first (outermost) block wins on conflicts. Blocks whose
+      // yaml is invalid (e.g. scalars with multiple colons) are stripped textually.
+      for (let guard = 0; guard < 3 && /^\s*---\r?\n/.test(content); guard++) {
+        const trimmed = content.trimStart()
+        try {
+          const again = matter(trimmed)
+          if (Object.keys(again.data).length === 0) break
+          data = { ...again.data, ...data }
+          content = again.content
+        } catch {
+          const block = trimmed.match(/^---\r?\n[\s\S]*?\r?\n---[^\S\n]*\r?\n?/)
+          if (!block) break
+          content = trimmed.slice(block[0].length)
+        }
+      }
       const fmTitle = typeof data.title === 'string' ? data.title : null
       const fallback = path.basename(relPath).replace(/\.mdx?$/i, '').replace(/[-_]+/g, ' ')
       notes.push({

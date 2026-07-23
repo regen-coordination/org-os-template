@@ -25,3 +25,29 @@ describe('scanSources', () => {
     expect(notes.find(n => n.slug === 'beta/unicode-cafe')!.title).toBe('Unicode Café')
   })
 })
+
+describe('duplicated frontmatter blocks', () => {
+  it('strips a second frontmatter block from the body, first block wins', async () => {
+    const { defineKmsConfig } = await import('../src/config.ts')
+    const cfg = defineKmsConfig({
+      identity: { name: 'x' },
+      sources: [{ id: 'gamma', label: 'G', dir: 'vault/gamma', content: ['meta/double.md'] }],
+    })
+    const [note] = await scanSources(cfg, FIXTURE_ROOT)
+    expect(note.title).toBe('Outer Title')                    // outer wins
+    expect(note.frontmatter.author).toBe('Someone')           // inner keys merged
+    expect(note.body).not.toContain('Inner Title')            // block stripped
+    expect(note.body.trim().startsWith('# Outer Title')).toBe(true)
+  })
+  it('textually strips an inner block whose yaml is invalid', async () => {
+    const { defineKmsConfig } = await import('../src/config.ts')
+    const cfg = defineKmsConfig({
+      identity: { name: 'x' },
+      sources: [{ id: 'gamma', label: 'G', dir: 'vault/gamma', content: ['meta/double-invalid.md'] }],
+    })
+    const [note] = await scanSources(cfg, FIXTURE_ROOT)
+    expect(note.title).toBe('Valid Outer')
+    expect(note.body).not.toContain('Broken inner')
+    expect(note.body.trim().startsWith('Body survives')).toBe(true)
+  })
+})

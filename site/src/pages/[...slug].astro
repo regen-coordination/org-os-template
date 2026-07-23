@@ -41,11 +41,13 @@ const tagLine = note.tags.length ? note.tags.join(' · ') : null
   <div class="note-grid">
     <FileTree tree={tree} currentSlug={note.slug} />
     <article data-pagefind-body>
-      <p class="crumb kc-mono">❦ {tagLine ?? note.source} · {note.slug.split('/').slice(0, -1).join('/')}</p>
-      <h1>{note.title}</h1>
-      <p class="meta kc-mono">{note.date ? `tended ${note.date.slice(0, 10)}` : 'undated'} · ~{Math.max(1, Math.round(note.body.split(/\s+/).length / 220))} min</p>
-      <div class="rule"></div>
-      <div class="prose" set:html={note.html} />
+      <div class="article-inner">
+        <p class="crumb kc-mono">❦ {tagLine ?? note.source} · {note.slug.split('/').slice(0, -1).join('/')}</p>
+        <h1>{note.title}</h1>
+        <p class="meta kc-mono">{note.date ? `tended ${note.date.slice(0, 10)}` : 'undated'} · ~{Math.max(1, Math.round(note.body.split(/\s+/).length / 220))} min</p>
+        <div class="rule"></div>
+        <div class="prose" set:html={note.html} />
+      </div>
     </article>
     <NoteAside headings={note.headings} backlinks={note.backlinks} relPath={note.relPath}
       source={note.source} date={note.date} commit={null} slug={note.slug}>
@@ -55,14 +57,24 @@ const tagLine = note.tags.length ? note.tags.join(' · ') : null
 </Shell>
 <style>
   .note-grid { display: flex; min-height: 80vh }
-  article { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.4rem 1rem }
-  article > * { width: 100%; max-width: var(--kc-measure) }
-  .crumb { color: var(--kc-faint); font-size: .6rem; letter-spacing: .08em }
-  h1 { font-size: 1.7rem; letter-spacing: -.03em; margin: .4rem 0 .1rem; font-weight: 600 }
-  .meta { color: var(--kc-faint); font-size: .6rem }
-  .rule { width: 26px; height: 2px; background: var(--kc-accent); margin: .8rem 0 }
-  .prose { line-height: 1.85; font-size: .95rem; color: var(--kc-ink-soft) }
-  .prose :global(h2) { letter-spacing: -.02em; margin-top: 2rem }
+  article { flex: 1; padding: 2rem 1.2rem }
+  /* one fixed-width centered column — never per-element ch widths */
+  .article-inner { max-width: 640px; margin: 0 auto }
+  .crumb { color: var(--kc-faint); font-size: .6rem; letter-spacing: .08em; margin: 0 }
+  h1 { font-size: 1.7rem; letter-spacing: -.03em; margin: .5rem 0 .15rem; font-weight: 600 }
+  .meta { color: var(--kc-faint); font-size: .6rem; margin: 0 }
+  .rule { width: 26px; height: 2px; background: var(--kc-accent); margin: 1rem 0 1.2rem }
+  .prose { line-height: 1.8; font-size: .95rem; color: var(--kc-ink-soft) }
+  .prose :global(h2) { letter-spacing: -.02em; margin-top: 2rem; color: var(--kc-ink) }
+  .prose :global(a:not(.kc-wikilink)) { color: inherit; text-decoration: none;
+    border-bottom: 1px dotted var(--kc-accent) }
+  .prose :global(a:not(.kc-wikilink):hover), .prose :global(a.kc-wikilink:hover) {
+    border-bottom-style: solid; color: var(--kc-accent) }
+  .prose :global(ul), .prose :global(ol) { padding-left: 1.2rem }
+  .prose :global(li) { margin: .25rem 0 }
+  .prose :global(hr) { border: 0; border-top: 1px solid var(--kc-hairline); margin: 1.6rem 0 }
+  .prose :global(blockquote) { border-left: 2px solid var(--kc-accent); margin: 1rem 0;
+    padding: .2rem 0 .2rem .9rem; color: var(--kc-muted) }
   .prose :global(code) { font-family: var(--kc-mono); font-size: .82em; background: var(--kc-paper-tint);
     border: 1px solid var(--kc-hairline); border-radius: 3px; padding: 0 .3em }
   .prose :global(pre) { background: var(--kc-paper-tint); border: 1px solid var(--kc-hairline);

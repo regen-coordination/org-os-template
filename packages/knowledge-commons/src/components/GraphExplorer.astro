@@ -36,7 +36,15 @@ const { accent, sources } = Astro.props
   for (const e of artifact.edges) if (graph.hasNode(e.s) && graph.hasNode(e.t) && !graph.hasEdge(e.s, e.t))
     graph.addEdge(e.s, e.t, { edgeKind: e.kind, color: '#e3ddd2', size: 0.5 })
   const container = document.getElementById('gx-canvas')!
-  const sigma = new Sigma(graph, container, { renderLabels: true, labelRenderedSizeThreshold: 7 })
+  const sigma = new Sigma(graph, container, {
+    renderLabels: true,
+    labelRenderedSizeThreshold: 10,   // only hubs get labels at rest — zoom reveals the rest
+    labelDensity: 0.5,
+    labelGridCellSize: 140,
+    labelFont: 'SF Mono, Menlo, monospace',
+    labelSize: 11,
+    labelColor: { color: '#3d3831' },
+  })
 
   const state = { sources: new Set([...document.querySelectorAll('#gx-sources .chip')].map(c => (c as HTMLElement).dataset.source!)),
                   kinds: new Set(['semantic', 'wikilink', 'note', 'bridge']), text: '' }

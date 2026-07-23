@@ -22,8 +22,10 @@ export async function loadGaps(config: KmsConfig, rootDir: string, n = 3) {
   if (!config.features.gaps) return { top: [], total: 0 }
   try {
     const doc = yaml.load(await fs.readFile(path.resolve(rootDir, config.features.gaps), 'utf8')) as any
-    const gaps: any[] = doc?.gaps ?? doc?.knowledge_gaps ?? []
-    return { top: gaps.slice(0, n).map(g => g.title ?? g.name ?? String(g)), total: gaps.length }
+    const gaps: any[] = (doc?.gaps ?? doc?.knowledge_gaps ?? []).filter((g: any) => (g?.status ?? 'open') === 'open')
+    const label = (g: any) => typeof g === 'string' ? g
+      : String(g.summary ?? g.title ?? g.name ?? g.kind ?? g.id ?? 'unnamed gap').slice(0, 70)
+    return { top: gaps.slice(0, n).map(label), total: gaps.length }
   } catch { return { top: [], total: 0 } }
 }
 

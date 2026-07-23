@@ -16,14 +16,18 @@ const { slug } = Astro.props
   const center = 'note:' + slug
   const keep = new Set([center])
   for (const e of artifact.edges) { if (e.s === center) keep.add(e.t); if (e.t === center) keep.add(e.s) }
-  const g = new Graph({ type: 'undirected' })
-  for (const n of artifact.nodes) if (keep.has(n.id))
-    g.addNode(n.id, { label: n.label, x: n.x, y: n.y, size: n.id === center ? 7 : 4,
-                      color: n.id === center ? getComputedStyle(document.body).getPropertyValue('--kc-accent') : '#c9c2b6' })
-  for (const e of artifact.edges) if (keep.has(e.s) && keep.has(e.t) && g.hasNode(e.s) && g.hasNode(e.t) && !g.hasEdge(e.s, e.t))
-    g.addEdge(e.s, e.t, { color: '#e8e2d8', size: 0.5 })
-  if (g.order > 0) new Sigma(g, host, { renderLabels: g.order <= 12 })
-  else host.innerHTML = '<p style="color:var(--kc-faint);font-size:.62rem;text-align:center;padding:1rem 0">graph not yet grown ⟡</p>'
+  if (keep.size <= 1) {
+    // a lone dot looks broken — show the honest empty state instead
+    host.innerHTML = '<p style="color:var(--kc-faint);font-size:.62rem;text-align:center;padding:2.2rem 0">no connections yet ⟡</p>'
+  } else {
+    const g = new Graph({ type: 'undirected' })
+    for (const n of artifact.nodes) if (keep.has(n.id))
+      g.addNode(n.id, { label: n.label, x: n.x, y: n.y, size: n.id === center ? 7 : 4,
+                        color: n.id === center ? getComputedStyle(document.body).getPropertyValue('--kc-accent') : '#c9c2b6' })
+    for (const e of artifact.edges) if (keep.has(e.s) && keep.has(e.t) && g.hasNode(e.s) && g.hasNode(e.t) && !g.hasEdge(e.s, e.t))
+      g.addEdge(e.s, e.t, { color: '#e8e2d8', size: 0.5 })
+    new Sigma(g, host, { renderLabels: g.order <= 12, labelFont: 'SF Mono, Menlo, monospace', labelSize: 9 })
+  }
 </script>
 <style>
   .kc-minigraph { border: 1px solid var(--kc-border); border-radius: 7px; position: relative;
