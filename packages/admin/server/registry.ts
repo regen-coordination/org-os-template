@@ -67,7 +67,9 @@ export function findEntity(seq: YAMLSeq, id: string): { index: number; item: YAM
 }
 
 function saveDoc(path: string, doc: ReturnType<typeof parseDocument>): void {
-  writeFileSync(path, doc.toString())
+  // flowCollectionPadding:false keeps `["a"]` from being rewritten to `[ "a" ]` on
+  // every save, so untouched flow arrays stay out of the diff (minimal-diff guarantee).
+  writeFileSync(path, doc.toString({ flowCollectionPadding: false }))
 }
 
 /** Minimal-diff update: set only changed keys, delete removed ones. */

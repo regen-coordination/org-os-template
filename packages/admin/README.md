@@ -21,7 +21,9 @@ Binds 127.0.0.1 only — no auth by design in v1.
   `knowledge-manifest` read-only.
 - Direct mode only: saves commit to the current branch as
   `admin(<registry>): <verb> <id>`. Proposals land in M3.
-- Nested structures edit as YAML sub-fields.
+- Nested structures edit as YAML sub-fields. Scalar edits preserve surrounding
+  comments and formatting; replacing a whole nested object/array drops comments
+  *inside that value* (the rest of the file is untouched).
 
 ## Test
 

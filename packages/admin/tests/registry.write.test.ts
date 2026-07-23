@@ -36,6 +36,15 @@ describe('updateEntity', () => {
   it('throws for a missing id', () => {
     expect(() => updateEntity(repo, 'projects', 'ghost', { id: 'ghost' })).toThrowError(/not found/i)
   })
+  it('does not reformat untouched flow-style arrays (minimal diff)', () => {
+    updateEntity(repo, 'projects', 'proj-001', {
+      id: 'proj-001', title: 'Node Onboarding Program', status: 'archive',
+      type: 'program', lead: 'luiz', contributors: ['ana'], tags: ['nodes', 'onboarding'],
+    })
+    const text = read('projects')
+    expect(text).toContain('contributors: ["ana"]')       // not `[ "ana" ]`
+    expect(text).toContain('tags: ["nodes", "onboarding"]')
+  })
 })
 
 describe('createEntity', () => {

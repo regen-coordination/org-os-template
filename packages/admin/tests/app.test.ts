@@ -64,6 +64,24 @@ describe('PUT /api/registries/:name/:id', () => {
   it('403s writes to document registries', async () => {
     expect((await app.request('/api/registries/finances/x', json('PUT', { id: 'x' }))).status).toBe(403)
   })
+  it('422s and does not commit when body id differs from URL id', async () => {
+    const before = lastCommit()
+    const res = await app.request('/api/registries/members/luiz',
+      json('PUT', { id: 'luiz-renamed', name: 'Luiz', role: 'Core Steward', layer: 'core', status: 'active', joined: '2023-01-15' }))
+    expect(res.status).toBe(422)
+    expect((await res.json()).errors[0].field).toBe('id')
+    expect(lastCommit()).toBe(before)
+  })
+  it('serializes concurrent writes to the same entity without losing an edit', async () => {
+    const base = { id: 'proj-001', title: 'X', type: 'program', lead: 'luiz', contributors: ['ana'], tags: ['nodes'] }
+    await Promise.all([
+      app.request('/api/registries/projects/proj-001', json('PUT', { ...base, status: 'develop' })),
+      app.request('/api/registries/projects/proj-001', json('PUT', { ...base, status: 'archive' })),
+    ])
+    // Both edits must be committed as two distinct commits, not one lost-update.
+    const count = execSync('git rev-list --count HEAD', { cwd: repo }).toString().trim()
+    expect(Number(count)).toBe(3) // fixture-initial + 2 writes
+  })
 })
 
 describe('POST /api/registries/:name', () => {
