@@ -1,0 +1,19 @@
+{
+  "$id": "orgos://registry/sources",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "name", "type", "status", "last_synced"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "type": { "enum": ["blog", "podcast", "newsletter", "github", "forum", "social"] },
+    "url": { "type": "string" },
+    "feed_url": { "type": "string" },
+    "status": { "enum": ["active", "paused", "archived"] },
+    "last_synced": { "type": "string", "format": "date" },
+    "sync_method": { "enum": ["rss", "api", "manual", "scrape"] },
+    "content_count": { "type": "number" },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  }
+}

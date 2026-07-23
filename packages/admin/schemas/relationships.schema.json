@@ -1,0 +1,17 @@
+{
+  "$id": "orgos://registry/relationships",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "partner", "type", "status", "since"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "partner": { "type": "string" },
+    "type": { "enum": ["alliance", "collaboration", "funding", "advisory", "peer"] },
+    "status": { "enum": ["active", "dormant", "completed", "proposed"] },
+    "since": { "type": "string", "format": "date" },
+    "contact": { "type": "string" },
+    "description": { "type": "string" },
+    "touchpoints": { "type": "array", "items": { "type": "object" } }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "$id": "orgos://registry/projects",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "title", "status", "type", "lead", "started", "target_completion"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "status": { "enum": ["idea", "develop", "execute", "archive"] },
+    "type": { "enum": ["program", "initiative", "workstream", "experiment"] },
+    "lead": { "type": ["string", "null"] },
+    "contributors": { "type": "array", "items": { "type": "string" } },
+    "started": { "type": "string", "format": "date" },
+    "target_completion": { "type": ["string", "null"], "format": "date" },
+    "description": { "type": "string" },
+    "milestones": { "type": "array", "items": { "type": "object" } },
+    "related_ideas": { "type": "array", "items": { "type": "string" } },
+    "funding_source": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  }
+}

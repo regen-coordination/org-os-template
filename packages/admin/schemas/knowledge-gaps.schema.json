@@ -1,0 +1,15 @@
+{
+  "$id": "orgos://registry/knowledge-gaps",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "kind", "status", "detected", "summary"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["orphan", "ambiguous-edge", "weak-community"] },
+    "node_ids": { "type": "array", "items": { "type": "string" } },
+    "summary": { "type": "string" },
+    "status": { "enum": ["open", "curated", "dismissed"] },
+    "detected": { "type": "string", "format": "date" }
+  }
+}

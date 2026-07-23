@@ -1,0 +1,18 @@
+{
+  "$id": "orgos://registry/channels",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "platform", "name", "visibility", "status"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "platform": { "enum": ["telegram", "discord", "forum", "email", "slack", "signal", "matrix"] },
+    "name": { "type": "string" },
+    "url": { "type": "string" },
+    "purpose": { "type": "string" },
+    "visibility": { "enum": ["public", "members", "core", "private"] },
+    "topics": { "type": "array", "items": { "type": "string" } },
+    "managed_by": { "type": "string" },
+    "status": { "enum": ["active", "archived", "migrating"] }
+  }
+}

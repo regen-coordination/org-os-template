@@ -1,0 +1,8 @@
+{
+  "$id": "orgos://registry/_generic",
+  "type": "object",
+  "required": ["id"],
+  "properties": { "id": { "type": "string", "minLength": 1 } },
+  "additionalProperties": true,
+  "x-order": ["id"]
+}

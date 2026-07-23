@@ -1,0 +1,21 @@
+{
+  "$id": "orgos://registry/events",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "title", "type", "date", "status"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "type": { "enum": ["assembly", "workshop", "deadline", "milestone", "call", "conference"] },
+    "date": { "type": "string", "format": "date" },
+    "end_date": { "type": "string", "format": "date" },
+    "recurrence": { "type": ["string", "null"] },
+    "location": { "type": "string" },
+    "url": { "type": ["string", "null"] },
+    "related_project": { "type": ["string", "null"] },
+    "participants": { "type": "array", "items": { "type": "string" } },
+    "status": { "enum": ["upcoming", "completed", "cancelled"] },
+    "notes": { "type": "string" }
+  }
+}

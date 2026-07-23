@@ -1,0 +1,18 @@
+{
+  "$id": "orgos://registry/assets",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "type", "name", "owner", "status", "renewal_date"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["domain", "account", "credential", "brand", "tool", "document", "contract"] },
+    "name": { "type": "string" },
+    "platform": { "type": ["string", "null"] },
+    "url": { "type": ["string", "null"] },
+    "owner": { "type": "string" },
+    "status": { "enum": ["active", "expired", "pending", "transferred"] },
+    "renewal_date": { "type": "string", "format": "date" },
+    "notes": { "type": "string" }
+  }
+}
