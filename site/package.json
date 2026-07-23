@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/sync-wellknown.mjs && astro build",
+    "build": "node scripts/sync-wellknown.mjs && astro build && node scripts/check-budgets.mjs",
     "preview": "astro preview",
     "e2e": "playwright test"
   },

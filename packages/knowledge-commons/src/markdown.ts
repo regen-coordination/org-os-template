@@ -57,6 +57,15 @@ function remarkWikilinks(note: NoteFile, index: SlugIndex, base: string, out: Re
   }
 }
 
+/** Drop a leading level-1 heading: the page layout always renders the note title as
+ *  the H1, so a body that opens with `# Title` would produce a duplicate H1. */
+function remarkStripLeadingH1() {
+  return (tree: any) => {
+    const first = tree.children?.[0]
+    if (first && first.type === 'heading' && first.depth === 1) tree.children.shift()
+  }
+}
+
 function collectHeadings(tree: any): Heading[] {
   const out: Heading[] = []
   // One slugger per document so repeated headings dedupe (`foo`, `foo-1`) exactly like
@@ -85,6 +94,7 @@ export async function renderNote(note: NoteFile, index: SlugIndex, opts: { base:
   const excerpt = firstParagraph(parsed).slice(0, 280)
   const file = await unified()
     .use(remarkParse).use(remarkGfm)
+    .use(remarkStripLeadingH1)
     .use(remarkWikilinks(note, index, opts.base, links))
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeSlug)

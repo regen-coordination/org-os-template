@@ -15,6 +15,17 @@ describe('renderNote', () => {
     expect(r.html).toContain('href="/alpha/guide/reserve-ratio#math"')
     expect(r.html).toContain('>the math</a>')
   })
+  it('strips a leading level-1 heading (layout supplies the title H1)', async () => {
+    const note: NoteFile = {
+      source: 'alpha', slug: 'alpha/leading-h1', relPath: 'leading-h1.md',
+      title: 'Leading H1', tags: [], date: null, frontmatter: {},
+      body: '# Leading H1\n\nBody text.\n\n## A section\n\nmore',
+    }
+    const r = await renderNote(note, index, { base: '/' })
+    expect(r.html).not.toContain('<h1')
+    expect(r.html).toContain('<h2')           // deeper headings survive
+    expect(r.excerpt.startsWith('Body text.')).toBe(true)
+  })
   it('renders missing links as dead spans and records them', async () => {
     const pooling = notes.find(n => n.slug === 'alpha/pooling')!
     const r = await renderNote(pooling, index, { base: '/' })
