@@ -1,10 +1,118 @@
 ---
-// src/pages/index.astro (placeholder, replaced in Task 17)
 import { getCollection } from 'astro:content'
 import Shell from '@org-os/knowledge-commons/components/Shell.astro'
-import { kmsConfig } from '../content.config'
-const notes = await getCollection('notes')
+import KBox from '@org-os/knowledge-commons/components/KBox.astro'
+import { kmsConfig, ROOT } from '../content.config'
+import { recent, deepCut, loadGaps, loadTrails } from '../lib/home-data'
+
+const entries = await getCollection('notes')
+const notes = entries.map(e => e.data)
+const bySource = Object.fromEntries(kmsConfig.sources.map(s => [s.id, notes.filter(n => n.source === s.id)]))
+const tended = recent(notes, 3)
+const cut = kmsConfig.features.deepCut ? deepCut(notes) : null
+const gaps = await loadGaps(kmsConfig, ROOT)
+const trails = kmsConfig.features.trails ? (await loadTrails(kmsConfig, ROOT)).slice(0, 4) : []
+const maxCount = Math.max(1, ...Object.values(bySource).map(v => v.length))
+const bar = (n: number) => '▆'.repeat(Math.max(0, Math.round((n / maxCount) * 4))) + '▍'
 ---
-<Shell title="commons" identity={kmsConfig.identity}>
-  <p>{notes.length} notes</p>
+<Shell title={kmsConfig.identity.name} identity={kmsConfig.identity}>
+  <div class="home">
+    <div class="hero-row">
+      <KBox label={`❦ commons`} corner="● alive" accent>
+        <h1>The shared knowledge of<br />the regen network<span class="cursor">_</span></h1>
+        <p class="vitals kc-mono">∴ {notes.length} notes · {kmsConfig.sources.length} organisms</p>
+        <input class="kc-mono" placeholder="search the commons… ⌘K" onfocus="document.getElementById('kc-palette-open')?.click()" />
+      </KBox>
+      <KBox label="◉ map" tint>
+        <a href="/graph/" class="maplink" id="kc-home-map" aria-label="open the graph explorer"></a>
+        <p class="maplegend kc-mono">explore ↗</p>
+      </KBox>
+    </div>
+
+    {trails.length > 0 && <KBox label="⟡ trailheads" corner="guided paths">
+      <div class="trails">{trails.map(t => (
+        <div class="trail">
+          <div class="t-head"><b>{t.label}</b><span class="kc-mono t-n">{t.stops.length} stops</span></div>
+          {t.promise && <p class="t-promise">{t.promise}</p>}
+          <p class="thread kc-mono">◉{'──○'.repeat(Math.min(5, Math.max(1, t.stops.length - 1)))}
+            {t.stops[0] && <a href={`/${t.stops[0].slug}`}> ⋯ begin: {t.stops[0].title} →</a>}</p>
+        </div>))}
+      </div>
+    </KBox>}
+
+    <div class="two-col">
+      <KBox label="├ biomes" corner={String(kmsConfig.sources.length)}>
+        {kmsConfig.sources.map(s => (
+          <div class="biome">
+            <span><b>{s.emoji} {s.label}</b><br /><span class="tagline">{s.tagline}</span></span>
+            <span class="kc-mono count">{bar(bySource[s.id].length)} {bySource[s.id].length}
+              <a href={`/${s.id}/`} class="enter">→</a></span>
+          </div>))}
+      </KBox>
+      <div class="stack">
+        <KBox label="◦ recently tended" corner="the living edge">
+          {tended.map(n => <p class="tended"><a href={`/${n.slug}`}>{n.title}</a>
+            <span class="kc-mono when">{n.source} · {n.date!.slice(0, 10)}</span></p>)}
+        </KBox>
+        {cut && <KBox label="⚄ deep cut" corner="resurfaced" tint>
+          <p class="cut"><a href={`/${cut.slug}`}><b>{cut.title}</b></a> — {cut.excerpt.slice(0, 90)}…</p>
+        </KBox>}
+        {gaps.total > 0 && <KBox label="◌ gaps" corner="help wanted">
+          {gaps.top.map(g => <p class="gap kc-mono">◌ {g}</p>)}
+          <p class="gap kc-mono faint">⋯ {gaps.total} open</p>
+        </KBox>}
+      </div>
+    </div>
+  </div>
 </Shell>
+<script>
+  // ambient mini-map: draw the real artifact into the home map box
+  const host = document.getElementById('kc-home-map')
+  if (host) fetch('/graph.json').then(r => r.json()).then(a => {
+    if (!a.nodes.length) return
+    const w = host.clientWidth || 220, h = 100
+    const cvs = document.createElement('canvas')
+    cvs.width = w * 2; cvs.height = h * 2; cvs.style.width = w + 'px'; cvs.style.height = h + 'px'
+    host.appendChild(cvs)
+    const ctx = cvs.getContext('2d')!; ctx.scale(2, 2)
+    const xs = a.nodes.map((n: any) => n.x), ys = a.nodes.map((n: any) => n.y)
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+    const P = ['#d6281e', '#2ea36b', '#4a6fa5', '#c9a227', '#8f5cf7']
+    for (const n of a.nodes) {
+      ctx.fillStyle = P[n.community % P.length]; ctx.globalAlpha = 0.7
+      ctx.beginPath()
+      ctx.arc(6 + ((n.x - minX) / (maxX - minX || 1)) * (w - 12), 6 + ((n.y - minY) / (maxY - minY || 1)) * (h - 12), Math.min(2.2, n.size / 4), 0, 7)
+      ctx.fill()
+    }
+  })
+</script>
+<style>
+  .home { max-width: 880px; margin: 0 auto; padding: 1rem 1.1rem 3rem }
+  .hero-row { display: grid; grid-template-columns: 1.9fr 1fr; gap: 14px; align-items: stretch }
+  h1 { font-size: 1.6rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.1; margin: .2rem 0 }
+  .cursor { color: var(--kc-accent); animation: blink 1.2s steps(2) infinite }
+  @keyframes blink { 50% { opacity: 0 } }
+  .vitals { color: var(--kc-muted); font-size: .62rem }
+  .hero-row input { border: 1px solid var(--kc-border); border-radius: 5px; padding: 6px 9px;
+    font-size: .68rem; width: 70%; margin-top: .5rem; background: var(--kc-paper) }
+  .maplink { display: block; min-height: 100px } .maplegend { text-align: right; font-size: .55rem; color: var(--kc-faint); margin: 0 }
+  .trails { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 26px }
+  .t-head { display: flex; justify-content: space-between; align-items: baseline }
+  .t-head b { letter-spacing: -.01em } .t-n { font-size: .55rem; color: var(--kc-faint) }
+  .t-promise { color: var(--kc-muted); font-size: .72rem; margin: .2rem 0 }
+  .thread { color: var(--kc-border); font-size: .68rem }
+  .thread a { color: var(--kc-faint); font-size: .58rem; text-decoration: none }
+  .two-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; align-items: start }
+  .stack { display: flex; flex-direction: column }
+  .biome { display: flex; justify-content: space-between; align-items: center;
+           border-bottom: 1px solid var(--kc-hairline-soft); padding: .45rem 0; font-size: .8rem }
+  .biome:last-child { border-bottom: 0 }
+  .tagline { color: var(--kc-faint); font-size: .62rem }
+  .count { color: var(--kc-muted); font-size: .62rem } .enter { color: var(--kc-accent); text-decoration: none }
+  .tended { font-size: .78rem; margin: .3rem 0; border-bottom: 1px solid var(--kc-hairline-soft); padding-bottom: .3rem }
+  .tended a { color: var(--kc-ink); text-decoration: none }
+  .when { color: var(--kc-faint); font-size: .55rem; float: right }
+  .cut, .gap { font-size: .72rem } .cut a { color: inherit; text-decoration: none }
+  .gap { color: var(--kc-muted); margin: .2rem 0 } .gap::first-letter { color: var(--kc-accent) } .faint { color: var(--kc-faint) }
+  @media (max-width: 760px) { .hero-row, .two-col, .trails { grid-template-columns: 1fr } }
+</style>
