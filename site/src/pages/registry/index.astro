@@ -1,0 +1,35 @@
+---
+import { getCollection } from 'astro:content'
+import Shell from '@org-os/knowledge-commons/components/Shell.astro'
+import KBox from '@org-os/knowledge-commons/components/KBox.astro'
+import { kmsConfig } from '../../content.config'
+const regs = (await getCollection('registries')).map(r => r.data)
+const KINDS = ['projects', 'ideas', 'funding-opportunities', 'members', 'skills']
+const shown = regs.filter(r => KINDS.includes(r.kind) && r.items.length > 0)
+const label = (it: any) => it.name ?? it.title ?? it.id ?? '—'
+const detail = (it: any) => it.status ?? it.stage ?? it.role ?? ''
+const summary = (it: any) => it.summary ?? it.description ?? ''
+---
+<Shell title={`registry — ${kmsConfig.identity.name}`} identity={kmsConfig.identity}>
+  <div class="reg">
+    <h1>Registry<span style="color:var(--kc-accent)">.</span></h1>
+    {shown.length === 0 && <p class="empty kc-mono">no registries loaded ⟡</p>}
+    {shown.map(r => (
+      <KBox label={`◫ ${r.kind}`} corner={`${r.source} · ${r.items.length}`}>
+        <table>
+          {r.items.slice(0, 50).map((it: any) => (
+            <tr><td class="n">{label(it)}</td><td class="kc-mono s">{detail(it)}</td><td class="d">{String(summary(it)).slice(0, 90)}</td></tr>
+          ))}
+        </table>
+      </KBox>))}
+  </div>
+</Shell>
+<style>
+  .reg { max-width: 880px; margin: 0 auto; padding: 1rem 1.1rem 3rem }
+  h1 { font-size: 1.5rem; letter-spacing: -.03em; font-weight: 600 }
+  .empty { color: var(--kc-faint); font-size: .8rem }
+  table { width: 100%; border-collapse: collapse; font-size: .74rem }
+  td { border-bottom: 1px solid var(--kc-hairline-soft); padding: .35rem .4rem; vertical-align: top }
+  tr:last-child td { border-bottom: 0 }
+  .n { font-weight: 600; white-space: nowrap } .s { color: var(--kc-accent); font-size: .6rem } .d { color: var(--kc-muted) }
+</style>

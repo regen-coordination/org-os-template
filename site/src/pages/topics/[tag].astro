@@ -1,0 +1,33 @@
+---
+import { getCollection } from 'astro:content'
+import Shell from '@org-os/knowledge-commons/components/Shell.astro'
+import KBox from '@org-os/knowledge-commons/components/KBox.astro'
+import { kmsConfig } from '../../content.config'
+
+export async function getStaticPaths() {
+  const notes = await getCollection('notes')
+  const tags = new Map<string, typeof notes>()
+  for (const n of notes) for (const t of n.data.tags) {
+    const key = t.toLowerCase(); tags.set(key, [...(tags.get(key) ?? []), n])
+  }
+  return [...tags.entries()].map(([tag, list]) => ({ params: { tag }, props: { tag, list: list.map(n => n.data) } }))
+}
+const { tag, list } = Astro.props
+const bySource = Object.groupBy(list, (n: any) => n.source)
+---
+<Shell title={`❦ ${tag} — ${kmsConfig.identity.name}`} identity={kmsConfig.identity}>
+  <div class="topic">
+    <h1><span class="kc-mono" style="color:var(--kc-accent)">❦</span> {tag}</h1>
+    {Object.entries(bySource).map(([src, notes]) => (
+      <KBox label={`├ ${src}`} corner={String(notes!.length)}>
+        <ul>{notes!.map((n: any) => <li><a href={`/${n.slug}`}>{n.title}</a><span class="ex">{n.excerpt.slice(0, 80)}</span></li>)}</ul>
+      </KBox>))}
+  </div>
+</Shell>
+<style>
+  .topic { max-width: 720px; margin: 0 auto; padding: 1rem 1.1rem 3rem }
+  h1 { font-size: 1.4rem; letter-spacing: -.03em; font-weight: 600 }
+  ul { list-style: none; padding: 0; margin: 0 } li { padding: .3rem 0; border-bottom: 1px solid var(--kc-hairline-soft); font-size: .78rem }
+  li:last-child { border-bottom: 0 } a { color: var(--kc-ink); text-decoration: none; font-weight: 600 }
+  .ex { display: block; color: var(--kc-muted); font-size: .65rem }
+</style>
