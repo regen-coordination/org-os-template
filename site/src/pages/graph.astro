@@ -1,0 +1,8 @@
+---
+import Shell from '@org-os/knowledge-commons/components/Shell.astro'
+import GraphExplorer from '@org-os/knowledge-commons/components/GraphExplorer.astro'
+import { kmsConfig } from '../content.config'
+---
+<Shell title={`graph — ${kmsConfig.identity.name}`} identity={kmsConfig.identity}>
+  <GraphExplorer accent={kmsConfig.identity.accent} sources={kmsConfig.sources.map(s => ({ id: s.id, label: s.label }))} />
+</Shell>

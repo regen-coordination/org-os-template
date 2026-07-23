@@ -9,7 +9,6 @@ import KBox from './KBox.astro'
 ---
 <aside class="kc-aside">
   <slot name="graph" />
-  <div id="kc-minigraph-slot" data-slug={slug}></div>
   {headings.length > 0 && <KBox label="§ contents">
     <ul class="toc">{headings.map(h => <li style={`padding-left:${(h.depth - 2) * .7}rem`}><a href={`#${h.id}`}>{h.text}</a></li>)}</ul>
   </KBox>}

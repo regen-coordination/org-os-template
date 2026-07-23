@@ -1,0 +1,92 @@
+---
+interface Props { accent: string; sources: { id: string; label: string }[] }
+const { accent, sources } = Astro.props
+---
+<div class="kc-explorer">
+  <div class="rail kc-mono">
+    <input id="gx-filter" placeholder="filter nodes…" />
+    <div class="chips" id="gx-sources">
+      {sources.map(s => <button class="chip on" data-source={s.id}>{s.label}</button>)}
+    </div>
+    <div class="chips" id="gx-kinds">
+      <button class="chip on" data-kind="semantic">semantic</button>
+      <button class="chip on" data-kind="wikilink">wikilinks</button>
+    </div>
+  </div>
+  <div id="gx-canvas"></div>
+  <aside class="inspector kc-mono" id="gx-inspector" hidden>
+    <span class="kc-label" id="gx-i-kind"></span>
+    <h3 id="gx-i-label"></h3>
+    <p id="gx-i-meta"></p>
+    <a id="gx-i-open" class="open" href="#">open note →</a>
+  </aside>
+  <noscript><p class="kc-mono">graph needs javascript — see <a href="/graph-list/">list view</a></p></noscript>
+  <p class="fallback kc-mono"><a href="/graph-list/">list view (no-js / screen readers) →</a></p>
+</div>
+<script>
+  import Graph from 'graphology'
+  import Sigma from 'sigma'
+  const PALETTE = ['#d6281e','#2ea36b','#4a6fa5','#c9a227','#8f5cf7','#e0763c','#3aa7a3','#b0537f']
+  const res = await fetch('/graph.json'); const artifact = await res.json()
+  const graph = new Graph({ type: 'undirected', multi: false })
+  for (const n of artifact.nodes) graph.addNode(n.id, {
+    label: n.label, x: n.x, y: n.y, size: n.size,
+    color: PALETTE[n.community % PALETTE.length], nodeKind: n.kind, source: n.source, slug: n.slug ?? null,
+  })
+  for (const e of artifact.edges) if (graph.hasNode(e.s) && graph.hasNode(e.t) && !graph.hasEdge(e.s, e.t))
+    graph.addEdge(e.s, e.t, { edgeKind: e.kind, color: '#e3ddd2', size: 0.5 })
+  const container = document.getElementById('gx-canvas')!
+  const sigma = new Sigma(graph, container, { renderLabels: true, labelRenderedSizeThreshold: 7 })
+
+  const state = { sources: new Set([...document.querySelectorAll('#gx-sources .chip')].map(c => (c as HTMLElement).dataset.source!)),
+                  kinds: new Set(['semantic', 'wikilink', 'note', 'bridge']), text: '' }
+  function applyFilters() {
+    sigma.setSetting('nodeReducer', (id, attrs) => {
+      const visible = state.sources.has(attrs.source)
+        && (attrs.nodeKind === 'note' || state.kinds.has(attrs.nodeKind))
+        && (!state.text || String(attrs.label).toLowerCase().includes(state.text))
+      return visible ? attrs : { ...attrs, hidden: true }
+    })
+    sigma.refresh()
+  }
+  document.getElementById('gx-filter')!.addEventListener('input', e => { state.text = (e.target as HTMLInputElement).value.toLowerCase(); applyFilters() })
+  for (const chip of document.querySelectorAll('.chip')) chip.addEventListener('click', () => {
+    chip.classList.toggle('on')
+    const el = chip as HTMLElement
+    const set = el.dataset.source ? state.sources : state.kinds
+    const key = el.dataset.source ?? el.dataset.kind!
+    set.has(key) ? set.delete(key) : set.add(key)
+    applyFilters()
+  })
+  sigma.on('clickNode', ({ node }) => {
+    const a = graph.getNodeAttributes(node)
+    document.getElementById('gx-inspector')!.hidden = false
+    document.getElementById('gx-i-kind')!.textContent = `● ${a.nodeKind} · ${a.source}`
+    document.getElementById('gx-i-label')!.textContent = a.label
+    document.getElementById('gx-i-meta')!.textContent = `${graph.degree(node)} connections`
+    const open = document.getElementById('gx-i-open') as HTMLAnchorElement
+    if (a.slug) { open.href = `/${a.slug}`; open.hidden = false } else open.hidden = true
+    history.replaceState(null, '', `?node=${encodeURIComponent(node)}`)
+  })
+  const focus = new URLSearchParams(location.search).get('node')
+  if (focus && graph.hasNode(focus)) {
+    const a = graph.getNodeAttributes(focus)
+    sigma.getCamera().animate({ x: a.x, y: a.y, ratio: 0.15 }, { duration: 400 })
+  }
+</script>
+<style define:vars={{ accent }}>
+  .kc-explorer { position: relative; height: calc(100vh - 90px) }
+  #gx-canvas { position: absolute; inset: 0 }
+  .rail { position: absolute; top: 12px; left: 12px; z-index: 2; display: flex; flex-direction: column; gap: 6px; width: 190px }
+  .rail input { border: 1px solid var(--kc-border); border-radius: 6px; padding: 6px 8px; font: inherit; font-size: .68rem; background: var(--kc-paper) }
+  .chips { background: var(--kc-paper); border: 1px solid var(--kc-hairline); border-radius: 6px; padding: 6px; display: flex; flex-wrap: wrap; gap: 4px }
+  .chip { border: 1px solid var(--kc-border); border-radius: 10px; padding: 1px 7px; font: inherit; font-size: .58rem;
+          background: none; color: var(--kc-muted); cursor: pointer }
+  .chip.on { border-color: var(--accent); color: var(--accent) }
+  .inspector { position: absolute; top: 12px; right: 12px; z-index: 2; width: 210px; background: var(--kc-paper);
+               border: 1px solid var(--kc-hairline); border-radius: 8px; padding: 12px; font-size: .68rem }
+  .inspector h3 { font-family: var(--kc-sans); letter-spacing: -.01em; margin: .3rem 0 }
+  .open { background: var(--kc-ink); color: var(--kc-paper); border-radius: 5px; padding: 4px 9px; text-decoration: none; font-size: .62rem }
+  .fallback { position: absolute; bottom: 8px; left: 12px; font-size: .58rem }
+  .fallback a { color: var(--kc-faint) }
+</style>

@@ -1,0 +1,34 @@
+---
+interface Props { slug: string }
+const { slug } = Astro.props
+---
+<div class="kc-minigraph">
+  <span class="kl kc-label">◉ neighborhood</span>
+  <div class="cv" id={`mg-${slug.replace(/[^a-z0-9]/g, '-')}`} data-slug={slug}></div>
+  <a class="open kc-mono" href={`/graph/?node=${encodeURIComponent('note:' + slug)}`}>open in graph ↗</a>
+</div>
+<script>
+  import Graph from 'graphology'
+  import Sigma from 'sigma'
+  const host = document.querySelector('.kc-minigraph .cv') as HTMLElement
+  const slug = host.dataset.slug!
+  const artifact = await (await fetch('/graph.json')).json()
+  const center = 'note:' + slug
+  const keep = new Set([center])
+  for (const e of artifact.edges) { if (e.s === center) keep.add(e.t); if (e.t === center) keep.add(e.s) }
+  const g = new Graph({ type: 'undirected' })
+  for (const n of artifact.nodes) if (keep.has(n.id))
+    g.addNode(n.id, { label: n.label, x: n.x, y: n.y, size: n.id === center ? 7 : 4,
+                      color: n.id === center ? getComputedStyle(document.body).getPropertyValue('--kc-accent') : '#c9c2b6' })
+  for (const e of artifact.edges) if (keep.has(e.s) && keep.has(e.t) && g.hasNode(e.s) && g.hasNode(e.t) && !g.hasEdge(e.s, e.t))
+    g.addEdge(e.s, e.t, { color: '#e8e2d8', size: 0.5 })
+  if (g.order > 0) new Sigma(g, host, { renderLabels: g.order <= 12 })
+  else host.innerHTML = '<p style="color:var(--kc-faint);font-size:.62rem;text-align:center;padding:1rem 0">graph not yet grown ⟡</p>'
+</script>
+<style>
+  .kc-minigraph { border: 1px solid var(--kc-border); border-radius: 7px; position: relative;
+                  background: var(--kc-paper); padding: .8rem .5rem .3rem; margin-top: 1rem }
+  .kl { position: absolute; top: -.5em; left: .7rem; background: var(--kc-paper); padding: 0 .45em }
+  .cv { height: 120px }
+  .open { display: block; text-align: right; font-size: .55rem; color: var(--kc-faint); text-decoration: none; padding: 0 .3rem .3rem }
+</style>

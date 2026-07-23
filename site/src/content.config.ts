@@ -2,10 +2,11 @@ import { defineCollection, z } from 'astro:content'
 import { defineKmsConfig } from '@org-os/knowledge-commons'
 import { notesLoader, registriesLoader } from '@org-os/knowledge-commons/loaders'
 import rawConfig from '../kms.config.mjs'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// ROOT is the site/ dir. Anchor to process.cwd() (astro build runs from site/)
+// rather than import.meta.url, which is unreliable in bundled endpoints/pages
+// where fileURLToPath points at a build chunk, not the source path.
+export const ROOT = process.cwd()
 export const kmsConfig = defineKmsConfig(rawConfig)
 
 const notes = defineCollection({

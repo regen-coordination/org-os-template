@@ -4,6 +4,7 @@ import Shell from '@org-os/knowledge-commons/components/Shell.astro'
 import KBox from '@org-os/knowledge-commons/components/KBox.astro'
 import FileTree from '@org-os/knowledge-commons/components/FileTree.astro'
 import NoteAside from '@org-os/knowledge-commons/components/NoteAside.astro'
+import MiniGraph from '@org-os/knowledge-commons/components/MiniGraph.astro'
 import { kmsConfig } from '../content.config'
 
 export async function getStaticPaths() {
@@ -47,7 +48,9 @@ const tagLine = note.tags.length ? note.tags.join(' · ') : null
       <div class="prose" set:html={note.html} />
     </article>
     <NoteAside headings={note.headings} backlinks={note.backlinks} relPath={note.relPath}
-      source={note.source} date={note.date} commit={null} slug={note.slug} />
+      source={note.source} date={note.date} commit={null} slug={note.slug}>
+      <MiniGraph slot="graph" slug={note.slug} />
+    </NoteAside>
   </div>
 </Shell>
 <style>

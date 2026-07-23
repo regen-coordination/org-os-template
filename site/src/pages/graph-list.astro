@@ -1,0 +1,36 @@
+---
+import Shell from '@org-os/knowledge-commons/components/Shell.astro'
+import KBox from '@org-os/knowledge-commons/components/KBox.astro'
+import { commonsFor } from '@org-os/knowledge-commons/loaders'
+import { kmsConfig, ROOT } from '../content.config'
+
+const c = await commonsFor(kmsConfig, ROOT)
+const nodes = c.artifact?.nodes ?? []
+const bySource: Record<string, typeof nodes> = {}
+for (const n of nodes) (bySource[n.source ||= 'unknown'] ??= []).push(n)
+const sourceLabel = (id: string) => kmsConfig.sources.find(s => s.id === id)?.label ?? id
+---
+<Shell title={`graph (list) — ${kmsConfig.identity.name}`} identity={kmsConfig.identity}>
+  <div class="glist">
+    <h1>Graph<span style="color:var(--kc-accent)">.</span> <span class="sub kc-mono">list view · {nodes.length} nodes</span></h1>
+    <p class="hint kc-mono">Text fallback for the <a href="/graph/">interactive graph</a> — accessible to screen readers and no-JS clients.</p>
+    {Object.entries(bySource).sort().map(([src, list]) => (
+      <KBox label={`├ ${sourceLabel(src)}`} corner={String(list.length)}>
+        <ul>{list.sort((a, b) => a.label.localeCompare(b.label)).map(n => (
+          <li>{n.slug ? <a href={`/${n.slug}`}>{n.label}</a> : <span>{n.label}</span>}
+            <span class="kind kc-mono">{n.kind}</span></li>
+        ))}</ul>
+      </KBox>
+    ))}
+  </div>
+</Shell>
+<style>
+  .glist { max-width: 820px; margin: 0 auto; padding: 1rem 1.1rem 3rem }
+  h1 { font-size: 1.5rem; letter-spacing: -.03em; font-weight: 600 }
+  .sub { color: var(--kc-faint); font-size: .7rem; font-weight: 400 }
+  .hint { color: var(--kc-muted); font-size: .68rem } .hint a { color: var(--kc-accent) }
+  ul { list-style: none; margin: 0; padding: 0; columns: 2; font-size: .74rem; line-height: 1.7 }
+  li { break-inside: avoid } a { color: var(--kc-ink); text-decoration: none }
+  a:hover { border-bottom: 1px solid var(--kc-accent) }
+  .kind { color: var(--kc-faint); font-size: .55rem; margin-left: .3rem }
+</style>
