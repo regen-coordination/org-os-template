@@ -1,0 +1,54 @@
+---
+---
+<dialog id="kc-palette" class="kc-mono">
+  <input id="kc-q" placeholder="search the commons…" autofocus />
+  <ul id="kc-results"></ul>
+  <p class="hint">↑↓ navigate · ↵ open · esc close</p>
+</dialog>
+<script>
+  const dialog = document.getElementById('kc-palette') as HTMLDialogElement
+  const input = document.getElementById('kc-q') as HTMLInputElement
+  const list = document.getElementById('kc-results')!
+  let pagefind: any = null
+  async function open() {
+    dialog.showModal(); input.value = ''; list.innerHTML = ''
+    // Non-literal specifier so the bundler can't resolve /pagefind/ at build time
+    // (the index only exists after `astro build` runs the pagefind integration).
+    const pf = '/pagefind/pagefind.js'
+    pagefind ??= await import(/* @vite-ignore */ pf).catch(() => null)
+  }
+  document.getElementById('kc-palette-open')?.addEventListener('click', open)
+  addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); dialog.open ? dialog.close() : open() }
+  })
+  let sel = 0
+  input.addEventListener('input', async () => {
+    if (!pagefind || input.value.length < 2) { list.innerHTML = ''; return }
+    const search = await pagefind.search(input.value)
+    const items = await Promise.all(search.results.slice(0, 8).map((r: any) => r.data()))
+    sel = 0
+    list.innerHTML = items.map((d: any, i: number) =>
+      `<li class="${i === 0 ? 'sel' : ''}"><a href="${d.url}">${d.meta?.title ?? d.url}</a><span>${d.excerpt}</span></li>`).join('')
+  })
+  input.addEventListener('keydown', e => {
+    const items = [...list.querySelectorAll('li')]
+    if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1) }
+    else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0) }
+    else if (e.key === 'Enter' && items[sel]) { location.href = items[sel].querySelector('a')!.href }
+    else return
+    e.preventDefault(); items.forEach((li, i) => li.classList.toggle('sel', i === sel))
+  })
+</script>
+<style>
+  dialog { border: 1px solid var(--kc-border); border-radius: 8px; background: var(--kc-paper);
+    width: min(560px, 90vw); padding: 0 }
+  dialog::backdrop { background: rgba(20, 16, 12, .35) }
+  input { width: 100%; border: 0; border-bottom: 1px solid var(--kc-hairline); background: none;
+    padding: .8rem 1rem; font: inherit; font-size: .8rem; color: var(--kc-ink); outline: none }
+  ul { list-style: none; margin: 0; padding: .3rem 0; max-height: 50vh; overflow-y: auto }
+  li { padding: .45rem 1rem; font-size: .72rem } li.sel { background: var(--kc-paper-tint); border-left: 2px solid var(--kc-accent) }
+  li a { color: var(--kc-ink); text-decoration: none; display: block }
+  li span { color: var(--kc-faint); font-size: .62rem; display: block }
+  li span :global(mark) { background: none; color: var(--kc-accent) }
+  .hint { color: var(--kc-faint); font-size: .55rem; padding: .4rem 1rem; border-top: 1px solid var(--kc-hairline); margin: 0 }
+</style>

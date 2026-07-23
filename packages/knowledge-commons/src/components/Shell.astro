@@ -1,5 +1,6 @@
 ---
 import '../styles/tokens.css'
+import Palette from './Palette.astro'
 interface Props { title: string; identity: { name: string; emoji: string; accent: string }; commit?: string | null }
 const { title, identity, commit } = Astro.props
 const [brand, rest] = identity.name.includes('/') ? identity.name.split(/\/(.+)/) : [identity.name, '']
@@ -24,6 +25,19 @@ const [brand, rest] = identity.name.includes('/') ? identity.name.split(/\/(.+)/
     <span>⠿ synced{commit ? ` @ ${commit}` : ''} · built by the network, for the network</span>
     <span><a href="/.well-known/dao.json">.well-known ↗</a> · <a href="/rss.xml">rss ↗</a> · <a href="/llms.txt">llms.txt ↗</a></span>
   </footer>
+  <Palette />
+  <script>
+    document.getElementById('kc-wander')?.addEventListener('click', async e => {
+      e.preventDefault()
+      const idx = await (await fetch('/notes-index.json')).json()
+      const visited = new Set(JSON.parse(localStorage.getItem('kc-visited') ?? '[]'))
+      const pool = idx.filter((n: any) => !visited.has(n.slug))
+      const weighted = (pool.length ? pool : idx).flatMap((n: any) => Array(1 + Math.min(5, n.degree)).fill(n))
+      const pick = weighted[Math.floor(Math.random() * weighted.length)]
+      visited.add(pick.slug); localStorage.setItem('kc-visited', JSON.stringify([...visited].slice(-200)))
+      location.href = '/' + pick.slug
+    })
+  </script>
 </body>
 </html>
 <style>
