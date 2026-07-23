@@ -489,6 +489,46 @@ Check package documentation for dependency notes.
 
 ---
 
+## @org-os/knowledge-commons
+
+A reusable Astro integration that turns any org-os instance's content into a sleek
+knowledge-commons site — a full replacement for Obsidian Publish / Quartz, with an
+interactive knowledge graph. Lives at `packages/knowledge-commons/`; the reference
+deployment is `site/` (mounts org-os + regen-toolkit + refi-dao + refi-bcn).
+
+**What it provides**
+- **Content Layer loaders** (`./loaders`): `notesLoader`, `registriesLoader`, plus
+  `buildCommons`/`commonsFor` — multi-source Markdown + `data/*.yaml` → typed collections.
+- **Link core**: wikilink resolver (local-first, ambiguity-aware), backlink index,
+  broken-link report. Built on Astro's Content Layer (no dead deps — BrainDB was
+  deliberately reimplemented, not adopted).
+- **Graph pipeline**: graphify `graph.json` (NetworkX) → Graphology, merged with the
+  wikilink graph, seeded ForceAtlas2 layout baked at build → one compact artifact
+  (~0.14 MB gz for 3.6k nodes). Rendered via a sigma.js WebGL island.
+- **UI** (`./components/*`, `./styles/tokens.css`): Swiss-Technical × organic/ASCII
+  design system — `Shell`, `KBox`, `FileTree`, `NoteAside`, `GraphExplorer`,
+  `MiniGraph`, `Palette`. All themed via `--kc-*` CSS custom properties.
+
+**How an instance adopts it**
+1. `npm i @org-os/knowledge-commons` (workspace: `file:../packages/knowledge-commons`).
+2. Write `kms.config.mjs` — `identity` (name/emoji/accent) + `sources[]`
+   (`id`, `label`, `dir`, `content` globs, optional `exclude`/`data`/`graph`/`trails`)
+   + `features` flags. `dir` paths resolve from the site root (`process.cwd()`).
+3. Wire `notesLoader`/`registriesLoader` into `src/content.config.ts` (export `ROOT`
+   and `kmsConfig`), then add three pages minimum: `index.astro`, `graph.astro`,
+   `[...slug].astro`. Optional: `registry/`, `topics/[tag]`, `llms.txt`, `rss.xml`.
+4. `npm run build` — fully static, deploy anywhere. Static v1; components are
+   islands-ready for a Server-Islands upgrade later.
+
+**Resilience:** nothing content-shaped fails the build — malformed frontmatter,
+broken/ambiguous wikilinks, and missing graph files degrade gracefully (spec §8).
+
+Design: `docs/superpowers/specs/2026-07-23-org-os-kms-design.md` ·
+Plan: `docs/superpowers/plans/2026-07-23-org-os-kms.md` ·
+Research: `docs/knowledge-commons-astro-stack.md`.
+
+---
+
 ## References
 
 - **Setup Script:** `scripts/setup-org-os.mjs`
