@@ -1,0 +1,39 @@
+---
+import '../styles/tokens.css'
+interface Props { title: string; identity: { name: string; emoji: string; accent: string }; commit?: string | null }
+const { title, identity, commit } = Astro.props
+const [brand, rest] = identity.name.includes('/') ? identity.name.split(/\/(.+)/) : [identity.name, '']
+---
+<html lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  <style define:vars={{ accent: identity.accent }}>:root { --kc-accent: var(--accent) }</style>
+</head>
+<body>
+  <header class="kc-mono">
+    <span><span class="dot">{identity.emoji}</span> <b>{brand}</b><span class="sep">/</span>{rest}</span>
+    <nav>
+      <a href="/">knowledge</a> · <a href="/registry/">registry</a> ·
+      <a href="/graph/" class="acc">graph</a> · <a href="#" id="kc-wander" class="acc">wander ⚄</a> ·
+      <button id="kc-palette-open" class="kbd">⌘K</button>
+    </nav>
+  </header>
+  <main><slot /></main>
+  <footer class="kc-mono">
+    <span>⠿ synced{commit ? ` @ ${commit}` : ''} · built by the network, for the network</span>
+    <span><a href="/.well-known/dao.json">.well-known ↗</a> · <a href="/rss.xml">rss ↗</a> · <a href="/llms.txt">llms.txt ↗</a></span>
+  </footer>
+</body>
+</html>
+<style>
+  header, footer { display: flex; justify-content: space-between; align-items: baseline;
+    padding: .7rem 1.1rem; border-bottom: 1px solid var(--kc-hairline); font-size: .7rem }
+  footer { border-bottom: 0; border-top: 1px solid var(--kc-hairline); color: var(--kc-faint); font-size: .62rem }
+  header a, footer a { color: inherit; text-decoration: none }
+  header nav { color: var(--kc-muted) } header nav a.acc { color: var(--kc-accent) }
+  .dot { color: var(--kc-accent) } .sep { color: var(--kc-border) }
+  .kbd { border: 1px solid var(--kc-border); border-radius: 3px; padding: 0 .35em; background: none;
+         font: inherit; color: inherit; cursor: pointer }
+  main { min-height: 70vh }
+</style>

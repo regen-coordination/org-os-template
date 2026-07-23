@@ -1,0 +1,31 @@
+:root {
+  --kc-accent: #d6281e;
+  --kc-paper: #fdfcfa;
+  --kc-paper-tint: #fcfaf6;
+  --kc-ink: #1a1714;
+  --kc-ink-soft: #3d3831;
+  --kc-muted: #8a8378;
+  --kc-faint: #a39d94;
+  --kc-hairline: #eae6df;
+  --kc-hairline-soft: #f1ede6;
+  --kc-border: #ddd5c7;
+  --kc-alive: #2ea36b;
+  --kc-mono: 'SF Mono', ui-monospace, Menlo, monospace;
+  --kc-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --kc-measure: 60ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --kc-paper: #16130f; --kc-paper-tint: #1c1813; --kc-ink: #ece7de;
+    --kc-ink-soft: #cfc8bc; --kc-muted: #8a8378; --kc-faint: #6b6459;
+    --kc-hairline: #2a251e; --kc-hairline-soft: #221e18; --kc-border: #3a342b;
+  }
+}
+* { box-sizing: border-box }
+body { margin: 0; background: var(--kc-paper); color: var(--kc-ink); font-family: var(--kc-sans) }
+.kc-mono { font-family: var(--kc-mono) }
+.kc-label { font-family: var(--kc-mono); font-size: .6rem; letter-spacing: .16em; color: var(--kc-accent); text-transform: uppercase }
+a.kc-wikilink { color: inherit; text-decoration: none; border-bottom: 1px solid var(--kc-accent) }
+.kc-deadlink { color: var(--kc-muted); border-bottom: 1px dashed var(--kc-border); cursor: help }
+.kc-ambiguous { border-bottom: 1px double var(--kc-accent); cursor: help }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }

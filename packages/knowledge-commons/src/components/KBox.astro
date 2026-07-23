@@ -1,0 +1,19 @@
+---
+interface Props { label: string; corner?: string; tint?: boolean; accent?: boolean }
+const { label, corner, tint = false, accent = false } = Astro.props
+---
+<section class:list={['kbox', { tint, accent }]}>
+  <span class="kl" set:html={label} />
+  {corner && <span class="kc" set:html={corner} />}
+  <slot />
+</section>
+<style>
+  .kbox { border: 1px solid var(--kc-border); border-radius: 7px; position: relative;
+          padding: 1rem .9rem .8rem; background: var(--kc-paper); margin-top: 1rem }
+  .kbox.tint { background: var(--kc-paper-tint) }
+  .kbox.accent { border-color: var(--kc-accent) }
+  .kl, .kc { position: absolute; top: -.5em; background: inherit; padding: 0 .45em;
+             font-family: var(--kc-mono); font-size: .6rem; letter-spacing: .16em }
+  .kl { left: .7rem; color: var(--kc-accent) }
+  .kc { right: .7rem; color: var(--kc-faint) }
+</style>

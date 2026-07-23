@@ -1,6 +1,10 @@
 ---
 // src/pages/index.astro (placeholder, replaced in Task 17)
 import { getCollection } from 'astro:content'
+import Shell from '@org-os/knowledge-commons/components/Shell.astro'
+import { kmsConfig } from '../content.config'
 const notes = await getCollection('notes')
 ---
-<html><body><h1>commons</h1><p>{notes.length} notes loaded</p></body></html>
+<Shell title="commons" identity={kmsConfig.identity}>
+  <p>{notes.length} notes</p>
+</Shell>
