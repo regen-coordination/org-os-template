@@ -1,0 +1,68 @@
+---
+import { getCollection } from 'astro:content'
+import Shell from '@org-os/knowledge-commons/components/Shell.astro'
+import KBox from '@org-os/knowledge-commons/components/KBox.astro'
+import FileTree from '@org-os/knowledge-commons/components/FileTree.astro'
+import NoteAside from '@org-os/knowledge-commons/components/NoteAside.astro'
+import { kmsConfig } from '../content.config'
+
+export async function getStaticPaths() {
+  const notes = await getCollection('notes')
+  return notes.map(n => ({ params: { slug: n.data.slug }, props: { note: n.data, all: notes.map(x => x.data) } }))
+}
+const { note, all } = Astro.props
+
+// file tree: source → folders → notes
+function buildTree(notes: typeof all) {
+  const roots: any[] = []
+  for (const src of kmsConfig.sources) {
+    const mine = notes.filter(n => n.source === src.id)
+    const top = { name: `${src.emoji ?? ''} ${src.label}`.trim(), slug: src.id, count: mine.length, children: [] as any[] }
+    for (const n of mine.sort((a, b) => a.slug.localeCompare(b.slug))) {
+      const segs = n.slug.split('/').slice(1)
+      let cursor = top
+      for (let i = 0; i < segs.length - 1; i++) {
+        const dirSlug = [src.id, ...segs.slice(0, i + 1)].join('/')
+        let dir = cursor.children.find((c: any) => c.slug === dirSlug && c.children.length >= 0 && !c.isLeaf)
+        if (!dir) { dir = { name: segs[i], slug: dirSlug, count: 0, children: [] }; cursor.children.push(dir) }
+        dir.count++; cursor = dir
+      }
+      cursor.children.push({ name: n.title, slug: n.slug, count: 0, children: [], isLeaf: true })
+    }
+    roots.push(top)
+  }
+  return roots
+}
+const tree = buildTree(all)
+const tagLine = note.tags.length ? note.tags.join(' · ') : null
+---
+<Shell title={`${note.title} — ${kmsConfig.identity.name}`} identity={kmsConfig.identity}>
+  <div class="note-grid">
+    <FileTree tree={tree} currentSlug={note.slug} />
+    <article data-pagefind-body>
+      <p class="crumb kc-mono">❦ {tagLine ?? note.source} · {note.slug.split('/').slice(0, -1).join('/')}</p>
+      <h1>{note.title}</h1>
+      <p class="meta kc-mono">{note.date ? `tended ${note.date.slice(0, 10)}` : 'undated'} · ~{Math.max(1, Math.round(note.body.split(/\s+/).length / 220))} min</p>
+      <div class="rule"></div>
+      <div class="prose" set:html={note.html} />
+    </article>
+    <NoteAside headings={note.headings} backlinks={note.backlinks} relPath={note.relPath}
+      source={note.source} date={note.date} commit={null} slug={note.slug} />
+  </div>
+</Shell>
+<style>
+  .note-grid { display: flex; min-height: 80vh }
+  article { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.4rem 1rem }
+  article > * { width: 100%; max-width: var(--kc-measure) }
+  .crumb { color: var(--kc-faint); font-size: .6rem; letter-spacing: .08em }
+  h1 { font-size: 1.7rem; letter-spacing: -.03em; margin: .4rem 0 .1rem; font-weight: 600 }
+  .meta { color: var(--kc-faint); font-size: .6rem }
+  .rule { width: 26px; height: 2px; background: var(--kc-accent); margin: .8rem 0 }
+  .prose { line-height: 1.85; font-size: .95rem; color: var(--kc-ink-soft) }
+  .prose :global(h2) { letter-spacing: -.02em; margin-top: 2rem }
+  .prose :global(code) { font-family: var(--kc-mono); font-size: .82em; background: var(--kc-paper-tint);
+    border: 1px solid var(--kc-hairline); border-radius: 3px; padding: 0 .3em }
+  .prose :global(pre) { background: var(--kc-paper-tint); border: 1px solid var(--kc-hairline);
+    border-radius: 7px; padding: .9rem; overflow-x: auto }
+  @media (max-width: 900px) { .note-grid { flex-direction: column } .kc-aside { width: 100% !important; border-left: 0 !important } }
+</style>

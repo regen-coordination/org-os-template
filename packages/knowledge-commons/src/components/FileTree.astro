@@ -1,0 +1,47 @@
+---
+interface TreeNode { name: string; slug?: string; count: number; children: TreeNode[] }
+interface Props { tree: TreeNode[]; currentSlug: string }
+const { tree, currentSlug } = Astro.props
+---
+<aside class="kc-filetree kc-mono" data-collapsed="true">
+  <button class="rail" id="kc-tree-toggle" aria-label="toggle file tree">»</button>
+  <div class="panel">
+    <div class="head"><span class="kc-label">⌂ files</span><button id="kc-tree-close">«</button></div>
+    <ul>{tree.map(top => (
+      <li><details open={currentSlug.startsWith(top.slug ?? ' ')}>
+        <summary>{top.name} <span class="n">{top.count}</span></summary>
+        <ul>{top.children.map(function render(c): any { return (
+          <li class:list={{ here: c.slug === currentSlug }}>
+            {c.children.length
+              ? <details open={currentSlug.startsWith((c.slug ?? '') + '/')}><summary>{c.name} <span class="n">{c.count}</span></summary>
+                  <ul>{c.children.map(render)}</ul></details>
+              : <a href={`/${c.slug}`}>{c.name}</a>}
+          </li>) })}</ul>
+      </details></li>))}
+    </ul>
+  </div>
+</aside>
+<script>
+  const el = document.querySelector('.kc-filetree')!
+  const setState = (open: boolean) => { el.setAttribute('data-collapsed', String(!open)); localStorage.setItem('kc-tree', String(open)) }
+  document.getElementById('kc-tree-toggle')!.addEventListener('click', () => setState(true))
+  document.getElementById('kc-tree-close')!.addEventListener('click', () => setState(false))
+  if (localStorage.getItem('kc-tree') === 'true') setState(true)
+  addEventListener('keydown', e => { if (e.key === '[' && !(e.target as HTMLElement).closest('input,textarea')) setState(el.getAttribute('data-collapsed') === 'true') })
+</script>
+<style>
+  .kc-filetree { font-size: .68rem }
+  .rail { width: 26px; border: 0; border-right: 1px solid var(--kc-hairline); background: var(--kc-paper-tint);
+          color: var(--kc-accent); cursor: pointer; height: 100%; font: inherit }
+  .panel { display: none; width: 200px; border-right: 1px solid var(--kc-hairline);
+           background: var(--kc-paper-tint); padding: .8rem .6rem; height: 100%; overflow-y: auto }
+  [data-collapsed="false"] .rail { display: none }
+  [data-collapsed="false"] .panel { display: block }
+  .head { display: flex; justify-content: space-between; margin-bottom: .5rem }
+  .head button { border: 0; background: none; color: var(--kc-faint); cursor: pointer; font: inherit }
+  ul { list-style: none; padding-left: .7rem; margin: 0; line-height: 1.8 }
+  summary { cursor: pointer; color: var(--kc-ink-soft) }
+  a { color: var(--kc-muted); text-decoration: none }
+  .here > a { color: var(--kc-ink); border-left: 2px solid var(--kc-accent); padding-left: .3rem; font-weight: 600 }
+  .n { color: var(--kc-faint); font-size: .55rem }
+</style>

@@ -1,0 +1,31 @@
+---
+interface Props {
+  headings: { depth: number; text: string; id: string }[]
+  backlinks: { fromSlug: string; fromTitle: string; fromSource: string }[]
+  relPath: string; source: string; date: string | null; commit: string | null; slug: string
+}
+const { headings, backlinks, relPath, source, date, commit, slug } = Astro.props
+import KBox from './KBox.astro'
+---
+<aside class="kc-aside">
+  <slot name="graph" />
+  <div id="kc-minigraph-slot" data-slug={slug}></div>
+  {headings.length > 0 && <KBox label="§ contents">
+    <ul class="toc">{headings.map(h => <li style={`padding-left:${(h.depth - 2) * .7}rem`}><a href={`#${h.id}`}>{h.text}</a></li>)}</ul>
+  </KBox>}
+  <KBox label="← backlinks" corner={String(backlinks.length)}>
+    {backlinks.length === 0 && <p class="empty">no backlinks yet ⟡</p>}
+    <ul class="bl">{backlinks.slice(0, 8).map(b => <li><a href={`/${b.fromSlug}`}>{b.fromTitle}</a> <span class="src">{b.fromSource}</span></li>)}</ul>
+    {backlinks.length > 8 && <p class="more">⋯ {backlinks.length - 8} more</p>}
+  </KBox>
+  <p class="prov kc-mono">src {source}/{relPath}<br />{date && `tended ${date.slice(0, 10)} · `}⠿ {commit ?? 'local'}</p>
+</aside>
+<style>
+  .kc-aside { width: 230px; padding: 0 .9rem; border-left: 1px solid var(--kc-hairline); background: var(--kc-paper-tint) }
+  ul { list-style: none; margin: 0; padding: 0; font-size: .72rem; line-height: 1.8 }
+  a { color: var(--kc-ink-soft); text-decoration: none }
+  .toc a { color: var(--kc-muted) }
+  .src { color: var(--kc-faint); font-size: .55rem; font-family: var(--kc-mono) }
+  .empty, .more { color: var(--kc-faint); font-size: .65rem }
+  .prov { color: var(--kc-faint); font-size: .55rem; line-height: 1.7; margin-top: 1rem }
+</style>
