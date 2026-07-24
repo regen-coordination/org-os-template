@@ -10,7 +10,7 @@ Make an org-os instance fully visible and operable through multica, without givi
 
 Two directions, combined and staged:
 
-- **Hands (Phase 1):** org-os becomes an *agent provider* multica can invoke — issues assigned to the "org-os" agent execute as headless, session-disciplined org-os sessions.
+- **Hands (Phase 1):** org-os becomes an *executable teammate* in multica — an "org-os operator" agent persona (instructions + imported org-os skills, riding the detected `claude` runtime, bound to the instance repo via a `local_directory` project resource) executes issues as session-disciplined org-os work.
 - **Eyes (Phase 2):** org-os state is *projected* into multica — tasks, agents, skills, and cron become issues, agent profiles, registry skills, and autopilots, with reconciled write-back.
 
 A native "git-backed workspace" driver inside multica (Approach B) is deliberately deferred to an upstream RFC in Phase 3, informed by real bridge mileage.
@@ -37,18 +37,19 @@ A native "git-backed workspace" driver inside multica (Approach B) is deliberate
                              │ autopilots           │
                      ┌───────▼────────┐    ┌────────▼───────────────┐
                      │ Multica daemon │    │ packages/multica-bridge │  Phase 2
-                     │ (local, PATH   │    │ (org-os sync: yaml ⇄    │
-                     │  auto-detect)  │    │  issues, agents, skills,│
+                     │ (local; runs   │    │ (org-os sync: yaml ⇄    │
+                     │ detected CLIs) │    │  issues, agents, skills,│
                      └───────┬────────┘    │  autopilots)            │
-                             │ invokes     └────────┬───────────────┘
-                     ┌───────▼────────┐             │ reads/writes
-                     │ org-os CLI shim│   Phase 1   │
-                     │ (agent provider│─────────────▼──────────────┐
-                     │  → headless    │    org-os instance repo     │
-                     │  session)      │    data/*.yaml · memory/ ·  │
-                     └────────────────┘    skills/ · HEARTBEAT.md   │
-                                           (canonical truth, git)   │
-                                           └────────────────────────┘
+                             │ runs `claude` as    └────┬───────────┘
+                             │ "org-os operator" agent  │ reads/writes
+                     ┌───────▼─────────────┐  Phase 1   │
+                     │ org-os operator     │────────────▼───────────┐
+                     │ persona: session-   │   org-os instance repo  │
+                     │ discipline instr. + │   data/*.yaml · memory/ │
+                     │ imported skills;    │   skills/ · HEARTBEAT.md│
+                     │ local_directory →   │   (canonical truth, git)│
+                     │ instance repo       │   └─────────────────────┘
+                     └─────────────────────┘
 ```
 
 Multica stays **vanilla** — no fork. Its database is a cache of projections; org-os remains fully functional if multica is down.
@@ -61,14 +62,16 @@ Multica stays **vanilla** — no fork. Its database is a cache of projections; o
 - Run `multica daemon` locally; create one workspace `org-os`.
 - Verify a vanilla flow: assign a trivial issue to a detected agent CLI (e.g. Claude Code) and watch it execute.
 
-### Phase 1 — Hands: `org-os` agent provider (~1 day)
+### Phase 1 — Hands: "org-os operator" agent persona (~1 day)
 
-Creates `packages/multica-bridge/` (which Phase 2 extends with the sync loop). A small executable `packages/multica-bridge/bin/org-os-agent`, symlinked onto PATH so multica's daemon auto-detects it as an agent CLI. Per invocation:
+**Research finding (2026-07-24, from multica source):** the daemon's provider registry is hardcoded (`defaultAgentCommandNames` + explicit `probe()` calls in `server/internal/daemon/config.go`) — a custom CLI on PATH is never auto-detected, so the originally-sketched PATH shim is not viable without forking. Multica's *supported* customization layer is the **Agent**: an instructions block (markdown, passed verbatim to the runtime CLI) plus skills materialized from GitHub URLs, riding an already-detected runtime (`claude`). Projects additionally support a **`local_directory` resource** (`server/internal/handler/agent.go`) that binds tasks to an existing local directory on a specific daemon instead of a fresh worktree.
 
-1. **Receive** the issue prompt/spec from multica (stdin/args — exact invocation contract to be confirmed against multica's `server/` + daemon code during implementation).
-2. **Resolve workspace** — the target org-os instance repo, from shim config (pilot: this framework repo).
-3. **Execute headless** — invoke `claude -p` (or OpenCode) with a session preamble enforcing org-os discipline: read `IDENTITY.md`/`AGENTS.md` + relevant `data/*.yaml`; do the task; append to `memory/YYYY-MM-DD.md`; run `npm run generate:schemas` if data changed; commit to an `agent/<issue-id>` branch.
-4. **Stream/return** progress and the final result to the daemon so multica shows live status.
+Phase 1 therefore ships, in `packages/multica-bridge/` (which Phase 2 extends with the sync loop):
+
+1. **Operator instructions** — `packages/multica-bridge/personas/org-os-operator.md`: the session-discipline preamble pasted into the multica agent's instructions: bootstrap context from `IDENTITY.md`/`AGENTS.md` + relevant `data/*.yaml`; do the task; append to `memory/YYYY-MM-DD.md`; run `npm run generate:schemas` if data changed; commit to an `agent/<issue-id>` branch; draft-and-present anything external.
+2. **Multica-side setup** (documented, scriptable where the API allows): workspace `org-os` → agent "org-os operator" (runtime `claude`, instructions from the persona file, skills imported from `github.com/regen-coordination/org-os-template` `skills/`) → project bound to the local framework repo via `local_directory` pinned to the Mac's daemon.
+3. **Runtime permission profile** — the instance repo's `.claude/settings.json` (checked in) enforcing the autonomy policy at the CLI layer: allow repo-internal ops, deny `git push` and external-comms tools.
+4. **Smoke issue** — an issue assigned to the operator that performs a real yaml task end-to-end and lands an `agent/<issue-id>` branch.
 
 ### Phase 2 — Eyes: `packages/multica-bridge/` (~2–3 days)
 
@@ -88,11 +91,11 @@ One process, `npm run multica:sync` (daemon mode or one-shot), running four mapp
 - **Conflict rule: yaml wins.** The multica-side edit is preserved as a memory note — never silently dropped.
 - Issues authored in the multica UI flow back as new task entries in yaml on the next reconcile — the UI is a legitimate *input* surface even though git is truth.
 
-**Config:** `packages/multica-bridge/config.yaml`, shared by shim and bridge — instance path, delegated agent CLI, multica endpoint/credentials reference, autonomy policy, `vaultSafe` flag.
+**Config:** `packages/multica-bridge/config.yaml`, shared by the Phase 1 setup tooling and the bridge — instance path, multica endpoint/credentials reference, workspace/agent/project identifiers.
 
 ### Phase 3 — Upstream (ongoing)
 
-1. **Provider PR** — add org-os to multica's supported agent CLIs (follows the pattern of their existing ~14 providers; the credibility opener).
+1. **Agent-template PR** — contribute an "org-os operator" template to multica's curated catalog (`server/internal/agenttmpl/templates/`, plain JSON added by normal PR — a far cheaper opener than a Go provider). A native provider PR remains an option later if the persona proves limiting.
 2. **Bridge as reference** — register `multica-bridge` in org-os's `PACKAGES.md` as the "git-backed org connector" reference implementation; write it up for the multica community.
 3. **Git-backed workspace RFC** — after real mileage, propose the workspace-storage abstraction upstream (multica workspaces backed directly by a git repo of yaml), with the bridge as evidence of demand and shape.
 
@@ -100,22 +103,22 @@ Federation-wide rollout (one multica workspace per org-os instance: hub, refi-bc
 
 ## Safety
 
-Enforced at the **shim layer**, not by trusting the LLM:
+Enforced at the **runtime-CLI permission layer** (the repo's checked-in `.claude/settings.json`), not by trusting the LLM:
 
-- Headless sessions run with a permission profile allowlisting repo-internal ops (file edits within the instance repo, `npm run` scripts, git commit/branch) and denying network sends, `git push`, and external-comms tooling.
-- Session preamble additionally instructs draft-and-present: external actions are written as drafts into the issue result for human execution.
+- Deny rules for `git push`, `git stash`, `git clean`, `git reset --hard`, and external-comms tooling; allow rules for repo-internal ops (file edits within the instance repo, `npm run` scripts, git add/commit/branch). The deny list doubles as the `vaultSafe` guard, so pointing the setup at the Zettelkasten hub or vault-adjacent instances later is safe by default (per `docs/VAULT-SAFETY.md` in the hub).
+- Operator instructions additionally mandate draft-and-present: external actions (comms, publishing, financial) are written as drafts into the issue result for human execution.
 - Agent commits land on `agent/<issue-id>` branches, never directly on `master`. Merging is a human act (or a follow-up reviewed issue).
-- `vaultSafe: true` config flag (on by default) blocks stash/clean/reset-hard patterns, so pointing the shim at the Zettelkasten hub or vault-adjacent instances later is safe by default (per `docs/VAULT-SAFETY.md` in the hub).
+- Known limitation vs the original shim design: instructions are soft; the hard guarantees live entirely in the CLI permission config, so that file is the security boundary and gets its own tests.
 
 ## Error handling
 
-- **Shim:** agent CLI failure or timeout → report `failed` to multica with the log tail; never leave the repo mid-state (the session either commits its branch or discards it).
+- **Operator sessions:** failure or timeout surfaces through multica's own task lifecycle (daemon reports failed runs); operator instructions require never leaving the repo mid-state — a session either commits its `agent/*` branch or leaves the working tree untouched.
 - **Bridge:** multica unreachable → skip cycle, log, retry with backoff; org-os is fully functional without multica. Malformed yaml → fail loudly, sync nothing (no partial projections). Write-backs are atomic per file, validated (`npm run validate:schemas`) before commit.
 - **Sync-state loss:** `.sync-state.json` deleted → full re-reconcile from `orgos_id`s; worst case is duplicate detection by slug, never data loss (git is truth).
 
 ## Testing
 
-- **Shim:** contract test with a fake daemon invocation (golden input → expected session behavior with a stubbed agent CLI); one live smoke against real multica.
+- **Operator:** permission-profile tests (the `.claude/settings.json` deny rules actually block push/stash/clean/reset-hard in a headless `claude -p` probe); persona lint (instructions reference only files that exist); one live smoke issue through real multica.
 - **Bridge:** mapper unit tests (yaml fixture → expected API payloads, and reverse); reconcile-loop test covering the yaml-wins conflict rule; integration smoke against Docker multica (create issue in UI → appears in yaml; edit yaml → appears in UI).
 - Uses the repo's existing `scripts/test` harness conventions.
 
@@ -123,11 +126,12 @@ Enforced at the **shim layer**, not by trusting the LLM:
 
 - **A. Sync bridge only** — eyes without hands; adopted as Phase 2.
 - **B. Fork multica with a native org-os workspace driver** — deepest integration, but heavy Go work in a fast-moving young codebase plus fork-maintenance burden; deferred to the Phase 3 RFC.
-- **C. Agent-provider shim only** — hands without eyes; adopted as Phase 1.
-- Chosen: **C then A, staged**, with B as the upstream endgame — mirrors the KOI early-adopter playbook (work in kind first, architectural contribution second).
+- **C. Agent-provider shim only** — hands without eyes; adopted as Phase 1, then **revised on research**: the daemon's provider registry is hardcoded, so C's mechanism became the persona-based operator (instructions + skills + `local_directory`) rather than a PATH shim.
+- Chosen: **C (persona form) then A, staged**, with B as the upstream endgame — mirrors the KOI early-adopter playbook (work in kind first, architectural contribution second).
 
 ## Open questions (to resolve during implementation)
 
-- Exact daemon↔CLI invocation contract (args/stdin/streaming format) — read from multica source in Phase 1, step 1.
+- ~~Exact daemon↔CLI invocation contract~~ — resolved 2026-07-24: registry hardcoded; persona + `local_directory` is the supported path (see Phase 1).
 - Whether multica's API exposes webhooks usable by the bridge or polling is required initially.
 - Skills registry write format (`skills-lock.json`) fidelity to org-os `SKILL.md` frontmatter.
+- How much of the multica-side setup (workspace, agent, project, local_directory binding) is drivable via REST API vs requiring UI clicks — determines how reproducible `npm run multica:setup` can be.
