@@ -105,7 +105,8 @@ Federation-wide rollout (one multica workspace per org-os instance: hub, refi-bc
 
 Enforced at the **runtime-CLI permission layer** (the repo's checked-in `.claude/settings.json`), not by trusting the LLM:
 
-- Deny rules for `git push`, `git stash`, `git clean`, `git reset --hard`, and external-comms tooling; allow rules for repo-internal ops (file edits within the instance repo, `npm run` scripts, git add/commit/branch). The deny list doubles as the `vaultSafe` guard, so pointing the setup at the Zettelkasten hub or vault-adjacent instances later is safe by default (per `docs/VAULT-SAFETY.md` in the hub).
+- Checked-in deny rules for `git stash`, `git clean`, `git reset --hard` — safe to apply repo-wide because vault-safety already forbids them for every session. The deny list doubles as the `vaultSafe` guard, so pointing the setup at the Zettelkasten hub or vault-adjacent instances later is safe by default (per `docs/VAULT-SAFETY.md` in the hub).
+- `git push` is NOT denied in shared settings (that would break human workflows like `/close`); instead a versioned **pre-push hook** refuses to push `agent/*` branches — the only branches the operator works on — so agent work can never be published without a human merging it to a normal branch first.
 - Operator instructions additionally mandate draft-and-present: external actions (comms, publishing, financial) are written as drafts into the issue result for human execution.
 - Agent commits land on `agent/<issue-id>` branches, never directly on `master`. Merging is a human act (or a follow-up reviewed issue).
 - Known limitation vs the original shim design: instructions are soft; the hard guarantees live entirely in the CLI permission config, so that file is the security boundary and gets its own tests.
