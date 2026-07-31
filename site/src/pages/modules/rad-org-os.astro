@@ -1,50 +1,34 @@
 ---
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import yaml from "js-yaml";
 import Layout from "../../components/Layout.astro";
 import StatusBadge from "../../components/StatusBadge.astro";
 
-const now = [
-  { t: "Substrate-agnostic core", b: "Identity files, memory, registries, schemas, skills — markdown, YAML, and git. No script in the framework calls the GitHub API. An org can seed an instance on Radicle today; nothing breaks, but nothing assists yet." },
-  { t: "Radicle in the federation schema", b: "schemas/federation.yaml lists radicle as a valid platforms.primary value — a declaration slot, not a feature. No code reads it yet." },
-  { t: "KMS connector seam — on paper", b: "The knowledge-management connector-layer design specifies a radicle source driver: Radicle repos as knowledge sources. Written design, not shipped code — the connector layer isn't implemented yet." },
-  { t: "Radicle supplies the primitives", b: "DID identities, patches, issues, private repos, seed nodes on Raspberry-Pi-class hardware, a scriptable CLI, and node events agents can consume (Radicle 1.9.x). CI exists but is bring-your-own." },
-];
-const next = [
-  { t: "Substrate driver interface", b: "clone · sync · push · propose-change · publish-schema, with github and radicle drivers behind the framework's scripts, selected by platforms.primary." },
-  { t: "Radicle bootstrap path", b: "“Where does your org live?” in the setup interview — rad init + seeding instead of a GitHub fork." },
-  { t: "Seed-node runbook", b: "Home server or Raspberry Pi, systemd, seeding policy as membership, Radicle pinned ≥1.9.1." },
-  { t: "KMS radicle connector", b: "Implement the specced stub: pull knowledge from Radicle repos via the read API + CLI." },
-];
-const later = [
-  { t: "Federation transport over Radicle", b: "Instances discover and sync each other peer-to-peer; gossip replaces webhook/cron sync." },
-  { t: "Operator trunks as patches", b: "Per-operator branches become Radicle patches; delegate quorum is the merge gate — canonical org state becomes cryptographically multi-sig." },
-  { t: "DID ↔ members mapping", b: "Members carry did:key; agents verify authorship against the delegate set." },
-  { t: "Agent as node-local daemon", b: "Trigger on node events, act via the rad CLI, read via radicle-httpd. (Official HTTP API is read-only — agents write through the CLI.)" },
-  { t: "Private instances", b: "Allow-list replication for sensitive orgs. Stated plainly: not encrypted at rest — seed-node control is part of the threat model." },
-  { t: "CI + publishing", b: "radicle-ci-broker adapters; publishing via Radicle Pages (paid Radicle Garden service) or self-hosted." },
-];
-const tiers = [
-  { key: "now", label: "Now", status: "live", desc: "True today", items: now },
-  { key: "next", label: "Next", status: "in-dev", desc: "Committed roadmap", items: next },
-  { key: "later", label: "Later", status: "planned", desc: "Exploration — published as exploration", items: later },
-] as const;
+interface TierItem { title: string; body: string; }
+interface Tier { label: string; status: "planned" | "in-dev" | "live"; desc: string; items: TierItem[]; }
+const doc = yaml.load(readFileSync(resolve(process.cwd(), "src/data/rad-org-os.yaml"), "utf8")) as { tiers: Tier[] };
+const tiers = doc.tiers;
+
+const diagramCaption = "Architecture diagram: org files feed a substrate driver interface, which has a github driver and a radicle driver";
 ---
 <Layout title="rad-org-os" current="modules" description="rad-org-os — the sovereign distribution of org-os: the full organizational stack on Radicle, peer-to-peer. And the missing organization layer for Radicle.">
-  <div class="container">
-    <p class="eyebrow">v0.5 module · <span class="mono">rad-org-os</span> <StatusBadge status="in-dev" /></p>
+  <div class="container page">
+    <p class="eyebrow">v0.5 module · <span>rad-org-os</span> <StatusBadge status="in-dev" /></p>
     <h1>Your organization, on infrastructure nobody can withdraw.</h1>
     <p class="prose lead">rad-org-os will run the full org-os stack on <a href="https://radicle.dev">Radicle</a> — peer-to-peer, sovereign, no single chokepoint. Same files, different substrate. It is in development: nothing Radicle-specific has shipped yet, and the map below says exactly what exists.</p>
 
     <section class="why">
-      <article class="surface pad">
-        <h3>For orgs that can't depend on platforms</h3>
+      <article class="surface pad ticked">
+        <h2>For orgs that can't depend on platforms</h2>
         <p>Accounts get suspended; domains get blocklisted. Radicle demonstrated the alternative on itself: when ISPs blocklisted radicle.xyz in April 2026, the project moved domains and the peer-to-peer network was unaffected. HardenedBSD stood up six global replicas in 24 hours.</p>
       </article>
-      <article class="surface pad">
-        <h3>The same argument without the risk</h3>
+      <article class="surface pad ticked">
+        <h2>The same argument without the risk</h2>
         <p>You don't need to be a target to want your org's memory, decisions, and data replicated across machines your members control — instead of one vendor's database.</p>
       </article>
-      <article class="surface pad">
-        <h3>Both directions</h3>
+      <article class="surface pad ticked">
+        <h2>Both directions</h2>
         <p>A sovereign distribution for org-os users — and, since Radicle has no org or team primitive of its own, the missing <em>organization layer</em> for Radicle: membership, memory, governance, and federation composed from files and delegate quorum.</p>
       </article>
     </section>
@@ -61,9 +45,9 @@ const tiers = [
           </div>
           <div class="grid">
             {tier.items.map((it) => (
-              <article class="surface pad item">
-                <h4>{it.t}</h4>
-                <p>{it.b}</p>
+              <article class="surface pad item ticked">
+                <h4>{it.title}</h4>
+                <p>{it.body}</p>
               </article>
             ))}
           </div>
@@ -73,7 +57,8 @@ const tiers = [
 
     <section>
       <h2>Architecture</h2>
-      <pre class="diagram mono" aria-label="Architecture diagram: org files feed a substrate driver interface, which has a github driver and a radicle driver">{`        org files (markdown · YAML · git)
+      <figure class="figure">
+        <pre class="diagram mono" role="img" aria-label={diagramCaption} tabindex="0">{`        org files (markdown · YAML · git)
    identity · memory · data/ · .well-known/ · skills/
                       │
              substrate driver interface
@@ -82,6 +67,8 @@ const tiers = [
            github            radicle
         (remote, PRs)   (seed nodes, patches,
                          DIDs, delegate quorum)`}</pre>
+        <figcaption class="figcap">{diagramCaption}</figcaption>
+      </figure>
     </section>
 
     <section class="status surface pad">
@@ -90,27 +77,29 @@ const tiers = [
     </section>
 
     <div class="ctas">
-      <a class="mono link" href="/docs/rad-org-os">read the docs →</a>
-      <a class="mono link" href="https://github.com/regen-coordination/org-os-template">follow the repo →</a>
-      <a class="mono link" href="/federation">see the federation →</a>
+      <a class="mono link" href="/docs/rad-org-os">read the docs<span class="arr"> →</span></a>
+      <a class="mono link" href="https://github.com/regen-coordination/org-os-template">follow the repo (on GitHub today — that's the point)<span class="arr"> →</span></a>
+      <a class="mono link" href="/federation">see the federation<span class="arr"> →</span></a>
     </div>
   </div>
 </Layout>
 <style>
-.container { padding-block: var(--space-12) var(--space-24); }
-.lead { max-width: 62ch; font-size: var(--text-lg); }
-.eyebrow :global(.badge) { vertical-align: middle; margin-left: var(--space-2); }
+.page { padding-block: var(--space-12) var(--space-24); }
+.lead { font-size: var(--text-lg); }
 section { margin-top: var(--space-16); }
 .pad { padding: var(--space-5); }
 .why { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
-.why h3, .item h4 { margin: 0 0 var(--space-2); }
+.why h2 { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
+.item h4 { margin: 0 0 var(--space-2); }
 .why p, .item p { margin: 0; font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); }
 .tier { margin-top: var(--space-8); }
 .tier-head { display: flex; align-items: center; gap: var(--space-3); border-bottom: var(--border-hair) solid var(--color-line-2); padding-bottom: var(--space-2); margin-bottom: var(--space-4); }
 .tier-head h3 { margin: 0; }
-.tier-desc { font-size: var(--text-sm); color: var(--color-faint); }
+.tier-desc { font-size: var(--text-sm); color: var(--color-muted); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
-.diagram { overflow-x: auto; padding: var(--space-5); font-size: var(--text-sm); line-height: 1.5; color: var(--color-muted); border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius); }
+.diagram { overflow-x: auto; padding: var(--space-5); font-size: var(--text-sm); line-height: 1.5; color: var(--color-muted); background: var(--color-bg-2); }
 .status h2 { margin-top: 0; }
 .ctas { display: flex; flex-wrap: wrap; gap: var(--space-6); margin-top: var(--space-12); }
+.ctas a .arr { display: inline-block; transition: transform var(--t-fast); }
+.ctas a:hover .arr { transform: translateX(3px); }
 </style>

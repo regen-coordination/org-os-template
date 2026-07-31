@@ -1,0 +1,42 @@
+# Capability map for /modules/rad-org-os. Canonical copy: docs/RAD-ORG-OS.md — correct there first, then mirror here.
+tiers:
+  - label: Now
+    status: live
+    desc: True today
+    items:
+      - title: "Substrate-agnostic core"
+        body: "Identity files, memory, registries, schemas, skills — markdown, YAML, and git. No script in the framework calls the GitHub API (checkable: nothing in scripts/ invokes api.github.com or gh). An org can seed an instance on Radicle today; nothing breaks, but nothing assists yet."
+      - title: "Radicle in the federation schema"
+        body: "schemas/federation.yaml lists radicle as a valid platforms.primary value — a declaration slot, not a feature. No code reads it yet."
+      - title: "KMS connector seam — on paper"
+        body: "The knowledge-management connector-layer design specifies a radicle source driver: Radicle repos as knowledge sources. Written design, not shipped code — the connector layer isn't implemented yet."
+      - title: "Radicle supplies the primitives"
+        body: "DID identities, patches, issues, private repos, seed nodes on Raspberry-Pi-class hardware, a scriptable CLI, and node events agents can consume (Radicle 1.9.x). CI exists but is bring-your-own."
+  - label: Next
+    status: in-dev
+    desc: Committed roadmap
+    items:
+      - title: "Substrate driver interface"
+        body: "clone · sync · push · propose-change · publish-schema, with github and radicle drivers behind the framework's scripts, selected by platforms.primary."
+      - title: "Radicle bootstrap path"
+        body: "“Where does your org live?” in the setup interview — rad init + seeding instead of a GitHub fork."
+      - title: "Seed-node runbook"
+        body: "Home server or Raspberry Pi, systemd, seeding policy as membership, Radicle pinned ≥1.9.1."
+      - title: "KMS radicle connector"
+        body: "Implement the specced stub: pull knowledge from Radicle repos via the read API + CLI."
+  - label: Later
+    status: planned
+    desc: Exploration — published as exploration
+    items:
+      - title: "Federation transport over Radicle"
+        body: "Instances discover and sync each other peer-to-peer; gossip replaces webhook/cron sync."
+      - title: "Operator trunks as patches"
+        body: "Per-operator branches become Radicle patches; delegate quorum is the merge gate — canonical org state becomes cryptographically multi-sig."
+      - title: "DID ↔ members mapping"
+        body: "Members carry did:key; agents verify authorship against the delegate set."
+      - title: "Agent as node-local daemon"
+        body: "Trigger on node events, act via the rad CLI, read via radicle-httpd. (Official HTTP API is read-only — agents write through the CLI.)"
+      - title: "Private instances"
+        body: "Allow-list replication for sensitive orgs. Stated plainly: not encrypted at rest — seed-node control is part of the threat model."
+      - title: "CI + publishing"
+        body: "radicle-ci-broker adapters; publishing via Radicle Pages (paid Radicle Garden service) or self-hosted."

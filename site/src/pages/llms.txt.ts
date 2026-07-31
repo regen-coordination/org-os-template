@@ -10,7 +10,7 @@ export const GET: APIRoute = ({ site }) => {
     "## Pages",
     `- [Home](${base}/): what org-os is`,
     `- [Modules](${base}/modules): v0.5 module roadmap`,
-    `- [rad-org-os](${base}/modules/rad-org-os): sovereign Radicle-native distribution — module page`,
+    `- [rad-org-os](${base}/modules/rad-org-os): sovereign Radicle-native distribution`,
     `- [Federation](${base}/federation): live network of instances`,
     `- [Get started](${base}/get-started): spin up an instance`,
     `- [About](${base}/about): mission and federation model`,
