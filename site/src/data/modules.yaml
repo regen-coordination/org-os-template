@@ -13,7 +13,7 @@ modules:
   - id: rad-org-os
     name: rad-org-os
     status: in-dev
-    summary: Radicle-native sovereign p2p infrastructure for grassroots orgs.
+    summary: The sovereign distribution — org-os on Radicle, peer-to-peer. And the missing org layer for Radicle.
     link: /modules/rad-org-os
   - id: org-os-hermes
     name: Hermes Agent

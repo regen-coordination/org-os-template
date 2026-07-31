@@ -10,7 +10,7 @@
 
 **The same argument holds without the risk.** You don't need to be a target to want your organization's memory, decisions, and data replicated across machines your members control instead of a single vendor's database.
 
-**Same files, different substrate.** org-os's core is already substrate-agnostic: identity files, memory, registries, schemas, and skills are markdown, YAML, and git, and no script in the framework calls the GitHub API (checkable: nothing in `scripts/` invokes `api.github.com` or `gh`). What still assumes GitHub is the plumbing around the edges — bootstrap, sync scripts, federation transport, and operator flows. That is the work rad-org-os does.
+**Same files, different substrate.** org-os's core is already substrate-agnostic: identity files, memory, registries, schemas, and skills are markdown, YAML, and git, and no script executes a GitHub API call — `api.github.com` appears nowhere in the repo (`scripts/test-federation.sh` only *prints* `gh workflow run …` as operator instructions). What still assumes GitHub is the plumbing around it: bootstrap, sync scripts, federation transport, operator flows, and the framework's own CI — `.github/workflows/` holds three GitHub-only workflows, one of which regenerates schemas and auto-commits using `GITHUB_TOKEN`. That is the work rad-org-os does.
 
 ## The four components
 
@@ -23,7 +23,7 @@
 
 ### Now — true today
 
-- The entire file-based core works on any git substrate; an org *can* seed an org-os instance on Radicle today — nothing breaks, but nothing assists yet.
+- The entire file-based core works on any git substrate; an org *can* seed an org-os instance on Radicle today — nothing breaks, but nothing assists yet. (The framework's own CI in `.github/workflows/` is GitHub-only, so a Radicle-hosted instance runs its validators locally until the substrate work lands.)
 - `schemas/federation.yaml` already lists `radicle` as a valid `platforms.primary` value. Precisely: that is a declaration slot, not a feature — no code reads it yet (`gitlab` is listed on the same line, and there is no GitLab support either).
 - A `radicle` source driver is specified in the KMS connector-layer design. To be exact: that is a written design, not shipped code — the connector layer itself is not yet implemented.
 - Radicle itself supplies the primitives (1.9.x): DID identities, patches, issues, private repos (allow-list replication), seed nodes on Raspberry-Pi-class hardware, a fully scriptable `rad` CLI, and a node event socket with a webhooks adapter. CI exists but is bring-your-own: a broker plus an adapter you run yourself (the native runner is unsandboxed; hosted CI is still in development).
@@ -35,7 +35,7 @@ Tracked as the `rad-org-os` project in `data/projects.yaml`, with the individual
 1. **Substrate driver interface** + `radicle` driver behind the framework's sync/bootstrap scripts (the current GitHub behavior becomes the extracted `github` driver).
 2. **Radicle bootstrap path** in the setup interview — "where does your org live?" → GitHub or Radicle; `rad init` + seeding instead of fork.
 3. **Seed-node runbook** — home server or Raspberry Pi, systemd, seeding policy as membership, Radicle pinned ≥1.9.1.
-4. **KMS `radicle` connector `pull`** — implemented against the `radicle-httpd` read API + `rad` CLI.
+4. **KMS `radicle` connector `pull`** — implemented against the `radicle-httpd` read API + `rad` CLI. Gated on the KMS connector layer landing first.
 
 ### Later — exploration, published as exploration
 

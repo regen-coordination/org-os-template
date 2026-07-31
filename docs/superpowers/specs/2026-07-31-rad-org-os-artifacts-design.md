@@ -2,6 +2,8 @@
 
 > **Date:** 2026-07-31 · **Status:** approved design (brainstorm output) · **Scope:** artifacts + roadmap only — no Radicle code this cycle.
 >
+> **Erratum (2026-07-31, post-implementation).** Two copy directives below were retracted during review and must NOT be reintroduced: (1) the "~90% substrate-agnostic / closes the last 10%" figure — invented, unsupported by any measurement; say what is and isn't substrate-agnostic instead. (2) `repository.primary` — the real field is `platforms.primary`. Also note the shipped "what still assumes GitHub" list includes the framework's own CI (`.github/workflows/`), which this spec's drafts omitted. Shipped artifacts are correct; this document is the point-in-time record.
+>
 > **Theme:** Turn the one-line `rad-org-os` module entry into a real public surface: a capability map (current + future), the first module detail page on the org-os site, a canonical framework doc, and the data/roadmap entries that make it a tracked workstream. Grounded in `docs/research/2026-07-31-radicle-state-of-network.md` (Radicle 1.9.1, July 2026).
 
 ---

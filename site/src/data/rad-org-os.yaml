@@ -5,7 +5,7 @@ tiers:
     desc: True today
     items:
       - title: "Substrate-agnostic core"
-        body: "Identity files, memory, registries, schemas, skills — markdown, YAML, and git. No script in the framework calls the GitHub API (checkable: nothing in scripts/ invokes api.github.com or gh). An org can seed an instance on Radicle today; nothing breaks, but nothing assists yet."
+        body: "Identity files, memory, registries, schemas, skills — markdown, YAML, and git. No script executes a GitHub API call: api.github.com appears nowhere in the repo. An org can seed an instance on Radicle today; nothing breaks, but nothing assists yet. What still assumes GitHub: bootstrap, sync scripts, federation transport, operator flows, and the framework's own CI in .github/workflows/."
       - title: "Radicle in the federation schema"
         body: "schemas/federation.yaml lists radicle as a valid platforms.primary value — a declaration slot, not a feature. No code reads it yet."
       - title: "KMS connector seam — on paper"
@@ -23,7 +23,7 @@ tiers:
       - title: "Seed-node runbook"
         body: "Home server or Raspberry Pi, systemd, seeding policy as membership, Radicle pinned ≥1.9.1."
       - title: "KMS radicle connector"
-        body: "Implement the specced stub: pull knowledge from Radicle repos via the read API + CLI."
+        body: "Pull knowledge from Radicle repos via the radicle-httpd read API + rad CLI. Gated on the KMS connector layer landing first."
   - label: Later
     status: planned
     desc: Exploration — published as exploration
