@@ -6,6 +6,7 @@ const DIST = "dist";
 const REQUIRED = [
   "index.html",
   "modules/index.html",
+  "modules/rad-org-os/index.html",
   "federation/index.html",
   "docs/index.html",
   "docs/architecture/index.html",

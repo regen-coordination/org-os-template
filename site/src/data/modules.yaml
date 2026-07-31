@@ -14,7 +14,7 @@ modules:
     name: rad-org-os
     status: in-dev
     summary: Radicle-native sovereign p2p infrastructure for grassroots orgs.
-    link: null
+    link: /modules/rad-org-os
   - id: org-os-hermes
     name: Hermes Agent
     status: in-dev
