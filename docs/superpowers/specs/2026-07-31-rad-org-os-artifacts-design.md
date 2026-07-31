@@ -31,7 +31,7 @@ The original site spec (`2026-06-17-org-os-website-design.md` §1) deferred "per
 
 Four components under one name:
 
-1. **Code-substrate abstraction** (framework seam). org-os stops assuming GitHub: a small driver interface — clone, sync, push, propose-change, publish-schema — with `github` and `radicle` drivers, selected by the existing `repository.primary` field (`schemas/federation.yaml` already enumerates `radicle`). GitHub becomes *a* backend, not *the* backend.
+1. **Code-substrate abstraction** (framework seam). org-os stops assuming GitHub: a small driver interface — clone, sync, push, propose-change, publish-schema — with `github` and `radicle` drivers, selected by the existing `platforms.primary` field (`schemas/federation.yaml:393-401` already enumerates `radicle`; note no code reads that field yet). GitHub becomes *a* backend, not *the* backend.
 2. **The Radicle-native distro.** Fork/seed/bootstrap/federate an org-os instance entirely over Radicle: `rad clone` instead of GitHub fork, patches instead of PRs, `did:key` identities as operator identities, seed nodes replacing the central remote.
 3. **KMS `radicle` connector.** Already a specced stub in the connector-layer design (`2026-07-19-org-os-kms-connector-layer-design.md`): Radicle repos as knowledge sources. rad-org-os is the module that implements it.
 4. **The org layer for Radicle** *(added from research).* Heartwood has **no org/team primitive** — only per-repo delegates + quorum. rad-org-os composes one from org-os's existing shapes: the instance repo as org index (member DIDs/RIDs in `data/members.yaml`), membership as seed-node allow-list policy, `federation.yaml` as network topology, delegate quorum as cryptographic multi-sig over canonical org state.
@@ -46,7 +46,7 @@ The content core, rendered on the site page, in the doc, and tracked as roadmap.
 
 ### Now — true today
 - The entire file-based core (identity files, memory, data registries, EIP-4824 schemas, skills, session lifecycle) works on any git substrate; nothing in the org-os core calls GitHub APIs.
-- `schemas/federation.yaml` accepts `repository.primary: radicle`.
+- `schemas/federation.yaml` lists `radicle` as a valid `platforms.primary` value — a declaration slot, not a feature; no code reads it yet.
 - A `radicle` source driver is specified in the KMS connector-layer *design* — a written design, not shipped code (the connector layer itself is not yet implemented; there is no `connectors/` directory in `packages/org-os-kms/`).
 - An org *can* seed an org-os instance on Radicle today — nothing breaks, but nothing assists. (Radicle itself supplies: DIDs, patches, issues, private repos via allow-list replication, seed nodes on RPi-class hardware, scriptable `rad` CLI, node event socket + webhooks adapter, CI broker with GitHub Actions bridge.)
 
@@ -81,7 +81,9 @@ The content core, rendered on the site page, in the doc, and tracked as roadmap.
 
 **Data change:** `site/src/data/modules.yaml` → `rad-org-os.link: /modules/rad-org-os` (card's "spec pending" becomes "learn more →").
 
-**Copy rules (from POSITIONING.md §9 + research):** demonstrate, don't assert; no "Tech for Palestine" (unverified); disclose Radicle caveats where relevant (read-only official API, private repos not encrypted at rest, Pages is paid); SOUL voice — plain, direct, technically precise, no corporate speak.
+**Copy rules (from POSITIONING.md §9 + research):** demonstrate, don't assert; no "Tech for Palestine" (unverified); disclose Radicle caveats where relevant (read-only official API, private repos not encrypted at rest, Pages is paid, CI is bring-your-own, mirroring covers code but not issues/patches); SOUL voice — plain, direct, technically precise, no corporate speak.
+
+**Single-source rule (drift control).** `docs/RAD-ORG-OS.md` is the **canonical** capability map; the site page mirrors it. Corrections start in the doc, then propagate to the page in the same commit. This spec and its plan are point-in-time records — they are not kept in sync after the artifacts ship, so the ongoing drift surface is exactly two files.
 
 ---
 
@@ -114,5 +116,5 @@ The content core, rendered on the site page, in the doc, and tracked as roadmap.
 - `docs/research/2026-07-31-radicle-state-of-network.md` — Radicle capability inventory (grounds every claim here).
 - `docs/superpowers/specs/2026-06-17-org-os-website-design.md` — site architecture, theming, page conventions.
 - `docs/superpowers/specs/2026-07-19-org-os-kms-connector-layer-design.md` — `radicle` connector stub contract.
-- `schemas/federation.yaml` — `repository.primary` enum.
+- `schemas/federation.yaml:393-401` — the `platforms.primary` enum (`github | gitlab | radicle | other`).
 - `docs/POSITIONING.md` — voice, honest-positioning rules (§9).
