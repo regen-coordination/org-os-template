@@ -102,4 +102,9 @@ section { margin-top: var(--space-16); }
 .ctas { display: flex; flex-wrap: wrap; gap: var(--space-6); margin-top: var(--space-12); }
 .ctas a .arr { display: inline-block; transition: transform var(--t-fast); }
 .ctas a:hover .arr { transform: translateX(3px); }
+/* Same breakpoint SectionBlock uses to stack its heading row. */
+@media (max-width: 560px) {
+  .tier-head { flex-wrap: wrap; align-items: flex-start; gap: var(--space-2); }
+  .ctas { flex-direction: column; gap: var(--space-3); }
+}
 </style>
