@@ -92,3 +92,13 @@ projects:
     members: ["github:luizfernandosg"]
     startDate: "2026-04-05"
     description: "Longer-horizon: new instance specs (regen-coordination-os, regen-toolkit), support for new org types (Fund, Initiative, Coalition), federation at scale (10+ nodes)."
+
+  - id: "rad-org-os"
+    name: "rad-org-os"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-07-31"
+    description: "The sovereign distribution: full org-os stack on Radicle, plus the missing org layer for Radicle (which has no org/team primitive). Public artifacts shipped 2026-07-31 (docs/RAD-ORG-OS.md, /modules/rad-org-os, roadmap). Next: substrate driver interface, Radicle bootstrap path, seed-node runbook, KMS radicle connector. Spec: docs/superpowers/specs/2026-07-31-rad-org-os-artifacts-design.md"
+    researchArtifacts:
+      - "docs/research/2026-07-31-radicle-state-of-network.md"
