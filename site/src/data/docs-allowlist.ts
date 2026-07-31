@@ -10,6 +10,7 @@ export const DOCS_ALLOWLIST: DocEntry[] = [
   { file: "EIP4824-GUIDE",        slug: "eip4824",               title: "EIP-4824 Guide",          group: "Reference" },
   { file: "PACKAGE-LIFECYCLE",    slug: "package-lifecycle",     title: "Package Lifecycle",       group: "Reference" },
   { file: "OPERATOR-GUIDE",       slug: "operator-guide",        title: "Operator Guide",          group: "Operating" },
+  { file: "RAD-ORG-OS",           slug: "rad-org-os",            title: "rad-org-os",              group: "Modules" },
 ];
 export const docBySlug = (slug: string) => DOCS_ALLOWLIST.find((d) => d.slug === slug);
 export const docByFile = (file: string) =>
