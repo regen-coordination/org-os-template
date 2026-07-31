@@ -47,6 +47,7 @@ Supporting proof points for copy:
 - org-os **extends EIP-4824** with operational URIs (meetings, projects, finances) — dogfooded even though the framework itself is "Framework, not a DAO."
 - **It runs itself.** Every standard ships with a reference implementation and validators; the hub's own federation went from 27 drift items to 0 in the latest consolidation.
 - **Vault-safe by design** — snapshot refs, file-loss audits, banned destructive git ops, operator trunks. Born from a real data-loss incident, codified into iron rules.
+- **The sovereignty thesis has a live demonstration** — Radicle's own radicle.xyz was ISP-blocklisted (2026-04); the project moved domains and the p2p network was unaffected. rad-org-os builds the org layer on exactly that property (research: `docs/research/2026-07-31-radicle-state-of-network.md`).
 - **Autopoietic** — explicit self-improvement loops (modeled on karpathy/autoresearch): agents don't just operate the workspace, they improve it, and instance-proven patterns (≥2 instances) get promoted upstream.
 
 ---
@@ -119,7 +120,7 @@ Supporting proof points for copy:
 **v0.5 constellation (from modules.yaml):**
 - **Website Generator** *(in-dev)* — any instance's data + docs → federated public site (the org-os site is its first output)
 - **KMS / org-os-kms** *(installed, maturing)* — toolkit-framework knowledge commons bound into org-os as a swappable module
-- **rad-org-os** *(in-dev)* — Radicle-native sovereign p2p infra for grassroots orgs
+- **rad-org-os** *(in-dev)* — the sovereign distribution: the full org-os stack on Radicle, p2p, on infrastructure no single platform can withdraw — and, because Radicle has no org/team primitive of its own, the missing org layer for Radicle. Doc: `docs/RAD-ORG-OS.md` · page: `/modules/rad-org-os`
 - **Hermes Agent** *(in-dev)* — local runtime + Telegram gateway (replacing OpenClaw)
 - **Members Hub** *(planned)* — membership, roles, contribution surfaces
 - **Ideation System** *(planned)* — idea capture → triage → hatching pipeline, federated
