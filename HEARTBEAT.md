@@ -19,6 +19,10 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 - [ ] Finalize `framework-dashboard-template` scoping — reusable dashboard package (scoping plan)
 - [ ] Finalize `obsidian-interface` scoping — Obsidian as primary operator interface (scoping plan)
 - [ ] Finalize `obsidian-canvas-interface` scoping — Canvas as system overview + interface (scoping plan, depends on `obsidian-interface`)
+- [ ] rad-org-os: plan the substrate driver interface (clone/sync/push/propose-change/publish-schema; `github` + `radicle` drivers, selected by `platforms.primary`) — see `docs/RAD-ORG-OS.md` "Next"
+- [ ] rad-org-os: add a Radicle bootstrap path to the setup interview (`rad init` + seeding instead of a GitHub fork)
+- [ ] rad-org-os: write the seed-node runbook (home server / RPi, systemd, seeding policy as membership, Radicle pinned ≥1.9.1)
+- [ ] rad-org-os: implement the KMS `radicle` connector `pull` (specced stub → `radicle-httpd` read API + `rad` CLI; blocked on the connector layer landing)
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
 ### Orchestration (multi-instance)
