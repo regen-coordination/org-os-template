@@ -47,7 +47,7 @@ The content core, rendered on the site page, in the doc, and tracked as roadmap.
 ### Now — true today
 - The entire file-based core (identity files, memory, data registries, EIP-4824 schemas, skills, session lifecycle) works on any git substrate; nothing in the org-os core calls GitHub APIs.
 - `schemas/federation.yaml` accepts `repository.primary: radicle`.
-- The KMS connector layer names `radicle` as a registered, specced source driver (stub).
+- A `radicle` source driver is specified in the KMS connector-layer *design* — a written design, not shipped code (the connector layer itself is not yet implemented; there is no `connectors/` directory in `packages/org-os-kms/`).
 - An org *can* seed an org-os instance on Radicle today — nothing breaks, but nothing assists. (Radicle itself supplies: DIDs, patches, issues, private repos via allow-list replication, seed nodes on RPi-class hardware, scriptable `rad` CLI, node event socket + webhooks adapter, CI broker with GitHub Actions bridge.)
 
 ### Next — committed roadmap

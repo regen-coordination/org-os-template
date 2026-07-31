@@ -55,7 +55,7 @@ Full content:
 
 1. **Code-substrate abstraction** — a small driver interface (clone, sync, push, propose-change, publish-schema) with `github` and `radicle` drivers, selected by the existing `repository.primary` field in `federation.yaml`. GitHub becomes *a* backend, not *the* backend.
 2. **The Radicle-native distro** — fork/seed/bootstrap/federate an instance entirely over Radicle: `rad clone` instead of GitHub fork, patches instead of PRs, `did:key` identities as operator identities, seed nodes replacing the central remote.
-3. **KMS `radicle` connector** — the knowledge-management connector layer already registers `radicle` as a specced source driver; rad-org-os implements it (Radicle repos as knowledge sources).
+3. **KMS `radicle` connector** — the knowledge-management connector-layer *design* specifies `radicle` as one of its source drivers; rad-org-os implements it once that layer lands (Radicle repos as knowledge sources).
 4. **The org layer for Radicle** — Radicle's Heartwood protocol has no org/team primitive: only per-repo delegates and quorum. rad-org-os composes an organization from org-os's existing shapes: the instance repo as org index (member DIDs in `data/members.yaml`), membership as seed-node replication policy, `federation.yaml` as network topology, and delegate quorum as cryptographic multi-sig over the org's canonical state.
 
 ## Capability map
@@ -64,7 +64,7 @@ Full content:
 
 - The entire file-based core works on any git substrate; an org *can* seed an org-os instance on Radicle today — nothing breaks, but nothing assists yet.
 - `federation.yaml` accepts `repository.primary: radicle`.
-- The KMS connector layer names `radicle` as a registered, specced source driver (stub).
+- A `radicle` source driver is specified in the KMS connector-layer design. To be exact: that is a written design, not shipped code — the connector layer itself is not yet implemented.
 - Radicle itself supplies the primitives (v1.9.x): DID identities, patches, issues, private repos (allow-list replication), seed nodes on Raspberry-Pi-class hardware, a fully scriptable `rad` CLI, a node event socket with a webhooks adapter, and CI via broker adapters including a GitHub Actions bridge.
 
 ### Next — committed roadmap
@@ -173,7 +173,7 @@ import StatusBadge from "../../components/StatusBadge.astro";
 const now = [
   { t: "Substrate-agnostic core", b: "Identity files, memory, registries, schemas, skills — markdown, YAML, and git. Nothing in the core calls a GitHub API. An org can seed an instance on Radicle today; nothing breaks, but nothing assists yet." },
   { t: "Radicle in the federation schema", b: "federation.yaml already accepts repository.primary: radicle — an instance can declare Radicle as home." },
-  { t: "KMS connector seam", b: "The knowledge-management connector layer registers radicle as a specced source driver: Radicle repos as knowledge sources." },
+  { t: "KMS connector seam — on paper", b: "The knowledge-management connector-layer design specifies a radicle source driver: Radicle repos as knowledge sources. Written design, not shipped code — the connector layer isn't implemented yet." },
   { t: "Radicle supplies the primitives", b: "DID identities, patches, issues, private repos, seed nodes on Raspberry-Pi-class hardware, a scriptable CLI, and node events agents can consume (Radicle 1.9, 2026)." },
 ];
 const next = [
