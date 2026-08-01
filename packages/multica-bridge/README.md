@@ -14,10 +14,16 @@ reconciles changes back. Yaml + git stay canonical.
 
 ## Safety model
 
-- Repo `.claude/settings.json` denies `git stash` / `git clean` /
-  `git reset --hard` for every Claude session in this repo (vault-safety).
+- Repo `.claude/settings.json` wires a `PreToolUse` guard
+  (`scripts/guards/deny-destructive-git.mjs`) that inspects the actual Bash
+  command string and blocks `git stash` / `git clean` / `git reset --hard` for
+  every Claude session in this repo, regardless of flag order or inserted git
+  global options (vault-safety). The `permissions.deny` entries beside it are
+  prefix matches — cheap defense-in-depth, bypassable on their own, which is
+  why the guard exists.
 - `scripts/git-hooks/pre-push` refuses to push `agent/*` branches — operator
   work is merged locally after human review, never published by the agent.
+  Install both hooks with `npm run install:hooks`.
 - The persona mandates draft-and-present for anything external.
 
 ## Tests

@@ -5,5 +5,19 @@
       "Bash(git clean:*)",
       "Bash(git reset --hard:*)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/guards/deny-destructive-git.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
   }
 }

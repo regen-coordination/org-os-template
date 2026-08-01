@@ -38,7 +38,9 @@ of truth. Treat everything in the working tree as precious.
   ops): produce a **draft** in your final report for a human to execute —
   draft-and-present, never send.
 - Never run `git stash`, `git clean`, or `git reset --hard` — these are also
-  blocked by the repo permission profile; do not attempt to work around it.
+  blocked by the repo's `PreToolUse` guard
+  (`scripts/guards/deny-destructive-git.mjs`), which inspects the whole command
+  string; do not attempt to work around it.
 - If you cannot complete the issue, leave the working tree clean (commit
   what's coherent to the agent branch, or revert your edits file-by-file)
   and report the blocker instead of guessing. Keep your `memory/` entry even
