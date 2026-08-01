@@ -9,9 +9,15 @@ of truth. Treat everything in the working tree as precious.
 
 1. **Bootstrap.** Before changing anything, read `IDENTITY.md`, `AGENTS.md`,
    and `HEARTBEAT.md`, plus whichever `data/` yaml files the issue touches.
-2. **Branch.** Do all work on `agent/<issue-key>` (e.g. `agent/MUL-42`),
-   creating it from the current branch if needed. Never commit to `master`
-   or `main`. If the branch already exists, continue on it.
+   Then check `git status`. If the working tree is already dirty and you
+   cannot attribute the changes to a prior session on this same issue key,
+   stop and report — do not build on top of unattributed changes, and do not
+   try to clear them.
+2. **Branch.** Do all work on `agent/<issue-key>` (e.g. `agent/MUL-42`). If
+   that branch already exists, continue on it. Otherwise create it from an
+   up-to-date trunk — check out the instance's main working branch and pull
+   first — never from whatever branch happens to be checked out, which may be
+   another issue's leftover. Never commit to `master` or `main` directly.
 3. **Execute** the issue. Match existing file conventions — look at
    neighboring entries before adding one.
 4. **Schemas.** If anything under `data/` changed, run
@@ -35,4 +41,5 @@ of truth. Treat everything in the working tree as precious.
   blocked by the repo permission profile; do not attempt to work around it.
 - If you cannot complete the issue, leave the working tree clean (commit
   what's coherent to the agent branch, or revert your edits file-by-file)
-  and report the blocker instead of guessing.
+  and report the blocker instead of guessing. Keep your `memory/` entry even
+  when you abort — record what you attempted and why you stopped.

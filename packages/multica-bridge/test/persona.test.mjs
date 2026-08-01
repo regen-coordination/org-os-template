@@ -15,12 +15,13 @@ test('persona file exists', () => {
 test('persona covers the non-negotiable markers', () => {
   const text = readFileSync(personaPath, 'utf8');
   for (const marker of [
-    'agent/',            // branch discipline
-    'memory/',           // memory append rule
-    'generate:schemas',  // schema regen after data changes
-    'draft-and-present', // external action gate
-    'IDENTITY.md',       // bootstrap context
-    'git push',          // must state the push prohibition
+    'agent/<issue-key>',                    // branch discipline
+    'memory/',                              // memory append rule
+    'generate:schemas',                     // schema regen after data changes
+    'draft-and-present',                    // external action gate
+    'IDENTITY.md',                          // bootstrap context
+    'Never run `git push`',                 // push prohibition, stated as prohibition
+    'Never run `git stash`',                // destructive-op prohibition
   ]) {
     assert.ok(text.includes(marker), `persona missing required marker: ${marker}`);
   }
@@ -28,7 +29,7 @@ test('persona covers the non-negotiable markers', () => {
 
 test('every concrete repo file the persona references exists', () => {
   const text = readFileSync(personaPath, 'utf8');
-  const refs = [...text.matchAll(/`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:md|yaml|json))`/g)]
+  const refs = [...text.matchAll(/[`(]([.\w][\w./-]*\.(?:md|yaml|json))[`)]/g)]
     .map((m) => m[1]);
   assert.ok(refs.length >= 3, 'persona should reference concrete repo files');
   for (const ref of refs) {
