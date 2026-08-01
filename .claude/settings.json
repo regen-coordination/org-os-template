@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git stash:*)",
+      "Bash(git clean:*)",
+      "Bash(git reset --hard:*)"
+    ]
+  }
+}
