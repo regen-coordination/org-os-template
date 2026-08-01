@@ -63,7 +63,7 @@ Expected: `Switched to a new branch 'feat/multica-operator'` (untracked files re
   "private": true,
   "description": "Multica × org-os integration: operator persona (Phase 1) and yaml ⇄ multica sync bridge (Phase 2)",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test"
   }
 }
 ```
@@ -105,7 +105,7 @@ cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/pack
 npm test
 ```
 
-Expected: `node --test` exits non-zero complaining `test/` does not exist. That's the red baseline; Task 2 adds the first test.
+Expected: `node --test` reports 0 tests found (no `test/` dir yet). That's the red baseline; Task 2 adds the first test. (Do NOT use `node --test test/` — on Node 23.3.0 a directory argument is resolved as a module and throws `MODULE_NOT_FOUND`. Bare `node --test` discovers `test/*.test.mjs` correctly.)
 
 - [ ] **Step 5: Commit**
 
@@ -145,12 +145,13 @@ test('persona file exists', () => {
 test('persona covers the non-negotiable markers', () => {
   const text = readFileSync(personaPath, 'utf8');
   for (const marker of [
-    'agent/',            // branch discipline
-    'memory/',           // memory append rule
-    'generate:schemas',  // schema regen after data changes
-    'draft-and-present', // external action gate
-    'IDENTITY.md',       // bootstrap context
-    'git push',          // must state the push prohibition
+    'agent/<issue-key>',                    // branch discipline
+    'memory/',                              // memory append rule
+    'generate:schemas',                     // schema regen after data changes
+    'draft-and-present',                    // external action gate
+    'IDENTITY.md',                          // bootstrap context
+    'Never run `git push`',                 // push prohibition, stated as prohibition
+    'Never run `git stash`',                // destructive-op prohibition
   ]) {
     assert.ok(text.includes(marker), `persona missing required marker: ${marker}`);
   }
@@ -158,7 +159,7 @@ test('persona covers the non-negotiable markers', () => {
 
 test('every concrete repo file the persona references exists', () => {
   const text = readFileSync(personaPath, 'utf8');
-  const refs = [...text.matchAll(/`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:md|yaml|json))`/g)]
+  const refs = [...text.matchAll(/[`(]([.\w][\w./-]*\.(?:md|yaml|json))[`)]/g)]
     .map((m) => m[1]);
   assert.ok(refs.length >= 3, 'persona should reference concrete repo files');
   for (const ref of refs) {
@@ -194,9 +195,15 @@ of truth. Treat everything in the working tree as precious.
 
 1. **Bootstrap.** Before changing anything, read `IDENTITY.md`, `AGENTS.md`,
    and `HEARTBEAT.md`, plus whichever `data/` yaml files the issue touches.
-2. **Branch.** Do all work on `agent/<issue-key>` (e.g. `agent/MUL-42`),
-   creating it from the current branch if needed. Never commit to `master`
-   or `main`. If the branch already exists, continue on it.
+   Then check `git status`. If the working tree is already dirty and you
+   cannot attribute the changes to a prior session on this same issue key,
+   stop and report — do not build on top of unattributed changes, and do not
+   try to clear them.
+2. **Branch.** Do all work on `agent/<issue-key>` (e.g. `agent/MUL-42`). If
+   that branch already exists, continue on it. Otherwise create it from an
+   up-to-date trunk — check out the instance's main working branch and pull
+   first — never from whatever branch happens to be checked out, which may be
+   another issue's leftover. Never commit to `master` or `main` directly.
 3. **Execute** the issue. Match existing file conventions — look at
    neighboring entries before adding one.
 4. **Schemas.** If anything under `data/` changed, run
@@ -220,8 +227,11 @@ of truth. Treat everything in the working tree as precious.
   blocked by the repo permission profile; do not attempt to work around it.
 - If you cannot complete the issue, leave the working tree clean (commit
   what's coherent to the agent branch, or revert your edits file-by-file)
-  and report the blocker instead of guessing.
+  and report the blocker instead of guessing. Keep your `memory/` entry even
+  when you abort — record what you attempted and why you stopped.
 ```
+
+> Amendment (post-review): the branch-base, dirty-tree, memory-on-abort, marker-polarity, and dotfile-regex changes above were added after the Task 2 code-quality review. The reviewer also flagged that the persona asserts a permission profile that Tasks 3–4 create — that is sequencing, not a defect: the persona is not wired into multica until Task 7.
 
 - [ ] **Step 4: Run the tests and make sure they pass**
 
@@ -321,6 +331,8 @@ claude -p "Run exactly: git stash list" 2>&1 | tail -5
 ```
 
 Expected: the response indicates the Bash call was blocked/denied by permission rules (it must NOT show `git stash list` output). If it runs the command, stop — the settings file location or syntax is wrong; fix before continuing.
+
+**Probe design matters — use only harmless commands.** `git stash list` and `git clean -n` are read-only/dry-run, so the model has no independent reason to refuse them; a refusal therefore proves the *permission layer* fired. Probing with a genuinely destructive command (e.g. `git reset --hard HEAD`) is useless as evidence: the model refuses on CLAUDE.md vault-safety grounds without ever attempting the Bash call, so the deny rule is never exercised and you learn nothing about whether the pattern matches. Verified 2026-07-24: `git stash list` → "denied", `git clean -n` → "The command was denied by permissions". `Bash(git reset --hard:*)` remains verified by pattern analogy only (both layers refuse it, but the permission layer can't be isolated).
 
 - [ ] **Step 6: Commit**
 
@@ -670,6 +682,24 @@ multica project list --output json   # take the org-os pilot project id
 ```
 
 Edit `config.yaml`: set `multica.project` to that id. Verify `git status --short -- config.yaml` shows nothing (gitignored).
+
+- [ ] **Step 4a: Confirm the operator session is rooted AT the repo (highest-value safety check)**
+
+The entire safety model — `.claude/settings.json` deny rules AND the `PreToolUse` guard — only loads when the Claude session's project directory IS this repo. If multica's `local_directory` binding gives the agent a cwd *above* the repo (e.g. the parent vault), `03 Libraries/org-os/.claude/settings.json` is never read and **nothing is enforced**. This is a configuration-level bypass of the whole model, not a gap in it.
+
+Verify by assigning a throwaway issue whose entire content is: "Run exactly this and report the output verbatim: `git -c core.pager=cat stash list`". Expected: the operator reports being blocked by the vault-safety guard. If it returns stash contents instead, STOP — the binding is rooted wrong, and no operator issue should run until it's fixed.
+
+- [ ] **Step 4b: Confirm the push guard is actually live on this machine**
+
+The pre-push hook is only enforced where it has been installed — unlike `.claude/settings.json`, which applies the moment it is checked in. Before wiring a live agent:
+
+```bash
+cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+npm run install:hooks
+ls -l "$(git rev-parse --git-path hooks)/pre-push"
+```
+
+Expected: the hook file exists and is executable. Being present in git is necessary but NOT sufficient. (Note: the Task 4 `hooks:install` script was consolidated into the pre-existing, already-documented `install:hooks` after review flagged the near-identical names as a foot-gun.)
 
 - [ ] **Step 5: Verify assignability**
 
