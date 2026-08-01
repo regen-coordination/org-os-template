@@ -35,6 +35,8 @@
     "selftest": "node scripts/selftest.mjs",
     "version:check": "node scripts/update-version.mjs --check",
     "install:hooks": "node scripts/install-hooks.mjs",
+    "hooks:install": "node scripts/install-git-hooks.mjs",
+    "test:multica-bridge": "npm test --prefix packages/multica-bridge",
     "generate:skills": "node scripts/generate-skills.mjs",
     "generate:quilt": "node scripts/generate-quilt.mjs",
     "sync:packages": "node scripts/sync-packages.mjs",
