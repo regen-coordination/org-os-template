@@ -2,7 +2,7 @@
 # Refuses to push agent/* branches. Multica operator work lands on
 # agent/<issue-key> branches and is reviewed + merged locally by a human —
 # the agent must never publish. Versioned here; installed into the live git
-# hooks dir by `npm run hooks:install` (scripts/install-git-hooks.mjs).
+# hooks dir by `npm run install:hooks` (scripts/install-hooks.mjs).
 #
 # git calls pre-push with lines on stdin:
 #   <local_ref> <local_sha> <remote_ref> <remote_sha>

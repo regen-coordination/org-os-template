@@ -6,4 +6,4 @@ multica:
   agent: org-os operator       # agent display name (see `multica agent list`)
   project: ""                  # project id — fill from `multica project list --output json`
 instance:
-  path: /Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os
+  path: /absolute/path/to/this/org-os/instance  # fill in during setup
