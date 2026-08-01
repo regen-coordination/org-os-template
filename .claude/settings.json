@@ -13,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/guards/deny-destructive-git.mjs\"",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/guards/deny-destructive-git.mjs\" || exit 2",
             "timeout": 15
           }
         ]

@@ -123,3 +123,24 @@ test('settings.json wires the guard as a PreToolUse hook on Bash', async () => {
   );
   assert.ok(wired, 'no PreToolUse/Bash hook invoking deny-destructive-git.mjs');
 });
+
+test('the wired hook command fails closed if the guard cannot run at all', async () => {
+  // Claude Code treats any exit code other than 2 as a *non-blocking* error,
+  // so a missing `node`, a deleted guard file or a syntax error would silently
+  // reopen the boundary. `|| exit 2` maps every failure to a block.
+  const { readFileSync } = await import('node:fs');
+  const settings = JSON.parse(readFileSync(resolve(repoRoot, '.claude/settings.json'), 'utf8'));
+  const command = settings.hooks.PreToolUse.flatMap((e) => e.hooks ?? []).find((h) =>
+    (h.command ?? '').includes('deny-destructive-git.mjs'),
+  ).command;
+  assert.match(command, /\|\|\s*exit 2/, `hook command is not fail-closed: ${command}`);
+});
+
+test('the fail-closed wrapper blocks when the guard is missing', () => {
+  const r = spawnSync(
+    'sh',
+    ['-c', `node "${resolve(repoRoot, 'scripts/guards/does-not-exist.mjs')}" || exit 2`],
+    { input: '{}', encoding: 'utf8' },
+  );
+  assert.equal(r.status, 2, `expected exit 2, got ${r.status}`);
+});
