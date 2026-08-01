@@ -48,3 +48,6 @@ __pycache__
 
 # Git worktrees (isolated workspaces)
 .worktrees/
+
+# Multica bridge local config (machine-specific path + credentials-adjacent ids)
+packages/multica-bridge/config.yaml

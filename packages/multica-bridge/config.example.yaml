@@ -1,0 +1,9 @@
+# Copy to config.yaml (gitignored) and fill in during multica-side setup
+# (docs/SETUP.md). Shared by Phase 1 setup tooling and the Phase 2 bridge.
+multica:
+  baseUrl: http://localhost:3000
+  workspace: org-os            # workspace slug
+  agent: org-os operator       # agent display name (see `multica agent list`)
+  project: ""                  # project id — fill from `multica project list --output json`
+instance:
+  path: /Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os
