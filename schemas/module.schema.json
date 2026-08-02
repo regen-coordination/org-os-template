@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://organizational-os.github.io/schemas/module.schema.json",
+  "title": "org-os module manifest (module.yaml)",
+  "description": "Canonical format for modules/<id>/module.yaml. Mirrored by validateManifest() in scripts/modules.mjs.",
+  "type": "object",
+  "required": ["id", "version", "type", "description"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^org-os-[a-z0-9-]+$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "type": { "enum": ["core", "operational", "integration"] },
+    "description": { "type": "string" },
+    "dependencies": { "type": "array", "items": { "type": "string", "pattern": "^org-os-[a-z0-9-]+$" } },
+    "files": {
+      "type": "object",
+      "description": "Map of source path (relative to the module dir) → target path (relative to the instance root). Overwritten on update.",
+      "additionalProperties": { "type": "string" }
+    },
+    "templates": {
+      "type": "object",
+      "description": "Seed-only data files: copied when the target does not exist, NEVER overwritten on update.",
+      "additionalProperties": { "type": "string" }
+    },
+    "checks": {
+      "type": "array",
+      "description": "Declarative health checks (Phase 3): file-exists | freshness | command."
+    },
+    "npm": { "type": "string", "description": "Optional npm package name for code modules." }
+  },
+  "additionalProperties": false
+}
