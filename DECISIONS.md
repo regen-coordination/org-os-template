@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-02 · DFOS as the federation's cryptographic proof layer
+
+**Status:** active
+**Scope:** federation, framework, agent-runtime
+
+**Decision** — Adopt the DFOS protocol (Metalabel; protocol.dfos.com) as org-os's cryptographic identity and verifiable-authorship layer, staged: `did:dfos` identities for org instances **and** their agents (agents get scoped, revocable credentials issued by the org DID); anchoring of federation manifests, knowledge-commons artifacts, and governance decisions (with witness countersignatures from peer orgs) — memory/agent work logs deliberately excluded; Metalabel's hosted relay first, self-hosted later; the hosted spaces product only as a research-gated final phase. Mechanism: `packages/dfos-bridge/` wrapping the official `dfos` CLI plus the official `dfos@metalabel` Claude Code skill. Git stays canonical — DFOS adds proofs *about* org-os state, never storage or truth.
+
+**Why** — org-os federation already separates public structure (`.well-known/`) from private content (repos), which is exactly DFOS's public-proof/private-content "dark forest" topology — the protocol supplies the cryptographic backbone the model was missing without changing it. The CLI-bridge architecture won over library-native (`@metalabel/dfos-protocol` alone would make us own key custody, the security-sensitive part the CLI's OS-keychain handling already solves) and over CI-first anchoring (keys in CI secrets before custody thinking is done). Spaces-first was rejected as anchor: no public API found, and the protocol layers deliver value without the hosted product.
+
+**Refs** — spec `docs/superpowers/specs/2026-07-25-dfos-org-os-integration-design.md` (filename date reflects the skewed git clock; authored 2026-08-01, commits `f35fbe2`/`10d2f61`), queue entry `docs/agent-plans/QUEUE.md` Queued #8 (`c4b8cf8`), `memory/2026-08-02.md`
+
+---
+
 ## 2026-08-02 · Positioning — the four-layer thesis; demonstrate rather than assert
 
 **Status:** active
