@@ -1,6 +1,6 @@
 ---
 title: org-os Philosophy — Manifesto + Note-Web (Design)
-date: 2026-07-16
+date: 2026-08-02
 author: org-os
 status: design
 workstream: framework-evolution

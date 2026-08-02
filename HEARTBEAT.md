@@ -7,6 +7,8 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## Active Tasks
 
 ### Technical
+- [ ] Draft `PHILOSOPHY.md` manifesto + ~11 note stubs under `docs/philosophy/` — spec design-approved 2026-08-02, awaiting operator review: `docs/superpowers/specs/2026-08-02-org-os-philosophy-manifesto-design.md` (prose-first; no implementation plan by agreement)
+- [ ] Reconcile `autopoiesis-research` with `philosophy-foundations` — revisit that corpus's "not a literal claim" disclaimer once the manifesto lands; decide whether Phase 2/3 inherit the philosophical spine explicitly
 - [ ] Execute `autopoiesis-research` Phase 2 (12-task TDD plan; cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Plan: `docs/superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md`
 - [ ] Execute `autopoiesis-research` Phase 3 (decisions rollup + plan annotations + per-instance cascade) after Phase 2 gate
 - [ ] Execute `multica-integration` plan (25 tasks, spec + plan ready, execution deferred 2026-04-25 — recommend fresh worktree)
