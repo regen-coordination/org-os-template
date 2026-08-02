@@ -1,6 +1,6 @@
 # Plan Queue — org-os (framework)
 
-> Last updated: 2026-08-02 (GitHub Pages deploy plan queued)
+> Last updated: 2026-08-02 (dfos-integration queued, design approved)
 
 ## Active
 
@@ -19,6 +19,7 @@
 5. [package-integration](package-integration.md) — Audit packages/, define lifecycle (`docs/PACKAGE-LIFECYCLE.md`), resolve consumption mechanism  ·  workstream: package-integration  ·  est. 3 sessions  ·  parent of multica-integration
 6. [system-reliability](system-reliability.md) — Audit reliability infra, decide trigger layering (pre-commit / CI / scheduled), implement enforcement  ·  workstream: reliability  ·  est. 3 sessions
 7. [instance-bootstrap](instance-bootstrap.md) — Framework cloning + wizard with package/skill selection + knowledge bootstrap (one source). Engine for `non-tech-onboarding` web wrapper  ·  workstream: instance-bootstrap  ·  est. 4 sessions
+8. **dfos-integration** — **Design-approved 2026-08-01.** DFOS protocol (protocol.dfos.com, Metalabel) as the federation's cryptographic identity + verifiable-authorship layer: `did:dfos` for org instances **and** agents (scoped, revocable agent credentials), `packages/dfos-bridge/` wrapping the official `dfos` CLI + `dfos@metalabel` Claude Code skill, anchoring federation manifests / knowledge-commons artifacts / governance decisions (with witness countersignatures from peer orgs), `.well-known/dfos.json` + `federation.yaml` v3.1 + `npm run verify:federation`. Git stays canonical — DFOS adds proofs, not storage. Hosted relay first, self-hosted later; spaces product is a research-gated tail (no public API found). Phases 0–1 (~1.5 days) ship standalone value. Spec: [`2026-07-25-dfos-org-os-integration-design.md`](../superpowers/specs/2026-07-25-dfos-org-os-integration-design.md) · implementation plan pending (writing-plans next) · workstream: federation-protocol
 
 ## Scoping
 
