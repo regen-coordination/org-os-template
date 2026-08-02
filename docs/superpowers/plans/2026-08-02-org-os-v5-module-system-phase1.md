@@ -8,7 +8,14 @@
 
 **Tech Stack:** Node ESM (`.mjs`, repo is `"type": "module"`), `js-yaml` (already a dependency), `node:crypto`, `node:test` built-in runner (no new dependencies).
 
-**Working branch:** `feat/multica-operator` (current). Pre-commit runs `validate:structure` — every commit below must keep it green.
+**Working branch:** `autopoiesis-phase2-pilot` (contains the spec and plan commits). Pre-commit runs `validate:structure` — every commit below must keep it green.
+
+**Concurrency warning:** another agent process is committing to this branch and has
+uncommitted work in `scripts/sync-upstream.mjs` and `tests/scripts/sync-upstream.test.mjs`.
+Every commit below stages **explicit paths only** — never `git add -A` or `git add .`.
+
+**Test convention:** this repo runs `node --test "tests/**/*.test.mjs"` via `npm test`,
+with script tests under `tests/scripts/`. Module engine tests follow that convention.
 
 ---
 
@@ -17,7 +24,7 @@
 | File | Responsibility |
 |---|---|
 | `scripts/modules.mjs` | **Create.** The engine: manifest validation, registry loading, dependency resolution, materialization, adoption, state writing. Exports pure functions for tests; CLI entry guarded by `import.meta.url` check |
-| `scripts/test/modules.test.mjs` | **Create.** Fixture-based tests (temp dirs) for every engine function |
+| `tests/scripts/modules.test.mjs` | **Create.** Fixture-based tests (temp dirs) for every engine function |
 | `schemas/module.schema.json` | **Create.** JSON Schema documenting `module.yaml` (authoritative format reference; engine's `validateManifest` mirrors it) |
 | `scripts/validate-structure.mjs` | **Modify.** New section 10 validating `data/modules.yaml` + `.well-known/modules.json` when present |
 | `docs/FILE-STRUCTURE.md` | **Modify.** Document `modules/` (framework) and `data/modules.yaml` (instances) |
@@ -59,12 +66,12 @@ Published state format (`.well-known/modules.json`, generated):
 
 **Files:**
 - Create: `scripts/modules.mjs`
-- Create: `scripts/test/modules.test.mjs`
+- Create: `tests/scripts/modules.test.mjs`
 - Create: `schemas/module.schema.json`
 
 - [ ] **Step 1: Create the test file with failing tests for `validateManifest`**
 
-Create `scripts/test/modules.test.mjs`:
+Create `tests/scripts/modules.test.mjs`:
 
 ```js
 import { test } from 'node:test';
@@ -73,7 +80,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import yaml from 'js-yaml';
-import { validateManifest } from '../modules.mjs';
+import { validateManifest } from '../../scripts/modules.mjs';
 
 // --- fixtures ------------------------------------------------------------
 
@@ -146,8 +153,8 @@ test('validateManifest reports missing fields and bad values', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `node --test scripts/test/`
-Expected: FAIL — `Cannot find module '../modules.mjs'` (or export missing).
+Run: `node --test tests/scripts/modules.test.mjs`
+Expected: FAIL — `Cannot find module '../../scripts/modules.mjs'` (or export missing).
 
 - [ ] **Step 3: Create `scripts/modules.mjs` with `validateManifest`**
 
@@ -194,7 +201,7 @@ export function validateManifest(m) {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `node --test scripts/test/`
+Run: `node --test tests/scripts/modules.test.mjs`
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Create `schemas/module.schema.json`**
@@ -236,7 +243,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/modules.mjs scripts/test/modules.test.mjs schemas/module.schema.json
+git add scripts/modules.mjs tests/scripts/modules.test.mjs schemas/module.schema.json
 git commit -m "feat(modules): engine scaffold — module.yaml validation + schema (v5 Phase 1)"
 ```
 
@@ -246,14 +253,14 @@ git commit -m "feat(modules): engine scaffold — module.yaml validation + schem
 
 **Files:**
 - Modify: `scripts/modules.mjs` (append)
-- Modify: `scripts/test/modules.test.mjs` (append)
+- Modify: `tests/scripts/modules.test.mjs` (append)
 
 - [ ] **Step 1: Append failing tests**
 
-Append to `scripts/test/modules.test.mjs`; also extend the import line from `'../modules.mjs'` to include the new functions:
+Append to `tests/scripts/modules.test.mjs`; also extend the import line from `'../modules.mjs'` to include the new functions:
 
 ```js
-import { validateManifest, loadRegistry, resolveInstallOrder } from '../modules.mjs';
+import { validateManifest, loadRegistry, resolveInstallOrder } from '../../scripts/modules.mjs';
 ```
 
 ```js
@@ -287,7 +294,7 @@ test('resolveInstallOrder throws on unknown module', () => {
 
 - [ ] **Step 2: Run tests to verify the new ones fail**
 
-Run: `node --test scripts/test/`
+Run: `node --test tests/scripts/modules.test.mjs`
 Expected: 2 pass, 5 FAIL (`loadRegistry is not a function` or similar export error).
 
 - [ ] **Step 3: Append the implementation to `scripts/modules.mjs`**
@@ -322,13 +329,13 @@ export function resolveInstallOrder(registry, id, seen = new Set(), order = []) 
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `node --test scripts/test/`
+Run: `node --test tests/scripts/modules.test.mjs`
 Expected: PASS (7 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/modules.mjs scripts/test/modules.test.mjs
+git add scripts/modules.mjs tests/scripts/modules.test.mjs
 git commit -m "feat(modules): registry loading + dependency resolution"
 ```
 
@@ -338,7 +345,7 @@ git commit -m "feat(modules): registry loading + dependency resolution"
 
 **Files:**
 - Modify: `scripts/modules.mjs` (append)
-- Modify: `scripts/test/modules.test.mjs` (append)
+- Modify: `tests/scripts/modules.test.mjs` (append)
 
 - [ ] **Step 1: Append failing tests**
 
@@ -348,7 +355,7 @@ Extend the import line:
 import {
   validateManifest, loadRegistry, resolveInstallOrder,
   sha256, addModule, loadInstanceManifest,
-} from '../modules.mjs';
+} from '../../scripts/modules.mjs';
 ```
 
 Append:
@@ -400,7 +407,7 @@ test('addModule skips modules already installed at the same version', () => {
 
 - [ ] **Step 2: Run tests to verify the new ones fail**
 
-Run: `node --test scripts/test/`
+Run: `node --test tests/scripts/modules.test.mjs`
 Expected: 7 pass, 3 FAIL (missing exports).
 
 - [ ] **Step 3: Append the implementation to `scripts/modules.mjs`**
@@ -484,13 +491,13 @@ export function addModule(root, registry, id, { now = new Date().toISOString() }
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `node --test scripts/test/`
+Run: `node --test tests/scripts/modules.test.mjs`
 Expected: PASS (10 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/modules.mjs scripts/test/modules.test.mjs
+git add scripts/modules.mjs tests/scripts/modules.test.mjs
 git commit -m "feat(modules): add command — materialization, checksums, install state"
 ```
 
@@ -500,7 +507,7 @@ git commit -m "feat(modules): add command — materialization, checksums, instal
 
 **Files:**
 - Modify: `scripts/modules.mjs` (append)
-- Modify: `scripts/test/modules.test.mjs` (append)
+- Modify: `tests/scripts/modules.test.mjs` (append)
 
 - [ ] **Step 1: Append failing tests**
 
@@ -540,7 +547,7 @@ test('adoptModules leaves already-recorded modules alone', () => {
 
 - [ ] **Step 2: Run tests to verify the new ones fail**
 
-Run: `node --test scripts/test/`
+Run: `node --test tests/scripts/modules.test.mjs`
 Expected: 10 pass, 2 FAIL.
 
 - [ ] **Step 3: Append the implementation to `scripts/modules.mjs`**
@@ -570,13 +577,13 @@ export function adoptModules(root, registry, { now = new Date().toISOString() } 
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `node --test scripts/test/`
+Run: `node --test tests/scripts/modules.test.mjs`
 Expected: PASS (12 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/modules.mjs scripts/test/modules.test.mjs
+git add scripts/modules.mjs tests/scripts/modules.test.mjs
 git commit -m "feat(modules): adopt command — record pre-existing files as install state"
 ```
 
@@ -660,7 +667,7 @@ In `package.json`, add two entries to `"scripts"` (after the `"selftest"` line) 
 
 ```json
 "module": "node scripts/modules.mjs",
-"test:modules": "node --test scripts/test/",
+"test:modules": "node --test tests/scripts/modules.test.mjs",
 ```
 
 and change:
