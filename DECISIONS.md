@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-02 · Admin app — local-first API+SPA, layered proposals, build don't fork
+
+**Status:** active
+**Scope:** operator-ux, framework, data-model, governance
+
+**Decision** — Build the org-os admin app (`packages/admin/`) as a **backend-API + SPA from day one**, shipped local-first (localhost, no auth, run beside the repo) with the same server deploying hosted in v2. A staged change is **layered**: a `data/proposals.yaml` entry (governance metadata, EIP-4824 export) that *points at* a `proposal/<slug>` git branch holding the edits. Editing surface expands in **rings** — v1 the 14 `data/*.yaml` registries, ring B markdown, ring C system files behind capability flags and always via proposal, never direct commit. The shell is **A+B**: Map (canvas) and Overview (dashboard) as co-equal home tabs, canvas = registry-graph spine with graphify neighborhoods expanded on demand. The workspace-of-views layer is **built natively** over the registries rather than adopting Anytype.
+
+**Why** — The API boundary *is* the local→hosted migration path: it lets v1 run on a laptop and v2 on Railway without rework, and makes the CLI, agents and a future MCP server peers of the SPA rather than second-class. Local-only was rejected (never becomes the shared steward surface the brief asked for); hosted-first was rejected (drags auth, secrets and hosting in before the core loop is proven). On proposals: pure git branches can't surface in `.well-known/proposals.json` for the federation without scraping git, and pure changeset files rebuild half of git (conflicts, rebasing) — the layered model lets each side do what it's good at. On **Anytype** (evaluated at the operator's request): forking is blocked by licence — Any Source Available 1.0 permits modification only for non-commercial use or on Any-authorized "Allowed Networks", and an app handling treasury/funding facilitates exactly the economic transactions that carve-out excludes — *and* by architecture, since its encrypted CRDT object store is the source of truth where org-os's is git+YAML, and it ships no embeddable web client. What survives is its *model*: Objects + Relations + Sets-with-switchable-views, which our EIP-4824 schemas already describe, so the view engine is a lens over registries. Its new local REST API is kept as a future connector target, not a dependency.
+
+**Refs** — spec `docs/superpowers/specs/2026-07-23-admin-app-design.md`, plans `docs/superpowers/plans/2026-07-23-admin-app-{m1,m2,m3}.md` (plans dir is gitignored; filename dates reflect the skewed git clock — authored 2026-08-02), M1 shipped on `feat/admin-app` (18 commits, PR [#1](https://github.com/regen-coordination/org-os-template/pull/1)), `HEARTBEAT.md`, `memory/2026-08-02.md`
+
+---
+
 ## 2026-08-02 · DFOS as the federation's cryptographic proof layer
 
 **Status:** active
