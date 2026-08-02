@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-02 · Positioning — the four-layer thesis; demonstrate rather than assert
+
+**Status:** active
+**Scope:** framework, operator-ux, public-surfaces
+
+**Decision** — org-os positions on the **intersection of four layers**, not on any single one: (1) agent-native file workspace, (2) organizational rather than personal scope, (3) machine-readable org data (YAML registries + EIP-4824/DAOstar `.well-known/`), (4) multi-org federation with a personal hub node. Adversarially-verified landscape research found no project combining all four; every peer covers at most one or two. Two supporting calls: **demonstrate layers 3–4 rather than assert them** (the public site proves them with the live federation graph and real instances), and **treat operator experience as the traction priority** over further framework depth.
+
+**Why** — Layer 1 is now a commodity: OpenClaw (383k★), claude-chief-of-staff, and LifeOS-OSS independently converged on the same `SOUL.md`/`AGENTS.md`/`TOOLS.md`/`memory/` conventions, and those conventions became multi-vendor standards (AGENTS.md under the Linux Foundation, 60k+ projects; the Agent Skills `SKILL.md` format across Anthropic/OpenAI/OpenCode; Obsidian's CEO shipping official vault-agent skills). Positioning on the workspace layer alone would be undifferentiated and would fight standards org-os benefits from. Positioning on schemas or federation alone was rejected too — they are uncontested *because no one has validated demand for them*, so asserting their value invites skepticism; showing a federation that actually runs does not. Operator experience won the priority argument on evidence: claude-chief-of-staff reached ~419★ in weeks on executive-assistant UX alone, while org-os's differentiating layers attracted no competitive pressure at all.
+
+**Refs** — `docs/POSITIONING.md`, `docs/research/2026-07-15-agent-native-org-landscape.md` (104-agent verified landscape; one refuted claim excluded — note the filename date is an authoring error, the work is 2026-08-02), `memory/2026-08-02.md`, commits `e2a2f4f` + `eb390a0` (rad-org-os sovereignty proof point), `site/src/data/landing.yaml` (not yet updated), plan `org-os-website`
+
+---
+
 ## 2026-07-15 · v0.5 cross-instance consolidation — diff-verified backports, generated artifacts registered by mechanism
 
 **Status:** active
