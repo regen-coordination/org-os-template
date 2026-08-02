@@ -69,7 +69,47 @@ Backfilled in this pilot (branch `autopoiesis-phase2-pilot`):
 
 ## Exercise — what we ran, what happened
 
-(filled in Task 10)
+**Stage A — Self-validation (2026-08-02):**
+- `npm run validate:structure`: **pass** — 53 passed, 0 failed, 2 warnings
+  (pre-existing: MASTERPROMPT.md coexists with MASTERPLAN.md; optional
+  `ideas/` absent). Includes the new §8b lineage check: genesis_commit
+  40-hex ✓.
+- `npm run validate:schemas`: **pass** — 14 passed, 0 failed, 0 warnings.
+
+**Stage B — Synthetic propagation (adapted vault-safe):**
+
+The plan's Stage B bumped the real framework and rolled back with
+`git reset --hard` — banned under vault safety. Adapted: *both* sides live
+in `mktemp -d` — upstream = temp clone of org-os at pilot HEAD (branch
+forced to `main`), instance = clone of that clone. Zero mutation of the
+real repo.
+
+- Instance customization (SOUL.md marker + upstream URL): commit `4d5a1a6`.
+- Framework bump (README line): commit `0b67e38`.
+- First run **refused: working tree dirty** — the untracked `node_modules`
+  symlink. The real repo ignores `node_modules` via `.git/info/exclude`,
+  which does not propagate to clones. Correct vault-safe behavior; fixed
+  in the fixture by excluding locally. (Finding: fresh instances cloned
+  from the framework lack the exclude — see postmortem.)
+- Re-run `node scripts/sync-upstream.mjs --yes`: **exit 0**, all 10 stages.
+  - Rebase: "Successfully rebased and updated refs/heads/main."
+  - stage 6 migrate: no-op (0.5 == 0.5) ✓
+  - stage 7 sync:packages: warned (`knowledge_base` enabled but not in
+    framework) — correctly non-fatal ✓
+  - stage 8 validators: both passed inside the instance ✓
+  - stage 9/10: lineage updated, receipt `memory/sync-2026-08-02.md` ✓
+
+**Closure evidence — all four conditions met:**
+1. Pulled the framework bump: README.md tail = "upstream change for sync test" ✓
+2. Preserved the customization: SOUL.md tail = `<!-- instance-only soul marker -->` ✓
+3. `last_sync_commit: "0b67e38b56768a253ee52fa0128561e755bf4f14"` == upstream HEAD ✓
+4. Receipt `memory/sync-2026-08-02.md` with upstream, old/new SHAs, counts ✓
+
+Cosmetic defects observed (postmortem): the stale YAML comment
+"# framework IS the upstream; null is correct here" survives beside the
+now-set SHA (regex replace keeps trailing comments); "Commits applied: 203"
+counted the whole upstream history on a first sync with `last_sync_commit:
+null` — the true delta was 1 commit.
 
 ## What worked
 
