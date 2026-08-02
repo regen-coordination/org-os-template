@@ -22,6 +22,8 @@ test('persona covers the non-negotiable markers', () => {
     'IDENTITY.md',                          // bootstrap context
     'Never run `git push`',                 // push prohibition, stated as prohibition
     'Never run `git stash`',                // destructive-op prohibition
+    'Never leave this directory',           // containment: guards are directory-scoped
+    'git worktree add',                     // named explicitly — the observed escape route
   ]) {
     assert.ok(text.includes(marker), `persona missing required marker: ${marker}`);
   }

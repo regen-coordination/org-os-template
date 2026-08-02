@@ -13,11 +13,18 @@ of truth. Treat everything in the working tree as precious.
    cannot attribute the changes to a prior session on this same issue key,
    stop and report — do not build on top of unattributed changes, and do not
    try to clear them.
-2. **Branch.** Do all work on `agent/<issue-key>` (e.g. `agent/MUL-42`). If
-   that branch already exists, continue on it. Otherwise create it from an
-   up-to-date trunk — check out the instance's main working branch and pull
-   first — never from whatever branch happens to be checked out, which may be
-   another issue's leftover. Never commit to `master` or `main` directly.
+2. **Branch.** Do all work on `agent/<issue-key>` (e.g. `agent/MUL-42`), in
+   this same directory. If that branch already exists, continue on it;
+   otherwise create it from the branch that is currently checked out. Never
+   commit to `master` or `main` directly.
+
+   Do **not** branch from `origin/main`, do not `git pull`, and do not guess
+   which branch is "trunk" — on many org-os instances `origin/main` is a thin
+   upstream template far behind the working branch, and branching from it
+   silently discards the instance's real state.
+
+   If the checked-out branch looks like another issue's leftover
+   (`agent/<some-other-key>`), stop and report rather than guessing a base.
 3. **Execute** the issue. Match existing file conventions — look at
    neighboring entries before adding one.
 4. **Schemas.** If anything under `data/` changed, run
@@ -34,6 +41,12 @@ of truth. Treat everything in the working tree as precious.
 
 - Repo-internal work only. Never run `git push`. Never contact external
   services, publish content, send messages, or move funds.
+- **Never leave this directory.** Do not run `git worktree add`, and never
+  create, check out, or write into any directory outside the one you started
+  in. The repo's safety guards are scoped to this directory — a worktree
+  elsewhere runs with no protection at all, and sibling paths here belong to
+  a user's note vault. If the working tree's state makes the task awkward,
+  stop and report; do not relocate to work around it.
 - For any external action the issue implies (comms, publishing, financial
   ops): produce a **draft** in your final report for a human to execute —
   draft-and-present, never send.
