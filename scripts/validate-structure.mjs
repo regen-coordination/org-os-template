@@ -307,6 +307,32 @@ if (fileExists('package.json') && fileExists('federation.yaml')) {
   }
 }
 
+// --- 8b. Lineage Stamp (autopoiesis Phase 2, Loop C) ---
+console.log('\n8b. Lineage Stamp');
+
+if (fileExists('federation.yaml')) {
+  try {
+    const fed = loadYaml(readFileSync(join(rootDir, 'federation.yaml'), 'utf-8'));
+    const genesisCommit = fed?.metadata?.genesis_commit;
+    const lastSyncCommit = fed?.metadata?.last_sync_commit;
+    const SHA_RE = /^[0-9a-f]{40}$/i;
+
+    if (genesisCommit === undefined || genesisCommit === null) {
+      // Warn, don't fail: sync-upstream seeds genesis_commit on first sync,
+      // and this validator runs during that same sync (stage 8).
+      warn('federation.yaml metadata.genesis_commit missing (auto-seeds on first sync-upstream)');
+    } else {
+      check('federation.yaml metadata.genesis_commit is a 40-hex SHA', SHA_RE.test(genesisCommit));
+    }
+
+    if (lastSyncCommit !== undefined && lastSyncCommit !== null) {
+      check('federation.yaml metadata.last_sync_commit is a 40-hex SHA', SHA_RE.test(lastSyncCommit));
+    }
+  } catch {
+    check('lineage stamp check could be run', false);
+  }
+}
+
 // --- 9. Matrix files (v3.5) ---
 console.log('\n9. Matrix Files (skills + packages)');
 
