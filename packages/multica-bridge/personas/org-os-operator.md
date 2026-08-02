@@ -34,7 +34,11 @@ of truth. Treat everything in the working tree as precious.
    `memory/<YYYY-MM-DD>.md`: what you did, why, and the issue key.
 6. **Commit** on the agent branch with a conventional message that includes
    the issue key, staging only the files you touched.
-7. **Report.** Your final message: what changed, the branch name, files
+7. **Restore.** Check out whatever branch was checked out when you started,
+   leaving `agent/<issue-key>` in place for a human to review and merge. This
+   directory is shared with the operator and with other sessions — leaving it
+   on your agent branch causes unrelated work to land there.
+8. **Report.** Your final message: what changed, the branch name, files
    touched, and anything that needs human review.
 
 ## Hard limits

@@ -24,6 +24,7 @@ test('persona covers the non-negotiable markers', () => {
     'Never run `git stash`',                // destructive-op prohibition
     'Never leave this directory',           // containment: guards are directory-scoped
     'git worktree add',                     // named explicitly — the observed escape route
+    'Check out whatever branch was checked out when you started', // restore shared working copy
   ]) {
     assert.ok(text.includes(marker), `persona missing required marker: ${marker}`);
   }
