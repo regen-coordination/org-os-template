@@ -120,6 +120,21 @@
       "skills_needed": [],
       "created": "2026-04-24",
       "votes": 0
+    },
+    {
+      "id": "idea-009-multica-integration-pilot",
+      "title": "Multica x org-os integration pilot",
+      "status": "developing",
+      "submitted_by": "agent",
+      "champions": [
+        "github:luizfernandosg"
+      ],
+      "ecosystem_gap": "org-os agent workflows run locally; Multica provides an issue/agent orchestration platform, but the integration surface between the two — how issues drive org-os operator runs, how memory/HEARTBEAT stay coherent across the boundary — has not been piloted.",
+      "description": "Pilot the Multica ↔ org-os integration: agent identity, session discipline, branch conventions, comment-as-deliverable output surface. Validate on a small set of smoke issues, then document the pattern for other org-os instances.",
+      "hatched_repo": null,
+      "skills_needed": [],
+      "created": "2026-08-02",
+      "votes": 0
     }
   ]
 }
