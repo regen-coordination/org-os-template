@@ -418,13 +418,33 @@ metadata:
   created: "2026-03-06"
   last_updated: "2026-03-06"
   framework_version: "3.0"
+  genesis_commit: "a1b2c3…"      # 40-hex SHA, immutable
+  last_sync_commit: null          # 40-hex SHA or null
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `created` | date | When this federation manifest was first created |
-| `last_updated` | date | Last modification date |
+| `last_updated` | date | Last modification date (refreshed by `sync-upstream`) |
 | `framework_version` | string | org-os framework version this manifest conforms to |
+| `genesis_commit` | string | 40-hex SHA of the instance's first commit — the framework state it was born from. Immutable; seeded at clone time or on first `sync:upstream` |
+| `last_sync_commit` | string \| null | 40-hex SHA of the upstream framework HEAD at the most recent sync. Updated by `npm run sync:upstream`; `null` means never synced — or the framework itself, which is its own upstream |
+
+#### Lineage stamp (`genesis_commit` + `last_sync_commit`)
+
+Together these two fields form the **lineage stamp** (autopoiesis Phase 2,
+Loop C cascade closure). Use cases:
+
+- Audit the framework state an instance was born from vs. its current
+  synced state (`git log genesis_commit..last_sync_commit` on the framework).
+- Detect shared ancestry: two instances with the same `genesis_commit`
+  are forks of the same framework state.
+- Cross-check sync receipts: `last_sync_commit` matches the newest
+  `memory/sync-YYYY-MM-DD.md` receipt written by `sync-upstream`.
+
+Validated by `npm run validate:schemas` (shape: 40-hex SHA / null) and
+`npm run validate:structure` §8b. A missing `genesis_commit` is a warning,
+not an error — `sync-upstream` seeds it on the first sync.
 
 ---
 

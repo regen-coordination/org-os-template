@@ -72,6 +72,14 @@ The framework does **not** push changes to downstream instances. Each instance p
 4. Instance's `federation.yaml.metadata.framework_version` is updated to the new version.
 5. Framework hub (this repo) picks up the new state on next `npm run analyze:instances`.
 
+> **Note (2026-08-02):** `npm run sync:upstream` is implemented and now
+> covered by tests (`tests/scripts/sync-upstream.test.mjs`, autopoiesis
+> Phase 2 pilot). After a sync, `federation.yaml.metadata.last_sync_commit`
+> records the upstream HEAD that was merged (and `genesis_commit` is seeded
+> if the instance never recorded one), and a sync receipt lands in
+> `memory/sync-YYYY-MM-DD.md`. The sync leaves these changes uncommitted
+> for operator review.
+
 Migrations must be:
 - **Idempotent** — running twice does nothing the second time.
 - **Additive where possible** — never delete data without a `--destructive` flag.
