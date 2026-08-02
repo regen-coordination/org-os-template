@@ -15,8 +15,10 @@
  *   6. Run npm run migrate (if any new framework migrations to apply).
  *   7. Run npm run sync:packages (refresh enabled packages from framework).
  *   8. Run npm run validate:structure + validate:schemas.
- *   9. Update federation.yaml.metadata.last_sync_commit + last_updated.
- *  10. Write memory/sync-YYYY-MM-DD.md receipt.
+ *   9. Update federation.yaml.metadata.last_sync_commit + last_updated;
+ *      seed metadata.genesis_commit from the instance's root commit if
+ *      it was never recorded (first sync).
+ *  10. Write memory/sync-YYYY-MM-DD.md receipt (creating memory/ if needed).
  *
  * Usage:
  *   npm run sync:upstream                # interactive confirmation
@@ -27,7 +29,7 @@
  */
 
 import {
-  readFileSync, writeFileSync, existsSync, statSync,
+  readFileSync, writeFileSync, existsSync, statSync, mkdirSync,
 } from "node:fs";
 import { execSync, spawnSync } from "node:child_process";
 import path from "node:path";
@@ -46,7 +48,10 @@ function log(stage, msg) {
 }
 
 function git(args, opts = {}) {
-  return execSync(`git ${args}`, { cwd: rootDir, encoding: "utf-8", ...opts }).trim();
+  // With stdio: "inherit" execSync returns null — guard before trim,
+  // otherwise a *successful* pull is misreported as a failure (stage 5).
+  const out = execSync(`git ${args}`, { cwd: rootDir, encoding: "utf-8", ...opts });
+  return out == null ? "" : out.trim();
 }
 
 function gitOk(args) {
@@ -190,6 +195,14 @@ log("stage 9", "updating federation.yaml.metadata.last_sync_commit + last_update
 if (!dry) {
   const today = new Date().toISOString().slice(0, 10);
   let updated = fedRaw;
+  // Seed genesis_commit on first sync if the instance never recorded one
+  // (validate-identity warns about this case and promises the auto-seed).
+  if (!/genesis_commit:/.test(updated)) {
+    const rootCommits = git("rev-list --max-parents=0 HEAD").split("\n");
+    const genesis = rootCommits[rootCommits.length - 1].trim();
+    updated = updated.replace(/(metadata:)/, `$1\n  genesis_commit: "${genesis}"`);
+    log("stage 9", `seeded genesis_commit ${genesis.slice(0, 12)} (first sync)`);
+  }
   // Replace last_sync_commit
   if (/last_sync_commit:/.test(updated)) {
     updated = updated.replace(
@@ -215,7 +228,9 @@ if (!dry) {
 log("stage 10", "writing memory receipt");
 if (!dry) {
   const today = new Date().toISOString().slice(0, 10);
-  const receiptPath = path.join(rootDir, "memory", `sync-${today}.md`);
+  const memoryDir = path.join(rootDir, "memory");
+  mkdirSync(memoryDir, { recursive: true }); // fresh instances may lack memory/
+  const receiptPath = path.join(memoryDir, `sync-${today}.md`);
   const receipt = `# Sync receipt — ${today}
 
 - **Upstream:** ${upstream.url}
