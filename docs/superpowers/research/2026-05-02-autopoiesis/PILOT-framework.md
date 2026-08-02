@@ -4,7 +4,7 @@
 > Spec: [`2026-05-02-org-os-autopoiesis-design.md`](../../specs/2026-05-02-org-os-autopoiesis-design.md)
 > Synthesis: [`SYNTHESIS.md`](SYNTHESIS.md)
 > Loop: Loop C — Population learning (Metabolism → Cognition → Federation)
-> Status: in progress
+> Status: complete, awaiting Phase 2 gate
 
 ## Context note (2026-08-02)
 
@@ -192,4 +192,47 @@ null` — the true delta was 1 commit.
 
 ## Migration note for downstream instances
 
-(filled in Task 12)
+When `npm run sync:upstream` runs against a downstream instance after
+this pilot lands:
+
+**New files (delivered via sync):**
+- `tests/scripts/sync-upstream.test.mjs`,
+  `tests/scripts/validate-identity.test.mjs` — test harness; optional for
+  instances, ships with the framework.
+
+**Modified files (delivered via sync):**
+- `scripts/sync-upstream.mjs` — **the stage-5 fix is load-bearing**: any
+  instance carrying the `ec09cdc` version cannot complete a sync with new
+  commits (every successful pull is reported as a failure). Instances
+  must receive this file via a manual copy or first-sync bootstrap,
+  because the broken version can't sync itself. One workable path:
+  `git fetch upstream && git checkout upstream/main -- scripts/sync-upstream.mjs`,
+  then run the normal sync.
+- `scripts/validate-structure.mjs` — §8b lineage check (warn-only when
+  `genesis_commit` absent; no action required before syncing).
+- `scripts/validate-identity.mjs` — docstring only.
+- `docs/FEDERATION.md`, `docs/VERSIONING.md` — documentation.
+
+**Required follow-up per instance (operator-driven):**
+1. Nothing mandatory: `genesis_commit` auto-seeds on the first post-pilot
+   sync (stage 9), and `memory/` is created if absent (stage 10).
+2. (Optional) Verify the seed: `genesis_commit` should equal
+   `git rev-list --max-parents=0 HEAD | tail -1` in the instance.
+3. Run `npm run validate:structure` — §8b should pass or warn, never
+   block.
+4. If the instance relies on `.git/info/exclude` for `node_modules`
+   (clones don't inherit it), the first sync may refuse on a dirty tree —
+   add the exclude locally or land a tracked `.gitignore` entry (Phase 3).
+
+**Per-instance notes:**
+
+| Instance | Notes |
+|----------|-------|
+| `refi-bcn-os` | Production; heavily diverged `initialize.mjs` (+800 lines). Rebase-based sync should replay local commits, but review the conflict surface before the first sync. |
+| `refi-dao-os` | Production; long-overdue sync — expect a large accumulated delta; review before merging. |
+| `refi-med-os` | Fresh (born 2026-04-29). First-ever sync seeds `genesis_commit` automatically. |
+| `dao-os` | Real submodule of the hub; sync from inside its own directory. |
+| `openclaw` | AgentRuntime, not a typical data instance — verify the lineage/sync model applies or document an exception. |
+| `regen-coordination-os` | Cloned locally 2026-07-15; standalone clone with own remote — sync from inside its own directory. |
+
+All six are listed in `federation.yaml` `downstream:` (verified 2026-04-29).
