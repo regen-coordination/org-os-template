@@ -26,6 +26,9 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 - [ ] federation-map: add an automated bundle-drift test (run esbuild to a temp file, byte-compare vs committed `dist/federation-map.iife.js`) so a stale vault artifact fails CI instead of silently shipping old code — only review Minor left open
 - [ ] federation-map: optional review cleanups — `self.emoji` emitted but never rendered (dead field in `kms/src/map.mjs`); `federation` edge kind has no CSS rule (falls back to base green — confirm intended)
 - [ ] federation-map: populate `data/ecosystems.yaml` `sources:` lists once instances carry `source-systems.yaml` (currently empty arrays; ring-3 source nodes therefore absent on the hub)
+- [ ] graphify-integration: answer the scope question (A ingest source / B query engine / C adapter / D profile bundle) and resume brainstorm → spec → plan — see `memory/2026-08-02.md`
+- [ ] graphify-integration: decide the Node↔Python bridge (subprocess CLI / MCP server / REST server) and whether a Python toolchain becomes an org-os instance requirement — blocks the spec
+- [ ] Hygiene: `.gitignore` `graphify-out/` (contains a 2.8MB generated `graph.html`) and `site/test-results/` — both currently untracked but not ignored
 - [ ] Investigate: git commit timestamps run ~2 weeks behind the system clock (commits stamped 2026-07-19 while `date` says 2026-08-02) — dashboard "N days ago" math will read wrong until resolved
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
