@@ -49,7 +49,7 @@ Outbound (`publish`) is draft-and-present only.
 | connector | status | notes |
 |---|---|---|
 | `github` | active | issues → signal, releases → resource (via `gh` CLI) |
-| `koi` | active | events/bundles → resource; FORGET → review signal |
+| `koi` | active | GET /rids corpus inventory → resource; bounded + paginated; FORGET → review signal |
 | `geo` | stub | read side of the Geo graph; spec in `src/connectors/geo.mjs` |
 | `radicle` | stub | p2p-git COBs; spec in `src/connectors/radicle.mjs` |
 | `atproto` | stub | Bluesky lexicon records; spec in `src/connectors/atproto.mjs` |
@@ -63,5 +63,8 @@ is the implementation spec. Building one = fill in `pull`/`map`, flip status to 
 - **GitHub incremental pull** uses a bounded window (issues 500, releases 200) with a server-side
   `updated:>=` date filter. Repos with more changed items than the window between pulls may miss the
   tail; a saturation warning is emitted when a window fills. Full server-side pagination is a follow-on.
-- **KOI** maps every non-FORGET bundle to `resource` (schema-by-RID-type is a follow-on).
+- **KOI** pulls the paginated `/rids` corpus inventory (bounded by `max_records`, default 200 of
+  30k+ upstream RIDs; filter with `contexts`). The deployed node exposes no event stream, so
+  `subscribe` remains unavailable there; the `FORGET → review signal` path is kept for KOI-net
+  coordinators that do. Many RIDs are `#chunkN` fragments — chunk consolidation is a follow-on.
 - `subscribe` (live events) and `publish` (contribute-back) are declared but not implemented.
