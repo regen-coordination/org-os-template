@@ -113,15 +113,82 @@ null` — the true delta was 1 commit.
 
 ## What worked
 
-(filled in Task 11)
+- **The loop actually closes.** Stage B's synthetic instance pulled the
+  framework bump, kept its SOUL.md customization through the rebase, got
+  `last_sync_commit` pinned to the exact upstream HEAD (`0b67e38b…`), and
+  received a dated receipt — all four closure conditions met in one
+  unattended `--yes` run.
+- **Characterization tests as archaeology.** Writing tests against the
+  already-shipped scripts immediately surfaced a fatal defect (stage-5
+  null crash, below) that fifteen weeks of the script existing had not —
+  the script had never been run against a real upstream with new commits.
+- **The deploy-shaped test harness.** Copying the script into
+  `<tmp>/scripts/` and symlinking `node_modules` tests the script exactly
+  as instances receive it (it resolves its root from its own location).
+  Both suites (7 + 10 cases) run in ~45 s against real git repos.
+- **Warn-don't-fail layering held up.** validate-identity warns (exit 0)
+  on missing `genesis_commit`, validate-structure §8b mirrors that, and
+  sync-upstream stage 8 therefore doesn't deadlock a first sync — then
+  stage 9 seeds the field. Exercised in the `withGenesis: false` test.
+- **Existing guards fired correctly in anger.** The dirty-tree refusal
+  triggered on the fixture's untracked `node_modules` symlink before any
+  git mutation; `.sync-freeze` refusal exits 2 as documented.
 
 ## What broke / had to be invented
 
-(filled in Task 11)
+- **Stage-5 null crash (fatal, shipped):** `git()` called `.trim()` on
+  `execSync(..., { stdio: "inherit" })`, which returns `null` — so every
+  *successful* pull was caught and reported as "Pull failed", after the
+  rebase had already happened. As shipped, `sync-upstream` could never
+  complete a sync that had new commits. Found by the first happy-path
+  test; fixed with a null guard in `scripts/sync-upstream.mjs`.
+- **Promised-but-missing genesis seeding:** validate-identity's warning
+  text said genesis "will auto-seed on first sync-upstream", but no code
+  did it. Invented: stage 9 seeds from `git rev-list --max-parents=0 HEAD`
+  (last line = root commit) when `genesis_commit:` is absent.
+- **`memory/` assumption:** stage 10 crashed on instances without a
+  `memory/` directory (git doesn't track empty dirs, so fresh clones can
+  lack it). Fixed with `mkdirSync(..., { recursive: true })`.
+- **Exit-code doc drift:** the header claimed "exit 2 on warnings"; the
+  code exits 0 (correct — stage 8 depends on it). Doc fixed, behavior kept.
+- **`.git/info/exclude` doesn't propagate:** the framework ignores
+  `node_modules` in `.git/info/exclude` rather than `.gitignore`, so a
+  cloned instance sees it as untracked → dirty-tree refusal on first sync.
+  Worked around in fixtures; real fix (tracked `.gitignore` entry) left
+  for Phase 3 — it touches every downstream clone.
+- **Vault-banned exercise recipe:** the plan's Stage B mutated the real
+  framework and rolled back with a hard reset — prohibited here. Invented
+  the two-temp-clones topology (upstream clone + instance clone, both in
+  `mktemp -d`); strictly safer and reusable in CI.
+- **Cosmetic:** stale YAML comment survives next to the updated
+  `last_sync_commit` (regex keeps trailing comments); first-sync receipt
+  reports "Commits applied: 203" (whole history) when `last_sync_commit`
+  is null — should use the merge-base delta instead.
 
 ## Decisions for Phase 3 DECISIONS.md
 
-(filled in Task 11)
+- **Identity validation = file-agreement + SHA-shape check.** Lighter than
+  cryptographic identity (DID); enough to catch drift today; defers the
+  DID story (`identity-lineage-tracking` per SYNTHESIS net-new).
+- **Lineage stamp lives in `metadata.`** (`genesis_commit` +
+  `last_sync_commit`), not a parallel `lineage:` block; revisit only if
+  more lineage fields accumulate.
+- **Missing `genesis_commit` is a warning everywhere, an error nowhere.**
+  Seed-on-first-sync (stage 9) is the enforcement mechanism; hard-failing
+  validators would deadlock the very sync that fixes the gap.
+- **Sync preserves customizations via rebase, not stash.** Committed
+  instance changes replay on top of upstream; `maintain_on_sync` entries
+  are today informational (counted in the receipt). If the framework
+  edits a maintained file, the rebase conflicts and the sync aborts
+  loudly — acceptable for Phase 2; Phase 3 should decide whether
+  `maintain_on_sync` gets teeth (e.g., `ours` merge strategy per path).
+- **Sync output stays uncommitted.** Stage 9/10 changes (lineage bump +
+  receipt) are deliberately left for operator review — draft-and-present.
+  The no-op test encodes this: commit, then re-sync → "already up to date".
+- **`last_sync_commit: null` on the framework itself** (it IS the
+  upstream) — kept from the implementation, replacing the plan's
+  omit-the-field approach; a present-but-null key is greppable and
+  validated.
 
 ## Migration note for downstream instances
 
