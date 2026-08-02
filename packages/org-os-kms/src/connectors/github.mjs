@@ -54,11 +54,12 @@ export const githubConnector = {
         }
       }
       if (include.includes('releases')) {
-        const rels = gh(['release', 'list', '--repo', repo, '--limit', String(RELEASE_LIMIT), '--json', 'name,tagName,url,publishedAt']);
+        const rels = gh(['release', 'list', '--repo', repo, '--limit', String(RELEASE_LIMIT), '--json', 'name,tagName,publishedAt']);
         if (rels.length >= RELEASE_LIMIT) warnings.push(`github ${repo}: release window saturated at ${RELEASE_LIMIT}`);
         for (const r of rels) {
           if (sinceReleases && r.publishedAt <= sinceReleases) continue;
-          records.push({ kind: 'release', repo, name: r.name || r.tagName, url: r.url, publishedAt: r.publishedAt, body: '' });
+          // gh release list has no `url` field — construct the canonical tag URL.
+          records.push({ kind: 'release', repo, name: r.name || r.tagName, url: `https://github.com/${repo}/releases/tag/${r.tagName}`, publishedAt: r.publishedAt, body: '' });
           bumpR(r.publishedAt);
         }
       }

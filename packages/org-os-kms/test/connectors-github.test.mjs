@@ -68,6 +68,23 @@ test('github pull: a newer issue does NOT cause a newer release to be skipped (p
   assert.ok(records.some((r) => r.kind === 'release'));
 });
 
+test('github pull requests only valid gh release fields and constructs the release url', async () => {
+  const calls = [];
+  const fake = (args) => {
+    calls.push(args);
+    if (args[0] === 'release') return [{ name: 'v1.2.0', tagName: 'v1.2.0', publishedAt: '2026-07-01T00:00:00Z' }];
+    return [];
+  };
+  const { records } = await githubConnector.pull(
+    { repos: ['o/r'], include: ['releases'] }, { cursor: null }, { ghJSON: fake });
+  const relArgs = calls.find((a) => a[0] === 'release');
+  const jsonSpec = relArgs[relArgs.indexOf('--json') + 1];
+  // `url` is not a valid gh release-list field — requesting it makes gh exit non-zero.
+  assert.ok(!jsonSpec.split(',').includes('url'), `must not request url field, got: ${jsonSpec}`);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].url, 'https://github.com/o/r/releases/tag/v1.2.0');
+});
+
 test('github pull warns on an unhandled include type', async () => {
   const fake = () => [];
   const { warnings } = await githubConnector.pull(
