@@ -23,7 +23,7 @@
     },
     "checks": {
       "type": "array",
-      "description": "Declarative health checks (Phase 3): file-exists | freshness | command."
+      "description": "Reserved for Phase 3 declarative health checks. Item shape is not yet constrained."
     },
     "npm": { "type": "string", "description": "Optional npm package name for code modules." }
   },

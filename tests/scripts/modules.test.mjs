@@ -1,14 +1,28 @@
+// tests/scripts/modules.test.mjs
+//
+// Tests for scripts/modules.mjs (v5 module engine, Phase 1: manifest
+// validation). Fixtures build a fake framework `modules/` tree and a fake
+// instance root in temp dirs, reused by Tasks 2-5 as the engine grows
+// loadRegistry, resolveInstallOrder, addModule, adoptModules and a CLI.
+//
+// writeModule() takes `dirName` separately from `manifest.id` on purpose:
+// the directory a module lives in and the id inside its module.yaml are two
+// independent pieces of data, and Task 2's loadRegistry() is specifically
+// responsible for catching the case where they disagree (id/directory
+// mismatch). Keeping them as separate parameters here lets later tests
+// construct that mismatch directly, e.g. writeModule(root, 'org-os-foo', {
+// id: 'org-os-bar', ... }).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import yaml from 'js-yaml';
-import { validateManifest } from '../../scripts/modules.mjs';
+import { validateManifest, REQUIRED_FIELDS, MODULE_TYPES, KNOWN_FIELDS } from '../../scripts/modules.mjs';
 
 // --- fixtures ------------------------------------------------------------
 
-export function writeModule(fwRoot, dirName, manifest, files = {}) {
+function writeModule(fwRoot, dirName, manifest, files = {}) {
   const dir = join(fwRoot, 'modules', dirName);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'module.yaml'), yaml.dump(manifest));
@@ -19,7 +33,7 @@ export function writeModule(fwRoot, dirName, manifest, files = {}) {
   }
 }
 
-export function makeFramework() {
+function makeFramework() {
   const root = mkdtempSync(join(tmpdir(), 'orgos-fw-'));
   writeModule(
     root,
@@ -51,7 +65,7 @@ export function makeFramework() {
   return root;
 }
 
-export function makeInstance() {
+function makeInstance() {
   const root = mkdtempSync(join(tmpdir(), 'orgos-inst-'));
   mkdirSync(join(root, 'data'), { recursive: true });
   return root;
@@ -68,8 +82,32 @@ test('validateManifest accepts a valid manifest', () => {
 
 test('validateManifest reports missing fields and bad values', () => {
   const errors = validateManifest({ id: 'PM!', version: '1.0', type: 'weird' });
-  assert.ok(errors.some((e) => e.includes('description')));
-  assert.ok(errors.some((e) => e.includes('invalid id')));
-  assert.ok(errors.some((e) => e.includes('invalid version')));
-  assert.ok(errors.some((e) => e.includes('invalid type')));
+  const expected = [
+    'missing required field: description',
+    'invalid id: PM!',
+    'invalid version: 1.0',
+    'invalid type: weird',
+  ];
+  assert.deepEqual(errors.slice().sort(), expected.slice().sort());
+});
+
+test('module.schema.json and validateManifest agree on the field set', () => {
+  const schemaPath = new URL('../../schemas/module.schema.json', import.meta.url);
+  const s = JSON.parse(readFileSync(schemaPath, 'utf-8'));
+  assert.deepEqual(s.required.slice().sort(), [...REQUIRED_FIELDS].sort());
+  assert.deepEqual(Object.keys(s.properties).sort(), [...KNOWN_FIELDS].sort());
+  assert.deepEqual(s.properties.type.enum, MODULE_TYPES);
+});
+
+test('validateManifest rejects unknown fields and non-string leaf values', () => {
+  const errors = validateManifest({
+    id: 'org-os-x', version: '1.0.0', type: 'core', description: 'd',
+    dependancies: ['org-os-standards'],
+  });
+  assert.ok(errors.some((e) => e.includes('unknown field: dependancies')));
+  assert.deepEqual(
+    validateManifest({ id: 'org-os-x', version: '1.0.0', type: 'core', description: 'd',
+                       files: { 'a.md': { nested: 1 } } }),
+    ['files["a.md"] target must be a string']
+  );
 });
