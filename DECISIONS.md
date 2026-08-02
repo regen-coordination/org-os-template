@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-02 · rad-org-os — Radicle as a pluggable host backend, not a fork; sovereignty guaranteed by a fail-loud write path
+
+**Status:** active
+**Scope:** framework, federation, data-model, agent-runtime, governance
+
+**Decision** — org-os gains the ability to run **fully on Radicle** (Heartwood p2p git) instead of GitHub, delivered as **"A-with-B packaging"**: one host-provider abstraction (`@org-os/host` — a `HostDriver` interface with `github` and `radicle` drivers, selected per-repo by a new `federation.yaml platforms.canonical`) **plus** a Radicle-first bootstrap (`@org-os/rad` — `rad-bootstrap` zero→live genesis + a self-hostable seed-node recipe) so new communities never touch GitHub. Seven governing rules were set: (1) **reads degrade, writes fail loudly** — upstream `radicle-httpd` is read-only, so reads use the HTTP JSON API and writes shell to `rad`, erroring with actionable guidance rather than silently falling back (this *is* the sovereignty guarantee); (2) **canonicality splits by cohort** — new instances Radicle-canonical from genesis, existing repos GitHub-canonical with a rad mirror until their operator opts in, no forced migration; (3) **identity sovereignty tracks hosting sovereignty** — a member `id` is a URI whose scheme must match `platforms.canonical` (`did:key:` vs `github:`), enforced by `validateMemberIdScheme`; (4) **governance maps onto Radicle's native identity doc** — `governance.proposal_threshold` → the identity-doc `threshold`, which *is* main's quorum, since Radicle **disallows** an explicit `xyz.radicle.crefs` rule for the default branch (crefs is only for additional protected patterns like release tags); (5) **availability is a 3-tier spectrum, honestly framed** — self-hosted / radicle.garden / public seeds, with Radicle "private" documented plainly as selective replication and **not encrypted at rest**; (6) **v1 = Tiers 1+2**, with Tier 3 (CI + hosting) designed-but-deferred; (7) **runtime-agnosticism only** — the local-LLM runtime is a separate module.
+
+**Why** — Radicle + open models let org-os and its agents reach activist, community and political organizing groups that a GitHub dependency excludes, and Radicle supplies natively what org-os had left empty: cryptographic identity (`did:key`), signed refs, and quorum governance (the DID slot was explicitly deferred as "no instance has an identity beyond a GitHub URL"). Alternatives lost on boundaries: extending the KMS *knowledge-ingestion* connector to carry hosting/collaboration overloads the wrong abstraction; a standalone parallel command set forks the workflow surface and defers the integration debt; a big-bang migration would force every collaborator onto `rad` at once. Deferring Tier 3 reflects verified reality — Radicle's CI story (`radicle-ci-broker`) is node-operator-coupled and the weakest part of the stack. The fail-loud rule exists because the abstraction otherwise *invites* a silent HTTP fallback; review proved the risk real by catching `openChange` returning success without creating a patch.
+
+**Refs** — branch `feat/rad-org-os` (54 commits, `4472a1d..9835c3c`, **local only — merge path undecided**); spec `docs/superpowers/specs/2026-07-20-rad-org-os-design.md` (Appendix A: 18 adversarially-verified Radicle claims); roadmap + 4 plans `docs/superpowers/plans/2026-07-20-rad-org-os-*`; operator guide `docs/RADICLE.md`; packages `packages/org-os-host/`, `packages/rad-org-os/`; `memory/2026-08-02.md`. Live-verified against `rad 1.8.0` + `seed.radicle.xyz` (write path via a disposable throwaway identity) — no live-verification debt remains.
+
+---
+
 ## 2026-07-15 · v0.5 cross-instance consolidation — diff-verified backports, generated artifacts registered by mechanism
 
 **Status:** active

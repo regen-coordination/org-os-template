@@ -7,6 +7,11 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## Active Tasks
 
 ### Technical
+- [ ] **Decide the merge path for `feat/rad-org-os`** (54 commits, local only, Tiers 1+2 complete) — target trunk ambiguous (`v0.5` / `main` / live `feat/multica-operator`); not pushed pending the call
+- [ ] `rad-org-os` Tier 3 — replace the 3 GitHub Actions workflows with `radicle-ci-broker` adapters + GitHub-Pages → node hosting rebuild (lands on the Plan-3 seed-node recipe)
+- [ ] `rad-org-os` operator step — apply a `threshold`/`crefs` change on a real repo via interactive `rad id update` (`buildCrefs()` generates the payload; runner: `packages/rad-org-os/scripts/live-verify.sh`)
+- [ ] `rad-skill` adoption — `rad clone rad:zvBj4kByGeQSrSy2c4H7fyK42cS8`, licence check, re-express as a runtime-neutral org-os skill (spec Open Decision 5)
+- [ ] Scope the local-LLM runtime module (separate from rad-org-os, near `org-os-hermes`) — rad-org-os only guarantees runtime-agnosticism
 - [ ] Execute `autopoiesis-research` Phase 2 (12-task TDD plan; cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Plan: `docs/superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md`
 - [ ] Execute `autopoiesis-research` Phase 3 (decisions rollup + plan annotations + per-instance cascade) after Phase 2 gate
 - [ ] Execute `multica-integration` plan (25 tasks, spec + plan ready, execution deferred 2026-04-25 — recommend fresh worktree)
@@ -87,6 +92,7 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 _(Move completed items here with date — keep for 30 days then remove)_
 
+- [2026-08-02] **`rad-org-os` Tiers 1+2 complete — org-os runs fully on Radicle.** 4 plans shipped on branch `feat/rad-org-os` (54 commits, `4472a1d..9835c3c`, **local only — merge path undecided**). Ships `@org-os/host` (HostDriver interface + registry + `resolveDriver` by `platforms.canonical` + behavior-preserving `github` driver + reusable contract suite) and `@org-os/rad` (radicle-httpd reads, fail-loudly `rad` CLI writes, did:key identity, COB issue/patch mapping, `rad-bootstrap` zero→live genesis, seed-node Docker+Tor recipe, 3-tier availability chooser, governance mapping, canonical-aware `/commit /sync /handoff /close /initialize`). 151 tests green (55 rad + 30 host + 66 kms); GitHub cohort unchanged. **Live-verified**: read path keyless vs `seed.radicle.xyz`; write path proven via a throwaway identity (real `rad auth`→git-init genesis→`rad init`, 814ms) — no live-verification debt left. Review caught 5 defects green tests hid (silent-write `openChange`, missing git-init before `rad init`, dash-incompatible Dockerfile, uncommitted genesis stamp, sync-`whoami` contract mismatch). Spec: `docs/superpowers/specs/2026-07-20-rad-org-os-design.md` · roadmap + 4 plans in `docs/superpowers/plans/2026-07-20-rad-org-os-*` · operator guide `docs/RADICLE.md` · see `memory/2026-08-02.md`.
 - [2026-07-15] **v0.5 cross-instance consolidation complete** — drift 27→0 across all 7 instances. Promoted: `research` (3-way reconciled), `working-with-obsidian-canvas`, `web-browsing`, `notion-cli` skills; `/commit` `/sync` `/handoff` commands; `sync-commands.mjs` cross-editor mechanism; operator-trunk model (`operator-setup.sh` + pre-commit guard); `generate-all-schemas.mjs` merge + `clone-linked-repos.mjs` backport. federation.yaml 0.5 labels fixed, agent.skills 21→32, bread-coop-os in downstream. Matrices: 40 skills / 22 packages. Commit `177c2c8`. See `memory/2026-07-15.md` + DECISIONS.md entry.
 - [2026-05-03] **Autopoiesis research scoping + Phase 1 complete.** Spec + 3 phase plans + 9 aspect notes (Genesis, Identity, Membrane, Coupling, Metabolism, Self-maintenance, Cognition, Federation, Volition) + synthesis. Phase 1 gate passed; pilot loop = Loop C (Population learning — cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Phase 2 plan replanned for Loop C. Surfaced two phantom-script bugs in framework. See `memory/2026-05-03.md` and `docs/superpowers/research/2026-05-02-autopoiesis/SYNTHESIS.md`.
 - [2026-04-29] **`refi-med-os` instance scaffolded + pushed live** to `ReFiDAO/refi-med-os` (public). Federated under `refi-dao` network as LocalNode peer. Public website + knowledge base consolidated at `repos/refi-mediterranean/`. Bootstrap pending — operator follows `BOOTSTRAP.md` + one-pager. Hub registered in `data/instances.yaml` + `federation.yaml`. See `memory/2026-04-29.md`.
@@ -99,4 +105,4 @@ _(Move completed items here with date — keep for 30 days then remove)_
 
 ---
 
-_Last updated: 2026-07-15_
+_Last updated: 2026-08-02_
