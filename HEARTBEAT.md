@@ -23,6 +23,10 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 - [ ] rad-org-os: add a Radicle bootstrap path to the setup interview (`rad init` + seeding instead of a GitHub fork)
 - [ ] rad-org-os: write the seed-node runbook (home server / RPi, systemd, seeding policy as membership, Radicle pinned ≥1.9.1)
 - [ ] rad-org-os: implement the KMS `radicle` connector `pull` (specced stub → `radicle-httpd` read API + `rad` CLI; blocked on the connector layer landing)
+- [ ] federation-map: add an automated bundle-drift test (run esbuild to a temp file, byte-compare vs committed `dist/federation-map.iife.js`) so a stale vault artifact fails CI instead of silently shipping old code — only review Minor left open
+- [ ] federation-map: optional review cleanups — `self.emoji` emitted but never rendered (dead field in `kms/src/map.mjs`); `federation` edge kind has no CSS rule (falls back to base green — confirm intended)
+- [ ] federation-map: populate `data/ecosystems.yaml` `sources:` lists once instances carry `source-systems.yaml` (currently empty arrays; ring-3 source nodes therefore absent on the hub)
+- [ ] Investigate: git commit timestamps run ~2 weeks behind the system clock (commits stamped 2026-07-19 while `date` says 2026-08-02) — dashboard "N days ago" math will read wrong until resolved
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
 ### Orchestration (multi-instance)
@@ -40,7 +44,7 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 - [ ] Consider backporting refi-bcn-os `close.md`/`initialize.md` command-body improvements (richer than framework's; review after initialize.mjs reconciliation)
 - [ ] Document the hub data-bridge pattern (refi-dao `docs/HUB.md` module contract + allowlist→JSON snapshot) as a framework doc
 - [ ] coop-os hygiene: working tree contains a nested mirror of the whole `03 Libraries/` workspace (517 dirty files) — clean up separately, NOT with git clean (vault safety)
-- [ ] Propagate v0.5 consolidation downstream on each instance's next sync (new skills: research, web-browsing, notion-cli, working-with-obsidian-canvas; commands: /commit /sync /handoff; sync-commands mechanism)
+- [ ] Propagate v0.5 consolidation downstream on each instance's next sync (new skills: research, web-browsing, notion-cli, working-with-obsidian-canvas; commands: /commit /sync /handoff; sync-commands mechanism; **+ federation map** — instances get it via the kms profile plus one `<federation-map>` embed)
 
 ### Funding
 - N/A (solo phase — no treasury, no active funding applications)
@@ -91,6 +95,7 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 _(Move completed items here with date — keep for 30 days then remove)_
 
+- [2026-08-02] **Federation map ("the torch") shipped** — interactive map of an instance's external world (ring 1 instances · ring 2 frontier peers-of-peers · ring 3 sources/ecosystems), the counterpart to the internal note graph. New package `@org-os/federation-map` (framework-agnostic `<federation-map>` web component; deterministic ring-pinned d3-force layout × torchlight styling; d3-force sole dep). kms data plane: `render map` → `map.json`, `federate frontier` (one-hop peer-manifest fetch, stale-cache-never-breaks), `render map html` → self-contained offline vault artifact + portal index. Site `/federation` + home mini swapped off the old static SVG. Live map: 35 nodes. Final review caught + fixed a Critical panel XSS on remote-influenced frontier data. 19+65+7 tests green. Spec: `docs/superpowers/specs/2026-07-19-federation-map-design.md` · plan: `docs/superpowers/plans/2026-07-19-federation-map.md` · see `memory/2026-08-02.md`.
 - [2026-07-15] **v0.5 cross-instance consolidation complete** — drift 27→0 across all 7 instances. Promoted: `research` (3-way reconciled), `working-with-obsidian-canvas`, `web-browsing`, `notion-cli` skills; `/commit` `/sync` `/handoff` commands; `sync-commands.mjs` cross-editor mechanism; operator-trunk model (`operator-setup.sh` + pre-commit guard); `generate-all-schemas.mjs` merge + `clone-linked-repos.mjs` backport. federation.yaml 0.5 labels fixed, agent.skills 21→32, bread-coop-os in downstream. Matrices: 40 skills / 22 packages. Commit `177c2c8`. See `memory/2026-07-15.md` + DECISIONS.md entry.
 - [2026-05-03] **Autopoiesis research scoping + Phase 1 complete.** Spec + 3 phase plans + 9 aspect notes (Genesis, Identity, Membrane, Coupling, Metabolism, Self-maintenance, Cognition, Federation, Volition) + synthesis. Phase 1 gate passed; pilot loop = Loop C (Population learning — cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Phase 2 plan replanned for Loop C. Surfaced two phantom-script bugs in framework. See `memory/2026-05-03.md` and `docs/superpowers/research/2026-05-02-autopoiesis/SYNTHESIS.md`.
 - [2026-04-29] **`refi-med-os` instance scaffolded + pushed live** to `ReFiDAO/refi-med-os` (public). Federated under `refi-dao` network as LocalNode peer. Public website + knowledge base consolidated at `repos/refi-mediterranean/`. Bootstrap pending — operator follows `BOOTSTRAP.md` + one-pager. Hub registered in `data/instances.yaml` + `federation.yaml`. See `memory/2026-04-29.md`.
@@ -103,4 +108,4 @@ _(Move completed items here with date — keep for 30 days then remove)_
 
 ---
 
-_Last updated: 2026-07-15_
+_Last updated: 2026-08-02_

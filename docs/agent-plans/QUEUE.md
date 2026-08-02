@@ -1,6 +1,6 @@
 # Plan Queue — org-os (framework)
 
-> Last updated: 2026-06-17 (org-os-website design-approved; implementation plan next)
+> Last updated: 2026-08-02 (federation-map shipped)
 
 ## Active
 
@@ -29,5 +29,6 @@
 
 ## Completed
 
+- ~~**federation-map** ("the torch")~~ — Interactive map of an instance's external world: ring 1 federated instances · ring 2 frontier peers-of-peers · ring 3 sources/ecosystems; the counterpart to the internal note graph (two linked views joined by portals). New package `@org-os/federation-map` (framework-agnostic web component, d3-force sole dep) + kms data plane (`render map`, `federate frontier`, `render map html`). Surfaces: site `/federation` + home mini, and a self-contained offline vault artifact for Obsidian. Spec: [`2026-07-19-federation-map-design.md`](../superpowers/specs/2026-07-19-federation-map-design.md) · 14-task plan: [`2026-07-19-federation-map.md`](../superpowers/plans/2026-07-19-federation-map.md) · workstream: federation-protocol + public-surfaces · **completed 2026-08-02** (19+65+7 tests green; final review caught + fixed a Critical panel XSS on remote frontier data). Open follow-up: automated bundle-drift test.
 - ~~[v2-phase1-framework](v2-phase1-framework.md)~~ — Framework standards, docs, skills, data model, session lifecycle
 - ~~[versioning-system](versioning-system.md)~~ — Reconciled versioning + migrations + changelog + policy · workstream: v2-stabilization · completed 2026-04-24
