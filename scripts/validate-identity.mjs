@@ -10,7 +10,10 @@
  *     - metadata.genesis_commit: 40-hex SHA (immutable, set at clone time)
  *     - metadata.last_sync_commit: 40-hex SHA OR null (mutable, set by sync-upstream)
  *
- * Exit 0 if all green; 1 on any failure; 2 on warnings only.
+ * Exit 0 if all green (warnings allowed); 1 on any failure, or on
+ * warnings when --strict. Warnings must NOT block by default: sync-upstream
+ * stage 8 runs this validator, and instances without a genesis_commit yet
+ * (seeded on first sync) would otherwise never be able to sync.
  *
  * Wired in as `npm run validate:schemas` (per existing package.json mapping).
  *
