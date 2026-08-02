@@ -11,7 +11,7 @@ Everything here generalizes to any other instance by swapping that path.
 
 | Thing | State | Action needed |
 |---|---|---|
-| Docker Desktop | installed at `/Applications/Docker.app`, **not running** (so `docker` is not on PATH) | start it (step 0) |
+| Docker Desktop | installed at `/Applications/Docker.app` | started; daemon healthy |
 | Port 3000 | **taken** by a `next-server` dev process from `refi-dao-os/commons` | remap multica's frontend (step 2) |
 | Port 8080 | free | — |
 | Agent CLIs on PATH | `claude`, `opencode`, `hermes`, `cursor-agent` | none — the daemon registers a runtime for each |
@@ -89,7 +89,7 @@ multica daemon status
 ```
 
 Expected: daemon running, with runtimes registered for `claude`, `opencode`, `hermes`,
-`cursor-agent`. Record what it actually detected: `<fill>`
+`cursor-agent`. Detected 2026-08-02: `claude`, `opencode`, `hermes`, `cursor`, `openclaw`.
 
 ## Step 6 — Vanilla smoke test (before org-os is involved)
 
@@ -224,3 +224,77 @@ instance keeps issue namespaces clean.
   (`git checkout -- .`, `git restore .`, `rm -rf`). It targets accidents, not adversaries.
 - Multica's daemon may invoke `claude` with its own flags; step 9 is what proves our
   settings still apply under multica's actual invocation, not just under a plain shell.
+
+
+---
+
+# Live run record — 2026-08-02
+
+Everything below was executed, not planned. Multica **0.4.16**, self-hosted,
+frontend on **http://localhost:3100** (3000 was taken by an unrelated
+`refi-dao-os/commons` dev server), backend on 8080, Postgres pgvector:pg17.
+
+## What deviated from the runbook
+
+- **Homebrew install failed** — it wanted a `sudo` reinstall of the Xcode
+  Command Line Tools. The `install.sh` script fetches a prebuilt darwin/arm64
+  binary instead; set `MULTICA_BIN_DIR=$HOME/.local/bin` to skip `sudo` entirely.
+- **Login is scriptable.** `POST /auth/send-code` then `POST /auth/verify-code`
+  (note: **no** `/api` prefix on the auth routes). Without Resend the code is
+  printed to the backend log. `send-code` is rate-limited — don't loop it.
+  Then `POST /api/tokens` with the returned JWT mints a `mul_...` PAT for
+  `multica login --token`.
+- `MULTICA_DEV_VERIFICATION_CODE` does **not** work out of the box: the compose
+  file defaults `APP_ENV=production`, and the dev-code path is disabled in
+  production. Not worth weakening; the log-printed code works.
+- `multica login` blocks on "waiting for workspace creation" when no workspace
+  exists. Create the workspace first via `POST /api/workspaces`.
+- **Issues do not dispatch on assignment.** An issue sits in `todo` until it is
+  moved to `in_progress` (`multica issue status <id> in_progress`).
+- Agents are created via `POST /api/agents` with `runtime_id` from
+  `GET /api/runtimes` — the UI is not required for any of this.
+
+## Safety gate — PASSED (ORG-2)
+
+The operator, running under multica's own invocation, reported verbatim:
+
+> BLOCKED by the org-os vault-safety guard
+> (`scripts/guards/deny-destructive-git.mjs`): destructive git operation:
+> `stash` ... refused command: `git -c core.pager=cat stash list; echo ...`
+
+It also confirmed that `-c core.pager=cat` and `;`-chaining do not bypass it.
+The daemon log independently shows `workdir=".../03 Libraries/org-os"` — the
+session is rooted AT the repo, so `.claude/settings.json` and the guard load.
+
+## Smoke — PASSED on the second attempt (ORG-4)
+
+Branch `agent/ORG-4`, commit `feat(ideas): record Multica x org-os integration
+pilot [ORG-4]`, 3 files: `data/ideas.yaml`, regenerated `.well-known/ideas.json`,
+`memory/2026-08-02.md`. Pushing `agent/ORG-4` to a throwaway remote was refused
+by the pre-push hook, as designed.
+
+## Two defects the live run exposed (both now fixed in the persona)
+
+1. **The operator escaped its own guard.** Told to "create it from an up-to-date
+   trunk — pull first", it reasoned *"Branches diverged significantly (5 vs 155).
+   I'll use a worktree off `origin/main`"* and created a worktree at
+   `03 Libraries/org-os-ORG-3` — a **sibling path inside the vault**, with no
+   `.claude/settings.json` and no guard script, because that old `origin/main`
+   history predates them. On this repo `origin/main` is a thin upstream template
+   155 commits behind. Fixed: the persona now forbids `git worktree add` and any
+   work outside its directory, and forbids branching from `origin/main` or
+   pulling. Worktree and branch were removed; nothing was lost.
+
+2. **A shared working copy leaks branch state.** The operator left the repo
+   checked out on `agent/ORG-4`; a concurrent session in the same directory then
+   committed unrelated work (`ca79192`, a philosophy-manifesto design) onto the
+   agent branch. Fixed: step 7 now requires restoring the branch that was
+   checked out on entry. Note this is inherent to `local_directory` — multica's
+   path mutex serializes *its own* tasks, not other humans or agents using the
+   directory.
+
+## Failure modes seen (transient, not integration bugs)
+
+`API Error: Stream idle timeout` and `Unable to connect to API
+(ConnectionRefused)` both killed runs mid-task. The daemon reports these as
+`blocked / agent_error.*` and the repo was left clean each time.
