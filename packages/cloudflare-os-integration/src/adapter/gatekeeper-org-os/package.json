@@ -1,0 +1,25 @@
+{
+  "name": "@gadgets/org-os-gatekeeper",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/org-os.ts",
+  "scripts": {
+    "dev": "echo \"run 'pnpm dev-server' in the root directory instead\" >&2 && exit 1",
+    "deploy": "wrangler deploy",
+    "build": "tsc",
+    "types:check": "tsc --noEmit",
+    "sync:types": "node scripts/sync-types.mjs",
+    "sync:core": "node scripts/sync-core.mjs",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@gadgets/workshop-shared": "workspace:*",
+    "capnweb": "^0.8.0",
+    "capnweb-validate": "0.2.1",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wrangler": "^4.119.0"
+  }
+}
