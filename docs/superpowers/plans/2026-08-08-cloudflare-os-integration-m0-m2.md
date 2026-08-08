@@ -732,7 +732,16 @@ test("unknown instance / capability / registry", async () => {
   - `get_federation` — "Read the org's federation topology (peers, upstream, network)."
   - `get_schema` — "Read a .well-known EIP-4824 descriptor."
   - `get_context_bundle` — "Load org identity, agent rules, memory index, recent decisions, and registry snapshots — call at conversation start."
-- [ ] **Step 3:** Configure instances + secrets (per §D2): instances `[{ id: "org-os", owner: "organizational-os", repo: "organizational-os-template" }, { id: "refi-bcn-os", owner: "refibcn", repo: "refi-bcn-os" }]` — **verify both repos are reachable and current first** (the org-os hub work branch must be pushed; adjust `ref` to the pushed branch if not `main`); one fine-grained GitHub token, `contents:read` on exactly those two repos, stored as the gatekeeper secret (never in either repo). `substrateFor` = `new GitHubSubstrate({ …instance, token, fetchImpl: globalThis.fetch, cache })` with `cache` backed per §D1's storage idiom (Durable Object storage if the template provides it; else in-memory Map per isolate — record which in the runbook).
+- [ ] **Step 3:** Configure instances + secrets (per §D2). **Corrected 2026-08-08** — the original text had the hub as `organizational-os/organizational-os-template`, which does not exist; the real remote (`git remote -v`, and `federation.yaml` line 26) is `regen-coordination/org-os-template`. Wrong owner/repo surfaces as an opaque `NOT_FOUND` from `GitHubSubstrate`, so it is worth getting right before wiring:
+
+```js
+instances: [
+  { id: "org-os",      owner: "regen-coordination", repo: "org-os-template", ref: "autopoiesis-phase2-pilot" },
+  { id: "refi-bcn-os", owner: "refibcn",            repo: "refi-bcn-os" },  // ref defaults to "main" — confirm
+]
+```
+
+`ref` for the hub is the work branch, pushed 2026-08-08 — this integration's code is not on `main`. Note `federation.yaml` line 50 still lists refi-bcn-os as `luizfernandosg/refi-bcn-os`; its actual remote is `refibcn/refi-bcn-os` (stale entry, worth fixing separately). One fine-grained GitHub token, `contents:read` on exactly those two repos, stored as the gatekeeper secret (never in either repo). **`pull-requests:write` is deliberately NOT granted yet** — the spec lists it, but nothing before M3 can open a PR, so scope it when writes land. `substrateFor` = `new GitHubSubstrate({ …instance, token, fetchImpl: globalThis.fetch, cache })` with `cache` backed per §D1's storage idiom (Durable Object storage if the template provides it; else in-memory Map per isolate — record which in the runbook).
 - [ ] **Step 4:** Local verify: `pnpm run-local`, ask the workspace agent *"Call get_registry for instance org-os, registry projects"*. Expected: project list matching `data/projects.yaml` with a provenance sha.
 - [ ] **Step 5:** Deploy to the pilot workspace; repeat the verify there.
 - [ ] **Step 6:** Write `src/adapter/README.md` recording exactly what was done (file paths in the fork, registration, secret name, cache backing, vendor/sync mechanism if used); mirror into doc §"Adapter wiring runbook". Commit: `git add packages/cloudflare-os-integration/src/adapter docs/integrations/cloudflare-os.md && git commit -m "docs(cloudflare-os): adapter wiring runbook — gatekeeper-org-os live"`
