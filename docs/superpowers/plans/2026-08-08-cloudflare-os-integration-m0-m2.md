@@ -586,7 +586,9 @@ test("rejects duplicates, bad ids, missing fields", () => {
 });
 ```
 
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement (`id` must match `/^[a-z0-9][a-z0-9-]*$/`; `owner`/`repo` non-empty strings; defaults `ref: "main"`, `trust: "read"`; throw on duplicate ids). **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): instance registry validation`.
+- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement (`id` must match `/^[a-z0-9][a-z0-9-]*$/`; `owner`/`repo` non-empty **and constrained to URL-safe GitHub-shaped characters** — alphanumerics, hyphen, underscore, period; reject `/`, `?`, `#`, whitespace; defaults `ref: "main"`, `trust: "read"`; throw on duplicate ids). **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): instance registry validation`.
+
+> **Amendment (after Task 10 review):** the original text said only "non-empty strings" for `owner`/`repo`. Task 9's `GitHubSubstrate` encodes `path` and `ref` but interpolates `owner`/`repo` raw into the API URL (deliberately — they're static operator config). Together that left a cross-module gap neither task's review would catch alone: a `#` in `owner` silently truncates the URL at the fragment, a `/` shifts path structure toward unintended API sub-resources. Severity is low (deploy-time operator config, not request-controlled), but the fix is a few lines and `instances.mjs`'s own header already claimed these fields are "validated here rather than trusted at the point of use." Constraining them here is the cheaper half of the fix; `github-substrate.mjs` is left unchanged.
 
 ### Task 11: `context-bundle.mjs`
 
