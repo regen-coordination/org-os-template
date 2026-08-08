@@ -13,6 +13,31 @@
 
 ---
 
+## Status (2026-08-08)
+
+**All in-repo work is done. 86 tests passing in `packages/cloudflare-os-integration`.**
+
+| Tasks | State |
+|---|---|
+| 4–12 (M1 core: scaffold, page core, substrates, instances, context bundle, capabilities) | ✅ complete |
+| 15–17 (M2: `render-page.mjs`, `get_page`, page-shim rewire — **byte parity verified**) | ✅ complete |
+| 18 Step 1 (gadget source) · 19 (process wiring) | ✅ complete |
+| **1–3 (M0 probe) · 13 (adapter wiring) · 14 (M1 acceptance) · 18 Steps 2–4 (install)** | ⛔ **blocked** |
+
+Everything blocked needs the same thing: **a Cloudflare account with the `cloudflare-os-starter`
+fork deployed**, plus `~/code/cloudflare-os` cloned for the local read. None of it is in-repo
+work. `docs/integrations/cloudflare-os.md` does not exist yet — Task 2 creates it, and the M0
+GATE on §D1–D6 is what unblocks Tasks 13 and 18.2.
+
+Two things to settle before resuming, both flagged by the plan's own reviews:
+- **Task 14 question 4** — the context bundle excludes `HEARTBEAT.md`, so "what tasks are
+  urgent" only works if the workspace agent invokes capabilities mid-conversation. Confirm in
+  §D3 first; otherwise widen the bundle or make it a `get_page` check.
+- **Task 13 Step 3** — branch `autopoiesis-phase2-pilot` has **no upstream**. Push it (or point
+  `ref` at whatever is actually reachable) before configuring instances.
+
+---
+
 ## Context primer (read first)
 
 - **org-os instances** are git repos with `data/*.yaml` registries, `federation.yaml`, `HEARTBEAT.md` (checkbox tasks), `DECISIONS.md`, `memory/`, `.well-known/*.json`.
@@ -151,7 +176,7 @@ git commit -m "docs(cloudflare-os): M0 gate passed — hello-world gatekeeper li
 - Create: `packages/cloudflare-os-integration/README.md`
 - Modify: `package.json` (root — add script next to `"test:multica-bridge"`)
 
-- [ ] **Step 1:** Create `packages/cloudflare-os-integration/package.json`:
+- [x] **Step 1:** Create `packages/cloudflare-os-integration/package.json`:
 
 ```json
 {
@@ -169,22 +194,22 @@ git commit -m "docs(cloudflare-os): M0 gate passed — hello-world gatekeeper li
 }
 ```
 
-- [ ] **Step 2:** Create `README.md` (3 short sections: What (spec link), Layout (tree from this plan), Test (`npm test`)).
-- [ ] **Step 3:** In root `package.json`, next to `"test:multica-bridge"`, add:
+- [x] **Step 2:** Create `README.md` (3 short sections: What (spec link), Layout (tree from this plan), Test (`npm test`)).
+- [x] **Step 3:** In root `package.json`, next to `"test:multica-bridge"`, add:
 
 ```json
 "test:cloudflare-os-integration": "npm test --prefix packages/cloudflare-os-integration",
 ```
 
-- [ ] **Step 4:** `cd packages/cloudflare-os-integration && npm install && npm test` — expected: exit 0, "tests 0".
-- [ ] **Step 5:** Commit: `git add packages/cloudflare-os-integration package.json && git commit -m "feat(cloudflare-os): scaffold integration package"`
+- [x] **Step 4:** `cd packages/cloudflare-os-integration && npm install && npm test` — expected: exit 0, "tests 0".
+- [x] **Step 5:** Commit: `git add packages/cloudflare-os-integration package.json && git commit -m "feat(cloudflare-os): scaffold integration package"`
 
 ### Task 5: `parse-helpers.mjs` (pure ports)
 
 **Files:**
 - Create: `src/page-core/parse-helpers.mjs`, `test/parse-helpers.test.mjs` (paths relative to the package from here on)
 
-- [ ] **Step 1:** Write the failing test `test/parse-helpers.test.mjs`:
+- [x] **Step 1:** Write the failing test `test/parse-helpers.test.mjs`:
 
 ```js
 import { test } from "node:test";
@@ -222,8 +247,8 @@ test("parseFrontmatter splits yaml and body", () => {
 });
 ```
 
-- [ ] **Step 2:** Run `npm test` — expected FAIL: `Cannot find module .../parse-helpers.mjs`.
-- [ ] **Step 3:** Implement `src/page-core/parse-helpers.mjs`. `extractCheckboxes` is a **verbatim copy** of `scripts/initialize.mjs:60-102`. `daysUntil(dateStr, now)` / `getRelativeAge(dateStr, now)` are copies of `initialize.mjs:128-135` / `104-117` with `now` as a parameter instead of `new Date()` (do not mutate the caller's `now`: `const n = new Date(now); n.setHours(0,0,0,0)`). Add:
+- [x] **Step 2:** Run `npm test` — expected FAIL: `Cannot find module .../parse-helpers.mjs`.
+- [x] **Step 3:** Implement `src/page-core/parse-helpers.mjs`. `extractCheckboxes` is a **verbatim copy** of `scripts/initialize.mjs:60-102`. `daysUntil(dateStr, now)` / `getRelativeAge(dateStr, now)` are copies of `initialize.mjs:128-135` / `104-117` with `now` as a parameter instead of `new Date()` (do not mutate the caller's `now`: `const n = new Date(now); n.setHours(0,0,0,0)`). Add:
 
 ```js
 import yaml from "js-yaml";
@@ -237,14 +262,14 @@ export function parseFrontmatter(text) {
 }
 ```
 
-- [ ] **Step 4:** Run `npm test` — expected: PASS (4 tests).
-- [ ] **Step 5:** Commit: `git commit -am "feat(cloudflare-os): pure parse helpers ported from initialize.mjs"`
+- [x] **Step 4:** Run `npm test` — expected: PASS (4 tests).
+- [x] **Step 5:** Commit: `git commit -am "feat(cloudflare-os): pure parse helpers ported from initialize.mjs"`
 
 ### Task 6: Fixture instance
 
 **Files:** Create under `test/fixtures/instance-a/`:
 
-- [ ] **Step 1:** `federation.yaml`:
+- [x] **Step 1:** `federation.yaml`:
 
 ```yaml
 identity:
@@ -265,7 +290,7 @@ knowledge-commons:
   published_domains: [regen]
 ```
 
-- [ ] **Step 2:** `data/projects.yaml`:
+- [x] **Step 2:** `data/projects.yaml`:
 
 ```yaml
 projects:
@@ -279,7 +304,7 @@ projects:
     status: discovery
 ```
 
-- [ ] **Step 3:** `HEARTBEAT.md`:
+- [x] **Step 3:** `HEARTBEAT.md`:
 
 ```markdown
 # Heartbeat
@@ -292,7 +317,7 @@ projects:
 - [ ] Grant application
 ```
 
-- [ ] **Step 4:** `data/instances.yaml`:
+- [x] **Step 4:** `data/instances.yaml`:
 
 ```yaml
 instances:
@@ -306,7 +331,7 @@ instances:
     drift: [skills/foo]
 ```
 
-- [ ] **Step 5:** `data/events.yaml` (one event inside `[now, now+7d)` for NOW=2026-08-08, one outside), `data/meetings.yaml` (same pattern):
+- [x] **Step 5:** `data/events.yaml` (one event inside `[now, now+7d)` for NOW=2026-08-08, one outside), `data/meetings.yaml` (same pattern):
 
 ```yaml
 events:
@@ -324,7 +349,7 @@ meetings:
     date: "2026-07-01"
 ```
 
-- [ ] **Step 6:** `DECISIONS.md` (three `## 2026-…` entries), `MEMORY.md` (a short index list), `IDENTITY.md` (2 lines), `AGENTS.md` (2 lines), `docs/agent-plans/QUEUE.md` (2-line queue), `.well-known/dao.json` (`{"@context":"test","name":"instance-a"}`), `packages/operations/projects/alpha.md`:
+- [x] **Step 6:** `DECISIONS.md` (three `## 2026-…` entries), `MEMORY.md` (a short index list), `IDENTITY.md` (2 lines), `AGENTS.md` (2 lines), `docs/agent-plans/QUEUE.md` (2-line queue), `.well-known/dao.json` (`{"@context":"test","name":"instance-a"}`), `packages/operations/projects/alpha.md`:
 
 ```markdown
 ---
@@ -335,13 +360,13 @@ status: develop
 - [ ] task two
 ```
 
-- [ ] **Step 7:** Commit: `git add test/fixtures && git commit -m "test(cloudflare-os): fixture instance-a"`
+- [x] **Step 7:** Commit: `git add test/fixtures && git commit -m "test(cloudflare-os): fixture instance-a"`
 
 ### Task 7: `build-state.mjs`
 
 **Files:** Create `src/page-core/build-state.mjs`, `test/build-state.test.mjs`. Test helper loads the fixture into a `{path: content}` object:
 
-- [ ] **Step 1:** Failing test:
+- [x] **Step 1:** Failing test:
 
 ```js
 import { test } from "node:test";
@@ -399,8 +424,8 @@ test("buildState builds the page view-model from raw files", () => {
 });
 ```
 
-- [ ] **Step 2:** Run `npm test` — expected FAIL (module not found).
-- [ ] **Step 3:** Implement `buildState(files, { now })`, porting from `initialize.mjs` with fs swapped for the `files` object:
+- [x] **Step 2:** Run `npm test` — expected FAIL (module not found).
+- [x] **Step 3:** Implement `buildState(files, { now })`, porting from `initialize.mjs` with fs swapped for the `files` object:
   - `loadYaml(files, p)`: `try { return files[p] ? yaml.load(files[p]) : null } catch { return null }`.
   - **identity**: `federation.yaml` → `{ name: identity.name ?? null, type: identity.type ?? null }`.
   - **projects**: port `initialize.mjs:223-286` — registry mapping (`title||name||id`, `status||"idea"`, `lead`, `started||startDate`, `taskCount:0`), then merge docs from keys matching `/^packages\/operations\/projects\/[^/]+\.md$/` (skip `readme.md` case-insensitive and `_` prefix), `parseFrontmatter`, `taskCount = (content.match(/- \[ \]/g) || []).length`, same name-merge logic.
@@ -409,9 +434,9 @@ test("buildState builds the page view-model from raw files", () => {
   - **federation**: port `initialize.mjs:580-612` verbatim (v3 + v1 shapes).
   - **events/meetings**: parse `data/events.yaml` / `data/meetings.yaml`; item `{ date, title: x.title || x.name || x.topic || x.id }`; `thisWeek` = date `d` with `now <= d < now+7d` (compare on `YYYY-MM-DD` string dates parsed as UTC); `upcoming` = `d >= now+7d`. *(Documented simplification: rolling window, not calendar week.)*
   - **decisionsRaw** = `files["DECISIONS.md"] ?? null`; **plansRaw** = `files["docs/agent-plans/QUEUE.md"] ?? null`; **funding** = `{ upcoming: [] }`.
-- [ ] **Step 4:** `npm test` — expected: PASS.
+- [x] **Step 4:** `npm test` — expected: PASS.
 
-- [ ] **Step 5 (added after Task 6 review):** Add coverage the Task 5/6 reviews flagged as missing. Append to `test/build-state.test.mjs`:
+- [x] **Step 5 (added after Task 6 review):** Add coverage the Task 5/6 reviews flagged as missing. Append to `test/build-state.test.mjs`:
 
 ```js
 test("federation: root-level peers/upstream shape (what real instances actually use)", () => {
@@ -441,7 +466,7 @@ test("parseFrontmatter returns empty data for malformed yaml", () => {
 });
 ```
 
-- [ ] **Step 6:** `npm test` — expected: PASS. Commit: `git commit -am "feat(cloudflare-os): pure buildState page-core"`
+- [x] **Step 6:** `npm test` — expected: PASS. Commit: `git commit -am "feat(cloudflare-os): pure buildState page-core"`
 
 ### Task 8: `memory-substrate.mjs`
 
@@ -450,7 +475,7 @@ test("parseFrontmatter returns empty data for malformed yaml", () => {
 The Substrate contract (document it in a header comment — all methods async):
 `readFile(path) → string` (throws `SubstrateError("NOT_FOUND")`), `listDir(path) → [{name, type: "file"|"dir"}]`, `head() → { sha, date }`, `proposeChange() → throws "M3 — not implemented"`.
 
-- [ ] **Step 1:** Failing test:
+- [x] **Step 1:** Failing test:
 
 ```js
 import { test } from "node:test";
@@ -480,7 +505,7 @@ test("head + proposeChange", async () => {
 });
 ```
 
-- [ ] **Step 2:** Run — expected FAIL. **Step 3:** Implement (`SubstrateError extends Error` with `.code`; `listDir` derives sorted direct children from key prefixes, deduping subdirs as `type:"dir"`). **Step 4:** Run — PASS. **Step 5:** Commit `feat(cloudflare-os): substrate contract + MemorySubstrate`.
+- [x] **Step 2:** Run — expected FAIL. **Step 3:** Implement (`SubstrateError extends Error` with `.code`; `listDir` derives sorted direct children from key prefixes, deduping subdirs as `type:"dir"`). **Step 4:** Run — PASS. **Step 5:** Commit `feat(cloudflare-os): substrate contract + MemorySubstrate`.
 
 ### Task 9: `github-substrate.mjs`
 
@@ -488,7 +513,7 @@ test("head + proposeChange", async () => {
 
 Constructor: `new GitHubSubstrate({ owner, repo, ref, token, fetchImpl, cache, ttlMs = 60_000, now = () => Date.now() })`. `cache` is Map-like (`get`/`set`), storing `{ etag, body, fetchedAt }` per URL.
 
-- [ ] **Step 1:** Failing test with a scripted fake fetch:
+- [x] **Step 1:** Failing test with a scripted fake fetch:
 
 ```js
 import { test } from "node:test";
@@ -560,14 +585,14 @@ test("404 → SubstrateError NOT_FOUND; head() hits branches API; listDir maps c
 });
 ```
 
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement: base URL `https://api.github.com`; `readFile` = cached GET `/repos/{owner}/{repo}/contents/{path}?ref={ref}` with `Accept: application/vnd.github.raw+json`; cache flow: fresh-within-TTL → cached body, else revalidate with `If-None-Match` (304 → refresh `fetchedAt`, return cached), non-ok with cache present → return cached + `this.lastReadStale = true`, non-ok without cache → `SubstrateError` (`NOT_FOUND` on 404, `UPSTREAM` otherwise); `head()` = GET `/repos/{owner}/{repo}/branches/{ref}` → `{ sha: commit.sha, date: commit.commit.committer.date }` (same cache flow); `listDir(path)` = GET contents on the dir (default Accept) mapping `[{name, type}]`; `proposeChange()` throws `M3` error. Reset `lastReadStale = false` at the start of each successful fresh read.
-- [ ] **Step 4:** Run — PASS. **Step 5:** Commit `feat(cloudflare-os): GitHubSubstrate with ETag/TTL cache and stale-while-revalidate`.
+- [x] **Step 2:** Run — FAIL. **Step 3:** Implement: base URL `https://api.github.com`; `readFile` = cached GET `/repos/{owner}/{repo}/contents/{path}?ref={ref}` with `Accept: application/vnd.github.raw+json`; cache flow: fresh-within-TTL → cached body, else revalidate with `If-None-Match` (304 → refresh `fetchedAt`, return cached), non-ok with cache present → return cached + `this.lastReadStale = true`, non-ok without cache → `SubstrateError` (`NOT_FOUND` on 404, `UPSTREAM` otherwise); `head()` = GET `/repos/{owner}/{repo}/branches/{ref}` → `{ sha: commit.sha, date: commit.commit.committer.date }` (same cache flow); `listDir(path)` = GET contents on the dir (default Accept) mapping `[{name, type}]`; `proposeChange()` throws `M3` error. Reset `lastReadStale = false` at the start of each successful fresh read.
+- [x] **Step 4:** Run — PASS. **Step 5:** Commit `feat(cloudflare-os): GitHubSubstrate with ETag/TTL cache and stale-while-revalidate`.
 
 ### Task 10: `instances.mjs`
 
 **Files:** Create `src/gatekeeper/instances.mjs`, `test/instances.test.mjs`.
 
-- [ ] **Step 1:** Failing test:
+- [x] **Step 1:** Failing test:
 
 ```js
 import { test } from "node:test";
@@ -586,7 +611,7 @@ test("rejects duplicates, bad ids, missing fields", () => {
 });
 ```
 
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement (`id` must match `/^[a-z0-9][a-z0-9-]*$/`; `owner`/`repo` non-empty **and constrained to URL-safe GitHub-shaped characters** — alphanumerics, hyphen, underscore, period; reject `/`, `?`, `#`, whitespace; defaults `ref: "main"`, `trust: "read"`; throw on duplicate ids). **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): instance registry validation`.
+- [x] **Step 2:** Run — FAIL. **Step 3:** Implement (`id` must match `/^[a-z0-9][a-z0-9-]*$/`; `owner`/`repo` non-empty **and constrained to URL-safe GitHub-shaped characters** — alphanumerics, hyphen, underscore, period; reject `/`, `?`, `#`, whitespace; defaults `ref: "main"`, `trust: "read"`; throw on duplicate ids). **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): instance registry validation`.
 
 > **Amendment (after Task 10 review):** the original text said only "non-empty strings" for `owner`/`repo`. Task 9's `GitHubSubstrate` encodes `path` and `ref` but interpolates `owner`/`repo` raw into the API URL (deliberately — they're static operator config). Together that left a cross-module gap neither task's review would catch alone: a `#` in `owner` silently truncates the URL at the fragment, a `/` shifts path structure toward unintended API sub-resources. Severity is low (deploy-time operator config, not request-controlled), but the fix is a few lines and `instances.mjs`'s own header already claimed these fields are "validated here rather than trusted at the point of use." Constraining them here is the cheaper half of the fix; `github-substrate.mjs` is left unchanged.
 
@@ -594,7 +619,7 @@ test("rejects duplicates, bad ids, missing fields", () => {
 
 **Files:** Create `src/gatekeeper/context-bundle.mjs`, `test/context-bundle.test.mjs`.
 
-- [ ] **Step 1:** Failing test (uses `MemorySubstrate` over the fixture loader from Task 7):
+- [x] **Step 1:** Failing test (uses `MemorySubstrate` over the fixture loader from Task 7):
 
 ```js
 import { test } from "node:test";
@@ -637,7 +662,7 @@ test("recentDecisions takes dated entries only, skipping boilerplate headings", 
 
 > **Amendment (after Task 11 review):** when more than 5 dated sections exist, push `"recentDecisions"` into `truncated[]`. Without it, an org with 5 decisions and an org with 50 produce structurally identical bundles — an agent asked about decision #8 answers "no such decision" confidently, with no way to know its answer set was capped. Reusing `truncated[]` signals it with no shape change. Related: `registries.*` collapses "file absent" and "file unparseable" into the same `null`; that stays as-is for M1, but if a real instance ever ships a broken registry silently, revisit with a `registriesInvalid[]` companion field.
 
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement: read `IDENTITY.md`→`identity`, `AGENTS.md`→`agentRules`, `MEMORY.md`→`memoryIndex`; `recentDecisions` = the last 5 **dated** `## `-delimited sections of `DECISIONS.md` — a section counts only when its heading matches `/^## \d{4}-\d{2}-\d{2}/`, so non-dated boilerplate sections are skipped (newest-first as they appear); `registries` = `{ projects, members }` via `js-yaml` (each `null` when missing/unparseable); every string section sliced to `maxBytesPerSection` (default 64 000) with section names pushed to `truncated: []`; `provenance = await substrate.head()`; individual `NOT_FOUND` → `null`. **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): context bundle builder`.
+- [x] **Step 2:** Run — FAIL. **Step 3:** Implement: read `IDENTITY.md`→`identity`, `AGENTS.md`→`agentRules`, `MEMORY.md`→`memoryIndex`; `recentDecisions` = the last 5 **dated** `## `-delimited sections of `DECISIONS.md` — a section counts only when its heading matches `/^## \d{4}-\d{2}-\d{2}/`, so non-dated boilerplate sections are skipped (newest-first as they appear); `registries` = `{ projects, members }` via `js-yaml` (each `null` when missing/unparseable); every string section sliced to `maxBytesPerSection` (default 64 000) with section names pushed to `truncated: []`; `provenance = await substrate.head()`; individual `NOT_FOUND` → `null`. **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): context bundle builder`.
 
 ### Task 12: `capabilities.mjs` (read caps + dispatch)
 
@@ -647,7 +672,7 @@ Result envelope (all capabilities): success `{ ok: true, data, provenance: { ins
 
 > **Amendment (after Task 12 review):** `error.detail` added. Task 18's gadget renders `error.message` verbatim to a non-technical member, but `GitHubSubstrate` puts up to 200 chars of **raw upstream response body** into its `SubstrateError.message` (correctly — it's the only live diagnostic signal), and `validateName` embedded a stringified regex. So `message` is now operator-readable plain language and `detail` carries the diagnostic text, documented as not-for-display. The split belongs at this boundary, not in the substrate. Two consequences for later tasks: **Task 16** — `now` is threaded through the dispatch call to handlers, so `get_page` can reach it without changing `handle()`'s signature; **Task 18** — the gadget must render `code` + `message` only, never `detail`.
 
-- [ ] **Step 1:** Failing test:
+- [x] **Step 1:** Failing test:
 
 ```js
 import { test } from "node:test";
@@ -691,7 +716,7 @@ test("unknown instance / capability / registry", async () => {
 });
 ```
 
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement `createGatekeeper({ instances, substrateFor, now })` (instances validated via `validateInstances`; `substrateFor(instance)` returns/creates its substrate — memoize per id). `handle(name, args)`: resolve capability → resolve instance → run → wrap envelope; provenance `sha`/`date` from `substrate.head()`, `stale` from `substrate.lastReadStale === true`. `get_registry`: `name` must match `/^[a-z0-9-]+$/` else `BAD_ARGS`; reads `data/${name}.yaml`, parses with `js-yaml` (parse error → `UPSTREAM` with message "registry parse failed: <name>"). `get_federation`: reads + parses `federation.yaml` through the same `loadFederation` port used in `build-state.mjs` — **export that function from `build-state.mjs`** and reuse (DRY). `get_schema`: `name` validated the same way; reads `.well-known/${name}.json`, `JSON.parse`. `get_context_bundle`: delegates to `buildContextBundle`. Catch `SubstrateError` → its code; anything else → `UPSTREAM`. **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): read capabilities + dispatch envelope`.
+- [x] **Step 2:** Run — FAIL. **Step 3:** Implement `createGatekeeper({ instances, substrateFor, now })` (instances validated via `validateInstances`; `substrateFor(instance)` returns/creates its substrate — memoize per id). `handle(name, args)`: resolve capability → resolve instance → run → wrap envelope; provenance `sha`/`date` from `substrate.head()`, `stale` from `substrate.lastReadStale === true`. `get_registry`: `name` must match `/^[a-z0-9-]+$/` else `BAD_ARGS`; reads `data/${name}.yaml`, parses with `js-yaml` (parse error → `UPSTREAM` with message "registry parse failed: <name>"). `get_federation`: reads + parses `federation.yaml` through the same `loadFederation` port used in `build-state.mjs` — **export that function from `build-state.mjs`** and reuse (DRY). `get_schema`: `name` validated the same way; reads `.well-known/${name}.json`, `JSON.parse`. `get_context_bundle`: delegates to `buildContextBundle`. Catch `SubstrateError` → its code; anything else → `UPSTREAM`. **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): read capabilities + dispatch envelope`.
 
 ### Task 13: Adapter wiring into the Cloudflare OS fork
 
@@ -732,7 +757,7 @@ test("unknown instance / capability / registry", async () => {
 
 **Files:** Create `src/page-core/render-page.mjs`, `test/render-page.test.mjs`.
 
-- [ ] **Step 1:** Failing test:
+- [x] **Step 1:** Failing test:
 
 ```js
 import { test } from "node:test";
@@ -775,13 +800,13 @@ test("dashboard composes sections; unknown page throws", () => {
 });
 ```
 
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement: port the four renderer bodies **verbatim** from `scripts/page-shim.mjs` (`projects` :64-75, `tasks` :77-99, `instances` :101-110, `this-week` :124-165) as pure functions of `state`; `decisions` → `state.decisionsRaw ?? "# Decisions\n\nDECISIONS.md not found.\n"`; `plans` → `state.plansRaw ?? "# Plans\n\nQUEUE.md not found.\n"`; `dashboard` (new composite, not initialize.mjs parity): `# ${state.identity.name}` + type line, then `## Projects` (projects table), `## Tasks` (`N critical · N urgent · N upcoming`), `## This Week` (reuse this-week body), `## Federation` (`network · N peers`). **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): pure renderPage ported from page-shim`.
+- [x] **Step 2:** Run — FAIL. **Step 3:** Implement: port the four renderer bodies **verbatim** from `scripts/page-shim.mjs` (`projects` :64-75, `tasks` :77-99, `instances` :101-110, `this-week` :124-165) as pure functions of `state`; `decisions` → `state.decisionsRaw ?? "# Decisions\n\nDECISIONS.md not found.\n"`; `plans` → `state.plansRaw ?? "# Plans\n\nQUEUE.md not found.\n"`; `dashboard` (new composite, not initialize.mjs parity): `# ${state.identity.name}` + type line, then `## Projects` (projects table), `## Tasks` (`N critical · N urgent · N upcoming`), `## This Week` (reuse this-week body), `## Federation` (`network · N peers`). **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): pure renderPage ported from page-shim`.
 
 ### Task 16: `get_page` capability
 
 **Files:** Modify `src/gatekeeper/capabilities.mjs`, `test/capabilities.test.mjs`.
 
-- [ ] **Step 1:** Add failing tests:
+- [x] **Step 1:** Add failing tests:
 
 ```js
 test("get_page renders markdown for supported pages", async () => {
@@ -797,19 +822,19 @@ test("get_page rejects unknown page ids", async () => {
 });
 ```
 
-- [ ] **Step 2:** Run — FAIL (also update the catalog test: `READ_CAPABILITIES` now ends with `"get_page"`). **Step 3:** Implement: `get_page` reads via substrate the fixed input set — `federation.yaml`, `HEARTBEAT.md`, `DECISIONS.md`, `docs/agent-plans/QUEUE.md`, `data/{projects,instances,events,meetings}.yaml`, plus `listDir("packages/operations/projects")` → read each `.md` (each read individually tolerant: `NOT_FOUND` → key absent) — assembles the `files` object, `buildState(files, { now: now() })`, `renderPage`. Capability declaration for Task 18: `get_page` — "Render an org-os page (dashboard, projects, tasks, instances, decisions, plans, this-week) as markdown." **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): get_page capability`.
+- [x] **Step 2:** Run — FAIL (also update the catalog test: `READ_CAPABILITIES` now ends with `"get_page"`). **Step 3:** Implement: `get_page` reads via substrate the fixed input set — `federation.yaml`, `HEARTBEAT.md`, `DECISIONS.md`, `docs/agent-plans/QUEUE.md`, `data/{projects,instances,events,meetings}.yaml`, plus `listDir("packages/operations/projects")` → read each `.md` (each read individually tolerant: `NOT_FOUND` → key absent) — assembles the `files` object, `buildState(files, { now: now() })`, `renderPage`. Capability declaration for Task 18: `get_page` — "Render an org-os page (dashboard, projects, tasks, instances, decisions, plans, this-week) as markdown." **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): get_page capability`.
 
 ### Task 17: Rewire `scripts/page-shim.mjs` onto the shared core (parity-gated)
 
 **Files:** Modify `scripts/page-shim.mjs`.
 
-- [ ] **Step 1:** Capture BEFORE outputs (repo root):
+- [x] **Step 1:** Capture BEFORE outputs (repo root):
 
 ```bash
 for p in projects tasks instances decisions plans this-week; do node scripts/page-shim.mjs $p > /tmp/before-$p.md; done
 ```
 
-- [ ] **Step 2:** Edit `scripts/page-shim.mjs`: delete the `renderers` object (lines 62–166); import `{ renderPage } from "../packages/cloudflare-os-integration/src/page-core/render-page.mjs"`; after loading `state` from `initialize.mjs` JSON, attach the raw docs the core renderers expect and delegate:
+- [x] **Step 2:** Edit `scripts/page-shim.mjs`: delete the `renderers` object (lines 62–166); import `{ renderPage } from "../packages/cloudflare-os-integration/src/page-core/render-page.mjs"`; after loading `state` from `initialize.mjs` JSON, attach the raw docs the core renderers expect and delegate:
 
 ```js
 state.decisionsRaw = fs.existsSync(path.join(rootDir, "DECISIONS.md"))
@@ -829,7 +854,7 @@ process.stdout.write(out);
 
 Keep the `dashboard` early-exit delegation to `initialize.mjs --format=markdown` exactly as-is (shim's dashboard stays the rich one; the core's composite dashboard serves the gadget).
 
-- [ ] **Step 3:** Parity check — must be silent:
+- [x] **Step 3:** Parity check — must be silent:
 
 ```bash
 for p in projects tasks instances decisions plans this-week; do node scripts/page-shim.mjs $p > /tmp/after-$p.md; diff /tmp/before-$p.md /tmp/after-$p.md || echo "PARITY FAIL: $p"; done
@@ -837,14 +862,14 @@ for p in projects tasks instances decisions plans this-week; do node scripts/pag
 
 Expected: no output. The core renderers were ported verbatim, so any diff is a porting bug — fix the core, not the shim.
 
-- [ ] **Step 4:** `npm run page dashboard | head -5` still renders the banner. `npm test --prefix packages/cloudflare-os-integration` still green.
-- [ ] **Step 5:** Commit: `git add scripts/page-shim.mjs && git commit -m "refactor(page-shim): delegate renderers to shared page-core (parity verified)"`
+- [x] **Step 4:** `npm run page dashboard | head -5` still renders the banner. `npm test --prefix packages/cloudflare-os-integration` still green.
+- [x] **Step 5:** Commit: `git add scripts/page-shim.mjs && git commit -m "refactor(page-shim): delegate renderers to shared page-core (parity verified)"`
 
 ### Task 18: `org-dashboard` gadget
 
 **Files:** Create `blueprints/org-dashboard/gadget.html` (canonical copy; installed into the workspace per §D6).
 
-- [ ] **Step 1:** Write `blueprints/org-dashboard/gadget.html` — complete source; the only deployment-specific seam is `callCapability`, whose body comes from doc §D4:
+- [x] **Step 1:** Write `blueprints/org-dashboard/gadget.html` — complete source; the only deployment-specific seam is `callCapability`, whose body comes from doc §D4:
 
 ```html
 <!doctype html>
@@ -911,7 +936,7 @@ Expected: no output. The core renderers were ported verbatim, so any diff is a p
 - Modify: `data/projects.yaml`, `DECISIONS.md`
 - Create/append: `memory/2026-08-08.md`
 
-- [ ] **Step 1:** Read the last existing entry in `data/projects.yaml` and append a new project **matching its exact field style** (canonical fields; adjust only if neighbors differ):
+- [x] **Step 1:** Read the last existing entry in `data/projects.yaml` and append a new project **matching its exact field style** (canonical fields; adjust only if neighbors differ):
 
 ```yaml
   - id: cloudflare-os-integration
@@ -921,11 +946,11 @@ Expected: no output. The core renderers were ported verbatim, so any diff is a p
     started: "2026-08-08"
 ```
 
-- [ ] **Step 2:** Run `npm run generate:schemas && npm run validate:schemas && npm run generate:quilt` — all green.
-- [ ] **Step 3:** Append to `DECISIONS.md` (matching its entry format): date 2026-08-08, decision = Architecture B (dedicated `gatekeeper-org-os` with substrate interface; GitHub substrate now, workerd/Radicle later; PR-only writes deferred to M3), spec link, alternatives A (stock GitHub gatekeeper) and C (hosted API) rejected — reasons per spec.
-- [ ] **Step 4:** Append a session note to `memory/2026-08-08.md` (never overwrite): pilot deployed, M-milestones landed, discovery-doc location, follow-up = M3–M4 plan.
-- [ ] **Step 5:** Full check: `npm test && npm run test:cloudflare-os-integration && npm run validate:structure` — green.
-- [ ] **Step 6:** Commit: `git add data/ .well-known/ docs/ DECISIONS.md memory/ && git commit -m "chore(cloudflare-os): project registry + decision log + session memory (M0–M2 complete)"`
+- [x] **Step 2:** Run `npm run generate:schemas && npm run validate:schemas && npm run generate:quilt` — all green.
+- [x] **Step 3:** Append to `DECISIONS.md` (matching its entry format): date 2026-08-08, decision = Architecture B (dedicated `gatekeeper-org-os` with substrate interface; GitHub substrate now, workerd/Radicle later; PR-only writes deferred to M3), spec link, alternatives A (stock GitHub gatekeeper) and C (hosted API) rejected — reasons per spec.
+- [x] **Step 4:** Append a session note to `memory/2026-08-08.md` (never overwrite): pilot deployed, M-milestones landed, discovery-doc location, follow-up = M3–M4 plan.
+- [x] **Step 5:** Full check: `npm test && npm run test:cloudflare-os-integration && npm run validate:structure` — green.
+- [x] **Step 6:** Commit: `git add data/ .well-known/ docs/ DECISIONS.md memory/ && git commit -m "chore(cloudflare-os): project registry + decision log + session memory (M0–M2 complete)"`
 
 ---
 
