@@ -8,8 +8,16 @@
 //
 //   id     — caller-facing name, must match /^[a-z0-9][a-z0-9-]*$/ and be
 //            unique across the list.
-//   owner  — GitHub org/user that owns the repo. Non-empty string.
-//   repo   — GitHub repo name. Non-empty string.
+//   owner  — GitHub org/user that owns the repo. `GitHubSubstrate` (Task 9)
+//            interpolates `owner`/`repo` directly into its request URLs
+//            *without* percent-encoding them (unlike `path`/`ref`, which it
+//            does encode) — the reasoning there is that owner/repo are
+//            static operator config, not request-controlled input. That
+//            means a stray "/", "?", "#", or whitespace here would silently
+//            reshape or truncate the URL rather than cleanly 404ing, so this
+//            module constrains both fields to GitHub's own character set:
+//            alphanumerics, hyphens, underscores, and periods.
+//   repo   — GitHub repo name. Same character constraint as `owner`.
 //   ref    — git ref (branch, tag, or sha) to read from. Defaults to "main".
 //   trust  — informational only for the read-only pilot; no capability
 //            currently branches on it and no enum is enforced here. M3 will
@@ -25,6 +33,11 @@
 // see `memory-substrate.mjs`), so it deliberately isn't one.
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+// GitHub org/user and repo names: alphanumerics, hyphens, underscores,
+// periods. Deliberately excludes "/", "?", "#", and whitespace — the
+// characters that would reshape or truncate a URL these values are
+// interpolated into unencoded (see header comment).
+const OWNER_REPO_PATTERN = /^[A-Za-z0-9._-]+$/;
 
 export function validateInstances(instances) {
   if (!Array.isArray(instances)) {
@@ -40,11 +53,15 @@ export function validateInstances(instances) {
     if (typeof id !== "string" || !ID_PATTERN.test(id)) {
       throw new Error(`instances[${index}]: id must match ${ID_PATTERN}, got ${JSON.stringify(id)}`);
     }
-    if (typeof owner !== "string" || owner === "") {
-      throw new Error(`instances[${index}] (id: "${id}"): owner must be a non-empty string, got ${JSON.stringify(owner)}`);
+    if (typeof owner !== "string" || !OWNER_REPO_PATTERN.test(owner)) {
+      throw new Error(
+        `instances[${index}] (id: "${id}"): owner must be a non-empty string matching ${OWNER_REPO_PATTERN}, got ${JSON.stringify(owner)}`,
+      );
     }
-    if (typeof repo !== "string" || repo === "") {
-      throw new Error(`instances[${index}] (id: "${id}"): repo must be a non-empty string, got ${JSON.stringify(repo)}`);
+    if (typeof repo !== "string" || !OWNER_REPO_PATTERN.test(repo)) {
+      throw new Error(
+        `instances[${index}] (id: "${id}"): repo must be a non-empty string matching ${OWNER_REPO_PATTERN}, got ${JSON.stringify(repo)}`,
+      );
     }
     if (typeof trust !== "string") {
       throw new Error(`instances[${index}] (id: "${id}"): trust must be a string, got ${JSON.stringify(trust)}`);

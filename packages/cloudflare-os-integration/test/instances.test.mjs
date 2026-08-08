@@ -57,6 +57,32 @@ test("rejects empty or non-string owner/repo", () => {
   assert.throws(() => validateInstances([{ id: "a", owner: 5, repo: "y" }]), /owner/);
 });
 
+// ── owner/repo are interpolated raw into GitHub API URLs by GitHubSubstrate
+// (owner/repo are NOT percent-encoded there, unlike path/ref) — so they must
+// be constrained to a URL-safe character class here rather than just
+// non-empty, or a stray "/", "?", or "#" silently reshapes the request.
+test("rejects owner/repo containing URL-structural characters", () => {
+  assert.throws(() => validateInstances([{ id: "a", owner: "x/y", repo: "z" }]), /owner/);
+  assert.throws(() => validateInstances([{ id: "a", owner: "x#y", repo: "z" }]), /owner/);
+  assert.throws(() => validateInstances([{ id: "a", owner: "x?y", repo: "z" }]), /owner/);
+  assert.throws(() => validateInstances([{ id: "a", owner: "x y", repo: "z" }]), /owner/);
+
+  assert.throws(() => validateInstances([{ id: "a", owner: "x", repo: "y/z" }]), /repo/);
+  assert.throws(() => validateInstances([{ id: "a", owner: "x", repo: "y#z" }]), /repo/);
+  assert.throws(() => validateInstances([{ id: "a", owner: "x", repo: "y?z" }]), /repo/);
+  assert.throws(() => validateInstances([{ id: "a", owner: "x", repo: "y z" }]), /repo/);
+});
+
+// ── real-world GitHub names must still validate — periods are legal in repo
+// names (e.g. GitHub Pages repos), and these are the actual Task 13 values.
+test("accepts real-world GitHub owner/repo names, including periods", () => {
+  assert.doesNotThrow(() =>
+    validateInstances([{ id: "org-os", owner: "organizational-os", repo: "organizational-os-template" }]),
+  );
+  assert.doesNotThrow(() => validateInstances([{ id: "refi-bcn-os", owner: "refibcn", repo: "refi-bcn-os" }]));
+  assert.doesNotThrow(() => validateInstances([{ id: "pages", owner: "example", repo: "example.github.io" }]));
+});
+
 // ── trust must be a string when present, but no enum enforcement (M3 concern) ──
 test("rejects non-string trust, accepts arbitrary string values", () => {
   assert.throws(() => validateInstances([{ id: "a", owner: "x", repo: "y", trust: 1 }]), /trust/);
@@ -66,7 +92,7 @@ test("rejects non-string trust, accepts arbitrary string values", () => {
 // ── no mutation of caller input ─────────────────────────────────────────────
 test("does not mutate the input array or its entries", () => {
   const input = [{ id: "org-os", owner: "organizational-os", repo: "organizational-os-template" }];
-  const frozenEntry = input[0];
+  const frozenEntry = Object.freeze(input[0]);
   const out = validateInstances(input);
   assert.equal(input.length, 1);
   assert.equal(input[0], frozenEntry);
