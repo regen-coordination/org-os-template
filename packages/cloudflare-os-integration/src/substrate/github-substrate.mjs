@@ -17,6 +17,14 @@ import { SubstrateError } from "./memory-substrate.mjs";
 const API_BASE = "https://api.github.com";
 const RAW_ACCEPT = "application/vnd.github.raw+json";
 const JSON_ACCEPT = "application/vnd.github+json";
+const ERROR_SNIPPET_MAX = 200;
+
+// GitHub's Contents API path is `/`-separated but each segment must be
+// percent-encoded individually — encoding the whole path would turn the "/"
+// separators themselves into %2F and break routing.
+function encodePath(path) {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
 
 export class GitHubSubstrate {
   constructor({ owner, repo, ref, token, fetchImpl, cache, ttlMs = 60_000, now = () => Date.now() }) {
@@ -32,30 +40,47 @@ export class GitHubSubstrate {
   }
 
   async readFile(path) {
-    const url = `${API_BASE}/repos/${this.owner}/${this.repo}/contents/${path}?ref=${this.ref}`;
-    const { status, body } = await this._cachedFetch(url, RAW_ACCEPT, (res) => res.text());
-    if (status === "not_found") throw new SubstrateError("NOT_FOUND", `not found: ${path}`);
-    if (status === "upstream") throw new SubstrateError("UPSTREAM", `upstream error reading ${path}`);
-    return body;
+    const url = `${API_BASE}/repos/${this.owner}/${this.repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(this.ref)}`;
+    return this._cachedFetch(url, RAW_ACCEPT, path);
   }
 
   async listDir(path) {
-    const url = `${API_BASE}/repos/${this.owner}/${this.repo}/contents/${path}?ref=${this.ref}`;
-    const { status, body } = await this._cachedFetch(url, JSON_ACCEPT, (res) => res.text());
-    // Per the Substrate contract, listDir never throws NOT_FOUND — a missing
-    // directory and an empty one are both just "no children".
-    if (status === "not_found") return [];
-    if (status === "upstream") throw new SubstrateError("UPSTREAM", `upstream error listing ${path}`);
-    const entries = JSON.parse(body);
-    return entries.map(({ name, type }) => ({ name, type }));
+    const url = `${API_BASE}/repos/${this.owner}/${this.repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(this.ref)}`;
+    let body;
+    try {
+      body = await this._cachedFetch(url, JSON_ACCEPT, path);
+    } catch (err) {
+      // Per the Substrate contract, listDir never throws NOT_FOUND — a
+      // missing directory and an empty one are both just "no children".
+      if (err instanceof SubstrateError && err.code === "NOT_FOUND") return [];
+      throw err;
+    }
+
+    let entries;
+    try {
+      entries = JSON.parse(body);
+    } catch (err) {
+      throw new SubstrateError("UPSTREAM", `malformed directory listing for ${path}: ${err.message}`);
+    }
+
+    return entries
+      // The Contents API can also return "symlink"/"submodule"; normalize
+      // anything that isn't a dir to "file" so the documented "file" | "dir"
+      // union always holds.
+      .map(({ name, type }) => ({ name, type: type === "dir" ? "dir" : "file" }))
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   }
 
   async head() {
-    const url = `${API_BASE}/repos/${this.owner}/${this.repo}/branches/${this.ref}`;
-    const { status, body } = await this._cachedFetch(url, JSON_ACCEPT, (res) => res.text());
-    if (status === "not_found") throw new SubstrateError("NOT_FOUND", `not found: branch ${this.ref}`);
-    if (status === "upstream") throw new SubstrateError("UPSTREAM", `upstream error reading head`);
-    const parsed = JSON.parse(body);
+    const url = `${API_BASE}/repos/${this.owner}/${this.repo}/branches/${encodeURIComponent(this.ref)}`;
+    const body = await this._cachedFetch(url, JSON_ACCEPT, `branch ${this.ref}`);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch (err) {
+      throw new SubstrateError("UPSTREAM", `malformed branch response for ${this.ref}: ${err.message}`);
+    }
     return { sha: parsed.commit.sha, date: parsed.commit.commit.committer.date };
   }
 
@@ -65,16 +90,19 @@ export class GitHubSubstrate {
   }
 
   // ── shared cache flow ────────────────────────────────────────────────────
-  // Returns { status: "ok" | "not_found" | "upstream", body }. `readFile`,
-  // `listDir`, and `head` differ only in URL, Accept header, and how they
-  // parse `body` — that per-method work stays at the call sites.
-  async _cachedFetch(url, accept, readBody) {
+  // Returns the response body string on success (fresh cache hit, 304, or
+  // 2xx), or the last-known-good cached body when a refresh fails but a
+  // cached entry exists (setting `lastReadStale`). Throws `SubstrateError`
+  // (`NOT_FOUND` / `UPSTREAM`) when there's no cache to fall back on.
+  // `label` is a human-readable request descriptor (the repo-relative path,
+  // or "branch {ref}") used only for error messages.
+  async _cachedFetch(url, accept, label) {
     const cached = this.cache.get(url);
     const now = this.now();
 
     if (cached && now - cached.fetchedAt < this.ttlMs) {
       this.lastReadStale = false;
-      return { status: "ok", body: cached.body };
+      return cached.body;
     }
 
     const headers = { Authorization: `Bearer ${this.token}`, Accept: accept };
@@ -85,24 +113,46 @@ export class GitHubSubstrate {
     if (res.status === 304 && cached) {
       this.cache.set(url, { ...cached, fetchedAt: now });
       this.lastReadStale = false;
-      return { status: "ok", body: cached.body };
+      return cached.body;
     }
 
     if (res.ok) {
-      const body = await readBody(res);
+      const body = await res.text();
       this.cache.set(url, { etag: res.headers.get("etag"), body, fetchedAt: now });
       this.lastReadStale = false;
-      return { status: "ok", body };
+      return body;
     }
 
     if (cached) {
       // Refresh failed (rate limit, transient upstream error, ...) but we
       // have last-known-good content — serve it and flag the staleness
-      // rather than erroring.
+      // rather than erroring. The cached etag is deliberately left as-is so
+      // the *next* revalidation still checks against the last confirmed-good
+      // response, not the failed attempt.
       this.lastReadStale = true;
-      return { status: "ok", body: cached.body };
+      return cached.body;
     }
 
-    return { status: res.status === 404 ? "not_found" : "upstream", body: undefined };
+    if (res.status === 404) {
+      throw new SubstrateError("NOT_FOUND", `not found: ${label}`);
+    }
+
+    const snippet = await this._errorSnippet(res);
+    throw new SubstrateError(
+      "UPSTREAM",
+      `upstream error ${res.status} for ${label}${snippet ? `: ${snippet}` : ""}`,
+    );
+  }
+
+  // Best-effort truncated body text for a failed response, so a live rate
+  // limit or server error is distinguishable in logs. Capped to keep a huge
+  // error page from bloating the error message.
+  async _errorSnippet(res) {
+    try {
+      const text = await res.text();
+      return text ? text.slice(0, ERROR_SNIPPET_MAX) : "";
+    } catch {
+      return "";
+    }
   }
 }

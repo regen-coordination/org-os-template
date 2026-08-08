@@ -117,3 +117,132 @@ test("lastReadStale resets to false on the next successful fresh read", async ()
   assert.equal(await sub.readFile("x.md"), "v2");
   assert.equal(sub.lastReadStale, false);
 });
+
+// ── (review fix 1) URL encoding — the fake fetch records the raw string, so
+// these tests assert on that string directly rather than round-tripping
+// through a real URL parser. Unencoded, a `#` in `path` would truncate the
+// query string (dropping `ref=`) and a `/` in `ref` would land as an extra
+// path segment against a real fetch/URL implementation.
+
+test("readFile encodes '#' in path segments so the ref query string survives", async () => {
+  const f = fakeFetch([{ status: 200, headers: {}, body: "ok" }]);
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map() });
+  await sub.readFile("data/pro#ject.yaml");
+  assert.equal(f.calls[0].url, "https://api.github.com/repos/o/r/contents/data/pro%23ject.yaml?ref=main");
+});
+
+test("readFile encodes a ref containing '/' as a query value", async () => {
+  const f = fakeFetch([{ status: 200, headers: {}, body: "ok" }]);
+  const sub = new GitHubSubstrate({ ...base, ref: "feature/foo", fetchImpl: f, cache: new Map() });
+  await sub.readFile("x.md");
+  assert.equal(f.calls[0].url, "https://api.github.com/repos/o/r/contents/x.md?ref=feature%2Ffoo");
+});
+
+test("head encodes a ref containing '/' as %2F rather than an extra path segment", async () => {
+  const f = fakeFetch([
+    { status: 200, headers: {}, body: '{"commit":{"sha":"abc","commit":{"committer":{"date":"2026-08-08T00:00:00Z"}}}}' },
+  ]);
+  const sub = new GitHubSubstrate({ ...base, ref: "feature/foo", fetchImpl: f, cache: new Map() });
+  await sub.head();
+  assert.equal(f.calls[0].url, "https://api.github.com/repos/o/r/branches/feature%2Ffoo");
+});
+
+// ── (review fix 2) listDir sorts by name, matching the documented contract
+// (memory-substrate.mjs header + MemorySubstrate's explicit sort) — GitHub's
+// returned order must not leak through unsorted.
+
+test("listDir sorts entries by name regardless of GitHub's returned order", async () => {
+  const f = fakeFetch([
+    {
+      status: 200,
+      headers: {},
+      body: '[{"name":"zeta.yaml","type":"file"},{"name":"alpha.yaml","type":"file"},{"name":"beta","type":"dir"}]',
+    },
+  ]);
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map() });
+  assert.deepEqual(await sub.listDir("data"), [
+    { name: "alpha.yaml", type: "file" },
+    { name: "beta", type: "dir" },
+    { name: "zeta.yaml", type: "file" },
+  ]);
+});
+
+// ── (review fix 6) listDir normalizes exotic Contents-API types (symlink,
+// submodule) to "file" so the documented "file" | "dir" union always holds.
+
+test("listDir normalizes non-dir entry types (e.g. symlink) to \"file\"", async () => {
+  const f = fakeFetch([{ status: 200, headers: {}, body: '[{"name":"link","type":"symlink"}]' }]);
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map() });
+  assert.deepEqual(await sub.listDir("data"), [{ name: "link", type: "file" }]);
+});
+
+// ── (review fix 3) UPSTREAM errors carry the HTTP status, the request path,
+// and a truncated snippet of the response body — the only diagnostic signal
+// available once this runs live against real GitHub.
+
+test("UPSTREAM error message includes status, path, and a body snippet", async () => {
+  const f = fakeFetch([{ status: 500, headers: {}, body: '{"message":"internal server error, something broke badly"}' }]);
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map() });
+  await assert.rejects(
+    () => sub.readFile("x.md"),
+    (e) => {
+      assert.equal(e.code, "UPSTREAM");
+      assert.match(e.message, /500/);
+      assert.match(e.message, /x\.md/);
+      assert.match(e.message, /internal server error/);
+      return true;
+    },
+  );
+});
+
+test("UPSTREAM error body snippet is capped so a huge error page can't bloat the message", async () => {
+  const bigBody = JSON.stringify({ message: "x".repeat(500) });
+  const f = fakeFetch([{ status: 500, headers: {}, body: bigBody }]);
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map() });
+  await assert.rejects(
+    () => sub.readFile("x.md"),
+    (e) => {
+      assert.ok(e.message.length < 300, `message too long: ${e.message.length} chars`);
+      return true;
+    },
+  );
+});
+
+// ── (review fix 4) malformed JSON responses surface as SubstrateError
+// UPSTREAM (naming the path), not a raw SyntaxError — capabilities must only
+// ever see SubstrateError per the dispatch contract.
+
+test("listDir wraps malformed JSON as SubstrateError UPSTREAM naming the path", async () => {
+  const f = fakeFetch([{ status: 200, headers: {}, body: "not json" }]);
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map() });
+  await assert.rejects(() => sub.listDir("data"), (e) => e.code === "UPSTREAM" && /data/.test(e.message));
+});
+
+test("head wraps malformed JSON as SubstrateError UPSTREAM naming the ref", async () => {
+  const f = fakeFetch([{ status: 200, headers: {}, body: "not json" }]);
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map() });
+  await assert.rejects(() => sub.head(), (e) => e.code === "UPSTREAM" && /main/.test(e.message));
+});
+
+// ── (review fix 7) the ETag used for the *next* revalidation stays pinned to
+// the last confirmed-good response even after an intervening failed
+// (stale-served) refresh — asserted directly rather than inferred from
+// return values.
+
+test("stale-serve does not clobber the cached ETag used for the next revalidation", async () => {
+  const f = fakeFetch([
+    { status: 200, headers: { etag: 'W/"e1"' }, body: "v1" },
+    { status: 403, headers: {}, body: '{"message":"rate limit"}' },
+    { status: 304, headers: {} },
+  ]);
+  let t = 0;
+  const sub = new GitHubSubstrate({ ...base, fetchImpl: f, cache: new Map(), ttlMs: 1000, now: () => t });
+  await sub.readFile("x.md");
+  t = 5000;
+  assert.equal(await sub.readFile("x.md"), "v1");
+  assert.equal(sub.lastReadStale, true);
+  t = 10000;
+  assert.equal(await sub.readFile("x.md"), "v1");
+  assert.equal(f.calls[2].opts.headers["If-None-Match"], 'W/"e1"');
+  assert.equal(sub.lastReadStale, false);
+});
