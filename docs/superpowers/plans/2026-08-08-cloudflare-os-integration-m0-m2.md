@@ -643,7 +643,9 @@ test("recentDecisions takes dated entries only, skipping boilerplate headings", 
 
 **Files:** Create `src/gatekeeper/capabilities.mjs`, `test/capabilities.test.mjs`.
 
-Result envelope (all capabilities): success `{ ok: true, data, provenance: { instance, sha, date, stale } }`; failure `{ ok: false, error: { code, message } }` — codes: `UNKNOWN_CAPABILITY`, `UNKNOWN_INSTANCE`, `BAD_ARGS`, `NOT_FOUND`, `UPSTREAM`.
+Result envelope (all capabilities): success `{ ok: true, data, provenance: { instance, sha, date, stale } }`; failure `{ ok: false, error: { code, message, detail? } }` — codes: `UNKNOWN_CAPABILITY`, `UNKNOWN_INSTANCE`, `BAD_ARGS`, `NOT_FOUND`, `UPSTREAM`.
+
+> **Amendment (after Task 12 review):** `error.detail` added. Task 18's gadget renders `error.message` verbatim to a non-technical member, but `GitHubSubstrate` puts up to 200 chars of **raw upstream response body** into its `SubstrateError.message` (correctly — it's the only live diagnostic signal), and `validateName` embedded a stringified regex. So `message` is now operator-readable plain language and `detail` carries the diagnostic text, documented as not-for-display. The split belongs at this boundary, not in the substrate. Two consequences for later tasks: **Task 16** — `now` is threaded through the dispatch call to handlers, so `get_page` can reach it without changing `handle()`'s signature; **Task 18** — the gadget must render `code` + `message` only, never `detail`.
 
 - [ ] **Step 1:** Failing test:
 
@@ -878,6 +880,8 @@ Expected: no output. The core renderers were ported verbatim, so any diff is a p
   async function load() {
     $("out").textContent = "loading…";
     const r = await callCapability("get_page", { instance: $("instance").value, page_id: page });
+    // Render code + message only. NEVER render r.error.detail — it carries raw upstream
+    // response bodies and parser output, which is diagnostic-only (see Task 12 amendment).
     if (!r.ok) { $("out").textContent = `error [${r.error.code}]: ${r.error.message}`; $("prov").textContent = ""; return; }
     $("out").textContent = r.data.markdown;
     const { sha, date, stale } = r.provenance;
