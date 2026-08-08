@@ -47,3 +47,11 @@ test("listDir dedupes nested subdirectories into a single dir entry, sorted", as
 test("listDir returns empty array for a path with no children", async () => {
   assert.deepEqual(await sub.listDir("docs/agent-plans"), []);
 });
+
+// ── Documented precondition-violation behavior, not a feature: a leading or
+// trailing slash makes `path` match no key, so listDir quietly returns [].
+// Pinned here so a future refactor can't silently change this to a throw.
+test("listDir returns [] for paths violating the no-leading/trailing-slash precondition", async () => {
+  assert.deepEqual(await sub.listDir("data/"), []);
+  assert.deepEqual(await sub.listDir("/data"), []);
+});

@@ -2,10 +2,10 @@
 //
 // A Substrate is the swappable storage driver behind every gatekeeper
 // capability. Capabilities never touch GitHub (or any other backend)
-// directly — they call these four methods only. This keeps the page core and
-// capabilities pure and lets storage be swapped (in-memory for tests, GitHub
-// API for the pilot, workerd-local-git or Radicle later) without touching
-// capability code.
+// directly — they call these four methods (plus the optional `lastReadStale`
+// property below). This keeps the page core and capabilities pure and lets
+// storage be swapped (in-memory for tests, GitHub API for the pilot,
+// workerd-local-git or Radicle later) without touching capability code.
 //
 // All four methods are async, even where an implementation (like this one)
 // could answer synchronously — callers must not assume otherwise.
@@ -32,6 +32,27 @@
 //   proposeChange(change) → Promise<never>
 //     Writes are out of scope until M3. Always throws an Error whose message
 //     contains "M3" (read-only pilot).
+//
+//   Path precondition violations: callers are expected to pass `path` values
+//   matching the shapes documented above (no leading/trailing slashes).
+//   Violating that precondition is undefined-but-pinned behavior, not an
+//   error: a malformed path (e.g. a leading or trailing slash) simply
+//   matches no key, so `listDir` returns `[]` and `readFile` throws
+//   `SubstrateError("NOT_FOUND")` — the same result as a genuinely absent
+//   path, not a distinct failure mode.
+//
+//   lastReadStale (optional, mutable property, not a method)
+//     A substrate *may* expose a mutable `lastReadStale: boolean` on itself.
+//     Capabilities (Task 12's dispatcher) read it polymorphically after
+//     calling into whatever substrate `substrateFor()` returns, to attach
+//     `stale` to the provenance envelope (`substrate.lastReadStale === true`).
+//     Absent or falsy means "not stale" — that default is a guarantee of the
+//     contract, not an implementation accident, so every substrate is safe
+//     to read this off of even if it never sets it. `MemorySubstrate` never
+//     sets it: reads are served straight from the in-memory map, so they can
+//     never be stale. `GitHubSubstrate` (Task 9) is the implementation that
+//     actually sets it true, when a cache revalidation fails and it falls
+//     back to serving cached content.
 //
 // SubstrateError codes used across the integration (name them consistently —
 // Task 9's GitHubSubstrate and Task 12's capability dispatch both rely on
@@ -100,6 +121,14 @@ export class MemorySubstrate {
   }
 
   async proposeChange() {
+    // Deliberately a plain Error, not a SubstrateError, matching the plan's
+    // spec for both this and Task 9's GitHubSubstrate — do not change this
+    // without a plan update. Latent trap: Task 12's dispatch rule is "catch
+    // SubstrateError → use its code; anything else → UPSTREAM," so once M3
+    // wires writes into capability dispatch, this stub is indistinguishable
+    // from a genuine backend failure. When that happens, this should likely
+    // become `SubstrateError("NOT_IMPLEMENTED", ...)` so dispatch can tell
+    // "unbuilt" apart from "broken."
     throw new Error("M3 — not implemented");
   }
 }
