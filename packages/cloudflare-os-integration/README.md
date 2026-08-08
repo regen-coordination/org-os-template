@@ -28,4 +28,9 @@ packages/cloudflare-os-integration/
 npm test
 ```
 
-Runs all tests in `test/*.test.mjs` via `node --test`. Expected on empty package: exit 0 with "tests 0".
+Runs all tests in `test/*.test.mjs` via `node --test`. Also reachable from the repo root as
+`npm run test:cloudflare-os-integration`.
+
+`scripts/page-shim.mjs` in the repo root imports `src/page-core/render-page.mjs` directly, so its
+output is byte-identical to the renderers it replaced — the parity check in the M0–M2 plan's
+Task 17 is the gate on any change to those renderer bodies.
