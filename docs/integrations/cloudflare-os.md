@@ -65,20 +65,34 @@ Package files needed: `wrangler.jsonc`, `package.json`, `tsconfig.json`,
 it routes `/gatekeeper/<name>/*` "to whichever gatekeepers are bound (**discovered by scanning its
 own `GATEKEEPER_*` service bindings**, so installing a gatekeeper is purely a binding change)."
 
-So: add `gatekeeper-org-os` to the workspace, give the router a `GATEKEEPER_ORG_OS` service
-binding, done. No central registry file to edit.
+✅ **Confirmed by running it (Task 3, 2026-08-08).** In local dev it is even simpler than that:
+`run-dev-server.js` (`findGatekeepers`, line 62) scans `packages/` for any directory named
+`gatekeeper-*` containing a `wrangler.jsonc`, derives the binding name
+(`gatekeeper-helloworld` → `GATEKEEPER_HELLOWORLD`) and writes it into a generated
+`wrangler.dev.jsonc`. **Dropping the directory in is the entire install** — no config file to
+edit anywhere. Verified end to end:
+
+```
+env.GATEKEEPER_HELLOWORLD (gatekeeper-helloworld#GatekeeperVendor)   Worker   local
+[wrangler:info] GET /gatekeeper/helloworld/ 200 OK (4ms)
+```
+
+For the **starter**, the equivalent slot already exists: `packages/custom-gatekeeper` plus the
+`workers.customGatekeeper.name` entry in `deployment.jsonc`, bound by `scripts/deploy.mjs` as
+`GATEKEEPER_CUSTOM`.
 
 **Config and secrets:**
 - Per-package `wrangler.jsonc` is the source of deployment config.
 - The release manifest is generated from it by `scripts/release/manifest-lib.mjs`, with
   account-specific values replaced by placeholders (`$ACCOUNT_ID`, `$WORKER_NAME(...)`,
   `$SECRET(...)`, `$PUBLIC_BASE_URL`).
-- ⚠️ **We must set `NO_DEFAULT_CRED_INPUTS`.** The deploy wizard defaults a gatekeeper's inputs to
-  OAuth `CLIENT_ID`/`CLIENT_SECRET`, and **"the wizard blocks Install on unfilled secret inputs,
-  so a spurious default makes a gatekeeper uninstallable."** org-os authenticates with a single
-  GitHub PAT, not an OAuth app — so we either opt out via `NO_DEFAULT_CRED_INPUTS` in
-  `manifest-lib.mjs` or declare a per-package `deploy-inputs.json` with just our token input.
-  **This would have blocked the install with a confusing error.**
+- **Credential-free provisioning.** The deploy wizard defaults a gatekeeper's inputs to OAuth
+  `CLIENT_ID`/`CLIENT_SECRET`, and *"the wizard blocks Install on unfilled secret inputs, so a
+  spurious default makes a gatekeeper uninstallable."* org-os uses a GitHub PAT, not an OAuth app.
+  On the **upstream** path that means opting out via `NO_DEFAULT_CRED_INPUTS` in
+  `manifest-lib.mjs`; on the **starter** path `packages/custom-gatekeeper` already models the
+  credential-free shape (`autoProvisionsAccount: true`, `providesAuth: false`, no connect flow),
+  so following it avoids the trap by construction. The PAT goes in a Wrangler secret.
 - Admin enable/disable is enforced at one chokepoint: `user.ts:getGatekeeperClassFor()`.
 
 **Local dev:** `pnpm run-local` runs the whole stack on wrangler + workerd at
