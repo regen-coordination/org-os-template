@@ -187,11 +187,19 @@ function loadCalendarItems(files, path, arrKey, now) {
     title: x.title || x.name || x.topic || x.id,
   }));
 
-  const weekEnd = new Date(now.getTime() + 7 * 86400000);
+  // Compare calendar dates, not instants: `now` carries a time-of-day (e.g.
+  // noon) while item dates are bare YYYY-MM-DD strings that parse to UTC
+  // midnight. Without normalizing, a same-day item's midnight sorts before
+  // `now`'s noon and silently drops out of both buckets. Derive `now`'s
+  // UTC calendar date via the YYYY-MM-DD slice, then reconstruct as
+  // UTC-midnight Dates for an apples-to-apples comparison. Doesn't mutate
+  // the caller's `now`.
+  const today = new Date(now.toISOString().slice(0, 10));
+  const weekEnd = new Date(today.getTime() + 7 * 86400000);
 
   const thisWeek = items.filter((x) => {
     const d = new Date(x.date);
-    return now <= d && d < weekEnd;
+    return today <= d && d < weekEnd;
   });
   const upcoming = items.filter((x) => new Date(x.date) >= weekEnd);
 

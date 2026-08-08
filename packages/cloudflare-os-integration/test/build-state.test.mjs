@@ -55,3 +55,31 @@ test("federation: root-level peers/upstream shape (what real instances actually 
   assert.deepEqual(s.federation.peers.map((p) => p.name), ["peer-one", "peer-two"]);
   assert.equal(s.federation.upstream.length, 1);
 });
+
+// Boundary regression coverage: `now` (2026-08-08T12:00:00Z) carries a
+// time-of-day, but item dates are bare YYYY-MM-DD strings (UTC midnight).
+// Without normalizing `now` to a calendar date first, a same-day item's
+// midnight sorts *before* `now`'s noon and silently drops out of both
+// buckets, and an item at exactly now+7d sorts *before* weekEnd's noon and
+// wrongly lands in thisWeek. Pins all four regions of the window using an
+// inline files map — events and meetings share loadCalendarItems, so this
+// covers meetings' path too; only events is exercised here.
+test("events: this-week window pins all four boundary regions", () => {
+  const files = {
+    "data/events.yaml": [
+      "events:",
+      "  - title: AtNow",
+      '    date: "2026-08-08"', // same calendar day as `now` → in thisWeek
+      "  - title: Inside",
+      '    date: "2026-08-10"', // strictly inside the window → in thisWeek
+      "  - title: AtNowPlus7",
+      '    date: "2026-08-15"', // exactly now+7d, exclusive upper bound → NOT in thisWeek, in upcoming
+      "  - title: WellPast",
+      '    date: "2026-09-01"', // well past the window → in upcoming
+      "",
+    ].join("\n"),
+  };
+  const state = buildState(files, { now: NOW });
+  assert.deepEqual(state.events.thisWeek.map((e) => e.title), ["AtNow", "Inside"]);
+  assert.deepEqual(state.events.upcoming.map((e) => e.title), ["AtNowPlus7", "WellPast"]);
+});
