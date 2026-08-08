@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-08 · Cloudflare OS integration — dedicated gatekeeper over a swappable substrate
+
+**Status:** active
+**Scope:** framework, agent-runtime, operator-ux, federation
+
+**Decision** — Integrate org-os with Cloudflare OS via **Architecture B: a dedicated `gatekeeper-org-os` driver built on a substrate interface**, rather than by configuring the stock GitHub gatekeeper (A) or standing up a hosted org-os API (C). All meaning lives in this repo at `packages/cloudflare-os-integration/`: a pure, runtime-agnostic page core (file contents in → view-model → markdown out), a `Substrate` contract (`readFile` / `listDir` / `head` / `proposeChange`) with `GitHubSubstrate` as the first driver and workerd/Radicle as later ones, and read-only capabilities behind a uniform result envelope carrying provenance (`sha`, `date`, `stale`). The Cloudflare OS deployment — a `cloudflare-os-starter` fork — holds only thin adapter wiring. **Writes are deferred to M3**: `proposeChange` throws, and when it lands it will be PR-only, never a direct commit.
+
+**Why** — The stock GitHub gatekeeper (A) reads files but knows nothing about org-os *structure*: it can hand an agent raw `data/projects.yaml` bytes but cannot answer "what are the active projects", cannot merge per-project task counts, and carries no provenance, so an answer can't be traced to a commit. A hosted API (C) would give the richest surface but adds a service to run, secure and pay for, and makes the federation depend on a single availability point — the opposite of the git-canonical model. B keeps git as the source of truth, puts the org-os semantics in ordinary tested Node code this repo already owns, and makes the runtime a swappable detail: the same page core serves the Cloudflare gadget, `scripts/page-shim.mjs`, and any later TUI. The substrate seam is what makes the Radicle distribution (`rad-org-os`) reachable without a rewrite. Read-only first is deliberate: it retires the platform's unknowns at zero blast radius, and the human-in-the-loop approval path for writes is a Cloudflare OS mechanism worth understanding before depending on it.
+
+**Refs** — spec `docs/superpowers/specs/2026-08-08-cloudflare-os-org-os-integration-design.md`, plan `docs/superpowers/plans/2026-08-08-cloudflare-os-integration-m0-m2.md` (plans dir is gitignored), package `packages/cloudflare-os-integration/`, related decisions 2026-07-31 (rad-org-os substrate thinking) and 2026-08-02 (admin app — the other operator surface over the same registries), `memory/2026-08-08.md`
+
+---
+
 ## 2026-08-02 · Admin app — local-first API+SPA, layered proposals, build don't fork
 
 **Status:** active

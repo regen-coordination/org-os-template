@@ -4,7 +4,7 @@
 > system as **one organism** — modules, integrations, and federation as nested
 > containers, shaded by live status.
 >
-> Woven **2026-07-31** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
+> Woven **2026-08-08** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
 > hand. Edit prose in the generator `scripts/generate-quilt.mjs` (organ layout/taglines)
 > or per-entry detail in `scripts/lib/quilt-view.mjs` (PKG_DETAIL, GARDEN_GROUPS, …).
 
@@ -25,10 +25,10 @@ live patches get room, dormant things shrink to pods.
 ## The organism
 
 ```
-╔═ ORG-OS · framework v0.5 · woven 2026-07-31 ═════════════════════════════════════════╗
+╔═ ORG-OS · framework v0.5 · woven 2026-08-08 ═════════════════════════════════════════╗
 ║ ┏━ CORE · nucleus ━━━━━━━━━━━━━━━━━━━┓ ┏━ DATA ≡ SCHEMAS ━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─HEARTBEAT █─╮ ╭─MEMORY █─╮       ┃ ┃ ╭─data/*.yaml █──╮ ╭─.well-known █─╮      ┃ ║
-║ ┃ │ 41 open     │ │ 16d ago  │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
+║ ┃ │ 52 open     │ │ 6d ago   │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
 ║ ┃ ╰─────────────╯ ╰──────────╯       ┃ ┃ ╰────────────────╯ ╰───────────────╯      ┃ ║
 ║ ┃ █ spine ─ (SOUL) (IDENTITY) (USER) ┃ ┃ ≡ generate ⇄ validate ✓                   ┃ ║
 ║ ┃           (TOOLS)                  ┃ ┃   yaml is truth, schema is face           ┃ ║
@@ -43,7 +43,7 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ ~ many doors, one house               ┃ ┃ ~ where the world plugs in             ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ↕                                           ║
-║ ┏━ AUTOMATION · metabolism · scripts ×30 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
+║ ┏━ AUTOMATION · metabolism · scripts ×31 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ loop ─ (initialize » dashboard) (generate ⇄ validate) (sync-upstream ↔ spokes)   ┃ ║
 ║ ┃        (analyze » drift-report) (clone-framework » birth)                        ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
@@ -59,7 +59,7 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ │ sync 04-24 · drift ☓3 │ │ sync 04-28      │ │ sync 05-16        │              ┃ ║
 ║ ┃ ╰───────────────────────╯ ╰─────────────────╯ ╰───────────────────╯              ┃ ║
 ║ ┃ ▒☓ substrate ─ (openclaw · agent runtime · sync ∅ · 3 drift)                     ┃ ║
-║ ┃ ledger: bread-coop 2.5mo » refi-med 3mo » regen-coord 3.5mo » dao 4mo            ┃ ║
+║ ┃ ledger: bread-coop 3mo » refi-med 3.5mo » regen-coord 3.5mo » dao 4.5mo          ┃ ║
 ║ ┃   refi-bcn 4.5mo » refi-dao 5mo » openclaw ∅ · ☓7                                ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ⊕                                           ║
@@ -95,11 +95,15 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ ▒ local color ─ (instance-specific ×2) — stays local until it proves general     ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          »                                           ║
-║ ┏━ PROJECTS · the field · ×12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
+║ ┏━ PROJECTS · the field · ×13 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─v2-stab ▓─────────╮ ╭─federation ▓─────╮ ╭─orchestration ▓─╮ ╭─skill-promo ▓─╮ ┃ ║
 ║ ┃ │ v3 tag local only │ │ e2e sync queued  │ │ drift 27»0 ✓    │ │ v0.5 wave ✓   │ ┃ ║
 ║ ┃ │ changelog pending │ │ » autopoiesis p2 │ │ backports ×3    │ │ dao-wave next │ ┃ ║
 ║ ┃ ╰───────────────────╯ ╰──────────────────╯ ╰─────────────────╯ ╰───────────────╯ ┃ ║
+║ ┃ ╭─cloudflare-os ▓──╮                                                             ┃ ║
+║ ┃ │ M1+M2 core ✓     │                                                             ┃ ║
+║ ┃ │ M0 probe pending │                                                             ┃ ║
+║ ┃ ╰──────────────────╯                                                             ┃ ║
 ║ ┃ ▒ discovery ─ (onboarding) (pkg-integration·multica) (reliability) (bootstrap)   ┃ ║
 ║ ┃               (opal) (operator-interfaces) (evolution » autopoiesis)             ┃ ║
 ║ ┃               (rad-org-os)                                                       ┃ ║

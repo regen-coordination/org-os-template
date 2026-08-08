@@ -119,6 +119,7 @@ export const PROJECT_DETAIL = {
   "federation-protocol": [" e2e sync queued ", " » autopoiesis p2 "],
   "instance-orchestration": [" drift 27»0 ✓ ", " backports ×3 "],
   "skill-promotion": [" v0.5 wave ✓ ", " dao-wave next "],
+  "cloudflare-os-integration": [" M1+M2 core ✓ ", " M0 probe pending "],
 };
 
 export const PROJECT_SHORT = {
@@ -127,7 +128,7 @@ export const PROJECT_SHORT = {
   "package-integration": "pkg-integration·multica", "non-tech-onboarding": "onboarding",
   "instance-bootstrap": "bootstrap", "opal-rollout": "opal",
   "operator-interfaces": "operator-interfaces", "framework-evolution": "evolution » autopoiesis",
-  reliability: "reliability",
+  reliability: "reliability", "cloudflare-os-integration": "cloudflare-os",
 };
 
 const projShort = (id) => PROJECT_SHORT[id] ?? id;
