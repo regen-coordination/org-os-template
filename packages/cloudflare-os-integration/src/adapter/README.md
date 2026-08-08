@@ -71,6 +71,12 @@ a stale branch.
 pnpm exec wrangler secret put ORG_OS_GITHUB_TOKEN --name gatekeeper-org-os
 ```
 
+**Local dev:** the multi-worker dev server doesn't read per-package secrets. The sanctioned
+mechanism is `PASSTHROUGH_GATEKEEPER_VARS` in the workspace's `run-dev-server.js` — add
+`"gatekeeper-org-os": ["ORG_OS_GITHUB_TOKEN"]` (a local edit; not upstream) and put the token in
+the gitignored root `.dev.vars`. For a personal machine the `gh` CLI token works (broad `repo`
+scope — acceptable locally, never in deployment).
+
 Fine-grained PAT, **`contents: read` only**. `regen-coordination/org-os-template` is public and
 readable without one (at 60 req/hr instead of 5,000); `refibcn/refi-bcn-os` is **private** and
 requires it. Because fine-grained PATs are scoped to a single resource owner and these repos sit
@@ -104,16 +110,39 @@ The comment in `org-os.ts` says the same thing at the call site.
 Every read calls `authorizeObservation()` *before* fetching, so an observation the user would
 deny never reaches GitHub.
 
+## Model: OpenCode Go (verified 2026-08-09)
+
+No code needed — Cloudflare OS's **Ollama** provider slot is a generic OpenAI-compatible client
+(`api: "openai-completions"`, honors `apiUrl`, sends the token as a bearer). The `openai`
+provider slot does NOT work here: it speaks the OpenAI *Responses* API, which compat gateways
+don't implement. Workspace model config:
+
+| Field | Value |
+|---|---|
+| Provider | Ollama (the compat slot — label is cosmetic) |
+| Model | e.g. `kimi-k3`, `gpt-5.6-luna`, `qwen3.8-max` (25 ids live-listed from `GET /models`) |
+| API URL | `https://opencode.ai/zen/go/v1` |
+| API token | the workspace's Go API key |
+
+Verified: `/models` authenticates and lists 25 ids. Caveats: `claude-*` models are on the
+pay-per-token Zen tier, **not** the $10 Go plan; a key whose workspace has no balance returns
+`CreditsError` on completions even though `/models` works — check billing on the right workspace.
+Go's caps: $12/5h, $30/wk, $60/mo. Unknown model ids get conservative window defaults
+(128k context / 4096 out). Being hosted, this config survives deployment — unlike local Ollama.
+
 ## Verified
 
 - `pnpm run types:check` silent.
-- `env.GATEKEEPER_ORG_OS (gatekeeper-org-os#GatekeeperVendor)` bound; `ORG_OS_INSTANCES` loaded.
+- `env.GATEKEEPER_ORG_OS (gatekeeper-org-os#GatekeeperVendor)` bound; `ORG_OS_INSTANCES` and
+  `ORG_OS_GITHUB_TOKEN` loaded in local dev.
 - `GET /gatekeeper/org-os/` → 200.
-- Core against the **live** GitHub API: `get_registry` returned 13 projects and `get_page`
-  rendered the projects table, both stamped `sha 9057858…`, `stale: false`.
+- Core against the **live** GitHub API, public hub: `get_registry` 13 projects, `get_page`
+  rendered, `sha 9057858…`, `stale: false`.
+- Core against the **live private pilot `refi-bcn-os`** (2026-08-09): `get_registry` 27 projects,
+  `get_federation` network `refi-dao` with 8 peers, `get_page` dashboard 3005 chars — all
+  `sha 54dc2f1`, `stale: false`.
 
 ## Not yet verified
 
-- The agent calling the capability in chat — needs a model configured (none locally).
+- The agent calling the capability in chat (model config + Go credits are operator steps).
 - Anything in a deployed workspace.
-- `refi-bcn-os` reads — needs the token.
