@@ -36,6 +36,7 @@
     "version:check": "node scripts/update-version.mjs --check",
     "install:hooks": "node scripts/install-hooks.mjs",
     "test:multica-bridge": "npm test --prefix packages/multica-bridge",
+    "test:cloudflare-os-integration": "npm test --prefix packages/cloudflare-os-integration",
     "generate:skills": "node scripts/generate-skills.mjs",
     "generate:quilt": "node scripts/generate-quilt.mjs",
     "sync:packages": "node scripts/sync-packages.mjs",
