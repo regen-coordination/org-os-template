@@ -27,7 +27,8 @@ import yaml from "js-yaml";
 import { SubstrateError } from "../substrate/memory-substrate.mjs";
 import { validateInstances } from "./instances.mjs";
 import { buildContextBundle } from "./context-bundle.mjs";
-import { loadFederation } from "../page-core/build-state.mjs";
+import { loadFederation, buildState } from "../page-core/build-state.mjs";
+import { renderPage, SUPPORTED_PAGES } from "../page-core/render-page.mjs";
 
 // `name` args (`get_registry`, `get_schema`) are interpolated into a
 // substrate path (`data/${name}.yaml`, `.well-known/${name}.json`) — this is
@@ -36,10 +37,16 @@ import { loadFederation } from "../page-core/build-state.mjs";
 // there's no path-segment ambiguity to worry about here.
 const NAME_PATTERN = /^[a-z0-9-]+$/;
 
-// ── the four read capabilities, in catalog order ─────────────────────────────
-// Task 16 adds a fifth (`get_page`) to this array — appended, not reordered,
-// so existing indices/consumers are stable.
-export const READ_CAPABILITIES = ["get_registry", "get_federation", "get_schema", "get_context_bundle"];
+// ── the read capabilities, in catalog order ──────────────────────────────────
+// `get_page` was appended by Task 16, not inserted, so existing
+// indices/consumers stay stable. Future capabilities append likewise.
+export const READ_CAPABILITIES = [
+  "get_registry",
+  "get_federation",
+  "get_schema",
+  "get_context_bundle",
+  "get_page",
+];
 
 function cap(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -184,14 +191,85 @@ async function getContextBundle(substrate, args, ctx) {
   }
 }
 
+// ── get_page ─────────────────────────────────────────────────────────────────
+// The fixed input set `buildState` consumes. Every one of these is optional on
+// a real instance, so each read is individually tolerant: a failure drops the
+// key and the page core's `?? null` defaults take over. Only the whole-page
+// path (an unknown page_id, a renderer bug) fails the capability.
+const PAGE_INPUT_FILES = [
+  "federation.yaml",
+  "HEARTBEAT.md",
+  "DECISIONS.md",
+  "docs/agent-plans/QUEUE.md",
+  "data/projects.yaml",
+  "data/instances.yaml",
+  "data/events.yaml",
+  "data/meetings.yaml",
+];
+
+const PROJECT_DOCS_DIR = "packages/operations/projects";
+
+// Reads `path`, returning null instead of throwing. Deliberately swallows
+// UPSTREAM as well as NOT_FOUND: a page assembled from ~9 independent sources
+// should degrade section-by-section rather than fail wholesale because one
+// upstream read hiccuped. Genuine total failure still surfaces — a substrate
+// that can't serve anything also can't serve `head()`, which is not tolerant.
+async function readOptional(substrate, path) {
+  try {
+    return await substrate.readFile(path);
+  } catch {
+    return null;
+  }
+}
+
+async function getPage(substrate, args, ctx) {
+  const pageId = args?.page_id;
+  if (typeof pageId !== "string" || !SUPPORTED_PAGES.includes(pageId)) {
+    badArgs(
+      `"${String(pageId)}" isn't a page this gatekeeper can render — try one of: ${SUPPORTED_PAGES.join(", ")}.`,
+      `page_id must be one of ${JSON.stringify(SUPPORTED_PAGES)}, got ${JSON.stringify(pageId)}`,
+    );
+  }
+
+  const files = {};
+  await Promise.all(
+    PAGE_INPUT_FILES.map(async (p) => {
+      const content = await readOptional(substrate, p);
+      if (content !== null) files[p] = content;
+    }),
+  );
+
+  // Per-project markdown docs contribute task counts to the projects table.
+  // The directory is absent on most instances; listDir failure is not an error.
+  let entries = [];
+  try {
+    entries = await substrate.listDir(PROJECT_DOCS_DIR);
+  } catch {
+    entries = [];
+  }
+  await Promise.all(
+    (entries || [])
+      .filter((e) => e?.type === "file" && typeof e.name === "string" && e.name.endsWith(".md"))
+      .map(async (e) => {
+        const p = `${PROJECT_DOCS_DIR}/${e.name}`;
+        const content = await readOptional(substrate, p);
+        if (content !== null) files[p] = content;
+      }),
+  );
+
+  const state = buildState(files, { now: ctx.now() });
+  return { page_id: pageId, markdown: renderPage(pageId, state) };
+}
+
 // Dispatch table: capability name -> (substrate, args, ctx) => Promise<data>.
-// Adding Task 16's get_page is one entry here plus one push onto
-// READ_CAPABILITIES above — no restructuring.
+// Adding a capability is one entry here plus one push onto READ_CAPABILITIES
+// above — no restructuring.
 const HANDLERS = {
   get_registry: getRegistry,
   get_federation: getFederation,
   get_schema: getSchema,
   get_context_bundle: getContextBundle,
+  get_page: getPage,
 };
 
 // ── error mapping ─────────────────────────────────────────────────────────────
@@ -245,7 +323,7 @@ function toErrorEnvelope(err) {
 //   Unused by the four read capabilities here; held (and passed down) for
 //   Task 16's `get_page`, which needs `now()` for `buildState`.
 
-export function createGatekeeper({ instances, substrateFor, now }) {
+export function createGatekeeper({ instances, substrateFor, now = () => new Date() }) {
   const validated = validateInstances(instances);
   const byId = new Map(validated.map((i) => [i.id, i]));
   const substrateCache = new Map();

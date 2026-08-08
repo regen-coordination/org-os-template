@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGatekeeper, READ_CAPABILITIES } from "../src/gatekeeper/capabilities.mjs";
+import { SUPPORTED_PAGES } from "../src/page-core/render-page.mjs";
 import { MemorySubstrate, SubstrateError } from "../src/substrate/memory-substrate.mjs";
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
@@ -30,7 +31,43 @@ const gk = createGatekeeper({
 });
 
 test("capability catalog", () => {
-  assert.deepEqual(READ_CAPABILITIES, ["get_registry", "get_federation", "get_schema", "get_context_bundle"]);
+  assert.deepEqual(READ_CAPABILITIES, ["get_registry", "get_federation", "get_schema", "get_context_bundle", "get_page"]);
+});
+
+test("get_page renders markdown for supported pages", async () => {
+  const r = await gk.handle("get_page", { instance: "instance-a", page_id: "projects" });
+  assert.equal(r.ok, true);
+  assert.ok(r.data.markdown.startsWith("# Projects"));
+  assert.equal(r.data.page_id, "projects");
+  assert.equal(r.provenance.sha, "abc123");
+});
+
+test("get_page rejects unknown page ids", async () => {
+  assert.equal((await gk.handle("get_page", { instance: "instance-a", page_id: "nope" })).error.code, "BAD_ARGS");
+});
+
+// get_page reads ~9 fixed paths plus a directory listing; on a real instance most of them are
+// routinely absent. Each read must degrade to an absent key rather than failing the whole page,
+// otherwise one missing optional file (say data/events.yaml) blanks the operator's dashboard.
+test("get_page tolerates missing inputs — a sparse instance still renders", async () => {
+  const sparse = createGatekeeper({
+    instances: [{ id: "instance-b", owner: "o", repo: "r" }],
+    substrateFor: () => new MemorySubstrate(loadFixture("instance-b"), { sha: "s", date: "d" }),
+    now: () => new Date("2026-08-08T12:00:00Z"),
+  });
+  const r = await sparse.handle("get_page", { instance: "instance-b", page_id: "dashboard" });
+  assert.equal(r.ok, true);
+  assert.ok(r.data.markdown.includes("## Projects"));
+  assert.ok(r.data.markdown.includes("0 critical"));
+});
+
+test("get_page renders every supported page id", async () => {
+  for (const page of SUPPORTED_PAGES) {
+    const r = await gk.handle("get_page", { instance: "instance-a", page_id: page });
+    assert.equal(r.ok, true, `${page} should render`);
+    assert.equal(typeof r.data.markdown, "string");
+    assert.ok(r.data.markdown.length > 0, `${page} should not be empty`);
+  }
 });
 
 test("get_registry parses a data/ registry with provenance", async () => {
