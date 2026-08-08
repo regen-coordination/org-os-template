@@ -31,3 +31,16 @@ test("parseFrontmatter splits yaml and body", () => {
   });
   assert.deepEqual(parseFrontmatter("no fm"), { data: {}, content: "no fm" });
 });
+
+test("getRelativeAge hour and day buckets", () => {
+  assert.equal(getRelativeAge("2026-08-08T09:00:00Z", NOW), "3h ago");
+  assert.equal(getRelativeAge("2026-08-05T12:00:00Z", NOW), "3d ago");
+});
+
+test("daysUntil handles past dates", () => {
+  assert.equal(daysUntil("2026-08-01", NOW), -7);
+});
+
+test("parseFrontmatter returns empty data for malformed yaml", () => {
+  assert.deepEqual(parseFrontmatter("---\n: : bad\n---\nBody"), { data: {}, content: "Body" });
+});
