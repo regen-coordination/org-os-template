@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { renderPage } from "../packages/cloudflare-os-integration/src/page-core/render-page.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,113 +61,23 @@ try {
   process.exit(1);
 }
 
-const renderers = {
-  projects() {
-    const projects = state.projects || [];
-    let out = `# Projects\n\n${projects.length} workstreams.\n\n`;
-    out += "| Project | Stage | Lead | Started | Tasks |\n";
-    out += "|---|---|---|---|---|\n";
-    for (const p of projects) {
-      out += `| ${p.name} | ${p.stage} | ${p.lead || "—"} | ${p.startDate || "—"} | ${p.taskCount ?? 0} |\n`;
-    }
-    return out;
-  },
+// The renderers now live in the shared page core, which the Cloudflare OS gatekeeper's
+// `get_page` capability renders from the same state shape. They were ported verbatim, so this
+// script's output is byte-identical to the pre-delegation version — any diff is a porting bug
+// in the core, not something to patch here.
+//
+// The core reads DECISIONS.md / QUEUE.md off the state object rather than from disk (it also
+// runs in a Worker, with no fs), so the shim supplies them as raw strings.
+state.decisionsRaw = fs.existsSync(path.join(rootDir, "DECISIONS.md"))
+  ? fs.readFileSync(path.join(rootDir, "DECISIONS.md"), "utf-8")
+  : null;
+const queuePath = path.join(rootDir, "docs/agent-plans/QUEUE.md");
+state.plansRaw = fs.existsSync(queuePath) ? fs.readFileSync(queuePath, "utf-8") : null;
 
-  tasks() {
-    const tasks = state.tasks || { critical: [], urgent: [], upcoming: [], completed: [] };
-    let out = `# Tasks\n\n`;
-    const tiers = [
-      ["Critical", tasks.critical],
-      ["Urgent", tasks.urgent],
-      ["Upcoming", tasks.upcoming],
-      ["Completed", tasks.completed],
-    ];
-    for (const [label, list] of tiers) {
-      if (!list || list.length === 0) continue;
-      out += `## ${label} (${list.length})\n\n`;
-      for (const t of list) {
-        const checkbox = t.done ? "[x]" : "[ ]";
-        const cat = t.category ? ` _(${t.category})_` : "";
-        out += `- ${checkbox} ${t.text}${cat}\n`;
-      }
-      out += "\n";
-    }
-    return out;
-  },
-
-  instances() {
-    const instances = state.instances || [];
-    let out = `# Instances\n\n${instances.length} tracked instances.\n\n`;
-    out += "| ID | Name | Type | Maturity | Framework | Last Sync | Drift |\n";
-    out += "|---|---|---|---|---|---|---|\n";
-    for (const i of instances) {
-      out += `| ${i.id} | ${i.name} | ${i.type} | ${i.maturity} | ${i.framework_version || "—"} | ${i.last_sync || "—"} | ${i.drift_count ?? 0} |\n`;
-    }
-    return out;
-  },
-
-  decisions() {
-    const decisionsPath = path.join(rootDir, "DECISIONS.md");
-    if (!fs.existsSync(decisionsPath)) {
-      return "# Decisions\n\nDECISIONS.md not found.\n";
-    }
-    return fs.readFileSync(decisionsPath, "utf-8");
-  },
-
-  plans() {
-    const queuePath = path.join(rootDir, "docs/agent-plans/QUEUE.md");
-    if (!fs.existsSync(queuePath)) {
-      return "# Plans\n\nQUEUE.md not found.\n";
-    }
-    return fs.readFileSync(queuePath, "utf-8");
-  },
-
-  "this-week"() {
-    const events = state.events?.thisWeek || [];
-    const meetings = state.meetings?.thisWeek || [];
-    const funding = (state.funding?.upcoming || []).filter((f) => {
-      if (!f.daysLeft) return false;
-      return f.daysLeft <= 7;
-    });
-    const critical = state.tasks?.critical || [];
-    const urgent = state.tasks?.urgent || [];
-
-    let out = `# This Week\n\n`;
-    if (!events.length && !meetings.length && !funding.length && !critical.length && !urgent.length) {
-      out += "_Nothing scheduled or critical this week._\n";
-      return out;
-    }
-    if (critical.length) {
-      out += "## Critical tasks\n\n";
-      for (const t of critical) out += `- ⚡ ${t.text}\n`;
-      out += "\n";
-    }
-    if (urgent.length) {
-      out += "## Urgent tasks\n\n";
-      for (const t of urgent) out += `- ◆ ${t.text}\n`;
-      out += "\n";
-    }
-    if (meetings.length) {
-      out += "## Meetings\n\n";
-      for (const m of meetings) out += `- ${m.date || "—"} — ${m.title}\n`;
-      out += "\n";
-    }
-    if (events.length) {
-      out += "## Events\n\n";
-      for (const e of events) out += `- ${e.date || "—"} — ${e.title}\n`;
-      out += "\n";
-    }
-    if (funding.length) {
-      out += "## Funding deadlines (≤7 days)\n\n";
-      for (const f of funding) out += `- ${f.daysLeft}d left — ${f.title}\n`;
-      out += "\n";
-    }
-    return out;
-  },
-};
-
-const renderer = renderers[pageId];
-if (!renderer) {
+let out;
+try {
+  out = renderPage(pageId, state);
+} catch {
   process.stderr.write(
     `page-shim: page "${pageId}" is not yet available in shim mode.\n` +
       `Available pages: ${SUPPORTED.join(", ")}\n` +
@@ -175,5 +86,5 @@ if (!renderer) {
   process.exit(2);
 }
 
-process.stdout.write(renderer());
+process.stdout.write(out);
 process.exit(0);
