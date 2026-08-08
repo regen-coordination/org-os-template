@@ -1,0 +1,9 @@
+instances:
+  - id: child-1
+    name: Child One
+    type: LocalNode
+    maturity: production
+    framework_version: "0.5"
+    last_sync: "2026-08-01"
+    cloned: true
+    drift: [skills/foo]
