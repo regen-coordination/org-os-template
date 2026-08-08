@@ -100,6 +100,13 @@ function loadTasks(files, now) {
     }
 
     if (item.due) {
+      // Known asymmetry: `daysUntil` (parse-helpers.mjs, ported verbatim from
+      // initialize.mjs) normalizes days via setHours(0,0,0,0) in the *local*
+      // timezone, while loadCalendarItems below normalizes in *UTC*. Left
+      // as-is here — daysUntil can't change under the faithfulness constraint
+      // on this port. Inert in the Worker (always UTC), but in a non-UTC
+      // Node CLI/CI environment (Task 17) a same-day task and a same-day
+      // event could land in different "day 0" buckets relative to each other.
       const days = daysUntil(item.due, now);
       if (days <= 0) {
         critical.push({ ...item, daysLeft: days });
@@ -139,7 +146,10 @@ function loadInstances(files) {
 
 // ── Federation ───────────────────────────────────────────────────────────────
 // Verbatim port of scripts/initialize.mjs:580-612 (loadFederation). Exported
-// separately — Task 12 reuses it for a get_federation capability.
+// separately — Task 12 reuses it for a get_federation capability. Keeps its
+// original "load" name on purpose (even though it now parses an in-memory
+// map rather than reading a file) for easy side-by-side diffing against
+// upstream initialize.mjs — not a naming oversight.
 export function loadFederation(files) {
   const federation = loadYaml(files, "federation.yaml");
   if (!federation) return null;
@@ -219,6 +229,10 @@ export function buildState(files, { now }) {
     meetings: loadCalendarItems(files, "data/meetings.yaml", "meetings", now),
     decisionsRaw: files["DECISIONS.md"] ?? null,
     plansRaw: files["docs/agent-plans/QUEUE.md"] ?? null,
+    // Deliberate stub, not a port: initialize.mjs:502 (loadFunding) reads
+    // data/funding-opportunities.yaml and supports both the funding_opportunities
+    // and legacy opportunities keys. Out of scope for M0-M2 — the renderers
+    // this task feeds only need the { upcoming: [] } shape to exist.
     funding: { upcoming: [] },
   };
 }
