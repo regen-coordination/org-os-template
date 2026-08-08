@@ -1,0 +1,20 @@
+identity:
+  name: instance-b
+  type: LocalNode
+
+federation:
+  network: test-net
+
+peers:
+  - name: peer-one
+    url: https://example.invalid/peer-one
+    trust: read
+  - name: peer-two
+    url: https://example.invalid/peer-two
+    trust: read-write
+
+upstream:
+  - repository: https://example.invalid/org-os-template
+    last_sync: "2026-08-01"
+
+downstream: []
