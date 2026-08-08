@@ -635,6 +635,8 @@ test("recentDecisions takes dated entries only, skipping boilerplate headings", 
 });
 ```
 
+> **Amendment (after Task 11 review):** when more than 5 dated sections exist, push `"recentDecisions"` into `truncated[]`. Without it, an org with 5 decisions and an org with 50 produce structurally identical bundles — an agent asked about decision #8 answers "no such decision" confidently, with no way to know its answer set was capped. Reusing `truncated[]` signals it with no shape change. Related: `registries.*` collapses "file absent" and "file unparseable" into the same `null`; that stays as-is for M1, but if a real instance ever ships a broken registry silently, revisit with a `registriesInvalid[]` companion field.
+
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement: read `IDENTITY.md`→`identity`, `AGENTS.md`→`agentRules`, `MEMORY.md`→`memoryIndex`; `recentDecisions` = the last 5 **dated** `## `-delimited sections of `DECISIONS.md` — a section counts only when its heading matches `/^## \d{4}-\d{2}-\d{2}/`, so non-dated boilerplate sections are skipped (newest-first as they appear); `registries` = `{ projects, members }` via `js-yaml` (each `null` when missing/unparseable); every string section sliced to `maxBytesPerSection` (default 64 000) with section names pushed to `truncated: []`; `provenance = await substrate.head()`; individual `NOT_FOUND` → `null`. **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): context bundle builder`.
 
 ### Task 12: `capabilities.mjs` (read caps + dispatch)
@@ -709,6 +711,8 @@ test("unknown instance / capability / registry", async () => {
 - [ ] **Step 6:** Write `src/adapter/README.md` recording exactly what was done (file paths in the fork, registration, secret name, cache backing, vendor/sync mechanism if used); mirror into doc §"Adapter wiring runbook". Commit: `git add packages/cloudflare-os-integration/src/adapter docs/integrations/cloudflare-os.md && git commit -m "docs(cloudflare-os): adapter wiring runbook — gatekeeper-org-os live"`
 
 ### Task 14: M1 acceptance — org chat with real context
+
+> **Note (from the Task 11 review):** `get_context_bundle` deliberately carries only identity, agent rules, the memory *index*, ≤5 decisions, and the `projects`/`members` registries — **not** `HEARTBEAT.md`, meetings, ideas, or governance. So question 4 below ("what tasks are urgent") is answerable only if the agent calls `get_page`/`get_registry` on demand rather than reasoning from the bundle alone. Confirm in M0 §D3 that the workspace agent does invoke capabilities mid-conversation; if it only gets one context injection at conversation start, either widen the bundle or drop question 4 to a `get_page` check. Decide before running acceptance, not during.
 
 - [ ] **Step 1:** In the deployed workspace chat, with context loading per §D5 (native or `get_context_bundle` fallback), ask and verify each against the repos:
   1. "What are the active projects in org-os?" → matches `data/projects.yaml`
