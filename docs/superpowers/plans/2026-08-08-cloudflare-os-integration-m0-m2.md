@@ -352,17 +352,25 @@ import { fileURLToPath } from "node:url";
 import { buildState } from "../src/page-core/build-state.mjs";
 
 const NOW = new Date("2026-08-08T12:00:00Z");
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "instance-a");
+const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 
-function loadFixture(dir = root, prefix = "") {
-  const files = {};
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) Object.assign(files, loadFixture(p, `${prefix}${e.name}/`));
-    else files[`${prefix}${e.name}`] = fs.readFileSync(p, "utf-8");
-  }
-  return files;
+// Walks a fixture instance into the flat { "relative/path": contents } map the page core consumes.
+// See test/fixtures/README.md — fixture dates are calibrated to NOW below; change both or neither.
+function loadFixture(name = "instance-a") {
+  const walk = (dir, prefix = "") => {
+    const files = {};
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) Object.assign(files, walk(p, `${prefix}${e.name}/`));
+      else files[`${prefix}${e.name}`] = fs.readFileSync(p, "utf-8");
+    }
+    return files;
+  };
+  return walk(path.join(fixturesDir, name));
 }
+```
+
+This helper is reused verbatim by Tasks 11, 12, 15, and 16 — copy it into each test file that needs it (four small copies beat a shared test-util module for something this size; revisit if it grows).
 
 test("buildState builds the page view-model from raw files", () => {
   const state = buildState(loadFixture(), { now: NOW });
@@ -402,7 +410,38 @@ test("buildState builds the page view-model from raw files", () => {
   - **events/meetings**: parse `data/events.yaml` / `data/meetings.yaml`; item `{ date, title: x.title || x.name || x.topic || x.id }`; `thisWeek` = date `d` with `now <= d < now+7d` (compare on `YYYY-MM-DD` string dates parsed as UTC); `upcoming` = `d >= now+7d`. *(Documented simplification: rolling window, not calendar week.)*
   - **decisionsRaw** = `files["DECISIONS.md"] ?? null`; **plansRaw** = `files["docs/agent-plans/QUEUE.md"] ?? null`; **funding** = `{ upcoming: [] }`.
 - [ ] **Step 4:** `npm test` — expected: PASS.
-- [ ] **Step 5:** Commit: `git commit -am "feat(cloudflare-os): pure buildState page-core"`
+
+- [ ] **Step 5 (added after Task 6 review):** Add coverage the Task 5/6 reviews flagged as missing. Append to `test/build-state.test.mjs`:
+
+```js
+test("federation: root-level peers/upstream shape (what real instances actually use)", () => {
+  const s = buildState(loadFixture("instance-b"), { now: NOW });
+  assert.equal(s.federation.network, "test-net");
+  assert.deepEqual(s.federation.peers.map((p) => p.name), ["peer-one", "peer-two"]);
+  assert.equal(s.federation.upstream.length, 1);
+});
+```
+
+`instance-a` nests `peers`/`upstream` under `federation:`; `instance-b` puts them at root — the shape every real org-os instance uses. `loadFederation` supports both (`fedSection.peers || federation.peers`); without this test only the nested branch is covered. Note `loadFederation` maps `p.role || null`, so real peers' `trust:` field is not surfaced — that is existing upstream behavior, not a bug to fix here.
+
+Append to `test/parse-helpers.test.mjs` (three untested branches the Task 5 review flagged):
+
+```js
+test("getRelativeAge hour and day buckets", () => {
+  assert.equal(getRelativeAge("2026-08-08T09:00:00Z", NOW), "3h ago");
+  assert.equal(getRelativeAge("2026-08-05T12:00:00Z", NOW), "3d ago");
+});
+
+test("daysUntil handles past dates", () => {
+  assert.equal(daysUntil("2026-08-01", NOW), -7);
+});
+
+test("parseFrontmatter returns empty data for malformed yaml", () => {
+  assert.deepEqual(parseFrontmatter("---\n: : bad\n---\nBody"), { data: {}, content: "Body" });
+});
+```
+
+- [ ] **Step 6:** `npm test` — expected: PASS. Commit: `git commit -am "feat(cloudflare-os): pure buildState page-core"`
 
 ### Task 8: `memory-substrate.mjs`
 
@@ -568,7 +607,7 @@ test("bundle: identity, agent rules, memory index, recent decisions, registry sn
   assert.ok(b.identity.includes("#"));
   assert.ok(b.agentRules.length > 0);
   assert.ok(b.memoryIndex.length > 0);
-  assert.equal(b.recentDecisions.length, 3);            // fixture has 3 "## " entries
+  assert.equal(b.recentDecisions.length, 3);            // instance-a has 3 dated "## " entries
   assert.ok(b.registries.projects.projects.length === 2);
   assert.deepEqual(b.provenance, { sha: "abc123", date: "2026-08-08" });
 });
@@ -583,7 +622,18 @@ test("missing files degrade to null, never throw; oversize sections truncate wit
 });
 ```
 
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement: read `IDENTITY.md`→`identity`, `AGENTS.md`→`agentRules`, `MEMORY.md`→`memoryIndex`; `recentDecisions` = last 5 `## `-delimited sections of `DECISIONS.md` (newest-first as they appear); `registries` = `{ projects, members }` via `js-yaml` (each `null` when missing/unparseable); every string section sliced to `maxBytesPerSection` (default 64 000) with section names pushed to `truncated: []`; `provenance = await substrate.head()`; individual `NOT_FOUND` → `null`. **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): context bundle builder`.
+Plus this test (added after the Task 6 review — real `DECISIONS.md` files carry non-dated boilerplate headings like `## Conventions` / `## How to Use This File`, which must not reach the agent as "recent decisions"):
+
+```js
+test("recentDecisions takes dated entries only, skipping boilerplate headings", async () => {
+  const sub = new MemorySubstrate(loadFixture("instance-b"), { sha: "s", date: "d" });
+  const b = await buildContextBundle(sub, {});
+  assert.equal(b.recentDecisions.length, 2);                       // "## Conventions" excluded
+  assert.ok(b.recentDecisions.every((d) => /^## \d{4}-\d{2}-\d{2}/.test(d)));
+});
+```
+
+- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement: read `IDENTITY.md`→`identity`, `AGENTS.md`→`agentRules`, `MEMORY.md`→`memoryIndex`; `recentDecisions` = the last 5 **dated** `## `-delimited sections of `DECISIONS.md` — a section counts only when its heading matches `/^## \d{4}-\d{2}-\d{2}/`, so non-dated boilerplate sections are skipped (newest-first as they appear); `registries` = `{ projects, members }` via `js-yaml` (each `null` when missing/unparseable); every string section sliced to `maxBytesPerSection` (default 64 000) with section names pushed to `truncated: []`; `provenance = await substrate.head()`; individual `NOT_FOUND` → `null`. **Step 4:** PASS. **Step 5:** Commit `feat(cloudflare-os): context bundle builder`.
 
 ### Task 12: `capabilities.mjs` (read caps + dispatch)
 
