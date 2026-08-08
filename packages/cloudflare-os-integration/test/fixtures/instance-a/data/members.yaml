@@ -1,0 +1,8 @@
+schema_version: "2.0"
+members:
+  - id: github:alice
+    name: Alice
+    role: maintainer
+  - id: github:bob
+    name: Bob
+    role: contributor

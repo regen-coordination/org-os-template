@@ -31,6 +31,7 @@ test("bundle: identity, agent rules, memory index, recent decisions, registry sn
   assert.ok(b.memoryIndex.length > 0);
   assert.equal(b.recentDecisions.length, 3);            // instance-a has 3 dated "## " entries
   assert.ok(b.registries.projects.projects.length === 2);
+  assert.equal(b.registries.members.members.length, 2); // data/members.yaml fixture
   assert.deepEqual(b.provenance, { sha: "abc123", date: "2026-08-08" });
 });
 
@@ -101,6 +102,33 @@ test("recentDecisions: more than 5 dated sections keeps only the 5 most recent, 
       "## 2026-08-03 · Third",
     ],
   );
+  // 7 dated sections > the 5-entry cap — the agent needs to know its answer
+  // set might be incomplete, not silently receive a truncated-but-unflagged list.
+  assert.ok(b.truncated.includes("recentDecisions"));
+});
+
+test("recentDecisions: exactly 5 dated sections does not flag truncation", async () => {
+  const sub = new MemorySubstrate(
+    {
+      "DECISIONS.md": [
+        "## 2026-08-05 · Fifth",
+        "body 5",
+        "## 2026-08-04 · Fourth",
+        "body 4",
+        "## 2026-08-03 · Third",
+        "body 3",
+        "## 2026-08-02 · Second",
+        "body 2",
+        "## 2026-08-01 · First",
+        "body 1",
+        "",
+      ].join("\n"),
+    },
+    { sha: "s", date: "d" },
+  );
+  const b = await buildContextBundle(sub, {});
+  assert.equal(b.recentDecisions.length, 5);
+  assert.equal(b.truncated.includes("recentDecisions"), false);
 });
 
 test("DECISIONS.md with no dated sections yields [], not a throw", async () => {
@@ -124,4 +152,30 @@ test("SubstrateError with code UPSTREAM propagates rather than degrading to null
     () => buildContextBundle(sub, {}),
     (e) => e instanceof SubstrateError && e.code === "UPSTREAM",
   );
+});
+
+test("registries: malformed YAML degrades to null without throwing", async () => {
+  const sub = new MemorySubstrate(
+    { "data/projects.yaml": "projects: [unterminated: [\n  - broken" },
+    { sha: "s", date: "d" },
+  );
+  const b = await buildContextBundle(sub, {});
+  assert.equal(b.registries.projects, null);
+});
+
+// Guards against the truncated[] assembly regressing back to a shared
+// push target raced under Promise.all (see the buildContextBundle comment):
+// every text section is oversize here, so a correct, order-independent
+// implementation must report all three regardless of resolution order.
+test("truncated[] lists every oversize section in a fixed field order", async () => {
+  const sub = new MemorySubstrate(
+    {
+      "IDENTITY.md": "x".repeat(20),
+      "AGENTS.md": "x".repeat(20),
+      "MEMORY.md": "x".repeat(20),
+    },
+    { sha: "s", date: "d" },
+  );
+  const b = await buildContextBundle(sub, { maxBytesPerSection: 5 });
+  assert.deepEqual(b.truncated, ["identity", "agentRules", "memoryIndex"]);
 });

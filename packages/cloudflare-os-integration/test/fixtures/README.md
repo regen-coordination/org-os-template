@@ -25,11 +25,13 @@ For `instance-a`:
 
 ## What each fixture covers
 
-- **`instance-a/`** — the full instance surface (federation, projects, instances,
-  events, meetings, heartbeat, decisions, memory, identity, agents, queue,
-  dao.json, a project markdown file). Uses the v3 **nested** `federation:` shape
-  (`federation.peers` / `federation.upstream`). `DECISIONS.md` is clean: exactly
-  three back-to-back dated `## ` entries, no boilerplate headings.
+- **`instance-a/`** — the full instance surface (federation, projects, members,
+  instances, events, meetings, heartbeat, decisions, memory, identity, agents,
+  queue, dao.json, a project markdown file). Uses the v3 **nested** `federation:`
+  shape (`federation.peers` / `federation.upstream`). `DECISIONS.md` is clean:
+  exactly three back-to-back dated `## ` entries, no boilerplate headings.
+  `data/members.yaml` has 2 members, covering the `registries.members` path
+  `context-bundle.mjs` shares with `registries.projects`.
 - **`instance-b/`** — two files only, covering shapes `instance-a` doesn't:
   - `federation.yaml` — the real-world **root-level** shape (`peers:` and
     `upstream:` as top-level keys, `federation:` holding only `network`, peers

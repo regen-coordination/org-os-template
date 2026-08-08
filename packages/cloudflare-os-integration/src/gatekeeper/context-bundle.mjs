@@ -38,21 +38,27 @@ async function readOptional(substrate, path) {
 }
 
 // ── string sections (identity / agentRules / memoryIndex) ──────────────────
-// Truncates to `maxBytes` and records `name` in `truncated` when it did.
-// `maxBytes` is a JS-string-length slice, not an actual byte count — the
-// option is named "bytes" but the spec's own test pins char-length slicing
-// (`maxBytesPerSection: 10` against a 100+-char string asserts
-// `.length === 10`). Noted here rather than "fixed": a true byte-accurate
-// slice would behave differently on multi-byte UTF-8 content, and the test
-// pins this behavior deliberately.
-async function readTextSection(substrate, path, name, maxBytes, truncated) {
+// Truncates to `maxBytes` and reports whether it did, via return value rather
+// than a shared push target — see the `truncated[]` assembly note in
+// `buildContextBundle` for why. `maxBytes` is a JS-string-length slice, not
+// an actual byte count — the option is named "bytes" but the spec's own test
+// pins char-length slicing (`maxBytesPerSection: 10` against a 100+-char
+// string asserts `.length === 10`). Noted here rather than "fixed": a true
+// byte-accurate slice would behave differently on multi-byte UTF-8 content,
+// and the test pins this behavior deliberately.
+//
+// A further wrinkle left as-is for the same reason: slicing at a raw
+// UTF-16 code-unit index can bisect a surrogate pair if a non-BMP character
+// (emoji, some CJK) sits exactly at the cutoff, leaving a lone surrogate at
+// the end of the returned string. Low-likelihood for prose files like these,
+// and not worth guarding given the plan pins plain `.slice(0, n)`.
+async function readTextSection(substrate, path, maxBytes) {
   const content = await readOptional(substrate, path);
-  if (content === null) return null;
+  if (content === null) return { content: null, truncated: false };
   if (content.length > maxBytes) {
-    truncated.push(name);
-    return content.slice(0, maxBytes);
+    return { content: content.slice(0, maxBytes), truncated: true };
   }
-  return content;
+  return { content, truncated: false };
 }
 
 // ── recentDecisions ──────────────────────────────────────────────────────
@@ -78,12 +84,18 @@ async function readTextSection(substrate, path, name, maxBytes, truncated) {
 // DECISIONS.md exercises this, and fence-aware parsing isn't worth the
 // complexity it would add here.
 //
-// Not subject to `maxBytesPerSection` truncation — only identity/agentRules/
-// memoryIndex (whole-file reads that can be arbitrarily large) are. This
-// list is already structurally bounded to 5 sections, and slicing mid-entry
-// would hand the agent a sentence-cut fragment of a specific historical
-// decision — a worse failure mode than the size cap is solving for on the
-// whole-file narrative blobs.
+// Entries themselves are not subject to `maxBytesPerSection` truncation —
+// only identity/agentRules/memoryIndex (whole-file reads that can be
+// arbitrarily large) are. Slicing mid-entry would hand the agent a
+// sentence-cut fragment of a specific historical decision — a worse failure
+// mode than the size cap is solving for on the whole-file narrative blobs.
+//
+// The *list* is still capped at 5, though, and when a real cap happens
+// (more than 5 dated sections exist) that's flagged in `truncated` under
+// the name "recentDecisions" — same "this was cut down" signal the text
+// sections give, and for the same reason: an agent asked "was there ever a
+// decision about X" needs to know its answer set might be incomplete,
+// rather than confidently answering "no" over a silently truncated list.
 function splitDatedSections(text) {
   const lines = text.split("\n");
   const sections = [];
@@ -105,8 +117,12 @@ function splitDatedSections(text) {
 
 async function readRecentDecisions(substrate) {
   const content = await readOptional(substrate, "DECISIONS.md");
-  if (content === null) return [];
-  return splitDatedSections(content).slice(0, MAX_RECENT_DECISIONS);
+  if (content === null) return { decisions: [], truncated: false };
+  const dated = splitDatedSections(content);
+  return {
+    decisions: dated.slice(0, MAX_RECENT_DECISIONS),
+    truncated: dated.length > MAX_RECENT_DECISIONS,
+  };
 }
 
 // ── registries (projects / members) ─────────────────────────────────────
@@ -125,25 +141,39 @@ async function readRegistry(substrate, path) {
 }
 
 // ── buildContextBundle ───────────────────────────────────────────────────
+// `truncated[]` is derived from each read's own ordered result rather than
+// built by every reader pushing into one array they all share. The reads
+// below run concurrently under `Promise.all`; a shared push target's
+// insertion order would then depend on which promise happens to resolve
+// first. That's stable under `MemorySubstrate` (synchronous under the hood)
+// but timing-dependent under `GitHubSubstrate`'s real network latency, so
+// the same bundle could report `["agentRules", "identity"]` on one call and
+// the reverse on the next. Reading each flag off the positionally-ordered
+// `Promise.all` result and re-assembling `truncated` in a fixed field order
+// removes the shared mutable state instead of just papering over the race.
 
 export async function buildContextBundle(substrate, { maxBytesPerSection = DEFAULT_MAX_BYTES_PER_SECTION } = {}) {
-  const truncated = [];
-
-  const [identity, agentRules, memoryIndex, recentDecisions, projects, members, provenance] = await Promise.all([
-    readTextSection(substrate, "IDENTITY.md", "identity", maxBytesPerSection, truncated),
-    readTextSection(substrate, "AGENTS.md", "agentRules", maxBytesPerSection, truncated),
-    readTextSection(substrate, "MEMORY.md", "memoryIndex", maxBytesPerSection, truncated),
+  const [identityR, agentRulesR, memoryIndexR, decisionsR, projects, members, provenance] = await Promise.all([
+    readTextSection(substrate, "IDENTITY.md", maxBytesPerSection),
+    readTextSection(substrate, "AGENTS.md", maxBytesPerSection),
+    readTextSection(substrate, "MEMORY.md", maxBytesPerSection),
     readRecentDecisions(substrate),
     readRegistry(substrate, "data/projects.yaml"),
     readRegistry(substrate, "data/members.yaml"),
     substrate.head(),
   ]);
 
+  const truncated = [];
+  if (identityR.truncated) truncated.push("identity");
+  if (agentRulesR.truncated) truncated.push("agentRules");
+  if (memoryIndexR.truncated) truncated.push("memoryIndex");
+  if (decisionsR.truncated) truncated.push("recentDecisions");
+
   return {
-    identity,
-    agentRules,
-    memoryIndex,
-    recentDecisions,
+    identity: identityR.content,
+    agentRules: agentRulesR.content,
+    memoryIndex: memoryIndexR.content,
+    recentDecisions: decisionsR.decisions,
     registries: { projects, members },
     provenance,
     truncated,
