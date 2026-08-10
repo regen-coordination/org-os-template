@@ -736,8 +736,6 @@ Start with `SOUL.md` (mission and values), `IDENTITY.md` (what we are), then
 See `data/instances.yaml` for the authoritative registry; `npm run analyze:instances` for
 current drift state.
 
-## Common operations
-
 {{> cheatsheet }}
 
 - **Skills:** {{ counts.skills }} total — see `SKILLS.md` and `data/skills-matrix.yaml`
@@ -760,6 +758,11 @@ current drift state.
 
 MIT
 ```
+
+> **Correction (found during execution):** `templates/partials/cheatsheet.md` already opens with
+> its own `## Common operations` heading, so a literal heading above `{{> cheatsheet }}` renders
+> the H2 twice. The template above omits it. Fix it here rather than in the partial —
+> `templates/GETTING-STARTED.md` consumes the same partial.
 
 - [ ] **Step 5:** Render and inspect:
 
@@ -901,7 +904,16 @@ test("site module ids are unique", () => {
 cd site && node --test test/modules-catalog.test.mjs
 ```
 
-Expected: FAIL — the second test reports ids present in `modules.yaml` but absent from the catalog (`org-os-website-generator`, `org-os-members-hub`, `org-os-ideation`), because the current file uses different ids than MODULES.md.
+Expected: FAIL — the second test reports an id present in `modules.yaml` but absent from the catalog, because the current file uses different ids than MODULES.md. (`assert.ok` throws on the first offender, so exactly one id is named per run.)
+
+> **Correction (found during execution):** Task 3's catalog lists `org-os-members-hub` and
+> `org-os-ideas` only as rows in the `## Planned` **table**, not as `### <id> — ` headings, so
+> the Step 3 `modules.yaml` below leaves the test red. Before Step 9, promote those two out of
+> the Planned table into full `### ` entries in `docs/MODULES.md` (What it is / How it works /
+> Status `planned`, house style) and delete their now-duplicate table rows. `docs/MODULES.md`
+> is therefore an eighth file in this task's commit. The rule the test enforces —
+> *anything the site shows must have a real catalog entry* — is the point; the table was the
+> wrong shape for a module the site advertises.
 
 - [ ] **Step 3:** Replace `site/src/data/modules.yaml` in full:
 
@@ -1050,7 +1062,12 @@ git commit -m "feat(site): module catalog mirrors MODULES.md, pilot status, drif
 grep -n "^## \|substrate\|driver" docs/RAD-ORG-OS.md | head -20
 ```
 
-- [ ] **Step 2:** Insert this section immediately **before** the doc's "Next" section (or append at the end if there is none):
+> **Correction (found during execution):** there is no `## Next` **h2** — the roadmap is
+> `### Next — committed roadmap`, an h3 *inside* `## Capability map`, with a sibling
+> `### Later`. Inserting an h2 before it would split that section and reparent `### Later`.
+> Take the fallback: append after `## FAQ`, before the trailing `---` + spec/research footer.
+
+- [ ] **Step 2:** Insert this section immediately **before** the doc's "Next" section (or append at the end if there is none — see the correction above, which is what actually applies):
 
 ```markdown
 ## The substrate seam (shipped 2026-08)
