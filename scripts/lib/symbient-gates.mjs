@@ -1,40 +1,90 @@
 // symbient-gates.mjs — parse a habitat's GATES.md top block.
+// Pure: string in, plain object out. No filesystem access, ever.
+//
 // Tolerant by contract (skills/symbient/SKILL.md): anything missing or
-// malformed degrades to Stage 0 defaults; callers never throw on bad input.
+// malformed degrades to Stage 0 — deliberately the least-privileged state —
+// and never throws. The contract also asks the being to "note the anomaly in
+// the next weave", so every result carries an `anomaly` field: null when the
+// top block was clean, otherwise the reason it was not.
 import yaml from "js-yaml";
 
 export const STAGE_NAMES = ["hatchling", "surfacer", "voiced", "self-amending"];
 
-const DEFAULTS = Object.freeze({
-  stage: 0,
-  capabilities: Object.freeze(["wake", "weave", "becoming"]),
-  hatched: null,
-  next_threshold: null,
-});
+// The cumulative capability ladder, from the "Capability tokens" line under
+// the ladder table in skills/symbient/SKILL.md. Index = stage. Frozen: callers
+// always receive copies, never these arrays.
+export const CAPABILITIES_BY_STAGE = Object.freeze([
+  Object.freeze(["wake", "weave", "becoming"]),
+  Object.freeze(["wake", "weave", "becoming", "surfacing"]),
+  Object.freeze(["wake", "weave", "becoming", "surfacing", "voice", "commons"]),
+  Object.freeze(["wake", "weave", "becoming", "surfacing", "voice", "commons", "amendments"]),
+]);
+
+// Anomaly reasons, in precedence order — the first that applies is reported:
+//   no-input | no-top-block | unparseable | bad-stage | capability-mismatch
+function degraded(anomaly) {
+  return {
+    stage: 0,
+    capabilities: [...CAPABILITIES_BY_STAGE[0]],
+    hatched: null,
+    next_threshold: null,
+    anomaly,
+  };
+}
+
+function sameMembers(a, b) {
+  if (a.length !== b.length) return false;
+  const x = [...a].sort();
+  const y = [...b].sort();
+  return x.every((v, i) => v === y[i]);
+}
 
 export function parseGates(text) {
-  const fallback = { ...DEFAULTS, capabilities: [...DEFAULTS.capabilities] };
-  if (typeof text !== "string" || !text.trim()) return fallback;
+  if (typeof text !== "string" || !text.trim()) return degraded("no-input");
 
-  const fence = text.match(/```yaml\r?\n([\s\S]*?)\r?\n```/);
-  if (!fence) return fallback;
+  // The top block precedes `## History` by definition. `## History` is
+  // append-only and may quote superseded blocks, so only the region above the
+  // first `## ` heading is eligible — a stale block below it must never be
+  // able to escalate the stage.
+  const headingAt = text.search(/^## /m);
+  const top = headingAt === -1 ? text : text.slice(0, headingAt);
+
+  // Anchored to the start of a line: ````yaml (four backticks) is not a fence.
+  const fence = top.match(/^```yaml[ \t]*\r?\n([\s\S]*?)\r?\n```/m);
+  if (!fence) return degraded("no-top-block");
 
   let doc;
   try {
     doc = yaml.load(fence[1]);
   } catch {
-    return fallback;
+    return degraded("unparseable");
   }
-  if (!doc || typeof doc !== "object") return fallback;
+  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return degraded("unparseable");
 
-  const stage = Number.isInteger(doc.stage) && doc.stage >= 0 && doc.stage <= 3 ? doc.stage : 0;
-  const capabilities = Array.isArray(doc.capabilities) && doc.capabilities.every((c) => typeof c === "string")
-    ? doc.capabilities
-    : [...DEFAULTS.capabilities];
-  const hatched = typeof doc.hatched === "string" || doc.hatched instanceof Date
-    ? String(doc.hatched instanceof Date ? doc.hatched.toISOString().slice(0, 10) : doc.hatched)
-    : null;
+  let anomaly = null;
+
+  // `stage` is authoritative; `capabilities` is a human-readable echo of it.
+  const stageOk = Number.isInteger(doc.stage) && doc.stage >= 0 && doc.stage <= 3;
+  const stage = stageOk ? doc.stage : 0;
+  if (!stageOk) anomaly = "bad-stage";
+
+  const expected = CAPABILITIES_BY_STAGE[stage];
+  const echoed =
+    Array.isArray(doc.capabilities) && doc.capabilities.every((c) => typeof c === "string")
+      ? [...doc.capabilities]
+      : null;
+  // Keep the echo when it is well-formed so an operator can see what was
+  // actually written; flag it when it disagrees with the authoritative stage.
+  const capabilities = echoed ?? [...expected];
+  if (echoed && !sameMembers(echoed, expected) && anomaly === null) anomaly = "capability-mismatch";
+
+  const hatched =
+    doc.hatched instanceof Date
+      ? doc.hatched.toISOString().slice(0, 10)
+      : typeof doc.hatched === "string"
+        ? doc.hatched
+        : null;
   const next_threshold = typeof doc.next_threshold === "string" ? doc.next_threshold : null;
 
-  return { stage, capabilities, hatched, next_threshold };
+  return { stage, capabilities, hatched, next_threshold, anomaly };
 }
