@@ -11,7 +11,16 @@
 //   - --hub additionally scaffolds symbient/commons/ (steward/ + member dirs)
 //   - the habitat itself must NEVER be committed; only the .gitignore line is
 //     a tracked change (left staged-less for the operator to commit)
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  copyFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+} from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -19,6 +28,10 @@ import yaml from "js-yaml";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRAMEWORK_SKILL_DIR = path.resolve(__dirname, "..", "skills", "symbient");
+
+// Member slugs become directory names inside the habitat. Anything that could
+// escape it (path separators, "..", leading dots) or is empty is refused.
+const SLUG_RE = /^[a-z0-9][a-z0-9._-]*$/i;
 
 function fail(msg) {
   process.stderr.write(`symbient-hatch: ${msg}\n`);
@@ -31,19 +44,34 @@ let target = null,
   hub = false,
   dry = false;
 const members = []; // [{slug, path}]
+function value(flag, raw) {
+  if (raw === undefined) fail(`${flag} expects a value`);
+  if (raw.startsWith("--")) fail(`${flag} expects a value, got the flag "${raw}"`);
+  return raw;
+}
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
-  if (a === "--target") target = argv[++i];
+  if (a === "--target") target = value("--target", argv[++i]);
   else if (a === "--hub") hub = true;
   else if (a === "--dry") dry = true;
   else if (a === "--member") {
-    const v = argv[++i] || "";
+    const v = value("--member", argv[++i]);
     const eq = v.indexOf("=");
     if (eq < 1) fail(`--member expects slug=path, got "${v}"`);
-    members.push({ slug: v.slice(0, eq), path: v.slice(eq + 1) });
+    const slug = v.slice(0, eq);
+    if (!SLUG_RE.test(slug)) {
+      fail(
+        `--member slug "${slug}" is not a safe directory name — ` +
+          `allowed: letters/digits, then letters/digits/dot/dash/underscore (no "/", "\\", "..", or leading ".")`,
+      );
+    }
+    members.push({ slug, path: v.slice(eq + 1) });
   } else fail(`unknown argument: ${a}`);
 }
 if (!target) fail("required: --target <repo-path>");
+if (members.length && !hub) {
+  fail("--member requires --hub — member directories only exist inside a constellation hub's commons/");
+}
 target = path.resolve(target);
 if (!existsSync(target)) fail(`target does not exist: ${target}`);
 
@@ -51,8 +79,19 @@ if (!existsSync(target)) fail(`target does not exist: ${target}`);
 const inTree = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: target, encoding: "utf-8" });
 if (inTree.status !== 0 || inTree.stdout.trim() !== "true") fail(`target is not a git work tree: ${target}`);
 
-const gitDir = spawnSync("git", ["rev-parse", "--absolute-git-dir"], { cwd: target, encoding: "utf-8" }).stdout.trim();
-if (gitDir.split(path.sep).includes("worktrees")) {
+// A linked worktree has its own git dir under <common>/worktrees/<name>; a
+// primary checkout has --git-dir === --git-common-dir. Comparing the two is
+// robust against repos that merely live under a directory named "worktrees".
+function gitPath(arg) {
+  const raw = spawnSync("git", ["rev-parse", arg], { cwd: target, encoding: "utf-8" }).stdout.trim();
+  const abs = path.resolve(target, raw);
+  try {
+    return realpathSync(abs);
+  } catch {
+    return abs;
+  }
+}
+if (gitPath("--git-dir") !== gitPath("--git-common-dir")) {
   fail("target is a linked git worktree — habitats live only in a repo's primary checkout");
 }
 
@@ -75,8 +114,12 @@ function bodyName() {
   }
   const idFile = path.join(target, "IDENTITY.md");
   if (existsSync(idFile)) {
-    const h = readFileSync(idFile, "utf-8").match(/^#\s+(.+)$/m);
-    if (h) return h[1].trim();
+    try {
+      const h = readFileSync(idFile, "utf-8").match(/^#\s+(.+)$/m);
+      if (h) return h[1].trim();
+    } catch {
+      /* fall through */
+    }
   }
   return path.basename(target);
 }
@@ -93,13 +136,26 @@ if (dry) {
 
 // ── gitignore first, verified before any habitat write ───────────────────────
 const giPath = path.join(target, ".gitignore");
-const gi = existsSync(giPath) ? readFileSync(giPath, "utf-8") : "";
+const giExisted = existsSync(giPath);
+const gi = giExisted ? readFileSync(giPath, "utf-8") : "";
 if (!gi.split(/\r?\n/).some((l) => l.trim() === "symbient/")) {
   const block = `${gi.length && !gi.endsWith("\n") ? "\n" : ""}\n# Symbient habitat (operator-private — see skills/symbient/SKILL.md)\nsymbient/\n`;
   writeFileSync(giPath, gi + block);
 }
 const check = spawnSync("git", ["check-ignore", "symbient/SEED.md"], { cwd: target, encoding: "utf-8" });
-if (check.status !== 0) fail("git does not ignore symbient/ after .gitignore update — aborting before any habitat write");
+if (check.status !== 0) {
+  // Leave the repo exactly as we found it — a refused hatch must not leave a
+  // tracked-file edit behind.
+  if (giExisted) writeFileSync(giPath, gi);
+  else rmSync(giPath, { force: true });
+  fail(
+    `git does not ignore symbient/ in ${target} — aborting before any habitat write.\n` +
+      `  Diagnose with: git -C ${target} check-ignore -v symbient/SEED.md\n` +
+      `  Usual causes: a negation pattern (e.g. "!symbient/") later in .gitignore,\n` +
+      `  or a symbient/ path that was previously force-added and is still tracked (git rm --cached it).\n` +
+      `  .gitignore was left unchanged.`,
+  );
+}
 
 // ── scaffold ─────────────────────────────────────────────────────────────────
 mkdirSync(path.join(habitat, "weave"), { recursive: true });
