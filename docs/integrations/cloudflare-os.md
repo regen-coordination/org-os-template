@@ -241,9 +241,67 @@ Side-effecting actions must not actually be performed until they are approved."*
 
 ---
 
+## Deployment runbook (operator checklist)
+
+Everything here needs a Cloudflare account and is deliberately outside every implementation
+plan — the in-repo work is done and verified against a **local** Cloudflare OS stack. Work
+top to bottom; each step's verification gates the next.
+
+- [ ] **1. Deploy the starter.** Fork `https://github.com/cloudflare/cloudflare-os-starter`,
+      deploy it into the pilot Cloudflare account (its README, or `https://os.cloudflare.app/deploy`).
+      **Verify:** the workspace URL loads, a document can be created, the agent chat responds.
+      **Record** the deployed URL and starter fork URL in this file's header.
+
+- [ ] **2. Install `gatekeeper-org-os`.** Follow "Install" in
+      [`../../packages/cloudflare-os-integration/src/adapter/README.md`](../../packages/cloudflare-os-integration/src/adapter/README.md):
+      copy the adapter into the workspace, run `sync-core.mjs` + `sync-types.mjs`, generate
+      Worker types, apply the `mainModule` fix, `pnpm run types:check`.
+      **Verify:** `types:check` silent; `GATEKEEPER_ORG_OS` appears in the binding list.
+
+- [ ] **3. Configure instances and the token.** Set `ORG_OS_INSTANCES` in `wrangler.jsonc`
+      (hub + `refi-bcn-os`) and put a fine-grained PAT — **`contents: read` only**, scoped to
+      `refibcn` — in the `ORG_OS_GITHUB_TOKEN` secret. Do **not** grant `pull-requests:write`;
+      nothing before M3 opens a PR.
+      **Check the hub `ref`:** it is pinned to the work branch because the integration is not on
+      `main`. Update it when the branch merges, or the gatekeeper reads a stale tree.
+
+- [ ] **4. Configure the model.** Ollama provider slot (the OpenAI-compatible one), API URL
+      `https://opencode.ai/zen/go/v1`, the workspace's Go API key. The `openai` slot does not
+      work — it speaks the Responses API. **Verify:** the model list populates, and a trivial
+      chat completes (a `CreditsError` here means billing, not configuration).
+
+- [ ] **5. M1 acceptance — org chat with real context.** In the deployed workspace chat, ask and
+      verify each answer against the repos:
+      1. "What are the active projects in org-os?" → matches `data/projects.yaml`
+      2. "What were the last three decisions?" → matches `DECISIONS.md`
+      3. "What's in refi-bcn-os's federation — who are its peers?" → matches its `federation.yaml`
+      4. "What tasks are urgent right now?" → consistent with `HEARTBEAT.md` due dates.
+         (This one requires mid-conversation capability invocation, which §D3 confirms the
+         platform does — the context bundle alone does not carry `HEARTBEAT.md`.)
+
+      Then ask "which commit is this from?" — the agent should report the provenance sha.
+      **Record** the four Q/A pairs and their shas under "M1 acceptance evidence" below.
+
+- [ ] **6. Install the org-dashboard gadget.** Create a gadget in the workspace, paste
+      `packages/cloudflare-os-integration/blueprints/org-dashboard/gadget.html` as its source,
+      and write `rpc.mjs` — a ~3-line shim adapting the injected binding to
+      `callCapability(name, args)` (§D4).
+      **Verify:** the dashboard renders for the hub; the instance switcher re-renders for
+      `refi-bcn-os`; all 7 pages load; the provenance footer shows a real sha; and revoking the
+      token (or going offline past the cache TTL) shows the **STALE** badge rather than an error.
+
+- [ ] **7. Export the blueprint.** Export the gadget to a `.gadget` archive and commit it next to
+      the HTML (§D6 — the HTML stays the human-editable source; the archive is the
+      distributable). **Verify:** importing the archive into a second workspace reproduces the
+      gadget.
+
+- [ ] **8. Flip the status.** Update `docs/MODULES.md` — `org-os-cloudflare-os` status `pilot` →
+      `live` — and `site/src/data/modules.yaml` to match. Run `cd site && npm test` to confirm
+      the catalog test still passes, and note the deployment in `DECISIONS.md`.
+
 ## M1 acceptance evidence
 
-_(filled by Task 14 — requires the deployed workspace)_
+_(filled by runbook step 5 — requires the deployed workspace)_
 
 ## Adapter wiring runbook
 
