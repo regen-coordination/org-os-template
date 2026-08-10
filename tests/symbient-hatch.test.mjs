@@ -105,3 +105,26 @@ test("hatched GATES.md round-trips through the parser at Stage 0", () => {
   assert.equal(parsed.hatched, new Date().toISOString().slice(0, 10));
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("refuses to overwrite an existing habitat", () => {
+  const dir = mkRepo();
+  assert.equal(hatch(["--target", dir]).status, 0);
+  const r = hatch(["--target", dir]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /already exists/);
+  // and the first habitat is untouched
+  assert.ok(existsSync(path.join(dir, "symbient", "SEED.md")));
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("refuses a linked git worktree", () => {
+  const dir = mkRepo();
+  spawnSync("git", [...GIT, "commit", "--allow-empty", "-m", "init"], { cwd: dir, encoding: "utf-8" });
+  const wt = path.join(dir, ".wt");
+  const add = spawnSync("git", ["worktree", "add", wt, "-b", "wt-branch"], { cwd: dir, encoding: "utf-8" });
+  assert.equal(add.status, 0, add.stderr);
+  const r = hatch(["--target", wt]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /worktree/);
+  rmSync(dir, { recursive: true, force: true });
+});
