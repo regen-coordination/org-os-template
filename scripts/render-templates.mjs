@@ -14,7 +14,7 @@
  *   node scripts/render-templates.mjs --dry     # print to stdout, don't write
  */
 
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
@@ -33,15 +33,35 @@ const skillsMatrix = yaml.load(readFileSync(path.join(rootDir, "data", "skills-m
 const packagesMatrix = yaml.load(readFileSync(path.join(rootDir, "data", "packages-matrix.yaml"), "utf-8")) || {};
 const instancesYaml = yaml.load(readFileSync(path.join(rootDir, "data", "instances.yaml"), "utf-8")) || {};
 
-const docs = readdirSync(path.join(rootDir, "docs"))
-  .filter((f) => f.endsWith(".md"))
-  .sort()
-  .slice(0, 12) // top 12 to keep README scannable
-  .map((f) => ({
-    title: f.replace(/\.md$/, "").replace(/-/g, " "),
-    path: `docs/${f}`,
-    blurb: "",
-  }));
+// Curated documentation spine — editorial order and real blurbs, deliberately not
+// `readdirSync().sort().slice(0, 12)`. The old alphabetical slice produced entries with
+// empty blurbs ("— " and nothing after it) and silently truncated anything past the
+// twelfth filename, which is why docs/MODULES.md could never appear. Mirrors the site's
+// curated set in site/src/data/docs-allowlist.ts; keep the two in step.
+const DOC_SPINE = [
+  { file: "ARCHITECTURE.md", title: "Architecture", blurb: "How an instance is put together" },
+  { file: "MODULES.md", title: "Modules", blurb: "The v0.5 catalog — what ships, what's planned" },
+  { file: "FEDERATION.md", title: "Federation", blurb: "Peers, trust levels, lineage, drift" },
+  { file: "DATA-MODEL.md", title: "Data Model", blurb: "The registries and their cross-references" },
+  { file: "EIP4824-GUIDE.md", title: "EIP-4824 Guide", blurb: "Machine-readable org schemas, generated from your data" },
+  { file: "AGENTIC-ARCHITECTURE.md", title: "Agentic Architecture", blurb: "How agents read, act on, and improve the workspace" },
+  { file: "OPERATOR-GUIDE.md", title: "Operator Guide", blurb: "Running a downstream instance day to day" },
+  { file: "COMMANDS.md", title: "Commands", blurb: "Session lifecycle and the slash-command set" },
+  { file: "FILE-STRUCTURE.md", title: "File Structure", blurb: "Canonical paths, and what validate:structure enforces" },
+  { file: "SKILL-PROMOTION.md", title: "Skill Promotion", blurb: "How instance-proven patterns become canonical" },
+  { file: "RAD-ORG-OS.md", title: "rad-org-os", blurb: "The sovereign distribution — org-os on Radicle" },
+  { file: "VAULT-SAFETY.md", title: "Vault Safety", blurb: "Snapshots, audits, and the destructive-op bans" },
+];
+
+const missingDocs = DOC_SPINE.filter((d) => !existsSync(path.join(rootDir, "docs", d.file)));
+if (missingDocs.length) {
+  console.error(
+    `render-templates: DOC_SPINE names docs that don't exist: ${missingDocs.map((d) => d.file).join(", ")}`,
+  );
+  process.exit(1);
+}
+
+const docs = DOC_SPINE.map((d) => ({ title: d.title, path: `docs/${d.file}`, blurb: d.blurb }));
 
 const data = {
   org: {
