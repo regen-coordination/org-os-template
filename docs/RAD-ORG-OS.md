@@ -76,6 +76,42 @@ Tracked as the `rad-org-os` project in `data/projects.yaml`, with the individual
 
 **Can we run both?** Yes, with one caveat: mirroring GitHub↔Radicle is the documented transition pattern (push both remotes; community sync tools exist), but it mirrors *code* only. Issues and patches are Radicle collaborative objects with no official bidirectional bridge, so those live on one side or the other. The substrate abstraction is designed to make "both" a configuration, not a fork.
 
+## The substrate seam (shipped 2026-08)
+
+The driver interface rad-org-os needs is no longer hypothetical. The Cloudflare OS module
+([`docs/MODULES.md`](MODULES.md)) shipped it, tested, as the way its capabilities reach an
+org's repository — because the same problem appears whenever org-os runs somewhere that isn't
+a local filesystem.
+
+**The contract** (`packages/cloudflare-os-integration/src/substrate/`), all methods async:
+
+| Method | Returns | Notes |
+|---|---|---|
+| `readFile(path)` | file contents as a string | throws `SubstrateError("NOT_FOUND")` when absent |
+| `listDir(path)` | `[{ name, type: "file" \| "dir" }]` | direct children only |
+| `head()` | `{ sha, date }` | the provenance stamp every capability response carries |
+| `proposeChange({ files, message, branch })` | a change reference | M3; PR-only by design — never a direct commit |
+
+Errors are a closed set: `SubstrateError` with `code` of `NOT_FOUND` or `UPSTREAM`. Callers
+never see transport detail, which is what lets a capability be written once and run against any
+driver.
+
+**Two implementations exist today.** `MemorySubstrate` (a `{path: contents}` map, used by the
+test suite) and `GitHubSubstrate` (the GitHub REST API with ETag revalidation, a TTL, and
+stale-while-revalidate: a rate-limited refresh serves the last known-good content and flags
+`lastReadStale` rather than failing the read). Capabilities never touch GitHub directly.
+
+**What this means for rad-org-os.** A Radicle driver is an implementation of these four
+methods over `radicle-httpd`'s read API and the `rad` CLI — not a new capability layer.
+Everything already built on top (registry reads, federation reads, page rendering, the context
+bundle, and M3's write path) works unchanged the moment the driver exists.
+
+**What it deliberately does not cover.** `clone`, `sync`, `push`, and `publish-schema` are
+*instance-lifecycle* operations — they act on a whole repository, not on paths within one — and
+they are out of the read/write substrate on purpose. The open task "plan the substrate driver
+interface" is therefore narrower than it was: it starts from this shipped contract and designs
+the lifecycle layer above it, rather than designing both at once from a blank page.
+
 ---
 
 *Spec: `docs/superpowers/specs/2026-07-31-rad-org-os-artifacts-design.md` · Research: `docs/research/2026-07-31-radicle-state-of-network.md`*
