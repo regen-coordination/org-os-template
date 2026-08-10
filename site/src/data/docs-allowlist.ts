@@ -3,6 +3,7 @@
 export interface DocEntry { file: string; slug: string; title: string; group: string; }
 export const DOCS_ALLOWLIST: DocEntry[] = [
   { file: "ARCHITECTURE",         slug: "architecture",          title: "Architecture",            group: "Concepts" },
+  { file: "MODULES",              slug: "modules",               title: "Modules",                 group: "Concepts" },
   { file: "AGENTIC-ARCHITECTURE", slug: "agentic-architecture",  title: "Agentic Architecture",    group: "Concepts" },
   { file: "FEDERATION",           slug: "federation",            title: "Federation",              group: "Concepts" },
   { file: "ECOSYSTEM",            slug: "ecosystem",             title: "Ecosystem",               group: "Concepts" },

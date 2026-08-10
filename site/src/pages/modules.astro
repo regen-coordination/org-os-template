@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import yaml from "js-yaml";
 import Layout from "../components/Layout.astro";
 import ModuleCard from "../components/ModuleCard.astro";
-interface Module { id: string; name: string; status: "planned" | "in-dev" | "live"; summary: string; link: string | null; }
+interface Module { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
 const doc = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as { modules: Module[] };
 const modules = doc.modules;
 ---

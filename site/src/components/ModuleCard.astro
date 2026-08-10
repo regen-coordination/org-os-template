@@ -1,6 +1,6 @@
 ---
 import StatusBadge from "./StatusBadge.astro";
-interface Props { id: string; name: string; status: "planned" | "in-dev" | "live"; summary: string; link: string | null; }
+interface Props { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
 const { id, name, status, summary, link } = Astro.props;
 ---
 <article class:list={["surface card ticked", status]} data-status={status}>
@@ -26,7 +26,7 @@ const { id, name, status, summary, link } = Astro.props;
   content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
   background: var(--color-line-2);
 }
-.card.live::after, .card.in-dev::after { background: var(--color-accent); }
+.card.live::after, .card.in-dev::after, .card.pilot::after { background: var(--color-accent); }
 .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); border-color: var(--color-line-2); }
 
 .head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }

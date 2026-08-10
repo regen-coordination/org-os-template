@@ -10,6 +10,7 @@ const REQUIRED = [
   "federation/index.html",
   "docs/index.html",
   "docs/architecture/index.html",
+  "docs/modules/index.html",
   "docs/federation/index.html",
   "docs/rad-org-os/index.html",
   "get-started/index.html",

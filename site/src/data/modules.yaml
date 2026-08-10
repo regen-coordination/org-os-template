@@ -1,5 +1,27 @@
-# v0.5 module roadmap. status: planned | in-dev | live
+# Mirror of docs/MODULES.md — that file is canon; this one feeds /modules.
+# site/test/modules-catalog.test.mjs fails if an id here is missing from the catalog.
+# status: planned | in-dev | pilot | live
 modules:
+  - id: org-os-cloudflare-os
+    name: Cloudflare OS Integration
+    status: pilot
+    summary: Org data, pages, and an org-literate agent in a browser workspace — for the people who will never touch git.
+    link: /docs/modules
+  - id: org-os-federation
+    name: Federation
+    status: live
+    summary: Peers, trust levels, lineage and drift across a network of sovereign instances.
+    link: /docs/federation
+  - id: rad-org-os
+    name: rad-org-os
+    status: in-dev
+    summary: The sovereign distribution — org-os on Radicle, peer-to-peer. And the missing org layer for Radicle.
+    link: /modules/rad-org-os
+  - id: org-os-standards
+    name: Standards & Module Engine
+    status: in-dev
+    summary: EIP-4824 schemas, structure validation, and the module system everything else is tracked by.
+    link: /docs/modules
   - id: org-os-website-generator
     name: Website Generator
     status: in-dev
@@ -7,25 +29,25 @@ modules:
     link: /docs/architecture
   - id: org-os-kms
     name: Knowledge Management System
-    status: planned
-    summary: Compiled, indexed, linted knowledge commons across the federation.
-    link: null
-  - id: rad-org-os
-    name: rad-org-os
     status: in-dev
-    summary: The sovereign distribution — org-os on Radicle, peer-to-peer. And the missing org layer for Radicle.
-    link: /modules/rad-org-os
+    summary: Compiled, indexed, linted knowledge commons across the federation.
+    link: /docs/modules
+  - id: org-os-admin
+    name: Admin App
+    status: in-dev
+    summary: Schema-driven forms over an instance's registries, committing every edit to git.
+    link: /docs/modules
   - id: org-os-hermes
     name: Hermes Agent
     status: in-dev
     summary: Local agent runtime + Telegram gateway, replacing OpenClaw.
-    link: null
+    link: /docs/modules
   - id: org-os-members-hub
     name: Members Hub
     status: planned
     summary: Membership, roles, and contribution surfaces for instances.
     link: null
-  - id: org-os-ideation
+  - id: org-os-ideas
     name: Ideation System
     status: planned
     summary: Idea capture → triage → hatching pipeline, federated.

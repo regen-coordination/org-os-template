@@ -214,15 +214,33 @@ because it does not resolve on this branch until PR #1 merges)
 Specified, not yet built. Boundaries are settled so later migration doesn't relitigate them —
 see the v5 spec's §6 backlog.
 
+The two surfaced on the public roadmap get full entries; the rest are boundary declarations.
+
+### org-os-ideas — Ideation System
+
+**What it is.** Idea capture → triage → hatching, federated across instances.
+
+**How it works.** The `idea-scout` skill writes `data/ideas.yaml`; the hatching pipeline
+promotes an idea into a project or a module manifest once it earns one.
+
+**Status.** `planned`.
+
+### org-os-members-hub — Members Hub
+
+**What it is.** Membership, roles, and contribution surfaces for an instance.
+
+**How it works.** Reads the CRM registries and renders who is here, what they hold, and what
+they have contributed — the human-facing counterpart to `org-os-crm`'s data.
+
+**Status.** `planned`.
+
 | Module | What it will consolidate |
 |---|---|
 | **org-os-agent-core** | Identity/memory templates, `org-os-init`, `initialize.mjs`, session commands |
 | **org-os-bootstrap** | The interview, `setup-org-os.mjs`, the SETUP/BOOTSTRAP docs |
-| **org-os-ideas** | `idea-scout`, `data/ideas.yaml`, the hatching pipeline |
 | **org-os-research** | The research skill, autoresearch loops, `data/knowledge-gaps.yaml` |
 | **org-os-treasury** | `capital-flow`, `data/finances.yaml`, `data/assets.yaml` |
 | **org-os-crm** | Members, relationships, channels, governance registries |
-| **org-os-members-hub** | Membership, roles, and contribution surfaces |
 | **org-os-comms** | Telegram and channel connectivity |
 | **org-os-koi** | KOI-net bridges and the OPAL integration |
 | **org-os-egregore** | `packages/egregore-core` |
