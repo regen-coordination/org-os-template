@@ -1,5 +1,11 @@
 # Organizational OS Package Registry
 
+> **Deprecated.** The conceptual package registry below is superseded by
+> [`docs/MODULES.md`](MODULES.md) — the v0.5 module catalog — and by the module system design in
+> [`2026-08-02-org-os-v5-modularization-design.md`](superpowers/specs/2026-08-02-org-os-v5-modularization-design.md).
+> Kept for reference until the v5 tranche has manifests. For the *lifecycle* of npm packages
+> (which is a different thing from modules), see [`PACKAGE-LIFECYCLE.md`](PACKAGE-LIFECYCLE.md).
+
 **Version:** 1.0.0  
 **Date:** 2026-03-21  
 **Applies to:** org-os v3.1+
