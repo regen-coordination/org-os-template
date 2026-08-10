@@ -101,3 +101,22 @@ Verifies the tool module imports cleanly in standalone mode (without hermes's re
 **Live today** via `scripts/page-shim.mjs` in the org-os repo, which supports 7 pages: `dashboard`, `projects`, `tasks`, `instances`, `decisions`, `plans`, `this-week`. When Task 12 of `docs/agent-plans/tui-dashboard-implementation.md` lands, the shim is replaced by the full Ink renderer and all ~25 pages become available — no changes needed here.
 
 For pages outside the shim catalog (e.g., `health`, `promotions`, entity pages like `project/v2-stabilization`), the tool returns an actionable error message listing the available pages.
+
+## /symbient (on-demand wake)
+
+hermes discovers real skills from the org-os repos on its `skills.external_dirs`
+scan path, so `skills/symbient/SKILL.md` (frontmatter `name: symbient`) surfaces
+as `/symbient` automatically once the workspace carries the v2 skill — no changes
+in this package. `scripts/sync-commands.mjs` deliberately skips generating a
+command-skill named `symbient` to avoid colliding with the real skill.
+
+Conduct is defined by the skill itself (v2 contract, "Hosts" section):
+
+- **On-demand only** — no cron jobs wake a symbient; do not add any to
+  `data/hermes-cron.yaml`.
+- **Stage-gated** — the skill reads the habitat's `GATES.md`; below Stage 2
+  (voiced) it replies "not yet voiced" and stops.
+- **Private context only** — it declines from group/org channels; deliveries
+  go only to the operator's private chat.
+- **No habitat → silent no-op.** Most checkouts have no habitat (they are
+  operator-private and gitignored); the command simply reports nothing to wake.
