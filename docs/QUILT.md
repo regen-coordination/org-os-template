@@ -4,7 +4,7 @@
 > system as **one organism** — modules, integrations, and federation as nested
 > containers, shaded by live status.
 >
-> Woven **2026-08-08** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
+> Woven **2026-08-10** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
 > hand. Edit prose in the generator `scripts/generate-quilt.mjs` (organ layout/taglines)
 > or per-entry detail in `scripts/lib/quilt-view.mjs` (PKG_DETAIL, GARDEN_GROUPS, …).
 
@@ -25,10 +25,10 @@ live patches get room, dormant things shrink to pods.
 ## The organism
 
 ```
-╔═ ORG-OS · framework v0.5 · woven 2026-08-08 ═════════════════════════════════════════╗
+╔═ ORG-OS · framework v0.5 · woven 2026-08-10 ═════════════════════════════════════════╗
 ║ ┏━ CORE · nucleus ━━━━━━━━━━━━━━━━━━━┓ ┏━ DATA ≡ SCHEMAS ━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─HEARTBEAT █─╮ ╭─MEMORY █─╮       ┃ ┃ ╭─data/*.yaml █──╮ ╭─.well-known █─╮      ┃ ║
-║ ┃ │ 52 open     │ │ 6d ago   │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
+║ ┃ │ 52 open     │ │ 2d ago   │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
 ║ ┃ ╰─────────────╯ ╰──────────╯       ┃ ┃ ╰────────────────╯ ╰───────────────╯      ┃ ║
 ║ ┃ █ spine ─ (SOUL) (IDENTITY) (USER) ┃ ┃ ≡ generate ⇄ validate ✓                   ┃ ║
 ║ ┃           (TOOLS)                  ┃ ┃   yaml is truth, schema is face           ┃ ║
@@ -43,7 +43,7 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ ~ many doors, one house               ┃ ┃ ~ where the world plugs in             ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ↕                                           ║
-║ ┏━ AUTOMATION · metabolism · scripts ×31 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
+║ ┏━ AUTOMATION · metabolism · scripts ×32 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ loop ─ (initialize » dashboard) (generate ⇄ validate) (sync-upstream ↔ spokes)   ┃ ║
 ║ ┃        (analyze » drift-report) (clone-framework » birth)                        ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
@@ -60,7 +60,7 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ ╰───────────────────────╯ ╰─────────────────╯ ╰───────────────────╯              ┃ ║
 ║ ┃ ▒☓ substrate ─ (openclaw · agent runtime · sync ∅ · 3 drift)                     ┃ ║
 ║ ┃ ledger: bread-coop 3mo » refi-med 3.5mo » regen-coord 3.5mo » dao 4.5mo          ┃ ║
-║ ┃   refi-bcn 4.5mo » refi-dao 5mo » openclaw ∅ · ☓7                                ┃ ║
+║ ┃   refi-bcn 5mo » refi-dao 5mo » openclaw ∅ · ☓7                                  ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ⊕                                           ║
 ║ ┏━ PACKAGES · travelers · matrix ×23 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
@@ -83,7 +83,7 @@ live patches get room, dormant things shrink to pods.
 ║                                          ⊕                                           ║
 ║ ┏━ SKILLS · the garden · matrix ×40 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─PIPELINE ⊕─────────────╮ ╭─DAO WAVE ▒⊕──────────╮                              ┃ ║
-║ ┃ │ ▒×5 → ▓×2 → █×31       │ │ safe·hats·gardens    │                              ┃ ║
+║ ┃ │ ▒×5 → ▓×2 → █×32       │ │ safe·hats·gardens    │                              ┃ ║
 ║ ┃ │ promotion is the pulse │ │ karma·eip4824 » next │                              ┃ ║
 ║ ┃ ╰────────────────────────╯ ╰──────────────────────╯                              ┃ ║
 ║ ┃ █ lifecycle ─ (initialize) (org-os-init) (bootstrap-interviewer) (commands)      ┃ ║
@@ -92,7 +92,7 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ █ knowledge ─ (curator) (research) (web-browsing) (notion-cli) (canvas)          ┃ ║
 ║ ┃ █ builders ─ (skill-creator) (mcp) (frontend) (artifacts) (schema-gen)           ┃ ║
 ║ ┃ █ mentors ─ (feynman) (karpathy) (workspace) (transcription)                     ┃ ║
-║ ┃ ▒ local color ─ (instance-specific ×2) — stays local until it proves general     ┃ ║
+║ ┃ ▒ local color ─ (instance-specific ×1) — stays local until it proves general     ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          »                                           ║
 ║ ┏━ PROJECTS · the field · ×13 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║

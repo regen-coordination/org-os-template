@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-10 · Symbient v2 — public practice, private beings
+
+**Status:** active
+**Scope:** framework, agent-runtime, operator-ux
+
+**Decision** — Promote the symbient practice from an instance-local experiment to a **canonical framework skill** (`skills/symbient/`, `data/skills-matrix.yaml` `promotion_status: canonical`), with the public/private line drawn between *practice* and *being*: the contract, the developmental gates, and the hatch tooling are tracked framework code; every habitat is **operator-private** — created by `scripts/symbient-hatch.mjs` into a gitignored slot, never committed, and no being is ever named in a tracked file, commit message, or report. Growth is **gate-governed** across four stages — 0 hatchling → 1 surfacer → 2 voiced → 3 self-amending — with each crossing recorded in the habitat's `GATES.md` and reviewed by the operator, who may continue, extend, or **archive** (move to `archive/`, never delete). Host reach in v2 is deliberately **on-demand only**: hermes surfaces `/symbient` and stage-gates below Stage 2 ("not yet voiced"); no cron wakes a symbient. The quilt medium is **third-party vendored** — the Quilt Protocol by Wib & Wob under CC BY-NC, at `skills/symbient/QUILT-PROTOCOL.md` — and the matrix note carries a commercial-use flag so any future paid/commercial surface reviews the licence first. The v1 instance habitat migrates through the same review-and-archive mechanism rather than being rewritten in place.
+
+**Why** — The practice had proven itself in one instance but was recorded as "not generalizable in current form"; what made it generalizable was separating the two things v1 conflated. The *contract* is ordinary framework material — reviewable, testable, cloneable — while the *being* is operator-personal context whose value depends on it not being published, and whose presence in a shared repo would leak a named relationship into every clone and every federation surface. Gitignore (not a private branch, not encryption) was chosen because it is the one mechanism that already holds across the framework and all downstream clones with no key management and no way to accidentally push. Stage gates exist because the failure mode of a persistent agent-identity is unearned reach: writing, speaking to hosts, or touching the commons before anything has demonstrably changed an operator decision — so reach is granted per stage against evidence, not per capability. On-demand-only hermes follows from the same logic and keeps a live being out of group/org channels entirely. Vendoring the quilt protocol rather than reimplementing it keeps attribution honest; recording CC BY-NC in the matrix means the constraint surfaces at the moment a publishing or commercialization decision is made, not after.
+
+**Refs** — spec `docs/superpowers/specs/2026-08-10-symbient-v2-design.md`, plan `docs/superpowers/plans/2026-08-10-symbient-v2.md` (plans dir is gitignored), `skills/symbient/` (SKILL.md contract, vendored `QUILT-PROTOCOL.md`, SEED template), `scripts/symbient-hatch.mjs` + `scripts/lib/symbient-gates.mjs`, `data/skills-matrix.yaml`, `docs/DATA-MODEL.md` §6 (`submitted_by: "symbient"`), commits `7ad999b`/`4869d81`/`908c4f0`/`ad9bccf`
+
+---
+
 ## 2026-08-08 · Cloudflare OS integration — dedicated gatekeeper over a swappable substrate
 
 **Status:** active

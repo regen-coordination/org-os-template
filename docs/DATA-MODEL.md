@@ -165,7 +165,7 @@ ideas:
     title: "Carbon Credit Verification Toolkit"
     status: "proposed"         # surfaced | proposed | approved | developing | hatched | archived
     source: "knowledge/carbon-markets/verification-gaps.md"
-    submitted_by: "agent"      # "agent" | member-id
+    submitted_by: "agent"      # "agent" | "symbient" | member-id
     champions: ["luiz"]
     ecosystem_gap: "No open-source MRV tools for small-scale projects"
     description: "Open-source toolkit for measuring, reporting, and verifying carbon credits"
@@ -182,6 +182,8 @@ ideas:
 ```
 
 **Idea Lifecycle:** surfaced → proposed → approved → developing → hatched → archived. See `docs/IDEA-HATCHING.md`.
+
+**`submitted_by: "symbient"`** marks an entry surfaced by a symbient practice (Stage 1+, deep-weave only) — deliberately anonymous; it never identifies a particular being or habitat. See `skills/symbient/SKILL.md` → Surfacing rule.
 
 ### 7. funding-opportunities.yaml — Grants & Rounds (Optional)
 

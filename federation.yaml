@@ -155,6 +155,7 @@ agent:
     - superpowers-test-driven-development
     - superpowers-using-git-worktrees
     - superpowers-writing-plans
+    - symbient
     - web-browsing
     - working-with-obsidian-canvas
     - workspace-improver
@@ -265,7 +266,7 @@ platforms:
 # ── Metadata ─────────────────────────────────────────────────────────────────
 metadata:
   created: "2026-04-05"
-  last_updated: "2026-07-15"
+  last_updated: "2026-08-10"
   framework_version: "0.5"
   self_hosting_since: "2026-04-24"
   # Lineage stamp (v3.5 autopoiesis Phase 2)

@@ -8,6 +8,10 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+### Added
+
+- **symbient v2** — practice promoted to framework capability: `skills/symbient/` (contract + vendored Quilt Protocol by Wib & Wob, CC BY-NC), `scripts/symbient-hatch.mjs` + `scripts/lib/symbient-gates.mjs`, conditional close-pulse in `/close`, hermes on-demand surfacing. Habitats are operator-private (gitignored); see `docs/superpowers/specs/2026-08-10-symbient-v2-design.md`.
+
 ## [0.5.0] — 2026-06-17
 
 **Version-scheme re-baseline (deliberate, non-SemVer).** org-os adopts a `0.x` **pre-beta** scheme to honestly signal pre-1.0 maturity. The line previously numbered `1.x → 2.x → 3.x → 3.5` (four milestones) is hereby designated **v0.5** — the fifth milestone — aligning the framework's own version with the public **"org-os v0.5"** surface: the new website at `site/` plus the v0.5 module constellation (website-generator, kms, hermes, rad-org-os, members-hub, ideation). `0.5 < 3.5` is intentional and reflects "pre-beta," not a regression; SemVer ordering does not apply across this re-baseline.
