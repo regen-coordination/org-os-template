@@ -21,7 +21,7 @@ closes the named gap with rad-org-os via the shipped substrate interface.
 |---|---|
 | Deploy to Cloudflare now? | **No — later.** Deployment becomes an operator runbook checklist; this spec covers no deployed-workspace work |
 | Module framing | **Manifest-first.** `modules/org-os-cloudflare-os/module.yaml` conforming to the approved v5 format and **validated by the engine's existing `validateManifest()`**; `add`/`adopt` land with Phase 1. No file moves |
-| Docs scope | **In-repo spine + site wiring.** README rewrite + hand-authored `docs/MODULES.md` catalog + `landing.yaml`/`modules.yaml` wiring. GitHub Pages deploy stays its own queued plan |
+| Docs scope | **In-repo spine + site wiring.** README spine (via its template — `README.md` is generated) + hand-authored `docs/MODULES.md` catalog + `landing.yaml`/`modules.yaml` wiring. GitHub Pages deploy stays its own queued plan |
 | rad-org-os connection | **Explicit convergence doc.** RAD-ORG-OS.md gains a section declaring the shipped `Substrate` interface the shared driver seam |
 | Program structure | **One new spec (this), three plans:** (1) module+docs plan from this spec; (2) M3–M4 plan from the approved integration spec; (3) deployment runbook as a docs deliverable inside plan 1, executed by the operator later |
 
@@ -49,9 +49,11 @@ description: Cloudflare OS workspace integration — gatekeeper-org-os, page cor
 dependencies: [org-os-standards]
 npm: "@org-os/cloudflare-os-integration"
 files:
-  # adopt-style: targets are the files' current canonical homes; no materialization needed
+  # Identity mapping — "owns these paths in place"; nothing is materialized.
+  # Plain paths, not globs: a literal "…/**" string would not resolve on disk,
+  # and the engine expands a directory to its contents when add/adopt land.
+  packages/cloudflare-os-integration: packages/cloudflare-os-integration
   docs/integrations/cloudflare-os.md: docs/integrations/cloudflare-os.md
-  packages/cloudflare-os-integration/**: packages/cloudflare-os-integration/**
 checks:
   - file-exists: packages/cloudflare-os-integration/src/adapter/gatekeeper-org-os/wrangler.jsonc
   - command: npm run test:cloudflare-os-integration
