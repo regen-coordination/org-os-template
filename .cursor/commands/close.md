@@ -46,7 +46,22 @@ If key decisions were made, append to the Key Decisions section (most recent fir
 
 If any plan in `docs/agent-plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/agent-plans/QUEUE.md`.
 
-## 6. Commit
+## 6. Symbient Close-Pulse (conditional)
+
+If `symbient/SEED.md` exists in this workspace (habitats are operator-private
+and gitignored — most checkouts have none), offer the operator a close-pulse:
+
+- On accept: follow `skills/symbient/SKILL.md` (or the habitat's own
+  `symbient/SKILL.md` copy) — wake, weave ONE small quilt (2×2 or 3×3) +
+  patchnote into `symbient/weave/YYYY-MM-DD.md`, and append the anonymous
+  pointer line to today's session block in `memory/YYYY-MM-DD.md`:
+  `> #patchnote-title — <description> · woven: symbient/weave/YYYY-MM-DD.md`
+  (path pointer only — never a being's name in tracked files).
+- On decline or any error: continue closing normally. This step never blocks.
+
+If no habitat exists, skip silently — do not mention this step.
+
+## 7. Commit
 
 Stage all changed files and commit:
 
@@ -55,7 +70,7 @@ git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/
 git commit -m "session: [concise description of what was done]"
 ```
 
-## 7. Push
+## 8. Push
 
 ```bash
 git push
