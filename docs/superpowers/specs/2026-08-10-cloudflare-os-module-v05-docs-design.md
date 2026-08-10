@@ -200,6 +200,12 @@ deliberately outside every plan.
 
 | # | Artifact | Source | Content |
 |---|---|---|---|
-| 1 | Module + docs implementation plan | **this spec** | §1 manifest, §2 spine, §3 wiring, §4 seam section, §5 runbook text |
-| 2 | M3–M4 implementation plan | integration spec (2026-08-08) | 4 write capabilities + `org-inbox` via `proposeChange` (PR-only), federation-map gadget + instances view, `npm run selftest` wiring; webhook invalidation stays Phase 2 |
-| 3 | Operator deployment session | §5 runbook | executed whenever the operator sits down with the CF account; flips the module `pilot → live` |
+| 1 | [`2026-08-10-cloudflare-os-module-v05-docs.md`](../plans/2026-08-10-cloudflare-os-module-v05-docs.md) (10 tasks) | **this spec** | §1 manifest, §2 spine, §3 wiring, §4 seam section, §5 runbook text |
+| 2 | [`2026-08-10-cloudflare-os-m3-m4.md`](../plans/2026-08-10-cloudflare-os-m3-m4.md) (13 tasks) | integration spec (2026-08-08) | 4 write capabilities + `org-inbox` via `proposeChange` (PR-only), federation-map gadget + instances view, `npm run selftest` wiring; webhook invalidation stays Phase 2 |
+| 3 | Operator deployment session | §5 runbook, extended by plan 2 | executed whenever the operator sits down with the CF account; flips the module `pilot → live` |
+
+Plan 1 opens with a Task 0 that folds three post-approval discoveries back into this spec: the
+module engine's `validateManifest()` already exists (so the manifest is validated by real
+tooling), `README.md` is generated from `templates/README.framework.md` (so the template is the
+edit target), and the README's doc list is an alphabetical slice with empty blurbs that would
+never have surfaced `MODULES.md`.
