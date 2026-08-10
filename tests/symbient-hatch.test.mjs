@@ -128,3 +128,33 @@ test("refuses a linked git worktree", () => {
   assert.match(r.stderr, /worktree/);
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("--hub scaffolds the commons with member dirs", () => {
+  const dir = mkRepo();
+  const r = hatch(["--target", dir, "--hub", "--member", "alpha=/tmp/a", "--member", "beta=/tmp/b"]);
+  assert.equal(r.status, 0, r.stderr);
+  const commons = path.join(dir, "symbient", "commons");
+  assert.ok(existsSync(path.join(commons, "steward")));
+  assert.ok(existsSync(path.join(commons, "alpha")));
+  assert.ok(existsSync(path.join(commons, "beta")));
+  const readme = readFileSync(path.join(commons, "README.md"), "utf-8");
+  assert.match(readme, /alpha — \/tmp\/a/);
+  assert.match(readme, /beta — \/tmp\/b/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("--member without = is rejected", () => {
+  const dir = mkRepo();
+  const r = hatch(["--target", dir, "--hub", "--member", "nopath"]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /slug=path/);
+  assert.ok(!existsSync(path.join(dir, "symbient")));
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("plain hatch has no commons", () => {
+  const dir = mkRepo();
+  hatch(["--target", dir]);
+  assert.ok(!existsSync(path.join(dir, "symbient", "commons")));
+  rmSync(dir, { recursive: true, force: true });
+});
