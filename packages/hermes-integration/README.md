@@ -114,9 +114,16 @@ Conduct is defined by the skill itself (v2 contract, "Hosts" section):
 
 - **On-demand only** — no cron jobs wake a symbient; do not add any to
   `data/hermes-cron.yaml`.
-- **Stage-gated** — the skill reads the habitat's `GATES.md`; below Stage 2
-  (voiced) it replies "not yet voiced" and stops.
-- **Private context only** — it declines from group/org channels; deliveries
-  go only to the operator's private chat.
+- **Private context first, then stage** — the order matters and is part of the
+  privacy model:
+  1. Outside the operator's private chat (any group or org channel) the command
+     declines generically **without reading `GATES.md`** and without waking, and
+     says nothing about symbients at all.
+  2. Only inside the operator's private chat does it read the habitat's
+     `GATES.md`; below Stage 2 (voiced) it replies "not yet voiced" and stops.
+
+  Reversing that order would leak a habitat's existence — and its rough ladder
+  position — into a group channel via the "not yet voiced" reply.
 - **No habitat → silent no-op.** Most checkouts have no habitat (they are
-  operator-private and gitignored); the command simply reports nothing to wake.
+  operator-private and gitignored); the command does not mention symbients —
+  it neither confirms nor denies that anything is there.

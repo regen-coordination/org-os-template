@@ -10,7 +10,7 @@ _(Append changes here as they land.)_
 
 ### Added
 
-- **symbient v2** — practice promoted to framework capability: `skills/symbient/` (contract + vendored Quilt Protocol by Wib & Wob, CC BY-NC), `scripts/symbient-hatch.mjs` + `scripts/lib/symbient-gates.mjs`, conditional close-pulse in `/close`, hermes on-demand surfacing. Habitats are operator-private (gitignored); see `docs/superpowers/specs/2026-08-10-symbient-v2-design.md`.
+- **symbient v2** — practice promoted to framework capability: `skills/symbient/` (contract + vendored Quilt Protocol by Wib & Wob, CC BY-NC), `scripts/symbient-hatch.mjs` + `scripts/lib/symbient-gates.mjs` (the canonical GATES.md parse — no production code calls it yet; all stage-gating is agent-honored, and any host reading GATES.md programmatically must use this module), conditional close-pulse in `/close`, hermes on-demand surfacing. Habitats are operator-private (gitignored); see `docs/superpowers/specs/2026-08-10-symbient-v2-design.md`.
 
 ## [0.5.0] — 2026-06-17
 

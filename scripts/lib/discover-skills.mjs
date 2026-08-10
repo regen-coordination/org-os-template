@@ -12,7 +12,38 @@
 // anomalies: SKILL.md missing or unparseable; duplicate id across sources (later flagged).
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
+
+// Anomaly `path` values are published: they land in .well-known/skills.json and
+// SKILLS.md, which the federation site serves and llms.txt advertises. Absolute
+// paths would leak the operator's username and home layout onto that surface,
+// so every anomaly path is rendered relative to the root it was scanned from:
+// workspace-scoped paths relative to the workspace dir, user-scoped as
+// "~/.claude/skills/…". Skill records keep their absolute `path` — that field
+// is consumed in-process and is not written to any published file.
+function makeRelativizer(root, prefix = "") {
+  if (!root) return (p) => p;
+  const base = path.resolve(root);
+  return (p) => {
+    const abs = path.resolve(p);
+    const rel = path.relative(base, abs);
+    // Outside the scanned root (shouldn't happen) → leave it alone rather than
+    // emit a misleading ../.. chain.
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return p;
+    return prefix + rel.split(path.sep).join("/");
+  };
+}
+
+// "~/.claude/" for a root inside the home directory; "" for anything else
+// (temp dirs in tests, system paths) — never the literal home path.
+function homePrefix(root) {
+  const home = homedir();
+  const rel = path.relative(home, path.resolve(root));
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return "";
+  if (!rel) return "~/";
+  return "~/" + rel.split(path.sep).join("/") + "/";
+}
 
 function parseFrontmatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -31,7 +62,7 @@ function parseFrontmatter(content) {
   return fm;
 }
 
-function scanSkillsDir(skillsDir, source) {
+function scanSkillsDir(skillsDir, source, rel = (p) => p) {
   const skills = [];
   const anomalies = [];
 
@@ -41,7 +72,7 @@ function scanSkillsDir(skillsDir, source) {
   try {
     entries = readdirSync(skillsDir, { withFileTypes: true });
   } catch (e) {
-    anomalies.push({ source, kind: "unreadable", path: skillsDir, detail: e.message });
+    anomalies.push({ source, kind: "unreadable", path: rel(skillsDir), detail: e.message });
     return { skills, anomalies };
   }
 
@@ -56,7 +87,7 @@ function scanSkillsDir(skillsDir, source) {
       anomalies.push({
         source,
         kind: "missing-skill-md",
-        path: skillDir,
+        path: rel(skillDir),
         detail: `${entry.name}/SKILL.md not found`,
       });
       continue;
@@ -66,7 +97,7 @@ function scanSkillsDir(skillsDir, source) {
     try {
       content = readFileSync(skillFile, "utf-8");
     } catch (e) {
-      anomalies.push({ source, kind: "unreadable", path: skillFile, detail: e.message });
+      anomalies.push({ source, kind: "unreadable", path: rel(skillFile), detail: e.message });
       continue;
     }
 
@@ -75,7 +106,7 @@ function scanSkillsDir(skillsDir, source) {
       anomalies.push({
         source,
         kind: "no-frontmatter",
-        path: skillFile,
+        path: rel(skillFile),
         detail: `${entry.name}/SKILL.md lacks YAML frontmatter`,
       });
       // Still register the skill with empty frontmatter
@@ -85,6 +116,9 @@ function scanSkillsDir(skillsDir, source) {
       id: (frontmatter && frontmatter.name) || entry.name,
       source,
       path: skillFile,
+      // Publication-safe rendering of `path`, used wherever an anomaly is
+      // written to a generated file.
+      displayPath: rel(skillFile),
       frontmatter: frontmatter || {},
       hasIssues: !frontmatter,
     });
@@ -93,7 +127,7 @@ function scanSkillsDir(skillsDir, source) {
   return { skills, anomalies };
 }
 
-function findPluginSkills(pluginRoot, maxDepth = 5) {
+function findPluginSkills(pluginRoot, maxDepth = 5, rel = (p) => p) {
   // Plugin skills live under arbitrary sub-paths (e.g., ~/.claude/plugins/<pkg>/skills/<name>/).
   // Bounded recursive scan looking for "skills" directories.
   const skills = [];
@@ -113,7 +147,7 @@ function findPluginSkills(pluginRoot, maxDepth = 5) {
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const full = path.join(dir, entry.name);
       if (entry.name === "skills") {
-        const { skills: s, anomalies: a } = scanSkillsDir(full, "plugin");
+        const { skills: s, anomalies: a } = scanSkillsDir(full, "plugin", rel);
         skills.push(...s);
         anomalies.push(...a);
       } else {
@@ -130,17 +164,20 @@ export function discoverSkills({ workspaceDir = null, userDir = null, pluginRoot
   const allAnomalies = [];
 
   if (workspaceDir) {
-    const { skills, anomalies } = scanSkillsDir(path.join(workspaceDir, "skills"), "workspace");
+    const rel = makeRelativizer(workspaceDir);
+    const { skills, anomalies } = scanSkillsDir(path.join(workspaceDir, "skills"), "workspace", rel);
     allSkills.push(...skills);
     allAnomalies.push(...anomalies);
   }
   if (userDir) {
-    const { skills, anomalies } = scanSkillsDir(path.join(userDir, "skills"), "user");
+    const rel = makeRelativizer(userDir, homePrefix(userDir));
+    const { skills, anomalies } = scanSkillsDir(path.join(userDir, "skills"), "user", rel);
     allSkills.push(...skills);
     allAnomalies.push(...anomalies);
   }
   if (pluginRoot) {
-    const { skills, anomalies } = findPluginSkills(pluginRoot);
+    const rel = makeRelativizer(pluginRoot, homePrefix(pluginRoot));
+    const { skills, anomalies } = findPluginSkills(pluginRoot, 5, rel);
     allSkills.push(...skills);
     allAnomalies.push(...anomalies);
   }
@@ -155,7 +192,7 @@ export function discoverSkills({ workspaceDir = null, userDir = null, pluginRoot
       allAnomalies.push({
         source: "cross-source",
         kind: "duplicate-id",
-        path: instances.map((i) => i.path).join(", "),
+        path: instances.map((i) => i.displayPath ?? i.path).join(", "),
         detail: `skill id "${id}" appears in ${instances.length} sources: ${instances.map((i) => i.source).join(", ")}`,
       });
     }

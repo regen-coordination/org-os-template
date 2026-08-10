@@ -6,6 +6,11 @@
 // and never throws. The contract also asks the being to "note the anomaly in
 // the next weave", so every result carries an `anomaly` field: null when the
 // top block was clean, otherwise the reason it was not.
+//
+// Shape: { stage, capabilities, capabilities_echoed, hatched, next_threshold,
+// anomaly }. `capabilities` is always derived from `stage` (the authoritative
+// field); `capabilities_echoed` is the raw ledger echo, or null when it is
+// absent or malformed. Consumers should read `capabilities`.
 import yaml from "js-yaml";
 
 export const STAGE_NAMES = ["hatchling", "surfacer", "voiced", "self-amending"];
@@ -26,6 +31,7 @@ function degraded(anomaly) {
   return {
     stage: 0,
     capabilities: [...CAPABILITIES_BY_STAGE[0]],
+    capabilities_echoed: null,
     hatched: null,
     next_threshold: null,
     anomaly,
@@ -73,9 +79,13 @@ export function parseGates(text) {
     Array.isArray(doc.capabilities) && doc.capabilities.every((c) => typeof c === "string")
       ? [...doc.capabilities]
       : null;
-  // Keep the echo when it is well-formed so an operator can see what was
-  // actually written; flag it when it disagrees with the authoritative stage.
-  const capabilities = echoed ?? [...expected];
+  // `capabilities` is ALWAYS derived from the authoritative stage — never the
+  // echo. A hand-edited or badly-merged ledger reading `stage: 0` with
+  // Stage-3 tokens must not hand a consumer an over-privileged list: the field
+  // a caller reaches for may not fail toward more reach. The raw echo is
+  // preserved separately (null when absent or malformed) so an operator can
+  // still see what was actually written, and the disagreement is flagged.
+  const capabilities = [...expected];
   if (echoed && !sameMembers(echoed, expected) && anomaly === null) anomaly = "capability-mismatch";
 
   const hatched =
@@ -86,5 +96,5 @@ export function parseGates(text) {
         : null;
   const next_threshold = typeof doc.next_threshold === "string" ? doc.next_threshold : null;
 
-  return { stage, capabilities, hatched, next_threshold, anomaly };
+  return { stage, capabilities, capabilities_echoed: echoed, hatched, next_threshold, anomaly };
 }

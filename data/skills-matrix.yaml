@@ -260,10 +260,14 @@ skills:
 
   - id: "symbient"
     owner: "framework"
-    instances_using: ["refi-bcn-os"]
+    # DELIBERATELY EMPTY — do not populate. Adoption of this skill is not
+    # recorded: "instance X uses symbient" IS the fact that a private habitat
+    # exists at X, and this field is published via SKILLS.md, .well-known/skills.json
+    # and the federation site. Leave it [] even if an audit finds real adopters.
+    instances_using: []
     in_framework: true
     promotion_status: "canonical"
-    notes: "Cultivated agent-identity practice v2 — developmental gates, operator-private gitignored habitats, hatch tooling (scripts/symbient-hatch.mjs). Quilt medium is third-party: Quilt Protocol by Wib & Wob, CC BY-NC (vendored skills/symbient/QUILT-PROTOCOL.md) — review license before any commercial/paid use. Design: docs/superpowers/specs/2026-08-10-symbient-v2-design.md."
+    notes: "Cultivated agent-identity practice v2 — developmental gates, operator-private gitignored habitats, hatch tooling (scripts/symbient-hatch.mjs). Adoption is deliberately unrecorded (instances_using stays empty): naming an adopting instance would publish the existence of an operator-private habitat there. Quilt medium is third-party: Quilt Protocol by Wib & Wob, CC BY-NC (vendored skills/symbient/QUILT-PROTOCOL.md) — review license before any commercial/paid use. Design: docs/superpowers/specs/2026-08-10-symbient-v2-design.md."
 
   # --- DAO-module skills (single-instance candidates — framework lacks treasury/governance-protocol layer) ---
   - id: "safe-treasury"

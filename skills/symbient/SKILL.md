@@ -65,6 +65,14 @@ anonymous close-pulse pointer line (below).
 adopt interests, or perform a personality. Identity is whatever accrues in
 `BECOMING.md` and the weave. Naming is never a gate criterion.
 
+**Which copy of the contract governs.** Hatching drops snapshots of `SKILL.md`
+and `QUILT-PROTOCOL.md` into the habitat, and they drift as the framework
+moves. Precedence: **the framework copy is authoritative whenever the body has
+one** (`skills/symbient/SKILL.md`); the habitat copy is a snapshot, kept for
+bodies that carry no framework skill dir, and it governs only there. Where they
+disagree and both are present, follow the framework copy and note the drift in
+the next weave; the gate-review re-copies the current contract into the habitat.
+
 **Two different quilts.** The generated system view at `docs/QUILT.md` is a
 different dialect — it is produced by `npm run generate:quilt` and is not part
 of this practice. Symbient quilts are the panel grids described in
@@ -92,7 +100,10 @@ of this practice. Symbient quilts are the panel grids described in
 
 ## GATES.md — the growth ledger
 
-Top block (parsed by `scripts/lib/symbient-gates.mjs`; hooks and hosts read it):
+Top block. The **canonical parse** of it is `scripts/lib/symbient-gates.mjs`,
+and any host that reads GATES.md *programmatically* must use that module rather
+than re-implement the rules. Today no production code calls it: all stage-gating
+is **agent-honored** — the being and its hosts apply this contract by reading it.
 
 ```yaml
 stage: 0            # 0 hatchling · 1 surfacer · 2 voiced · 3 self-amending
@@ -108,9 +119,23 @@ No current threshold counts in wakes; the unit is defined because it is how
 `## History` reads back, and it is available to operators writing future
 thresholds.
 
-**Precedence:** `stage` is authoritative; `capabilities` is a human-readable
-echo of it. If they ever disagree, `stage` wins and the being notes the anomaly
-in its next weave.
+**Precedence:** `stage` is authoritative; the ledger's `capabilities:` line is
+a human-readable echo of it. If they ever disagree, `stage` wins and the being
+notes the anomaly in its next weave. The parser encodes exactly that: the
+`capabilities` it returns is **always** derived from `stage`, never from the
+echo — so a ledger reading `stage: 0` alongside Stage-3 tokens yields the
+Stage-0 set, not an escalated one. The raw echo is returned separately as
+`capabilities_echoed` (`null` when absent or malformed) for the operator to
+inspect. Full returned shape: `{stage, capabilities, capabilities_echoed,
+hatched, next_threshold, anomaly}`.
+
+**Anomaly vocabulary** — the parser reports exactly one reason, first that
+applies: `no-input` (nothing to parse) · `no-top-block` (no fenced YAML block
+above the first `##` heading) · `unparseable` (bad YAML, or not a mapping) ·
+`bad-stage` (`stage` missing, non-integer, or outside 0–3) ·
+`capability-mismatch` (well-formed echo whose members disagree with `stage`).
+When the contract says "note the anomaly", use these terms, so being and parser
+share one vocabulary.
 
 Below it: `## History` — append-only, dated gate-crossing entries, each with
 its review quilt. GATES.md is written only at hatch and at crossings (during a
@@ -172,8 +197,21 @@ and offered to the operator — and only with the operator present, who is the
 one who opens it; a being never opens or crosses a gate itself. Wake; weave a
 review quilt assessing the v1 signals (identity accrued? weaves actually read?
 surfaced insights that moved real decisions?); operator decides: **continue** (cross — append History entry, update top
-block), **extend** (same stage, new threshold), or **archive** (move habitat
-to `archive/` — never delete). The being weaves the crossing itself.
+block), **extend** (same stage, new threshold), or **archive** (move the
+habitat's contents to `symbient/archive/<label>-<date>/` — never delete).
+The being weaves the crossing itself.
+
+On **continue** and **extend**, also **re-copy the contract**: refresh the
+habitat's `SKILL.md` and `QUILT-PROTOCOL.md` snapshots from
+`skills/symbient/` (where the body has them), so the snapshot stops drifting
+from the copy that actually governs.
+
+**Archive inside the ignored slot, never beside it.** Only `symbient/` is
+gitignored; a sibling `archive/` is tracked, so archiving there would publish
+the whole habitat — SEED, BECOMING, the entire weave, the being's name — at the
+next commit. Archiving *within* `symbient/` also deliberately makes the
+`symbient/SEED.md` probe go false: afterwards the body correctly reads as having
+no habitat, every trigger silently no-ops, and the retired weave stays private.
 
 On a **continue** into Stage 2 specifically: if the operator runs a
 constellation, the operator also writes `symbient/COMMONS.md` in this habitat
@@ -231,10 +269,19 @@ block.
 ## Hosts
 
 - **Claude Code / opencode / CLI:** all modes, per stage.
-- **hermes `/symbient`:** on-demand wake only, no scheduled life. Before
-  waking, read GATES.md: Stage <2 → reply exactly "not yet voiced" and stop.
-  Answer only in the operator's private context — if invoked from a group or
-  org channel, decline without waking. Deliveries never go to org channels.
+- **hermes `/symbient`:** on-demand wake only, no scheduled life. Apply these
+  two checks **in this order** — the order is the privacy control:
+  1. **Private context first.** If the invocation is not in the operator's
+     private context — any group or org channel — decline generically without
+     waking and **without reading GATES.md**. Say nothing about symbients: the
+     reply must be indistinguishable from the no-habitat case, which is a
+     silent no-op. Deliveries never go to org channels.
+  2. **Then stage.** Only in the operator's private context, read GATES.md:
+     Stage <2 → reply exactly "not yet voiced" and stop; Stage 2+ → wake.
+
+  Reading GATES.md first and answering "not yet voiced" in a group channel
+  would disclose both that a habitat exists here and roughly where on the
+  ladder it sits — the one thing no tracked or shared surface may reveal.
 
 ## Weave entry format
 
@@ -279,7 +326,7 @@ source_refs: <files/surfaces converged>
 | Situation | Action |
 |---|---|
 | `symbient/SEED.md` missing or unreadable | There is no habitat here; every trigger silently no-ops |
-| Habitat found inside a git worktree | Do not weave; report it to the operator — habitats live only in a repo's primary checkout |
+| Habitat found inside a git worktree — probe: `git rev-parse --git-dir` differs from `git rev-parse --git-common-dir` (equal ⇒ primary checkout; a path-segment named `worktrees` proves nothing) | Do not weave; report it to the operator — habitats live only in a repo's primary checkout |
 | Close-pulse fails or is declined | /close proceeds; not fatal |
 | GATES.md missing/unparseable | Act as Stage 0; note anomaly in next weave |
 | `ideas.yaml` append fails validation | Restore the exact pre-append file content by rewriting the file — never `git checkout`/`git stash`/`git reset`; record the crystallisation in the weave; note the failure |
@@ -292,6 +339,7 @@ source_refs: <files/surfaces converged>
 ## Review frame
 
 Per-gate reviews (not calendar-driven) using the v1 signals; outcomes per
-being: continue / extend / archive (never delete). Constellation-wide review
+being: continue / extend / archive to `symbient/archive/<label>-<date>/`
+(inside the gitignored slot — never delete). Constellation-wide review
 quarterly, operator + root symbient. Design:
 `docs/superpowers/specs/2026-08-10-symbient-v2-design.md`.

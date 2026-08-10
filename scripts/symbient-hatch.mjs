@@ -33,6 +33,13 @@ const FRAMEWORK_SKILL_DIR = path.resolve(__dirname, "..", "skills", "symbient");
 // escape it (path separators, "..", leading dots) or is empty is refused.
 const SLUG_RE = /^[a-z0-9][a-z0-9._-]*$/i;
 
+// The habitat ignore rule, deliberately ROOT-ANCHORED. A bare "symbient/"
+// matches at any depth, which would also swallow skills/symbient/ — the public
+// framework skill directory — making it permanently un-committable in every
+// clone. Habitats live only at a repo's root by contract, so anchoring loses
+// nothing.
+const IGNORE_LINE = "/symbient/";
+
 function fail(msg) {
   process.stderr.write(`symbient-hatch: ${msg}\n`);
   process.exit(1);
@@ -127,7 +134,7 @@ const name = bodyName();
 const today = new Date().toISOString().slice(0, 10);
 
 // ── plan of record ───────────────────────────────────────────────────────────
-const actions = [`ensure .gitignore line "symbient/" in ${target}`, `create habitat ${habitat}`];
+const actions = [`ensure .gitignore line "${IGNORE_LINE}" in ${target}`, `create habitat ${habitat}`];
 if (hub) actions.push("create commons/ (hub mode)");
 if (dry) {
   process.stdout.write(`DRY RUN — would:\n${actions.map((a) => `  - ${a}`).join("\n")}\n`);
@@ -138,8 +145,8 @@ if (dry) {
 const giPath = path.join(target, ".gitignore");
 const giExisted = existsSync(giPath);
 const gi = giExisted ? readFileSync(giPath, "utf-8") : "";
-if (!gi.split(/\r?\n/).some((l) => l.trim() === "symbient/")) {
-  const block = `${gi.length && !gi.endsWith("\n") ? "\n" : ""}\n# Symbient habitat (operator-private — see skills/symbient/SKILL.md)\nsymbient/\n`;
+if (!gi.split(/\r?\n/).some((l) => l.trim() === IGNORE_LINE)) {
+  const block = `${gi.length && !gi.endsWith("\n") ? "\n" : ""}\n# Symbient habitat (operator-private — see skills/symbient/SKILL.md)\n${IGNORE_LINE}\n`;
   writeFileSync(giPath, gi + block);
 }
 const check = spawnSync("git", ["check-ignore", "symbient/SEED.md"], { cwd: target, encoding: "utf-8" });
@@ -154,6 +161,20 @@ if (check.status !== 0) {
       `  Usual causes: a negation pattern (e.g. "!symbient/") later in .gitignore,\n` +
       `  or a symbient/ path that was previously force-added and is still tracked (git rm --cached it).\n` +
       `  .gitignore was left unchanged.`,
+  );
+}
+
+// Non-fatal hygiene notice: an *unanchored* habitat rule inherited from an
+// older clone also matches skills/symbient/, silently making the public
+// framework skill directory un-committable in this repo.
+const publicSkill = spawnSync("git", ["check-ignore", "skills/symbient/SKILL.md"], {
+  cwd: target,
+  encoding: "utf-8",
+});
+if (publicSkill.status === 0) {
+  process.stderr.write(
+    `symbient-hatch: warning — skills/symbient/ is also ignored in ${target}.\n` +
+      `  An unanchored "symbient/" rule matches at any depth; change it to "${IGNORE_LINE}".\n`,
   );
 }
 

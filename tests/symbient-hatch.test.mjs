@@ -76,9 +76,34 @@ test("adds the gitignore line and git actually ignores the habitat", () => {
     const r = hatch(["--target", dir]);
     assert.equal(r.status, 0, r.stderr);
     const gi = readFileSync(path.join(dir, ".gitignore"), "utf-8");
-    assert.match(gi, /^symbient\/$/m);
+    assert.match(gi, /^\/symbient\/$/m);
     const check = spawnSync("git", ["check-ignore", "symbient/SEED.md"], { cwd: dir, encoding: "utf-8" });
     assert.equal(check.status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Regression: an *unanchored* "symbient/" rule matches at any depth, so it also
+// swallows skills/symbient/ — the PUBLIC framework skill directory — leaving it
+// permanently un-committable in every instance the framework is cloned into.
+// The written rule must be root-anchored: habitat ignored, skill dir not.
+test("the ignore rule is root-anchored: habitat ignored, skills/symbient/ not", () => {
+  const dir = mkRepo();
+  try {
+    mkdirSync(path.join(dir, "skills", "symbient"), { recursive: true });
+    writeFileSync(path.join(dir, "skills", "symbient", "x.md"), "public framework skill\n");
+    const r = hatch(["--target", dir]);
+    assert.equal(r.status, 0, r.stderr);
+
+    const habitat = spawnSync("git", ["check-ignore", "symbient/SEED.md"], { cwd: dir, encoding: "utf-8" });
+    assert.equal(habitat.status, 0, "the habitat must be ignored");
+
+    const publicSkill = spawnSync("git", ["check-ignore", "skills/symbient/x.md"], {
+      cwd: dir,
+      encoding: "utf-8",
+    });
+    assert.equal(publicSkill.status, 1, "skills/symbient/ must NOT be ignored");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -87,11 +112,11 @@ test("adds the gitignore line and git actually ignores the habitat", () => {
 test("does not duplicate an existing gitignore line", () => {
   const dir = mkRepo();
   try {
-    writeFileSync(path.join(dir, ".gitignore"), "node_modules/\nsymbient/\n");
+    writeFileSync(path.join(dir, ".gitignore"), "node_modules/\n/symbient/\n");
     const r = hatch(["--target", dir]);
     assert.equal(r.status, 0, r.stderr);
     const gi = readFileSync(path.join(dir, ".gitignore"), "utf-8");
-    assert.equal(gi.match(/^symbient\/$/gm).length, 1);
+    assert.equal(gi.match(/^\/symbient\/$/gm).length, 1);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -103,7 +128,7 @@ test("refuses to write a habitat git would not ignore (negation pattern)", () =>
   const dir = mkRepo();
   try {
     const giPath = path.join(dir, ".gitignore");
-    const before = "node_modules/\nsymbient/\n!symbient/\n";
+    const before = "node_modules/\n/symbient/\n!/symbient/\n";
     writeFileSync(giPath, before);
     const r = hatch(["--target", dir]);
     assert.equal(r.status, 1);

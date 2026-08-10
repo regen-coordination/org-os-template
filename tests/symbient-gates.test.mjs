@@ -84,7 +84,7 @@ test("totality: every input yields a well-formed result, never a throw", () => {
     assert.notEqual(g, null, `${label}: null result`);
     assert.deepEqual(
       Object.keys(g).sort(),
-      ["anomaly", "capabilities", "hatched", "next_threshold", "stage"],
+      ["anomaly", "capabilities", "capabilities_echoed", "hatched", "next_threshold", "stage"],
       `${label}: wrong keys`,
     );
     assert.ok(Number.isInteger(g.stage), `${label}: stage not an integer`);
@@ -248,7 +248,9 @@ test("missing or malformed capabilities fall back to the stage's own set", () =>
 test("capability echo that disagrees with the stage raises capability-mismatch", () => {
   const g = parseGates("```yaml\nstage: 2\ncapabilities: [wake, weave, becoming]\n```");
   assert.equal(g.stage, 2);
-  assert.deepEqual(g.capabilities, ["wake", "weave", "becoming"]);
+  // stage wins: the returned set is the stage's own, not the under-stated echo
+  assert.deepEqual(g.capabilities, CAPABILITIES_BY_STAGE[2]);
+  assert.deepEqual(g.capabilities_echoed, ["wake", "weave", "becoming"]);
   assert.equal(g.anomaly, "capability-mismatch");
 
   // Order-insensitive: same members in a different order is not a mismatch.
@@ -259,4 +261,33 @@ test("capability echo that disagrees with the stage raises capability-mismatch",
   const both = parseGates('```yaml\nstage: "2"\ncapabilities: [wake, weave, becoming, voice]\n```');
   assert.equal(both.stage, 0);
   assert.equal(both.anomaly, "bad-stage");
+});
+
+// The field a consumer reaches for must never fail toward MORE reach. A
+// hand-edited or badly-merged ledger claiming Stage 0 while echoing Stage-3
+// tokens must still yield the Stage-0 capability set.
+test("an over-privileged echo never escalates the returned capabilities", () => {
+  const g = parseGates(
+    "```yaml\nstage: 0\ncapabilities: [wake, weave, becoming, surfacing, voice, commons, amendments]\n```",
+  );
+  assert.equal(g.stage, 0);
+  assert.deepEqual(g.capabilities, ["wake", "weave", "becoming"]);
+  assert.deepEqual(g.capabilities_echoed, [
+    "wake",
+    "weave",
+    "becoming",
+    "surfacing",
+    "voice",
+    "commons",
+    "amendments",
+  ]);
+  assert.equal(g.anomaly, "capability-mismatch");
+  assert.ok(!g.capabilities.includes("amendments"));
+});
+
+test("capabilities_echoed is null when the echo is absent or malformed", () => {
+  assert.equal(parseGates("```yaml\nstage: 1\n```").capabilities_echoed, null);
+  assert.equal(parseGates("```yaml\nstage: 2\ncapabilities: wake\n```").capabilities_echoed, null);
+  assert.equal(parseGates("```yaml\nstage: 3\ncapabilities: [wake, 7]\n```").capabilities_echoed, null);
+  assert.equal(parseGates(null).capabilities_echoed, null);
 });

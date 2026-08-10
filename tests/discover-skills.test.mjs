@@ -75,6 +75,39 @@ test("discoverSkills detects duplicates across sources", () => {
   }
 });
 
+// Anomaly `path` values are published — .well-known/skills.json is served by the
+// federation site and advertised by llms.txt — so an absolute path there leaks
+// the operator's username and home layout. Every anomaly path must be rendered
+// relative to the root it was scanned from.
+test("anomaly paths are relative to their scanned root, never absolute", () => {
+  const ws = mkdtempSync(path.join(tmpdir(), "discover-relws-"));
+  const user = mkdtempSync(path.join(tmpdir(), "discover-reluser-"));
+  try {
+    mkdirSync(path.join(ws, "skills", "broken"), { recursive: true }); // missing-skill-md
+    mkdirSync(path.join(ws, "skills", "bare"), { recursive: true });
+    writeFileSync(path.join(ws, "skills", "bare", "SKILL.md"), "no frontmatter"); // no-frontmatter
+    for (const d of [ws, user]) {
+      mkdirSync(path.join(d, "skills", "shared"), { recursive: true });
+      writeFileSync(path.join(d, "skills", "shared", "SKILL.md"), "---\nname: shared\n---\n");
+    }
+
+    const result = discoverSkills({ workspaceDir: ws, userDir: user });
+    assert.ok(result.anomalies.length >= 3, "expected the three anomaly kinds");
+    for (const a of result.anomalies) {
+      assert.ok(!a.path.includes(ws), `${a.kind} leaked the workspace root: ${a.path}`);
+      assert.ok(!a.path.includes(user), `${a.kind} leaked the user root: ${a.path}`);
+      for (const p of a.path.split(", ")) {
+        assert.ok(!path.isAbsolute(p), `${a.kind} path is absolute: ${p}`);
+      }
+    }
+    assert.equal(result.anomalies.find((a) => a.kind === "missing-skill-md").path, "skills/broken");
+    assert.equal(result.anomalies.find((a) => a.kind === "no-frontmatter").path, "skills/bare/SKILL.md");
+  } finally {
+    rmSync(ws, { recursive: true, force: true });
+    rmSync(user, { recursive: true, force: true });
+  }
+});
+
 test("discoverSkills falls back to dir name when frontmatter is missing", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "discover-skills-"));
   try {

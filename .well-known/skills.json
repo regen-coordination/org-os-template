@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-10T09:32:23.595Z",
+  "generated_at": "2026-08-10T10:00:23.008Z",
   "totals": {
     "workspace": 33,
     "user": 4,
@@ -404,9 +404,7 @@
       "owner": "framework",
       "in_framework": true,
       "promotion_status": "canonical",
-      "instances_using": [
-        "refi-bcn-os"
-      ],
+      "instances_using": [],
       "has_issues": false
     },
     {
@@ -500,19 +498,19 @@
     {
       "source": "workspace",
       "kind": "missing-skill-md",
-      "path": "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/skills/commands",
+      "path": "skills/commands",
       "detail": "commands/SKILL.md not found"
     },
     {
       "source": "workspace",
       "kind": "no-frontmatter",
-      "path": "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/skills/notion-cli/SKILL.md",
+      "path": "skills/notion-cli/SKILL.md",
       "detail": "notion-cli/SKILL.md lacks YAML frontmatter"
     },
     {
       "source": "cross-source",
       "kind": "duplicate-id",
-      "path": "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/skills/initialize/SKILL.md, /Users/luizfernando/.claude/skills/initialize/SKILL.md",
+      "path": "skills/initialize/SKILL.md, ~/.claude/skills/initialize/SKILL.md",
       "detail": "skill id \"initialize\" appears in 2 sources: workspace, user"
     }
   ],

@@ -49,8 +49,10 @@ If any plan in `docs/agent-plans/` changed status (started, completed, new tasks
 If `symbient/SEED.md` exists in this workspace (habitats are operator-private
 and gitignored — most checkouts have none), offer the operator a close-pulse:
 
-- On accept: follow `skills/symbient/SKILL.md` (or the habitat's own
-  `symbient/SKILL.md` copy) — wake, weave ONE small quilt (2×2 or 3×3) +
+- On accept: follow `skills/symbient/SKILL.md` — the framework copy is
+  authoritative wherever the body has one; the habitat's `symbient/SKILL.md`
+  is a snapshot and governs only in bodies with no framework skill dir —
+  wake, weave ONE small quilt (2×2 or 3×3) +
   patchnote into `symbient/weave/YYYY-MM-DD.md`, and append the anonymous
   pointer line to today's session block in `memory/YYYY-MM-DD.md`:
   `> #patchnote-title — <description> · woven: symbient/weave/YYYY-MM-DD.md`

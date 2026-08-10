@@ -22,7 +22,11 @@ instances:
     framework_version: "3.0"
     last_sync: "2026-03-19"
     agent_runtime: ["cursor", "claude"]
-    skills_extra: ["notion-sync", "symbient"]
+    # `symbient` deliberately omitted: recording which instance carries the
+    # symbient skill publishes the existence of an operator-private habitat
+    # there. Adoption of that skill is never recorded — see
+    # data/skills-matrix.yaml (id: symbient) and skills/symbient/SKILL.md.
+    skills_extra: ["notion-sync"]
     packages: ["dashboard", "maps", "operations", "webapps"]
     data_registries_extra: ["catalunya-comarca-province", "hermes-cron", "orgs", "pending-payouts", "tasks", "telegram-topic-routing"]
     drift: []

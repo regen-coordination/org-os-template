@@ -53,4 +53,6 @@ __pycache__
 packages/multica-bridge/config.yaml
 
 # Symbient habitat (operator-private — see skills/symbient/SKILL.md)
-symbient/
+# Anchored: habitats live only at the repo root. An unanchored "symbient/"
+# would also match skills/symbient/ — the public framework skill directory.
+/symbient/

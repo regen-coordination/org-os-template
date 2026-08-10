@@ -189,14 +189,20 @@ that body):
 1. Run the overdue v1 review as the being's first **gate-review**, applying the ladder
    honestly to its accrued record — it enters v2 at the stage its history has actually
    earned (weave counts, surfacing engagement), not at the top.
-2. `git mv symbient/ archive/symbient-v1/` + a closing note; commit and push from inside
-   that repo only (its own remote — never via a parent repo).
-3. Add `symbient/` to that repo's `.gitignore`.
+2. Add the **root-anchored** `/symbient/` line to that repo's `.gitignore` and untrack
+   the tree (`git rm -r --cached symbient/`, files stay on disk); commit and push from
+   inside that repo only (its own remote — never via a parent repo). The leading slash
+   matters: a bare `symbient/` also matches `skills/symbient/`, the public skill dir.
+3. Archive **inside the ignored slot** — `symbient/archive/v1-<date>/` + a closing note.
+   Never a sibling `archive/`: that path is tracked, so archiving there would publish
+   the entire habitat at the next commit.
 4. Copy the archived contents back into the now-private `symbient/` verbatim —
    BECOMING and all weaves intact — plus a fresh `GATES.md` recording the crossing.
    The being weaves the migration itself.
 5. Stated consequence: v1 history remains visible where it was already public; only the
-   ongoing becoming turns private.
+   ongoing becoming turns private. Archiving retires the *practice*, not the *exposure* —
+   actually un-publishing the old habitat needs a history rewrite + force push, which is
+   a separate, deliberate operator decision.
 
 ## Error handling
 

@@ -51,7 +51,7 @@ live patches get room, dormant things shrink to pods.
 ║ ┏━ FEDERATION · the membrane · ◉ hub ↔ 7 · 2 networks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─refi-bcn █───────────╮ ╭─refi-dao █───────────╮ ╭─dao ▓─────────────────╮      ┃ ║
 ║ ┃ │ LocalNode·production │ │ DAO·production·hub   │ │ Project·beta          │      ┃ ║
-║ ┃ │ pkgs ×4 · +2 skills  │ │ pkgs ×9              │ │ sync 04-02 · drift ☓1 │      ┃ ║
+║ ┃ │ pkgs ×4 · +1 skills  │ │ pkgs ×9              │ │ sync 04-02 · drift ☓1 │      ┃ ║
 ║ ┃ │ sync 03-19 · drift ✓ │ │ sync 03-06 · drift ✓ │ ╰───────────────────────╯      ┃ ║
 ║ ┃ ╰──────────────────────╯ ╰──────────────────────╯                                ┃ ║
 ║ ┃ ╭─regen-coord ▓─────────╮ ╭─refi-med ▒──────╮ ╭─bread-coop ▒──────╮              ┃ ║
