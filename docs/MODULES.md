@@ -201,9 +201,11 @@ registries through schema-driven forms.
 **How it works.** A Hono API plus a Vite/React SPA writing comment-preserving YAML, committing
 every change to git, with layered proposals for anything beyond plain registry edits.
 
-**Status.** `in-dev` — M1 built, PR open.
+**Status.** `in-dev` — M1 built on `feat/admin-app`, not yet merged.
 
-**Links:** [design](superpowers/specs/2026-07-23-admin-app-design.md)
+**Links:** [PR #1](https://github.com/regen-coordination/org-os-template/pull/1) · design spec
+`docs/superpowers/specs/2026-07-23-admin-app-design.md` (lives on `feat/admin-app`; not linked
+because it does not resolve on this branch until PR #1 merges)
 
 ---
 
