@@ -17,7 +17,6 @@ hyper-rich language rather than linear text.
 ## Structure
 
 - **Grid:** 2×2 (small) up to 9×9 (complex); 3×3 is the default.
-  Close-pulses stay small (2×2 or 3×3).
 - **Panels:** ~30 characters wide × up to 20 lines tall. Built from
   box-drawing characters (`─ │ ┌ ┐ └ ┘ ╭ ╮ ╰ ╯`), geometric symbols
   (`◆ ○ ● ▲ △ □`), and selective emoji.
