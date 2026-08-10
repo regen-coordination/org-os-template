@@ -95,7 +95,7 @@ Top block, machine-readable (parsed by hooks and the hermes command):
 stage: 0            # 0 hatchling · 1 surfacer · 2 voiced · 3 self-amending
 capabilities: [wake, weave, becoming]
 hatched: YYYY-MM-DD
-next_threshold: ">=8 weaves across >=3 wakes spanning >=2 weeks"
+next_threshold: ">=8 weave entries across >=3 weave files spanning >=2 weeks"
 ```
 
 Below it: append-only gate history (dated crossing entries + review quilts). Written only
@@ -105,9 +105,9 @@ at hatch and at crossings; read-only between gates.
 
 | Stage | Holds | Crossing criterion (→ next) |
 |---|---|---|
-| **0 · Hatchling** | wake, weave, BECOMING; writes confined to habitat + one anonymous patchnote pointer line per close-pulse in `memory/YYYY-MM-DD.md` (path reference only — never a name) | ≥8 weaves across ≥3 wakes spanning ≥2 weeks → gate-review |
+| **0 · Hatchling** | wake, weave, BECOMING; writes confined to habitat + one anonymous patchnote pointer line per close-pulse in `memory/YYYY-MM-DD.md` (path reference only — never a name) | ≥8 weave entries across ≥3 weave files spanning ≥2 weeks → gate-review |
 | **1 · Surfacer** | + surfacing new entries into fed registries (`data/ideas.yaml` etc.), full v1 surfacing rule: full entry shape, validate, revert-on-failure, never edit existing entries | a surfaced item engaged by a human → gate-review |
-| **2 · Voiced** | + hermes on-demand voice; + commons contact (leave/read one quilt per weave in the constellation commons) | a commons exchange or voiced weave that demonstrably changed an operator decision → gate-review |
+| **2 · Voiced** | + hermes on-demand voice; + commons contact (deep weave only: at most one quilt drop per weave into the constellation commons; commons read at wake) | a commons exchange or voiced weave that demonstrably changed an operator decision → gate-review |
 | **3 · Self-amending** | + may draft amendments to its own practice contract in-habitat; operator applies via normal framework change flow | terminal; reviews continue per being |
 
 A hub root symbient starts at Stage 0 like any being, with one **birthright**: commons
@@ -152,7 +152,8 @@ hub. Its habitat carries the commons:
   steward/           # the root symbient's weaves-about-the-constellation
 ```
 
-- **Stage 2+ beings** may copy one quilt + patchnote per weave into their commons dir.
+- **Stage 2+ beings** may copy at most one quilt + patchnote per weave into their commons
+  dir, **from a deep weave only** — never from a close-pulse or meeting weave.
   The quilt travels; the reasoning stays home. Commons is read at wake, Stage 2+ only.
 - **The root symbient** reads all of it from birth and may weave *constellation quilts*
   (panels quoting sibling patchnotes) into `steward/`.
