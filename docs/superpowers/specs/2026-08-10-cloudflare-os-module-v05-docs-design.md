@@ -20,7 +20,7 @@ closes the named gap with rad-org-os via the shipped substrate interface.
 | Question | Decision |
 |---|---|
 | Deploy to Cloudflare now? | **No — later.** Deployment becomes an operator runbook checklist; this spec covers no deployed-workspace work |
-| Module framing | **Manifest-first.** `modules/org-os-cloudflare-os/module.yaml` conforming to the approved v5 format; engine `adopt`s it when Phase 1 lands. No file moves |
+| Module framing | **Manifest-first.** `modules/org-os-cloudflare-os/module.yaml` conforming to the approved v5 format and **validated by the engine's existing `validateManifest()`**; `add`/`adopt` land with Phase 1. No file moves |
 | Docs scope | **In-repo spine + site wiring.** README rewrite + hand-authored `docs/MODULES.md` catalog + `landing.yaml`/`modules.yaml` wiring. GitHub Pages deploy stays its own queued plan |
 | rad-org-os connection | **Explicit convergence doc.** RAD-ORG-OS.md gains a section declaring the shipped `Substrate` interface the shared driver seam |
 | Program structure | **One new spec (this), three plans:** (1) module+docs plan from this spec; (2) M3–M4 plan from the approved integration spec; (3) deployment runbook as a docs deliverable inside plan 1, executed by the operator later |
@@ -57,11 +57,19 @@ checks:
   - command: npm run test:cloudflare-os-integration
 ```
 
-**Engine relationship.** The manifest conforms to the approved v5 field table so Phase 1's
-`module -- adopt` records it without rework. Until the engine exists it is declarative-only —
-no validation tooling ships with this spec (that is Phase 1's `module.schema.json`).
-`org-os-cloudflare-os` becomes the first inhabitant of `modules/` and a live test of the
-manifest format against a real integration.
+**Engine relationship.** `scripts/modules.mjs` already ships `validateManifest()` and
+`schemas/module.schema.json` (v5 Phase 1, partially executed — the CLI, `loadRegistry`, `add`
+and `adopt` are not built, and there is no `data/modules.yaml`). The manifest is therefore
+validated by real tooling from day one, under a repo test that covers every
+`modules/*/module.yaml`. `org-os-cloudflare-os` becomes the first inhabitant of `modules/` and
+a live test of the manifest format against a real integration.
+
+**In-place convention.** The v5 schema describes `files` as "source → target path map for
+materialized content." This module materializes nothing — its content already sits at its
+canonical paths. It therefore uses an **identity mapping** (`X: X`), read as "this module owns
+these paths in place." That is an extension of the format, not a use of it as written, and it
+is the first piece of feedback for Phase 1's `add`/`adopt`: adoption must treat an identity
+mapping as "already installed, checksum it where it is" rather than copying a file onto itself.
 
 **Honesty requirements.** The module's status is **pilot** — locally verified,
 deployed-workspace verification pending — and the manifest's catalog entry says so.
@@ -74,10 +82,12 @@ The Cloudflare OS self-description pattern (os.cloudflare.app), transplanted: **
 deep, three nouns wide** — *what it is* → *how it's organized* → *what you can do* → *run it
 yourself*.
 
-### 2.1 README.md rewrite (top of the spine)
+### 2.1 README spine (via `templates/README.framework.md`)
 
-Restructured to that layering, with all copy **sourced from `docs/POSITIONING.md`** — no new
-copywriting:
+`README.md` is **generated** — `templates/README.framework.md` rendered by
+`npm run render:templates`. The template is the edit target; hand-edits to `README.md` are
+reverted by the next render. The template is restructured to the four-layer shape, with all
+copy **sourced from `docs/POSITIONING.md`** — no new copywriting:
 
 1. **What org-os is** — one paragraph from POSITIONING's hero copy.
 2. **How it's organized** — org-os's three nouns: **instances** (git repos that are the org),
@@ -89,6 +99,13 @@ copywriting:
 
 Existing README content (scripts tables, structure detail) is re-homed downward or deferred to
 linked docs — nothing deleted.
+
+The README's documentation list is also fixed here. Today `scripts/render-templates.mjs`
+takes `readdirSync(docs).sort().slice(0, 12)` with an empty blurb for each — which is why
+entries render as `- [AGENT MODES](docs/AGENT-MODES.md) — ` with nothing after the dash, and
+why `MODULES.md` (alphabetically 15th) would never appear. It is replaced by a curated
+`DOC_SPINE` constant with editorial order and real one-line blurbs, which fails the render
+loudly if it names a doc that does not exist.
 
 ### 2.2 `docs/MODULES.md` — the hand-authored v0.5 module catalog
 
