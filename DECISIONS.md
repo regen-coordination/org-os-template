@@ -16,6 +16,43 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-10 · Cloudflare OS is org-os's first tracked module; the framework describes itself
+
+**Status:** active
+**Scope:** framework, operator-ux, public-surfaces
+
+**Decision** — Frame the Cloudflare OS integration as **`org-os-cloudflare-os`**, a
+`type: integration` module declared by `modules/org-os-cloudflare-os/module.yaml` and validated
+by the module engine's existing `validateManifest()` — **manifest-first**, ahead of the engine's
+`add`/`adopt` commands, with no files moved. Because the module's content already sits at
+canonical paths, `files` uses an **identity mapping** (`X: X`) meaning "owns these paths in
+place" — an extension of the v5 format, and the first concrete feedback for Phase 1's `adopt`.
+Alongside it, give org-os a **layered self-description** modeled on how Cloudflare OS explains
+itself: a README spine (what it is → how it's organized, as three nouns: instances, modules,
+federation → what you can do → run it yourself) generated from `templates/README.framework.md`,
+and a hand-authored `docs/MODULES.md` catalog that deprecates `docs/PACKAGES.md`. One canonical
+chain is enforced rather than asserted: `POSITIONING.md` → README + `landing.yaml`, and
+`MODULES.md` → `site/src/data/modules.yaml`, the latter guarded by
+`site/test/modules-catalog.test.mjs`. The shipped `Substrate` interface is declared in
+`docs/RAD-ORG-OS.md` as the driver seam rad-org-os builds to.
+
+**Why** — Three lists of modules existed (the v5 spec, the site, PACKAGES.md) and none was
+canonical; the README opened on setup mechanics rather than identity; and "module" was a word
+in a spec rather than a tracked thing. Manifest-first makes the claim true at the cost of one
+file, and pressure-tests the manifest format against a real integration before six more modules
+are written against it. Engine-first was rejected as blocking the docs on a separate execution
+effort; docs-only was rejected because an untracked "module" is marketing. Deployment stays an
+operator runbook: the in-repo work is verified against a local Cloudflare OS stack, and nothing
+in the plan depends on a Cloudflare account.
+
+**Refs** — spec `docs/superpowers/specs/2026-08-10-cloudflare-os-module-v05-docs-design.md` ·
+plan `docs/superpowers/plans/2026-08-10-cloudflare-os-module-v05-docs.md` ·
+`modules/org-os-cloudflare-os/module.yaml` · `docs/MODULES.md` ·
+v5 design `docs/superpowers/specs/2026-08-02-org-os-v5-modularization-design.md` ·
+integration design `docs/superpowers/specs/2026-08-08-cloudflare-os-org-os-integration-design.md`
+
+---
+
 ## 2026-08-10 · Symbient v2 — public practice, private beings
 
 **Status:** active
