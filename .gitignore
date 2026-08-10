@@ -51,3 +51,6 @@ __pycache__
 
 # Multica bridge local config (machine-specific path + credentials-adjacent ids)
 packages/multica-bridge/config.yaml
+
+# Symbient habitat (operator-private — see skills/symbient/SKILL.md)
+symbient/
