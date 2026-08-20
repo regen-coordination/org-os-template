@@ -28,18 +28,18 @@ After reading all files, the agent validates schemas (`npm run validate:schemas`
 
 ### File Roles
 
-| File | Written by | Read by | Update frequency |
-|------|-----------|---------|------------------|
-| MASTERPLAN.md | Human | Agent | Weekly/monthly |
-| SOUL.md | Human | Agent | Rarely |
-| IDENTITY.md | Human | Agent | Rarely |
-| USER.md | Human | Agent | Rarely |
-| MEMORY.md | Both | Agent | Per session |
-| memory/*.md | Agent | Agent | Daily |
-| HEARTBEAT.md | Both | Agent | Per session |
-| TOOLS.md | Human | Agent | When config changes |
-| CLAUDE.md | Human | Agent | Rarely |
-| federation.yaml | Human | Agent | When network changes |
+| File            | Written by | Read by | Update frequency     |
+| --------------- | ---------- | ------- | -------------------- |
+| MASTERPLAN.md   | Human      | Agent   | Weekly/monthly       |
+| SOUL.md         | Human      | Agent   | Rarely               |
+| IDENTITY.md     | Human      | Agent   | Rarely               |
+| USER.md         | Human      | Agent   | Rarely               |
+| MEMORY.md       | Both       | Agent   | Per session          |
+| memory/\*.md    | Agent      | Agent   | Daily                |
+| HEARTBEAT.md    | Both       | Agent   | Per session          |
+| TOOLS.md        | Human      | Agent   | When config changes  |
+| CLAUDE.md       | Human      | Agent   | Rarely               |
+| federation.yaml | Human      | Agent   | When network changes |
 
 **Key principle:** Human-controlled files (SOUL, IDENTITY, MASTERPLAN) set direction. Agent-controlled files (memory/, HEARTBEAT updates) track execution. MEMORY.md is shared — agents log, humans curate.
 
@@ -53,36 +53,47 @@ MASTERPLAN.md is the most important human-authored file. Inspired by [karpathy/a
 # MASTERPLAN.md — [Org Name]
 
 ## Identity
+
 Who this agent is, what org it serves, its mandate.
 
 ## Activations
+
 What the agent should focus on RIGHT NOW.
+
 - [ ] Process Q1 meeting backlog
 - [ ] Fill gaps in carbon-markets knowledge domain
 - [ ] Prepare Q2 assembly materials
 
 ## Research Directions
+
 Longer-term knowledge gaps to fill, processes to improve.
+
 - Investigate conviction voting mechanisms for our context
 - Map regional funding landscape for Southern Europe
 
 ## Success Metrics
+
 How to evaluate whether improvements worked.
+
 - Schema validation passes: `npm run validate:schemas`
 - HEARTBEAT pending count decreasing
 - Knowledge coverage increasing per domain
 
 ## Boundaries
+
 What NOT to change autonomously.
+
 - Do not modify SOUL.md, IDENTITY.md, federation.yaml
 - Do not send external messages without approval
 - Do not commit financial transactions
 - Draft-and-present for anything public-facing
 
 ## Workfronts
+
 Active workstreams with priorities and context.
 
 ## Safety Policy
+
 Autonomous vs. requires-approval actions.
 ```
 
@@ -100,6 +111,7 @@ The `bootstrap-interviewer` skill runs an interactive setup:
 6. "Do you have existing data sources (Notion, Google Drive, GitHub repos)?"
 
 The interview auto-generates:
+
 - `SOUL.md` — from mission, values answers
 - `IDENTITY.md` — from name, type, governance answers
 - `data/members.yaml` — from team answers
@@ -124,6 +136,7 @@ The `knowledge-curator` skill handles ingestion. Each source is registered in `d
 ### Phase 3: Ongoing Learning
 
 Continuous improvement through daily operations:
+
 - **Meeting processing** → Builds operational memory, extracts action items
 - **Heartbeat monitoring** → Learns priorities, tracks task completion
 - **Knowledge curation** → Expands knowledge commons from new content
@@ -135,27 +148,32 @@ Continuous improvement through daily operations:
 Skills define what agents can do. They follow a three-tier model:
 
 ### Core Skills (from framework)
+
 Provided by org-os and available to all instances:
 
-| Skill | Purpose |
-|-------|---------|
-| `meeting-processor` | Process transcripts, extract decisions and action items |
-| `funding-scout` | Identify funding opportunities, track applications |
-| `knowledge-curator` | Aggregate knowledge from sources into knowledge/ |
-| `capital-flow` | Orchestrate capital movements, queue transactions |
-| `schema-generator` | Generate EIP-4824 schemas from data/*.yaml |
-| `heartbeat-monitor` | Proactive health checks, task prioritization |
-| `bootstrap-interviewer` | Guided interview for new org setup (v2) |
-| `idea-scout` | Scan knowledge for ecosystem gaps, surface ideas (v2) |
-| `workspace-improver` | Autonomous improvement loop — autoresearch (v2) |
+| Skill                   | Purpose                                                 |
+| ----------------------- | ------------------------------------------------------- |
+| `meeting-processor`     | Process transcripts, extract decisions and action items |
+| `funding-scout`         | Identify funding opportunities, track applications      |
+| `knowledge-curator`     | Aggregate knowledge from sources into knowledge/        |
+| `capital-flow`          | Orchestrate capital movements, queue transactions       |
+| `schema-generator`      | Generate EIP-4824 schemas from data/\*.yaml             |
+| `heartbeat-monitor`     | Proactive health checks, task prioritization            |
+| `bootstrap-interviewer` | Guided interview for new org setup (v2)                 |
+| `idea-scout`            | Scan knowledge for ecosystem gaps, surface ideas (v2)   |
+| `workspace-improver`    | Autonomous improvement loop — autoresearch (v2)         |
 
 ### Custom Skills (instance-specific)
+
 Created by instances for their unique needs. Examples:
+
 - `cooperative-ops` (refi-bcn-os) — Barcelona cooperative operations
 - `governance-facilitator` (refi-dao-os) — Steward council facilitation
 
 ### Shared Skills (promoted from instances)
+
 When a custom skill proves valuable, it can be promoted:
+
 1. Instance creates custom skill in `skills/`
 2. Skill proves value over multiple sessions
 3. Instance proposes to framework (PR or federation declaration)
@@ -229,6 +247,7 @@ memory/YYYY-MM-DD.md   = experiment log (what was tried, results)
 ### Boundaries
 
 Agents may modify:
+
 - `data/*.yaml` — Fill gaps, update stale records
 - `knowledge/` — Process new content, improve pages
 - `memory/` — Log everything
@@ -237,6 +256,7 @@ Agents may modify:
 - `.well-known/` — Regenerate schemas
 
 Agents must NOT modify without human approval:
+
 - `SOUL.md` — Organization identity
 - `IDENTITY.md` — Governance infrastructure
 - `federation.yaml` — Network relationships
@@ -245,13 +265,13 @@ Agents must NOT modify without human approval:
 
 ### Evaluation Metrics
 
-| Metric | How to measure | Target |
-|--------|---------------|--------|
-| Schema validation | `npm run validate:schemas` | Pass |
-| HEARTBEAT pending | Count unchecked items | Decreasing |
-| Knowledge coverage | domain coverage in knowledge-manifest.yaml | Increasing |
-| Data freshness | last_updated dates in registries | Within 7 days |
-| Idea pipeline | ideas.yaml entries in active states | Growing |
+| Metric             | How to measure                             | Target        |
+| ------------------ | ------------------------------------------ | ------------- |
+| Schema validation  | `npm run validate:schemas`                 | Pass          |
+| HEARTBEAT pending  | Count unchecked items                      | Decreasing    |
+| Knowledge coverage | domain coverage in knowledge-manifest.yaml | Increasing    |
+| Data freshness     | last_updated dates in registries           | Within 7 days |
+| Idea pipeline      | ideas.yaml entries in active states        | Growing       |
 
 ## Agent Modes
 
@@ -259,15 +279,17 @@ Agent modes are personas that shape how the agent operates. They're defined in `
 
 ### Standard Modes (provided by framework)
 
-| Mode | Focus | Use when |
-|------|-------|----------|
-| `default` | General operations | Normal day-to-day work |
+| Mode                     | Focus                | Use when                        |
+| ------------------------ | -------------------- | ------------------------------- |
+| `default`                | General operations   | Normal day-to-day work          |
 | `governance-facilitator` | Governance processes | Elections, proposals, decisions |
-| `content-processor` | Content ingestion | Processing blog, podcast, docs |
-| `ideation-curator` | Idea pipeline | Managing ideas, scouting gaps |
+| `content-processor`      | Content ingestion    | Processing blog, podcast, docs  |
+| `ideation-curator`       | Idea pipeline        | Managing ideas, scouting gaps   |
 
 ### Custom Modes (instance-specific)
+
 Instances can add modes for their context:
+
 - `cooperative-ops` — Cooperative management workflows
 - `aggregator-indexer` — Content aggregation and indexing
 - `network-facilitator` — Cross-org coordination (for hub nodes)
@@ -298,9 +320,35 @@ Guide governance processes: elections, proposals, council decisions.
 - Schema generator for governance schema updates
 ```
 
-## Safety Policy
+### Berd Personas (`.agents/agents/`)
+
+For the Berd desktop app, personas live as **Agent Markdown**
+files in the repo at `.agents/agents/<slug>.md` — Berd's project-local agent
+directory, discovered automatically when the workspace is open. Format: YAML
+frontmatter with required `name` + `description` (optional `good_for`, `vibes`,
+`avatar`, `model`), body = the persona's system prompt.
+
+The framework ships two:
+
+| Persona       | Role                                                                             |
+| ------------- | -------------------------------------------------------------------------------- |
+| `operator.md` | Runs org-os workspaces day to day — sessions, registries, memory, vault-safe git |
+| `upstream.md` | Develops the framework itself — skills, schemas, docs, migrations                |
+
+Some personas need to work when no project is open (Operator spans the whole
+federation), so `npm run sync:agents` mirrors the repo's agents to the
+user-level `~/.agents/agents/`. The sync is one-way (repo → global) and marker
+guarded: every canonical file carries `managed_by: org-os` in its frontmatter,
+and the script only overwrites global files bearing that marker. Hand-authored
+global agents are skipped (pass `--adopt` to take one over); agents bundled by
+the Berd app itself are never touched. Edit personas in the repo, then re-run
+the sync — global edits to managed copies are overwritten on the next sync.
+
+Instances that adopt Berd add their own personas to their `.agents/agents/`;
+the sync script arrives with the framework via `sync:upstream`.
 
 ### Autonomous Actions (no approval needed)
+
 - Read any workspace file
 - Update memory/ daily logs
 - Update HEARTBEAT.md task status
@@ -310,6 +358,7 @@ Guide governance processes: elections, proposals, council decisions.
 - Draft documents for review
 
 ### Requires Human Approval
+
 - Send external messages (Telegram, email, GitHub)
 - Execute on-chain transactions
 - Publish content publicly
@@ -319,7 +368,9 @@ Guide governance processes: elections, proposals, council decisions.
 - Create or delete repositories
 
 ### Escalation Protocol
+
 When uncertain about autonomy level:
+
 1. Check MASTERPLAN.md boundaries section
 2. If not covered, default to draft-and-present
 3. Log the question in memory/ for human review
@@ -328,16 +379,21 @@ When uncertain about autonomy level:
 ## Integration Points
 
 ### Agent Runtimes
+
 org-os workspaces are compatible with multiple agent runtimes:
+
 - **Claude Code** — Primary CLI agent (`.claude/` config)
 - **Cursor** — IDE agent (`.cursor/` config)
 - **OpenClaw** — Autonomous agent platform
 - **OpenCode** — Open-source agent runtime
+- **Berd** — Desktop agent app (`.agents/agents/` personas, see § Agent Modes)
 
 Each runtime reads the same workspace files. Platform-specific config goes in their respective directories. See `docs/TOOL-SETUP.md`.
 
 ### External Tools via MCP
+
 Agents can access external systems via MCP (Model Context Protocol) servers:
+
 - **Notion** — Read/write Notion databases
 - **GitHub** — PR management, issue tracking
 - **Telegram** — Community messaging (read-only recommended)
