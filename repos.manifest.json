@@ -2,18 +2,13 @@
   "baseDirectory": "repos",
   "repositories": [
     {
-      "name": "organizational-os-framework",
-      "url": "https://github.com/regen-coordination/organizational-os-framework.git",
+      "name": "org-os-framework",
+      "url": "https://github.com/regen-coordination/org-os-framework.git",
       "branch": "main"
     },
     {
-      "name": "organizational-os-template",
-      "url": "https://github.com/regen-coordination/organizational-os-template.git",
-      "branch": "main"
-    },
-    {
-      "name": "organizational-os",
-      "url": "https://github.com/regen-coordination/organizational-os.git",
+      "name": "org-os-template",
+      "url": "https://github.com/regen-coordination/org-os-template.git",
       "branch": "main"
     },
     {

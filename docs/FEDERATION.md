@@ -111,8 +111,8 @@ Declares the template or framework repository this instance inherits from.
 ```yaml
 upstream:
   - type: "template"
-    repository: "organizational-os-template"
-    url: "https://github.com/regen-coordination/organizational-os-template"
+    repository: "org-os-template"
+    url: "https://github.com/regen-coordination/org-os-template"
     relationship: "fork"
     last_sync: "2026-03-06"
     sync_frequency: "monthly"
@@ -802,8 +802,8 @@ peers:
 
 upstream:
   - type: "template"
-    repository: "organizational-os-template"
-    url: "https://github.com/regen-coordination/organizational-os-template"
+    repository: "org-os-template"
+    url: "https://github.com/regen-coordination/org-os-template"
     relationship: "fork"
     remote_name: "upstream"
 

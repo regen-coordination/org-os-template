@@ -2,16 +2,16 @@
 id: project-id
 type: project
 name: "Project Name"
-status: Integrate # Integrate, Develop, Execute, Archive
-lead: member-id
+status: Integrate  # Integrate, Develop, Execute, Archive
+lead: did:refibcn:luiz-fernando
 members:
-  - member-id-1
-  - member-id-2
+  - did:refibcn:luiz-fernando
+  - did:refibcn:giulio-quarta
+  - did:refibcn:andrea-farias
 startDate: YYYY-MM-DD
 budget:
   allocated: 0
-  currency: USD
-notion_url: "" # Notion page URL (optional, for /initialize dashboard links)
+  currency: EUR
 ---
 
 # {{name}}
@@ -25,6 +25,13 @@ notion_url: "" # Notion page URL (optional, for /initialize dashboard links)
 ### Context & Requirements
 
 [Gather requirements, stakeholder needs, research]
+
+### Source-of-Truth Inputs
+
+- [ ] `03 Libraries/ReFi-Barcelona` references reviewed
+- [ ] `03 Libraries/ReFi-BCN-Website` references reviewed
+- [ ] `03 Libraries/Regenerant-Catalunya` references reviewed
+- [ ] `03 Libraries/ReFi DAO` references reviewed
 
 ### Success Criteria
 
@@ -48,9 +55,9 @@ notion_url: "" # Notion page URL (optional, for /initialize dashboard links)
 
 ### Tasks
 
-- [ ] Task 1 (@assignee) #task-1
-- [ ] Task 2 (@assignee) #task-2
-- [ ] Task 3 (@assignee) #task-3
+- [ ] Task 1 (@did:refibcn:luiz-fernando) #task-1
+- [ ] Task 2 (@did:refibcn:giulio-quarta) #task-2
+- [ ] Task 3 (@did:refibcn:andrea-farias) #task-3
 
 ### Progress Updates
 
@@ -61,6 +68,11 @@ notion_url: "" # Notion page URL (optional, for /initialize dashboard links)
 ### Learnings
 
 [What worked, what didn't]
+
+### Normalization Impact
+
+- [ ] Updated canonical values in `knowledge/normalization-log.md` when needed
+- [ ] Synced affected registries in `data/`
 
 ### Outcomes
 

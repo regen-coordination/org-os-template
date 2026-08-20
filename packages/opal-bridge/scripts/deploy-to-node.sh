@@ -35,7 +35,7 @@ declare -A NODES=(
     ["dao-os"]="regen-coordination/dao-os"
     ["grants-os"]="regen-coordination/grants-os"
     ["coop-os"]="regen-coordination/coop-os"
-    ["organizational-os"]="regen-coordination/organizational-os"
+    ["org-os"]="regen-coordination/org-os-template"
     ["becoming-constellations"]="regen-coordination/becoming-constellations"
     ["regenerant-catalunya"]="regen-coordination/regenerant-catalunya"
 )

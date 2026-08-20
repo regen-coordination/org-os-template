@@ -121,6 +121,19 @@ Spawn multiple agents with different angles:
   - Use for: Ecosystem intelligence, competitive analysis
 ```
 
+### Query the knowledge graph first
+
+If `graphify-out/graph.json` exists, answer questions about the organization's
+code, docs, and structure from the graph before grep-based exploration:
+
+```bash
+graphify query "How does the funding pipeline connect to the curator?"
+```
+
+The graph carries file:line citations and an EXTRACTED/INFERRED/AMBIGUOUS audit
+trail. Fall back to normal exploration when the graph is absent, stale, or the
+question is outside its corpus. See `skills/knowledge-graph/SKILL.md`.
+
 ### Subagent Lifecycle
 
 1. **Define** — Clear task, expected output, constraints
@@ -395,7 +408,7 @@ This workspace is part of a federation network (see `federation.yaml`).
 
 ## 11. Integration Points
 
-**Upstream**: [organizational-os](https://github.com/regen-coordination/organizational-os) — Framework standards, schemas, best practices
+**Upstream**: [org-os-framework](https://github.com/regen-coordination/org-os-framework) — Standards, schemas, and patterns
 
 **Common Integrations** (see `federation.yaml`):
 

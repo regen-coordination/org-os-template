@@ -37,16 +37,21 @@ Then follow the startup sequence in `AGENTS.md`:
 
 Use `/initialize` to start a session (renders dashboard, loads context) and `/close` to end it (writes memory, commits, pushes). These are defined in `.claude/commands/`.
 
+**Optional: Notion API access.** Copy `.env.example` to `.env` and add your `NOTION_API_KEY` for script-based Notion access. Not needed if using Claude Code/Cursor (MCP handles auth automatically).
+
 ## Common Tasks
 
 ```bash
-npm run initialize         # Gather org state (JSON output)
+npm run initialize         # Gather org state (JSON default, --format=markdown for dashboard)
 npm run setup              # Interactive setup wizard
 npm run generate:schemas   # Regenerate EIP-4824 schemas
 npm run validate:schemas   # Validate schema compliance
 npm run validate:structure # Check instance against canonical spec
 npm run clone:repos        # Clone linked repositories
 npm run sync:upstream      # Sync instances with framework
+npm run knowledge          # Compile knowledge base + index + lint
+npm run compile:knowledge  # Extract sources → compile pages → update indexes
+npm run lint:knowledge     # Health check (structure, links, freshness)
 ```
 
 ## Key Docs

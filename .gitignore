@@ -3,7 +3,10 @@ node_modules/
 .pnp
 .pnp.js
 
-# Local linked repo clones
+# External agent skills (installed via feynman install-skills --repo)
+.agents/skills/feynman/
+
+# Local linked repo clones (keep only docs/manifest in this repo)
 repos/*
 !repos/README.md
 
@@ -23,6 +26,10 @@ data/kb/map.json
 # Local env files
 .env
 .env*.local
+
+# Superpowers plugin ephemeral plans
+docs/superpowers/*
+!docs/superpowers/specs/
 
 # Editor
 .vscode/*
@@ -56,3 +63,9 @@ packages/multica-bridge/config.yaml
 # Anchored: habitats live only at the repo root. An unanchored "symbient/"
 # would also match skills/symbient/ — the public framework skill directory.
 /symbient/
+
+# Graphify — commit data (graph.json, cache/, manifest.json, GRAPH_REPORT.md, cost.json),
+# ignore renderings and machine-local files
+graphify-out/graph.html
+graphify-out/.graphify_python
+graphify-out/.graphify_root

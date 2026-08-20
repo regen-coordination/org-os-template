@@ -70,9 +70,12 @@ Scan for improvement opportunities in priority order:
 - Are dates stale (last_updated > 7 days ago)?
 
 **Priority 3: Knowledge Gaps**
-- Are there knowledge domains with coverage: "none" or "partial"?
+- Run `npm run compile:knowledge` to refresh the knowledge extract and compiled pages
+- Run `npm run lint:knowledge` — address any hard failures
+- Check for domains with coverage: "none" or "partial" in `data/knowledge-manifest.yaml`
+- Check for `<!-- LLM-SYNTHESIZE -->` markers — invoke knowledge-curator in Compilation Mode to synthesize
 - Are there sources in data/sources.yaml that haven't been processed?
-- Can existing knowledge pages be improved or expanded?
+- After changes, run `npm run knowledge` to validate the full pipeline
 
 **Priority 4: Schema Health**
 - Does `npm run validate:schemas` pass?

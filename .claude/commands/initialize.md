@@ -9,7 +9,12 @@ You are opening a new org-os session. Follow these steps exactly.
 Pull latest changes (skip silently if offline or no remote):
 
 ```bash
-git pull --rebase --quiet 2>&1 || echo "sync: no remote or offline — continuing with local state"
+TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ "$TOPLEVEL" = "$(pwd)" ]; then
+  git pull --rebase --quiet 2>&1 || echo "sync: no remote or offline — continuing with local state"
+else
+  echo "sync: embedded repo — skipping pull"
+fi
 ```
 
 ## Step 2: Render Dashboard

@@ -4,7 +4,7 @@
 > system as **one organism** — modules, integrations, and federation as nested
 > containers, shaded by live status.
 >
-> Woven **2026-08-10** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
+> Woven **2026-08-20** by `npm run generate:quilt` from `data/*.yaml` — do not edit by
 > hand. Edit prose in the generator `scripts/generate-quilt.mjs` (organ layout/taglines)
 > or per-entry detail in `scripts/lib/quilt-view.mjs` (PKG_DETAIL, GARDEN_GROUPS, …).
 
@@ -25,10 +25,10 @@ live patches get room, dormant things shrink to pods.
 ## The organism
 
 ```
-╔═ ORG-OS · framework v0.5 · woven 2026-08-10 ═════════════════════════════════════════╗
+╔═ ORG-OS · framework v0.5 · woven 2026-08-20 ═════════════════════════════════════════╗
 ║ ┏━ CORE · nucleus ━━━━━━━━━━━━━━━━━━━┓ ┏━ DATA ≡ SCHEMAS ━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─HEARTBEAT █─╮ ╭─MEMORY █─╮       ┃ ┃ ╭─data/*.yaml █──╮ ╭─.well-known █─╮      ┃ ║
-║ ┃ │ 52 open     │ │ 2d ago   │       ┃ ┃ │ ×17 registries │ │ EIP-4824 ×11  │      ┃ ║
+║ ┃ │ 54 open     │ │ 0d ago   │       ┃ ┃ │ ×18 registries │ │ EIP-4824 ×11  │      ┃ ║
 ║ ┃ ╰─────────────╯ ╰──────────╯       ┃ ┃ ╰────────────────╯ ╰───────────────╯      ┃ ║
 ║ ┃ █ spine ─ (SOUL) (IDENTITY) (USER) ┃ ┃ ≡ generate ⇄ validate ✓                   ┃ ║
 ║ ┃           (TOOLS)                  ┃ ┃   yaml is truth, schema is face           ┃ ║
@@ -43,7 +43,7 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ ~ many doors, one house               ┃ ┃ ~ where the world plugs in             ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ↕                                           ║
-║ ┏━ AUTOMATION · metabolism · scripts ×32 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
+║ ┏━ AUTOMATION · metabolism · scripts ×35 + hooks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ loop ─ (initialize » dashboard) (generate ⇄ validate) (sync-upstream ↔ spokes)   ┃ ║
 ║ ┃        (analyze » drift-report) (clone-framework » birth)                        ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
@@ -59,8 +59,8 @@ live patches get room, dormant things shrink to pods.
 ║ ┃ │ sync 04-24 · drift ☓3 │ │ sync 04-28      │ │ sync 05-16        │              ┃ ║
 ║ ┃ ╰───────────────────────╯ ╰─────────────────╯ ╰───────────────────╯              ┃ ║
 ║ ┃ ▒☓ substrate ─ (openclaw · agent runtime · sync ∅ · 3 drift)                     ┃ ║
-║ ┃ ledger: bread-coop 3mo » refi-med 3.5mo » regen-coord 3.5mo » dao 4.5mo          ┃ ║
-║ ┃   refi-bcn 5mo » refi-dao 5mo » openclaw ∅ · ☓7                                  ┃ ║
+║ ┃ ledger: bread-coop 3mo » refi-med 4mo » regen-coord 4mo » dao 4.5mo              ┃ ║
+║ ┃   refi-bcn 5mo » refi-dao 5.5mo » openclaw ∅ · ☓7                                ┃ ║
 ║ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ║
 ║                                          ⊕                                           ║
 ║ ┏━ PACKAGES · travelers · matrix ×23 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║

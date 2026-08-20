@@ -43,6 +43,29 @@ sections:
     show: true
     queued_preview: 3       # Bumped from 2 — framework has several queued plans
 
+  pipelines:
+    show: true
+    pipelines:
+      - id: ideas
+        source: data/ideas.yaml
+        label: "Ideas"
+        stages: [surfaced, proposed, approved, developing, hatched]
+      - id: funding
+        source: data/funding-opportunities.yaml
+        label: "Funding"
+        stages: [monitoring, researching, applied, awarded]
+      - id: knowledge
+        source: data/knowledge-manifest.yaml
+        label: "Knowledge"
+        stages: [stub, partial, comprehensive]
+      - id: plans
+        source: docs/plans/QUEUE.md
+        label: "Plans"
+        stages: [backlog, queued, active, completed]
+
+  knowledge_graph:
+    show: true
+
   apps:
     show: false             # No apps at framework level; instances turn on
 

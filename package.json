@@ -11,11 +11,11 @@
   },
   "scripts": {
     "clone:repos": "node scripts/clone-linked-repos.mjs",
+    "index:repos": "node scripts/index-linked-repos.mjs",
     "bootstrap:local": "npm run clone:repos && npm install",
     "quartz": "./quartz/bootstrap-cli.mjs",
     "setup": "node scripts/setup-org-os.mjs",
     "setup:cursor": "node scripts/setup-cursor-rules.mjs",
-    "sync": "node scripts/sync-github.mjs",
     "sync:upstream": "node scripts/sync-upstream.mjs",
     "sync:commands": "node scripts/sync-commands.mjs",
     "sync:agents": "node scripts/sync-agents.mjs",
@@ -32,6 +32,12 @@
     "knowledge:lint": "node scripts/lint-knowledge.mjs",
     "knowledge:normalize": "node scripts/normalize-kb-frontmatter.mjs",
     "knowledge:update-index": "node scripts/update-knowledge-index.mjs",
+    "compile:knowledge": "node scripts/compile-knowledge.mjs && node scripts/update-knowledge-index.mjs",
+    "lint:knowledge": "node scripts/lint-knowledge.mjs",
+    "knowledge": "npm run compile:knowledge && npm run lint:knowledge",
+    "graph:status": "node scripts/graph-status.mjs --format=markdown",
+    "graph:gaps": "node scripts/graph-gaps.mjs",
+    "graph:update": "command -v graphify >/dev/null 2>&1 && graphify . --update || echo 'graph: CLI not installed — see docs/integrations/graphify.md'",
     "check:divergence": "node scripts/check-divergence.mjs",
     "selftest": "node scripts/selftest.mjs",
     "version:check": "node scripts/update-version.mjs --check",
@@ -45,7 +51,7 @@
     "clone:framework": "node scripts/clone-framework.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "docs": "npx quartz build --serve -d docs",
-    "check": "tsc --noEmit && npx prettier . --check",
+    "check": "node scripts/graph-status.mjs --test && node scripts/graph-gaps.mjs --test && tsc --noEmit && npx prettier . --check",
     "format": "npx prettier . --write",
     "initialize": "node scripts/initialize.mjs",
     "initialize:markdown": "node scripts/initialize.mjs --format=markdown",
@@ -53,7 +59,10 @@
     "paperclip": "cd packages/paperclip-agents-app && npm run dev",
     "paperclip:server": "cd packages/paperclip-agents-app && npm run dev:server",
     "paperclip:build": "cd packages/paperclip-agents-app && npm run build:ui",
-    "deploy:pages": "node scripts/deploy-pages.mjs"
+    "deploy:pages": "node scripts/deploy-pages.mjs",
+    "generate:dashboard": "node packages/dashboard/generate.mjs",
+    "build:site": "cd repos/refi-bcn-knowledge && npx quartz build",
+    "serve:site": "cd repos/refi-bcn-knowledge && npx quartz build --serve"
   },
   "engines": {
     "npm": ">=10.9.2",
@@ -72,6 +81,8 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
+    "@notionhq/client": "^3.1.0",
+    "dotenv": "^17.4.2",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.1.0",
     "prettier": "^3.6.2"

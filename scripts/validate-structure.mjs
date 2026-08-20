@@ -95,7 +95,7 @@ for (const dir of requiredDirs) {
 }
 
 // Optional directories
-const optionalDirs = ['knowledge', 'ideas', 'docs', 'repos', '.claude'];
+const optionalDirs = ['knowledge', 'ideas', 'docs', 'repos', '.claude', 'graphify-out'];
 for (const dir of optionalDirs) {
   if (!dirExists(dir)) {
     warn(`${dir}/ not present (optional)`);
@@ -122,6 +122,7 @@ const optionalDataFiles = [
   'events.yaml',
   'channels.yaml',
   'assets.yaml',
+  'knowledge-gaps.yaml',
 ];
 
 for (const file of requiredDataFiles) {
@@ -213,10 +214,14 @@ if (fileExists('federation.yaml')) {
     check('federation.yaml has identity.name', !!fed?.identity?.name);
     check('federation.yaml has identity.type', !!fed?.identity?.type);
     // Federation participation: at least one of network/peers/upstream/downstream
-    // (per FILE-STRUCTURE.md schema; the legacy `federation:` wrapper was never adopted)
+    // (per FILE-STRUCTURE.md schema; v3.0 flat manifest) — or the legacy v2
+    // `federation:` wrapper, grouped under a `federation:` key. Accept either.
+    const hasV3Flat = !!(fed?.network || fed?.peers || fed?.upstream || fed?.downstream);
+    const hasLegacyFederationSection =
+      fed && typeof fed.federation === 'object' && fed.federation !== null;
     check(
-      'federation.yaml has federation participation (network/peers/upstream/downstream)',
-      !!(fed?.network || fed?.peers || fed?.upstream || fed?.downstream),
+      'federation.yaml has federation participation (network/peers/upstream/downstream, or legacy federation: section)',
+      hasV3Flat || hasLegacyFederationSection,
     );
     check('federation.yaml has agent section', !!fed?.agent);
 

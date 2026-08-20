@@ -14,7 +14,7 @@ inputs:
   - data/projects.yaml (active projects for context)
 outputs:
   - data/ideas.yaml entries (status: surfaced)
-  - ideas/[slug].md detailed descriptions
+  - docs/docs/ideas/[slug].md detailed descriptions
   - memory/YYYY-MM-DD.md log of scouting session
 dependencies:
   - knowledge-curator
@@ -89,7 +89,7 @@ For ideas that pass evaluation:
   comments: []
 ```
 
-2. Create `ideas/[slug].md` with detailed description:
+2. Create `docs/ideas/[slug].md` with detailed description:
 ```markdown
 # [Title]
 
@@ -135,7 +135,7 @@ Write to `memory/YYYY-MM-DD.md`:
 ### ideas.yaml entry
 See Step 4 above for the complete schema.
 
-### ideas/[slug].md
+### docs/ideas/[slug].md
 See Step 4 above for the detailed description format.
 
 ## Idea Lifecycle (for reference)

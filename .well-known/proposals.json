@@ -1,22 +1,4 @@
 {
   "@context": "https://www.daostar.org/schemas",
-  "type": "ProposalRegistry",
-  "proposals": [
-    {
-      "id": "gov-20260424-001",
-      "title": "Self-hosting inauguration",
-      "type": "amendment",
-      "status": "ratified",
-      "date": "2026-04-24",
-      "summary": "The org-os repo adopts org-os as its own operating system. Stubs filled with real content; instance-orchestration layer introduced (data/instances.yaml, skills-matrix.yaml, packages-matrix.yaml). Solo → OSS → DAO trajectory documented in IDENTITY.md."
-    },
-    {
-      "id": "gov-20260424-002",
-      "title": "Projects-vs-plans separation",
-      "type": "amendment",
-      "status": "ratified",
-      "date": "2026-04-24",
-      "summary": "data/projects.yaml holds long-lived workstreams; docs/agent-plans/ holds specific plans. Plans reference parent workstream via `workstream:` frontmatter."
-    }
-  ]
+  "proposals": []
 }

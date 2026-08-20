@@ -1,7 +1,7 @@
 ---
 name: funding-scout
 version: 1.0.0
-description: Identify, track, and report on funding opportunities relevant to this organization
+description: Identify, track, and report funding opportunities using local registries plus ReFi BCN Notion CRM/research signals, with deadline escalation into HEARTBEAT
 author: organizational-os
 category: coordination
 metadata:
@@ -17,6 +17,11 @@ metadata:
 ## What This Is
 
 Monitors and tracks funding opportunities relevant to this organization's domains. Maintains a database of known opportunities, alerts on upcoming deadlines, and helps prepare application materials for human review.
+
+For ReFi BCN, use these Notion sources as discovery inputs:
+- CRM (`2156ed08-45cb-815c-9a3a-000b46e37cb7`) — funding intent and partner profile signals
+- Notes & Documents (`1386ed08-45cb-81ed-b055-000ba5b70a6b`) — meeting/context clues
+- Research & Reading List (`1386ed08-45cb-814b-9193-000b605eb1e7`) — external opportunities and references
 
 ## When to Use
 
@@ -51,18 +56,22 @@ See `references/funding-platforms.yaml` for full list. Core platforms:
 
 ### Scan Workflow (Scheduled)
 
-1. Check `data/funding-opportunities.yaml` for current list and upcoming deadlines
-2. Identify opportunities with deadlines within 30 days → add to `HEARTBEAT.md`
-3. Note any opportunities that need action (application, onboarding, profile creation)
-4. Write weekly scan summary to `memory/YYYY-MM-DD.md`
+1. Check `data/funding-opportunities.yaml` for current list and upcoming deadlines.
+2. Query Notion CRM for entries signaling active funding need (e.g., short-mid term window).
+3. Review Notion Notes/Research entries from the last 7-14 days for funding mentions.
+4. Add or update opportunities in local registry with status, deadline, and source refs.
+5. Identify opportunities with deadlines within 30 days → add to `HEARTBEAT.md`.
+6. Maintain a minimum active pipeline of 5 opportunities (unless explicitly deprioritized by operator).
+7. Write weekly scan summary to `memory/YYYY-MM-DD.md`.
 
 ### On-Demand Query
 
 When asked about funding:
-1. Read `data/funding-opportunities.yaml`
-2. If hub sync is configured, check `knowledge/<domain>/funding-opportunities.yaml`
-3. Return list ranked by: deadline (urgent first) → relevance to org domains → amount
-4. Suggest which ones match current org activity level and capacity
+1. Read `data/funding-opportunities.yaml`.
+2. If needed, cross-check recent Notion CRM/Notes signals for strategic fit.
+3. If hub sync is configured, check `knowledge/<domain>/funding-opportunities.yaml`.
+4. Return list ranked by: deadline (urgent first) → domain relevance → execution capacity.
+5. Suggest which opportunities match current ReFi BCN priorities (Regenerant, node coordination, tooling, knowledge commons).
 
 ### Add New Opportunity
 
@@ -77,7 +86,12 @@ When a new opportunity is found, add to `data/funding-opportunities.yaml`:
   matching: true
   url: "https://..."
   status: pending
+  eligible: true
+  discovered_by: "refi-bcn-agent"
   discovered_date: "YYYY-MM-DD"
+  source_refs:
+    - "Notion: page-or-database-id"
+    - "https://..."
   notes: "Any important context"
 ```
 
@@ -116,3 +130,11 @@ knowledge-commons:
     - "regenerative-finance"
 ```
 Prioritize opportunities that match declared domains.
+
+## ReFi BCN Prioritization Heuristics
+
+When multiple options exist, prioritize opportunities that:
+1. Strengthen local regenerative/cooperative initiatives in Barcelona/Catalonia.
+2. Support ReFi BCN coordination capacity and ecosystem infrastructure.
+3. Reinforce Regenerant/Localism execution and reporting commitments.
+4. Are executable with current team bandwidth and timeline.

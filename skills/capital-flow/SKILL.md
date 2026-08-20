@@ -140,6 +140,30 @@ Add to `HEARTBEAT.md` when:
 - Contributor payout is due (check member agreement dates)
 - Treasury balance below operational threshold (if configured)
 
+## ReFi BCN Implementation Runbook (Operational)
+
+### Monthly treasury cycle
+
+1. **State check**
+   - Review `data/finances.yaml` for latest balances/flows
+   - Check pending items in `data/pending-payouts.yaml` (if present)
+   - Flag treasury anomalies in `HEARTBEAT.md`
+2. **Payout draft prep (never execute autonomously)**
+   - Build/update draft payout queue in `data/pending-payouts.yaml`
+   - Include source refs (meeting/project basis for each payout line)
+3. **Operator review package**
+   - Produce summary with: recipient, amount, token, rationale, urgency
+   - Explicitly tag as `DRAFT — operator approval required`
+4. **Post-execution bookkeeping (after human execution only)**
+   - Record final tx details in `data/finances.yaml`
+   - Close related HEARTBEAT task and log in `memory/YYYY-MM-DD.md`
+
+### Quality gate (must pass)
+- [ ] No transaction execution by agent
+- [ ] Every payout line has rationale + source reference
+- [ ] Draft and executed records are clearly separated
+- [ ] High-impact/financial decisions are escalated to Luiz before action
+
 ## Notes
 
 - This skill reads `data/finances.yaml` and `data/members.yaml`

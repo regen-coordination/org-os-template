@@ -1,7 +1,7 @@
 ---
 name: meeting-processor
 version: 1.0.0
-description: Process meeting transcripts into structured organizational records
+description: Process meeting transcripts and Notion meeting notes into structured organizational records, action items, and memory updates
 author: organizational-os
 category: operations
 metadata:
@@ -17,6 +17,8 @@ metadata:
 ## What This Is
 
 Processes meeting transcripts (from Granola, Google Meet, Otter.ai, Zoom, or manual notes) into structured meeting notes following Organizational OS conventions. Extracts action items, updates project pages, and writes entries to organizational memory.
+
+This skill can also be used to process meeting records from a Notion `Notes & Documents` data source into local structured artifacts (instance-specific — see the customization note below).
 
 ## When to Use
 
@@ -34,6 +36,10 @@ Processes meeting transcripts (from Granola, Google Meet, Otter.ai, Zoom, or man
 ## Recommended pre-processor: `meeting-notes-transcription-fixer`
 
 If raw notes contain transcription errors (misheard proper nouns, acronyms, project names that recur in your org), run `meeting-notes-transcription-fixer` first to normalize the corpus, then run this skill. The transcription-fixer maintains per-instance dictionaries of recurring corrections; meeting-processor consumes already-clean text.
+
+> **Instance customization point.** If your instance uses Notion as the source
+> of meeting records, add your org's root page / data source IDs and any
+> record-prioritization rules here (see `docs/OPERATOR-GUIDE.md`).
 
 ## Usage
 
@@ -88,7 +94,15 @@ Keep to 3-7 bullet points or a short paragraph per major topic.
 - Any follow-ups not captured in action items
 ```
 
-### Step 4: Update Memory
+### Step 4: Update Meeting Registry
+
+Add or update a structured entry in `data/meetings.yaml` with:
+- stable local meeting id (e.g., `meeting-refibcn-weekly-ops-YYMMDD`)
+- participants using local member IDs when available
+- key outcomes (2-5 bullets)
+- source refs including Notion page ID or source document
+
+### Step 5: Update Memory
 
 Append to `memory/YYYY-MM-DD.md`:
 ```markdown
@@ -96,13 +110,14 @@ Append to `memory/YYYY-MM-DD.md`:
 - Key decisions: [brief list]
 - Action items created: [count]
 - Related projects: [names]
+- Notion source: [page title / page id if applicable]
 ```
 
-### Step 5: Update HEARTBEAT.md
+### Step 6: Update HEARTBEAT.md
 
 For each action item with urgency or a due date, add to `HEARTBEAT.md` under the appropriate section.
 
-### Step 6: Update Project Pages
+### Step 7: Update Project Pages
 
 For any action item linked to a specific project, add `- [ ]` task to the project page in `packages/operations/projects/`.
 
