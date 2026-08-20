@@ -278,28 +278,62 @@ function generateFinances() {
   console.log(`✓ Generated finances.json`);
 }
 
-// Generate proposals.json (placeholder)
+// Generate proposals.json
 function generateProposals() {
+  const govPath = path.join(rootDir, 'data', 'governance.yaml');
+  let decisions = [];
+
+  if (fs.existsSync(govPath)) {
+    const govData = yaml.load(fs.readFileSync(govPath, 'utf-8'));
+    decisions = (govData?.governance?.decisions || []).map(d => ({
+      id: d.id,
+      title: d.title,
+      type: d.type || "proposal",
+      status: d.status || "draft",
+      date: d.date || null,
+      summary: d.summary || ""
+    }));
+  }
+
   const schema = {
     "@context": "https://www.daostar.org/schemas",
-    "proposals": []
+    "type": "ProposalRegistry",
+    "proposals": decisions
   };
 
   const outputPath = path.join(rootDir, '.well-known', 'proposals.json');
   fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log('✓ Generated proposals.json');
+  console.log(`✓ Generated proposals.json (${decisions.length} proposals)`);
 }
 
-// Generate activities.json (placeholder)
+// Generate activities.json
 function generateActivities() {
+  const activities = [];
+
+  // Pull from meetings
+  const meetingsPath = path.join(rootDir, 'data', 'meetings.yaml');
+  if (fs.existsSync(meetingsPath)) {
+    const meetingsData = yaml.load(fs.readFileSync(meetingsPath, 'utf-8'));
+    for (const m of (meetingsData?.meetings || []).slice(-20)) {
+      activities.push({
+        id: m.id,
+        type: "meeting",
+        title: m.title || m.id,
+        date: m.date,
+        summary: m.summary || null
+      });
+    }
+  }
+
   const schema = {
     "@context": "https://www.daostar.org/schemas",
-    "activities": []
+    "type": "ActivityLog",
+    "activities": activities
   };
 
   const outputPath = path.join(rootDir, '.well-known', 'activities.json');
   fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log('✓ Generated activities.json');
+  console.log(`✓ Generated activities.json (${activities.length} activities)`);
 }
 
 // Generate contracts.json (placeholder)

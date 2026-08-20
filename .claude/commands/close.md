@@ -42,7 +42,7 @@ If key decisions were made, append to the Key Decisions section (most recent fir
 
 ## 5. Update Plan Queue
 
-If any plan in `docs/plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/plans/QUEUE.md`.
+If any plan in `docs/agent-plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/agent-plans/QUEUE.md`.
 
 ## 6. Symbient Close-Pulse (conditional)
 
@@ -77,7 +77,7 @@ This is incremental (seconds for code-only changes). If the update fails, report
 Stage all changed files and commit:
 
 ```bash
-git add memory/ HEARTBEAT.md MEMORY.md data/ docs/plans/ graphify-out/
+git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/ graphify-out/
 git commit -m "session: [concise description of what was done]"
 ```
 
