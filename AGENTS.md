@@ -24,6 +24,8 @@ Hard rules:
 2. **Never `git clean`** — those untracked files are content, not build artifacts.
 3. **Never `git reset --hard`** while uncommitted content exists.
 4. **`--no-verify` is forbidden** unless the user explicitly authorizes it.
+5. **`main` is the only branching base.** Feature-off-feature branches require a DECISIONS.md entry stating why; every session that creates commits pushes its branch before `/close` completes.
+6. **Superseded branches are archived as `archive/<name>` tags**, never left as branches.
 
 After any risky op: `npm run vault:audit` (loud failure if files vanished).
 

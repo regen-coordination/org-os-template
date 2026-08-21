@@ -16,6 +16,23 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-21 — Trunk discipline
+
+**Decision:** `main` is the only branching base. Feature-off-feature branches
+require a DECISIONS.md entry stating why. Every session that creates commits
+pushes its branch before /close completes. Superseded branches are archived
+as `archive/<name>` tags, never left as branches.
+
+**Why:** The 2026 Q2–Q3 stack (multica-operator → v0.5 → v3.5 → pilot →
+berd-agents) left main 248 commits stale, the trunk ambiguous, and the sole
+copy of the tip on one laptop. Merge cost grew with every session.
+Branch-off-branch development also hid substantial completed work from the
+trunk — the archived `archive/v3.5-execution` branch's 983-line
+`scripts/clone-framework.mjs`, more than triple main's 318-line version, is
+the concrete example.
+
+**Refs:** this plan (docs/superpowers/plans/2026-08-21-ship-and-validate.md), Pushback critique F5/F6.
+
 ## 2026-08-20 · Berd personas are framework files: canonical in-repo, global copies are managed mirrors
 
 **Status:** active
