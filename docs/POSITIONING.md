@@ -14,13 +14,13 @@
 
 ### Short (landing hero)
 
-Fork a repo, answer six questions, and your organization has a brain: identity and values agents actually follow, structured data registries, session memory, 30+ operational skills, machine-readable schemas, and a federation protocol connecting you to a network of peer orgs (single-operator dogfood; external pilot is the open milestone). No SaaS, no lock-in — markdown, YAML, and git.
+Clone the framework and configure your org, and it has a brain: identity and values agents actually follow, structured data registries, session memory, 30+ operational skills, machine-readable schemas, and a federation protocol connecting you to a network of peer orgs (single-operator dogfood; external pilot is the open milestone). The config-driven cloning engine that does this is shipped and tested — it produced a real instance, bread-coop-os. The walkup version ("fork the repo, answer a guided interview in place") is not there yet: a 2026-08-21 clean-room newcomer test found it 7 Blocker-level ways broken, including a wizard that silently leaves the fork's own data in place (`memory/reports/clean-room-bootstrap-2026-08-21.md`). No SaaS, no lock-in — markdown, YAML, and git.
 
 ### Long (about page)
 
 org-os is three things at once:
 
-- **A template** — fork-in-hours starting point for a new organization (DAO, cooperative, nonprofit, local node, project). A guided six-question interview generates your identity files, data registries, and federation config.
+- **A template** — a config-driven cloning engine (`scripts/clone-framework.mjs`, shipped, 4 automated tests, one real instance produced: bread-coop-os) generates a new organization (DAO, cooperative, nonprofit, local node, project) into a fresh directory from a YAML answer file: identity files and federation config, in hours. The walkup version of that promise — fork this repo, answer a guided interview in place — is not a working newcomer path yet: a 2026-08-21 clean-room test found the interview asks nine undocumented questions instead of the documented six, cannot complete outside a real interactive terminal, and — even completed by hand — never touches data registries (members, projects, channels, sources) at all (`memory/reports/clean-room-bootstrap-2026-08-21.md`).
 - **A standard** — a canonical file structure, a 14-registry data model, and EIP-4824/DAOstar-compliant machine-readable schemas, so organizations stop reinventing the same shapes and can actually interoperate.
 - **A live network hub** — the framework repo is itself a running org-os instance (self-hosting since 2026-04-24), coordinating a federation of 6 downstream instances with drift monitoring, pull-based migrations, and a skill-promotion pipeline. Honest scope: today every instance is operated by the maintainer — a full-depth dogfood of the network shape. The first unaffiliated instance is the open milestone (see `DECISIONS.md` 2026-08-21 "External-validation milestone").
 
@@ -71,7 +71,7 @@ Supporting proof points for copy:
 ## 4. Features (website features page, grouped)
 
 ### Run your org from files
-- Fork-in-hours bootstrap: 6-question guided interview generates identity + registries + federation config (CLI or web form)
+- Config-driven bootstrap: a shipped, tested cloning engine (`clone-framework.mjs`) generates a new instance's identity + federation config from a YAML answer file — one real instance produced (bread-coop-os, 2026-05-16). The in-place "fork it, answer a guided interview" version a newcomer would actually try is not working yet — 9 undocumented prompts, no non-interactive mode, data registries never touched — see `memory/reports/clean-room-bootstrap-2026-08-21.md`
 - Session dashboard: projects, tasks, calendar, funding pipeline, federation status — rendered from your data at `/initialize`
 - Deterministic agent startup: 9-step context load so every session begins fully oriented
 - Multi-runtime: same files work in Claude Code, Cursor, OpenCode, OpenClaw; host integrations for Hermes and opencode
@@ -116,7 +116,7 @@ Supporting proof points for copy:
 | Data model & schemas | 14 registries, EIP-4824 generation, validators, selftest |
 | Skills system | 34 skills, promotion pipeline, cross-vendor SKILL.md format |
 | Federation protocol | federation.yaml, hub/instance sync, drift analysis, migrations |
-| Bootstrap engine | cloning engine (8-stage, non-interactive) — shipped, wired to `npm run clone:framework`, the recommended path per BOOTSTRAP.md; 4 automated tests, 1 acceptance instance (bread-coop-os, 2026-05-16). Guided interview (`npm run setup`) is a separate path. |
+| Bootstrap engine | cloning engine (8-stage, non-interactive) — shipped, wired to `npm run clone:framework`, the recommended path per BOOTSTRAP.md; 4 automated tests, 1 acceptance instance (bread-coop-os, 2026-05-16). Guided interview (`npm run setup`) is a separate, in-place path — a 2026-08-21 clean-room newcomer test found it broken (7 Blockers): the wizard cannot complete non-interactively, and even a completed run silently no-ops against a populated fork, leaving the maintainer's own identity and data in place while both validation commands report a full pass. See `memory/reports/clean-room-bootstrap-2026-08-21.md`. |
 | Vault safety | snapshots, audits, operator trunks, recovery runbook |
 
 **v0.5 constellation (from modules.yaml):**
@@ -143,7 +143,7 @@ Supporting proof points for copy:
 ### By moment
 - **"We keep losing knowledge between tools."** → registries + memory + meeting pipeline: every decision, meeting, and idea lands in versioned files agents can query.
 - **"We want an AI chief of staff for the org, not just for me."** → the personal-OS pattern (validated at 383k stars by OpenClaw) applied to organizational scope.
-- **"We're starting a new org this month."** → fork, 6 questions, first session in hours (interview tested internally; first outside-operator timing run pending — Task 14) — with governance-upgrade path documented (solo → OSS → DAO evolution triggers).
+- **"We're starting a new org this month."** → the config-driven cloning engine does this today — a YAML answer file in, a working instance out in hours, proven against a real org (bread-coop-os). The walkup path a newcomer would actually reach for — fork the repo, answer a guided interview in place — does not work yet: a 2026-08-21 clean-room test (persona: a 9-person worker co-op) found the wizard can't complete non-interactively and, even hand-completed, silently leaves the fork's own identity and data in place while both documented health checks report a full pass (7 Blockers; `memory/reports/clean-room-bootstrap-2026-08-21.md`). Governance-upgrade path (solo → OSS → DAO evolution triggers) is documented and unaffected by this.
 - **"Our network of orgs can't see each other."** → federation: publish schemas, subscribe to peers, share skills, keep sovereignty.
 - **"Non-technical members need in."** → 5-level operator ladder: chat → browser dashboard → guided setup → CLI → direct editing.
 
