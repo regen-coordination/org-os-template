@@ -8,6 +8,8 @@
 
 ### One-liner
 
+**Wedge one-liner (landing hero):** An AI chief of staff for your organization — not just for you. Your org's knowledge, data, and operations as files any agent can read, act on, and federate.
+
 **org-os is the operating system for organizations run by humans and AI agents together — a git-native workspace where your org's knowledge, data, and operations live as files any agent can read, act on, and federate.**
 
 ### Short (landing hero)
@@ -20,7 +22,7 @@ org-os is three things at once:
 
 - **A template** — fork-in-hours starting point for a new organization (DAO, cooperative, nonprofit, local node, project). A guided six-question interview generates your identity files, data registries, and federation config.
 - **A standard** — a canonical file structure, a 13-registry data model, and EIP-4824/DAOstar-compliant machine-readable schemas, so organizations stop reinventing the same shapes and can actually interoperate.
-- **A live network hub** — the framework repo is itself a running org-os instance (self-hosting since 2026-04-24), coordinating a real federation of instances with drift monitoring, pull-based migrations, and a skill-promotion pipeline.
+- **A live network hub** — the framework repo is itself a running org-os instance (self-hosting since 2026-04-24), coordinating a federation of 6 downstream instances with drift monitoring, pull-based migrations, and a skill-promotion pipeline. Honest scope: today every instance is operated by the maintainer — a full-depth dogfood of the network shape. The first unaffiliated instance is the open milestone (see `docs/superpowers/plans/2026-08-21-ship-and-validate.md`, Task 16).
 
 The core bet: the same file conventions that let coding agents work on codebases (AGENTS.md, SKILL.md, CLAUDE.md — now Linux Foundation / Anthropic / OpenAI standards) can run *organizations*. org-os extends that commodity layer with what no one else has built: a governed organizational data model, standards-compliant org schemas, and multi-org federation.
 
@@ -39,7 +41,7 @@ Verified landscape finding (2026-07): **org-os is the only project combining all
 | **Agent-native file workspace** — identity files, memory, skills | ✅ Rides the AGENTS.md + Agent Skills standards | OpenClaw (383k★), claude-chief-of-staff, LifeOS-OSS — all converged on the same conventions, all *personal*-scope |
 | **Organizational scope** — models an org, not an individual | ✅ | Two 2-star markdown "CompanyOS" templates; 5dive (Linux-primitives, not file-based) |
 | **Machine-readable org data** — 13 YAML registries + EIP-4824 `.well-known/` schemas | ✅ Only agent-native project implementing any org schema standard | None |
-| **Multi-org federation** — hub/instance topology, trust levels, drift analysis, skill promotion | ✅ Running live across 7 instances | None (peers' "multi-agent" = single host) |
+| **Multi-org federation** — hub/instance topology, trust levels, drift analysis, skill promotion | ✅ Running across 6 downstream instances + the hub (single-operator dogfood; external pilot is the open milestone) | None (peers' "multi-agent" = single host) |
 
 Supporting proof points for copy:
 
@@ -57,7 +59,7 @@ Supporting proof points for copy:
 1. **Agent identity files** — the org's brain at repo root: `MASTERPLAN.md` (strategy), `SOUL.md` (values/voice), `IDENTITY.md` (org identity), `USER.md` (operator), `AGENTS.md` (operating manual), `TOOLS.md` (config).
 2. **Memory** — `MEMORY.md` (index) + `memory/YYYY-MM-DD.md` (daily logs, append-only) + `DECISIONS.md` (authoritative record) + `HEARTBEAT.md` (live pulse/tasks).
 3. **Data registries** — `data/*.yaml`, single source of truth: members, projects, finances, governance, meetings, ideas (+7 optional: funding-opportunities, relationships, sources, knowledge-manifest, events, channels, assets).
-4. **Schemas** — `.well-known/*.json` EIP-4824/DAOstar descriptors, auto-generated from registries, never hand-edited. Your org becomes machine-readable and discoverable.
+4. **Schemas** — `.well-known/*.json` EIP-4824/DAOstar descriptors, auto-generated from registries, never hand-edited. Your org becomes machine-readable and discoverable. Consumed today by: the site build (aggregates instance `.well-known/` at build time), the federation map data plane, and `npm run analyze:instances` drift reports. The standing invitation of layer 3 is external consumers; none exist yet.
 5. **Skills** — portable agent capabilities as `skills/<name>/SKILL.md` (cross-vendor Agent Skills format). Three tiers: core / custom / shared; instance-proven skills get promoted to canonical.
 6. **Sessions** — deterministic lifecycle: `/initialize` (sync, dashboard, plan) → work → `/close` (memory, commit, push). Plus `/commit`, `/sync`, `/handoff`, `/skills` for multi-operator flow.
 7. **Federation** — `federation.yaml` declares identity, peers, trust levels (full/read/none), upstream/downstream. Git is the substrate; koi-net adds optional real-time sync. "Opt-in, additive, sovereignty-preserving."
@@ -84,7 +86,7 @@ Supporting proof points for copy:
 - 13-registry canonical data model with cross-references, validators, and semver'd schema versions
 - `npm run selftest`: every promised failure mode caught by at least one trigger layer (manual / pre-commit / CI)
 
-### 32 operational skills
+### 34 operational skills
 - **Operations:** meeting processing, heartbeat monitoring, knowledge curation, funding scout, idea scout
 - **Capital & governance:** treasury monitoring and transaction queueing (Gnosis Safe, Hats, Gardens), EIP-4824 schema generation
 - **Research:** deep-research workflows with provenance, first-principles frameworks, autoresearch loops
@@ -112,9 +114,9 @@ Supporting proof points for copy:
 |---|---|
 | Session lifecycle | `/initialize` → `/close` + dashboard + memory protocol |
 | Data model & schemas | 13 registries, EIP-4824 generation, validators, selftest |
-| Skills system | 32 skills, promotion pipeline, cross-vendor SKILL.md format |
+| Skills system | 34 skills, promotion pipeline, cross-vendor SKILL.md format |
 | Federation protocol | federation.yaml, hub/instance sync, drift analysis, migrations |
-| Bootstrap engine | interview + cloning engine (8-stage), acceptance-tested end-to-end |
+| Bootstrap engine | cloning engine (8-stage, non-interactive) — shipped, wired to `npm run clone:framework`, the recommended path per BOOTSTRAP.md; 4 automated tests, 1 acceptance instance (bread-coop-os, 2026-05-16). Guided interview (`npm run setup`) is a separate path. |
 | Vault safety | snapshots, audits, operator trunks, recovery runbook |
 
 **v0.5 constellation (from modules.yaml):**
@@ -141,7 +143,7 @@ Supporting proof points for copy:
 ### By moment
 - **"We keep losing knowledge between tools."** → registries + memory + meeting pipeline: every decision, meeting, and idea lands in versioned files agents can query.
 - **"We want an AI chief of staff for the org, not just for me."** → the personal-OS pattern (validated at 383k stars by OpenClaw) applied to organizational scope.
-- **"We're starting a new org this month."** → fork, 6 questions, first session in hours — with governance-upgrade path documented (solo → OSS → DAO evolution triggers).
+- **"We're starting a new org this month."** → fork, 6 questions, first session in hours (interview tested internally; first outside-operator timing run pending — Task 14) — with governance-upgrade path documented (solo → OSS → DAO evolution triggers).
 - **"Our network of orgs can't see each other."** → federation: publish schemas, subscribe to peers, share skills, keep sovereignty.
 - **"Non-technical members need in."** → 5-level operator ladder: chat → browser dashboard → guided setup → CLI → direct editing.
 
@@ -174,7 +176,7 @@ Supporting proof points for copy:
 
 ## 8. Numbers box (for the site, as of v0.5.0, 2026-07-15)
 
-32 skills · 13 packages · 13 canonical registries (+3 hub-only) · 11 EIP-4824 descriptors · 6 slash commands · 40 npm scripts · 7 federation instances · drift 27→0 · self-hosting since 2026-04-24 · 100/100 toolkit-framework tests green
+34 skills · 13 packages · 13 canonical registries (+3 hub-only) · 11 EIP-4824 descriptors · 6 slash commands · 40 npm scripts · 6 downstream instances + hub · drift 27→0 · self-hosting since 2026-04-24 · 100/100 toolkit-framework tests green
 
 ---
 

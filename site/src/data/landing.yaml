@@ -1,7 +1,7 @@
 # Hero copy. Canon: docs/POSITIONING.md §1 (Definition). Edit there first, mirror here.
 eyebrow: "Framework · standards · federation"
-title: "The operating system for organizations run by humans and AI agents together"
-subtitle: "A git-native workspace where your org's knowledge, data, and operations live as files any agent can read, act on, and federate. No SaaS, no lock-in — markdown, YAML, and git."
+title: "An AI chief of staff for your organization — not just for you"
+subtitle: "Your org's knowledge, data, and operations as files any agent can read, act on, and federate. No SaaS, no lock-in — markdown, YAML, and git."
 ctas:
   - { label: "$ npm run setup", href: "/get-started", variant: "solid" }
   - { label: "/modules", href: "/modules", variant: "ghost" }
