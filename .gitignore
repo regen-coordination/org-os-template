@@ -29,7 +29,9 @@ data/kb/map.json
 
 # Superpowers plugin ephemeral plans
 docs/superpowers/*
+!docs/superpowers/plans/
 !docs/superpowers/specs/
+!docs/superpowers/research/
 
 # Editor
 .vscode/*
@@ -69,3 +71,6 @@ packages/multica-bridge/config.yaml
 graphify-out/graph.html
 graphify-out/.graphify_python
 graphify-out/.graphify_root
+
+# Playwright test artifacts (site/)
+site/test-results/
