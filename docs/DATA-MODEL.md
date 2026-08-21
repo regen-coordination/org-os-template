@@ -347,7 +347,7 @@ Same shape as `skills-matrix.yaml` but for packages. Surfaces package divergence
 
 ### Extension Pattern for Instances
 
-Instances MAY add their own registries beyond the canonical 13 (e.g., `tasks.yaml`, `pending-payouts.yaml`, `blog-articles.yaml`). When they do:
+Instances MAY add their own registries beyond the canonical 14 (e.g., `tasks.yaml`, `pending-payouts.yaml`, `blog-articles.yaml`). When they do:
 
 - Declare the extra registry in the framework's `data/instances.yaml` under `data_registries_extra[]` so drift monitoring knows about it.
 - Keep it out of `.well-known/` generation unless adding a `/well-known/` endpoint is intentional.
@@ -357,7 +357,7 @@ Instances MAY add their own registries beyond the canonical 13 (e.g., `tasks.yam
 
 ## Recognized Extension Registries (Optional Patterns)
 
-Instance-proven registry shapes worth reusing. Not part of the canonical 13; adopt as needed. (Consolidated from instance audits, 2026-07-15.)
+Instance-proven registry shapes worth reusing. Not part of the canonical 14; adopt as needed. (Consolidated from instance audits, 2026-07-15.)
 
 ### hermes-cron.yaml — Declarative Agent Cron Jobs
 
