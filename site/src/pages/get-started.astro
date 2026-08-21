@@ -3,7 +3,7 @@ import Layout from "../components/Layout.astro";
 const repo = "https://github.com/regen-coordination/org-os-template";
 const steps = [
   { n: "01", title: "Clone the framework", body: "Use the cloning engine to scaffold a new instance with package + skill selection.", code: "node scripts/clone-framework.mjs --target ../my-org --config config.yaml" },
-  { n: "02", title: "Or run the guided interview", body: "Prefer a wizard? The interactive setup walks you through identity capture.", code: "npm run setup" },
+  { n: "02", title: "Or run the guided interview", body: "Prefer a wizard? npm run setup walks through identity capture — not a working newcomer path yet (a 2026-08-21 clean-room test found it broken 7 ways). Use step 01 until it's fixed.", code: "npm run setup" },
   { n: "03", title: "Open a session", body: "Read MASTERPLAN.md, SOUL.md, IDENTITY.md, then initialize.", code: "/initialize" },
 ];
 ---
