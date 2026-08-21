@@ -79,7 +79,7 @@ state, and stay in lineage with the framework.
 `.well-known/*.json` publishes the instance to anyone who asks; `analyze:instances` reports
 drift across the network; the federation map renders it all as a graph.
 
-**Status.** `live` — running across 7 instances.
+**Status.** `live` — running across 6 downstream instances + the hub (single-operator dogfood; external pilot is the open milestone).
 
 **Links:** [federation docs](FEDERATION.md) · package `packages/org-os-federation-map/`
 
