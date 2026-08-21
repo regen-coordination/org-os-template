@@ -6,6 +6,22 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 ## Active Tasks
 
+### Clean-room bootstrap fix-list (2026-08-21 — outranks the rest of this backlog)
+
+Task 14 forked org-os as a stranger would ("Harbor Bakery Co-op") and found the documented
+newcomer path silently produces a wrong instance that passes every check. Full findings:
+`memory/reports/clean-room-bootstrap-2026-08-21.md`. Ordered by first-hour impact per the
+report's own fix-list.
+
+- [ ] **B3/B4/B5/B6 — Make the fork target an actual blank template.** Strip `data/members.yaml`, `data/projects.yaml`, `TOOLS.md`, `.well-known/*.json`, `SOUL.md`, `IDENTITY.md`, `federation.yaml` to genuine placeholders in `org-os-template` specifically; keep the maintainer's live content in a separate self-hosting repo/branch.
+- [ ] **B7 — Add a content-diff check to `validate:schemas`/`validate:structure`** that fails when `.well-known/dao.json`'s `name` disagrees with `IDENTITY.md`'s `Name`, or `data/projects.yaml`/`data/members.yaml` still carry upstream placeholder IDs after setup — turns the false green light into a real safety net.
+- [ ] **B2 — Give the interactive wizard a non-interactive/scriptable mode** (flags or `--config answers.yaml`, analogous to `clone-framework.mjs`) that works *in place* in the current repo, not only a new sibling directory — unblocks CI users and any AI agent driving setup.
+- [ ] **B1 — Reconcile `BOOTSTRAP.md`'s six-question description with what `scripts/setup-org-os.mjs` actually asks** (nine prompts, none of which cover team/projects/channels/sources as documented), or make the script ask what's documented.
+- [ ] **M1 — Delete or fix `docs/SETUP-PATHS.md`.** Linked from README as the disambiguation doc; describes an Egregore/Filesystem/Hybrid path-selection tool that doesn't exist in `scripts/setup-org-os.mjs`.
+- [ ] **M2 — Point Level 2 of `docs/OPERATOR-GUIDE.md` at something real** — a URL, a command, or an honest "not built yet, use Level 3." As written it promises a web form/chat flow that doesn't exist.
+- [ ] **M3 — Reconcile README's two competing bootstrap commands** (`clone-framework.mjs` "Recommended" vs. `npm run setup`) with explicit guidance on which to use, instead of deferring to the dead-end M1 doc.
+- [ ] **M4 — Fix or reframe `clone-framework.mjs`'s "Recommended" framing.** It contradicts README's "fork a repo, answer six questions" — it hand-authors a YAML config and materializes the org in a new sibling directory, not the forked repo itself.
+
 ### Technical
 - [ ] **External-validation pilot (v0.6 gate):** recruit one unaffiliated operator to run their org on org-os for 30 consecutive days with ≤4 support interventions and a publishing `.well-known/` instance — see `DECISIONS.md` 2026-08-21 "External-validation milestone". Recruitment is Task 15, `docs/superpowers/plans/2026-08-21-ship-and-validate.md`. Until this lands, network claims stay scoped to single-operator dogfooding and frozen workstreams stay frozen.
 - [ ] Execute `autopoiesis-research` Phase 2 (12-task TDD plan; cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Plan: `docs/superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md`
