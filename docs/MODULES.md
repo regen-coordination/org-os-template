@@ -79,7 +79,7 @@ state, and stay in lineage with the framework.
 `.well-known/*.json` publishes the instance to anyone who asks; `analyze:instances` reports
 drift across the network; the federation map renders it all as a graph.
 
-**Status.** `live` — running across 6 downstream instances + the hub (single-operator dogfood; external pilot is the open milestone).
+**Status.** `live` — running across 5 downstream instances + the hub (`federation.yaml` declares 7 peers; dao-os and openclaw are marked non-instances there — dev platform, agent runtime — leaving 5; single-operator dogfood, external pilot is the open milestone).
 
 **Links:** [federation docs](FEDERATION.md) · package `packages/org-os-federation-map/`
 

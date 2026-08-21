@@ -14,21 +14,27 @@
 
 ### Short (landing hero)
 
-Clone the framework and configure your org, and it has a brain: identity and values agents actually follow, structured data registries, session memory, 30+ operational skills, machine-readable schemas, and a federation protocol connecting you to a network of peer orgs (single-operator dogfood; external pilot is the open milestone). The config-driven cloning engine that does this is shipped and tested — it produced a real instance, bread-coop-os. The walkup version ("fork the repo, answer a guided interview in place") is not there yet: a 2026-08-21 clean-room newcomer test found it 7 Blocker-level ways broken, including a wizard that silently leaves the fork's own data in place (`memory/reports/clean-room-bootstrap-2026-08-21.md`). No SaaS, no lock-in — markdown, YAML, and git.
+Clone the framework and configure your org, and it has a brain: identity and values agents actually follow, structured data registries, session memory, 34 operational skills, machine-readable schemas, and a federation protocol connecting you to a network of peer orgs (single-operator dogfood; external pilot is the open milestone). The config-driven cloning engine that does this is shipped and tested. The walkup "fork it, answer a guided interview" path isn't there yet — see Bootstrap status below. No SaaS, no lock-in — markdown, YAML, and git.
 
 ### Long (about page)
 
 org-os is three things at once:
 
-- **A template** — a config-driven cloning engine (`scripts/clone-framework.mjs`, shipped, 4 automated tests, one real instance produced: bread-coop-os) generates a new organization (DAO, cooperative, nonprofit, local node, project) into a fresh directory from a YAML answer file: identity files and federation config, in hours. The walkup version of that promise — fork this repo, answer a guided interview in place — is not a working newcomer path yet: a 2026-08-21 clean-room test found the interview asks nine undocumented questions instead of the documented six, cannot complete outside a real interactive terminal, and — even completed by hand — never touches data registries (members, projects, channels, sources) at all (`memory/reports/clean-room-bootstrap-2026-08-21.md`).
+- **A template** — a config-driven cloning engine (`scripts/clone-framework.mjs`, shipped, 4 automated tests, one real instance produced: bread-coop-os) generates a new organization (DAO, cooperative, nonprofit, local node, project) into a fresh directory from a YAML answer file: identity files and federation config, in hours. The walkup version of that promise — fork this repo, answer a guided interview in place — is not a working newcomer path yet. See Bootstrap status below.
 - **A standard** — a canonical file structure, a 14-registry data model, and EIP-4824/DAOstar-compliant machine-readable schemas, so organizations stop reinventing the same shapes and can actually interoperate.
-- **A live network hub** — the framework repo is itself a running org-os instance (self-hosting since 2026-04-24), coordinating a federation of 6 downstream instances with drift monitoring, pull-based migrations, and a skill-promotion pipeline. Honest scope: today every instance is operated by the maintainer — a full-depth dogfood of the network shape. The first unaffiliated instance is the open milestone (see `DECISIONS.md` 2026-08-21 "External-validation milestone").
+- **A live network hub** — the framework repo is itself a running org-os instance (self-hosting since 2026-04-24), coordinating a federation of 5 downstream instances with drift monitoring, pull-based migrations, and a skill-promotion pipeline. (`federation.yaml` declares 7 peers; 2 carry an explicit `note:` marking them non-instances — `dao-os`, a dev platform, and `openclaw`, an agent runtime — leaving 5 operational data instances.) Honest scope: today every instance is operated by the maintainer — a full-depth dogfood of the network shape. The first unaffiliated instance is the open milestone (see `DECISIONS.md` 2026-08-21 "External-validation milestone").
 
 The core bet: the same file conventions that let coding agents work on codebases (AGENTS.md, SKILL.md, CLAUDE.md — now Linux Foundation / Anthropic / OpenAI standards) can run *organizations*. org-os extends that commodity layer with what no one else has built: a governed organizational data model, standards-compliant org schemas, and multi-org federation.
 
 ### What org-os is NOT (from SOUL.md)
 
 Not a SaaS product · not a central authority · not a single org's internal tool · not a governance protocol ("we describe governance; we don't dictate it") · not finished.
+
+### Bootstrap status (canonical — full evidence; other mentions in this doc cite this)
+
+The config-driven cloning engine (`scripts/clone-framework.mjs`) is shipped, tested (4 automated tests), and has produced one real instance (bread-coop-os, 2026-05-16) — into a **new sibling directory**, not the forked repo itself.
+
+The walkup path a newcomer would actually reach for — fork this repo, run `npm run setup`, answer a guided interview in place — is not a working newcomer path. A 2026-08-21 clean-room test (persona: a 9-person worker co-op, docs-only) found it broken 7 Blocker-level ways: the interview asks nine undocumented prompts instead of the documented six and never touches the data registries (members, projects, channels, sources) it claims to cover; it cannot complete outside a real interactive terminal (exit 13, no diagnosable message); and — even hand-completed — its rewrite guards silently no-op against a populated fork, because this repo self-hosts and ships the maintainer's own live identity, members, projects, and RPC endpoints as the "template." A newcomer finishes "successfully" with the maintainer's data untouched, `generate:schemas` republishes it, and both `validate:schemas` and `validate:structure` report a full pass on the result. Full findings, ranked: `memory/reports/clean-room-bootstrap-2026-08-21.md`.
 
 ---
 
@@ -41,7 +47,7 @@ Verified landscape finding (2026-07): **org-os is the only project combining all
 | **Agent-native file workspace** — identity files, memory, skills | ✅ Rides the AGENTS.md + Agent Skills standards | OpenClaw (383k★), claude-chief-of-staff, LifeOS-OSS — all converged on the same conventions, all *personal*-scope |
 | **Organizational scope** — models an org, not an individual | ✅ | Two 2-star markdown "CompanyOS" templates; 5dive (Linux-primitives, not file-based) |
 | **Machine-readable org data** — 14 YAML registries + EIP-4824 `.well-known/` schemas | ✅ Only agent-native project implementing any org schema standard | None |
-| **Multi-org federation** — hub/instance topology, trust levels, drift analysis, skill promotion | ✅ Running across 6 downstream instances + the hub (single-operator dogfood; external pilot is the open milestone) | None (peers' "multi-agent" = single host) |
+| **Multi-org federation** — hub/instance topology, trust levels, drift analysis, skill promotion | ✅ Running across 5 downstream instances + the hub (excludes dao-os/openclaw, non-instances per `federation.yaml`; single-operator dogfood, external pilot is the open milestone) | None (peers' "multi-agent" = single host) |
 
 Supporting proof points for copy:
 
@@ -71,7 +77,7 @@ Supporting proof points for copy:
 ## 4. Features (website features page, grouped)
 
 ### Run your org from files
-- Config-driven bootstrap: a shipped, tested cloning engine (`clone-framework.mjs`) generates a new instance's identity + federation config from a YAML answer file — one real instance produced (bread-coop-os, 2026-05-16). The in-place "fork it, answer a guided interview" version a newcomer would actually try is not working yet — 9 undocumented prompts, no non-interactive mode, data registries never touched — see `memory/reports/clean-room-bootstrap-2026-08-21.md`
+- Config-driven bootstrap: a shipped, tested cloning engine (`clone-framework.mjs`) generates a new instance's identity + federation config from a YAML answer file — one real instance produced (bread-coop-os, 2026-05-16). The in-place "fork it, answer a guided interview" version a newcomer would actually try is not working yet — see Bootstrap status (§1)
 - Session dashboard: projects, tasks, calendar, funding pipeline, federation status — rendered from your data at `/initialize`
 - Deterministic agent startup: 9-step context load so every session begins fully oriented
 - Multi-runtime: same files work in Claude Code, Cursor, OpenCode, OpenClaw; host integrations for Hermes and opencode
@@ -116,7 +122,7 @@ Supporting proof points for copy:
 | Data model & schemas | 14 registries, EIP-4824 generation, validators, selftest |
 | Skills system | 34 skills, promotion pipeline, cross-vendor SKILL.md format |
 | Federation protocol | federation.yaml, hub/instance sync, drift analysis, migrations |
-| Bootstrap engine | cloning engine (8-stage, non-interactive) — shipped, wired to `npm run clone:framework`, the recommended path per BOOTSTRAP.md; 4 automated tests, 1 acceptance instance (bread-coop-os, 2026-05-16). Guided interview (`npm run setup`) is a separate, in-place path — a 2026-08-21 clean-room newcomer test found it broken (7 Blockers): the wizard cannot complete non-interactively, and even a completed run silently no-ops against a populated fork, leaving the maintainer's own identity and data in place while both validation commands report a full pass. See `memory/reports/clean-room-bootstrap-2026-08-21.md`. |
+| Bootstrap engine | cloning engine (8-stage, non-interactive) — shipped, wired to `npm run clone:framework`, the recommended path per BOOTSTRAP.md; 4 automated tests, 1 acceptance instance (bread-coop-os, 2026-05-16). Guided interview (`npm run setup`) is a separate, in-place path — broken (7 Blockers). See Bootstrap status (§1). |
 | Vault safety | snapshots, audits, operator trunks, recovery runbook |
 
 **v0.5 constellation (from modules.yaml):**
@@ -138,12 +144,12 @@ Supporting proof points for copy:
 - **Local node / chapter** — light-weight instance federating with a global org; local meetings, funding scout, shared knowledge commons. *Live: refi-bcn-os (production), refi-med-os.*
 - **Cooperative / nonprofit** — no on-chain requirement; same memory, meetings, funding pipeline, and operator ladder. *Acceptance-tested: bread-coop-os.*
 - **Network-of-networks hub** — aggregate instances, monitor drift, coordinate a federation from one dashboard. *Live: regen-coordination-os + the org-os hub itself.*
-- **Personal hub** — an individual's Obsidian vault as the hub node federating their org instances. *Live: lf-zettelkasten-os.*
+- **Personal hub** — an individual's Obsidian vault as the hub node federating their org instances. *Live: lf-zettelkasten-os (uses org-os as its framework; not a `federation.yaml` downstream peer, so not counted in the 5-instance total above).*
 
 ### By moment
 - **"We keep losing knowledge between tools."** → registries + memory + meeting pipeline: every decision, meeting, and idea lands in versioned files agents can query.
 - **"We want an AI chief of staff for the org, not just for me."** → the personal-OS pattern (validated at 383k stars by OpenClaw) applied to organizational scope.
-- **"We're starting a new org this month."** → the config-driven cloning engine does this today — a YAML answer file in, a working instance out in hours, proven against a real org (bread-coop-os). The walkup path a newcomer would actually reach for — fork the repo, answer a guided interview in place — does not work yet: a 2026-08-21 clean-room test (persona: a 9-person worker co-op) found the wizard can't complete non-interactively and, even hand-completed, silently leaves the fork's own identity and data in place while both documented health checks report a full pass (7 Blockers; `memory/reports/clean-room-bootstrap-2026-08-21.md`). Governance-upgrade path (solo → OSS → DAO evolution triggers) is documented and unaffected by this.
+- **"We're starting a new org this month."** → the config-driven cloning engine does this today — a YAML answer file in, a working instance out in hours, proven against a real org (bread-coop-os). The walkup path a newcomer would actually reach for — fork the repo, answer a guided interview in place — does not work yet (7 Blockers; see Bootstrap status, §1). Governance-upgrade path (solo → OSS → DAO evolution triggers) is documented and unaffected by this.
 - **"Our network of orgs can't see each other."** → federation: publish schemas, subscribe to peers, share skills, keep sovereignty.
 - **"Non-technical members need in."** → 5-level operator ladder: chat → browser dashboard → guided setup → CLI → direct editing.
 
@@ -174,9 +180,11 @@ Supporting proof points for copy:
 
 ---
 
-## 8. Numbers box (for the site, as of v0.5.0, 2026-07-15)
+## 8. Numbers box (for the site, as of v0.5.0, 2026-07-15; re-verified 2026-08-21)
 
-34 skills · 14 canonical registries (+3 hub-only) · 11 EIP-4824 descriptors · 6 slash commands · 53 npm scripts · 6 downstream instances + hub · drift 27→0 · self-hosting since 2026-04-24 · 100/100 toolkit-framework tests green
+34 skills · 14 canonical registries (+3 hub-only) · 11 EIP-4824 descriptors · 6 slash commands · 53 npm scripts · 5 downstream instances + hub (excludes dao-os/openclaw — non-instances per `federation.yaml`) · drift 27→0 · self-hosting since 2026-04-24 · 100/100 toolkit-framework tests green
+
+_Packages count intentionally omitted (noted 2026-08-21): no repo-defined tier yields one defensible number — 18 `packages/` dirs vs. 23 `data/packages-matrix.yaml` entries, and the matrix carries no `status` field to separate shipped from candidate. Restore once one of those becomes canonical._
 
 ---
 
