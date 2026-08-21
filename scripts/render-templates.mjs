@@ -14,7 +14,7 @@
  *   node scripts/render-templates.mjs --dry     # print to stdout, don't write
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
@@ -29,7 +29,6 @@ const dry = process.argv.includes("--dry");
 // Derive data from existing org-os state
 const pkg = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf-8"));
 const fed = yaml.load(readFileSync(path.join(rootDir, "federation.yaml"), "utf-8")) || {};
-const skillsMatrix = yaml.load(readFileSync(path.join(rootDir, "data", "skills-matrix.yaml"), "utf-8")) || {};
 const packagesMatrix = yaml.load(readFileSync(path.join(rootDir, "data", "packages-matrix.yaml"), "utf-8")) || {};
 const instancesYaml = yaml.load(readFileSync(path.join(rootDir, "data", "instances.yaml"), "utf-8")) || {};
 
@@ -82,7 +81,12 @@ const data = {
     })),
   },
   counts: {
-    skills: (skillsMatrix.skills || []).length,
+    // data/skills-matrix.yaml also carries unpromoted candidates (DAO-module skills
+    // living in dao-os) and the generated skills/commands/ mirror — neither ships in
+    // this repo's skills/. Count what's actually here: top-level skills/<name>/SKILL.md.
+    skills: readdirSync(path.join(rootDir, "skills"), { withFileTypes: true }).filter(
+      (e) => e.isDirectory() && existsSync(path.join(rootDir, "skills", e.name, "SKILL.md")),
+    ).length,
     packages: (packagesMatrix.packages || []).length,
   },
   docs,
