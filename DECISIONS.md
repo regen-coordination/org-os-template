@@ -16,6 +16,19 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 
 ---
 
+## 2026-08-21 — External-validation milestone
+
+**Decision:** org-os's next version milestone (v0.6) is gated on one
+unaffiliated operator running their org on org-os for 30 consecutive days
+with ≤4 support interventions and their instance publishing valid
+`.well-known/` schemas. Until then, every positioning claim about the
+network is scoped as single-operator dogfooding (POSITIONING §1), and
+frozen workstreams (portfolio memo 2026-08-21) stay frozen.
+
+**Why:** All existing validation is internal (F1/F2, Pushback critique
+2026-08-21). This is the only experiment that can falsify the value
+proposition; it therefore gates further layer-building.
+
 ## 2026-08-21 — Trunk discipline
 
 **Decision:** `main` is the only branching base. Feature-off-feature branches

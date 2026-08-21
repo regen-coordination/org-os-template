@@ -7,6 +7,7 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 ## Active Tasks
 
 ### Technical
+- [ ] **External-validation pilot (v0.6 gate):** recruit one unaffiliated operator to run their org on org-os for 30 consecutive days with ≤4 support interventions and a publishing `.well-known/` instance — see `DECISIONS.md` 2026-08-21 "External-validation milestone". Recruitment is Task 15, `docs/superpowers/plans/2026-08-21-ship-and-validate.md`. Until this lands, network claims stay scoped to single-operator dogfooding and frozen workstreams stay frozen.
 - [ ] Execute `autopoiesis-research` Phase 2 (12-task TDD plan; cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Plan: `docs/superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md`
 - [ ] Execute `autopoiesis-research` Phase 3 (decisions rollup + plan annotations + per-instance cascade) after Phase 2 gate
 - [ ] Execute `multica-integration` plan (25 tasks, spec + plan ready, execution deferred 2026-04-25 — recommend fresh worktree)
