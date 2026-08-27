@@ -1,8 +1,8 @@
 ---
 id: v3-5-release-implementation
 title: "org-os v3.5 — Implementation Plan"
-status: queued
-priority: 0
+status: superseded
+priority: null
 scope: framework
 spec: ../superpowers/specs/2026-04-25-org-os-3-5-release-design.md
 target_version: "3.5.0"
@@ -14,6 +14,8 @@ workstream: v3.5-release
 ---
 
 # org-os v3.5 Release — Implementation Plan
+
+> **Release status (2026-08-28):** Superseded — the 3.5 line was re-baselined to 0.5 (CHANGELOG [0.5.0]); its branches are archived as archive/* tags; remaining salvage decision tracked in the masterplan. Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

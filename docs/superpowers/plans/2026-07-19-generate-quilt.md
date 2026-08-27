@@ -1,5 +1,7 @@
 # generate-quilt.mjs Implementation Plan (QUILT Phase B)
 
+> **Release status (2026-08-28):** Completed (docs/QUILT.md + npm run generate:quilt shipped). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Re-weave `docs/QUILT.md` (the organic organism visualization) deterministically from `data/*.yaml`, so status shading, counts, and dates never go stale.

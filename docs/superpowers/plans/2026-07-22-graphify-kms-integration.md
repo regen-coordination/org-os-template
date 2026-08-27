@@ -1,5 +1,7 @@
 # Graphify KMS Integration Implementation Plan
 
+> **Release status (2026-08-28):** Completed — shipped on main; portfolio memo §4 row 14 closed the residual scope question. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Integrate Graphify as a core knowledge-graph module of org-os: session-bookend graph updates, dashboard stats, a knowledge-gaps registry feeding the curator, and a query-first agent protocol — all as thin read-only consumers of `graphify-out/graph.json`.

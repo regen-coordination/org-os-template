@@ -1,5 +1,7 @@
 # Autopoiesis Research — Phase 2: Cascade Closure (Loop C) Implementation Plan
 
+> **Release status (2026-08-28):** Completed 2026-08-02, gate passed (sync-upstream.mjs + validate-identity.mjs + lineage stamp on main); checkboxes never ticked. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close Loop C (Population learning — Metabolism → Cognition → Federation) at the framework level by implementing the three cascade-closure artifacts: `scripts/sync-upstream.mjs`, `scripts/validate-identity.mjs`, and lineage stamps in `federation.yaml.metadata`. After Phase 2 lands, downstream instances inherit these via the now-functional sync mechanism (cascade in Phase 3).

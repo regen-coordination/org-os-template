@@ -1,5 +1,7 @@
 # Federation Map ("The Torch") Implementation Plan
 
+> **Release status (2026-08-28):** Completed 2026-08-02 (spec status: implemented; QUEUE Completed) — checkboxes were never ticked; treat the spec + QUEUE as authoritative. Open follow-up (bundle-drift test) tracked in HEARTBEAT. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** An interactive federation/provenance map — `<federation-map>` web component + `org-os-kms render map` data builder — embedded in the site's `/federation` page and home, with frontier discovery and a self-contained vault artifact.

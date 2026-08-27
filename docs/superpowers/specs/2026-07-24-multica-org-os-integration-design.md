@@ -1,7 +1,7 @@
 # Multica × org-os Integration — Design Spec
 
 **Date:** 2026-07-24
-**Status:** Approved design, pending implementation plan
+**Status:** approved; frozen (v0.6+; portfolio memo row 8)
 **Multica:** https://github.com/multica-ai/multica — agent-teammate orchestration platform (Next.js UI, Go backend, Postgres/pgvector, local daemon that auto-detects agent CLIs and executes assigned issues)
 
 ## Goal

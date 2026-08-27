@@ -1,7 +1,7 @@
 # Cloudflare OS × org-os Integration — Design Spec
 
 **Date:** 2026-08-08
-**Status:** Approved design, pending implementation plan
+**Status:** implemented M0–M2 in-repo (v0.5); deployment half frozen (portfolio memo row 0)
 **Cloudflare OS:** https://github.com/cloudflare/cloudflare-os — agent workspace on Cloudflare Workers (open-sourced 2026-08-05, Apache 2.0, early access). Kernel: `packages/workshop-backend`; drivers: `packages/gatekeeper-*` (GitHub, Google, Slack, Notion, …); shell: `packages/workshop-frontend`; processes: Gadgets (sandboxed Dynamic-Worker apps, per-gadget SQLite via Durable Object Facets); executables: Blueprints (shareable app templates — fork code, not data). Deploy: own CF account via https://github.com/cloudflare/cloudflare-os-starter; self-host on `workerd` announced, docs pending. Announcement: https://blog.cloudflare.com/cloudflare-os/
 
 ## Goal

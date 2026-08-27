@@ -1,7 +1,7 @@
 ---
 id: org-os-3-5-release
 title: "org-os v3.5 — Ready for Real Orgs (Release Design)"
-status: design-approved
+status: superseded (0.x re-baseline; branches archived)
 type: release-spec
 target_version: "3.5.0"
 created: 2026-04-25

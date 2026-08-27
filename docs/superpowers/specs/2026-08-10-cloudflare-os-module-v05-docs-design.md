@@ -1,7 +1,7 @@
 # Cloudflare OS as an org-os Module + v0.5 Self-Description — Design
 
 **Date:** 2026-08-10
-**Status:** Approved (brainstorm 2026-08-10)
+**Status:** partially implemented (v0.5)
 **Related:**
 - `docs/superpowers/specs/2026-08-08-cloudflare-os-org-os-integration-design.md` (the integration itself; M3–M4 plan derives from it, not from this spec)
 - `docs/superpowers/specs/2026-08-02-org-os-v5-modularization-design.md` (module system; this spec conforms to its manifest format ahead of the engine)

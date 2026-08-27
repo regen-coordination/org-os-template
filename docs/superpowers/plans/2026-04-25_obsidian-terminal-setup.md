@@ -1,5 +1,7 @@
 # Obsidian Terminal Setup — Implementation Plan
 
+> **Release status (2026-08-28):** Out of scope for the framework (personal vault theming); excluded from the release. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Create an Obsidian vault with integrated terminal that replicates macOS Terminal.app aesthetics — Red Sands theme with translucency, SF Mono font at smaller size (9pt).

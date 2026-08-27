@@ -1,5 +1,7 @@
 # rad-org-os Public Artifacts Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 11; branch feat/rad-org-os (55 commits) preserved per masterplan WS-E. Referenced branch v0.5 is now archive/v0.5. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the rad-org-os public surface — canonical doc, first module detail page, and data/roadmap entries — per the approved spec `docs/superpowers/specs/2026-07-31-rad-org-os-artifacts-design.md`.

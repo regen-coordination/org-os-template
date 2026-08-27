@@ -1,7 +1,7 @@
 # DFOS × org-os Integration — Design Spec
 
 **Date:** 2026-07-25
-**Status:** Approved design, pending implementation plan
+**Status:** approved; frozen (v0.6+; portfolio memo rows 3–4)
 **DFOS:** https://protocol.dfos.com/ — open protocol for cryptographic identity and verifiable content (self-certifying `did:dfos` Ed25519 operation chains, content-addressed CIDs, public proofs / private content, relay network). Product layer: https://dfos.com/ (Metalabel's hosted "private internets": member-governed spaces with chat, posts, calendar, archive, treasury). Reference repo: https://github.com/metalabel/dfos (TS/Go/Python/Rust/Swift implementations, shared test vectors, CLI, official Claude Code skill `dfos@metalabel`).
 
 ## Goal

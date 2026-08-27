@@ -2,7 +2,7 @@
 title: org-os as a Two-Level Autopoietic System — Research Scoping
 date: 2026-05-02
 author: org-os
-status: design
+status: Phases 1–2 implemented (v0.5); Phase 3 frozen (portfolio memo row 5)
 workstream: framework-evolution
 related:
   - docs/agent-plans/QUEUE.md

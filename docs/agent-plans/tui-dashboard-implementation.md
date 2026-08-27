@@ -1,5 +1,7 @@
 # TUI Dashboard Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo 2026-08-21 §4 row 6 (frozen behind admin-app M2 + named-demand trigger). Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Companion design spec: [`tui-dashboard.md`](tui-dashboard.md).
 
 **Goal:** Ship the walking-skeleton v1 of the org-os TUI: a shared data layer (`packages/tui-data/`) plus an Ink-based renderer (`packages/tui/`) that drives both an interactive terminal UI and an agent-print mode for embedding pages in chat. v1 includes 4 representative pages (one section, one entity, one cross-cut, plus the dashboard home view), proves the manifest-driven page registry end-to-end, and preserves every existing entry point (`/initialize`, `npm run initialize`, all validators) untouched.

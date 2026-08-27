@@ -1,5 +1,7 @@
 # Skills Section Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 6 (named explicitly as the tempting quick-ship to resist). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a discovery walker that scans workspace + user + plugin skills, expose the result as a compact dashboard section, a generated `SKILLS.md` page, a machine-readable `.well-known/skills.json`, and a `/skills` slash command — so operators can verify the right skills are loaded and federation peers can compare skill sets.

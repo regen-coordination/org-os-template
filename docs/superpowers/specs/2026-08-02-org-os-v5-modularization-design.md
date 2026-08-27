@@ -1,7 +1,7 @@
 # org-os v5 — Module System Design
 
 **Date:** 2026-08-02
-**Status:** Approved (brainstorm 2026-08-02)
+**Status:** frozen (v0.6+; portfolio memo row 2) — one manifest-first module shipped in v0.5
 **Supersedes:** the conceptual package registry in `docs/PACKAGES.md`
 **Related:** `docs/FILE-STRUCTURE.md`, `docs/FEDERATION.md`, `docs/AGENTIC-ARCHITECTURE.md`
 

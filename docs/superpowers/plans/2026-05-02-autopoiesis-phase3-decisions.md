@@ -1,5 +1,7 @@
 # Autopoiesis Research — Phase 3: Decisions Integration & Cascade Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 5 (trigger: external pilot hits a federation-scale problem Loop C doesn't solve). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn theory (Phase 1) + pilot (Phase 2) into changes the engineering plans can act on, queue any net-new plans, and propagate the framework-level pilot capability to each downstream instance via `sync:upstream` (or document the per-instance follow-up where automatic sync is insufficient).

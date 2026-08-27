@@ -1,5 +1,7 @@
 # org-os-kms Connector Layer — Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 12; 19 unmerged commits preserved (archive tag per masterplan WS-E). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a composable connector layer to `@org-os/kms` so external protocols (GitHub + KOI real; geo/radicle/atproto/synthefy specced stubs) become pluggable knowledge sources declared in `kms.yaml`, feeding the toolkit-framework `ingest → store → review` pipeline.

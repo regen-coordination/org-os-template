@@ -1,5 +1,7 @@
 # Multica × org-os Operator (Phases 0–1) Implementation Plan
 
+> **Release status (2026-08-28):** Superseded — its branch is archived (archive/feat-multica-operator); Multica scope folded into portfolio memo §4 row 8. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make this org-os instance operable through a self-hosted multica: an "org-os operator" agent persona executes multica issues inside this repo under org-os session discipline, with hard safety guards.

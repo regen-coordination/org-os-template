@@ -1,5 +1,7 @@
 # Cloudflare OS × org-os Integration — M0–M2 Implementation Plan
 
+> **Release status (2026-08-28):** M0–M2 in-repo surface SHIPPED in v0.5 (86 tests); remaining deployment-dependent tasks frozen per portfolio memo §4 row 0. Header's working branch (autopoiesis-phase2-pilot) is archived — trunk is main. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deploy Cloudflare OS for the org-os federation and build the `gatekeeper-org-os` read core + context bundle (M1) and the shared page core + org-dashboard gadget (M2), after an M0 platform probe that retires the gatekeeper-authoring unknown.

@@ -2,7 +2,7 @@
 title: org-os Philosophy — Manifesto + Note-Web (Design)
 date: 2026-07-16
 author: org-os
-status: design
+status: design; unstarted (v0.6+)
 workstream: framework-evolution
 related:
   - SOUL.md

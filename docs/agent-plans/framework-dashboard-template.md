@@ -1,7 +1,7 @@
 ---
 id: framework-dashboard-template
 title: "Reusable Dashboard Package Template"
-status: scoping
+status: frozen
 priority: null
 scope: framework
 depends_on: []
@@ -12,6 +12,8 @@ estimated_sessions: null
 tags: [v2, packages, dashboard]
 workstream: v2-stabilization
 ---
+
+> **Release status (2026-08-28):** Deferred to v0.6+ — frozen behind tui-dashboard (portfolio memo §4 row 6). Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 ## Goal
 

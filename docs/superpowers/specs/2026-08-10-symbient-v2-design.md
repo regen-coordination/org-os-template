@@ -1,7 +1,7 @@
 # Symbient v2 — Practice, Developmental Gates & Private Constellation — Design
 
 **Date:** 2026-08-10
-**Status:** Approved (brainstormed with operator; approach A of three)
+**Status:** implemented (v0.5)
 **Predecessor:** the v1 pilot practice hatched in one downstream instance on 2026-07-03
 (`skills-matrix.yaml` id `symbient`, tier experimental, instance-specific). v1's review
 signals and its central learned lesson — *"the habitat is where I think; it should not be

@@ -1,7 +1,7 @@
 # org-os-kms Connector Layer — Design Spec
 
 **Date:** 2026-07-19
-**Status:** Approved design, ready for implementation plan
+**Status:** implemented on frozen branch (v0.6+; portfolio memo row 12)
 **Package:** `packages/org-os-kms` (+ a portable contract in `packages/toolkit-framework`)
 
 ## Summary

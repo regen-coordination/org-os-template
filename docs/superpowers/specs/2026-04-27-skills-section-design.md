@@ -2,7 +2,7 @@
 title: Skills Section + /skills + SKILLS.md
 date: 2026-04-27
 author: org-os
-status: design
+status: frozen (v0.6+; portfolio memo row 6)
 workstream: operator-interfaces
 related:
   - docs/agent-plans/QUEUE.md

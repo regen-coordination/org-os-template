@@ -1,5 +1,7 @@
 # org-os Website + Docs Site — Implementation Plan
 
+> **Release status (2026-08-28):** Built + copy truthed-up (ship-and-validate Task 9 + final fix wave); deploy is masterplan WS-D; spec §16 theme decision resolved (current default locked). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the org-os public framework website + docs site as a static Astro 5 app at `org-os/site/`, presenting the v0.5 module roadmap, rendering curated docs from a single source of truth, and federating live-at-build with the instance registry.

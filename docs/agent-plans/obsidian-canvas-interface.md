@@ -1,7 +1,7 @@
 ---
 id: obsidian-canvas-interface
 title: "Obsidian Canvas as System Overview + Operational Interface"
-status: scoping
+status: frozen
 priority: null
 scope: framework
 depends_on: [obsidian-interface]
@@ -12,6 +12,8 @@ estimated_sessions: null
 tags: [interface, obsidian, canvas, visualization, packages]
 workstream: operator-interfaces
 ---
+
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 6. Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 ## Goal
 

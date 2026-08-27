@@ -1,5 +1,7 @@
 # Cloudflare OS Module + v0.5 Self-Description — Implementation Plan
 
+> **Release status (2026-08-28):** Substantially landed on main (modules/org-os-cloudflare-os/, docs/MODULES.md) though checkboxes were never ticked; residual items fold into the masterplan. Branch header stale (autopoiesis-phase2-pilot archived). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the Cloudflare OS integration org-os's first tracked module, and give org-os a layered self-description — README spine, `docs/MODULES.md` catalog, wired into the site — so the framework explains itself the way `os.cloudflare.app` does.

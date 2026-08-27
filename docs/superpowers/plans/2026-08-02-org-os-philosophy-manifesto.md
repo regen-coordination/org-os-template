@@ -1,5 +1,7 @@
 # org-os Philosophy — Manifesto + Note-Web Implementation Plan
 
+> **Release status (2026-08-28):** Unstarted; deferred to v0.6+ (no PHILOSOPHY.md exists). Not release-blocking. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Write `PHILOSOPHY.md` (a ~1,800–2,400-word manifesto arguing org-os as an attempt at synthetic autopoiesis and organizational self-consciousness) plus an 11-note web under `docs/philosophy/`, wired in with two one-line pointer edits.

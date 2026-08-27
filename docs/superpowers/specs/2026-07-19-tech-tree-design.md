@@ -1,7 +1,7 @@
 ---
 id: tech-tree
 title: "org-os Tech Tree — dialectical development graph (Design)"
-status: design-approved
+status: implemented on frozen branch (v0.6+; portfolio memo row 13)
 type: feature-spec
 created: 2026-07-19
 last_updated: 2026-07-19

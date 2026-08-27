@@ -1,7 +1,7 @@
 # Graphify KMS Integration — Design Spec
 
 **Date:** 2026-07-22
-**Status:** Approved (design), pending implementation plan
+**Status:** implemented (on main, v0.5)
 **Owner:** org-os framework
 
 ## Summary

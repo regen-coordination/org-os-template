@@ -1,7 +1,7 @@
 ---
 id: future-instance-specs
 title: "Write Specs for regen-coordination-os and regen-toolkit"
-status: queued
+status: frozen
 priority: 1
 scope: framework
 depends_on: [v2-phase1-framework]
@@ -12,6 +12,8 @@ estimated_sessions: 1-2
 tags: [v2, specs, phase3]
 workstream: framework-evolution
 ---
+
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo. Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 ## Goal
 

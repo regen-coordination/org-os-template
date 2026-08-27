@@ -1,5 +1,7 @@
 # multica-integration Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 8 (trigger: Multica stable self-hosted release). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship `packages/multica-integration/` — a thin glue package that wires Multica (github.com/multica-ai/multica) into org-os as the primary agent runtime, with self-hosted server (docker-compose), slash commands, and a one-way `HEARTBEAT.md` → multica issues bridge that runs manually and on `/close`.

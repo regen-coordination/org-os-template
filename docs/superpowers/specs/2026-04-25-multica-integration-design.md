@@ -1,7 +1,7 @@
 ---
 title: multica-integration package — design spec
 date: 2026-04-25
-status: approved
+status: approved; frozen (v0.6+; portfolio memo row 8)
 phase: a
 workstream: package-integration
 related_plans:

@@ -13,6 +13,8 @@ tags: [versioning, infrastructure, migration, breaking-changes]
 workstream: v2-stabilization
 ---
 
+> **Release status (2026-08-28):** Completed 2026-04-24; its 3.x SemVer policy is superseded by the 0.x pre-beta re-baseline (CHANGELOG [0.5.0]) — docs/VERSIONING.md update ships in v0.5. Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
+
 ## Delivered
 
 - `docs/VERSIONING.md` — policy. Single source of truth (`package.json.version`), decoupled schema/framework/skill/MASTERPLAN versions, strict semver, pull-based instance migrations, enforcement via `validate:structure`.

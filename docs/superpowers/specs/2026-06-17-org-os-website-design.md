@@ -1,7 +1,7 @@
 ---
 id: org-os-website
 title: "org-os v0.5 — Framework Website + Docs Site (Design)"
-status: design-approved
+status: implemented (deploy pending — v0.5 masterplan WS-D)
 type: feature-spec
 created: 2026-06-17
 last_updated: 2026-06-17

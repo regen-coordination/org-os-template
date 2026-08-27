@@ -1,5 +1,7 @@
 # org-os v5 Module System — Phase 1 Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 2 (trigger: a second module manifest exists). One module (org-os-cloudflare-os) shipped manifest-first in v0.5. Branch header stale. Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the org-os module engine (list/add/adopt/registry), the manifest formats, install-state tracking, and two pilot modules (`org-os-standards`, `org-os-meeting-processor`), per the approved spec `docs/superpowers/specs/2026-08-02-org-os-v5-modularization-design.md` (Phase 1 of §10).

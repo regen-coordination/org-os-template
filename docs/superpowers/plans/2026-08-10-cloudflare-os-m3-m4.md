@@ -1,5 +1,7 @@
 # Cloudflare OS Integration M3–M4 — Implementation Plan
 
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 0. Branch header stale (autopoiesis-phase2-pilot archived). Convergence: [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the non-technical **write path** (M3 — four write capabilities plus the `org-inbox` gadget, every change arriving as a pull request) and the **federation view** (M4 — a `get_federation_map` capability plus a federation-map gadget), then wire the package into `npm run selftest`.

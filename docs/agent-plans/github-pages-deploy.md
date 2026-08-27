@@ -1,7 +1,7 @@
 ---
 id: github-pages-deploy
 title: "Deploy org-os website via GitHub Pages"
-status: queued
+status: active
 priority: 1
 scope: framework
 depends_on: [org-os-website]
@@ -12,6 +12,8 @@ estimated_sessions: 1
 tags: [deploy, github-pages, public-surfaces, website]
 workstream: public-surfaces
 ---
+
+> **Release status (2026-08-28):** Ships in v0.5 — all four open decisions LOCKED (target repo = regen-coordination/org-os-template; URL = GitHub Pages project path https://regen-coordination.github.io/org-os-template/; site source = main, which now contains the built site; theme = current default). The 'Context' section's working-tree description is stale — trunk is now main. Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 ## Goal
 
