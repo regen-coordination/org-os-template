@@ -4,6 +4,12 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 ---
 
+## 🚢 v0.5 release in flight (2026-08-28)
+
+**The single convergence point is [`docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md`](docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md)** — consolidated trunk + admin M1 + `packages/instance-doctor/` (assessment + reliable sync) + live site + `v0.5.0` tag + branch/worktree topology cleared. Everything below either ships in it, is frozen behind it (QUEUE has triggers), or is done. Do not start non-masterplan work before the tag.
+
+---
+
 ## Active Tasks
 
 ### Vault-safety guard over-matches `clean` (2026-08-21 — found during tonight's session, not yet fixed)
@@ -31,7 +37,7 @@ report's own fix-list.
 
 ### Technical
 - [ ] **External-validation pilot (v0.6 gate):** recruit one unaffiliated operator to run their org on org-os for 30 consecutive days with ≤4 support interventions and a publishing `.well-known/` instance — see `DECISIONS.md` 2026-08-21 "External-validation milestone". Recruitment is Task 15, `docs/superpowers/plans/2026-08-21-ship-and-validate.md`. Until this lands, network claims stay scoped to single-operator dogfooding and frozen workstreams stay frozen.
-- [ ] Execute `autopoiesis-research` Phase 2 (12-task TDD plan; cascade closure: `sync-upstream.mjs` + `validate-identity.mjs` + lineage stamp). Plan: `docs/superpowers/plans/2026-05-02-autopoiesis-phase2-pilot.md`
+- [x] ~~Execute `autopoiesis-research` Phase 2~~ — **done 2026-08-02, gate passed** (sync-upstream + validate-identity + lineage stamp on main; fatal stage-5 bug fixed; 17 tests). Was never checked off here.
 - [ ] Execute `autopoiesis-research` Phase 3 (decisions rollup + plan annotations + per-instance cascade) after Phase 2 gate
 - [ ] Execute `multica-integration` plan (25 tasks, spec + plan ready, execution deferred 2026-04-25 — recommend fresh worktree)
 - [ ] Complete `federation-protocol` end-to-end sync test (queued plan; will benefit from Phase 2 sync-upstream.mjs)
@@ -50,16 +56,15 @@ report's own fix-list.
 - [ ] federation-map: add an automated bundle-drift test (run esbuild to a temp file, byte-compare vs committed `dist/federation-map.iife.js`) so a stale vault artifact fails CI instead of silently shipping old code — only review Minor left open
 - [ ] federation-map: optional review cleanups — `self.emoji` emitted but never rendered (dead field in `kms/src/map.mjs`); `federation` edge kind has no CSS rule (falls back to base green — confirm intended)
 - [ ] federation-map: populate `data/ecosystems.yaml` `sources:` lists once instances carry `source-systems.yaml` (currently empty arrays; ring-3 source nodes therefore absent on the hub)
-- [ ] graphify-integration: answer the scope question (A ingest source / B query engine / C adapter / D profile bundle) and resume brainstorm → spec → plan — see `memory/2026-08-02.md`
-- [ ] graphify-integration: decide the Node↔Python bridge (subprocess CLI / MCP server / REST server) and whether a Python toolchain becomes an org-os instance requirement — blocks the spec
+- [x] ~~graphify-integration scope question~~ — **resolved by what shipped** (A: ingest source — `graphify export --wiki` + `compile:knowledge` on main; portfolio memo §4 row 14 closed it)
 - [ ] dfos-integration: operator review of the approved spec, then run writing-plans on Phases 0–1 (`did:dfos` identities + `verify:federation`) — spec `docs/superpowers/specs/2026-07-25-dfos-org-os-integration-design.md`, queue #8
 - [ ] dfos-integration: ask Metalabel about hosted-relay terms/limits and whether the spaces product exposes an API (Phase 4 gate; open questions in spec)
 - [x] ~~org-os-website: wire `docs/POSITIONING.md` into `site/src/data/landing.yaml` + `modules.yaml`~~ — done 2026-08-10; `landing.yaml` carries the four-layer hero, `modules.yaml` mirrors `docs/MODULES.md` under a drift test
 - [ ] v5 module engine: implement `loadRegistry`/`add`/`adopt` + the `npm run module` script (`scripts/modules.mjs` is a 70-line validate-only scaffold). `adopt` must treat an identity mapping (`X: X`) as "already installed — checksum in place", per `modules/org-os-cloudflare-os/module.yaml`
 - [ ] Give the v5 core tranche manifests (`org-os-standards` first — `org-os-cloudflare-os` already declares a dependency on it), then regenerate `docs/MODULES.md` from the registry instead of maintaining it by hand
 - [ ] Execute the Cloudflare OS deployment runbook (`docs/integrations/cloudflare-os.md`) when a Cloudflare account is available; flip `org-os-cloudflare-os` `pilot` → `live` in `docs/MODULES.md` + `site/src/data/modules.yaml` on success
-- [ ] github-pages-deploy: publish the built org-os site to a live URL via GitHub Pages — plan queued (`docs/agent-plans/github-pages-deploy.md`). No live site exists anywhere (verified 2026-08-02). Lock open decisions first: target repo (`org-os-framework` rec.), URL strategy (github.io vs custom domain), canonical `site/` branch
-- [ ] Hygiene: `.gitignore` `graphify-out/` (contains a 2.8MB generated `graph.html`) and `site/test-results/` — both currently untracked but not ignored
+- [ ] github-pages-deploy — **decisions LOCKED 2026-08-28** (repo `org-os-template`, github.io project path, current theme; site source = `main`). Execution = masterplan **WS-D**. Live URL will be `https://regen-coordination.github.io/org-os-template/`
+- [x] ~~Hygiene: `.gitignore` graphify renderings + test artifacts~~ — landed via the 2026-08-21 trunk merge (`61f117e` + Task 8 narrowing)
 - [ ] Investigate: git commit timestamps run ~2 weeks behind the system clock (commits stamped 2026-07-19 while `date` says 2026-08-02) — dashboard "N days ago" math will read wrong until resolved
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
@@ -77,8 +82,11 @@ report's own fix-list.
 - [ ] Evaluate regen-coordination-os Figma/OKLCH design-token scripts (`derive-{light,dark}-tokens.mjs`, `figma-{extract,render,deepfetch}.mjs`) for promotion as a design-system pipeline
 - [ ] Consider backporting refi-bcn-os `close.md`/`initialize.md` command-body improvements (richer than framework's; review after initialize.mjs reconciliation)
 - [ ] Document the hub data-bridge pattern (refi-dao `docs/HUB.md` module contract + allowlist→JSON snapshot) as a framework doc
-- [ ] coop-os hygiene: working tree contains a nested mirror of the whole `03 Libraries/` workspace (517 dirty files) — clean up separately, NOT with git clean (vault safety)
-- [ ] Propagate v0.5 consolidation downstream on each instance's next sync (new skills: research, web-browsing, notion-cli, working-with-obsidian-canvas; commands: /commit /sync /handoff; sync-commands mechanism; **+ federation map** — instances get it via the kms profile plus one `<federation-map>` embed)
+- [ ] coop hygiene — **claim corrected 2026-08-28 sweep:** the big dirty tree is `03 Libraries/coop` (the app repo, 989 dirty files on `fix/landing-page-bugs`), NOT regen-coordination-os (24 dirty); no nested `03 Libraries` mirror found. Tidy separately, vault-safe methods only
+- [ ] Propagate v0.5 downstream — **now the post-release Active-1**, executed via `instance-doctor` (masterplan WS-B/WS-H; QUEUE "Next after release"). Sweep 2026-08-28: no instance currently has a working sync path — bcn/regen/bread missing `sync-upstream.mjs` (broken npm entries), dao a no-op stub + no upstream remote; lineage stamps absent everywhere except bread-coop
+- [ ] **Instance promotion ledgers (found 2026-08-28, tracked nowhere upstream until now):** `refi-bcn-os/docs/kms/FRAMEWORK-FEEDBACK.md` (TF-1..TF-6) + `refi-dao-os/docs/kms/FRAMEWORK-FEEDBACK.md` (~18 items, A1..F1; F1 dispatch package built + unsent, re-target to `archive/knowledge-commons`). Registration = masterplan WS-F4; full fold = v0.6
+- [ ] 🔴 **kms `store` silently overwrites objects sharing a title-slug (data loss at scale)** — refi-dao ledger B5, flagged critical there; triage during WS-B or first v0.5.x patch — data loss outranks scope freeze
+- [ ] 🔴 **kms provenance criticals** — refi-dao ledger section D (two red items); same triage window as B5
 
 ### Funding
 - N/A (solo phase — no treasury, no active funding applications)
@@ -104,14 +112,14 @@ report's own fix-list.
 - [ ] `.well-known/*.json` matches current `data/`
 
 ### Federation
-- [ ] `federation.yaml` `downstream` lists all 6 known instances (refi-bcn-os, refi-dao-os, refi-med-os, dao-os, openclaw, regen-coordination-os) — verified 2026-04-29
+- [x] `federation.yaml` `downstream` lists all known instances — verified 2026-04-29, re-verified 2026-07-15 (bread-coop-os added)
 - [ ] Tell maintainers of refi-dao-os, refi-bcn-os, regen-coordination-os to add `refi-med-os` to their `federation.yaml peers:` lists on next sync
 - [ ] Instance sync review performed in last 7 days (`memory/reports/instances-drift-*.md`)
 
 ### Release
-- [ ] Push `v3.0.0` tag to origin when publishing publicly (currently local only)
-- [ ] Edit `CHANGELOG.md` `[Unreleased]` stub before the next `npm run version:update`
-- [ ] Apply `v2-to-v3` migration to each downstream instance on their next sync session
+- [ ] Ship `v0.5.0` per the masterplan (WS-G): tag + push `main --follow-tags`; push historical `v3.0.0`/`v3.5.0` tags alongside (supersedes the old "push v3.0.0 when publishing" item)
+- [ ] CHANGELOG `[Unreleased]` (symbient v2) folds into `[0.5.0]` at ship — masterplan WS-C2
+- [ ] Cross-scheme migrations (3.0/3.5 → 0.5) run per-instance via `instance-doctor sync` — masterplan WS-B8/WS-H (supersedes "apply v2-to-v3 on next sync")
 
 ---
 
@@ -145,4 +153,4 @@ _(Move completed items here with date — keep for 30 days then remove)_
 
 ---
 
-_Last updated: 2026-08-02_
+_Last updated: 2026-08-28 (v0.5 release-masterplan convergence pass)_

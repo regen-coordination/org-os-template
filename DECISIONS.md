@@ -12,6 +12,19 @@ Each decision is a section with these fields:
 - **Why** — the rationale, including alternatives considered and what made them lose
 - **Refs** — commits, files, plans, related decisions, session memory
 
+---
+
+## 2026-08-28 · v0.5 release masterplan — single convergence point
+
+**Status:** active
+**Scope:** framework, federation, release
+
+**Decision** — Operator directive: everything converges on **one release masterplan** (`docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md`). It (1) absorbs the open remainder of ship-and-validate (Tasks 4, 10–12, 15) with its gates resolved: deploy = `org-os-template` GitHub Pages project path, release tag = `v0.5.0`, one versioning story (0.x pre-beta canonical; MASTERPLAN's 2.0.0 header aligned); (2) **adopts the 2026-08-21 portfolio memo** (Active-3 + freeze table + triggers) with one amendment — a new **`packages/instance-doctor/`** (full instance assessment + reliable update/sync) joins the release as the vehicle for downstream propagation, motivated by the 2026-08-28 six-instance sweep: no instance has a working sync path (`sync-upstream.mjs` missing or stubbed everywhere, zero receipts, lineage stamps absent except bread-coop-os); (3) clears **all** development branches/worktrees via push → `archive/*` tag → delete (frozen work resumes from tags when triggers fire); (4) stamps every plan/spec/queue entry with its verdict + pointer.
+
+**Why** — The repo had two overlapping ship plans (2026-08-10 line written against a stale git snapshot; 2026-08-21 line executed but gated), four live version schemes, 9 branches + 7 worktrees, and instances that cannot ingest any of it. One authority document, one topology, one version story, and a tested sync tool are the minimum for the release goal: stable and reliable for real adoption and collaborative use. Alternatives — keeping parallel plans (drift already bit twice tonight), or propagating by hand per instance (unverifiable, the 08-21 clean-room experiment shows manual paths silently break) — both lose to a TDD'd doctor + receipts.
+
+**Refs** — `docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md`, `docs/agent-plans/2026-08-21-portfolio-decision-memo.md`, `docs/agent-plans/QUEUE.md` (2026-08-28 rewrite), sweep reports in session memory 2026-08-28, `memory/reports/instances-drift-2026-08-21.md`, instance ledgers `refi-{bcn,dao}-os/docs/kms/FRAMEWORK-FEEDBACK.md`
+
 When a decision is superseded, mark it `superseded` and add a `Superseded by:` link to the newer decision. Do not delete; the trail is the value.
 
 ---

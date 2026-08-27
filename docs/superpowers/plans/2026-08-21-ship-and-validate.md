@@ -1,5 +1,7 @@
 # Ship & Validate — Critique Remediation Plan
 
+> **STATUS (2026-08-28):** Phases 0–3 + 5 and Tasks 14/16 **executed 2026-08-21** (ledger: `.superpowers/sdd/2026-08-21-ship-and-validate/progress.md` — trunk landed +292, triage round 1, positioning truthed-up, clean-room experiment, portfolio memo). The open remainder — **Task 4** (admin PR #1), **Tasks 10–12** (versioning story, deploy target, Pages), **Task 15** (pilot outreach) — is **absorbed by the [v0.5 release masterplan](2026-08-28-v0.5-release-masterplan.md)** (WS-A, WS-C, WS-D, and post-release Active-2 respectively), whose operator decisions resolve this plan's gates.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the gap between org-os's built-and-verified work and its shipped, externally-validated reality — land the trunk, deploy the site, true up the positioning claims, shrink the active portfolio, and run the first external-adoption experiment.

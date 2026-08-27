@@ -1,5 +1,7 @@
 # MASTERPLAN.md — Organizational OS Framework
 
+> ⚠️ **Version header below is stale (v2-era) and is corrected in the v0.5 release (masterplan WS-C3).** The framework is at **0.5.0 (pre-beta)** — see `CHANGELOG.md [0.5.0]` for the 3.5→0.5 re-baseline. **Current activation: the [v0.5 release masterplan](docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md)** — do not take the "Activations" section below as current.
+
 **Version:** 2.0.0
 **Date:** 2026-04-05
 **Workspace:** org-os (organizational-os-template)
