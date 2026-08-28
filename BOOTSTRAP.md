@@ -1,6 +1,10 @@
 # BOOTSTRAP.md — First-Run Onboarding
 
-_Run this when deploying org-os for a new organization. Bootstrapping has three phases: guided interview, source ingestion, and ongoing learning. After Phase 1 completes, this file can be archived._
+_Run this when deploying org-os for a new organization. Bootstrapping has three phases: identity capture, source ingestion, and ongoing learning. After Phase 1 completes, this file can be archived._
+
+> **There is one recommended setup path:** the cloning engine (`npm run clone:framework`), below. It is non-interactive, config-driven, agent-friendly, and produces a fresh instance in a **sibling directory** with your identity and a lineage stamp — the framework repo is a *generator*, not the thing you edit in place. If you are driving it with an AI agent (Claude Code, Cursor, a ChatGPT connector), follow [`docs/ADOPT-WITH-AN-AGENT.md`](docs/ADOPT-WITH-AN-AGENT.md) — the same path, as a copy-paste recipe.
+>
+> The only alternative is `npm run setup` — an **in-place, interactive-terminal-only** wizard (it cannot be driven by an agent or any non-TTY shell, and in a clone of this repo it edits around the maintainer's live content rather than replacing it — see the 2026-08-21 clean-room findings). Its real prompts, in order: org type · org name · description · base URL · operational packages (multiselect) · agent runtime · federation network · emoji · Notion integration. It does **not** ask about team, projects, communication channels, or data sources — those are Phase 1 work after either path.
 
 > **Note:** The org-os repo itself is bootstrapped as of 2026-04-24. See `memory/2026-04-24.md` for the self-hosting inauguration notes. New instances (downstream of this framework) run the phases below.
 
@@ -50,16 +54,14 @@ After cloning, the manual phases below still apply for filling in identity, inge
 
 ---
 
-## Phase 1: Guided Interview
+## Phase 1: Identity Capture
 
-Use the `bootstrap-interviewer` skill to set up the workspace interactively. The agent asks questions and generates files automatically.
+The cloning engine scaffolds the files; Phase 1 fills them with your org's reality. This is **agent-led conversation, not a script**: open a session in the new instance with any agent runtime and use the `bootstrap-interviewer` skill, which walks these six topics and writes the files as you answer. (No `npm` command runs this phase — the six topics below are what the *skill* covers, not what `npm run setup` asks; that wizard's nine prompts are listed at the top of this file and cover only the first and fifth topics.)
 
 ### For New Workspaces (Empty Instance)
 
-Run the bootstrap interview:
-
 1. **Organization identity** — name, type, mission, values
-   → Generates: `SOUL.md`, `IDENTITY.md`
+   → Fills: `SOUL.md`, `IDENTITY.md` (the clone seeds name/type; this pass adds the substance)
 
 2. **Team** — core members, roles, contact info
    → Generates: `data/members.yaml`
@@ -71,12 +73,12 @@ Run the bootstrap interview:
    → Generates: `data/channels.yaml`
 
 5. **Network** — federation membership, peers
-   → Generates: `federation.yaml` (identity + federation sections)
+   → Reviews: `federation.yaml` (the clone wrote identity + lineage; this pass confirms peers/trust)
 
 6. **Data sources** — Notion, GitHub repos, websites, docs
    → Populates: `TOOLS.md`, `data/sources.yaml`
 
-The interview works via CLI (Claude Code) or web form (for non-tech operators). See `docs/OPERATOR-GUIDE.md`.
+The interview runs wherever your agent does — Claude Code, Cursor, OpenCode. There is no web form today (`docs/OPERATOR-GUIDE.md` Level 2 describes the agent-guided equivalent).
 
 ### For Existing Workspaces (Agent Joining)
 

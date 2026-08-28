@@ -31,15 +31,18 @@ All data is read-only in the browser. To make changes, use the chat interface (L
 
 ### Level 2: Guided Setup (Basic Computer Literacy)
 
-Bootstrap a new org via web form or chat flow:
+Bootstrap a new org **with an AI agent doing the terminal work for you**. There is no web form
+today — the honest version of this level is: you talk, the agent runs the one recommended path
+(`npm run clone:framework`), and you review what it produced. The copy-paste recipe your agent
+follows is [`ADOPT-WITH-AN-AGENT.md`](ADOPT-WITH-AN-AGENT.md); it covers:
 
-1. Org name, type, mission
-2. Core members and roles
-3. Active projects
-4. Communication channels
-5. Existing data sources
+1. Org name, type, mission (a small config file the agent writes from your answers)
+2. Package and skill selection
+3. Generating the instance and verifying it (`doctor assess` — no blockers except the expected missing remote)
+4. Filling in members, projects, channels and sources afterward via the `bootstrap-interviewer` skill (BOOTSTRAP.md Phase 1)
 
-The system generates all workspace files automatically. You receive a ready-to-use org-os instance with pre-configured packages.
+You receive a ready-to-use org-os instance with pre-configured packages, plus a health report
+you can read without being a developer.
 
 ### Level 3: Claude Code CLI (Developers)
 
@@ -64,7 +67,7 @@ cd packages/knowledge-exchange && node scripts/process-knowledge.js
 Edit YAML files, write scripts, create agent skills, manage federation connections.
 
 - Edit `data/*.yaml` files directly for bulk data changes
-- Create new agent skills in `agents/skills/`
+- Create new agent skills in `skills/` (repo root)
 - Write custom generation scripts in `packages/*/scripts/`
 - Configure federation in `federation.yaml`
 

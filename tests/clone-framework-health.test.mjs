@@ -90,6 +90,48 @@ test('the clone publishes its OWN identity, not the framework\'s', () => {
   });
 });
 
+test('the clone carries no framework registry content — identity stripped by construction', () => {
+  // The 2026-08-29 WS-I recipe run found the recommended path shipping the
+  // maintainer's member entry, 13 framework projects, the framework's SOUL,
+  // its tool endpoints, and its federation frontier cache — the Harbor Bakery
+  // B4/B5 leak. Stage 4b resets those; this pins it.
+  withClone((dir) => {
+    const members = yaml.load(readFileSync(path.join(dir, 'data', 'members.yaml'), 'utf-8'));
+    assert.equal(members.members.length, 1, 'members.yaml must carry only the bootstrap operator');
+    assert.equal(members.members[0].name, 'Test Operator');
+
+    const projects = yaml.load(readFileSync(path.join(dir, 'data', 'projects.yaml'), 'utf-8'));
+    assert.deepEqual(projects.projects, [], 'projects.yaml must start empty');
+
+    const ideas = yaml.load(readFileSync(path.join(dir, 'data', 'ideas.yaml'), 'utf-8'));
+    assert.deepEqual(ideas.ideas, [], 'ideas.yaml must start empty');
+
+    assert.ok(
+      !existsSync(path.join(dir, 'data', 'federation', 'frontier')),
+      'the framework\'s federation frontier cache must not ship in an instance',
+    );
+
+    const soul = readFileSync(path.join(dir, 'SOUL.md'), 'utf-8');
+    assert.ok(!soul.includes('org-os itself'), 'SOUL.md must be the instance\'s, not the framework\'s');
+    assert.ok(soul.includes('test-instance-os'), 'SOUL.md must name the instance');
+
+    const tools = readFileSync(path.join(dir, 'TOOLS.md'), 'utf-8');
+    assert.ok(!/gnosis|llamarpc/i.test(tools), 'the framework\'s API endpoints must not ship in an instance');
+
+    // The catch-all: the maintainer's handle appearing anywhere in the
+    // instance's data/ or identity files is a leak by definition.
+    for (const rel of ['data/members.yaml', 'data/projects.yaml', 'data/ideas.yaml',
+                       'data/ecosystems.yaml', 'data/relationships.yaml', 'USER.md', 'SOUL.md']) {
+      const p = path.join(dir, rel);
+      if (!existsSync(p)) continue;
+      assert.ok(
+        !/luizfernandosg|Luiz Fernando/.test(readFileSync(p, 'utf-8')),
+        `maintainer identity leaked into ${rel}`,
+      );
+    }
+  });
+});
+
 test('every framework-version surface in the clone reads the current framework version', () => {
   withClone((dir) => {
     const fwVersion = JSON.parse(readFileSync(path.join(rootDir, 'package.json'), 'utf-8')).version;
