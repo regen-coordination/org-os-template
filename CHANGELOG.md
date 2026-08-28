@@ -8,10 +8,10 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
-## [0.5.0] — 2026-08-28
+## [0.5.0] — 2026-08-29
 
 **The beta.** The release that makes org-os stable and reliable enough for real adoption and
-collaborative use: a consolidated trunk, a public site, a package that can assess and repair a
+collaborative use: a consolidated trunk, a public site, a package that can assess any
 downstream instance, one coherent versioning story, and a branch topology that is just `main`.
 
 **Version-scheme re-baseline (deliberate, non-SemVer).** Declared **2026-06-17**, shipped here.
@@ -28,14 +28,18 @@ semver-sorted list.
 - **`packages/instance-doctor`** — the reliability centrepiece. `doctor assess` runs six checks
   over any instance (identity coherence + template leakage, lineage stamps, cross-scheme version
   surfaces, machinery integrity, structure/schemas, freshness) and prints a BLOCKER/WARN/OK
-  scorecard with `--json` and blocker exit codes. `doctor sync` runs nine stages — snapshot,
-  ensure-upstream, fetch, inject-machinery, sync-upstream, migrate, generate-schemas, re-assess,
-  receipt — aborting on the first failure so an instance is never left half-migrated. Hub mode
-  (`npm run doctor -- --dir ../other-instance`) is what breaks the bootstrap deadlock: an instance
-  cannot repair its own updating mechanism using its own updating mechanism, so the framework
-  supplies it. Ships `skills/instance-doctor/SKILL.md`, `npm run doctor`, and
-  `modules/org-os-instance-doctor/module.yaml` — the **second tracked module**, which fires the
-  module-engine un-freeze trigger for v0.6.
+  scorecard with `--json` and blocker exit codes — **proven against all six real instances plus
+  the framework itself in the 2026-08-28 acceptance run**, where it surfaced every defect that
+  run reported. `doctor sync` runs nine stages — snapshot, ensure-upstream, fetch,
+  inject-machinery, sync-upstream, migrate, generate-schemas, re-assess, receipt — aborting on
+  the first failure so an instance is never left half-migrated. **Its `--dry-run` planning half
+  is proven; a full sync is not** — the same acceptance run found the strategy it delegates to
+  cannot apply to scaffolded instances (see Known issues), so v0.5's proven surface is
+  `assess` + `sync --dry-run`. Hub mode (`npm run doctor -- --dir ../other-instance`) is what
+  breaks the bootstrap deadlock: an instance cannot repair its own updating mechanism using its
+  own updating mechanism, so the framework supplies it. Ships `skills/instance-doctor/SKILL.md`,
+  `npm run doctor`, and `modules/org-os-instance-doctor/module.yaml` — the **second tracked
+  module**, which fires the module-engine un-freeze trigger for v0.6.
 - **Admin app M1** — `packages/admin/` lands on trunk after eight months on a branch, with its 44
   tests wired into `npm test`, `selftest` and CI so they cannot go quiet again.
 - **Public site, live** — `https://regen-coordination.github.io/org-os-template/`, auto-deploying
@@ -92,8 +96,10 @@ semver-sorted list.
 
 ### Known issues
 
-Shipped knowingly and documented rather than quietly. Both are **data-loss** defects in the kms
-layer, found by production use in `refi-dao-os` and recorded in its framework-feedback ledger:
+Shipped knowingly and documented rather than quietly.
+
+Two **data-loss** defects in the kms layer, found by production use in `refi-dao-os` and
+recorded in its framework-feedback ledger:
 
 - 🔴 **`kms store` silently overwrites objects sharing a title-slug** (ledger B5) — at scale this
   loses knowledge objects without an error.
@@ -103,6 +109,22 @@ layer, found by production use in `refi-dao-os` and recorded in its framework-fe
 (downstream propagation) — the fleet is not synced onto a knowledge store that can lose data.
 Data loss is exempt from the portfolio freeze table. Both instance feedback ledgers are now
 registered as recognized upstream inputs in `docs/SKILL-PROMOTION.md`.
+
+One architectural finding from the release's own acceptance run (WS-H, 2026-08-28 —
+`memory/reports/ws-h-acceptance-2026-08-28.md`):
+
+- 🔴 **A full `doctor sync` cannot yet sync any real instance.** Stage 5 delegates to
+  `scripts/sync-upstream.mjs`, whose `git pull --rebase upstream main` assumes the instance is a
+  *fork* of the framework — but every real instance is a *scaffold* with its own root commit
+  (verified six-for-six), so the rebase conflicts and leaves the repo mid-rebase. The lineage
+  stamps record the true provenance; git history does not. The v0.5 reliability claim is
+  therefore **`assess` + `sync --dry-run`**, both proven against the live fleet.
+
+**Disposition (operator decision 2026-08-29, per the WS-H report's option 2):** replace the
+history-based sync with a **file-level overlay** (framework-owned paths copied, instance-owned
+paths untouched, lineage stamp recording the applied framework commit — the primitive
+`sync-packages.mjs` already uses) in **v0.5.1**, then re-run WS-H acceptance in full. Fleet
+propagation stays v0.6 Active-1, already gated on the kms items above.
 
 Also known, and *not* fixed here: `npm run setup` (the in-place wizard) remains TTY-only and has
 not been re-tested end to end since the 2026-08-21 clean-room run. Use `clone:framework`.
