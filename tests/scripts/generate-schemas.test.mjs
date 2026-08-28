@@ -20,14 +20,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const ORG_ROOT = path.resolve('.');
+import { ORG_ROOT, nodeModulesDir } from '../helpers/repo-paths.mjs';
 const REAL_SCRIPT = path.join(ORG_ROOT, 'scripts', 'generate-all-schemas.mjs');
 
 function setupInstance() {
   const root = mkdtempSync(path.join(tmpdir(), 'generate-schemas-'));
   mkdirSync(path.join(root, 'scripts'));
   copyFileSync(REAL_SCRIPT, path.join(root, 'scripts', 'generate-all-schemas.mjs'));
-  symlinkSync(path.join(ORG_ROOT, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+  symlinkSync(nodeModulesDir(), path.join(root, 'node_modules'), 'dir');
 
   mkdirSync(path.join(root, '.well-known'));
   mkdirSync(path.join(root, 'data'));

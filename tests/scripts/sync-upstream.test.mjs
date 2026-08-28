@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const ORG_ROOT = path.resolve('.');
+import { ORG_ROOT, nodeModulesDir } from '../helpers/repo-paths.mjs';
 const REAL_SCRIPT = path.join(ORG_ROOT, 'scripts', 'sync-upstream.mjs');
 
 function git(cwd, args) {
@@ -59,7 +59,7 @@ function setupFrameworkAndInstance({ withGenesis = true, createMemoryDir = true 
   configureRepo(instance);
   mkdirSync(path.join(instance, 'scripts'), { recursive: true });
   copyFileSync(REAL_SCRIPT, path.join(instance, 'scripts', 'sync-upstream.mjs'));
-  symlinkSync(path.join(ORG_ROOT, 'node_modules'), path.join(instance, 'node_modules'), 'dir');
+  symlinkSync(nodeModulesDir(), path.join(instance, 'node_modules'), 'dir');
   if (createMemoryDir) {
     mkdirSync(path.join(instance, 'memory'), { recursive: true });
     writeFileSync(path.join(instance, 'memory', '.gitkeep'), '');
