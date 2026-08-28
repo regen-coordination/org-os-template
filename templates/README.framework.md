@@ -4,6 +4,8 @@
 
 **Type:** Framework + orchestration hub · **Version:** {{ org.version }} · **Status:** {{ org.status }}
 
+**Site:** <https://regen-coordination.github.io/org-os-template/>
+
 ---
 
 ## What org-os is

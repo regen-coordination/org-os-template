@@ -8,6 +8,7 @@ import SectionBlock from "../components/SectionBlock.astro";
 import FederationMapIsland from "../components/FederationMapIsland.astro";
 import ModuleCard from "../components/ModuleCard.astro";
 import { federationData } from "../lib/federation";
+import { withBase } from "../lib/base";
 
 const landing = yaml.load(readFileSync(resolve(process.cwd(), "src/data/landing.yaml"), "utf8")) as any;
 const mod = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as any;
@@ -18,10 +19,10 @@ const statline = `${federationData.nodes.length} instances · framework v0.5 · 
   <div class="container">
     <Hero eyebrow={landing.eyebrow} title={landing.title} subtitle={landing.subtitle} ctas={landing.ctas} statline={statline} />
   </div>
-  <SectionBlock index="01" eyebrow="Federation" title="One OS, many nodes" href="/federation" cta="Explore the network">
+  <SectionBlock index="01" eyebrow="Federation" title="One OS, many nodes" href={withBase("/federation")} cta="Explore the network">
     <FederationMapIsland mode="mini" />
   </SectionBlock>
-  <SectionBlock index="02" eyebrow="v0.5 roadmap" title="Modules" href="/modules" cta="See all modules">
+  <SectionBlock index="02" eyebrow="v0.5 roadmap" title="Modules" href={withBase("/modules")} cta="See all modules">
     <div class="grid">{teaserModules.map((m: any) => <ModuleCard {...m} />)}</div>
   </SectionBlock>
 </Layout>

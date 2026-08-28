@@ -1,5 +1,6 @@
 ---
 import Layout from "../components/Layout.astro";
+import { withBase } from "../lib/base";
 const repo = "https://github.com/regen-coordination/org-os-template";
 const steps = [
   { n: "01", title: "Clone the framework", body: "Use the cloning engine to scaffold a new instance with package + skill selection.", code: "node scripts/clone-framework.mjs --target ../my-org --config config.yaml" },
@@ -18,7 +19,7 @@ const steps = [
         <div><h3>{s.title}</h3><p>{s.body}</p><pre class="mono">{s.code}</pre></div>
       </section>
     ))}
-    <p>Next: read the <a href={`${repo}/blob/main/BOOTSTRAP.md`}>BOOTSTRAP</a> sequence and the <a href="/docs/operator-guide">Operator Guide</a>.</p>
+    <p>Next: read the <a href={`${repo}/blob/main/BOOTSTRAP.md`}>BOOTSTRAP</a> sequence and the <a href={withBase("/docs/operator-guide")}>Operator Guide</a>.</p>
   </div>
 </Layout>
 <style>

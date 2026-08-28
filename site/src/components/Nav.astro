@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../lib/base";
 interface Props { current?: string; }
 const { current = "home" } = Astro.props;
 const links = [
@@ -11,11 +12,11 @@ const links = [
 ---
 <nav class="nav">
   <div class="container nav-inner">
-    <a href="/" class="brand mono" aria-label="org-os home">~/org-os<span class="cursor" aria-hidden="true"></span></a>
+    <a href={withBase("/")} class="brand mono" aria-label="org-os home">~/org-os<span class="cursor" aria-hidden="true"></span></a>
     <ul>
       {links.map((l) => (
         <li>
-          <a href={l.href} class:list={["nav-link", { active: current === l.id }]}
+          <a href={withBase(l.href)} class:list={["nav-link", { active: current === l.id }]}
              aria-current={current === l.id ? "page" : undefined}>{l.label}</a>
         </li>
       ))}

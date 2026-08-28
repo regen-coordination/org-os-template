@@ -1,5 +1,6 @@
 ---
 import Layout from "../../components/Layout.astro";
+import { withBase } from "../../lib/base";
 import { DOCS_ALLOWLIST } from "../../data/docs-allowlist";
 const groups = [...new Set(DOCS_ALLOWLIST.map((d) => d.group))];
 ---
@@ -13,7 +14,7 @@ const groups = [...new Set(DOCS_ALLOWLIST.map((d) => d.group))];
         <h2>{g}</h2>
         <ul>
           {DOCS_ALLOWLIST.filter((d) => d.group === g).map((d) => (
-            <li><a href={`/docs/${d.slug}`}>{d.title}</a></li>
+            <li><a href={withBase(`/docs/${d.slug}`)}>{d.title}</a></li>
           ))}
         </ul>
       </section>

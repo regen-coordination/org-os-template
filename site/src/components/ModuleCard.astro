@@ -1,5 +1,6 @@
 ---
 import StatusBadge from "./StatusBadge.astro";
+import { withBase } from "../lib/base";
 interface Props { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
 const { id, name, status, summary, link } = Astro.props;
 ---
@@ -11,7 +12,7 @@ const { id, name, status, summary, link } = Astro.props;
   <h3 class="name">{name}</h3>
   <p class="summary">{summary}</p>
   {link
-    ? <a class="more mono link" href={link}>learn more<span class="arr"> →</span></a>
+    ? <a class="more mono link" href={withBase(link)}>learn more<span class="arr"> →</span></a>
     : <span class="more mono muted">spec pending</span>}
 </article>
 <style>

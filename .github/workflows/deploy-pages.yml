@@ -1,0 +1,88 @@
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Deliberately NOT paths-filtered. The site is cross-coupled to several things
+# outside site/: scripts/aggregate-federation.mjs imports
+# packages/org-os-kms/src/map.mjs directly, the build copies the repo's
+# .well-known/ and reads data/instances.yaml, and the docs collection globs
+# ../docs. A filter narrow enough to be worth having would skip the deploy
+# exactly when one of those breaks or changes the site, and the failure mode is
+# silent staleness — the site keeps serving the old build and nothing reports it.
+# A redundant two-minute deploy is much cheaper than that.
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue rather than cancel, so a push is never
+# silently dropped mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+            packages/org-os-federation-map/package-lock.json
+
+      # Order matters: the site imports ../../packages/org-os-kms, whose own
+      # transitive deps (js-yaml) resolve upward into the root install.
+      - name: Install root dependencies
+        run: npm ci
+
+      # The <federation-map> client bundle imports d3-force, which is declared
+      # only in packages/org-os-federation-map. Without this the client build
+      # dies with "Rollup failed to resolve import d3-force" — verified against
+      # a sibling-free clone, which is exactly what a runner is.
+      - name: Install federation-map dependencies
+        working-directory: packages/org-os-federation-map
+        run: npm ci
+
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+
+      # `npm run build` = aggregate + astro build + verify-build.mjs, and
+      # verify-build enforces the base-prefix gate, so a link that would 404 on
+      # the project path fails the deploy rather than shipping.
+      - name: Build site
+        working-directory: site
+        run: npm run build
+
+      - name: Site tests
+        working-directory: site
+        run: npm test
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

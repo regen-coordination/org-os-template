@@ -9,7 +9,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -18,23 +18,48 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+            packages/admin/package-lock.json
+            packages/org-os-federation-map/package-lock.json
 
+      # `npm ci` only — the old `|| npm install` fallback meant a lockfile that
+      # had drifted out of sync still produced a green run, which is the one
+      # thing this step exists to catch.
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       # packages/admin is not an npm workspace, so the root install does not
       # reach it and its 44 tests would be skipped by the selftest step below.
       - name: Install admin package dependencies
-        run: npm ci --prefix packages/admin
+        working-directory: packages/admin
+        run: npm ci
+
+      # The site's client bundle imports d3-force via
+      # packages/org-os-federation-map; without this the site build below fails
+      # to resolve it on a runner.
+      - name: Install federation-map dependencies
+        working-directory: packages/org-os-federation-map
+        run: npm ci
+
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
 
       - name: Validate structure
         run: npm run validate:structure
 
+      # No `|| echo` soft-fail: the validator has shipped since v3.6, so a
+      # failure here is a real failure and must not be swallowed.
       - name: Validate schemas
-        run: npm run validate:schemas || echo "schemas validator not yet available (will land in v3.6 with autopoiesis)"
+        run: npm run validate:schemas
 
       - name: Analyze instances
         run: npm run analyze:instances
+
+      - name: Tests
+        run: npm test
 
       - name: Selftest (full reliability suite)
         run: npm run selftest
@@ -43,6 +68,15 @@ jobs:
       # covering it, the gate should break here rather than go quiet.
       - name: Admin package tests
         run: npm run test:admin
+
+      # Includes verify-build.mjs, which enforces the base-prefix gate.
+      - name: Build site
+        working-directory: site
+        run: npm run build
+
+      - name: Site tests
+        working-directory: site
+        run: npm test
 
       - name: Check version triplet consistency
         run: npm run version:check

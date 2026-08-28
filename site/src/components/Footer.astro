@@ -1,4 +1,5 @@
 ---
+import { withBase } from "../lib/base";
 const year = 2026; // build-stamped
 const repo = "https://github.com/regen-coordination/org-os-template";
 ---
@@ -10,15 +11,15 @@ const repo = "https://github.com/regen-coordination/org-os-template";
     </div>
     <nav class="col links mono" aria-label="Footer">
       <span class="label">Machine</span>
-      <a class="link" href="/llms.txt">llms.txt</a>
-      <a class="link" href="/federation.json">federation.json</a>
-      <a class="link" href="/.well-known/">.well-known</a>
+      <a class="link" href={withBase("/llms.txt")}>llms.txt</a>
+      <a class="link" href={withBase("/federation.json")}>federation.json</a>
+      <a class="link" href={withBase("/.well-known/")}>.well-known</a>
     </nav>
     <nav class="col links mono" aria-label="Project">
       <span class="label">Project</span>
       <a class="link" href={repo}>Source</a>
-      <a class="link" href="/docs">Docs</a>
-      <a class="link" href="/get-started">Get started</a>
+      <a class="link" href={withBase("/docs")}>Docs</a>
+      <a class="link" href={withBase("/get-started")}>Get started</a>
     </nav>
   </div>
   <div class="container baseline mono">

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import yaml from "js-yaml";
 import Layout from "../../components/Layout.astro";
+import { withBase } from "../../lib/base";
 import StatusBadge from "../../components/StatusBadge.astro";
 
 interface TierItem { title: string; body: string; }
@@ -35,7 +36,7 @@ const diagramCaption = "Architecture diagram: org files feed a substrate driver 
 
     <section>
       <h2>Capability map</h2>
-      <p class="prose">Three tiers, strictly meant: what is true today, what is committed, what is still exploration. The canonical copy lives in the <a href="/docs/rad-org-os">rad-org-os doc</a>.</p>
+      <p class="prose">Three tiers, strictly meant: what is true today, what is committed, what is still exploration. The canonical copy lives in the <a href={withBase("/docs/rad-org-os")}>rad-org-os doc</a>.</p>
       {tiers.map((tier) => (
         <div class="tier">
           <div class="tier-head">
@@ -73,13 +74,13 @@ const diagramCaption = "Architecture diagram: org files feed a substrate driver 
 
     <section class="status surface pad">
       <h2>Status — honest</h2>
-      <p class="prose">In development. No Radicle-specific code has shipped yet. What exists today is the first tier above: a substrate-agnostic core, a <code>radicle</code> value in the federation schema that nothing reads yet, and a specced KMS connector. The rest is the roadmap. Full detail, including caveats on private repos and CI, is in the <a href="/docs/rad-org-os">rad-org-os doc</a>.</p>
+      <p class="prose">In development. No Radicle-specific code has shipped yet. What exists today is the first tier above: a substrate-agnostic core, a <code>radicle</code> value in the federation schema that nothing reads yet, and a specced KMS connector. The rest is the roadmap. Full detail, including caveats on private repos and CI, is in the <a href={withBase("/docs/rad-org-os")}>rad-org-os doc</a>.</p>
     </section>
 
     <div class="ctas">
-      <a class="mono link" href="/docs/rad-org-os">read the docs<span class="arr"> →</span></a>
+      <a class="mono link" href={withBase("/docs/rad-org-os")}>read the docs<span class="arr"> →</span></a>
       <a class="mono link" href="https://github.com/regen-coordination/org-os-template">follow the repo (on GitHub today — that's the point)<span class="arr"> →</span></a>
-      <a class="mono link" href="/federation">see the federation<span class="arr"> →</span></a>
+      <a class="mono link" href={withBase("/federation")}>see the federation<span class="arr"> →</span></a>
     </div>
   </div>
 </Layout>

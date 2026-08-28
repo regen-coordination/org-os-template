@@ -1,17 +1,18 @@
 ---
 // Thin Astro wrapper around the framework-agnostic element (spec §1: "B's ergonomics,
 // zero lock-in"). mode="mini" renders the sparse home-page variant wrapped in a link.
+import { withBase } from "../lib/base";
 interface Props { mode?: "full" | "mini" }
 const { mode = "full" } = Astro.props;
 ---
 {mode === "mini" ? (
-  <a href="/federation" class="mini-wrap" aria-label="Explore the federation map">
-    <federation-map mode="mini" src="/map.json"></federation-map>
+  <a href={withBase("/federation")} class="mini-wrap" aria-label="Explore the federation map">
+    <federation-map mode="mini" src={withBase("/map.json")}></federation-map>
   </a>
 ) : (
-  <federation-map src="/map.json"></federation-map>
+  <federation-map src={withBase("/map.json")}></federation-map>
 )}
-<noscript><p class="mono">Interactive map needs JavaScript — the data is at <a href="/map.json">/map.json</a>.</p></noscript>
+<noscript><p class="mono">Interactive map needs JavaScript — the data is at <a href={withBase("/map.json")}>/map.json</a>.</p></noscript>
 <script>
   import "../../../packages/org-os-federation-map/src/index.mjs";
 </script>

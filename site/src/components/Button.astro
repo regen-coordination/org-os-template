@@ -1,8 +1,9 @@
 ---
+import { withBase } from "../lib/base";
 interface Props { href: string; variant?: "solid" | "ghost"; }
 const { href, variant = "solid" } = Astro.props;
 ---
-<a href={href} class:list={["btn", variant]}><slot /></a>
+<a href={withBase(href)} class:list={["btn", variant]}><slot /></a>
 <style>
 .btn {
   display: inline-flex; align-items: center; gap: 0.5em;
