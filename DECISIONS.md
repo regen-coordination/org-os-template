@@ -198,6 +198,21 @@ integration design `docs/superpowers/specs/2026-08-08-cloudflare-os-org-os-integ
 
 ---
 
+## 2026-08-02 · Philosophy — org-os as an attempt at synthetic autopoiesis; dialectical form, literal content, regulative method
+
+**Status:** active
+**Scope:** framework, governance
+
+**Decision** — org-os gains a canonical root **`PHILOSOPHY.md`** manifesto plus a living note-web (`docs/philosophy/`, ~11 interlinked notes), holding the central claim in a specific configuration: **dialectical form, strong-literal content, regulative "as-if" method**. The text argues that an organization is the *motion of organizing* — holding organisation, organism, and organizing true at once — and is structured as a four-movement phenomenological ascent (Organisation → Organism → Organizing → Spirit) so its form enacts its content. It is simultaneously a **mandate**: it licenses and disciplines what org-os builds, naming `SOUL.md`/`IDENTITY.md`/`MEMORY.md` as an organization's actual apparatus for reading its own self-description back. `PHILOSOPHY.md` is also the single place licensed to use philosophical jargon (defined on first use), an explicit exception to `SOUL.md`'s "no jargon" rule.
+
+**Why** — The existing `autopoiesis-research` corpus is deliberately mechanical: its scoping spec brackets off "Maturana–Varela orthodoxy", "deep formalism", and "philosophy paper", and calls autopoiesis "a working frame, not a literal claim". That bracket left the project's most ambitious idea with no home, no argument, and no mandate status — `SOUL.md` carries values and voice, not philosophy. The three-part stance was chosen because each part fixes a failure mode of the others: a purely **strong** claim collapses into mysticism (orgs are literally alive, unfalsifiable); a purely **regulative** claim retreats into mere metaphor and cannot drive design; **dialectical form** is what lets the strong claim stay alive as content while the "as-if" keeps it honest as method — and it makes the acknowledged pretension productive rather than embarrassing. Two hinges were confirmed load-bearing: **von Foerster's second-order cybernetics** (the system folding its own observer in) is what turns "living motion" into "self-knowing" — without it the ascent to Spirit is a leap of faith; and the **DAO thread carries the present tense**, since Beer, Luhmann and Hegel theorized the self-observing collective while agent-native substrates are the first chance to actually attempt one. This is the turn from commentary on a tradition to participation in it. Alternatives rejected: deepening `SOUL.md` instead (values and philosophy are different registers, and the jargon exception would have contaminated the values file); a genealogical structure tracing cybernetics → Luhmann → DAOs (describes a tradition rather than enacting an argument); and folding Spirit into the synthesis as a coda (the Spirit question was the operator's explicit second lineage and needed its own summit).
+
+**Refs** — spec `docs/superpowers/specs/2026-08-02-org-os-philosophy-manifesto-design.md`, `memory/2026-08-02.md` (§11:05 scoping, §13:25 design), `docs/agent-plans/QUEUE.md` Active §3 `philosophy-foundations`, grounds `docs/superpowers/research/2026-05-02-autopoiesis/` (whose "not a literal claim" disclaimer this revisits), commit `615f7f7`. **Manifesto prose not yet drafted** — spec awaiting operator review. **Status note (2026-08-28, WS-E):** the decision stands; the *work* is frozen for v0.5 — see the `philosophy-manifesto` row in [`docs/agent-plans/QUEUE.md`](docs/agent-plans/QUEUE.md) (trigger: operator interest). Salvaged from `agent/ORG-4` before that branch was archived.
+
+---
+
+---
+
 ## 2026-08-02 · Positioning — the four-layer thesis; demonstrate rather than assert
 
 **Status:** active

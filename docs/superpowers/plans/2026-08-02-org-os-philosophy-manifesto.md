@@ -10,7 +10,7 @@
 
 **Tech Stack:** Markdown only. Obsidian `[[wiki-links]]` between notes; relative markdown links for anything outside `docs/philosophy/` (GitHub-renderable). No code, no `data/` changes, no schema regeneration.
 
-**Spec:** `docs/superpowers/specs/2026-07-16-org-os-philosophy-manifesto-design.md` — read it in full before Task 1. It is the source of truth for stance, structure, and voice.
+**Spec:** `docs/superpowers/specs/2026-08-02-org-os-philosophy-manifesto-design.md` — read it in full before Task 1. It is the source of truth for stance, structure, and voice.
 
 ---
 
@@ -89,7 +89,7 @@ Notes are seeds, not literature reviews. Extend a note when a session genuinely 
 - [`PHILOSOPHY.md`](../../PHILOSOPHY.md) — the manifesto (spine)
 - [`SOUL.md`](../../SOUL.md) — values and voice (grounded by the philosophy)
 - [`docs/superpowers/research/2026-05-02-autopoiesis/`](../superpowers/research/2026-05-02-autopoiesis/) — the operational corpus: the mechanism of the metaphor
-- [`docs/superpowers/specs/2026-07-16-org-os-philosophy-manifesto-design.md`](../superpowers/specs/2026-07-16-org-os-philosophy-manifesto-design.md) — the design this web implements
+- [`docs/superpowers/specs/2026-08-02-org-os-philosophy-manifesto-design.md`](../superpowers/specs/2026-08-02-org-os-philosophy-manifesto-design.md) — the design this web implements
 ```
 
 - [ ] **Step 2: Verify the file exists and the table lists 11 notes**
