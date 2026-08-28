@@ -13,7 +13,7 @@
 // crash left stdout empty the 19 resulting failures read as ordinary assertion
 // mismatches rather than "the script never ran". Deriving both from this file's
 // own location makes the suite independent of the working directory.
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,10 +24,26 @@ export const ORG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)
  * Nearest installed node_modules at or above the repo root. Git worktrees
  * share the primary checkout's install, so the upward walk is what makes these
  * fixtures work from a worktree as well as from the main checkout.
+ *
+ * The walk is bounded: it refuses to cross into a DIFFERENT standalone repo
+ * above us (a directory with a `.git` *directory* — worktree and submodule
+ * roots carry a `.git` file and may be ascended through). Without the bound,
+ * a checkout without its own install would silently bind to the enclosing
+ * vault's node_modules and run fixtures against a foreign dependency tree —
+ * the exact "wrong tree, no signal" failure this helper exists to eliminate.
+ * Failing loudly ("run npm install") is the correct behavior there.
  */
 export function nodeModulesDir(from = ORG_ROOT) {
   let dir = path.resolve(from);
   for (;;) {
+    if (dir !== path.resolve(from)) {
+      const gitEntry = path.join(dir, '.git');
+      if (existsSync(gitEntry) && statSync(gitEntry).isDirectory()) {
+        throw new Error(
+          `no node_modules between ${from} and the enclosing repo boundary ${dir} — run npm install`,
+        );
+      }
+    }
     const candidate = path.join(dir, 'node_modules');
     if (existsSync(candidate)) return candidate;
     const parent = path.dirname(dir);

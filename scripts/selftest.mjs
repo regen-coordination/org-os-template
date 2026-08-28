@@ -105,11 +105,23 @@ if (existsSync(path.join(rootDir, "tests"))) {
 // see them. Unless they are named here they simply never run again after the
 // day they merge — which is exactly what happened to test:multica-bridge and
 // test:cloudflare-os-integration. Instances carry no packages/admin, so this
-// reports SKIP there rather than failing.
-if (existsSync(path.join(rootDir, "packages", "admin", "package.json"))) {
-  run("test:admin", "npm", ["run", "test:admin"], { skipKey: "admin" });
-} else {
+// reports SKIP there rather than failing. It also SKIPs (with instructions)
+// when the package is present but its deps are not installed: packages/admin
+// is not an npm workspace, so a plain root `npm install` never reaches it, and
+// running vitest dep-less would FAIL the whole reliability suite on a machine
+// that did everything the README asks. CI installs the deps explicitly, so the
+// suite still gates every push there.
+const adminDir = path.join(rootDir, "packages", "admin");
+if (!existsSync(path.join(adminDir, "package.json"))) {
   results.push({ name: "test:admin", status: "SKIP", detail: "packages/admin not present" });
+} else if (!existsSync(path.join(adminDir, "node_modules"))) {
+  results.push({
+    name: "test:admin",
+    status: "SKIP",
+    detail: "deps not installed — npm ci --prefix packages/admin",
+  });
+} else {
+  run("test:admin", "npm", ["run", "test:admin"], { skipKey: "admin" });
 }
 
 // Report

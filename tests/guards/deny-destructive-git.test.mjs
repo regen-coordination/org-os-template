@@ -15,10 +15,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { ORG_ROOT } from '../helpers/repo-paths.mjs';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const repoRoot = ORG_ROOT;
 const guardPath = resolve(repoRoot, 'scripts/guards/deny-destructive-git.mjs');
 
 function runGuard(payload) {
@@ -85,6 +85,33 @@ const BLOCKED = [
   'git $CMD',
   'git $(echo clean)',
   'git ${VERB} -fd',
+  // --- 2026-08-28 second review pass: verified bypasses of the first A6 ---
+  // tokenizer, all of which the pre-A6 guard blocked. Pinned forever.
+  // quoted option arguments containing spaces must not shift the arity skip
+  // (this repo's own absolute path contains a space — "03 Libraries")
+  'git -C "/Users/x/03 Libraries/refi-med-os" clean -fdx',
+  'git -c "user.name=A B" stash push -u',
+  'git --git-dir "/tmp/my repo/.git" reset --hard',
+  // backslash-newline continuations are one invocation
+  'git \\\n  clean -fd',
+  'git \\\n  stash',
+  // expansion in command position beside a destructive verb: fail closed
+  'V=git; $V clean -fd',
+  'GG=git\n$GG stash',
+  // =-attached-only globals must not swallow the subcommand token
+  'git --exec-path clean -fd',
+  'git --config-env clean -fd',
+  // a quoted subcommand is still that subcommand
+  'git "stash"',
+  // wrappers with quoted payloads, nested quoting included
+  'sh -c "git -C \'/tmp/a b\' clean -fd"',
+  // documented residual (fail-closed, not a defect): quoted PROSE with the two
+  // words adjacent is indistinguishable from an executable `sh -c` payload
+  // without shell semantics, so it stays blocked — `git commit -F <file>` is
+  // the escape hatch for prose that must name the banned commands.
+  'git commit -m "never run git stash"',
+  // ...and the dashed libexec spelling as an exact bare token, same rationale
+  'grep -rn git-stash scripts/guards/',
 ];
 
 for (const command of BLOCKED) {
@@ -112,6 +139,15 @@ const ALLOWED = [
   'git worktree remove .claude/worktrees/v05-main',
   'git push origin main --follow-tags',
   'git -C ../refi-med-os status',
+  // quoted spaced paths and continuations on BENIGN commands stay allowed —
+  // the bypass fixes above must not come at the cost of blocking these
+  'git -C "/tmp/my repo" status',
+  'git log \\\n  --oneline',
+  // expansions without a destructive verb in the segment are normal traffic
+  '$EDITOR notes.md',
+  'echo "$PATH" && git status',
+  // both verbs in a message, neither adjacent to a `git` token: fine
+  'git commit -m "docs: the clean-room stash story"',
 ];
 
 for (const command of ALLOWED) {

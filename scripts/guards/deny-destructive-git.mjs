@@ -19,63 +19,72 @@
  *   exit 0 = no decision; normal permission flow continues
  *   exit 1 = non-blocking error (i.e. the command still runs) — never used here
  *
- * DESIGN TRADEOFF — conservative matching, in *subcommand position*:
- * We still do NOT parse shell grammar. Quoting, `sh -c`, `env`, `xargs`,
- * command substitution, aliases and heredocs make a correct parser a losing
- * game, and a parser that is 95% correct is a boundary with a 5% hole. What we
- * do instead is coarse splitting: quotes are dissolved, `;` `&&` `|` cut the
- * string into invocations, and in each one every token that *is* the git
- * binary (`git`, `/usr/bin/git`, `./git`) is examined. Global options are
- * skipped the way git itself skips them, and the first non-option token is
- * taken as the subcommand. Chaining, wrappers and inserted global options are
- * therefore all still caught regardless of token order.
+ * DESIGN — conservative matching in *subcommand position*:
+ * We still do NOT parse shell grammar; a parser that is 95% correct is a
+ * boundary with a 5% hole. Instead:
  *
- * The one thing that changed (2026-08-28, masterplan WS-A A6): we no longer
- * block on the *bare word* `clean`/`stash` appearing anywhere in a command that
- * also mentions git. `\bclean\b` treats `-` and `/` as word boundaries, so
- * `git add memory/reports/clean-room-bootstrap-2026-08-21.md` and
- * `grep -rn clean scripts/git-hooks/` were blocked — observed twice on
- * 2026-08-28, and the reason six release handoffs had to teach a
- * `git commit -F <file>` workaround. Matching in subcommand position keeps
- * every destructive spelling blocked while letting those through.
+ *   1. Backslash-newline continuations are erased (a two-line `git \` /
+ *      `clean -fd` is one invocation).
+ *   2. Quoted spans are LIFTED into single fused tokens, so `-C "/a b"` stays
+ *      one option argument and cannot shift the option-arity skip onto the
+ *      wrong token (`git -C "/path with space" clean -fdx` was an observed
+ *      bypass of the previous tokenizer, which dissolved quotes into spaces).
+ *   3. Each quoted span's CONTENT is additionally scanned as its own command
+ *      stream, so wrappers like `sh -c 'git stash'` and nested quoting are
+ *      still caught. The cost is a known residual false-positive: a *message*
+ *      containing the two words adjacently (`git commit -m "never run git
+ *      stash"`) is also blocked, because inert `-m` payloads and executable
+ *      `sh -c` payloads are indistinguishable without shell semantics. Use
+ *      `git commit -F <file>` for prose that must name the banned commands.
+ *   4. In every invocation segment, every token that *is* the git binary
+ *      (`git`, `/usr/bin/git`, `./git`) is examined; global options are
+ *      skipped with their real arity, and the first non-option token is the
+ *      subcommand. Tokens containing `=` are skipped as config-style
+ *      arguments — no git subcommand contains `=`, so a mis-modelled option
+ *      arity degrades to skipping its argument instead of opening a hole.
+ *   5. Fail closed on what cannot be resolved statically: a subcommand slot
+ *      holding a shell expansion (`git $CMD`), or an expansion in command
+ *      position alongside a destructive verb token (`V=git; $V clean -fd`,
+ *      another observed bypass).
  *
- * The fail-closed posture is untouched, and is if anything wider:
- *   - dashed invocations (`git-clean`, `git-stash`, and path-prefixed forms
- *     like `/usr/libexec/git-core/git-clean`) are blocked outright;
- *   - a subcommand slot we cannot resolve because it is a shell expansion
- *     (`git $CMD`, `git $(echo clean)`) is blocked rather than guessed;
- *   - any unexpected failure inside this guard blocks.
+ * Scope stays the three verbs that have destroyed vault content here (`stash`,
+ * `clean`, `reset --hard`, plus their dashed libexec spellings). Widening to
+ * `checkout --`/`restore`/`rm` is a separate operator decision — see
+ * docs/VAULT-SAFETY.md; packages/multica-bridge/docs/SETUP.md documents them
+ * as out of scope today.
+ *
  * False positives remain the acceptable direction to be wrong: a false block
- * costs one rephrase, a false allow costs irreplaceable user notes.
+ * costs one rephrase, a false allow costs irreplaceable user notes. Any
+ * unexpected failure inside this guard blocks.
+ *
+ * This file is deliberately a single self-contained script with no imports and
+ * no exports: multica-bridge SETUP tells operators to copy exactly this file
+ * (plus .claude/settings.json) into each new instance. The suite in
+ * tests/guards/deny-destructive-git.test.mjs drives it as a subprocess.
  */
 
 const BLOCK = 2;
 const ALLOW = 0;
 
-// The git binary as an argv[0]: `git`, `/usr/bin/git`, `./git`.
+// The git binary as an argv token: `git`, `/usr/bin/git`, `./git`.
 // Deliberately does NOT match `.git` (as in `ls -la .git/hooks`), `digit`,
 // `legit`, `github.com`, or a directory like `scripts/git-hooks/`.
 const GIT_BINARY = /^(?:.*\/)?git$/;
 
 // The dashed binaries git installs in libexec. These ARE the destructive
-// commands, so they stay blocked even though `-` is no longer a boundary.
+// commands, so they are blocked outright in any position.
 const GIT_DASHED_DESTRUCTIVE = /^(?:.*\/)?git-(clean|stash)$/;
 
 // git global options that consume the FOLLOWING token as their argument.
-// Attached forms (`--git-dir=/tmp/x/.git`) carry their own value and are
+// Only options git actually accepts in separate-argument form belong here:
+// `--exec-path`, `--super-prefix` and `--config-env` are =-attached only (bare
+// `--exec-path` prints and exits), and listing them with arity 2 previously
+// swallowed the real subcommand (`git --exec-path clean -fd` — observed
+// bypass). Attached forms (`--git-dir=/x`) carry their own value and are
 // handled by the generic "starts with -" skip.
-const OPT_WITH_ARG = new Set([
-  '-c',
-  '-C',
-  '--git-dir',
-  '--work-tree',
-  '--namespace',
-  '--exec-path',
-  '--super-prefix',
-  '--config-env',
-]);
+const OPT_WITH_ARG = new Set(['-c', '-C', '--git-dir', '--work-tree', '--namespace']);
 
-// A subcommand slot containing a shell expansion cannot be resolved statically.
+// A token containing a shell expansion cannot be resolved statically.
 const EXPANSION = /\$/;
 
 // `--hard` plus every unambiguous abbreviation git itself accepts for it
@@ -83,45 +92,81 @@ const EXPANSION = /\$/;
 // Deliberately does not match `--help` or `--hard-<something>`.
 const HARD = /^--h(?:a(?:r(?:d)?)?)?$/;
 
+// Fuses whitespace inside a lifted quoted span so it stays one token.
+const FUSE = '';
+
+const REASONS = {
+  clean: 'destructive git operation: `clean` (deletes untracked files)',
+  stash: 'destructive git operation: `stash` (discards/relocates uncommitted work)',
+  hard: 'destructive git operation: `reset --hard` (discards uncommitted work)',
+};
+
 /**
- * Coarse split into invocations, each a token array. Quotes are dissolved —
- * they never bind tokens together for our purposes, so `sh -c 'git stash'`
- * still exposes `git` then `stash`. Grouping characters are dropped so that
- * `$(git rev-list ...)` exposes its inner command. `;` `&&` `||` `|` cut
- * invocations apart so `git status && git clean -fd` is seen as two.
+ * Lift quoted spans out of the command: each becomes a single fused token in
+ * the outer stream, and its raw content is returned for recursive scanning.
  */
-function invocations(command) {
-  return command
+function liftQuotes(command) {
+  const contents = [];
+  const lifted = command.replace(/"([^"]*)"|'([^']*)'|`([^`]*)`/g, (_, d, s, b) => {
+    const inner = d ?? s ?? b ?? '';
+    contents.push(inner);
+    return ` ${inner.trim().replace(/\s+/g, FUSE) || FUSE} `;
+  });
+  return { lifted, contents };
+}
+
+/**
+ * Split a command into invocation segments (token arrays). Quotes are lifted
+ * first; leftover unbalanced quote chars and grouping chars are dissolved;
+ * `;` `&` `|` and newlines separate invocations; lone `\` tokens (escapes and
+ * stray continuations) are dropped.
+ */
+function segments(command) {
+  const { lifted, contents } = liftQuotes(command.replace(/\\\r?\n/g, ' '));
+  const segs = lifted
     .replace(/[`'"]/g, ' ')
     .replace(/[()<>{}]/g, ' ')
-    .split(/[;&|]+/)
-    .map((part) => part.split(/\s+/).filter(Boolean));
+    .split(/[;&|\n]+/)
+    .map((part) => part.split(/\s+/).filter((t) => t && t !== '\\'));
+  return { segs, contents };
 }
 
 /**
  * Given the index of a git binary token, return the index of its subcommand,
- * skipping global options exactly as git does. Returns -1 when the invocation
- * has no subcommand at all (`git --version`, or a trailing bare `git`).
+ * skipping global options with their arity and `=`-bearing config arguments.
+ * Returns -1 when the invocation has no subcommand (`git --version`).
  */
 function subcommandIndex(tokens, gitIndex) {
   let i = gitIndex + 1;
   while (i < tokens.length) {
     const token = tokens[i];
-    if (!token.startsWith('-')) return i;
-    i += OPT_WITH_ARG.has(token) ? 2 : 1;
+    if (token.startsWith('-')) { i += OPT_WITH_ARG.has(token) ? 2 : 1; continue; }
+    if (token.includes('=')) { i += 1; continue; } // config-style argument, never a subcommand
+    return i;
   }
   return -1;
 }
 
-function verdict(command) {
-  for (const tokens of invocations(command)) {
+function scan(command, depth = 0) {
+  if (depth > 4) return 'quoting nested too deep to inspect';
+  const { segs, contents } = segments(command);
+
+  for (const tokens of segs) {
+    if (tokens.length && EXPANSION.test(tokens[0])) {
+      // `V=git; $V clean -fd` — the binary is unresolvable; fail closed when a
+      // destructive verb rides in the same invocation (observed bypass).
+      const verb =
+        (tokens.includes('clean') && 'clean') ||
+        (tokens.includes('stash') && 'stash') ||
+        (tokens.includes('reset') && tokens.some((t) => HARD.test(t)) && 'hard');
+      if (verb) {
+        return `command starts with a shell expansion (\`${tokens[0]}\`) beside a destructive git verb — cannot be cleared (${REASONS[verb]})`;
+      }
+    }
+
     for (let i = 0; i < tokens.length; i++) {
       const dashed = tokens[i].match(GIT_DASHED_DESTRUCTIVE);
-      if (dashed) {
-        return dashed[1] === 'clean'
-          ? 'destructive git operation: `git-clean` (deletes untracked files)'
-          : 'destructive git operation: `git-stash` (discards/relocates uncommitted work)';
-      }
+      if (dashed) return REASONS[dashed[1] === 'clean' ? 'clean' : 'stash'].replace('`', '`git-');
 
       if (!GIT_BINARY.test(tokens[i])) continue;
 
@@ -132,19 +177,26 @@ function verdict(command) {
       if (EXPANSION.test(sub)) {
         return `git subcommand is a shell expansion (\`${sub}\`) and cannot be inspected`;
       }
-      if (sub === 'stash') {
-        return 'destructive git operation: `stash` (discards/relocates uncommitted work)';
-      }
-      if (sub === 'clean') {
-        return 'destructive git operation: `clean` (deletes untracked files)';
-      }
+      if (sub === 'stash') return REASONS.stash;
+      if (sub === 'clean') return REASONS.clean;
       if (sub === 'reset' && tokens.slice(subIndex + 1).some((t) => HARD.test(t))) {
-        return 'destructive git operation: `reset --hard` (discards uncommitted work)';
+        return REASONS.hard;
       }
     }
   }
 
+  // Quoted contents are command streams in their own right (`sh -c 'git
+  // stash'`, `xargs -I{} sh -c "..."`). Scan them recursively.
+  for (const content of contents) {
+    const reason = scan(content, depth + 1);
+    if (reason) return reason;
+  }
+
   return null;
+}
+
+function verdict(command) {
+  return scan(command, 0);
 }
 
 function block(reason) {
@@ -153,7 +205,8 @@ function block(reason) {
       'This repo sits beside an Obsidian vault full of untracked, irreplaceable notes; ' +
       '`git stash`, `git clean` and `git reset --hard` have destroyed user content here before. ' +
       'Do not attempt to work around this guard. Use `npm run vault:snapshot` to checkpoint, ' +
-      'commit what is coherent, or revert file-by-file instead.\n',
+      'commit what is coherent, or revert file-by-file instead. ' +
+      '(If this blocked mere prose naming those commands, use `git commit -F <file>`.)\n',
   );
   process.exit(BLOCK);
 }
@@ -164,13 +217,6 @@ async function readStdin() {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-// This file is deliberately a single self-contained script with no exports and
-// no "am I the main module?" branch. `packages/multica-bridge/docs/SETUP.md`
-// tells operators to copy exactly this file (plus .claude/settings.json) into
-// each new instance, and a main-module check would be one more way for the
-// boundary to silently become a no-op. The suite in
-// tests/guards/deny-destructive-git.test.mjs therefore drives it as a
-// subprocess, which is also the only thing that proves the real exit codes.
 try {
   const raw = await readStdin();
 
