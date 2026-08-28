@@ -61,9 +61,19 @@ if (!instancesFile?.instances) {
 const knownSkills = new Set((skillsMatrix?.skills || []).map((s) => s.id));
 const knownPackages = new Set((packagesMatrix?.packages || []).map((p) => p.id));
 
+// Read, never hardcoded: this said '3.0' in every drift report generated after
+// the 2026-06-17 re-baseline, quietly contradicting the framework it ran from.
+const frameworkVersion = (() => {
+  try {
+    return JSON.parse(readFileSync(join(frameworkRoot, 'package.json'), 'utf-8')).version;
+  } catch {
+    return null;
+  }
+})();
+
 const report = {
   generated_at: new Date().toISOString(),
-  framework_version: '3.0',
+  framework_version: frameworkVersion,
   instances: [],
   summary: {
     total: 0,
