@@ -60,7 +60,13 @@ test("clone-framework creates valid instance from fixture config", () => {
     const fed = yaml.load(readFileSync(path.join(dst, "federation.yaml"), "utf-8"));
     assert.equal(fed.identity.name, "test-instance-os");
     assert.equal(fed.identity.type, "LocalNode");
-    assert.equal(fed.metadata.framework_version, "3.5");
+    // Read, not hardcoded: this assertion said "3.5" for eleven weeks after the
+    // 0.x re-baseline, so it passed while the script stamped every new instance
+    // with a version the framework had already left behind.
+    const fwVersion = JSON.parse(
+      readFileSync(path.resolve(__dirname, "..", "package.json"), "utf-8"),
+    ).version;
+    assert.equal(fed.metadata.framework_version, fwVersion.match(/^(\d+)\.(\d+)/)[0]);
     assert.ok(fed.metadata.genesis_commit, "genesis_commit missing");
     assert.equal(fed.metadata.last_sync_commit, null);
 
