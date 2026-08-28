@@ -1,6 +1,6 @@
 # Instance Drift Report — 2026-08-28
 
-**Generated:** 2026-08-28T20:46:51.010Z
+**Generated:** 2026-08-28T20:53:01.666Z
 **Framework version:** 0.5.0
 
 ## Summary
