@@ -16,11 +16,58 @@
 import path from 'node:path';
 
 import { CANONICAL_MACHINERY, CANONICAL_UPSTREAM_URL, normalizeRepoUrl, CANONICAL_UPSTREAM_SLUG } from './checks/machinery.mjs';
-import { planSync, renderReceipt, restampVersionSurfaces, stampLineage } from './sync.mjs';
+import {
+  planSync,
+  reconcileDeclaredUpstream,
+  renderReceipt,
+  restampVersionSurfaces,
+  stampLineage,
+} from './sync.mjs';
 
 /** Where a receipt lands. `memory/reports/` matches the framework's convention. */
 export function receiptPathFor(dir, today) {
   return path.join(dir, 'memory', 'reports', `sync-receipt-${today}.md`);
+}
+
+const RECEIPT_RE = /^memory\/reports\/sync-receipt-\d{4}-\d{2}-\d{2}\.md$/;
+
+/** Paths `doctor sync` writes itself: the machinery it installs and its receipts. */
+export function isDoctorOwnedPath(rel) {
+  return CANONICAL_MACHINERY.includes(rel) || RECEIPT_RE.test(rel);
+}
+
+/**
+ * The path out of one `git status --porcelain` line.
+ *
+ * Deliberately does NOT slice a fixed offset. Porcelain's status column is two
+ * characters wide and often begins with a space (` M path`), and every helper
+ * here receives output that has been trimmed — which silently eats that leading
+ * space on the FIRST line only, so a fixed offset cuts one character off exactly
+ * one path per run. That bug made the doctor read its own file as an operator's
+ * uncommitted work. Matching the status token instead survives both forms.
+ */
+export function porcelainPath(line) {
+  const rel = String(line).replace(/^[ MADRCU?!]{1,2}\s+/, '');
+  // Renames read "old -> new"; the destination is the path that exists now.
+  return rel.split(' -> ').pop().replace(/^"|"$/g, '').trim();
+}
+
+/**
+ * Working-tree entries that are NOT the doctor's own output.
+ *
+ * A previous aborted run leaves injected machinery and its receipt behind. If
+ * those counted as "dirty", the doctor could never retry after its own abort —
+ * its debris would block it forever. Operator changes still block, which is the
+ * point: sync must not run over work someone has not committed.
+ *
+ * @param {string} porcelain output of `git status --porcelain -uall`
+ * @returns {string[]} the offending entries, verbatim
+ */
+export function foreignDirtyEntries(porcelain) {
+  return (porcelain || '')
+    .split('\n')
+    .filter(Boolean)
+    .filter((line) => !isDoctorOwnedPath(porcelainPath(line)));
 }
 
 /**
@@ -96,33 +143,80 @@ export function runSync(snapshot, opts = {}, io) {
 
       // sync-upstream refuses on a dirty tree (its stage 1). Failing here, with
       // the snapshot already safely written, beats failing four stages later.
-      const dirty = snapshot.git?.dirtyCount ?? 0;
-      if (dirty > 0) {
+      //
+      // Read fresh rather than trusting the pre-run snapshot, and ignore the
+      // doctor's own artifacts — otherwise the debris of an aborted run blocks
+      // every retry.
+      const status = io.git(dir, ['status', '--porcelain', '-uall']);
+      const foreign = status.ok ? foreignDirtyEntries(status.out) : [];
+      if (foreign.length > 0) {
+        const shown = foreign.slice(0, 5).join(', ');
+        const more = foreign.length > 5 ? `, +${foreign.length - 5} more` : '';
         return {
           status: 'failed',
-          detail: `${detail} — but the working tree has ${dirty} uncommitted change(s), and sync refuses to run on a dirty tree. Commit or discard them, then re-run.`,
+          detail: `${detail} — but the working tree has ${foreign.length} uncommitted change(s) that are not the doctor's own (${shown}${more}), and sync refuses to run over uncommitted work. Commit or discard them, then re-run.`,
         };
       }
       return { status: 'ok', detail };
     },
 
     'ensure-upstream'() {
+      const notes = [];
+
+      // 1. The git remote — what fetch and pull actually use.
       const current = snapshot.git?.remotes?.upstream ?? null;
       if (!current) {
         const r = io.git(dir, ['remote', 'add', 'upstream', upstreamUrl]);
-        return r.ok
-          ? { status: 'ok', detail: `added upstream → ${upstreamUrl}` }
-          : { status: 'failed', detail: r.out };
+        if (!r.ok) return { status: 'failed', detail: r.out };
+        notes.push(`added remote upstream → ${upstreamUrl}`);
+      } else {
+        const slug = normalizeRepoUrl(current);
+        const wanted = normalizeRepoUrl(upstreamUrl);
+        if (slug === wanted || slug === CANONICAL_UPSTREAM_SLUG) {
+          notes.push(`remote already canonical (${current})`);
+        } else {
+          const r = io.git(dir, ['remote', 'set-url', 'upstream', upstreamUrl]);
+          if (!r.ok) return { status: 'failed', detail: r.out };
+          notes.push(`rewrote remote from ${current} to ${upstreamUrl}`);
+        }
       }
-      const slug = normalizeRepoUrl(current);
-      const wanted = normalizeRepoUrl(upstreamUrl);
-      if (slug === wanted || slug === CANONICAL_UPSTREAM_SLUG) {
-        return { status: 'ok', detail: `upstream already canonical (${current})` };
+
+      // 2. The DECLARATION in federation.yaml — what sync-upstream.mjs reads.
+      // Repairing only the remote leaves sync-upstream unable to run at all
+      // when the declaration lacks a `url` key (the refi-med-os case).
+      const fedPath = path.join(dir, 'federation.yaml');
+      const currentRaw = federationRaw ?? io.readText(fedPath);
+      if (currentRaw) {
+        const reconciled = reconcileDeclaredUpstream(currentRaw, upstreamUrl);
+        if (reconciled.changed) {
+          io.writeText(fedPath, reconciled.raw);
+          federationRaw = reconciled.raw;
+
+          // Commit it now, for the same reason the machinery is committed: the
+          // next stage refuses to run on a dirty tree, so an uncommitted repair
+          // would guarantee the abort it was meant to prevent. A standalone
+          // commit also lets an operator see and revert exactly this change.
+          const staged = io.git(dir, ['add', '--', 'federation.yaml']);
+          if (!staged.ok) {
+            return { status: 'failed', detail: `could not stage federation.yaml: ${staged.out}` };
+          }
+          const message =
+            `chore(sync): point the declared upstream at the canonical framework repo\n\n` +
+            `federation.yaml upstream[0] now reads ${upstreamUrl}.\n\n` +
+            `scripts/sync-upstream.mjs reads this declaration, not the git remote, so\n` +
+            `a stale or url-less entry stops the sync before it starts. Written by\n` +
+            `\`doctor sync\` (@org-os/instance-doctor).`;
+          const committed = io.git(dir, ['commit', '-m', message]);
+          if (!committed.ok) {
+            return { status: 'failed', detail: `could not commit federation.yaml: ${committed.out}` };
+          }
+          notes.push(`${reconciled.note} (committed)`);
+        } else {
+          notes.push('declaration already canonical');
+        }
       }
-      const r = io.git(dir, ['remote', 'set-url', 'upstream', upstreamUrl]);
-      return r.ok
-        ? { status: 'ok', detail: `rewrote upstream from ${current} to ${upstreamUrl}` }
-        : { status: 'failed', detail: r.out };
+
+      return { status: 'ok', detail: notes.join('; ') };
     },
 
     fetch() {
@@ -138,9 +232,49 @@ export function runSync(snapshot, opts = {}, io) {
         io.copy(from, path.join(dir, rel));
         copied.push(rel);
       }
-      return copied.length > 0
-        ? { status: 'ok', detail: `installed ${copied.join(', ')}` }
-        : { status: 'failed', detail: 'the framework checkout carries none of the sync machinery' };
+      if (copied.length === 0) {
+        return { status: 'failed', detail: 'the framework checkout carries none of the sync machinery' };
+      }
+
+      // Commit what we just wrote. Injecting machinery dirties the working
+      // tree, and the very next stage (sync-upstream) refuses to run on a dirty
+      // tree — so without this the doctor's own repair step guarantees its own
+      // failure. Found by the first real acceptance run against refi-med-os.
+      //
+      // Committing is also the honest record: the instance really did gain
+      // these files, from a known framework commit, and an operator can revert
+      // that one commit if they disagree. Explicit paths only — never `-A` —
+      // so nothing else an operator left in the tree gets swept in.
+      // Include any receipt left by an earlier aborted run: it is doctor-owned
+      // output, and sync-upstream's own dirty check would otherwise trip on it.
+      const status = io.git(dir, ['status', '--porcelain', '-uall']);
+      const leftoverReceipts = (status.ok ? status.out : '')
+        .split('\n')
+        .filter(Boolean)
+        .map(porcelainPath)
+        .filter((rel) => RECEIPT_RE.test(rel));
+
+      const toStage = [...new Set([...copied, ...leftoverReceipts])];
+      const staged = io.git(dir, ['add', '--', ...toStage]);
+      if (!staged.ok) return { status: 'failed', detail: `could not stage machinery: ${staged.out}` };
+
+      const pending = io.git(dir, ['diff', '--cached', '--name-only']);
+      if (pending.ok && pending.out) {
+        const head = String(snapshot.framework?.headSha ?? '').slice(0, 12) || 'unknown';
+        const message =
+          `chore(sync): install framework sync machinery\n\n` +
+          `Copied from the org-os framework at ${head} by \`doctor sync\`\n` +
+          `(@org-os/instance-doctor). Files: ${copied.join(', ')}.\n\n` +
+          `The instance could not sync itself without these; sync-upstream.mjs was\n` +
+          `missing, stubbed, or stale here. Revert this commit to undo the injection.`;
+        const committed = io.git(dir, ['commit', '-m', message]);
+        if (!committed.ok) {
+          return { status: 'failed', detail: `could not commit machinery: ${committed.out}` };
+        }
+        return { status: 'ok', detail: `installed and committed ${copied.join(', ')}` };
+      }
+
+      return { status: 'ok', detail: `${copied.join(', ')} already current — nothing to commit` };
     },
 
     'sync-upstream'() {

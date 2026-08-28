@@ -11,6 +11,7 @@ import {
   restampVersionSurfaces,
   stampLineage,
   renderReceipt,
+  reconcileDeclaredUpstream,
 } from '../../packages/instance-doctor/src/sync.mjs';
 
 const FED_3_0 = `# federation.yaml
@@ -78,6 +79,70 @@ test('re-stamping a surface that is absent is a no-op, not a crash', () => {
   const out = restampVersionSurfaces({}, '0.5.0');
   assert.deepEqual(out.changed, []);
   assert.equal(out.federationRaw, null);
+});
+
+// --- the declared upstream ----------------------------------------------
+
+const CANON = 'https://github.com/regen-coordination/org-os-template.git';
+
+test('the refi-med-os shape: repository but no url, pointing at the legacy repo', () => {
+  // sync-upstream.mjs stage 3 reads federation.yaml.upstream[0].url and exits 1
+  // when it is absent. Fixing only the git REMOTE therefore gets the doctor as
+  // far as running sync-upstream and no further. Found in WS-H H1.
+  const raw = `identity:
+  name: "ReFi Mediterranean"
+
+upstream:
+  - repository: "https://github.com/regen-coordination/organizational-os-framework"
+    last_sync: "2026-04-28"
+    sync_frequency: "on-demand"
+
+downstream: []
+`;
+  const out = reconcileDeclaredUpstream(raw, CANON);
+  assert.equal(out.changed, true);
+  assert.match(out.raw, /url: "https:\/\/github\.com\/regen-coordination\/org-os-template\.git"/);
+  assert.match(out.raw, /repository: "https:\/\/github\.com\/regen-coordination\/org-os-template\.git"/);
+  assert.match(out.raw, /last_sync: "2026-04-28"/, 'unrelated fields survive');
+  assert.match(out.raw, /sync_frequency: "on-demand"/);
+  assert.match(out.raw, /downstream: \[\]/, 'the block after upstream survives');
+});
+
+test('an existing url value is rewritten in place', () => {
+  const raw = `upstream:
+  - type: "template"
+    url: "https://github.com/luizfernandosg/organizational-os-template"
+    relationship: "fork"
+`;
+  const out = reconcileDeclaredUpstream(raw, CANON);
+  assert.equal(out.changed, true);
+  assert.match(out.raw, /url: "https:\/\/github\.com\/regen-coordination\/org-os-template\.git"/);
+  assert.ok(!out.raw.includes('luizfernandosg'));
+  assert.match(out.raw, /relationship: "fork"/);
+});
+
+test('an already-canonical declaration is left alone', () => {
+  const raw = `upstream:\n  - url: "${CANON}"\n`;
+  const out = reconcileDeclaredUpstream(raw, CANON);
+  assert.equal(out.changed, false);
+  assert.equal(out.raw, raw);
+});
+
+test('a missing upstream block is created', () => {
+  const raw = 'identity:\n  name: "Acme"\n\ndownstream: []\n';
+  const out = reconcileDeclaredUpstream(raw, CANON);
+  assert.equal(out.changed, true);
+  assert.match(out.raw, /^upstream:$/m);
+  assert.match(out.raw, new RegExp(`url: "${CANON.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+  assert.match(out.raw, /identity:/, 'existing content survives');
+});
+
+test('an empty upstream list gets its first entry', () => {
+  const raw = 'upstream: []\ndownstream: []\n';
+  const out = reconcileDeclaredUpstream(raw, CANON);
+  assert.equal(out.changed, true);
+  assert.match(out.raw, /url: "https:\/\/github\.com\/regen-coordination\/org-os-template\.git"/);
+  assert.match(out.raw, /downstream: \[\]/);
 });
 
 // --- the lineage stamp ---------------------------------------------------

@@ -185,6 +185,88 @@ export function stampLineage(federationRaw, { genesisCommit, lastSyncCommit, tod
   return out;
 }
 
+/**
+ * Reconcile `federation.yaml`'s DECLARED upstream to the canonical URL.
+ *
+ * Fixing the git remote is not enough. `scripts/sync-upstream.mjs` reads
+ * `federation.yaml.upstream[0].url` at its stage 3 and exits when that key is
+ * absent — and refi-med-os declared `repository:` with no `url:` at all, aimed
+ * at the divergent legacy repo. So a doctor that repaired only the remote got
+ * exactly as far as invoking sync-upstream and no further.
+ *
+ * Operates on raw text so comments, ordering and unrelated keys survive.
+ *
+ * @returns {{raw: string, changed: boolean, note: string}}
+ */
+export function reconcileDeclaredUpstream(raw, canonicalUrl = CANONICAL_UPSTREAM_URL) {
+  const text = String(raw ?? '');
+  const quoted = `"${canonicalUrl}"`;
+
+  const entry = [
+    'upstream:',
+    `  - url: ${quoted}`,
+    `    repository: ${quoted}`,
+    '    relationship: "template"',
+  ].join('\n');
+
+  // No upstream key at all, or an explicitly empty list.
+  const emptyList = /^upstream:\s*\[\s*\]\s*$/m;
+  if (emptyList.test(text)) {
+    return { raw: text.replace(emptyList, entry), changed: true, note: 'declared upstream created (was an empty list)' };
+  }
+  if (!/^upstream:\s*$/m.test(text)) {
+    const appended = text.endsWith('\n') ? `${text}\n${entry}\n` : `${text}\n\n${entry}\n`;
+    return { raw: appended, changed: true, note: 'declared upstream created (key was absent)' };
+  }
+
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => /^upstream:\s*$/.test(l));
+  let end = start + 1;
+  while (end < lines.length && (lines[end].trim() === '' || /^\s/.test(lines[end]))) end += 1;
+
+  const block = lines.slice(start + 1, end);
+  const itemIdx = block.findIndex((l) => /^\s*-\s/.test(l));
+  if (itemIdx === -1) {
+    lines.splice(start + 1, 0, `  - url: ${quoted}`, `    repository: ${quoted}`);
+    return { raw: lines.join('\n'), changed: true, note: 'declared upstream entry created' };
+  }
+
+  // The first list item runs until the next item or the end of the block.
+  let itemEnd = itemIdx + 1;
+  while (itemEnd < block.length && !/^\s*-\s/.test(block[itemEnd])) itemEnd += 1;
+
+  let changed = false;
+  let sawUrl = false;
+  for (let i = itemIdx; i < itemEnd; i += 1) {
+    const urlMatch = /^(\s*(?:-\s+)?)url:\s*(.*)$/.exec(block[i]);
+    if (urlMatch) {
+      sawUrl = true;
+      if (urlMatch[2].trim() !== quoted) {
+        block[i] = `${urlMatch[1]}url: ${quoted}`;
+        changed = true;
+      }
+      continue;
+    }
+    const repoMatch = /^(\s*(?:-\s+)?)repository:\s*(.*)$/.exec(block[i]);
+    if (repoMatch && repoMatch[2].trim() !== quoted) {
+      block[i] = `${repoMatch[1]}repository: ${quoted}`;
+      changed = true;
+    }
+  }
+
+  if (!sawUrl) {
+    // Indent the inserted key to match the item's own keys.
+    const indent = (/^(\s*)-\s/.exec(block[itemIdx]) || [, '  '])[1] + '  ';
+    block.splice(itemIdx + 1, 0, `${indent}url: ${quoted}`);
+    changed = true;
+  }
+
+  if (!changed) return { raw: text, changed: false, note: 'declared upstream already canonical' };
+
+  lines.splice(start + 1, end - (start + 1), ...block);
+  return { raw: lines.join('\n'), changed: true, note: `declared upstream set to ${canonicalUrl}` };
+}
+
 const STATUS_ICON = { ok: '✓', failed: '✗', skipped: '·' };
 
 export function renderReceipt({
