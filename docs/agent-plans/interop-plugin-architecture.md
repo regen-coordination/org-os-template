@@ -42,7 +42,7 @@ Verified 2026-08-28 (github.com/deepseek-ai/deepseek-harness): open-source agent
 | Cloudflare OS | **M0–M2 shipped**; deploy half frozen (memo row 0) | First tracked module; `Substrate` interface is the declared driver seam |
 | Hermes | **shipped** (`packages/hermes-integration`) | Local runtime + Telegram gateway lane |
 | Multica | frozen (memo row 8) | Trigger: stable self-hosted release |
-| Berd | internal (personas layer; 2026-08-21 critique session lineage) | Formalize as a module when it stabilizes |
+| Berd | **identified + spec'd** (2026-08-28; personas layer shipped 2026-08-20) | github.com/block/berd — Block's desktop app over Goose/ACP, open-sourced 2026-08-19 (its "formalize when it stabilizes" trigger fired). Module #4 `org-os-berd` = personas + curated skills bridge into `.agents/skills/`; build post-v0.5-tag as v0.6 Active #5. Spec: [berd design](../superpowers/specs/2026-08-28-berd-integration-design.md) |
 | Buzz | **identified + spec'd** (2026-08-28) | github.com/block/buzz — Block's Nostr-based workspace (chat+forge+workflows, one signed event log; humans and agents as keypair peers). Agent-lane bridge = module #3 `org-os-buzz`, build post-v0.5-tag as v0.6 Active #4. Spec: [buzz design](../superpowers/specs/2026-08-28-buzz-integration-design.md) |
 | dsh plugin (org-os ↔ dsh) | to scope | The new reference harness; 200k★ ecosystem reach |
 | A2A / agent-to-agent protocols | watch | Adopt when a federation peer needs it, per standards-first principle |
@@ -58,4 +58,4 @@ Verified 2026-08-28 (github.com/deepseek-ai/deepseek-harness): open-source agent
 
 - **v0.5 (in the release, already planned):** `org-os-instance-doctor` ships manifest-first as module #2 (masterplan WS-B B10) → fires the engine trigger for v0.6.
 - **v0.6 (this doc's build phase, at un-freeze):** brainstorm → spec update of the v5 modularization design with the plugin/discovery model above → module engine (`loadRegistry/add/adopt/update`) built against ≥2 real manifests → migrate 2–3 existing packages (hermes-integration, federation-map, kms) to manifests as the acceptance test → publish the `org-os-module` topic convention in docs/FEDERATION.md + SKILL-PROMOTION.md.
-- **Research tail:** dsh plugin prototype (org-os instance exposed inside dsh), Berd formalization. Buzz identification resolved 2026-08-28 (spec above).
+- **Research tail:** dsh plugin prototype (org-os instance exposed inside dsh). Buzz identification and Berd formalization both resolved 2026-08-28 (specs above).
