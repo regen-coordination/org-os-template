@@ -1,0 +1,16 @@
+identity:
+  name: instance-a
+  type: LocalNode
+federation:
+  network: test-net
+  role: instance
+  peers:
+    - name: org-os
+      url: https://github.com/organizational-os/organizational-os-template
+      role: hub
+  upstream:
+    - repository: https://github.com/organizational-os/organizational-os-template
+      last_sync: "2026-08-01"
+knowledge-commons:
+  enabled: true
+  published_domains: [regen]

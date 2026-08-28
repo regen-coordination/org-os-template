@@ -1,7 +1,7 @@
 ---
 id: federation-protocol
 title: "End-to-End Federation Exchange"
-status: queued
+status: frozen
 priority: 2
 scope: framework
 depends_on: [v2-phase1-framework]
@@ -10,7 +10,10 @@ started: null
 completed: null
 estimated_sessions: 2
 tags: [v2, federation, phase4]
+workstream: federation-protocol
 ---
+
+> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo; note its dependency scripts/sync-upstream.mjs shipped in v0.5 and the instance-doctor package supersedes part of its test scope. Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 ## Goal
 

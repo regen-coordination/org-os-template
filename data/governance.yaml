@@ -1,32 +1,29 @@
 schema_version: "2.0"
 
-# Governance Registry
-# Tracks governance model, decisions, and elections
+# Governance Registry — org-os framework
+# Solo-maintainer phase. Evolves to steward-council when OSS phase begins.
 
 governance:
-  model: "steward-council"     # steward-council | multisig | assembly | conviction
+  model: "solo-maintainer"     # solo-maintainer | steward-council | multisig | assembly | conviction
   current_phase: "bootstrap"   # bootstrap | transition | active | sunset
   infrastructure:
-    safe: null
-    hats_tree: null
-    gardens: null
-    snapshot: null
-  decisions: []
-    # Example:
-    # - id: "gov-001"
-    #   title: "Adopt Distributed Stewardship Model"
-    #   type: "proposal"       # proposal | election | amendment | emergency
-    #   status: "draft"        # draft | voting | ratified | rejected | expired
-    #   date: "2026-01-01"
-    #   passed_by: null
-    #   summary: ""
+    safe: null           # populate at OSS→DAO trigger
+    hats_tree: null      # populate at OSS→DAO trigger
+    gardens: null        # populate at OSS→DAO trigger
+    snapshot: null       # populate at solo→OSS trigger (public proposals)
+  decisions:
+    - id: "gov-20260424-001"
+      title: "Self-hosting inauguration"
+      type: "amendment"
+      status: "ratified"
+      date: "2026-04-24"
+      passed_by: "solo-maintainer"
+      summary: "The org-os repo adopts org-os as its own operating system. Stubs filled with real content; instance-orchestration layer introduced (data/instances.yaml, skills-matrix.yaml, packages-matrix.yaml). Solo → OSS → DAO trajectory documented in IDENTITY.md."
+    - id: "gov-20260424-002"
+      title: "Projects-vs-plans separation"
+      type: "amendment"
+      status: "ratified"
+      date: "2026-04-24"
+      passed_by: "solo-maintainer"
+      summary: "data/projects.yaml holds long-lived workstreams; docs/agent-plans/ holds specific plans. Plans reference parent workstream via `workstream:` frontmatter."
   elections: []
-    # Example:
-    # - id: "election-001"
-    #   title: "Steward Council Election Q2 2026"
-    #   status: "upcoming"     # upcoming | nominations | voting | completed
-    #   nominations_open: "2026-04-09"
-    #   voting_start: "2026-04-16"
-    #   voting_end: "2026-04-23"
-    #   seats: 5
-    #   candidates: []

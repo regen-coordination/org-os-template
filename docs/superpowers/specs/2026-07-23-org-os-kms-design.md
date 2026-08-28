@@ -1,7 +1,7 @@
 # org-os Knowledge Commons (KMS) — Design Spec
 
 **Date:** 2026-07-23
-**Status:** Approved (brainstorm 2026-07-22/23)
+**Status:** frozen (v0.6+; portfolio memo §5)
 **Research basis:** [docs/knowledge-commons-astro-stack.md](../../knowledge-commons-astro-stack.md) — 104-agent deep research, 24/25 claims verified
 **Related:** [2026-07-22-graphify-kms-integration-design.md](2026-07-22-graphify-kms-integration-design.md)
 

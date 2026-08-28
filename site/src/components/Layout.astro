@@ -1,0 +1,35 @@
+---
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
+import "../styles/tokens.css";
+import "../styles/theme.css";
+import "../styles/global.css";
+import Nav from "./Nav.astro";
+import Footer from "./Footer.astro";
+
+interface Props { title: string; description?: string; current?: string; noindex?: boolean; }
+const {
+  title,
+  description = "org-os — the agent-native org operating system. Framework, standards, and orchestration hub for a federation of regenerative organizations.",
+  current = "home",
+  noindex = false,
+} = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content={description} />
+  <meta name="theme-color" content="#f6f4ed" />
+  {noindex && <meta name="robots" content="noindex" />}
+  <title>{title} · org-os</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+  <Nav current={current} />
+  <main id="main"><slot /></main>
+  <Footer />
+</body>
+</html>

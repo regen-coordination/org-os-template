@@ -1,0 +1,19 @@
+{
+  "name": "@org-os/hermes-integration",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "hermes skill + Python tool: org-os pages exposed via the hermes tool registry",
+  "keywords": [
+    "hermes",
+    "hermes-skill",
+    "org-os",
+    "tui"
+  ],
+  "scripts": {
+    "test": "python3 test/smoke.test.py"
+  },
+  "engines": {
+    "python": ">=3.10"
+  }
+}

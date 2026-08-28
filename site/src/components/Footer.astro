@@ -1,0 +1,43 @@
+---
+const year = 2026; // build-stamped
+const repo = "https://github.com/regen-coordination/org-os-template";
+---
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="col">
+      <span class="brand mono">~/org-os</span>
+      <p class="tag">The agent-native org operating system. Framework · standards · orchestration hub for a federation of regenerative organizations.</p>
+    </div>
+    <nav class="col links mono" aria-label="Footer">
+      <span class="label">Machine</span>
+      <a class="link" href="/llms.txt">llms.txt</a>
+      <a class="link" href="/federation.json">federation.json</a>
+      <a class="link" href="/.well-known/">.well-known</a>
+    </nav>
+    <nav class="col links mono" aria-label="Project">
+      <span class="label">Project</span>
+      <a class="link" href={repo}>Source</a>
+      <a class="link" href="/docs">Docs</a>
+      <a class="link" href="/get-started">Get started</a>
+    </nav>
+  </div>
+  <div class="container baseline mono">
+    <span>MIT · {year}</span>
+    <span class="faint">v0.5 · pre-beta · self-hosting since 2026</span>
+  </div>
+</footer>
+<style>
+.footer { margin-top: var(--space-32); border-top: var(--border-hair) solid var(--color-line-2); background: var(--color-bg-2); }
+.footer-inner { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--space-8);
+  padding-block: var(--space-12) var(--space-8); }
+.brand { font-weight: 600; color: var(--color-ink); }
+.tag { margin-top: var(--space-3); max-width: 42ch; font-size: var(--text-sm); color: var(--color-muted); }
+.col.links { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-sm); }
+.col .label { margin-bottom: var(--space-1); }
+.col .link { color: var(--color-muted); }
+.baseline { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2);
+  padding-block: var(--space-5); border-top: var(--border-hair) dashed var(--color-line);
+  font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); color: var(--color-muted); text-transform: uppercase; }
+.baseline .faint { color: var(--color-faint); }
+@media (max-width: 720px) { .footer-inner { grid-template-columns: 1fr 1fr; } .footer-inner .col:first-child { grid-column: 1 / -1; } }
+</style>

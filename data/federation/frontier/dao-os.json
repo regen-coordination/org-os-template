@@ -1,0 +1,20 @@
+{
+  "fetched_at": "2026-07-19T15:01:24.229Z",
+  "source": "local",
+  "peers": [
+    {
+      "id": "grants-os",
+      "name": "grants-os",
+      "repo": "luizfernandosg/grants-os",
+      "url": "https://github.com/luizfernandosg/grants-os",
+      "type": null
+    },
+    {
+      "id": "ecosystem-canvas",
+      "name": "ecosystem-canvas",
+      "repo": "luizfernandosg/ecosystem-canvas",
+      "url": "https://github.com/luizfernandosg/ecosystem-canvas",
+      "type": null
+    }
+  ]
+}

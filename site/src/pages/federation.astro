@@ -1,0 +1,23 @@
+---
+import Layout from "../components/Layout.astro";
+import FederationMapIsland from "../components/FederationMapIsland.astro";
+import InstanceCard from "../components/InstanceCard.astro";
+import { federationData } from "../lib/federation";
+---
+<Layout title="Federation" current="federation" description="The org-os federation — instances, networks, and live-at-build state.">
+  <div class="container">
+    <p class="eyebrow">Federation</p>
+    <h1>One OS, many nodes</h1>
+    <p class="prose">Each node is a sovereign org-os instance. Edges show framework lineage (dashed) and federation membership (solid). State is aggregated at build from each instance's <code>.well-known/</code>.</p>
+    <FederationMapIsland />
+    <p class="mono faint">Generated {federationData.generatedAt}</p>
+    <div class="grid">
+      {federationData.nodes.map((node) => <InstanceCard node={node} />)}
+    </div>
+  </div>
+</Layout>
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4); margin-top: var(--space-8); }
+.faint { color: var(--color-faint); font-size: var(--text-sm); }
+</style>

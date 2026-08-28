@@ -1,0 +1,44 @@
+# bread-coop-os bootstrap config — v3.5 acceptance test for clone-framework.
+#
+# Worker-owned bread cooperative. Bioregional, food-sovereignty focused.
+# Fictional org used to validate end-to-end framework cloning works as expected.
+
+org:
+  name: "bread-coop-os"
+  tagline: "Worker-owned bread cooperative — bread as commons, not commodity"
+  type: "Cooperative"
+  short_description: "Operating system for a worker-owned bread cooperative federation in formation."
+  emoji: "🍞"
+  license: "MIT"
+
+operator:
+  name: "Luiz Fernando"
+  email: "luizfernandolfsg@gmail.com"
+
+network:
+  name: "regen-coordination"
+  upstream_url: "https://github.com/organizational-os/organizational-os-template.git"
+
+# Minimal package surface (a cooperative just starting out)
+packages:
+  operations: true
+  webapps: false
+
+# Core skill set for cooperative bootstrap
+skills:
+  - bootstrap-interviewer
+  - org-os-init
+  - initialize
+  - heartbeat-monitor
+  - knowledge-curator
+  - meeting-processor
+  - meeting-notes-transcription-fixer
+  - funding-scout
+  - capital-flow
+  - schema-generator
+  - workspace-improver
+  - skills-curator
+  - skill-creator
+  - superpowers-brainstorming
+  - superpowers-writing-plans
+  - superpowers-executing-plans

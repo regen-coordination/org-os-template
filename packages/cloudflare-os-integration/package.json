@@ -1,0 +1,13 @@
+{
+  "name": "@org-os/cloudflare-os-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare OS integration: gatekeeper-org-os core, substrate drivers, page core, blueprints",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@org-os/opencode-integration",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "main": "src/index.mjs",
+  "description": "opencode plugin: registers org_os_page and org_os_tui tools backed by the org-os TUI",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "org-os",
+    "tui"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

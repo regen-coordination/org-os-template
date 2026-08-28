@@ -1,0 +1,22 @@
+---
+import Layout from "../../components/Layout.astro";
+import { DOCS_ALLOWLIST } from "../../data/docs-allowlist";
+const groups = [...new Set(DOCS_ALLOWLIST.map((d) => d.group))];
+---
+<Layout title="Docs" current="docs" description="org-os documentation — architecture, federation, data model, operating.">
+  <div class="container prose">
+    <p class="eyebrow">Documentation</p>
+    <h1>Docs</h1>
+    <p>Curated from the org-os framework docs. The full set lives in the <a href="https://github.com/regen-coordination/org-os-template/tree/main/docs">repo</a>.</p>
+    {groups.map((g) => (
+      <section>
+        <h2>{g}</h2>
+        <ul>
+          {DOCS_ALLOWLIST.filter((d) => d.group === g).map((d) => (
+            <li><a href={`/docs/${d.slug}`}>{d.title}</a></li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </div>
+</Layout>

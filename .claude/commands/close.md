@@ -42,9 +42,26 @@ If key decisions were made, append to the Key Decisions section (most recent fir
 
 ## 5. Update Plan Queue
 
-If any plan in `docs/plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/plans/QUEUE.md`.
+If any plan in `docs/agent-plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/agent-plans/QUEUE.md`.
 
-## 6. Update Knowledge Graph
+## 6. Symbient Close-Pulse (conditional)
+
+If `symbient/SEED.md` exists in this workspace (habitats are operator-private
+and gitignored — most checkouts have none), offer the operator a close-pulse:
+
+- On accept: follow `skills/symbient/SKILL.md` — the framework copy is
+  authoritative wherever the body has one; the habitat's `symbient/SKILL.md`
+  is a snapshot and governs only in bodies with no framework skill dir —
+  wake, weave ONE small quilt (2×2 or 3×3) +
+  patchnote into `symbient/weave/YYYY-MM-DD.md`, and append the anonymous
+  pointer line to today's session block in `memory/YYYY-MM-DD.md`:
+  `> #patchnote-title — <description> · woven: symbient/weave/YYYY-MM-DD.md`
+  (path pointer only — never a being's name in tracked files).
+- On decline or any error: continue closing normally. This step never blocks.
+
+If no habitat exists, skip silently — do not mention this step.
+
+## 7. Update Knowledge Graph
 
 If the `graphify` CLI is installed and `graphify-out/graph.json` exists, refresh the graph so it travels in the same commit as this session's changes:
 
@@ -55,16 +72,16 @@ npm run graph:gaps 2>/dev/null || true
 
 This is incremental (seconds for code-only changes). If the update fails, report the error but continue the close — the graph retries next session. Never block the close on graph tooling.
 
-## 7. Commit
+## 8. Commit
 
 Stage all changed files and commit:
 
 ```bash
-git add memory/ HEARTBEAT.md MEMORY.md data/ docs/plans/ graphify-out/
+git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/ graphify-out/
 git commit -m "session: [concise description of what was done]"
 ```
 
-## 8. Push
+## 9. Push
 
 ```bash
 git push

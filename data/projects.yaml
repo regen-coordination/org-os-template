@@ -1,14 +1,112 @@
 schema_version: "2.0"
 
-# Projects Registry
-# Projects are also tracked in content/projects/ as markdown files
-# This file provides structured data for schema generation
+# Projects Registry — org-os framework workstreams
+# Long-lived work streams. Specific implementation plans live in docs/agent-plans/
+# and reference their parent via `workstream:` frontmatter.
 
-projects: []
-  # Example:
-  # - id: "project-example"
-  #   name: "Example Project"
-  #   status: "Develop"
-  #   lead: "eip155:1:0x1234abcd"
-  #   members: []
-  #   startDate: "2026-01-01"
+projects:
+  - id: "v2-stabilization"
+    name: "v2.0.0 Stabilization"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "Complete v2.0.0 framework: docs suite, skills, validation scripts, lifecycle commands. Active plans feed here until all activations in MASTERPLAN.md §3 are cleared."
+
+  - id: "federation-protocol"
+    name: "Federation Protocol"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "End-to-end federation exchange — sync direction rules, trust levels, conflict resolution. Tests span framework ↔ instances."
+
+  - id: "non-tech-onboarding"
+    name: "Non-Tech Onboarding"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "Web wizard + GitHub Actions backend so non-technical operators can bootstrap an instance without CLI. Scoping stage."
+
+  - id: "instance-orchestration"
+    name: "Instance Orchestration"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "Track and orchestrate all downstream instances. Drift monitoring, cross-instance skill/package catalogs, promotion pipeline. New as of self-hosting inauguration."
+
+  - id: "skill-promotion"
+    name: "Skill Promotion"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "Promote skills validated across ≥2 instances to framework-canonical status. Current candidates: research (in refi-bcn-os + refi-dao-os), DAO-module skills (in dao-os)."
+
+  - id: "package-integration"
+    name: "Package Integration"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-25"
+    description: "Treat packages as a first-class framework concern, parallel to skills. Audit packages/, define lifecycle (promotion + retirement), and resolve the consumption mechanism (how instances activate framework packages). First end-to-end test: promoting the dashboard package."
+
+  - id: "reliability"
+    name: "System Reliability"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-25"
+    description: "Make reliability a first-class concern. Four failure modes (data integrity, agent runtime, federation drift, recovery) × four trigger layers (manual, pre-commit, CI, scheduled). Audit existing checks, decide the layering, implement enforcement. End state: every failure mode has ≥1 enforced trigger; recovery is a documented runbook."
+
+  - id: "instance-bootstrap"
+    name: "Instance Bootstrap Pipeline"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-25"
+    description: "End-to-end pipeline for creating a new org-os instance: framework cloning, wizard with package/skill selection, and knowledge bootstrap with one source ingested as proof-of-pipeline. The engine; non-tech-onboarding becomes the web UI wrapper on top."
+
+  - id: "opal-rollout"
+    name: "OPAL Rollout"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "Roll production-ready OPAL integration (integrations/opal/) out to operational instances (refi-bcn-os, refi-dao-os) so meeting transcripts populate data/meetings.yaml automatically."
+
+  - id: "operator-interfaces"
+    name: "Operator Interfaces"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-24"
+    description: "How non-agent humans work with org-os day-to-day. Primary surface: Obsidian (the vault is already an Obsidian workspace). Secondary: Obsidian Canvas for system overview + live operation. Candidate packages: packages/obsidian-interface, packages/obsidian-canvas."
+
+  - id: "framework-evolution"
+    name: "Framework Evolution"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-04-05"
+    description: "Longer-horizon: new instance specs (regen-coordination-os, regen-toolkit), support for new org types (Fund, Initiative, Coalition), federation at scale (10+ nodes)."
+
+  - id: "rad-org-os"
+    name: "rad-org-os"
+    status: "Discovery"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-07-31"
+    description: "The sovereign distribution: full org-os stack on Radicle, plus the missing org layer for Radicle (which has no org/team primitive). Public artifacts shipped 2026-07-31 (docs/RAD-ORG-OS.md, /modules/rad-org-os, roadmap). Next: substrate driver interface, Radicle bootstrap path, seed-node runbook, KMS radicle connector. Spec: docs/superpowers/specs/2026-07-31-rad-org-os-artifacts-design.md"
+    researchArtifacts:
+      - "docs/research/2026-07-31-radicle-state-of-network.md"
+
+  - id: "cloudflare-os-integration"
+    name: "Cloudflare OS Integration"
+    status: "Develop"
+    lead: "github:luizfernandosg"
+    members: ["github:luizfernandosg"]
+    startDate: "2026-08-08"
+    description: "Expose org-os instances to a Cloudflare OS workspace through a dedicated gatekeeper-org-os driver over a swappable substrate (GitHub now; workerd/Radicle later). All meaning lives in packages/cloudflare-os-integration/ — pure page core, substrate interface, read capabilities — with the Cloudflare deployment holding only adapter wiring. M1 read core + context bundle and M2 shared page core + org-dashboard gadget are built and tested; M0 platform probe (Tasks 1-3), adapter wiring (13), acceptance (14) and gadget install (18.2-3) need a deployed Cloudflare workspace. Writes and federation view deferred to M3-M4. Spec: docs/superpowers/specs/2026-08-08-cloudflare-os-org-os-integration-design.md"

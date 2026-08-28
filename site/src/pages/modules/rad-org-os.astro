@@ -1,0 +1,110 @@
+---
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import yaml from "js-yaml";
+import Layout from "../../components/Layout.astro";
+import StatusBadge from "../../components/StatusBadge.astro";
+
+interface TierItem { title: string; body: string; }
+interface Tier { label: string; status: "planned" | "in-dev" | "live"; desc: string; items: TierItem[]; }
+const doc = yaml.load(readFileSync(resolve(process.cwd(), "src/data/rad-org-os.yaml"), "utf8")) as { tiers: Tier[] };
+const tiers = doc.tiers;
+
+const diagramCaption = "Architecture diagram: org files feed a substrate driver interface, which has a github driver and a radicle driver";
+---
+<Layout title="rad-org-os" current="modules" description="rad-org-os — the sovereign distribution of org-os: the full organizational stack on Radicle, peer-to-peer. And the missing organization layer for Radicle.">
+  <div class="container page">
+    <p class="eyebrow">v0.5 module · <span>rad-org-os</span> <StatusBadge status="in-dev" /></p>
+    <h1>Your organization, on infrastructure nobody can withdraw.</h1>
+    <p class="prose lead">rad-org-os will run the full org-os stack on <a href="https://radicle.dev">Radicle</a> — peer-to-peer, sovereign, no single chokepoint. Same files, different substrate. It is in development: nothing Radicle-specific has shipped yet, and the map below says exactly what exists.</p>
+
+    <section class="why">
+      <article class="surface pad ticked">
+        <h2>For orgs that can't depend on platforms</h2>
+        <p>Accounts get suspended; domains get blocklisted. Radicle demonstrated the alternative on itself: when ISPs blocklisted radicle.xyz in April 2026, the project moved domains and the peer-to-peer network was unaffected. HardenedBSD stood up six global replicas in 24 hours.</p>
+      </article>
+      <article class="surface pad ticked">
+        <h2>The same argument without the risk</h2>
+        <p>You don't need to be a target to want your org's memory, decisions, and data replicated across machines your members control — instead of one vendor's database.</p>
+      </article>
+      <article class="surface pad ticked">
+        <h2>Both directions</h2>
+        <p>A sovereign distribution for org-os users — and, since Radicle has no org or team primitive of its own, the missing <em>organization layer</em> for Radicle: membership, memory, governance, and federation composed from files and delegate quorum.</p>
+      </article>
+    </section>
+
+    <section>
+      <h2>Capability map</h2>
+      <p class="prose">Three tiers, strictly meant: what is true today, what is committed, what is still exploration. The canonical copy lives in the <a href="/docs/rad-org-os">rad-org-os doc</a>.</p>
+      {tiers.map((tier) => (
+        <div class="tier">
+          <div class="tier-head">
+            <h3>{tier.label}</h3>
+            <StatusBadge status={tier.status} />
+            <span class="tier-desc">{tier.desc}</span>
+          </div>
+          <div class="grid">
+            {tier.items.map((it) => (
+              <article class="surface pad item ticked">
+                <h4>{it.title}</h4>
+                <p>{it.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+
+    <section>
+      <h2>Architecture</h2>
+      <figure class="figure">
+        <pre class="diagram mono" role="img" aria-label="ASCII architecture diagram; described below" tabindex="0">{`        org files (markdown · YAML · git)
+   identity · memory · data/ · .well-known/ · skills/
+                      │
+             substrate driver interface
+      clone · sync · push · propose-change · publish-schema
+              ┌───────┴────────┐
+           github            radicle
+        (remote, PRs)   (seed nodes, patches,
+                         DIDs, delegate quorum)`}</pre>
+        <figcaption class="figcap">{diagramCaption}</figcaption>
+      </figure>
+    </section>
+
+    <section class="status surface pad">
+      <h2>Status — honest</h2>
+      <p class="prose">In development. No Radicle-specific code has shipped yet. What exists today is the first tier above: a substrate-agnostic core, a <code>radicle</code> value in the federation schema that nothing reads yet, and a specced KMS connector. The rest is the roadmap. Full detail, including caveats on private repos and CI, is in the <a href="/docs/rad-org-os">rad-org-os doc</a>.</p>
+    </section>
+
+    <div class="ctas">
+      <a class="mono link" href="/docs/rad-org-os">read the docs<span class="arr"> →</span></a>
+      <a class="mono link" href="https://github.com/regen-coordination/org-os-template">follow the repo (on GitHub today — that's the point)<span class="arr"> →</span></a>
+      <a class="mono link" href="/federation">see the federation<span class="arr"> →</span></a>
+    </div>
+  </div>
+</Layout>
+<style>
+.page { padding-block: var(--space-12) var(--space-24); }
+.lead { font-size: var(--text-lg); }
+section { margin-top: var(--space-16); }
+.pad { padding: var(--space-5); }
+.why { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
+.why h2 { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
+.item h4 { margin: 0 0 var(--space-2); }
+.why p, .item p { margin: 0; font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); }
+.tier { margin-top: var(--space-8); }
+.tier-head { display: flex; align-items: center; gap: var(--space-3); border-bottom: var(--border-hair) solid var(--color-line-2); padding-bottom: var(--space-2); margin-bottom: var(--space-4); }
+.tier-head h3 { margin: 0; }
+.tier-desc { font-size: var(--text-sm); color: var(--color-muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
+.diagram { overflow-x: auto; padding: var(--space-5); font-size: var(--text-sm); line-height: 1.5; color: var(--color-muted); background: var(--color-bg-2); }
+.status h2 { margin-top: 0; }
+.ctas { display: flex; flex-wrap: wrap; gap: var(--space-6); margin-top: var(--space-12); }
+.ctas a .arr { display: inline-block; transition: transform var(--t-fast); }
+.ctas a:hover .arr { transform: translateX(3px); }
+/* Same breakpoint SectionBlock uses to stack its heading row. */
+@media (max-width: 560px) {
+  .tier-head { flex-wrap: wrap; align-items: flex-start; gap: var(--space-2); }
+  .ctas { flex-direction: column; gap: var(--space-3); }
+}
+</style>

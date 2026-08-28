@@ -1,0 +1,29 @@
+---
+import Layout from "../components/Layout.astro";
+const repo = "https://github.com/regen-coordination/org-os-template";
+const steps = [
+  { n: "01", title: "Clone the framework", body: "Use the cloning engine to scaffold a new instance with package + skill selection.", code: "node scripts/clone-framework.mjs --target ../my-org --config config.yaml" },
+  { n: "02", title: "Or run the guided interview", body: "Prefer a wizard? npm run setup walks through identity capture — not a working newcomer path yet (a 2026-08-21 clean-room test found it broken 7 ways). Use step 01 until it's fixed.", code: "npm run setup" },
+  { n: "03", title: "Open a session", body: "Read MASTERPLAN.md, SOUL.md, IDENTITY.md, then initialize.", code: "/initialize" },
+];
+---
+<Layout title="Get started" current="get-started" description="Spin up your own org-os instance.">
+  <div class="container prose">
+    <p class="eyebrow">Operators</p>
+    <h1>Give your org an operating system</h1>
+    <p>org-os is the canonical template. Downstream instances fork or sync from it. Requirements: Node ≥22, npm ≥10.9.2, git.</p>
+    {steps.map((s) => (
+      <section class="step">
+        <span class="mono n">{s.n}</span>
+        <div><h3>{s.title}</h3><p>{s.body}</p><pre class="mono">{s.code}</pre></div>
+      </section>
+    ))}
+    <p>Next: read the <a href={`${repo}/blob/main/BOOTSTRAP.md`}>BOOTSTRAP</a> sequence and the <a href="/docs/operator-guide">Operator Guide</a>.</p>
+  </div>
+</Layout>
+<style>
+.step { display: flex; gap: var(--space-4); margin: var(--space-8) 0; }
+.step .n { color: var(--color-accent); font-size: var(--text-lg); }
+.step pre { background: var(--color-surface); border: 1px solid var(--color-line);
+  border-radius: var(--radius); padding: var(--space-3); overflow-x: auto; font-size: var(--text-sm); }
+</style>

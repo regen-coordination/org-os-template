@@ -1,0 +1,10 @@
+schema_version: "2.0"
+projects:
+  - id: alpha
+    title: Alpha Project
+    status: develop
+    lead: github:someone
+    started: "2026-06-01"
+  - id: beta
+    title: Beta Project
+    status: discovery

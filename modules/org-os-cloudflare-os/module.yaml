@@ -1,0 +1,23 @@
+# org-os-cloudflare-os — the Cloudflare OS workspace integration.
+#
+# An IN-PLACE module: everything it owns already sits at its canonical path, so
+# `files` is an identity mapping rather than a materialization map (see
+# modules/README.md). Nothing here is copied on install.
+#
+# Status is tracked in docs/MODULES.md, not in this manifest — the v5 schema has
+# no status field, and inventing one would fail `additionalProperties: false`.
+id: org-os-cloudflare-os
+version: 1.0.0
+type: integration
+description: >-
+  Cloudflare OS workspace integration — the gatekeeper-org-os adapter, a pure page
+  core shared with page-shim, GitHub/memory substrates, and the org-dashboard gadget.
+dependencies:
+  - org-os-standards
+npm: "@org-os/cloudflare-os-integration"
+files:
+  packages/cloudflare-os-integration: packages/cloudflare-os-integration
+  docs/integrations/cloudflare-os.md: docs/integrations/cloudflare-os.md
+checks:
+  - file-exists: packages/cloudflare-os-integration/src/adapter/gatekeeper-org-os/wrangler.jsonc
+  - command: npm run test:cloudflare-os-integration

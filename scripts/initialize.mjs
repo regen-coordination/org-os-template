@@ -249,7 +249,11 @@ function loadProjects() {
     path.join(rootDir, "content", "projects"), // fallback for v1 instances
   ]) {
     if (!fs.existsSync(projectsDir)) continue;
-    const files = fs.readdirSync(projectsDir).filter((f) => f.endsWith(".md"));
+    const files = fs
+      .readdirSync(projectsDir)
+      .filter((f) => f.endsWith(".md"))
+      // Skip package docs / templates, not actual projects
+      .filter((f) => f.toLowerCase() !== "readme.md" && !f.startsWith("_"));
     for (const file of files) {
       const parsed = parseMarkdownFrontmatter(path.join(projectsDir, file));
       if (!parsed) continue;
@@ -456,6 +460,47 @@ function loadMembers() {
   }));
 }
 
+// ── Ideas ────────────────────────────────────────────────────────────────────
+
+function loadIdeas() {
+  const ideasData = readYamlSafe(path.join(rootDir, "data", "ideas.yaml"));
+  return (ideasData?.ideas || []).map((i) => ({
+    id: i.id,
+    title: i.title,
+    status: i.status,
+    champions: i.champions || [],
+  }));
+}
+
+// ── Instances (framework-only) ───────────────────────────────────────────────
+
+function loadInstances() {
+  const instData = readYamlSafe(path.join(rootDir, "data", "instances.yaml"));
+  return (instData?.instances || []).map((i) => ({
+    id: i.id,
+    name: i.name,
+    type: i.type,
+    maturity: i.maturity,
+    framework_version: i.framework_version,
+    last_sync: i.last_sync,
+    cloned: i.cloned,
+    drift_count: (i.drift || []).length,
+  }));
+}
+
+// ── Skill promotion candidates (framework-only) ──────────────────────────────
+
+function loadSkillCandidates() {
+  const matrix = readYamlSafe(path.join(rootDir, "data", "skills-matrix.yaml"));
+  return (matrix?.skills || [])
+    .filter((s) => s.promotion_status === "candidate")
+    .map((s) => ({
+      id: s.id,
+      owner: s.owner,
+      instances_using: s.instances_using || [],
+    }));
+}
+
 // ── Funding ──────────────────────────────────────────────────────────────────
 
 function loadFunding(fundingData) {
@@ -516,6 +561,10 @@ function loadRecentMemory() {
       .map((l) => l.replace(/^[-*]\s+/, ""))
       .slice(0, 2)
       .join(" ")
+      // Strip markdown emphasis/quote/code markers so the summary reads clean
+      .replace(/[*_`]+/g, "")
+      .replace(/^\s*>\s*/g, "")
+      .replace(/\s+/g, " ")
       .trim();
 
     if (lines) {
@@ -1132,6 +1181,10 @@ async function main() {
   const tasks = loadTasks();
   const events = loadEvents();
   const meetings = loadMeetings();
+  const members = loadMembers();
+  const ideas = loadIdeas();
+  const instances = loadInstances();
+  const skillCandidates = loadSkillCandidates();
   const funding = loadFunding(fundingData);
   const recentMemory = loadRecentMemory();
   const federation = loadFederation(federationData);
@@ -1148,6 +1201,10 @@ async function main() {
     tasks,
     events,
     meetings,
+    members,
+    ideas,
+    instances,
+    skillCandidates,
     funding,
     recentMemory,
     federation,
@@ -1342,8 +1399,11 @@ function generateAsciiBanner(name) {
       }
     }
   }
+  // Append " OS" only when the name doesn't already end in OS
+  // (e.g. "org-os" → "ORG-OS", not "ORG-OS OS").
+  const base = displayName.toUpperCase();
+  const fullText = /(^|[\s-])OS$/.test(base) ? base : base + " OS";
 
-  const fullText = displayName.toUpperCase() + "  OS";
   const lines = ["", "", "", "", ""];
   for (const char of fullText) {
     const glyph = font[char] || font[" "];

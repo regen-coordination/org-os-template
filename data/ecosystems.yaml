@@ -1,0 +1,16 @@
+# data/ecosystems.yaml — curated ecosystem nodes for the federation map ("the torch").
+# Spec: docs/superpowers/specs/2026-07-19-federation-map-design.md §3.
+# Each entry becomes a ring-3 ecosystem node; `sources` lists source-system ids it groups.
+ecosystems:
+  - id: regen-commons
+    name: Regen Commons
+    url: https://github.com/regen-coordination
+    sources: []
+  - id: refi-network
+    name: ReFi Network
+    url: https://refidao.com
+    sources: []
+  - id: agent-standards
+    name: Agent-Native Standards
+    url: https://agentsmd.com
+    sources: []

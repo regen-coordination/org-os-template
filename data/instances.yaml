@@ -1,0 +1,154 @@
+schema_version: "2.0"
+
+# Instances Registry — FRAMEWORK-ONLY REGISTRY
+# Tracks live state of every downstream instance. Populated by npm run analyze:instances.
+# Only relevant for the framework repo (and potentially network hubs).
+# Individual instances do NOT need this file.
+#
+# Lifecycle: remote (not cloned) → cloned → synced → production
+# Maturity: alpha | beta | production
+
+instances:
+  - id: "refi-bcn-os"
+    name: "ReFi Barcelona"
+    type: "LocalNode"
+    maturity: "production"
+    repo: "https://github.com/luizfernandosg/refi-bcn-os"
+    local_path: "../refi-bcn-os"
+    cloned: true
+    federation_network: "refi-dao"
+    federation_role: "spoke"
+    masterplan_version: "2.0.0"
+    framework_version: "3.0"
+    last_sync: "2026-03-19"
+    agent_runtime: ["cursor", "claude"]
+    # `symbient` deliberately omitted: recording which instance carries the
+    # symbient skill publishes the existence of an operator-private habitat
+    # there. Adoption of that skill is never recorded — see
+    # data/skills-matrix.yaml (id: symbient) and skills/symbient/SKILL.md.
+    skills_extra: ["notion-sync"]
+    packages: ["dashboard", "maps", "operations", "webapps"]
+    data_registries_extra: ["catalunya-comarca-province", "hermes-cron", "orgs", "pending-payouts", "tasks", "telegram-topic-routing"]
+    drift: []
+    notes: "Cooperative-in-formation. Luiz is Strategy Lead. Operational maturity."
+
+  - id: "refi-dao-os"
+    name: "ReFi DAO"
+    type: "DAO"
+    maturity: "production"
+    repo: "https://github.com/luizfernandosg/refi-dao-os"
+    local_path: "../refi-dao-os"
+    cloned: true
+    federation_network: "regen-coordination"
+    federation_role: "hub"
+    masterplan_version: "2.2.0"
+    framework_version: "3.0"
+    last_sync: "2026-03-06"
+    agent_runtime: ["claude-code"]
+    skills_extra: []
+    packages: ["coordination", "dashboard", "governance", "hub", "operations", "org-os-kms", "regen-agents", "toolkit-framework", "webapps"]
+    data_registries_extra: ["blog-articles", "entities", "figma-assets", "hermes-cron", "tasks", "website-source-mapping"]
+    drift: []
+    notes: "Phase 2 infrastructure deployment. Active governance, Gardens DAO and Karma GAP wired."
+
+  - id: "dao-os"
+    name: "DAO OS"
+    type: "Project"
+    maturity: "beta"
+    repo: "https://github.com/regen-coordination/dao-os"
+    local_path: "../dao-os"
+    cloned: true
+    federation_network: ""
+    federation_role: "dev-platform"
+    masterplan_version: null
+    framework_version: "3.0"
+    last_sync: "2026-04-02"
+    agent_runtime: []
+    skills_extra: ["safe-treasury", "hats-governance", "gardens-governance", "karma-reputation", "eip4824-identity"]
+    packages: ["connectors", "core"]
+    data_registries_extra: []
+    drift:
+      - "no_masterplan"
+    notes: "DAO-module development platform, not an operational instance. Source of high-value promotion candidates (DAO-module skills)."
+
+  - id: "openclaw"
+    name: "openclaw"
+    type: "AgentRuntime"
+    maturity: "alpha"
+    repo: null
+    local_path: "../openclaw"
+    cloned: true
+    federation_network: null
+    federation_role: "agent-runtime"
+    masterplan_version: null
+    framework_version: null
+    last_sync: null
+    agent_runtime: []
+    skills_extra: []
+    packages: []
+    data_registries_extra: []
+    drift:
+      - "no_federation_yaml"
+      - "no_masterplan"
+      - "stub_identity"
+    notes: "Agent runtime container. Not a data instance — provides the agent substrate that other instances invoke."
+
+  - id: "regen-coordination-os"
+    name: "Regen Coordination"
+    type: "Hub"
+    maturity: "beta"
+    repo: "https://github.com/regen-coordination/regen-coordination-os"
+    local_path: "../regen-coordination-os"
+    cloned: true
+    federation_network: "regen-coordination"
+    federation_role: "hub"
+    masterplan_version: null
+    framework_version: "3.0"
+    last_sync: "2026-04-24"
+    agent_runtime: ["claude-code"]
+    skills_extra: []
+    packages: ["agents-app", "coop", "dashboard", "egregore-core", "koi-bridge", "koi-opal-bridge", "opal-bridge", "operations", "paperclip-agents-app", "regen-agents", "regen-toolkit", "webapps"]
+    data_registries_extra: ["deployment-requirements", "feedback-process", "funds", "initiatives", "nodes", "ontology", "option-library", "programs"]
+    drift:
+      - "no_federation_section"
+      - "missing_governance_yaml"
+      - "missing_dao_json"
+    notes: "Synced to framework v3.0 on 2026-04-24 — full overlay (skills, scripts, schemas, packages, framework docs). Instance identity files (SOUL, IDENTITY, USER, HEARTBEAT, MEMORY, TOOLS, README, federation.yaml, data/) preserved. Three pre-existing structural issues to resolve in next session."
+
+  - id: "refi-med-os"
+    name: "ReFi Mediterranean"
+    type: "LocalNode"
+    maturity: "alpha"
+    repo: "https://github.com/ReFiDAO/refi-med-os"
+    local_path: "../refi-med-os"
+    cloned: true
+    federation_network: "refi-dao"
+    federation_role: "spoke"
+    masterplan_version: "2.0.0"
+    framework_version: "3.0"
+    last_sync: "2026-04-28"
+    agent_runtime: ["claude-code"]
+    skills_extra: []
+    packages: []
+    data_registries_extra: ["tasks"]
+    drift: []
+    notes: "Scaffolded 2026-04-28 from framework v3.0. Bootstrap pending — identity/members/projects are TBD-stubs; operator follows BOOTSTRAP.md + one-pager to complete the bootstrap-interviewer flow. Public website + knowledge base mounted at repos/refi-mediterranean/ (independent remote at ReFiDAO/ReFi-Mediterranean)."
+
+  - id: "bread-coop-os"
+    name: "Bread Cooperative"
+    type: "Cooperative"
+    maturity: "alpha"
+    repo: null
+    local_path: "../bread-coop-os"
+    cloned: true
+    federation_network: "regen-coordination"
+    federation_role: "spoke"
+    masterplan_version: null
+    framework_version: "3.5"
+    last_sync: "2026-05-16"
+    agent_runtime: ["claude-code"]
+    skills_extra: []
+    packages: ["operations"]
+    data_registries_extra: []
+    drift: []
+    notes: "Acceptance-test instance for clone-framework.mjs (v3.5). Bootstrapped 2026-05-16 with config at tests/fixtures/bread-coop-config.yaml. Worker-owned bread cooperative (fictional/test). Lineage stamp populated. Not yet pushed to a remote."

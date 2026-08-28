@@ -14,6 +14,25 @@ This file contains your mandate, activations, research directions, success metri
 
 ---
 
+## ⚠️ Workspace Safety — Before Any Destructive Git Op
+
+**Read `docs/VAULT-SAFETY.md` before running any git operation that touches the working tree** (merge, rebase, pull, reset, checkout across branches, clean, stash, large `git add -A`).
+
+Hard rules:
+
+1. **Never `git stash`** in a workspace with precious untracked content (instances with `memory/`, drafts, daily notes). Use `npm run vault:snapshot -- "<reason>"` instead — it creates a permanent `refs/snapshots/<...>` ref without disturbing the tree.
+2. **Never `git clean`** — those untracked files are content, not build artifacts.
+3. **Never `git reset --hard`** while uncommitted content exists.
+4. **`--no-verify` is forbidden** unless the user explicitly authorizes it.
+5. **`main` is the only branching base.** Feature-off-feature branches require a DECISIONS.md entry stating why; every session that creates commits pushes its branch before `/close` completes.
+6. **Superseded branches are archived as `archive/<name>` tags**, never left as branches.
+
+After any risky op: `npm run vault:audit` (loud failure if files vanished).
+
+Full protocol + 7-layer recovery runbook: **[docs/VAULT-SAFETY.md](docs/VAULT-SAFETY.md)**.
+
+---
+
 ## 1. Deterministic Session Startup Sequence
 
 **Recommended:** Run `/initialize` (OpenCode) or `npm run initialize` to get a visual dashboard of the full workspace state — projects, tasks, calendar, funding deadlines, cheatsheets. This reads all files below automatically and renders them as an actionable overview.

@@ -1,0 +1,3 @@
+/* theme.css — the active theme. Swap this single import to retheme the whole site. */
+@import "./themes/systems.css";        /* ACTIVE — light systems (primary) */
+/* @import "./themes/systems-dark.css";   dark variant (Task 3) */

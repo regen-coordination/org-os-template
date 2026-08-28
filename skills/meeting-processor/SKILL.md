@@ -1,7 +1,7 @@
 ---
 name: meeting-processor
 version: 1.0.0
-description: Process meeting transcripts and Notion meeting notes into structured organizational records, action items, and memory updates for ReFi BCN operations
+description: Process meeting transcripts and Notion meeting notes into structured organizational records, action items, and memory updates
 author: organizational-os
 category: operations
 metadata:
@@ -18,7 +18,7 @@ metadata:
 
 Processes meeting transcripts (from Granola, Google Meet, Otter.ai, Zoom, or manual notes) into structured meeting notes following Organizational OS conventions. Extracts action items, updates project pages, and writes entries to organizational memory.
 
-For ReFi BCN operations, this skill is also used to process records from Notion `Notes & Documents` into local structured artifacts.
+This skill can also be used to process meeting records from a Notion `Notes & Documents` data source into local structured artifacts (instance-specific — see the customization note below).
 
 ## When to Use
 
@@ -33,17 +33,13 @@ For ReFi BCN operations, this skill is also used to process records from Notion 
 - For async decisions (no meeting) → write directly to project page
 - For very short exchanges (< 5 min) → add directly to memory
 
-## ReFi BCN Notion Defaults
+## Recommended pre-processor: `meeting-notes-transcription-fixer`
 
-When no transcript file is provided, check Notion first:
+If raw notes contain transcription errors (misheard proper nouns, acronyms, project names that recur in your org), run `meeting-notes-transcription-fixer` first to normalize the corpus, then run this skill. The transcription-fixer maintains per-instance dictionaries of recurring corrections; meeting-processor consumes already-clean text.
 
-- Root page: `ReFi Barcelona` (`1386ed08-45cb-80d9-9ab8-e7de7ad5fb16`)
-- Notes data source: `Notes & Documents` (`1386ed08-45cb-81ed-b055-000ba5b70a6b`)
-
-Prioritize records tagged or titled like:
-- weekly ops sync
-- work session
-- kickoff / planning
+> **Instance customization point.** If your instance uses Notion as the source
+> of meeting records, add your org's root page / data source IDs and any
+> record-prioritization rules here (see `docs/OPERATOR-GUIDE.md`).
 
 ## Usage
 

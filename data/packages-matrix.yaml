@@ -1,0 +1,201 @@
+schema_version: "2.0"
+
+# Packages Matrix — FRAMEWORK-ONLY REGISTRY
+# Cross-instance catalog of every package across the federation.
+# Surfaces divergence and promotion candidates.
+#
+# lifecycle_status (v3.5+):
+#   active   — currently used by ≥1 instance; maintained
+#   dormant  — in framework but no instances currently using; kept as scaffolding
+#   planned  — approved for inclusion; not yet built
+#   retired  — no longer maintained; existing consumers should migrate
+
+packages:
+  # --- Framework packages (in org-os/packages/) ---
+  - id: "agents-app"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "dormant"
+    notes: "Agent control app. Bundled at framework; instances consume via federation.yaml toggles."
+
+  - id: "egregore-core"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "dormant"
+    notes: "Collective intelligence core. Referenced by refi-bcn federation.yaml peers."
+
+  - id: "toolkit-framework"
+    owner: "framework"
+    instances_using: ["regen-toolkit", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@regen-commons/toolkit-framework — portable, org-os-agnostic knowledge commons framework (semantic kernel, 22 schemas, the machine, 7 skills, 3 adapters). Develops in regen-toolkit; promoted here 2026-07-05. Consumed via org-os-kms. 100/100 tests."
+
+  - id: "org-os-kms"
+    owner: "framework"
+    instances_using: ["regen-toolkit"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@org-os/kms — binds toolkit-framework into org-os (module src/bind.mjs + profile). Executable lifecycle, registry bridge, CLI, render, federation. Installed + activated in regen-toolkit 2026-07-05; refi-dao-os adopting. Depends on toolkit-framework. 44/44 tests. + map builder/frontier/vault-artifact (federation map, 2026-07)"
+
+  - id: "org-os-federation-map"
+    owner: "framework"
+    instances_using: ["org-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@org-os/federation-map — 'the torch'. View-plane web component for the federation/provenance map (d3-force only dep). Data plane is org-os-kms `render map`. Spec: docs/superpowers/specs/2026-07-19-federation-map-design.md."
+
+  - id: "koi-bridge"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "dormant"
+    notes: "KOI-net integration bridge."
+
+  - id: "koi-opal-bridge"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "dormant"
+    notes: "KOI-net ↔ OPAL bridge."
+
+  - id: "opal-bridge"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "planned"
+    notes: "OPAL meeting/transcript processing bridge. Rollout planned (opal-rollout workstream)."
+
+  - id: "operations"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "Operational layer. Active in both production instances."
+
+  - id: "paperclip-agents-app"
+    owner: "framework"
+    instances_using: ["regen-coordination-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "dormant"
+    notes: "Paperclip agent control app variant. ⚠ 2026-07-15 audit: regen-coordination-os fork is AHEAD (org-os-bridge subpackage, memory/skill syncers, org_os_integration SQLite migrations, migrate/validate CLIs). Backport review pending — see HEARTBEAT."
+
+  - id: "regen-agents"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "Shared operational agents. Used by both production instances."
+
+  - id: "webapps"
+    owner: "framework"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "Shared webapp scaffolding."
+
+  # --- Framework canonical packages (v3.5 additions: host integrations) ---
+  - id: "hermes-integration"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    lifecycle_status: "active"
+    notes: "Hermes runtime integration: skill + Python tool that auto-invokes org_os_page when operator mentions org-os state. In active framework use; awaiting instance adoption signal."
+
+  - id: "opencode-integration"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    lifecycle_status: "active"
+    notes: "opencode npm plugin: registers two tools (org_os_page, org_os_tui) + 5 slash-command templates (/dashboard, /initialize, /org-projects, /org-decisions, /org-this-week). In active framework use; awaiting instance adoption signal."
+
+  # --- Instance-originated packages (promotion candidates) ---
+  - id: "dashboard"
+    owner: "refi-bcn-os"
+    instances_using: ["refi-bcn-os", "refi-dao-os"]
+    in_framework: false
+    promotion_status: "candidate"
+    lifecycle_status: "planned"
+    notes: "Present in both production instances. Framework-dashboard-template scoping plan exists — promotion path already identified. Physical promotion deferred to P11 of v3.5 release."
+
+  - id: "governance"
+    owner: "refi-dao-os"
+    instances_using: ["refi-dao-os"]
+    in_framework: false
+    promotion_status: "evaluating"
+    lifecycle_status: "active"
+    notes: "DAO-specific governance package. Overlaps with dao-os DAO-module skills — evaluate together."
+
+  - id: "coordination"
+    owner: "refi-dao-os"
+    instances_using: ["refi-dao-os"]
+    in_framework: false
+    promotion_status: "evaluating"
+    lifecycle_status: "active"
+    notes: "Network coordination package. Single instance; evaluate if generalizable."
+
+  # --- DAO-OS platform-specific packages ---
+  - id: "connectors"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "DAO-OS module connectors (Safe, Hats, Gardens, Karma, EIP-4824). Platform-specific; the DAO-module SKILLS are the promotion candidates, not the connector package."
+
+  - id: "core"
+    owner: "dao-os"
+    instances_using: ["dao-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "DAO-OS platform core (composer UI, module registry). Platform-specific."
+
+  # --- Instance products & content packages (registered 2026-07-15 consolidation) ---
+  - id: "maps"
+    owner: "refi-bcn-os"
+    instances_using: ["refi-bcn-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "Catalunya bioregional actor map (D3/SVG, comarques GeoJSON, reads data/orgs.yaml). Geography-bound. The CONCEPT (geo 'second view' of the KB) could inspire a framework viz pattern."
+
+  - id: "hub"
+    owner: "refi-dao-os"
+    instances_using: ["refi-dao-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "Pointer-only package — real hub is external repo ReFiDAO/refi-dao-hub (public read-only interface fed by an allowlist data-bridge from data/*.yaml). The PATTERN (docs/HUB.md module contract + bridge) is a framework doc candidate."
+
+  - id: "coop"
+    owner: "regen-coordination-os"
+    instances_using: ["regen-coordination-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "Standalone product: browser extension + PWA for local-first knowledge capture (WebGPU inference, Yjs CRDT, Safe/4337, Semaphore ZK, Storacha). Self-contained app, not framework machinery."
+
+  - id: "regen-toolkit"
+    owner: "regen-coordination-os"
+    instances_using: ["regen-coordination-os"]
+    in_framework: false
+    promotion_status: "instance-specific"
+    lifecycle_status: "active"
+    notes: "Regen Web3 Toolkit — content/curriculum project (3 audience tracks), not a code package. Domain knowledge product."

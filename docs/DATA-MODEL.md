@@ -165,7 +165,7 @@ ideas:
     title: "Carbon Credit Verification Toolkit"
     status: "proposed"         # surfaced | proposed | approved | developing | hatched | archived
     source: "knowledge/carbon-markets/verification-gaps.md"
-    submitted_by: "agent"      # "agent" | member-id
+    submitted_by: "agent"      # "agent" | "symbient" | member-id
     champions: ["luiz"]
     ecosystem_gap: "No open-source MRV tools for small-scale projects"
     description: "Open-source toolkit for measuring, reporting, and verifying carbon credits"
@@ -182,6 +182,8 @@ ideas:
 ```
 
 **Idea Lifecycle:** surfaced → proposed → approved → developing → hatched → archived. See `docs/IDEA-HATCHING.md`.
+
+**`submitted_by: "symbient"`** marks an entry surfaced by a symbient practice (Stage 1+, deep-weave only) — deliberately anonymous; it never identifies a particular being or habitat. See `skills/symbient/SKILL.md` → Surfacing rule.
 
 ### 7. funding-opportunities.yaml — Grants & Rounds (Optional)
 
@@ -325,11 +327,112 @@ gaps:
 
 ---
 
+## Framework-Only Registries
+
+Some registries are only relevant for the **framework repo** (and potentially network hubs) — they track cross-instance state, not local organizational data. Individual instances do **not** need these files.
+
+### instances.yaml — Downstream Instance State
+
+Per-instance record of every downstream instance of this framework. Populated and updated by `npm run analyze:instances`.
+
+Fields: `id`, `name`, `type`, `maturity` (`alpha|beta|production`), `repo`, `local_path`, `cloned`, `federation_network`, `federation_role`, `masterplan_version`, `framework_version`, `last_sync`, `agent_runtime[]`, `skills_extra[]`, `packages[]`, `data_registries_extra[]`, `drift[]`, `notes`.
+
+### skills-matrix.yaml — Cross-Instance Skill Catalog
+
+Every skill across the federation, with `owner`, `instances_using[]`, `in_framework`, `promotion_status` (`canonical|candidate|evaluating|instance-specific`). Surfaces promotion candidates. See `docs/SKILL-PROMOTION.md`.
+
+### packages-matrix.yaml — Cross-Instance Package Catalog
+
+Same shape as `skills-matrix.yaml` but for packages. Surfaces package divergence across instances.
+
+### Extension Pattern for Instances
+
+Instances MAY add their own registries beyond the canonical 14 (e.g., `tasks.yaml`, `pending-payouts.yaml`, `blog-articles.yaml`). When they do:
+
+- Declare the extra registry in the framework's `data/instances.yaml` under `data_registries_extra[]` so drift monitoring knows about it.
+- Keep it out of `.well-known/` generation unless adding a `/well-known/` endpoint is intentional.
+- Follow canonical conventions (top-level key matches filename; `schema_version: "2.0"` header; entries with unique `id`).
+
+---
+
+## Recognized Extension Registries (Optional Patterns)
+
+Instance-proven registry shapes worth reusing. Not part of the canonical 14; adopt as needed. (Consolidated from instance audits, 2026-07-15.)
+
+### hermes-cron.yaml — Declarative Agent Cron Jobs
+
+Proven in refi-bcn-os + refi-dao-os alongside `packages/hermes-integration`. Declares scheduled proactive-agent jobs (a chat gateway reconciles them on boot — e.g. `infra/hermes/entrypoint.sh`):
+
+```yaml
+schema_version: "1.0"
+jobs:
+  - id: "heartbeat-6h"
+    schedule: "0 */6 * * *"      # cron, UTC
+    deliver: "telegram"          # delivery channel
+    channel: null                # channel/topic id (instance-specific)
+    prompt: |
+      Read HEARTBEAT.md and report anything urgent or overdue.
+```
+
+Keep channel ids and prompts instance-side; the registry shape + boot-reconciliation contract is the reusable part.
+
+### Hub-Type Federation Registries — nodes / funds / initiatives / programs
+
+Proven in regen-coordination-os (Hub-type instance). A network-of-networks graph for hubs coordinating multiple orgs — cross-referencing member nodes, on-chain treasuries, shared initiatives, and funding programs:
+
+```yaml
+# nodes.yaml — member/network node registry
+nodes:
+  - id: "node-example"
+    name: ""
+    network: ""                  # which federation/network it belongs to
+    type: "LocalNode"
+    location: ""
+    status: "active"
+    repo: null
+    website: null
+
+# funds.yaml — on-chain fund instances
+funds:
+  - id: "fund-example"
+    type: "safe"                 # safe | gardens-pool | octant-vault | …
+    network_chain: ""
+    address: ""
+    node: "node-example"         # → nodes.yaml
+    signers: []
+    status: "active"
+
+# initiatives.yaml — cross-network initiatives
+initiatives:
+  - id: "initiative-example"
+    name: ""
+    networks: []
+    status: "active"
+    description: ""
+
+# programs.yaml — funding/coordination programs
+programs:
+  - id: "program-example"
+    name: ""
+    category: "funding/artifact-based"   # funding/yield-protocol | funding/streaming | …
+    status: "active"
+```
+
+Cross-references: `funds.node → nodes.id`, `initiatives.networks[] → nodes.network`, `programs ↔ funds`.
+
+### Other observed instance extensions
+
+- **`orgs.yaml`** (refi-bcn-os) — external-org/stakeholder directory with rings/clusters + JSON compile step for viz. Candidate for a future canonical `orgs.yaml` registry (generic shape, minus geography).
+- **`figma-assets.yaml`** (refi-dao-os) — design-asset registry with `share_policy` permission governance (`public-view-no-duplication | duplicatable | private | tbd`) and commons-linkage fields.
+
+---
+
 ## Schema Generation
 
 ```bash
 npm run generate:schemas    # Generate .well-known/*.json from data/*.yaml
 npm run validate:schemas    # Validate EIP-4824 compliance
+npm run analyze:instances   # Framework-only — scan downstream instances and write drift report
 ```
 
 ## Notion Sync

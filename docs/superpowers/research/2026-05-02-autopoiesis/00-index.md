@@ -1,0 +1,32 @@
+# Autopoiesis Research — Index
+
+> Research scoping spec: [`2026-05-02-org-os-autopoiesis-design.md`](../../specs/2026-05-02-org-os-autopoiesis-design.md)
+> Phase 1 plan: [`2026-05-02-autopoiesis-phase1-conceptual.md`](../../plans/2026-05-02-autopoiesis-phase1-conceptual.md)
+
+## Status
+
+Phase 1 — Conceptual matrix · **complete, awaiting operator review at Phase 1 gate** (2026-05-02).
+
+## Cell notes (instance-primary, framework-secondary)
+
+| # | Aspect | File | Status |
+|---|--------|------|--------|
+| 1 | Genesis | [01-genesis.md](01-genesis.md) | done |
+| 2 | Identity & Continuity | [02-identity.md](02-identity.md) | done |
+| 3 | Membrane | [03-membrane.md](03-membrane.md) | done |
+| 4 | Structural coupling | [04-coupling.md](04-coupling.md) | done |
+| 5 | Metabolism | [05-metabolism.md](05-metabolism.md) | done |
+| 6 | Self-maintenance | [06-self-maintenance.md](06-self-maintenance.md) | done |
+| 7 | Cognition / Evolution | [07-cognition.md](07-cognition.md) | done |
+| 8 | Federation / Multicellularity | [08-federation.md](08-federation.md) | done |
+| 9 | Volition / Decision | [09-volition.md](09-volition.md) | done |
+
+## Synthesis
+
+[SYNTHESIS.md](SYNTHESIS.md) — **done**. Recommends Loop C (Metabolism → Cognition → Federation, cascade closure) for Phase 2 pilot, overriding spec's default Loop A.
+
+## Phase 2 / 3 outputs (later)
+
+- `PILOT-framework.md` — Phase 2 close
+- `DECISIONS.md` — Phase 3 rollup
+- `CASCADE.md` — Phase 3 cascade plan

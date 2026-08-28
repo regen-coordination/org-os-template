@@ -1,0 +1,22 @@
+---
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import yaml from "js-yaml";
+import Layout from "../components/Layout.astro";
+import ModuleCard from "../components/ModuleCard.astro";
+interface Module { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
+const doc = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as { modules: Module[] };
+const modules = doc.modules;
+---
+<Layout title="Modules" current="modules" description="The org-os v0.5 module roadmap.">
+  <div class="container">
+    <p class="eyebrow">v0.5 roadmap</p>
+    <h1>Modules</h1>
+    <p class="prose">org-os v0.5 is a constellation of modules. Status is honest — badges show what ships today vs. what's planned.</p>
+    <div class="grid">{modules.map((m) => <ModuleCard {...m} />)}</div>
+  </div>
+</Layout>
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4); margin-top: var(--space-8); }
+</style>

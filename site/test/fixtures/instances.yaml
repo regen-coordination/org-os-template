@@ -1,0 +1,38 @@
+schema_version: "2.0"
+instances:
+  - id: "present-instance"
+    name: "Present Instance"
+    type: "LocalNode"
+    maturity: "production"
+    repo: "https://example.com/present"
+    local_path: "./present-instance"
+    federation_network: "refi-dao"
+    federation_role: "spoke"
+    framework_version: "3.0"
+    packages: ["operations"]
+    drift: []
+    notes: "Has readable local data."
+  - id: "hub-instance"
+    name: "Hub Instance"
+    type: "Hub"
+    maturity: "beta"
+    repo: "https://example.com/hub"
+    local_path: "./hub-instance"
+    federation_network: "refi-dao"
+    federation_role: "hub"
+    framework_version: "3.0"
+    packages: []
+    drift: []
+    notes: "The hub."
+  - id: "missing-instance"
+    name: "Missing Instance"
+    type: "LocalNode"
+    maturity: "alpha"
+    repo: null
+    local_path: "./does-not-exist"
+    federation_network: "refi-dao"
+    federation_role: "spoke"
+    framework_version: null
+    packages: []
+    drift: ["no_masterplan"]
+    notes: "Local path absent — must degrade gracefully."

@@ -1,0 +1,32 @@
+---
+interface Props { eyebrow?: string; title: string; href?: string; cta?: string; index?: string; }
+const { eyebrow, title, href, cta, index } = Astro.props;
+---
+<section class="block container">
+  <div class="head">
+    <div class="lede">
+      {index && <span class="idx mono">{index}</span>}
+      <div>
+        {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+        <h2>{title}</h2>
+      </div>
+    </div>
+    {href && cta && <a href={href} class="cta mono link">{cta}<span class="arr"> →</span></a>}
+  </div>
+  <slot />
+</section>
+<style>
+.block { margin: var(--space-24) auto; }
+.head {
+  display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-6);
+  border-bottom: var(--border-hair) solid var(--color-line-2);
+  padding-bottom: var(--space-4); margin-bottom: var(--space-8);
+}
+.lede { display: flex; align-items: flex-start; gap: var(--space-4); }
+.idx { font-size: var(--text-lg); color: var(--color-faint); line-height: 1; padding-top: 0.2em; font-variant-numeric: tabular-nums; }
+.cta { color: var(--color-muted); font-size: var(--text-sm); white-space: nowrap; }
+.cta:hover { color: var(--color-accent); }
+.cta .arr { display: inline-block; transition: transform var(--t-fast); }
+.cta:hover .arr { transform: translateX(3px); }
+@media (max-width: 560px) { .head { flex-direction: column; align-items: flex-start; gap: var(--space-3); } }
+</style>

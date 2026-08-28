@@ -1,0 +1,52 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>org-os dashboard</title>
+<style>
+  body { font: 14px/1.5 ui-monospace, monospace; margin: 1.5rem; max-width: 60rem; }
+  nav { margin-bottom: 1rem; } nav button, select { font: inherit; margin-right: .4rem; }
+  nav button[aria-pressed="true"] { font-weight: 700; text-decoration: underline; }
+  pre { white-space: pre-wrap; } footer { margin-top: 1rem; color: #666; font-size: 12px; }
+  .stale { color: #b45309; font-weight: 700; }
+</style></head>
+<body>
+<nav>
+  <select id="instance">
+    <option value="org-os">org-os (hub)</option>
+    <option value="refi-bcn-os">refi-bcn-os</option>
+  </select>
+  <span id="pages"></span>
+  <button id="refresh">↻</button>
+</nav>
+<pre id="out">loading…</pre>
+<footer id="prov"></footer>
+<script type="module">
+  // SEAM (§D4 of docs/integrations/cloudflare-os.md): wire to the workshop RPC session.
+  // Contract: callCapability(name, args) → the gatekeeper envelope {ok, data, provenance}|{ok:false, error}.
+  import { callCapability } from "./rpc.mjs"; // rpc.mjs is written during install per §D4
+
+  const PAGES = ["dashboard", "projects", "tasks", "instances", "decisions", "plans", "this-week"];
+  const $ = (id) => document.getElementById(id);
+  $("pages").innerHTML = PAGES.map((p) => `<button data-p="${p}" aria-pressed="${p === "dashboard"}">${p}</button>`).join("");
+  let page = "dashboard";
+
+  async function load() {
+    $("out").textContent = "loading…";
+    const r = await callCapability("get_page", { instance: $("instance").value, page_id: page });
+    // Render code + message only. NEVER render r.error.detail — it carries raw upstream
+    // response bodies and parser output, which is diagnostic-only (see Task 12 amendment).
+    if (!r.ok) { $("out").textContent = `error [${r.error.code}]: ${r.error.message}`; $("prov").textContent = ""; return; }
+    $("out").textContent = r.data.markdown;
+    const { sha, date, stale } = r.provenance;
+    $("prov").innerHTML = `as of <code>${(sha || "").slice(0, 7)}</code> · ${date || "?"}` +
+      (stale ? ` · <span class="stale">STALE — refresh failed, showing cache</span>` : "");
+  }
+  $("pages").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-p]"); if (!b) return;
+    page = b.dataset.p;
+    for (const x of $("pages").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    load();
+  });
+  $("instance").addEventListener("change", load);
+  $("refresh").addEventListener("click", load);
+  load();
+</script>
+</body></html>

@@ -1,0 +1,8 @@
+# Hero copy. Canon: docs/POSITIONING.md §1 (Definition). Edit there first, mirror here.
+eyebrow: "Framework · standards · federation"
+title: "An AI chief of staff for your organization — not just for you"
+subtitle: "Your org's knowledge, data, and operations as files any agent can read, act on, and federate. Single-operator dogfood today — external pilot is the open milestone. No SaaS, no lock-in — markdown, YAML, and git."
+ctas:
+  - { label: "$ node scripts/clone-framework.mjs", href: "/get-started", variant: "solid" }
+  - { label: "/modules", href: "/modules", variant: "ghost" }
+  - { label: "/federation", href: "/federation", variant: "ghost" }

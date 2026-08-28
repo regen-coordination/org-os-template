@@ -1,0 +1,29 @@
+{
+  "name": "gatekeeper-org-os",
+  "main": ".wrangler/validate/src/org-os.ts",
+  "build": {
+    "command": "pnpm exec capnweb-validate build --out .wrangler/validate",
+    "watch_dir": "src"
+  },
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["allow_irrevocable_stub_storage"],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.txt", "**/*.svg"], "fallthrough": false }
+  ],
+  "migrations": [
+    {
+      "tag": "v0",
+      "new_sqlite_classes": ["OrgOsGatekeeperImpl"]
+    }
+  ],
+  "vars": {
+    // Public repository coordinates — not secret. The token that reads them is.
+    // ref defaults to "main" when omitted.
+    "ORG_OS_INSTANCES": "[{\"id\":\"org-os\",\"owner\":\"regen-coordination\",\"repo\":\"org-os-template\",\"ref\":\"autopoiesis-phase2-pilot\"},{\"id\":\"refi-bcn-os\",\"owner\":\"refibcn\",\"repo\":\"refi-bcn-os\"}]"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "invocation_logs": false }
+  }
+}

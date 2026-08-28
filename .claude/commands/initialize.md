@@ -2,11 +2,11 @@
 description: Open org-os session — sync, gather state, render dashboard, plan work
 ---
 
-You are opening a new org-os session. Follow these steps exactly:
+You are opening a new org-os session. Follow these steps exactly.
 
 ## Step 1: Sync
 
-Run this command to pull latest changes (handles embedded repos gracefully):
+Pull latest changes (skip silently if offline or no remote):
 
 ```bash
 TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -17,26 +17,34 @@ else
 fi
 ```
 
-## Step 2: Gather State + Render Dashboard
+## Step 2: Render Dashboard
 
-Run the initialize script with markdown output. This produces the complete pre-rendered dashboard:
+Run the initialize script with `--format=markdown` and **print its output verbatim** — the script renders the full ASCII dashboard. Do not reformat, re-render, or wrap in extra markdown:
 
 ```bash
 node scripts/initialize.mjs --format=markdown
 ```
 
-If the script fails (missing dependencies, node not found), try `npm install` first, then retry. If it still fails, read the key files manually: `HEARTBEAT.md`, `federation.yaml`, `data/projects.yaml`, `data/funding-opportunities.yaml`, `data/events.yaml`, recent files in `memory/`, and `docs/plans/QUEUE.md`.
+If the script fails (missing deps, node not found):
 
-## Step 3: Output Dashboard
+1. Try `npm install`, then retry once.
+2. If still failing, fall back to reading these files directly and produce a minimal status summary: `IDENTITY.md`, `HEARTBEAT.md`, `federation.yaml`, `data/projects.yaml`, `data/tasks.yaml`, recent files in `memory/`, and `docs/agent-plans/QUEUE.md`.
+3. Never block — always produce something useful.
 
-**Output the script result verbatim.** Do not re-render, reformat, or add sections. The script handles all visual formatting, section visibility, and `dashboard.yaml` configuration.
+## Step 3: Note Session Context
 
-Check stderr output for any warnings (Notion API errors, parse failures) and mention them briefly if relevant.
+Silently note for the rest of the session:
 
-## Step 4: Wait for Operator
+- Organization (from header / `federation.yaml`)
+- Highest-priority task (Critical / Urgent in the dashboard)
+- Active projects and active plans (from Plans / Pipelines section)
+- Funding deadlines within 30 days
+- What was worked on last (Recent Context)
 
-End with the session prompt (already included in the script output). Wait for the operator to pick what to work on. Then transition to **Phase 2: PLAN** — load context, analyze, and present a tight work plan (5-7 steps max). Then execute.
+## Step 4: Wait for the Operator
 
-Read `skills/org-os-init/SKILL.md` for Phases 2-4 (PLAN, EXECUTE, CLOSE) guidance.
+End by displaying the **Session Prompt** with 3 contextual suggestions (already produced by the script), then wait for the operator to pick what to work on. Transition to **Phase 2: PLAN** — load context, analyze, present a tight 5–7 step work plan, then execute.
+
+For the full session lifecycle (PLAN → EXECUTE → CLOSE), see `skills/org-os-init/SKILL.md`. For platform-specific handling (Hermes, OpenCode), see `skills/initialize/SKILL.md`.
 
 $ARGUMENTS

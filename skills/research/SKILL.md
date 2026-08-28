@@ -1,6 +1,6 @@
 ---
 name: research
-version: 1.0.0
+version: 1.1.0
 description: Deep research workflows powered by Feynman — investigation briefs, literature reviews, source comparisons, autoresearch loops, and topic monitoring. Outputs to docs/research/ with provenance tracking.
 triggers:
   - "research"
@@ -28,7 +28,7 @@ outputs:
   - docs/research/experiments/*.md (autoresearch logs)
   - docs/research/watches/*.md (topic monitoring baselines)
   - docs/research/session-logs/*.md (session logs)
-  - *.provenance.md sidecars (citation tracking)
+  - "*.provenance.md sidecars (citation tracking)"
 dependencies:
   - knowledge-curator
   - idea-scout
@@ -50,8 +50,8 @@ All outputs land in `docs/research/` organized by workflow type.
 ## When to Use
 
 - Operator asks to research a topic, ecosystem, funding opportunity, or technology
-- Before major strategic decisions (cooperative formation, partnership evaluation, funding applications)
-- To survey academic or industry literature on ReFi, ESS, cooperative governance, regenerative finance
+- Before major strategic decisions (entity formation, partnership evaluation, funding applications)
+- To survey academic or industry literature relevant to the organization's domains
 - To compare tools, frameworks, platforms, or approaches
 - To set up ongoing monitoring of a research area or competitor landscape
 - During autoresearch loops for iterative optimization
@@ -63,7 +63,7 @@ All outputs land in `docs/research/` organized by workflow type.
 Multi-source investigation producing a structured brief with inline citations.
 
 ```
-feynman deepresearch "Current approaches to cooperative governance in Web3 DAOs"
+feynman deepresearch "Current approaches to decentralized governance in member-owned organizations"
 ```
 
 Output: `docs/research/briefs/YYYY-MM-DD-<slug>.md` + `.provenance.md`
@@ -75,7 +75,7 @@ Output: `docs/research/briefs/YYYY-MM-DD-<slug>.md` + `.provenance.md`
 Academic-focused review with consensus, disagreements, and open questions.
 
 ```
-feynman lit "Regenerative finance mechanisms and their measured impact on local economies"
+feynman lit "Measured impact of participatory funding mechanisms on community outcomes"
 ```
 
 Output: `docs/research/lit-reviews/YYYY-MM-DD-<slug>.md` + `.provenance.md`
@@ -87,7 +87,7 @@ Output: `docs/research/lit-reviews/YYYY-MM-DD-<slug>.md` + `.provenance.md`
 Compare multiple sources, tools, or approaches with an agreement/disagreement matrix.
 
 ```
-feynman compare "Gnosis Safe vs Aragon vs DAOhaus for cooperative treasury management"
+feynman compare "Gnosis Safe vs Aragon vs DAOhaus for organizational treasury management"
 ```
 
 Output: `docs/research/comparisons/YYYY-MM-DD-<slug>.md`
@@ -99,7 +99,7 @@ Output: `docs/research/comparisons/YYYY-MM-DD-<slug>.md`
 Iterative experiment loop that optimizes toward a goal.
 
 ```
-feynman autoresearch "Optimize ReFi BCN grant application success factors"
+feynman autoresearch "Optimize this organization's grant application success factors"
 ```
 
 Output: `docs/research/experiments/YYYY-MM-DD-<slug>.md`
@@ -111,7 +111,7 @@ Output: `docs/research/experiments/YYYY-MM-DD-<slug>.md`
 Set up recurring monitoring on a topic.
 
 ```
-feynman watch "New ReFi funding rounds and grant programs in Europe"
+feynman watch "New grant programs and funding rounds in the organization's domain"
 ```
 
 Output: `docs/research/watches/YYYY-MM-DD-<slug>.md` (baseline survey)
@@ -197,13 +197,40 @@ Write a brief entry to `docs/research/session-logs/YYYY-MM-DD.md`:
 - [N] sources analyzed, [M] cited in brief
 ```
 
-## ReFi BCN Research Priorities
+## Instance Research Priorities
 
-When suggesting research topics, prioritize:
+> **Instance customization point.** Each org instance should replace this
+> section with its own prioritized research areas — the standing topics the
+> agent should favor when suggesting or scoping research. Derive them from
+> the instance's `SOUL.md` (mission/domains), `data/projects.yaml` (active
+> work), and `data/funding-opportunities.yaml` (funding landscape).
+>
+> Example structure:
+>
+> 1. **[Domain 1]** — [subtopics the org cares about]
+> 2. **[Domain 2]** — [subtopics]
+> 3. **Funding landscape** — [grant programs and funders relevant to the org]
+> 4. **Federation** — inter-org coordination, network governance, data sovereignty
 
-1. **Cooperative governance** — ESS/cooperative structures, DAO governance, hybrid models
-2. **Regenerative finance** — ReFi mechanisms, impact measurement, token economics
-3. **Funding landscape** — Grant programs, public goods funding, EU programs (LIFE, Horizon)
-4. **Local economy** — Barcelona/Catalunya ecosystem, SSE policy, community currencies
-5. **Knowledge commons** — Open knowledge systems, decentralized publishing, IPFS/Ceramic
-6. **Federation** — Inter-org coordination, network governance, data sovereignty
+## Browser Capability
+
+For sources that plain fetch/search cannot read — JS-heavy portals, interactive
+maps, multi-step navigation — use the `web-browsing` skill
+(`skills/web-browsing/SKILL.md`), which drives a real local browser via the
+browse.sh CLI. Read-only browsing is autonomous (log evidence); anything
+state-changing (logins, form submissions) is draft-and-present per
+`AGENTS.md` Section G.
+
+## Related Skills
+
+- **`expert-feynman`** — a persona/technique module (Richard Feynman's
+  first-principles thinking, explanation frameworks, cargo-cult detection).
+  Despite the shared name, it is unrelated to the Feynman research tool this
+  skill wraps. Split: **research** = the org-os workflow harness, output
+  conventions (`docs/research/` tree, provenance sidecars), and integration
+  back into org data; **expert-feynman** = a thinking style to load when you
+  need to interrogate assumptions or explain a mechanism simply. They compose
+  well: load expert-feynman while reviewing a research brief's claims.
+- **`knowledge-curator`**, **`idea-scout`**, **`funding-scout`** — downstream
+  integration targets for research findings (see Step 4).
+- **`web-browsing`** — browser capability for hard-to-fetch sources (above).

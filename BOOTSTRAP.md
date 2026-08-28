@@ -2,6 +2,52 @@
 
 _Run this when deploying org-os for a new organization. Bootstrapping has three phases: guided interview, source ingestion, and ongoing learning. After Phase 1 completes, this file can be archived._
 
+> **Note:** The org-os repo itself is bootstrapped as of 2026-04-24. See `memory/2026-04-24.md` for the self-hosting inauguration notes. New instances (downstream of this framework) run the phases below.
+
+> **⚠️ Workspace Safety:** Before any destructive git operation (merge, rebase, pull, reset, checkout across branches, clean, stash), run `npm run vault:snapshot -- "<reason>"`. Never use `git stash` in a workspace with precious untracked content. See [docs/VAULT-SAFETY.md](docs/VAULT-SAFETY.md) for the full protocol and recovery runbook.
+
+---
+
+## Quick Path: Cloning Engine (v3.5+)
+
+For most new instances, prefer the cloning engine over the manual phases below. It's faster, idempotent, and produces a structurally-valid instance with a lineage stamp pointing back to this framework.
+
+```bash
+# 1. Write a config file describing the new org
+cat > /tmp/my-org-config.yaml <<'YAML'
+org:
+  name: "my-new-org"
+  type: "Cooperative"            # or DAO, LocalNode, Hub, Project
+  short_description: "What this org does in one sentence."
+  emoji: "🌱"
+operator:
+  name: "Your Name"
+  email: "you@example.com"
+network:
+  name: "regen-coordination"     # or whichever federation network
+packages:
+  operations: true               # which framework packages to materialize
+skills:
+  - bootstrap-interviewer        # which skills to include
+  - org-os-init
+  - heartbeat-monitor
+  - knowledge-curator
+YAML
+
+# 2. Clone into a sibling directory
+npm run clone:framework -- --target ../my-new-org --config /tmp/my-org-config.yaml
+
+# 3. Bootstrap-interviewer fills in remaining identity (Phase 1 below)
+cd ../my-new-org
+npm install
+npm run validate:structure
+npm run selftest
+```
+
+The reference acceptance-test instance bootstrapped this way is `bread-coop-os` (see `data/instances.yaml`). Its config lives at `tests/fixtures/bread-coop-config.yaml`.
+
+After cloning, the manual phases below still apply for filling in identity, ingesting sources, and ongoing learning — but the file scaffolding, package selection, federation lineage, and reset placeholders are done for you.
+
 ---
 
 ## Phase 1: Guided Interview

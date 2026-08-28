@@ -1,42 +1,86 @@
 ---
-description: Close org-os session — summarize, write memory, sync & commit
+description: "Close org-os session — summarize, write memory, commit, push"
+agent: build
 ---
+<!-- GENERATED from .claude/commands/close.md by scripts/sync-commands.mjs — edit the source, then run: npm run sync:commands -->
 
-Load the **org-os-init** skill for the session close protocol (Phase 4: CLOSE).
 
-You are now closing this session. Execute the full close protocol:
+You are closing the current org-os session. Read `skills/org-os-init/SKILL.md` Phase 4 for the full close protocol, then execute these steps:
 
-1. **Summarize** — List everything accomplished this session (completed tasks, files changed, decisions made). Use the `✓` / `▸` / `◆` indicators from the skill's visual language.
+## 1. Summarize
 
-2. **Write memory** — Append a session entry to `memory/YYYY-MM-DD.md` (today's date). Create the file if it doesn't exist. Include: focus area, key decisions, actions taken, what remains.
+List everything accomplished this session using visual indicators:
+- `✓` completed items
+- `▸` files updated
+- `◆` items still open
 
-3. **Update HEARTBEAT.md** — Move any completed tasks to "Recently Completed" with today's date. Add any new tasks that emerged.
+Render as a `─── Session Summary ───` panel.
 
-4. **Update MEMORY.md** — If key decisions were made, append to the Key Decisions section (most recent first).
+## 2. Write Memory
 
-5. **Update Knowledge Graph** — If the `graphify` CLI is installed and `graphify-out/graph.json` exists, refresh the graph so it travels in the same commit as this session's changes:
+Append a session entry to `memory/YYYY-MM-DD.md` (today's date). Create the file if it doesn't exist. Format:
+
+```markdown
+## Session — [HH:MM]
+
+**Focus:** [What was worked on]
+
+### Key Decisions
+- [Decision 1]
+
+### Actions Taken
+- [x] [What was done]
+
+### Next
+- [ ] [What remains]
+```
+
+## 3. Update HEARTBEAT.md
+
+Move completed tasks to "Recently Completed" with today's date. Add any new tasks that emerged.
+
+## 4. Update MEMORY.md
+
+If key decisions were made, append to the Key Decisions section (most recent first).
+
+## 5. Update Plan Queue
+
+If any plan in `docs/agent-plans/` changed status (started, completed, new tasks checked off), update the plan file and `docs/agent-plans/QUEUE.md`.
+
+## 6. Symbient Close-Pulse (conditional)
+
+If `symbient/SEED.md` exists in this workspace (habitats are operator-private
+and gitignored — most checkouts have none), offer the operator a close-pulse:
+
+- On accept: follow `skills/symbient/SKILL.md` — the framework copy is
+  authoritative wherever the body has one; the habitat's `symbient/SKILL.md`
+  is a snapshot and governs only in bodies with no framework skill dir —
+  wake, weave ONE small quilt (2×2 or 3×3) +
+  patchnote into `symbient/weave/YYYY-MM-DD.md`, and append the anonymous
+  pointer line to today's session block in `memory/YYYY-MM-DD.md`:
+  `> #patchnote-title — <description> · woven: symbient/weave/YYYY-MM-DD.md`
+  (path pointer only — never a being's name in tracked files).
+- On decline or any error: continue closing normally. This step never blocks.
+
+If no habitat exists, skip silently — do not mention this step.
+
+## 7. Commit
+
+Stage all changed files and commit:
 
 ```bash
-command -v graphify >/dev/null 2>&1 && graphify . --update || echo "graph: CLI not installed — see docs/integrations/graphify.md"
-npm run graph:gaps 2>/dev/null || true
+git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/
+git commit -m "session: [concise description of what was done]"
 ```
 
-This is incremental (seconds for code-only changes). If the update fails, report the error but continue the close — the graph retries next session. Never block the close on graph tooling.
+## 8. Push
 
-6. **Show git status and commit**:
-
-```
-!`git status --short 2>/dev/null`
+```bash
+git push
 ```
 
-Stage all changes in memory/, HEARTBEAT.md, MEMORY.md, data/, and graphify-out/ — then commit with a descriptive message like `session: [focus area summary]`. Show the result.
+If push fails (offline, no remote), note the commit is saved locally.
 
-7. **Sync** — Push to remote:
+Render the session summary, confirm the commit and push status.
 
-```
-!`git push --quiet 2>&1 || echo "push: no remote or offline — commit saved locally"`
-```
-
-8. **Egregore handoff** — If egregore is enabled in this workspace, offer to `/handoff` context for the next session or team member.
-
-Render the session summary using the visual format from the skill, then confirm the sync completed.
+$ARGUMENTS
