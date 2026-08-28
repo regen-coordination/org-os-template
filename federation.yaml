@@ -134,6 +134,7 @@ agent:
     - funding-scout
     - heartbeat-monitor
     - idea-scout
+    - instance-doctor
     - initialize
     - karpathy-guidelines
     - knowledge-curator

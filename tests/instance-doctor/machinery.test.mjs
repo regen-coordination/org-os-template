@@ -11,6 +11,8 @@ import {
   normalizeRepoUrl,
   localScriptTargets,
   CANONICAL_UPSTREAM_URL,
+  CANONICAL_UPSTREAM_SLUG,
+  KNOWN_WRONG_UPSTREAMS,
 } from '../../packages/instance-doctor/src/checks/machinery.mjs';
 
 const HEALTHY = {
@@ -176,6 +178,35 @@ test('regen-coordination-os signature: a duplicate package.json key is a BLOCKER
   const f = r.findings.find((x) => x.code === 'package-json-duplicate-key');
   assert.ok(f, JSON.stringify(r.findings.map((x) => x.code)));
   assert.match(f.message, /scripts\.initialize/);
+});
+
+test('every upstream name found in the fleet on 2026-08-28 is explained, not guessed at', () => {
+  // Six wrong spellings are declared across the six instances. An unrecognised
+  // one still reports, but with a generic reason — this asserts the observed
+  // ones all carry a real explanation.
+  const observed = [
+    'regen-coordination/organizational-os-framework', // refi-med-os (remote + declared)
+    'organizational-os/organizational-os-template', // bread-coop-os
+    'regen-coordination/organizational-os', // regen-coordination-os
+    'luizfernandosg/organizational-os-template', // refi-bcn-os, dao-os
+    'regen-coordination/organizational-os-template', // refi-dao-os
+    'regen-coordination/org-os-framework', // AGENTS.md §11
+  ];
+  for (const slug of observed) {
+    assert.ok(KNOWN_WRONG_UPSTREAMS[slug], `${slug} has no recorded explanation`);
+  }
+  assert.ok(!KNOWN_WRONG_UPSTREAMS[CANONICAL_UPSTREAM_SLUG], 'the canonical slug must not be listed as wrong');
+});
+
+test('an unrecognised upstream still reports, with a generic reason', () => {
+  const r = checkMachinery(
+    clone({
+      git: { isRepo: true, remotes: { upstream: 'https://github.com/someone/something-else.git' }, dirtyCount: 0 },
+    }),
+  );
+  const f = r.findings.find((x) => x.code === 'upstream-remote-wrong-url');
+  assert.ok(f);
+  assert.match(f.hint, /not the canonical framework repository/);
 });
 
 test('machinery skew is surfaced instead of decaying silently', () => {

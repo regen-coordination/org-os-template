@@ -26,10 +26,21 @@ export const CANONICAL_UPSTREAM_SLUG = 'regen-coordination/org-os-template';
 /**
  * Repository names that have circulated as "the framework" and are not.
  * Keyed by owner/repo slug; the value explains why it is wrong.
+ *
+ * The v0.5 masterplan recorded three circulating names. Running this check
+ * across the fleet on 2026-08-28 found six, every one of them still declared
+ * somewhere: five owner/repo spellings of the old template plus the phantom in
+ * AGENTS.md §11. Add new ones here rather than scattering URL checks around.
  */
 export const KNOWN_WRONG_UPSTREAMS = {
   'regen-coordination/organizational-os-framework':
     'a live but divergent legacy repository — its HEAD is not the framework HEAD',
+  'regen-coordination/organizational-os-template':
+    'the pre-rename name of the canonical repository — it redirects today, but the declaration is stale',
+  'regen-coordination/organizational-os':
+    'a shortened pre-rename variant that no longer resolves to the framework',
+  'organizational-os/organizational-os-template':
+    'the pre-rename name under a different owner, from before the repository moved',
   'luizfernandosg/organizational-os-template':
     'a personal fork of the pre-rename repository, not the canonical origin',
   'regen-coordination/org-os-framework':

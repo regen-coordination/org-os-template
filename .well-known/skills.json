@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-10T10:00:23.008Z",
+  "generated_at": "2026-08-28T18:57:39.055Z",
   "totals": {
-    "workspace": 33,
+    "workspace": 35,
     "user": 4,
     "plugin": 0
   },
@@ -76,7 +76,7 @@
     {
       "id": "funding-scout",
       "source": "workspace",
-      "description": "Identify, track, and report on funding opportunities relevant to this organization",
+      "description": "Identify, track, and report funding opportunities using local registries plus ReFi BCN Notion CRM/research signals, with deadline escalation into HEARTBEAT",
       "version": "1.0.0",
       "owner": "framework",
       "in_framework": true,
@@ -90,7 +90,7 @@
     {
       "id": "heartbeat-monitor",
       "source": "workspace",
-      "description": "Proactive organizational health monitoring and task tracking",
+      "description": "Monitor organizational health, deadlines, and operational load across HEARTBEAT.md, local data files, and ReFi BCN Notion task/project systems",
       "version": "1.0.0",
       "owner": "framework",
       "in_framework": true,
@@ -129,6 +129,17 @@
       "has_issues": false
     },
     {
+      "id": "instance-doctor",
+      "source": "workspace",
+      "description": "Assess any org-os instance for identity, lineage, version, machinery, structure and freshness defects, then sync it reliably from the framework — the guided assess → read scorecard → sync → verify flow",
+      "version": "1.0.0",
+      "owner": "framework",
+      "in_framework": true,
+      "promotion_status": "evaluating",
+      "instances_using": [],
+      "has_issues": false
+    },
+    {
       "id": "karpathy-guidelines",
       "source": "workspace",
       "description": "Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code to avoid overcomplication, make surgical changes, surface assumptions, and define verifiable success criteria.",
@@ -154,6 +165,17 @@
         "refi-bcn-os",
         "refi-dao-os"
       ],
+      "has_issues": false
+    },
+    {
+      "id": "knowledge-graph",
+      "source": "workspace",
+      "description": "Build, update, and query the org's Graphify knowledge graph; maintain the knowledge-gaps registry for the curator",
+      "version": "1.0.0",
+      "owner": "framework",
+      "in_framework": true,
+      "promotion_status": "evaluating",
+      "instances_using": [],
       "has_issues": false
     },
     {
@@ -187,7 +209,7 @@
     {
       "id": "meeting-processor",
       "source": "workspace",
-      "description": "Process meeting transcripts into structured organizational records",
+      "description": "Process meeting transcripts and Notion meeting notes into structured organizational records, action items, and memory updates",
       "version": "1.0.0",
       "owner": "framework",
       "in_framework": true,
@@ -515,6 +537,7 @@
     }
   ],
   "unmapped_on_disk": [
+    "knowledge-graph",
     "close",
     "graphify",
     "tldraw-offline"

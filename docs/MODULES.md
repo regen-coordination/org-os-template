@@ -24,6 +24,37 @@ whether they have drifted.
 
 Modules with a manifest in `modules/`.
 
+### org-os-instance-doctor — Instance Assessment & Reliable Sync
+
+**What it is.** The answer to "is this instance actually healthy, and can I safely update it?"
+Two verbs — `assess` (read-only scorecard) and `sync` (guided repair-then-update) — runnable
+from inside an instance or, more usefully, from the framework against a sibling.
+
+**How it works.** Six checks read one snapshot of the instance and each return
+`BLOCKER`/`WARN`/`OK` with a remediation hint: identity coherence and template leakage, lineage
+stamps, cross-scheme version surfaces, machinery integrity, structure/schemas via the
+framework's own validators, and freshness. `sync` then runs nine stages — snapshot,
+ensure-upstream, fetch, inject-machinery, sync-upstream, migrate, generate-schemas, re-assess,
+receipt — aborting on the first failure so an instance is never left half-migrated.
+
+The `--dir` hub mode is the point. As of the 2026-08-28 sweep **no instance could run
+`sync-upstream.mjs`** — missing in three, a 178-byte no-op in a fourth, aimed at a divergent
+repository in a fifth. An instance cannot repair its own updating mechanism using its own
+updating mechanism, so the framework supplies it.
+
+Every check is a pure function over a snapshot and every side effect is injected, which is why
+the suite runs without a network.
+
+**Status.** `pilot` — the package and its tests ship in v0.5; acceptance against the real
+`refi-med-os`, `bread-coop-os` and `regen-coordination-os` instances runs in WS-H, before the
+tag is cut.
+
+**Links:** [manifest](../modules/org-os-instance-doctor/module.yaml) ·
+[operator skill](../skills/instance-doctor/SKILL.md) ·
+package `packages/instance-doctor/`
+
+---
+
 ### org-os-cloudflare-os — Cloudflare OS Integration
 
 **What it is.** The bridge between an org-os instance and a
