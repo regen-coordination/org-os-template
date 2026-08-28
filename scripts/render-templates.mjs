@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { render } from "../templates/render.mjs";
+import { SITE_URL } from "../site/base.config.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -68,6 +69,9 @@ const data = {
     tagline: "shared operating system for a federation of regenerative organizations",
     short_description: fed.identity?.short_description || "Framework + standards + orchestration hub.",
     version: pkg.version,
+    // Live site URL — single source of truth is site/base.config.mjs, so a
+    // deploy-path change re-renders the README instead of drifting from it.
+    site: SITE_URL,
     status: "active",
     bootstrap_date: "2026-04-24",
   },

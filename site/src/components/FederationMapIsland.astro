@@ -12,7 +12,7 @@ const { mode = "full" } = Astro.props;
 ) : (
   <federation-map src={withBase("/map.json")}></federation-map>
 )}
-<noscript><p class="mono">Interactive map needs JavaScript — the data is at <a href={withBase("/map.json")}>/map.json</a>.</p></noscript>
+<noscript><p class="mono">Interactive map needs JavaScript — the data is at <a href={withBase("/map.json")}>{withBase("/map.json")}</a>.</p></noscript>
 <script>
   import "../../../packages/org-os-federation-map/src/index.mjs";
 </script>

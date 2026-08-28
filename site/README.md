@@ -6,12 +6,18 @@ The org-os framework website + docs + live federation — one static Astro site.
 
 ```bash
 npm install        # one-time
-npm run dev        # aggregates federation.json, then http://localhost:4321
+npm run dev        # aggregates federation.json, then http://localhost:4321/org-os-template/
 npm run build      # aggregate → astro build → verify  (static site → dist/)
 npm test           # unit tests for the federation aggregator
 ```
 
 Requires Node ≥22. Build/dev must run from this directory (`site/`).
+
+The site is served under the `/org-os-template` base path (GitHub Pages project
+page — see `base.config.mjs`), in dev as well as production, so the plain
+`http://localhost:4321` root shows Astro's 404. Internal links go through
+`withBase()` from `src/lib/base.ts`; `scripts/verify-build.mjs` fails the build
+on any link that skips (or doubles) the prefix.
 
 ## How it works
 
@@ -29,8 +35,18 @@ Requires Node ≥22. Build/dev must run from this directory (`site/`).
 
 `src/styles` + `src/components` + `scripts/` are the reusable core; `src/data/*.yaml` is org-os's own content (landing copy, module roadmap, docs allowlist). This split is the basis for the future `org-os-website-generator` module — any instance would swap the data, keep the core.
 
+## Deployment
+
+Live at <https://regen-coordination.github.io/org-os-template/> — locked by the
+v0.5 release masterplan (WS-D, operator decision 2026-08-28). Origin and base
+path live in `base.config.mjs` (the single source of truth, consumed by
+`astro.config.mjs`, `verify-build.mjs`, and the root README render);
+`.github/workflows/deploy-pages.yml` deploys on every push to `main`.
+
 ## Open decisions (see spec §16)
 
-Domain (`astro.config.mjs` `site:` is a placeholder), accent color, and the final curated-docs allowlist are not yet locked. Spec: `../docs/superpowers/specs/2026-06-17-org-os-website-design.md`.
+Accent color and the final curated-docs allowlist are not yet locked (a custom
+domain would be a new decision, made by changing `base.config.mjs`). Spec:
+`../docs/superpowers/specs/2026-06-17-org-os-website-design.md`.
 
 Built by the org-os framework. MIT.

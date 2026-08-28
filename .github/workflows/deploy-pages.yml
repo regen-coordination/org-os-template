@@ -37,9 +37,14 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
+          # Same four-lockfile list as validate.yml even though this workflow
+          # never installs packages/admin — the list is the npm cache KEY, and
+          # matching validate.yml's makes this run a guaranteed cache hit off
+          # the validate run on the same push instead of warming a second cache.
           cache-dependency-path: |
             package-lock.json
             site/package-lock.json
+            packages/admin/package-lock.json
             packages/org-os-federation-map/package-lock.json
 
       # Order matters: the site imports ../../packages/org-os-kms, whose own
