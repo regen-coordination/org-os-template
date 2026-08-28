@@ -1,0 +1,14 @@
+{
+  "name": "@org-os/instance-doctor",
+  "version": "0.1.0",
+  "description": "Assess any org-os instance and sync it reliably from the framework. One package, two verbs: `doctor assess` (read-only scorecard) and `doctor sync` (snapshot → repair → sync → migrate → re-assess → receipt).",
+  "type": "module",
+  "private": true,
+  "main": "src/index.mjs",
+  "bin": { "org-os-doctor": "src/cli.mjs" },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "license": "MIT",
+  "keywords": ["org-os", "instance", "assessment", "sync", "federation", "reliability"]
+}
