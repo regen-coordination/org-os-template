@@ -6,9 +6,9 @@ Precedent: [`branch-triage-2026-08-21.md`](branch-triage-2026-08-21.md).
 Policy: **archive-tag → push tag → verify on origin → delete branch → remove worktree.**
 Nothing becomes unreachable; frozen work resumes from its tag when the memo trigger fires.
 
-**Status: PARTIAL.** Tagging and the unheld branch deletions are complete. Worktree
-removal and remote-ref deletion were refused by the session's permission layer and
-are listed under "Blocked" for the operator to run or authorize.
+**Status: COMPLETE.** Worktree removal and remote-ref deletion were initially refused
+by the session's permission layer; the operator authorized them and they were run in
+the same session. E3's end state is verified below.
 
 Baseline: `main` at `671310d` (merge of PR #2, WS-B), then `b9c1cc5` (ORG-4 salvage).
 
@@ -83,11 +83,13 @@ origin. WS-G G2 explicitly forbids this: bare `v3.x` tags outrank `v0.5.0` in an
 semver-sorted tag list, which is the whole reason the re-baseline needs them under
 `archive/`.
 
-Corrected as far as permissions allowed: `archive/v3.0.0` and `archive/v3.5.0` were
-created (pointing at the same commits, annotated with the re-baseline explanation)
-and pushed. **Removing the bare tags from origin is still outstanding** — see Blocked.
-This must be done before the `v0.5.0` tag is cut, or WS-G ships into a tag list where
-`v3.5.0` sorts above the release.
+Corrected in full. `archive/v3.0.0` and `archive/v3.5.0` were created — same commits,
+annotated with the re-baseline explanation — and pushed; the bare `v3.0.0` and `v3.5.0`
+were then deleted from origin, and locally too, so a future `git push --tags` cannot
+recreate the problem. Verified: `git ls-remote --tags origin` matches no `refs/tags/v[0-9]`.
+
+This mattered for WS-G: had it stood, the release would have been tagged into a list
+where `v3.5.0` sorts above `v0.5.0`.
 
 ---
 
@@ -185,53 +187,58 @@ scope and its adoption claim. See the recommendation at the end.
 
 ---
 
-## Blocked — needs operator action or authorization
+## Permission interruption — resolved
 
-The session's permission layer refused these. Each was attempted and denied; nothing
-was worked around.
+Worktree removal and every remote-ref deletion were refused by the session's
+permission layer partway through E1. Each was attempted once and denied; nothing was
+worked around. The operator authorized them and they ran in the same session.
 
-**1. Worktree removal** (5 worktrees). All verified free of untracked files
-beforehand; only `v3-5-templates` has a modification, a regenerable `package-lock.json`,
-so it needs `--force`.
+Executed after authorization:
 
 ```
 git worktree remove .claude/worktrees/v3-5-docs-prep
-git worktree remove --force .claude/worktrees/v3-5-templates
+git worktree remove --force .claude/worktrees/v3-5-templates    # regenerable package-lock.json
 git worktree remove .worktrees/kms-connector-layer
 git worktree remove .worktrees/rad-close
 git worktree remove .worktrees/tech-tree
 git worktree prune
-```
 
-**2. The five branches those worktrees hold** — deletable only once the worktrees are
-gone. All five are tagged and verified on origin.
-
-```
 git branch -D feat/rad-org-os feature/kms-connector-layer feature/tech-tree \
               release/v3.5-docs-prep release/v3.5-templates
-```
 
-**3. Remote ref deletion** — the stale origin-only branches, plus the bare historical
-tags that must not outrank `v0.5.0`:
-
-```
-git push origin --delete autopoiesis-phase2-pilot v0.5 feat/multica-operator release/v3.5-design
-git push origin --delete feat/instance-doctor feat/berd-agents feature/tech-tree
+git push origin --delete autopoiesis-phase2-pilot v0.5 feat/multica-operator \
+                        release/v3.5-design feat/instance-doctor feat/berd-agents \
+                        feature/tech-tree
 git push origin :refs/tags/v3.0.0 :refs/tags/v3.5.0
 ```
 
-Every one of these is covered by an `archive/*` tag already verified on origin.
+Each branch deletion re-verified its `archive/*` tag on origin immediately beforehand.
+
+The bare `v3.0.0` / `v3.5.0` tags were also deleted **locally**, after confirming
+`archive/v3.0.0` and `archive/v3.5.0` point at the same commits (`1019eee`, `7752abe`).
+Leaving them local would let a future `git push --tags` recreate exactly the problem
+this section had to undo.
 
 ---
 
-## E3 — not yet reachable
+## E3 — verified
 
-`git branch` currently shows `main` plus the five worktree-held branches; `git worktree
-list` shows six entries. E3's end state (main only, zero worktrees) is reachable as
-soon as the blocked commands above run.
+```
+$ git branch
+* main
 
-Gates green on `main` at this point: `npm test` 358/358 · `validate:schemas` 14/14 ·
-`validate:structure` 53/53 · `version:check` · `selftest` 7/7 · site build + 15 tests.
+$ git worktree list
+…/03 Libraries/org-os   cd00a53 [main]
+
+$ git ls-remote --heads origin
+  main
+```
+
+`main` only, locally and on origin. One worktree — the primary checkout. No bare
+`v3.x` tag remains on either side. Stale remote-tracking refs pruned.
+
+Gates green on `main`: `npm test` 358/358 · `validate:schemas` 14/14 ·
+`validate:structure` 53/53 · `version:check` agrees · `selftest` 7/7.
 
 ---
 
