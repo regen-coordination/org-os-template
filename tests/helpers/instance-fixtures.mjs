@@ -101,6 +101,26 @@ export function makeInstance(opts = {}) {
 
 export const CANONICAL_UPSTREAM = 'https://github.com/regen-coordination/org-os-template.git';
 
+/**
+ * A shape with nothing wrong with it: current framework line, canonical
+ * upstream, stamped lineage, a migrations dir, recent memory and a receipt.
+ * Anything the doctor reports against this is a false positive.
+ */
+export const healthyShape = () => ({
+  name: 'Acme Co',
+  pkgName: 'acme-os',
+  frameworkVersion: '0.5',
+  metadataExtra: {
+    genesis_commit: '"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+    last_sync_commit: '"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
+  },
+  remotes: { origin: 'https://github.com/acme/acme-os.git', upstream: CANONICAL_UPSTREAM },
+  files: {
+    'migrations/.gitkeep': '',
+    'memory/reports/sync-receipt-2026-08-26.md': '# Sync receipt\n',
+  },
+});
+
 /** refi-med-os: pristine 3.0 scaffold, no machinery, upstream → legacy repo. */
 export const refiMedShape = () => ({
   name: 'ReFi Mediterranean',
