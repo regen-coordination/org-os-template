@@ -1,0 +1,11 @@
+{
+  "$id": "orgos://registry/finances",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "treasury": { "type": "object" },
+    "budgets": { "type": "array", "items": { "type": "object" } },
+    "expenses": { "type": "array", "items": { "type": "object" } },
+    "revenues": { "type": "array", "items": { "type": "object" } }
+  }
+}

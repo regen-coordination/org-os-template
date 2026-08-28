@@ -1,0 +1,19 @@
+{
+  "$id": "orgos://registry/members",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "name", "role", "layer", "status", "joined"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "role": { "type": "string" },
+    "layer": { "enum": ["core", "contributor", "community", "observer"] },
+    "status": { "enum": ["active", "inactive", "alumni"] },
+    "joined": { "type": "string", "format": "date" },
+    "left": { "type": ["string", "null"], "format": "date" },
+    "skills": { "type": "array", "items": { "type": "string" } },
+    "handles": { "type": "object", "additionalProperties": { "type": "string" } },
+    "affiliations": { "type": "array" }
+  }
+}

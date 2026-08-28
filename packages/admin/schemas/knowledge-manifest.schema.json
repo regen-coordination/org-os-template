@@ -1,0 +1,9 @@
+{
+  "$id": "orgos://registry/knowledge-manifest",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "domains": { "type": "array", "items": { "type": "object" } },
+    "exchange": { "type": "object" }
+  }
+}

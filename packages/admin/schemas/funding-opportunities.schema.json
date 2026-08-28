@@ -1,0 +1,22 @@
+{
+  "$id": "orgos://registry/funding-opportunities",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "title", "type", "status", "deadline", "amount_available", "relevance"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "type": { "enum": ["grants-round", "rfp", "bounty", "retroactive", "investment"] },
+    "platform": { "type": "string" },
+    "status": { "enum": ["upcoming", "open", "closed", "awarded"] },
+    "deadline": { "type": "string", "format": "date" },
+    "amount_available": { "type": "number" },
+    "currency": { "type": "string" },
+    "relevance": { "enum": ["high", "medium", "low"] },
+    "url": { "type": "string" },
+    "notes": { "type": "string" },
+    "applied": { "type": "boolean" },
+    "application_id": { "type": ["string", "null"] }
+  }
+}

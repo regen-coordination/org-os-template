@@ -62,7 +62,9 @@
     "deploy:pages": "node scripts/deploy-pages.mjs",
     "generate:dashboard": "node packages/dashboard/generate.mjs",
     "build:site": "cd repos/refi-bcn-knowledge && npx quartz build",
-    "serve:site": "cd repos/refi-bcn-knowledge && npx quartz build --serve"
+    "serve:site": "cd repos/refi-bcn-knowledge && npx quartz build --serve",
+    "admin": "npm --prefix packages/admin run start",
+    "admin:dev": "npm --prefix packages/admin run dev"
   },
   "engines": {
     "npm": ">=10.9.2",

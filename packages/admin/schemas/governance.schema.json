@@ -1,0 +1,12 @@
+{
+  "$id": "orgos://registry/governance",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "model": { "enum": ["steward-council", "multisig", "assembly", "conviction"] },
+    "current_phase": { "enum": ["bootstrap", "transition", "active", "sunset"] },
+    "infrastructure": { "type": "object" },
+    "decisions": { "type": "array", "items": { "type": "object" } },
+    "elections": { "type": "array", "items": { "type": "object" } }
+  }
+}

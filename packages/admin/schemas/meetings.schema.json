@@ -1,0 +1,21 @@
+{
+  "$id": "orgos://registry/meetings",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "x-order": ["id", "title", "date", "type", "duration_minutes"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "date": { "type": "string", "format": "date" },
+    "type": { "enum": ["sync", "assembly", "workshop", "standup", "ad-hoc"] },
+    "participants": { "type": "array", "items": { "type": "string" } },
+    "duration_minutes": { "type": "number" },
+    "recording_url": { "type": ["string", "null"] },
+    "transcript_path": { "type": ["string", "null"] },
+    "summary": { "type": "string" },
+    "decisions": { "type": "array", "items": { "type": "string" } },
+    "action_items": { "type": "array", "items": { "type": "object" } },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  }
+}
