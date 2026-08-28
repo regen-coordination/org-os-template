@@ -1,9 +1,7 @@
 # MASTERPLAN.md — Organizational OS Framework
 
-> ⚠️ **Version header below is stale (v2-era) and is corrected in the v0.5 release (masterplan WS-C3).** The framework is at **0.5.0 (pre-beta)** — see `CHANGELOG.md [0.5.0]` for the 3.5→0.5 re-baseline. **Current activation: the [v0.5 release masterplan](docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md)** — do not take the "Activations" section below as current.
-
-**Version:** 2.0.0
-**Date:** 2026-04-05
+**Version:** 0.5.0
+**Date:** 2026-08-28
 **Workspace:** org-os (organizational-os-template)
 **Agent Identity:** Organizational OS Framework Development Agent
 **Type:** Framework / Template Development
@@ -66,13 +64,23 @@ org-os (patterns extracted, framework improved)
 
 ## 3. Activations
 
-What the agent should focus on RIGHT NOW:
+**This file no longer carries the active task list.** It held a v2-era checklist
+(the v2.0.0 doc suite, `validate-structure.mjs`, the v2 skills) long after every
+item shipped, which made it a misleading first read for any agent starting a
+session — precisely the status debt the v0.5 release set out to clear.
 
-- [ ] Complete v2.0.0 documentation suite (FILE-STRUCTURE, DATA-MODEL, AGENTIC-ARCHITECTURE, SKILL-SPECIFICATION, FEDERATION, etc.)
-- [ ] Create v2 skills: bootstrap-interviewer, idea-scout, workspace-improver
-- [ ] Update BOOTSTRAP.md with 3-phase bootstrapping process
-- [ ] Create validate-structure.mjs script
-- [ ] Ensure all existing skills are complete and well-documented
+What is actually active lives in two places, both kept current:
+
+- **[`docs/agent-plans/QUEUE.md`](docs/agent-plans/QUEUE.md)** — the plan queue.
+  Every entry carries a verdict: ships-in-v0.5, frozen with an un-freeze trigger,
+  superseded, or completed.
+- **[`HEARTBEAT.md`](HEARTBEAT.md)** — live tasks and system health, consulted at
+  the start of every session.
+
+The current release line is the
+**[v0.5 release masterplan](docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md)**,
+which is the convergence point every plan, spec and branch in this repo points at.
+Policy for what a version bump means: [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
 ---
 

@@ -190,16 +190,6 @@ npm run validate:schemas
 
 ## 🔄 Additional Commands
 
-### `/setup:cursor` — Configure Cursor AI Rules
-
-```bash
-npm run setup:cursor
-```
-
-Sets up Cursor AI editor rules for your organization (optional).
-
----
-
 ### `/sync:upstream` — Sync with Template Updates
 
 ```bash

@@ -213,7 +213,7 @@ Content → AI Extraction → Human Review → Structured Storage → Network Di
 
 - Core: `federation.yaml`, `SOUL.md`, `AGENTS.md`
 - Knowledge: `knowledge/INDEX.md`, `docs/integrations/*.md`
-- Agents: `MASTERPROMPT.md`, `skills/*/SKILL.md`
+- Agents: `AGENTS.md`, `MASTERPLAN.md`, `skills/*/SKILL.md`
 - Federation: `MEMBERS.md`, `docs/FEDERATION.md`
 
 ---

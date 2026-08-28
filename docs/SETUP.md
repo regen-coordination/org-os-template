@@ -128,13 +128,12 @@ The template includes GitHub Actions workflows:
 - **Deploy**: Automatically deploys on push to main
 - **Generate Schemas**: Auto-generates schemas on data changes
 
-### Configure Cursor Rules
+### Configure your agent runtime
 
-```bash
-npm run setup:cursor
-```
-
-This generates Cursor rules for AI-assisted development.
+org-os is read by agents through `AGENTS.md` and the files it points at, which
+every major runtime already picks up — no per-editor generation step is needed.
+For Cursor specifically, point it at `AGENTS.md`; for Claude Code, `CLAUDE.md`
+and `.claude/commands/` are read automatically.
 
 ## Troubleshooting
 

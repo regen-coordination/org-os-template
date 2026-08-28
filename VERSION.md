@@ -6,9 +6,20 @@ This document tracks the semantic version of the organizational OS framework and
 
 ## Current Version
 
-**Framework Version:** `1.0.0`  
-**Released:** 2026-04-02  
-**Status:** Stable
+**Framework Version:** `0.5.0`  
+**Released:** 2026-06-17 (re-baseline) · v0.5 beta in progress  
+**Status:** Pre-beta (`0.x` line)
+
+> **The `0.x` re-baseline.** This file read `1.0.0` from 2026-04-02 until
+> 2026-08-28 — a fourth, stale scheme that no check could see, because
+> `version:check` only read three surfaces. It now reads five (WS-C5).
+>
+> org-os deliberately renumbered `3.5 → 0.5` on 2026-06-17 to signal pre-1.0
+> maturity honestly. `0.5 < 3.5` is intentional and is not a regression; SemVer
+> ordering does not apply across the re-baseline. The line previously numbered
+> `1.x → 2.x → 3.x → 3.5` (four milestones) is designated **v0.5**, the fifth.
+> Source of truth: the `[0.5.0]` entry in [`CHANGELOG.md`](CHANGELOG.md);
+> policy: [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
 ---
 

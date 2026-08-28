@@ -1,21 +1,73 @@
 # Versioning Policy
 
-**Status:** active since v3.0.0 (2026-04-24)
+**Status:** active · rewritten 2026-08-28 for the `0.x` pre-beta line (v0.5 WS-C1)
 
 ## TL;DR
 
+- The framework is on the **`0.x` pre-beta line**. Current: `0.5.0`.
 - Framework version = `package.json.version` — this is the **single source of truth**.
-- `federation.yaml.metadata.framework_version` mirrors major.minor of the above. Enforced by `validate:structure`.
+- Four other surfaces mirror it and are machine-checked by `npm run version:check`.
+- `0.minor` = **milestone number**, not a semver minor. `1.0.0` is reserved.
+- The legacy `1.x → 3.5` line is **historical**. `0.5 < 3.5` is deliberate, not a regression.
 - Data schemas, skills, and per-instance mandates (`MASTERPLAN.md`) version **independently**.
-- Strict semver. Breaking changes bump major. Document every change in `CHANGELOG.md`.
 - Downstream instances **pull** migrations, they don't get pushed.
+
+## The `0.x` pre-beta line (current)
+
+On **2026-06-17** org-os renumbered itself `3.5 → 0.5`. This was deliberate and
+non-SemVer: the version was overstating the project's maturity, and `3.x` read as
+"third stable generation" to anyone encountering it cold. `0.x` says the true thing —
+pre-1.0, interfaces still moving, adopt with your eyes open.
+
+**`0.minor` is a milestone counter, not a semver minor.** The line previously numbered
+`1.x → 2.x → 3.x → 3.5` was four milestones; `0.5` is the fifth. So:
+
+| Milestone | Legacy number | Current number |
+|---:|---|---|
+| 1 | `1.x` | — historical |
+| 2 | `2.x` | — historical |
+| 3 | `3.0` | — historical |
+| 4 | `3.5` | — historical |
+| 5 | — | **`0.5`** |
+| 6 | — | `0.6` |
+
+**This table is the map, and it has one source of truth: the `[0.5.0]` entry in
+[`CHANGELOG.md`](../CHANGELOG.md).** This section restates it; `packages/instance-doctor`
+implements it in `checks/versions.mjs`. Do not write a third copy — a version map that
+disagrees with itself is worse than none, and cross-scheme comparison is exactly where
+that bites (a naive semver compare reads an instance on `3.0` as *ahead* of a framework
+on `0.5`).
+
+**`0.5 < 3.5` is intentional.** SemVer ordering does not apply across the re-baseline.
+Sorted tag lists are the practical hazard: historical tags are therefore published as
+`archive/v3.0.0` and `archive/v3.5.0`, never bare, so they cannot outrank `v0.5.0`.
+
+### What bumps what, on the 0.x line
+
+- **`0.(n+1)`** — a milestone: a coherent body of work shipped together, announced in
+  `CHANGELOG.md`. Breaking changes are allowed here and are called out with a migration.
+- **`0.n.p`** — a patch: fixes and additions that break nothing.
+- **`1.0.0`** — **reserved.** Not a bigger number; a claim. It means the framework has
+  been run by operators who are not its author, its interfaces have stopped moving, and
+  breaking changes have become genuinely exceptional. The v0.6 external-pilot gate is a
+  step toward it, not the thing itself.
+
+### Historical: the `1.x → 3.5` line
+
+Superseded by the re-baseline above and kept only so old references resolve. Anything
+still claiming `3.0` or `3.5` — an instance's `framework_version`, a stale doc, a
+sync receipt — is on the legacy scheme and is *behind* `0.5`, by the milestone table.
+`doctor assess` reports this as `framework-version-stale` with the milestone distance.
 
 ## Sources of version truth
 
 | Version | Where it lives | Scope |
 |---|---|---|
-| Framework | `package.json.version` | The whole framework (code + canonical docs + standards) |
+| Framework | `package.json.version` | The whole framework (code + canonical docs + standards) — **the source of truth** |
 | Framework (mirror) | `federation.yaml.metadata.framework_version` | Major.minor of framework, visible to federated peers |
+| Framework (mirror) | `CHANGELOG.md` most-recent `## [X.Y.Z]` | The released milestone |
+| Framework (mirror) | `VERSION.md` → `**Framework Version:**` | Human-facing version page |
+| Framework (mirror) | `MASTERPLAN.md` → `**Version:**` header | The framework's own mandate file (see below) |
 | Data schema | `schema_version` in each `data/*.yaml` | One schema per registry; bumps when that registry's shape changes |
 | Skill | `version` in each `skills/<name>/SKILL.md` frontmatter | Per-skill; bumps independently |
 | Instance mandate | `MASTERPLAN.md` version header | Per-instance; tracks how each instance evolves its own agent mandate |
@@ -143,7 +195,10 @@ git push origin v3.1.0
 
 ## Pre-1.0 and 0.x
 
-Not applicable. The framework is at `3.x`. If a future major rewrite justified it, a `reset to 0.x` would be called out explicitly as a breaking change and require the same migration machinery.
+See [The `0.x` pre-beta line (current)](#the-0x-pre-beta-line-current) above — this is
+now the framework's actual line, not a hypothetical. (Until 2026-08-28 this section read
+"Not applicable. The framework is at `3.x`", eleven weeks after the re-baseline. Kept as
+a marker of why `version:check` now reads every surface it can.)
 
 ## Enforcement
 
@@ -168,7 +223,7 @@ Every instance carries a **lineage stamp** in `federation.yaml.metadata`:
 
 ```yaml
 metadata:
-  framework_version: "3.5"       # major.minor of the framework this instance is on
+  framework_version: "0.5"       # major.minor of the framework this instance is on
   genesis_commit: "<40-hex SHA>" # framework commit at clone time; immutable
   last_sync_commit: "<SHA>|null" # framework commit pinned at last sync-upstream run
 ```
@@ -177,13 +232,23 @@ metadata:
 - **`last_sync_commit`** is updated by `scripts/sync-upstream.mjs` after every successful sync. `null` means "never synced" (either freshly cloned, or the framework itself, which is its own upstream).
 - `scripts/validate-identity.mjs` (run via `npm run validate:schemas`) checks shape: 40-hex SHA for genesis, 40-hex SHA or null for last_sync.
 
-## Version triplet sanity (v3.5+)
+## Version surface check (five surfaces since v0.5)
 
-Three sources must agree on framework version:
+Every surface that states a framework version must agree on major.minor:
 
-1. `package.json` → `version` (semver, e.g., `3.5.0`)
-2. `federation.yaml` → `metadata.framework_version` (major.minor, e.g., `3.5`)
+1. `package.json` → `version` (semver, e.g. `0.5.0`) — the source of truth
+2. `federation.yaml` → `metadata.framework_version` (major.minor, e.g. `0.5`)
 3. `CHANGELOG.md` → most-recent `## [X.Y.Z]` heading
+4. `VERSION.md` → the `**Framework Version:**` line
+5. `MASTERPLAN.md` → the `**Version:**` header
+
+Surfaces 4 and 5 were added in v0.5 (WS-C5) because they were the two that had actually
+drifted — `VERSION.md` said `1.0.0` and `MASTERPLAN.md` said `2.0.0` while the framework
+was on `0.5.0`, and the three-surface check could not see either. A surface no check
+reads is a surface that drifts unnoticed.
+
+Both are optional: absent, or present without a version line, means "makes no claim" and
+is not an error. That is what lets instances run the same check.
 
 Check via:
 

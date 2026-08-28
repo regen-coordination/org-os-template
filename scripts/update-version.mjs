@@ -20,13 +20,17 @@
  * 7. Inserts a new empty [Unreleased] section at the top.
  * 8. Does NOT commit, does NOT tag, does NOT push. Those are manual.
  *
- * Check mode:
- * - Verifies package.json version, federation.yaml framework_version (major.minor),
- *   and most-recent CHANGELOG.md [X.Y.Z] heading all agree.
+ * Check mode (five surfaces since v0.5 WS-C5):
+ * - Verifies package.json version, federation.yaml framework_version,
+ *   the most-recent CHANGELOG.md [X.Y.Z] heading, root VERSION.md's
+ *   "**Framework Version:**" line, and MASTERPLAN.md's "**Version:**" header
+ *   all agree on major.minor.
+ * - VERSION.md and MASTERPLAN.md are optional: absent, or present without a
+ *   version line, means "makes no claim" and is not drift.
  * - Exit 0 if consistent; exit 1 with diff if not. No file modifications.
  */
 
-import { readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 const frameworkRoot = resolve(process.argv[1], '../..');
@@ -37,42 +41,74 @@ function die(msg) {
   process.exit(1);
 }
 
-// --- Check mode (v3.5+) — read all three sources and verify agreement ---
+// --- Check mode (v3.5+, widened to five surfaces in v0.5 WS-C5) ---
+//
+// This read three sources for a long time, and the two it could not see were
+// exactly the two that were wrong: root VERSION.md said 1.0.0 and MASTERPLAN.md
+// said 2.0.0 while the framework was on 0.5.0. A surface a check cannot see is
+// a surface that drifts unnoticed, so all five are read here.
+//
+// Absence is not drift: an instance need not carry VERSION.md or MASTERPLAN.md,
+// and a VERSION.md without a "**Framework Version:**" line is making no claim.
+// Those cases report "—" rather than failing.
 if (arg === '--check') {
+  const majorMinor = (v) => (v ? (String(v).match(/^(\d+)\.(\d+)/) || [])[0] : null);
+  const readIfPresent = (rel) => {
+    const p = resolve(frameworkRoot, rel);
+    return existsSync(p) ? readFileSync(p, 'utf-8') : null;
+  };
+
   const pkg = JSON.parse(readFileSync(resolve(frameworkRoot, 'package.json'), 'utf-8'));
   const pkgVersion = pkg.version;
-  const pkgMajorMinor = (pkgVersion.match(/^(\d+)\.(\d+)/) || [])[0];
+  const pkgMajorMinor = majorMinor(pkgVersion);
 
   const fedRaw = readFileSync(resolve(frameworkRoot, 'federation.yaml'), 'utf-8');
-  const fedFwMatch = fedRaw.match(/^\s*framework_version:\s*"?([\d.]+)"?$/m);
-  const fedFw = fedFwMatch ? fedFwMatch[1] : null;
+  const fedFw = (fedRaw.match(/^\s*framework_version:\s*"?([\d.]+)"?$/m) || [])[1] || null;
 
   const changelogRaw = readFileSync(resolve(frameworkRoot, 'CHANGELOG.md'), 'utf-8');
-  const clMatch = changelogRaw.match(/^##\s*\[(\d+\.\d+\.\d+)\]/m);
-  const clVersion = clMatch ? clMatch[1] : null;
-  const clMajorMinor = clVersion ? (clVersion.match(/^(\d+)\.(\d+)/) || [])[0] : null;
+  const clVersion = (changelogRaw.match(/^##\s*\[(\d+\.\d+\.\d+)\]/m) || [])[1] || null;
 
-  console.log('Version triplet check:');
-  console.log(`  package.json:                       ${pkgVersion}`);
-  console.log(`  federation.yaml framework_version:  ${fedFw}`);
-  console.log(`  CHANGELOG.md most-recent release:   ${clVersion}`);
+  const versionMdRaw = readIfPresent('VERSION.md');
+  const versionMd = versionMdRaw
+    ? (versionMdRaw.match(/\*\*Framework Version:\*\*\s*`?(\d+\.\d+(?:\.\d+)?)`?/i) || [])[1] || null
+    : null;
+
+  const masterplanRaw = readIfPresent('MASTERPLAN.md');
+  const masterplan = masterplanRaw
+    ? (masterplanRaw.match(/^\*\*Version:\*\*\s*`?(\d+\.\d+(?:\.\d+)?)`?/m) || [])[1] || null
+    : null;
+
+  // surface label → declared value (null = makes no claim)
+  const surfaces = [
+    ['package.json', pkgVersion],
+    ['federation.yaml framework_version', fedFw],
+    ['CHANGELOG.md most-recent release', clVersion],
+    ['VERSION.md Framework Version', versionMd],
+    ['MASTERPLAN.md version header', masterplan],
+  ];
+
+  console.log('Version surface check (5 surfaces):');
+  for (const [label, value] of surfaces) {
+    console.log(`  ${(label + ':').padEnd(36)} ${value ?? '— (absent)'}`);
+  }
   console.log('');
 
   const errors = [];
   if (!fedFw) errors.push('federation.yaml is missing metadata.framework_version');
   if (!clVersion) errors.push('CHANGELOG.md has no [X.Y.Z] release entry');
-  if (fedFw && pkgMajorMinor !== fedFw) {
-    errors.push(`major.minor mismatch: package.json ${pkgMajorMinor} ≠ federation.yaml ${fedFw}`);
-  }
-  if (clMajorMinor && pkgMajorMinor !== clMajorMinor) {
-    errors.push(`major.minor mismatch: package.json ${pkgMajorMinor} ≠ CHANGELOG.md ${clMajorMinor}`);
+  for (const [label, value] of surfaces) {
+    if (!value || label === 'package.json') continue;
+    const mm = majorMinor(value);
+    if (mm !== pkgMajorMinor) {
+      errors.push(`major.minor mismatch: package.json ${pkgMajorMinor} ≠ ${label} ${mm}`);
+    }
   }
 
   if (errors.length === 0) {
     console.log('✓ All version sources agree.');
     process.exit(0);
   }
-  console.error('✗ Version triplet inconsistent:');
+  console.error('✗ Version surfaces inconsistent:');
   errors.forEach((e) => console.error(`  - ${e}`));
   process.exit(1);
 }
