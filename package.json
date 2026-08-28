@@ -23,6 +23,7 @@
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
     "analyze:instances": "node scripts/analyze-instances.mjs",
+    "doctor": "node scripts/doctor.mjs",
     "version:update": "node scripts/update-version.mjs",
     "migrate": "node scripts/migrate.mjs",
     "vault:snapshot": "node scripts/vault-snapshot.mjs",

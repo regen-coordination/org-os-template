@@ -1,0 +1,30 @@
+# org-os-instance-doctor — instance assessment and reliable framework sync.
+#
+# An IN-PLACE module: everything it owns already sits at its canonical path, so
+# `files` is an identity mapping rather than a materialization map (see
+# modules/README.md). Nothing here is copied on install.
+#
+# The SECOND tracked module, after org-os-cloudflare-os. Two manifests in
+# modules/ is the un-freeze trigger for the module engine in v0.6 — see
+# docs/agent-plans/interop-plugin-architecture.md.
+#
+# Status is tracked in docs/MODULES.md, not in this manifest — the v5 schema has
+# no status field, and inventing one would fail `additionalProperties: false`.
+id: org-os-instance-doctor
+version: 1.0.0
+type: operational
+description: >-
+  Assess any org-os instance against the framework and sync it reliably — the
+  B1-B6 check battery with a BLOCKER/WARN scorecard, and a nine-stage guided
+  sync that repairs the machinery an instance needs before it can update itself.
+dependencies:
+  - org-os-standards
+npm: "@org-os/instance-doctor"
+files:
+  packages/instance-doctor: packages/instance-doctor
+  skills/instance-doctor: skills/instance-doctor
+  scripts/doctor.mjs: scripts/doctor.mjs
+checks:
+  - file-exists: packages/instance-doctor/src/cli.mjs
+  - file-exists: skills/instance-doctor/SKILL.md
+  - command: npm run doctor -- --help

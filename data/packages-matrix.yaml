@@ -44,6 +44,14 @@ packages:
     lifecycle_status: "active"
     notes: "@org-os/kms — binds toolkit-framework into org-os (module src/bind.mjs + profile). Executable lifecycle, registry bridge, CLI, render, federation. Installed + activated in regen-toolkit 2026-07-05; refi-dao-os adopting. Depends on toolkit-framework. 44/44 tests. + map builder/frontier/vault-artifact (federation map, 2026-07)"
 
+  - id: "instance-doctor"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "@org-os/instance-doctor — assess any instance (identity, lineage, cross-scheme versions, machinery integrity, structure, freshness) and sync it reliably from the framework. Hub mode (--dir) is what breaks the bootstrap deadlock: as of the 2026-08-28 sweep no instance could run sync-upstream.mjs, so the framework supplies the machinery. Ships modules/org-os-instance-doctor/module.yaml as the second tracked module. Exposed as npm run doctor. v0.5 WS-B."
+
   - id: "org-os-federation-map"
     owner: "framework"
     instances_using: ["org-os"]

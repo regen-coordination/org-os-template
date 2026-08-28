@@ -106,6 +106,13 @@ skills:
     promotion_status: "canonical"
     notes: "Behavioral guidelines to reduce LLM coding mistakes. Adapted from Andrej Karpathy's observations."
 
+  - id: "instance-doctor"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    notes: "Operator flow for @org-os/instance-doctor: assess -> read scorecard -> sync -> verify. Framework-side skill (hub mode against a sibling instance); adoption is recorded once instances carry the injected machinery. v0.5 WS-B."
+
   - id: "initialize"
     owner: "framework"
     instances_using: ["regen-coordination-os", "refi-med-os"]
