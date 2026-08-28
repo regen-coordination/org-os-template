@@ -3,9 +3,9 @@ import Layout from "../components/Layout.astro";
 import { withBase } from "../lib/base";
 const repo = "https://github.com/regen-coordination/org-os-template";
 const steps = [
-  { n: "01", title: "Clone the framework", body: "Use the cloning engine to scaffold a new instance with package + skill selection.", code: "node scripts/clone-framework.mjs --target ../my-org --config config.yaml" },
-  { n: "02", title: "Or run the guided interview", body: "Prefer a wizard? npm run setup walks through identity capture — not a working newcomer path yet (a 2026-08-21 clean-room test found it broken 7 ways). Use step 01 until it's fixed.", code: "npm run setup" },
-  { n: "03", title: "Open a session", body: "Read MASTERPLAN.md, SOUL.md, IDENTITY.md, then initialize.", code: "/initialize" },
+  { n: "01", title: "Clone the framework as a generator", body: "The one recommended path. Describe your org in a small YAML config; the engine materializes a fresh instance in a sibling directory — your identity, your package + skill selection, a lineage stamp back to the framework, and no framework content left behind.", code: "npm run clone:framework -- --target ../my-org --config my-org.yaml" },
+  { n: "02", title: "Let your agent drive it", body: "Claude Code, Cursor, or a connector setup is the normal case: you answer questions in plain language, the agent writes the config, runs the engine, and verifies the result. The recipe it follows is docs/adopt-with-an-agent — verified end-to-end against a fresh clone.", code: "npm run doctor -- --dir ../my-org   # acceptance: no blockers except the expected missing remote" },
+  { n: "03", title: "Publish your schemas, open a session", body: "Inside the new instance: generate your EIP-4824 descriptors, validate, then read GETTING-STARTED.md and run the bootstrap-interviewer skill to fill in members, projects and sources.", code: "npm run generate:schemas && npm run validate:schemas\n/initialize" },
 ];
 ---
 <Layout title="Get started" current="get-started" description="Spin up your own org-os instance.">
@@ -19,7 +19,7 @@ const steps = [
         <div><h3>{s.title}</h3><p>{s.body}</p><pre class="mono">{s.code}</pre></div>
       </section>
     ))}
-    <p>Next: read the <a href={`${repo}/blob/main/BOOTSTRAP.md`}>BOOTSTRAP</a> sequence and the <a href={withBase("/docs/operator-guide")}>Operator Guide</a>.</p>
+    <p>Next: the <a href={withBase("/docs/adopt-with-an-agent")}>agent recipe</a>, the <a href={`${repo}/blob/main/BOOTSTRAP.md`}>BOOTSTRAP</a> sequence, and the <a href={withBase("/docs/operator-guide")}>Operator Guide</a>. (An in-place wizard, <code>npm run setup</code>, exists for real interactive terminals — nine prompts, not agent-drivable; prefer the engine.)</p>
   </div>
 </Layout>
 <style>

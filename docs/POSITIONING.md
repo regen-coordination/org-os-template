@@ -120,7 +120,7 @@ Supporting proof points for copy:
 |---|---|
 | Session lifecycle | `/initialize` → `/close` + dashboard + memory protocol |
 | Data model & schemas | 14 registries, EIP-4824 generation, validators, selftest |
-| Skills system | 34 skills, promotion pipeline, cross-vendor SKILL.md format |
+| Skills system | 35 skills, promotion pipeline, cross-vendor SKILL.md format |
 | Federation protocol | federation.yaml, hub/instance sync, drift analysis, migrations |
 | Bootstrap engine | cloning engine (8-stage, non-interactive) — shipped, wired to `npm run clone:framework`, the recommended path per BOOTSTRAP.md; 4 automated tests, 1 acceptance instance (bread-coop-os, 2026-05-16). Guided interview (`npm run setup`) is a separate, in-place path — broken (7 Blockers). See Bootstrap status (§1). |
 | Vault safety | snapshots, audits, operator trunks, recovery runbook |
@@ -180,9 +180,9 @@ Supporting proof points for copy:
 
 ---
 
-## 8. Numbers box (for the site, as of v0.5.0, 2026-07-15; re-verified 2026-08-21)
+## 8. Numbers box (for the site, as of v0.5.0; re-verified 2026-08-29 against the tagged release)
 
-34 skills · 14 canonical registries (+3 hub-only) · 11 EIP-4824 descriptors · 6 slash commands · 53 npm scripts · 5 downstream instances + hub (excludes dao-os/openclaw — non-instances per `federation.yaml`) · drift 27→0 · self-hosting since 2026-04-24 · 100/100 toolkit-framework tests green
+35 skills · 14 canonical registries (+4 hub-only) · 11 EIP-4824 descriptors · 6 slash commands · 55 npm scripts · 5 downstream instances + hub (excludes dao-os/openclaw — non-instances per `federation.yaml`) · drift 27→0 · self-hosting since 2026-04-24 · 100/100 toolkit-framework tests green
 
 _Packages count intentionally omitted (noted 2026-08-21): no repo-defined tier yields one defensible number — 18 `packages/` dirs vs. 23 `data/packages-matrix.yaml` entries, and the matrix carries no `status` field to separate shipped from candidate. Restore once one of those becomes canonical._
 
