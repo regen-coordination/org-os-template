@@ -19,7 +19,14 @@
  *
  * Usage:
  *   npm run validate:schemas
- *   node scripts/validate-identity.mjs --strict   # warnings → errors
+ *   node scripts/validate-identity.mjs --strict          # warnings → errors
+ *   node scripts/validate-identity.mjs ../refi-med-os    # validate another instance
+ *
+ * The target directory defaults to this script's own checkout. Passing one
+ * lets the FRAMEWORK's validator assess a sibling instance, which is what
+ * packages/instance-doctor does — instances carry missing or skewed copies of
+ * this script, so running theirs is exactly what cannot be relied on.
+ * Mirrors scripts/validate-structure.mjs, which has always taken argv[2].
  */
 
 import { readFileSync, existsSync } from "node:fs";
@@ -29,9 +36,11 @@ import yaml from "js-yaml";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, "..");
 
-const strict = process.argv.includes("--strict");
+const args = process.argv.slice(2);
+const strict = args.includes("--strict");
+const targetArg = args.find((a) => !a.startsWith("-"));
+const rootDir = targetArg ? path.resolve(targetArg) : path.resolve(__dirname, "..");
 let passed = 0, failed = 0, warned = 0;
 
 function check(name, ok, detail = "") {
