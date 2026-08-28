@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const ORG_ROOT = path.resolve('.');
+import { ORG_ROOT, nodeModulesDir } from '../helpers/repo-paths.mjs';
 const REAL_SCRIPT = path.join(ORG_ROOT, 'scripts', 'validate-identity.mjs');
 const SHA40 = 'a1b2c3d4e5f6789012345678901234567890abcd';
 
@@ -32,7 +32,7 @@ function setupInstance({
   const root = mkdtempSync(path.join(tmpdir(), 'validate-identity-'));
   mkdirSync(path.join(root, 'scripts'));
   copyFileSync(REAL_SCRIPT, path.join(root, 'scripts', 'validate-identity.mjs'));
-  symlinkSync(path.join(ORG_ROOT, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+  symlinkSync(nodeModulesDir(), path.join(root, 'node_modules'), 'dir');
 
   // Full .well-known/ so section 1 emits no warnings (keeps --strict tests isolated)
   mkdirSync(path.join(root, '.well-known'));

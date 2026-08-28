@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const ORG_ROOT = path.resolve(".");
+import { ORG_ROOT } from "../helpers/repo-paths.mjs";
 const SCRIPT = path.join(ORG_ROOT, "scripts", "sync-agents.mjs");
 
 const MANAGED_AGENT = (body = "You are Testa.") =>
