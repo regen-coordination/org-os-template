@@ -14,6 +14,19 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-08-28 · Interop direction: everything is a plugin, org-os as connective tissue
+
+**Status:** active
+**Scope:** framework, architecture, package-integration
+
+**Decision** — Operator directive: org-os's extension architecture converges on **one plugin/module mechanism** modeled on DeepSeek Harness's everything-is-a-plugin pattern (`dsh`, ~200k★, verified 2026-08-28): manifest-declared modules (`modules/<id>/module.yaml`) unify today's three half-overlapping mechanisms (`packages/`, `skills/`, `modules/`), with permissionless topic-based discovery (`org-os-module`) and the existing ≥2-instance promotion bar as the canonization layer. org-os positions as **connective tissue** across the agentic-infra wave (Cloudflare OS, Hermes, Multica, Berd, dsh, MCP/AGENTS.md/SKILL.md standards) — the organizational substrate any runtime plugs into, wrapping platforms rather than forking or competing. **Build stays frozen for v0.5** (portfolio memo row 2); the design is locked as input, and the un-freeze trigger ("a second module manifest exists") fires at ship: WS-B registers `org-os-instance-doctor` manifest-first as module #2.
+
+**Why** — Three parallel extension mechanisms with no enforced lifecycle is the audit's known integrity gap, and every named platform integration so far (cloudflare-os shipped; hermes, multica, berd in various states) invented its own packaging. One manifest mechanism + open discovery + gated promotion is how a 200k-star ecosystem solved the same problem, and it matches org-os's standards-first posture (ride AGENTS.md/SKILL.md/MCP/EIP-4824; bridge only where standards stop). Alternatives — keeping packages/skills/modules separate (drift proven), or building a bespoke registry service (a SaaS org-os swore off) — both lose. Scoping doc: `docs/agent-plans/interop-plugin-architecture.md`.
+
+**Refs** — `docs/agent-plans/interop-plugin-architecture.md`, `docs/superpowers/specs/2026-08-02-org-os-v5-modularization-design.md`, masterplan WS-B B10, portfolio memo §4 row 2, github.com/deepseek-ai/deepseek-harness
+
+---
+
 ## 2026-08-28 · v0.5 release masterplan — single convergence point
 
 **Status:** active

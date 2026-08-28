@@ -17,7 +17,7 @@
 | Item | Plan/spec | Trigger (additive to the external-pilot floor) |
 |---|---|---|
 | cloudflare-os deploy half + M3–M4 | `2026-08-10-cloudflare-os-m3-m4.md` | pilot operator asks for a hosted dashboard |
-| v5 module engine (beyond manifest-first) | `2026-08-02-org-os-v5-module-system-phase1.md` | a second module manifest exists |
+| v5 module engine (beyond manifest-first) | `2026-08-02-org-os-v5-module-system-phase1.md` · **design input: [`interop-plugin-architecture.md`](interop-plugin-architecture.md)** (everything-is-a-plugin per dsh; one manifest mechanism unifying packages/skills/modules; `org-os-module` topic discovery; org-os as connective tissue across Cloudflare OS/Hermes/Multica/Berd/dsh) | a second module manifest exists — **fires at v0.5 ship**: WS-B B10 registers `org-os-instance-doctor` as module #2 |
 | autopoiesis Phase 3 | `2026-05-02-autopoiesis-phase3-decisions.md` | pilot hits a federation-scale problem Loop C can't solve |
 | skills-section · tui-dashboard · obsidian-interface · obsidian-canvas-interface · framework-dashboard-template · commands-consolidation | respective plans | admin M2 ships **and** (2wk daily-use gap **or** second operator names one) |
 | instance-bootstrap (wizard scope) | `instance-bootstrap.md` | resumes with package-consumption answer; **cloning engine itself is shipped** (`clone:framework`, bread-coop acceptance) — salvage diff vs `archive/v3.5-execution` runs in WS-E2 |
