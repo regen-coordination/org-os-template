@@ -22,6 +22,11 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      # packages/admin is not an npm workspace, so the root install does not
+      # reach it and its 44 tests would be skipped by the selftest step below.
+      - name: Install admin package dependencies
+        run: npm ci --prefix packages/admin
+
       - name: Validate structure
         run: npm run validate:structure
 
@@ -33,6 +38,11 @@ jobs:
 
       - name: Selftest (full reliability suite)
         run: npm run selftest
+
+      # Explicit row as well as the selftest step: if selftest ever stops
+      # covering it, the gate should break here rather than go quiet.
+      - name: Admin package tests
+        run: npm run test:admin
 
       - name: Check version triplet consistency
         run: npm run version:check

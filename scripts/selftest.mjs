@@ -101,6 +101,17 @@ if (existsSync(path.join(rootDir, "tests"))) {
   results.push({ name: "node --test tests/", status: "SKIP", detail: "no tests/ directory" });
 }
 
+// Package suites live outside the root `tests/**` glob, so `npm test` cannot
+// see them. Unless they are named here they simply never run again after the
+// day they merge — which is exactly what happened to test:multica-bridge and
+// test:cloudflare-os-integration. Instances carry no packages/admin, so this
+// reports SKIP there rather than failing.
+if (existsSync(path.join(rootDir, "packages", "admin", "package.json"))) {
+  run("test:admin", "npm", ["run", "test:admin"], { skipKey: "admin" });
+} else {
+  results.push({ name: "test:admin", status: "SKIP", detail: "packages/admin not present" });
+}
+
 // Report
 console.log("\nResults:");
 let passed = 0, failed = 0, warned = 0, skipped = 0;
