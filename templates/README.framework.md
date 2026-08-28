@@ -54,16 +54,26 @@ of inventing its own.
 ### You're an **operator** spinning up a new org
 
 ```bash
-# Shipped and tested — use this
+# The one recommended path
 node scripts/clone-framework.mjs --target ../my-new-org --config config.yaml
+
+# Then check what you got, from this repo
+npm run doctor -- --dir ../my-new-org
 ```
 
-The in-place path (`npm run setup`, fork-and-answer-a-guided-interview) is not a working
-newcomer path yet — a 2026-08-21 clean-room test found it broken 7 Blocker-level ways, including
-a wizard that silently leaves the fork's own identity and data in place while both validation
-commands report a full pass. Use the cloning engine above until that's fixed. Full evidence:
-`memory/reports/clean-room-bootstrap-2026-08-21.md`. See `BOOTSTRAP.md` for the full first-run
-sequence.
+A fresh instance should report **no blockers except `git-remote-absent`** — expected until you
+create a repository for it. Anything else is a bug, and `tests/clone-framework-health.test.mjs`
+fails the build if it reappears. That guard exists because until 2026-08-28 this path produced an
+instance with 7 blockers seconds after creation, the worst being that it published *the
+framework's* identity as its own.
+
+The in-place alternative (`npm run setup`) converts a fork you have already made. It is an
+interactive TTY-only wizard, not scriptable, and a 2026-08-21 clean-room test found the newcomer
+path through it broken in 7 Blocker-level ways — including leaving the fork's own identity and
+data in place while both validation commands reported a full pass. Some of those causes are fixed
+by the cloning-engine work above; the wizard itself has not been re-tested end to end, so prefer
+the clone. Evidence: `memory/reports/clean-room-bootstrap-2026-08-21.md`. Full first-run sequence:
+`BOOTSTRAP.md`.
 
 ### You're a **contributor** to the framework
 

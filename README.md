@@ -15,7 +15,7 @@ git-native workspace where an org's knowledge, data, and operations live as file
 read, act on, and federate.
 
 Clone the framework and configure your org, and it has a brain: identity and values agents
-actually follow, structured data registries, session memory, 34 operational
+actually follow, structured data registries, session memory, 35 operational
 skills, machine-readable schemas, and a federation protocol connecting you to a network of peer
 orgs (single-operator dogfood; external pilot is the open milestone). The config-driven cloning
 engine that does this is shipped and tested — it produced a real instance, bread-coop-os. No
@@ -54,16 +54,26 @@ of inventing its own.
 ### You're an **operator** spinning up a new org
 
 ```bash
-# Shipped and tested — use this
+# The one recommended path
 node scripts/clone-framework.mjs --target ../my-new-org --config config.yaml
+
+# Then check what you got, from this repo
+npm run doctor -- --dir ../my-new-org
 ```
 
-The in-place path (`npm run setup`, fork-and-answer-a-guided-interview) is not a working
-newcomer path yet — a 2026-08-21 clean-room test found it broken 7 Blocker-level ways, including
-a wizard that silently leaves the fork's own identity and data in place while both validation
-commands report a full pass. Use the cloning engine above until that's fixed. Full evidence:
-`memory/reports/clean-room-bootstrap-2026-08-21.md`. See `BOOTSTRAP.md` for the full first-run
-sequence.
+A fresh instance should report **no blockers except `git-remote-absent`** — expected until you
+create a repository for it. Anything else is a bug, and `tests/clone-framework-health.test.mjs`
+fails the build if it reappears. That guard exists because until 2026-08-28 this path produced an
+instance with 7 blockers seconds after creation, the worst being that it published *the
+framework's* identity as its own.
+
+The in-place alternative (`npm run setup`) converts a fork you have already made. It is an
+interactive TTY-only wizard, not scriptable, and a 2026-08-21 clean-room test found the newcomer
+path through it broken in 7 Blocker-level ways — including leaving the fork's own identity and
+data in place while both validation commands reported a full pass. Some of those causes are fixed
+by the cloning-engine work above; the wizard itself has not been re-tested end to end, so prefer
+the clone. Evidence: `memory/reports/clean-room-bootstrap-2026-08-21.md`. Full first-run sequence:
+`BOOTSTRAP.md`.
 
 ### You're a **contributor** to the framework
 
@@ -126,8 +136,8 @@ current drift state.
 | `/skills` | List skills across workspace + user + plugin sources |
 
 
-- **Skills:** 34 total — see `SKILLS.md` and `data/skills-matrix.yaml`
-- **Packages:** 23 total — see `data/packages-matrix.yaml` + `docs/PACKAGE-LIFECYCLE.md`
+- **Skills:** 35 total — see `SKILLS.md` and `data/skills-matrix.yaml`
+- **Packages:** 24 total — see `data/packages-matrix.yaml` + `docs/PACKAGE-LIFECYCLE.md`
 - **Modules:** see [`docs/MODULES.md`](docs/MODULES.md) and `modules/`
 
 ## Documentation

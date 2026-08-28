@@ -8,24 +8,112 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.5.0] — 2026-08-28
+
+**The beta.** The release that makes org-os stable and reliable enough for real adoption and
+collaborative use: a consolidated trunk, a public site, a package that can assess and repair a
+downstream instance, one coherent versioning story, and a branch topology that is just `main`.
+
+**Version-scheme re-baseline (deliberate, non-SemVer).** Declared **2026-06-17**, shipped here.
+org-os adopts a `0.x` **pre-beta** scheme to signal pre-1.0 maturity honestly. The line previously
+numbered `1.x → 2.x → 3.x → 3.5` (four milestones) is designated **v0.5** — the fifth. `0.5 < 3.5`
+is intentional and reflects "pre-beta", not a regression; SemVer ordering does not apply across
+this re-baseline. **This paragraph is the single source of truth for the cross-scheme map**;
+`docs/VERSIONING.md` restates it and `packages/instance-doctor` implements it. Historical tags are
+published as `archive/v3.0.0` / `archive/v3.5.0`, never bare, so they cannot outrank `v0.5.0` in a
+semver-sorted list.
+
 ### Added
 
-- **symbient v2** — practice promoted to framework capability: `skills/symbient/` (contract + vendored Quilt Protocol by Wib & Wob, CC BY-NC), `scripts/symbient-hatch.mjs` + `scripts/lib/symbient-gates.mjs` (the canonical GATES.md parse — no production code calls it yet; all stage-gating is agent-honored, and any host reading GATES.md programmatically must use this module), conditional close-pulse in `/close`, hermes on-demand surfacing. Habitats are operator-private (gitignored); see `docs/superpowers/specs/2026-08-10-symbient-v2-design.md`.
-
-## [0.5.0] — 2026-06-17
-
-**Version-scheme re-baseline (deliberate, non-SemVer).** org-os adopts a `0.x` **pre-beta** scheme to honestly signal pre-1.0 maturity. The line previously numbered `1.x → 2.x → 3.x → 3.5` (four milestones) is hereby designated **v0.5** — the fifth milestone — aligning the framework's own version with the public **"org-os v0.5"** surface: the new website at `site/` plus the v0.5 module constellation (website-generator, kms, hermes, rad-org-os, members-hub, ideation). `0.5 < 3.5` is intentional and reflects "pre-beta," not a regression; SemVer ordering does not apply across this re-baseline.
+- **`packages/instance-doctor`** — the reliability centrepiece. `doctor assess` runs six checks
+  over any instance (identity coherence + template leakage, lineage stamps, cross-scheme version
+  surfaces, machinery integrity, structure/schemas, freshness) and prints a BLOCKER/WARN/OK
+  scorecard with `--json` and blocker exit codes. `doctor sync` runs nine stages — snapshot,
+  ensure-upstream, fetch, inject-machinery, sync-upstream, migrate, generate-schemas, re-assess,
+  receipt — aborting on the first failure so an instance is never left half-migrated. Hub mode
+  (`npm run doctor -- --dir ../other-instance`) is what breaks the bootstrap deadlock: an instance
+  cannot repair its own updating mechanism using its own updating mechanism, so the framework
+  supplies it. Ships `skills/instance-doctor/SKILL.md`, `npm run doctor`, and
+  `modules/org-os-instance-doctor/module.yaml` — the **second tracked module**, which fires the
+  module-engine un-freeze trigger for v0.6.
+- **Admin app M1** — `packages/admin/` lands on trunk after eight months on a branch, with its 44
+  tests wired into `npm test`, `selftest` and CI so they cannot go quiet again.
+- **Public site, live** — `https://regen-coordination.github.io/org-os-template/`, auto-deploying
+  on push to `main`, with a base-path gate asserting every internal link carries `/org-os-template`
+  exactly once.
+- **symbient v2** — practice promoted to framework capability: `skills/symbient/` (contract +
+  vendored Quilt Protocol by Wib & Wob, CC BY-NC), `scripts/symbient-hatch.mjs` +
+  `scripts/lib/symbient-gates.mjs` (the canonical GATES.md parse — no production code calls it
+  yet; all stage-gating is agent-honored, and any host reading GATES.md programmatically must use
+  this module), conditional close-pulse in `/close`, hermes on-demand surfacing. Habitats are
+  operator-private (gitignored).
+- **Federation map** — `@org-os/federation-map`, an interactive map of an instance's external
+  world (ring 1 instances · ring 2 frontier peers-of-peers · ring 3 sources/ecosystems), plus the
+  kms data plane behind it (`render map`, `federate frontier`, offline vault artifact).
+- **kms + quilt** — `@org-os/kms` binds `@regen-commons/toolkit-framework` into org-os as both a
+  module and the default knowledge profile.
+- **Cloudflare OS integration M0–M2** — the `gatekeeper-org-os` adapter, a pure page core shared
+  with `page-shim`, GitHub/memory substrates, and the org-dashboard gadget. First tracked module.
+- **graphify integration** — knowledge-graph ingest via `graphify export --wiki` +
+  `compile:knowledge`, with `graph:status` / `graph:gaps` surfaced in the dashboard.
+- **Autopoiesis Phase 2** — cascade closure: the 10-stage `scripts/sync-upstream.mjs`,
+  `scripts/validate-identity.mjs`, and the `genesis_commit` / `last_sync_commit` lineage stamp.
 
 ### Changed
-- `package.json` version: `3.5.0` → `0.5.0`.
-- `federation.yaml` `metadata.framework_version`: `"3.5"` → `"0.5"`.
-- `README.md` version header → `0.5.0 (pre-beta)`.
-- Public site (`site/`): the v0.5 framework website ships as the first surface of this milestone; the home statline now reads `framework v0.5`.
+
+- **One versioning story.** `version:check` now reads **five** surfaces, not three — `package.json`,
+  `federation.yaml`, `CHANGELOG.md`, root `VERSION.md`, and the `MASTERPLAN.md` header. The two it
+  could not previously see were the two that were wrong: `VERSION.md` said `1.0.0` and
+  `MASTERPLAN.md` said `2.0.0` while the framework was on `0.5.0`. Both corrected.
+  `docs/VERSIONING.md` rewritten around the `0.x` line: `0.minor` is a milestone counter, `1.0.0`
+  is reserved as a claim rather than a number, and `3.x` is demoted to Historical.
+- **`clone-framework.mjs` no longer produces a broken instance.** It emitted one with 7 doctor
+  blockers seconds after creation. It now renders the instance's own `.well-known/dao.json`,
+  strips the framework's generated `.well-known/*.json` and CHANGELOG, reads the framework version
+  instead of hardcoding `3.5`, writes the canonical upstream URL rather than a legacy spelling,
+  and drops npm scripts pointing at files the instance never receives.
+  `tests/clone-framework-health.test.mjs` fails the build if any of it regresses.
+- **CI enforces the release gate.** `validate.yml` runs `npm test` and the site build/tests, with
+  the stale soft-fail on `validate:schemas` removed.
+- **Branch topology cleared to `main`.** Nine branches and five worktrees retired behind 18
+  `archive/*` tags, each annotated with its restore command; proof in
+  `memory/reports/branch-triage-2026-08-28.md`.
+- **The vault-safety guard** stopped over-matching: `clean` / `stash` / `reset --hard` are matched
+  only in git subcommand position, so pathspecs and commit messages naming them no longer trip it.
+- **Status debt cleared** — `MASTERPLAN.md`'s Activations section (a v2-era checklist long after
+  every item shipped) now points at the live queue; `docs/SETUP-PATHS.md` reduced to an honest
+  stub; the README states one recommended bootstrap path and how to verify it.
+
+### Removed
+
+- `MASTERPROMPT.md` — superseded by `MASTERPLAN.md` + `AGENTS.md`.
+- `npm run quartz` and `npm run setup:cursor` — both pointed at files that have never existed in
+  this repository's history, and `setup:cursor` was documented in two places as if it worked.
+
+### Known issues
+
+Shipped knowingly and documented rather than quietly. Both are **data-loss** defects in the kms
+layer, found by production use in `refi-dao-os` and recorded in its framework-feedback ledger:
+
+- 🔴 **`kms store` silently overwrites objects sharing a title-slug** (ledger B5) — at scale this
+  loses knowledge objects without an error.
+- 🔴 **kms provenance criticals** (ledger section D, two items).
+
+**Disposition (WS-F4):** the fix targets **v0.5.1**, and these items **gate v0.6 Active-1**
+(downstream propagation) — the fleet is not synced onto a knowledge store that can lose data.
+Data loss is exempt from the portfolio freeze table. Both instance feedback ledgers are now
+registered as recognized upstream inputs in `docs/SKILL-PROMOTION.md`.
+
+Also known, and *not* fixed here: `npm run setup` (the in-place wizard) remains TTY-only and has
+not been re-tested end to end since the 2026-08-21 clean-room run. Use `clone:framework`.
 
 ### Follow-ups (flagged, not done here)
-- `docs/VERSIONING.md` should formalize the `0.x` pre-beta policy (it still describes the `3.x` SemVer line).
-- Downstream instances in `data/instances.yaml` still record their last-synced `framework_version` (`3.0`/`3.5`) — historical sync records, to be reconciled in a later federation sync.
-- The in-flight `release/v3.5-*` branches predate this re-baseline and need separate reconciliation.
+
+- Downstream instances still record legacy `framework_version` values (`3.0`/`3.5`). Propagation
+  across the fleet is v0.6 Active-1, gated on the kms items above; `doctor sync` is the vehicle.
+- Six different repository names have circulated as "the framework" and every instance declares a
+  wrong one. All six are recorded in `packages/instance-doctor`'s `KNOWN_WRONG_UPSTREAMS`;
+  reconciling the repositories themselves is a separate operator action.
 
 ## [3.5.0] — 2026-05-16
 
@@ -135,7 +223,8 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v3.5.0...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/regen-coordination/org-os-template/compare/archive/v3.5.0...v0.5.0
 [3.5.0]: https://github.com/regen-coordination/org-os-template/compare/v3.0.0...v3.5.0
 [3.0.0]: https://github.com/regen-coordination/org-os-template/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/regen-coordination/org-os-template/releases/tag/v2.0.0

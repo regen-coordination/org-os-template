@@ -49,6 +49,48 @@ Skills can also move the other way: if a canonical skill stops being used or div
 
 ---
 
+---
+
+## Instance feedback ledgers (added v0.5, WS-F4)
+
+Promotion has always assumed the signal flows one way: a skill proves itself in
+an instance, gets counted, and is promoted. But instances also produce *written
+feedback about the framework itself* — defects, gaps, and design objections found
+by running it for real. Until 2026-08-28 that channel was tracked nowhere upstream,
+so two ledgers accumulated for months without a single item reaching the framework's
+own queue.
+
+**Recognized ledgers:**
+
+| Ledger | Items | Notes |
+|---|---|---|
+| [`refi-bcn-os/docs/kms/FRAMEWORK-FEEDBACK.md`](../../refi-bcn-os/docs/kms/FRAMEWORK-FEEDBACK.md) | TF-1 … TF-6 | kms/toolkit feedback from production use |
+| [`refi-dao-os/docs/kms/FRAMEWORK-FEEDBACK.md`](../../refi-dao-os/docs/kms/FRAMEWORK-FEEDBACK.md) | ~18, A1 … F1 | includes two 🔴 data-loss items; F1 is a built-but-unsent dispatch package, re-targeted to `archive/feat-knowledge-commons` |
+
+**How a ledger item is handled.** Same shape as skill promotion — evidence first,
+then a verdict that is written down:
+
+1. **Registered** — the ledger is listed here. Being listed does not imply the
+   framework agrees with any item in it.
+2. **Triaged** — each item gets one of: *accepted* (enters `docs/agent-plans/QUEUE.md`
+   or `HEARTBEAT.md`), *instance-specific* (stays local, recorded as such), or
+   *declined* (with the reason, in the ledger, so it is not re-litigated).
+3. **Severity overrides the freeze.** A data-loss item is not subject to the
+   portfolio freeze table. The two 🔴 kms items are the live example: they ship as
+   documented Known Issues in `CHANGELOG.md [0.5.0]`, their fix targets **v0.5.1**,
+   and they **gate v0.6 Active-1** — the fleet is not synced onto a knowledge store
+   that can lose data. That is the WS-F4 decision, recorded in `DECISIONS.md`.
+
+**Status.** Registered 2026-08-28. Full triage of both ledgers is v0.6 work; only
+the severity carve-out above was actioned for v0.5.
+
+**Why this belongs in the promotion doc.** Promotion and feedback are the same
+loop read in opposite directions: one carries proven practice up from instances,
+the other carries proven problems. A framework that instruments only the first
+direction learns what works and never learns what does not.
+
+---
+
 ## Script-Level Reconciliation (added v3.5.0)
 
 The same promotion mechanism extends to **scripts**. The framework's `scripts/` directory grows by absorbing knowledge-pipeline and validation scripts proven across ≥2 instances.
