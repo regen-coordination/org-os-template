@@ -473,6 +473,9 @@ test('the local stages work against real repositories', () => {
   try {
     writeFileSync(path.join(upstreamRepo, 'README.md'), '# framework\n');
     git(upstreamRepo, ['init', '--quiet', '--initial-branch=main']);
+    // Repo-local identity — see the note in tests/helpers/instance-fixtures.mjs.
+    git(upstreamRepo, ['config', 'user.email', 'fixture@org-os.test']);
+    git(upstreamRepo, ['config', 'user.name', 'org-os fixture']);
     git(upstreamRepo, ['add', '.']);
     git(upstreamRepo, ['commit', '--quiet', '-m', 'framework: initial']);
 

@@ -89,6 +89,13 @@ export function makeInstance(opts = {}) {
 
   if (initGit) {
     git(dir, ['init', '--quiet', '--initial-branch=main']);
+    // Repo-local identity: CI runners have no global git ident, and anything
+    // that commits in this repo later — the fixture's own initial commit, or
+    // the doctor's ensure-upstream/inject-machinery stages under test — dies
+    // with "fatal: empty ident name" without it. Same pattern as
+    // packages/admin/tests/fixtures.ts. Local-only; never --global.
+    git(dir, ['config', 'user.email', 'fixture@org-os.test']);
+    git(dir, ['config', 'user.name', 'org-os fixture']);
     git(dir, ['add', '.']);
     git(dir, ['commit', '--quiet', '-m', 'fixture: initial']);
     for (const [remote, url] of Object.entries(remotes)) {

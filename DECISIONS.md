@@ -14,6 +14,32 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-08-29 · v0.5.0 shipped — the convergence decision executed
+
+**Status:** active
+**Scope:** framework, federation, release
+
+**Decision** — Tag `v0.5.0` cut on `main`, executing the 2026-08-28 convergence decision in full. The five locked decisions, as executed: (1) **memo adoption + doctor amendment** — portfolio memo is release policy and `packages/instance-doctor` shipped as the Active-1 vehicle (with its claim scoped per the decision below); (2) **deploy target** — `regen-coordination/org-os-template` via GitHub Pages project path, live at `https://regen-coordination.github.io/org-os-template/` with auto-deploy and a base-path gate; (3) **one versioning story** — 0.x pre-beta canonical across all five machine-checked surfaces, CHANGELOG `[0.5.0]` folded, historical tags published only as `archive/v3.0.0`/`archive/v3.5.0` (bare `v3.x` tags removed from origin — never re-push them, they would outrank `v0.5.0` in semver-sorted lists); (4) **branch-clearing policy** — `main` is the only branch, zero worktrees, every deletion preceded by a pushed `archive/*` tag with recorded rev-list containment; (5) **kms data-loss disposition (F4)** — the two 🔴 ledger items ship as documented Known Issues, fix targets v0.5.1, gating v0.6 Active-1. Acceptance ran **before** the tag (WS-H gates WS-G) and stopped the first attempt; the tag was cut only after the claim was narrowed to what acceptance actually proved.
+
+**Why** — Every prior release in this repo's history was declared rather than proven; this one gated the tag on acceptance against the live fleet and honored the gate when it failed. The framework's own release process is now an instance of the reliability story it ships.
+
+**Refs** — `docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md` (all workstreams ticked), `memory/reports/ws-h-acceptance-2026-08-28.md`, `memory/reports/instances-drift-2026-08-29.md`, `CHANGELOG.md [0.5.0]`, `memory/2026-08-29.md`
+
+---
+
+## 2026-08-29 · v0.5 reliability claim narrowed: assess + dry-run proven, history-based sync retired
+
+**Status:** active
+**Scope:** framework, instances, release
+
+**Decision** — The v0.5 reliability claim is **`doctor assess` + `doctor sync --dry-run`**, both proven against all six real instances plus the framework itself. A full `doctor sync` ships **documented as unproven** (CHANGELOG Known issue, SKILL.md and package README status callouts) because WS-H acceptance demonstrated it cannot work as designed: stage 5 delegates to `scripts/sync-upstream.mjs`, whose `git pull --rebase upstream main` assumes the instance is a fork — and every real instance is a scaffold with its own root commit (verified six-for-six; the lineage stamps record provenance, git history does not). The replacement is a **file-level overlay sync** (framework-owned paths copied, instance-owned paths untouched, lineage stamp recording the applied framework commit — the primitive `sync-packages.mjs` already uses and the `genesis_commit` design implies), targeting **v0.5.1**, after which the original WS-H H1–H3 acceptance re-runs in full. Fleet propagation stays v0.6 Active-1, already gated on the kms items.
+
+**Why** — Option 2 of the WS-H report, over shipping the original claim untrue (the exact confident untruth this release set out to remove) and over delaying the tag (option 3: nothing real is bought by waiting — the fleet is not being synced before v0.6 anyway, and the assess half is the one that found every defect in the acceptance report). The failed acceptance also proved the process: refi-med-os was damaged by the rebase, fully recovered from the doctor's own snapshot refs, and four real defects were found and fixed with regression tests along the way.
+
+**Refs** — `memory/reports/ws-h-acceptance-2026-08-28.md` (the failure analysis and options), `memory/reports/instances-drift-2026-08-29.md` (the narrowed acceptance, PASSED), masterplan second amendment (2026-08-29), commits `bb60ee6` (claim narrowing), `692fb42` (the four defect fixes)
+
+---
+
 ## 2026-08-28 · Interop direction: everything is a plugin, org-os as connective tissue
 
 **Status:** active
