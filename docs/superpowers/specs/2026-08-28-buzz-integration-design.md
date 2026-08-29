@@ -111,3 +111,47 @@ Exact touchpoints (repo `skills/org-os-init/SKILL.md` vs user-level session skil
 - **Standards-first** — buzz-cli is Block's own agent-standard surface; no bespoke Nostr code.
 - **Honest maturity** — `lifecycle_status: experimental`; Buzz itself labeled as a developer preview throughout.
 - **Release freeze** — nothing in this spec authorizes pre-tag build work.
+
+## Reconciliation (2026-08-29)
+
+Task 1 (deferred at build time — Docker/just/hermit/buzz-cli/goose were all
+absent from the build machine) ran against a live local relay. Nearly every
+documented guess in the shipped wrapper was wrong. The real surface, recorded
+in full in `packages/buzz-integration/VERIFIED.md`:
+
+- The binary is **`buzz`**, not `buzz-cli`.
+- The relay is an **HTTP REST** endpoint (`POST /query`) at
+  `http://localhost:3000` by default — not a websocket; `ws://` was wrong.
+- The identity env var is **`BUZZ_PRIVATE_KEY`** (accepts 64-char hex or
+  `nsec1…` bech32) — the CLI does not read `BUZZ_NSEC` at all.
+- The verbs are `messages send`, `messages get`, and `channels list`/`create`
+  — not the single-word `post` / `read` / `status` guessed in the plan.
+  `--channel` takes a UUID, never a channel name.
+  There is **no `--json` flag** (stdout is always JSON) and **no `status`
+  subcommand** (`channels list` is the connectivity/auth probe).
+- Exit codes are real and distinguishable: `0` success, `1` bad input, `2`
+  relay/network error (retryable), `3` auth error — `status()` now reports
+  "no key" vs "relay down" precisely instead of guessing from one bundled
+  probe.
+
+**Provenance design change, approved by the operator:** the `--tag` flag this
+spec's Decisions table implicitly assumed (tagging each event `sha=`,
+`source=`, `truncated=`) does not exist on the real CLI. Provenance is
+carried instead as a machine-readable trailer appended to the message
+content itself, separated from the digest body by a blank line:
+
+```
+org-os: sha=<short-sha> source=org-os-session truncated=<true|false>
+```
+
+Content is part of the signed event, so provenance still survives in the
+permanent log and is greppable on read-back — the original design's intent
+(a cryptographically signed, SHA-cross-linked mirror of session history) is
+preserved; only the transport of that provenance changed. The original
+Decisions table above is left as-is (it recorded the *intent*, not a flag
+that turned out not to exist); this section is the correction.
+
+`packages/buzz-integration/lib/buzz.mjs`, its scripts, and
+`tests/buzz-integration/` were reconciled to the verified surface in the same
+pass. See `packages/buzz-integration/VERIFIED.md` for the full command/output
+table and git history for the exact diff.

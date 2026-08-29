@@ -1,68 +1,93 @@
-# buzz-cli — VERIFIED.md
+# buzz — VERIFIED.md
 
-**Status: PENDING.** The pin and the CLI-surface verification described below
-have **not** been performed. `packages/buzz-integration/lib/buzz.mjs`
-currently encodes `CLI_MAP` as **unverified documented defaults** taken from
-the buzz-integration implementation plan — nobody has run these commands
-against a real `buzz-cli` or a live relay.
-
-## Why this file exists in this state
-
-Task 1 of the plan (clone + pin `block/buzz`, stand up its Docker relay, mint
-an agent keypair, and record the verified `buzz-cli` invocations) requires the
-operator's environment. At the time this wrapper (Task 2) was built:
-
-- Docker was not running.
-- `just`, `hermit`, `buzz-cli`, and `goose` were all absent from the machine.
-
-So Task 1 could not run, and nothing here has been verified. This stub exists
-so downstream tasks (module manifest checks, TOOLS.md pointers) have a file
-to point at, and so the next operator has a form to fill in rather than a
-blank page.
-
-## What the operator must do (Task 1)
-
-1. Clone `block/buzz` and pin a specific commit/tag (record it below).
-2. `just setup && just build && just dev` — bring up the local Docker relay
-   (`ws://localhost:3000` by default).
-3. Mint an agent keypair (nsec/npub) with `buzz-cli`. Put the npub in
-   `TOOLS.md`; the nsec goes **only** in `.env` as `BUZZ_NSEC` — never in any
-   tracked file.
-4. Exercise `buzz-cli` directly: post one event to a channel, read it back,
-   check status. Record the **actual observed** command forms, flags, and
-   output shapes in the table below, replacing every "pending" cell.
-5. Reconcile `packages/buzz-integration/lib/buzz.mjs`'s `CLI_MAP` (and the
-   corresponding argv assertions in `tests/buzz-integration/buzz-lib.test.mjs`)
-   against what was actually observed. Only change `CLI_MAP` to match a
-   re-verified pin — never guess.
-6. Update the Status line at the top of this file from PENDING to VERIFIED,
-   with the date and pinned version.
+**Status: VERIFIED — 2026-08-29.** Task 1 of the buzz-integration plan ran
+against a real `buzz` binary and a live local relay. Nearly every guess
+encoded in the original `CLI_MAP` (built from documented defaults when Task 1
+was deferred — Docker/just/hermit/buzz-cli/goose were all absent from the
+build machine) was wrong: wrong binary name, wrong transport, wrong env var,
+wrong verbs, wrong flags, wrong output shapes, and an invented `--tag` flag
+that does not exist. This file records what was actually observed and
+supersedes every prior "assumed" row below.
 
 ## Pin
 
 | Field | Value |
 |---|---|
-| `block/buzz` commit/tag pinned | pending |
-| `buzz-cli` version (`buzz-cli --version`) | pending |
-| Verification date | pending |
-| Verified by | pending |
+| Relay | Local, via `deploy/compose` from `block/buzz`, image `ghcr.io/block/buzz:main` |
+| Binary | `buzz` (NOT `buzz-cli`) — `~/.local/bin/buzz`, a symlink to `/Applications/Buzz.app/Contents/MacOS/buzz` |
+| Verification date | 2026-08-29 |
+| Verified by | Operator, against the running local relay |
+| Resolved channel | `org-os-dev` → UUID `3344f08a-5f68-4c7e-8499-bcbe0bfb22ff` |
 
-## CLI surface (intent → command → output shape)
+## Environment variables the CLI itself reads
 
-The command column shows what `CLI_MAP` in `lib/buzz.mjs` *currently assumes*
-(unverified). Fill in "Observed command" and "Observed output shape" once
-Task 1 runs, then reconcile `CLI_MAP` to match.
+| Variable | Purpose | Verified default / accepted forms |
+|---|---|---|
+| `BUZZ_RELAY_URL` | Relay endpoint | `http://localhost:3000` by default. **HTTP REST** (`POST /query`) — not a websocket. `ws://` is wrong. |
+| `BUZZ_PRIVATE_KEY` | Agent identity | Accepts **either** 64-char hex **or** `nsec1…` bech32. (The old `BUZZ_NSEC` name is not read by the CLI at all.) |
 
-| Intent | Assumed command (current `CLI_MAP`, unverified) | Observed command | Observed output shape |
-|---|---|---|---|
-| post | `buzz-cli post --channel <channel> --content <content> [--tag k=v ...] --json` | pending | pending |
-| read | `buzz-cli read --channel <channel> [--since <unix-seconds>] --json` | pending | pending |
-| status | `buzz-cli status --relay <relayUrl> --json` | pending | pending |
-| version check | `buzz-cli --version` | pending | pending |
+## CLI surface (intent → command → observed output shape)
+
+There is **no `--json` flag** anywhere — stdout is always JSON, unconditionally.
+There is **no `--tag` flag** — provenance now travels as a trailer appended to
+message content (operator decision, 2026-08-29 reconciliation; see
+`scripts/post-digest.mjs`). There is **no `status` subcommand**; `channels
+list` is the verified connectivity/auth probe. `--channel` always takes a
+**UUID**, never a channel name — names resolve via `channels list`.
+
+| Intent | Verified command | Observed output shape |
+|---|---|---|
+| post | `buzz messages send --channel <UUID> --content <text>` (or `--content -` to read the body from stdin) | Top-level JSON object: `{"accepted":true,"event_id":"<64hex>","mention_pubkeys":[],"message":""}` |
+| read | `buzz messages get --channel <UUID> [--since <unix-seconds>] [--limit <n>]` | Top-level JSON **array** (not `{events:[...]}`), each item `{content, created_at, id, kind, pubkey, tags}`; `created_at` is unix seconds. Empty result is `[]`. |
+| connectivity/auth probe | `buzz channels list` | Top-level JSON **array**, each item `{channel_id, created_at, description, name}` — note the id field is `channel_id`, not `id` |
+| channel creation | `buzz channels create --name <name> --type stream --visibility open [--description <text>]` | (not exercised by the wrapper; recorded for completeness) |
+
+## Errors
+
+JSON on **stderr**, shape `{"error":"<category>","message":"<detail>","retryable":<bool>}`.
+
+## Exit codes (verified by running each case)
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Bad input (invalid UUID, unknown subcommand) |
+| `2` | Relay/network error (connection refused) — `retryable:true` |
+| `3` | Auth error (missing/invalid key) |
+
+`lib/buzz.mjs`'s `status()` uses exit `3` to report a key problem and exit `2`
+to report a relay-down problem, instead of guessing from a single bundled
+probe.
+
+## Provenance trailer (replaces the planned `--tag` design)
+
+The original design tagged each posted event `sha=`, `source=`, `truncated=`
+via a `--tag` flag. That flag does not exist in the real CLI. The operator
+decided (2026-08-29): carry provenance as a machine-readable trailer appended
+to the message content, separated from the digest body by a blank line:
+
+```
+org-os: sha=<short-sha> source=org-os-session truncated=<true|false>
+```
+
+Content is part of the signed event, so provenance still survives in the
+permanent log and is greppable on read-back — preserving the original
+design's intent without the nonexistent flag.
+
+## Reconciliation history
+
+- **2026-08-28 (build time):** Task 1 deferred — Docker was not running;
+  `just`, `hermit`, `buzz-cli`, and `goose` were all absent from the machine.
+  `CLI_MAP` was built from documented guesses.
+- **2026-08-29 (this reconciliation):** Task 1 ran against a live local
+  relay (`deploy/compose`, image `ghcr.io/block/buzz:main`) and the real
+  `buzz` binary. Every row above was observed directly, not assumed.
+  `packages/buzz-integration/lib/buzz.mjs`'s `CLI_MAP`, `loadConfig`, and
+  `status()` were reconciled to match; see git history for the exact diff.
 
 ## Downstream consumers of this file
 
 - `packages/buzz-integration/lib/buzz.mjs` — `CLI_MAP` comment points here.
-- A later module manifest (`modules/org-os-buzz/module.yaml`) asserts this
-  file exists via a `file-exists` check — do not delete or rename it.
-- `TOOLS.md` Buzz section will point here once Task 1 lands.
+- `modules/org-os-buzz/module.yaml` asserts this file exists via a
+  `file-exists` check — do not delete or rename it.
+- `TOOLS.md` Buzz section points here.
