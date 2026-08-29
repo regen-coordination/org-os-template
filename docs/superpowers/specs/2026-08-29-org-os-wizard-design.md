@@ -92,19 +92,29 @@ it is the scorecard filling in.
 The wizard needs to know what to offer next. It does not invent a progress
 model, because the instance already publishes one.
 
-`packages/instance-doctor` emits a scorecard of checks with severities
-(`blocker` / `warn` / `hint`) and remediation hints — verified across all six
-instances during WS-H narrowed acceptance (2026-08-29). That output *is* the
-wizard's to-do list:
+`packages/instance-doctor` emits a scorecard of checks whose findings each carry
+a level (`BLOCKER` / `WARN`; `OK` means no finding), a stable machine `code`, and
+a remediation `hint` — verified across all six instances during WS-H narrowed
+acceptance (2026-08-29). That output *is* the wizard's to-do list:
 
-| Scorecard state | What the concierge offers |
+| Scorecard state (real check codes) | What the concierge offers |
 |---|---|
-| Instance does not exist | Door A or Door B (§6), then `clone:framework` |
-| `git-remote-absent` blocker | "Do you want this backed up on GitHub?" → `remote add` walkthrough |
-| Schema/structure blockers | `generate:schemas`, `validate:*`, explain what failed in plain language |
-| Registries thin (members/projects empty) | `bootstrap-interviewer` — BOOTSTRAP.md Phase 1, where the substance goes |
-| No sources ingested | Source ingestion — BOOTSTRAP.md Phase 2, one source end-to-end |
-| Clean scorecard | Day-to-day: heartbeat, session open/close, drift, funding deadlines |
+| no instance at the path | Door A or Door B (§6), then `clone:framework` |
+| `not-a-git-repo`, `git-remote-absent` | "Do you want this backed up on GitHub?" → `remote add` walkthrough |
+| `dao-json-missing`, `template-leakage`, `identity-name-disagreement` | `generate:schemas`, `validate:*`, explain what failed in plain language |
+| `identity-md-missing`, `scaffold-placeholder` | `bootstrap-interviewer` — BOOTSTRAP.md Phase 1, where the substance goes |
+| `registries-unpopulated` ⚠️ *new check* | `bootstrap-interviewer`, then the registries the org actually needs |
+| `no-sources-ingested` ⚠️ *new check* | Source ingestion — BOOTSTRAP.md Phase 2, one source end-to-end |
+| no blockers | Day-to-day: heartbeat, session open/close, drift, funding deadlines |
+
+⚠️ **Two rungs have no signal today.** The doctor's snapshot never reads
+`data/*.yaml` registry contents, so nothing currently reports that an instance
+is structurally valid but organizationally empty — which is precisely the state
+a freshly-cloned instance is in, and therefore the rung the wizard needs most.
+`registries-unpopulated` and `no-sources-ingested` are new `WARN`-level checks
+that Phase 1 adds to `instance-doctor`. This keeps the "no new state" property
+intact: the wizard still reads exactly one state source, and that source gets
+the two signals it was missing.
 
 Two consequences worth stating explicitly. **The wizard has no state of its
 own** — nothing to persist, nothing to corrupt, nothing to resume; re-running
