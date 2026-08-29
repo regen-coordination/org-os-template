@@ -55,6 +55,11 @@ per-registry write lock racing `.git/index.lock` across registries).
 - **CI could not run the instance-doctor suite.** Fixture repos had no git identity and runners
   have no global one, so the doctor's own commit stages died with `fatal: empty ident name` —
   `validate.yml` was red while local runs passed on the developer's global config.
+- **`version:update` left two of the five version surfaces stale.** It bumped package.json,
+  federation.yaml and the CHANGELOG but not `VERSION.md` or `MASTERPLAN.md`, and because
+  `version:check` compares major.minor the gap passed silently — cutting a patch release would
+  have shipped a `VERSION.md` reading the previous version. Bump mode now moves every surface it
+  checks.
 - **`AGENTS.md` §11 pointed at the wrong upstream.** Now the canonical `org-os-template`. Executing
   the fix corrected the record: `org-os-framework` and `organizational-os-framework` are the *same*
   repository (the latter is a former name GitHub redirects), so the "three circulating names" were
