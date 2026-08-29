@@ -72,8 +72,8 @@ report's own fix-list.
 
 ### Berd bridge dogfood acceptance (module #4 → live)
 
-- [ ] **Prerequisite — live GUI confirmation of the discovery path:** `docs/integrations/berd.md` verified `.agents/skills/` from Berd's own Tauri scanner and Goose's own source, but marks live confirmation PENDING OPERATOR. The operator opens this repo as a Berd project and confirms the five bridged skills are discovered alongside `feynman`.
-- [ ] **Prerequisite — Goose verification + pruning pass (plan Task 5):** exercise each of the five bridged skills once under Goose, record the per-skill verdict in a "Goose verification" table in `docs/integrations/berd.md`, and prune any that fail from `modules/org-os-berd/module.yaml`'s exposure list, then re-run `npm run sync:skills:berd -- --check`. Note that until this runs, the exposure list names skills that are materialized but unverified — which is exactly why the module is catalogued `in-dev` rather than `pilot`.
+- [x] ~~**Prerequisite — live confirmation of the discovery path.**~~ — **done 2026-08-29**: `/Applications/Berd.app/Contents/MacOS/goosed skills list`, run from the repo root, discovered all five bridged skills at their `.agents/skills/<name>` paths with parsed frontmatter and non-zero description/content token counts, alongside the untouched `feynman` sub-skills (evidence: `/tmp/goose-skills.txt`). This exercises Berd's actual bundled Goose backend directly — stronger evidence than the live-GUI walkthrough this item originally specified — so it satisfies the prerequisite; see `docs/integrations/berd.md`'s 2026-08-29 note.
+- [ ] **Prerequisite — Goose verification + pruning pass (plan Task 5):** exercise each of the five bridged skills once under Goose to do real work, record the per-skill verdict in a "Goose verification" table in `docs/integrations/berd.md`, and prune any that fail from `modules/org-os-berd/module.yaml`'s exposure list, then re-run `npm run sync:skills:berd -- --check`. Discovery is confirmed; functional use under Goose is not — that's why the module is catalogued `pilot` rather than `live`.
 - [ ] One full org-os session (initialize → work → close) driven from Berd/Goose
 - [ ] 5 real work uses of bridged skills from Berd: ☐ ☐ ☐ ☐ ☐
       (on completion: flip docs/MODULES.md org-os-berd to **live**, update the
@@ -82,17 +82,20 @@ report's own fix-list.
 
 ### Buzz lane dogfood acceptance (module #3 → live)
 
-- [ ] **Prerequisite — plan Task 1 (pin and verify):** clone/pin `block/buzz`, bring up its
-      dev relay, mint the agent keypair, exercise `buzz-cli` post/read directly, and fill in
-      `packages/buzz-integration/VERIFIED.md`'s pending table. `CLI_MAP` in `lib/buzz.mjs`
-      currently encodes unverified documented defaults and must be reconciled against what is
-      actually observed — never guessed.
-- [ ] **Prerequisite — record the npub:** replace the PENDING marker in `TOOLS.md`'s Buzz
-      section with the agent's real npub once Task 1 mints a keypair. The `nsec` never goes in
-      any tracked file — only `.env` as `BUZZ_NSEC`.
-- [ ] **Prerequisite — plan Task 8 Step 1 (the live round-trip):** with the relay up and `.env`
-      filled, `npm run buzz:doctor` → all ✓; post a digest; `npm run buzz:read` → the message
-      appears. Append the transcript to `VERIFIED.md`.
+- [x] ~~**Prerequisite — plan Task 1 (pin and verify).**~~ — **done 2026-08-29**: cloned/pinned
+      `block/buzz`, brought up its local relay (`deploy/compose`, image
+      `ghcr.io/block/buzz:main`), minted the agent keypair, and exercised the real `buzz`
+      binary directly. `CLI_MAP` in `lib/buzz.mjs` was reconciled to the observed surface — see
+      `packages/buzz-integration/VERIFIED.md` (status: VERIFIED).
+- [x] ~~**Prerequisite — record the npub.**~~ — **done 2026-08-29**: `TOOLS.md`'s Buzz section
+      carries the agent's real npub
+      (`npub16pl9y5zxuq5fujfqan6n34m42x5qarl8emkea3nvytm97egjdduqy39kdn`). The private key never
+      goes in any tracked file — only `.env` as `BUZZ_PRIVATE_KEY` (not `BUZZ_NSEC`, which the
+      real CLI does not read at all — see VERIFIED.md).
+- [x] ~~**Prerequisite — plan Task 8 Step 1 (the live round-trip).**~~ — **done 2026-08-29**:
+      with the relay up and `.env` filled, `npm run buzz:doctor` reported all four checks green
+      and exited 0; `npm run buzz:post` posted a SHA-tagged digest; `npm run buzz:read` read it
+      back with its provenance trailer intact, exit 0. Transcript recorded in `VERIFIED.md`.
 - [ ] **Prerequisite — sync the machine-local skill mirror (after this branch merges):**
       `~/.claude/skills/initialize/SKILL.md` and `~/.claude/skills/close/SKILL.md` need the
       same two hook steps that landed in `.claude/commands/initialize.md` and `close.md` —

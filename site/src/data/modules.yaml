@@ -9,13 +9,13 @@ modules:
     link: /docs/modules
   - id: org-os-berd
     name: Berd Desktop Integration
-    status: in-dev
-    summary: Canonical Berd personas plus a curated skills bridge into .agents/skills/ — built, not yet Goose-verified.
+    status: pilot
+    summary: Canonical Berd personas plus a curated skills bridge into .agents/skills/ — built and live discovery-verified via goosed, not yet exercised under Goose.
     link: /docs/modules
   - id: org-os-buzz
     name: Buzz Agent Lane
-    status: in-dev
-    summary: SHA-tagged signed session digests to a local Buzz relay on /close, read back on /initialize — built, not yet verified against a real relay.
+    status: pilot
+    summary: SHA-tagged signed session digests to a local Buzz relay on /close, read back on /initialize — built and verified end-to-end against a live relay, dogfood acceptance pending.
     link: /docs/modules
   - id: org-os-federation
     name: Federation

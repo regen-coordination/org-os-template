@@ -96,12 +96,15 @@ one-way and marker-guarded (`managed_by: org-os`) by `scripts/sync-skills-berd.m
 (`npm run sync:skills:berd`), the same pattern `sync-agents.mjs` uses for personas. `--check`
 byte-compares the mirror and is wired into `npm run selftest` (optional, `skipKey: "berd"`).
 
-**Status.** `in-dev` — the personas layer is verified live in the Berd app; the skills bridge
-is built, tested, and committed but **not yet Goose-verified**. `.agents/skills/` is confirmed
-as the discovery path from Berd's own Tauri scanner source and Goose's own source (two
-independent implementations that agree), but no materialized skill has been confirmed to load
-or run inside an actual Berd session — that live GUI confirmation is deferred to the operator.
-See `docs/integrations/berd.md` for the full verification trail.
+**Status.** `pilot` — built and verified, not yet running in production. The personas layer is
+verified live in the Berd app (2026-08-20); the skills bridge is built, tested, and now
+discovery-verified live: `goosed skills list` (Berd v0.6.2's own bundled Goose backend), run
+from the repo root, discovered all five bridged skills at their `.agents/skills/<name>` paths —
+each with parsed frontmatter and non-zero description/content token counts — alongside the
+untouched `feynman` sub-skills. That supersedes the source-level inference this entry
+previously relied on. What remains before `live`: exercising each bridged skill under Goose to
+do real work (plan Task 5's per-skill verdict + pruning pass) and the 5-use dogfood tally. See
+`docs/integrations/berd.md` for the full verification trail.
 
 **Links:** [manifest](../modules/org-os-berd/module.yaml) ·
 [discovery & verification](integrations/berd.md) ·
@@ -118,23 +121,23 @@ session to `#org-os-dev`, `/initialize` reads the channel back. Fail-open everyw
 never blocks a session.
 
 **How it works.** `packages/buzz-integration/lib/buzz.mjs` is a thin wrapper that shells out to
-a pinned `buzz-cli` binary (JSON in/out) for `postEvent`, `readChannel`, and `status`; nothing
+a pinned `buzz` binary (JSON in/out) for `postEvent`, `readChannel`, and `status`; nothing
 else in the repo speaks the Nostr protocol Buzz is built on. Three root-invoked scripts sit on
 top — `npm run buzz:post`, `npm run buzz:read`, `npm run buzz:doctor` — and the session skills
 gain two optional hooks: a read-back step in `/initialize` and a digest-post step in `/close`,
 both fail-open (a non-green `doctor` or any lane error prints a one-line skip and never blocks
 the session).
 
-**Status.** `in-dev` — **and unverified against a real relay.** Docker, `just`, `hermit`,
-`buzz-cli`, and `goose` are all absent from the build machine, so Task 1 of the integration plan
-(clone + pin `block/buzz`, stand up its relay, mint a keypair, and record the actual observed
-CLI surface) could not run. `CLI_MAP` in `lib/buzz.mjs` currently encodes **unverified
-documented defaults** — the verbs and flags are guesses from Buzz's docs, not observed
-behavior — and every test in `tests/buzz-integration/` exercises a fake-CLI fixture, never a
-real binary or relay. No keypair exists and no npub has been minted. See
-`packages/buzz-integration/VERIFIED.md`, whose status line reads **PENDING**, for the full
-verification trail and what the operator still has to do. This module does not move past
-`in-dev` until that live round-trip (the plan's Task 8) runs.
+**Status.** `pilot` — built and verified, not yet running in production. Verified end-to-end
+2026-08-29 against a live local relay (`deploy/compose`, image `ghcr.io/block/buzz:main`) and
+the real `buzz` binary: `npm run buzz:doctor` reports all four checks green and exits 0,
+`npm run buzz:post` posted a SHA-tagged digest, and `npm run buzz:read` read it back with its
+`org-os: sha=… source=org-os-session truncated=false` provenance trailer intact. `CLI_MAP` in
+`lib/buzz.mjs` now encodes the observed CLI surface, not documented guesses — see
+`packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**) for the full trail. What remains
+before `live`: the 5-consecutive-session `/close`-posts + `/initialize`-reads dogfood tally
+(HEARTBEAT.md tracker), and syncing the `/initialize` read-back hook to the machine-local skill
+mirrors some tools (e.g. Zed/claude-acp) read instead of the project copy.
 
 **Links:** [manifest](../modules/org-os-buzz/module.yaml) ·
 [verification trail](../packages/buzz-integration/VERIFIED.md) ·

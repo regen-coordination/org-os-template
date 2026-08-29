@@ -1,6 +1,6 @@
 # Berd Integration — Agent Surfaces
 
-**Status:** agents dir verified live (2026-08-20) · skills dir verified from source/docs only (2026-08-29), live GUI confirmation **PENDING OPERATOR**
+**Status:** agents dir verified live (2026-08-20) · skills dir discovery verified live 2026-08-29 via `goosed skills list` (see "Verified 2026-08-29" below) — supersedes the source/docs-only PENDING-OPERATOR marker for _discovery_; exercising a bridged skill under Goose to do real work is still unverified
 **Spec:** [`docs/superpowers/specs/2026-08-28-berd-integration-design.md`](../superpowers/specs/2026-08-28-berd-integration-design.md)
 **Pinned:** Berd v0.6.2 (satisfies the design spec's ≥ v0.6.0 floor) · Goose commit `063694cf7` (2026-08-17, per Berd's own `goose-backend.lock.json` at tag `v0.6.2`)
 
@@ -14,7 +14,7 @@
 
 Confirmed by opening this repo as a Berd project: `.agents/agents/{operator,upstream}.md` are auto-discovered as Berd's project-local Agent Markdown. Canonical in-repo; `npm run sync:agents` (`scripts/sync-agents.mjs`) mirrors them one-way to `~/.agents/agents/`, marker-guarded on `managed_by: org-os`. See `DECISIONS.md` § "2026-08-20 · Berd personas are framework files" and `docs/AGENTIC-ARCHITECTURE.md` § "Berd Personas".
 
-### Skills dir — `.agents/skills/` (verified from source/docs only, 2026-08-29 — live GUI confirmation PENDING OPERATOR)
+### Skills dir — `.agents/skills/` (source/docs verified 2026-08-29; live discovery verified 2026-08-29 — see "Verified 2026-08-29" below)
 
 **Finding: `.agents/skills/` is confirmed as the project-local Agent Skills discovery path, by two independent implementations that agree — but neither confirmation comes from opening this repo in the Berd app.**
 
@@ -33,11 +33,29 @@ Berd's UI-facing scanner and Goose's context-loading scanner are two separate Ru
 
 **One documented discrepancy, noted for honesty, not hidden:** Berd's `skills/README.md` points contributors at the third-party `npx skills add` CLI ([`vercel-labs/skills`](https://github.com/vercel-labs/skills)) to install published skills. That CLI's own source (`src/skills.ts`, `src/blob.ts`) targets `.goose/skills/` — the backward-compatibility path in both scanners above — as Goose's project-local install location, not `.agents/skills/`. Both scanners still find a skill installed there (it's second in each one's search order), it just isn't the recommended/highest-priority location. This repo's existing `.agents/skills/feynman/*` (hand-placed, no `managed_by` marker) already uses the recommended path.
 
-**What is NOT verified:** whether this repo, opened as a workspace in the actual Berd desktop app, shows `.agents/skills/feynman/*` in its Skills UI and makes them loadable in a live session. Both code paths above say it should; confirming it end-to-end requires opening this repo in the Berd desktop GUI — deferred to the operator (Step 2 of the design spec's build task 1).
+**What is NOT verified:** functional exercise under Goose. `goosed skills list` (see "Verified 2026-08-29" below) confirms discovery and parsing empirically — the five bridged skills plus `feynman` are found and parsed with real, non-zero token counts — but no agent has actually invoked one of them under Goose to do work, and no one has opened this repo in the Berd desktop GUI to confirm the Skills UI itself renders them. Both remain open; see `HEARTBEAT.md`'s Berd dogfood-acceptance tracker.
+
+## Verified 2026-08-29 — live discovery confirmation
+
+`/Applications/Berd.app/Contents/MacOS/goosed skills list`, run from the repo root against
+Berd's own bundled `goosed` binary (the actual runtime, not source-level inference), discovered
+**all five** bridged skills at their `.agents/skills/<name>` paths — `funding-scout`,
+`heartbeat-monitor`, `knowledge-curator`, `meeting-processor`, `org-os-init` — each with parsed
+frontmatter and non-zero description/content token counts, confirming Goose parsed them
+successfully rather than merely listing the directory. The 19 hand-authored `feynman`
+sub-skills were discovered too and are untouched by the bridge. Evidence captured at
+`/tmp/goose-skills.txt`.
+
+This is stronger evidence than the live-GUI check this doc originally deferred to the operator
+(Step 2 of the design spec's build task 1) — it exercises Berd's actual bundled Goose backend
+directly, not a UI screenshot — and it **supersedes the PENDING-OPERATOR marker above for
+discovery**. It does **not** supersede it for functional use: no agent has invoked a bridged
+skill under Goose to do real work, so that half of Step 2, and the plan's Task 5 pruning pass
+that depends on it, remain open (see `HEARTBEAT.md`'s Berd dogfood-acceptance tracker).
 
 ## The bridge
 
-The design spec's module #4, `org-os-berd` (`modules/org-os-berd/module.yaml`), is built and catalogued `in-dev`: it wraps the shipped personas layer plus a curated skills bridge — `scripts/sync-skills-berd.mjs` and `npm run sync:skills:berd` materialize a curated subset of `skills/` into `.agents/skills/<name>/` as committed, marker-guarded copies, the same one-way, `managed_by: org-os` pattern `sync-agents.mjs` already uses for `.agents/agents/`. This doc's verified path (`.agents/skills/`) is the copy target that bridge writes to; the manifest's exposure list points here. What remains open is Goose verification, not the build: no materialized skill has yet been confirmed to load or run inside an actual Berd session (see "What is NOT verified" above) — that's why the module stays `in-dev` rather than `pilot`. See `docs/MODULES.md`'s `org-os-berd` entry for the current status summary.
+The design spec's module #4, `org-os-berd` (`modules/org-os-berd/module.yaml`), is built and catalogued `pilot`: it wraps the shipped personas layer plus a curated skills bridge — `scripts/sync-skills-berd.mjs` and `npm run sync:skills:berd` materialize a curated subset of `skills/` into `.agents/skills/<name>/` as committed, marker-guarded copies, the same one-way, `managed_by: org-os` pattern `sync-agents.mjs` already uses for `.agents/agents/`. This doc's verified path (`.agents/skills/`) is the copy target that bridge writes to; the manifest's exposure list points here. Discovery is now confirmed live (`goosed skills list`, above); what remains open is functional exercise, not discovery: no materialized skill has yet been invoked under Goose to do real work (see "What is NOT verified" above) — that's why the module is `pilot` rather than `live`. See `docs/MODULES.md`'s `org-os-berd` entry for the current status summary.
 
 ## Re-verification note
 

@@ -10,7 +10,7 @@ type: integration
 description: >-
   Buzz agent lane — org-os sessions post SHA-tagged signed digests to a local
   Buzz relay channel on /close and read it back on /initialize, via a thin
-  wrapper over the pinned buzz-cli. Fail-open everywhere; local relay only.
+  wrapper over the pinned buzz binary. Fail-open everywhere; local relay only.
 dependencies:
   - org-os-standards
 files:

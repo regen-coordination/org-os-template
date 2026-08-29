@@ -138,8 +138,8 @@ packages:
     instances_using: []
     in_framework: true
     promotion_status: "evaluating"
-    lifecycle_status: "dormant"
-    notes: "@buzz-integration — thin wrapper (lib/buzz.mjs) over the pinned buzz-cli binary for a signed, SHA-tagged session-digest comms lane (npm run buzz:post/read/doctor), wired fail-open into /initialize and /close — but every doctor check is currently ✗ and both hooks always print a skip line, so nothing actually runs yet (present but inert, like koi-bridge). Ships modules/org-os-buzz/module.yaml as the third tracked module. UNVERIFIED against a real relay: Task 1 of the integration plan (pin block/buzz, mint a keypair, record the observed buzz-cli surface) has not run — Docker/just/hermit/buzz-cli/goose are all absent from the build machine. CLI_MAP in lib/buzz.mjs is unverified documented defaults; every test uses a fake-CLI fixture. See packages/buzz-integration/VERIFIED.md (status: PENDING). 56/56 tests green against the fixture."
+    lifecycle_status: "active"
+    notes: "@buzz-integration — thin wrapper (lib/buzz.mjs) over the pinned buzz binary for a signed, SHA-tagged session-digest comms lane (npm run buzz:post/read/doctor), wired fail-open into /initialize and /close. Verified end-to-end 2026-08-29 against a live local relay (deploy/compose, image ghcr.io/block/buzz:main) and the real buzz binary: doctor reports all four checks green and exits 0, and post/read round-tripped a digest with its provenance trailer intact. CLI_MAP in lib/buzz.mjs now encodes the observed CLI surface, not documented guesses. Ships modules/org-os-buzz/module.yaml as the third tracked module. See packages/buzz-integration/VERIFIED.md (status: VERIFIED) for the full trail. Still open before the lane runs in production: the 5-consecutive-session /close-posts + /initialize-reads dogfood tally (HEARTBEAT.md tracker) and syncing the /initialize read-back hook to machine-local skill mirrors some tools read instead of the project copy. 56/56 tests green against the fixture."
 
   # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
