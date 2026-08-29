@@ -4,10 +4,17 @@
 // sync-agents pattern; see modules/org-os-berd/module.yaml for the exposure
 // list and docs/integrations/berd.md for the verified discovery surface).
 //
-// Copy = canonical dir, verbatim, EXCEPT SKILL.md gains one injected line —
+// Copy = canonical dir, verbatim (bytes + permission bits; symlinks are a
+// hard error, not a silent drop), EXCEPT SKILL.md gains one injected line —
 // `managed_by: org-os` before the closing frontmatter fence. The marker is
 // the overwrite permission for future runs; hand-authored targets are
 // skipped (--adopt to take over). --check recomputes and byte-compares.
+//
+// "Hand-authored" is a directory-content question, not a SKILL.md-existence
+// question: an existing target dir that is empty (or absent) has nothing to
+// protect and is installed into normally; an existing target dir that holds
+// ANY file (with or without a root SKILL.md) that isn't a managed mirror is
+// left untouched unless --adopt is passed.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,18 +49,44 @@ if (exposure.length === 0) {
   process.exit(1);
 }
 
+// A SKILL.md must OPEN with a frontmatter fence, not merely contain a line
+// that looks like one later on (an ordinary markdown thematic break, e.g.
+// `---` under a heading, would otherwise fool a bare indexOf scan and splice
+// the marker into the body instead of the frontmatter — silently, since the
+// resulting file has no opening fence for `gray-matter` to parse either, so
+// every later run sees it as "hand-authored" and `--check` calls it clean).
 const injectMarker = (raw) => {
+  if (!/^---\r?\n/.test(raw)) return null;
   const fence = raw.indexOf("\n---", 3); // end of frontmatter block
   if (fence === -1) return null;
   return raw.slice(0, fence) + "\nmanaged_by: org-os" + raw.slice(fence);
 };
 
-const listFiles = (dir) =>
+// Recursive, sorted directory listing as {rel, full, symlink} entries.
+// Directories themselves are excluded; symlinks are INCLUDED (as `symlink:
+// true`) so callers can decide whether to hard-error on them rather than
+// have them silently vanish from the file set the way an `isFile()`-only
+// filter would drop them.
+const statEntries = (dir) =>
   fs
     .readdirSync(dir, { recursive: true, withFileTypes: true })
-    .filter((d) => d.isFile())
-    .map((d) => path.relative(dir, path.join(d.parentPath ?? d.path, d.name)))
-    .sort();
+    .filter((d) => d.isFile() || d.isSymbolicLink())
+    .map((d) => {
+      const full = path.join(d.parentPath ?? d.path, d.name);
+      return {
+        rel: path.relative(dir, full),
+        full,
+        symlink: d.isSymbolicLink(),
+      };
+    })
+    .sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+
+// Plain file list (relative paths only, symlinks excluded) — used for target
+// dirs, which we only ever populate ourselves and never with symlinks.
+const listFiles = (dir) =>
+  statEntries(dir)
+    .filter((e) => !e.symlink)
+    .map((e) => e.rel);
 
 let failures = 0,
   drift = 0;
@@ -73,38 +106,65 @@ for (const name of exposure) {
     failures++;
     continue;
   }
-  // Build the expected materialized content in memory.
+
+  // Build the expected materialized content in memory: Buffer + permission
+  // bits per file, verbatim, except SKILL.md gains the marker. Read as raw
+  // bytes (not "utf8") for everything but SKILL.md so binary files survive
+  // the round trip losslessly.
   let skillFailed = false;
   const expected = new Map();
-  for (const rel of listFiles(srcDir)) {
-    let content = fs.readFileSync(path.join(srcDir, rel), "utf8");
-    if (rel === "SKILL.md") {
-      const injected = injectMarker(content);
+  for (const entry of statEntries(srcDir)) {
+    if (entry.symlink) {
+      console.error(
+        `ERROR: ${name}/${entry.rel} is a symlink; canon must not contain symlinks.`,
+      );
+      failures++;
+      skillFailed = true;
+      continue;
+    }
+    const mode = fs.statSync(entry.full).mode & 0o777;
+    if (entry.rel === "SKILL.md") {
+      const injected = injectMarker(fs.readFileSync(entry.full, "utf8"));
       if (!injected) {
         console.error(`ERROR: ${name}/SKILL.md has no frontmatter fence.`);
         failures++;
         skillFailed = true;
-        content = null;
-      } else content = injected;
+        continue;
+      }
+      expected.set(entry.rel, { buf: Buffer.from(injected, "utf8"), mode });
+    } else {
+      expected.set(entry.rel, { buf: fs.readFileSync(entry.full), mode });
     }
-    if (content !== null) expected.set(rel, content);
   }
   if (skillFailed) continue;
 
+  // "present" = the target dir exists AND holds at least one file. An
+  // absent dir and an empty dir (e.g. detritus from an interrupted prior
+  // run) are both "nothing to protect" and materialize normally; a dir
+  // holding any file at all — with or without a root SKILL.md — that isn't
+  // a fully in-sync managed mirror is hand-authored territory.
+  const tgtFiles = fs.existsSync(tgtDir) ? listFiles(tgtDir) : [];
+  const present = tgtFiles.length > 0;
   const tgtSkill = path.join(tgtDir, "SKILL.md");
-  const exists = fs.existsSync(tgtSkill);
   const managed =
-    exists &&
+    tgtFiles.includes("SKILL.md") &&
     matter(fs.readFileSync(tgtSkill, "utf8")).data.managed_by === "org-os";
+  const expectedKeys = [...expected.keys()].sort();
   const inSync =
-    exists &&
-    listFiles(tgtDir).join("\n") === [...expected.keys()].join("\n") &&
-    [...expected].every(
-      ([rel, c]) => fs.readFileSync(path.join(tgtDir, rel), "utf8") === c,
-    );
+    present &&
+    managed &&
+    tgtFiles.join("\n") === expectedKeys.join("\n") &&
+    [...expected].every(([rel, { buf, mode }]) => {
+      const p = path.join(tgtDir, rel);
+      return (
+        fs.existsSync(p) &&
+        Buffer.compare(fs.readFileSync(p), buf) === 0 &&
+        (fs.statSync(p).mode & 0o777) === mode
+      );
+    });
 
   if (CHECK) {
-    if (!exists) {
+    if (!present) {
       tally("missing", name);
       drift++;
     } else if (!managed) tally("hand-authored", name, "  (ignored by check)");
@@ -114,7 +174,7 @@ for (const name of exposure) {
     } else tally("in-sync", name);
     continue;
   }
-  if (exists && !managed && !ADOPT) {
+  if (present && !managed && !ADOPT) {
     tally("skipped", name, "  (hand-authored — rerun with --adopt)");
     continue;
   }
@@ -122,15 +182,17 @@ for (const name of exposure) {
     tally("unchanged", name);
     continue;
   }
-  const action = !exists ? "install" : managed ? "update" : "adopt";
+  const action = !present ? "install" : managed ? "update" : "adopt";
   if (DRY) {
     tally(`would ${action}`, name);
     continue;
   }
   fs.rmSync(tgtDir, { recursive: true, force: true });
-  for (const [rel, c] of expected) {
-    fs.mkdirSync(path.dirname(path.join(tgtDir, rel)), { recursive: true });
-    fs.writeFileSync(path.join(tgtDir, rel), c);
+  for (const [rel, { buf, mode }] of expected) {
+    const dst = path.join(tgtDir, rel);
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.writeFileSync(dst, buf);
+    fs.chmodSync(dst, mode);
   }
   const PAST_TENSE = {
     install: "installed",

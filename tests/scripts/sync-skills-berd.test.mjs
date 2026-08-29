@@ -14,6 +14,9 @@ import {
   writeFileSync,
   readFileSync,
   existsSync,
+  chmodSync,
+  statSync,
+  symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -163,4 +166,103 @@ test("--check passes when mirror matches, fails on drift", () => {
 test("exposure entry with no canonical skill dir is a hard error", () => {
   const f = setup({ skills: {}, exposure: ["ghost"] });
   assert.equal(run(f).status, 1);
+});
+
+// --- Fix-round covering tests (review findings on commit 9e81a00) ---
+
+// Finding 1 + critical interaction: an existing target dir with nothing in
+// it (e.g. an empty dir left behind by an interrupted prior run) must be
+// treated exactly like an absent dir — installed into normally, never
+// skipped. Locks down the specific detritus scenario in .agents/skills/
+// today (five empty dirs from an earlier interrupted attempt) so Task 4's
+// real materialization run doesn't quietly skip all five curated skills.
+test("existing empty target directory is treated as absent and installs normally", () => {
+  const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
+  mkdirSync(path.join(f.tgt, "alpha"), { recursive: true });
+  const r = run(f);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /installed/);
+  assert.equal(
+    readFileSync(path.join(f.tgt, "alpha", "SKILL.md"), "utf-8"),
+    MIRRORED("alpha"),
+  );
+});
+
+// Finding 1: a target dir with real, unmanaged content but no root
+// SKILL.md must be skipped like any other hand-authored target — not
+// treated as "absent" and blown away by the blanket rmSync.
+test("target dir with unmanaged files but no SKILL.md is skipped, not destroyed", () => {
+  const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
+  const alphaDir = path.join(f.tgt, "alpha");
+  mkdirSync(path.join(alphaDir, "notes"), { recursive: true });
+  writeFileSync(path.join(alphaDir, "README.md"), "precious\n");
+  writeFileSync(path.join(alphaDir, "notes", "precious.md"), "do not delete\n");
+  const r = run(f);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /skipped/);
+  assert.equal(
+    readFileSync(path.join(alphaDir, "README.md"), "utf-8"),
+    "precious\n",
+  );
+  assert.equal(
+    readFileSync(path.join(alphaDir, "notes", "precious.md"), "utf-8"),
+    "do not delete\n",
+  );
+  assert.ok(!existsSync(path.join(alphaDir, "SKILL.md")));
+});
+
+// Finding 2: a SKILL.md that never opens with a frontmatter fence — even
+// if it contains an unrelated markdown thematic break (`---`) later in the
+// body — must be a hard error, not a corrupted mirror.
+test("a SKILL.md with no opening frontmatter fence is a hard error, not a corrupted mirror", () => {
+  const noFence = "# Alpha\n\nIntro paragraph.\n\n---\n\n## Section two\n";
+  const f = setup({ skills: { alpha: { "SKILL.md": noFence } } });
+  const r = run(f);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /no frontmatter fence/);
+  assert.ok(!existsSync(path.join(f.tgt, "alpha")));
+});
+
+// Finding 3: binary files must round-trip byte-for-byte — not through a
+// lossy utf8 decode/encode, which corrupts invalid-utf8 byte sequences.
+test("binary files are copied byte-for-byte, not lossily decoded through utf8", () => {
+  const bin = Buffer.from([0x00, 0xff, 0xfe, 0x80, 0xc3, 0x28, 0x10]);
+  const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
+  writeFileSync(path.join(f.src, "alpha", "blob.bin"), bin);
+  const r = run(f);
+  assert.equal(r.status, 0, r.stderr);
+  const mirrored = readFileSync(path.join(f.tgt, "alpha", "blob.bin"));
+  assert.ok(
+    mirrored.equals(bin),
+    "binary content must round-trip byte-for-byte",
+  );
+});
+
+// Finding 3: an executable canonical file must stay executable in the
+// mirror — the copy must preserve permission bits, not just content.
+test("executable file mode is preserved in the mirror", () => {
+  const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
+  const scriptPath = path.join(f.src, "alpha", "run.sh");
+  writeFileSync(scriptPath, "#!/bin/sh\necho hi\n");
+  chmodSync(scriptPath, 0o755);
+  const r = run(f);
+  assert.equal(r.status, 0, r.stderr);
+  const mirroredMode =
+    statSync(path.join(f.tgt, "alpha", "run.sh")).mode & 0o777;
+  assert.equal(mirroredMode, 0o755);
+});
+
+// Finding 3: a symlink in canon must be a hard error, not silently dropped
+// from the materialized mirror.
+test("a symlink in canon is a hard error, not a silent drop", () => {
+  const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
+  writeFileSync(path.join(f.src, "alpha", "real.md"), "target content\n");
+  symlinkSync(
+    path.join(f.src, "alpha", "real.md"),
+    path.join(f.src, "alpha", "link.md"),
+  );
+  const r = run(f);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /symlink/);
+  assert.ok(!existsSync(path.join(f.tgt, "alpha")));
 });
