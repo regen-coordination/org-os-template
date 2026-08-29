@@ -1,15 +1,58 @@
 {
   "$id": "orgos://registry/knowledge-gaps",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "kind", "status", "detected", "summary"],
+  "x-order": [
+    "id",
+    "kind",
+    "status",
+    "detected",
+    "summary"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "kind": { "enum": ["orphan", "ambiguous-edge", "weak-community"] },
-    "node_ids": { "type": "array", "items": { "type": "string" } },
-    "summary": { "type": "string" },
-    "status": { "enum": ["open", "curated", "dismissed"] },
-    "detected": { "type": "string", "format": "date" }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": [
+        "orphan",
+        "ambiguous-edge",
+        "weak-community"
+      ]
+    },
+    "node_ids": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "open",
+        "curated",
+        "dismissed"
+      ]
+    },
+    "detected": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

@@ -21,9 +21,16 @@ describe('validateEntity', () => {
     expect(r.valid).toBe(true)
   })
   it('reports enum violations with a field path', () => {
-    const r = validateEntity(repo, 'projects', { id: 'p2', status: 'launched' })
+    // members.layer is a genuine closed vocabulary. projects.status is NOT:
+    // its enum was removed once real data proved every instance defines its
+    // own lifecycle words (see tests/real-data.test.ts).
+    const r = validateEntity(repo, 'members', { id: 'm2', layer: 'wizard' })
     expect(r.valid).toBe(false)
-    expect(r.errors).toContainEqual(expect.objectContaining({ field: 'status' }))
+    expect(r.errors).toContainEqual(expect.objectContaining({ field: 'layer' }))
+  })
+  it('accepts an instance-defined project status', () => {
+    const r = validateEntity(repo, 'projects', { id: 'p3', status: 'Discovery' })
+    expect(r.valid).toBe(true)
   })
   it('reports a broken member reference', () => {
     const r = validateEntity(repo, 'projects', { id: 'p2', status: 'idea', lead: 'ghost' })

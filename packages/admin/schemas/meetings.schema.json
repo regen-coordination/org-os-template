@@ -1,21 +1,104 @@
 {
   "$id": "orgos://registry/meetings",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "title", "date", "type", "duration_minutes"],
+  "x-order": [
+    "id",
+    "title",
+    "date",
+    "type",
+    "duration_minutes"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "title": { "type": "string" },
-    "date": { "type": "string", "format": "date" },
-    "type": { "enum": ["sync", "assembly", "workshop", "standup", "ad-hoc"] },
-    "participants": { "type": "array", "items": { "type": "string" } },
-    "duration_minutes": { "type": "number" },
-    "recording_url": { "type": ["string", "null"] },
-    "transcript_path": { "type": ["string", "null"] },
-    "summary": { "type": "string" },
-    "decisions": { "type": "array", "items": { "type": "string" } },
-    "action_items": { "type": "array", "items": { "type": "object" } },
-    "tags": { "type": "array", "items": { "type": "string" } }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "type": {
+      "enum": [
+        "sync",
+        "assembly",
+        "workshop",
+        "standup",
+        "ad-hoc"
+      ]
+    },
+    "participants": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "duration_minutes": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "recording_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "transcript_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "decisions": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "action_items": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object"
+      }
+    },
+    "tags": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

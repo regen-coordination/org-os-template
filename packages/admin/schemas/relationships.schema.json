@@ -1,17 +1,81 @@
 {
   "$id": "orgos://registry/relationships",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "partner", "type", "status", "since"],
+  "x-order": [
+    "id",
+    "partner",
+    "type",
+    "status",
+    "since"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "partner": { "type": "string" },
-    "type": { "enum": ["alliance", "collaboration", "funding", "advisory", "peer"] },
-    "status": { "enum": ["active", "dormant", "completed", "proposed"] },
-    "since": { "type": "string", "format": "date" },
-    "contact": { "type": "string" },
-    "description": { "type": "string" },
-    "touchpoints": { "type": "array", "items": { "type": "object" } }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "partner": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "enum": [
+        "alliance",
+        "collaboration",
+        "funding",
+        "advisory",
+        "peer"
+      ]
+    },
+    "status": {
+      "enum": [
+        "active",
+        "dormant",
+        "completed",
+        "proposed"
+      ]
+    },
+    "since": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "contact": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "touchpoints": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "Where this relationship is visible. Real data uses file paths as strings; objects are accepted for richer records.",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

@@ -46,7 +46,13 @@ export default function RegistryPage({ name }: { name: string }) {
         </tbody>
       </table>
       {selected && (
+        // `key` is load-bearing, not decoration. EntityForm seeds its draft
+        // state once from `entity`; without a key, React reuses the same
+        // instance when you click a different row, so the heading shows the
+        // new entity while every field still holds the old one — and saving
+        // 422s on an id mismatch (or 409s as a duplicate, after `+ New`).
         <EntityForm
+          key={selected === 'new' ? 'new' : String((selected as { id?: unknown }).id ?? 'unknown')}
           registry={name}
           schema={schema}
           entity={selected === 'new' ? null : selected}

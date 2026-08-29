@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseDocument, isSeq, isMap, isScalar, YAMLSeq, YAMLMap } from 'yaml'
-import { REGISTRIES, registryDef, type RegistryKind } from './registries.ts'
+import { REGISTRIES, registryDef, resolveTopKey, type RegistryKind } from './registries.ts'
 
 export type Entity = Record<string, unknown>
 
@@ -29,7 +29,7 @@ export function listRegistries(repo: string) {
     .map(def => {
       if (def.kind === 'document') return { name: def.name, kind: def.kind, count: null }
       const { doc } = loadDoc(repo, def.name)
-      const node = doc.get(def.topKey)
+      const node = doc.get(resolveTopKey(k => doc.has(k), def))
       return { name: def.name, kind: def.kind, count: isSeq(node) ? node.items.length : 0 }
     })
 }
@@ -38,12 +38,13 @@ export function readRegistry(repo: string, name: string): RegistryRead {
   const def = registryDef(name)
   const { doc } = loadDoc(repo, name)
   const schemaVersion = (doc.get('schema_version') as string | undefined) ?? null
+  const topKey = resolveTopKey(k => doc.has(k), def)
   if (def.kind === 'document') {
-    const node = doc.get(def.topKey)
+    const node = doc.get(topKey)
     return { name, kind: def.kind, schemaVersion,
       document: (isMap(node) ? node.toJSON() : {}) as Record<string, unknown> }
   }
-  const node = doc.get(def.topKey)
+  const node = doc.get(topKey)
   const entries = isSeq(node) ? (node.toJSON() as Entity[]) : []
   return { name, kind: def.kind, schemaVersion, entries }
 }
@@ -52,10 +53,11 @@ export function readRegistry(repo: string, name: string): RegistryRead {
 export function collectionSeq(doc: ReturnType<typeof parseDocument>, name: string): YAMLSeq {
   const def = registryDef(name)
   if (def.kind !== 'collection') throw new Error(`${name} is a document registry`)
-  let node = doc.get(def.topKey)
+  const topKey = resolveTopKey(k => doc.has(k), def)
+  let node = doc.get(topKey)
   if (!isSeq(node)) {
     node = doc.createNode([])
-    doc.set(def.topKey, node)
+    doc.set(topKey, node)
   }
   return node as YAMLSeq
 }

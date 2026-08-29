@@ -1,22 +1,126 @@
 {
   "$id": "orgos://registry/projects",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "title", "status", "type", "lead", "started", "target_completion"],
+  "x-order": [
+    "id",
+    "title",
+    "status",
+    "type",
+    "lead",
+    "started",
+    "target_completion"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "title": { "type": "string" },
-    "status": { "enum": ["idea", "develop", "execute", "archive"] },
-    "type": { "enum": ["program", "initiative", "workstream", "experiment"] },
-    "lead": { "type": ["string", "null"] },
-    "contributors": { "type": "array", "items": { "type": "string" } },
-    "started": { "type": "string", "format": "date" },
-    "target_completion": { "type": ["string", "null"], "format": "date" },
-    "description": { "type": "string" },
-    "milestones": { "type": "array", "items": { "type": "object" } },
-    "related_ideas": { "type": "array", "items": { "type": "string" } },
-    "funding_source": { "type": ["string", "null"] },
-    "tags": { "type": "array", "items": { "type": "string" } }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Lifecycle stage. DATA-MODEL suggests idea -> develop -> execute -> archive, but the vocabulary is instance-defined and real instances differ (this repo uses Discovery/Develop; regen-coordination uses Develop/Execute/Integrate; refi-dao uses Backlog/Planning/In Progress/Ongoing/Done/Icebox). Not an enum: a hardcoded one rejected every project in every instance checked.",
+      "examples": [
+        "idea",
+        "develop",
+        "execute",
+        "archive"
+      ]
+    },
+    "type": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Project shape. Instance-defined; DATA-MODEL suggests the examples below.",
+      "examples": [
+        "program",
+        "initiative",
+        "workstream",
+        "experiment"
+      ]
+    },
+    "lead": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contributors": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "started": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "target_completion": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "milestones": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object"
+      }
+    },
+    "related_ideas": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "funding_source": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

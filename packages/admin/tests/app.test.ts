@@ -55,10 +55,12 @@ describe('PUT /api/registries/:name/:id', () => {
   it('422s with field errors and does not commit', async () => {
     const before = lastCommit()
     const res = await app.request('/api/registries/projects/proj-001',
-      json('PUT', { id: 'proj-001', status: 'launched' }))
+      // `lead` must reference a real member — a constraint that survives
+      // (projects.status no longer has an enum; see tests/real-data.test.ts).
+      json('PUT', { id: 'proj-001', status: 'Discovery', lead: 'ghost' }))
     expect(res.status).toBe(422)
     const body = await res.json()
-    expect(body.errors[0].field).toBe('status')
+    expect(body.errors[0].field).toBe('lead')
     expect(lastCommit()).toBe(before)
   })
   it('403s writes to document registries', async () => {

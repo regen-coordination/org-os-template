@@ -1,19 +1,88 @@
 {
   "$id": "orgos://registry/members",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "name", "role", "layer", "status", "joined"],
+  "x-order": [
+    "id",
+    "name",
+    "role",
+    "layer",
+    "status",
+    "joined"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "name": { "type": "string" },
-    "role": { "type": "string" },
-    "layer": { "enum": ["core", "contributor", "community", "observer"] },
-    "status": { "enum": ["active", "inactive", "alumni"] },
-    "joined": { "type": "string", "format": "date" },
-    "left": { "type": ["string", "null"], "format": "date" },
-    "skills": { "type": "array", "items": { "type": "string" } },
-    "handles": { "type": "object", "additionalProperties": { "type": "string" } },
-    "affiliations": { "type": "array" }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "role": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "layer": {
+      "enum": [
+        "core",
+        "contributor",
+        "community",
+        "observer"
+      ]
+    },
+    "status": {
+      "enum": [
+        "active",
+        "inactive",
+        "alumni"
+      ]
+    },
+    "joined": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "left": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "skills": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "handles": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "affiliations": {
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

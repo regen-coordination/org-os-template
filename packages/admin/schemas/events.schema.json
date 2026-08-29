@@ -1,21 +1,98 @@
 {
   "$id": "orgos://registry/events",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "title", "type", "date", "status"],
+  "x-order": [
+    "id",
+    "title",
+    "type",
+    "date",
+    "status"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "title": { "type": "string" },
-    "type": { "enum": ["assembly", "workshop", "deadline", "milestone", "call", "conference"] },
-    "date": { "type": "string", "format": "date" },
-    "end_date": { "type": "string", "format": "date" },
-    "recurrence": { "type": ["string", "null"] },
-    "location": { "type": "string" },
-    "url": { "type": ["string", "null"] },
-    "related_project": { "type": ["string", "null"] },
-    "participants": { "type": "array", "items": { "type": "string" } },
-    "status": { "enum": ["upcoming", "completed", "cancelled"] },
-    "notes": { "type": "string" }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "enum": [
+        "assembly",
+        "workshop",
+        "deadline",
+        "milestone",
+        "call",
+        "conference"
+      ]
+    },
+    "date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "end_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "recurrence": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "location": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "related_project": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "participants": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": [
+        "upcoming",
+        "completed",
+        "cancelled"
+      ]
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

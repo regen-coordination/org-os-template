@@ -1,25 +1,125 @@
 {
   "$id": "orgos://registry/ideas",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "title", "status", "submitted_by", "created", "votes"],
+  "x-order": [
+    "id",
+    "title",
+    "status",
+    "submitted_by",
+    "created",
+    "votes"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "title": { "type": "string" },
-    "status": { "enum": ["surfaced", "proposed", "approved", "developing", "hatched", "archived"] },
-    "source": { "type": "string" },
-    "submitted_by": { "type": "string" },
-    "champions": { "type": "array", "items": { "type": "string" } },
-    "ecosystem_gap": { "type": "string" },
-    "description": { "type": "string" },
-    "hatched_repo": { "type": ["string", "null"] },
-    "skills_needed": { "type": "array", "items": { "type": "string" } },
-    "resources": { "type": "array" },
-    "compensation": { "type": "object" },
-    "created": { "type": "string", "format": "date" },
-    "updated": { "type": "string", "format": "date" },
-    "votes": { "type": "number" },
-    "comments": { "type": "array" }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "surfaced",
+        "proposed",
+        "approved",
+        "developing",
+        "hatched",
+        "archived"
+      ]
+    },
+    "source": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "submitted_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "champions": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "ecosystem_gap": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "hatched_repo": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "skills_needed": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "resources": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "compensation": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "created": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "updated": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "votes": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "comments": {
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

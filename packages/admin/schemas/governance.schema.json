@@ -3,10 +3,46 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "model": { "enum": ["steward-council", "multisig", "assembly", "conviction"] },
-    "current_phase": { "enum": ["bootstrap", "transition", "active", "sunset"] },
-    "infrastructure": { "type": "object" },
-    "decisions": { "type": "array", "items": { "type": "object" } },
-    "elections": { "type": "array", "items": { "type": "object" } }
-  }
+    "model": {
+      "enum": [
+        "steward-council",
+        "multisig",
+        "assembly",
+        "conviction"
+      ]
+    },
+    "current_phase": {
+      "enum": [
+        "bootstrap",
+        "transition",
+        "active",
+        "sunset"
+      ]
+    },
+    "infrastructure": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "decisions": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object"
+      }
+    },
+    "elections": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

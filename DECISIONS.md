@@ -23,7 +23,7 @@ Each decision is a section with these fields:
 
 **Why** — Every prior release in this repo's history was declared rather than proven; this one gated the tag on acceptance against the live fleet and honored the gate when it failed. The framework's own release process is now an instance of the reliability story it ships.
 
-**Refs** — `docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md` (all workstreams ticked), `memory/reports/ws-h-acceptance-2026-08-28.md`, `memory/reports/instances-drift-2026-08-29.md`, `CHANGELOG.md [0.5.0]`, `memory/2026-08-29.md`
+**Refs** — `docs/superpowers/plans/2026-08-28-v0.5-release-masterplan.md` (all workstreams ticked), `memory/reports/ws-h-acceptance-2026-08-28.md`, `memory/reports/ws-h-acceptance-narrowed-2026-08-29.md`, `CHANGELOG.md [0.5.0]`, `memory/2026-08-29.md`
 
 ---
 
@@ -36,7 +36,7 @@ Each decision is a section with these fields:
 
 **Why** — Option 2 of the WS-H report, over shipping the original claim untrue (the exact confident untruth this release set out to remove) and over delaying the tag (option 3: nothing real is bought by waiting — the fleet is not being synced before v0.6 anyway, and the assess half is the one that found every defect in the acceptance report). The failed acceptance also proved the process: refi-med-os was damaged by the rebase, fully recovered from the doctor's own snapshot refs, and four real defects were found and fixed with regression tests along the way.
 
-**Refs** — `memory/reports/ws-h-acceptance-2026-08-28.md` (the failure analysis and options), `memory/reports/instances-drift-2026-08-29.md` (the narrowed acceptance, PASSED), masterplan second amendment (2026-08-29), commits `bb60ee6` (claim narrowing), `692fb42` (the four defect fixes)
+**Refs** — `memory/reports/ws-h-acceptance-2026-08-28.md` (the failure analysis and options), `memory/reports/ws-h-acceptance-narrowed-2026-08-29.md` (the narrowed acceptance, PASSED), masterplan second amendment (2026-08-29), commits `bb60ee6` (claim narrowing), `692fb42` (the four defect fixes)
 
 ---
 

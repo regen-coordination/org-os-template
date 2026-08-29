@@ -1,19 +1,87 @@
 {
   "$id": "orgos://registry/sources",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "name", "type", "status", "last_synced"],
+  "x-order": [
+    "id",
+    "name",
+    "type",
+    "status",
+    "last_synced"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "name": { "type": "string" },
-    "type": { "enum": ["blog", "podcast", "newsletter", "github", "forum", "social"] },
-    "url": { "type": "string" },
-    "feed_url": { "type": "string" },
-    "status": { "enum": ["active", "paused", "archived"] },
-    "last_synced": { "type": "string", "format": "date" },
-    "sync_method": { "enum": ["rss", "api", "manual", "scrape"] },
-    "content_count": { "type": "number" },
-    "tags": { "type": "array", "items": { "type": "string" } }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "enum": [
+        "blog",
+        "podcast",
+        "newsletter",
+        "github",
+        "forum",
+        "social"
+      ]
+    },
+    "url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "feed_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "active",
+        "paused",
+        "archived"
+      ]
+    },
+    "last_synced": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "sync_method": {
+      "enum": [
+        "rss",
+        "api",
+        "manual",
+        "scrape"
+      ]
+    },
+    "content_count": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

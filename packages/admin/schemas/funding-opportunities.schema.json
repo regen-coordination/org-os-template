@@ -1,22 +1,103 @@
 {
   "$id": "orgos://registry/funding-opportunities",
   "type": "object",
-  "required": ["id"],
+  "required": [
+    "id"
+  ],
   "additionalProperties": true,
-  "x-order": ["id", "title", "type", "status", "deadline", "amount_available", "relevance"],
+  "x-order": [
+    "id",
+    "title",
+    "type",
+    "status",
+    "deadline",
+    "amount_available",
+    "relevance"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "title": { "type": "string" },
-    "type": { "enum": ["grants-round", "rfp", "bounty", "retroactive", "investment"] },
-    "platform": { "type": "string" },
-    "status": { "enum": ["upcoming", "open", "closed", "awarded"] },
-    "deadline": { "type": "string", "format": "date" },
-    "amount_available": { "type": "number" },
-    "currency": { "type": "string" },
-    "relevance": { "enum": ["high", "medium", "low"] },
-    "url": { "type": "string" },
-    "notes": { "type": "string" },
-    "applied": { "type": "boolean" },
-    "application_id": { "type": ["string", "null"] }
-  }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "enum": [
+        "grants-round",
+        "rfp",
+        "bounty",
+        "retroactive",
+        "investment"
+      ]
+    },
+    "platform": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "upcoming",
+        "open",
+        "closed",
+        "awarded"
+      ]
+    },
+    "deadline": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "amount_available": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "currency": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "relevance": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "applied": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "application_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }
