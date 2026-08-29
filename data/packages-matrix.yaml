@@ -133,6 +133,14 @@ packages:
     lifecycle_status: "active"
     notes: "opencode npm plugin: registers two tools (org_os_page, org_os_tui) + 5 slash-command templates (/dashboard, /initialize, /org-projects, /org-decisions, /org-this-week). In active framework use; awaiting instance adoption signal."
 
+  - id: "buzz-integration"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    lifecycle_status: "dormant"
+    notes: "@buzz-integration — thin wrapper (lib/buzz.mjs) over the pinned buzz-cli binary for a signed, SHA-tagged session-digest comms lane (npm run buzz:post/read/doctor), wired fail-open into /initialize and /close — but every doctor check is currently ✗ and both hooks always print a skip line, so nothing actually runs yet (present but inert, like koi-bridge). Ships modules/org-os-buzz/module.yaml as the third tracked module. UNVERIFIED against a real relay: Task 1 of the integration plan (pin block/buzz, mint a keypair, record the observed buzz-cli surface) has not run — Docker/just/hermit/buzz-cli/goose are all absent from the build machine. CLI_MAP in lib/buzz.mjs is unverified documented defaults; every test uses a fake-CLI fixture. See packages/buzz-integration/VERIFIED.md (status: PENDING). 56/56 tests green against the fixture."
+
   # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
     owner: "refi-bcn-os"

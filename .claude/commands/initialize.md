@@ -31,6 +31,12 @@ If the script fails (missing deps, node not found):
 2. If still failing, fall back to reading these files directly and produce a minimal status summary: `IDENTITY.md`, `HEARTBEAT.md`, `federation.yaml`, `data/projects.yaml`, `data/tasks.yaml`, recent files in `memory/`, and `docs/agent-plans/QUEUE.md`.
 3. Never block — always produce something useful.
 
+## Step 2b: Buzz channel read-back (optional, fail-open)
+
+If the workspace has the Buzz lane configured (`npm run buzz:doctor` exits 0), run
+`npm run buzz:read` and include its output block in the session context under
+"Since last session". If the doctor is not green, skip silently — one line at most.
+
 ## Step 3: Note Session Context
 
 Silently note for the rest of the session:

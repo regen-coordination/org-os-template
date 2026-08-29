@@ -80,6 +80,69 @@ package `packages/cloudflare-os-integration/`
 
 ---
 
+### org-os-berd — Berd Desktop Integration
+
+**What it is.** The bridge between an org-os instance and
+[Berd](https://github.com/block/berd), Block's open-source Goose-backed desktop agent app:
+canonical in-repo personas plus a curated slice of org-os skills, both surfaced through Berd's
+project-local `.agents/` discovery.
+
+**How it works.** A hybrid manifest. Identity entries own the shipped personas layer —
+`.agents/agents/{operator,upstream}.md` mirrored by `scripts/sync-agents.mjs`, verified live in
+the Berd app since 2026-08-20. Materialization entries (`skills/<name>: .agents/skills/<name>`)
+double as the module's curated exposure list: five skills — `org-os-init`,
+`meeting-processor`, `heartbeat-monitor`, `knowledge-curator`, `funding-scout` — mirrored
+one-way and marker-guarded (`managed_by: org-os`) by `scripts/sync-skills-berd.mjs`
+(`npm run sync:skills:berd`), the same pattern `sync-agents.mjs` uses for personas. `--check`
+byte-compares the mirror and is wired into `npm run selftest` (optional, `skipKey: "berd"`).
+
+**Status.** `in-dev` — the personas layer is verified live in the Berd app; the skills bridge
+is built, tested, and committed but **not yet Goose-verified**. `.agents/skills/` is confirmed
+as the discovery path from Berd's own Tauri scanner source and Goose's own source (two
+independent implementations that agree), but no materialized skill has been confirmed to load
+or run inside an actual Berd session — that live GUI confirmation is deferred to the operator.
+See `docs/integrations/berd.md` for the full verification trail.
+
+**Links:** [manifest](../modules/org-os-berd/module.yaml) ·
+[discovery & verification](integrations/berd.md) ·
+[design](superpowers/specs/2026-08-28-berd-integration-design.md) ·
+[architecture](AGENTIC-ARCHITECTURE.md)
+
+---
+
+### org-os-buzz — Buzz Agent Lane
+
+**What it is.** A signed, cryptographically-provenanced comms lane between org-os sessions and
+a local [Buzz](https://github.com/block/buzz) relay: `/close` posts a SHA-tagged digest of the
+session to `#org-os-dev`, `/initialize` reads the channel back. Fail-open everywhere — the lane
+never blocks a session.
+
+**How it works.** `packages/buzz-integration/lib/buzz.mjs` is a thin wrapper that shells out to
+a pinned `buzz-cli` binary (JSON in/out) for `postEvent`, `readChannel`, and `status`; nothing
+else in the repo speaks the Nostr protocol Buzz is built on. Three root-invoked scripts sit on
+top — `npm run buzz:post`, `npm run buzz:read`, `npm run buzz:doctor` — and the session skills
+gain two optional hooks: a read-back step in `/initialize` and a digest-post step in `/close`,
+both fail-open (a non-green `doctor` or any lane error prints a one-line skip and never blocks
+the session).
+
+**Status.** `in-dev` — **and unverified against a real relay.** Docker, `just`, `hermit`,
+`buzz-cli`, and `goose` are all absent from the build machine, so Task 1 of the integration plan
+(clone + pin `block/buzz`, stand up its relay, mint a keypair, and record the actual observed
+CLI surface) could not run. `CLI_MAP` in `lib/buzz.mjs` currently encodes **unverified
+documented defaults** — the verbs and flags are guesses from Buzz's docs, not observed
+behavior — and every test in `tests/buzz-integration/` exercises a fake-CLI fixture, never a
+real binary or relay. No keypair exists and no npub has been minted. See
+`packages/buzz-integration/VERIFIED.md`, whose status line reads **PENDING**, for the full
+verification trail and what the operator still has to do. This module does not move past
+`in-dev` until that live round-trip (the plan's Task 8) runs.
+
+**Links:** [manifest](../modules/org-os-buzz/module.yaml) ·
+[verification trail](../packages/buzz-integration/VERIFIED.md) ·
+[design](superpowers/specs/2026-08-28-buzz-integration-design.md) ·
+package `packages/buzz-integration/`
+
+---
+
 ## The v5 core tranche
 
 The seven modules the v5 spec migrates first. Each proves a different module shape; none has a

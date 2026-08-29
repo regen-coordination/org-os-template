@@ -357,6 +357,30 @@ the sync — global edits to managed copies are overwritten on the next sync.
 Instances that adopt Berd add their own personas to their `.agents/agents/`;
 the sync script arrives with the framework via `sync:upstream`.
 
+#### Berd Skills Bridge (`.agents/skills/`)
+
+Alongside personas, `modules/org-os-berd/module.yaml` also owns a curated **exposure list**:
+its materialization entries (`skills/<name>: .agents/skills/<name>`) name which framework
+skills are mirrored into Berd's project-local Agent Skills directory — today `org-os-init`,
+`meeting-processor`, `heartbeat-monitor`, `knowledge-curator`, and `funding-scout`.
+`scripts/sync-skills-berd.mjs` (`npm run sync:skills:berd`) performs the mirror: a one-way,
+marker-guarded copy of the same shape as `sync-agents.mjs` — each materialized `SKILL.md`
+gains an injected `managed_by: org-os` frontmatter line, and only files carrying that marker
+are overwritten on re-sync (hand-authored targets are skipped; `--adopt` takes one over).
+`--check` byte-compares the mirror against the manifest without writing, and is wired into
+`npm run selftest` as an optional step (`skipKey: "berd"`) so drift between the manifest's
+exposure list and the committed `.agents/skills/` tree fails CI rather than going unnoticed.
+`.agents/skills/feynman/` is untouched by any of this — it is hand-authored, carries no
+`managed_by` marker, and the sync's hand-authored-detection skips it by design.
+
+`.agents/skills/` is Berd/Goose's project-local Agent Skills discovery path per
+`docs/integrations/berd.md`, confirmed there from Berd's own Tauri scanner source and Goose's
+own source — two independent implementations that agree. That verification is source-level,
+not a runtime observation: **no skill mirrored by this bridge has yet been confirmed to load
+or run inside an actual Berd session.** Live GUI confirmation, and any pruning of the exposure
+list that follows from it, are deferred to the operator (see `docs/integrations/berd.md` §
+"Skills dir").
+
 ### Autonomous Actions (no approval needed)
 
 - Read any workspace file

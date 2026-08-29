@@ -42,11 +42,17 @@ function run(name, cmd, args, { optional = false, skipKey = null } = {}) {
 
   // Check if the underlying script file exists (optional checks)
   if (optional) {
-    const scriptIdx = args.findIndex((a) => a.endsWith(".mjs") || a.endsWith(".js"));
+    const scriptIdx = args.findIndex(
+      (a) => a.endsWith(".mjs") || a.endsWith(".js"),
+    );
     if (scriptIdx > -1) {
       const scriptPath = path.resolve(rootDir, args[scriptIdx]);
       if (!existsSync(scriptPath)) {
-        results.push({ name, status: "SKIP", detail: `script missing: ${args[scriptIdx]}` });
+        results.push({
+          name,
+          status: "SKIP",
+          detail: `script missing: ${args[scriptIdx]}`,
+        });
         return;
       }
     }
@@ -66,8 +72,16 @@ function run(name, cmd, args, { optional = false, skipKey = null } = {}) {
   if (result.status === 0) {
     results.push({ name, status: "PASS", detail: "" });
   } else {
-    const tail = (result.stderr || result.stdout || "").trim().split("\n").slice(-3).join(" | ");
-    results.push({ name, status: "FAIL", detail: `exit ${result.status}: ${tail}` });
+    const tail = (result.stderr || result.stdout || "")
+      .trim()
+      .split("\n")
+      .slice(-3)
+      .join(" | ");
+    results.push({
+      name,
+      status: "FAIL",
+      detail: `exit ${result.status}: ${tail}`,
+    });
   }
 }
 
@@ -75,7 +89,9 @@ console.log(`Running selftest from ${rootDir}\n`);
 
 // Mandatory checks
 run("validate:structure", "node", ["scripts/validate-structure.mjs"]);
-run("validate:schemas", "node", ["scripts/validate-identity.mjs"], { optional: true });
+run("validate:schemas", "node", ["scripts/validate-identity.mjs"], {
+  optional: true,
+});
 run("analyze:instances", "node", ["scripts/analyze-instances.mjs"]);
 
 // Optional advisory checks
@@ -84,21 +100,42 @@ run("check:divergence", "node", ["scripts/check-divergence.mjs"], {
   skipKey: "divergence",
 });
 
+run(
+  "berd skills mirror in sync",
+  "node",
+  ["scripts/sync-skills-berd.mjs", "--check"],
+  {
+    optional: true,
+    skipKey: "berd",
+  },
+);
+
 // Optional capability checks (introduced by later phases)
-run("clone:framework --dry", "node", [
-  "scripts/clone-framework.mjs",
-  "--target",
-  "/tmp/selftest-clone-" + process.pid,
-  "--config",
-  "tests/fixtures/instance-config.yaml",
-  "--dry",
-], { optional: true, skipKey: "clone" });
+run(
+  "clone:framework --dry",
+  "node",
+  [
+    "scripts/clone-framework.mjs",
+    "--target",
+    "/tmp/selftest-clone-" + process.pid,
+    "--config",
+    "tests/fixtures/instance-config.yaml",
+    "--dry",
+  ],
+  { optional: true, skipKey: "clone" },
+);
 
 // Node test suites (if tests/ exists)
 if (existsSync(path.join(rootDir, "tests"))) {
-  run("node --test tests/", "node", ["--test", "tests/**/*.test.mjs"], { skipKey: "tests" });
+  run("node --test tests/", "node", ["--test", "tests/**/*.test.mjs"], {
+    skipKey: "tests",
+  });
 } else {
-  results.push({ name: "node --test tests/", status: "SKIP", detail: "no tests/ directory" });
+  results.push({
+    name: "node --test tests/",
+    status: "SKIP",
+    detail: "no tests/ directory",
+  });
 }
 
 // Package suites live outside the root `tests/**` glob, so `npm test` cannot
@@ -113,7 +150,11 @@ if (existsSync(path.join(rootDir, "tests"))) {
 // suite still gates every push there.
 const adminDir = path.join(rootDir, "packages", "admin");
 if (!existsSync(path.join(adminDir, "package.json"))) {
-  results.push({ name: "test:admin", status: "SKIP", detail: "packages/admin not present" });
+  results.push({
+    name: "test:admin",
+    status: "SKIP",
+    detail: "packages/admin not present",
+  });
 } else if (!existsSync(path.join(adminDir, "node_modules"))) {
   results.push({
     name: "test:admin",
@@ -126,7 +167,10 @@ if (!existsSync(path.join(adminDir, "package.json"))) {
 
 // Report
 console.log("\nResults:");
-let passed = 0, failed = 0, warned = 0, skipped = 0;
+let passed = 0,
+  failed = 0,
+  warned = 0,
+  skipped = 0;
 for (const r of results) {
   const icon = { PASS: "✓", FAIL: "✗", WARN: "⚠", SKIP: "·" }[r.status];
   const detail = r.detail ? `  ${r.detail}` : "";
@@ -137,7 +181,9 @@ for (const r of results) {
   else skipped++;
 }
 
-console.log(`\n  ${passed} passed, ${failed} failed, ${warned} warnings, ${skipped} skipped`);
+console.log(
+  `\n  ${passed} passed, ${failed} failed, ${warned} warnings, ${skipped} skipped`,
+);
 
 if (failed > 0) process.exit(1);
 if (warned > 0) process.exit(2);

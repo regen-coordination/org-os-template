@@ -70,8 +70,51 @@ report's own fix-list.
 - [ ] Investigate: git commit timestamps run ~2 weeks behind the system clock (commits stamped 2026-07-19 while `date` says 2026-08-02) — dashboard "N days ago" math will read wrong until resolved
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
+### Berd bridge dogfood acceptance (module #4 → live)
+
+- [ ] **Prerequisite — live GUI confirmation of the discovery path:** `docs/integrations/berd.md` verified `.agents/skills/` from Berd's own Tauri scanner and Goose's own source, but marks live confirmation PENDING OPERATOR. The operator opens this repo as a Berd project and confirms the five bridged skills are discovered alongside `feynman`.
+- [ ] **Prerequisite — Goose verification + pruning pass (plan Task 5):** exercise each of the five bridged skills once under Goose, record the per-skill verdict in a "Goose verification" table in `docs/integrations/berd.md`, and prune any that fail from `modules/org-os-berd/module.yaml`'s exposure list, then re-run `npm run sync:skills:berd -- --check`. Note that until this runs, the exposure list names skills that are materialized but unverified — which is exactly why the module is catalogued `in-dev` rather than `pilot`.
+- [ ] One full org-os session (initialize → work → close) driven from Berd/Goose
+- [ ] 5 real work uses of bridged skills from Berd: ☐ ☐ ☐ ☐ ☐
+      (on completion: flip docs/MODULES.md org-os-berd to **live**, update the
+      site mirror + QUEUE entry; then evaluate the Buzz×Berd v2 trigger —
+      both acceptances passed?)
+
+### Buzz lane dogfood acceptance (module #3 → live)
+
+- [ ] **Prerequisite — plan Task 1 (pin and verify):** clone/pin `block/buzz`, bring up its
+      dev relay, mint the agent keypair, exercise `buzz-cli` post/read directly, and fill in
+      `packages/buzz-integration/VERIFIED.md`'s pending table. `CLI_MAP` in `lib/buzz.mjs`
+      currently encodes unverified documented defaults and must be reconciled against what is
+      actually observed — never guessed.
+- [ ] **Prerequisite — record the npub:** replace the PENDING marker in `TOOLS.md`'s Buzz
+      section with the agent's real npub once Task 1 mints a keypair. The `nsec` never goes in
+      any tracked file — only `.env` as `BUZZ_NSEC`.
+- [ ] **Prerequisite — plan Task 8 Step 1 (the live round-trip):** with the relay up and `.env`
+      filled, `npm run buzz:doctor` → all ✓; post a digest; `npm run buzz:read` → the message
+      appears. Append the transcript to `VERIFIED.md`.
+- [ ] **Prerequisite — sync the machine-local skill mirror (after this branch merges):**
+      `~/.claude/skills/initialize/SKILL.md` and `~/.claude/skills/close/SKILL.md` need the
+      same two hook steps that landed in `.claude/commands/initialize.md` and `close.md` —
+      some tools (e.g. Zed/claude-acp) scan only the user-level copy, not the project one, so
+      until this syncs the hooks won't fire there. Deliberately not done from this worktree:
+      the branch is unmerged, and mutating machine-local state ahead of that would apply the
+      hooks before the code they depend on has landed. Same gap, in-repo: `skills/initialize/SKILL.md`
+      never received the read-back hook (`sync-commands.mjs` deliberately skips generating a
+      command-skill for `/initialize` since this real skill already owns that name — it logs
+      "hermes: skip /initialize (a real skill already provides it)"), while
+      `skills/commands/close/SKILL.md` did receive the post hook; and `skills/org-os-init/SKILL.md`
+      (one of the five skills bridged into Berd) carries neither hook. Net effect: close posts but
+      initialize never reads, so the marker never advances and the acceptance below cannot be
+      satisfied from Hermes or Berd surfaces until both are patched too.
+- [ ] 5 consecutive real sessions where /close posts and /initialize reads with zero
+      manual intervention: ☐ ☐ ☐ ☐ ☐ (tick per session; on the 5th, flip
+      docs/MODULES.md org-os-buzz to **live**, update the site mirror + QUEUE entry, and
+      re-evaluate `lifecycle_status` in data/packages-matrix.yaml)
+
 ### Orchestration (multi-instance)
 - [ ] Weekly: run `npm run analyze:instances` and review drift report
+- [ ] **Known issue: `analyze-instances.mjs` overwrites the tracked drift report with placeholders when run from a worktree** — running `npm run selftest` or `npm run analyze:instances` from a git worktree (not the primary checkout) rewrites `memory/reports/instances-drift-<today>.md`, replacing real drift data with "Not locally scannable" for every instance. Root cause: `frameworkRoot` is derived from `process.argv[1]` (`scripts/analyze-instances.mjs:18`) and resolves each instance's `local_path` relative to the worktree root instead of the primary checkout, so no sibling org-instance dir is ever found; the unconditional `writeFileSync` (`scripts/analyze-instances.mjs:246`) then writes the placeholder report anyway. Found 2026-08-29 during Task 4 (berd integration) selftest wiring. Mitigation: `git restore` the report file after any worktree-run gate, never stage it. Real fix: skip the write (or gate it behind at least one instance actually being scannable) instead of silently overwriting real data with placeholders.
 - [ ] Review skill-promotion candidates (see `data/skills-matrix.yaml` where `promotion_status: candidate`)
   - `safe-treasury`, `hats-governance`, `gardens-governance`, `karma-reputation`, `eip4824-identity` — DAO modules in dao-os; evaluate for framework
 - [x] ~~`research` promotion — promoted to framework v0.5 (2026-07-15 consolidation; 3 instance copies reconciled)~~
