@@ -116,9 +116,10 @@ do real work (plan Task 5's per-skill verdict + pruning pass) and the 5-use dogf
 ### org-os-buzz — Buzz Agent Lane
 
 **What it is.** A signed, cryptographically-provenanced comms lane between org-os sessions and
-a local [Buzz](https://github.com/block/buzz) relay: `/close` posts a SHA-tagged digest of the
-session to `#org-os-dev`, `/initialize` reads the channel back. Fail-open everywhere — the lane
-never blocks a session.
+a [Buzz](https://github.com/block/buzz) relay — since 2026-08-29 the operator's hosted
+community, with the local compose relay as dev sandbox: `/close` posts a SHA-tagged digest of
+the session to `#org-os-dev`, `/initialize` reads the channel back. Fail-open everywhere — the
+lane never blocks a session.
 
 **How it works.** `packages/buzz-integration/lib/buzz.mjs` is a thin wrapper that shells out to
 a pinned `buzz` binary (JSON in/out) for `postEvent`, `readChannel`, and `status`; nothing
@@ -134,7 +135,10 @@ the real `buzz` binary: `npm run buzz:doctor` reports all four checks green and 
 `npm run buzz:post` posted a SHA-tagged digest, and `npm run buzz:read` read it back with its
 `org-os: sha=… source=org-os-session truncated=false` provenance trailer intact. `CLI_MAP` in
 `lib/buzz.mjs` now encodes the observed CLI surface, not documented guesses — see
-`packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**) for the full trail. Every
+`packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**) for the full trail. Graduated
+the same day to the operator's hosted community relay — redaction review passed, operator
+approved digests as-is, round-trip re-verified hosted (DECISIONS.md "Buzz lane graduated").
+Every
 session surface — project commands, in-repo skills, the Berd-bridged `org-os-init` mirror, and
 the machine-local `~/.claude/skills/` mirrors some tools (e.g. Zed/claude-acp) read instead of
 the project copy — carries both hooks as of 2026-08-29. What remains before `live`: the
