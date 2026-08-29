@@ -14,6 +14,19 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-08-29 · Interfaces contract — two planes, four surfaces; legacy apps pruned
+
+**Status:** active
+**Scope:** framework, operator-ux, architecture
+
+**Decision** — org-os declares one interface contract with two planes: a git-native **data plane** (`data/*.yaml`, `.well-known/`, `graphify-out/`, docs/memory — read by build-time consumers, written only by trusted local processes as ordinary commits) and a **live plane** whose only server is the admin app's Hono API — every current and future live surface (admin SPA, chat bots, MCP) is a *client* of it. Four canonical surfaces: **CLI · KMS · Admin · Conversational**. A new interface is a new client of a plane; a new server or write path requires amending the spec. The superseded surfaces — `packages/dashboard`, `agents-app`, `paperclip-agents-app`, `webapps` + orphaned `PAPERCLIP_DEPLOYMENT_GUIDE.md` — are deleted outright in **0.6.0** (`feat/interfaces-prune`, merging after the 0.5.1 cut), **overturning the 2026-08-02 modularization ruling** that kept them as npm workspaces.
+
+**Why** — Six interface experiments in six months, each inventing its own access path (two parallel Fastify servers, static HTML snapshots, template webapps); v0.5.0 shipped the surfaces that won but nothing stated the rule preventing the next bespoke server. Delete-outright beats attic/deprecate-in-place: git history preserves everything and the tree stays legible. The 08-02 ruling's premise (no shipped alternative) expired when admin M1 and hermes landed. Alternatives considered: a physical `packages/interfaces/` restructure (rejected — churns shipped paths for cosmetics) and an inventory-only doc (rejected — doesn't prevent recurrence).
+
+**Refs** — spec `docs/superpowers/specs/2026-08-29-org-os-interfaces-design.md` (commits `efeb225`, `099c2ba`) · QUEUE v0.6 Active #6 (`0d08f5d`) · `docs/MODULES.md` §Distributions and surfaces · supersedes the "Not modules" workspaces line of `2026-08-02-org-os-v5-modularization-design.md` · `memory/2026-08-29.md`
+
+---
+
 ## 2026-08-29 · v0.5.0 shipped — the convergence decision executed
 
 **Status:** active
