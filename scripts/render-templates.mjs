@@ -98,6 +98,8 @@ const data = {
 
 const sources = [
   { template: "README.framework.md", target: "README.md" },
+  // Session/adoption one-pager (WS-I I4) — rendered so its numbers stay live.
+  { template: "session-one-pager.md", target: "docs/sessions/2026-09-10-one-pager.md" },
 ];
 
 for (const { template, target } of sources) {

@@ -175,6 +175,38 @@ if (!dry) {
   }
 }
 
+// === Stage 4b: reset instance-owned registries + operator files ===
+// The copy in stage 2 brings the framework's LIVE data with it — members,
+// projects, ideas, ecosystems, relationships, the operator profile, tool
+// endpoints and the federation frontier cache. None of that is the new org's.
+// Verified 2026-08-29 (WS-I recipe run): without this stage a fresh instance
+// carried the maintainer's member entry, 13 framework projects and the
+// framework's own SOUL — the Harbor Bakery B4/B5 leak, surviving in the
+// recommended path. Identity has to be stripped by construction, not by
+// operator diligence; tests/clone-framework-health.test.mjs pins it.
+const today = new Date().toISOString().slice(0, 10);
+const operatorName = config.operator?.name || "TODO: operator name";
+const registryResets = {
+  "data/members.yaml": `schema_version: "2.0"\n\n# Members Registry — seeded with the bootstrap operator; add your team.\n\nmembers:\n  - id: "operator"\n    name: ${JSON.stringify(operatorName)}\n    role: "Operator"\n    layer: "core"\n    status: "active"\n    joined: "${today}"\n`,
+  "data/projects.yaml": `schema_version: "2.0"\n\n# Projects Registry — fill via the bootstrap-interviewer skill (BOOTSTRAP.md Phase 1).\n\nprojects: []\n`,
+  "data/ideas.yaml": `schema_version: "2.0"\n\nideas: []\n`,
+  "data/relationships.yaml": `schema_version: "2.0"\n\nrelationships: []\n`,
+  "data/ecosystems.yaml": `ecosystems: []\n`,
+  "SOUL.md": `# SOUL.md — Who We Are\n\n_This file defines the character, values, and voice of ${config.org.name}. It grounds the agent in the org's shared identity._\n\n---\n\n## Mission\n\n${config.org.short_description || "TODO: what this organization exists to do."}\n\n## Values\n\n- TODO\n\n## Voice\n\n- TODO\n\n_Seeded by clone-framework on ${today}; the bootstrap-interviewer pass (BOOTSTRAP.md Phase 1) gives this substance._\n`,
+  "USER.md": `# USER.md — About Your Operator\n\n_The person you're helping. Update as preferences surface through working together._\n\n---\n\n- **Name:** ${operatorName}\n${config.operator?.email ? `- **Email:** ${config.operator.email}\n` : ""}- **Role:** Operator\n\n_Seeded by clone-framework on ${today}._\n`,
+  "TOOLS.md": `# TOOLS.md — Local Tool Notes\n\n_Skills define how tools work. This file is for your specifics — the setup unique to this node. Never put credentials here — reference where they're stored._\n\n---\n\n## API Endpoints\n\n_(none configured yet)_\n\n## Channels\n\n_(none configured yet)_\n`,
+};
+log("stage 4b", `resetting ${Object.keys(registryResets).length} instance-owned registries + operator files`);
+if (!dry) {
+  for (const [name, content] of Object.entries(registryResets)) {
+    const p = path.join(target, name);
+    if (existsSync(path.dirname(p))) writeFileSync(p, content);
+  }
+  // The frontier cache is the FRAMEWORK's view of its peers, not the instance's.
+  const frontier = path.join(target, "data", "federation", "frontier");
+  if (existsSync(frontier)) rmSync(frontier, { recursive: true, force: true });
+}
+
 // === Stage 5: materialize packages + skills per config ===
 // Packages: filter packages/<id>/ to only enabled ones from config.packages
 const enabledPackages = config.packages || {};

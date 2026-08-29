@@ -67,13 +67,18 @@ fails the build if it reappears. That guard exists because until 2026-08-28 this
 instance with 7 blockers seconds after creation, the worst being that it published *the
 framework's* identity as its own.
 
+Driving this with an AI agent (Claude Code, Cursor, a ChatGPT connector) is the normal case —
+[`docs/ADOPT-WITH-AN-AGENT.md`](docs/ADOPT-WITH-AN-AGENT.md) is the copy-paste recipe, and
+`BOOTSTRAP.md` has the config template plus the full first-run sequence.
+
 The in-place alternative (`npm run setup`) converts a fork you have already made. It is an
-interactive TTY-only wizard, not scriptable, and a 2026-08-21 clean-room test found the newcomer
-path through it broken in 7 Blocker-level ways — including leaving the fork's own identity and
-data in place while both validation commands reported a full pass. Some of those causes are fixed
-by the cloning-engine work above; the wizard itself has not been re-tested end to end, so prefer
-the clone. Evidence: `memory/reports/clean-room-bootstrap-2026-08-21.md`. Full first-run sequence:
-`BOOTSTRAP.md`.
+interactive **TTY-only** wizard — agents and CI shells cannot drive it — asking nine prompts:
+org type · name · description · base URL · packages · agent runtime · network · emoji · Notion.
+A 2026-08-21 clean-room test found the newcomer path through it broken in 7 Blocker-level ways —
+including leaving the fork's own identity and data in place while both validation commands
+reported a full pass. Some of those causes are fixed by the cloning-engine work above; the wizard
+itself has not been re-tested end to end, so prefer the clone. Evidence:
+`memory/reports/clean-room-bootstrap-2026-08-21.md`.
 
 ### You're a **contributor** to the framework
 
