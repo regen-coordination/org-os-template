@@ -8,27 +8,46 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
 
 // intent → argv builder. Defaults are the Task-1-verified invocations.
 const CLI_MAP = {
-  post: (c, { content, tags }) => ["post", "--channel", c.channel, "--content", content,
-    ...Object.entries(tags ?? {}).flatMap(([k, v]) => ["--tag", `${k}=${v}`]), "--json"],
-  read: (c, { since }) => ["read", "--channel", c.channel,
-    ...(since ? ["--since", String(since)] : []), "--json"],
+  post: (c, { content, tags }) => [
+    "post",
+    "--channel",
+    c.channel,
+    "--content",
+    content,
+    ...Object.entries(tags ?? {}).flatMap(([k, v]) => ["--tag", `${k}=${v}`]),
+    "--json",
+  ],
+  read: (c, { since }) => [
+    "read",
+    "--channel",
+    c.channel,
+    ...(since ? ["--since", String(since)] : []),
+    "--json",
+  ],
   status: (c) => ["status", "--relay", c.relayUrl, "--json"],
 };
 
-// Parse one raw .env value: strip a surrounding quote pair (leaving any "#"
-// inside it untouched), else strip a trailing " # comment" and whitespace.
+// Parse one raw .env value: if it opens with a quote, take everything up to
+// the matching closing quote (leaving any "#" inside untouched, and
+// discarding anything — including a trailing comment — after the close).
+// Otherwise strip from the first "#" onward (dotenv treats "#" as a comment
+// marker whether or not it's preceded by whitespace) and trim.
 function parseEnvValue(raw) {
   const v = raw.trim();
-  if (v.length >= 2) {
-    const first = v[0];
-    const last = v[v.length - 1];
-    if ((first === '"' || first === "'") && last === first) return v.slice(1, -1);
+  const first = v[0];
+  if (first === '"' || first === "'") {
+    const closeIdx = v.indexOf(first, 1);
+    if (closeIdx !== -1) return v.slice(1, closeIdx);
   }
-  return v.replace(/\s+#.*$/, "").trim();
+  const hashIdx = v.indexOf("#");
+  return (hashIdx === -1 ? v : v.slice(0, hashIdx)).trim();
 }
 
 // Parse .env text into a flat key→value map. Never throws on malformed
@@ -48,7 +67,8 @@ export function loadConfig({ root = ROOT, env = process.env } = {}) {
   let fileVars = {};
   try {
     const envPath = path.join(root, ".env");
-    if (existsSync(envPath)) fileVars = parseEnvFile(readFileSync(envPath, "utf8"));
+    if (existsSync(envPath))
+      fileVars = parseEnvFile(readFileSync(envPath, "utf8"));
   } catch {
     // Any read failure (EISDIR, EACCES, etc.) is treated as "no .env" —
     // loadConfig must never throw; safe defaults / env vars still apply.
@@ -67,11 +87,15 @@ function invoke(intent, args, cfg) {
   try {
     const c = cfg ?? loadConfig();
     const r = spawnSync(c.bin, CLI_MAP[intent](c, args), {
-      encoding: "utf8", timeout: 15000,
+      encoding: "utf8",
+      timeout: 15000,
       env: { ...process.env, BUZZ_RELAY_URL: c.relayUrl, BUZZ_NSEC: c.nsec },
     });
     if (r.error || r.status !== 0)
-      return { ok: false, error: r.error?.message ?? r.stderr?.trim() ?? `exit ${r.status}` };
+      return {
+        ok: false,
+        error: r.error?.message ?? r.stderr?.trim() ?? `exit ${r.status}`,
+      };
     return { ok: true, ...JSON.parse(r.stdout) };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -87,11 +111,24 @@ export function status(cfg) {
   try {
     const c = cfg ?? loadConfig();
     const bin = !spawnSync(c.bin, ["--version"], { encoding: "utf8" }).error;
-    if (!bin) return { ok: false, checks: { bin: false, relay: false, key: false, channel: false } };
+    if (!bin)
+      return {
+        ok: false,
+        checks: { bin: false, relay: false, key: false, channel: false },
+      };
     const relay = invoke("status", {}, c).ok;
-    const checks = { bin, relay, key: Boolean(c.nsec), channel: Boolean(c.channel) };
+    const checks = {
+      bin,
+      relay,
+      key: Boolean(c.nsec),
+      channel: Boolean(c.channel),
+    };
     return { ok: Object.values(checks).every(Boolean), checks };
   } catch (e) {
-    return { ok: false, error: e.message, checks: { bin: false, relay: false, key: false, channel: false } };
+    return {
+      ok: false,
+      error: e.message,
+      checks: { bin: false, relay: false, key: false, channel: false },
+    };
   }
 }

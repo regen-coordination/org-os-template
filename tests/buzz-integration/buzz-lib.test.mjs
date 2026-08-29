@@ -1,12 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync, chmodSync, mkdirSync } from "node:fs";
+import {
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  chmodSync,
+  mkdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-const { postEvent, readChannel, status, loadConfig } = await import(
-  "../../packages/buzz-integration/lib/buzz.mjs"
-);
+const { postEvent, readChannel, status, loadConfig } =
+  await import("../../packages/buzz-integration/lib/buzz.mjs");
 
 function fakeCli(dir, reply) {
   const bin = path.join(dir, "fake-buzz-cli.mjs");
@@ -42,13 +47,18 @@ function fakeCliRaw(dir, stdout) {
 }
 
 const cfg = (dir, reply) => ({
-  bin: fakeCli(dir, reply), relayUrl: "ws://localhost:3000",
-  channel: "org-os-dev", nsec: "nsec1fake",
+  bin: fakeCli(dir, reply),
+  relayUrl: "ws://localhost:3000",
+  channel: "org-os-dev",
+  nsec: "nsec1fake",
 });
 
 test("postEvent invokes the CLI with channel + content and parses the reply", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
-  const r = postEvent({ content: "hello", tags: { sha: "abc123" } }, cfg(dir, { id: "evt1" }));
+  const r = postEvent(
+    { content: "hello", tags: { sha: "abc123" } },
+    cfg(dir, { id: "evt1" }),
+  );
   assert.equal(r.ok, true);
   assert.equal(r.id, "evt1");
   const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
@@ -58,7 +68,12 @@ test("postEvent invokes the CLI with channel + content and parses the reply", ()
 
 test("readChannel passes since and returns events", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
-  const r = readChannel({ since: 1756300000 }, cfg(dir, { events: [{ id: "e", created_at: 1, pubkey: "p", content: "c" }] }));
+  const r = readChannel(
+    { since: 1756300000 },
+    cfg(dir, {
+      events: [{ id: "e", created_at: 1, pubkey: "p", content: "c" }],
+    }),
+  );
   assert.equal(r.ok, true);
   assert.equal(r.events.length, 1);
   // Important 3 fix: actually verify "passes since" — the test's own name
@@ -70,14 +85,25 @@ test("readChannel passes since and returns events", () => {
 });
 
 test("missing binary → ok:false, never throws", () => {
-  const r = status({ bin: "/nonexistent/buzz-cli", relayUrl: "ws://x", channel: "c", nsec: "n" });
+  const r = status({
+    bin: "/nonexistent/buzz-cli",
+    relayUrl: "ws://x",
+    channel: "c",
+    nsec: "n",
+  });
   assert.equal(r.ok, false);
 });
 
 test("loadConfig reads .env lines and env vars override", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
-  writeFileSync(path.join(dir, ".env"), "BUZZ_RELAY_URL=ws://from-file:3000\nBUZZ_CHANNEL=org-os-dev\n");
-  const c = loadConfig({ root: dir, env: { BUZZ_RELAY_URL: "ws://from-env:3000" } });
+  writeFileSync(
+    path.join(dir, ".env"),
+    "BUZZ_RELAY_URL=ws://from-file:3000\nBUZZ_CHANNEL=org-os-dev\n",
+  );
+  const c = loadConfig({
+    root: dir,
+    env: { BUZZ_RELAY_URL: "ws://from-env:3000" },
+  });
   assert.equal(c.relayUrl, "ws://from-env:3000");
   assert.equal(c.channel, "org-os-dev");
 });
@@ -114,7 +140,10 @@ test("CRITICAL: loadConfig never throws when .env is unreadable (EACCES)", () =>
 
 test(".env parsing: quoted values have surrounding quotes stripped", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
-  writeFileSync(path.join(dir, ".env"), `BUZZ_CHANNEL="org-os-dev"\nBUZZ_NSEC='nsec1abc'\n`);
+  writeFileSync(
+    path.join(dir, ".env"),
+    `BUZZ_CHANNEL="org-os-dev"\nBUZZ_NSEC='nsec1abc'\n`,
+  );
   const c = loadConfig({ root: dir, env: {} });
   assert.equal(c.channel, "org-os-dev");
   assert.equal(c.nsec, "nsec1abc");
@@ -122,7 +151,10 @@ test(".env parsing: quoted values have surrounding quotes stripped", () => {
 
 test(".env parsing: trailing comment on an unquoted value is stripped", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
-  writeFileSync(path.join(dir, ".env"), `BUZZ_CHANNEL=org-os-dev # the dev channel\n`);
+  writeFileSync(
+    path.join(dir, ".env"),
+    `BUZZ_CHANNEL=org-os-dev # the dev channel\n`,
+  );
   const c = loadConfig({ root: dir, env: {} });
   assert.equal(c.channel, "org-os-dev");
 });
@@ -145,7 +177,10 @@ test(".env parsing: 'export KEY=value' prefix is recognized", () => {
 
 test(".env parsing: CRLF line endings do not break parsing", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
-  writeFileSync(path.join(dir, ".env"), "BUZZ_CHANNEL=org-os-dev\r\nBUZZ_RELAY_URL=ws://crlf:3000\r\n");
+  writeFileSync(
+    path.join(dir, ".env"),
+    "BUZZ_CHANNEL=org-os-dev\r\nBUZZ_RELAY_URL=ws://crlf:3000\r\n",
+  );
   const c = loadConfig({ root: dir, env: {} });
   assert.equal(c.channel, "org-os-dev");
   assert.equal(c.relayUrl, "ws://crlf:3000");
@@ -155,9 +190,26 @@ test(".env parsing: blank lines and comment-only lines are ignored", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
   // Distinguishing value (not the built-in default) so a silent
   // default-fallback can't masquerade as a real, successful parse.
-  writeFileSync(path.join(dir, ".env"), `\n# a full-line comment\nBUZZ_NSEC=nsec1blanktest\n\n`);
+  writeFileSync(
+    path.join(dir, ".env"),
+    `\n# a full-line comment\nBUZZ_NSEC=nsec1blanktest\n\n`,
+  );
   const c = loadConfig({ root: dir, env: {} });
   assert.equal(c.nsec, "nsec1blanktest");
+});
+
+test(".env parsing: comment with no preceding space is still stripped", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
+  writeFileSync(path.join(dir, ".env"), `BUZZ_CHANNEL=org-os-dev# note\n`);
+  const c = loadConfig({ root: dir, env: {} });
+  assert.equal(c.channel, "org-os-dev");
+});
+
+test(".env parsing: quoted value with a trailing comment strips both", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
+  writeFileSync(path.join(dir, ".env"), `BUZZ_CHANNEL="org-os-dev" # note\n`);
+  const c = loadConfig({ root: dir, env: {} });
+  assert.equal(c.channel, "org-os-dev");
 });
 
 // --- IMPORTANT 2: fail-open coverage across postEvent/readChannel, not just
@@ -167,7 +219,10 @@ test("postEvent: non-zero exit CLI → ok:false, never throws", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
   const bin = fakeCliExit(dir, 1);
   assert.doesNotThrow(() => {
-    const r = postEvent({ content: "x" }, { bin, relayUrl: "ws://x", channel: "c", nsec: "n" });
+    const r = postEvent(
+      { content: "x" },
+      { bin, relayUrl: "ws://x", channel: "c", nsec: "n" },
+    );
     assert.equal(r.ok, false);
   });
 });
@@ -176,7 +231,10 @@ test("postEvent: non-JSON stdout → ok:false, never throws", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
   const bin = fakeCliRaw(dir, "not-json{{{");
   assert.doesNotThrow(() => {
-    const r = postEvent({ content: "x" }, { bin, relayUrl: "ws://x", channel: "c", nsec: "n" });
+    const r = postEvent(
+      { content: "x" },
+      { bin, relayUrl: "ws://x", channel: "c", nsec: "n" },
+    );
     assert.equal(r.ok, false);
   });
 });
@@ -185,7 +243,10 @@ test("readChannel: empty stdout → ok:false, never throws", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
   const bin = fakeCliRaw(dir, "");
   assert.doesNotThrow(() => {
-    const r = readChannel({ since: 1 }, { bin, relayUrl: "ws://x", channel: "c", nsec: "n" });
+    const r = readChannel(
+      { since: 1 },
+      { bin, relayUrl: "ws://x", channel: "c", nsec: "n" },
+    );
     assert.equal(r.ok, false);
   });
 });
@@ -194,7 +255,10 @@ test("readChannel: non-zero exit CLI → ok:false, never throws", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-"));
   const bin = fakeCliExit(dir, 2);
   assert.doesNotThrow(() => {
-    const r = readChannel({ since: 1 }, { bin, relayUrl: "ws://x", channel: "c", nsec: "n" });
+    const r = readChannel(
+      { since: 1 },
+      { bin, relayUrl: "ws://x", channel: "c", nsec: "n" },
+    );
     assert.equal(r.ok, false);
   });
 });
