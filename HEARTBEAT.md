@@ -99,7 +99,14 @@ report's own fix-list.
       some tools (e.g. Zed/claude-acp) scan only the user-level copy, not the project one, so
       until this syncs the hooks won't fire there. Deliberately not done from this worktree:
       the branch is unmerged, and mutating machine-local state ahead of that would apply the
-      hooks before the code they depend on has landed.
+      hooks before the code they depend on has landed. Same gap, in-repo: `skills/initialize/SKILL.md`
+      never received the read-back hook (`sync-commands.mjs` deliberately skips generating a
+      command-skill for `/initialize` since this real skill already owns that name — it logs
+      "hermes: skip /initialize (a real skill already provides it)"), while
+      `skills/commands/close/SKILL.md` did receive the post hook; and `skills/org-os-init/SKILL.md`
+      (one of the five skills bridged into Berd) carries neither hook. Net effect: close posts but
+      initialize never reads, so the marker never advances and the acceptance below cannot be
+      satisfied from Hermes or Berd surfaces until both are patched too.
 - [ ] 5 consecutive real sessions where /close posts and /initialize reads with zero
       manual intervention: ☐ ☐ ☐ ☐ ☐ (tick per session; on the 5th, flip
       docs/MODULES.md org-os-buzz to **live**, update the site mirror + QUEUE entry, and
