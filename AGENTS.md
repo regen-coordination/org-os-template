@@ -410,7 +410,9 @@ This workspace is part of a federation network (see `federation.yaml`).
 
 ## 11. Integration Points
 
-**Upstream**: [org-os-framework](https://github.com/regen-coordination/org-os-framework) — Standards, schemas, and patterns
+**Upstream**: [org-os-template](https://github.com/regen-coordination/org-os-template) — Standards, schemas, and patterns. This is the **canonical** framework repository and the only URL an instance's `upstream` remote should carry.
+
+This link previously pointed at `org-os-framework`, which is a **real but divergent** repository — and, as the v0.5 sweep established, the *same* repository as `organizational-os-framework` (the latter is a former name; GitHub redirects it). So the three names in circulation were really two repos: the canonical one, and one legacy repo answering to two names. That legacy repo was archived 2026-08-29 with a README pointing here. `packages/instance-doctor` detects either legacy URL on an instance's `upstream` remote and rewrites it to the canonical one.
 
 **Common Integrations** (see `federation.yaml`):
 
