@@ -1,15 +1,15 @@
 # Instance Drift Report — 2026-08-29
 
-**Generated:** 2026-08-29T00:28:56.764Z
+**Generated:** 2026-08-29T00:36:31.117Z
 **Framework version:** 0.5.0
 
 ## Summary
 
-- Instances tracked: 7
-- Cloned locally: 7
+- Instances tracked: 8
+- Cloned locally: 8
 - Production: 2
-- Total drift items: 22
-- Unmapped skills (not in skills-matrix): concurrent-safe-edit, deploy-verify, handoff, no-ai-slop, request-routing, telegram-crm-intake, voronoi-motif
+- Total drift items: 25
+- Unmapped skills (not in skills-matrix): concurrent-safe-edit, deploy-verify, handoff, no-ai-slop, request-routing, telegram-crm-intake, voronoi-motif, references, regen-toolkit
 - Unmapped packages (not in packages-matrix): knowledge-commons
 
 ## ReFi Barcelona (`refi-bcn-os`)
@@ -117,3 +117,18 @@
 - federation.yaml: yes (v3.5)
 
 **Drift:** none ✓
+
+## Regen Web3 Toolkit (`regen-toolkit`)
+
+- Type: Project
+- Maturity: beta
+- Skills: 10 (heartbeat-monitor, idea-scout, knowledge-curator, meeting-processor, org-os-init, references, regen-toolkit, research, schema-generator, workspace-improver)
+- Packages: 12 (agents-app, dashboard, egregore-core, koi-bridge, koi-opal-bridge, opal-bridge, operations, org-os-kms, paperclip-agents-app, regen-agents, toolkit-framework, webapps)
+- Data registries: 23
+- MASTERPLAN: yes
+- federation.yaml: yes (v?)
+
+**Drift (3):**
+- ⚠ undeclared_skill:references
+- ⚠ unmapped_skill:references
+- ⚠ unmapped_skill:regen-toolkit

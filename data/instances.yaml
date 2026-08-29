@@ -152,3 +152,22 @@ instances:
     data_registries_extra: []
     drift: []
     notes: "Acceptance-test instance for clone-framework.mjs (v3.5). Bootstrapped 2026-05-16 with config at tests/fixtures/bread-coop-config.yaml. Worker-owned bread cooperative (fictional/test). Lineage stamp populated. Not yet pushed to a remote."
+
+  - id: "regen-toolkit"
+    name: "Regen Web3 Toolkit"
+    type: "Project"
+    maturity: "beta"
+    repo: https://github.com/regen-coordination/regen-toolkit
+    local_path: "../regen-coordination-os/repos/regen-toolkit"
+    cloned: true
+    federation_network: "regen-coordination"
+    federation_role: "spoke"
+    masterplan_version: null
+    framework_version: null
+    last_sync: "2026-04-24"
+    agent_runtime: ["claude-code"]
+    skills_extra: ["regen-toolkit"]
+    packages: []
+    data_registries_extra: ["concepts", "deployment-requirements", "encyclopedia", "encyclopedia-salvaged", "feedback-process", "option-library", "resources", "resources-salvaged", "source-systems", "tracks"]
+    drift: []
+    notes: "Nested instance — lives at regen-coordination-os/repos/regen-toolkit as a linked repo with its OWN git remote (origin regen-coordination/regen-toolkit, plus a personal fork), on branch regen-toolkit-os. Registered 2026-08-29 after the v0.5 fleet sweep found it undeclared: it has federation.yaml + data/ + its own scaffold root (0e499a54), so it is a real instance, but every drift report and 'instances tracked' count before this entry was blind to it. Assess-only for now — the working tree carries ~2,275 uncommitted files, so the doctor correctly refuses to sync it; resolve that tree before any propagation. Its federation.yaml also predates the metadata block (no framework_version, no lineage stamp), which is why assess reports framework-version-missing."
