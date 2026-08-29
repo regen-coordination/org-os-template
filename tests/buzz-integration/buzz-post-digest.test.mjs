@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, chmodSync } from "node:fs";
+import { spawnSync, spawn, execSync } from "node:child_process";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  chmodSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +17,11 @@ const SCRIPT = path.resolve(
   __dirname,
   "../../packages/buzz-integration/scripts/post-digest.mjs",
 );
+const REPO_ROOT = path.resolve(__dirname, "../..");
+const expectedSha = execSync("git rev-parse --short HEAD", {
+  cwd: REPO_ROOT,
+  encoding: "utf8",
+}).trim();
 
 // Fake CLI fixture, reused verbatim from tests/buzz-integration/buzz-lib.test.mjs.
 function fakeCli(dir, reply) {
@@ -26,10 +37,11 @@ console.log(${JSON.stringify(JSON.stringify(reply))});`,
   return bin;
 }
 
-function run(args, { env, input } = {}) {
+function run(args, { env, input, cwd } = {}) {
   return spawnSync("node", [SCRIPT, ...args], {
     encoding: "utf8",
     input: input ?? "",
+    cwd,
     env: { ...process.env, ...env },
   });
 }
@@ -41,7 +53,7 @@ const baseEnv = (bin) => ({
   BUZZ_NSEC: "nsec1fake",
 });
 
-test("post-digest: posts stdin content with sha= tag present in fake-CLI argv", () => {
+test("post-digest: posts stdin content with the real repo HEAD sha tag present in fake-CLI argv", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
   const bin = fakeCli(dir, { id: "evt1" });
 
@@ -54,12 +66,12 @@ test("post-digest: posts stdin content with sha= tag present in fake-CLI argv", 
     argv.some((a) => a.includes("session digest content")),
     "expected content in argv",
   );
-  const tagIdx = argv.indexOf("--tag");
-  assert.ok(tagIdx !== -1, "expected --tag flag");
   const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
+  // M6: assert the *exact* real HEAD sha, not just a "sha=" prefix — a
+  // hardcoded fake sha must not be able to pass this test.
   assert.ok(
-    tags.some((t) => t.startsWith("sha=")),
-    "expected a sha= tag",
+    tags.includes(`sha=${expectedSha}`),
+    `expected sha=${expectedSha} in tags, got: ${tags.join(", ")}`,
   );
   assert.ok(
     tags.includes("source=org-os-session"),
@@ -101,4 +113,134 @@ test("post-digest: dead binary → skip line, exit 0", () => {
 
   assert.equal(r.status, 0);
   assert.match(r.stdout, /post failed.*skipped/);
+});
+
+// --- I1: a stdin that never sends EOF (an interactive TTY, a stuck upstream
+// pipe, a FIFO left open) must not hang the script forever. Bounded with an
+// outer race + hard kill so a genuine regression fails fast instead of
+// wedging the test run.
+
+test("I1: a stdin that never closes does not hang forever", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "should-not-happen" });
+
+  const child = spawn("node", [SCRIPT], {
+    env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stdout = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stdin.on("error", () => {}); // ignore EPIPE if the child exits first
+  // Deliberately never write to or close child.stdin — simulating a stdin
+  // that never sends EOF.
+
+  const outerTimeoutMs = 4000;
+  const result = await Promise.race([
+    new Promise((resolve) => child.on("exit", (code) => resolve({ code }))),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ timedOut: true }), outerTimeoutMs),
+    ),
+  ]);
+
+  if (result.timedOut) {
+    child.kill("SIGKILL");
+    child.stdin.destroy();
+    assert.fail(
+      `post-digest did not exit within ${outerTimeoutMs}ms against a stdin that never closes`,
+    );
+  }
+  child.stdin.destroy();
+  assert.equal(result.code, 0);
+  assert.match(stdout, /skipped/);
+});
+
+// --- I4: a bad --file (missing, a directory, or no value at all) must be
+// reported as a read/usage failure, not misreported as an "empty digest" —
+// those are different problems with different fixes.
+
+test("I4a: --file pointing at a nonexistent path reports a read failure, not empty digest", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "should-not-happen" });
+  const missing = path.join(dir, "does-not-exist.md");
+
+  const r = run(["--file", missing], { env: baseEnv(bin) });
+
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stdout, /empty digest/);
+  assert.match(r.stdout, /could not read/);
+});
+
+test("I4b: --file pointing at a directory reports a read failure, not empty digest", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "should-not-happen" });
+  const subdir = path.join(dir, "a-directory");
+  mkdirSync(subdir);
+
+  const r = run(["--file", subdir], { env: baseEnv(bin) });
+
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stdout, /empty digest/);
+  assert.match(r.stdout, /could not read/);
+});
+
+test("I4c: --file with no value reports a usage error, not empty digest", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "should-not-happen" });
+
+  const r = run(["--file"], { env: baseEnv(bin), input: "" });
+
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stdout, /empty digest/);
+  assert.match(r.stdout, /requires a path/);
+});
+
+// --- M3: the sha tag must reflect the script's own repo, not whatever
+// directory the caller happened to invoke it from.
+
+test("M3: sha is derived from the script's own repo root, not the caller's cwd", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-cwd" });
+  const otherCwd = mkdtempSync(path.join(tmpdir(), "buzz-cwd-elsewhere-"));
+
+  const r = run([], {
+    env: baseEnv(bin),
+    input: "digest posted from a different cwd",
+    cwd: otherCwd, // not a git repo — a cwd-derived sha would fail/differ here
+  });
+
+  assert.equal(r.status, 0);
+  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
+  assert.ok(
+    tags.includes(`sha=${expectedSha}`),
+    `expected sha=${expectedSha} even when invoked from ${otherCwd}, got: ${tags.join(", ")}`,
+  );
+});
+
+// --- M2: git's own stderr (e.g. "fatal: not a git repository") must never
+// leak into post-digest's stdio — it would show up in the /close transcript
+// ahead of the correct fail-open "sha unknown" outcome.
+
+test("M2: a failing git invocation does not leak its stderr into post-digest's output", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-git-fail" });
+  const fakeGitDir = mkdtempSync(path.join(tmpdir(), "buzz-fake-git-"));
+  const fakeGit = path.join(fakeGitDir, "git");
+  writeFileSync(
+    fakeGit,
+    `#!/usr/bin/env bash\necho "boom-from-fake-git-stderr" 1>&2\nexit 1\n`,
+  );
+  chmodSync(fakeGit, 0o755);
+
+  const r = run([], {
+    env: {
+      ...baseEnv(bin),
+      PATH: `${fakeGitDir}:${process.env.PATH}`,
+    },
+    input: "digest with a failing git lookup",
+  });
+
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stdout, /boom-from-fake-git-stderr/);
+  assert.doesNotMatch(r.stderr, /boom-from-fake-git-stderr/);
 });

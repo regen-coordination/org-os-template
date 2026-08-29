@@ -110,7 +110,10 @@ export const readChannel = (args, cfg) => invoke("read", args, cfg);
 export function status(cfg) {
   try {
     const c = cfg ?? loadConfig();
-    const bin = !spawnSync(c.bin, ["--version"], { encoding: "utf8" }).error;
+    const bin = !spawnSync(c.bin, ["--version"], {
+      encoding: "utf8",
+      timeout: 5000,
+    }).error;
     if (!bin)
       return {
         ok: false,
