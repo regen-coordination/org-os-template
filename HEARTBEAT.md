@@ -70,6 +70,14 @@ report's own fix-list.
 - [ ] Investigate: git commit timestamps run ~2 weeks behind the system clock (commits stamped 2026-07-19 while `date` says 2026-08-02) — dashboard "N days ago" math will read wrong until resolved
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
+### Berd bridge dogfood acceptance (module #4 → live)
+
+- [ ] One full org-os session (initialize → work → close) driven from Berd/Goose
+- [ ] 5 real work uses of bridged skills from Berd: ☐ ☐ ☐ ☐ ☐
+      (on completion: flip docs/MODULES.md org-os-berd to **live**, update the
+      site mirror + QUEUE entry; then evaluate the Buzz×Berd v2 trigger —
+      both acceptances passed?)
+
 ### Orchestration (multi-instance)
 - [ ] Weekly: run `npm run analyze:instances` and review drift report
 - [ ] **Known issue: `analyze-instances.mjs` overwrites the tracked drift report with placeholders when run from a worktree** — running `npm run selftest` or `npm run analyze:instances` from a git worktree (not the primary checkout) rewrites `memory/reports/instances-drift-<today>.md`, replacing real drift data with "Not locally scannable" for every instance. Root cause: `frameworkRoot` is derived from `process.argv[1]` (`scripts/analyze-instances.mjs:18`) and resolves each instance's `local_path` relative to the worktree root instead of the primary checkout, so no sibling org-instance dir is ever found; the unconditional `writeFileSync` (`scripts/analyze-instances.mjs:246`) then writes the placeholder report anyway. Found 2026-08-29 during Task 4 (berd integration) selftest wiring. Mitigation: `git restore` the report file after any worktree-run gate, never stage it. Real fix: skip the write (or gate it behind at least one instance actually being scannable) instead of silently overwriting real data with placeholders.
