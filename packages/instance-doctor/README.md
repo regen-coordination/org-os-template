@@ -1,21 +1,20 @@
 # @org-os/instance-doctor
 
-Assess any org-os instance, and plan a framework sync.
+Assess any org-os instance, and sync it from the framework.
 
 ```bash
 npm run doctor                              # assess the current workspace
 npm run doctor -- --dir ../refi-med-os      # assess a sibling (hub mode)
 npm run doctor -- sync --dir ../refi-med-os --dry-run
-npm run doctor -- sync --dir ../refi-med-os   # v0.5: unproven — see below
+npm run doctor -- sync --dir ../refi-med-os
 ```
 
-**Status (v0.5):** `assess` and `sync --dry-run` are proven against the live
-fleet (all six real instances + the framework). A **full `sync` is not**: its
-stage 5 delegates to `scripts/sync-upstream.mjs`, whose rebase assumes fork
-lineage, and every real instance is a scaffold with its own root commit — the
-2026-08-28 acceptance run (`memory/reports/ws-h-acceptance-2026-08-28.md`)
-demonstrated the failure and stopped the release tag until the claim was
-narrowed. The file-level overlay replacement targets v0.5.1.
+**Status:** `assess` is proven across the live fleet, and the **file-level
+overlay** sync is accepted end to end against a real instance (all nine stages
+green, identity and root commit intact —
+`memory/reports/overlay-acceptance-2026-08-29.md`). The overlay replaced a
+history-based rebase that assumed fork lineage and stranded scaffolded
+instances mid-rebase.
 
 Operator flow, scorecard reference and the full stage list live in
 [`skills/instance-doctor/SKILL.md`](../../skills/instance-doctor/SKILL.md).

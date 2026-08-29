@@ -12,16 +12,20 @@ section to a dated release heading and rewrites the comparison links — the hea
 `[Unreleased]` until then because `version:check` reads the first `[X.Y.Z]` heading as the
 current release and would fail against `package.json`.
 
-Still open for 0.5.1, not yet done: the **file-level overlay sync** that replaces the
-history-based one (see `[0.5.0]` → Known issues), the two 🔴 **kms data-loss** fixes, and the
-remaining admin defects (YAML reflow rewriting whole registries on a one-field edit; the
-per-registry write lock racing `.git/index.lock` across registries).
+Still open for 0.5.1, not yet done: the two 🔴 **kms data-loss** fixes, and the remaining admin
+defects (YAML reflow rewriting whole registries on a one-field edit; the per-registry write lock
+racing `.git/index.lock` across registries).
 
 ### Added
 
 - **`docs/ADOPT-WITH-AN-AGENT.md`** — the copy-paste recipe for driving setup from Claude Code,
   Cursor or a ChatGPT connector. Non-interactive end to end, so an agent can complete it without
   a TTY. Verified by executing it against a fresh clone of `main`.
+- **`data/instances.yaml` now declares `regen-toolkit`** — a real instance (own remote,
+  `federation.yaml`, 23 registries, own scaffold root) nested at
+  `regen-coordination-os/repos/regen-toolkit`. It was undeclared, so `analyze:instances`, every
+  drift report and the v0.5 fleet sweep were blind to it. Assess-only: its tree carries ~2,275
+  uncommitted files.
 - **Session kit** (`docs/sessions/`) — narrative, live demo script, FAQ, a one-pager rendered
   through `render:templates` so its numbers stay live, plus the branch-instance and scheduling
   drafts for the Regen Knowledge Commons session.
@@ -31,6 +35,15 @@ per-registry write lock racing `.git/index.lock` across registries).
 
 ### Fixed
 
+- **`doctor sync` can now actually sync an instance** — the 🔴 architectural Known Issue that
+  narrowed v0.5.0's reliability claim is closed. Stage 5 no longer delegates to a
+  `git pull --rebase upstream main` that assumes fork lineage; a **file-level overlay**
+  (`packages/instance-doctor/src/overlay.mjs`) copies framework-owned paths in, leaves everything
+  the organization owns untouched, never deletes, and lets the lineage stamp record which
+  framework commit was applied. Accepted end to end against `refi-med-os` — the very instance the
+  rebase corrupted — with all nine stages green, 0 blockers, identity and root commit intact, and
+  a second run reporting a clean no-op. Full record:
+  `memory/reports/overlay-acceptance-2026-08-29.md`.
 - **The recommended setup path shipped the framework's own content.** A fresh instance carried
   the maintainer's member entry, 13 framework projects, framework ideas/ecosystems/relationships,
   the framework's `SOUL.md` and API endpoints, and its federation frontier cache — the 2026-08-21

@@ -1,7 +1,7 @@
 ---
 name: instance-doctor
 version: 1.0.0
-description: Assess any org-os instance for identity, lineage, version, machinery, structure and freshness defects, and plan a framework sync — the guided assess → read scorecard → plan → verify flow. Assess and sync --dry-run are proven against the live fleet; a full sync is not yet (v0.5 known issue)
+description: Assess any org-os instance for identity, lineage, version, machinery, structure and freshness defects, then sync it from the framework — the guided assess → read scorecard → sync → verify flow. Assess is proven across the live fleet; the file-level overlay sync is accepted end to end against a real instance
 author: organizational-os
 category: infrastructure
 metadata:
@@ -23,10 +23,9 @@ Two verbs over any org-os instance:
   against all six real instances plus the framework itself (2026-08-28
   acceptance run).
 - **`sync`** — snapshots the instance, repairs the machinery it needs in order
-  to update itself, runs the framework's sync, migrates, re-assesses, and
-  writes a dated receipt. **Status (v0.5): only `--dry-run` is proven.** The
-  full run is known to fail against every real instance — see the status
-  callout in §3 before using it.
+  to update itself, overlays the framework's own files, migrates, re-assesses,
+  and writes a dated receipt. Aborts on the first failure, so an instance is
+  never left half-migrated.
 
 It exists because of a specific deadlock. Downstream instances are supposed to
 update themselves by running `scripts/sync-upstream.mjs`. As of the 2026-08-28
@@ -101,17 +100,18 @@ npm run doctor -- sync --dir ../refi-med-os --dry-run
 `--dry-run` is genuinely read-only — safe against dirty production trees. It
 prints the nine stages with exactly what each will do to this instance.
 
-> **Status (v0.5): stop at `--dry-run`.** The full run is architecturally
-> broken against every real instance: stage 5 delegates to
-> `scripts/sync-upstream.mjs`, whose `git pull --rebase upstream main` assumes
-> the instance is a *fork* — all six real instances are *scaffolds* with their
-> own root commit, so the rebase conflicts and leaves the repo mid-rebase
-> (verified in the 2026-08-28 acceptance run against refi-med-os, fully
-> recovered; `memory/reports/ws-h-acceptance-2026-08-28.md`). A file-level
-> overlay replacement targets v0.5.1. Until it lands, run the full sync only
-> against an instance that genuinely forked the framework's git history.
+> **Status:** the full sync works. Stage 5 used to delegate to a
+> `git pull --rebase upstream main` that assumes the instance is a *fork* —
+> every real instance is a *scaffold* with its own root commit, so it stranded
+> the repo mid-rebase (it did exactly that to refi-med-os on 2026-08-28, which
+> is why v0.5.0 shipped with the claim narrowed). Since v0.5.1 stage 5 is a
+> **file-level overlay**: framework-owned paths copied in, everything the org
+> owns left alone, the lineage stamp recording which framework commit was
+> applied. Accepted end to end against refi-med-os with all nine stages green
+> (`memory/reports/overlay-acceptance-2026-08-29.md`). Re-running is a clean
+> no-op.
 
-The full run, once the overlay lands (v0.5.1) — or today, against a true fork:
+Then run it:
 
 ```bash
 npm run doctor -- sync --dir ../refi-med-os
@@ -126,7 +126,8 @@ The nine stages:
 3. **fetch** — fetch the framework.
 4. **inject-machinery** — copy the framework's sync scripts into the instance.
    This is the step that breaks the deadlock.
-5. **sync-upstream** — run the framework's 10-stage sync, now actually present.
+5. **overlay** — copy the framework-owned paths (scripts/, templates/) over the
+   instance's. Never touches data/, memory/, identity files or .well-known/.
 6. **migrate** — framework migrations, plus the cross-scheme version re-stamp.
 7. **generate-schemas** — republish `.well-known/`.
 8. **re-assess** — the full battery again.

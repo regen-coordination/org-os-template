@@ -1,6 +1,6 @@
 # Instance Drift Report — 2026-08-29
 
-**Generated:** 2026-08-29T00:36:31.117Z
+**Generated:** 2026-08-29T00:45:27.873Z
 **Framework version:** 0.5.0
 
 ## Summary
@@ -8,7 +8,7 @@
 - Instances tracked: 8
 - Cloned locally: 8
 - Production: 2
-- Total drift items: 25
+- Total drift items: 26
 - Unmapped skills (not in skills-matrix): concurrent-safe-edit, deploy-verify, handoff, no-ai-slop, request-routing, telegram-crm-intake, voronoi-motif, references, regen-toolkit
 - Unmapped packages (not in packages-matrix): knowledge-commons
 
@@ -102,9 +102,10 @@
 - Packages: 0 (—)
 - Data registries: 14
 - MASTERPLAN: yes
-- federation.yaml: yes (v3.0)
+- federation.yaml: yes (v0.5)
 
-**Drift:** none ✓
+**Drift (1):**
+- ⚠ framework_version_mismatch:declared=3.0,actual=0.5
 
 ## Bread Cooperative (`bread-coop-os`)
 
