@@ -191,7 +191,11 @@ test('the plan runs the stages in the order the masterplan specifies', () => {
       'ensure-upstream',
       'fetch',
       'inject-machinery',
-      'sync-upstream',
+      // v0.5.1: `overlay` replaces the old `sync-upstream` stage. That stage
+      // shelled out to a rebase that assumes fork lineage and stranded every
+      // scaffolded instance mid-rebase; the overlay copies framework-owned
+      // paths in instead. See packages/instance-doctor/src/overlay.mjs.
+      'overlay',
       'migrate',
       'generate-schemas',
       're-assess',

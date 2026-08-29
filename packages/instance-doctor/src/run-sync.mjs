@@ -16,6 +16,7 @@
 import path from 'node:path';
 
 import { CANONICAL_MACHINERY, CANONICAL_UPSTREAM_URL, normalizeRepoUrl, CANONICAL_UPSTREAM_SLUG } from './checks/machinery.mjs';
+import { FRAMEWORK_OWNED, isInstanceOwned, overlayPlan } from './overlay.mjs';
 import {
   planSync,
   reconcileDeclaredUpstream,
@@ -277,9 +278,79 @@ export function runSync(snapshot, opts = {}, io) {
       return { status: 'ok', detail: `${copied.join(', ')} already current — nothing to commit` };
     },
 
-    'sync-upstream'() {
-      const r = io.run('node', ['scripts/sync-upstream.mjs', '--yes'], dir);
-      return r.ok ? { status: 'ok', detail: r.out || 'sync-upstream completed' } : { status: 'failed', detail: r.out };
+    // Replaces the history-based sync (v0.5.1). The old stage shelled out to
+    // `scripts/sync-upstream.mjs --yes`, whose `git pull --rebase upstream main`
+    // assumes fork lineage; against a scaffolded instance it conflicts on every
+    // shared filename and strands the repo mid-rebase. See overlay.mjs.
+    overlay() {
+      const frameworkDir = snapshot.framework?.dir;
+      if (!frameworkDir) {
+        return { status: 'failed', detail: 'no framework directory to overlay from' };
+      }
+
+      const frameworkFiles = new Map();
+      for (const prefix of FRAMEWORK_OWNED) {
+        for (const rel of io.listFiles(frameworkDir, prefix)) {
+          const content = io.readText(path.join(frameworkDir, rel));
+          if (content !== null && content !== undefined) frameworkFiles.set(rel, content);
+        }
+      }
+      if (frameworkFiles.size === 0) {
+        return { status: 'failed', detail: `no framework-owned files found under ${FRAMEWORK_OWNED.join(', ')}` };
+      }
+
+      const instanceFiles = new Map();
+      for (const rel of frameworkFiles.keys()) {
+        const content = io.readText(path.join(dir, rel));
+        if (content !== null && content !== undefined) instanceFiles.set(rel, content);
+      }
+
+      const plan = overlayPlan({ frameworkFiles, instanceFiles });
+
+      // Belt-and-braces: the planner already refuses instance-owned paths, but
+      // this stage is the one that writes, so it re-checks before touching disk.
+      // A sync that clobbers data/ or memory/ would destroy the organization it
+      // was meant to update — there is no acceptable version of that bug.
+      const trespass = plan.actions.filter((a) => isInstanceOwned(a.path));
+      if (trespass.length > 0) {
+        return {
+          status: 'failed',
+          detail: `refusing to write instance-owned path(s): ${trespass.map((t) => t.path).join(', ')}`,
+        };
+      }
+
+      if (!plan.changed) {
+        return { status: 'ok', detail: `already current — ${plan.summary.unchanged} framework file(s) match` };
+      }
+
+      const written = [];
+      for (const action of plan.actions) {
+        if (action.action === 'unchanged') continue;
+        io.writeText(path.join(dir, action.path), action.content);
+        written.push(action.path);
+      }
+
+      // Commit it: the stages after this one refuse to run on a dirty tree, so
+      // leaving the overlay uncommitted would guarantee the abort it exists to
+      // prevent. Explicit paths only — never `-A` — so an operator can see and
+      // revert exactly what the framework changed.
+      const staged = io.git(dir, ['add', '--', ...written]);
+      if (!staged.ok) return { status: 'failed', detail: `could not stage the overlay: ${staged.out}` };
+
+      const committed = io.git(dir, [
+        'commit', '-m',
+        `chore(sync): overlay framework machinery (${plan.summary.add} added, ${plan.summary.update} updated)`,
+      ]);
+      if (!committed.ok) {
+        return { status: 'failed', detail: `could not commit the overlay: ${committed.out}` };
+      }
+
+      const shown = written.slice(0, 6).join(', ');
+      const more = written.length > 6 ? `, +${written.length - 6} more` : '';
+      return {
+        status: 'ok',
+        detail: `${plan.summary.add} added, ${plan.summary.update} updated (${shown}${more}); ${plan.summary.unchanged} already current`,
+      };
     },
 
     migrate() {

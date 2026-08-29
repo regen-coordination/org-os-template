@@ -15,7 +15,7 @@
  *   ensure-upstream   add or rewrite the `upstream` remote to the canonical URL
  *   fetch             fetch it
  *   inject-machinery  copy the framework's sync machinery into the instance
- *   sync-upstream     run the instance's (now real) sync-upstream.mjs
+ *   overlay           copy framework-owned paths in (replaces the rebase)
  *   migrate           framework migrations + the 3.x→0.5 re-baseline re-stamp
  *   generate-schemas  republish .well-known/
  *   re-assess         run the full B1-B6 battery again
@@ -33,13 +33,14 @@ import {
   normalizeRepoUrl,
 } from './checks/machinery.mjs';
 import { milestoneOrdinal, TEMPLATE_PACKAGE_NAME } from './checks/versions.mjs';
+import { FRAMEWORK_OWNED } from './overlay.mjs';
 
 export const STAGE_IDS = [
   'snapshot',
   'ensure-upstream',
   'fetch',
   'inject-machinery',
-  'sync-upstream',
+  'overlay',
   'migrate',
   'generate-schemas',
   're-assess',
@@ -94,9 +95,9 @@ export function planSync(snapshot) {
       detail: `copy from the framework: ${CANONICAL_MACHINERY.join(', ')}`,
     },
     {
-      id: 'sync-upstream',
-      title: 'Run sync-upstream',
-      detail: 'the framework 10-stage pull-based sync, now present in the instance',
+      id: 'overlay',
+      title: 'Overlay the framework',
+      detail: `copy framework-owned paths (${FRAMEWORK_OWNED.join(', ')}) over the instance's, leaving everything the org owns untouched`,
     },
     { id: 'migrate', title: 'Migrate', detail: migrateDetail },
     { id: 'generate-schemas', title: 'Regenerate schemas', detail: 'npm run generate:schemas' },

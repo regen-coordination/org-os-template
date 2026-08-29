@@ -11,7 +11,7 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const realIo = {
@@ -61,6 +61,29 @@ export const realIo = {
   copy(from, to) {
     mkdirSync(path.dirname(to), { recursive: true });
     copyFileSync(from, to);
+  },
+
+  /**
+   * Repo-relative file paths under `root/prefix`, recursively. Used by the
+   * overlay to enumerate framework-owned machinery. Returns [] when the prefix
+   * does not exist, because a framework without templates/ is not an error.
+   * Skips node_modules and .git, which are never framework-owned content.
+   */
+  listFiles(root, prefix) {
+    const base = path.join(root, prefix);
+    if (!existsSync(base)) return [];
+    const out = [];
+    const walk = (abs, rel) => {
+      for (const entry of readdirSync(abs, { withFileTypes: true })) {
+        if (entry.name === 'node_modules' || entry.name === '.git') continue;
+        const nextAbs = path.join(abs, entry.name);
+        const nextRel = rel ? `${rel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) walk(nextAbs, nextRel);
+        else if (entry.isFile()) out.push(`${prefix}${nextRel}`);
+      }
+    };
+    walk(base, '');
+    return out;
   },
 
   today: () => new Date().toISOString().slice(0, 10),

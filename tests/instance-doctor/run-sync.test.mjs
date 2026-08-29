@@ -76,7 +76,10 @@ function fakeIo(overrides = {}) {
       calls.push(['run', dir, `${cmd} ${args.join(' ')}`]);
       return OK;
     },
-    readText: (p) => written[p] ?? null,
+    // Framework-side reads return content so the overlay has something to copy;
+    // instance-side reads fall back to `written`, so a fresh instance sees the
+    // file as absent and the overlay plans an `add`.
+    readText: (p) => written[p] ?? (String(p).startsWith('/tmp/org-os/') ? 'FRAMEWORK CONTENT' : null),
     writeText: (p, contents) => {
       calls.push(['write', p, '']);
       written[p] = contents;
@@ -84,6 +87,10 @@ function fakeIo(overrides = {}) {
     exists: () => true,
     mkdirp: (p) => calls.push(['mkdirp', p, '']),
     copy: (from, to) => calls.push(['copy', from, to]),
+    // The overlay stage enumerates framework-owned files. Default: one machinery
+    // file under scripts/, so a clean run has something to copy and the stage is
+    // exercised rather than short-circuiting on an empty framework.
+    listFiles: (root, prefix) => (prefix === 'scripts/' ? ['scripts/doctor.mjs'] : []),
     reassess: () => ({ status: 'OK', summary: { blockers: 0, warnings: 1, checks: 6 } }),
     today: () => '2026-08-28',
     timestamp: () => '20260828-120000Z',
@@ -322,7 +329,7 @@ test('a failing stage stops forward motion and every later stage is skipped', ()
   assert.equal(byId.snapshot, 'ok');
   assert.equal(byId['ensure-upstream'], 'ok');
   assert.equal(byId.fetch, 'failed');
-  for (const later of ['inject-machinery', 'sync-upstream', 'migrate', 'generate-schemas', 're-assess']) {
+  for (const later of ['inject-machinery', 'overlay', 'migrate', 'generate-schemas', 're-assess']) {
     assert.equal(byId[later], 'skipped', `${later} must not run after an abort`);
   }
 });
