@@ -87,7 +87,8 @@ When the session starts (via `/initialize` or "initialize workspace"), run the i
 1. **Sync** — Run: `TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null); if [ "$TOPLEVEL" = "$(pwd)" ]; then git pull --rebase --quiet 2>&1; else echo "sync: embedded repo — skipping pull"; fi`. Non-blocking; reports state, never silently skips.
 2. **Generate dashboard** — Run `node scripts/initialize.mjs --format=markdown`. This produces the complete ASCII dashboard with Unicode box-drawing, respecting `dashboard.yaml` configuration (section visibility, ordering, limits).
 3. **Output** — Print the pre-rendered markdown **verbatim** (do not reformat).
-4. **Context / Transition** — Note key state for the session, then wait for the operator to pick what to work on before proceeding to Phase 2.
+4. **Buzz channel read-back** (optional, fail-open) — If the workspace has the Buzz lane configured (`npm run buzz:doctor` exits 0), run `npm run buzz:read` and fold its output into the session context (step 5) under "Since last session". If the doctor isn't green, skip silently — one line at most.
+5. **Context / Transition** — Note key state for the session, then wait for the operator to pick what to work on before proceeding to Phase 2.
 
 > **📘 For Hermes agents:** Load the `initialize` skill for optimized handling. It includes platform-specific workarounds (absolute paths, cd patterns, error recovery).
 
@@ -253,7 +254,20 @@ When the operator says "close", "wrap up", "done for now", or when `/close` is t
 
 5. **Commit** — Stage `memory/`, `HEARTBEAT.md`, `MEMORY.md`, and any `data/` changes. Commit with message: `session: [concise description of what was done]`.
 
-6. **Push** — Run `git push`. If it fails (offline/no remote), note that the commit is saved locally.
+6. **Post session digest to Buzz** (optional, fail-open) — After the close commit exists, publish the session digest (the Session Summary panel from step 1) through the Buzz lane. Write it to a temp file and post it with `--file` — never a bare pipe or an inherited terminal stdin that a producer could leave open:
+
+   ```bash
+   DIGEST_FILE=$(mktemp)
+   cat > "$DIGEST_FILE" <<'BUZZ_DIGEST_EOF'
+   <digest text>
+   BUZZ_DIGEST_EOF
+   npm run buzz:post -- --file "$DIGEST_FILE"
+   rm -f "$DIGEST_FILE"
+   ```
+
+   The script appends a machine-readable provenance trailer to the digest content (`org-os: sha=<short> source=org-os-session truncated=<bool>`) carrying the commit SHA. Any failure prints a skip line — never block the close.
+
+7. **Push** — Run `git push`. If it fails (offline/no remote), note that the commit is saved locally.
 
 ### Close Rules
 
