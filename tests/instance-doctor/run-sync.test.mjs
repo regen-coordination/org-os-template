@@ -375,21 +375,120 @@ test('an aborted run never re-stamps the version surfaces', () => {
   assert.equal(io.written[path.join('/tmp/instance', 'VERSION.md')], undefined);
 });
 
-test("an operator's uncommitted work aborts at the snapshot stage — but the snapshot is taken first", () => {
-  const io = fakeIo({
+// --- the plan-aware dirty gate (v0.5.1) ----------------------------------
+//
+// Until v0.5.1 the gate refused on ANY foreign dirty entry, because stage 5 was
+// `git pull --rebase`, which rewrites the whole working tree. The overlay writes
+// a computed, narrow file list instead, so the honest question is no longer "is
+// the tree clean?" but "does any uncommitted change intersect what this run will
+// actually write?". Measured across the fleet on 2026-08-29: ~3,250 uncommitted
+// files across six instances, exactly one genuine collision — and the coarse
+// gate was blocking all seven unsynced instances over work the overlay would
+// never touch. These tests pin BOTH directions, because narrowing a safety gate
+// is only safe if the thing it still catches is pinned too.
+
+/**
+ * An io bag whose framework carries one non-machinery file under scripts/.
+ * `scripts/doctor.mjs` and friends are CANONICAL_MACHINERY, which
+ * foreignDirtyEntries already filters out as doctor-owned — so a collision test
+ * built on those would pass for the wrong reason.
+ */
+function overlayIo({ status, instanceFiles = {}, ...rest } = {}) {
+  return fakeIo({
     gitRespond: (dir, args) => {
       if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
       if (args[0] === 'rev-list') return { ok: true, out: 'e'.repeat(40) };
-      if (args[0] === 'status') return { ok: true, out: ' M data/members.yaml\n?? drafts/notes.md' };
-      return OK;
+      if (args[0] === 'status') return { ok: true, out: status };
+      return undefined;
     },
+    listFiles: (root, prefix) => (prefix === 'scripts/' ? ['scripts/generate-schemas.mjs'] : []),
+    readText: (p) => {
+      const s = String(p);
+      if (s.startsWith('/tmp/org-os/')) return 'FRAMEWORK CONTENT';
+      const rel = s.replace('/tmp/instance/', '');
+      return rel in instanceFiles ? instanceFiles[rel] : null;
+    },
+    ...rest,
   });
-  const r = runSync(fakeSnapshot(), {}, io);
+}
+
+const snapshotStage = (r) => r.stages.find((s) => s.id === 'snapshot');
+
+test('a dirty data/members.yaml does not block — the overlay never writes instance-owned paths', () => {
+  // The single most common fleet case: refi-dao-os carries 177 uncommitted
+  // files, zero of which the overlay would touch.
+  const io = overlayIo({ status: ' M data/members.yaml\n?? drafts/notes.md' });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(snapshotStage(r).status, 'ok', JSON.stringify(r.stages, null, 2));
+  assert.notEqual(r.abortStage, 'snapshot');
+});
+
+test('a dirty framework-owned file the overlay WOULD write still blocks, and is named', () => {
+  // The direction that must survive the narrowing. The instance's copy differs
+  // from the framework's, so the plan says `update` — this run would overwrite
+  // uncommitted work, which is exactly what the gate exists to prevent.
+  const io = overlayIo({
+    status: ' M scripts/generate-schemas.mjs\n M data/members.yaml',
+    instanceFiles: { 'scripts/generate-schemas.mjs': 'OPERATOR EDIT' },
+  });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
   assert.equal(r.aborted, true);
   assert.equal(r.abortStage, 'snapshot');
-  const stage = r.stages.find((s) => s.id === 'snapshot');
+  const stage = snapshotStage(r);
   assert.match(stage.detail, /refs\/snapshots\//, 'the snapshot ref must still be recorded');
-  assert.match(stage.detail, /data\/members\.yaml/, 'the operator should be told WHICH files block it');
+  assert.match(stage.detail, /scripts\/generate-schemas\.mjs/, 'name the colliding file');
+  assert.ok(
+    !stage.detail.includes('data/members.yaml'),
+    'a non-colliding dirty file must not be presented as a blocker',
+  );
+});
+
+test("an instance-authored script the framework lacks does not block", () => {
+  // Five of the six "in scope" hits in the 2026-08-29 sweep were these:
+  // onboard-member.mjs, lib/keccak.mjs, … The overlay only writes paths the
+  // framework owns and never deletes, so it cannot touch them.
+  const io = overlayIo({ status: '?? scripts/our-tool.mjs' });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(snapshotStage(r).status, 'ok', JSON.stringify(r.stages, null, 2));
+  assert.notEqual(r.abortStage, 'snapshot');
+});
+
+test('an uncommitted DELETION of a file the overlay would restore blocks', () => {
+  // The overlay reads the working tree, so a deleted file plans as `add` — the
+  // run would silently undo the operator's uncommitted deletion.
+  const io = overlayIo({ status: ' D scripts/generate-schemas.mjs' });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(r.abortStage, 'snapshot');
+  assert.match(snapshotStage(r).detail, /scripts\/generate-schemas\.mjs/);
+});
+
+test('a framework-owned file whose content already matches does not block', () => {
+  // Plan says `unchanged`, so this run writes nothing there. Only add+update
+  // count as writes.
+  const io = overlayIo({
+    status: ' M scripts/generate-schemas.mjs',
+    instanceFiles: { 'scripts/generate-schemas.mjs': 'FRAMEWORK CONTENT' },
+  });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(snapshotStage(r).status, 'ok', JSON.stringify(r.stages, null, 2));
+});
+
+test('when the overlay plan cannot be computed, the gate falls back to refusing any dirty tree', () => {
+  // No framework checkout means no plan, and a gate that cannot see what it is
+  // about to write must refuse over uncommitted work. The safe direction.
+  const io = overlayIo({ status: ' M data/members.yaml', listFiles: () => [] });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(r.abortStage, 'snapshot');
+  assert.match(snapshotStage(r).detail, /data\/members\.yaml/);
+});
+
+test('the snapshot ref is written BEFORE the gate refuses', () => {
+  const io = overlayIo({
+    status: ' M scripts/generate-schemas.mjs',
+    instanceFiles: { 'scripts/generate-schemas.mjs': 'OPERATOR EDIT' },
+  });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(r.abortStage, 'snapshot');
   assert.ok(io.calls.some(([, , cmd]) => cmd.startsWith('update-ref refs/snapshots/')));
 });
 

@@ -72,6 +72,72 @@ export function foreignDirtyEntries(porcelain) {
 }
 
 /**
+ * Build the overlay plan for `dir` against `frameworkDir`, reading only.
+ *
+ * Shared by the gate in the snapshot stage and the overlay stage itself, so the
+ * question the gate asks ("what will this run write?") is answered by the same
+ * code that later does the writing. Returns null when no plan can be computed —
+ * no framework checkout, or a framework carrying none of the owned prefixes.
+ *
+ * Note the instance side is read from the WORKING TREE, not from HEAD. That is
+ * deliberate: the gate cares about the bytes the overlay would overwrite, and an
+ * uncommitted edit is exactly what is at risk.
+ */
+export function buildOverlayPlan(dir, frameworkDir, io) {
+  if (!frameworkDir) return null;
+
+  const frameworkFiles = new Map();
+  for (const prefix of FRAMEWORK_OWNED) {
+    for (const rel of io.listFiles(frameworkDir, prefix)) {
+      const content = io.readText(path.join(frameworkDir, rel));
+      if (content !== null && content !== undefined) frameworkFiles.set(rel, content);
+    }
+  }
+  if (frameworkFiles.size === 0) return null;
+
+  const instanceFiles = new Map();
+  for (const rel of frameworkFiles.keys()) {
+    const content = io.readText(path.join(dir, rel));
+    if (content !== null && content !== undefined) instanceFiles.set(rel, content);
+  }
+
+  return overlayPlan({ frameworkFiles, instanceFiles });
+}
+
+/**
+ * The paths an overlay run would actually write. `unchanged` is not a write.
+ *
+ * @param {ReturnType<typeof overlayPlan>|null} plan
+ * @returns {Set<string>|null} null when there is no plan to reason about
+ */
+export function plannedWritePaths(plan) {
+  if (!plan) return null;
+  return new Set(
+    plan.actions.filter((a) => a.action === 'add' || a.action === 'update').map((a) => a.path),
+  );
+}
+
+/**
+ * The dirty entries this run would actually overwrite.
+ *
+ * The v0.5.1 gate. The old one refused on any `foreignDirtyEntries` hit, which
+ * was correct when stage 5 was `git pull --rebase` — that rewrites the entire
+ * working tree, so every uncommitted file genuinely was at risk. The overlay
+ * writes a computed, narrow list, so the honest question is the intersection.
+ *
+ * A null `planned` set means the plan could not be computed; a gate that cannot
+ * see what it is about to write refuses over everything, which is the safe
+ * direction to be wrong.
+ *
+ * @param {string[]} foreign  verbatim porcelain lines from foreignDirtyEntries()
+ * @param {Set<string>|null} planned
+ */
+export function collidingDirtyEntries(foreign, planned) {
+  if (planned === null) return foreign;
+  return foreign.filter((line) => planned.has(porcelainPath(line)));
+}
+
+/**
  * @param {object} snapshot   from readInstance()
  * @param {object} opts
  * @param {boolean} [opts.dryRun]      print the plan, touch nothing
@@ -142,23 +208,46 @@ export function runSync(snapshot, opts = {}, io) {
 
       const detail = `snapshot ref ${ref}${note}`;
 
-      // sync-upstream refuses on a dirty tree (its stage 1). Failing here, with
-      // the snapshot already safely written, beats failing four stages later.
+      // The gate. Failing here, with the snapshot already safely written, beats
+      // failing four stages later.
       //
       // Read fresh rather than trusting the pre-run snapshot, and ignore the
       // doctor's own artifacts — otherwise the debris of an aborted run blocks
       // every retry.
       const status = io.git(dir, ['status', '--porcelain', '-uall']);
       const foreign = status.ok ? foreignDirtyEntries(status.out) : [];
-      if (foreign.length > 0) {
-        const shown = foreign.slice(0, 5).join(', ');
-        const more = foreign.length > 5 ? `, +${foreign.length - 5} more` : '';
+
+      // v0.5.1: ask whether the uncommitted work INTERSECTS what this run will
+      // write, not merely whether the tree is clean. The old question belonged
+      // to the rebase this overlay replaced. Across the fleet on 2026-08-29 the
+      // coarse form was holding seven instances hostage to ~3,250 uncommitted
+      // files, exactly one of which the overlay would ever have touched.
+      const planned = plannedWritePaths(buildOverlayPlan(dir, snapshot.framework?.dir, io));
+      const colliding = collidingDirtyEntries(foreign, planned);
+
+      if (colliding.length > 0) {
+        // Name the files. A refusal an operator cannot act on is a bug report
+        // addressed to nobody.
+        const shown = colliding.slice(0, 5).join(', ');
+        const more = colliding.length > 5 ? `, +${colliding.length - 5} more` : '';
+        const scope =
+          planned === null
+            ? `the overlay plan could not be computed, so sync refuses over all ${colliding.length} uncommitted change(s) that are not the doctor's own`
+            : `${colliding.length} uncommitted change(s) collide with file(s) this sync would overwrite`;
         return {
           status: 'failed',
-          detail: `${detail} — but the working tree has ${foreign.length} uncommitted change(s) that are not the doctor's own (${shown}${more}), and sync refuses to run over uncommitted work. Commit or discard them, then re-run.`,
+          detail: `${detail} — but ${scope} (${shown}${more}). Commit or revert them, then re-run.`,
         };
       }
-      return { status: 'ok', detail };
+
+      // Say what was let through. The operator should be able to read the
+      // receipt and see that the gate saw their work and judged it out of scope,
+      // rather than wonder whether it looked at all.
+      const passed = foreign.length;
+      const note2 = passed > 0
+        ? ` — ${passed} uncommitted change(s) present, none in this run's write set`
+        : '';
+      return { status: 'ok', detail: `${detail}${note2}` };
     },
 
     'ensure-upstream'() {
@@ -288,24 +377,14 @@ export function runSync(snapshot, opts = {}, io) {
         return { status: 'failed', detail: 'no framework directory to overlay from' };
       }
 
-      const frameworkFiles = new Map();
-      for (const prefix of FRAMEWORK_OWNED) {
-        for (const rel of io.listFiles(frameworkDir, prefix)) {
-          const content = io.readText(path.join(frameworkDir, rel));
-          if (content !== null && content !== undefined) frameworkFiles.set(rel, content);
-        }
-      }
-      if (frameworkFiles.size === 0) {
+      // Same builder the snapshot gate used, so the set of files the gate
+      // reasoned about and the set this stage writes cannot drift apart. It is
+      // recomputed rather than cached: inject-machinery has committed since,
+      // which legitimately turns some `update`s into `unchanged`s.
+      const plan = buildOverlayPlan(dir, frameworkDir, io);
+      if (!plan) {
         return { status: 'failed', detail: `no framework-owned files found under ${FRAMEWORK_OWNED.join(', ')}` };
       }
-
-      const instanceFiles = new Map();
-      for (const rel of frameworkFiles.keys()) {
-        const content = io.readText(path.join(dir, rel));
-        if (content !== null && content !== undefined) instanceFiles.set(rel, content);
-      }
-
-      const plan = overlayPlan({ frameworkFiles, instanceFiles });
 
       // Belt-and-braces: the planner already refuses instance-owned paths, but
       // this stage is the one that writes, so it re-checks before touching disk.

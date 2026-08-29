@@ -137,8 +137,16 @@ The nine stages:
 the receipt names the stage that stopped it. A half-migrated instance is worse
 than an unsynced one, because it looks synced.
 
-A dirty working tree aborts at stage 1 — the snapshot is still written, but the
-sync refuses to continue. Commit or discard, then re-run.
+Uncommitted work aborts at stage 1 **only when it collides with a file this run
+would overwrite** — the intersection of your dirty paths with the overlay's
+`add`+`update` set. The snapshot is still written, and the refusal names the
+exact colliding files. Commit or revert those, then re-run.
+
+Everything else stays put: the overlay only writes framework-owned paths and
+never deletes, so uncommitted `data/`, `memory/`, drafts, generated output and
+your own scripts are out of scope by construction and do not block. (Before
+v0.5.1 the gate refused on any dirty file at all — correct when stage 5 was a
+rebase that rewrote the whole tree, far too coarse for a file-level overlay.)
 
 ### 4. Verify
 
@@ -154,8 +162,9 @@ cat ../refi-med-os/memory/reports/sync-receipt-*.md
 
 - **It will not guess your identity.** A name disagreement is reported, never
   resolved — picking the "right" name is an organizational decision.
-- **It will not sync a dirty tree.** Nor will it stash, discard, or hard-reset
-  anything to make one clean.
+- **It will not overwrite uncommitted work.** It refuses when a dirty file is
+  one it would write, and it will never stash, discard, or hard-reset anything
+  to clear the way.
 - **It will not touch an instance's own `package.json` version.** That is the
   instance's version, not a framework claim. The only exception is a
   `package.json` still named after the template, which means the file was

@@ -41,7 +41,7 @@ export function checkFreshness(snapshot) {
       finding.warn(
         'working-tree-dirty',
         `${dirty} uncommitted change(s) in the working tree`,
-        'sync refuses to run on a dirty tree — commit or snapshot first (`doctor sync --dry-run` is safe either way)',
+        'sync only refuses when an uncommitted change collides with a file it would overwrite; it names them if so (`doctor sync --dry-run` is safe either way)',
       ),
     );
   }
