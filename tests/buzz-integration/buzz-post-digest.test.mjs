@@ -18,10 +18,18 @@ const SCRIPT = path.resolve(
   "../../packages/buzz-integration/scripts/post-digest.mjs",
 );
 const REPO_ROOT = path.resolve(__dirname, "../..");
-const expectedSha = execSync("git rev-parse --short HEAD", {
-  cwd: REPO_ROOT,
-  encoding: "utf8",
-}).trim();
+// Guarded (not top-level-throwing): a git-less checkout must not fail to
+// load this entire test file — the two tests that need it skip themselves
+// instead.
+let expectedSha = null;
+try {
+  expectedSha = execSync("git rev-parse --short HEAD", {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  }).trim();
+} catch {
+  expectedSha = null;
+}
 
 // Fake CLI fixture, reused verbatim from tests/buzz-integration/buzz-lib.test.mjs.
 function fakeCli(dir, reply) {
@@ -53,7 +61,9 @@ const baseEnv = (bin) => ({
   BUZZ_NSEC: "nsec1fake",
 });
 
-test("post-digest: posts stdin content with the real repo HEAD sha tag present in fake-CLI argv", () => {
+test("post-digest: posts stdin content with the real repo HEAD sha tag present in fake-CLI argv", (t) => {
+  if (!expectedSha)
+    return t.skip("git rev-parse unavailable in this environment");
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
   const bin = fakeCli(dir, { id: "evt1" });
 
@@ -197,7 +207,9 @@ test("I4c: --file with no value reports a usage error, not empty digest", () => 
 // --- M3: the sha tag must reflect the script's own repo, not whatever
 // directory the caller happened to invoke it from.
 
-test("M3: sha is derived from the script's own repo root, not the caller's cwd", () => {
+test("M3: sha is derived from the script's own repo root, not the caller's cwd", (t) => {
+  if (!expectedSha)
+    return t.skip("git rev-parse unavailable in this environment");
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
   const bin = fakeCli(dir, { id: "evt-cwd" });
   const otherCwd = mkdtempSync(path.join(tmpdir(), "buzz-cwd-elsewhere-"));
@@ -243,4 +255,95 @@ test("M2: a failing git invocation does not leak its stderr into post-digest's o
   assert.equal(r.status, 0);
   assert.doesNotMatch(r.stdout, /boom-from-fake-git-stderr/);
   assert.doesNotMatch(r.stderr, /boom-from-fake-git-stderr/);
+});
+
+// --- NEW-2: the I1 stdin timeout must not discard content it has already
+// fully buffered. A total (rather than idle) budget throws away a complete
+// digest just because the producer held the pipe open afterward, and
+// truncates a legitimately slow-but-completing stream mid-flight.
+
+test("NEW-2a: a producer that writes the complete digest then holds the pipe open still gets posted", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-hold-open" });
+
+  const child = spawn("node", [SCRIPT], {
+    env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise((resolve) =>
+    child.on("exit", (code) => resolve(code)),
+  );
+  let stdout = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stdin.on("error", () => {}); // ignore EPIPE if the child exits first
+
+  child.stdin.write("the complete digest, written instantly");
+  // Deliberately never call child.stdin.end() — the producer holds the pipe
+  // open, as if waiting on something else before eventually closing it.
+
+  const outerTimeoutMs = 4000;
+  const result = await Promise.race([
+    exitPromise.then((code) => ({ code })),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ timedOut: true }), outerTimeoutMs),
+    ),
+  ]);
+  if (result.timedOut) {
+    child.kill("SIGKILL");
+    child.stdin.destroy();
+    assert.fail(`post-digest did not exit within ${outerTimeoutMs}ms`);
+  }
+  child.stdin.destroy();
+
+  assert.equal(result.code, 0);
+  assert.match(stdout, /digest posted/);
+  assert.doesNotMatch(stdout, /timed out/);
+  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  assert.ok(
+    argv.some((a) => a.includes("the complete digest, written instantly")),
+    "expected the fully-buffered content to have been posted, not discarded",
+  );
+});
+
+test("NEW-2b: a slow stream that finishes normally is not truncated by the idle timer", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-slow-stream" });
+
+  const child = spawn("node", [SCRIPT], {
+    env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise((resolve) =>
+    child.on("exit", (code) => resolve(code)),
+  );
+  let stdout = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stdin.on("error", () => {}); // ignore EPIPE if the child exits first
+
+  const chunks = ["slow ", "stream ", "of ", "digest ", "content"];
+  for (const chunk of chunks) {
+    child.stdin.write(chunk);
+    await new Promise((resolve) => setTimeout(resolve, 150)); // < 300ms idle window, aggregate > 300ms total
+  }
+  child.stdin.end();
+
+  const outerTimeoutMs = 5000;
+  const result = await Promise.race([
+    exitPromise.then((code) => ({ code })),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ timedOut: true }), outerTimeoutMs),
+    ),
+  ]);
+  if (result.timedOut) {
+    child.kill("SIGKILL");
+    assert.fail(`post-digest did not exit within ${outerTimeoutMs}ms`);
+  }
+
+  assert.equal(result.code, 0);
+  assert.match(stdout, /digest posted/);
+  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  assert.ok(
+    argv.some((a) => a.includes(chunks.join(""))),
+    "expected the full streamed content, not a truncated prefix",
+  );
 });

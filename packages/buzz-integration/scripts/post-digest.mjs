@@ -24,31 +24,52 @@ const flagValue = (n) => {
 // I1: `readFileSync(0)` blocks the event loop forever if stdin never sends
 // EOF (an interactive TTY, a stuck upstream pipe, a FIFO left open) — a
 // silent hang is worse than any non-zero exit for something fail-open is
-// supposed to guard. Read stdin asynchronously with a bounded timeout
-// instead; override via BUZZ_STDIN_TIMEOUT_MS for tests.
+// supposed to guard. Read stdin asynchronously with a bounded *idle*
+// timeout instead (reset on every chunk, not a fixed total budget) —
+// override via BUZZ_STDIN_TIMEOUT_MS for tests.
+//
+// NEW-2: the timeout must never discard content already buffered. A total
+// (one-shot) budget throws away a complete digest just because the
+// producer held the pipe open afterward, and truncates a legitimately
+// slow-but-completing stream mid-flight. An *idle* timer — rearmed on each
+// `data` event, and resolving with whatever has been buffered so far
+// rather than nothing — keeps the hang guard (a producer that sends
+// nothing at all still times out) without the loss.
 const STDIN_TIMEOUT_MS = Number(process.env.BUZZ_STDIN_TIMEOUT_MS) || 3000;
 
-function readStdin(timeoutMs) {
+function readStdin(idleTimeoutMs) {
   return new Promise((resolve) => {
     let data = "";
     let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      process.stdin.pause();
-      process.stdin.removeAllListeners();
-      resolve({ timedOut: true });
-    }, timeoutMs);
+    let timer;
+
     const settle = (result) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       resolve(result);
     };
+
+    const armIdleTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        process.stdin.pause();
+        process.stdin.removeAllListeners();
+        // Only a genuinely empty read (nothing ever arrived) counts as a
+        // real timeout; anything already buffered gets posted as-is.
+        settle(data ? { data } : { timedOut: true });
+      }, idleTimeoutMs);
+    };
+
     process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk) => (data += chunk));
+    process.stdin.on("data", (chunk) => {
+      data += chunk;
+      armIdleTimer(); // more data just arrived — reset the idle window
+    });
     process.stdin.on("end", () => settle({ data }));
     process.stdin.on("error", (error) => settle({ error }));
+
+    armIdleTimer(); // start the idle window even before any data arrives
   });
 }
 

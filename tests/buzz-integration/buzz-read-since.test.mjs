@@ -265,3 +265,94 @@ test("I2b: with no marker file, --since sent to the CLI is ~(now - 24h) and is a
     `expected --since ~= now - 24h, got ${sentSince} (window [${before - 5}, ${after + 5}])`,
   );
 });
+
+// --- NEW-1: the C1 guard must not conflate "reply shape unrecognized" with
+// "genuinely zero new events" — collapsing them both into events=[] means an
+// unrecognized shape (e.g. a field rename during buzz-cli preview drift, or
+// `{}` from a relay proxy) is reported as "no new messages" AND advances the
+// marker, permanently skipping whatever messages were actually there.
+
+test("NEW-1a: an unrecognized reply shape (renamed field) does not advance the marker or claim zero messages", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
+  const bin = fakeCli(dir, {
+    messages: [
+      {
+        id: "e1",
+        created_at: 1700000000,
+        pubkey: "p",
+        content: "IMPORTANT MESSAGE ONE",
+      },
+      {
+        id: "e2",
+        created_at: 1700000001,
+        pubkey: "p",
+        content: "IMPORTANT MESSAGE TWO",
+      },
+      {
+        id: "e3",
+        created_at: 1700000002,
+        pubkey: "p",
+        content: "IMPORTANT MESSAGE THREE",
+      },
+    ],
+  });
+  const state = path.join(dir, "state.json");
+  writeFileSync(state, JSON.stringify({ lastRead: 1700000000 }));
+
+  const r = run(["--state", state], baseEnv(bin));
+
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(
+    r.stdout,
+    /no new messages/,
+    "an unrecognized shape must not be reported as zero new messages",
+  );
+  const marker = JSON.parse(readFileSync(state, "utf8"));
+  assert.equal(
+    marker.lastRead,
+    1700000000,
+    "marker must not advance when the reply shape is unrecognized",
+  );
+});
+
+test("NEW-1b: an empty-object reply ({}) is also unrecognized, not zero events", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
+  const bin = fakeCli(dir, {});
+  const state = path.join(dir, "state.json");
+  writeFileSync(state, JSON.stringify({ lastRead: 1700000000 }));
+
+  const r = run(["--state", state], baseEnv(bin));
+
+  assert.equal(r.status, 0);
+  const marker = JSON.parse(readFileSync(state, "utf8"));
+  assert.equal(
+    marker.lastRead,
+    1700000000,
+    "marker must not advance when the reply shape is unrecognized",
+  );
+});
+
+// --- cheap item: a non-string `content` field on an otherwise well-formed
+// event must render the content itself, not the whole event object (which
+// stringifies to the useless, payload-losing "[object Object]").
+
+test("cheap: non-string content field renders the content, not the whole event", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
+  const bin = fakeCli(dir, {
+    events: [
+      {
+        id: "e1",
+        created_at: 1700000000,
+        pubkey: "p",
+        content: { text: "nested payload" },
+      },
+    ],
+  });
+  const state = path.join(dir, "state.json");
+
+  const r = run(["--state", state], baseEnv(bin));
+
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stdout, /\[object Object\]/);
+  assert.match(r.stdout, /nested payload/);
+});

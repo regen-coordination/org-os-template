@@ -31,28 +31,42 @@ if (!r.ok) {
   console.log(`buzz: relay unreachable — skipped (${r.error})`);
   process.exit(0);
 }
-// C1: `r.events` comes straight from parsed CLI/relay JSON — never assume
-// it is a well-formed array, or that its entries are well-formed objects.
-// A field rename, a relay proxy returning `{}`, or a malformed entry must
-// never crash this script.
-const events = Array.isArray(r.events) ? r.events : [];
+// NEW-1: `!Array.isArray(r.events)` ("the reply doesn't have a recognizable
+// events array" — a field rename during buzz-cli preview drift, or `{}`
+// from a relay proxy) is a *different* condition from "the array is present
+// and genuinely empty". Conflating them into events=[] would report real,
+// unread messages as "no new messages" AND advance the marker past them
+// forever. Bail out loudly instead, and never touch the marker.
+if (!Array.isArray(r.events)) {
+  console.log(
+    `buzz: unrecognized reply shape (no events array) — skipped, marker not advanced`,
+  );
+  process.exit(0);
+}
+const events = r.events;
 if (events.length === 0)
   console.log(`buzz: #${cfg.channel} — no new messages since last session`);
 else {
   console.log(`### Buzz #${cfg.channel} since last session\n`);
   for (const e of events) {
+    const isObj = e && typeof e === "object";
     const createdAt =
-      e && typeof e === "object" && Number.isFinite(e.created_at)
-        ? e.created_at
-        : null;
+      isObj && Number.isFinite(e.created_at) ? e.created_at : null;
     const ts =
       createdAt !== null
         ? new Date(createdAt * 1000).toISOString()
         : "unknown-time";
-    const content =
-      e && typeof e === "object" && typeof e.content === "string"
-        ? e.content
-        : String(e ?? "");
+    // cheap fix: coerce the *content field*, not the whole event, when it
+    // isn't already a string — otherwise a non-string content (an object,
+    // e.g. `{content: {text: "…"}}`) renders as the useless, payload-losing
+    // "[object Object]" for the entire event instead of just its content.
+    let content;
+    if (isObj) {
+      content =
+        typeof e.content === "string" ? e.content : renderValue(e.content);
+    } else {
+      content = renderValue(e);
+    }
     console.log(`- [${ts}] ${content}`);
   }
 }
@@ -69,4 +83,16 @@ if (!argv.includes("--no-advance")) {
   } catch (err) {
     console.log(`buzz: could not save read marker — skipped (${err.message})`);
   }
+}
+
+function renderValue(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
 }
