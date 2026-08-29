@@ -1,7 +1,7 @@
 ---
 id: non-tech-onboarding
 title: "Non-Tech Operator Onboarding"
-status: frozen
+status: superseded
 priority: null
 scope: framework
 depends_on: [future-instance-specs, instance-bootstrap]
@@ -13,6 +13,8 @@ tags: [v2, accessibility, onboarding]
 workstream: non-tech-onboarding
 ---
 
+> **SUPERSEDED 2026-08-29** by [`org-os-wizard`](../superpowers/specs/2026-08-29-org-os-wizard-design.md) (v0.6 Active #7). `docs/OPERATOR-GUIDE.md` and `docs/CHAT-INTERFACE.md` below are **shipped**. The web wizard, `deploy:pages` config and shared navigation header are **retired unbuilt**: the wizard spec settles that the agent performs its own setup, so the one page an operator receives only has to get them to a working chat window. Open Question 1 (“which platform for the web wizard?”) is answered *none*. Content preserved below for the record.
+>
 > **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 row 6-adjacent; OPERATOR-GUIDE Level 2 promise is not built (clean-room finding M2). Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 ## Goal
