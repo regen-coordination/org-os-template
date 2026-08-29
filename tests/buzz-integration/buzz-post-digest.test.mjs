@@ -347,3 +347,110 @@ test("NEW-2b: a slow stream that finishes normally is not truncated by the idle 
     "expected the full streamed content, not a truncated prefix",
   );
 });
+
+// --- NEW-A: the idle timer alone has no upper bound. A producer that keeps
+// sending a trickle of bytes (each one resetting the idle window) can keep
+// readStdin — and therefore /close — alive forever. This harness bounds
+// itself with an explicit outer kill; it must never rely on the script
+// exiting on its own to end the test.
+
+test("NEW-A: a drip-fed stdin that never goes idle is still bounded by a total deadline", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-slow-drip" });
+
+  const child = spawn("node", [SCRIPT], {
+    env: {
+      ...process.env,
+      ...baseEnv(bin),
+      BUZZ_STDIN_TIMEOUT_MS: "2000", // idle window: never elapses in this test
+      BUZZ_STDIN_TOTAL_TIMEOUT_MS: "300", // total deadline: must fire regardless
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise((resolve) =>
+    child.on("exit", (code) => resolve(code)),
+  );
+  let stdout = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stdin.on("error", () => {}); // ignore EPIPE if the child exits first
+
+  // Drip one byte every 100ms, indefinitely — well past the 300ms total
+  // deadline, and each byte keeps resetting the 2000ms idle timer. Only a
+  // never-rearmed total deadline can ever end this.
+  const dripInterval = setInterval(() => {
+    child.stdin.write("x");
+  }, 100);
+
+  // Bounded harness kill — do NOT rely on the script exiting on its own.
+  const outerTimeoutMs = 6000;
+  const result = await Promise.race([
+    exitPromise.then((code) => ({ code })),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ timedOut: true }), outerTimeoutMs),
+    ),
+  ]);
+  clearInterval(dripInterval);
+  child.stdin.destroy();
+
+  if (result.timedOut) {
+    child.kill("SIGKILL");
+    assert.fail(
+      `post-digest did not exit within ${outerTimeoutMs}ms against a drip-fed stdin that never goes idle`,
+    );
+  }
+
+  assert.equal(result.code, 0);
+});
+
+// --- NEW-B: when a timer (idle or total) fires with data already buffered,
+// that data may or may not be everything the producer intended to send —
+// post-digest cannot tell the difference between "producer is done and is
+// holding the pipe open" and "producer stalled mid-digest". Posting the
+// partial is correct; announcing it as an unqualified clean success is not.
+
+test("NEW-B: a mid-digest stall posts the truncated content but flags it, not a plain success", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-mid-stall" });
+
+  const child = spawn("node", [SCRIPT], {
+    env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise((resolve) =>
+    child.on("exit", (code) => resolve(code)),
+  );
+  let stdout = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stdin.on("error", () => {});
+
+  const partial = "first line of a digest that never finishes writing";
+  child.stdin.write(partial);
+  // Never write more, never end() — the pipe stalls mid-digest.
+
+  const outerTimeoutMs = 4000;
+  const result = await Promise.race([
+    exitPromise.then((code) => ({ code })),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ timedOut: true }), outerTimeoutMs),
+    ),
+  ]);
+  if (result.timedOut) {
+    child.kill("SIGKILL");
+    child.stdin.destroy();
+    assert.fail(`post-digest did not exit within ${outerTimeoutMs}ms`);
+  }
+  child.stdin.destroy();
+
+  assert.equal(result.code, 0);
+  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  assert.ok(
+    argv.some((a) => a.includes(partial)),
+    "expected the partial content to still be posted",
+  );
+  assert.match(stdout, /digest posted/);
+  assert.match(
+    stdout,
+    /truncat/i,
+    "expected the success message to flag that the content may be incomplete",
+  );
+});

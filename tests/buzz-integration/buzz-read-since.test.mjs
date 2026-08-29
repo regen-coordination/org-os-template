@@ -356,3 +356,25 @@ test("cheap: non-string content field renders the content, not the whole event",
   assert.doesNotMatch(r.stdout, /\[object Object\]/);
   assert.match(r.stdout, /nested payload/);
 });
+
+// --- NEW-C: the empty-vs-unrecognized distinction (NEW-1) is only half
+// tested without this — a genuinely empty `events: []]` must still advance
+// the marker, or a quiet channel's marker freezes forever and every future
+// run re-scans an ever-widening window.
+
+test("NEW-C: a genuinely empty events array still advances the marker", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
+  const bin = fakeCli(dir, { events: [] });
+  const state = path.join(dir, "state.json");
+  writeFileSync(state, JSON.stringify({ lastRead: 1700000000 }));
+
+  const r = run(["--state", state], baseEnv(bin));
+
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /no new messages/);
+  const marker = JSON.parse(readFileSync(state, "utf8"));
+  assert.ok(
+    marker.lastRead > 1700000000,
+    "marker must advance past the seed on a genuinely empty read",
+  );
+});

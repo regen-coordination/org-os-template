@@ -24,9 +24,8 @@ const flagValue = (n) => {
 // I1: `readFileSync(0)` blocks the event loop forever if stdin never sends
 // EOF (an interactive TTY, a stuck upstream pipe, a FIFO left open) — a
 // silent hang is worse than any non-zero exit for something fail-open is
-// supposed to guard. Read stdin asynchronously with a bounded *idle*
-// timeout instead (reset on every chunk, not a fixed total budget) —
-// override via BUZZ_STDIN_TIMEOUT_MS for tests.
+// supposed to guard. Read stdin asynchronously instead — override via
+// BUZZ_STDIN_TIMEOUT_MS / BUZZ_STDIN_TOTAL_TIMEOUT_MS for tests.
 //
 // NEW-2: the timeout must never discard content already buffered. A total
 // (one-shot) budget throws away a complete digest just because the
@@ -35,31 +34,54 @@ const flagValue = (n) => {
 // `data` event, and resolving with whatever has been buffered so far
 // rather than nothing — keeps the hang guard (a producer that sends
 // nothing at all still times out) without the loss.
+//
+// NEW-A: the idle timer alone has no upper bound — a producer that never
+// goes idle for `idleTimeoutMs` (one byte every second, forever) can keep
+// re-arming it indefinitely, turning the hang guard back into a hang. A
+// second, never-rearmed total-deadline timer runs alongside it; whichever
+// fires first ends the read. Default 15000ms matches lib/buzz.mjs's own
+// invoke() CLI timeout, so nothing in this pipeline blocks more than 15s;
+// real /close invocations complete in well under a second per the plan's
+// own timing audit (0.11-0.39s), so this should only ever engage against a
+// stalled or adversarial producer.
+//
+// NEW-B: either timer firing with data already buffered means the read
+// ended before natural EOF — the content may or may not be everything the
+// producer intended to send. `truncated: true` on that result lets the
+// caller say so instead of reporting a plain, unqualified success.
 const STDIN_TIMEOUT_MS = Number(process.env.BUZZ_STDIN_TIMEOUT_MS) || 3000;
+const STDIN_TOTAL_TIMEOUT_MS =
+  Number(process.env.BUZZ_STDIN_TOTAL_TIMEOUT_MS) || 15000;
 
-function readStdin(idleTimeoutMs) {
+function readStdin(idleTimeoutMs, totalTimeoutMs) {
   return new Promise((resolve) => {
     let data = "";
     let settled = false;
-    let timer;
+    let idleTimer;
+    let totalTimer;
 
     const settle = (result) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      clearTimeout(idleTimer);
+      clearTimeout(totalTimer);
+      process.stdin.pause();
+      process.stdin.removeAllListeners();
       resolve(result);
     };
 
-    const armIdleTimer = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        process.stdin.pause();
-        process.stdin.removeAllListeners();
-        // Only a genuinely empty read (nothing ever arrived) counts as a
-        // real timeout; anything already buffered gets posted as-is.
-        settle(data ? { data } : { timedOut: true });
-      }, idleTimeoutMs);
+    // Only a genuinely empty read (nothing ever arrived) counts as a real
+    // timeout; anything already buffered gets posted as-is, flagged.
+    const onTimeout = () => {
+      settle(data ? { data, truncated: true } : { timedOut: true });
     };
+
+    const armIdleTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(onTimeout, idleTimeoutMs);
+    };
+
+    totalTimer = setTimeout(onTimeout, totalTimeoutMs);
 
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => {
@@ -87,6 +109,7 @@ if (fileFlagPresent && !filePath) {
 
 let content = "";
 let readError = null;
+let truncated = false;
 
 if (filePath) {
   try {
@@ -95,13 +118,16 @@ if (filePath) {
     readError = err;
   }
 } else {
-  const result = await readStdin(STDIN_TIMEOUT_MS);
+  const result = await readStdin(STDIN_TIMEOUT_MS, STDIN_TOTAL_TIMEOUT_MS);
   if (result.timedOut) {
     console.log("buzz: stdin read timed out — skipped");
     process.exit(0);
   }
   if (result.error) readError = result.error;
-  else content = result.data;
+  else {
+    content = result.data;
+    truncated = Boolean(result.truncated);
+  }
 }
 
 if (readError) {
@@ -135,7 +161,14 @@ const r = postEvent(
 );
 console.log(
   r.ok
-    ? `buzz: digest posted (sha ${sha}, event ${r.id ?? "?"})`
+    ? `buzz: digest posted (sha ${sha}, event ${r.id ?? "?"})${
+        // NEW-B: flag the timer path — we can't tell "producer finished,
+        // held the pipe open" from "producer stalled mid-digest", so say so
+        // rather than reporting an unqualified clean success.
+        truncated
+          ? " — stdin read stopped before EOF; content may be truncated"
+          : ""
+      }`
     : `buzz: post failed — skipped (${r.error})`,
 );
 process.exit(0);
