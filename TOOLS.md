@@ -44,6 +44,9 @@ _(Channel IDs, group names, bot handles — no tokens here)_
 - Channel: `org-os-dev` → UUID `3344f08a-5f68-4c7e-8499-bcbe0bfb22ff` (the CLI takes the UUID, never the name; resolve via `buzz channels list`)
 - Agent npub: `npub16pl9y5zxuq5fujfqan6n34m42x5qarl8emkea3nvytm97egjdduqy39kdn`. The private key
   never goes here — only in `.env` as `BUZZ_PRIVATE_KEY`.
+- Roster (2026-08-29): this agent (relay **owner**) + the hub `lf-zettelkasten-os`
+  (**member**, `npub1xly7vdccs5ranvn09t7l5py4unnw6xdk3shx9gyul69336k55vxsuvxdz2`) — the
+  network's second member, joined via the runbook recipe in `docs/integrations/buzz.md`.
 - Verification trail: `packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**, 2026-08-29 —
   the CLI surface in `lib/buzz.mjs` was reconciled against the real `buzz` binary and a live
   local relay)
