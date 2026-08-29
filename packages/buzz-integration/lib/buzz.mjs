@@ -110,6 +110,11 @@ export const readChannel = (args, cfg) => invoke("read", args, cfg);
 export function status(cfg) {
   try {
     const c = cfg ?? loadConfig();
+    // key/channel are locally knowable from cfg alone — compute them before
+    // the bin early-return so a missing binary never misreports a populated
+    // key/channel as false (bin and relay legitimately need the CLI).
+    const key = Boolean(c.nsec);
+    const channel = Boolean(c.channel);
     const bin = !spawnSync(c.bin, ["--version"], {
       encoding: "utf8",
       timeout: 5000,
@@ -117,15 +122,10 @@ export function status(cfg) {
     if (!bin)
       return {
         ok: false,
-        checks: { bin: false, relay: false, key: false, channel: false },
+        checks: { bin: false, relay: false, key, channel },
       };
     const relay = invoke("status", {}, c).ok;
-    const checks = {
-      bin,
-      relay,
-      key: Boolean(c.nsec),
-      channel: Boolean(c.channel),
-    };
+    const checks = { bin, relay, key, channel };
     return { ok: Object.values(checks).every(Boolean), checks };
   } catch (e) {
     return {
