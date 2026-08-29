@@ -19,14 +19,41 @@ const CLI_MAP = {
   status: (c) => ["status", "--relay", c.relayUrl, "--json"],
 };
 
-export function loadConfig({ root = ROOT, env = process.env } = {}) {
+// Parse one raw .env value: strip a surrounding quote pair (leaving any "#"
+// inside it untouched), else strip a trailing " # comment" and whitespace.
+function parseEnvValue(raw) {
+  const v = raw.trim();
+  if (v.length >= 2) {
+    const first = v[0];
+    const last = v[v.length - 1];
+    if ((first === '"' || first === "'") && last === first) return v.slice(1, -1);
+  }
+  return v.replace(/\s+#.*$/, "").trim();
+}
+
+// Parse .env text into a flat key→value map. Never throws on malformed
+// content — unmatched lines (blank, comments, garbage) are simply skipped.
+function parseEnvFile(text) {
   const fileVars = {};
-  const envPath = path.join(root, ".env");
-  if (existsSync(envPath))
-    for (const line of readFileSync(envPath, "utf8").split("\n")) {
-      const m = line.match(/^([A-Z_]+)=(.*)$/);
-      if (m) fileVars[m[1]] = m[2];
-    }
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.replace(/\r$/, "").trim();
+    if (!line || line.startsWith("#")) continue;
+    const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (m) fileVars[m[1]] = parseEnvValue(m[2]);
+  }
+  return fileVars;
+}
+
+export function loadConfig({ root = ROOT, env = process.env } = {}) {
+  let fileVars = {};
+  try {
+    const envPath = path.join(root, ".env");
+    if (existsSync(envPath)) fileVars = parseEnvFile(readFileSync(envPath, "utf8"));
+  } catch {
+    // Any read failure (EISDIR, EACCES, etc.) is treated as "no .env" —
+    // loadConfig must never throw; safe defaults / env vars still apply.
+    fileVars = {};
+  }
   const get = (k, dflt) => env[k] ?? fileVars[k] ?? dflt;
   return {
     relayUrl: get("BUZZ_RELAY_URL", "ws://localhost:3000"),
@@ -37,8 +64,8 @@ export function loadConfig({ root = ROOT, env = process.env } = {}) {
 }
 
 function invoke(intent, args, cfg) {
-  const c = cfg ?? loadConfig();
   try {
+    const c = cfg ?? loadConfig();
     const r = spawnSync(c.bin, CLI_MAP[intent](c, args), {
       encoding: "utf8", timeout: 15000,
       env: { ...process.env, BUZZ_RELAY_URL: c.relayUrl, BUZZ_NSEC: c.nsec },
@@ -51,13 +78,20 @@ function invoke(intent, args, cfg) {
   }
 }
 
-export const postEvent = (args, cfg) => invoke("post", args, cfg);
+export function postEvent(args, cfg) {
+  if (!args?.content) return { ok: false, error: "content is required" };
+  return invoke("post", args, cfg);
+}
 export const readChannel = (args, cfg) => invoke("read", args, cfg);
 export function status(cfg) {
-  const c = cfg ?? loadConfig();
-  const bin = !spawnSync(c.bin, ["--version"], { encoding: "utf8" }).error;
-  if (!bin) return { ok: false, checks: { bin: false, relay: false, key: false, channel: false } };
-  const relay = invoke("status", {}, c).ok;
-  const checks = { bin, relay, key: Boolean(c.nsec), channel: Boolean(c.channel) };
-  return { ok: Object.values(checks).every(Boolean), checks };
+  try {
+    const c = cfg ?? loadConfig();
+    const bin = !spawnSync(c.bin, ["--version"], { encoding: "utf8" }).error;
+    if (!bin) return { ok: false, checks: { bin: false, relay: false, key: false, channel: false } };
+    const relay = invoke("status", {}, c).ok;
+    const checks = { bin, relay, key: Boolean(c.nsec), channel: Boolean(c.channel) };
+    return { ok: Object.values(checks).every(Boolean), checks };
+  } catch (e) {
+    return { ok: false, error: e.message, checks: { bin: false, relay: false, key: false, channel: false } };
+  }
 }
