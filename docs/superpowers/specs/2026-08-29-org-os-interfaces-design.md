@@ -111,6 +111,9 @@ and `packages/hermes-integration/` (touched by the 2026-08-10 symbient work).
 
 ### Doc updates in the same change
 
+- **`data/packages-matrix.yaml`** — entries for the four deleted packages move to
+  a terminal `lifecycle_status` (or are removed, whichever the matrix schema and
+  `validate:structure` expect); `data/governance.yaml` checked for references.
 - **`docs/MODULES.md`** — "Not modules" section: replace the "stay npm workspaces"
   line with a supersession record pointing at this spec; fix the stale
   org-os-admin status line ("M1 built on `feat/admin-app`, not yet merged" →
