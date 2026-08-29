@@ -17,11 +17,17 @@ the recommended path.
   condition that hard-stopped the 2026-08-21 run at `npm run setup`'s first
   prompt (B2). The recommended path never needs a TTY.
 - **Clean room:** `/tmp/adopt-verify3`, fresh clone.
-- **Deviation (logged):** cloned from the local repo at `feat/adoption-kit`
-  rather than GitHub `main` — the polished kit under test is this branch and
-  is not merged yet. Everything else is the public path. **Recommend a
-  10-minute confirmation re-run from GitHub `main` after the PR merges** (the
-  commands are identical).
+- **Deviation (logged, now closed):** the first run cloned from the local repo
+  at `feat/adoption-kit`, since the kit under test was not yet merged.
+  **Confirmation re-run completed after PR #3 merged** — `git clone` from
+  public GitHub `main` @ `bffe188`, recipe followed verbatim, different
+  operator identity ("Ana Ferreira") to be sure nothing was carried over from
+  the first run. Same result: `schemas PASS`, `structure PASS`, **1 blocker
+  (`git-remote-absent`, expected)**, `dao.json` = `harbor-bakery-os`,
+  `IDENTITY.md` = `harbor-bakery-os`, members = `["Ana Ferreira"]`, projects
+  `[]`, frontier cache absent, **zero leaks** across `data/`, `SOUL.md`,
+  `USER.md`, `TOOLS.md`, `IDENTITY.md` (sweep also covered the framework's
+  Gnosis/llamarpc endpoints). The public path is verified end-to-end.
 
 ## Timeline
 
