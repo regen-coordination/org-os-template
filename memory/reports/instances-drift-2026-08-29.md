@@ -1,6 +1,6 @@
 # Instance Drift Report — 2026-08-29
 
-**Generated:** 2026-08-29T00:45:27.873Z
+**Generated:** 2026-08-29T01:39:14.302Z
 **Framework version:** 0.5.0
 
 ## Summary
@@ -8,7 +8,7 @@
 - Instances tracked: 8
 - Cloned locally: 8
 - Production: 2
-- Total drift items: 26
+- Total drift items: 29
 - Unmapped skills (not in skills-matrix): concurrent-safe-edit, deploy-verify, handoff, no-ai-slop, request-routing, telegram-crm-intake, voronoi-motif, references, regen-toolkit
 - Unmapped packages (not in packages-matrix): knowledge-commons
 
@@ -66,9 +66,10 @@
 - Packages: 2 (connectors, core)
 - Data registries: 0
 - MASTERPLAN: no
-- federation.yaml: yes (v3.0)
+- federation.yaml: yes (v0.5)
 
-**Drift:** none ✓
+**Drift (1):**
+- ⚠ framework_version_mismatch:declared=3.0,actual=0.5
 
 ## openclaw (`openclaw`)
 
@@ -90,9 +91,10 @@
 - Packages: 12 (agents-app, coop, dashboard, egregore-core, koi-bridge, koi-opal-bridge, opal-bridge, operations, paperclip-agents-app, regen-agents, regen-toolkit, webapps)
 - Data registries: 17
 - MASTERPLAN: yes
-- federation.yaml: yes (v3.0)
+- federation.yaml: yes (v0.5)
 
-**Drift:** none ✓
+**Drift (1):**
+- ⚠ framework_version_mismatch:declared=3.0,actual=0.5
 
 ## ReFi Mediterranean (`refi-med-os`)
 
@@ -115,9 +117,10 @@
 - Packages: 1 (operations)
 - Data registries: 13
 - MASTERPLAN: yes
-- federation.yaml: yes (v3.5)
+- federation.yaml: yes (v0.5)
 
-**Drift:** none ✓
+**Drift (1):**
+- ⚠ framework_version_mismatch:declared=3.5,actual=0.5
 
 ## Regen Web3 Toolkit (`regen-toolkit`)
 

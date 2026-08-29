@@ -44,6 +44,28 @@ racing `.git/index.lock` across registries).
   rebase corrupted — with all nine stages green, 0 blockers, identity and root commit intact, and
   a second run reporting a clean no-op. Full record:
   `memory/reports/overlay-acceptance-2026-08-29.md`.
+- **`doctor sync`'s dirty-tree gate refused over work it was never going to touch.** The refusal
+  was written for the rebase above, which rewrote the whole working tree — so any uncommitted file
+  anywhere genuinely was at risk. The overlay writes a computed, narrow list, and the gate never
+  followed. It now intersects the uncommitted paths with the overlay plan's `add`+`update` set
+  (`unchanged` is not a write), and `buildOverlayPlan()` is shared with the overlay stage so the
+  gate and the writer cannot drift apart. Measured across the fleet: **3,256 uncommitted files
+  across six instances, exactly one genuine collision** — the coarse form was blocking all seven
+  unsynced instances. Safety is unchanged where it matters: a real collision still aborts, still
+  after the snapshot ref is written, still naming the exact files; an uncommitted *deletion* of a
+  file the overlay would restore counts as a collision; and when no plan can be computed the gate
+  falls back to refusing any dirty tree. The `working-tree-dirty` hint and `skills/instance-doctor/SKILL.md`
+  claimed "sync refuses to run on a dirty tree" and are corrected.
+- **Four instances synced on the strength of it** — `bread-coop-os` (8 → 5 blockers),
+  `regen-coordination-os` (9 → 8), `dao-os` (3 → 3) and `regen-toolkit` (4 → 4, with 3,005
+  uncommitted files of which **zero** were committed or touched). All four kept their root commit
+  and identity, took 3 sync commits each, and left a snapshot ref. None reached zero blockers, so
+  all four aborted at `re-assess` and **none carries a `last_sync_commit` stamp**: every remaining
+  blocker is instance-owned content (`.well-known/` identity leakage, `CHANGELOG.md` version
+  claims, `package.json` script targets) that the overlay is forbidden to touch. Fleet propagation
+  is now blocked on per-instance content repair, not on sync tooling. `refi-bcn-os` and
+  `refi-dao-os` were deliberately left unsynced — production, and refi-dao gates v0.6 Active-1.
+  Full record: `memory/reports/fleet-sync-2026-08-29.md`.
 - **The recommended setup path shipped the framework's own content.** A fresh instance carried
   the maintainer's member entry, 13 framework projects, framework ideas/ecosystems/relationships,
   the framework's `SOUL.md` and API endpoints, and its federation frontier cache — the 2026-08-21
