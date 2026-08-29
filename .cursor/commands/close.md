@@ -63,16 +63,46 @@ and gitignored — most checkouts have none), offer the operator a close-pulse:
 
 If no habitat exists, skip silently — do not mention this step.
 
-## 7. Commit
+## 7. Update Knowledge Graph
+
+If the `graphify` CLI is installed and `graphify-out/graph.json` exists, refresh the graph so it travels in the same commit as this session's changes:
+
+```bash
+command -v graphify >/dev/null 2>&1 && graphify . --update || echo "graph: CLI not installed — see docs/integrations/graphify.md"
+npm run graph:gaps 2>/dev/null || true
+```
+
+This is incremental (seconds for code-only changes). If the update fails, report the error but continue the close — the graph retries next session. Never block the close on graph tooling.
+
+## 8. Commit
 
 Stage all changed files and commit:
 
 ```bash
-git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/
+git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/ graphify-out/
 git commit -m "session: [concise description of what was done]"
 ```
 
-## 8. Push
+## 8b. Post session digest to Buzz (optional, fail-open)
+
+After the close commit exists, publish the session digest through the Buzz lane. Write
+the digest text (the Session Summary panel from Step 1) to a temp file and post it with
+`--file` — never a bare pipe or an inherited terminal stdin that a producer could leave
+open:
+
+```bash
+DIGEST_FILE=$(mktemp)
+cat > "$DIGEST_FILE" <<'BUZZ_DIGEST_EOF'
+<digest text>
+BUZZ_DIGEST_EOF
+npm run buzz:post -- --file "$DIGEST_FILE"
+rm -f "$DIGEST_FILE"
+```
+
+The script tags the event with the commit SHA automatically. Any failure prints a skip
+line — never block the close.
+
+## 9. Push
 
 ```bash
 git push

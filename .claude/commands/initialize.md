@@ -17,6 +17,12 @@ else
 fi
 ```
 
+## Step 2b: Buzz channel read-back (optional, fail-open)
+
+If the workspace has the Buzz lane configured (`npm run buzz:doctor` exits 0), run
+`npm run buzz:read` and include its output block in the session context under
+"Since last session". If the doctor is not green, skip silently — one line at most.
+
 ## Step 2: Render Dashboard
 
 Run the initialize script with `--format=markdown` and **print its output verbatim** — the script renders the full ASCII dashboard. Do not reformat, re-render, or wrap in extra markdown:

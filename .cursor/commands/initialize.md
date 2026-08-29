@@ -11,8 +11,19 @@ You are opening a new org-os session. Follow these steps exactly.
 Pull latest changes (skip silently if offline or no remote):
 
 ```bash
-git pull --rebase --quiet 2>&1 || echo "sync: no remote or offline — continuing with local state"
+TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ "$TOPLEVEL" = "$(pwd)" ]; then
+  git pull --rebase --quiet 2>&1 || echo "sync: no remote or offline — continuing with local state"
+else
+  echo "sync: embedded repo — skipping pull"
+fi
 ```
+
+## Step 2b: Buzz channel read-back (optional, fail-open)
+
+If the workspace has the Buzz lane configured (`npm run buzz:doctor` exits 0), run
+`npm run buzz:read` and include its output block in the session context under
+"Since last session". If the doctor is not green, skip silently — one line at most.
 
 ## Step 2: Render Dashboard
 
