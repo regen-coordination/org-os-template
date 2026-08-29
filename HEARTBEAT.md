@@ -80,6 +80,31 @@ report's own fix-list.
       site mirror + QUEUE entry; then evaluate the Buzz×Berd v2 trigger —
       both acceptances passed?)
 
+### Buzz lane dogfood acceptance (module #3 → live)
+
+- [ ] **Prerequisite — plan Task 1 (pin and verify):** clone/pin `block/buzz`, bring up its
+      dev relay, mint the agent keypair, exercise `buzz-cli` post/read directly, and fill in
+      `packages/buzz-integration/VERIFIED.md`'s pending table. `CLI_MAP` in `lib/buzz.mjs`
+      currently encodes unverified documented defaults and must be reconciled against what is
+      actually observed — never guessed.
+- [ ] **Prerequisite — record the npub:** replace the PENDING marker in `TOOLS.md`'s Buzz
+      section with the agent's real npub once Task 1 mints a keypair. The `nsec` never goes in
+      any tracked file — only `.env` as `BUZZ_NSEC`.
+- [ ] **Prerequisite — plan Task 8 Step 1 (the live round-trip):** with the relay up and `.env`
+      filled, `npm run buzz:doctor` → all ✓; post a digest; `npm run buzz:read` → the message
+      appears. Append the transcript to `VERIFIED.md`.
+- [ ] **Prerequisite — sync the machine-local skill mirror (after this branch merges):**
+      `~/.claude/skills/initialize/SKILL.md` and `~/.claude/skills/close/SKILL.md` need the
+      same two hook steps that landed in `.claude/commands/initialize.md` and `close.md` —
+      some tools (e.g. Zed/claude-acp) scan only the user-level copy, not the project one, so
+      until this syncs the hooks won't fire there. Deliberately not done from this worktree:
+      the branch is unmerged, and mutating machine-local state ahead of that would apply the
+      hooks before the code they depend on has landed.
+- [ ] 5 consecutive real sessions where /close posts and /initialize reads with zero
+      manual intervention: ☐ ☐ ☐ ☐ ☐ (tick per session; on the 5th, flip
+      docs/MODULES.md org-os-buzz to **live**, update the site mirror + QUEUE entry, and
+      re-evaluate `lifecycle_status` in data/packages-matrix.yaml)
+
 ### Orchestration (multi-instance)
 - [ ] Weekly: run `npm run analyze:instances` and review drift report
 - [ ] **Known issue: `analyze-instances.mjs` overwrites the tracked drift report with placeholders when run from a worktree** — running `npm run selftest` or `npm run analyze:instances` from a git worktree (not the primary checkout) rewrites `memory/reports/instances-drift-<today>.md`, replacing real drift data with "Not locally scannable" for every instance. Root cause: `frameworkRoot` is derived from `process.argv[1]` (`scripts/analyze-instances.mjs:18`) and resolves each instance's `local_path` relative to the worktree root instead of the primary checkout, so no sibling org-instance dir is ever found; the unconditional `writeFileSync` (`scripts/analyze-instances.mjs:246`) then writes the placeholder report anyway. Found 2026-08-29 during Task 4 (berd integration) selftest wiring. Mitigation: `git restore` the report file after any worktree-run gate, never stage it. Real fix: skip the write (or gate it behind at least one instance actually being scannable) instead of silently overwriting real data with placeholders.
