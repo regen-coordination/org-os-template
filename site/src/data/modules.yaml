@@ -7,6 +7,11 @@ modules:
     status: pilot
     summary: Org data, pages, and an org-literate agent in a browser workspace — for the people who will never touch git.
     link: /docs/modules
+  - id: org-os-berd
+    name: Berd Desktop Integration
+    status: in-dev
+    summary: Canonical Berd personas plus a curated skills bridge into .agents/skills/ — built, not yet Goose-verified.
+    link: /docs/modules
   - id: org-os-federation
     name: Federation
     status: live

@@ -80,6 +80,36 @@ package `packages/cloudflare-os-integration/`
 
 ---
 
+### org-os-berd — Berd Desktop Integration
+
+**What it is.** The bridge between an org-os instance and
+[Berd](https://github.com/block/berd), Block's open-source Goose-backed desktop agent app:
+canonical in-repo personas plus a curated slice of org-os skills, both surfaced through Berd's
+project-local `.agents/` discovery.
+
+**How it works.** A hybrid manifest. Identity entries own the shipped personas layer —
+`.agents/agents/{operator,upstream}.md` mirrored by `scripts/sync-agents.mjs`, verified live in
+the Berd app since 2026-08-20. Materialization entries (`skills/<name>: .agents/skills/<name>`)
+double as the module's curated exposure list: five skills — `org-os-init`,
+`meeting-processor`, `heartbeat-monitor`, `knowledge-curator`, `funding-scout` — mirrored
+one-way and marker-guarded (`managed_by: org-os`) by `scripts/sync-skills-berd.mjs`
+(`npm run sync:skills:berd`), the same pattern `sync-agents.mjs` uses for personas. `--check`
+byte-compares the mirror and is wired into `npm run selftest` (optional, `skipKey: "berd"`).
+
+**Status.** `in-dev` — the personas layer is verified live in the Berd app; the skills bridge
+is built, tested, and committed but **not yet Goose-verified**. `.agents/skills/` is confirmed
+as the discovery path from Berd's own Tauri scanner source and Goose's own source (two
+independent implementations that agree), but no materialized skill has been confirmed to load
+or run inside an actual Berd session — that live GUI confirmation is deferred to the operator.
+See `docs/integrations/berd.md` for the full verification trail.
+
+**Links:** [manifest](../modules/org-os-berd/module.yaml) ·
+[discovery & verification](integrations/berd.md) ·
+[design](superpowers/specs/2026-08-28-berd-integration-design.md) ·
+[architecture](AGENTIC-ARCHITECTURE.md)
+
+---
+
 ## The v5 core tranche
 
 The seven modules the v5 spec migrates first. Each proves a different module shape; none has a
