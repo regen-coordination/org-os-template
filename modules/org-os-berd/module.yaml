@@ -1,0 +1,30 @@
+# org-os-berd — the Berd desktop integration (module #4).
+#
+# HYBRID mapping: identity entries own shipped in-place content (personas,
+# sync scripts); materialization entries (skills/<name> → .agents/skills/<name>)
+# double as the CURATED EXPOSURE LIST that scripts/sync-skills-berd.mjs reads.
+# Only Goose-verified skills may appear as materialization entries (Task 5
+# prunes). Status lives in docs/MODULES.md, not here (schema is strict).
+id: org-os-berd
+version: 0.1.0
+type: integration
+description: >-
+  Berd desktop integration — canonical in-repo agent personas (Operator,
+  Upstream) mirrored to the user level, plus a curated, marker-guarded bridge
+  materializing org-os skills into Berd's project-local .agents/skills/
+  surface so Berd/Goose agents work this org with its own skills.
+dependencies:
+  - org-os-standards
+files:
+  .agents/agents: .agents/agents
+  scripts/sync-agents.mjs: scripts/sync-agents.mjs
+  scripts/sync-skills-berd.mjs: scripts/sync-skills-berd.mjs
+  skills/org-os-init: .agents/skills/org-os-init
+  skills/meeting-processor: .agents/skills/meeting-processor
+  skills/heartbeat-monitor: .agents/skills/heartbeat-monitor
+  skills/knowledge-curator: .agents/skills/knowledge-curator
+  skills/funding-scout: .agents/skills/funding-scout
+checks:
+  - file-exists: .agents/agents/operator.md
+  - file-exists: scripts/sync-skills-berd.mjs
+  - command: node scripts/sync-skills-berd.mjs --check
