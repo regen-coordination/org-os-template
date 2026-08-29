@@ -110,6 +110,39 @@ See `docs/integrations/berd.md` for the full verification trail.
 
 ---
 
+### org-os-buzz — Buzz Agent Lane
+
+**What it is.** A signed, cryptographically-provenanced comms lane between org-os sessions and
+a local [Buzz](https://github.com/block/buzz) relay: `/close` posts a SHA-tagged digest of the
+session to `#org-os-dev`, `/initialize` reads the channel back. Fail-open everywhere — the lane
+never blocks a session.
+
+**How it works.** `packages/buzz-integration/lib/buzz.mjs` is a thin wrapper that shells out to
+a pinned `buzz-cli` binary (JSON in/out) for `postEvent`, `readChannel`, and `status`; nothing
+else in the repo speaks the Nostr protocol Buzz is built on. Three root-invoked scripts sit on
+top — `npm run buzz:post`, `npm run buzz:read`, `npm run buzz:doctor` — and the session skills
+gain two optional hooks: a read-back step in `/initialize` and a digest-post step in `/close`,
+both fail-open (a non-green `doctor` or any lane error prints a one-line skip and never blocks
+the session).
+
+**Status.** `in-dev` — **and unverified against a real relay.** Docker, `just`, `hermit`,
+`buzz-cli`, and `goose` are all absent from the build machine, so Task 1 of the integration plan
+(clone + pin `block/buzz`, stand up its relay, mint a keypair, and record the actual observed
+CLI surface) could not run. `CLI_MAP` in `lib/buzz.mjs` currently encodes **unverified
+documented defaults** — the verbs and flags are guesses from Buzz's docs, not observed
+behavior — and every test in `tests/buzz-integration/` exercises a fake-CLI fixture, never a
+real binary or relay. No keypair exists and no npub has been minted. See
+`packages/buzz-integration/VERIFIED.md`, whose status line reads **PENDING**, for the full
+verification trail and what the operator still has to do. This module does not move past
+`in-dev` until that live round-trip (the plan's Task 8) runs.
+
+**Links:** [manifest](../modules/org-os-buzz/module.yaml) ·
+[verification trail](../packages/buzz-integration/VERIFIED.md) ·
+[design](superpowers/specs/2026-08-28-buzz-integration-design.md) ·
+package `packages/buzz-integration/`
+
+---
+
 ## The v5 core tranche
 
 The seven modules the v5 spec migrates first. Each proves a different module shape; none has a

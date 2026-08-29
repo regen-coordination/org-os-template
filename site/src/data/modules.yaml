@@ -12,6 +12,11 @@ modules:
     status: in-dev
     summary: Canonical Berd personas plus a curated skills bridge into .agents/skills/ — built, not yet Goose-verified.
     link: /docs/modules
+  - id: org-os-buzz
+    name: Buzz Agent Lane
+    status: in-dev
+    summary: SHA-tagged signed session digests to a local Buzz relay on /close, read back on /initialize — built, not yet verified against a real relay.
+    link: /docs/modules
   - id: org-os-federation
     name: Federation
     status: live
