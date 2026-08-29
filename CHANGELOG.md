@@ -6,7 +6,69 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
-_(Append changes here as they land.)_
+**Staged for `0.5.1`.** Everything below is already on `main` but landed *after* the `v0.5.0`
+tag, so a clone of the tag does not have it. `npm run version:update 0.5.1` promotes this
+section to a dated release heading and rewrites the comparison links — the heading stays
+`[Unreleased]` until then because `version:check` reads the first `[X.Y.Z]` heading as the
+current release and would fail against `package.json`.
+
+Still open for 0.5.1, not yet done: the **file-level overlay sync** that replaces the
+history-based one (see `[0.5.0]` → Known issues), the two 🔴 **kms data-loss** fixes, and the
+remaining admin defects (YAML reflow rewriting whole registries on a one-field edit; the
+per-registry write lock racing `.git/index.lock` across registries).
+
+### Added
+
+- **`docs/ADOPT-WITH-AN-AGENT.md`** — the copy-paste recipe for driving setup from Claude Code,
+  Cursor or a ChatGPT connector. Non-interactive end to end, so an agent can complete it without
+  a TTY. Verified by executing it against a fresh clone of `main`.
+- **Session kit** (`docs/sessions/`) — narrative, live demo script, FAQ, a one-pager rendered
+  through `render:templates` so its numbers stay live, plus the branch-instance and scheduling
+  drafts for the Regen Knowledge Commons session.
+- **`tests/clone-framework-health.test.mjs`** gains a no-leak test, and **`packages/admin/tests/real-data.test.ts`**
+  is new: it runs the admin app's own validator over this repository's real registries, which is
+  the regression that would have caught every admin defect fixed below.
+
+### Fixed
+
+- **The recommended setup path shipped the framework's own content.** A fresh instance carried
+  the maintainer's member entry, 13 framework projects, framework ideas/ecosystems/relationships,
+  the framework's `SOUL.md` and API endpoints, and its federation frontier cache — the 2026-08-21
+  clean-room B4/B5 leak, still alive in the engine path. `clone-framework` stage 4b now resets
+  instance-owned registries and operator files, so identity is stripped **by construction**
+  rather than by operator diligence. Clean-room re-run against public `main`: zero leaks.
+- **The admin app could not open or save this repository's own data.** Schemas were derived from
+  `DATA-MODEL.md`'s examples rather than real registries: `projects` 0/13 valid (status enum vs
+  the real `Discovery`/`Develop`), `relationships` 0/7 (touchpoints typed as objects; real data is
+  strings, plus `null` rejected on optional fields). `projects.status`/`type` are no longer enums —
+  fleet evidence shows the vocabulary is instance-defined and genuinely differs — and optional
+  fields across all 14 schemas accept `null`, which is how an unset field is written in these YAML
+  registries.
+- **A funding-opportunities data-loss path.** The admin hardcoded the top-level key
+  `funding_opportunities`; four of five real instances use `opportunities`. The UI showed an empty
+  registry for a populated file, then appended to a *new* second top-level key on create, splitting
+  one list in two. `RegistryDef` now carries aliases and every call site resolves against the
+  document.
+- **The admin entity form showed one entity's data under another's heading.** `EntityForm` seeds
+  its draft once and had no `key`, so selecting a different row reused the instance; saving then
+  422'd on an id mismatch, or 409'd as a duplicate after `+ New`.
+- **CI could not run the instance-doctor suite.** Fixture repos had no git identity and runners
+  have no global one, so the doctor's own commit stages died with `fatal: empty ident name` —
+  `validate.yml` was red while local runs passed on the developer's global config.
+- **`AGENTS.md` §11 pointed at the wrong upstream.** Now the canonical `org-os-template`. Executing
+  the fix corrected the record: `org-os-framework` and `organizational-os-framework` are the *same*
+  repository (the latter is a former name GitHub redirects), so the "three circulating names" were
+  two repos. The legacy one is archived with a README pointing here.
+
+### Changed
+
+- **One honest setup path** across the quickstart trio. `BOOTSTRAP.md`, the README and
+  `docs/OPERATOR-GUIDE.md` now tell one story: the cloning engine as a generator, with
+  `npm run setup` framed as the in-place TTY-only alternative and its real nine prompts listed.
+  Closes clean-room findings **B1**, **M2**, **M4** and **m2**; `OPERATOR-GUIDE` Level 2 stops
+  promising a web form that does not exist.
+- Site `/get-started` rewritten to that path; the agent recipe joins the curated docs allowlist;
+  `POSITIONING.md` numbers re-verified against the tagged release.
 
 ## [0.5.0] — 2026-08-29
 

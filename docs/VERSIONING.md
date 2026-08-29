@@ -165,33 +165,65 @@ Rules:
 
 ## Release process
 
-When it's time to cut a release:
+Write the changelog **as work lands**, under `## [Unreleased]`. `version:update` promotes that
+section to a dated release heading — so at release time there is nothing to author, which is what
+makes cutting a tag a short job instead of an archaeology session.
 
 ```bash
 # 1. All work merged to main, working tree clean
-git status                        # must be clean
+git switch main && git fetch && git merge --ff-only origin/main
+git status                                  # must be clean
 
-# 2. Bump version and update metadata + changelog stub
-npm run version:update 3.1.0       # or 3.0.1 / 4.0.0 etc.
+# 2. Prove it. The tag claims this suite is green — run it, don't assume.
+npm test && npm run validate:schemas && npm run validate:structure \
+  && npm run selftest && npm run test:admin \
+  && (cd site && npm run build && npm test)
+gh run list --workflow=validate.yml --limit 1   # and a GREEN CI run on this commit
 
-# 3. Hand-edit CHANGELOG.md to replace the stub with real content
+# 3. Pause the crons that commit straight to main (they have raced a release)
+gh workflow disable drift.yml
+gh workflow disable generate-schemas.yml
 
-# 4. Review the diff
+# 4. Snapshot, then bump. version:update rewrites the five version surfaces and
+#    promotes [Unreleased] → [<version>] — <date> with comparison links.
+npm run vault:snapshot -- "v0.5.1 release point"
+npm run version:update 0.5.1
+npm run version:check                       # all five surfaces must agree
+
+# 5. Review, then commit with EXPLICIT paths (never `git add -A` here)
 git diff
+git add package.json federation.yaml CHANGELOG.md VERSION.md MASTERPLAN.md
+git commit -m "release: v0.5.1"
 
-# 5. Commit the release
-git add -A
-git commit -m "release: v3.1.0"
+# 6. Re-check for a race immediately before tagging, then tag and publish
+git fetch && git merge --ff-only origin/main
+git tag -a v0.5.1 -m "org-os v0.5.1 — <one line>"
+git push origin main --follow-tags
 
-# 6. Tag locally (do not push the tag until publishing publicly)
-git tag -a v3.1.0 -m "v3.1.0"
-
-# 7. (optional) Publish
-git push
-git push origin v3.1.0
+# 7. Unpause the crons, verify nothing was lost
+gh workflow enable drift.yml
+gh workflow enable generate-schemas.yml
+npm run vault:audit
 ```
 
-`version:update` does NOT push anything. That's always manual.
+`version:update` does NOT commit, tag, or push. That is always manual.
+
+**Hard-won rules, all from the v0.5.0 ship (2026-08-29):**
+
+- **Acceptance gates the tag, not the other way round.** If the release claims something works,
+  prove it against something real *before* tagging — and if the proof fails, narrow the claim or
+  delay. v0.5.0's own acceptance failed and the tag waited; the sync claim shipped scoped to what
+  was actually demonstrated, with the gap documented under Known issues.
+- **A green local suite is not a green CI run.** `validate.yml` was red for a day while local runs
+  passed, because the developer's global git identity masked a fixture defect runners hit.
+- **Never re-push a bare historical tag.** Old lines are published as `archive/vX.Y.Z` only —
+  a bare `v3.5.0` would outrank `v0.5.0` in semver-sorted lists and undo the one-versioning story
+  at the surface newcomers see.
+- **Hand-written reports must not use a generator's filename.** `analyze:instances` owns
+  `memory/reports/instances-drift-<date>.md` and regenerates it on every gate run; an acceptance
+  report written there was overwritten mid-session.
+- **Expect `main` to move under you.** Concurrent sessions and the weekly bot both commit directly;
+  re-fetch immediately before the tag (step 6), not just at the start.
 
 ## Pre-1.0 and 0.x
 
