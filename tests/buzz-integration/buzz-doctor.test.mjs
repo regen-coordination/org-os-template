@@ -13,8 +13,10 @@ const SCRIPT = path.resolve(
 );
 
 // Fake CLI fixture, reused verbatim from tests/buzz-integration/buzz-lib.test.mjs.
+// `channels list` (the real connectivity/auth probe) returns a top-level
+// array — an empty array is a perfectly valid "all-green" reply.
 function fakeCli(dir, reply) {
-  const bin = path.join(dir, "fake-buzz-cli.mjs");
+  const bin = path.join(dir, "fake-buzz.mjs");
   writeFileSync(
     bin,
     `#!/usr/bin/env node
@@ -26,6 +28,15 @@ console.log(${JSON.stringify(JSON.stringify(reply))});`,
   return bin;
 }
 
+// Fake CLI that exits with a specific code and no stdout — used to simulate
+// the verified auth (3) / relay-down (2) exit codes.
+function fakeCliExit(dir, code) {
+  const bin = path.join(dir, "fake-buzz-exit.mjs");
+  writeFileSync(bin, `#!/usr/bin/env node\nprocess.exit(${code});\n`);
+  chmodSync(bin, 0o755);
+  return bin;
+}
+
 function run(env) {
   return spawnSync("node", [SCRIPT], {
     encoding: "utf8",
@@ -33,16 +44,18 @@ function run(env) {
   });
 }
 
+const baseEnv = (bin) => ({
+  BUZZ_CLI_BIN: bin,
+  BUZZ_RELAY_URL: "http://localhost:3000",
+  BUZZ_CHANNEL: "org-os-dev",
+  BUZZ_PRIVATE_KEY: "nsec1fake",
+});
+
 test("doctor: all-green fake → exit 0 with four check lines", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-doctor-"));
-  const bin = fakeCli(dir, {});
+  const bin = fakeCli(dir, []);
 
-  const r = run({
-    BUZZ_CLI_BIN: bin,
-    BUZZ_RELAY_URL: "ws://localhost:3000",
-    BUZZ_CHANNEL: "org-os-dev",
-    BUZZ_NSEC: "nsec1fake",
-  });
+  const r = run(baseEnv(bin));
 
   assert.equal(r.status, 0);
   const checkLines = r.stdout
@@ -52,46 +65,59 @@ test("doctor: all-green fake → exit 0 with four check lines", () => {
   assert.match(r.stdout, /lane ready/);
 });
 
-test("doctor: dead binary → exit 2 and shows a failed buzz-cli check", () => {
-  const r = run({
-    BUZZ_CLI_BIN: "/nonexistent/buzz-cli-does-not-exist",
-    BUZZ_RELAY_URL: "ws://localhost:3000",
-    BUZZ_CHANNEL: "org-os-dev",
-    BUZZ_NSEC: "nsec1fake",
-  });
+test("doctor: dead binary → exit 2 and shows a failed buzz check", () => {
+  const r = run(baseEnv("/nonexistent/buzz-does-not-exist"));
 
   assert.equal(r.status, 2);
-  assert.match(r.stdout, /✗ buzz-cli/);
+  assert.match(r.stdout, /✗ buzz binary/);
+  assert.match(r.stdout, /lane not ready/);
+});
+
+test("doctor: auth error (exit 3) reports the key check as failed, not the relay", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-doctor-"));
+  const bin = fakeCliExit(dir, 3);
+
+  const r = run(baseEnv(bin));
+
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /✓ relay/); // the binary ran and reached the relay
+  assert.match(r.stdout, /✗ agent key/); // but auth itself failed
+  assert.match(r.stdout, /lane not ready/);
+});
+
+test("doctor: relay/network error (exit 2) reports the relay check as failed", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-doctor-"));
+  const bin = fakeCliExit(dir, 2);
+
+  const r = run(baseEnv(bin));
+
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /✗ relay/);
   assert.match(r.stdout, /lane not ready/);
 });
 
 test("doctor: output names each of the four checks", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-doctor-"));
-  const bin = fakeCli(dir, {});
+  const bin = fakeCli(dir, []);
 
-  const r = run({
-    BUZZ_CLI_BIN: bin,
-    BUZZ_RELAY_URL: "ws://localhost:3000",
-    BUZZ_CHANNEL: "org-os-dev",
-    BUZZ_NSEC: "nsec1fake",
-  });
+  const r = run(baseEnv(bin));
 
-  assert.match(r.stdout, /buzz-cli/); // bin
+  assert.match(r.stdout, /buzz binary/); // bin
   assert.match(r.stdout, /relay/); // relay
   assert.match(r.stdout, /key/); // key
   assert.match(r.stdout, /channel/); // channel
 });
 
-// --- I3: lib/buzz.mjs's status() probes `buzz-cli --version` with no
-// timeout, unlike invoke()'s 15s timeout. Against a hanging binary, doctor
-// never returns at all — and since the session hooks branch on doctor's
-// exit code, a hang there yields no code whatsoever. Bounded with an outer
-// race + hard kill so a genuine regression fails fast instead of wedging
-// the test run.
+// --- I3: lib/buzz.mjs's status() probes `channels list` (there is no
+// `--version` flag — the real CLI rejects it, and no `status` subcommand)
+// with a 5s timeout. Against a hanging binary, doctor must still return
+// promptly instead of wedging on the 15s timeout used for post/read.
+// Bounded with an outer race + hard kill so a genuine regression fails fast
+// instead of wedging the test run.
 
-test("I3: doctor does not hang forever against a hanging buzz-cli binary", async () => {
+test("I3: doctor does not hang forever against a hanging buzz binary", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-doctor-"));
-  const bin = path.join(dir, "hanging-buzz-cli.mjs");
+  const bin = path.join(dir, "hanging-buzz.mjs");
   writeFileSync(
     bin,
     `#!/usr/bin/env node\nsetInterval(() => {}, 1_000_000);\n`,
@@ -99,13 +125,7 @@ test("I3: doctor does not hang forever against a hanging buzz-cli binary", async
   chmodSync(bin, 0o755);
 
   const child = spawn("node", [SCRIPT], {
-    env: {
-      ...process.env,
-      BUZZ_CLI_BIN: bin,
-      BUZZ_RELAY_URL: "ws://localhost:3000",
-      BUZZ_CHANNEL: "org-os-dev",
-      BUZZ_NSEC: "nsec1fake",
-    },
+    env: { ...process.env, ...baseEnv(bin) },
   });
 
   const outerTimeoutMs = 8000;
@@ -119,7 +139,7 @@ test("I3: doctor does not hang forever against a hanging buzz-cli binary", async
   if (result.timedOut) {
     child.kill("SIGKILL");
     assert.fail(
-      `doctor.mjs did not exit within ${outerTimeoutMs}ms against a hanging buzz-cli binary`,
+      `doctor.mjs did not exit within ${outerTimeoutMs}ms against a hanging buzz binary`,
     );
   }
   assert.equal(result.code, 2); // bin check fails → lane not ready

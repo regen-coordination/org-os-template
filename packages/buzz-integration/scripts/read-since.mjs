@@ -31,12 +31,14 @@ if (!r.ok) {
   console.log(`buzz: relay unreachable — skipped (${r.error})`);
   process.exit(0);
 }
-// NEW-1: `!Array.isArray(r.events)` ("the reply doesn't have a recognizable
-// events array" — a field rename during buzz-cli preview drift, or `{}`
-// from a relay proxy) is a *different* condition from "the array is present
-// and genuinely empty". Conflating them into events=[] would report real,
-// unread messages as "no new messages" AND advance the marker past them
-// forever. Bail out loudly instead, and never touch the marker.
+// NEW-1: `messages get` returns a top-level JSON array (VERIFIED.md);
+// buzz.mjs's invoke() only sets `r.events` when it actually saw one. A
+// reply that parses but isn't an array (a field rename during a future
+// buzz preview drift, or `{}` from a relay proxy) is a *different*
+// condition from "the array is present and genuinely empty" — conflating
+// them into events=[] would report real, unread messages as "no new
+// messages" AND advance the marker past them forever. Bail out loudly
+// instead, and never touch the marker.
 if (!Array.isArray(r.events)) {
   console.log(
     `buzz: unrecognized reply shape (no events array) — skipped, marker not advanced`,
@@ -45,9 +47,11 @@ if (!Array.isArray(r.events)) {
 }
 const events = r.events;
 if (events.length === 0)
-  console.log(`buzz: #${cfg.channel} — no new messages since last session`);
+  console.log(
+    `buzz: channel ${cfg.channel} — no new messages since last session`,
+  );
 else {
-  console.log(`### Buzz #${cfg.channel} since last session\n`);
+  console.log(`### Buzz channel ${cfg.channel} since last session\n`);
   for (const e of events) {
     const isObj = e && typeof e === "object";
     const createdAt =

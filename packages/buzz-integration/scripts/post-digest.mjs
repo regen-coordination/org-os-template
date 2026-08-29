@@ -164,25 +164,24 @@ try {
   /* keep unknown */
 }
 
+// OPERATOR DECISION (2026-08-29 reconciliation): the real CLI has no --tag
+// flag. Provenance travels instead as a machine-readable trailer appended
+// to the message content — content is part of the signed event, so it
+// still survives in the permanent log and is greppable on read-back.
+// item 1: the console line doesn't survive the session; the signed event
+// does. A partial digest indistinguishable from a complete one in that
+// permanent log misrepresents exactly the provenance guarantee the log
+// exists for — the trailer's truncated= field carries that fact into the
+// event itself, not just into /close's terminal output at the time.
+const trailer = `org-os: sha=${sha} source=org-os-session truncated=${truncated}`;
+
 const r = postEvent(
-  {
-    content: content.trim(),
-    // item 1: the console line doesn't survive the session; the signed
-    // event does. A partial digest indistinguishable from a complete one
-    // in that permanent log misrepresents exactly the provenance guarantee
-    // the log exists for — tag the timer path so it's recoverable from the
-    // event itself, not just from /close's terminal output at the time.
-    tags: {
-      sha,
-      source: "org-os-session",
-      ...(truncated ? { truncated: "true" } : {}),
-    },
-  },
+  { content: `${content.trim()}\n\n${trailer}` },
   loadConfig(),
 );
 console.log(
   r.ok
-    ? `buzz: digest posted (sha ${sha}, event ${r.id ?? "?"})${
+    ? `buzz: digest posted (sha ${sha}, event ${r.event_id ?? "?"})${
         // NEW-B: flag the timer path — we can't tell "producer finished,
         // held the pipe open" from "producer stalled mid-digest", so say so
         // rather than reporting an unqualified clean success.

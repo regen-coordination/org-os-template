@@ -32,8 +32,9 @@ try {
 }
 
 // Fake CLI fixture, reused verbatim from tests/buzz-integration/buzz-lib.test.mjs.
+// `messages send` (the real post verb) replies with a top-level JSON object.
 function fakeCli(dir, reply) {
-  const bin = path.join(dir, "fake-buzz-cli.mjs");
+  const bin = path.join(dir, "fake-buzz.mjs");
   writeFileSync(
     bin,
     `#!/usr/bin/env node
@@ -57,41 +58,46 @@ function run(args, { env, input, cwd } = {}) {
 const baseEnv = (bin) => ({
   BUZZ_CLI_BIN: bin,
   BUZZ_CHANNEL: "org-os-dev",
-  BUZZ_RELAY_URL: "ws://localhost:3000",
-  BUZZ_NSEC: "nsec1fake",
+  BUZZ_RELAY_URL: "http://localhost:3000",
+  BUZZ_PRIVATE_KEY: "nsec1fake",
 });
 
-test("post-digest: posts stdin content with the real repo HEAD sha tag present in fake-CLI argv", (t) => {
+// Pulls the value passed to --content out of a recorded argv.json (there is
+// no --tag flag on the real CLI — provenance now travels inside this value
+// as a trailer, per the 2026-08-29 operator decision).
+function contentArg(dir) {
+  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  const i = argv.indexOf("--content");
+  assert.ok(i !== -1, "expected --content in argv");
+  return argv[i + 1];
+}
+
+test("post-digest: posts stdin content with a provenance trailer carrying the real repo HEAD sha", (t) => {
   if (!expectedSha)
     return t.skip("git rev-parse unavailable in this environment");
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt1" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt1" });
 
   const r = run([], { env: baseEnv(bin), input: "session digest content" });
 
   assert.equal(r.status, 0);
   assert.match(r.stdout, /digest posted/);
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
-  assert.ok(
-    argv.some((a) => a.includes("session digest content")),
-    "expected content in argv",
-  );
-  const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
+  const content = contentArg(dir);
+  assert.ok(content.includes("session digest content"));
   // M6: assert the *exact* real HEAD sha, not just a "sha=" prefix — a
   // hardcoded fake sha must not be able to pass this test.
-  assert.ok(
-    tags.includes(`sha=${expectedSha}`),
-    `expected sha=${expectedSha} in tags, got: ${tags.join(", ")}`,
-  );
-  assert.ok(
-    tags.includes("source=org-os-session"),
-    "expected source=org-os-session tag",
+  assert.match(
+    content,
+    new RegExp(
+      `org-os: sha=${expectedSha} source=org-os-session truncated=false$`,
+    ),
+    `expected a trailer with sha=${expectedSha}, got: ${content}`,
   );
 });
 
 test("post-digest: --file variant reads content from a file", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt2" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt2" });
   const file = path.join(dir, "digest.md");
   writeFileSync(file, "digest from a file\n");
 
@@ -99,13 +105,12 @@ test("post-digest: --file variant reads content from a file", () => {
 
   assert.equal(r.status, 0);
   assert.match(r.stdout, /digest posted/);
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
-  assert.ok(argv.some((a) => a.includes("digest from a file")));
+  assert.ok(contentArg(dir).includes("digest from a file"));
 });
 
 test("post-digest: empty digest → skip line, exit 0", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "should-not-happen" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "should-not-happen" });
 
   const r = run([], { env: baseEnv(bin), input: "   \n  " });
 
@@ -117,7 +122,7 @@ test("post-digest: dead binary → skip line, exit 0", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
 
   const r = run([], {
-    env: baseEnv("/nonexistent/buzz-cli-does-not-exist"),
+    env: baseEnv("/nonexistent/buzz-does-not-exist"),
     input: "some content to post",
   });
 
@@ -132,7 +137,7 @@ test("post-digest: dead binary → skip line, exit 0", () => {
 
 test("I1: a stdin that never closes does not hang forever", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "should-not-happen" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "should-not-happen" });
 
   const child = spawn("node", [SCRIPT], {
     env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
@@ -170,7 +175,7 @@ test("I1: a stdin that never closes does not hang forever", async () => {
 
 test("I4a: --file pointing at a nonexistent path reports a read failure, not empty digest", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "should-not-happen" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "should-not-happen" });
   const missing = path.join(dir, "does-not-exist.md");
 
   const r = run(["--file", missing], { env: baseEnv(bin) });
@@ -182,7 +187,7 @@ test("I4a: --file pointing at a nonexistent path reports a read failure, not emp
 
 test("I4b: --file pointing at a directory reports a read failure, not empty digest", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "should-not-happen" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "should-not-happen" });
   const subdir = path.join(dir, "a-directory");
   mkdirSync(subdir);
 
@@ -195,7 +200,7 @@ test("I4b: --file pointing at a directory reports a read failure, not empty dige
 
 test("I4c: --file with no value reports a usage error, not empty digest", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "should-not-happen" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "should-not-happen" });
 
   const r = run(["--file"], { env: baseEnv(bin), input: "" });
 
@@ -204,14 +209,14 @@ test("I4c: --file with no value reports a usage error, not empty digest", () => 
   assert.match(r.stdout, /requires a path/);
 });
 
-// --- M3: the sha tag must reflect the script's own repo, not whatever
+// --- M3: the trailer's sha must reflect the script's own repo, not whatever
 // directory the caller happened to invoke it from.
 
 test("M3: sha is derived from the script's own repo root, not the caller's cwd", (t) => {
   if (!expectedSha)
     return t.skip("git rev-parse unavailable in this environment");
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-cwd" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-cwd" });
   const otherCwd = mkdtempSync(path.join(tmpdir(), "buzz-cwd-elsewhere-"));
 
   const r = run([], {
@@ -221,11 +226,10 @@ test("M3: sha is derived from the script's own repo root, not the caller's cwd",
   });
 
   assert.equal(r.status, 0);
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
-  const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
+  const content = contentArg(dir);
   assert.ok(
-    tags.includes(`sha=${expectedSha}`),
-    `expected sha=${expectedSha} even when invoked from ${otherCwd}, got: ${tags.join(", ")}`,
+    content.includes(`sha=${expectedSha}`),
+    `expected sha=${expectedSha} even when invoked from ${otherCwd}, got: ${content}`,
   );
 });
 
@@ -235,7 +239,7 @@ test("M3: sha is derived from the script's own repo root, not the caller's cwd",
 
 test("M2: a failing git invocation does not leak its stderr into post-digest's output", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-git-fail" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-git-fail" });
   const fakeGitDir = mkdtempSync(path.join(tmpdir(), "buzz-fake-git-"));
   const fakeGit = path.join(fakeGitDir, "git");
   writeFileSync(
@@ -264,7 +268,7 @@ test("M2: a failing git invocation does not leak its stderr into post-digest's o
 
 test("NEW-2a: a producer that writes the complete digest then holds the pipe open still gets posted", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-hold-open" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-hold-open" });
 
   const child = spawn("node", [SCRIPT], {
     env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
@@ -298,16 +302,20 @@ test("NEW-2a: a producer that writes the complete digest then holds the pipe ope
   assert.equal(result.code, 0);
   assert.match(stdout, /digest posted/);
   assert.doesNotMatch(stdout, /timed out/);
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  const content = contentArg(dir);
   assert.ok(
-    argv.some((a) => a.includes("the complete digest, written instantly")),
+    content.includes("the complete digest, written instantly"),
     "expected the fully-buffered content to have been posted, not discarded",
   );
+  // Note: the pipe never sent EOF here, so this still resolves via the idle
+  // timer — truncated=true is correct per NEW-B (readStdin cannot tell
+  // "producer finished, held the pipe open" from "producer stalled"), even
+  // though the buffered content happens to be complete.
 });
 
 test("NEW-2b: a slow stream that finishes normally is not truncated by the idle timer", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-slow-stream" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-slow-stream" });
 
   const child = spawn("node", [SCRIPT], {
     env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
@@ -344,13 +352,14 @@ test("NEW-2b: a slow stream that finishes normally is not truncated by the idle 
   assert.doesNotMatch(
     stdout,
     /truncat/i,
-    "a complete, EOF-terminated post must NOT be flagged as truncated",
+    "a complete, EOF-terminated post must NOT be flagged as truncated in the console message",
   );
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  const content = contentArg(dir);
   assert.ok(
-    argv.some((a) => a.includes(chunks.join(""))),
+    content.includes(chunks.join("")),
     "expected the full streamed content, not a truncated prefix",
   );
+  assert.match(content, /truncated=false$/);
 });
 
 // --- NEW-A: the idle timer alone has no upper bound. A producer that keeps
@@ -361,7 +370,7 @@ test("NEW-2b: a slow stream that finishes normally is not truncated by the idle 
 
 test("NEW-A: a drip-fed stdin that never goes idle is still bounded by a total deadline", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-slow-drip" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-slow-drip" });
 
   const child = spawn("node", [SCRIPT], {
     env: {
@@ -415,7 +424,7 @@ test("NEW-A: a drip-fed stdin that never goes idle is still bounded by a total d
 
 test("NEW-B: a mid-digest stall posts the truncated content but flags it, not a plain success", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-mid-stall" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-mid-stall" });
 
   const child = spawn("node", [SCRIPT], {
     env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
@@ -447,9 +456,9 @@ test("NEW-B: a mid-digest stall posts the truncated content but flags it, not a 
   child.stdin.destroy();
 
   assert.equal(result.code, 0);
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  const content = contentArg(dir);
   assert.ok(
-    argv.some((a) => a.includes(partial)),
+    content.includes(partial),
     "expected the partial content to still be posted",
   );
   assert.match(stdout, /digest posted/);
@@ -463,27 +472,26 @@ test("NEW-B: a mid-digest stall posts the truncated content but flags it, not a 
 // --- item 1: the console line doesn't survive the session; the event does.
 // The spec calls the Buzz log "a cryptographically signed mirror of session
 // history" — a partial digest indistinguishable from a complete one in that
-// permanent log falsifies exactly that. Tag the timer path so the event
-// itself (not just the terminal output) carries provenance of truncation.
+// permanent log falsifies exactly that. The provenance trailer's
+// truncated= field carries that fact into the event itself, not just into
+// the terminal output.
 
-test("item 1: an EOF-terminated post does not carry a truncated tag", () => {
+test("item 1: an EOF-terminated post carries truncated=false in the trailer", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-eof-tag-check" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-eof-tag-check" });
 
   const r = run([], { env: baseEnv(bin), input: "a complete digest via EOF" });
 
   assert.equal(r.status, 0);
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
-  const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
-  assert.ok(
-    !tags.some((t) => t.startsWith("truncated=")),
-    `expected no truncated tag on a clean EOF post, got: ${tags.join(", ")}`,
-  );
+  assert.match(contentArg(dir), /truncated=false$/);
 });
 
-test("item 1: a timer-truncated post carries a truncated=true tag", async () => {
+test("item 1: a timer-truncated post carries truncated=true in the trailer", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-timer-tag-check" });
+  const bin = fakeCli(dir, {
+    accepted: true,
+    event_id: "evt-timer-tag-check",
+  });
 
   const child = spawn("node", [SCRIPT], {
     env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
@@ -511,12 +519,7 @@ test("item 1: a timer-truncated post carries a truncated=true tag", async () => 
   child.stdin.destroy();
 
   assert.equal(result.code, 0);
-  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
-  const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
-  assert.ok(
-    tags.includes("truncated=true"),
-    `expected a truncated=true tag on the timer path, got: ${tags.join(", ")}`,
-  );
+  assert.match(contentArg(dir), /truncated=true$/);
 });
 
 // --- item 3: the sha lookup's `execSync("git rev-parse ...")` had no
@@ -527,7 +530,7 @@ test("item 1: a timer-truncated post carries a truncated=true tag", async () => 
 
 test("item 3: a hanging git does not hang the post — falls back to sha=unknown", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
-  const bin = fakeCli(dir, { id: "evt-hanging-git" });
+  const bin = fakeCli(dir, { accepted: true, event_id: "evt-hanging-git" });
   const fakeGitDir = mkdtempSync(path.join(tmpdir(), "buzz-fake-git-"));
   const fakeGit = path.join(fakeGitDir, "git");
   writeFileSync(fakeGit, `#!/usr/bin/env bash\nsleep 8\nexit 1\n`);
@@ -573,4 +576,5 @@ test("item 3: a hanging git does not hang the post — falls back to sha=unknown
     `expected the git call to be bounded well under the fake git's 8s sleep, took ${result.elapsed}ms`,
   );
   assert.match(stdout, /digest posted \(sha unknown/);
+  assert.match(contentArg(dir), /sha=unknown/);
 });

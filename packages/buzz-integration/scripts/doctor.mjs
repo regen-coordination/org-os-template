@@ -4,10 +4,10 @@ import { status, loadConfig } from "../lib/buzz.mjs";
 const cfg = loadConfig();
 const s = status(cfg);
 const label = {
-  bin: "buzz-cli on PATH (pinned)",
+  bin: "buzz binary on PATH (pinned)",
   relay: `relay ${cfg.relayUrl}`,
-  key: "agent key (BUZZ_NSEC)",
-  channel: `channel #${cfg.channel}`,
+  key: "agent key (BUZZ_PRIVATE_KEY)",
+  channel: `channel ${cfg.channel}`,
 };
 for (const [k, ok] of Object.entries(s.checks))
   console.log(` ${ok ? "✓" : "✗"} ${label[k]}`);

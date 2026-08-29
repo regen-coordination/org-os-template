@@ -21,9 +21,10 @@ const SCRIPT = path.resolve(
 
 // Fake CLI fixture, reused verbatim from tests/buzz-integration/buzz-lib.test.mjs:
 // records argv to argv.json and prints a canned JSON reply on stdout regardless
-// of which intent (post/read/status) it was invoked for.
+// of which intent (post/read/status) it was invoked for. `messages get` (the
+// real read verb) replies with a top-level JSON array, not `{events: [...]}`.
 function fakeCli(dir, reply) {
-  const bin = path.join(dir, "fake-buzz-cli.mjs");
+  const bin = path.join(dir, "fake-buzz.mjs");
   writeFileSync(
     bin,
     `#!/usr/bin/env node
@@ -46,17 +47,15 @@ function run(args, env) {
 const baseEnv = (bin) => ({
   BUZZ_CLI_BIN: bin,
   BUZZ_CHANNEL: "org-os-dev",
-  BUZZ_RELAY_URL: "ws://localhost:3000",
-  BUZZ_NSEC: "nsec1fake",
+  BUZZ_RELAY_URL: "http://localhost:3000",
+  BUZZ_PRIVATE_KEY: "nsec1fake",
 });
 
 test("read-since: prints event content and advances marker", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, {
-    events: [
-      { id: "e1", created_at: 1700000000, pubkey: "p", content: "hello world" },
-    ],
-  });
+  const bin = fakeCli(dir, [
+    { id: "e1", created_at: 1700000000, pubkey: "p", content: "hello world" },
+  ]);
   const state = path.join(dir, "state.json");
 
   const r = run(["--state", state], baseEnv(bin));
@@ -71,11 +70,9 @@ test("read-since: prints event content and advances marker", () => {
 
 test("read-since: corrupt marker file still works (falls back to 24h window)", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, {
-    events: [
-      { id: "e1", created_at: 1700000000, pubkey: "p", content: "still works" },
-    ],
-  });
+  const bin = fakeCli(dir, [
+    { id: "e1", created_at: 1700000000, pubkey: "p", content: "still works" },
+  ]);
   const state = path.join(dir, "state.json");
   writeFileSync(state, "{ this is not valid json");
 
@@ -94,7 +91,7 @@ test("read-since: dead binary → exit 0 with skipped in stdout", () => {
 
   const r = run(
     ["--state", state],
-    baseEnv("/nonexistent/buzz-cli-does-not-exist"),
+    baseEnv("/nonexistent/buzz-does-not-exist"),
   );
 
   assert.equal(r.status, 0);
@@ -103,11 +100,9 @@ test("read-since: dead binary → exit 0 with skipped in stdout", () => {
 
 test("read-since: --no-advance leaves marker untouched", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, {
-    events: [
-      { id: "e1", created_at: 1700000000, pubkey: "p", content: "no advance" },
-    ],
-  });
+  const bin = fakeCli(dir, [
+    { id: "e1", created_at: 1700000000, pubkey: "p", content: "no advance" },
+  ]);
   const state = path.join(dir, "state.json");
   writeFileSync(state, JSON.stringify({ lastRead: 1234567890 }));
 
@@ -118,11 +113,11 @@ test("read-since: --no-advance leaves marker untouched", () => {
   assert.equal(marker.lastRead, 1234567890);
 });
 
-// --- C1: a reply that parses as JSON but doesn't have a well-formed
-// `events` array must never crash the script (was: unguarded `.length` /
-// `new Date(...)` access → TypeError/RangeError, exit 1 with a stack trace).
+// --- C1: a reply that parses as JSON but isn't the real top-level array
+// shape must never crash the script (was: unguarded `.length` / `new
+// Date(...)` access → TypeError/RangeError, exit 1 with a stack trace).
 
-test("C1a: reply with no events key at all does not crash", () => {
+test("C1a: an object reply (not the real bare-array shape) does not crash", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
   const bin = fakeCli(dir, { ok: true, result: "fine" });
   const state = path.join(dir, "state.json");
@@ -152,9 +147,9 @@ test("C1b: null reply does not crash", () => {
   assert.doesNotMatch(r.stderr, /Error/);
 });
 
-test("C1c: events field that is not an array does not crash", () => {
+test("C1c: a bare-string reply (neither object nor array) does not crash", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, { events: "oops" });
+  const bin = fakeCli(dir, "oops");
   const state = path.join(dir, "state.json");
 
   const r = run(["--state", state], baseEnv(bin));
@@ -167,9 +162,9 @@ test("C1c: events field that is not an array does not crash", () => {
   assert.doesNotMatch(r.stderr, /Error/);
 });
 
-test("C1d: malformed event entries (null, bare number) do not crash", () => {
+test("C1d: a top-level array with malformed entries (null, bare number) does not crash", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, { events: [null, 5] });
+  const bin = fakeCli(dir, [null, 5]);
   const state = path.join(dir, "state.json");
 
   const r = run(["--state", state], baseEnv(bin));
@@ -189,9 +184,9 @@ test("C1d: malformed event entries (null, bare number) do not crash", () => {
 
 test("C2a: state path under a nonexistent parent directory does not crash", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, {
-    events: [{ id: "e1", created_at: 1700000000, pubkey: "p", content: "hi" }],
-  });
+  const bin = fakeCli(dir, [
+    { id: "e1", created_at: 1700000000, pubkey: "p", content: "hi" },
+  ]);
   const state = path.join(dir, "no-such-subdir", "state.json");
 
   const r = run(["--state", state], baseEnv(bin));
@@ -206,9 +201,9 @@ test("C2a: state path under a nonexistent parent directory does not crash", () =
 
 test("C2b: state path that is itself a directory does not crash", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, {
-    events: [{ id: "e1", created_at: 1700000000, pubkey: "p", content: "hi" }],
-  });
+  const bin = fakeCli(dir, [
+    { id: "e1", created_at: 1700000000, pubkey: "p", content: "hi" },
+  ]);
   const state = path.join(dir, "state-is-a-dir");
   mkdirSync(state);
 
@@ -234,7 +229,7 @@ test("I2a: marker is not advanced when the read fails", () => {
 
   const r = run(
     ["--state", state],
-    baseEnv("/nonexistent/buzz-cli-does-not-exist"),
+    baseEnv("/nonexistent/buzz-does-not-exist"),
   );
 
   assert.equal(r.status, 0);
@@ -248,7 +243,7 @@ test("I2a: marker is not advanced when the read fails", () => {
 
 test("I2b: with no marker file, --since sent to the CLI is ~(now - 24h) and is actually sent", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, { events: [] });
+  const bin = fakeCli(dir, []);
   const state = path.join(dir, "state.json"); // does not exist yet
 
   const before = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
@@ -268,11 +263,12 @@ test("I2b: with no marker file, --since sent to the CLI is ~(now - 24h) and is a
 
 // --- NEW-1: the C1 guard must not conflate "reply shape unrecognized" with
 // "genuinely zero new events" — collapsing them both into events=[] means an
-// unrecognized shape (e.g. a field rename during buzz-cli preview drift, or
-// `{}` from a relay proxy) is reported as "no new messages" AND advances the
-// marker, permanently skipping whatever messages were actually there.
+// unrecognized shape (e.g. a field rename during a future buzz preview
+// drift, or `{}` from a relay proxy) is reported as "no new messages" AND
+// advances the marker, permanently skipping whatever messages were actually
+// there.
 
-test("NEW-1a: an unrecognized reply shape (renamed field) does not advance the marker or claim zero messages", () => {
+test("NEW-1a: an unrecognized reply shape (object instead of the real bare array) does not advance the marker or claim zero messages", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
   const bin = fakeCli(dir, {
     messages: [
@@ -338,16 +334,14 @@ test("NEW-1b: an empty-object reply ({}) is also unrecognized, not zero events",
 
 test("cheap: non-string content field renders the content, not the whole event", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, {
-    events: [
-      {
-        id: "e1",
-        created_at: 1700000000,
-        pubkey: "p",
-        content: { text: "nested payload" },
-      },
-    ],
-  });
+  const bin = fakeCli(dir, [
+    {
+      id: "e1",
+      created_at: 1700000000,
+      pubkey: "p",
+      content: { text: "nested payload" },
+    },
+  ]);
   const state = path.join(dir, "state.json");
 
   const r = run(["--state", state], baseEnv(bin));
@@ -358,13 +352,13 @@ test("cheap: non-string content field renders the content, not the whole event",
 });
 
 // --- NEW-C: the empty-vs-unrecognized distinction (NEW-1) is only half
-// tested without this — a genuinely empty `events: []]` must still advance
-// the marker, or a quiet channel's marker freezes forever and every future
-// run re-scans an ever-widening window.
+// tested without this — a genuinely empty top-level array `[]` must still
+// advance the marker, or a quiet channel's marker freezes forever and every
+// future run re-scans an ever-widening window.
 
-test("NEW-C: a genuinely empty events array still advances the marker", () => {
+test("NEW-C: a genuinely empty top-level array still advances the marker", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "buzz-read-"));
-  const bin = fakeCli(dir, { events: [] });
+  const bin = fakeCli(dir, []);
   const state = path.join(dir, "state.json");
   writeFileSync(state, JSON.stringify({ lastRead: 1700000000 }));
 
