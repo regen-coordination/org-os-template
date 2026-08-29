@@ -80,6 +80,75 @@ package `packages/cloudflare-os-integration/`
 
 ---
 
+### org-os-berd — Berd Desktop Integration
+
+**What it is.** The bridge between an org-os instance and
+[Berd](https://github.com/block/berd), Block's open-source Goose-backed desktop agent app:
+canonical in-repo personas plus a curated slice of org-os skills, both surfaced through Berd's
+project-local `.agents/` discovery.
+
+**How it works.** A hybrid manifest. Identity entries own the shipped personas layer —
+`.agents/agents/{operator,upstream}.md` mirrored by `scripts/sync-agents.mjs`, verified live in
+the Berd app since 2026-08-20. Materialization entries (`skills/<name>: .agents/skills/<name>`)
+double as the module's curated exposure list: five skills — `org-os-init`,
+`meeting-processor`, `heartbeat-monitor`, `knowledge-curator`, `funding-scout` — mirrored
+one-way and marker-guarded (`managed_by: org-os`) by `scripts/sync-skills-berd.mjs`
+(`npm run sync:skills:berd`), the same pattern `sync-agents.mjs` uses for personas. `--check`
+byte-compares the mirror and is wired into `npm run selftest` (optional, `skipKey: "berd"`).
+
+**Status.** `pilot` — built and verified, not yet running in production. The personas layer is
+verified live in the Berd app (2026-08-20); the skills bridge is built, tested, and now
+discovery-verified live: `goosed skills list` (Berd v0.6.2's own bundled Goose backend), run
+from the repo root, discovered all five bridged skills at their `.agents/skills/<name>` paths —
+each with parsed frontmatter and non-zero description/content token counts — alongside the
+untouched `feynman` sub-skills. That supersedes the source-level inference this entry
+previously relied on. What remains before `live`: exercising each bridged skill under Goose to
+do real work (plan Task 5's per-skill verdict + pruning pass) and the 5-use dogfood tally. See
+`docs/integrations/berd.md` for the full verification trail.
+
+**Links:** [manifest](../modules/org-os-berd/module.yaml) ·
+[discovery & verification](integrations/berd.md) ·
+[design](superpowers/specs/2026-08-28-berd-integration-design.md) ·
+[architecture](AGENTIC-ARCHITECTURE.md)
+
+---
+
+### org-os-buzz — Buzz Agent Lane
+
+**What it is.** A signed, cryptographically-provenanced comms lane between org-os sessions and
+a local [Buzz](https://github.com/block/buzz) relay: `/close` posts a SHA-tagged digest of the
+session to `#org-os-dev`, `/initialize` reads the channel back. Fail-open everywhere — the lane
+never blocks a session.
+
+**How it works.** `packages/buzz-integration/lib/buzz.mjs` is a thin wrapper that shells out to
+a pinned `buzz` binary (JSON in/out) for `postEvent`, `readChannel`, and `status`; nothing
+else in the repo speaks the Nostr protocol Buzz is built on. Three root-invoked scripts sit on
+top — `npm run buzz:post`, `npm run buzz:read`, `npm run buzz:doctor` — and the session skills
+gain two optional hooks: a read-back step in `/initialize` and a digest-post step in `/close`,
+both fail-open (a non-green `doctor` or any lane error prints a one-line skip and never blocks
+the session).
+
+**Status.** `pilot` — built and verified, not yet running in production. Verified end-to-end
+2026-08-29 against a live local relay (`deploy/compose`, image `ghcr.io/block/buzz:main`) and
+the real `buzz` binary: `npm run buzz:doctor` reports all four checks green and exits 0,
+`npm run buzz:post` posted a SHA-tagged digest, and `npm run buzz:read` read it back with its
+`org-os: sha=… source=org-os-session truncated=false` provenance trailer intact. `CLI_MAP` in
+`lib/buzz.mjs` now encodes the observed CLI surface, not documented guesses — see
+`packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**) for the full trail. Every
+session surface — project commands, in-repo skills, the Berd-bridged `org-os-init` mirror, and
+the machine-local `~/.claude/skills/` mirrors some tools (e.g. Zed/claude-acp) read instead of
+the project copy — carries both hooks as of 2026-08-29. What remains before `live`: the
+5-consecutive-session `/close`-posts + `/initialize`-reads dogfood tally (HEARTBEAT.md
+tracker; 0/5).
+
+**Links:** [manifest](../modules/org-os-buzz/module.yaml) ·
+[operations runbook](integrations/buzz.md) ·
+[verification trail](../packages/buzz-integration/VERIFIED.md) ·
+[design](superpowers/specs/2026-08-28-buzz-integration-design.md) ·
+package `packages/buzz-integration/`
+
+---
+
 ## The v5 core tranche
 
 The seven modules the v5 spec migrates first. Each proves a different module shape; none has a

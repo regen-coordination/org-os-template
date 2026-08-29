@@ -74,3 +74,6 @@ graphify-out/.graphify_root
 
 # Playwright test artifacts (site/)
 site/test-results/
+
+# Buzz agent lane — local read-marker state (machine-specific)
+.buzz-state.json

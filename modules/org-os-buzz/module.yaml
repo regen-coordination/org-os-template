@@ -1,0 +1,20 @@
+# org-os-buzz — the Buzz agent-lane integration (module #3).
+#
+# An IN-PLACE module: everything it owns already sits at its canonical path.
+# The external dependency (block/buzz at the pinned release) is recorded in
+# packages/buzz-integration/VERIFIED.md, not here — the v5 schema models
+# module-to-module deps only.
+id: org-os-buzz
+version: 0.1.0
+type: integration
+description: >-
+  Buzz agent lane — org-os sessions post SHA-tagged signed digests to a local
+  Buzz relay channel on /close and read it back on /initialize, via a thin
+  wrapper over the pinned buzz binary. Fail-open everywhere; local relay only.
+dependencies:
+  - org-os-standards
+files:
+  packages/buzz-integration: packages/buzz-integration
+checks:
+  - file-exists: packages/buzz-integration/lib/buzz.mjs
+  - file-exists: packages/buzz-integration/VERIFIED.md

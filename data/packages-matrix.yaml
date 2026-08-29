@@ -133,6 +133,14 @@ packages:
     lifecycle_status: "active"
     notes: "opencode npm plugin: registers two tools (org_os_page, org_os_tui) + 5 slash-command templates (/dashboard, /initialize, /org-projects, /org-decisions, /org-this-week). In active framework use; awaiting instance adoption signal."
 
+  - id: "buzz-integration"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    lifecycle_status: "active"
+    notes: "@buzz-integration — thin wrapper (lib/buzz.mjs) over the pinned buzz binary for a signed, SHA-tagged session-digest comms lane (npm run buzz:post/read/doctor), wired fail-open into /initialize and /close. Verified end-to-end 2026-08-29 against a live local relay (deploy/compose, image ghcr.io/block/buzz:main) and the real buzz binary: doctor reports all four checks green and exits 0, and post/read round-tripped a digest with its provenance trailer intact. CLI_MAP in lib/buzz.mjs now encodes the observed CLI surface, not documented guesses. Ships modules/org-os-buzz/module.yaml as the third tracked module. See packages/buzz-integration/VERIFIED.md (status: VERIFIED) for the full trail. Still open before the lane runs in production: the 5-consecutive-session /close-posts + /initialize-reads dogfood tally (HEARTBEAT.md tracker) and syncing the /initialize read-back hook to machine-local skill mirrors some tools read instead of the project copy. 56/56 tests green against the fixture."
+
   # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
     owner: "refi-bcn-os"

@@ -98,6 +98,12 @@ Print the script output **exactly as received**. The dashboard includes:
 - **Recent Memory** — Last 3 memory entries
 - **Apps** — Available workspace applications
 
+### Step 3b: Buzz Channel Read-Back (optional, fail-open)
+
+If the workspace has the Buzz lane configured (`npm run buzz:doctor` exits 0), run
+`npm run buzz:read` and fold its output into Step 4's session context under "Since last
+session". If the doctor isn't green, skip silently — one line at most.
+
 ### Step 4: Set Session Context
 
 After displaying the dashboard, note for yourself:

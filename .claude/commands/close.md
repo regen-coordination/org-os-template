@@ -81,6 +81,26 @@ git add memory/ HEARTBEAT.md MEMORY.md data/ docs/agent-plans/ graphify-out/
 git commit -m "session: [concise description of what was done]"
 ```
 
+## 8b. Post session digest to Buzz (optional, fail-open)
+
+After the close commit exists, publish the session digest through the Buzz lane. Write
+the digest text (the Session Summary panel from Step 1) to a temp file and post it with
+`--file` — never a bare pipe or an inherited terminal stdin that a producer could leave
+open:
+
+```bash
+DIGEST_FILE=$(mktemp)
+cat > "$DIGEST_FILE" <<'BUZZ_DIGEST_EOF'
+<digest text>
+BUZZ_DIGEST_EOF
+npm run buzz:post -- --file "$DIGEST_FILE"
+rm -f "$DIGEST_FILE"
+```
+
+The script appends a machine-readable provenance trailer to the digest content
+(`org-os: sha=<short> source=org-os-session truncated=<bool>`) carrying the commit SHA.
+Any failure prints a skip line — never block the close.
+
 ## 9. Push
 
 ```bash

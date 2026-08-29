@@ -70,8 +70,52 @@ report's own fix-list.
 - [ ] Investigate: git commit timestamps run ~2 weeks behind the system clock (commits stamped 2026-07-19 while `date` says 2026-08-02) — dashboard "N days ago" math will read wrong until resolved
 - [ ] Run `npm run generate:schemas` after any `data/` edit
 
+### Berd bridge dogfood acceptance (module #4 → live)
+
+- [x] ~~**Prerequisite — live confirmation of the discovery path.**~~ — **done 2026-08-29**: `/Applications/Berd.app/Contents/MacOS/goosed skills list`, run from the repo root, discovered all five bridged skills at their `.agents/skills/<name>` paths with parsed frontmatter and non-zero description/content token counts, alongside the untouched `feynman` sub-skills (evidence: `/tmp/goose-skills.txt`). This exercises Berd's actual bundled Goose backend directly — stronger evidence than the live-GUI walkthrough this item originally specified — so it satisfies the prerequisite; see `docs/integrations/berd.md`'s 2026-08-29 note.
+- [ ] **Prerequisite — Goose verification + pruning pass (plan Task 5):** exercise each of the five bridged skills once under Goose to do real work, record the per-skill verdict in a "Goose verification" table in `docs/integrations/berd.md`, and prune any that fail from `modules/org-os-berd/module.yaml`'s exposure list, then re-run `npm run sync:skills:berd -- --check`. Discovery is confirmed; functional use under Goose is not — that's why the module is catalogued `pilot` rather than `live`.
+- [ ] One full org-os session (initialize → work → close) driven from Berd/Goose
+- [ ] 5 real work uses of bridged skills from Berd: ☐ ☐ ☐ ☐ ☐
+      (on completion: flip docs/MODULES.md org-os-berd to **live**, update the
+      site mirror + QUEUE entry; then evaluate the Buzz×Berd v2 trigger —
+      both acceptances passed?)
+
+### Buzz lane dogfood acceptance (module #3 → live)
+
+- [x] ~~**Prerequisite — plan Task 1 (pin and verify).**~~ — **done 2026-08-29**: cloned/pinned
+      `block/buzz`, brought up its local relay (`deploy/compose`, image
+      `ghcr.io/block/buzz:main`), minted the agent keypair, and exercised the real `buzz`
+      binary directly. `CLI_MAP` in `lib/buzz.mjs` was reconciled to the observed surface — see
+      `packages/buzz-integration/VERIFIED.md` (status: VERIFIED).
+- [x] ~~**Prerequisite — record the npub.**~~ — **done 2026-08-29**: `TOOLS.md`'s Buzz section
+      carries the agent's real npub
+      (`npub16pl9y5zxuq5fujfqan6n34m42x5qarl8emkea3nvytm97egjdduqy39kdn`). The private key never
+      goes in any tracked file — only `.env` as `BUZZ_PRIVATE_KEY` (not `BUZZ_NSEC`, which the
+      real CLI does not read at all — see VERIFIED.md).
+- [x] ~~**Prerequisite — plan Task 8 Step 1 (the live round-trip).**~~ — **done 2026-08-29**:
+      with the relay up and `.env` filled, `npm run buzz:doctor` reported all four checks green
+      and exited 0; `npm run buzz:post` posted a SHA-tagged digest; `npm run buzz:read` read it
+      back with its provenance trailer intact, exit 0. Transcript recorded in `VERIFIED.md`.
+- [x] ~~**Prerequisite — sync the machine-local skill mirror (after this branch merges).**~~ —
+      **done 2026-08-29** (verified by inspection during the lane review pass): both
+      machine-local mirrors carry their hooks (`~/.claude/skills/initialize/SKILL.md` Step 3b
+      read-back; `~/.claude/skills/close/SKILL.md` Step 6b digest post), and the 2026-08-29
+      `/initialize` session exercised the user-level read-back live (doctor green, channel
+      read, marker advanced). The in-repo half of the gap closed in `7b9a78c`
+      (`skills/initialize/SKILL.md` gained Step 3b; `skills/org-os-init/SKILL.md` gained both
+      hooks) and the Berd mirror was re-materialized in `e3b1dc0`. All eight session surfaces
+      now carry their hooks — see the surfaces table in `docs/integrations/buzz.md` — so the
+      acceptance tally below can be satisfied from any surface. (Hooks on Hermes/Berd surfaces
+      exist but have not yet *fired* from those runtimes — that's the Berd acceptance's
+      business, not this item's.)
+- [ ] 5 consecutive real sessions where /close posts and /initialize reads with zero
+      manual intervention: ☐ ☐ ☐ ☐ ☐ (tick per session; on the 5th, flip
+      docs/MODULES.md org-os-buzz to **live**, update the site mirror + QUEUE entry, and
+      re-evaluate `lifecycle_status` in data/packages-matrix.yaml)
+
 ### Orchestration (multi-instance)
 - [ ] Weekly: run `npm run analyze:instances` and review drift report
+- [ ] **Known issue: `analyze-instances.mjs` overwrites the tracked drift report with placeholders when run from a worktree** — running `npm run selftest` or `npm run analyze:instances` from a git worktree (not the primary checkout) rewrites `memory/reports/instances-drift-<today>.md`, replacing real drift data with "Not locally scannable" for every instance. Root cause: `frameworkRoot` is derived from `process.argv[1]` (`scripts/analyze-instances.mjs:18`) and resolves each instance's `local_path` relative to the worktree root instead of the primary checkout, so no sibling org-instance dir is ever found; the unconditional `writeFileSync` (`scripts/analyze-instances.mjs:246`) then writes the placeholder report anyway. Found 2026-08-29 during Task 4 (berd integration) selftest wiring. Mitigation: `git restore` the report file after any worktree-run gate, never stage it. Real fix: skip the write (or gate it behind at least one instance actually being scannable) instead of silently overwriting real data with placeholders.
 - [ ] Review skill-promotion candidates (see `data/skills-matrix.yaml` where `promotion_status: candidate`)
   - `safe-treasury`, `hats-governance`, `gardens-governance`, `karma-reputation`, `eip4824-identity` — DAO modules in dao-os; evaluate for framework
 - [x] ~~`research` promotion — promoted to framework v0.5 (2026-07-15 consolidation; 3 instance copies reconciled)~~

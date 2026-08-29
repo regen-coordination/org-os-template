@@ -10,6 +10,7 @@ metadata:
       env: []
       bins: []
       config: []
+managed_by: org-os
 ---
 
 # Meeting Processor

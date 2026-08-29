@@ -17,6 +17,7 @@
     "sync:upstream": "node scripts/sync-upstream.mjs",
     "sync:commands": "node scripts/sync-commands.mjs",
     "sync:agents": "node scripts/sync-agents.mjs",
+    "sync:skills:berd": "node scripts/sync-skills-berd.mjs",
     "generate:schemas": "node scripts/generate-all-schemas.mjs",
     "validate:schemas": "node scripts/validate-identity.mjs",
     "validate:structure": "node scripts/validate-structure.mjs",
@@ -36,7 +37,7 @@
     "knowledge": "npm run compile:knowledge && npm run lint:knowledge",
     "graph:status": "node scripts/graph-status.mjs --format=markdown",
     "graph:gaps": "node scripts/graph-gaps.mjs",
-    "graph:update": "command -v graphify >/dev/null 2>&1 && graphify . --update || echo 'graph: CLI not installed \u2014 see docs/integrations/graphify.md'",
+    "graph:update": "command -v graphify >/dev/null 2>&1 && graphify . --update || echo 'graph: CLI not installed — see docs/integrations/graphify.md'",
     "check:divergence": "node scripts/check-divergence.mjs",
     "selftest": "node scripts/selftest.mjs",
     "version:check": "node scripts/update-version.mjs --check",
@@ -64,7 +65,10 @@
     "build:site": "cd repos/refi-bcn-knowledge && npx quartz build",
     "serve:site": "cd repos/refi-bcn-knowledge && npx quartz build --serve",
     "admin": "npm --prefix packages/admin run start",
-    "admin:dev": "npm --prefix packages/admin run dev"
+    "admin:dev": "npm --prefix packages/admin run dev",
+    "buzz:doctor": "node packages/buzz-integration/scripts/doctor.mjs",
+    "buzz:post": "node packages/buzz-integration/scripts/post-digest.mjs",
+    "buzz:read": "node packages/buzz-integration/scripts/read-since.mjs"
   },
   "engines": {
     "npm": ">=10.9.2",

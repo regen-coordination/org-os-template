@@ -27,6 +27,7 @@ metadata:
     - initialize
     - heartbeat-monitor
     - funding-scout
+managed_by: org-os
 ---
 
 # Org-OS Session Lifecycle
