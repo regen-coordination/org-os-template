@@ -97,8 +97,9 @@ npm run buzz:post -- --file "$DIGEST_FILE"
 rm -f "$DIGEST_FILE"
 ```
 
-The script tags the event with the commit SHA automatically. Any failure prints a skip
-line — never block the close.
+The script appends a machine-readable provenance trailer to the digest content
+(`org-os: sha=<short> source=org-os-session truncated=<bool>`) carrying the commit SHA.
+Any failure prints a skip line — never block the close.
 
 ## 9. Push
 
