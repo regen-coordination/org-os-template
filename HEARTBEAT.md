@@ -72,6 +72,8 @@ report's own fix-list.
 
 ### Berd bridge dogfood acceptance (module #4 → live)
 
+- [ ] **Prerequisite — live GUI confirmation of the discovery path:** `docs/integrations/berd.md` verified `.agents/skills/` from Berd's own Tauri scanner and Goose's own source, but marks live confirmation PENDING OPERATOR. The operator opens this repo as a Berd project and confirms the five bridged skills are discovered alongside `feynman`.
+- [ ] **Prerequisite — Goose verification + pruning pass (plan Task 5):** exercise each of the five bridged skills once under Goose, record the per-skill verdict in a "Goose verification" table in `docs/integrations/berd.md`, and prune any that fail from `modules/org-os-berd/module.yaml`'s exposure list, then re-run `npm run sync:skills:berd -- --check`. Note that until this runs, the exposure list names skills that are materialized but unverified — which is exactly why the module is catalogued `in-dev` rather than `pilot`.
 - [ ] One full org-os session (initialize → work → close) driven from Berd/Goose
 - [ ] 5 real work uses of bridged skills from Berd: ☐ ☐ ☐ ☐ ☐
       (on completion: flip docs/MODULES.md org-os-berd to **live**, update the
