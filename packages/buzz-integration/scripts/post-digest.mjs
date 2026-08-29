@@ -40,10 +40,14 @@ const flagValue = (n) => {
 // re-arming it indefinitely, turning the hang guard back into a hang. A
 // second, never-rearmed total-deadline timer runs alongside it; whichever
 // fires first ends the read. Default 15000ms matches lib/buzz.mjs's own
-// invoke() CLI timeout, so nothing in this pipeline blocks more than 15s;
-// real /close invocations complete in well under a second per the plan's
-// own timing audit (0.11-0.39s), so this should only ever engage against a
-// stalled or adversarial producer.
+// invoke() CLI timeout for the same *stage* of the pipeline. That is NOT
+// an end-to-end bound on this script: the stdin read (up to 15s), the git
+// sha lookup (up to 5s, see item 3 below), and postEvent's own CLI
+// invocation (up to 15s, in lib/buzz.mjs's invoke()) are sequential and
+// additive, so the real worst case here is on the order of 35s, not 15s.
+// Real /close invocations complete in well under a second per the plan's
+// own timing audit (0.11-0.39s), so any of these stages should only ever
+// engage against a stalled or adversarial producer/git/relay.
 //
 // NEW-B: either timer firing with data already buffered means the read
 // ended before natural EOF — the content may or may not be everything the
@@ -146,17 +150,34 @@ let sha = "unknown";
 try {
   // M2: don't let git's own stderr (e.g. "fatal: not a git repository")
   // leak into this script's output ahead of the correct fail-open result.
+  // item 3: a hanging or pathologically slow git (a stuck NFS-mounted
+  // .git, a misbehaving hook, an adversarial PATH entry) must not block
+  // the whole script — 5000ms is ample for `rev-parse --short HEAD`, and
+  // a timeout falls into the same catch as any other git failure below.
   sha = execSync("git rev-parse --short HEAD", {
     encoding: "utf8",
     cwd: ROOT,
     stdio: ["ignore", "pipe", "ignore"],
+    timeout: 5000,
   }).trim();
 } catch {
   /* keep unknown */
 }
 
 const r = postEvent(
-  { content: content.trim(), tags: { sha, source: "org-os-session" } },
+  {
+    content: content.trim(),
+    // item 1: the console line doesn't survive the session; the signed
+    // event does. A partial digest indistinguishable from a complete one
+    // in that permanent log misrepresents exactly the provenance guarantee
+    // the log exists for — tag the timer path so it's recoverable from the
+    // event itself, not just from /close's terminal output at the time.
+    tags: {
+      sha,
+      source: "org-os-session",
+      ...(truncated ? { truncated: "true" } : {}),
+    },
+  },
   loadConfig(),
 );
 console.log(

@@ -341,6 +341,11 @@ test("NEW-2b: a slow stream that finishes normally is not truncated by the idle 
 
   assert.equal(result.code, 0);
   assert.match(stdout, /digest posted/);
+  assert.doesNotMatch(
+    stdout,
+    /truncat/i,
+    "a complete, EOF-terminated post must NOT be flagged as truncated",
+  );
   const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
   assert.ok(
     argv.some((a) => a.includes(chunks.join(""))),
@@ -450,7 +455,122 @@ test("NEW-B: a mid-digest stall posts the truncated content but flags it, not a 
   assert.match(stdout, /digest posted/);
   assert.match(
     stdout,
-    /truncat/i,
+    /content may be truncated/i,
     "expected the success message to flag that the content may be incomplete",
   );
+});
+
+// --- item 1: the console line doesn't survive the session; the event does.
+// The spec calls the Buzz log "a cryptographically signed mirror of session
+// history" — a partial digest indistinguishable from a complete one in that
+// permanent log falsifies exactly that. Tag the timer path so the event
+// itself (not just the terminal output) carries provenance of truncation.
+
+test("item 1: an EOF-terminated post does not carry a truncated tag", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-eof-tag-check" });
+
+  const r = run([], { env: baseEnv(bin), input: "a complete digest via EOF" });
+
+  assert.equal(r.status, 0);
+  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
+  assert.ok(
+    !tags.some((t) => t.startsWith("truncated=")),
+    `expected no truncated tag on a clean EOF post, got: ${tags.join(", ")}`,
+  );
+});
+
+test("item 1: a timer-truncated post carries a truncated=true tag", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-timer-tag-check" });
+
+  const child = spawn("node", [SCRIPT], {
+    env: { ...process.env, ...baseEnv(bin), BUZZ_STDIN_TIMEOUT_MS: "300" },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise((resolve) =>
+    child.on("exit", (code) => resolve(code)),
+  );
+  child.stdin.on("error", () => {});
+  child.stdin.write("a digest that stalls before the tag check");
+  // Never end() — the pipe stalls, forcing the timer path.
+
+  const outerTimeoutMs = 4000;
+  const result = await Promise.race([
+    exitPromise.then((code) => ({ code })),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ timedOut: true }), outerTimeoutMs),
+    ),
+  ]);
+  if (result.timedOut) {
+    child.kill("SIGKILL");
+    child.stdin.destroy();
+    assert.fail(`post-digest did not exit within ${outerTimeoutMs}ms`);
+  }
+  child.stdin.destroy();
+
+  assert.equal(result.code, 0);
+  const argv = JSON.parse(readFileSync(path.join(dir, "argv.json"), "utf8"));
+  const tags = argv.filter((a, i) => argv[i - 1] === "--tag");
+  assert.ok(
+    tags.includes("truncated=true"),
+    `expected a truncated=true tag on the timer path, got: ${tags.join(", ")}`,
+  );
+});
+
+// --- item 3: the sha lookup's `execSync("git rev-parse ...")` had no
+// timeout of its own — a hanging or pathologically slow `git` (a stuck
+// NFS-mounted .git, a misbehaving hook, an adversarial PATH entry) could
+// block the whole script well past whatever bound the stdin read itself
+// enforces. A hanging `git` must fall back to sha=unknown, not hang.
+
+test("item 3: a hanging git does not hang the post — falls back to sha=unknown", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "buzz-post-"));
+  const bin = fakeCli(dir, { id: "evt-hanging-git" });
+  const fakeGitDir = mkdtempSync(path.join(tmpdir(), "buzz-fake-git-"));
+  const fakeGit = path.join(fakeGitDir, "git");
+  writeFileSync(fakeGit, `#!/usr/bin/env bash\nsleep 8\nexit 1\n`);
+  chmodSync(fakeGit, 0o755);
+
+  const start = Date.now();
+  const child = spawn("node", [SCRIPT], {
+    env: {
+      ...process.env,
+      ...baseEnv(bin),
+      PATH: `${fakeGitDir}:${process.env.PATH}`,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const exitPromise = new Promise((resolve) =>
+    child.on("exit", (code) => resolve(code)),
+  );
+  let stdout = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stdin.end("digest content for the hanging-git test");
+
+  // Bounded harness kill — generous relative to the intended ~5s git
+  // timeout, but well under the fake git's own 8s sleep, so a regression
+  // (no timeout at all) is caught by SIGKILL rather than an actual
+  // multi-minute wait if the fake git were ever made to sleep longer.
+  const outerTimeoutMs = 11000;
+  const result = await Promise.race([
+    exitPromise.then((code) => ({ code, elapsed: Date.now() - start })),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ timedOut: true }), outerTimeoutMs),
+    ),
+  ]);
+  if (result.timedOut) {
+    child.kill("SIGKILL");
+    assert.fail(
+      `post-digest did not exit within ${outerTimeoutMs}ms against a hanging git`,
+    );
+  }
+
+  assert.equal(result.code, 0);
+  assert.ok(
+    result.elapsed < 7000,
+    `expected the git call to be bounded well under the fake git's 8s sleep, took ${result.elapsed}ms`,
+  );
+  assert.match(stdout, /digest posted \(sha unknown/);
 });
