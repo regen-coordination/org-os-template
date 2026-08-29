@@ -96,20 +96,18 @@ report's own fix-list.
       with the relay up and `.env` filled, `npm run buzz:doctor` reported all four checks green
       and exited 0; `npm run buzz:post` posted a SHA-tagged digest; `npm run buzz:read` read it
       back with its provenance trailer intact, exit 0. Transcript recorded in `VERIFIED.md`.
-- [ ] **Prerequisite — sync the machine-local skill mirror (after this branch merges):**
-      `~/.claude/skills/initialize/SKILL.md` and `~/.claude/skills/close/SKILL.md` need the
-      same two hook steps that landed in `.claude/commands/initialize.md` and `close.md` —
-      some tools (e.g. Zed/claude-acp) scan only the user-level copy, not the project one, so
-      until this syncs the hooks won't fire there. Deliberately not done from this worktree:
-      the branch is unmerged, and mutating machine-local state ahead of that would apply the
-      hooks before the code they depend on has landed. Same gap, in-repo: `skills/initialize/SKILL.md`
-      never received the read-back hook (`sync-commands.mjs` deliberately skips generating a
-      command-skill for `/initialize` since this real skill already owns that name — it logs
-      "hermes: skip /initialize (a real skill already provides it)"), while
-      `skills/commands/close/SKILL.md` did receive the post hook; and `skills/org-os-init/SKILL.md`
-      (one of the five skills bridged into Berd) carries neither hook. Net effect: close posts but
-      initialize never reads, so the marker never advances and the acceptance below cannot be
-      satisfied from Hermes or Berd surfaces until both are patched too.
+- [x] ~~**Prerequisite — sync the machine-local skill mirror (after this branch merges).**~~ —
+      **done 2026-08-29** (verified by inspection during the lane review pass): both
+      machine-local mirrors carry their hooks (`~/.claude/skills/initialize/SKILL.md` Step 3b
+      read-back; `~/.claude/skills/close/SKILL.md` Step 6b digest post), and the 2026-08-29
+      `/initialize` session exercised the user-level read-back live (doctor green, channel
+      read, marker advanced). The in-repo half of the gap closed in `7b9a78c`
+      (`skills/initialize/SKILL.md` gained Step 3b; `skills/org-os-init/SKILL.md` gained both
+      hooks) and the Berd mirror was re-materialized in `e3b1dc0`. All eight session surfaces
+      now carry their hooks — see the surfaces table in `docs/integrations/buzz.md` — so the
+      acceptance tally below can be satisfied from any surface. (Hooks on Hermes/Berd surfaces
+      exist but have not yet *fired* from those runtimes — that's the Berd acceptance's
+      business, not this item's.)
 - [ ] 5 consecutive real sessions where /close posts and /initialize reads with zero
       manual intervention: ☐ ☐ ☐ ☐ ☐ (tick per session; on the 5th, flip
       docs/MODULES.md org-os-buzz to **live**, update the site mirror + QUEUE entry, and

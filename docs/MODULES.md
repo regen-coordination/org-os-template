@@ -134,12 +134,15 @@ the real `buzz` binary: `npm run buzz:doctor` reports all four checks green and 
 `npm run buzz:post` posted a SHA-tagged digest, and `npm run buzz:read` read it back with its
 `org-os: sha=… source=org-os-session truncated=false` provenance trailer intact. `CLI_MAP` in
 `lib/buzz.mjs` now encodes the observed CLI surface, not documented guesses — see
-`packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**) for the full trail. What remains
-before `live`: the 5-consecutive-session `/close`-posts + `/initialize`-reads dogfood tally
-(HEARTBEAT.md tracker), and syncing the `/initialize` read-back hook to the machine-local skill
-mirrors some tools (e.g. Zed/claude-acp) read instead of the project copy.
+`packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**) for the full trail. Every
+session surface — project commands, in-repo skills, the Berd-bridged `org-os-init` mirror, and
+the machine-local `~/.claude/skills/` mirrors some tools (e.g. Zed/claude-acp) read instead of
+the project copy — carries both hooks as of 2026-08-29. What remains before `live`: the
+5-consecutive-session `/close`-posts + `/initialize`-reads dogfood tally (HEARTBEAT.md
+tracker; 0/5).
 
 **Links:** [manifest](../modules/org-os-buzz/module.yaml) ·
+[operations runbook](integrations/buzz.md) ·
 [verification trail](../packages/buzz-integration/VERIFIED.md) ·
 [design](superpowers/specs/2026-08-28-buzz-integration-design.md) ·
 package `packages/buzz-integration/`
