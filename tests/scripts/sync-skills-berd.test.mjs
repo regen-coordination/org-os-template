@@ -17,6 +17,7 @@ import {
   chmodSync,
   statSync,
   symlinkSync,
+  unlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -170,13 +171,15 @@ test("exposure entry with no canonical skill dir is a hard error", () => {
 
 // --- Fix-round covering tests (review findings on commit 9e81a00) ---
 
-// Finding 1 + critical interaction: an existing target dir with nothing in
-// it (e.g. an empty dir left behind by an interrupted prior run) must be
-// treated exactly like an absent dir — installed into normally, never
-// skipped. Locks down the specific detritus scenario in .agents/skills/
-// today (five empty dirs from an earlier interrupted attempt) so Task 4's
-// real materialization run doesn't quietly skip all five curated skills.
-test("existing empty target directory is treated as absent and installs normally", () => {
+// Guard-rail, not a Finding-1 RED: an empty target dir passes against BOTH
+// the pre-fix and post-fix `exists` definitions (the pre-fix code keyed
+// "exists" on SKILL.md, which is already absent here too), so this test is
+// vacuous as evidence for the Finding-1 fix. It still earns its place by
+// locking down the naive "directory exists → skip" repair that a careless
+// fix could reach for instead — that version would silently skip all five
+// curated skills the first time Task 4 runs against the five empty dirs
+// already sitting in .agents/skills/ from an earlier interrupted attempt.
+test("guard-rail: existing empty target directory is treated as absent and installs normally", () => {
   const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
   mkdirSync(path.join(f.tgt, "alpha"), { recursive: true });
   const r = run(f);
@@ -265,4 +268,64 @@ test("a symlink in canon is a hard error, not a silent drop", () => {
   assert.equal(r.status, 1);
   assert.match(r.stderr, /symlink/);
   assert.ok(!existsSync(path.join(f.tgt, "alpha")));
+});
+
+// --- Fix round 2 covering tests (re-review of commit a33669a) ---
+
+// Finding A: a mirror that has lost its root SKILL.md but still holds other
+// materialized files is never a legitimate hand-authored override — there
+// is nothing there a human could have deliberately authored as a Berd
+// skill. `--check` must call this "drift" (exit 1), not "hand-authored"
+// (exit 0), or the broken mirror becomes invisible to the CI gate and
+// self-perpetuating (a plain sync also refuses to repair a hand-authored
+// target).
+test("--check reports drift, not hand-authored, when a mirror loses its SKILL.md but keeps other files", () => {
+  const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
+  mkdirSync(path.join(f.src, "alpha", "references"), { recursive: true });
+  writeFileSync(path.join(f.src, "alpha", "references", "data.yaml"), "k: v\n");
+  const installed = run(f);
+  assert.equal(installed.status, 0, installed.stderr);
+  unlinkSync(path.join(f.tgt, "alpha", "SKILL.md"));
+  const r = run(f, "--check");
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /drift/);
+  assert.doesNotMatch(r.stdout, /hand-authored/);
+});
+
+// Finding B: `--check` must not be blind to a symlink planted alongside a
+// legitimately materialized mirror. The prior fix's target-side `listFiles`
+// filtered symlinks out of the listing entirely, so an extra symlink never
+// showed up as an unexpected entry and the mirror still read as in-sync.
+test("--check reports drift when an extra symlink is planted in an otherwise in-sync mirror", () => {
+  const f = setup({ skills: { alpha: { "SKILL.md": SKILL("alpha") } } });
+  const installed = run(f);
+  assert.equal(installed.status, 0, installed.stderr);
+  symlinkSync("/etc/passwd", path.join(f.tgt, "alpha", "evil.md"));
+  const r = run(f, "--check");
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /drift/);
+});
+
+// Finding C: `.agents/skills/<name>` existing as a plain file (not a
+// directory) must be a per-skill hard error, not an uncaught readdirSync
+// exception that aborts every remaining skill in the run. Two skills are
+// named so the second (alphabetically later) skill's fate proves whether
+// the crash aborted the whole process: pre-fix, the uncaught exception on
+// "aaa" kills the process before "zzz" is ever reached.
+test("a target path that exists as a plain file is a per-skill hard error, not a crash that aborts other skills", () => {
+  const f = setup({
+    skills: {
+      aaa: { "SKILL.md": SKILL("aaa") },
+      zzz: { "SKILL.md": SKILL("zzz") },
+    },
+  });
+  mkdirSync(f.tgt, { recursive: true });
+  writeFileSync(path.join(f.tgt, "aaa"), "not a directory\n");
+  const r = run(f);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /ERROR:.*not a directory/i);
+  assert.equal(
+    readFileSync(path.join(f.tgt, "zzz", "SKILL.md"), "utf-8"),
+    MIRRORED("zzz"),
+  );
 });

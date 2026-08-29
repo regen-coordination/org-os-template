@@ -66,7 +66,11 @@ const injectMarker = (raw) => {
 // Directories themselves are excluded; symlinks are INCLUDED (as `symlink:
 // true`) so callers can decide whether to hard-error on them rather than
 // have them silently vanish from the file set the way an `isFile()`-only
-// filter would drop them.
+// filter would drop them. Used for BOTH the canonical source dir (a symlink
+// there is a hard error — canon must not contain them) and the target
+// mirror dir (a stray symlink there must surface as drift under --check,
+// not vanish from the listing the way a symlink-filtered listing would
+// hide it from view).
 const statEntries = (dir) =>
   fs
     .readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -80,13 +84,6 @@ const statEntries = (dir) =>
       };
     })
     .sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
-
-// Plain file list (relative paths only, symlinks excluded) — used for target
-// dirs, which we only ever populate ourselves and never with symlinks.
-const listFiles = (dir) =>
-  statEntries(dir)
-    .filter((e) => !e.symlink)
-    .map((e) => e.rel);
 
 let failures = 0,
   drift = 0;
@@ -138,21 +135,38 @@ for (const name of exposure) {
   }
   if (skillFailed) continue;
 
-  // "present" = the target dir exists AND holds at least one file. An
-  // absent dir and an empty dir (e.g. detritus from an interrupted prior
-  // run) are both "nothing to protect" and materialize normally; a dir
-  // holding any file at all — with or without a root SKILL.md — that isn't
-  // a fully in-sync managed mirror is hand-authored territory.
-  const tgtFiles = fs.existsSync(tgtDir) ? listFiles(tgtDir) : [];
-  const present = tgtFiles.length > 0;
+  // A pre-existing tgtDir path might be a plain file rather than a
+  // directory (existsSync is true for either) — readdirSync on a file
+  // throws, and an uncaught throw here would kill the whole process mid
+  // loop, aborting every skill still queued behind this one. Treat it as a
+  // per-skill hard error instead, same as any other malformed input.
+  if (fs.existsSync(tgtDir) && !fs.statSync(tgtDir).isDirectory()) {
+    console.error(`ERROR: ${tgtDir} exists but is not a directory.`);
+    failures++;
+    continue;
+  }
+
+  // "present" = the target dir exists AND holds at least one file or
+  // symlink. An absent dir and an empty dir (e.g. detritus from an
+  // interrupted prior run) are both "nothing to protect" and materialize
+  // normally; a dir holding anything at all — file or symlink, with or
+  // without a root SKILL.md — that isn't a fully in-sync managed mirror is
+  // either hand-authored territory or drift (see the CHECK discriminator
+  // below for which).
+  const tgtEntries = fs.existsSync(tgtDir) ? statEntries(tgtDir) : [];
+  const tgtHasSymlink = tgtEntries.some((e) => e.symlink);
+  const tgtFiles = tgtEntries.filter((e) => !e.symlink).map((e) => e.rel);
+  const present = tgtFiles.length > 0 || tgtHasSymlink;
+  const hasSkillMd = tgtFiles.includes("SKILL.md");
   const tgtSkill = path.join(tgtDir, "SKILL.md");
   const managed =
-    tgtFiles.includes("SKILL.md") &&
+    hasSkillMd &&
     matter(fs.readFileSync(tgtSkill, "utf8")).data.managed_by === "org-os";
   const expectedKeys = [...expected.keys()].sort();
   const inSync =
     present &&
     managed &&
+    !tgtHasSymlink &&
     tgtFiles.join("\n") === expectedKeys.join("\n") &&
     [...expected].every(([rel, { buf, mode }]) => {
       const p = path.join(tgtDir, rel);
@@ -164,11 +178,17 @@ for (const name of exposure) {
     });
 
   if (CHECK) {
+    // A target with no root SKILL.md at all is never a legitimate
+    // hand-authored override — there is nothing there a human could have
+    // deliberately authored as a Berd skill — so it can only ever be
+    // "missing" (absent) or "drift" (present but broken), never silently
+    // ignored the way a genuine hand-authored override is.
     if (!present) {
       tally("missing", name);
       drift++;
-    } else if (!managed) tally("hand-authored", name, "  (ignored by check)");
-    else if (!inSync) {
+    } else if (!managed && hasSkillMd) {
+      tally("hand-authored", name, "  (ignored by check)");
+    } else if (!inSync) {
       tally("drift", name);
       drift++;
     } else tally("in-sync", name);
