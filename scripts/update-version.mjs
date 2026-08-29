@@ -211,6 +211,39 @@ changelog = changelog.replace(
 writeFileSync(changelogPath, changelog, 'utf-8');
 console.log(`✓ CHANGELOG.md: promoted [Unreleased] → [${newVersion}] — ${today}`);
 
+// --- 4. VERSION.md + MASTERPLAN.md ---
+//
+// C5 made these two checked surfaces but not updated ones, and `--check`
+// compares major.minor — so a PATCH bump left both silently stale while still
+// reporting "all version sources agree". Cutting 0.5.1 would have shipped a
+// VERSION.md that says 0.5.0. Both are optional (an instance need not carry
+// them, and one without a version line is making no claim), so a miss is
+// reported rather than fatal.
+function rewriteOptional(file, label, pattern, replace) {
+  const p = resolve(frameworkRoot, file);
+  if (!existsSync(p)) return;
+  const before = readFileSync(p, 'utf-8');
+  if (!pattern.test(before)) {
+    console.log(`· ${file}: no ${label} line — makes no version claim, left alone`);
+    return;
+  }
+  writeFileSync(p, before.replace(pattern, replace), 'utf-8');
+  console.log(`✓ ${file}: ${label} → ${newVersion}`);
+}
+
+rewriteOptional(
+  'VERSION.md',
+  '**Framework Version:**',
+  /(\*\*Framework Version:\*\*\s*)`?\d+\.\d+(?:\.\d+)?`?/i,
+  `$1\`${newVersion}\``,
+);
+rewriteOptional(
+  'MASTERPLAN.md',
+  '**Version:**',
+  /^(\*\*Version:\*\*\s*)`?\d+\.\d+(?:\.\d+)?`?/m,
+  `$1${newVersion}`,
+);
+
 // --- Done ---
 
 console.log('');

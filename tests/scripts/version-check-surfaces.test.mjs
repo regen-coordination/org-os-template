@@ -10,7 +10,7 @@
 // assert the checking logic, not the repo's current state.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, cpSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -136,4 +136,61 @@ test('a VERSION.md without a Framework Version line is treated as absent', () =>
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// --- bump mode must MOVE every surface it checks ------------------------
+//
+// C5 added VERSION.md and MASTERPLAN.md as checked surfaces but not as updated
+// ones. Because `--check` compares major.minor, a PATCH bump left both stale
+// while still reporting "all version sources agree" — cutting 0.5.1 would have
+// shipped a VERSION.md reading 0.5.0. A surface the bump cannot move is a
+// surface that silently rots between minor releases.
+
+const bump = (dir, version) =>
+  spawnSync('node', [path.join(dir, 'scripts', 'update-version.mjs'), version], {
+    encoding: 'utf-8',
+  });
+
+const read = (dir, file) => readFileSync(path.join(dir, file), 'utf-8');
+
+test('a patch bump moves all five surfaces, not just the three', () => {
+  withFramework({}, (dir) => {
+    writeFileSync(
+      path.join(dir, 'CHANGELOG.md'),
+      '# Changelog\n\n## [Unreleased]\n\n- something landed\n\n## [0.5.0] — 2026-08-29\n',
+    );
+    const r = bump(dir, '0.5.1');
+    assert.equal(r.status, 0, `bump failed: ${r.stderr}${r.stdout}`);
+
+    assert.equal(JSON.parse(read(dir, 'package.json')).version, '0.5.1');
+    assert.match(read(dir, 'CHANGELOG.md'), /## \[0\.5\.1\] — \d{4}-\d{2}-\d{2}/);
+    assert.match(read(dir, 'VERSION.md'), /\*\*Framework Version:\*\*\s*`0\.5\.1`/);
+    assert.match(read(dir, 'MASTERPLAN.md'), /^\*\*Version:\*\* 0\.5\.1$/m);
+
+    // and the whole set still agrees afterwards
+    assert.equal(check(dir).status, 0, 'surfaces disagree after a patch bump');
+  });
+});
+
+test('the promoted changelog carries the real [Unreleased] content, and a fresh stub is left', () => {
+  withFramework({}, (dir) => {
+    writeFileSync(
+      path.join(dir, 'CHANGELOG.md'),
+      '# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- a real fix worth releasing\n\n## [0.5.0] — 2026-08-29\n',
+    );
+    assert.equal(bump(dir, '0.5.1').status, 0);
+    const cl = read(dir, 'CHANGELOG.md');
+    const promoted = cl.slice(cl.indexOf('## [0.5.1]'), cl.indexOf('## [0.5.0]'));
+    assert.match(promoted, /a real fix worth releasing/, 'content did not move into the release');
+    assert.match(cl, /## \[Unreleased\]\n\n_\(Append changes here as they land\.\)_/);
+  });
+});
+
+test('bump leaves an absent VERSION.md / MASTERPLAN.md alone instead of failing', () => {
+  withFramework({ versionMd: null, masterplan: null }, (dir) => {
+    writeFileSync(path.join(dir, 'CHANGELOG.md'), '# Changelog\n\n## [Unreleased]\n\n- x\n\n## [0.5.0] — 2026-08-29\n');
+    const r = bump(dir, '0.5.1');
+    assert.equal(r.status, 0, `bump should tolerate optional surfaces: ${r.stderr}`);
+    assert.equal(existsSync(path.join(dir, 'VERSION.md')), false);
+  });
 });
