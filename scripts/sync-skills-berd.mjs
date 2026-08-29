@@ -37,6 +37,21 @@ const ADOPT = argv.includes("--adopt");
 const DRY = argv.includes("--dry-run");
 const CHECK = argv.includes("--check");
 
+// A missing manifest means this instance simply doesn't have the module
+// (e.g. an overlay sync that covers scripts/ and templates/ but not
+// modules/ — see packages/instance-doctor/src/overlay.mjs's
+// FRAMEWORK_OWNED) — that is not a failure, so this must exit 0, not 1.
+// Left uncaught, `readFileSync` throws ENOENT here and kills the process,
+// which `npm run selftest`'s optional "berd skills mirror in sync" step
+// (skipKey: "berd") then records as a hard FAIL, since the script file
+// itself is present — `optional: true` only SKIPs a missing *script*.
+if (!fs.existsSync(MANIFEST)) {
+  console.log(
+    `sync-skills-berd: no org-os-berd manifest (${path.relative(root, MANIFEST)}) — skipped`,
+  );
+  process.exit(0);
+}
+
 // Curation list = manifest files entries targeting .agents/skills/
 const manifestFiles = yaml.load(fs.readFileSync(MANIFEST, "utf8"))?.files ?? {};
 const exposure = Object.entries(manifestFiles)
@@ -159,9 +174,23 @@ for (const name of exposure) {
   const present = tgtFiles.length > 0 || tgtHasSymlink;
   const hasSkillMd = tgtFiles.includes("SKILL.md");
   const tgtSkill = path.join(tgtDir, "SKILL.md");
-  const managed =
-    hasSkillMd &&
-    matter(fs.readFileSync(tgtSkill, "utf8")).data.managed_by === "org-os";
+  // A target SKILL.md can exist with syntactically broken frontmatter (hand
+  // damage, a bad merge, a half-written prior run) — gray-matter/js-yaml
+  // throws an uncaught YAMLException in that case, same failure class as
+  // the "not a directory" case above, via a different input. Left uncaught
+  // it would abort the whole loop, skipping every remaining skill.
+  let managed;
+  try {
+    managed =
+      hasSkillMd &&
+      matter(fs.readFileSync(tgtSkill, "utf8")).data.managed_by === "org-os";
+  } catch (e) {
+    console.error(
+      `ERROR: ${name}/SKILL.md has malformed frontmatter and could not be parsed: ${e.message}`,
+    );
+    failures++;
+    continue;
+  }
   const expectedKeys = [...expected.keys()].sort();
   const inSync =
     present &&

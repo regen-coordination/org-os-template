@@ -329,3 +329,59 @@ test("a target path that exists as a plain file is a per-skill hard error, not a
     MIRRORED("zzz"),
   );
 });
+
+// --- Final fix-wave items (whole-branch review, 2026-08-29) ---
+
+// Item 1a: an absent manifest (e.g. a downstream instance whose overlay
+// never received modules/org-os-berd/module.yaml, since overlay.mjs's
+// FRAMEWORK_OWNED covers scripts/ and templates/ but not modules/) must be
+// a clean skip, not an uncaught ENOENT — otherwise `npm run selftest`'s
+// optional "berd skills mirror in sync" check (script IS present, so
+// `optional: true` can't SKIP it) turns into a hard FAIL on every instance
+// that simply doesn't have the module.
+test("Item 1a: missing manifest is a skip (exit 0), not an ENOENT crash", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "sync-skills-"));
+  const r = spawnSync(
+    "node",
+    [
+      SCRIPT,
+      "--manifest",
+      path.join(root, "does-not-exist", "module.yaml"),
+      "--source-root",
+      path.join(root, "skills"),
+      "--target-root",
+      path.join(root, "agents-skills"),
+    ],
+    { encoding: "utf-8", cwd: ORG_ROOT },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /no org-os-berd manifest/);
+});
+
+// Item 1b: malformed frontmatter in an existing target SKILL.md (hand
+// damage, a bad merge, a half-written prior run) must be a per-skill hard
+// error like the sibling "not a directory" and "no frontmatter fence"
+// cases above — not an uncaught YAMLException that aborts the loop and
+// skips every remaining skill behind it. "zzz" sorts after "aaa"
+// alphabetically, so it proves the crash (pre-fix) took the whole process
+// down before "zzz" was ever reached.
+test("Item 1b: malformed target frontmatter is a per-skill hard error, not a crash that aborts other skills", () => {
+  const f = setup({
+    skills: {
+      aaa: { "SKILL.md": SKILL("aaa") },
+      zzz: { "SKILL.md": SKILL("zzz") },
+    },
+  });
+  mkdirSync(path.join(f.tgt, "aaa"), { recursive: true });
+  writeFileSync(
+    path.join(f.tgt, "aaa", "SKILL.md"),
+    "---\nname: aaa\n  description: bad indent\n---\n\nbroken\n",
+  );
+  const r = run(f);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /ERROR:.*aaa\/SKILL\.md/);
+  assert.equal(
+    readFileSync(path.join(f.tgt, "zzz", "SKILL.md"), "utf-8"),
+    MIRRORED("zzz"),
+  );
+});
