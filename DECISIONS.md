@@ -14,6 +14,32 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-08-29 · Buzz lane graduated to the hosted community relay
+
+- **Status:** active
+- **Scope:** framework / agent-runtime / operator-ux
+- **Decision:** The Buzz session lane's home relay is now the operator's hosted community
+  (`https://luizfernando.communities.buzz.xyz`, channel `org-os-dev` →
+  `5f255182-b310-4516-aef0-3b3c67a232ef`), for both wired instances (org-os framework +
+  lf-zettelkasten-os hub). Digests post **as-is** (no redaction pass). The local compose relay
+  is retired to dev-sandbox/archive duty; its channel (`3344f08a…`) holds the lane's day-one log.
+- **Why:** The spec gated any shared/hosted relay behind a redaction review + explicit operator
+  sign-off. Both happened this session: review found digests are org-internal but low-sensitivity
+  (task/people/event references), the operator owns every org and the community roster, and the
+  payoff is real — the signed org log becomes readable from any of the operator's devices via
+  the Buzz apps. Alternatives: stay local (no mobile access, no path to human teammates) and
+  hub-only trial (splits the channel across relays, kills cross-read) — both lost. Membership
+  model verified in source before flipping: closed community, roster via NIP-43 admin events
+  (the app's community-level "add directly" dialog), with NIP-OA owner-delegation available as
+  the agent path if roster adds ever become impractical. Round-trip verified live post-flip:
+  member-created channel, SHA-tagged graduation post, cross-read by the second agent.
+- **Refs:** `docs/integrations/buzz.md` (Operating → hosted), `packages/buzz-integration/VERIFIED.md`
+  (2026-08-29 hosted addendum), `TOOLS.md` Buzz section, spec
+  `docs/superpowers/specs/2026-08-28-buzz-integration-design.md` (safety gate + v2 graduation
+  trigger), memory/2026-08-29 session log.
+
+---
+
 ## 2026-08-29 · Interfaces contract — two planes, four surfaces; legacy apps pruned
 
 **Status:** active

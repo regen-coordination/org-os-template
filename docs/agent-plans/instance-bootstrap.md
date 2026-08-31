@@ -1,7 +1,7 @@
 ---
 id: instance-bootstrap
 title: "Instance Bootstrap Pipeline — Clone, Wizard, Knowledge"
-status: frozen
+status: superseded
 priority: 5
 scope: framework
 depends_on: []
@@ -13,6 +13,8 @@ tags: [bootstrap, onboarding, wizard, instances]
 workstream: instance-bootstrap
 ---
 
+> **SUPERSEDED 2026-08-29** by [`org-os-wizard`](../superpowers/specs/2026-08-29-org-os-wizard-design.md) (v0.6 Active #7). Phase 1 **shipped** as `clone:framework`; Open Questions 1–5 and 7 are resolved in the wizard spec §7; Phase 2’s selection step becomes a conversation the concierge holds, not a form; Phase 3 survives as the “no sources ingested” rung of the wizard’s ladder. The one open bounded task — the `archive/v3.5-execution` 983-line variant salvage diff — carries forward to wizard Phase 1. Content preserved below for the record.
+>
 > **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo §4 + §6. CORRECTION: Open Question 1 is answered and shipped — scripts/clone-framework.mjs (npm run clone:framework, 4/4 tests, produced bread-coop-os). Remaining bounded question: diff-review of the 983-line variant preserved in archive/v3.5-execution. Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
 
 ## Goal

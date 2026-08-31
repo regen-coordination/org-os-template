@@ -2,7 +2,7 @@
 
 **Status:** module #3 `org-os-buzz`, catalogued **pilot** — CLI surface and post/read round-trip verified live 2026-08-29 against a real relay ([`packages/buzz-integration/VERIFIED.md`](../../packages/buzz-integration/VERIFIED.md), status VERIFIED); the 5-session dogfood acceptance has **not started** (0/5 — `HEARTBEAT.md` tracker)
 **Spec:** [`docs/superpowers/specs/2026-08-28-buzz-integration-design.md`](../superpowers/specs/2026-08-28-buzz-integration-design.md) (see its 2026-08-29 Reconciliation section — nearly every documented guess in the original build was wrong; VERIFIED.md supersedes them)
-**Pin:** relay from `block/buzz` `deploy/compose`, image `ghcr.io/block/buzz:main` · binary `buzz` (`~/.local/bin/buzz` → `/Applications/Buzz.app/Contents/MacOS/buzz`) · channel `org-os-dev` → UUID `3344f08a-5f68-4c7e-8499-bcbe0bfb22ff`
+**Pin:** relay `https://luizfernando.communities.buzz.xyz` — the operator's hosted Buzz community (graduated 2026-08-29, DECISIONS.md; the local compose stack from `block/buzz` `deploy/compose`, image `ghcr.io/block/buzz:main`, stays on as dev sandbox) · binary `buzz` (`~/.local/bin/buzz` → `/Applications/Buzz.app/Contents/MacOS/buzz`) · channel `org-os-dev` → UUID `5f255182-b310-4516-aef0-3b3c67a232ef` (hosted; the day-one local log lives under `3344f08a…` on the sandbox relay)
 
 ## What Buzz is
 
@@ -10,7 +10,7 @@
 
 ## The lane in one paragraph
 
-`/close` posts the session digest to `#org-os-dev` as a signed event, with provenance appended as a machine-readable trailer (`org-os: sha=<short-sha> source=org-os-session truncated=<bool>`) — the Buzz log becomes a cryptographically signed mirror of session history, cross-linked to the close commit. `/initialize` reads the channel back since the last-read marker. Everything is **fail-open**: a dead relay, missing binary, or bad key produces one skip line and the session proceeds — `/close` can never fail because of Buzz. The lane points at a **local relay only**; anything shared or hosted is gated behind a redaction review (spec safety gate).
+`/close` posts the session digest to `#org-os-dev` as a signed event, with provenance appended as a machine-readable trailer (`org-os: sha=<short-sha> source=org-os-session truncated=<bool>`) — the Buzz log becomes a cryptographically signed mirror of session history, cross-linked to the close commit. `/initialize` reads the channel back since the last-read marker. Everything is **fail-open**: a dead relay, missing binary, or bad key produces one skip line and the session proceeds — `/close` can never fail because of Buzz. The lane's home is the **operator's hosted community relay** — graduated 2026-08-29 after the spec's safety gate was satisfied (redaction review done, operator approved digests as-is; DECISIONS.md "Buzz lane graduated"). The local compose relay stays on as dev sandbox and day-one archive.
 
 ## Operating
 
@@ -45,11 +45,13 @@ The read marker is `.buzz-state.json` at the repo root (gitignored, `{"lastRead"
 
 ### Config
 
-Repo-root `.env` (gitignored; placeholders in `.env.example`): `BUZZ_RELAY_URL` (HTTP REST, `http://localhost:3000` default — not a websocket), `BUZZ_CHANNEL` (**the UUID**, never the name), `BUZZ_PRIVATE_KEY` (64-char hex or `nsec1…`; the CLI does not read `BUZZ_NSEC`), optional `BUZZ_CLI_BIN`. The agent npub lives in `TOOLS.md`; the private key never enters a tracked file.
+Repo-root `.env` (gitignored; placeholders in `.env.example`): `BUZZ_RELAY_URL` (HTTP REST, **never** `ws://`/`wss://` — a hosted community's `wss://…` URL from the app becomes `https://…` for the CLI; `http://localhost:3000` is the local-sandbox default), `BUZZ_CHANNEL` (**the UUID**, never the name — and UUIDs are per-relay: switching relays means a new channel and a new UUID), `BUZZ_PRIVATE_KEY` (64-char hex or `nsec1…`; the CLI does not read `BUZZ_NSEC`), optional `BUZZ_CLI_BIN`. The agent npub lives in `TOOLS.md`; the private key never enters a tracked file.
 
-### The relay — start, stop, inspect
+### The relays — hosted home, local sandbox
 
-The relay is a machine-local compose stack from the `block/buzz` clone at `~/tools/buzz`, operated via `deploy/compose/run.sh` (Docker must be running; the stack needs its own `deploy/compose/.env` and refuses to start while any `CHANGE_ME` placeholder remains):
+**Hosted (the lane's home):** `https://luizfernando.communities.buzz.xyz` is a Block-operated multi-tenant community relay — nothing to start, stop, or back up on our side. Membership and roster are managed by the community owner from the Buzz apps (see Joining, below).
+
+**Local (dev sandbox + day-one archive):** a machine-local compose stack from the `block/buzz` clone at `~/tools/buzz`, operated via `deploy/compose/run.sh` (Docker must be running; the stack needs its own `deploy/compose/.env` and refuses to start while any `CHANGE_ME` placeholder remains):
 
 ```bash
 cd ~/tools/buzz/deploy/compose
@@ -64,12 +66,20 @@ With the relay down, nothing breaks — every hook and verb degrades to its skip
 
 ### Joining `#org-os-dev`
 
-Membership is two separate facts: being on the **relay roster**, and knowing the **channel UUID**.
+Buzz has **three membership planes with confusingly similar names**, and mixing them up is the #1 failure mode — it cost this integration its first hour against the hosted relay:
 
-- **Resolve the channel:** `buzz channels list` returns every channel with its `channel_id` — that UUID is what goes in `BUZZ_CHANNEL` and what every `--channel` flag takes. Names are never accepted.
-- **Roster:** on the relay host, `./run.sh add-member <npub-or-hex> [--role member|admin]` (wraps `buzz-admin` inside the relay container); `list-members` and `remove-member` complete the set. When adding several members in a loop, `sleep 1` between invocations and never parallelize — same-second timestamps collide in the kind:13534 roster event.
-- **A second org-os instance:** mint its own keypair with the `buzz` binary, record the npub in that instance's `TOOLS.md` (key only in its `.env`), add the npub to the roster, fill its `.env` (relay URL, channel UUID, key), and run `npm run buzz:doctor` until all four checks are green — the hooks then work unchanged. **Caveat, stated plainly:** today's relay listens on `localhost` of this machine; a second machine needs the relay reachable over a network, and the moment digests leave this machine the spec's safety gate applies — redaction review first, draft-and-present. No second instance has actually joined yet.
-- **A human teammate:** their own keypair via the Buzz desktop app, `add-member` with their npub, and they read/post in `#org-os-dev` from the app. Also unexercised. The v2 direction (spec) makes Berd's `buzz-handoff` skill the human window onto the channel — trigger: both lanes' acceptances passed *and* a second human wants in.
+1. **Community/relay membership** — the outer gate every request passes; failing it is the `403 relay_membership_required` / exit 3.
+2. **Channel membership** — *inside* the gate; an open channel is readable/postable by any relay member. Adding someone to a channel does **not** admit them to the relay.
+3. **Invites** — pairing links that pend until *redeemed in an app*. Right for humans; a headless agent never redeems one.
+
+The recipe:
+
+- **Resolve the channel:** `buzz channels list` returns every channel with its `channel_id` — that UUID is what goes in `BUZZ_CHANNEL` and what every `--channel` flag takes. Names are never accepted, and UUIDs are per-relay.
+- **Roster, hosted community:** the owner (or an admin) uses the community-level **Members → "Add someone directly"** dialog in the Buzz apps — paste the npub, pick the role. Not the "copy a link" half of that dialog (plane 3), and not a channel's own member list (plane 2). Under the hood this emits a NIP-43 kind:9030 admin event; the relay then republishes the kind:13534 roster snapshot. Verified live 2026-08-29: both agents admitted this way; a plain `member` could then create `#org-os-dev` itself.
+- **Roster, local sandbox:** on the relay host, `./run.sh add-member <npub-or-hex> [--role member|admin]` (wraps `buzz-admin` in the relay container); `list-members` / `remove-member` complete the set. `sleep 1` between multiple adds, never parallel — same-second timestamps collide in the kind:13534 event.
+- **NIP-OA owner delegation — the alternative designed for agents** (`crates/buzz-relay/src/api/mod.rs`, `buzz-sdk/src/nip_oa.rs`): the agent's requests carry `["auth", <owner-pubkey>, <conditions>, <sig>]`, where `sig` is the owner's BIP-340 signature over `nostr:agent-auth:<agent-pubkey>:<conditions>`. If it verifies and the owner is a member, the agent rides the owner's membership — no roster entry, scopable by kind and time window, revocable by the owner. Wire it via `BUZZ_AUTH_TAG`. Documented from source; **not yet exercised here** (direct roster adds were sufficient).
+- **A second org-os instance:** generate a secp256k1 keypair (the CLI ships no keygen — `openssl ecparam -name secp256k1 -genkey` plus the x-only pubkey is enough; the roster takes hex), record the npub in that instance's `TOOLS.md` (key only in its `.env`), get rostered (above), fill `.env` (relay URL, channel UUID, key), and run `npm run buzz:doctor` until all four checks are green — the hooks then work unchanged. **Exercised 2026-08-29 twice:** the hub joined the local relay this way (read + post + cross-read verified), then both instances re-verified the identical loop against the hosted relay post-graduation. A cross-*machine* agent join remains unexercised, but nothing structural blocks it anymore — the hosted relay is reachable from any machine, so the recipe is the same everywhere.
+- **A human teammate:** on the hosted community this is exactly what invite links are for — humans redeem them in the Buzz apps. The operator, as community owner, is in natively. The v2 direction (spec) additionally makes Berd's `buzz-handoff` skill the human window onto the channel — trigger: both lanes' acceptances passed *and* a second human wants in.
 
 ### The contract: VERIFIED.md and `CLI_MAP`
 
@@ -84,9 +94,9 @@ The reconciliation history in that file is the cautionary tale: the original wra
 ## What is NOT verified
 
 - **The dogfood acceptance.** 0 of 5 consecutive real sessions where `/close` posts and `/initialize` reads with zero manual intervention (`HEARTBEAT.md` tracker). Until 5/5, the module stays `pilot` and "adopted in this instance" is not claimed.
-- **Everything multi-party.** All verified behavior involves one agent identity, one machine, one local relay. The second-instance join recipe, the human-teammate path, and roster management under real use have never been exercised.
+- **Multi-party beyond two agents and their owner.** The second-instance join recipe was exercised live 2026-08-29 on both relays — the hub joined (roster add, doctor green, read + post + cross-read verified), and after graduation both agents re-verified the loop against the hosted community, where the operator sits as owner. Still unexercised: a cross-machine agent join, a *non-owner* human joining via invite link, the NIP-OA delegation path (`BUZZ_AUTH_TAG`), and the hub's first *hook-driven* post (a real `/close`, as opposed to the manual verification posts).
 - **Non-Claude-Code surfaces.** The hooks exist on the Hermes and Berd surfaces but have never fired from them — `org-os-init` has never run under Goose (see [berd.md](berd.md)).
-- **Anything beyond localhost.** Shared or hosted relays are explicitly gated behind a redaction review of digest content (spec safety gate).
+- ~~**Anything beyond localhost.**~~ **Gate passed 2026-08-29:** the spec's redaction review ran, the operator approved digests as-is, and the lane graduated to the hosted community (DECISIONS.md). Two CLI facts remain observed-but-unexercised: exit codes `4` (other) and `5` (write conflict), which `buzz --help` documents beyond the 0–3 in VERIFIED.md's table.
 
 Buzz itself is a v0.4.x developer preview — surface drift is expected, and the pin + VERIFIED.md protocol above is the mitigation.
 

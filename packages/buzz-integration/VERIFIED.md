@@ -84,6 +84,22 @@ design's intent without the nonexistent flag.
   `buzz` binary. Every row above was observed directly, not assumed.
   `packages/buzz-integration/lib/buzz.mjs`'s `CLI_MAP`, `loadConfig`, and
   `status()` were reconciled to match; see git history for the exact diff.
+- **2026-08-29 (hosted graduation):** the same binary was exercised against
+  the Block-operated multi-tenant community relay
+  `https://luizfernando.communities.buzz.xyz`. Observed: identical REST
+  surface over `https`; a non-member request fails with
+  `{"error":"auth_error","message":"relay error 403: relay_membership_required"}`
+  and exit `3`; after a community-owner roster add (the apps' community-level
+  "Add someone directly" dialog — NIP-43 kind:9030 under the hood; invite
+  *links* pend until redeemed and never admit a headless agent),
+  `channels list`, `channels create` (first live exercise of that verb —
+  `{"accepted":true,"channel_id":…,"event_id":…}`, allowed at role
+  `member`), `messages send`, `messages get`, and `users set-profile` all
+  behaved per the tables above. `buzz --help` additionally documents exit
+  codes `4` (other) and `5` (write conflict) beyond the 0–3 in this file's
+  table — not yet observed. Relay + channel pins live in `TOOLS.md` (hosted
+  community; local compose relay retained as sandbox). NIP-OA owner
+  delegation (`BUZZ_AUTH_TAG`) remains unexercised.
 
 ## Downstream consumers of this file
 

@@ -40,10 +40,19 @@ _(Channel IDs, group names, bot handles — no tokens here)_
 
 ### Buzz
 
-- Relay: `http://localhost:3000` (local dev relay only, HTTP REST — see `.env.example` / `BUZZ_RELAY_URL`)
-- Channel: `org-os-dev` → UUID `3344f08a-5f68-4c7e-8499-bcbe0bfb22ff` (the CLI takes the UUID, never the name; resolve via `buzz channels list`)
-- Agent npub: `npub16pl9y5zxuq5fujfqan6n34m42x5qarl8emkea3nvytm97egjdduqy39kdn`. The private key
-  never goes here — only in `.env` as `BUZZ_PRIVATE_KEY`.
+- Relay: `https://luizfernando.communities.buzz.xyz` (operator's hosted Buzz community, HTTP
+  REST — graduated 2026-08-29, DECISIONS.md "Buzz lane graduated"). The local compose relay
+  (`http://localhost:3000`, `~/tools/buzz/deploy/compose/run.sh`) is the dev sandbox; its
+  channel `3344f08a-5f68-4c7e-8499-bcbe0bfb22ff` holds the lane's day-one archive log.
+- Channel: `org-os-dev` → UUID `5f255182-b310-4516-aef0-3b3c67a232ef` (the CLI takes the UUID,
+  never the name; resolve via `buzz channels list`)
+- Agent npub: `npub16pl9y5zxuq5fujfqan6n34m42x5qarl8emkea3nvytm97egjdduqy39kdn`, display name
+  `org-os`. The private key never goes here — only in `.env` as `BUZZ_PRIVATE_KEY`.
+- Hosted community members (2026-08-29): the operator
+  (`npub1xand5ypq4sas58fp5036qma4p00ue6k9am6cjg3x3npc64tuvw2s6ujpnr`, owner) + this agent +
+  the hub agent `lf-hub` (`npub1xly7vdccs5ranvn09t7l5py4unnw6xdk3shx9gyul69336k55vxsuvxdz2`),
+  both added via the community Members → "add directly" dialog (invite links don't work for
+  headless agents — see the runbook).
 - Verification trail: `packages/buzz-integration/VERIFIED.md` (status: **VERIFIED**, 2026-08-29 —
   the CLI surface in `lib/buzz.mjs` was reconciled against the real `buzz` binary and a live
   local relay)
