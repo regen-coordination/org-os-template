@@ -2365,6 +2365,16 @@ npm run paper:call -- get_tokens '{"format":"json"}' | head -c 1200; echo
 npm run paper:push-tokens -- --tokens ../refi-dao-os/data/brand.yaml
 ```
 
+**Row 12b, while you are here (1 metered call, a deliberate failure).** `lib/paper.mjs` increments
+`metered` only after a call _succeeds_, so if Paper charges rejected calls too, every script
+under-reports and a 100-call week can overrun silently. Note Paper's own usage figure, run one call
+that must fail —
+`npm run paper:call -- write_html '{"html":"<div></div>","targetNodeId":"does-not-exist","mode":"insert-children"}'`
+— then read the figure again and record which way it went in row 12b. **If rejected calls are
+charged:** move the increment in `lib/paper.mjs` to before the `await` so it counts attempts, update
+the two Task 1 tests that assert the counter, and log the change in the Reconciliation section. If
+they are not charged, the current placement is correct and the row says so.
+
 Expected: the first prints the raw reply — note whether tokens arrive as `content[0].text` JSON array, `{tokens:[…]}`, or structured; note how colours come back (case, format) and whether `description` round-trips. If the shape is not one of the three `extractTokens` accepts, extend `extractTokens` + its test to the observed shape (and only that). The second push must print `created: 0 · updated: 0 · pruned: 0` and `metered calls: 1`.
 
 - [ ] **Step 5: Lint passes, then fails on a hand edit, then passes again (3 calls)**
@@ -2423,6 +2433,7 @@ changes **only** to match a re-verified row — never to track documentation, ne
 | 10  | `set_tokens` `{name, value}` updates; `{name, delete:true}` deletes            | ⟨fill⟩                                                                                             | Step 5                     |
 | 11  | a hand edit in the Theme tab is visible to `get_tokens` immediately            | ⟨fill⟩                                                                                             | Step 5                     |
 | 12  | quota-exceeded error shape                                                     | not observed                                                                                       | —                          |
+| 12b | does a **rejected** tool call still count against the weekly quota?            | ⟨fill — compare Paper's own usage display before and after deliberately failing one call⟩          | Task 7 Step 4              |
 | 13  | `export` reply shape (base64 `content[].type:"image"` vs file path)            | pending — Task 10                                                                                  | —                          |
 | 14  | `get_jsx` `format` enum: `"tailwind"` \| `"inline-styles"`                     | ✅ 2026-09-02                                                                                      | tools/list schema          |
 | 15  | inline `<svg>` with `<filter><feTurbulence>` renders on the canvas             | pending — Task 10                                                                                  | —                          |
