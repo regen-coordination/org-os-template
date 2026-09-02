@@ -1,0 +1,103 @@
+# Fixture: stylesheet + tokens blocks copied verbatim from refi-dao-os data/brand.yaml (v2.0, 2026-09-02).
+# Regenerate with the awk pair in docs/superpowers/plans/2026-09-02-paper-integration.md Task 2.
+stylesheet:
+  path: commons/public/brand.css
+  url: https://knowledge.refidao.com/brand.css
+  prefix: refi-
+  public_flag: COMMONS_BRAND_PUBLIC # "1" exempts the four brand paths from the commons gates (spec §9)
+
+# --- tokens: one entry per `--refi-*` custom property; value = the exact CSS string ---------
+tokens:
+  # canon six
+  color-cloud: "#F1F0FF"
+  color-blue: "#4571E1"
+  color-green: "#71E3BA"
+  color-pink: "#DE9AE9"
+  color-yellow: "#FFFA7E"
+  color-space: "#172027"
+  # derived shades (website-verified)
+  color-blue-light: "#6B91F0"
+  color-blue-dark: "#3458B8"
+  color-green-light: "#9AEDCE"
+  color-green-dark: "#4FC99D"
+  color-pink-light: "#E8B9EF"
+  color-pink-dark: "#C76DD9"
+  color-yellow-light: "#FFFCA8"
+  color-yellow-dark: "#E8E35E"
+  # surfaces — Space (dark) is default
+  bg: "#172027"
+  bg-deep: "#11181D"
+  bg-deeper: "#0B1015"
+  bg-abyss: "#050709" # the footer shade, tokenised (was untokenised drift)
+  bg-deep-cloud: "#E6E4FA" # Cloud-mode derived surface (light-palette bg-deep)
+  bg-deeper-cloud: "#DAD7F5" # Cloud-mode derived surface (light-palette bg-deeper)
+  bg-surface: "rgba(255,255,255,0.03)"
+  bg-elevated: "rgba(17,24,29,0.9)"
+  glass-blur: "20px"
+  glass-shadow: "0 8px 32px rgba(0,0,0,0.3)"
+  # text
+  text: "#F1F0FF"
+  text-muted: "rgba(241,240,255,0.6)"
+  text-subtle: "rgba(241,240,255,0.45)"
+  text-inverted: "#172027"
+  # borders
+  border: "rgba(255,255,255,0.08)"
+  border-hover: "rgba(255,255,255,0.12)"
+  border-active: "rgba(113,227,186,0.5)"
+  # glow
+  glow-blue: "0 0 40px rgba(69,113,225,0.3)"
+  glow-green: "0 0 40px rgba(113,227,186,0.3)"
+  # type — D1 resolved to Switzer (web sans) + Canela (logo asset only). See docs/brand/PROVENANCE.md.
+  font-sans: '"Switzer", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  font-display: '"Canela", Georgia, "Times New Roman", "Noto Serif", serif'
+  font-mono: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+  text-xs: "0.625rem"
+  text-sm: "0.75rem"
+  text-base: "0.875rem"
+  text-md: "1rem"
+  text-lg: "1.125rem"
+  text-xl: "1.25rem"
+  text-2xl: "1.5rem"
+  text-3xl: "2rem"
+  text-4xl: "2.5rem"
+  text-5xl: "3.5rem"
+  text-6xl: "4.5rem"
+  text-hero: "clamp(3rem, 8vw, 6rem)"
+  weight-light: "300"
+  weight-regular: "400"
+  weight-medium: "500"
+  weight-semibold: "600"
+  weight-bold: "700"
+  # space — the 14-step website scale
+  space-0: "0"
+  space-1: "0.25rem"
+  space-2: "0.5rem"
+  space-3: "0.75rem"
+  space-4: "1rem"
+  space-5: "1.25rem"
+  space-6: "1.5rem"
+  space-8: "2rem"
+  space-10: "2.5rem"
+  space-12: "3rem"
+  space-16: "4rem"
+  space-20: "5rem"
+  space-24: "6rem"
+  space-32: "8rem"
+  # radius
+  radius-sm: "0.5rem"
+  radius-md: "0.75rem"
+  radius-lg: "1rem"
+  radius-xl: "1.25rem"
+  radius-2xl: "1.5rem"
+  radius-full: "9999px"
+  # dataviz series — Blue → Green → Pink → Yellow → blue-dark → green-dark
+  series-1: "#4571E1"
+  series-2: "#71E3BA"
+  series-3: "#DE9AE9"
+  series-4: "#FFFA7E"
+  series-5: "#3458B8"
+  series-6: "#4FC99D"
+
+# --- §2 Logos --------------------------------------------------------------
+# figma_node = node id in canonical_figma_file (page "Brand Assets - Exports").
+# Web exports live in repos/repos/ReFi-DAO-Website/site/assets/ + assets/.
