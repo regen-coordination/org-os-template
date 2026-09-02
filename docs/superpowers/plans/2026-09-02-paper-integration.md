@@ -2826,7 +2826,7 @@ Expected: `lint:brand` green; the commit contains exactly three paths; the third
 - Create: `docs/brand/eval/out/02-growfi-social-card.paper.png`
 - Create: `docs/brand/eval/out/02-growfi-social-card.paper.html`
 - Create: `docs/brand/eval/out/PAPER-PROTOTYPE-2026-09-02.md`
-- Modify (org-os): `packages/paper-integration/VERIFIED.md` rows 13, 15, 16
+- Modify (org-os): `packages/paper-integration/VERIFIED.md` rows 13, 16, 17
 
 **Interfaces:**
 
@@ -2977,8 +2977,8 @@ Compare against the no-context HTML run `02-growfi-social-card.html`.
 ## What Paper did
 
 - ⟨row 13: export reply shape → what was done⟩
-- ⟨row 15: SVG feTurbulence grain — rendered / not; fallback used?⟩
-- ⟨row 16: inline logomark SVG with embedded raster — rendered / fell back to data-URI img⟩
+- ⟨row 16: SVG feTurbulence grain — rendered / not; fallback used?⟩
+- ⟨row 17: inline logomark SVG with embedded raster — rendered / fell back to data-URI img⟩
 - ⟨create_artboard accepted var() in backgroundColor: yes/no⟩
 - ⟨anything else rejected or surprising, with the exact message⟩
 
@@ -3014,7 +3014,7 @@ Hand-refine in Paper; leave at least one comment thread. A later session lists, 
 (`paper-design` → The review loop) — that is the `pilot` → `live` step.
 ```
 
-Fill every `⟨…⟩`. Then update org-os `packages/paper-integration/VERIFIED.md` rows 13, 15, 16 with what was observed.
+Fill every `⟨…⟩`. Then update org-os `packages/paper-integration/VERIFIED.md` rows 13, 16, 17 with what was observed.
 
 - [ ] **Step 10: Commit both repos (explicit paths)**
 
@@ -3025,7 +3025,7 @@ git commit -m "test(brand): Paper prototype — brief 02 built on a Paper canvas
 cd ../org-os
 npx prettier --write packages/paper-integration/VERIFIED.md
 git add packages/paper-integration/VERIFIED.md
-git commit -m "verify(paper): rows 13/15/16 from the refi-dao-os prototype — export shape, SVG filters, data-URI images"
+git commit -m "verify(paper): rows 13/16/17 from the refi-dao-os prototype — export shape, SVG filters, data-URI images"
 ```
 
 ---
