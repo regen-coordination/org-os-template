@@ -41,9 +41,35 @@ The token round trip has been run end to end against a real Paper file — `01M1
   - **Always injects `fileId`.** It therefore **cannot invoke `create_file`, `list_files`, or any other file-less tool** — the first live attempt to call `create_file` through it cost a metered call just to learn that Paper rejects the injected `fileId` (`Invalid fileId "placeholder"`, VERIFIED.md row 15). Reach for `lib/paper.mjs` directly for those tools.
   - **Exits 1 on a rejected tool call.** Paper reports a tool failure as a _successful_ JSON-RPC envelope carrying `isError: true`, not as a JSON-RPC error (VERIFIED.md row 14) — `call.mjs` checks `result.isError` itself and exits 1 so a script driving the canvas one element at a time doesn't read a rejection as success.
 
+### Getting a file id
+
+Nothing in this package can hand a first-time operator a file id — Paper's MCP surface has no "list files
+to pick from" step, and `doctor`'s fourth check just reports whether `PAPER_FILE_ID` is already set, not
+where to get one. Two routes:
+
+- **The human route (normal path).** Open Paper Desktop and create or open a file. The id is the last
+  path segment of the file's URL, `https://app.paper.design/file/<id>` — `PAPER_FILE_ID` accepts that
+  bare id, the `/file/<id>` path, or the whole URL (see Config, below).
+- **The agent route.** An agent can create a file instead, but **not** through `npm run paper:call` — that
+  script always injects `fileId` into the call arguments, and `create_file` takes no `fileId` and rejects
+  one. Call `lib/paper.mjs` directly:
+
+  ```js
+  node -e 'import("./packages/paper-integration/lib/paper.mjs").then(async ({createClient}) => {
+    const c = createClient();
+    console.log(await c.call("create_file", { name: "My Org — Brand canvas" }));
+  });'
+  ```
+
+  The reply carries `{ fileId, url }` as JSON inside `content[0].text`. One metered call.
+
+- **The ordering trap.** Paper Desktop only starts the MCP server once _some_ file is already open — so
+  before either route works, a human needs Paper Desktop running with a file open (any file; it doesn't
+  have to be the one you end up using).
+
 ### Config
 
-`.env` (gitignored; placeholders in `.env.example`): `PAPER_MCP_URL` (default `http://127.0.0.1:29979/mcp`) and `PAPER_FILE_ID` (bare id, `/file/<id>`, or full URL). Resolution order: `--file` flag → process env → framework `.env` → the instance `.env` beside the `--tokens` file (`<instance>/.env`). No credential exists in this integration.
+`.env` (gitignored; placeholders in `.env.example`): `PAPER_MCP_URL` (default `http://127.0.0.1:29979/mcp`) and `PAPER_FILE_ID` (bare id, `/file/<id>`, or full URL — from Getting a file id, above). Resolution order: `--file` flag → process env → framework `.env` → the instance `.env` beside the `--tokens` file (`<instance>/.env`). No credential exists in this integration.
 
 ### Registration (per instance, opt-in)
 

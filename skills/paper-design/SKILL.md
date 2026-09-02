@@ -37,6 +37,22 @@ export and comment threads. **This skill is the method; the drawing happens thro
 `packages/paper-integration/` only guarantees health, token sync and token drift — read
 `docs/integrations/paper.md` for the runbook and the module's current status.
 
+## When to Use
+
+- Asked to draft, refine, or export a visual artifact on a Paper canvas — a social card, poster, deck
+  slide, page mock, or any composition already described in the org's DESIGN.md.
+- Brand tokens are already pushed to the target Paper file (`npm run paper:lint-tokens` passes), or can
+  be pushed first with `paper:push-tokens`.
+- A human has left comments on an existing artboard that need addressing — see The review loop, below.
+
+## When NOT to Use
+
+- For an org whose tokens are not the ones currently pushed to the target Paper file — never use another
+  org's artifact as the style reference.
+- To pick a colour, size, or weight that has no token. Derive it into the org's own stylesheet and push
+  the token first; this skill draws from tokens, it does not invent brand values.
+- Past the 25-call per-artifact budget. Export what exists and stop — see Budget, below.
+
 ## Budget — read first
 
 The free tier allows **100 metered MCP tool calls per week**. `initialize`/`tools/list` are free; every
@@ -54,9 +70,11 @@ artifact: 25 calls, hard stop.** At 25, export what exists, release working indi
 Paper's own guide asks for a screenshot after every section and a `write_html` every ~15 lines. Keep its
 small-writes discipline (the human watches the canvas build) and **override the screenshot cadence** to
 fit the budget — say so if asked, rather than silently following Paper's guide into a blown budget. Never
-invoke on-canvas AI image generation (documented by Paper as a `paper-gen://` image source, not exercised
-here — but metered and off-brand regardless of the exact mechanism): every image is either the brand's
-own asset file or built from CSS/SVG primitives.
+invoke Paper's AI image generation (`paper-gen://` URLs) unless the operator has explicitly asked for a
+generated image: Paper's own MCP guide says plainly that "generation counts against the user's usage"
+(VERIFIED.md row 19) — it competes with the artifact's own 25-call budget for no design reason. Use
+Paper's own named alternative instead: plain placeholders — solid fills, SVG shapes — composed from
+tokens, the same as every other element on the canvas.
 
 ## Preconditions
 
@@ -68,7 +86,7 @@ own asset file or built from CSS/SVG primitives.
    `create_artboard`** — a missing face is a broken design, and the fix (installing the font locally) is
    the operator's.
 
-## Method
+## Procedure
 
 1. **Read the composition**, not the stylesheet. Open the org's DESIGN.md, pick the composition
    (social card, poster, deck slide, page, chart, doc page), and note: canvas size, world (light/dark),
