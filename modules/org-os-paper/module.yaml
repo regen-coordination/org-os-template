@@ -18,6 +18,7 @@ dependencies:
   - org-os-standards
 files:
   packages/paper-integration: packages/paper-integration
+  skills/paper-design: skills/paper-design
 checks:
   - file-exists: packages/paper-integration/lib/paper.mjs
   - file-exists: packages/paper-integration/VERIFIED.md

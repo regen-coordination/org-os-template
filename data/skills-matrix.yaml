@@ -27,6 +27,13 @@ skills:
     promotion_status: "evaluating"
     notes: "Queues capital movements. Not yet activated in production instances; framework provides, awaiting adoption signal."
 
+  - id: "paper-design"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    notes: "Design DESIGN.md compositions on a Paper canvas from pushed brand tokens under a metered-call budget; export back as PNG/JSX. Module org-os-paper. First adopter: refi-dao-os (brief-02 prototype pending)."
+
   - id: "funding-scout"
     owner: "framework"
     instances_using: ["refi-bcn-os", "refi-dao-os"]
