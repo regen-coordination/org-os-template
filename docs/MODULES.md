@@ -153,6 +153,35 @@ package `packages/buzz-integration/`
 
 ---
 
+### org-os-paper — Paper Design Canvas
+
+**What it is.** A human-editable design canvas for on-brand artifacts. An agent asked for a
+social card today writes a self-contained HTML file; a steward who wants to nudge the headline
+edits CSS. With [Paper](https://paper.design) — a canvas whose every element is real HTML/CSS —
+the agent drafts the composition from the org's brand tokens, the human refines it by hand, and
+PNG/SVG/JSX exports flow back into the repo.
+
+**How it works.** `packages/paper-integration/` speaks the MCP wire format directly to Paper
+Desktop's local server (`http://127.0.0.1:29979/mcp`, three JSON-RPC methods, no SDK). A pure
+planner maps a brand.yaml-shaped token map onto Paper's ten token types — names preserved
+verbatim (`--refi-color-blue`), rem→px, one-way — and `paper:push-tokens` syncs it diffed and
+idempotently in ≤3 metered calls; `paper:lint-tokens` is the Paper-side twin of an instance's
+`lint:brand`. `paper:doctor` spends zero metered calls. **org-os never draws:** agents design
+through Paper's own tools following `skills/paper-design/SKILL.md`, under a per-artifact call
+budget (the free tier allows 100 metered calls a week). Registration is instance-level opt-in via
+a committed `.mcp.json`.
+
+**Status.** `in-dev` — package and tests ship; live verification against Paper 0.5.6 and the
+refi-dao-os prototype (Tier-2 brief 02, the GrowFi social card, ≤30 metered calls) are the
+acceptance gate to `pilot`. See `docs/integrations/paper.md`.
+
+**Links:** [manifest](../modules/org-os-paper/module.yaml) ·
+[runbook](integrations/paper.md) ·
+[design](superpowers/specs/2026-09-02-paper-integration-design.md) ·
+package `packages/paper-integration/`
+
+---
+
 ## The v5 core tranche
 
 The seven modules the v5 spec migrates first. Each proves a different module shape; none has a
@@ -338,17 +367,17 @@ they have contributed — the human-facing counterpart to `org-os-crm`'s data.
 
 **Status.** `planned`.
 
-| Module | What it will consolidate |
-|---|---|
+| Module                | What it will consolidate                                                     |
+| --------------------- | ---------------------------------------------------------------------------- |
 | **org-os-agent-core** | Identity/memory templates, `org-os-init`, `initialize.mjs`, session commands |
-| **org-os-bootstrap** | The interview, `setup-org-os.mjs`, the SETUP/BOOTSTRAP docs |
-| **org-os-research** | The research skill, autoresearch loops, `data/knowledge-gaps.yaml` |
-| **org-os-treasury** | `capital-flow`, `data/finances.yaml`, `data/assets.yaml` |
-| **org-os-crm** | Members, relationships, channels, governance registries |
-| **org-os-comms** | Telegram and channel connectivity |
-| **org-os-koi** | KOI-net bridges and the OPAL integration |
-| **org-os-egregore** | `packages/egregore-core` |
-| **org-os-web3** | Safe, Hats, and Gardens integrations |
+| **org-os-bootstrap**  | The interview, `setup-org-os.mjs`, the SETUP/BOOTSTRAP docs                  |
+| **org-os-research**   | The research skill, autoresearch loops, `data/knowledge-gaps.yaml`           |
+| **org-os-treasury**   | `capital-flow`, `data/finances.yaml`, `data/assets.yaml`                     |
+| **org-os-crm**        | Members, relationships, channels, governance registries                      |
+| **org-os-comms**      | Telegram and channel connectivity                                            |
+| **org-os-koi**        | KOI-net bridges and the OPAL integration                                     |
+| **org-os-egregore**   | `packages/egregore-core`                                                     |
+| **org-os-web3**       | Safe, Hats, and Gardens integrations                                         |
 
 ---
 
@@ -358,6 +387,6 @@ Deliberate exclusions, so the boundary stays legible:
 
 - **`workspace-improver`, `schema-generator`** — framework-maintenance tooling, absorbed into
   `org-os-standards`.
-- **`packages/dashboard`, `webapps`, `agents-app`, `regen-agents`** — apps that *consume*
+- **`packages/dashboard`, `webapps`, `agents-app`, `regen-agents`** — apps that _consume_
   modules. They stay npm workspaces.
 - **`site/`** — a deployment, not a capability.

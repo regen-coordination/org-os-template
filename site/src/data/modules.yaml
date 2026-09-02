@@ -17,6 +17,11 @@ modules:
     status: pilot
     summary: SHA-tagged signed session digests to a local Buzz relay on /close, read back on /initialize — built and verified end-to-end against a live relay, dogfood acceptance pending.
     link: /docs/modules
+  - id: org-os-paper
+    name: Paper Design Canvas
+    status: in-dev
+    summary: Brand tokens pushed into a Paper design file, drift-linted; agents draft on-brand compositions a human refines by hand. Package built, live verification pending.
+    link: /docs/modules
   - id: org-os-federation
     name: Federation
     status: live

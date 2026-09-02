@@ -1,0 +1,23 @@
+# org-os-paper — the Paper design-canvas integration (module #5).
+#
+# An IN-PLACE module: everything it owns already sits at its canonical path.
+# The external dependency (Paper Desktop 0.5.6, MCP 2025-03-26) is recorded in
+# packages/paper-integration/VERIFIED.md, not here — the v5 schema models
+# module-to-module deps only.
+id: org-os-paper
+version: 0.1.0
+type: integration
+description: >-
+  Paper design canvas — an org's brand.yaml tokens are pushed into a Paper
+  file (one way, diffed, idempotent) and linted for drift, so agents design
+  DESIGN.md compositions on a human-editable canvas without inventing a
+  colour. Thin JSON-RPC client over Paper Desktop's local MCP server; agents
+  use Paper's own tools for the drawing. Free-tier metered-call budget is a
+  first-class constraint (doctor spends zero).
+dependencies:
+  - org-os-standards
+files:
+  packages/paper-integration: packages/paper-integration
+checks:
+  - file-exists: packages/paper-integration/lib/paper.mjs
+  - file-exists: packages/paper-integration/VERIFIED.md

@@ -140,6 +140,13 @@ packages:
     promotion_status: "evaluating"
     lifecycle_status: "active"
     notes: "@buzz-integration — thin wrapper (lib/buzz.mjs) over the pinned buzz binary for a signed, SHA-tagged session-digest comms lane (npm run buzz:post/read/doctor), wired fail-open into /initialize and /close. Verified end-to-end 2026-08-29 against a live local relay (deploy/compose, image ghcr.io/block/buzz:main) and the real buzz binary: doctor reports all four checks green and exits 0, and post/read round-tripped a digest with its provenance trailer intact. CLI_MAP in lib/buzz.mjs now encodes the observed CLI surface, not documented guesses. Ships modules/org-os-buzz/module.yaml as the third tracked module. See packages/buzz-integration/VERIFIED.md (status: VERIFIED) for the full trail. Still open before the lane runs in production: the 5-consecutive-session /close-posts + /initialize-reads dogfood tally (HEARTBEAT.md tracker) and syncing the /initialize read-back hook to machine-local skill mirrors some tools read instead of the project copy. 56/56 tests green against the fixture."
+  - id: "paper-integration"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    lifecycle_status: "active"
+    notes: "@paper-integration — thin MCP wire client (lib/paper.mjs) over Paper Desktop's local server + pure token planner (lib/tokens.mjs). npm run paper:doctor (zero metered calls) / paper:push-tokens (brand.yaml → Paper tokens, diffed, ≤3 calls) / paper:lint-tokens (1 call) / paper:call (passthrough). Ships modules/org-os-paper/module.yaml as module #5. Live verification and the refi-dao-os brief-02 prototype pending (VERIFIED.md)."
 
   # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
