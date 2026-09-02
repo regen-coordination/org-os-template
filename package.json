@@ -71,7 +71,8 @@
     "buzz:read": "node packages/buzz-integration/scripts/read-since.mjs",
     "paper:doctor": "node packages/paper-integration/scripts/doctor.mjs",
     "paper:call": "node packages/paper-integration/scripts/call.mjs",
-    "paper:push-tokens": "node packages/paper-integration/scripts/push-tokens.mjs"
+    "paper:push-tokens": "node packages/paper-integration/scripts/push-tokens.mjs",
+    "paper:lint-tokens": "node packages/paper-integration/scripts/lint-tokens.mjs"
   },
   "engines": {
     "npm": ">=10.9.2",
