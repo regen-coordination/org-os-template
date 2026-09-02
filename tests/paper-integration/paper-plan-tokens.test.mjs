@@ -211,3 +211,61 @@ test("diffTokens: create / update / unchanged / extra (prefix-scoped)", () => {
   assert.deepEqual(d.unchanged, ["--refi-color-blue"]);
   assert.deepEqual(d.extra, ["--refi-old-thing"]);
 });
+
+test("normalizeValue: rgb/rgba canonicalisation matches Paper's read-back form", () => {
+  // Real pairs observed round-tripping through a live Paper file: Paper
+  // canonicalises legacy rgba(r,g,b,a) into modern rgb(r g b / a%).
+  assert.equal(
+    normalizeValue("color", "rgba(255,255,255,0.03)"),
+    normalizeValue("color", "rgb(255 255 255 / 3%)"),
+  );
+  assert.equal(
+    normalizeValue("color", "rgba(17,24,29,0.9)"),
+    normalizeValue("color", "rgb(17 24 29 / 90%)"),
+  );
+  assert.equal(
+    normalizeValue("color", "rgba(113,227,186,0.5)"),
+    normalizeValue("color", "rgb(113 227 186 / 50%)"),
+  );
+  // No alpha means fully opaque — must equal both the space-separated form
+  // and an explicit alpha of 1.
+  assert.equal(
+    normalizeValue("color", "rgb(1,2,3)"),
+    normalizeValue("color", "rgb(1 2 3)"),
+  );
+  assert.equal(
+    normalizeValue("color", "rgb(1,2,3)"),
+    normalizeValue("color", "rgba(1,2,3,1)"),
+  );
+  // Percentage and decimal alpha must land on the same rounded value.
+  assert.equal(
+    normalizeValue("color", "rgba(0,0,0,0.5)"),
+    normalizeValue("color", "rgb(0 0 0 / 50%)"),
+  );
+});
+
+test("diffTokens: Paper's canonical rgb() read-back is unchanged, not update", () => {
+  // This is the actual bug: a brand value in legacy rgba() syntax diffed
+  // against Paper's modern rgb(r g b / a%) read-back must not be flagged as
+  // drift, or push/lint never settle.
+  const planned = [
+    {
+      type: "color",
+      name: "--refi-bg-surface",
+      value: "rgba(255,255,255,0.03)",
+      description: "d",
+    },
+  ];
+  const existing = [
+    {
+      type: "color",
+      name: "--refi-bg-surface",
+      value: "rgb(255 255 255 / 3%)",
+    },
+  ];
+  const d = diffTokens(planned, existing, { prefix: "refi-" });
+  assert.deepEqual(d.create, []);
+  assert.deepEqual(d.update, []);
+  assert.deepEqual(d.unchanged, ["--refi-bg-surface"]);
+  assert.deepEqual(d.extra, []);
+});

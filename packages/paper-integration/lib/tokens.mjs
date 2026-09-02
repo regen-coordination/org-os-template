@@ -150,10 +150,38 @@ export function planTokens(brand, { canvasWidth = 1080 } = {}) {
   return { tokens, skipped, converted };
 }
 
+// Paper canonicalises legacy rgba(r,g,b,a) into modern rgb(r g b / a%) on
+// read-back. Parse either syntax — comma or space separated, with or
+// without a `/` before alpha, alpha as a decimal or a percentage — into one
+// comparable form so the two compare equal. Returns null for anything that
+// isn't an rgb()/rgba() function (hsl/oklch/etc. are left alone: Paper has
+// not been observed to rewrite them).
+function canonicalRgb(v) {
+  const m = v.match(/^rgba?\(\s*([^)]*)\)\s*$/i);
+  if (!m) return null;
+  const parts = m[1]
+    .split(/[\s,/]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length < 3) return null;
+  const [r, g, b] = parts.slice(0, 3).map(Number);
+  if ([r, g, b].some((n) => !Number.isFinite(n))) return null;
+  let alphaPct = 100;
+  if (parts.length >= 4) {
+    const a = parts[3];
+    const n = a.endsWith("%") ? Number(a.slice(0, -1)) : Number(a) * 100;
+    if (!Number.isFinite(n)) return null;
+    alphaPct = Math.round(n);
+  }
+  return `rgb(${r} ${g} ${b} / ${alphaPct}%)`;
+}
+
 export function normalizeValue(type, value) {
   if (type === "fontWeight") return String(Number(value));
   let v = String(value).trim();
   if (type === "color") {
+    const rgb = canonicalRgb(v);
+    if (rgb) return rgb;
     v = v.toLowerCase().replace(/\s+/g, "");
     if (/^#[0-9a-f]{3}$/.test(v))
       v = "#" + [...v.slice(1)].map((c) => c + c).join("");
