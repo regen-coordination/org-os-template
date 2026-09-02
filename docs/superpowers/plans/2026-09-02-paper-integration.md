@@ -21,6 +21,8 @@
 - refi-dao-os commits stage **explicit paths only** (`git add <path>…`), on its current branch. Never `git stash`, `git clean`, `git reset --hard`, never `git add -A`. The instance's pre-existing dirty tree belongs to another session.
 - New files pass `npx prettier --check <file>` before commit. Existing tests stay green: `npm test`, `npm run validate:structure`, `npm --prefix site test`.
 - Dates: run `date +%Y-%m-%d` before stamping anything (today is 2026-09-02 at plan time).
+- Authoritative token counts for `refi-dao-os/data/brand.yaml` v2.0 (derived from the file 2026-09-02, and the numbers every task's assertions use): **79** tokens in the file → **75** planned Paper tokens · **4** skipped (`glass-blur`, `glass-shadow`, `glow-blue`, `glow-green`) · **31** converted. By Paper type: color 35 · spacing 14 · fontSize 12 · radius 6 · fontWeight 5 · fontFamily 3. Spot values: `--refi-text-base` `14px` · `--refi-text-5xl` `56px` · `--refi-text-hero` `86px` at canvas width 1080. If the instance file has changed since, recompute and update the assertions rather than forcing these numbers.
+- `PAPER_ENV_ROOT` overrides the framework root that `.env` is read from. It exists only so tests are hermetic — this repo has a real `.env`, and Task 7 adds `PAPER_FILE_ID` to it. Never set it in production.
 
 ---
 
@@ -28,52 +30,54 @@
 
 **org-os (framework), branch `luizfernando`:**
 
-| path | responsibility |
-|---|---|
-| `packages/paper-integration/lib/paper.mjs` | wire client (`initialize` / `listTools` / `call`), SSE + JSON reply parsing, `PaperError`, metered counter, `.env` config, `PIN`, `REQUIRED_TOOLS`, `extractTokens` |
-| `packages/paper-integration/lib/tokens.mjs` | pure planner: `loadBrand`, `planTokens`, `diffTokens`, `normalizeValue`, `toPx`, `isColor` |
-| `packages/paper-integration/scripts/doctor.mjs` | four free checks, exit 0/2 |
-| `packages/paper-integration/scripts/push-tokens.mjs` | plan → diff → `create_tokens` / `set_tokens`; `--dry-run`, `--prune` |
-| `packages/paper-integration/scripts/lint-tokens.mjs` | `get_tokens` → compare → exit 0/1 |
-| `packages/paper-integration/scripts/call.mjs` | generic `tools/call` passthrough for agents and the prototype (`--args-file`, `--out`) |
-| `packages/paper-integration/VERIFIED.md` | the contract with reality (Task 7) |
-| `modules/org-os-paper/module.yaml` | module manifest (`type: integration`) |
-| `skills/paper-design/SKILL.md` | the agent method |
-| `docs/integrations/paper.md` | operator runbook |
-| `docs/MODULES.md`, `site/src/data/modules.yaml` | catalog entry + mirror |
-| `data/packages-matrix.yaml`, `data/skills-matrix.yaml` | registry rows |
-| `package.json`, `.env.example` | scripts, env placeholders |
-| `tests/paper-integration/helpers/fake-paper.mjs` | in-process fake Paper MCP server (`node:http`) + `runScript` |
-| `tests/paper-integration/*.test.mjs` | lib, planner, doctor, push, lint, call |
-| `tests/fixtures/paper/brand.refi-dao.yaml` | `stylesheet:` + `tokens:` blocks copied from refi-dao-os |
+| path                                                   | responsibility                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/paper-integration/lib/paper.mjs`             | wire client (`initialize` / `listTools` / `call`), SSE + JSON reply parsing, `PaperError`, metered counter, `.env` config, `PIN`, `REQUIRED_TOOLS`, `extractTokens` |
+| `packages/paper-integration/lib/tokens.mjs`            | pure planner: `loadBrand`, `planTokens`, `diffTokens`, `normalizeValue`, `toPx`, `isColor`                                                                          |
+| `packages/paper-integration/scripts/doctor.mjs`        | four free checks, exit 0/2                                                                                                                                          |
+| `packages/paper-integration/scripts/push-tokens.mjs`   | plan → diff → `create_tokens` / `set_tokens`; `--dry-run`, `--prune`                                                                                                |
+| `packages/paper-integration/scripts/lint-tokens.mjs`   | `get_tokens` → compare → exit 0/1                                                                                                                                   |
+| `packages/paper-integration/scripts/call.mjs`          | generic `tools/call` passthrough for agents and the prototype (`--args-file`, `--out`)                                                                              |
+| `packages/paper-integration/VERIFIED.md`               | the contract with reality (Task 7)                                                                                                                                  |
+| `modules/org-os-paper/module.yaml`                     | module manifest (`type: integration`)                                                                                                                               |
+| `skills/paper-design/SKILL.md`                         | the agent method                                                                                                                                                    |
+| `docs/integrations/paper.md`                           | operator runbook                                                                                                                                                    |
+| `docs/MODULES.md`, `site/src/data/modules.yaml`        | catalog entry + mirror                                                                                                                                              |
+| `data/packages-matrix.yaml`, `data/skills-matrix.yaml` | registry rows                                                                                                                                                       |
+| `package.json`, `.env.example`                         | scripts, env placeholders                                                                                                                                           |
+| `tests/paper-integration/helpers/fake-paper.mjs`       | in-process fake Paper MCP server (`node:http`) + `runScript`                                                                                                        |
+| `tests/paper-integration/*.test.mjs`                   | lib, planner, doctor, push, lint, call                                                                                                                              |
+| `tests/fixtures/paper/brand.refi-dao.yaml`             | `stylesheet:` + `tokens:` blocks copied from refi-dao-os                                                                                                            |
 
 **refi-dao-os (instance), current branch `feat/graphify-knowledge-pilot` unless the operator names another:**
 
-| path | responsibility |
-|---|---|
-| `.mcp.json` | registers `paper` (http) for Claude Code |
-| `TOOLS.md` | new `## Paper (design canvas)` section |
-| `.claude/skills/refi-dao-brand/SKILL.md` | new `## Canvas (Paper)` route + social-card class→inline table |
-| `.env` (gitignored, not committed) | `PAPER_FILE_ID` |
-| `docs/brand/eval/out/02-growfi-social-card.paper.png` · `.paper.html` · `PAPER-PROTOTYPE-2026-09-02.md` | prototype outputs + report |
-| `DECISIONS.md`, `memory/2026-09-02.md` | record |
+| path                                                                                                    | responsibility                                                 |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `.mcp.json`                                                                                             | registers `paper` (http) for Claude Code                       |
+| `TOOLS.md`                                                                                              | new `## Paper (design canvas)` section                         |
+| `.claude/skills/refi-dao-brand/SKILL.md`                                                                | new `## Canvas (Paper)` route + social-card class→inline table |
+| `.env` (gitignored, not committed)                                                                      | `PAPER_FILE_ID`                                                |
+| `docs/brand/eval/out/02-growfi-social-card.paper.png` · `.paper.html` · `PAPER-PROTOTYPE-2026-09-02.md` | prototype outputs + report                                     |
+| `DECISIONS.md`, `memory/2026-09-02.md`                                                                  | record                                                         |
 
 ---
 
 ### Task 1: Wire client — `lib/paper.mjs`
 
 **Files:**
+
 - Create: `packages/paper-integration/lib/paper.mjs`
 - Test: `tests/paper-integration/paper-lib.test.mjs`
 
 **Interfaces:**
+
 - Produces:
   - `export const DEFAULT_URL = "http://127.0.0.1:29979/mcp"`
   - `export const PIN = { app: "0.5.6", server: "paper-desktop", protocol: "2025-03-26" }`
   - `export const REQUIRED_TOOLS = ["get_tokens", "create_tokens", "set_tokens", "export", "write_html"]`
   - `export class PaperError extends Error { code: "unreachable"|"rpc"|"quota"|"badreply"; data?: unknown }`
   - `export function parseEnvFile(text): Record<string,string>`
-  - `export function loadConfig({ root?, env?, tokensPath?, file? }): { url: string, fileId: string|undefined }`
+  - `export function loadConfig({ root?, env?, tokensPath?, file? }): { url: string, fileId: string|undefined }` — framework root is `root ?? env.PAPER_ENV_ROOT ?? <repo root>`
   - `export function parseReply(text: string): object` — accepts SSE (`data:` lines) or plain JSON; returns the JSON-RPC envelope
   - `export function createClient({ url?, fetch?, timeoutMs? = 15000 }): { initialize(), listTools(), call(name, args), metered: number, url }`
   - `export function extractTokens(result): Array<{ type, name, value, description? }>` — accepts `result.content[0].text` JSON that is either an array or `{ tokens: [...] }`, or a structured `result.tokens`
@@ -101,7 +105,11 @@ import {
 
 const sse = (obj) => `event: message\ndata: ${JSON.stringify(obj)}\n\n`;
 const rpcOk = (id, result) => ({ jsonrpc: "2.0", id, result });
-const rpcErr = (id, code, message, data) => ({ jsonrpc: "2.0", id, error: { code, message, data } });
+const rpcErr = (id, code, message, data) => ({
+  jsonrpc: "2.0",
+  id,
+  error: { code, message, data },
+});
 
 // A fetch double: records requests, replies from a queue of {status, body, contentType}.
 function fakeFetch(replies) {
@@ -113,7 +121,9 @@ function fakeFetch(replies) {
     return {
       ok: r.status < 400,
       status: r.status,
-      headers: { get: (h) => (h.toLowerCase() === "content-type" ? r.contentType : null) },
+      headers: {
+        get: (h) => (h.toLowerCase() === "content-type" ? r.contentType : null),
+      },
       text: async () => r.body,
     };
   };
@@ -123,8 +133,18 @@ function fakeFetch(replies) {
 
 test("constants: pin and required tools match the spec", () => {
   assert.equal(DEFAULT_URL, "http://127.0.0.1:29979/mcp");
-  assert.deepEqual(PIN, { app: "0.5.6", server: "paper-desktop", protocol: "2025-03-26" });
-  assert.deepEqual(REQUIRED_TOOLS, ["get_tokens", "create_tokens", "set_tokens", "export", "write_html"]);
+  assert.deepEqual(PIN, {
+    app: "0.5.6",
+    server: "paper-desktop",
+    protocol: "2025-03-26",
+  });
+  assert.deepEqual(REQUIRED_TOOLS, [
+    "get_tokens",
+    "create_tokens",
+    "set_tokens",
+    "export",
+    "write_html",
+  ]);
 });
 
 test("parseReply: SSE-framed envelope", () => {
@@ -138,12 +158,25 @@ test("parseReply: plain JSON envelope", () => {
 });
 
 test("parseReply: garbage → PaperError badreply", () => {
-  assert.throws(() => parseReply("<html>nope</html>"), (e) => e instanceof PaperError && e.code === "badreply");
+  assert.throws(
+    () => parseReply("<html>nope</html>"),
+    (e) => e instanceof PaperError && e.code === "badreply",
+  );
 });
 
 test("client.initialize: sends protocolVersion + clientInfo, returns serverInfo, not metered", async () => {
   const f = fakeFetch([
-    { status: 200, contentType: "text/event-stream", body: sse(rpcOk(1, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "paper-desktop", version: "0.5.6" } })) },
+    {
+      status: 200,
+      contentType: "text/event-stream",
+      body: sse(
+        rpcOk(1, {
+          protocolVersion: "2025-03-26",
+          capabilities: { tools: {} },
+          serverInfo: { name: "paper-desktop", version: "0.5.6" },
+        }),
+      ),
+    },
   ]);
   const c = createClient({ url: DEFAULT_URL, fetch: f });
   const info = await c.initialize();
@@ -151,25 +184,45 @@ test("client.initialize: sends protocolVersion + clientInfo, returns serverInfo,
   assert.equal(info.protocolVersion, "2025-03-26");
   assert.equal(f.calls[0].body.method, "initialize");
   assert.equal(f.calls[0].body.params.protocolVersion, "2025-03-26");
-  assert.equal(f.calls[0].body.params.clientInfo.name, "org-os-paper-integration");
+  assert.equal(
+    f.calls[0].body.params.clientInfo.name,
+    "org-os-paper-integration",
+  );
   assert.equal(c.metered, 0);
 });
 
 test("client.listTools: returns tools array, not metered", async () => {
   const f = fakeFetch([
-    { status: 200, contentType: "text/event-stream", body: sse(rpcOk(1, { tools: [{ name: "get_tokens", inputSchema: {} }] })) },
+    {
+      status: 200,
+      contentType: "text/event-stream",
+      body: sse(rpcOk(1, { tools: [{ name: "get_tokens", inputSchema: {} }] })),
+    },
   ]);
   const c = createClient({ fetch: f });
   const tools = await c.listTools();
-  assert.deepEqual(tools.map((t) => t.name), ["get_tokens"]);
+  assert.deepEqual(
+    tools.map((t) => t.name),
+    ["get_tokens"],
+  );
   assert.equal(f.calls[0].body.method, "tools/list");
   assert.equal(c.metered, 0);
 });
 
 test("client.call: sends tools/call with name+arguments, returns result, increments metered", async () => {
   const f = fakeFetch([
-    { status: 200, contentType: "text/event-stream", body: sse(rpcOk(1, { content: [{ type: "text", text: "[]" }] })) },
-    { status: 200, contentType: "application/json", body: JSON.stringify(rpcOk(2, { content: [{ type: "text", text: "ok" }] })) },
+    {
+      status: 200,
+      contentType: "text/event-stream",
+      body: sse(rpcOk(1, { content: [{ type: "text", text: "[]" }] })),
+    },
+    {
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        rpcOk(2, { content: [{ type: "text", text: "ok" }] }),
+      ),
+    },
   ]);
   const c = createClient({ fetch: f });
   const r1 = await c.call("get_tokens", { fileId: "F1" });
@@ -177,46 +230,88 @@ test("client.call: sends tools/call with name+arguments, returns result, increme
   assert.deepEqual(r1.content[0], { type: "text", text: "[]" });
   assert.equal(r2.content[0].text, "ok");
   assert.equal(f.calls[0].body.method, "tools/call");
-  assert.deepEqual(f.calls[0].body.params, { name: "get_tokens", arguments: { fileId: "F1" } });
+  assert.deepEqual(f.calls[0].body.params, {
+    name: "get_tokens",
+    arguments: { fileId: "F1" },
+  });
   assert.equal(c.metered, 2);
 });
 
 test("client.call: JSON-RPC error → PaperError rpc with code/message/data", async () => {
   const f = fakeFetch([
-    { status: 200, contentType: "text/event-stream", body: sse(rpcErr(1, -32602, "Invalid params", { field: "tokens" })) },
+    {
+      status: 200,
+      contentType: "text/event-stream",
+      body: sse(rpcErr(1, -32602, "Invalid params", { field: "tokens" })),
+    },
   ]);
   const c = createClient({ fetch: f });
-  await assert.rejects(c.call("create_tokens", {}), (e) => e instanceof PaperError && e.code === "rpc" && /Invalid params/.test(e.message) && e.data.field === "tokens");
+  await assert.rejects(
+    c.call("create_tokens", {}),
+    (e) =>
+      e instanceof PaperError &&
+      e.code === "rpc" &&
+      /Invalid params/.test(e.message) &&
+      e.data.field === "tokens",
+  );
 });
 
 test("client.call: quota-shaped error → PaperError quota", async () => {
   const f = fakeFetch([
-    { status: 429, contentType: "application/json", body: JSON.stringify(rpcErr(1, -32000, "MCP tool call limit reached for this week")) },
+    {
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify(
+        rpcErr(1, -32000, "MCP tool call limit reached for this week"),
+      ),
+    },
   ]);
   const c = createClient({ fetch: f });
-  await assert.rejects(c.call("get_tokens", {}), (e) => e instanceof PaperError && e.code === "quota");
+  await assert.rejects(
+    c.call("get_tokens", {}),
+    (e) => e instanceof PaperError && e.code === "quota",
+  );
 });
 
 test("client: connection refused → PaperError unreachable", async () => {
-  const err = Object.assign(new Error("fetch failed"), { cause: { code: "ECONNREFUSED" } });
+  const err = Object.assign(new Error("fetch failed"), {
+    cause: { code: "ECONNREFUSED" },
+  });
   const c = createClient({ fetch: fakeFetch([err]) });
-  await assert.rejects(c.initialize(), (e) => e instanceof PaperError && e.code === "unreachable");
+  await assert.rejects(
+    c.initialize(),
+    (e) => e instanceof PaperError && e.code === "unreachable",
+  );
 });
 
 test("parseEnvFile: quotes, comments, export prefix", () => {
-  const vars = parseEnvFile(`# c\nexport PAPER_FILE_ID=abc123 # trailing\nPAPER_MCP_URL="http://h/p#frag"\nBROKEN LINE\n`);
-  assert.deepEqual(vars, { PAPER_FILE_ID: "abc123", PAPER_MCP_URL: "http://h/p#frag" });
+  const vars = parseEnvFile(
+    `# c\nexport PAPER_FILE_ID=abc123 # trailing\nPAPER_MCP_URL="http://h/p#frag"\nBROKEN LINE\n`,
+  );
+  assert.deepEqual(vars, {
+    PAPER_FILE_ID: "abc123",
+    PAPER_MCP_URL: "http://h/p#frag",
+  });
 });
 
 test("loadConfig: precedence file flag > env > root .env > instance .env beside tokens", () => {
   const root = mkdtempSync(path.join(tmpdir(), "paper-root-"));
   const inst = mkdtempSync(path.join(tmpdir(), "paper-inst-"));
   writeFileSync(path.join(root, ".env"), "PAPER_FILE_ID=from-root\n");
-  writeFileSync(path.join(inst, ".env"), "PAPER_FILE_ID=from-instance\nPAPER_MCP_URL=http://127.0.0.1:1/mcp\n");
+  writeFileSync(
+    path.join(inst, ".env"),
+    "PAPER_FILE_ID=from-instance\nPAPER_MCP_URL=http://127.0.0.1:1/mcp\n",
+  );
   const tokensPath = path.join(inst, "data", "brand.yaml"); // need not exist for config resolution
 
-  assert.equal(loadConfig({ root, env: {}, tokensPath, file: "flag" }).fileId, "flag");
-  assert.equal(loadConfig({ root, env: { PAPER_FILE_ID: "from-env" }, tokensPath }).fileId, "from-env");
+  assert.equal(
+    loadConfig({ root, env: {}, tokensPath, file: "flag" }).fileId,
+    "flag",
+  );
+  assert.equal(
+    loadConfig({ root, env: { PAPER_FILE_ID: "from-env" }, tokensPath }).fileId,
+    "from-env",
+  );
   assert.equal(loadConfig({ root, env: {}, tokensPath }).fileId, "from-root");
   writeFileSync(path.join(root, ".env"), "\n");
   const c = loadConfig({ root, env: {}, tokensPath });
@@ -225,12 +320,39 @@ test("loadConfig: precedence file flag > env > root .env > instance .env beside 
   assert.equal(loadConfig({ root, env: {} }).url, DEFAULT_URL);
 });
 
+test("loadConfig: PAPER_ENV_ROOT overrides the framework root (test isolation)", () => {
+  const elsewhere = mkdtempSync(path.join(tmpdir(), "paper-elsewhere-"));
+  writeFileSync(path.join(elsewhere, ".env"), "PAPER_FILE_ID=from-env-root\n");
+  assert.equal(
+    loadConfig({ env: { PAPER_ENV_ROOT: elsewhere } }).fileId,
+    "from-env-root",
+  );
+  const empty = mkdtempSync(path.join(tmpdir(), "paper-empty-"));
+  assert.equal(
+    loadConfig({ env: { PAPER_ENV_ROOT: empty } }).fileId,
+    undefined,
+  );
+});
+
 test("extractTokens: text-content array, text-content {tokens}, structured", () => {
   const arr = [{ type: "color", name: "--refi-color-blue", value: "#4571E1" }];
-  assert.deepEqual(extractTokens({ content: [{ type: "text", text: JSON.stringify(arr) }] }), arr);
-  assert.deepEqual(extractTokens({ content: [{ type: "text", text: JSON.stringify({ tokens: arr }) }] }), arr);
+  assert.deepEqual(
+    extractTokens({ content: [{ type: "text", text: JSON.stringify(arr) }] }),
+    arr,
+  );
+  assert.deepEqual(
+    extractTokens({
+      content: [{ type: "text", text: JSON.stringify({ tokens: arr }) }],
+    }),
+    arr,
+  );
   assert.deepEqual(extractTokens({ tokens: arr }), arr);
-  assert.deepEqual(extractTokens({ content: [{ type: "text", text: "No design tokens in this file." }] }), []);
+  assert.deepEqual(
+    extractTokens({
+      content: [{ type: "text", text: "No design tokens in this file." }],
+    }),
+    [],
+  );
 });
 ```
 
@@ -252,11 +374,24 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
 
 export const DEFAULT_URL = "http://127.0.0.1:29979/mcp";
-export const PIN = { app: "0.5.6", server: "paper-desktop", protocol: "2025-03-26" };
-export const REQUIRED_TOOLS = ["get_tokens", "create_tokens", "set_tokens", "export", "write_html"];
+export const PIN = {
+  app: "0.5.6",
+  server: "paper-desktop",
+  protocol: "2025-03-26",
+};
+export const REQUIRED_TOOLS = [
+  "get_tokens",
+  "create_tokens",
+  "set_tokens",
+  "export",
+  "write_html",
+];
 const CLIENT_INFO = { name: "org-os-paper-integration", version: "0.1.0" };
 
 export class PaperError extends Error {
@@ -304,9 +439,16 @@ function readEnv(file) {
 // Precedence: explicit flag > process env > <root>/.env > <instance>/.env,
 // where <instance> is the parent of the directory holding the tokens file
 // (data/brand.yaml → the instance root). loadConfig never throws.
-export function loadConfig({ root = ROOT, env = process.env, tokensPath, file } = {}) {
-  const rootVars = readEnv(path.join(root, ".env"));
-  const instVars = tokensPath ? readEnv(path.resolve(path.dirname(tokensPath), "..", ".env")) : {};
+// PAPER_ENV_ROOT overrides the framework root the `.env` is read from. It
+// exists so tests are hermetic: this repo has a real `.env`, and once it
+// carries PAPER_FILE_ID the "no target file" paths would silently pass.
+// Never set in production.
+export function loadConfig({ root, env = process.env, tokensPath, file } = {}) {
+  const base = root ?? env.PAPER_ENV_ROOT ?? ROOT;
+  const rootVars = readEnv(path.join(base, ".env"));
+  const instVars = tokensPath
+    ? readEnv(path.resolve(path.dirname(tokensPath), "..", ".env"))
+    : {};
   const pick = (k) => env[k] || rootVars[k] || instVars[k] || undefined;
   return {
     url: pick("PAPER_MCP_URL") || DEFAULT_URL,
@@ -327,20 +469,32 @@ export function parseReply(text) {
   }
   try {
     const env = JSON.parse(payload);
-    if (typeof env !== "object" || env === null || !("jsonrpc" in env)) throw new Error("not a JSON-RPC envelope");
+    if (typeof env !== "object" || env === null || !("jsonrpc" in env))
+      throw new Error("not a JSON-RPC envelope");
     return env;
   } catch (e) {
-    throw new PaperError("badreply", `unparseable reply: ${e.message}`, { head: t.slice(0, 200) });
+    throw new PaperError("badreply", `unparseable reply: ${e.message}`, {
+      head: t.slice(0, 200),
+    });
   }
 }
 
 function classifyError(status, error) {
   const msg = String(error?.message ?? "");
-  if (status === 429 || /limit|quota|exceeded/i.test(msg)) return new PaperError("quota", msg || "quota exceeded", error?.data);
-  return new PaperError("rpc", msg || `JSON-RPC error ${error?.code}`, error?.data);
+  if (status === 429 || /limit|quota|exceeded/i.test(msg))
+    return new PaperError("quota", msg || "quota exceeded", error?.data);
+  return new PaperError(
+    "rpc",
+    msg || `JSON-RPC error ${error?.code}`,
+    error?.data,
+  );
 }
 
-export function createClient({ url = DEFAULT_URL, fetch = globalThis.fetch, timeoutMs = 15000 } = {}) {
+export function createClient({
+  url = DEFAULT_URL,
+  fetch = globalThis.fetch,
+  timeoutMs = 15000,
+} = {}) {
   let nextId = 1;
   const client = { url, metered: 0 };
 
@@ -352,12 +506,18 @@ export function createClient({ url = DEFAULT_URL, fetch = globalThis.fetch, time
     try {
       res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+        },
         body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
         signal: ctl.signal,
       });
     } catch (e) {
-      throw new PaperError("unreachable", `Paper MCP not reachable at ${url} (${e?.cause?.code || e.message})`);
+      throw new PaperError(
+        "unreachable",
+        `Paper MCP not reachable at ${url} (${e?.cause?.code || e.message})`,
+      );
     } finally {
       clearTimeout(timer);
     }
@@ -366,7 +526,12 @@ export function createClient({ url = DEFAULT_URL, fetch = globalThis.fetch, time
     try {
       env = parseReply(text);
     } catch (e) {
-      if (!res.ok) throw new PaperError(res.status === 429 ? "quota" : "rpc", `HTTP ${res.status}`, { head: text.slice(0, 200) });
+      if (!res.ok)
+        throw new PaperError(
+          res.status === 429 ? "quota" : "rpc",
+          `HTTP ${res.status}`,
+          { head: text.slice(0, 200) },
+        );
       throw e;
     }
     if (env.error) throw classifyError(res.status, env.error);
@@ -374,7 +539,11 @@ export function createClient({ url = DEFAULT_URL, fetch = globalThis.fetch, time
   }
 
   client.initialize = () =>
-    rpc("initialize", { protocolVersion: PIN.protocol, capabilities: {}, clientInfo: CLIENT_INFO });
+    rpc("initialize", {
+      protocolVersion: PIN.protocol,
+      capabilities: {},
+      clientInfo: CLIENT_INFO,
+    });
   client.listTools = async () => (await rpc("tools/list", {})).tools ?? [];
   client.call = async (name, args = {}) => {
     const result = await rpc("tools/call", { name, arguments: args });
@@ -399,16 +568,12 @@ export function extractTokens(result) {
   }
   return [];
 }
-
-export function firstText(result) {
-  return result?.content?.find((c) => c.type === "text")?.text ?? "";
-}
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `node --test tests/paper-integration/paper-lib.test.mjs`
-Expected: PASS, 13 tests
+Expected: PASS, 14 tests
 
 - [ ] **Step 5: Format and commit**
 
@@ -424,11 +589,13 @@ git commit -m "feat(paper): MCP wire client — initialize/tools-list/tools-call
 ### Task 2: Token planner — `lib/tokens.mjs`
 
 **Files:**
+
 - Create: `packages/paper-integration/lib/tokens.mjs`
 - Create: `tests/fixtures/paper/brand.refi-dao.yaml`
 - Test: `tests/paper-integration/paper-plan-tokens.test.mjs`
 
 **Interfaces:**
+
 - Produces:
   - `export const PAPER_TYPES = ["breakpoint","color","container","fontFamily","fontSize","fontWeight","letterSpacing","lineHeight","radius","spacing"]`
   - `export function loadBrand(yamlPath): { prefix: string, tokens: Record<string,string>, source: string }` — throws `Error` with a clear message if `tokens:` or `stylesheet.prefix` is missing
@@ -452,7 +619,7 @@ mkdir -p tests/fixtures/paper
 grep -c "^  [a-z]" tests/fixtures/paper/brand.refi-dao.yaml
 ```
 
-Expected: the count is `95` (4 stylesheet keys + 91 tokens). If refi-dao-os brand.yaml has changed, the count differs — update the assertions in Step 2 accordingly and note it in the commit message.
+Expected: the count is `83` (4 stylesheet keys + 79 tokens). If refi-dao-os brand.yaml has changed, the count differs — update the assertions in Step 2 accordingly and note it in the commit message.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -473,31 +640,65 @@ import {
 } from "../../packages/paper-integration/lib/tokens.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURE = path.resolve(__dirname, "../fixtures/paper/brand.refi-dao.yaml");
+const FIXTURE = path.resolve(
+  __dirname,
+  "../fixtures/paper/brand.refi-dao.yaml",
+);
 const brand = loadBrand(FIXTURE);
 const plan = planTokens(brand, { canvasWidth: 1080 });
 const byName = Object.fromEntries(plan.tokens.map((t) => [t.name, t]));
 
 test("loadBrand: prefix and token count from the fixture", () => {
   assert.equal(brand.prefix, "refi-");
-  assert.equal(Object.keys(brand.tokens).length, 91);
+  assert.equal(Object.keys(brand.tokens).length, 79);
 });
 
 test("loadBrand: missing tokens block throws a readable error", () => {
-  assert.throws(() => loadBrand(path.resolve(__dirname, "../fixtures/instance-config.yaml")), /tokens/);
+  assert.throws(
+    () =>
+      loadBrand(path.resolve(__dirname, "../fixtures/instance-config.yaml")),
+    /tokens/,
+  );
 });
 
 test("isColor", () => {
-  for (const v of ["#4571E1", "#fff", "rgba(255,255,255,0.03)", "rgb(1,2,3)", "hsl(1 2% 3%)", "oklch(0.5 0.1 200)"]) assert.equal(isColor(v), true, v);
-  for (const v of ["0.875rem", "20px", "300", '"Switzer", sans-serif', "0 8px 32px rgba(0,0,0,0.3)"]) assert.equal(isColor(v), false, v);
+  for (const v of [
+    "#4571E1",
+    "#fff",
+    "rgba(255,255,255,0.03)",
+    "rgb(1,2,3)",
+    "hsl(1 2% 3%)",
+    "oklch(0.5 0.1 200)",
+  ])
+    assert.equal(isColor(v), true, v);
+  for (const v of [
+    "0.875rem",
+    "20px",
+    "300",
+    '"Switzer", sans-serif',
+    "0 8px 32px rgba(0,0,0,0.3)",
+  ])
+    assert.equal(isColor(v), false, v);
 });
 
 test("toPx: rem, px, zero, clamp at width, unconvertible", () => {
-  assert.deepEqual(toPx("0.875rem", {}), { px: "14px", converted: true, from: "0.875rem" });
+  assert.deepEqual(toPx("0.875rem", {}), {
+    px: "14px",
+    converted: true,
+    from: "0.875rem",
+  });
   assert.deepEqual(toPx("9999px", {}), { px: "9999px", converted: false });
   assert.deepEqual(toPx("0", {}), { px: "0px", converted: true, from: "0" });
-  assert.deepEqual(toPx("clamp(3rem, 8vw, 6rem)", { width: 1080 }), { px: "86px", converted: true, from: "clamp(3rem, 8vw, 6rem)" });
-  assert.deepEqual(toPx("clamp(3rem, 8vw, 6rem)", { width: 400 }), { px: "48px", converted: true, from: "clamp(3rem, 8vw, 6rem)" });
+  assert.deepEqual(toPx("clamp(3rem, 8vw, 6rem)", { width: 1080 }), {
+    px: "86px",
+    converted: true,
+    from: "clamp(3rem, 8vw, 6rem)",
+  });
+  assert.deepEqual(toPx("clamp(3rem, 8vw, 6rem)", { width: 400 }), {
+    px: "48px",
+    converted: true,
+    from: "clamp(3rem, 8vw, 6rem)",
+  });
   assert.equal(toPx("auto", {}), null);
 });
 
@@ -509,7 +710,12 @@ test("planTokens: every token type is a Paper type; names are prefixed and patte
 });
 
 test("planTokens: colours pass through as-is (hex and rgba)", () => {
-  assert.deepEqual(byName["--refi-color-blue"], { type: "color", name: "--refi-color-blue", value: "#4571E1", description: "brand.yaml color-blue" });
+  assert.deepEqual(byName["--refi-color-blue"], {
+    type: "color",
+    name: "--refi-color-blue",
+    value: "#4571E1",
+    description: "brand.yaml color-blue",
+  });
   assert.equal(byName["--refi-bg-surface"].type, "color");
   assert.equal(byName["--refi-bg-surface"].value, "rgba(255,255,255,0.03)");
   assert.equal(byName["--refi-text-muted"].type, "color");
@@ -523,19 +729,38 @@ test("planTokens: font sizes rem→px, hero clamp evaluated at 1080 and flagged"
   assert.equal(byName["--refi-text-base"].value, "14px");
   assert.equal(byName["--refi-text-5xl"].value, "56px");
   assert.equal(byName["--refi-text-hero"].value, "86px");
-  assert.match(byName["--refi-text-hero"].description, /from clamp\(3rem, 8vw, 6rem\) at 1080px/);
-  assert.ok(plan.converted.some((c) => c.name === "--refi-text-hero" && c.to === "86px"));
+  assert.match(
+    byName["--refi-text-hero"].description,
+    /from clamp\(3rem, 8vw, 6rem\) at 1080px/,
+  );
+  assert.ok(
+    plan.converted.some(
+      (c) => c.name === "--refi-text-hero" && c.to === "86px",
+    ),
+  );
 });
 
 test("planTokens: spacing and radius rem→px, zero → 0px, 9999px kept", () => {
-  assert.deepEqual([byName["--refi-space-4"].type, byName["--refi-space-4"].value], ["spacing", "16px"]);
+  assert.deepEqual(
+    [byName["--refi-space-4"].type, byName["--refi-space-4"].value],
+    ["spacing", "16px"],
+  );
   assert.equal(byName["--refi-space-0"].value, "0px");
-  assert.deepEqual([byName["--refi-radius-lg"].type, byName["--refi-radius-lg"].value], ["radius", "16px"]);
+  assert.deepEqual(
+    [byName["--refi-radius-lg"].type, byName["--refi-radius-lg"].value],
+    ["radius", "16px"],
+  );
   assert.equal(byName["--refi-radius-full"].value, "9999px");
 });
 
 test("planTokens: weights become numbers", () => {
-  assert.deepEqual([byName["--refi-weight-semibold"].type, byName["--refi-weight-semibold"].value], ["fontWeight", 600]);
+  assert.deepEqual(
+    [
+      byName["--refi-weight-semibold"].type,
+      byName["--refi-weight-semibold"].value,
+    ],
+    ["fontWeight", 600],
+  );
 });
 
 test("planTokens: font families → first family, full stack in description", () => {
@@ -548,23 +773,52 @@ test("planTokens: font families → first family, full stack in description", ()
 
 test("planTokens: glow and glass are skipped with a reason, never silently", () => {
   const skippedNames = plan.skipped.map((s) => s.name).sort();
-  assert.deepEqual(skippedNames, ["--refi-glass-blur", "--refi-glass-shadow", "--refi-glow-blue", "--refi-glow-green"]);
+  assert.deepEqual(skippedNames, [
+    "--refi-glass-blur",
+    "--refi-glass-shadow",
+    "--refi-glow-blue",
+    "--refi-glow-green",
+  ]);
   for (const s of plan.skipped) assert.match(s.reason, /no Paper token type/);
-  assert.equal(plan.tokens.length + plan.skipped.length, 91);
+  assert.equal(plan.tokens.length + plan.skipped.length, 79);
 });
 
 test("normalizeValue: hex case, rgba whitespace, numeric weights, px trim", () => {
-  assert.equal(normalizeValue("color", "#4571e1"), normalizeValue("color", "#4571E1"));
-  assert.equal(normalizeValue("color", "rgba(255, 255, 255, 0.03)"), normalizeValue("color", "rgba(255,255,255,0.03)"));
-  assert.equal(normalizeValue("fontWeight", "600"), normalizeValue("fontWeight", 600));
+  assert.equal(
+    normalizeValue("color", "#4571e1"),
+    normalizeValue("color", "#4571E1"),
+  );
+  assert.equal(
+    normalizeValue("color", "rgba(255, 255, 255, 0.03)"),
+    normalizeValue("color", "rgba(255,255,255,0.03)"),
+  );
+  assert.equal(
+    normalizeValue("fontWeight", "600"),
+    normalizeValue("fontWeight", 600),
+  );
   assert.equal(normalizeValue("spacing", " 16px "), "16px");
 });
 
 test("diffTokens: create / update / unchanged / extra (prefix-scoped)", () => {
   const planned = [
-    { type: "color", name: "--refi-color-blue", value: "#4571E1", description: "d" },
-    { type: "spacing", name: "--refi-space-4", value: "16px", description: "d" },
-    { type: "fontWeight", name: "--refi-weight-bold", value: 700, description: "d" },
+    {
+      type: "color",
+      name: "--refi-color-blue",
+      value: "#4571E1",
+      description: "d",
+    },
+    {
+      type: "spacing",
+      name: "--refi-space-4",
+      value: "16px",
+      description: "d",
+    },
+    {
+      type: "fontWeight",
+      name: "--refi-weight-bold",
+      value: 700,
+      description: "d",
+    },
   ];
   const existing = [
     { type: "color", name: "--refi-color-blue", value: "#4571e1" }, // same after normalisation
@@ -573,8 +827,13 @@ test("diffTokens: create / update / unchanged / extra (prefix-scoped)", () => {
     { type: "color", name: "--color-primary", value: "#111" }, // not ours — ignored
   ];
   const d = diffTokens(planned, existing, { prefix: "refi-" });
-  assert.deepEqual(d.create.map((t) => t.name), ["--refi-weight-bold"]);
-  assert.deepEqual(d.update, [{ name: "--refi-space-4", value: "16px", description: "d" }]);
+  assert.deepEqual(
+    d.create.map((t) => t.name),
+    ["--refi-weight-bold"],
+  );
+  assert.deepEqual(d.update, [
+    { name: "--refi-space-4", value: "16px", description: "d" },
+  ]);
   assert.deepEqual(d.unchanged, ["--refi-color-blue"]);
   assert.deepEqual(d.extra, ["--refi-old-thing"]);
 });
@@ -608,20 +867,37 @@ export const PAPER_TYPES = [
 
 // Families Paper has no token type for. Listed, never silently dropped.
 const UNSUPPORTED_FAMILIES = new Set(["glow", "glass"]);
-const FAMILY_TYPE = { font: "fontFamily", weight: "fontWeight", space: "spacing", radius: "radius", text: "fontSize" };
+const FAMILY_TYPE = {
+  font: "fontFamily",
+  weight: "fontWeight",
+  space: "spacing",
+  radius: "radius",
+  text: "fontSize",
+};
 
 export function loadBrand(yamlPath) {
   const doc = yaml.load(readFileSync(yamlPath, "utf8"));
   const tokens = doc?.tokens;
   const prefix = doc?.stylesheet?.prefix;
-  if (!tokens || typeof tokens !== "object") throw new Error(`${yamlPath}: no top-level \`tokens:\` map`);
-  if (typeof prefix !== "string") throw new Error(`${yamlPath}: no \`stylesheet.prefix\``);
-  return { prefix, tokens: Object.fromEntries(Object.entries(tokens).map(([k, v]) => [k, String(v)])), source: yamlPath };
+  if (!tokens || typeof tokens !== "object")
+    throw new Error(`${yamlPath}: no top-level \`tokens:\` map`);
+  if (typeof prefix !== "string")
+    throw new Error(`${yamlPath}: no \`stylesheet.prefix\``);
+  return {
+    prefix,
+    tokens: Object.fromEntries(
+      Object.entries(tokens).map(([k, v]) => [k, String(v)]),
+    ),
+    source: yamlPath,
+  };
 }
 
 export function isColor(value) {
   const v = String(value).trim();
-  return /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) || /^(rgba?|hsla?|oklch|oklab|color)\(/i.test(v);
+  return (
+    /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ||
+    /^(rgba?|hsla?|oklch|oklab|color)\(/i.test(v)
+  );
 }
 
 function lengthToPx(term, { width, rootPx }) {
@@ -641,9 +917,15 @@ export function toPx(value, { width = 1080, rootPx = 16 } = {}) {
   if (/^-?[\d.]+px$/.test(v)) return { px: v, converted: false };
   const clamp = v.match(/^clamp\((.+),(.+),(.+)\)$/);
   if (clamp) {
-    const [lo, mid, hi] = clamp.slice(1).map((t) => lengthToPx(t, { width, rootPx }));
+    const [lo, mid, hi] = clamp
+      .slice(1)
+      .map((t) => lengthToPx(t, { width, rootPx }));
     if ([lo, mid, hi].some((n) => n === null)) return null;
-    return { px: `${Math.round(Math.min(Math.max(mid, lo), hi))}px`, converted: true, from: v };
+    return {
+      px: `${Math.round(Math.min(Math.max(mid, lo), hi))}px`,
+      converted: true,
+      from: v,
+    };
   }
   const n = lengthToPx(v, { width, rootPx });
   if (n === null) return null;
@@ -664,7 +946,10 @@ export function planTokens(brand, { canvasWidth = 1080 } = {}) {
     const family = shortName.split("-")[0];
     const base = `brand.yaml ${shortName}`;
     if (UNSUPPORTED_FAMILIES.has(family)) {
-      skipped.push({ name, reason: `no Paper token type for shadow/blur values (${rawValue})` });
+      skipped.push({
+        name,
+        reason: `no Paper token type for shadow/blur values (${rawValue})`,
+      });
       continue;
     }
     if (isColor(rawValue)) {
@@ -673,13 +958,21 @@ export function planTokens(brand, { canvasWidth = 1080 } = {}) {
     }
     const type = FAMILY_TYPE[family];
     if (type === "fontFamily") {
-      tokens.push({ type, name, value: firstFamily(rawValue), description: `${base} · stack: ${rawValue}` });
+      tokens.push({
+        type,
+        name,
+        value: firstFamily(rawValue),
+        description: `${base} · stack: ${rawValue}`,
+      });
       continue;
     }
     if (type === "fontWeight") {
       const n = Number(rawValue);
       if (!Number.isFinite(n)) {
-        skipped.push({ name, reason: `fontWeight must be numeric (${rawValue})` });
+        skipped.push({
+          name,
+          reason: `fontWeight must be numeric (${rawValue})`,
+        });
         continue;
       }
       tokens.push({ type, name, value: n, description: base });
@@ -698,7 +991,10 @@ export function planTokens(brand, { canvasWidth = 1080 } = {}) {
       tokens.push({ type, name, value: px.px, description });
       continue;
     }
-    skipped.push({ name, reason: `unclassified family "${family}" (${rawValue})` });
+    skipped.push({
+      name,
+      reason: `unclassified family "${family}" (${rawValue})`,
+    });
   }
   return { tokens, skipped, converted };
 }
@@ -708,7 +1004,8 @@ export function normalizeValue(type, value) {
   let v = String(value).trim();
   if (type === "color") {
     v = v.toLowerCase().replace(/\s+/g, "");
-    if (/^#[0-9a-f]{3}$/.test(v)) v = "#" + [...v.slice(1)].map((c) => c + c).join("");
+    if (/^#[0-9a-f]{3}$/.test(v))
+      v = "#" + [...v.slice(1)].map((c) => c + c).join("");
   }
   return v;
 }
@@ -723,11 +1020,15 @@ export function diffTokens(planned, existing, { prefix }) {
     plannedNames.add(t.name);
     const cur = byName.get(t.name);
     if (!cur) create.push(t);
-    else if (normalizeValue(t.type, cur.value) !== normalizeValue(t.type, t.value))
+    else if (
+      normalizeValue(t.type, cur.value) !== normalizeValue(t.type, t.value)
+    )
       update.push({ name: t.name, value: t.value, description: t.description });
     else unchanged.push(t.name);
   }
-  const extra = existing.map((t) => t.name).filter((n) => n.startsWith(`--${prefix}`) && !plannedNames.has(n));
+  const extra = existing
+    .map((t) => t.name)
+    .filter((n) => n.startsWith(`--${prefix}`) && !plannedNames.has(n));
   return { create, update, unchanged, extra };
 }
 ```
@@ -751,6 +1052,7 @@ git commit -m "feat(paper): pure token planner — brand.yaml tokens → Paper t
 ### Task 3: Fake Paper server helper, `doctor.mjs`, `call.mjs`
 
 **Files:**
+
 - Create: `tests/paper-integration/helpers/fake-paper.mjs`
 - Create: `packages/paper-integration/scripts/doctor.mjs`
 - Create: `packages/paper-integration/scripts/call.mjs`
@@ -758,7 +1060,8 @@ git commit -m "feat(paper): pure token planner — brand.yaml tokens → Paper t
 - Test: `tests/paper-integration/paper-doctor.test.mjs`, `tests/paper-integration/paper-call.test.mjs`
 
 **Interfaces:**
-- Consumes: `createClient`, `loadConfig`, `PIN`, `REQUIRED_TOOLS`, `PaperError`, `firstText` from Task 1.
+
+- Consumes: `createClient`, `loadConfig`, `PIN`, `REQUIRED_TOOLS`, `PaperError` from Task 1.
 - Produces:
   - helper `startFakePaper({ serverInfo?, tools?, handlers?, framing? = "sse" }): Promise<{ url, calls: Array<{method, params}>, close(): Promise<void> }>` — `handlers[toolName](args) → result` (default: `{ content: [{ type: "text", text: "ok" }] }`)
   - helper `runScript(scriptPath, args, env): Promise<{ status, stdout, stderr }>` (async spawn — the fake server lives in the test process and must keep serving)
@@ -773,12 +1076,22 @@ git commit -m "feat(paper): pure token planner — brand.yaml tokens → Paper t
 // SSE-framed replies by default, canned per-tool handlers, and a call log.
 import http from "node:http";
 import { spawn } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 const okText = (text) => ({ content: [{ type: "text", text }] });
 
 export async function startFakePaper({
   serverInfo = { name: "paper-desktop", version: "0.5.6" },
-  tools = ["get_tokens", "create_tokens", "set_tokens", "export", "write_html", "get_basic_info"],
+  tools = [
+    "get_tokens",
+    "create_tokens",
+    "set_tokens",
+    "export",
+    "write_html",
+    "get_basic_info",
+  ],
   handlers = {},
   framing = "sse",
 } = {}) {
@@ -791,21 +1104,51 @@ export async function startFakePaper({
       calls.push({ method: msg.method, params: msg.params });
       let reply;
       if (msg.method === "initialize") {
-        reply = { jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo } };
+        reply = {
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: {
+            protocolVersion: "2025-03-26",
+            capabilities: { tools: {} },
+            serverInfo,
+          },
+        };
       } else if (msg.method === "tools/list") {
-        reply = { jsonrpc: "2.0", id: msg.id, result: { tools: tools.map((name) => ({ name, inputSchema: { type: "object" } })) } };
+        reply = {
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: {
+            tools: tools.map((name) => ({
+              name,
+              inputSchema: { type: "object" },
+            })),
+          },
+        };
       } else if (msg.method === "tools/call") {
         const h = handlers[msg.params.name];
         try {
           const result = h ? h(msg.params.arguments ?? {}) : okText("ok");
-          reply = result instanceof Error
-            ? { jsonrpc: "2.0", id: msg.id, error: { code: -32000, message: result.message } }
-            : { jsonrpc: "2.0", id: msg.id, result };
+          reply =
+            result instanceof Error
+              ? {
+                  jsonrpc: "2.0",
+                  id: msg.id,
+                  error: { code: -32000, message: result.message },
+                }
+              : { jsonrpc: "2.0", id: msg.id, result };
         } catch (e) {
-          reply = { jsonrpc: "2.0", id: msg.id, error: { code: -32603, message: e.message } };
+          reply = {
+            jsonrpc: "2.0",
+            id: msg.id,
+            error: { code: -32603, message: e.message },
+          };
         }
       } else {
-        reply = { jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } };
+        reply = {
+          jsonrpc: "2.0",
+          id: msg.id,
+          error: { code: -32601, message: "Method not found" },
+        };
       }
       if (framing === "sse") {
         res.writeHead(200, { "Content-Type": "text/event-stream" });
@@ -825,10 +1168,22 @@ export async function startFakePaper({
   };
 }
 
+// PAPER_ENV_ROOT points every script at an empty directory so it never reads
+// this repo's real `.env` (which carries PAPER_FILE_ID after Task 7); the two
+// PAPER_* keys are cleared so an exported shell value cannot leak in either.
+// Node's spawn drops env entries whose value is undefined.
+const ISOLATED_ROOT = mkdtempSync(path.join(tmpdir(), "paper-env-root-"));
+
 export function runScript(scriptPath, args = [], env = {}) {
   return new Promise((resolve) => {
     const child = spawn("node", [scriptPath, ...args], {
-      env: { ...process.env, PAPER_MCP_URL: undefined, PAPER_FILE_ID: undefined, ...env },
+      env: {
+        ...process.env,
+        PAPER_MCP_URL: undefined,
+        PAPER_FILE_ID: undefined,
+        PAPER_ENV_ROOT: ISOLATED_ROOT,
+        ...env,
+      },
     });
     let stdout = "";
     let stderr = "";
@@ -839,7 +1194,7 @@ export function runScript(scriptPath, args = [], env = {}) {
 }
 ```
 
-Note: `env` entries set to `undefined` are dropped by Node's spawn, which is how the helper isolates the script from a developer's real `.env`-derived process env. The script still reads `<root>/.env` from disk; tests that need isolation pass `PAPER_MCP_URL` explicitly, which wins.
+Two isolation channels, both required: `undefined` env entries are dropped by Node's spawn (so an exported `PAPER_FILE_ID` in the developer's shell cannot leak in), and `PAPER_ENV_ROOT` points `loadConfig` at an empty temp directory instead of this repo's real `.env` — which gains `PAPER_FILE_ID` in Task 7 and would otherwise make the "no target file" tests pass for the wrong reason.
 
 - [ ] **Step 2: Write the failing doctor tests**
 
@@ -852,24 +1207,39 @@ import { fileURLToPath } from "node:url";
 import { startFakePaper, runScript } from "./helpers/fake-paper.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.resolve(__dirname, "../../packages/paper-integration/scripts/doctor.mjs");
+const SCRIPT = path.resolve(
+  __dirname,
+  "../../packages/paper-integration/scripts/doctor.mjs",
+);
 
 test("doctor: all green → exit 0, four ✓ lines, zero metered calls", async () => {
   const fake = await startFakePaper();
   try {
-    const r = await runScript(SCRIPT, [], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, [], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.equal(r.stdout.split("\n").filter((l) => l.trim().startsWith("✓")).length, 4);
+    assert.equal(
+      r.stdout.split("\n").filter((l) => l.trim().startsWith("✓")).length,
+      4,
+    );
     assert.match(r.stdout, /paper: canvas ready/);
     assert.match(r.stderr, /metered calls: 0/);
-    assert.ok(fake.calls.every((c) => c.method !== "tools/call"), "doctor must not spend metered calls");
+    assert.ok(
+      fake.calls.every((c) => c.method !== "tools/call"),
+      "doctor must not spend metered calls",
+    );
   } finally {
     await fake.close();
   }
 });
 
 test("doctor: unreachable → exit 2, first check ✗ with the fix line", async () => {
-  const r = await runScript(SCRIPT, [], { PAPER_MCP_URL: "http://127.0.0.1:1/mcp", PAPER_FILE_ID: "F1" });
+  const r = await runScript(SCRIPT, [], {
+    PAPER_MCP_URL: "http://127.0.0.1:1/mcp",
+    PAPER_FILE_ID: "F1",
+  });
   assert.equal(r.status, 2);
   assert.match(r.stdout, /✗ Paper Desktop MCP/);
   assert.match(r.stdout, /open a file in Paper Desktop/);
@@ -877,9 +1247,14 @@ test("doctor: unreachable → exit 2, first check ✗ with the fix line", async 
 });
 
 test("doctor: wrong server name → exit 2", async () => {
-  const fake = await startFakePaper({ serverInfo: { name: "something-else", version: "0.5.6" } });
+  const fake = await startFakePaper({
+    serverInfo: { name: "something-else", version: "0.5.6" },
+  });
   try {
-    const r = await runScript(SCRIPT, [], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, [], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 2);
     assert.match(r.stdout, /✗ Paper Desktop MCP/);
   } finally {
@@ -888,9 +1263,14 @@ test("doctor: wrong server name → exit 2", async () => {
 });
 
 test("doctor: newer version → still exit 0 but WARN re-verify", async () => {
-  const fake = await startFakePaper({ serverInfo: { name: "paper-desktop", version: "0.6.0" } });
+  const fake = await startFakePaper({
+    serverInfo: { name: "paper-desktop", version: "0.6.0" },
+  });
   try {
-    const r = await runScript(SCRIPT, [], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, [], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 0);
     assert.match(r.stdout, /⚠ .*0\.6\.0.*pinned 0\.5\.6/);
   } finally {
@@ -899,9 +1279,14 @@ test("doctor: newer version → still exit 0 but WARN re-verify", async () => {
 });
 
 test("doctor: missing required tool → exit 2 naming it", async () => {
-  const fake = await startFakePaper({ tools: ["get_tokens", "create_tokens", "export", "write_html"] });
+  const fake = await startFakePaper({
+    tools: ["get_tokens", "create_tokens", "export", "write_html"],
+  });
   try {
-    const r = await runScript(SCRIPT, [], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, [], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 2);
     assert.match(r.stdout, /✗ required tools.*set_tokens/);
   } finally {
@@ -915,7 +1300,9 @@ test("doctor: no file id → exit 2 with the fix line; --file satisfies it", asy
     const r1 = await runScript(SCRIPT, [], { PAPER_MCP_URL: fake.url });
     assert.equal(r1.status, 2);
     assert.match(r1.stdout, /✗ target file.*set PAPER_FILE_ID/);
-    const r2 = await runScript(SCRIPT, ["--file", "abc"], { PAPER_MCP_URL: fake.url });
+    const r2 = await runScript(SCRIPT, ["--file", "abc"], {
+      PAPER_MCP_URL: fake.url,
+    });
     assert.equal(r2.status, 0);
   } finally {
     await fake.close();
@@ -935,7 +1322,12 @@ Expected: FAIL — cannot find `scripts/doctor.mjs`
 // doctor.mjs — is the Paper canvas ready? Exit 0 green, 2 not-ready.
 // ZERO metered calls: only `initialize` and `tools/list`.
 import { parseArgs } from "node:util";
-import { createClient, loadConfig, PIN, REQUIRED_TOOLS } from "../lib/paper.mjs";
+import {
+  createClient,
+  loadConfig,
+  PIN,
+  REQUIRED_TOOLS,
+} from "../lib/paper.mjs";
 
 const { values } = parseArgs({
   options: { file: { type: "string" }, tokens: { type: "string" } },
@@ -952,10 +1344,16 @@ try {
   checks.push({
     ok: nameOk,
     label: `Paper Desktop MCP at ${cfg.url}${nameOk ? ` (${info.serverInfo.name} ${info.serverInfo.version})` : ` answered as "${info?.serverInfo?.name}"`}`,
-    fix: nameOk ? null : "expected paper-desktop — is something else on port 29979?",
+    fix: nameOk
+      ? null
+      : "expected paper-desktop — is something else on port 29979?",
   });
 } catch (e) {
-  checks.push({ ok: false, label: `Paper Desktop MCP at ${cfg.url}`, fix: "open a file in Paper Desktop — the app starts the MCP server on file open" });
+  checks.push({
+    ok: false,
+    label: `Paper Desktop MCP at ${cfg.url}`,
+    fix: "open a file in Paper Desktop — the app starts the MCP server on file open",
+  });
 }
 
 if (info) {
@@ -963,7 +1361,9 @@ if (info) {
   const same = v === PIN.app;
   checks.push({
     ok: true,
-    warn: same ? null : `running ${v}, pinned ${PIN.app} — re-observe VERIFIED.md before trusting the client`,
+    warn: same
+      ? null
+      : `running ${v}, pinned ${PIN.app} — re-observe VERIFIED.md before trusting the client`,
     label: `version ${v}${same ? " matches pin" : ""}`,
   });
   try {
@@ -972,24 +1372,37 @@ if (info) {
     checks.push({
       ok: missing.length === 0,
       label: `required tools ${missing.length ? `missing: ${missing.join(", ")}` : `present (${REQUIRED_TOOLS.length}/${REQUIRED_TOOLS.length} of ${names.size})`}`,
-      fix: missing.length ? "Paper surface drifted — update VERIFIED.md, then REQUIRED_TOOLS" : null,
+      fix: missing.length
+        ? "Paper surface drifted — update VERIFIED.md, then REQUIRED_TOOLS"
+        : null,
     });
   } catch (e) {
-    checks.push({ ok: false, label: "required tools", fix: `tools/list failed: ${e.message}` });
+    checks.push({
+      ok: false,
+      label: "required tools",
+      fix: `tools/list failed: ${e.message}`,
+    });
   }
 } else {
   checks.push({ ok: false, label: "version (unknown — server unreachable)" });
-  checks.push({ ok: false, label: "required tools (unknown — server unreachable)" });
+  checks.push({
+    ok: false,
+    label: "required tools (unknown — server unreachable)",
+  });
 }
 
 checks.push({
   ok: Boolean(cfg.fileId),
   label: `target file ${cfg.fileId ? cfg.fileId : "not configured"}`,
-  fix: cfg.fileId ? null : "set PAPER_FILE_ID in .env (instance or framework) or pass --file <id>",
+  fix: cfg.fileId
+    ? null
+    : "set PAPER_FILE_ID in .env (instance or framework) or pass --file <id>",
 });
 
 for (const c of checks) {
-  console.log(` ${c.ok ? (c.warn ? "⚠" : "✓") : "✗"} ${c.label}${c.warn ? ` — ${c.warn}` : ""}${!c.ok && c.fix ? ` — ${c.fix}` : ""}`);
+  console.log(
+    ` ${c.ok ? (c.warn ? "⚠" : "✓") : "✗"} ${c.label}${c.warn ? ` — ${c.warn}` : ""}${!c.ok && c.fix ? ` — ${c.fix}` : ""}`,
+  );
 }
 const ok = checks.every((c) => c.ok);
 console.log(ok ? "paper: canvas ready" : "paper: canvas not ready");
@@ -1015,18 +1428,41 @@ import { fileURLToPath } from "node:url";
 import { startFakePaper, runScript } from "./helpers/fake-paper.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.resolve(__dirname, "../../packages/paper-integration/scripts/call.mjs");
+const SCRIPT = path.resolve(
+  __dirname,
+  "../../packages/paper-integration/scripts/call.mjs",
+);
 
 test("call: forwards tool + args + fileId, prints result JSON, metered 1", async () => {
-  const fake = await startFakePaper({ handlers: { get_basic_info: (a) => ({ content: [{ type: "text", text: JSON.stringify({ file: a.fileId, artboards: [] }) }] }) } });
+  const fake = await startFakePaper({
+    handlers: {
+      get_basic_info: (a) => ({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ file: a.fileId, artboards: [] }),
+          },
+        ],
+      }),
+    },
+  });
   try {
-    const r = await runScript(SCRIPT, ["get_basic_info", "{}"], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F9" });
+    const r = await runScript(SCRIPT, ["get_basic_info", "{}"], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F9",
+    });
     assert.equal(r.status, 0, r.stderr);
     const out = JSON.parse(r.stdout);
-    assert.equal(out.content[0].text, JSON.stringify({ file: "F9", artboards: [] }));
+    assert.equal(
+      out.content[0].text,
+      JSON.stringify({ file: "F9", artboards: [] }),
+    );
     assert.match(r.stderr, /metered calls: 1/);
     const call = fake.calls.find((c) => c.method === "tools/call");
-    assert.deepEqual(call.params, { name: "get_basic_info", arguments: { fileId: "F9" } });
+    assert.deepEqual(call.params, {
+      name: "get_basic_info",
+      arguments: { fileId: "F9" },
+    });
   } finally {
     await fake.close();
   }
@@ -1037,15 +1473,29 @@ test("call: --args-file supplies large arguments; --out writes base64 image cont
   const argsFile = path.join(dir, "args.json");
   writeFileSync(argsFile, JSON.stringify({ nodeId: "N1", scale: 1 }));
   const png = Buffer.from("fake-png-bytes").toString("base64");
-  const fake = await startFakePaper({ handlers: { get_screenshot: () => ({ content: [{ type: "image", mimeType: "image/png", data: png }] }) } });
+  const fake = await startFakePaper({
+    handlers: {
+      get_screenshot: () => ({
+        content: [{ type: "image", mimeType: "image/png", data: png }],
+      }),
+    },
+  });
   try {
     const out = path.join(dir, "shot.png");
-    const r = await runScript(SCRIPT, ["get_screenshot", "--args-file", argsFile, "--out", out], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F9" });
+    const r = await runScript(
+      SCRIPT,
+      ["get_screenshot", "--args-file", argsFile, "--out", out],
+      { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F9" },
+    );
     assert.equal(r.status, 0, r.stderr);
     assert.equal(readFileSync(out, "utf8"), "fake-png-bytes");
     assert.match(r.stderr, /wrote .*shot\.png/);
     const call = fake.calls.find((c) => c.method === "tools/call");
-    assert.deepEqual(call.params.arguments, { nodeId: "N1", scale: 1, fileId: "F9" });
+    assert.deepEqual(call.params.arguments, {
+      nodeId: "N1",
+      scale: 1,
+      fileId: "F9",
+    });
   } finally {
     await fake.close();
   }
@@ -1054,7 +1504,9 @@ test("call: --args-file supplies large arguments; --out writes base64 image cont
 test("call: no file id → exit 2 before any metered call", async () => {
   const fake = await startFakePaper();
   try {
-    const r = await runScript(SCRIPT, ["get_basic_info"], { PAPER_MCP_URL: fake.url });
+    const r = await runScript(SCRIPT, ["get_basic_info"], {
+      PAPER_MCP_URL: fake.url,
+    });
     assert.equal(r.status, 2);
     assert.match(r.stderr, /PAPER_FILE_ID/);
     assert.ok(!fake.calls.some((c) => c.method === "tools/call"));
@@ -1064,9 +1516,18 @@ test("call: no file id → exit 2 before any metered call", async () => {
 });
 
 test("call: rpc error → exit 1 with the message", async () => {
-  const fake = await startFakePaper({ handlers: { write_html: () => new Error("targetNodeId not found") } });
+  const fake = await startFakePaper({
+    handlers: { write_html: () => new Error("targetNodeId not found") },
+  });
   try {
-    const r = await runScript(SCRIPT, ["write_html", '{"html":"<div/>","targetNodeId":"X","mode":"insert-children"}'], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F9" });
+    const r = await runScript(
+      SCRIPT,
+      [
+        "write_html",
+        '{"html":"<div/>","targetNodeId":"X","mode":"insert-children"}',
+      ],
+      { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F9" },
+    );
     assert.equal(r.status, 1);
     assert.match(r.stderr, /targetNodeId not found/);
   } finally {
@@ -1103,16 +1564,21 @@ const { values, positionals } = parseArgs({
 });
 const [tool, inlineJson] = positionals;
 if (!tool) {
-  console.error("usage: call.mjs <tool> [json-args] [--args-file p] [--file id] [--out p]");
+  console.error(
+    "usage: call.mjs <tool> [json-args] [--args-file p] [--file id] [--out p]",
+  );
   process.exit(2);
 }
 const cfg = loadConfig({ tokensPath: values.tokens, file: values.file });
 if (!cfg.fileId) {
-  console.error("paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>");
+  console.error(
+    "paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>",
+  );
   process.exit(2);
 }
 let args = {};
-if (values["args-file"]) args = JSON.parse(readFileSync(values["args-file"], "utf8"));
+if (values["args-file"])
+  args = JSON.parse(readFileSync(values["args-file"], "utf8"));
 else if (inlineJson) args = JSON.parse(inlineJson);
 args = { ...args, fileId: cfg.fileId };
 
@@ -1125,7 +1591,9 @@ try {
       writeFileSync(values.out, Buffer.from(img.data, "base64"));
       console.error(`wrote ${values.out} (${img.mimeType ?? "image"})`);
     } else {
-      console.error(`--out given but the reply carries no image content; result printed instead`);
+      console.error(
+        `--out given but the reply carries no image content; result printed instead`,
+      );
     }
   }
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");
@@ -1171,11 +1639,13 @@ git commit -m "feat(paper): doctor (four free checks, exit 0/2) + generic call p
 ### Task 4: `push-tokens.mjs`
 
 **Files:**
+
 - Create: `packages/paper-integration/scripts/push-tokens.mjs`
 - Modify: `package.json` (script)
 - Test: `tests/paper-integration/paper-push-tokens.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `loadBrand`, `planTokens`, `diffTokens` (Task 2); `createClient`, `loadConfig`, `extractTokens`, `PaperError` (Task 1); `startFakePaper`, `runScript` (Task 3).
 - Produces: `npm run paper:push-tokens -- --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--dry-run] [--prune]`. Exit 0 ok · 1 Paper rejected a write · 2 not-ready/usage. Stdout summary lines: `plan: N tokens · S skipped · C converted`, `create: n`, `update: n`, `unchanged: n`, `extra: n (use --prune to delete)`, then `skipped: <name> — <reason>` lines, then on real runs `created: n · updated: n · pruned: n`.
 
@@ -1190,9 +1660,17 @@ import { fileURLToPath } from "node:url";
 import { startFakePaper, runScript } from "./helpers/fake-paper.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.resolve(__dirname, "../../packages/paper-integration/scripts/push-tokens.mjs");
-const FIXTURE = path.resolve(__dirname, "../fixtures/paper/brand.refi-dao.yaml");
-const text = (obj) => ({ content: [{ type: "text", text: JSON.stringify(obj) }] });
+const SCRIPT = path.resolve(
+  __dirname,
+  "../../packages/paper-integration/scripts/push-tokens.mjs",
+);
+const FIXTURE = path.resolve(
+  __dirname,
+  "../fixtures/paper/brand.refi-dao.yaml",
+);
+const text = (obj) => ({
+  content: [{ type: "text", text: JSON.stringify(obj) }],
+});
 
 // A fake Paper with a mutable token store so create/set/delete are observable.
 function tokenStore(initial = []) {
@@ -1208,7 +1686,12 @@ function tokenStore(initial = []) {
         if (t.delete) store.delete(t.name);
         else store.set(t.name, { ...store.get(t.name), ...t });
       }
-      return text(tokens.map((t) => ({ name: t.name, result: t.delete ? "deleted" : "updated" })));
+      return text(
+        tokens.map((t) => ({
+          name: t.name,
+          result: t.delete ? "deleted" : "updated",
+        })),
+      );
     },
   };
   return { store, handlers };
@@ -1219,9 +1702,12 @@ const metered = (fake) => fake.calls.filter((c) => c.method === "tools/call");
 test("push --dry-run: prints the plan, spends zero metered calls", async () => {
   const fake = await startFakePaper(tokenStore());
   try {
-    const r = await runScript(SCRIPT, ["--tokens", FIXTURE, "--dry-run"], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, ["--tokens", FIXTURE, "--dry-run"], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /plan: 87 tokens · 4 skipped · \d+ converted/);
+    assert.match(r.stdout, /plan: 75 tokens · 4 skipped · 31 converted/);
     assert.match(r.stdout, /skipped: --refi-glow-blue — no Paper token type/);
     assert.match(r.stdout, /dry-run: nothing sent/);
     assert.equal(metered(fake).length, 0);
@@ -1235,21 +1721,33 @@ test("push: empty file → 1 get + 1 create batch with fileId; second run costs 
   const ts = tokenStore();
   const fake = await startFakePaper(ts);
   try {
-    const r1 = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r1 = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r1.status, 0, r1.stderr);
     const m1 = metered(fake);
-    assert.deepEqual(m1.map((c) => c.params.name), ["get_tokens", "create_tokens"]);
+    assert.deepEqual(
+      m1.map((c) => c.params.name),
+      ["get_tokens", "create_tokens"],
+    );
     assert.equal(m1[1].params.arguments.fileId, "F1");
-    assert.equal(m1[1].params.arguments.tokens.length, 87);
-    assert.match(r1.stdout, /created: 87 · updated: 0 · pruned: 0/);
+    assert.equal(m1[1].params.arguments.tokens.length, 75);
+    assert.match(r1.stdout, /created: 75 · updated: 0 · pruned: 0/);
     assert.match(r1.stderr, /metered calls: 2/);
     assert.equal(ts.store.get("--refi-weight-bold").value, 700);
     assert.equal(ts.store.get("--refi-text-hero").value, "86px");
 
     fake.calls.length = 0;
-    const r2 = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r2 = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r2.status, 0);
-    assert.deepEqual(metered(fake).map((c) => c.params.name), ["get_tokens"]);
+    assert.deepEqual(
+      metered(fake).map((c) => c.params.name),
+      ["get_tokens"],
+    );
     assert.match(r2.stdout, /created: 0 · updated: 0 · pruned: 0/);
     assert.match(r2.stderr, /metered calls: 1/);
   } finally {
@@ -1265,12 +1763,21 @@ test("push: changed value → set_tokens only for the changed names; extras repo
   ]);
   const fake = await startFakePaper(ts);
   try {
-    const r = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 0, r.stderr);
     const names = metered(fake).map((c) => c.params.name);
     assert.deepEqual(names, ["get_tokens", "create_tokens", "set_tokens"]);
     const set = metered(fake)[2].params.arguments.tokens;
-    assert.deepEqual(set, [{ name: "--refi-color-blue", value: "#4571E1", description: "brand.yaml color-blue" }]);
+    assert.deepEqual(set, [
+      {
+        name: "--refi-color-blue",
+        value: "#4571E1",
+        description: "brand.yaml color-blue",
+      },
+    ]);
     assert.match(r.stdout, /extra: 1 \(use --prune to delete\)/);
     assert.ok(ts.store.has("--refi-legacy"));
     assert.ok(ts.store.has("--color-primary"));
@@ -1286,9 +1793,13 @@ test("push --prune: deletes only prefix-carrying extras", async () => {
   ]);
   const fake = await startFakePaper(ts);
   try {
-    const r = await runScript(SCRIPT, ["--tokens", FIXTURE, "--prune"], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, ["--tokens", FIXTURE, "--prune"], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 0, r.stderr);
-    const set = metered(fake).find((c) => c.params.name === "set_tokens").params.arguments.tokens;
+    const set = metered(fake).find((c) => c.params.name === "set_tokens").params
+      .arguments.tokens;
     assert.deepEqual(set, [{ name: "--refi-legacy", delete: true }]);
     assert.ok(!ts.store.has("--refi-legacy"));
     assert.ok(ts.store.has("--color-primary"));
@@ -1299,7 +1810,10 @@ test("push --prune: deletes only prefix-carrying extras", async () => {
 });
 
 test("push: unreachable → exit 2; missing --tokens → exit 2 usage", async () => {
-  const r1 = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: "http://127.0.0.1:1/mcp", PAPER_FILE_ID: "F1" });
+  const r1 = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+    PAPER_MCP_URL: "http://127.0.0.1:1/mcp",
+    PAPER_FILE_ID: "F1",
+  });
   assert.equal(r1.status, 2);
   assert.match(r1.stderr, /unreachable/);
   const r2 = await runScript(SCRIPT, [], { PAPER_FILE_ID: "F1" });
@@ -1320,7 +1834,12 @@ Expected: FAIL — cannot find `scripts/push-tokens.mjs`
 // push-tokens.mjs — brand.yaml `tokens:` → Paper design tokens. One way.
 // get_tokens (1) → diff → create_tokens (≤1) → set_tokens (≤1). --dry-run is free.
 import { parseArgs } from "node:util";
-import { createClient, loadConfig, extractTokens, PaperError } from "../lib/paper.mjs";
+import {
+  createClient,
+  loadConfig,
+  extractTokens,
+  PaperError,
+} from "../lib/paper.mjs";
 import { loadBrand, planTokens, diffTokens } from "../lib/tokens.mjs";
 
 const { values } = parseArgs({
@@ -1333,45 +1852,60 @@ const { values } = parseArgs({
   },
 });
 if (!values.tokens) {
-  console.error("usage: push-tokens.mjs --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--dry-run] [--prune]");
+  console.error(
+    "usage: push-tokens.mjs --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--dry-run] [--prune]",
+  );
   process.exit(2);
 }
 const brand = loadBrand(values.tokens);
 const plan = planTokens(brand, { canvasWidth: Number(values["canvas-width"]) });
-console.log(`plan: ${plan.tokens.length} tokens · ${plan.skipped.length} skipped · ${plan.converted.length} converted (prefix --${brand.prefix}, source ${brand.source})`);
+console.log(
+  `plan: ${plan.tokens.length} tokens · ${plan.skipped.length} skipped · ${plan.converted.length} converted (prefix --${brand.prefix}, source ${brand.source})`,
+);
 for (const s of plan.skipped) console.log(`skipped: ${s.name} — ${s.reason}`);
 
 const cfg = loadConfig({ tokensPath: values.tokens, file: values.file });
 const client = createClient({ url: cfg.url });
 
 if (values["dry-run"]) {
-  for (const c of plan.converted) console.log(`converted: ${c.name} ${c.from} → ${c.to}`);
+  for (const c of plan.converted)
+    console.log(`converted: ${c.name} ${c.from} → ${c.to}`);
   console.log("dry-run: nothing sent");
   console.error(`metered calls: ${client.metered}`);
   process.exit(0);
 }
 if (!cfg.fileId) {
-  console.error("paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>");
+  console.error(
+    "paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>",
+  );
   process.exit(2);
 }
 
 try {
-  const existing = extractTokens(await client.call("get_tokens", { fileId: cfg.fileId }));
+  const existing = extractTokens(
+    await client.call("get_tokens", { fileId: cfg.fileId }),
+  );
   const diff = diffTokens(plan.tokens, existing, { prefix: brand.prefix });
   console.log(`create: ${diff.create.length}`);
   console.log(`update: ${diff.update.length}`);
   console.log(`unchanged: ${diff.unchanged.length}`);
-  console.log(`extra: ${diff.extra.length}${diff.extra.length && !values.prune ? " (use --prune to delete)" : ""}`);
+  console.log(
+    `extra: ${diff.extra.length}${diff.extra.length && !values.prune ? " (use --prune to delete)" : ""}`,
+  );
 
   let created = 0;
   let updated = 0;
   let pruned = 0;
   if (diff.create.length) {
-    await client.call("create_tokens", { fileId: cfg.fileId, tokens: diff.create });
+    await client.call("create_tokens", {
+      fileId: cfg.fileId,
+      tokens: diff.create,
+    });
     created = diff.create.length;
   }
   const sets = [...diff.update];
-  if (values.prune) for (const name of diff.extra) sets.push({ name, delete: true });
+  if (values.prune)
+    for (const name of diff.extra) sets.push({ name, delete: true });
   if (sets.length) {
     await client.call("set_tokens", { fileId: cfg.fileId, tokens: sets });
     updated = diff.update.length;
@@ -1393,7 +1927,7 @@ try {
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `node --test tests/paper-integration/paper-push-tokens.test.mjs`
-Expected: PASS, 5 tests. If `plan: 87 tokens` mismatches, recount: 91 fixture tokens − 4 skipped = 87.
+Expected: PASS, 5 tests. If `plan: 75 tokens` mismatches, recount: 79 fixture tokens − 4 skipped = 75.
 
 - [ ] **Step 5: Add npm script, format, commit**
 
@@ -1415,13 +1949,15 @@ git commit -m "feat(paper): push-tokens — diffed, idempotent brand.yaml → Pa
 ### Task 5: `lint-tokens.mjs`
 
 **Files:**
+
 - Create: `packages/paper-integration/scripts/lint-tokens.mjs`
 - Modify: `package.json` (script)
 - Test: `tests/paper-integration/paper-lint-tokens.test.mjs`
 
 **Interfaces:**
+
 - Consumes: Task 1, 2, 3 exports as in Task 4.
-- Produces: `npm run paper:lint-tokens -- --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--strict]`. Exit 0 in sync · 1 drift · 2 not-ready. Lines: `missing: <name>` · `changed: <name> paper=<v> brand=<v>` · `extra: <name>` · final `paper tokens: in sync (87 checked)` or `paper tokens: DRIFT — m missing · c changed · e extra`.
+- Produces: `npm run paper:lint-tokens -- --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--strict]`. Exit 0 in sync · 1 drift · 2 not-ready. Lines: `missing: <name>` · `changed: <name> paper=<v> brand=<v>` · `extra: <name>` · final `paper tokens: in sync (75 checked)` or `paper tokens: DRIFT — m missing · c changed · e extra`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1432,20 +1968,41 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakePaper, runScript } from "./helpers/fake-paper.mjs";
-import { loadBrand, planTokens } from "../../packages/paper-integration/lib/tokens.mjs";
+import {
+  loadBrand,
+  planTokens,
+} from "../../packages/paper-integration/lib/tokens.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.resolve(__dirname, "../../packages/paper-integration/scripts/lint-tokens.mjs");
-const FIXTURE = path.resolve(__dirname, "../fixtures/paper/brand.refi-dao.yaml");
-const text = (obj) => ({ content: [{ type: "text", text: JSON.stringify(obj) }] });
-const synced = () => planTokens(loadBrand(FIXTURE)).tokens.map(({ type, name, value }) => ({ type, name, value }));
+const SCRIPT = path.resolve(
+  __dirname,
+  "../../packages/paper-integration/scripts/lint-tokens.mjs",
+);
+const FIXTURE = path.resolve(
+  __dirname,
+  "../fixtures/paper/brand.refi-dao.yaml",
+);
+const text = (obj) => ({
+  content: [{ type: "text", text: JSON.stringify(obj) }],
+});
+const synced = () =>
+  planTokens(loadBrand(FIXTURE)).tokens.map(({ type, name, value }) => ({
+    type,
+    name,
+    value,
+  }));
 
 test("lint: in sync → exit 0, one metered call", async () => {
-  const fake = await startFakePaper({ handlers: { get_tokens: () => text(synced()) } });
+  const fake = await startFakePaper({
+    handlers: { get_tokens: () => text(synced()) },
+  });
   try {
-    const r = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /paper tokens: in sync \(87 checked\)/);
+    assert.match(r.stdout, /paper tokens: in sync \(75 checked\)/);
     assert.match(r.stderr, /metered calls: 1/);
   } finally {
     await fake.close();
@@ -1455,26 +2012,48 @@ test("lint: in sync → exit 0, one metered call", async () => {
 test("lint: missing and changed → exit 1 naming each", async () => {
   const tokens = synced().filter((t) => t.name !== "--refi-space-4");
   tokens.find((t) => t.name === "--refi-color-blue").value = "#000000";
-  const fake = await startFakePaper({ handlers: { get_tokens: () => text(tokens) } });
+  const fake = await startFakePaper({
+    handlers: { get_tokens: () => text(tokens) },
+  });
   try {
-    const r = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r.status, 1);
     assert.match(r.stdout, /missing: --refi-space-4/);
-    assert.match(r.stdout, /changed: --refi-color-blue paper=#000000 brand=#4571E1/);
-    assert.match(r.stdout, /paper tokens: DRIFT — 1 missing · 1 changed · 0 extra/);
+    assert.match(
+      r.stdout,
+      /changed: --refi-color-blue paper=#000000 brand=#4571E1/,
+    );
+    assert.match(
+      r.stdout,
+      /paper tokens: DRIFT — 1 missing · 1 changed · 0 extra/,
+    );
   } finally {
     await fake.close();
   }
 });
 
 test("lint: extras are reported but pass unless --strict", async () => {
-  const tokens = [...synced(), { type: "color", name: "--refi-rogue", value: "#ff0000" }];
-  const fake = await startFakePaper({ handlers: { get_tokens: () => text(tokens) } });
+  const tokens = [
+    ...synced(),
+    { type: "color", name: "--refi-rogue", value: "#ff0000" },
+  ];
+  const fake = await startFakePaper({
+    handlers: { get_tokens: () => text(tokens) },
+  });
   try {
-    const r1 = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r1 = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r1.status, 0);
     assert.match(r1.stdout, /extra: --refi-rogue/);
-    const r2 = await runScript(SCRIPT, ["--tokens", FIXTURE, "--strict"], { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F1" });
+    const r2 = await runScript(SCRIPT, ["--tokens", FIXTURE, "--strict"], {
+      PAPER_MCP_URL: fake.url,
+      PAPER_FILE_ID: "F1",
+    });
     assert.equal(r2.status, 1);
   } finally {
     await fake.close();
@@ -1482,7 +2061,10 @@ test("lint: extras are reported but pass unless --strict", async () => {
 });
 
 test("lint: unreachable → exit 2", async () => {
-  const r = await runScript(SCRIPT, ["--tokens", FIXTURE], { PAPER_MCP_URL: "http://127.0.0.1:1/mcp", PAPER_FILE_ID: "F1" });
+  const r = await runScript(SCRIPT, ["--tokens", FIXTURE], {
+    PAPER_MCP_URL: "http://127.0.0.1:1/mcp",
+    PAPER_FILE_ID: "F1",
+  });
   assert.equal(r.status, 2);
 });
 ```
@@ -1499,7 +2081,12 @@ Expected: FAIL — cannot find `scripts/lint-tokens.mjs`
 // lint-tokens.mjs — is the Paper file's token set in sync with brand.yaml?
 // Exactly one metered call. Exit 0 in sync, 1 drift, 2 not-ready.
 import { parseArgs } from "node:util";
-import { createClient, loadConfig, extractTokens, PaperError } from "../lib/paper.mjs";
+import {
+  createClient,
+  loadConfig,
+  extractTokens,
+  PaperError,
+} from "../lib/paper.mjs";
 import { loadBrand, planTokens, diffTokens } from "../lib/tokens.mjs";
 
 const { values } = parseArgs({
@@ -1511,27 +2098,45 @@ const { values } = parseArgs({
   },
 });
 if (!values.tokens) {
-  console.error("usage: lint-tokens.mjs --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--strict]");
+  console.error(
+    "usage: lint-tokens.mjs --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--strict]",
+  );
   process.exit(2);
 }
 const brand = loadBrand(values.tokens);
 const plan = planTokens(brand, { canvasWidth: Number(values["canvas-width"]) });
 const cfg = loadConfig({ tokensPath: values.tokens, file: values.file });
 if (!cfg.fileId) {
-  console.error("paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>");
+  console.error(
+    "paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>",
+  );
   process.exit(2);
 }
 const client = createClient({ url: cfg.url });
 try {
-  const existing = extractTokens(await client.call("get_tokens", { fileId: cfg.fileId }));
+  const existing = extractTokens(
+    await client.call("get_tokens", { fileId: cfg.fileId }),
+  );
   const byName = new Map(existing.map((t) => [t.name, t]));
   const diff = diffTokens(plan.tokens, existing, { prefix: brand.prefix });
   for (const t of diff.create) console.log(`missing: ${t.name}`);
-  for (const u of diff.update) console.log(`changed: ${u.name} paper=${byName.get(u.name).value} brand=${u.value}`);
+  for (const u of diff.update)
+    console.log(
+      `changed: ${u.name} paper=${byName.get(u.name).value} brand=${u.value}`,
+    );
   for (const n of diff.extra) console.log(`extra: ${n}`);
-  const drift = diff.create.length + diff.update.length + (values.strict ? diff.extra.length : 0);
-  if (drift === 0) console.log(`paper tokens: in sync (${plan.tokens.length} checked)${diff.extra.length ? ` · ${diff.extra.length} extra tolerated (--strict to fail)` : ""}`);
-  else console.log(`paper tokens: DRIFT — ${diff.create.length} missing · ${diff.update.length} changed · ${diff.extra.length} extra`);
+  const drift =
+    diff.create.length +
+    diff.update.length +
+    (values.strict ? diff.extra.length : 0);
+  if (drift === 0)
+    console.log(
+      `paper tokens: in sync (${plan.tokens.length} checked)${diff.extra.length ? ` · ${diff.extra.length} extra tolerated (--strict to fail)` : ""}`,
+    );
+  else
+    console.log(
+      `paper tokens: DRIFT — ${diff.create.length} missing · ${diff.update.length} changed · ${diff.extra.length} extra`,
+    );
   console.error(`metered calls: ${client.metered}`);
   process.exit(drift === 0 ? 0 : 1);
 } catch (e) {
@@ -1571,6 +2176,7 @@ Expected: `npm test` green including all prior suites.
 ### Task 6: Module manifest, catalog entries, registry rows, env placeholders
 
 **Files:**
+
 - Create: `modules/org-os-paper/module.yaml`
 - Modify: `docs/MODULES.md` (insert after the `org-os-buzz` section, before `## The v5 core tranche`)
 - Modify: `site/src/data/modules.yaml` (add row after `org-os-buzz`)
@@ -1578,6 +2184,7 @@ Expected: `npm test` green including all prior suites.
 - Modify: `.env.example` (append)
 
 **Interfaces:**
+
 - Consumes: nothing new. Produces the catalog surface Task 11 flips from `in-dev` to `pilot`.
 
 - [ ] **Step 1: Write the manifest**
@@ -1604,14 +2211,13 @@ dependencies:
   - org-os-standards
 files:
   packages/paper-integration: packages/paper-integration
-  skills/paper-design: skills/paper-design
 checks:
   - file-exists: packages/paper-integration/lib/paper.mjs
   - file-exists: packages/paper-integration/VERIFIED.md
 ```
 
 Run: `node --test tests/scripts/module-manifests.test.mjs`
-Expected: FAIL for now on `file-exists: packages/paper-integration/VERIFIED.md`? — No: the manifest test validates schema and id/dir match only; `checks` are "reserved for Phase 3" and not executed. Expected: PASS. (VERIFIED.md itself lands in Task 7; `skills/paper-design` in Task 8 — the identity mapping is a declaration, not a copy, so a not-yet-existing path does not fail the test.)
+Expected: PASS. Note `tests/scripts/module-manifests.test.mjs:55` asserts every `files:` target **already exists on disk** — which is why this manifest claims only `packages/paper-integration` (created in Task 1). Task 8 adds the `skills/paper-design` mapping when it creates that directory. `checks:` entries are "reserved for Phase 3" and are not executed, so naming `VERIFIED.md` (Task 7) here is safe.
 
 - [ ] **Step 2: Add the MODULES.md entry**
 
@@ -1646,7 +2252,6 @@ acceptance gate to `pilot`. See `docs/integrations/paper.md`.
 package `packages/paper-integration/`
 
 ---
-
 ```
 
 - [ ] **Step 3: Add the site mirror row**
@@ -1654,11 +2259,11 @@ package `packages/paper-integration/`
 In `site/src/data/modules.yaml`, after the `org-os-buzz` block, add:
 
 ```yaml
-  - id: org-os-paper
-    name: Paper Design Canvas
-    status: in-dev
-    summary: Brand tokens pushed into a Paper design file, drift-linted; agents draft on-brand compositions a human refines by hand. Package built, live verification pending.
-    link: /docs/modules
+- id: org-os-paper
+  name: Paper Design Canvas
+  status: in-dev
+  summary: Brand tokens pushed into a Paper design file, drift-linted; agents draft on-brand compositions a human refines by hand. Package built, live verification pending.
+  link: /docs/modules
 ```
 
 - [ ] **Step 4: Add the packages-matrix row**
@@ -1666,13 +2271,13 @@ In `site/src/data/modules.yaml`, after the `org-os-buzz` block, add:
 After the `buzz-integration` entry in `data/packages-matrix.yaml`:
 
 ```yaml
-  - id: "paper-integration"
-    owner: "framework"
-    instances_using: []
-    in_framework: true
-    promotion_status: "evaluating"
-    lifecycle_status: "active"
-    notes: "@paper-integration — thin MCP wire client (lib/paper.mjs) over Paper Desktop's local server + pure token planner (lib/tokens.mjs). npm run paper:doctor (zero metered calls) / paper:push-tokens (brand.yaml → Paper tokens, diffed, ≤3 calls) / paper:lint-tokens (1 call) / paper:call (passthrough). Ships modules/org-os-paper/module.yaml as module #5. Live verification and the refi-dao-os brief-02 prototype pending (VERIFIED.md)."
+- id: "paper-integration"
+  owner: "framework"
+  instances_using: []
+  in_framework: true
+  promotion_status: "evaluating"
+  lifecycle_status: "active"
+  notes: "@paper-integration — thin MCP wire client (lib/paper.mjs) over Paper Desktop's local server + pure token planner (lib/tokens.mjs). npm run paper:doctor (zero metered calls) / paper:push-tokens (brand.yaml → Paper tokens, diffed, ≤3 calls) / paper:lint-tokens (1 call) / paper:call (passthrough). Ships modules/org-os-paper/module.yaml as module #5. Live verification and the refi-dao-os brief-02 prototype pending (VERIFIED.md)."
 ```
 
 - [ ] **Step 5: Append to `.env.example`**
@@ -1708,10 +2313,12 @@ Expected: manifest test PASS; site test PASS (`org-os-paper` present in MODULES.
 ### Task 7: Live verification against Paper 0.5.6 — VERIFIED.md
 
 **Files:**
+
 - Create: `packages/paper-integration/VERIFIED.md`
 - Possibly modify: `packages/paper-integration/lib/paper.mjs` (`extractTokens` shape), `lib/tokens.mjs` (value rules), and their tests — **only to match an observed row**.
 
 **Interfaces:**
+
 - Consumes: everything in Tasks 1–5, a running Paper Desktop with a target file.
 - Produces: the pinned truth for `doctor`, `push`, `lint`; the `PAPER_FILE_ID` used by Tasks 9–10.
 
@@ -1741,14 +2348,15 @@ npm run paper:push-tokens -- --tokens ../refi-dao-os/data/brand.yaml --dry-run
 npm run paper:push-tokens -- --tokens ../refi-dao-os/data/brand.yaml
 ```
 
-Expected dry-run: `plan: 87 tokens · 4 skipped · N converted`, four `skipped:` lines (glow-blue, glow-green, glass-blur, glass-shadow), `dry-run: nothing sent`, `metered calls: 0`.
-Expected push: `create: 87 … created: 87 · updated: 0 · pruned: 0`, `metered calls: 2`.
+Expected dry-run: `plan: 75 tokens · 4 skipped · 31 converted`, four `skipped:` lines (glass-blur, glass-shadow, glow-blue, glow-green), `dry-run: nothing sent`, `metered calls: 0`.
+Expected push: `create: 75 … created: 75 · updated: 0 · pruned: 0`, `metered calls: 2`.
 
 **If `create_tokens` errors** (exit 1, `paper: rpc — …`): read the message. Likely causes and the rule for each:
+
 - value rejected for `fontFamily` (full stack vs single family) → the planner already sends the first family; if Paper wants quoting, adjust `firstFamily` in `lib/tokens.mjs` **and** its test, and record the row.
 - `fontWeight` wants a string → change the planner's weight branch to `String(n)`, update the test expecting `600`, record the row.
 - a batch-size limit → split `diff.create` into chunks of the observed limit in `push-tokens.mjs`; add a test with a fake handler that rejects >N; record the row.
-Re-run the push after any fix and confirm the second run is `metered calls: 1` with zeros.
+  Re-run the push after any fix and confirm the second run is `metered calls: 1` with zeros.
 
 - [ ] **Step 4: Observe the `get_tokens` reply shape (1 call) and the idempotent second push (1 call)**
 
@@ -1764,7 +2372,8 @@ Expected: the first prints the raw reply — note whether tokens arrive as `cont
 ```bash
 npm run paper:lint-tokens -- --tokens ../refi-dao-os/data/brand.yaml
 ```
-Expected: `paper tokens: in sync (87 checked)`, exit 0.
+
+Expected: `paper tokens: in sync (75 checked)`, exit 0.
 
 Now in Paper Desktop's **Theme** tab, change `--refi-color-blue` to any other colour by hand. Then:
 
@@ -1772,6 +2381,7 @@ Now in Paper Desktop's **Theme** tab, change `--refi-color-blue` to any other co
 npm run paper:lint-tokens -- --tokens ../refi-dao-os/data/brand.yaml; echo "exit $?"
 npm run paper:push-tokens -- --tokens ../refi-dao-os/data/brand.yaml
 ```
+
 Expected: lint prints `changed: --refi-color-blue paper=… brand=#4571E1` and `exit 1`; the push prints `updated: 1` and restores it (`metered calls: 2`).
 
 - [ ] **Step 6: Check Switzer visibility from Paper's side? — No.** `get_font_family_info` is metered and belongs to the prototype session (Task 10), after the font is installed (Task 9). Skip here.
@@ -1787,36 +2397,36 @@ changes **only** to match a re-verified row — never to track documentation, ne
 
 ## Pin
 
-| what | value | observed |
-|---|---|---|
-| Paper Desktop | `0.5.6` (bundle `com.todesktop.2601167vjw8xe`) | 2026-09-02, `initialize` → `serverInfo` |
-| MCP server name | `paper-desktop` | 2026-09-02 |
-| MCP protocol | `2025-03-26` | 2026-09-02 |
-| Endpoint | `http://127.0.0.1:29979/mcp`, POST, `Accept: application/json, text/event-stream` | 2026-09-02 |
-| Reply framing | `text/event-stream`, one `event: message` + `data: <envelope>` | 2026-09-02 |
-| Auth | none (loopback) | 2026-09-02 |
-| Tools | 36 (public docs page lists 24) — list below | 2026-09-02 |
+| what            | value                                                                             | observed                                |
+| --------------- | --------------------------------------------------------------------------------- | --------------------------------------- |
+| Paper Desktop   | `0.5.6` (bundle `com.todesktop.2601167vjw8xe`)                                    | 2026-09-02, `initialize` → `serverInfo` |
+| MCP server name | `paper-desktop`                                                                   | 2026-09-02                              |
+| MCP protocol    | `2025-03-26`                                                                      | 2026-09-02                              |
+| Endpoint        | `http://127.0.0.1:29979/mcp`, POST, `Accept: application/json, text/event-stream` | 2026-09-02                              |
+| Reply framing   | `text/event-stream`, one `event: message` + `data: <envelope>`                    | 2026-09-02                              |
+| Auth            | none (loopback)                                                                   | 2026-09-02                              |
+| Tools           | 36 (public docs page lists 24) — list below                                       | 2026-09-02                              |
 
 ## Observed facts
 
-| # | fact | observed | how |
-|---|---|---|---|
-| 1 | `GET /mcp` → 404; only POST JSON-RPC is served | ✅ 2026-09-02 | curl |
-| 2 | `initialize` and `tools/list` do **not** count toward the metered weekly quota | ⚠ inferred from Paper's pricing wording ("MCP tool calls"), not observed against the quota counter | pricing page + `/docs/mcp` |
-| 3 | `create_tokens` accepts a batch of 87 in one call | ⟨fill: ✅ / ❌ + limit⟩ | Task 7 Step 3 |
-| 4 | `fontFamily` value: single family name accepted (`"Switzer"`) | ⟨fill⟩ | Step 3 |
-| 5 | `fontWeight` value: number accepted (`600`) | ⟨fill⟩ | Step 3 |
-| 6 | size values must be px strings; rem rejected | ⟨fill: tested? only px was sent⟩ | Step 3 |
-| 7 | `get_tokens` json reply shape | ⟨fill: e.g. `content[0].text` = JSON array of `{type,name,value,description}`⟩ | Step 4 |
-| 8 | colour values round-trip verbatim (case preserved / normalised to …) | ⟨fill⟩ | Step 4 |
-| 9 | `description` round-trips through get_tokens | ⟨fill⟩ | Step 4 |
-| 10 | `set_tokens` `{name, value}` updates; `{name, delete:true}` deletes | ⟨fill⟩ | Step 5 |
-| 11 | a hand edit in the Theme tab is visible to `get_tokens` immediately | ⟨fill⟩ | Step 5 |
-| 12 | quota-exceeded error shape | not observed | — |
-| 13 | `export` reply shape (base64 `content[].type:"image"` vs file path) | pending — Task 10 | — |
-| 14 | `get_jsx` `format` enum: `"tailwind"` \| `"inline-styles"` | ✅ 2026-09-02 | tools/list schema |
-| 15 | inline `<svg>` with `<filter><feTurbulence>` renders on the canvas | pending — Task 10 | — |
-| 16 | `write_html` accepts `<img src="data:image/svg+xml;base64,…">` | pending — Task 10 | — |
+| #   | fact                                                                           | observed                                                                                           | how                        |
+| --- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------- |
+| 1   | `GET /mcp` → 404; only POST JSON-RPC is served                                 | ✅ 2026-09-02                                                                                      | curl                       |
+| 2   | `initialize` and `tools/list` do **not** count toward the metered weekly quota | ⚠ inferred from Paper's pricing wording ("MCP tool calls"), not observed against the quota counter | pricing page + `/docs/mcp` |
+| 3   | `create_tokens` accepts a batch of 75 in one call                              | ⟨fill: ✅ / ❌ + limit⟩                                                                            | Task 7 Step 3              |
+| 4   | `fontFamily` value: single family name accepted (`"Switzer"`)                  | ⟨fill⟩                                                                                             | Step 3                     |
+| 5   | `fontWeight` value: number accepted (`600`)                                    | ⟨fill⟩                                                                                             | Step 3                     |
+| 6   | size values must be px strings; rem rejected                                   | ⟨fill: tested? only px was sent⟩                                                                   | Step 3                     |
+| 7   | `get_tokens` json reply shape                                                  | ⟨fill: e.g. `content[0].text` = JSON array of `{type,name,value,description}`⟩                     | Step 4                     |
+| 8   | colour values round-trip verbatim (case preserved / normalised to …)           | ⟨fill⟩                                                                                             | Step 4                     |
+| 9   | `description` round-trips through get_tokens                                   | ⟨fill⟩                                                                                             | Step 4                     |
+| 10  | `set_tokens` `{name, value}` updates; `{name, delete:true}` deletes            | ⟨fill⟩                                                                                             | Step 5                     |
+| 11  | a hand edit in the Theme tab is visible to `get_tokens` immediately            | ⟨fill⟩                                                                                             | Step 5                     |
+| 12  | quota-exceeded error shape                                                     | not observed                                                                                       | —                          |
+| 13  | `export` reply shape (base64 `content[].type:"image"` vs file path)            | pending — Task 10                                                                                  | —                          |
+| 14  | `get_jsx` `format` enum: `"tailwind"` \| `"inline-styles"`                     | ✅ 2026-09-02                                                                                      | tools/list schema          |
+| 15  | inline `<svg>` with `<filter><feTurbulence>` renders on the canvas             | pending — Task 10                                                                                  | —                          |
+| 16  | `write_html` accepts `<img src="data:image/svg+xml;base64,…">`                 | pending — Task 10                                                                                  | —                          |
 
 Replace every `⟨fill⟩` with what you saw, including the exact error text for anything rejected.
 
@@ -1851,11 +2461,13 @@ Also record the metered calls this task spent (target ≤ 8) — Task 10's repor
 ### Task 8: `skills/paper-design/SKILL.md`, `docs/integrations/paper.md`, skills-matrix row
 
 **Files:**
+
 - Create: `skills/paper-design/SKILL.md`
 - Create: `docs/integrations/paper.md`
 - Modify: `data/skills-matrix.yaml` (add after the `capital-flow` entry)
 
 **Interfaces:**
+
 - Consumes: script names and flags from Tasks 3–5; observed facts from Task 7 (quote them, don't re-guess).
 - Produces: the method Task 10 follows; the runbook Task 11 flips to `pilot`.
 
@@ -1907,12 +2519,12 @@ The free tier allows **100 metered MCP tool calls per week**. `initialize`/`tool
 tool call is metered. **Per artifact: 25 calls, hard stop.** At 25, export what exists, release working
 indicators, report — do not "finish quickly". Typical spend for one composition:
 
-| step | calls |
-|---|---|
-| `get_basic_info` · `get_font_family_info([brand face])` · `create_artboard` | 3 |
-| `write_html`, one visual group each | 6–10 |
-| `get_screenshot` (max 3) · targeted `update_styles` / `set_text_content` (max 3) | ≤6 |
-| `find_nodes` colour audit · `export` · `get_jsx` · `finish_working_on_nodes` | 4 |
+| step                                                                             | calls |
+| -------------------------------------------------------------------------------- | ----- |
+| `get_basic_info` · `get_font_family_info([brand face])` · `create_artboard`      | 3     |
+| `write_html`, one visual group each                                              | 6–10  |
+| `get_screenshot` (max 3) · targeted `update_styles` / `set_text_content` (max 3) | ≤6    |
+| `find_nodes` colour audit · `export` · `get_jsx` · `finish_working_on_nodes`     | 4     |
 
 Paper's own guide asks for a screenshot after every section. Keep its small-writes discipline (the human
 watches the canvas build) and **override the screenshot cadence** to fit the budget. Never call image
@@ -1982,7 +2594,7 @@ the codebase's conventions (for refi-dao-os: classes from `brand.css`, tokens fr
 
 - [ ] **Step 2: Write the runbook**
 
-```markdown
+````markdown
 # Paper Integration — Design Canvas
 
 **Status:** module #5 `org-os-paper`, catalogued **in-dev** — package and tests ship; live token round-trip verified 2026-09-02 against Paper 0.5.6 ([`packages/paper-integration/VERIFIED.md`](../../packages/paper-integration/VERIFIED.md)); the refi-dao-os prototype (brief 02) is the gate to `pilot`
@@ -2015,8 +2627,13 @@ An org's `data/brand.yaml` `tokens:` are the source of truth. `npm run paper:pus
 Claude Code — commit `.mcp.json` at the instance root:
 
 ```json
-{ "mcpServers": { "paper": { "type": "http", "url": "http://127.0.0.1:29979/mcp" } } }
+{
+  "mcpServers": {
+    "paper": { "type": "http", "url": "http://127.0.0.1:29979/mcp" }
+  }
+}
 ```
+````
 
 Other hosts (documented by Paper, **unverified here**): Cursor `/add-plugin paper-desktop`; Claude Desktop via `npx mcp-remote http://127.0.0.1:29979/mcp`; Copilot `.vscode/mcp.json` `{"servers":{"paper":{"type":"http","url":"…"}}}`; OpenCode `{"mcp":{"paper":{"type":"remote","url":"…","enabled":true}}}`. Hermes and Berd: no wiring yet — the scripts above work from any shell regardless.
 
@@ -2039,7 +2656,8 @@ Paper resolves fonts from the machine and Google Fonts. A brand face that is on 
 ## Re-verification note
 
 `paper:doctor` warns when the running Paper version differs from the pin. On any bump, follow VERIFIED.md → Re-verification protocol before trusting `push`/`lint`.
-```
+
+````
 
 - [ ] **Step 3: Add the skills-matrix row**
 
@@ -2052,7 +2670,7 @@ After the `capital-flow` entry in `data/skills-matrix.yaml`:
     in_framework: true
     promotion_status: "evaluating"
     notes: "Design DESIGN.md compositions on a Paper canvas from pushed brand tokens under a metered-call budget; export back as PNG/JSX. Module org-os-paper. First adopter: refi-dao-os (brief-02 prototype pending)."
-```
+````
 
 - [ ] **Step 4: Verify, format, commit**
 
@@ -2070,12 +2688,14 @@ Expected: validate:structure counts 37 skills, `0 failed`.
 ### Task 9: refi-dao-os wiring — `.mcp.json`, TOOLS.md, brand-skill Canvas route, `.env`, Switzer
 
 **Files (all in `../refi-dao-os`):**
+
 - Create: `.mcp.json`
 - Modify: `TOOLS.md` (new section after `## Notion Integration`, before `## On-Chain Addresses`)
 - Modify: `.claude/skills/refi-dao-brand/SKILL.md` (append section)
 - Create (not committed): `.env` line `PAPER_FILE_ID=…`
 
 **Interfaces:**
+
 - Consumes: the file id from Task 7; the skill from Task 8.
 - Produces: the instance-side translation table Task 10 builds from.
 
@@ -2112,7 +2732,7 @@ Expected: `feat/graphify-knowledge-pilot` (or the branch the operator named) and
   Registered for Claude Code in `.mcp.json`.
 - **File:** `ReFi DAO — Brand canvas` — id in `.env` as `PAPER_FILE_ID` (per operator; the file lives in the
   operator's personal Paper account, free tier). Tokens pushed from `data/brand.yaml` 2026-09-02:
-  87 created, 4 skipped (`glow-*`, `glass-*` — no Paper token type). Drift check from the framework repo:
+  ⟨n⟩ created, 4 skipped (`glow-*`, `glass-*` — no Paper token type) — use the numbers the push actually printed. Drift check from the framework repo:
   `npm run paper:lint-tokens -- --tokens ../refi-dao-os/data/brand.yaml`.
 - **Budget:** free tier = 100 metered MCP tool calls/week. One artifact ≤ 25. Doctor is free.
 - **Fonts:** Switzer must be installed locally (Fontshare, ITF Free Font License — never commit the files):
@@ -2127,26 +2747,25 @@ Expected: `feat/graphify-knowledge-pilot` (or the branch the operator named) and
 Append to `.claude/skills/refi-dao-brand/SKILL.md`:
 
 ```markdown
-
 ## Canvas (Paper) — `paper-design`
 
-Route any request to build a ReFi DAO artifact *in Paper* through the framework skill `paper-design`
+Route any request to build a ReFi DAO artifact _in Paper_ through the framework skill `paper-design`
 (`org-os/skills/paper-design/SKILL.md`). Tokens are already in the file as `--refi-*` (same names as
 `brand.css`). Paper does not load `brand.css`, so every class becomes inline CSS over tokens. The table
 below is that translation for the compositions exercised so far — extend it as compositions are built.
 
 ### Social card (DESIGN.md §5) — 1080 × 1350 (4:5), world Space
 
-| brand.css | on the Paper canvas (inline, tokens only) |
-|---|---|
-| `.refi-page` (Space) | artboard `background: var(--refi-bg); color: var(--refi-text); font-family: var(--refi-font-sans); position: relative; overflow: hidden` |
-| `.refi-grain` glow | a full-bleed layer `background: radial-gradient(ellipse at 50% 0%, var(--refi-color-blue), transparent 60%); opacity: 0.18` |
-| `.refi-grain::after` grain | a full-bleed inline `<svg>` with `<filter><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.18 0"/></filter><rect width="100%" height="100%" filter="url(#g)"/></svg>` and `mix-blend-mode: overlay` (fallback: the same SVG as a `background-image` data URI, exactly as brand.css does) |
-| `.refi-orb` (sphere) | `aspect-ratio: 1; border-radius: 50%; background: conic-gradient(from 210deg, var(--refi-color-yellow), var(--refi-color-pink), var(--refi-color-blue), var(--refi-color-green), var(--refi-color-blue-light), var(--refi-color-yellow)); filter: saturate(1.05); overflow: hidden` + a child highlight layer `background: radial-gradient(circle at 32% 28%, var(--refi-color-cloud), transparent 42%); opacity: 0.35` + a child noise `<svg>` (baseFrequency 0.9, 2 octaves, alpha 0.35) at `opacity: 0.55; mix-blend-mode: overlay` |
-| logomark (Orb ring) | the real asset `repos/repos/ReFi-DAO-Website/site/assets/ReFi_Logomark.svg` inline (or as `<img src="data:image/svg+xml;base64,…">`), 84 × 84, inset `var(--refi-space-4)` top-left |
-| `.refi-heading-1` | `font-size: var(--refi-text-5xl); font-weight: var(--refi-weight-semibold); line-height: 62px; letter-spacing: -0.02em; color: var(--refi-text); margin: 0` |
-| `.refi-caption` | `font-size: var(--refi-text-sm); color: var(--refi-text-subtle); margin: 0` |
-| padding | `var(--refi-space-16)`; gap between heading and caption `var(--refi-space-6)` |
+| brand.css                  | on the Paper canvas (inline, tokens only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.refi-page` (Space)       | artboard `background: var(--refi-bg); color: var(--refi-text); font-family: var(--refi-font-sans); position: relative; overflow: hidden`                                                                                                                                                                                                                                                                                                                                                                                               |
+| `.refi-grain` glow         | a full-bleed layer `background: radial-gradient(ellipse at 50% 0%, var(--refi-color-blue), transparent 60%); opacity: 0.18`                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `.refi-grain::after` grain | a full-bleed inline `<svg>` with `<filter><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.18 0"/></filter><rect width="100%" height="100%" filter="url(#g)"/></svg>` and `mix-blend-mode: overlay` (fallback: the same SVG as a `background-image` data URI, exactly as brand.css does)                                                                                                                                        |
+| `.refi-orb` (sphere)       | `aspect-ratio: 1; border-radius: 50%; background: conic-gradient(from 210deg, var(--refi-color-yellow), var(--refi-color-pink), var(--refi-color-blue), var(--refi-color-green), var(--refi-color-blue-light), var(--refi-color-yellow)); filter: saturate(1.05); overflow: hidden` + a child highlight layer `background: radial-gradient(circle at 32% 28%, var(--refi-color-cloud), transparent 42%); opacity: 0.35` + a child noise `<svg>` (baseFrequency 0.9, 2 octaves, alpha 0.35) at `opacity: 0.55; mix-blend-mode: overlay` |
+| logomark (Orb ring)        | the real asset `repos/repos/ReFi-DAO-Website/site/assets/ReFi_Logomark.svg` inline (or as `<img src="data:image/svg+xml;base64,…">`), 84 × 84, inset `var(--refi-space-4)` top-left                                                                                                                                                                                                                                                                                                                                                    |
+| `.refi-heading-1`          | `font-size: var(--refi-text-5xl); font-weight: var(--refi-weight-semibold); line-height: 62px; letter-spacing: -0.02em; color: var(--refi-text); margin: 0`                                                                                                                                                                                                                                                                                                                                                                            |
+| `.refi-caption`            | `font-size: var(--refi-text-sm); color: var(--refi-text-subtle); margin: 0`                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| padding                    | `var(--refi-space-16)`; gap between heading and caption `var(--refi-space-6)`                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 Never: a literal hex, a recoloured Orb, flat Space, a paragraph, a partner's palette (DESIGN.md §6).
 ```
@@ -2192,12 +2811,14 @@ Expected: `lint:brand` green; the commit contains exactly three paths; the third
 ### Task 10: The prototype — brief 02 on the canvas (≤ 25 calls for the artifact)
 
 **Files (in `../refi-dao-os`):**
+
 - Create: `docs/brand/eval/out/02-growfi-social-card.paper.png`
 - Create: `docs/brand/eval/out/02-growfi-social-card.paper.html`
 - Create: `docs/brand/eval/out/PAPER-PROTOTYPE-2026-09-02.md`
 - Modify (org-os): `packages/paper-integration/VERIFIED.md` rows 13, 15, 16
 
 **Interfaces:**
+
 - Consumes: `npm run paper:call` (Task 3), the translation table (Task 9), `PAPER_FILE_ID`.
 - Produces: the acceptance evidence Task 11 judges.
 
@@ -2315,7 +2936,7 @@ require("fs").writeFileSync(process.argv[2],html);
 npm run paper:call -- finish_working_on_nodes '{}' $T | head -3
 ```
 
-Note: `get_jsx` returns JSX, not HTML — `className`/`style={{…}}` may need no change for a browser to *display* roughly, but the file's job is a record of exact values, not a runnable page; say so in its comment if the output is JSX-only.
+Note: `get_jsx` returns JSX, not HTML — `className`/`style={{…}}` may need no change for a browser to _display_ roughly, but the file's job is a record of exact values, not a runnable page; say so in its comment if the output is JSX-only.
 
 - [ ] **Step 9: Tally and write the report**
 
@@ -2331,16 +2952,16 @@ Compare against the no-context HTML run `02-growfi-social-card.html`.
 
 ## Metered calls
 
-| phase | calls |
-|---|---|
-| token push + lint round trip (org-os Task 7, this file id) | ⟨n⟩ |
-| preconditions (lint, font) | 2 |
-| context + artboard | 2 |
-| ground, Orb, logomark, type | ⟨5–6⟩ |
-| screenshot(s) + fixes | ⟨n⟩ |
-| colour audit | ⟨n⟩ |
-| export, jsx, finish | 3 |
-| **total this prototype** | **⟨n⟩ / ceiling 30** |
+| phase                                                      | calls                |
+| ---------------------------------------------------------- | -------------------- |
+| token push + lint round trip (org-os Task 7, this file id) | ⟨n⟩                  |
+| preconditions (lint, font)                                 | 2                    |
+| context + artboard                                         | 2                    |
+| ground, Orb, logomark, type                                | ⟨5–6⟩                |
+| screenshot(s) + fixes                                      | ⟨n⟩                  |
+| colour audit                                               | ⟨n⟩                  |
+| export, jsx, finish                                        | 3                    |
+| **total this prototype**                                   | **⟨n⟩ / ceiling 30** |
 
 ## What Paper did
 
@@ -2357,24 +2978,24 @@ Compare against the no-context HTML run `02-growfi-social-card.html`.
 
 ## Acceptance (spec §Prototype → pilot)
 
-| # | criterion | result |
-|---|---|---|
-| 1 | `paper:doctor` green | ⟨✅/❌⟩ |
-| 2 | second push = 1 call, 0 changes | ⟨✅/❌⟩ |
-| 3 | lint passes after push, fails after a hand edit, passes after re-push | ⟨✅/❌⟩ |
-| 4 | colour audit: zero off-token literals | ⟨✅/❌ + what⟩ |
-| 5 | export shows visible grain (not flat Space) | ⟨✅/❌⟩ |
-| 6 | passes brief Must / Must-not + DESIGN.md §6 **at operator review** | ⟨pending — operator⟩ |
-| 7 | total metered calls ≤ 30 | ⟨✅ n / ❌ n⟩ |
+| #   | criterion                                                             | result               |
+| --- | --------------------------------------------------------------------- | -------------------- |
+| 1   | `paper:doctor` green                                                  | ⟨✅/❌⟩              |
+| 2   | second push = 1 call, 0 changes                                       | ⟨✅/❌⟩              |
+| 3   | lint passes after push, fails after a hand edit, passes after re-push | ⟨✅/❌⟩              |
+| 4   | colour audit: zero off-token literals                                 | ⟨✅/❌ + what⟩       |
+| 5   | export shows visible grain (not flat Space)                           | ⟨✅/❌⟩              |
+| 6   | passes brief Must / Must-not + DESIGN.md §6 **at operator review**    | ⟨pending — operator⟩ |
+| 7   | total metered calls ≤ 30                                              | ⟨✅ n / ❌ n⟩        |
 
 ## Verdict needed from the operator
 
 Same table shape as `VERDICTS.md`: accept / cosmetic / reject for the Paper card, and whether the canvas
 version should replace the HTML run as the reference output for brief 02.
 
-| scenario | verdict (accept / cosmetic / reject) | note |
-|---|---|---|
-| 02 — GrowFi social card (Paper) | — | |
+| scenario                        | verdict (accept / cosmetic / reject) | note |
+| ------------------------------- | ------------------------------------ | ---- |
+| 02 — GrowFi social card (Paper) | —                                    |      |
 
 ## Next
 
@@ -2401,6 +3022,7 @@ git commit -m "verify(paper): rows 13/15/16 from the refi-dao-os prototype — e
 ### Task 11: Acceptance and status flip
 
 **Files:**
+
 - Modify (org-os): `docs/MODULES.md` (org-os-paper Status paragraph), `site/src/data/modules.yaml` (status + summary), `docs/integrations/paper.md` (Status line + "What is NOT verified"), `data/skills-matrix.yaml` (`instances_using`), `data/packages-matrix.yaml` (notes), `DECISIONS.md`, `memory/2026-09-02.md`, `HEARTBEAT.md`
 - Modify (refi-dao-os): `DECISIONS.md`, `memory/2026-09-02.md`
 
@@ -2425,9 +3047,9 @@ Expected: all green.
 
 - [ ] **Step 4: Record — both repos**
 
-org-os `DECISIONS.md` (follow the file's existing entry format; date from `date +%Y-%m-%d`): *Paper adopted as the agent design canvas (module #5 `org-os-paper`); tokens flow one way from brand.yaml; free-tier budget is a design constraint; registration is instance opt-in; status ⟨pilot / in-dev + why⟩.*
-org-os `memory/2026-09-02.md`: append a session block — what shipped, calls spent, VERIFIED rows learned, what is pending. `HEARTBEAT.md`: add *"Paper prototype — operator verdict on the brief-02 card + first comment-thread loop"* under the appropriate section.
-refi-dao-os `DECISIONS.md`: *Paper canvas wired for the brand system (`.mcp.json`, tokens pushed 2026-09-02); operator's personal free-tier account; verdict on the canvas card pending.* refi-dao-os `memory/2026-09-02.md`: append the same facts from the instance's side.
+org-os `DECISIONS.md` (follow the file's existing entry format; date from `date +%Y-%m-%d`): _Paper adopted as the agent design canvas (module #5 `org-os-paper`); tokens flow one way from brand.yaml; free-tier budget is a design constraint; registration is instance opt-in; status ⟨pilot / in-dev + why⟩._
+org-os `memory/2026-09-02.md`: append a session block — what shipped, calls spent, VERIFIED rows learned, what is pending. `HEARTBEAT.md`: add _"Paper prototype — operator verdict on the brief-02 card + first comment-thread loop"_ under the appropriate section.
+refi-dao-os `DECISIONS.md`: _Paper canvas wired for the brand system (`.mcp.json`, tokens pushed 2026-09-02); operator's personal free-tier account; verdict on the canvas card pending._ refi-dao-os `memory/2026-09-02.md`: append the same facts from the instance's side.
 
 ```bash
 cd ../org-os
@@ -2449,4 +3071,4 @@ Expected: both commits contain only the listed paths; refi-dao-os's other uncomm
 
 **Placeholder scan.** The only angle-bracket fills are in VERIFIED.md and the prototype report, where the plan requires observed values to replace them before commit — those are observation slots, not plan gaps.
 
-**Type consistency.** `createClient` returns `{ initialize, listTools, call, metered, url }` everywhere; `loadConfig({ root, env, tokensPath, file })` → `{ url, fileId }` everywhere; `planTokens` → `{ tokens, skipped, converted }`; `diffTokens` → `{ create, update, unchanged, extra }`; `extractTokens(result)`; `firstText(result)` is exported but only used by scripts if needed; `startFakePaper({ serverInfo, tools, handlers, framing })` → `{ url, calls, close }`; `runScript(scriptPath, args, env)` → `{ status, stdout, stderr }`. Script exit codes: 0 ok · 1 error/drift · 2 not-ready/usage across all four scripts.
+**Type consistency.** `createClient` returns `{ initialize, listTools, call, metered, url }` everywhere; `loadConfig({ root, env, tokensPath, file })` → `{ url, fileId }` everywhere; `planTokens` → `{ tokens, skipped, converted }`; `diffTokens` → `{ create, update, unchanged, extra }`; `extractTokens(result)`; `startFakePaper({ serverInfo, tools, handlers, framing })` → `{ url, calls, close }`; `runScript(scriptPath, args, env)` → `{ status, stdout, stderr }`. Script exit codes: 0 ok · 1 error/drift · 2 not-ready/usage across all four scripts.
