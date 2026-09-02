@@ -4,6 +4,10 @@
 // replies, typed errors, a metered-call counter. No SDK. PIN mirrors
 // packages/paper-integration/VERIFIED.md — change it ONLY to match a
 // re-verified row.
+// Metering: a tools/call counts once it reaches Paper and a response comes
+// back — success or JSON-RPC error, since a rejected call still likely got
+// billed. A transport failure (unreachable, timeout, abort) never counts:
+// nothing reached the server. initialize/tools/list are free and never count.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -156,6 +160,9 @@ export function createClient({
       clearTimeout(timer);
     }
     const text = await res.text();
+    // Reached the server and read a response: for tools/call this counts
+    // against quota regardless of what the envelope turns out to hold.
+    if (method === "tools/call") client.metered += 1;
     let env;
     try {
       env = parseReply(text);
@@ -179,11 +186,8 @@ export function createClient({
       clientInfo: CLIENT_INFO,
     });
   client.listTools = async () => (await rpc("tools/list", {})).tools ?? [];
-  client.call = async (name, args = {}) => {
-    const result = await rpc("tools/call", { name, arguments: args });
-    client.metered += 1;
-    return result;
-  };
+  client.call = (name, args = {}) =>
+    rpc("tools/call", { name, arguments: args });
   return client;
 }
 

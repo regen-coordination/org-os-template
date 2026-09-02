@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // call.mjs — generic `tools/call` passthrough. For agents driving the canvas
 // from a shell (and for the prototype). Always passes fileId. Prints the
-// result JSON on stdout and `metered calls: N` on stderr.
+// result JSON on stdout and `metered calls: N` on stderr — on EVERY exit
+// path, success or error, so an operator watching quota never sees a run
+// with no metered line.
 //   node scripts/call.mjs <tool> [json-args] [--args-file p] [--file id] [--out p] [--tokens brand.yaml]
 import { parseArgs } from "node:util";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -17,26 +19,44 @@ const { values, positionals } = parseArgs({
   },
 });
 const [tool, inlineJson] = positionals;
-if (!tool) {
-  console.error(
-    "usage: call.mjs <tool> [json-args] [--args-file p] [--file id] [--out p]",
-  );
-  process.exit(2);
-}
 const cfg = loadConfig({ tokensPath: values.tokens, file: values.file });
-if (!cfg.fileId) {
-  console.error(
-    "paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>",
-  );
-  process.exit(2);
+// Constructed before the early checks so every exit path — including usage
+// and no-target-file, neither of which reaches the server — has a count to
+// print.
+const client = createClient({ url: cfg.url, timeoutMs: 60000 });
+
+function bail(message, code) {
+  console.error(`metered calls: ${client.metered}`);
+  console.error(message);
+  process.exit(code);
 }
+
+if (!tool) {
+  bail(
+    "usage: call.mjs <tool> [json-args] [--args-file p] [--file id] [--out p]",
+    2,
+  );
+}
+if (!cfg.fileId) {
+  bail(
+    "paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>",
+    2,
+  );
+}
+
 let args = {};
-if (values["args-file"])
-  args = JSON.parse(readFileSync(values["args-file"], "utf8"));
-else if (inlineJson) args = JSON.parse(inlineJson);
+try {
+  if (values["args-file"])
+    args = JSON.parse(readFileSync(values["args-file"], "utf8"));
+  else if (inlineJson) args = JSON.parse(inlineJson);
+} catch (e) {
+  const source = values["args-file"]
+    ? `--args-file (${values["args-file"]})`
+    : "inline arguments";
+  bail(`paper: could not read ${source} — ${e.message}`, 1);
+}
 args = { ...args, fileId: cfg.fileId };
 
-const client = createClient({ url: cfg.url, timeoutMs: 60000 });
 try {
   const result = await client.call(tool, args);
   if (values.out) {

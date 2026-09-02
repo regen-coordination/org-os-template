@@ -150,7 +150,7 @@ test("client.call: sends tools/call with name+arguments, returns result, increme
   assert.equal(c.metered, 2);
 });
 
-test("client.call: JSON-RPC error → PaperError rpc with code/message/data", async () => {
+test("client.call: JSON-RPC error → PaperError rpc with code/message/data, still metered", async () => {
   const f = fakeFetch([
     {
       status: 200,
@@ -167,6 +167,22 @@ test("client.call: JSON-RPC error → PaperError rpc with code/message/data", as
       /Invalid params/.test(e.message) &&
       e.data.field === "tokens",
   );
+  // The call reached Paper and came back with a rejection — it likely got
+  // billed, so it must still count against quota.
+  assert.equal(c.metered, 1);
+});
+
+test("client.call: transport failure → PaperError unreachable, not metered", async () => {
+  const err = Object.assign(new Error("fetch failed"), {
+    cause: { code: "ECONNREFUSED" },
+  });
+  const c = createClient({ fetch: fakeFetch([err]) });
+  await assert.rejects(
+    c.call("get_tokens", {}),
+    (e) => e instanceof PaperError && e.code === "unreachable",
+  );
+  // Nothing reached Paper — must not count.
+  assert.equal(c.metered, 0);
 });
 
 test("client.call: quota-shaped error → PaperError quota", async () => {
