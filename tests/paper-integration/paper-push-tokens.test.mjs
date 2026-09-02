@@ -166,3 +166,30 @@ test("push: unreachable → exit 2; missing --tokens → exit 2 usage", async ()
   assert.equal(r2.status, 2);
   assert.match(r2.stderr, /--tokens/);
 });
+
+test("push: --tokens path does not exist → exit 2, clean message, metered line, no stack trace", async () => {
+  const r = await runScript(
+    SCRIPT,
+    [
+      "--tokens",
+      path.resolve(__dirname, "../fixtures/paper/does-not-exist.yaml"),
+    ],
+    { PAPER_FILE_ID: "F1" },
+  );
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /^paper: /m);
+  assert.match(r.stderr, /metered calls: 0/);
+  assert.doesNotMatch(r.stderr, /at file:\/\//);
+});
+
+test("push: brand file with no tokens: map → exit 2, clean message, metered line, no stack trace", async () => {
+  const r = await runScript(
+    SCRIPT,
+    ["--tokens", path.resolve(__dirname, "../fixtures/instance-config.yaml")],
+    { PAPER_FILE_ID: "F1" },
+  );
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /^paper: /m);
+  assert.match(r.stderr, /metered calls: 0/);
+  assert.doesNotMatch(r.stderr, /at file:\/\//);
+});

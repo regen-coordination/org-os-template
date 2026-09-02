@@ -19,38 +19,56 @@ const { values } = parseArgs({
     prune: { type: "boolean", default: false },
   },
 });
-if (!values.tokens) {
-  console.error(`metered calls: 0`);
-  console.error(
-    "usage: push-tokens.mjs --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--dry-run] [--prune]",
-  );
-  process.exit(2);
+
+// Constructed before any check — including usage, a bad --tokens file, and
+// no-target-file, none of which reach the server — so every exit path has a
+// live count to print. loadConfig never throws and doesn't require
+// values.tokens to point at a real file.
+const cfg = loadConfig({ tokensPath: values.tokens, file: values.file });
+const client = createClient({ url: cfg.url });
+
+// Every exit routes through here: one place prints `metered calls: N` (read
+// live off the client, never hardcoded) so a new exit path can't add itself
+// without it, the way two earlier ones did.
+function bail(message, code) {
+  console.error(`metered calls: ${client.metered}`);
+  if (message) console.error(message);
+  process.exit(code);
 }
-const brand = loadBrand(values.tokens);
-const plan = planTokens(brand, {
-  canvasWidth: Number(values["canvas-width"]),
-});
+
+if (!values.tokens) {
+  bail(
+    "usage: push-tokens.mjs --tokens <brand.yaml> [--file <id>] [--canvas-width 1080] [--dry-run] [--prune]",
+    2,
+  );
+}
+
+let brand, plan;
+try {
+  brand = loadBrand(values.tokens);
+  plan = planTokens(brand, { canvasWidth: Number(values["canvas-width"]) });
+} catch (e) {
+  // A typo'd path or a malformed brand file never reaches Paper — local
+  // config error, not a rejected write, so exit 2 and no raw stack trace.
+  bail(`paper: ${e.message}`, 2);
+}
+
 console.log(
   `plan: ${plan.tokens.length} tokens · ${plan.skipped.length} skipped · ${plan.converted.length} converted (prefix --${brand.prefix}, source ${brand.source})`,
 );
 for (const s of plan.skipped) console.log(`skipped: ${s.name} — ${s.reason}`);
 
-const cfg = loadConfig({ tokensPath: values.tokens, file: values.file });
-const client = createClient({ url: cfg.url });
-
 if (values["dry-run"]) {
   for (const c of plan.converted)
     console.log(`converted: ${c.name} ${c.from} → ${c.to}`);
   console.log("dry-run: nothing sent");
-  console.error(`metered calls: ${client.metered}`);
-  process.exit(0);
+  bail(null, 0);
 }
 if (!cfg.fileId) {
-  console.error(`metered calls: ${client.metered}`);
-  console.error(
+  bail(
     "paper: no target file — set PAPER_FILE_ID in .env or pass --file <id>",
+    2,
   );
-  process.exit(2);
 }
 
 try {
@@ -84,13 +102,10 @@ try {
     pruned = values.prune ? diff.extra.length : 0;
   }
   console.log(`created: ${created} · updated: ${updated} · pruned: ${pruned}`);
-  console.error(`metered calls: ${client.metered}`);
-  process.exit(0);
+  bail(null, 0);
 } catch (e) {
+  if (e instanceof PaperError)
+    bail(`paper: ${e.code} — ${e.message}`, e.code === "unreachable" ? 2 : 1);
   console.error(`metered calls: ${client.metered}`);
-  if (e instanceof PaperError) {
-    console.error(`paper: ${e.code} — ${e.message}`);
-    process.exit(e.code === "unreachable" ? 2 : 1);
-  }
   throw e;
 }
