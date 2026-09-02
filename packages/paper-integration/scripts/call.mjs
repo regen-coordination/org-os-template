@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // call.mjs — generic `tools/call` passthrough. For agents driving the canvas
-// from a shell (and for the prototype). Always passes fileId. Prints the
-// result JSON on stdout and `metered calls: N` on stderr — on EVERY exit
+// from a shell (and for the prototype). Always passes fileId — so this
+// script cannot call file-less tools such as create_file or list_files; use
+// lib/paper.mjs directly for those (known limitation, not fixed here). Prints
+// the result JSON on stdout and `metered calls: N` on stderr — on EVERY exit
 // path, success or error, so an operator watching quota never sees a run
 // with no metered line.
 //   node scripts/call.mjs <tool> [json-args] [--args-file p] [--file id] [--out p] [--tokens brand.yaml]
@@ -25,10 +27,15 @@ const cfg = loadConfig({ tokensPath: values.tokens, file: values.file });
 // print.
 const client = createClient({ url: cfg.url, timeoutMs: 60000 });
 
-function bail(message, code) {
+// The one process.exit in the file: every exit path prints the metered
+// line (plus any extra stderr lines), then exits.
+function finish(code, ...stderrLines) {
   console.error(`metered calls: ${client.metered}`);
-  console.error(message);
+  for (const line of stderrLines) console.error(line);
   process.exit(code);
+}
+function bail(message, code) {
+  finish(code, message);
 }
 
 if (!tool) {
@@ -71,13 +78,15 @@ try {
     }
   }
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");
-  console.error(`metered calls: ${client.metered}`);
-  process.exit(0);
+  // Paper reports a rejected call as a successful envelope carrying
+  // `isError: true`, not a JSON-RPC error — the result (Paper's message) is
+  // already printed above, but the process must still exit 1: a caller
+  // driving the canvas one element at a time must not read this as success.
+  finish(result?.isError ? 1 : 0);
 } catch (e) {
-  console.error(`metered calls: ${client.metered}`);
   if (e instanceof PaperError) {
-    console.error(`paper: ${e.code} — ${e.message}`);
-    process.exit(e.code === "unreachable" ? 2 : 1);
+    finish(e.code === "unreachable" ? 2 : 1, `paper: ${e.code} — ${e.message}`);
   }
+  console.error(`metered calls: ${client.metered}`);
   throw e;
 }

@@ -154,3 +154,60 @@ test("call: rpc error → exit 1 with the message, still metered", async () => {
     await fake.close();
   }
 });
+
+// Paper reports a rejected call as a successful envelope carrying
+// `isError: true` (observed live), not a JSON-RPC error. Both tests below
+// use the same tool so the exit code is shown to depend on the isError
+// flag, not on which tool was called.
+test("call: result carrying isError:true → exit 1, prints Paper's message, still metered 1", async () => {
+  const message =
+    'Invalid fileId "placeholder". Expected a Paper file id, /file/<id> route, or file URL.';
+  const fake = await startFakePaper({
+    handlers: {
+      write_html: () => ({
+        content: [{ type: "text", text: message }],
+        isError: true,
+      }),
+    },
+  });
+  try {
+    const r = await runScript(
+      SCRIPT,
+      [
+        "write_html",
+        '{"html":"<div/>","targetNodeId":"X","mode":"insert-children"}',
+      ],
+      { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F9" },
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /Invalid fileId/);
+    assert.match(r.stderr, /metered calls: 1/);
+  } finally {
+    await fake.close();
+  }
+});
+
+test("call: same tool, no isError → exit 0 and prints its result (happy path untouched)", async () => {
+  const fake = await startFakePaper({
+    handlers: {
+      write_html: () => ({
+        content: [{ type: "text", text: "node-42" }],
+      }),
+    },
+  });
+  try {
+    const r = await runScript(
+      SCRIPT,
+      [
+        "write_html",
+        '{"html":"<div/>","targetNodeId":"X","mode":"insert-children"}',
+      ],
+      { PAPER_MCP_URL: fake.url, PAPER_FILE_ID: "F9" },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).content[0].text, "node-42");
+    assert.match(r.stderr, /metered calls: 1/);
+  } finally {
+    await fake.close();
+  }
+});
