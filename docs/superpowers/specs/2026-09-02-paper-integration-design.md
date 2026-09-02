@@ -2,31 +2,31 @@
 
 **Date:** 2026-09-02
 **Status:** design approved in dialogue (operator session 2026-09-02); awaiting written review, then `writing-plans`
-**Paper:** https://paper.design — "the connected canvas for teams shipping with agents." A free-form design canvas whose every element is real HTML/CSS, so a design exports as code with no translation step. Web app (`app.paper.design`) + desktop app (`Paper.app`, todesktop build, `0.5.6` installed on the operator's Mac). Agent surface: **Paper MCP**, a local HTTP MCP server the desktop app starts when a file is open — `http://127.0.0.1:29979/mcp`, no auth, MCP protocol `2025-03-26`, SSE-framed replies, 36 tools observed live 2026-09-02 (the public docs page lists 24). Pricing: Free = 100 metered MCP tool calls/week; Pro = $20/editor/month, 1M/week. Docs: `/docs/mcp`, `/docs/tokens`, `/docs/paste`.
+**Paper:** https://paper.design — "the connected canvas for teams shipping with agents." A free-form design canvas whose every element is real HTML/CSS, so a design exports as code with no translation step. Web app (`app.paper.design`) + desktop app (`Paper.app`, todesktop build, `0.5.6` installed on the operator's Mac). Agent surface: **Paper MCP**, a local HTTP MCP server the desktop app starts when a file is open — `http://127.0.0.1:29979/mcp`, no auth, MCP protocol `2025-03-26`, SSE-framed replies, 34 tools observed live 2026-09-02 (the public docs page lists 24). Pricing: Free = 100 metered MCP tool calls/week; Pro = $20/editor/month, 1M/week. Docs: `/docs/mcp`, `/docs/tokens`, `/docs/paste`.
 **Prototype instance:** `refi-dao-os` — the only instance with a canonical machine-layer brand (`data/brand.yaml` v2.0, revised 2026-09-02; spec `refi-dao-os/docs/specs/2026-09-02-brand-system-v2-design.md`).
 
 ## Goal
 
 Give org-os agents a **human-editable design canvas** for on-brand artifacts. Today an agent asked for a ReFi DAO social card writes a self-contained HTML file (`docs/brand/eval/out/02-growfi-social-card.html`); a human who wants to nudge the headline or move the Orb has to edit CSS. Paper closes that gap: the agent drafts the composition onto a canvas from the org's brand tokens, the human refines it by hand in Paper, and PNG/SVG/JSX exports flow back into the repo.
 
-The first step of that path — and the only part that must be deterministic — is getting the org's brand tokens *into* the Paper file so the agent never invents a colour. That is what the package does. Everything else is method (a skill) and record (docs, VERIFIED.md).
+The first step of that path — and the only part that must be deterministic — is getting the org's brand tokens _into_ the Paper file so the agent never invents a colour. That is what the package does. Everything else is method (a skill) and record (docs, VERIFIED.md).
 
 This resolves nothing in the interop surface matrix — Paper is a new row — and follows its principles: org-os stays the substrate, not the runtime; integrations are modules with honest maturity labels; the wrapper is one file deep.
 
 ## Decisions (locked)
 
-| Question | Decision |
-|---|---|
-| Paper's job in org-os | **Agent design canvas.** Agents draft DESIGN.md compositions onto a Paper canvas from brand tokens; a human refines by hand; exports flow back. (Over: token-sync-only — proves the bridge but never tests Paper as a design surface; design-asset home / Figma successor — touches council-level sharing policy, and Paper ships no shared libraries yet.) |
-| Shape | **Thin bridge + canvas skill** — module `org-os-paper`: `packages/paper-integration/` (client, doctor, push-tokens, lint-tokens, VERIFIED.md) + `skills/paper-design/` + `docs/integrations/paper.md`. Agents design via the MCP tools directly; the package wraps only health, token sync and token drift. (Over: skill-only — no doctor, no repeatable sync, no drift lint, nothing usable from Hermes/Berd, no contract with the live server; full design-ops lane — three unverified sub-systems on a 100-call budget.) |
-| Plan / account | **Free tier, personal account.** 100 metered calls/week is a hard design constraint: doctor spends zero, push spends ≤3, one artifact ≤25. Protocol-level calls (`initialize`, `tools/list`) are free. |
-| Prototype | **Tier-2 brief 02 — GrowFi onboarding social card** (`refi-dao-os/docs/brand/eval/02-growfi-social-card.md`). Fixed brief, existing HTML output to compare against, a social card is Paper's sweet spot. |
-| Token direction | **One way: brand.yaml → Paper.** `data/brand.yaml` `tokens:` stays the source of truth. Paper-side token edits are drift; `lint-tokens` catches them. No flow back. |
-| Token names | **Preserved verbatim** (`--refi-color-blue`), so `var(--refi-*)` on the canvas is byte-identical to brand.css usage and `get_jsx` output is a drop-in for the web side. |
-| MCP registration | **Instance-level opt-in** via a committed `.mcp.json` (`type: http`). The framework repo has no brand to design and gets no `.mcp.json`. Hosts beyond Claude Code get a documented snippet, marked unverified. |
-| Where scripts run | From org-os against a sibling instance via `--tokens <path>` (instance-doctor hub-mode precedent) — no instance can pull framework packages yet. |
-| Session lifecycle | **Not a session lane.** No `/initialize` or `/close` hook. A dead Paper can never fail a session. |
-| Version pin | Paper `0.5.6` / MCP `2025-03-26`, recorded in VERIFIED.md. Paper auto-updates; doctor warns on drift; the Buzz re-verification protocol applies on any bump. |
+| Question              | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paper's job in org-os | **Agent design canvas.** Agents draft DESIGN.md compositions onto a Paper canvas from brand tokens; a human refines by hand; exports flow back. (Over: token-sync-only — proves the bridge but never tests Paper as a design surface; design-asset home / Figma successor — touches council-level sharing policy, and Paper ships no shared libraries yet.)                                                                                                                                                                 |
+| Shape                 | **Thin bridge + canvas skill** — module `org-os-paper`: `packages/paper-integration/` (client, doctor, push-tokens, lint-tokens, VERIFIED.md) + `skills/paper-design/` + `docs/integrations/paper.md`. Agents design via the MCP tools directly; the package wraps only health, token sync and token drift. (Over: skill-only — no doctor, no repeatable sync, no drift lint, nothing usable from Hermes/Berd, no contract with the live server; full design-ops lane — three unverified sub-systems on a 100-call budget.) |
+| Plan / account        | **Free tier, personal account.** 100 metered calls/week is a hard design constraint: doctor spends zero, push spends ≤3, one artifact ≤25. Protocol-level calls (`initialize`, `tools/list`) are free.                                                                                                                                                                                                                                                                                                                      |
+| Prototype             | **Tier-2 brief 02 — GrowFi onboarding social card** (`refi-dao-os/docs/brand/eval/02-growfi-social-card.md`). Fixed brief, existing HTML output to compare against, a social card is Paper's sweet spot.                                                                                                                                                                                                                                                                                                                    |
+| Token direction       | **One way: brand.yaml → Paper.** `data/brand.yaml` `tokens:` stays the source of truth. Paper-side token edits are drift; `lint-tokens` catches them. No flow back.                                                                                                                                                                                                                                                                                                                                                         |
+| Token names           | **Preserved verbatim** (`--refi-color-blue`), so `var(--refi-*)` on the canvas is byte-identical to brand.css usage and `get_jsx` output is a drop-in for the web side.                                                                                                                                                                                                                                                                                                                                                     |
+| MCP registration      | **Instance-level opt-in** via a committed `.mcp.json` (`type: http`). The framework repo has no brand to design and gets no `.mcp.json`. Hosts beyond Claude Code get a documented snippet, marked unverified.                                                                                                                                                                                                                                                                                                              |
+| Where scripts run     | From org-os against a sibling instance via `--tokens <path>` (instance-doctor hub-mode precedent) — no instance can pull framework packages yet.                                                                                                                                                                                                                                                                                                                                                                            |
+| Session lifecycle     | **Not a session lane.** No `/initialize` or `/close` hook. A dead Paper can never fail a session.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Version pin           | Paper `0.5.6` / MCP `2025-03-26`, recorded in VERIFIED.md. Paper auto-updates; doctor warns on drift; the Buzz re-verification protocol applies on any bump.                                                                                                                                                                                                                                                                                                                                                                |
 
 ## Architecture
 
@@ -46,7 +46,7 @@ docs/MODULES.md + site mirror  catalog entry
                                 │
                                 │ JSON-RPC 2.0 over HTTP (POST), SSE-framed replies
                                 ▼
-                 Paper Desktop  ·  http://127.0.0.1:29979/mcp  ·  36 tools
+                 Paper Desktop  ·  http://127.0.0.1:29979/mcp  ·  34 tools
                  (tokens · artboards · write_html · export · comments)
 ```
 
@@ -76,7 +76,7 @@ Four checks, **zero metered calls**:
 1. `initialize` succeeds and `serverInfo.name === "paper-desktop"`.
 2. `serverInfo.version` equals the pin in VERIFIED.md → OK; newer → WARN (re-verify); older → WARN.
 3. `tools/list` contains the five tools the package depends on: `get_tokens`, `create_tokens`, `set_tokens`, `export`, `write_html`.
-4. A target file is configured: `--file <id>` or `PAPER_FILE_ID` in `.env`. (Whether that file is *open* is a metered question — `get_basic_info` — and is asked only with `--deep`.)
+4. A target file is configured: `--file <id>` or `PAPER_FILE_ID` in `.env`. (Whether that file is _open_ is a metered question — `get_basic_info` — and is asked only with `--deep`.)
 
 Exit 0 green, 2 not-ready, each failing check with a one-line fix ("open a file in Paper Desktop"; "set PAPER_FILE_ID"). Same contract as `buzz:doctor`.
 
@@ -126,16 +126,16 @@ Paper has **ten token types** — `breakpoint · color · container · fontFamil
 
 Type is inferred **by value first, family second**:
 
-| brand.yaml family (refi-dao-os) | Paper type | conversion |
-|---|---|---|
-| any hex / rgb / rgba / hsl value — `color-*`, `bg-*`, `text`, `text-muted/subtle/inverted`, `border-*`, `series-*` | `color` | as-is |
-| `text-xs` … `text-6xl` (rem) | `fontSize` | rem → px at 16 |
-| `text-hero` (`clamp(3rem, 8vw, 6rem)`) | `fontSize` | evaluated at `--canvas-width` (default 1080 → 86px), **flagged** |
-| `space-*` | `spacing` | rem → px |
-| `radius-*` | `radius` | to px; `9999px` kept |
-| `weight-*` | `fontWeight` | string → number |
-| `font-sans`, `font-display`, `font-mono` | `fontFamily` | **first family of the stack**; full stack in the token `description` |
-| `glow-*`, `glass-blur`, `glass-shadow` | — | **skipped and listed** — Paper has no shadow or blur token type |
+| brand.yaml family (refi-dao-os)                                                                                    | Paper type   | conversion                                                           |
+| ------------------------------------------------------------------------------------------------------------------ | ------------ | -------------------------------------------------------------------- |
+| any hex / rgb / rgba / hsl value — `color-*`, `bg-*`, `text`, `text-muted/subtle/inverted`, `border-*`, `series-*` | `color`      | as-is                                                                |
+| `text-xs` … `text-6xl` (rem)                                                                                       | `fontSize`   | rem → px at 16                                                       |
+| `text-hero` (`clamp(3rem, 8vw, 6rem)`)                                                                             | `fontSize`   | evaluated at `--canvas-width` (default 1080 → 86px), **flagged**     |
+| `space-*`                                                                                                          | `spacing`    | rem → px                                                             |
+| `radius-*`                                                                                                         | `radius`     | to px; `9999px` kept                                                 |
+| `weight-*`                                                                                                         | `fontWeight` | string → number                                                      |
+| `font-sans`, `font-display`, `font-mono`                                                                           | `fontFamily` | **first family of the stack**; full stack in the token `description` |
+| `glow-*`, `glass-blur`, `glass-shadow`                                                                             | —            | **skipped and listed** — Paper has no shadow or blur token type      |
 
 Every conversion is written into the token's `description` (e.g. `from 0.875rem · brand.yaml text-base`) so a designer sees provenance in Paper's Theme panel. Names are `--<prefix><name>` — `--refi-color-blue` — matching Paper's `^--[a-zA-Z0-9_-]+$`.
 
@@ -154,16 +154,16 @@ The mapper is a **pure function** `planTokens(brandYaml, { canvasWidth }) → { 
 
 **Steps and budget:**
 
-| step | metered calls |
-|---|---|
-| `paper:doctor` | 0 |
-| `paper:push-tokens --dry-run`, review, then the real push | 2–3 |
-| `paper:lint-tokens` — proves the round trip | 1 |
-| `get_basic_info` · `get_font_family_info(["Switzer"])` · `create_artboard` 1080×1350 | 3 |
-| `write_html`, one group each: ground glow · grain layer (inline SVG `feTurbulence`) · Orb (conic gradient + noise overlay) · inline logomark SVG · heading · caption | 6–8 |
-| two `get_screenshot`, up to two targeted `update_styles` | 4 |
-| `find_nodes` colour audit · `export` PNG 2x · `get_jsx` inline · `finish_working_on_nodes` | 4 |
-| **ceiling** | **30** |
+| step                                                                                                                                                                 | metered calls |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `paper:doctor`                                                                                                                                                       | 0             |
+| `paper:push-tokens --dry-run`, review, then the real push                                                                                                            | 2–3           |
+| `paper:lint-tokens` — proves the round trip                                                                                                                          | 1             |
+| `get_basic_info` · `get_font_family_info(["Switzer"])` · `create_artboard` 1080×1350                                                                                 | 3             |
+| `write_html`, one group each: ground glow · grain layer (inline SVG `feTurbulence`) · Orb (conic gradient + noise overlay) · inline logomark SVG · heading · caption | 6–8           |
+| two `get_screenshot`, up to two targeted `update_styles`                                                                                                             | 4             |
+| `find_nodes` colour audit · `export` PNG 2x · `get_jsx` inline · `finish_working_on_nodes`                                                                           | 4             |
+| **ceiling**                                                                                                                                                          | **30**        |
 
 **Outputs** → `refi-dao-os/docs/brand/eval/out/`: `02-growfi-social-card.paper.png` (the export), `02-growfi-social-card.paper.html` (the inline-style JSX wrapped so it opens in a browser), `PAPER-PROTOTYPE-2026-09-02.md` (calls used, what worked, gaps found, the verdicts it needs from the operator — same shape as `VERDICTS.md`).
 
@@ -174,7 +174,7 @@ The mapper is a **pure function** `planTokens(brandYaml, { canvasWidth }) → { 
 3. `paper:lint-tokens` passes after push and **fails** after one token is edited by hand in Paper (then restored).
 4. The `find_nodes` audit finds zero colours that do not resolve to a `--refi-*` token.
 5. The export shows visible grain — not flat Space (DESIGN.md §6: "Flat Space is wrong Space").
-6. The card passes the brief's *Must* / *Must not* lists and DESIGN.md's rejection patterns at operator review.
+6. The card passes the brief's _Must_ / _Must not_ lists and DESIGN.md's rejection patterns at operator review.
 7. Total metered calls for the whole prototype ≤ 30, recorded in the report.
 
 **→ `live`:** the operator hand-refines the card in Paper and leaves at least one comment thread; a later session lists it, addresses it, resolves it.
@@ -191,14 +191,18 @@ No credentials exist in this integration: the MCP server is unauthenticated and 
 `.mcp.json` (instance root, committed):
 
 ```json
-{ "mcpServers": { "paper": { "type": "http", "url": "http://127.0.0.1:29979/mcp" } } }
+{
+  "mcpServers": {
+    "paper": { "type": "http", "url": "http://127.0.0.1:29979/mcp" }
+  }
+}
 ```
 
 ## Error handling
 
-- **Paper not running / port closed.** Doctor exits 2: *open a file in Paper Desktop.* Push and lint exit 2 the same way — never a stack trace.
-- **Not a session lane.** Nothing in `/initialize` or `/close` depends on Paper; there is nothing to fail open *from*.
-- **Sticky-file trap.** Paper routes calls that omit `fileId` to the most recently opened file *in the session*. Each script is a fresh process, so every call passes `fileId` explicitly. Multiple open files stay safe; parallel agents stay safe.
+- **Paper not running / port closed.** Doctor exits 2: _open a file in Paper Desktop._ Push and lint exit 2 the same way — never a stack trace.
+- **Not a session lane.** Nothing in `/initialize` or `/close` depends on Paper; there is nothing to fail open _from_.
+- **Sticky-file trap.** Paper routes calls that omit `fileId` to the most recently opened file _in the session_. Each script is a fresh process, so every call passes `fileId` explicitly. Multiple open files stay safe; parallel agents stay safe.
 - **Duplicates.** Push diffs first and updates existing names with `set_tokens`; it never creates a second `--refi-color-blue`. Prune is opt-in and prefix-scoped.
 - **Unsupported and converted tokens.** Skips are listed in the output, never silent (the Buzz rule: never advance past what you couldn't parse). Conversions are recorded in the token description.
 - **Quota exhausted.** The client maps the server's refusal to `PaperError { code: "quota" }` and the script prints the weekly cap. The exact error shape is unobserved; the first sighting becomes a VERIFIED.md row.
@@ -249,4 +253,4 @@ Steps 1–3 land on org-os branch `luizfernando`; steps 4–6 land in refi-dao-o
 - **No credentials** — loopback, unauthenticated; `.env` holds a file id, not a secret.
 - **Licence** — Switzer files are installed locally, never committed or redistributed (ITF FFL; refi-dao-os `PROVENANCE.md` row "Switzer — licence").
 - **Vault safety** — refi-dao-os commits stage explicit paths only; no stash, clean, or reset; the pre-existing dirty tree (including a deleted governance onboarding doc) is another session's and is left alone.
-- **Framework thinking** — the package reads *any* brand.yaml-shaped token map with a prefix; nothing in it knows the ReFi palette. The per-org class table lives in the instance.
+- **Framework thinking** — the package reads _any_ brand.yaml-shaped token map with a prefix; nothing in it knows the ReFi palette. The per-org class table lives in the instance.

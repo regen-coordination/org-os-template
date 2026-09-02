@@ -2339,7 +2339,7 @@ import("./packages/paper-integration/lib/paper.mjs").then(async ({ createClient 
 });'
 ```
 
-Expected: 36 tools including the five in `REQUIRED_TOOLS`. Save the sorted list for VERIFIED.md.
+Expected: 34 tools including the five in `REQUIRED_TOOLS`. Save the sorted list for VERIFIED.md.
 
 - [ ] **Step 3: Dry-run the push (free), then push for real (2 calls)**
 
@@ -2415,7 +2415,7 @@ changes **only** to match a re-verified row — never to track documentation, ne
 | Endpoint        | `http://127.0.0.1:29979/mcp`, POST, `Accept: application/json, text/event-stream` | 2026-09-02                              |
 | Reply framing   | `text/event-stream`, one `event: message` + `data: <envelope>`                    | 2026-09-02                              |
 | Auth            | none (loopback)                                                                   | 2026-09-02                              |
-| Tools           | 36 (public docs page lists 24) — list below                                       | 2026-09-02                              |
+| Tools           | 34 (public docs page lists 24) — list below                                       | 2026-09-02                              |
 
 ## Observed facts
 
@@ -2441,7 +2441,7 @@ changes **only** to match a re-verified row — never to track documentation, ne
 
 Replace every `⟨fill⟩` with what you saw, including the exact error text for anything rejected.
 
-## Tool list (36, sorted)
+## Tool list (34, sorted)
 
 ⟨paste the sorted list from Step 2⟩
 
@@ -2610,7 +2610,7 @@ the codebase's conventions (for refi-dao-os: classes from `brand.css`, tokens fr
 
 **Status:** module #5 `org-os-paper`, catalogued **in-dev** — package and tests ship; live token round-trip verified 2026-09-02 against Paper 0.5.6 ([`packages/paper-integration/VERIFIED.md`](../../packages/paper-integration/VERIFIED.md)); the refi-dao-os prototype (brief 02) is the gate to `pilot`
 **Spec:** [`docs/superpowers/specs/2026-09-02-paper-integration-design.md`](../superpowers/specs/2026-09-02-paper-integration-design.md) · plan [`2026-09-02-paper-integration.md`](../superpowers/plans/2026-09-02-paper-integration.md)
-**Pin:** Paper Desktop `0.5.6` · MCP `2025-03-26` · `http://127.0.0.1:29979/mcp` (loopback, no auth, started by the app when a file is open) · 36 tools
+**Pin:** Paper Desktop `0.5.6` · MCP `2025-03-26` · `http://127.0.0.1:29979/mcp` (loopback, no auth, started by the app when a file is open) · 34 tools
 
 ## What Paper is
 
