@@ -52,6 +52,19 @@ export const EXCLUDE_FILES = new Set([
   "tests/clone-genesis.test.mjs",
   "tests/clone-framework.test.mjs",
   "tests/clone-framework-health.test.mjs",
+  // Guards modules/ — "Framework-side home of org-os modules" (modules/README.md);
+  // scripts/modules.mjs itself calls modules/*/module.yaml "framework registry
+  // source". No instance consumes it (no data/modules.yaml; the v5 module engine
+  // this feeds is framework-only, unbuilt Phase 1+ work). One of its manifests
+  // (org-os-berd) claims .agents/agents, which is itself framework operational
+  // content excluded above — meaningless to validate against a copy.
+  "tests/scripts/module-manifests.test.mjs",
+  // Exercises validate-identity.mjs's --target flag, added solely so the
+  // framework-only packages/instance-doctor (excluded above) can point the
+  // framework's validator at a sibling instance. One case also hardcodes a
+  // /org-os/ match against the no-arg (self-checkout) path — true only when
+  // the checkout being validated IS the framework.
+  "tests/scripts/validate-identity-target.test.mjs",
 ]);
 
 // Reset in stage 4 (so don't bother copying).

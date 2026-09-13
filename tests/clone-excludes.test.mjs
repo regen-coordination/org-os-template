@@ -41,6 +41,7 @@ test("framework-only files are excluded", () => {
     "PAPERCLIP_DEPLOYMENT_GUIDE.md", "RESEARCH_INTELLIGENCE_PLAN.md",
     "tests/clone-genesis.test.mjs", "tests/clone-framework.test.mjs",
     "tests/clone-framework-health.test.mjs", "MASTERPROMPT.md", "README.md",
+    "tests/scripts/module-manifests.test.mjs", "tests/scripts/validate-identity-target.test.mjs",
   ]) {
     assert.equal(excluded(f), true, `${f} should be excluded`);
   }

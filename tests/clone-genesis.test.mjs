@@ -74,6 +74,7 @@ const MUST_NOT_EXIST = [
   "tests/buzz-integration", "tests/paper-integration", "tests/instance-doctor",
   "tests/clone-genesis.test.mjs", "tests/clone-framework.test.mjs", "tests/clone-framework-health.test.mjs",
   "data/instances.yaml", "data/skills-matrix.yaml", "data/packages-matrix.yaml",
+  "tests/scripts/module-manifests.test.mjs", "tests/scripts/validate-identity-target.test.mjs",
 ];
 
 test("a fresh clone carries no framework operational content or secrets", () => {
@@ -182,5 +183,16 @@ test("command-skills (Hermes runtime surface) are repointed too, not just dotfil
       true,
       "expected at least one skills/commands/*/SKILL.md to contain docs/plans/ — proves the repoint rewrote content, not just that files are silent on the subject",
     );
+  });
+});
+
+test("the instance's own selftest passes on day one (after generate:schemas)", { timeout: 600_000 }, () => {
+  withClone((dir) => {
+    const gen = spawnSync("node", ["scripts/generate-all-schemas.mjs"], { cwd: dir, encoding: "utf-8", timeout: 120_000 });
+    assert.equal(gen.status, 0, `generate:schemas failed: ${gen.stderr}${gen.stdout}`);
+    const st = spawnSync("node", ["scripts/selftest.mjs"], { cwd: dir, encoding: "utf-8", timeout: 540_000 });
+    assert.equal(st.status, 0, `selftest failed inside the clone:\n${st.stdout}\n${st.stderr}`);
+    assert.match(st.stdout, /analyze:instances\s+SKIP/);
+    assert.match(st.stdout, /berd skills mirror in sync\s+SKIP/);
   });
 });

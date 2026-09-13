@@ -34,6 +34,20 @@ const skips = skipArg ? skipArg.split(",") : [];
 
 const results = []; // { name, status: 'PASS'|'FAIL'|'WARN'|'SKIP', detail }
 
+// Inside a generated instance the framework's own registries are absent by
+// design (clone-framework strips them). The checks that read them are
+// framework checks, not instance checks — report them as skipped there
+// rather than failing a brand-new instance on day one.
+const isFramework = existsSync(path.join(rootDir, "data", "instances.yaml"));
+function frameworkOnly(name, marker, fn) {
+  if (isFramework) return fn();
+  results.push({
+    name,
+    status: "SKIP",
+    detail: `framework-only (no ${marker})`,
+  });
+}
+
 function run(name, cmd, args, { optional = false, skipKey = null } = {}) {
   if (skipKey && skips.includes(skipKey)) {
     results.push({ name, status: "SKIP", detail: `--skip ${skipKey}` });
@@ -92,7 +106,9 @@ run("validate:structure", "node", ["scripts/validate-structure.mjs"]);
 run("validate:schemas", "node", ["scripts/validate-identity.mjs"], {
   optional: true,
 });
-run("analyze:instances", "node", ["scripts/analyze-instances.mjs"]);
+frameworkOnly("analyze:instances", "data/instances.yaml", () =>
+  run("analyze:instances", "node", ["scripts/analyze-instances.mjs"]),
+);
 
 // Optional advisory checks
 run("check:divergence", "node", ["scripts/check-divergence.mjs"], {
@@ -100,14 +116,16 @@ run("check:divergence", "node", ["scripts/check-divergence.mjs"], {
   skipKey: "divergence",
 });
 
-run(
-  "berd skills mirror in sync",
-  "node",
-  ["scripts/sync-skills-berd.mjs", "--check"],
-  {
-    optional: true,
-    skipKey: "berd",
-  },
+frameworkOnly("berd skills mirror in sync", "data/skills-matrix.yaml", () =>
+  run(
+    "berd skills mirror in sync",
+    "node",
+    ["scripts/sync-skills-berd.mjs", "--check"],
+    {
+      optional: true,
+      skipKey: "berd",
+    },
+  ),
 );
 
 // Optional capability checks (introduced by later phases)
