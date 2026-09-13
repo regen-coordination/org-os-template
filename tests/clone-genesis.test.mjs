@@ -77,3 +77,45 @@ test("governance.yaml starts with no framework decisions", () => {
     assert.deepEqual(gov.governance.elections, []);
   });
 });
+
+test("the instance gets its own planning structure", () => {
+  withClone((dir) => {
+    for (const p of [
+      "docs/plans/QUEUE.md", "docs/plans/.gitkeep",
+      "docs/superpowers/specs/.gitkeep", "docs/superpowers/plans/.gitkeep",
+      "docs/superpowers/research/.gitkeep", "memory/.gitkeep", "DECISIONS.md",
+    ]) {
+      assert.equal(existsSync(path.join(dir, p)), true, `${p} must exist`);
+    }
+    const queue = readFileSync(path.join(dir, "docs", "plans", "QUEUE.md"), "utf-8");
+    assert.match(queue, /^# Plan Queue — test-instance-os/);
+    const decisions = readFileSync(path.join(dir, "DECISIONS.md"), "utf-8");
+    assert.match(decisions, /test-instance-os/);
+    assert.doesNotMatch(decisions, /Buzz lane|org-os framework version/i, "framework decisions leaked");
+    const gitignore = readFileSync(path.join(dir, ".gitignore"), "utf-8");
+    assert.match(gitignore, /^docs\/temp\/$/m);
+  });
+});
+
+test("commands point at the instance's plan queue, never the framework's", () => {
+  withClone((dir) => {
+    const offenders = [];
+    const scan = (abs, rel) => {
+      if (!existsSync(abs)) return;
+      for (const entry of readdirSync(abs, { withFileTypes: true })) {
+        const p = path.join(abs, entry.name);
+        const r = path.posix.join(rel, entry.name);
+        if (entry.isDirectory()) scan(p, r);
+        else if (entry.name.endsWith(".md") && readFileSync(p, "utf-8").includes("docs/agent-plans/")) offenders.push(r);
+      }
+    };
+    for (const d of [".claude/commands", ".cursor/commands", ".opencode/commands", "skills/commands"]) {
+      scan(path.join(dir, d), d);
+    }
+    assert.deepEqual(offenders, [], "these command files still reference docs/agent-plans/");
+    assert.match(
+      readFileSync(path.join(dir, ".claude", "commands", "close.md"), "utf-8"),
+      /docs\/plans\/QUEUE\.md/,
+    );
+  });
+});
