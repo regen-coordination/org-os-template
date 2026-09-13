@@ -20,6 +20,22 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const cloneScript = path.join(rootDir, "scripts", "clone-framework.mjs");
 const configPath = path.join(rootDir, "tests", "fixtures", "instance-config.yaml");
 
+/**
+ * Env for nested spawns, minus node:test's own control variables.
+ *
+ * `node --test` sets NODE_TEST_CONTEXT / NODE_TEST_WORKER_ID in its process
+ * env, and spawnSync inherits the parent env by default. A nested `node --test`
+ * that finds them set behaves as a serialized worker of the outer run and
+ * returns exit 0 even when its tests fail — verified directly: a failing test
+ * file exits 1 normally, and 0 under NODE_TEST_CONTEXT=child-v8. Without this
+ * scrub the clone's own `node --test tests/` line inside selftest.mjs is blind,
+ * and this test passes vacuously on a broken instance.
+ */
+function nestedEnv() {
+  const { NODE_TEST_CONTEXT, NODE_TEST_WORKER_ID, ...rest } = process.env;
+  return rest;
+}
+
 /** Clone into a temp dir (no git — nothing here needs a repo) and hand the path to fn. */
 function withClone(fn) {
   const dst = mkdtempSync(path.join(tmpdir(), "clone-genesis-"));
@@ -28,6 +44,7 @@ function withClone(fn) {
     const r = spawnSync("node", [cloneScript, "--target", dst, "--config", configPath, "--no-git"], {
       encoding: "utf-8",
       timeout: 120_000,
+      env: nestedEnv(),
     });
     assert.equal(r.status, 0, `clone failed: ${r.stderr}${r.stdout}`);
     // Reuse the framework's installed deps so the clone's own scripts can run
@@ -56,6 +73,7 @@ function withCloneConfig(configObject, fn) {
     const r = spawnSync("node", [cloneScript, "--target", dst, "--config", tmpConfigPath, "--no-git"], {
       encoding: "utf-8",
       timeout: 120_000,
+      env: nestedEnv(),
     });
     assert.equal(r.status, 0, `clone failed: ${r.stderr}${r.stdout}`);
     symlinkSync(path.join(rootDir, "node_modules"), path.join(dst, "node_modules"), "dir");
@@ -188,11 +206,39 @@ test("command-skills (Hermes runtime surface) are repointed too, not just dotfil
 
 test("the instance's own selftest passes on day one (after generate:schemas)", { timeout: 600_000 }, () => {
   withClone((dir) => {
-    const gen = spawnSync("node", ["scripts/generate-all-schemas.mjs"], { cwd: dir, encoding: "utf-8", timeout: 120_000 });
+    const gen = spawnSync("node", ["scripts/generate-all-schemas.mjs"], { cwd: dir, encoding: "utf-8", timeout: 120_000, env: nestedEnv() });
     assert.equal(gen.status, 0, `generate:schemas failed: ${gen.stderr}${gen.stdout}`);
-    const st = spawnSync("node", ["scripts/selftest.mjs"], { cwd: dir, encoding: "utf-8", timeout: 540_000 });
+    const st = spawnSync("node", ["scripts/selftest.mjs"], { cwd: dir, encoding: "utf-8", timeout: 540_000, env: nestedEnv() });
     assert.equal(st.status, 0, `selftest failed inside the clone:\n${st.stdout}\n${st.stderr}`);
     assert.match(st.stdout, /analyze:instances\s+SKIP/);
     assert.match(st.stdout, /berd skills mirror in sync\s+SKIP/);
+  });
+});
+
+test("symbient's coupled script + tests travel only when the symbient skill is selected", () => {
+  const fixtureConfig = yaml.load(readFileSync(configPath, "utf-8"));
+  const COUPLED = [
+    "scripts/symbient-hatch.mjs",
+    "scripts/lib/symbient-gates.mjs",
+    "tests/symbient-hatch.test.mjs",
+    "tests/symbient-gates.test.mjs",
+  ];
+
+  // Direction 1: the shared fixture does not list `symbient` — none of the
+  // coupled artifacts, nor skills/symbient/ itself, should exist.
+  withClone((dir) => {
+    assert.equal(existsSync(path.join(dir, "skills", "symbient")), false, "skills/symbient/ must not exist when symbient is not selected");
+    for (const rel of COUPLED) {
+      assert.equal(existsSync(path.join(dir, rel)), false, `${rel} must not exist when symbient is not selected`);
+    }
+  });
+
+  // Direction 2: a config that DOES select `symbient` must still receive the
+  // skill's own template content and the coupled script — proving the
+  // removal above is conditional, not an unconditional drop.
+  const withSymbient = { ...fixtureConfig, skills: [...fixtureConfig.skills, "symbient"] };
+  withCloneConfig(withSymbient, (dir) => {
+    assert.equal(existsSync(path.join(dir, "skills", "symbient", "SEED.template.md")), true, "skills/symbient/SEED.template.md must exist when symbient is selected");
+    assert.equal(existsSync(path.join(dir, "scripts", "symbient-hatch.mjs")), true, "scripts/symbient-hatch.mjs must exist when symbient is selected");
   });
 });

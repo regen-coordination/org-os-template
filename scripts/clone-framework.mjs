@@ -216,6 +216,19 @@ if (!dry) {
 }
 
 // Skills: filter skills/<id>/ to only those in config.skills (if specified)
+// Some skills ship machinery outside skills/<name>/ that hard-depends on the
+// skill's own files. scripts/symbient-hatch.mjs reads
+// skills/symbient/SEED.template.md unconditionally, so an instance that did
+// not select `symbient` shipped a script that crashes with ENOENT on first use
+// and a test suite that failed 10 subtests from the day it was generated.
+const SKILL_COUPLED_ARTIFACTS = {
+  symbient: [
+    "scripts/symbient-hatch.mjs",
+    "scripts/lib/symbient-gates.mjs",
+    "tests/symbient-hatch.test.mjs",
+    "tests/symbient-gates.test.mjs",
+  ],
+};
 if (Array.isArray(config.skills) && config.skills.length > 0) {
   const enabledSkills = new Set(config.skills);
   log("stage 5", `materializing skills (${config.skills.length} enabled)`);
@@ -227,6 +240,15 @@ if (Array.isArray(config.skills) && config.skills.length > 0) {
         if (!enabledSkills.has(entry.name)) {
           rmSync(path.join(targetSkillsDir, entry.name), { recursive: true, force: true });
         }
+      }
+    }
+    // A skill that was not materialized above takes its coupled artifacts
+    // with it — before stage 6d, so a matching npm script entry (none exist
+    // for symbient today) would be cleaned up there for free.
+    for (const [skill, artifacts] of Object.entries(SKILL_COUPLED_ARTIFACTS)) {
+      if (enabledSkills.has(skill)) continue;
+      for (const rel of artifacts) {
+        rmSync(path.join(target, rel), { recursive: true, force: true });
       }
     }
   }

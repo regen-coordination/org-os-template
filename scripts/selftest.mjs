@@ -34,6 +34,22 @@ const skips = skipArg ? skipArg.split(",") : [];
 
 const results = []; // { name, status: 'PASS'|'FAIL'|'WARN'|'SKIP', detail }
 
+/**
+ * Env for spawned checks, minus node:test's own control variables.
+ *
+ * `node --test` sets NODE_TEST_CONTEXT / NODE_TEST_WORKER_ID in its process
+ * env, and spawnSync inherits the parent env by default. If selftest.mjs is
+ * itself invoked as a child of a `node --test` run (e.g. from
+ * tests/clone-genesis.test.mjs), the "node --test tests/" check below would
+ * inherit them and — verified directly — report exit 0 regardless of real
+ * failures inside. Scrubbing here protects real operators too, not just that
+ * one test.
+ */
+function childEnv() {
+  const { NODE_TEST_CONTEXT, NODE_TEST_WORKER_ID, ...rest } = process.env;
+  return rest;
+}
+
 // Inside a generated instance the framework's own registries are absent by
 // design (clone-framework strips them). The checks that read them are
 // framework checks, not instance checks — report them as skipped there
@@ -76,6 +92,7 @@ function run(name, cmd, args, { optional = false, skipKey = null } = {}) {
     cwd: rootDir,
     encoding: "utf-8",
     stdio: verbose ? "inherit" : "pipe",
+    env: childEnv(),
   });
 
   if (result.error) {
