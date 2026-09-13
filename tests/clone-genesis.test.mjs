@@ -93,6 +93,8 @@ const MUST_NOT_EXIST = [
   "tests/clone-genesis.test.mjs", "tests/clone-framework.test.mjs", "tests/clone-framework-health.test.mjs",
   "data/instances.yaml", "data/skills-matrix.yaml", "data/packages-matrix.yaml",
   "tests/scripts/module-manifests.test.mjs", "tests/scripts/validate-identity-target.test.mjs",
+  "site",
+  ".github/workflows/deploy-pages.yml", ".github/workflows/drift.yml", ".github/workflows/validate.yml",
 ];
 
 test("a fresh clone carries no framework operational content or secrets", () => {

@@ -28,7 +28,7 @@ test("the framework's session log stays with the framework; the memory/ dir itse
 test("framework operational content dirs are excluded", () => {
   for (const d of [
     "graphify-out", "renders", "docs/agent-plans", "docs/superpowers",
-    ".superpowers", ".agents", "data/federation/frontier",
+    ".superpowers", ".agents", "data/federation/frontier", "site",
     "tests/buzz-integration", "tests/paper-integration", "tests/instance-doctor",
   ]) {
     assert.equal(excluded(d, true), true, `${d} should be excluded`);
@@ -42,9 +42,14 @@ test("framework-only files are excluded", () => {
     "tests/clone-genesis.test.mjs", "tests/clone-framework.test.mjs",
     "tests/clone-framework-health.test.mjs", "MASTERPROMPT.md", "README.md",
     "tests/scripts/module-manifests.test.mjs", "tests/scripts/validate-identity-target.test.mjs",
+    ".github/workflows/deploy-pages.yml", ".github/workflows/drift.yml", ".github/workflows/validate.yml",
   ]) {
     assert.equal(excluded(f), true, `${f} should be excluded`);
   }
+});
+
+test("generic CI workflow is NOT excluded", () => {
+  assert.equal(excluded(".github/workflows/generate-schemas.yml"), false);
 });
 
 test("instance machinery and structure are NOT excluded", () => {
@@ -67,6 +72,11 @@ test("framework-content excludes are root-anchored, not basename matches at any 
   assert.equal(excluded("renders", true), true);
   assert.equal(excluded("graphify-out", true), true);
   assert.equal(excluded(".agents", true), true);
+});
+
+test("site/ exclusion is root-anchored: the framework's own root site/ is excluded, an instance's nested site/ is not", () => {
+  assert.equal(excluded("site", true), true);
+  assert.equal(excluded("packages/operations/site", true), false);
 });
 
 test("git, deps, worktrees and .DS_Store are excluded at ANY depth", () => {

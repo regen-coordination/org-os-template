@@ -35,6 +35,17 @@ export const EXCLUDE_DIRS = new Set([
   "tests/buzz-integration",
   "tests/paper-integration",
   "tests/instance-doctor",
+  // The framework's own project website — package name "org-os-site",
+  // "Framework website + docs + live federation", an Astro app that deploys
+  // to regen-coordination.github.io/org-os-template (.github/workflows/deploy-pages.yml,
+  // excluded below). Found 2026-09-13 during the luizfernando genesis: it
+  // collided with that instance's OWN root-level site/ (a vendored Quartz
+  // publishing pipeline, ported by hand from the 2026-07-26 scaffold), which
+  // had to be deleted and re-ported around the leak. Root-anchored (EXCLUDE_DIRS,
+  // not EXCLUDE_ANYWHERE) on purpose: an instance's own nested `site` directory
+  // — or its own root `site/`, as here — is legitimate instance content, only
+  // the framework's root `site/` is not.
+  "site",
 ]);
 
 export const EXCLUDE_FILES = new Set([
@@ -65,6 +76,26 @@ export const EXCLUDE_FILES = new Set([
   // /org-os/ match against the no-arg (self-checkout) path — true only when
   // the checkout being validated IS the framework.
   "tests/scripts/validate-identity-target.test.mjs",
+  // .github/workflows/ triaged file-by-file 2026-09-13 (fix round 1, Task 7):
+  // framework-project workflows excluded by full path; generic CI stays.
+  // - deploy-pages.yml: builds and deploys the framework's own site/ (Astro,
+  //   excluded above) to regen-coordination.github.io/org-os-template; also
+  //   installs packages/org-os-federation-map and packages/admin, neither of
+  //   which an instance receives (stage 5 keeps only packages/operations).
+  //   Excluding site/ without excluding this workflow would leave a workflow
+  //   that fails on every push — not an argument for keeping it.
+  // - drift.yml: runs `npm run analyze:instances` against data/instances.yaml,
+  //   which no instance has (Task 4) — the framework's own federation-drift
+  //   monitor, meaningless pointed at a single instance.
+  // - validate.yml: same analyze:instances step, plus installs for
+  //   packages/admin and packages/org-os-federation-map (neither present in
+  //   an instance) and a site/ Astro build. Framework-only as a whole.
+  // - generate-schemas.yml KEPT: runs only `npm run generate:schemas` against
+  //   this instance's own data/*.yaml — generic CI any instance would want,
+  //   no framework-only reference.
+  ".github/workflows/deploy-pages.yml",
+  ".github/workflows/drift.yml",
+  ".github/workflows/validate.yml",
 ]);
 
 // Reset in stage 4 (so don't bother copying).
