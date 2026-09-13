@@ -56,3 +56,21 @@ test("instance machinery and structure are NOT excluded", () => {
     assert.equal(excluded(p, p === "docs/plans"), false, `${p} must be copied`);
   }
 });
+
+test("framework-content excludes are root-anchored, not basename matches at any depth", () => {
+  // A nested directory that merely shares a name with a framework dir is instance content.
+  assert.equal(excluded("skills/renders", true), false);
+  assert.equal(excluded("packages/operations/graphify-out", true), false);
+  assert.equal(excluded("docs/.agents", true), false);
+  // …while the framework's own root-level ones still go.
+  assert.equal(excluded("renders", true), true);
+  assert.equal(excluded("graphify-out", true), true);
+  assert.equal(excluded(".agents", true), true);
+});
+
+test("git, deps, worktrees and .DS_Store are excluded at ANY depth", () => {
+  assert.equal(excluded("site/node_modules", true), true);
+  assert.equal(excluded("packages/operations/.git", true), true);
+  assert.equal(excluded("content/work/.DS_Store"), true);
+  assert.equal(excluded(".claude/worktrees", true), true);
+});

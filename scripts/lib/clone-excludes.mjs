@@ -9,14 +9,18 @@
 // these rules carried 10 framework memory days, a 7.7 MB graph, 284 tracked
 // framework files and a copy of the framework's .env with live keys. The
 // 2026-07-26 luizfernando scaffold stripped the same leakage by hand in three
-// commits (ff61a69, 28fa4ba, ff24018); this module makes it structural.
+// commits in the luizfernando instance repo (03 Libraries/luizfernando: ff61a69,
+// 28fa4ba, ff24018); this module makes it structural.
 //
 // Kept separate from clone-framework.mjs so the rules are unit-testable
 // without running a clone.
 
+export const EXCLUDE_ANYWHERE = new Set([
+  // git + deps + worktrees + host-local config — matched at ANY depth
+  ".git", "node_modules", ".worktrees", ".claude/worktrees", ".DS_Store",
+]);
+
 export const EXCLUDE_DIRS = new Set([
-  // git + deps + worktrees + host-local config
-  ".git", "node_modules", ".worktrees", ".claude/worktrees", ".hermes",
   // framework operational content (its own history, not a template)
   "memory/reports",
   "graphify-out",
@@ -25,6 +29,7 @@ export const EXCLUDE_DIRS = new Set([
   "docs/superpowers",
   ".superpowers",
   ".agents",
+  ".hermes",
   "data/federation/frontier",
   // framework-only test suites — need framework env/fixtures, meaningless in an instance
   "tests/buzz-integration",
@@ -38,7 +43,6 @@ export const EXCLUDE_FILES = new Set([
   "README.md", // rendered fresh in stage 7
   "MASTERPROMPT.md", // framework-only
   ".buzz-state.json", // Buzz lane read-marker — machine-local state
-  ".DS_Store",
   "data/knowledge-gaps.yaml", // the framework's own graph gaps
   "PAPERCLIP_DEPLOYMENT_GUIDE.md", // another project's strategy material
   "RESEARCH_INTELLIGENCE_PLAN.md",
@@ -61,8 +65,11 @@ export const PLACEHOLDER_FILES = new Set([
  * @param {boolean} isDir
  */
 export function isExcluded(rel, name, isDir) {
-  if (EXCLUDE_DIRS.has(rel) || EXCLUDE_DIRS.has(name)) return true;
-  if (EXCLUDE_FILES.has(rel) || EXCLUDE_FILES.has(name)) return true;
+  // git, deps, worktrees, .DS_Store: excluded at any depth.
+  if (EXCLUDE_ANYWHERE.has(rel) || EXCLUDE_ANYWHERE.has(name)) return true;
+  // Framework dirs and files: root-anchored only.
+  if (EXCLUDE_DIRS.has(rel)) return true;
+  if (EXCLUDE_FILES.has(rel)) return true;
   if (PLACEHOLDER_FILES.has(rel)) return true;
   // Secrets never travel: .env and every .env.* variant except the example.
   if (!isDir && /^\.env(\..+)?$/.test(name) && name !== ".env.example") return true;
