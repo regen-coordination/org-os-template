@@ -23,9 +23,14 @@ identity:
 
   type:
     type: string
-    enum: ["DAO", "Cooperative", "Foundation", "Project", "LocalNode", "RegionalNode", "Hub", "Network", "Other"]
+    enum: ["DAO", "Cooperative", "Foundation", "Project", "LocalNode", "PersonalNode", "RegionalNode", "Hub", "Network", "Other"]
     description: "Organization/node type"
     required: true
+
+  scope:
+    type: string
+    description: "Optional qualifier for what this node is within its type (e.g. 'operational-unit', 'bioregion', 'program'). Free-form; not enumerated."
+    required: false
 
   emoji:
     type: string
@@ -60,35 +65,6 @@ identity:
     example: "https://org.example.com/.well-known/dao.json"
     required: true
   
-  type:
-    type: string
-    enum: ["Organization", "DAO", "Cooperative", "Project", "Foundation", "Other"]
-    description: "Type of organization"
-    default: "Organization"
-    required: true
-  
-  name:
-    type: string
-    description: "Organization name"
-    required: true
-  
-  onchain_registration:
-    enabled:
-      type: boolean
-      description: "Whether organization is registered on-chain"
-      default: false
-    
-    chain:
-      type: string
-      description: "Blockchain network (e.g., 'eip155:1' for Ethereum mainnet)"
-      required: false
-    
-    contract_address:
-      type: string
-      description: "EIP-4824 registration contract address"
-      format: address
-      required: false
-
 # ── Network Membership (NEW in v3.0) ─────────────────────────────────────────
 network:
   type: string

@@ -48,7 +48,7 @@ identity:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Human-readable organization name |
-| `type` | enum | yes | One of: `DAO`, `Cooperative`, `Foundation`, `Project`, `LocalNode`, `Hub` |
+| `type` | enum | yes | One of: `DAO`, `Cooperative`, `Foundation`, `Project`, `LocalNode`, `PersonalNode`, `RegionalNode`, `Hub`, `Network`, `Other` |
 | `emoji` | string | no | Visual identifier for dashboards and canvas layouts |
 | `daoURI` | URL | recommended | Points to the EIP-4824 `dao.json` in `.well-known/` |
 | `chain` | CAIP-2 | no | Primary chain identifier (e.g., `eip155:1` for Ethereum mainnet, `eip155:42220` for Celo) |
@@ -56,8 +56,9 @@ identity:
 | `hats` | integer | no | Hats Protocol tree ID for role management |
 | `gardens` | string | no | Gardens DAO contract address or status |
 | `onchain_registration` | object | no | On-chain org registration (chain, contract address, enabled flag) |
+| `scope` | string | no | Optional qualifier for what this node is within its type (e.g., `operational-unit`, `bioregion`, `program`) |
 
-The `type` field determines how other nodes interpret this instance. A `Hub` aggregates peers. A `LocalNode` operates within a geographic scope. A `DAO` or `Cooperative` has governance on-chain. A `Project` is a focused initiative. A `Foundation` is a supporting entity.
+The `type` field determines how other nodes interpret this instance. A `Hub` aggregates peers. A `LocalNode` operates within a geographic scope. A `PersonalNode` is a single person's own instance: their practice, portfolio, or garden, federating as a peer rather than representing a collective. A `DAO` or `Cooperative` has governance on-chain. A `Project` is a focused initiative. A `Foundation` is a supporting entity.
 
 ---
 
