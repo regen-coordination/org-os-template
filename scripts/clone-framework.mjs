@@ -30,6 +30,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { render } from "../templates/render.mjs";
+import { isExcluded } from "./lib/clone-excludes.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,29 +85,15 @@ if (existsSync(target)) {
 }
 
 // === Stage 2: copy framework, exclude framework-only state ===
-
-const EXCLUDE_DIRS = new Set([
-  ".git", "node_modules", ".worktrees", ".claude/worktrees",
-  "memory/reports", // framework-only drift reports
-  ".hermes", // host-specific local config
-]);
-const EXCLUDE_FILES = new Set([
-  ".gitignore.test", ".claude/scheduled_tasks.lock",
-  "README.md", // rendered fresh in stage 7
-  "MASTERPROMPT.md", // framework-only
-]);
-// Files that get reset in stage 4 (so don't bother copying)
-const PLACEHOLDER_FILES = new Set([
-  "MEMORY.md", "HEARTBEAT.md", "IDENTITY.md", "MASTERPLAN.md",
-]);
-
+//
+// The rules live in scripts/lib/clone-excludes.mjs (unit-tested there).
+// Everything the framework holds as its OWN operational content — session
+// log, plans, graph, secrets — is skipped by construction.
 function copyTree(src, dst, relPath = "") {
   if (!dry && !existsSync(dst)) mkdirSync(dst, { recursive: true });
   for (const entry of readdirSync(src, { withFileTypes: true })) {
     const rel = path.posix.join(relPath, entry.name);
-    if (EXCLUDE_DIRS.has(rel) || EXCLUDE_DIRS.has(entry.name)) continue;
-    if (EXCLUDE_FILES.has(rel) || EXCLUDE_FILES.has(entry.name)) continue;
-    if (PLACEHOLDER_FILES.has(rel)) continue;
+    if (isExcluded(rel, entry.name, entry.isDirectory())) continue;
 
     const s = path.join(src, entry.name);
     const d = path.join(dst, entry.name);
@@ -128,7 +115,6 @@ const STRIP_FILES = [
   "data/skills-matrix.yaml",
   "data/packages-matrix.yaml",
   "SKILLS.md", // regenerated per instance
-  "memory/2026-04-24.md", // framework bootstrap memory
   // The framework's own CHANGELOG is its release history, not the instance's.
   // Leaving it made every new instance claim the framework's version as its
   // own most-recent release — one of the contradicting version surfaces the
@@ -192,6 +178,7 @@ const registryResets = {
   "data/ideas.yaml": `schema_version: "2.0"\n\nideas: []\n`,
   "data/relationships.yaml": `schema_version: "2.0"\n\nrelationships: []\n`,
   "data/ecosystems.yaml": `ecosystems: []\n`,
+  "data/governance.yaml": `schema_version: "2.0"\n\n# Governance Registry — ${config.org.name}\n# Decisions are recorded in DECISIONS.md; ratified ones that need a machine-readable\n# record (EIP-4824 proposals) are mirrored here.\n\ngovernance:\n  model: "solo-maintainer"     # solo-maintainer | steward-council | multisig | assembly | conviction\n  current_phase: "bootstrap"   # bootstrap | transition | active | sunset\n  infrastructure:\n    safe: null\n    hats_tree: null\n    gardens: null\n    snapshot: null\n  decisions: []\n  elections: []\n`,
   "SOUL.md": `# SOUL.md — Who We Are\n\n_This file defines the character, values, and voice of ${config.org.name}. It grounds the agent in the org's shared identity._\n\n---\n\n## Mission\n\n${config.org.short_description || "TODO: what this organization exists to do."}\n\n## Values\n\n- TODO\n\n## Voice\n\n- TODO\n\n_Seeded by clone-framework on ${today}; the bootstrap-interviewer pass (BOOTSTRAP.md Phase 1) gives this substance._\n`,
   "USER.md": `# USER.md — About Your Operator\n\n_The person you're helping. Update as preferences surface through working together._\n\n---\n\n- **Name:** ${operatorName}\n${config.operator?.email ? `- **Email:** ${config.operator.email}\n` : ""}- **Role:** Operator\n\n_Seeded by clone-framework on ${today}._\n`,
   "TOOLS.md": `# TOOLS.md — Local Tool Notes\n\n_Skills define how tools work. This file is for your specifics — the setup unique to this node. Never put credentials here — reference where they're stored._\n\n---\n\n## API Endpoints\n\n_(none configured yet)_\n\n## Channels\n\n_(none configured yet)_\n`,
@@ -205,6 +192,11 @@ if (!dry) {
   // The frontier cache is the FRAMEWORK's view of its peers, not the instance's.
   const frontier = path.join(target, "data", "federation", "frontier");
   if (existsSync(frontier)) rmSync(frontier, { recursive: true, force: true });
+  // Stage 2 skips every file inside memory/ (the framework's own session log),
+  // so the directory itself only exists if copyTree happened to recurse into
+  // it. Guarantee it here; the .gitkeep comes in Task 3.
+  mkdirSync(path.join(target, "memory"), { recursive: true });
+  writeFileSync(path.join(target, "memory", ".gitkeep"), "");
 }
 
 // === Stage 5: materialize packages + skills per config ===
