@@ -8,7 +8,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  mkdtempSync, existsSync, readdirSync, readFileSync, rmSync, symlinkSync,
+  mkdtempSync, existsSync, readdirSync, readFileSync, writeFileSync, rmSync, symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -36,6 +36,33 @@ function withClone(fn) {
     return fn(dst);
   } finally {
     rmSync(dst, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Clone with a caller-supplied config object (written out as YAML to a temp
+ * file) instead of the shared fixture. Use this when a test needs to vary
+ * the skills/packages list — tests/clone-framework.test.mjs and
+ * clone-framework-health.test.mjs both consume the shared fixture directly,
+ * so mutating it would shift their expectations too.
+ */
+function withCloneConfig(configObject, fn) {
+  const dst = mkdtempSync(path.join(tmpdir(), "clone-genesis-"));
+  rmSync(dst, { recursive: true, force: true }); // clone-framework wants to create it
+  const tmpConfigDir = mkdtempSync(path.join(tmpdir(), "clone-genesis-config-"));
+  const tmpConfigPath = path.join(tmpConfigDir, "instance-config.yaml");
+  try {
+    writeFileSync(tmpConfigPath, yaml.dump(configObject));
+    const r = spawnSync("node", [cloneScript, "--target", dst, "--config", tmpConfigPath, "--no-git"], {
+      encoding: "utf-8",
+      timeout: 120_000,
+    });
+    assert.equal(r.status, 0, `clone failed: ${r.stderr}${r.stdout}`);
+    symlinkSync(path.join(rootDir, "node_modules"), path.join(dst, "node_modules"), "dir");
+    return fn(dst);
+  } finally {
+    rmSync(dst, { recursive: true, force: true });
+    rmSync(tmpConfigDir, { recursive: true, force: true });
   }
 }
 
@@ -116,6 +143,44 @@ test("commands point at the instance's plan queue, never the framework's", () =>
     assert.match(
       readFileSync(path.join(dir, ".claude", "commands", "close.md"), "utf-8"),
       /docs\/plans\/QUEUE\.md/,
+    );
+  });
+});
+
+test("command-skills (Hermes runtime surface) are repointed too, not just dotfile commands", () => {
+  const fixtureConfig = yaml.load(readFileSync(configPath, "utf-8"));
+  const config = {
+    ...fixtureConfig,
+    skills: [...fixtureConfig.skills, "commands"],
+  };
+  withCloneConfig(config, (dir) => {
+    const commandsDir = path.join(dir, "skills", "commands");
+    assert.equal(existsSync(commandsDir), true, "skills/commands/ must exist when the commands skill is enabled");
+
+    const skillFiles = [];
+    const walk = (abs, rel) => {
+      for (const entry of readdirSync(abs, { withFileTypes: true })) {
+        const p = path.join(abs, entry.name);
+        const r = path.posix.join(rel, entry.name);
+        if (entry.isDirectory()) walk(p, r);
+        else if (entry.name === "SKILL.md") skillFiles.push(r);
+      }
+    };
+    walk(commandsDir, "skills/commands");
+    assert.ok(skillFiles.length > 0, "expected at least one skills/commands/*/SKILL.md — test would be vacuous otherwise");
+
+    const offenders = [];
+    let repointedSomewhere = false;
+    for (const rel of skillFiles) {
+      const body = readFileSync(path.join(dir, rel), "utf-8");
+      if (body.includes("docs/agent-plans/")) offenders.push(rel);
+      if (body.includes("docs/plans/")) repointedSomewhere = true;
+    }
+    assert.deepEqual(offenders, [], "these command-skills still reference docs/agent-plans/");
+    assert.equal(
+      repointedSomewhere,
+      true,
+      "expected at least one skills/commands/*/SKILL.md to contain docs/plans/ — proves the repoint rewrote content, not just that files are silent on the subject",
     );
   });
 });
