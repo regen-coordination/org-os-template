@@ -89,12 +89,14 @@ if (existsSync(target)) {
 
 // === Stage 2: copy framework, exclude framework-only state ===
 //
-// Only COMMITTED content travels. Seven leaks were patched one deny-list entry
+// Every framework byte an instance receives comes from HEAD. Seven leaks were patched one deny-list entry
 // at a time while this walked the filesystem; a deny-list cannot see content
 // that does not exist yet. Now:
 //   1. the source set is the tree of HEAD (`git ls-tree -r HEAD`), and every
 //      file is written from its committed blob (`git cat-file --batch`), never
-//      read from the working tree. Untracked, gitignored, staged-but-uncommitted,
+//      read from the working tree. The same holds for what is not copied but
+//      USED: the templates and partials stage 7 renders and the package.json
+//      version stage 6 stamps are read from HEAD through readFrameworkFile(). Untracked, gitignored, staged-but-uncommitted,
 //      intent-to-add (`git add -N`) and skip-worktree edits cannot reach an
 //      instance, and neither can a symlink swapped in on disk for a committed
 //      directory. Symlinks (mode 120000) and gitlinks (submodules) are skipped;
@@ -103,7 +105,9 @@ if (existsSync(target)) {
 //      undeclared one is skipped and logged by name.
 //   3. the deny-list (isPathExcluded) prunes framework-only subpaths.
 //   4. tests/clone-manifest.txt pins the exact path set a fresh clone contains.
-// Rules + reasons live in scripts/lib/clone-excludes.mjs.
+// Rules + reasons live in scripts/lib/clone-excludes.mjs. The generator's own
+// code and rules (this file, scripts/lib/clone-excludes.mjs, templates/render.mjs)
+// are executed from disk — they are the program, not content that ships.
 //
 // A NEW framework file therefore does not reach instances until it is
 // committed — the same rule an operator needs when a template file "doesn't
@@ -190,7 +194,7 @@ function selectSourceFiles(root) {
     if (isPathExcluded(rel)) continue;
     files.push({ rel, sha: entry.sha, executable: entry.mode === "100755" });
   }
-  return { mode, files, undeclared: [...undeclared].sort() };
+  return { mode, files, undeclared: [...undeclared].sort(), head };
 }
 
 const FALLBACK_WARNING = [
@@ -206,6 +210,33 @@ const FALLBACK_WARNING = [
 ].join("\n");
 
 const source = selectSourceFiles(frameworkRoot);
+const headIndex = source.head ? new Map(source.head.filter((e) => e.type === "blob").map((e) => [e.rel, e])) : null;
+
+/**
+ * A framework file the generator USES without copying (templates, partials,
+ * package.json). Git mode: its committed blob at HEAD — a file missing from
+ * HEAD is an error, never silently read from disk. Fallback mode: disk,
+ * consistent with the rest of that (warned) mode.
+ */
+function readFrameworkFile(rel) {
+  if (!headIndex) return readFileSync(path.join(frameworkRoot, rel), "utf-8");
+  const entry = headIndex.get(rel);
+  if (!entry || entry.mode === "120000") {
+    throw new Error(`${rel} is not committed at HEAD — only committed framework content is used; commit it and re-run`);
+  }
+  return readBlobs(frameworkRoot, [entry.sha]).get(entry.sha).toString("utf-8");
+}
+
+/** Every committed (or, in fallback, on-disk) file directly under a framework directory. */
+function listFrameworkDir(relDir) {
+  if (!headIndex) {
+    const abs = path.join(frameworkRoot, relDir);
+    return existsSync(abs)
+      ? readdirSync(abs, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => `${relDir}/${e.name}`)
+      : [];
+  }
+  return [...headIndex.keys()].filter((k) => k.startsWith(`${relDir}/`) && !k.slice(relDir.length + 1).includes("/"));
+}
 if (source.mode === "filesystem") console.warn(FALLBACK_WARNING);
 for (const top of source.undeclared) {
   log("stage 2", `skipped undeclared top-level entry: ${top}`);
@@ -458,9 +489,9 @@ if (Array.isArray(config.skills) && config.skills.length > 0) {
 // The framework version is READ, never hardcoded. This file used to write
 // `3.5` literally, so every instance cloned after the 2026-06-17 re-baseline
 // was born claiming a version the framework had already left.
-const frameworkVersion = JSON.parse(
-  readFileSync(path.join(frameworkRoot, "package.json"), "utf-8"),
-).version;
+// Read from HEAD (readFrameworkFile), like everything copied in stage 2: an
+// uncommitted version bump must not be stamped onto HEAD's content.
+const frameworkVersion = JSON.parse(readFrameworkFile("package.json")).version;
 const frameworkMajorMinor = (frameworkVersion.match(/^(\d+)\.(\d+)/) || [])[0];
 
 // The canonical framework repository. Six other spellings circulate in the
@@ -765,8 +796,14 @@ When a decision is superseded, mark it \`superseded\` and add a \`Superseded by:
 }
 
 // === Stage 7: render README + GETTING-STARTED ===
-const templatesDir = path.join(frameworkRoot, "templates");
-const partialsDir = path.join(templatesDir, "partials");
+// Templates and partials come from HEAD (readFrameworkFile), not the working
+// tree: an uncommitted template edit — or a secret pasted into one — must not
+// reach an instance or its genesis commit.
+const partials = Object.fromEntries(
+  listFrameworkDir("templates/partials")
+    .filter((rel) => rel.endsWith(".md"))
+    .map((rel) => [path.posix.basename(rel, ".md"), readFrameworkFile(rel)]),
+);
 const renderData = {
   org: {
     name: config.org.name,
@@ -790,21 +827,21 @@ const renderData = {
   today: new Date().toISOString().slice(0, 10),
 };
 
-const readmeTmpl = readFileSync(path.join(templatesDir, "README.instance.md"), "utf-8");
-const gettingStartedTmpl = readFileSync(path.join(templatesDir, "GETTING-STARTED.md"), "utf-8");
+const readmeTmpl = readFrameworkFile("templates/README.instance.md");
+const gettingStartedTmpl = readFrameworkFile("templates/GETTING-STARTED.md");
 // The framework's CLAUDE.md tells every session it is in "the org-os
 // framework"; an instance gets its own, rendered like README.md.
-const claudeTmpl = readFileSync(path.join(templatesDir, "CLAUDE.instance.md"), "utf-8");
+const claudeTmpl = readFrameworkFile("templates/CLAUDE.instance.md");
 // AGENTS.md is where CLAUDE.md sends every session; the framework's copy calls
 // the workspace "the upstream framework", so it is rendered for instances too.
-const agentsTmpl = readFileSync(path.join(templatesDir, "AGENTS.instance.md"), "utf-8");
+const agentsTmpl = readFrameworkFile("templates/AGENTS.instance.md");
 
 log("stage 7", `rendering README.md + GETTING-STARTED.md + CLAUDE.md + AGENTS.md`);
 if (!dry) {
-  writeFileSync(path.join(target, "README.md"), render(readmeTmpl, renderData, { partialsDir }));
-  writeFileSync(path.join(target, "GETTING-STARTED.md"), render(gettingStartedTmpl, renderData, { partialsDir }));
-  writeFileSync(path.join(target, "CLAUDE.md"), render(claudeTmpl, renderData, { partialsDir }));
-  writeFileSync(path.join(target, "AGENTS.md"), render(agentsTmpl, renderData, { partialsDir }));
+  writeFileSync(path.join(target, "README.md"), render(readmeTmpl, renderData, { partials }));
+  writeFileSync(path.join(target, "GETTING-STARTED.md"), render(gettingStartedTmpl, renderData, { partials }));
+  writeFileSync(path.join(target, "CLAUDE.md"), render(claudeTmpl, renderData, { partials }));
+  writeFileSync(path.join(target, "AGENTS.md"), render(agentsTmpl, renderData, { partials }));
 }
 
 // === Stage 8: git init + initial commit ===

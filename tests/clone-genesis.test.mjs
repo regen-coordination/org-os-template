@@ -431,7 +431,7 @@ function filesContainingMarker(dir) {
   return listFiles(dir).filter((r) => r !== "node_modules" && readFileSync(path.join(dir, r)).includes(MARKER));
 }
 
-test("structural: only COMMITTED content reaches a clone — untracked, staged, intent-to-add, skip-worktree, edited-tracked and symlink-swapped content never does", { timeout: 300_000 }, () => {
+test("structural: every framework byte in a clone — copied, rendered from templates/partials, or the version stamp — comes from HEAD; untracked, staged, intent-to-add, skip-worktree, edited-tracked and symlink-swapped content never does", { timeout: 300_000 }, () => {
   withDisposableFramework((fw, { git, id }) => {
     // Committed first: a directory that will later be swapped for a symlink,
     // a new undeclared top-level dir, and npm scripts whose `cd` target is not
@@ -471,6 +471,14 @@ test("structural: only COMMITTED content reaches a clone — untracked, staged, 
     writeFileSync(path.join(outside, "a.md"), `# ${MARKER}\n`);
     rmSync(path.join(fw, "docs", "swap"), { recursive: true, force: true });
     symlinkSync(outside, path.join(fw, "docs", "swap"), "dir");
+    // (g) uncommitted edits to what stage 7 RENDERS: an instance template and a partial
+    writeFileSync(path.join(fw, "templates", "AGENTS.instance.md"), readFileSync(path.join(fw, "templates", "AGENTS.instance.md"), "utf-8") + `\n${MARKER}\n`);
+    writeFileSync(path.join(fw, "templates", "partials", "cheatsheet.md"), readFileSync(path.join(fw, "templates", "partials", "cheatsheet.md"), "utf-8") + `\n${MARKER}\n`);
+    // (h) an uncommitted framework version bump (read for federation.yaml + DECISIONS.md)
+    const committedVersion = JSON.parse(readFileSync(pkgPath, "utf-8")).version;
+    const bumped = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    bumped.version = "9.9.9";
+    writeFileSync(pkgPath, JSON.stringify(bumped, null, 2) + "\n");
 
     const { dst, r } = cloneFrom(fw);
     try {
@@ -484,6 +492,13 @@ test("structural: only COMMITTED content reaches a clone — untracked, staged, 
         "the committed blob, not the symlink target, must be written");
       assert.match(r.stdout, /skipped undeclared top-level entry: brand-new-area/);
       assert.doesNotMatch(r.stderr, /not a git work tree/);
+      const committedMajorMinor = committedVersion.match(/^(\d+)\.(\d+)/)[0];
+      const fed = yaml.load(readFileSync(path.join(dst, "federation.yaml"), "utf-8"));
+      assert.equal(fed.metadata.framework_version, committedMajorMinor, "version stamp must come from HEAD's package.json");
+      assert.equal(fed.version, committedMajorMinor);
+      for (const f of ["federation.yaml", "DECISIONS.md"]) {
+        assert.doesNotMatch(readFileSync(path.join(dst, f), "utf-8"), /9\.9/, `uncommitted version bump reached ${f}`);
+      }
       const clonePkg = JSON.parse(readFileSync(path.join(dst, "package.json"), "utf-8"));
       assert.ok(clonePkg.scripts["fixture:cd-dash"], "`cd -` must not count as a missing clone directory");
       assert.ok(clonePkg.scripts["fixture:cd-abs"], "an absolute cd target is not a clone directory");
