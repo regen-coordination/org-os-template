@@ -267,13 +267,14 @@ function listFiles(dir, rel = "") {
   return out;
 }
 
+/** Paths committed at HEAD — the generator's source set (not the index, not the working tree). */
 function gitLsFiles(root) {
-  const r = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
-  assert.equal(r.status, 0, `git ls-files failed: ${r.stderr}`);
+  const r = spawnSync("git", ["ls-tree", "-r", "-z", "--name-only", "--full-tree", "HEAD"], { cwd: root, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
+  assert.equal(r.status, 0, `git ls-tree failed: ${r.stderr}`);
   return r.stdout.split("\0").filter(Boolean);
 }
 
-test("containment: every file in a fresh clone is a declared, tracked framework file or a generator-written one", () => {
+test("containment: every file in a fresh clone is a declared, committed framework file or a generator-written one", () => {
   const tracked = new Set(gitLsFiles(rootDir));
   withClone((dir) => {
     const strays = listFiles(dir)
@@ -404,54 +405,105 @@ function withDisposableFramework(fn) {
   }
 }
 
-function cloneFrom(fw) {
+function cloneFrom(fw, { git = false, extra = [] } = {}) {
   const dst = mkdtempSync(path.join(tmpdir(), "clone-structural-out-"));
   rmSync(dst, { recursive: true, force: true });
-  const r = spawnSync("node", [path.join(fw, "scripts", "clone-framework.mjs"), "--target", dst, "--config", configPath, "--no-git"], {
+  const r = spawnSync("node", [path.join(fw, "scripts", "clone-framework.mjs"), "--target", dst, "--config", configPath, ...(git ? [] : ["--no-git"]), ...extra], {
     encoding: "utf-8", timeout: 120_000, env: nestedEnv(),
   });
   return { dst, r };
 }
 
-test("structural: untracked files never reach a clone; a new committed top-level dir is skipped and logged by name", { timeout: 300_000 }, () => {
+const MARKER = "INJECTED-FIXTURE-MARKER-7f3a";
+
+/** Every file in dir whose bytes contain MARKER (relative paths). */
+function filesContainingMarker(dir) {
+  return listFiles(dir).filter((r) => r !== "node_modules" && readFileSync(path.join(dir, r)).includes(MARKER));
+}
+
+test("structural: only COMMITTED content reaches a clone — untracked, staged, intent-to-add, skip-worktree, edited-tracked and symlink-swapped content never does", { timeout: 300_000 }, () => {
   withDisposableFramework((fw, { git, id }) => {
-    symlinkSync(path.join(rootDir, "node_modules"), path.join(fw, "node_modules"), "dir");
-    // Untracked secrets at the root — one on the deny-list, one only the
-    // source set can stop.
-    writeFileSync(path.join(fw, ".npmrc"), "//registry.npmjs.org/:_authToken=fixture\n");
-    writeFileSync(path.join(fw, "credentials.json"), "{\"token\":\"fixture\"}\n");
-    writeFileSync(path.join(fw, "scripts", "local-token.txt"), "fixture\n");
-    // A new top-level directory nobody declared.
+    // Committed first: a directory that will later be swapped for a symlink,
+    // a new undeclared top-level dir, and npm scripts whose `cd` target is not
+    // a clone directory (6d must keep them).
+    mkdirSync(path.join(fw, "docs", "swap"));
+    writeFileSync(path.join(fw, "docs", "swap", "a.md"), "# committed content\n");
     mkdirSync(path.join(fw, "brand-new-area"));
     writeFileSync(path.join(fw, "brand-new-area", "notes.md"), "# new\n");
-    git(["add", "brand-new-area"]);
-    git([...id, "commit", "-q", "-m", "add undeclared top-level dir"]);
+    const pkgPath = path.join(fw, "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    pkg.scripts["fixture:cd-dash"] = "cd - && node scripts/selftest.mjs";
+    pkg.scripts["fixture:cd-abs"] = "cd /tmp && ls";
+    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+    git(["add", "docs/swap", "brand-new-area", "package.json"]);
+    git([...id, "commit", "-q", "-m", "fixture: swap dir, undeclared top-level dir, cd scripts"]);
+    symlinkSync(path.join(rootDir, "node_modules"), path.join(fw, "node_modules"), "dir");
+
+    // Never committed:
+    // (a) untracked secrets — one on the deny-list, one only the source set stops
+    writeFileSync(path.join(fw, ".npmrc"), `//registry.npmjs.org/:_authToken=${MARKER}\n`);
+    writeFileSync(path.join(fw, "credentials.json"), `{"token":"${MARKER}"}\n`);
+    writeFileSync(path.join(fw, "scripts", "local-token.txt"), `${MARKER}\n`);
+    // (b) a secret pasted into the tracked .env.example (working-tree edit)
+    writeFileSync(path.join(fw, ".env.example"), readFileSync(path.join(fw, ".env.example"), "utf-8") + `NOTION_API_KEY=${MARKER}\n`);
+    // (c) staged but never committed
+    writeFileSync(path.join(fw, "scripts", "staged-secret.txt"), `${MARKER}\n`);
+    git(["add", "scripts/staged-secret.txt"]);
+    // (d) intent-to-add: tracked by name, content never in git
+    writeFileSync(path.join(fw, "scripts", "intent-to-add.txt"), `${MARKER}\n`);
+    git(["add", "-N", "scripts/intent-to-add.txt"]);
+    // (e) skip-worktree: an edit to a tracked file invisible to `git status`
+    git(["update-index", "--skip-worktree", "scripts/selftest.mjs"]);
+    writeFileSync(path.join(fw, "scripts", "selftest.mjs"), readFileSync(path.join(fw, "scripts", "selftest.mjs"), "utf-8") + `// ${MARKER}\n`);
+    // (f) a committed directory replaced on disk by a symlink to outside the repo
+    const outside = path.join(path.dirname(fw), "outside");
+    mkdirSync(outside);
+    writeFileSync(path.join(outside, "a.md"), `# ${MARKER}\n`);
+    rmSync(path.join(fw, "docs", "swap"), { recursive: true, force: true });
+    symlinkSync(outside, path.join(fw, "docs", "swap"), "dir");
 
     const { dst, r } = cloneFrom(fw);
     try {
       assert.equal(r.status, 0, `clone failed: ${r.stderr}${r.stdout}`);
-      for (const p of [".npmrc", "credentials.json", "scripts/local-token.txt", "brand-new-area"]) {
+      assert.deepEqual(filesContainingMarker(dst), [], "uncommitted content reached the clone");
+      for (const p of [".npmrc", "credentials.json", "scripts/local-token.txt", "scripts/staged-secret.txt",
+        "scripts/intent-to-add.txt", "brand-new-area"]) {
         assert.equal(existsSync(path.join(dst, p)), false, `${p} reached the clone`);
       }
+      assert.equal(readFileSync(path.join(dst, "docs", "swap", "a.md"), "utf-8"), "# committed content\n",
+        "the committed blob, not the symlink target, must be written");
       assert.match(r.stdout, /skipped undeclared top-level entry: brand-new-area/);
       assert.doesNotMatch(r.stderr, /not a git work tree/);
+      const clonePkg = JSON.parse(readFileSync(path.join(dst, "package.json"), "utf-8"));
+      assert.ok(clonePkg.scripts["fixture:cd-dash"], "`cd -` must not count as a missing clone directory");
+      assert.ok(clonePkg.scripts["fixture:cd-abs"], "an absolute cd target is not a clone directory");
     } finally {
       rmSync(dst, { recursive: true, force: true });
     }
 
-    // Non-git fallback (zip download): still clones, warns loudly.
+    // Non-git fallback (zip download): still clones, warns loudly — twice, the
+    // second time last — and makes NO genesis commit unless opted in.
     // Moved aside rather than deleted: a git background process can still be
     // writing inside .git, which makes a recursive rm fail with ENOTEMPTY.
     renameSync(path.join(fw, ".git"), path.join(path.dirname(fw), "git-parked"));
-    const fb = cloneFrom(fw);
+    const fb = cloneFrom(fw, { git: true });
     try {
       assert.equal(fb.r.status, 0, `fallback clone failed: ${fb.r.stderr}${fb.r.stdout}`);
-      assert.match(fb.r.stderr, /not a git work tree/);
-      assert.match(fb.r.stderr, /secret-safety guarantee\s*\n?.*DOES NOT HOLD/);
+      assert.equal((fb.r.stderr.match(/secret-safety guarantee/g) || []).length, 2, "warning printed before AND after the run");
+      assert.match(fb.r.stderr.trimEnd(), /--commit-unverified to commit anyway\.$/, "the warning is the last thing printed");
+      assert.match(fb.r.stdout, /stage 8\] skipped \(non-git fallback/);
+      assert.equal(existsSync(path.join(fb.dst, ".git")), false, "no genesis commit in fallback mode");
       assert.match(fb.r.stdout, /skipped undeclared top-level entry: brand-new-area/);
       assert.equal(existsSync(path.join(fb.dst, ".npmrc")), false, "deny-list still applies in fallback");
     } finally {
       rmSync(fb.dst, { recursive: true, force: true });
+    }
+    const opt = cloneFrom(fw, { git: true, extra: ["--commit-unverified"] });
+    try {
+      assert.equal(opt.r.status, 0, `opt-in fallback clone failed: ${opt.r.stderr}${opt.r.stdout}`);
+      assert.equal(existsSync(path.join(opt.dst, ".git")), true, "--commit-unverified makes the genesis commit");
+    } finally {
+      rmSync(opt.dst, { recursive: true, force: true });
     }
   });
 });

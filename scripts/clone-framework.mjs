@@ -4,13 +4,13 @@
  *
  * Stages (each can be inspected with --dry):
  *   1. Validate target directory is empty (or --force)
- *   2. Copy tracked framework files under declared top-level entries, minus the deny-list
+ *   2. Copy COMMITTED (HEAD) framework files under declared top-level entries, minus the deny-list
  *   3. Strip framework-only registries (instances.yaml, packages-matrix, skills-matrix)
  *   4. Reset markdown placeholders (IDENTITY, MASTERPLAN, MEMORY, HEARTBEAT, README)
  *   5. Materialize packages + skills per config (sync-packages with --enabled)
  *   6. Write federation.yaml with instance identity + lineage stamp
  *   7. Render README + GETTING-STARTED + CLAUDE.md from templates
- *   8. Git init + initial commit (skip with --no-git)
+ *   8. Git init + initial commit (skip with --no-git; skipped in non-git fallback unless --commit-unverified)
  *
  * Usage:
  *   node scripts/clone-framework.mjs --target ../my-org --config config.yaml
@@ -23,7 +23,7 @@
 
 import {
   readFileSync, writeFileSync, appendFileSync, readdirSync, statSync, existsSync,
-  mkdirSync, copyFileSync, rmSync, lstatSync, realpathSync,
+  mkdirSync, copyFileSync, rmSync, realpathSync,
 } from "node:fs";
 import { execSync, spawnSync } from "node:child_process";
 import path from "node:path";
@@ -46,6 +46,9 @@ const configArg = getArg("--config");
 const dry = process.argv.includes("--dry");
 const force = process.argv.includes("--force");
 const noGit = process.argv.includes("--no-git");
+// Non-git fallback only: make the genesis commit even though the copy was not
+// limited to committed content.
+const commitUnverified = process.argv.includes("--commit-unverified");
 
 if (!targetArg) {
   console.error("✗ --target <dir> is required");
@@ -86,18 +89,25 @@ if (existsSync(target)) {
 
 // === Stage 2: copy framework, exclude framework-only state ===
 //
-// The copy set is built from what the framework TRACKS, not from what happens
-// to be on disk. Seven leaks were patched one deny-list entry at a time while
-// this walked the filesystem; a deny-list cannot see content that does not
-// exist yet, and one basename regex was the only thing between a clone and
-// .npmrc / .netrc / *.pem / credentials.json. Now:
-//   1. `git ls-files` is the source set — untracked and gitignored files are
-//      structurally uncopyable.
+// Only COMMITTED content travels. Seven leaks were patched one deny-list entry
+// at a time while this walked the filesystem; a deny-list cannot see content
+// that does not exist yet. Now:
+//   1. the source set is the tree of HEAD (`git ls-tree -r HEAD`), and every
+//      file is written from its committed blob (`git cat-file --batch`), never
+//      read from the working tree. Untracked, gitignored, staged-but-uncommitted,
+//      intent-to-add (`git add -N`) and skip-worktree edits cannot reach an
+//      instance, and neither can a symlink swapped in on disk for a committed
+//      directory. Symlinks (mode 120000) and gitlinks (submodules) are skipped;
+//      the executable bit is taken from the tree mode.
 //   2. every top-level entry must be declared (TOP_LEVEL_ALLOW / _DENY); an
 //      undeclared one is skipped and logged by name.
 //   3. the deny-list (isPathExcluded) prunes framework-only subpaths.
 // Rules + reasons live in scripts/lib/clone-excludes.mjs.
-function gitTrackedFiles(root) {
+//
+// A NEW framework file therefore does not reach instances until it is
+// committed — the same rule an operator needs when a template file "doesn't
+// appear".
+function gitHeadEntries(root) {
   const probe = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf-8" });
   if (probe.status !== 0) return null;
   let top;
@@ -107,13 +117,43 @@ function gitTrackedFiles(root) {
     return null;
   }
   // A framework unpacked from a zip INSIDE some other repository is not a
-  // work tree of its own; that repository's index says nothing about it.
+  // work tree of its own; that repository's HEAD says nothing about it.
   if (top !== realpathSync(root)) return null;
-  const r = spawnSync("git", ["ls-files", "-z", "--cached"], {
+  const r = spawnSync("git", ["ls-tree", "-r", "-z", "--full-tree", "HEAD"], {
     cwd: root, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024,
   });
-  if (r.status !== 0) return null;
-  return r.stdout.split("\0").filter(Boolean);
+  if (r.status !== 0) return null; // e.g. no commits yet
+  const entries = [];
+  for (const rec of r.stdout.split("\0")) {
+    if (!rec) continue;
+    const tab = rec.indexOf("\t");
+    const [mode, type, sha] = rec.slice(0, tab).split(" ");
+    entries.push({ mode, type, sha, rel: rec.slice(tab + 1) });
+  }
+  return entries;
+}
+
+/** Read many blobs in one `git cat-file --batch` process. @returns {Map<sha, Buffer>} */
+function readBlobs(root, shas) {
+  const unique = [...new Set(shas)];
+  const blobs = new Map();
+  if (unique.length === 0) return blobs;
+  const r = spawnSync("git", ["cat-file", "--batch"], {
+    cwd: root, input: unique.join("\n") + "\n", maxBuffer: 2 * 1024 * 1024 * 1024,
+  });
+  if (r.status !== 0) throw new Error(`git cat-file --batch failed: ${r.stderr}`);
+  const out = r.stdout;
+  let pos = 0;
+  for (let k = 0; k < unique.length; k++) {
+    const nl = out.indexOf(0x0a, pos);
+    const [sha, type, size] = out.subarray(pos, nl).toString("utf-8").split(" ");
+    if (type !== "blob") throw new Error(`expected blob for ${unique[k]}, got "${type}"`);
+    const start = nl + 1;
+    const end = start + Number(size);
+    blobs.set(sha, out.subarray(start, end));
+    pos = end + 1; // trailing LF after each object
+  }
+  return blobs;
 }
 
 function walkFiles(root, rel = "") {
@@ -128,15 +168,18 @@ function walkFiles(root, rel = "") {
 }
 
 /**
- * @returns {{ mode: "git"|"filesystem", files: string[], undeclared: string[] }}
+ * @returns {{ mode: "git"|"filesystem", files: Array<{rel, sha?, executable?}>, undeclared: string[] }}
  */
 function selectSourceFiles(root) {
-  const tracked = gitTrackedFiles(root);
-  const mode = tracked ? "git" : "filesystem";
-  const candidates = tracked ?? walkFiles(root);
+  const head = gitHeadEntries(root);
+  const mode = head ? "git" : "filesystem";
+  const candidates = head
+    ? head.filter((e) => e.type === "blob" && e.mode !== "120000")
+    : walkFiles(root).map((rel) => ({ rel }));
   const undeclared = new Set();
   const files = [];
-  for (const rel of candidates) {
+  for (const entry of candidates) {
+    const { rel } = entry;
     const top = rel.split("/")[0];
     const decision = topLevelDecision(top);
     if (decision !== "allow") {
@@ -144,36 +187,40 @@ function selectSourceFiles(root) {
       continue;
     }
     if (isPathExcluded(rel)) continue;
-    // Tracked but deleted in the working tree, or a gitlink (submodule).
-    const abs = path.join(root, rel);
-    if (!existsSync(abs) || !lstatSync(abs).isFile()) continue;
-    files.push(rel);
+    files.push({ rel, sha: entry.sha, executable: entry.mode === "100755" });
   }
   return { mode, files, undeclared: [...undeclared].sort() };
 }
 
+const FALLBACK_WARNING = [
+  "",
+  "⚠⚠⚠ WARNING: the framework root is not a git work tree with commits (downloaded as a zip?).",
+  "⚠   Fell back to a filesystem walk + deny-list. The secret-safety guarantee",
+  "⚠   DOES NOT HOLD in this mode: any file on disk not on the deny-list (local",
+  "⚠   credentials, tokens, caches) may have been copied into the instance.",
+  "⚠   No genesis commit was made. Inspect the target before committing or",
+  "⚠   publishing it — or clone the framework with git and re-run. Pass",
+  "⚠   --commit-unverified to commit anyway.",
+  "",
+].join("\n");
+
 const source = selectSourceFiles(frameworkRoot);
-if (source.mode === "filesystem") {
-  console.warn([
-    "",
-    "⚠⚠⚠ WARNING: the framework root is not a git work tree (downloaded as a zip?).",
-    "⚠   Falling back to a filesystem walk + deny-list. The secret-safety guarantee",
-    "⚠   DOES NOT HOLD in this mode: any untracked file not on the deny-list (local",
-    "⚠   credentials, tokens, caches) will be copied into the instance. Inspect the",
-    "⚠   target before committing or publishing it, or clone the framework with git.",
-    "",
-  ].join("\n"));
-}
+if (source.mode === "filesystem") console.warn(FALLBACK_WARNING);
 for (const top of source.undeclared) {
   log("stage 2", `skipped undeclared top-level entry: ${top}`);
 }
-log("stage 2", `copying ${source.files.length} ${source.mode === "git" ? "tracked" : "on-disk"} framework files → target${dry ? " (dry)" : ""}`);
+log("stage 2", `copying ${source.files.length} ${source.mode === "git" ? "committed (HEAD)" : "on-disk"} framework files → target${dry ? " (dry)" : ""}`);
 if (!dry) {
   mkdirSync(target, { recursive: true });
-  for (const rel of source.files) {
-    const d = path.join(target, rel);
+  const blobs = source.mode === "git" ? readBlobs(frameworkRoot, source.files.map((f) => f.sha)) : null;
+  for (const f of source.files) {
+    const d = path.join(target, f.rel);
     mkdirSync(path.dirname(d), { recursive: true });
-    copyFileSync(path.join(frameworkRoot, rel), d);
+    if (blobs) {
+      writeFileSync(d, blobs.get(f.sha), { mode: f.executable ? 0o755 : 0o644 });
+    } else {
+      copyFileSync(path.join(frameworkRoot, f.rel), d);
+    }
   }
 }
 
@@ -505,7 +552,10 @@ if (!dry && existsSync(fwPkgPath)) {
       ...[...cmd.matchAll(/--prefix[=\s]+([\w.@/-]+)/g)].map((m) => m[1]),
       ...[...cmd.matchAll(/(?:^|&&|;|\|\|)\s*cd\s+([\w.@/-]+)/g)].map((m) => m[1]),
     ];
-    if (dirRefs.some((d) => !existsSync(path.join(target, d)))) {
+    // `cd -`, absolute paths (and `cd ~…`, which the pattern cannot match) do
+    // not name a directory inside the clone — never drop on their account.
+    const inClone = dirRefs.filter((d) => d !== "-" && !d.startsWith("/"));
+    if (inClone.some((d) => !existsSync(path.join(target, d)))) {
       delete pkg.scripts[name];
       dropped.push(name);
       continue;
@@ -684,7 +734,11 @@ if (!dry) {
 }
 
 // === Stage 8: git init + initial commit ===
-if (!noGit && !dry) {
+// In fallback mode the copy was NOT limited to committed content, so a
+// genesis commit would enshrine whatever was on disk. Skip it unless the
+// operator explicitly opts in.
+const skipGenesisCommit = source.mode === "filesystem" && !commitUnverified;
+if (!noGit && !dry && !skipGenesisCommit) {
   log("stage 8", `git init + initial commit`);
   try {
     execSync("git init -q", { cwd: target });
@@ -698,7 +752,7 @@ if (!noGit && !dry) {
     console.warn(`⚠ git init/commit failed: ${e.message}`);
   }
 } else {
-  log("stage 8", noGit ? "skipped (--no-git)" : "skipped (--dry)");
+  log("stage 8", noGit ? "skipped (--no-git)" : dry ? "skipped (--dry)" : "skipped (non-git fallback — pass --commit-unverified to commit anyway)");
 }
 
 console.log(`\n✓ ${dry ? "dry-run completed" : "instance bootstrapped"}: ${target}`);
@@ -709,3 +763,5 @@ console.log(`    npm run generate:schemas`);
 console.log(`    npm run validate:structure`);
 console.log(`    npm run selftest`);
 console.log(`    # Edit IDENTITY.md, SOUL.md, MASTERPLAN.md, federation.yaml.peers, data/*.yaml`);
+// Repeated last so it is the final thing the operator reads, not scrolled away.
+if (source.mode === "filesystem") console.warn(FALLBACK_WARNING);

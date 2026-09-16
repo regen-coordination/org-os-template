@@ -13,10 +13,11 @@
 //
 // Three layers, outermost first (see selectSourceFiles in clone-framework.mjs):
 //
-//   1. SOURCE SET — only files `git ls-files` reports are candidates. Anything
-//      untracked or gitignored (.env, *.pem, .npmrc, .netrc, credential files,
-//      caches, node_modules, machine-local state) cannot be copied at all.
-//      The filesystem walk is a warned fallback for non-git checkouts only.
+//   1. SOURCE SET — only files committed at HEAD are candidates, and each is
+//      written from its committed blob. Untracked, gitignored, staged-only,
+//      intent-to-add and skip-worktree content, and anything reached through a
+//      symlink on disk, cannot be copied at all. The filesystem walk is a
+//      warned fallback for non-git checkouts only (no genesis commit there).
 //   2. TOP LEVEL — every top-level entry is DECLARED: TOP_LEVEL_ALLOW (copied)
 //      or TOP_LEVEL_DENY (not copied, with a reason). An undeclared entry is
 //      not copied and is logged by name, so a new top-level directory in the
