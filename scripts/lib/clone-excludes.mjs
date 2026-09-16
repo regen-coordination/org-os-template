@@ -9,8 +9,7 @@
 // these rules carried 10 framework memory days, a 7.7 MB graph, 284 tracked
 // framework files and a copy of the framework's .env with live keys. The
 // 2026-07-26 luizfernando scaffold stripped the same leakage by hand in three
-// commits in the luizfernando instance repo (03 Libraries/luizfernando: ff61a69,
-// 28fa4ba, ff24018); this module makes it structural.
+// commits (ff61a69, 28fa4ba, ff24018); this module makes it structural.
 //
 // Kept separate from clone-framework.mjs so the rules are unit-testable
 // without running a clone.
