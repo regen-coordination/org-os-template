@@ -178,6 +178,12 @@ export const EXCLUDE_FILES = new Set([
   // which instances only receive when they enable it.
   "docs/integrations/buzz.md",
   "docs/VAULT-SAFETY-CASE-STUDY.md", // the framework hub's own incident narrative
+  // Found walking the clone manifest (fix round 1):
+  "docs/KNOWLEDGE-INITIATION.md", // the framework network's population plan; paths into the operator's own workspace
+  "docs/knowledge-commons-astro-stack.md", // research report for the framework's org-os-kms package
+  "docs/QUILT.md", // generated view of the FRAMEWORK organism; `npm run generate:quilt` weaves the instance's own
+  "docs/integrations/cloudflare-os.md", // the framework's own deployment runbook: pins another org's repo and token owner
+  "scripts/test-federation.sh", // hardcoded paths into the operator's own workspace
   // Fixtures whose only consumers are excluded suites.
   "tests/fixtures/bread-coop-config.yaml", // tests/instance-doctor
   // Renders the FRAMEWORK's README and session one-pager; imports site/ (excluded).

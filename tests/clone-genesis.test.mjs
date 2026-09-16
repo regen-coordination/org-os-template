@@ -108,6 +108,8 @@ const MUST_NOT_EXIST = [
   // (fix round 1).
   "docs/POSITIONING.md", "docs/V2-DEVELOPMENT-PLAN.md", "docs/RAD-ORG-OS.md", "docs/ECOSYSTEM.md",
   "docs/integrations/buzz.md", "docs/VAULT-SAFETY-CASE-STUDY.md",
+  "docs/KNOWLEDGE-INITIATION.md", "docs/knowledge-commons-astro-stack.md", "docs/QUILT.md",
+  "docs/integrations/cloudflare-os.md", "scripts/test-federation.sh",
   "tests/fixtures/paper", "tests/fixtures/bread-coop-config.yaml",
   "templates/README.framework.md", "templates/session-one-pager.md", "scripts/render-templates.mjs",
   // Secrets a filesystem walk would have carried.
