@@ -372,7 +372,7 @@ governance:
   maintainers:
     - name: "Core Stewards"
       role: "owner"
-    - name: "Giulio Quarta"
+    - name: "Example Maintainer"
       role: "maintainer"
   decision_model: "consensus"
   proposal_threshold: "Consent-based with objection window"
