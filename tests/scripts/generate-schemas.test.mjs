@@ -109,3 +109,55 @@ governance:
   const proposals = JSON.parse(readFileSync(path.join(root, '.well-known', 'proposals.json'), 'utf-8'));
   assert.deepEqual(proposals.proposals, []);
 });
+
+// Regression coverage for generateDao()'s description field. It used to read
+// only `identity.description`, a key no generator ever writes — the canonical
+// field everywhere else (clone-framework.mjs, render-templates.mjs, the
+// genesis config) is `identity.short_description`. So the boilerplate
+// fallback always fired, silently, and stayed invisible because generateDao()
+// early-returns until `identity.daoURI` is set. Found 2026-09-16 during the
+// PersonalNode instance activation, whose Task 9 was the first thing in that
+// instance's life to set daoURI — which is exactly when the bug surfaced.
+const REAL_DAO_TEMPLATE = path.join(ORG_ROOT, '.well-known', 'dao.json.template');
+
+function setupDaoInstance(identityExtra = '') {
+  const root = setupInstance();
+  mkdirSync(path.join(root, '.well-known'), { recursive: true });
+  copyFileSync(REAL_DAO_TEMPLATE, path.join(root, '.well-known', 'dao.json.template'));
+  writeFileSync(
+    path.join(root, 'federation.yaml'),
+    `identity:
+  name: test-org
+  type: Project
+  daoURI: "https://test-org.example/.well-known/dao.json"
+${identityExtra}`
+  );
+  return root;
+}
+
+test('generateDao() uses identity.short_description verbatim when set', () => {
+  const root = setupDaoInstance('  short_description: "The crafted, ratified sentence — not boilerplate."\n');
+  const result = run(root);
+  assert.equal(result.status, 0, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+
+  const dao = JSON.parse(readFileSync(path.join(root, '.well-known', 'dao.json'), 'utf-8'));
+  assert.equal(dao.description, 'The crafted, ratified sentence — not boilerplate.');
+});
+
+test('generateDao() falls back to legacy identity.description when short_description is absent', () => {
+  const root = setupDaoInstance('  description: "Legacy-field sentence."\n');
+  const result = run(root);
+  assert.equal(result.status, 0, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+
+  const dao = JSON.parse(readFileSync(path.join(root, '.well-known', 'dao.json'), 'utf-8'));
+  assert.equal(dao.description, 'Legacy-field sentence.');
+});
+
+test('generateDao() only uses the generic boilerplate when neither field is set', () => {
+  const root = setupDaoInstance();
+  const result = run(root);
+  assert.equal(result.status, 0, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+
+  const dao = JSON.parse(readFileSync(path.join(root, '.well-known', 'dao.json'), 'utf-8'));
+  assert.equal(dao.description, 'test-org operational identity surface for governance, members, projects, and coordination.');
+});

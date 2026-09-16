@@ -55,7 +55,17 @@ function generateDao() {
     return;
   }
 
+  // The canonical field is `short_description` (see clone-framework.mjs,
+  // render-templates.mjs, and the genesis config) — `description` is kept as a
+  // fallback so a manifest using either spelling isn't silently dropped. This
+  // key used to read `identity.description` only, which is never set by any
+  // generator, so the boilerplate fallback always fired — invisibly, because
+  // generateDao() early-returns until an instance sets identity.daoURI. Found
+  // 2026-09-16 during a PersonalNode instance activation: setting daoURI for the
+  // first time surfaced that the crafted short_description was being silently
+  // replaced by generic boilerplate in the published dao.json.
   const description =
+    federationContent?.identity?.short_description ||
     federationContent?.identity?.description ||
     `${orgName} operational identity surface for governance, members, projects, and coordination.`;
   let template = fs.readFileSync(templatePath, 'utf-8');
