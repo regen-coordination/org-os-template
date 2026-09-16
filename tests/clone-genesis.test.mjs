@@ -337,6 +337,17 @@ test("a clone's CLAUDE.md describes the instance, not the framework", () => {
   });
 });
 
+test("docs/ in a clone no longer points at docs/agent-plans/", () => {
+  withClone((dir) => {
+    const offenders = listFiles(dir, "docs")
+      .filter((r) => r.endsWith(".md") && readFileSync(path.join(dir, r), "utf-8").includes("docs/agent-plans/"));
+    assert.deepEqual(offenders, []);
+    assert.match(readFileSync(path.join(dir, "docs", "PLANS.md"), "utf-8"), /docs\/plans\//);
+  });
+  // The framework's own copy is untouched.
+  assert.match(readFileSync(path.join(rootDir, "docs", "PLANS.md"), "utf-8"), /docs\/agent-plans\//);
+});
+
 /**
  * A disposable git clone of the framework whose tree mirrors this working tree
  * (tracked + untracked-but-not-ignored files, committed there), so the proof
