@@ -497,7 +497,20 @@ if (!dry && existsSync(fwPkgPath)) {
   const pkg = JSON.parse(readFileSync(fwPkgPath, "utf-8"));
   const dropped = [];
   for (const [name, cmd] of Object.entries(pkg.scripts || {})) {
-    if (typeof cmd !== "string" || /--prefix\b/.test(cmd)) continue;
+    if (typeof cmd !== "string") continue;
+    // Directory forms: `npm … --prefix <dir>` and `cd <dir> && …`. These point
+    // at a package or another repository (build:site used to `cd` into another
+    // organisation's knowledge repo); drop when the directory is absent.
+    const dirRefs = [
+      ...[...cmd.matchAll(/--prefix[=\s]+([\w.@/-]+)/g)].map((m) => m[1]),
+      ...[...cmd.matchAll(/(?:^|&&|;|\|\|)\s*cd\s+([\w.@/-]+)/g)].map((m) => m[1]),
+    ];
+    if (dirRefs.some((d) => !existsSync(path.join(target, d)))) {
+      delete pkg.scripts[name];
+      dropped.push(name);
+      continue;
+    }
+    if (dirRefs.length > 0) continue;
     const m = /(?:^|\s)((?:\.\/)?[\w.@/-]+\.(?:mjs|js|cjs))(?:\s|$)/.exec(cmd);
     if (!m) continue;
     const file = m[1].replace(/^\.\//, "");

@@ -348,6 +348,24 @@ test("docs/ in a clone no longer points at docs/agent-plans/", () => {
   assert.match(readFileSync(path.join(rootDir, "docs", "PLANS.md"), "utf-8"), /docs\/agent-plans\//);
 });
 
+test("no npm script in a clone cd's or --prefix'es into a directory the clone lacks", () => {
+  withClone((dir) => {
+    const pkg = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf-8"));
+    const dead = [];
+    for (const [name, cmd] of Object.entries(pkg.scripts ?? {})) {
+      const dirs = [
+        ...[...cmd.matchAll(/--prefix[=\s]+([\w.@/-]+)/g)].map((m) => m[1]),
+        ...[...cmd.matchAll(/(?:^|&&|;|\|\|)\s*cd\s+([\w.@/-]+)/g)].map((m) => m[1]),
+      ];
+      for (const d of dirs) if (!existsSync(path.join(dir, d))) dead.push(`${name} -> ${d}`);
+    }
+    assert.deepEqual(dead, []);
+    for (const gone of ["build:site", "serve:site", "admin", "admin:dev", "test:admin", "paperclip"]) {
+      assert.equal(pkg.scripts[gone], undefined, `${gone} should have been dropped`);
+    }
+  });
+});
+
 /**
  * A disposable git clone of the framework whose tree mirrors this working tree
  * (tracked + untracked-but-not-ignored files, committed there), so the proof
