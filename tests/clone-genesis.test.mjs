@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtempSync, existsSync, readdirSync, readFileSync, writeFileSync, rmSync, symlinkSync,
-  mkdirSync, cpSync,
+  mkdirSync, cpSync, renameSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -397,7 +397,7 @@ function withDisposableFramework(fn) {
     git([...id, "commit", "-q", "--allow-empty", "-m", "mirror working tree"]);
     return fn(fw, { git, id });
   } finally {
-    rmSync(base, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 }
 
@@ -437,7 +437,9 @@ test("structural: untracked files never reach a clone; a new committed top-level
     }
 
     // Non-git fallback (zip download): still clones, warns loudly.
-    rmSync(path.join(fw, ".git"), { recursive: true, force: true });
+    // Moved aside rather than deleted: a git background process can still be
+    // writing inside .git, which makes a recursive rm fail with ENOTEMPTY.
+    renameSync(path.join(fw, ".git"), path.join(path.dirname(fw), "git-parked"));
     const fb = cloneFrom(fw);
     try {
       assert.equal(fb.r.status, 0, `fallback clone failed: ${fb.r.stderr}${fb.r.stdout}`);
