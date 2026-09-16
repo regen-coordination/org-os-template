@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtempSync, existsSync, readdirSync, readFileSync, writeFileSync, rmSync, symlinkSync,
-  mkdirSync, cpSync, renameSync,
+  mkdirSync, cpSync, renameSync, lstatSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -389,6 +389,9 @@ function withDisposableFramework(fn) {
       const src = path.join(rootDir, rel);
       const dst = path.join(fw, rel);
       if (!existsSync(src)) { rmSync(dst, { force: true }); continue; }
+      // Regular files only: a symlinked node_modules (worktrees, test
+      // harnesses) is untracked and not matched by the `node_modules/` ignore.
+      if (!lstatSync(src).isFile()) continue;
       mkdirSync(path.dirname(dst), { recursive: true });
       cpSync(src, dst);
     }
