@@ -9,7 +9,7 @@
  *   4. Reset markdown placeholders (IDENTITY, MASTERPLAN, MEMORY, HEARTBEAT, README)
  *   5. Materialize packages + skills per config (sync-packages with --enabled)
  *   6. Write federation.yaml with instance identity + lineage stamp
- *   7. Render README + GETTING-STARTED + CLAUDE.md from templates
+ *   7. Render README + GETTING-STARTED + CLAUDE.md + AGENTS.md from templates
  *   8. Git init + initial commit (skip with --no-git; skipped in non-git fallback unless --commit-unverified)
  *
  * Usage:
@@ -319,6 +319,13 @@ if (!dry) {
     writeFileSync(manifestPath, JSON.stringify({ ...manifest, repositories: [] }, null, 2) + "\n");
   }
 
+  // dashboard.yaml is a declared top-level deny: the framework's copy is tuned
+  // for its hub role and its custom sections read registries stripped in
+  // stage 3. The instance gets every default section, documented, matching
+  // loadDashboardConfig() in scripts/initialize.mjs (which is also what
+  // /initialize does when the file is absent).
+  writeFileSync(path.join(target, "dashboard.yaml"), DASHBOARD_YAML(config.org.name));
+
   // knowledge/ is a declared top-level deny (its INDEX.md describes the
   // framework's own knowledge commons); the instance gets an empty index.
   mkdirSync(path.join(target, "knowledge"), { recursive: true });
@@ -326,6 +333,68 @@ if (!dry) {
     path.join(target, "knowledge", "INDEX.md"),
     `# Knowledge Index — ${config.org.name}\n\n_Navigation for this instance's knowledge base. Domains are declared in \`data/knowledge-manifest.yaml\`; \`npm run knowledge\` compiles pages and refreshes the indexes._\n\n_(no domains yet)_\n`,
   );
+}
+
+function DASHBOARD_YAML(orgName) {
+  return `# dashboard.yaml — controls what /initialize shows for ${orgName}
+#
+# Every section below is on, with the same values /initialize uses when this
+# file is absent (loadDashboardConfig in scripts/initialize.mjs). Set
+# \`show: false\` to hide a section; delete a key to fall back to its default.
+# Sections always render in a fixed order, whatever the order here.
+
+schema_version: "2.0"
+
+sections:
+
+  header:
+    show: true
+    style: ascii            # ascii banner at the top of the dashboard
+
+  projects:
+    show: true              # data/projects.yaml, archived/done hidden
+    # max: 10               # cap rows (default: all)
+
+  tasks:
+    show: true              # HEARTBEAT.md active tasks by urgency
+    show_completed: true    # also list recently completed tasks
+    # max: 8                # cap tasks per tier (default: 8)
+
+  calendar:
+    show: true              # upcoming items from data/meetings.yaml + data/events.yaml
+    days: 7                 # look-ahead window in days
+
+  funding:
+    show: true              # data/funding-opportunities.yaml deadlines
+    horizon_days: 30        # only deadlines within this many days
+
+  context:
+    show: true              # latest memory/YYYY-MM-DD.md entries
+    max_entries: 3
+
+  plans:
+    show: true              # docs/plans/QUEUE.md
+    queued_preview: 2       # how many queued plans to preview
+
+  pipelines:
+    show: true              # stage bars for ideas, funding, knowledge, plans
+
+  knowledge_graph:
+    show: true              # graphify-out/ status, when a graph has been built
+
+  apps:
+    show: true              # known apps and workspaces present in this instance (self-hides when none)
+
+  cheatsheet:
+    show: true              # common commands
+
+  federation:
+    show: true              # federation.yaml peers + upstream
+
+  prompt:
+    show: true              # "what would you like to work on?" suggestions
+    suggestions: 3
+`;
 }
 
 // === Stage 5: materialize packages + skills per config ===
@@ -725,12 +794,16 @@ const gettingStartedTmpl = readFileSync(path.join(templatesDir, "GETTING-STARTED
 // The framework's CLAUDE.md tells every session it is in "the org-os
 // framework"; an instance gets its own, rendered like README.md.
 const claudeTmpl = readFileSync(path.join(templatesDir, "CLAUDE.instance.md"), "utf-8");
+// AGENTS.md is where CLAUDE.md sends every session; the framework's copy calls
+// the workspace "the upstream framework", so it is rendered for instances too.
+const agentsTmpl = readFileSync(path.join(templatesDir, "AGENTS.instance.md"), "utf-8");
 
-log("stage 7", `rendering README.md + GETTING-STARTED.md + CLAUDE.md`);
+log("stage 7", `rendering README.md + GETTING-STARTED.md + CLAUDE.md + AGENTS.md`);
 if (!dry) {
   writeFileSync(path.join(target, "README.md"), render(readmeTmpl, renderData, { partialsDir }));
   writeFileSync(path.join(target, "GETTING-STARTED.md"), render(gettingStartedTmpl, renderData, { partialsDir }));
   writeFileSync(path.join(target, "CLAUDE.md"), render(claudeTmpl, renderData, { partialsDir }));
+  writeFileSync(path.join(target, "AGENTS.md"), render(agentsTmpl, renderData, { partialsDir }));
 }
 
 // === Stage 8: git init + initial commit ===

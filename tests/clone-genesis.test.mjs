@@ -514,6 +514,32 @@ test("structural: only COMMITTED content reaches a clone — untracked, staged, 
   });
 });
 
+test("a clone's AGENTS.md is the instance's, not the framework's", () => {
+  withClone((dir) => {
+    const agents = readFileSync(path.join(dir, "AGENTS.md"), "utf-8");
+    assert.match(agents, /^# test-instance-os — Agent Guide/);
+    assert.doesNotMatch(agents, /upstream reference|As the \*\*upstream framework|framework layer|Agent Dojo/);
+    assert.doesNotMatch(agents, /npm run sync\s/, "no script named sync exists");
+    assert.match(agents, /docs\/VAULT-SAFETY\.md/, "the safety protocol is kept");
+  });
+});
+
+test("a clone's dashboard.yaml enables every default section and no custom section", () => {
+  withClone((dir) => {
+    const dash = yaml.load(readFileSync(path.join(dir, "dashboard.yaml"), "utf-8"));
+    assert.equal(dash.custom_sections, undefined);
+    for (const key of ["header", "projects", "tasks", "calendar", "funding", "context", "plans",
+      "pipelines", "knowledge_graph", "apps", "cheatsheet", "federation", "prompt"]) {
+      assert.equal(dash.sections[key]?.show, true, `${key} should be shown`);
+    }
+    assert.equal(dash.sections.calendar.days, 7);
+    assert.equal(dash.sections.funding.horizon_days, 30);
+    assert.equal(dash.sections.context.max_entries, 3);
+    assert.equal(dash.sections.plans.queued_preview, 2);
+    assert.equal(dash.sections.prompt.suggestions, 3);
+  });
+});
+
 test("a clone's VAULT-SAFETY.md keeps the rules but not the framework's incident narrative", () => {
   withClone((dir) => {
     const doc = readFileSync(path.join(dir, "docs", "VAULT-SAFETY.md"), "utf-8");

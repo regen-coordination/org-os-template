@@ -34,7 +34,7 @@ A new instance starts mostly empty. If `data/*.yaml` and `SOUL.md` are still pla
 
 ## Session Lifecycle
 
-Use `/initialize` to start a session (renders the dashboard, loads context) and `/close` to end it (writes memory, commits, pushes). Both are defined in `.claude/commands/`.
+Use `/initialize` to start a session (renders the dashboard, loads context) and `/close` to end it (writes memory, commits, and pushes once a git remote is configured — a new instance has none). Both are defined in `.claude/commands/`.
 
 **Optional: API access.** Copy `.env.example` to `.env` and fill in only the keys you use. `.env` is gitignored; never commit it.
 
