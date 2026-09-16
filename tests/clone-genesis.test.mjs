@@ -19,6 +19,7 @@ import yaml from "js-yaml";
 import {
   isPathExcluded, topLevelDecision, GENERATED_FILES, TOP_LEVEL_ALLOW, TOP_LEVEL_DENY,
 } from "../scripts/lib/clone-excludes.mjs";
+import { MANIFEST_PATH, parseManifest, clonePaths } from "../scripts/clone-manifest.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cloneScript = path.join(rootDir, "scripts", "clone-framework.mjs");
@@ -112,6 +113,7 @@ const MUST_NOT_EXIST = [
   "docs/integrations/cloudflare-os.md", "scripts/test-federation.sh",
   "tests/fixtures/paper", "tests/fixtures/bread-coop-config.yaml",
   "templates/README.framework.md", "templates/session-one-pager.md", "scripts/render-templates.mjs",
+  "tests/clone-manifest.txt", "scripts/clone-manifest.mjs",
   // Secrets a filesystem walk would have carried.
   ".npmrc", ".netrc", ".mcp.json", "credentials.json",
 ];
@@ -513,6 +515,19 @@ test("structural: only COMMITTED content reaches a clone — untracked, staged, 
     } finally {
       rmSync(opt.dst, { recursive: true, force: true });
     }
+  });
+});
+
+test("the clone's path set matches tests/clone-manifest.txt exactly", () => {
+  const expected = parseManifest(readFileSync(MANIFEST_PATH, "utf-8"));
+  withClone((dir) => {
+    const actual = clonePaths(dir);
+    const exp = new Set(expected);
+    const act = new Set(actual);
+    const unexpected = actual.filter((p) => !exp.has(p));
+    const missing = expected.filter((p) => !act.has(p));
+    assert.deepEqual({ unexpected, missing }, { unexpected: [], missing: [] },
+      "what ships to every new organisation changed — commit, run `npm run clone:manifest`, and review the diff");
   });
 });
 

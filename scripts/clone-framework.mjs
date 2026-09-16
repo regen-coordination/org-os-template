@@ -102,6 +102,7 @@ if (existsSync(target)) {
 //   2. every top-level entry must be declared (TOP_LEVEL_ALLOW / _DENY); an
 //      undeclared one is skipped and logged by name.
 //   3. the deny-list (isPathExcluded) prunes framework-only subpaths.
+//   4. tests/clone-manifest.txt pins the exact path set a fresh clone contains.
 // Rules + reasons live in scripts/lib/clone-excludes.mjs.
 //
 // A NEW framework file therefore does not reach instances until it is

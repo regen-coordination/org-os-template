@@ -25,6 +25,9 @@
 //   3. DENY-LIST — within allowed top-level entries, isExcluded() prunes
 //      framework-only subpaths. isPathExcluded() applies it to every ancestor
 //      directory of a file path, since git lists files, not directories.
+//   4. MANIFEST — tests/clone-manifest.txt lists every path a fresh clone of
+//      the reference fixture contains; tests/clone-genesis.test.mjs requires an
+//      exact match, so any change to what ships is a reviewable diff.
 //
 // Kept separate from clone-framework.mjs so the rules are unit-testable
 // without running a clone.
@@ -190,6 +193,9 @@ export const EXCLUDE_FILES = new Set([
   "scripts/render-templates.mjs",
   "templates/README.framework.md",
   "templates/session-one-pager.md",
+  // The clone manifest and its generator describe the framework's generator.
+  "tests/clone-manifest.txt",
+  "scripts/clone-manifest.mjs",
   "PAPERCLIP_DEPLOYMENT_GUIDE.md", // another project's strategy material
   "RESEARCH_INTELLIGENCE_PLAN.md",
   // Generator tests: they exercise clone-framework AS the framework (fixtures,
