@@ -102,7 +102,7 @@ const MUST_NOT_EXIST = [
   ".github/workflows/deploy-pages.yml", ".github/workflows/drift.yml", ".github/workflows/validate.yml",
   // Closed structurally by the top-level declaration (clone-excludes.mjs).
   "instances", "integrations", "modules", ".hermes", "CHANGELOG.md", "VERSION.md",
-  "SKILLS.md", "SYNC-GUIDE.md", "dashboard.yaml",
+  "SKILLS.md", "SYNC-GUIDE.md", // dashboard.yaml is generated fresh — see its own test
   // Framework history / self-description inside allowed entries.
   "docs/QUEUE.md", "docs/sessions", "docs/research", ".opencode/agents",
   // Framework self-description, strategy and framework-only fixtures/renderers
