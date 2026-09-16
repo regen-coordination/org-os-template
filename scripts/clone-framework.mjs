@@ -445,7 +445,17 @@ if (!dry) {
   const orgName = config.org.name;
   const orgDescription = config.org.short_description || `${orgName} — an org-os instance`;
   const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  const baseUrl = config.org.base_url || `https://${slug}.example.org`;
+  // {{BASE_URL}} is a bare HOST: the template owns the `https://` scheme, and
+  // generate-all-schemas.mjs (new URL(daoURI).host) and setup-org-os.mjs both
+  // substitute a host. Passing a full URL here published `https://https://…`
+  // in every URI field. Accept config.org.base_url with or without a scheme.
+  const configuredBase = config.org.base_url || `${slug}.example.org`;
+  let baseUrl;
+  try {
+    baseUrl = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(configuredBase) ? configuredBase : `https://${configuredBase}`).host;
+  } catch {
+    baseUrl = `${slug}.example.org`;
+  }
 
   const templatePath = path.join(wellKnownDir, "dao.json.template");
   let dao;

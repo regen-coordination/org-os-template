@@ -19,6 +19,9 @@ const federationPath = path.join(rootDir, 'federation.yaml');
 const federationRaw = fs.readFileSync(federationPath, 'utf-8');
 const federationContent = yaml.load(federationRaw);
 const daoURI = federationContent?.identity?.daoURI || 'https://org.example.com/.well-known/dao.json';
+// {{BASE_URL}} in .well-known/*.json.template is a bare HOST — the templates
+// own the `https://` scheme. clone-framework.mjs (stage 6c) and
+// setup-org-os.mjs substitute a host too; keep all three in agreement.
 let baseUrl = 'org.example.com';
 try {
   const daoUrl = new URL(daoURI);

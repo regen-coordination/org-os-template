@@ -295,6 +295,28 @@ test("every top-level entry the framework tracks is declared (allowed or denied 
   assert.deepEqual(undeclared, [], "declare these in TOP_LEVEL_ALLOW or TOP_LEVEL_DENY (scripts/lib/clone-excludes.mjs)");
 });
 
+test("genesis dao.json carries one scheme per URI, never https://https://", () => {
+  withClone((dir) => {
+    const raw = readFileSync(path.join(dir, ".well-known", "dao.json"), "utf-8");
+    assert.doesNotMatch(raw, /https?:\/\/https?:\/\//);
+    const dao = JSON.parse(raw);
+    for (const [k, v] of Object.entries(dao)) {
+      if (k.endsWith("URI")) assert.doesNotThrow(() => new URL(v), `${k} is not a valid URL: ${v}`);
+    }
+    assert.equal(new URL(dao.membersURI).host, "test-instance-os.example.org");
+  });
+});
+
+test("genesis dao.json accepts org.base_url with or without a scheme", () => {
+  const fixtureConfig = yaml.load(readFileSync(configPath, "utf-8"));
+  for (const base_url of ["https://org.example.net", "org.example.net"]) {
+    withCloneConfig({ ...fixtureConfig, org: { ...fixtureConfig.org, base_url } }, (dir) => {
+      const dao = JSON.parse(readFileSync(path.join(dir, ".well-known", "dao.json"), "utf-8"));
+      assert.equal(dao.membersURI, "https://org.example.net/.well-known/members.json", `base_url=${base_url}`);
+    });
+  }
+});
+
 test("repos.manifest.json in a clone lists no repositories", () => {
   withClone((dir) => {
     const manifest = JSON.parse(readFileSync(path.join(dir, "repos.manifest.json"), "utf-8"));
