@@ -9,12 +9,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtempSync, existsSync, readdirSync, readFileSync, writeFileSync, rmSync, symlinkSync,
+  mkdirSync, cpSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
+import {
+  isPathExcluded, topLevelDecision, GENERATED_FILES, TOP_LEVEL_ALLOW, TOP_LEVEL_DENY,
+} from "../scripts/lib/clone-excludes.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cloneScript = path.join(rootDir, "scripts", "clone-framework.mjs");
@@ -95,6 +99,13 @@ const MUST_NOT_EXIST = [
   "tests/scripts/module-manifests.test.mjs", "tests/scripts/validate-identity-target.test.mjs",
   "site",
   ".github/workflows/deploy-pages.yml", ".github/workflows/drift.yml", ".github/workflows/validate.yml",
+  // Closed structurally by the top-level declaration (clone-excludes.mjs).
+  "instances", "integrations", "modules", ".hermes", "CHANGELOG.md", "VERSION.md",
+  "SKILLS.md", "SYNC-GUIDE.md", "dashboard.yaml",
+  // Framework history / self-description inside allowed entries.
+  "docs/QUEUE.md", "docs/sessions", "docs/research", ".opencode/agents",
+  // Secrets a filesystem walk would have carried.
+  ".npmrc", ".netrc", ".mcp.json", "credentials.json",
 ];
 
 test("a fresh clone carries no framework operational content or secrets", () => {
@@ -242,5 +253,149 @@ test("symbient's coupled script + tests travel only when the symbient skill is s
   withCloneConfig(withSymbient, (dir) => {
     assert.equal(existsSync(path.join(dir, "skills", "symbient", "SEED.template.md")), true, "skills/symbient/SEED.template.md must exist when symbient is selected");
     assert.equal(existsSync(path.join(dir, "scripts", "symbient-hatch.mjs")), true, "scripts/symbient-hatch.mjs must exist when symbient is selected");
+  });
+});
+
+/** Every file under dir (relative posix paths), not following symlinks. */
+function listFiles(dir, rel = "") {
+  const out = [];
+  for (const entry of readdirSync(path.join(dir, rel), { withFileTypes: true })) {
+    const r = rel ? `${rel}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...listFiles(dir, r));
+    else out.push(r);
+  }
+  return out;
+}
+
+function gitLsFiles(root) {
+  const r = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
+  assert.equal(r.status, 0, `git ls-files failed: ${r.stderr}`);
+  return r.stdout.split("\0").filter(Boolean);
+}
+
+test("containment: every file in a fresh clone is a declared, tracked framework file or a generator-written one", () => {
+  const tracked = new Set(gitLsFiles(rootDir));
+  withClone((dir) => {
+    const strays = listFiles(dir)
+      .filter((rel) => rel !== "node_modules") // the test's own symlink, see withClone
+      .filter((rel) => {
+        if (GENERATED_FILES.has(rel)) return false;
+        const copyable = tracked.has(rel)
+          && topLevelDecision(rel.split("/")[0]) === "allow"
+          && !isPathExcluded(rel);
+        return !copyable;
+      });
+    assert.deepEqual(strays, [], "these files are neither copyable framework files nor declared generator output");
+  });
+});
+
+test("every top-level entry the framework tracks is declared (allowed or denied with a reason)", () => {
+  const undeclared = [...new Set(gitLsFiles(rootDir).map((f) => f.split("/")[0]))]
+    .filter((top) => !TOP_LEVEL_ALLOW.has(top) && !TOP_LEVEL_DENY.has(top));
+  assert.deepEqual(undeclared, [], "declare these in TOP_LEVEL_ALLOW or TOP_LEVEL_DENY (scripts/lib/clone-excludes.mjs)");
+});
+
+test("repos.manifest.json in a clone lists no repositories", () => {
+  withClone((dir) => {
+    const manifest = JSON.parse(readFileSync(path.join(dir, "repos.manifest.json"), "utf-8"));
+    assert.deepEqual(manifest.repositories, []);
+    assert.equal(manifest.baseDirectory, "repos", "schema kept");
+  });
+});
+
+test("a clone's CLAUDE.md describes the instance, not the framework", () => {
+  withClone((dir) => {
+    const claude = readFileSync(path.join(dir, "CLAUDE.md"), "utf-8");
+    assert.doesNotMatch(claude, /org-os framework\*\*/i, "must not call itself the org-os framework");
+    assert.doesNotMatch(claude, /This workspace is the \*\*org-os framework/i);
+    assert.doesNotMatch(claude, /Framework thinking/);
+    assert.match(claude, /\*\*test-instance-os\*\*, an org-os instance/);
+    assert.equal(existsSync(path.join(dir, "knowledge", "INDEX.md")), true);
+    assert.doesNotMatch(readFileSync(path.join(dir, "knowledge", "INDEX.md"), "utf-8"), /Framework reference/i);
+  });
+});
+
+/**
+ * A disposable git clone of the framework whose tree mirrors this working tree
+ * (tracked + untracked-but-not-ignored files, committed there), so the proof
+ * exercises the code under test even before it is committed here. The real
+ * framework tree is never modified.
+ */
+function withDisposableFramework(fn) {
+  const base = mkdtempSync(path.join(tmpdir(), "clone-structural-"));
+  const fw = path.join(base, "framework");
+  const git = (args, cwd = fw) => {
+    const r = spawnSync("git", args, { cwd, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
+    assert.equal(r.status, 0, `git ${args.join(" ")} failed: ${r.stderr}`);
+    return r.stdout;
+  };
+  try {
+    git(["clone", "-q", "--no-hardlinks", rootDir, fw], base);
+    const ls = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
+      cwd: rootDir, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024,
+    }).stdout.split("\0").filter(Boolean);
+    for (const rel of ls) {
+      const src = path.join(rootDir, rel);
+      const dst = path.join(fw, rel);
+      if (!existsSync(src)) { rmSync(dst, { force: true }); continue; }
+      mkdirSync(path.dirname(dst), { recursive: true });
+      cpSync(src, dst);
+    }
+    const id = ["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid"];
+    git(["add", "-A"]);
+    git([...id, "commit", "-q", "--allow-empty", "-m", "mirror working tree"]);
+    return fn(fw, { git, id });
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+}
+
+function cloneFrom(fw) {
+  const dst = mkdtempSync(path.join(tmpdir(), "clone-structural-out-"));
+  rmSync(dst, { recursive: true, force: true });
+  const r = spawnSync("node", [path.join(fw, "scripts", "clone-framework.mjs"), "--target", dst, "--config", configPath, "--no-git"], {
+    encoding: "utf-8", timeout: 120_000, env: nestedEnv(),
+  });
+  return { dst, r };
+}
+
+test("structural: untracked files never reach a clone; a new committed top-level dir is skipped and logged by name", { timeout: 300_000 }, () => {
+  withDisposableFramework((fw, { git, id }) => {
+    symlinkSync(path.join(rootDir, "node_modules"), path.join(fw, "node_modules"), "dir");
+    // Untracked secrets at the root — one on the deny-list, one only the
+    // source set can stop.
+    writeFileSync(path.join(fw, ".npmrc"), "//registry.npmjs.org/:_authToken=fixture\n");
+    writeFileSync(path.join(fw, "credentials.json"), "{\"token\":\"fixture\"}\n");
+    writeFileSync(path.join(fw, "scripts", "local-token.txt"), "fixture\n");
+    // A new top-level directory nobody declared.
+    mkdirSync(path.join(fw, "brand-new-area"));
+    writeFileSync(path.join(fw, "brand-new-area", "notes.md"), "# new\n");
+    git(["add", "brand-new-area"]);
+    git([...id, "commit", "-q", "-m", "add undeclared top-level dir"]);
+
+    const { dst, r } = cloneFrom(fw);
+    try {
+      assert.equal(r.status, 0, `clone failed: ${r.stderr}${r.stdout}`);
+      for (const p of [".npmrc", "credentials.json", "scripts/local-token.txt", "brand-new-area"]) {
+        assert.equal(existsSync(path.join(dst, p)), false, `${p} reached the clone`);
+      }
+      assert.match(r.stdout, /skipped undeclared top-level entry: brand-new-area/);
+      assert.doesNotMatch(r.stderr, /not a git work tree/);
+    } finally {
+      rmSync(dst, { recursive: true, force: true });
+    }
+
+    // Non-git fallback (zip download): still clones, warns loudly.
+    rmSync(path.join(fw, ".git"), { recursive: true, force: true });
+    const fb = cloneFrom(fw);
+    try {
+      assert.equal(fb.r.status, 0, `fallback clone failed: ${fb.r.stderr}${fb.r.stdout}`);
+      assert.match(fb.r.stderr, /not a git work tree/);
+      assert.match(fb.r.stderr, /secret-safety guarantee\s*\n?.*DOES NOT HOLD/);
+      assert.match(fb.r.stdout, /skipped undeclared top-level entry: brand-new-area/);
+      assert.equal(existsSync(path.join(fb.dst, ".npmrc")), false, "deny-list still applies in fallback");
+    } finally {
+      rmSync(fb.dst, { recursive: true, force: true });
+    }
   });
 });

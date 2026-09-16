@@ -142,9 +142,14 @@ test('every framework-version surface in the clone reads the current framework v
     assert.equal(fed.version, majorMinor);
     assert.match(fed.spec, new RegExp(`/${majorMinor}$`));
 
-    const versionMd = readFileSync(path.join(dir, 'VERSION.md'), 'utf-8');
-    const claimed = versionMd.match(/\*\*Framework Version:\*\*\s*`?([\d.]+)`?/)?.[1];
-    if (claimed) assert.match(claimed, new RegExp(`^${majorMinor.replace('.', '\\.')}`));
+    // VERSION.md is the framework's own release tracking and is no longer
+    // copied; absent is a valid answer, a present one must not contradict.
+    const versionMdPath = path.join(dir, 'VERSION.md');
+    if (existsSync(versionMdPath)) {
+      const versionMd = readFileSync(versionMdPath, 'utf-8');
+      const claimed = versionMd.match(/\*\*Framework Version:\*\*\s*`?([\d.]+)`?/)?.[1];
+      if (claimed) assert.match(claimed, new RegExp(`^${majorMinor.replace('.', '\\.')}`));
+    }
   });
 });
 

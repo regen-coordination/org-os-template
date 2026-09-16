@@ -4,12 +4,12 @@
  *
  * Stages (each can be inspected with --dry):
  *   1. Validate target directory is empty (or --force)
- *   2. Copy framework tree, excluding framework-only state
+ *   2. Copy tracked framework files under declared top-level entries, minus the deny-list
  *   3. Strip framework-only registries (instances.yaml, packages-matrix, skills-matrix)
  *   4. Reset markdown placeholders (IDENTITY, MASTERPLAN, MEMORY, HEARTBEAT, README)
  *   5. Materialize packages + skills per config (sync-packages with --enabled)
  *   6. Write federation.yaml with instance identity + lineage stamp
- *   7. Render README + GETTING-STARTED from templates
+ *   7. Render README + GETTING-STARTED + CLAUDE.md from templates
  *   8. Git init + initial commit (skip with --no-git)
  *
  * Usage:
@@ -23,14 +23,14 @@
 
 import {
   readFileSync, writeFileSync, appendFileSync, readdirSync, statSync, existsSync,
-  mkdirSync, copyFileSync, rmSync,
+  mkdirSync, copyFileSync, rmSync, lstatSync, realpathSync,
 } from "node:fs";
 import { execSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { render } from "../templates/render.mjs";
-import { isExcluded } from "./lib/clone-excludes.mjs";
+import { isExcluded, isPathExcluded, topLevelDecision } from "./lib/clone-excludes.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,26 +86,96 @@ if (existsSync(target)) {
 
 // === Stage 2: copy framework, exclude framework-only state ===
 //
-// The rules live in scripts/lib/clone-excludes.mjs (unit-tested there).
-// Everything the framework holds as its OWN operational content — session
-// log, plans, graph, secrets — is skipped by construction.
-function copyTree(src, dst, relPath = "") {
-  if (!dry && !existsSync(dst)) mkdirSync(dst, { recursive: true });
-  for (const entry of readdirSync(src, { withFileTypes: true })) {
-    const rel = path.posix.join(relPath, entry.name);
-    if (isExcluded(rel, entry.name, entry.isDirectory())) continue;
+// The copy set is built from what the framework TRACKS, not from what happens
+// to be on disk. Seven leaks were patched one deny-list entry at a time while
+// this walked the filesystem; a deny-list cannot see content that does not
+// exist yet, and one basename regex was the only thing between a clone and
+// .npmrc / .netrc / *.pem / credentials.json. Now:
+//   1. `git ls-files` is the source set — untracked and gitignored files are
+//      structurally uncopyable.
+//   2. every top-level entry must be declared (TOP_LEVEL_ALLOW / _DENY); an
+//      undeclared one is skipped and logged by name.
+//   3. the deny-list (isPathExcluded) prunes framework-only subpaths.
+// Rules + reasons live in scripts/lib/clone-excludes.mjs.
+function gitTrackedFiles(root) {
+  const probe = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf-8" });
+  if (probe.status !== 0) return null;
+  let top;
+  try {
+    top = realpathSync(probe.stdout.trim());
+  } catch {
+    return null;
+  }
+  // A framework unpacked from a zip INSIDE some other repository is not a
+  // work tree of its own; that repository's index says nothing about it.
+  if (top !== realpathSync(root)) return null;
+  const r = spawnSync("git", ["ls-files", "-z", "--cached"], {
+    cwd: root, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024,
+  });
+  if (r.status !== 0) return null;
+  return r.stdout.split("\0").filter(Boolean);
+}
 
-    const s = path.join(src, entry.name);
-    const d = path.join(dst, entry.name);
-    if (entry.isDirectory()) {
-      copyTree(s, d, rel);
-    } else if (entry.isFile()) {
-      if (!dry) copyFileSync(s, d);
+function walkFiles(root, rel = "") {
+  const out = [];
+  for (const entry of readdirSync(path.join(root, rel), { withFileTypes: true })) {
+    const r = rel ? `${rel}/${entry.name}` : entry.name;
+    if (isExcluded(r, entry.name, entry.isDirectory())) continue;
+    if (entry.isDirectory()) out.push(...walkFiles(root, r));
+    else if (entry.isFile()) out.push(r);
+  }
+  return out;
+}
+
+/**
+ * @returns {{ mode: "git"|"filesystem", files: string[], undeclared: string[] }}
+ */
+function selectSourceFiles(root) {
+  const tracked = gitTrackedFiles(root);
+  const mode = tracked ? "git" : "filesystem";
+  const candidates = tracked ?? walkFiles(root);
+  const undeclared = new Set();
+  const files = [];
+  for (const rel of candidates) {
+    const top = rel.split("/")[0];
+    const decision = topLevelDecision(top);
+    if (decision !== "allow") {
+      if (decision === "undeclared" && !isExcluded(top, top, rel.includes("/"))) undeclared.add(top);
+      continue;
     }
+    if (isPathExcluded(rel)) continue;
+    // Tracked but deleted in the working tree, or a gitlink (submodule).
+    const abs = path.join(root, rel);
+    if (!existsSync(abs) || !lstatSync(abs).isFile()) continue;
+    files.push(rel);
+  }
+  return { mode, files, undeclared: [...undeclared].sort() };
+}
+
+const source = selectSourceFiles(frameworkRoot);
+if (source.mode === "filesystem") {
+  console.warn([
+    "",
+    "⚠⚠⚠ WARNING: the framework root is not a git work tree (downloaded as a zip?).",
+    "⚠   Falling back to a filesystem walk + deny-list. The secret-safety guarantee",
+    "⚠   DOES NOT HOLD in this mode: any untracked file not on the deny-list (local",
+    "⚠   credentials, tokens, caches) will be copied into the instance. Inspect the",
+    "⚠   target before committing or publishing it, or clone the framework with git.",
+    "",
+  ].join("\n"));
+}
+for (const top of source.undeclared) {
+  log("stage 2", `skipped undeclared top-level entry: ${top}`);
+}
+log("stage 2", `copying ${source.files.length} ${source.mode === "git" ? "tracked" : "on-disk"} framework files → target${dry ? " (dry)" : ""}`);
+if (!dry) {
+  mkdirSync(target, { recursive: true });
+  for (const rel of source.files) {
+    const d = path.join(target, rel);
+    mkdirSync(path.dirname(d), { recursive: true });
+    copyFileSync(path.join(frameworkRoot, rel), d);
   }
 }
-log("stage 2", `copying framework tree → target${dry ? " (dry)" : ""}`);
-copyTree(frameworkRoot, target);
 
 // === Stage 3: strip framework-only registries ===
 // instances.yaml stays in the framework (instance doesn't need it).
@@ -114,12 +184,8 @@ const STRIP_FILES = [
   "data/instances.yaml",
   "data/skills-matrix.yaml",
   "data/packages-matrix.yaml",
-  "SKILLS.md", // regenerated per instance
-  // The framework's own CHANGELOG is its release history, not the instance's.
-  // Leaving it made every new instance claim the framework's version as its
-  // own most-recent release — one of the contradicting version surfaces the
-  // instance doctor reports.
-  "CHANGELOG.md",
+  // SKILLS.md and CHANGELOG.md used to be stripped here; both are now declared
+  // top-level denies in clone-excludes.mjs and never copied in the first place.
 ];
 
 // Every published .well-known/*.json is generated FROM framework data, so
@@ -192,11 +258,27 @@ if (!dry) {
   // The frontier cache is the FRAMEWORK's view of its peers, not the instance's.
   const frontier = path.join(target, "data", "federation", "frontier");
   if (existsSync(frontier)) rmSync(frontier, { recursive: true, force: true });
-  // Stage 2 skips every file inside memory/ (the framework's own session log),
-  // so the directory itself only exists if copyTree happened to recurse into
-  // it. Guarantee it here; the .gitkeep comes in Task 3.
+  // memory/ is a declared top-level deny (the framework's own session log), so
+  // stage 2 never creates it. The instance gets the empty directory.
   mkdirSync(path.join(target, "memory"), { recursive: true });
   writeFileSync(path.join(target, "memory", ".gitkeep"), "");
+
+  // The framework's manifest lists OTHER organisations' repositories, so
+  // `npm run clone:repos` on day one cloned strangers' repos into a new
+  // instance. Same schema, empty list.
+  const manifestPath = path.join(target, "repos.manifest.json");
+  if (existsSync(manifestPath)) {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    writeFileSync(manifestPath, JSON.stringify({ ...manifest, repositories: [] }, null, 2) + "\n");
+  }
+
+  // knowledge/ is a declared top-level deny (its INDEX.md describes the
+  // framework's own knowledge commons); the instance gets an empty index.
+  mkdirSync(path.join(target, "knowledge"), { recursive: true });
+  writeFileSync(
+    path.join(target, "knowledge", "INDEX.md"),
+    `# Knowledge Index — ${config.org.name}\n\n_Navigation for this instance's knowledge base. Domains are declared in \`data/knowledge-manifest.yaml\`; \`npm run knowledge\` compiles pages and refreshes the indexes._\n\n_(no domains yet)_\n`,
+  );
 }
 
 // === Stage 5: materialize packages + skills per config ===
@@ -555,11 +637,15 @@ const renderData = {
 
 const readmeTmpl = readFileSync(path.join(templatesDir, "README.instance.md"), "utf-8");
 const gettingStartedTmpl = readFileSync(path.join(templatesDir, "GETTING-STARTED.md"), "utf-8");
+// The framework's CLAUDE.md tells every session it is in "the org-os
+// framework"; an instance gets its own, rendered like README.md.
+const claudeTmpl = readFileSync(path.join(templatesDir, "CLAUDE.instance.md"), "utf-8");
 
-log("stage 7", `rendering README.md + GETTING-STARTED.md`);
+log("stage 7", `rendering README.md + GETTING-STARTED.md + CLAUDE.md`);
 if (!dry) {
   writeFileSync(path.join(target, "README.md"), render(readmeTmpl, renderData, { partialsDir }));
   writeFileSync(path.join(target, "GETTING-STARTED.md"), render(gettingStartedTmpl, renderData, { partialsDir }));
+  writeFileSync(path.join(target, "CLAUDE.md"), render(claudeTmpl, renderData, { partialsDir }));
 }
 
 // === Stage 8: git init + initial commit ===

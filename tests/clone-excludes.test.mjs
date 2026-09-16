@@ -7,7 +7,9 @@
 // framework files and a copy of the framework's .env.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isExcluded } from "../scripts/lib/clone-excludes.mjs";
+import {
+  isExcluded, isPathExcluded, topLevelDecision, TOP_LEVEL_ALLOW, TOP_LEVEL_DENY, GENERATED_FILES,
+} from "../scripts/lib/clone-excludes.mjs";
 
 const excluded = (rel, isDir = false) => isExcluded(rel, rel.split("/").pop(), isDir);
 
@@ -84,4 +86,47 @@ test("git, deps, worktrees and .DS_Store are excluded at ANY depth", () => {
   assert.equal(excluded("packages/operations/.git", true), true);
   assert.equal(excluded("content/work/.DS_Store"), true);
   assert.equal(excluded(".claude/worktrees", true), true);
+});
+
+test("credential-shaped files are excluded at any depth (defence in depth for the non-git fallback)", () => {
+  for (const f of [
+    ".npmrc", ".netrc", ".pgpass", ".mcp.json", "credentials.json", "credentials.prod.json",
+    "server.pem", "packages/operations/deploy.key", "certs/client.p12",
+  ]) {
+    assert.equal(excluded(f), true, `${f} should be excluded`);
+  }
+  assert.equal(excluded("docs/credentials-guide.md"), false);
+});
+
+test("isPathExcluded: an excluded directory excludes every file beneath it", () => {
+  assert.equal(isPathExcluded("site/src/pages/index.astro"), true);
+  assert.equal(isPathExcluded("docs/sessions/2026-09-10-one-pager.md"), true);
+  assert.equal(isPathExcluded("tests/instance-doctor/assess.test.mjs"), true);
+  assert.equal(isPathExcluded("packages/operations/node_modules/x/index.js"), true);
+  assert.equal(isPathExcluded(".opencode/agents/build.md"), true);
+  assert.equal(isPathExcluded(".claude/worktrees/w/README.md"), true);
+  // …and nothing else is dragged along.
+  assert.equal(isPathExcluded("scripts/lib/clone-excludes.mjs"), false);
+  assert.equal(isPathExcluded(".opencode/commands/close.md"), false);
+  assert.equal(isPathExcluded("docs/PLANS.md"), false);
+  assert.equal(isPathExcluded("docs/QUEUE.md"), true);
+});
+
+test("top-level declarations: allow and deny are disjoint, and every entry has a reason", () => {
+  for (const name of TOP_LEVEL_ALLOW.keys()) {
+    assert.equal(TOP_LEVEL_DENY.has(name), false, `${name} is both allowed and denied`);
+  }
+  for (const [name, why] of [...TOP_LEVEL_ALLOW, ...TOP_LEVEL_DENY]) {
+    assert.ok(typeof why === "string" && why.length > 10, `${name} needs a one-line reason`);
+  }
+  assert.equal(topLevelDecision("scripts"), "allow");
+  assert.equal(topLevelDecision("instances"), "deny");
+  assert.equal(topLevelDecision("some-new-dir"), "undeclared");
+});
+
+test("top-level files the generator writes are never also copied", () => {
+  for (const f of GENERATED_FILES) {
+    if (f.includes("/")) continue;
+    assert.notEqual(topLevelDecision(f), "allow", `${f} is generated — it must not be on the copy allow-list`);
+  }
 });
