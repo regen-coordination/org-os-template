@@ -48,7 +48,7 @@ npm run validate:structure
 npm run selftest
 ```
 
-The reference acceptance-test instance bootstrapped this way is `bread-coop-os` (see `data/instances.yaml`). Its config lives at `tests/fixtures/bread-coop-config.yaml`.
+`tests/fixtures/instance-config.yaml` is a complete example config to copy from.
 
 After cloning, the manual phases below still apply for filling in identity, ingesting sources, and ongoing learning — but the file scaffolding, package selection, federation lineage, and reset placeholders are done for you.
 

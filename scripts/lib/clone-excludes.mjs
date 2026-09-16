@@ -144,6 +144,7 @@ export const EXCLUDE_DIRS = new Set([
   "tests/buzz-integration",
   "tests/paper-integration",
   "tests/instance-doctor",
+  "tests/fixtures/paper", // consumed only by tests/paper-integration
   // The framework's own project website — package name "org-os-site",
   // "Framework website + docs + live federation", an Astro app that deploys
   // to regen-coordination.github.io/org-os-template (.github/workflows/deploy-pages.yml,
@@ -165,6 +166,23 @@ export const EXCLUDE_FILES = new Set([
   ".buzz-state.json", // Buzz lane read-marker — machine-local state
   "data/knowledge-gaps.yaml", // the framework's own graph gaps
   "docs/QUEUE.md", // the framework's task queue; the instance's is docs/plans/QUEUE.md
+  // Framework self-description and strategy (fix round 1, adversarial review).
+  "docs/POSITIONING.md", // website copy for the framework itself
+  "docs/V2-DEVELOPMENT-PLAN.md", // the framework's own v2 roadmap
+  "docs/RAD-ORG-OS.md", // the framework's sovereign-distribution strategy
+  "docs/ECOSYSTEM.md", // the framework operator's repository registry
+  // Runbook of the framework's own Buzz deployment: pins the operator's hosted
+  // relay, binary path and channel UUID throughout. Not a placeholder-able
+  // template — the module's generic setup lives in packages/buzz-integration,
+  // which instances only receive when they enable it.
+  "docs/integrations/buzz.md",
+  "docs/VAULT-SAFETY-CASE-STUDY.md", // the framework hub's own incident narrative
+  // Fixtures whose only consumers are excluded suites.
+  "tests/fixtures/bread-coop-config.yaml", // tests/instance-doctor
+  // Renders the FRAMEWORK's README and session one-pager; imports site/ (excluded).
+  "scripts/render-templates.mjs",
+  "templates/README.framework.md",
+  "templates/session-one-pager.md",
   "PAPERCLIP_DEPLOYMENT_GUIDE.md", // another project's strategy material
   "RESEARCH_INTELLIGENCE_PLAN.md",
   // Generator tests: they exercise clone-framework AS the framework (fixtures,

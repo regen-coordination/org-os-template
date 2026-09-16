@@ -104,6 +104,12 @@ const MUST_NOT_EXIST = [
   "SKILLS.md", "SYNC-GUIDE.md", "dashboard.yaml",
   // Framework history / self-description inside allowed entries.
   "docs/QUEUE.md", "docs/sessions", "docs/research", ".opencode/agents",
+  // Framework self-description, strategy and framework-only fixtures/renderers
+  // (fix round 1).
+  "docs/POSITIONING.md", "docs/V2-DEVELOPMENT-PLAN.md", "docs/RAD-ORG-OS.md", "docs/ECOSYSTEM.md",
+  "docs/integrations/buzz.md", "docs/VAULT-SAFETY-CASE-STUDY.md",
+  "tests/fixtures/paper", "tests/fixtures/bread-coop-config.yaml",
+  "templates/README.framework.md", "templates/session-one-pager.md", "scripts/render-templates.mjs",
   // Secrets a filesystem walk would have carried.
   ".npmrc", ".netrc", ".mcp.json", "credentials.json",
 ];
@@ -505,5 +511,13 @@ test("structural: only COMMITTED content reaches a clone — untracked, staged, 
     } finally {
       rmSync(opt.dst, { recursive: true, force: true });
     }
+  });
+});
+
+test("a clone's VAULT-SAFETY.md keeps the rules but not the framework's incident narrative", () => {
+  withClone((dir) => {
+    const doc = readFileSync(path.join(dir, "docs", "VAULT-SAFETY.md"), "utf-8");
+    assert.match(doc, /## The Iron Rules/);
+    assert.doesNotMatch(doc, /Case study|stversions\/` \(partial|43 full notes/);
   });
 });

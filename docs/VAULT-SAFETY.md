@@ -4,7 +4,7 @@
 
 > "Vault" in the script names (`vault:snapshot`, `vault:audit`) preserves the original vocabulary from the Obsidian-flavored hub where this protocol was born. The protocol applies to **any org-os workspace** where untracked content is precious — instances with operator-authored memory, daily notes, drafts, planning artifacts, or knowledge bases.
 
-**Why this exists:** On 2026-04-25, an agent ran `git stash --include-untracked` before an upstream merge to clean the working tree, completed the merge, and never popped the stash. ~50 days of vault notes silently vanished from the working tree. Syncthing then propagated the deletions to other devices. Everything was eventually recovered — `.stversions/`, dangling git blobs, and `stash@{0}^3` — but recovery took hours and several richer versions were nearly lost.
+**Why this exists:** an agent once stashed a workspace's untracked content before a merge and never popped it; weeks of notes vanished and a sync tool propagated the deletions to other devices. Recovery took hours. The framework keeps the full incident write-up in its own repository (`docs/VAULT-SAFETY-CASE-STUDY.md` at https://github.com/regen-coordination/org-os-template).
 
 This protocol exists so that no agent ever does that again.
 
@@ -24,7 +24,7 @@ These apply to **every command that touches the working tree** in any org-os wor
 
 5. **Never delete or `mv` files under `memory/`, `data/`, or root markdown files (`*.md`, `*.canvas`, `*.base`)** without explicit user confirmation. That includes "cleanup" passes and "let me archive this".
 
-6. **Never run any of the above on submodules either.** Org instances under `03 Libraries/*-os/` (or wherever instances live) are separate repos but share the same content-preservation rule.
+6. **Never run any of the above on submodules or nested instance repos either.** They are separate repos but share the same content-preservation rule.
 
 7. **`--no-verify` is forbidden** unless the user explicitly authorizes it for a specific commit.
 
@@ -165,22 +165,3 @@ It should report **0 missing files vs. the pre-op snapshot**. If it doesn't, rec
 ## Encoding gotcha
 
 Many workspace filenames use em-dash `–` (U+2013), accented characters (`á`, `ç`, `ã`, `ñ`), and emoji. When restoring from `git cat-file` or `git ls-tree`, **always quote the destination filename** so the shell preserves UTF-8. Avoid `printf '%b'` decoding — it produces literal `\303\241` filenames. If you see octal escape sequences in `ls`, you wrote files under wrong names; rename or re-restore properly.
-
----
-
-## Case study — 2026-04-25 incident (lf-zettelkasten-os hub)
-
-**Trigger:** A session ran `git stash push --include-untracked -m "WIP changes before upstream merge"` to clean the tree before pulling upstream `org-os` changes.
-
-**Damage:** ~50 untracked notes (daily/weekly/meeting/planning, dating back to March) disappeared from the working tree. Syncthing detected the local deletions and:
-- saved old snapshots into `.stversions/` (incomplete — Syncthing's last snapshot per file was from 1–24 hours before the stash);
-- propagated deletions to other Syncthing peers, also wiping them on those devices.
-
-**Why it wasn't caught immediately:** the merge succeeded with no conflicts; the agent reported success and ended the session. The user noticed only when opening Obsidian and seeing broken wikilinks.
-
-**Recovery:**
-- 6 notes from `.stversions/` (partial — older than disk state at deletion).
-- 4 notes from `git fsck --unreachable` dangling blobs (draft versions).
-- 43 full notes from `stash@{0}^3` (authoritative — actual pre-merge state).
-
-**Lesson:** the rule "never stash" was already in memory, but a brand-new session didn't read it before deciding to stash. Memory is best-effort; **`docs/VAULT-SAFETY.md` and the project's `CLAUDE.md` / `AGENTS.md` are guaranteed to be in every session's context**. That's why this protocol now lives in framework documentation, propagated to every instance.
