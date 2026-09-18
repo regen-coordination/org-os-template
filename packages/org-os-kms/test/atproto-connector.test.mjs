@@ -42,3 +42,43 @@ test('describe is a valid card', () => {
   const card = createAtprotoConnector({ createClient: () => ({}) }).describe({ peers: ['did:plc:a'], pds: 'https://pds' });
   for (const k of ['title', 'type', 'steward', 'return_path']) assert.ok(card[k], k);
 });
+
+test('map: strips PRIVATE_FIELDS (reviewed_by, review_needs, notes, high_risk, consent_note, provenance.surfaced_by) via publicView', () => {
+  const c = createAtprotoConnector({ createClient: () => ({}) });
+  const cfg = { self: 'did:plc:me', nsid_authority: AUTH };
+  const rec = { uri: `at://did:plc:peer/${RES}/rk1`, cid: 'cid', value: { $type: RES, title: 'T', type: 'resource', reviewed_by: 'x', review_needs: 'y', notes: 'z', high_risk: true, consent_note: 'cn', provenance: { surfaced_by: 'x', origin: 'o' } } };
+  const [cand] = c.map(rec, cfg);
+  assert.equal(cand.object.reviewed_by, undefined);
+  assert.equal(cand.object.review_needs, undefined);
+  assert.equal(cand.object.notes, undefined);
+  assert.equal(cand.object.high_risk, undefined);
+  assert.equal(cand.object.consent_note, undefined);
+  assert.equal(cand.object.provenance.surfaced_by, undefined);
+  assert.equal(cand.object.provenance.origin, 'o', 'provenance.origin kept');
+  assert.equal(cand.object.title, 'T', 'ordinary fields kept');
+});
+
+test('map: ignores claimed sourceUri with origin DID in peers list; keeps claims about non-listed origins; keeps own-repo republished', () => {
+  const c = createAtprotoConnector({ createClient: () => ({}) });
+  const cfg = { self: 'did:plc:me', nsid_authority: AUTH, peers: ['did:plc:peer', 'did:plc:q'] };
+  const fromPeer = { uri: `at://did:plc:peer/${RES}/rk1`, cid: 'x', value: { $type: RES, title: 'T', type: 'resource', sourceUri: `at://did:plc:q/${RES}/o1` } };
+  assert.deepEqual(c.map(fromPeer, cfg), [], 'claimed origin in peers ignored');
+  const outsideOrigin = { uri: `at://did:plc:peer/${RES}/rk2`, cid: 'x', value: { $type: RES, title: 'T2', type: 'resource', sourceUri: `at://did:plc:external/${RES}/o2` } };
+  const [cand] = c.map(outsideOrigin, cfg);
+  assert.equal(cand.object.sourceUri, `at://did:plc:external/${RES}/o2`, 'non-listed origin kept');
+  const ownRepoRepublished = { uri: `at://did:plc:peer/${RES}/rk3`, cid: 'x', value: { $type: RES, title: 'T3', type: 'resource', sourceUri: `at://did:plc:peer/${RES}/o3` } };
+  const [cr] = c.map(ownRepoRepublished, cfg);
+  assert.equal(cr.object.sourceUri, `at://did:plc:peer/${RES}/o3`, 'same-repo origin kept (peer republishing own record)');
+});
+
+test('map: handles non-string sourceUri and missing value safely', () => {
+  const c = createAtprotoConnector({ createClient: () => ({}) });
+  const cfg = { self: 'did:plc:me', nsid_authority: AUTH };
+  const nonStringSourceUri = { uri: `at://did:plc:peer/${RES}/rk1`, cid: 'x', value: { $type: RES, title: 'T', sourceUri: { not: 'string' } } };
+  const [cand] = c.map(nonStringSourceUri, cfg);
+  assert.equal(cand.object.sourceUri, `at://did:plc:peer/${RES}/rk1`, 'non-string sourceUri falls back to uri');
+  const nullValue = { uri: `at://did:plc:peer/${RES}/rk2`, cid: 'x', value: null };
+  assert.deepEqual(c.map(nullValue, cfg), [], 'null value returns empty');
+  const missingValue = { uri: `at://did:plc:peer/${RES}/rk3`, cid: 'x' };
+  assert.deepEqual(c.map(missingValue, cfg), [], 'missing value returns empty');
+});

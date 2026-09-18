@@ -29,13 +29,19 @@ export function createAtprotoConnector({ createClient = defaultCreateClient } = 
       return { records, cursor: next, retracted, errors };
     },
     map(record, config) {
+      if (!record.value || typeof record.value !== 'object') return [];
       const { uri, value } = record;
       const schema = fw.typeForNsid(value.$type, config.nsid_authority);
       if (!schema) return [];
-      const sourceUri = value.sourceUri || uri;
+      const claimedSourceUri = typeof value.sourceUri === 'string' ? value.sourceUri : null;
+      const sourceUri = claimedSourceUri || uri;
       if (originDid(sourceUri) === config.self) return [];
+      if (claimedSourceUri) {
+        const claimedOriginDid = originDid(claimedSourceUri);
+        if (claimedOriginDid !== originDid(uri) && (config.peers || []).includes(claimedOriginDid)) return [];
+      }
       const { $type, id, ...rest } = value;
-      return [{ schema, object: { ...rest, sourceUri, viaUri: uri } }];
+      return [{ schema, object: { ...fw.publicView(rest), sourceUri, viaUri: uri } }];
     },
   };
 }
