@@ -10,12 +10,13 @@ org-os-kms publish [--apply] [--dry]            [--dir <instance>]
 ```
 
 - `ingest` pulls the connectors declared in `kms.yaml` under `connectors:` (each entry: `name`, `config`, `cursor`). It is a CLI verb only: it is **not** bound to `close` (or `initialize`), so nothing runs it automatically.
-  - **Fail-soft per connector.** A connector that throws is reported as `status: 'failed'` (with `error`) and counted in `report.failed`; the others still run and the op still returns `ok: true`. A connector whose `pull` is not implemented is reported as `status: 'not-implemented'`. The CLI exits non-zero only for unknown verbs/subcommands, so **scripts must check `report.failed`, not the exit code**.
+  - **Fail-soft per connector.** A connector that throws is reported as `status: 'failed'` (with `error`) and counted in `report.failed`; the others still run and the op still returns `ok: true`. A connector whose `pull` is not implemented is reported as `status: 'not-implemented'`. The CLI exits non-zero only for unknown verbs/subcommands, so the exit code does **not** signal ingest problems. **Scripts must check all of:** `report.failed`, any non-empty `connectors[].errors`, and any non-empty `connectors[].invalid` / `connectors[].collided`. The `errors` check matters because the `atproto` connector catches a per-peer failure inside itself: that peer is listed in `connectors[].errors` while the connector's `status` stays `'ok'` and `report.failed` stays 0, so a run where every peer failed still looks successful if you only read `failed`. `invalid` and `collided` list candidates that were dropped (see section 10). The report is not persisted anywhere; capture the JSON the command prints.
   - `--connector <name>` runs only that declared connector. If no declared connector has that name the run does nothing and returns `report.warning: 'no declared connector named <name>'`.
+  - A `--connector` with no usable name (bare `--connector`, `--connector --dry`, or an empty value) is an operator-input error, not a connector failure: nothing runs, `kms.yaml` is not touched, and the result is `ok: false` with `report.error: '--connector needs a name (usage: --connector <name>)'`. It never falls back to running every connector. Note the CLI's flag parser only understands `--connector <name>` (space-separated); `--connector=<name>` is not parsed as that flag, so use the space form. Omitting `--connector` entirely means all declared connectors.
   - `--dry` runs every pull and mapping and reports what would happen (`candidates`, `invalid`, `collided`) but stores nothing, writes no source-system card, applies no retractions, and does not touch `kms.yaml` (no cursor write). Note that a dry run still performs the network pulls.
 - `publish` is described in section 2.
 
-The `ingest` report, per connector: `name`, `status`, `dry`, `pulled`, `candidates`, `stored`, `updated`, `collisions`, `collided`, `invalid`, `retractions`, `errors`. Top level: `connectors`, `failed`.
+The `ingest` report, per connector: `name`, `status`, `dry`, `pulled`, `candidates`, `stored`, `updated`, `collisions`, `collided`, `invalid`, `retractions`, `errors`. Top level: `connectors`, `failed`, and, only when set, `warning` (unknown `--connector` name) or `error` (unusable `--connector` value).
 
 ## 2. What `close` does (and does not) do
 
@@ -94,11 +95,21 @@ connectors:
 Order per connector: describe, pull, map, validate, upsert/store, write the source-system card, apply retractions.
 
 - Every candidate is validated **as it will be stored**: `maturity: raw`, `public_use: not-public-yet`, `ai_assisted: true` unless the mapper says otherwise, plus `work_order: connector:<name>:<time>`, `source_lineage` and `provenance.origin`. Whatever maturity or public use the origin claims is ignored.
-- **Upsert is by `sourceUri`.** An existing local object with the same `sourceUri` is updated (its local `id`, `maturity`, `public_use` and `review_needs` are not overwritten; `review_needs` is set to `updated at origin`). If several candidates in one pull share a `sourceUri`, only the last one is applied.
+- **Upsert is by `sourceUri`.** An existing local object with the same `sourceUri` is updated (its local `id`, `maturity`, `public_use` and `review_needs` are excluded from the origin patch, so origin cannot change them; afterwards `review_needs` is explicitly set to `updated at origin`, replacing any earlier value). If several candidates in one pull share a `sourceUri`, only the last one is applied.
 - **Collisions are skipped, never overwritten.** A new candidate whose slug is already taken by a local object (or by an earlier candidate in the same pull) is skipped and reported as `collided` (`{ schema, title }`, counted in `collisions`).
 - **Invalid candidates are reported, not stored.** They appear under `invalid` (`{ title, errors }`).
 - **The cursor still advances past invalid and collided records.** They are not retried until the peer's data changes (a new `rev`, or a different body hash). Read `invalid` and `collided` in the `ingest` report; that is the only place they are surfaced.
 - **Retractions never delete.** A record that disappeared at the origin sets `maturity: held` and `review_needs: 'retracted at origin <sourceUri>'`. Matching is by `sourceUri`; for atproto that is the peer's record AT-URI, so a stored record that carries its own different `sourceUri` claim is not matched by a retraction.
+- **`held` does NOT unpublish.** The publication floor (section 3) looks at type and `public_use`, not `maturity`. If a reviewer already promoted an ingested object to a publishable `public_use`, and it is later retracted at the origin, this instance **keeps publishing it** (`review_needs` and `maturity` change locally only). To make retraction take effect, add an instance gate (`publish.gate` in `kms.yaml`, a module exporting `isPublishable(obj, ctx)`; it can only narrow the floor):
+
+  ```js
+  // gate.mjs
+  export function isPublishable(obj) {
+    return obj.maturity === 'held' ? { ok: false, reason: 'held (retracted at origin)' } : { ok: true };
+  }
+  ```
+
+  A rejected object also disappears from the next publish (deleted from the PDS when applying, dropped from the static surface).
 - **Cursor write-back.** After a successful (non-dry) pull the cursor is written into the matching `connectors[]` entry of `kms.yaml`, but only if some connector's cursor actually changed (an empty `{}` counts as `null`, so a peerless atproto connector causes no write). That write re-serializes the whole file: **the first cursor write-back rewrites `kms.yaml` without its comments.** Keep commentary elsewhere. Failed and not-implemented connectors leave their cursor as it was.
 
 ## 11. Identity setup for a publisher

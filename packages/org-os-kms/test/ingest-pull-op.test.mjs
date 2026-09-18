@@ -152,3 +152,24 @@ test('no connectors declared: ok, empty report, kms.yaml untouched', async () =>
   assert.deepEqual(res, { ok: true, report: { connectors: [], failed: 0 } });
   assert.equal(kmsText(dir), before);
 });
+
+test('a --connector flag that is not a non-empty name is an operator error: nothing runs, kms.yaml untouched', async () => {
+  for (const bad of [true, '', '   ', false]) {
+    let pulls = 0;
+    const spy = { ...good, name: 'good', pull: async () => { pulls++; return { records: [], cursor: 9 }; } };
+    const dir = instance([{ name: 'good', config: {}, cursor: null }]);
+    const before = kmsText(dir);
+    const res = await OPS['ingest.pull'].run({ dir, flags: { connector: bad }, deps: { registry: { good: spy } } });
+    assert.deepEqual(res, { ok: false, report: { connectors: [], failed: 0, error: '--connector needs a name (usage: --connector <name>)' } }, JSON.stringify(bad));
+    assert.equal(pulls, 0, `pull invoked for ${JSON.stringify(bad)}`);
+    assert.equal(kmsText(dir), before);
+  }
+});
+
+test('flags.connector undefined still means all connectors; a named one still works', async () => {
+  const dir = instance([{ name: 'good', config: {}, cursor: null }, { name: 'stub', config: {}, cursor: null }]);
+  const all = await OPS['ingest.pull'].run({ dir, flags: { connector: undefined }, deps: { registry: { good, stub } } });
+  assert.equal(all.ok, true); assert.equal(all.report.connectors.length, 2);
+  const one = await OPS['ingest.pull'].run({ dir, flags: { connector: 'good' }, deps: { registry: { good, stub } } });
+  assert.equal(one.report.connectors.length, 1);
+});

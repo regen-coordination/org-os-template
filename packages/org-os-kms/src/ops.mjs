@@ -122,6 +122,10 @@ export const OPS = {
     const registry = ctx.deps?.registry || CONNECTORS;
     const dry = ctx.flags?.dry === true;
     const only = ctx.flags?.connector;
+    // A bare `--connector` (parsed as true) or an empty value must never silently widen the run to every connector.
+    if (ctx.flags && 'connector' in ctx.flags && only !== undefined && (typeof only !== 'string' || !only.trim())) {
+      return { ok: false, report: { connectors: [], failed: 0, error: '--connector needs a name (usage: --connector <name>)' } };
+    }
     const target = join(dir, config.target);
     const declared = config.connectors || [];
     if (typeof only === 'string' && !declared.some((d) => d.name === only)) {
