@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import yamlLib from 'js-yaml';
 import { listSchemas, loadSchema, validateObject } from '../src/index.mjs';
+
+const goodSource = yamlLib.load(
+  readFileSync(new URL('./fixtures/candidates/good-source-system.yaml', import.meta.url), 'utf8')
+).object;
 
 test('all schemas load and are well-formed (id + version)', () => {
   const names = listSchemas();
@@ -56,4 +62,59 @@ test('signal + public-use-boundary enums validate', () => {
   // public-use-boundary is a mixin block (no frontmatter), only `tier` required
   assert.equal(validateObject('public-use-boundary', { tier: 'restricted-working-notes' }).valid, true);
   assert.equal(validateObject('public-use-boundary', { tier: 'totally-public' }).valid, false);
+});
+
+test('source-system accepts type: blog', () => {
+  const r = validateObject('source-system', { ...goodSource, type: 'blog' });
+  assert.equal(r.valid, true, r.errors.join('; '));
+});
+test('source-system accepts type: publication', () => {
+  const r = validateObject('source-system', { ...goodSource, type: 'publication' });
+  assert.equal(r.valid, true, r.errors.join('; '));
+});
+
+test('track.outcome accepts an array', () => {
+  const obj = { title: 'T', type: 'journey', audience: 'newcomers', outcome: ['understands DAOs', 'has a wallet'] };
+  const r = validateObject('track', obj);
+  assert.equal(r.valid, true, r.errors.join('; '));
+});
+test('a field declared type: array rejects a scalar', () => {
+  const obj = { title: 'T', type: 'journey', audience: 'newcomers', outcome: 'a single string' };
+  const r = validateObject('track', obj);
+  assert.ok(r.errors.some((e) => /outcome/.test(e) && /array/.test(e)), `expected an array error, got: ${JSON.stringify(r.errors)}`);
+});
+
+// T4 — enum + field gaps surfaced by the framework<->Database_Spec crosswalk.
+test('source-system accepts type: organization / movement / platform', () => {
+  for (const type of ['organization', 'movement', 'platform']) {
+    const r = validateObject('source-system', { ...goodSource, type });
+    assert.equal(r.valid, true, `${type}: ${r.errors.join('; ')}`);
+  }
+});
+
+test('public-use-boundary accepts tier: requires-domain-review', () => {
+  const r = validateObject('public-use-boundary', { tier: 'requires-domain-review' });
+  assert.equal(r.valid, true, r.errors.join('; '));
+});
+
+test('claim-evidence accepts an evidence_stance (DoD #5)', () => {
+  const ok = validateObject('claim-evidence', {
+    title: 'c', type: 'claim-evidence', claim: 'x', evidence_stance: 'contradicting',
+  });
+  assert.equal(ok.valid, true, ok.errors.join('; '));
+  const bad = validateObject('claim-evidence', {
+    title: 'c', type: 'claim-evidence', claim: 'x', evidence_stance: 'made-up',
+  });
+  assert.equal(bad.valid, false);
+});
+
+test('implementation-record accepts a record_stage (prospective candidates, not just completed cases)', () => {
+  const ok = validateObject('implementation-record', {
+    title: 'i', type: 'implementation-record', source_position: 'self-report', record_stage: 'prospective',
+  });
+  assert.equal(ok.valid, true, ok.errors.join('; '));
+  const bad = validateObject('implementation-record', {
+    title: 'i', type: 'implementation-record', source_position: 'self-report', record_stage: 'made-up',
+  });
+  assert.equal(bad.valid, false);
 });
