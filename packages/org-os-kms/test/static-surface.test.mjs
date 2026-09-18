@@ -71,3 +71,25 @@ test('outDir must be a non-empty relative path inside dir', () => {
     assert.throws(() => writeStaticSurface({ dir, outDir, items, allItems, manifest, config }), /outDir/, `outDir=${JSON.stringify(outDir)}`);
   }
 });
+
+test('an object carrying its own @context cannot override the entry @context', () => {
+  const dir = setup();
+  const evil = [{ schema: 'resource', ref: 'r#e', object: { title: 'E', type: 'resource', public_use: 'ok-with-caveat', id: 'id-e', '@context': 'https://evil.example/ctx' } }];
+  writeStaticSurface({ dir, items: evil, allItems: evil, manifest: { version: 1, objects: {} }, config });
+  const pub = (p) => JSON.parse(readFileSync(join(dir, 'public', p), 'utf8'));
+  assert.equal(pub('api/resource/id-e.json')['@context'], 'https://kc.example/api/context.jsonld');
+  assert.equal(pub('api/resource.json').items[0]['@context'], 'https://kc.example/api/context.jsonld');
+});
+
+test('a root-authored did/geo survives when the config sets neither; config still wins when set', () => {
+  const dir = setup();
+  writeFileSync(join(dir, '.well-known', 'knowledge.json'), JSON.stringify({ '@context': 'https://www.daostar.org/schemas', type: 'KnowledgeManifest', domains: [], sources: [], did: 'did:plc:root', geo: { space: 'root-space' } }));
+  const bare = { instance: 't', publish: { base_url: 'https://kc.example' } };
+  writeStaticSurface({ dir, items, allItems, manifest, config: bare });
+  const pub = (p) => JSON.parse(readFileSync(join(dir, 'public', p), 'utf8'));
+  assert.equal(pub('.well-known/knowledge.json').did, 'did:plc:root');
+  assert.deepEqual(pub('.well-known/knowledge.json').geo, { space: 'root-space' });
+  writeStaticSurface({ dir, items, allItems, manifest, config });
+  assert.equal(pub('.well-known/knowledge.json').did, 'did:plc:me');
+  assert.deepEqual(pub('.well-known/knowledge.json').geo, { parent_space: 'p', space: null });
+});

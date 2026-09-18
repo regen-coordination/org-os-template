@@ -21,7 +21,7 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
   const bySchema = new Map();
   for (const { schema, object } of items) {
     const m = manifest.objects[object.id];
-    const entry = { '@context': CONTEXT, ...fw.publicView(object), ...(m ? { atUri: m.atUri, cid: m.cid } : {}) };
+    const entry = { ...fw.publicView(object), '@context': CONTEXT, ...(m ? { atUri: m.atUri, cid: m.cid } : {}) }; // @context last: an object's own can never override the absolute URL
     if (!bySchema.has(schema)) bySchema.set(schema, []);
     bySchema.get(schema).push(entry);
   }
@@ -45,7 +45,7 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
   const cards = allItems.filter((i) => fw.publishableTypes(config).includes('source-system') && i.schema === 'source-system' && fw.PUBLISHABLE_PUBLIC_USE.includes(i.object.public_use)).map(({ object }) => ({ title: object.title, url: object.url, steward: object.steward }));
   const sources = [...(km.sources || [])];
   for (const c of cards) if (!sources.some((s) => s.title === c.title)) sources.push(c);
-  write('.well-known/knowledge.json', { ...km, did: config.atproto?.did, geo: config.geo, exchange: { published_domains: authority ? schemas.map((s) => fw.nsidFor(s, authority)) : [], subscribed_domains: subscribed }, sources });
+  write('.well-known/knowledge.json', { ...km, did: config.atproto?.did ?? km.did, geo: config.geo ?? km.geo, exchange: { published_domains: authority ? schemas.map((s) => fw.nsidFor(s, authority)) : [], subscribed_domains: subscribed }, sources });
 
   for (const f of WELL_KNOWN_ALLOW) {
     const src = join(dir, '.well-known', f);
