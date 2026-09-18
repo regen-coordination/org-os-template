@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PUBLISHABLE_TYPES, OPT_IN_TYPES, ALL_TYPES, PUBLISHABLE_PUBLIC_USE, publishableTypes, isPublishable, PRIVATE_FIELDS, publicView } from '../src/publishable.mjs';
-import { listSchemas, loadSchema } from '../src/index.mjs';
+import { listSchemas, loadSchema, schemaFields, validateObject } from '../src/index.mjs';
 
 test('default set is 10 schemas, never person; opt-in adds source-system + public-use-boundary', () => {
   assert.equal(PUBLISHABLE_TYPES.length, 10);
@@ -43,4 +43,9 @@ test('publicView strips editorial internals, keeps everything else, does not mut
   assert.deepEqual(out, { title: 'A', provenance: { origin: 'o' }, url: 'u' });
   assert.equal(src.notes, 'internal');
   for (const f of ['notes', 'work_order', 'reviewed_by', 'review_needs', 'high_risk', 'consent_note', 'additional_provenance']) assert.ok(PRIVATE_FIELDS.includes(f), f);
+});
+
+test('identity + provenance fields exist on every default publishable schema', () => {
+  for (const t of PUBLISHABLE_TYPES) { const f = schemaFields(t); for (const k of ['id', 'grc20Id', 'sourceUri', 'viaUri']) assert.ok(f[k], `${t} lacks ${k}`); }
+  assert.equal(validateObject('resource', { title: 'x', type: 'resource', id: 'a-b', grc20Id: 'c', sourceUri: 'at://d/e/f' }).valid, true);
 });
