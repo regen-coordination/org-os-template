@@ -1,0 +1,111 @@
+// packages/org-os-kms/test/publish-op.test.mjs
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import yaml from 'js-yaml';
+import { OPS } from '../src/ops.mjs';
+import { LIFECYCLE_BINDINGS } from '../src/bind.mjs';
+
+function instance({ atproto = true, gate = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-pub-'));
+  mkdirSync(join(dir, 'data', 'kb'), { recursive: true });
+  writeFileSync(join(dir, 'data', 'kb', 'resource.yaml'), yaml.dump({ entries: {
+    a: { title: 'A', type: 'resource', public_use: 'ok-with-caveat' },
+    b: { title: 'B', type: 'resource', public_use: 'ok-with-caveat', maturity: 'reviewed' },
+    i: { title: 'I', type: 'resource', public_use: 'internal-only' } } }));
+  writeFileSync(join(dir, 'data', 'kb', 'source-system.yaml'), yaml.dump({ entries: { card: { title: 'Card', type: 'blog', public_use: 'ok-with-caveat', steward: 's', return_path: 'r' } } }));
+  if (gate) writeFileSync(join(dir, 'gate.mjs'), 'export function isPublishable(o){ return o.maturity === "reviewed" ? { ok: true } : { ok: false, reason: "not reviewed" }; }');
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.',
+    publish: { base_url: 'https://t.example', ...(gate ? { gate: 'gate.mjs' } : {}) },
+    ...(atproto ? { atproto: { did: 'did:plc:me', handle: 'kc.test', pds: 'https://pds.test', nsid_authority: 'xyz.regencoordination.kb' } } : {}) }));
+  return dir;
+}
+const fakeClientFactory = (log) => () => ({
+  async login() { log.push('login'); return { did: 'did:plc:me' }; },
+  async putRecord(op) { log.push(['put', op.rkey]); return { uri: `at://did:plc:me/${op.collection}/${op.rkey}`, cid: 'cid1' }; },
+  async deleteRecord(op) { log.push(['del', op.rkey]); },
+});
+const env = { ATPROTO_APP_PASSWORD: 'pw' };
+
+test('publish registered; bound after render.site, before sync.push', () => {
+  assert.ok(OPS.publish && OPS.publish.write === true);
+  const c = LIFECYCLE_BINDINGS.close;
+  assert.ok(c.indexOf('publish') > c.indexOf('render.site')); assert.equal(c.indexOf('publish'), c.indexOf('sync.push') - 1);
+});
+
+test('publish: gates by schema (card not published by default), mints, writes PDS + manifest + static', async () => {
+  const dir = instance(); const log = [];
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  assert.equal(res.report.minted, 2);
+  assert.equal(res.report.atproto.status, 'applied'); assert.equal(res.report.atproto.created, 2);
+  assert.ok(existsSync(join(dir, 'data', 'kms-published.json')));
+  assert.ok(existsSync(join(dir, 'public', 'api', 'resource.json')));
+  assert.ok(!existsSync(join(dir, 'public', 'api', 'source-system.json')), 'opt-in type not published');
+  const disk = yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries;
+  assert.ok(disk.a.id && disk.b.id && !disk.i.id);
+});
+
+test('publish: instance gate narrows; ids minted only for gate-passing objects', async () => {
+  const dir = instance({ gate: true }); const log = [];
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.report.gate.passed, 1); assert.equal(res.report.gate.rejected, 1);
+  assert.deepEqual(res.report.gate.by_reason, { 'not reviewed': 1 });
+  assert.equal(res.report.minted, 1); assert.equal(res.report.atproto.created, 1);
+  const disk = yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries;
+  assert.ok(disk.b.id && !disk.a.id);
+});
+
+test('second run is all skips', async () => {
+  const dir = instance(); const log = []; const deps = { createClient: fakeClientFactory(log), env };
+  await OPS.publish.run({ dir, flags: { apply: true }, deps });
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps });
+  assert.equal(res.report.atproto.skipped, 2); assert.equal(res.report.atproto.created, 0);
+});
+
+test('not configured (no atproto / no credential) → static still written, ok', async () => {
+  for (const dir of [instance({ atproto: false }), instance()]) {
+    const res = await OPS.publish.run({ dir, deps: { createClient: () => { throw new Error('must not be called'); }, env: {} } });
+    assert.equal(res.ok, true); assert.equal(res.report.atproto.status, 'not-configured');
+    assert.ok(existsSync(join(dir, 'public', 'api', 'resource.json')));
+  }
+});
+
+test('publish.static:false skips the surface', async () => {
+  const dir = instance({ atproto: false });
+  const cfg = yaml.load(readFileSync(join(dir, 'kms.yaml'), 'utf8')); cfg.publish = { static: false }; writeFileSync(join(dir, 'kms.yaml'), yaml.dump(cfg));
+  const res = await OPS.publish.run({ dir, deps: { env: {} } });
+  assert.equal(res.report.static, 'disabled'); assert.ok(!existsSync(join(dir, 'public')));
+});
+
+test('--dry: plans, mints nothing, writes nothing', async () => {
+  const dir = instance(); const log = [];
+  const res = await OPS.publish.run({ dir, flags: { dry: true }, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.report.dry, true); assert.equal(res.report.atproto.status, 'planned'); assert.equal(res.report.atproto.created, 2);
+  assert.equal(log.length, 0);
+  assert.ok(!existsSync(join(dir, 'data', 'kms-published.json'))); assert.ok(!existsSync(join(dir, 'public')));
+  assert.equal(yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries.a.id, undefined);
+});
+
+test('validation failure fails hard before any PDS write', async () => {
+  const dir = instance(); const log = [];
+  writeFileSync(join(dir, 'data', 'kb', 'resource.yaml'), yaml.dump({ entries: { a: { title: 'A', type: 'resource', public_use: 'ok-with-caveat', provenance: { score: 0.5 } } } }));
+  const res = await OPS.publish.run({ dir, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.ok, false); assert.equal(log.length, 0); assert.match(JSON.stringify(res.report.errors), /float/);
+});
+
+test('without --apply, close-mode publish plans only: nothing on PDS, no manifest, static still written', async () => {
+  const dir = instance(); const log = [];
+  const res = await OPS.publish.run({ dir, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.report.atproto.status, 'planned'); assert.equal(log.length, 0);
+  assert.ok(!existsSync(join(dir, 'data', 'kms-published.json')));
+  assert.ok(existsSync(join(dir, 'public', 'api', 'resource.json')));
+});
+
+test('grc20Id only when geo.space is set', async () => {
+  const dir = instance(); const deps = { createClient: fakeClientFactory([]), env };
+  await OPS.publish.run({ dir, flags: { apply: true }, deps });
+  assert.equal(yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries.a.grc20Id, undefined);
+});
