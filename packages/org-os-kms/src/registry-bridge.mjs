@@ -58,7 +58,7 @@ export function bridge(ctx) {
     if (!registry) { if (!report.skipped.includes(schema)) report.skipped.push(schema); continue; }
     if (registry.endsWith('/')) {
       try {
-        const slug = object.id || fw.slugify(object.title || 'untitled');
+        const slug = fw.slugify(object.title || 'untitled');
         report.docs.push(writeMarkdownDoc(join(dir, registry, `${slug}.md`), object).doc);
       } catch (e) { report.errors.push(`${schema}: ${e.message}`); }
       continue;
