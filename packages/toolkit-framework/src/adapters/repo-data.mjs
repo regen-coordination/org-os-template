@@ -20,7 +20,7 @@ function safeSchema(schema) {
   return schema;
 }
 
-function slugFor(object) {
+export function slugFor(object) {
   return slugify(object.title || object.id || '') || `untitled-${hashContent(yaml.dump(object)).slice(0, 8)}`;
 }
 

@@ -3,6 +3,7 @@
 // Dry-aware (dry writes nothing); each candidate is validated AS IT WILL BE STORED.
 import { getAdapter, slugify } from './storage.mjs';
 import { validateObject, checkInvariants } from './index.mjs';
+import { slugFor } from './adapters/repo-data.mjs';   // the adapter's own slug rule (title → id → untitled-<hash>), so collision detection mirrors store()
 
 export class NOT_IMPLEMENTED extends Error {
   constructor(name) { super(`connector ${name}: pull not implemented`); this.code = 'NOT_IMPLEMENTED'; }
@@ -19,8 +20,19 @@ export async function runConnector(connector, { config, cursor, adapter, target,
   const byOrigin = new Map(local.filter((i) => i.object.sourceUri).map((i) => [i.object.sourceUri, i]));
   const stamp = now();
 
-  const toStore = []; const toUpdate = []; const invalid = [];
-  for (const r of records) for (const { schema, object } of connector.map(r, config)) {
+  // The slug a stored object lives under: the ref's part after the LAST '#' (repo-data refs are `<file>#<slug>`).
+  const refSlug = (i) => (i.ref.includes('#') ? i.ref.slice(i.ref.lastIndexOf('#') + 1) : slugFor(i.object));
+  const taken = new Set(local.map((i) => `${i.schema}:${refSlug(i)}`));
+
+  // Flatten mapped objects; if several share a sourceUri within one pull, only the LAST is applied.
+  const mapped = [];
+  for (const r of records) for (const m of connector.map(r, config)) mapped.push(m);
+  const lastByOrigin = new Map();
+  mapped.forEach((m, idx) => { if (m.object.sourceUri) lastByOrigin.set(m.object.sourceUri, idx); });
+
+  const toStore = []; const toUpdate = []; const invalid = []; const collided = [];
+  mapped.forEach(({ schema, object }, idx) => {
+    if (object.sourceUri && lastByOrigin.get(object.sourceUri) !== idx) return;
     const base = { ...object, ai_assisted: object.ai_assisted ?? true,
       work_order: `connector:${connector.name}:${stamp}`,
       source_lineage: object.sourceUri ?? object.source_lineage ?? source.return_path,
@@ -29,18 +41,29 @@ export async function runConnector(connector, { config, cursor, adapter, target,
     const candidate = { ...base, maturity: 'raw', public_use: 'not-public-yet' };
     const v = validateObject(schema, candidate); const inv = checkInvariants(candidate);
     const errs = [...v.errors, ...(inv.violations || [])];
-    if (errs.length) { invalid.push({ title: object.title, errors: errs }); continue; }
+    if (errs.length) { invalid.push({ title: object.title, errors: errs }); return; }
     const existing = object.sourceUri && byOrigin.get(object.sourceUri);
     if (existing) {
       const patch = {}; for (const [k, x] of Object.entries(candidate)) if (!LOCAL_ONLY.includes(k)) patch[k] = x;
-      toUpdate.push({ ref: existing.ref, patch: { ...patch, review_needs: 'updated at origin' } });
-    } else toStore.push({ schema, object: candidate });
-  }
-  const report = { source, pulled: records.length, candidates: toStore.length + toUpdate.length, invalid, stored: 0, updated: 0, collisions: 0, cursor, retractions: 0, errors, dry };
+      patch.review_needs = 'updated at origin';
+      // The kept local maturity/public_use must not clash with the incoming ai_assisted: keep the local value if so.
+      let violations = checkInvariants({ ...existing.object, ...patch }).violations;
+      if (violations.length) { delete patch.ai_assisted; violations = checkInvariants({ ...existing.object, ...patch }).violations; }
+      if (violations.length) { invalid.push({ title: object.title, errors: violations }); return; }
+      toUpdate.push({ ref: existing.ref, patch });
+    } else {
+      // Never clobber local data: a NEW candidate whose slug is already taken (locally or earlier in this batch) is skipped.
+      const key = `${schema}:${slugFor(candidate)}`;
+      if (taken.has(key)) { collided.push({ schema, title: object.title }); return; }
+      taken.add(key);
+      toStore.push({ schema, object: candidate });
+    }
+  });
+  const report = { source, pulled: records.length, candidates: toStore.length + toUpdate.length, invalid, stored: 0, updated: 0, collisions: collided.length, collided, cursor, retractions: 0, errors, dry };
   if (dry) return report;
 
   for (const u of toUpdate) a.update(target, u.ref, u.patch);
-  const { stored, collisions = [] } = toStore.length ? a.store(target, toStore) : { stored: [], collisions: [] };
+  const { stored } = toStore.length ? a.store(target, toStore) : { stored: [] };
 
   // The federation primitive is always written: the source's own card (never overwritten once it exists).
   const cardSlug = slugify(source.title);
@@ -52,5 +75,5 @@ export async function runConnector(connector, { config, cursor, adapter, target,
     const set = new Set(retracted);
     for (const { object, ref } of a.list(target)) if (object.sourceUri && set.has(object.sourceUri)) { a.update(target, ref, { maturity: 'held', review_needs: `retracted at origin ${object.sourceUri}` }); retractions++; }
   }
-  return { ...report, stored: stored.length, updated: toUpdate.length, collisions: collisions.length, retractions, cursor: nextCursor };
+  return { ...report, stored: stored.length, updated: toUpdate.length, retractions, cursor: nextCursor };
 }
