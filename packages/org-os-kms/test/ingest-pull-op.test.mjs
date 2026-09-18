@@ -1,7 +1,7 @@
 // packages/org-os-kms/test/ingest-pull-op.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
@@ -172,4 +172,32 @@ test('flags.connector undefined still means all connectors; a named one still wo
   assert.equal(all.ok, true); assert.equal(all.report.connectors.length, 2);
   const one = await OPS['ingest.pull'].run({ dir, flags: { connector: 'good' }, deps: { registry: { good, stub } } });
   assert.equal(one.report.connectors.length, 1);
+});
+
+test('cursor write-back re-reads kms.yaml: a concurrent edit survives, the cursor lands, no tmp file is left', async () => {
+  const dir = instance([{ name: 'good', config: {}, cursor: null }]);
+  const editing = { ...good, pull: async (_c, { cursor }) => {
+    const doc = yaml.load(kmsText(dir)); doc.added_meanwhile = true;               // an operator edit lands mid-run
+    writeFileSync(join(dir, 'kms.yaml'), yaml.dump(doc));
+    return { records: [{ n: 'X' }], cursor: (cursor || 0) + 1 };
+  } };
+  const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good: editing } } });
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  const cfg = yaml.load(kmsText(dir));
+  assert.equal(cfg.added_meanwhile, true, 'concurrent edit preserved');
+  assert.equal(cfg.connectors[0].cursor, 1, 'cursor written');
+  assert.ok(!existsSync(join(dir, 'kms.yaml.tmp')), 'no tmp file left behind');
+});
+
+test('cursor change is skipped (and reported) when the connector entry moved/renamed since the read', async () => {
+  const dir = instance([{ name: 'good', config: {}, cursor: null }]);
+  const renaming = { ...good, pull: async () => {
+    const doc = yaml.load(kmsText(dir)); doc.connectors[0].name = 'renamed';
+    writeFileSync(join(dir, 'kms.yaml'), yaml.dump(doc));
+    return { records: [], cursor: 7 };
+  } };
+  const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good: renaming } } });
+  assert.equal(res.ok, true);
+  assert.equal(yaml.load(kmsText(dir)).connectors[0].cursor, null, 'not applied to a different entry');
+  assert.deepEqual(res.report.cursorSkipped, ['good']);
 });

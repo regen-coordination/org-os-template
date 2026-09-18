@@ -5,10 +5,11 @@
 // reimplementing any framework logic. `write:true` marks ops whose failure must stop the
 // run (fail-hard); reads/renders are fail-soft.
 import { join } from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
+import { atomicWrite } from './atomic-write.mjs';
 import { bridge } from './registry-bridge.mjs';
 import { renderDashboardSection, renderSiteData } from './render.mjs';
 import { checkPeers } from './federate.mjs';
@@ -151,17 +152,15 @@ export const OPS = {
     const shared = { self: config.atproto?.did, nsid_authority: config.atproto?.nsid_authority, pds: config.atproto?.pds };
     const report = { connectors: [], failed: 0 };
     const kmsPath = join(dir, 'kms.yaml');
-    const raw = yaml.load(readFileSync(kmsPath, 'utf8'));
     const normalize = (c) => (c == null || (typeof c === 'object' && !Array.isArray(c) && Object.keys(c).length === 0)) ? null : c;
-    let cursorChanged = false;
+    const cursorChanges = []; // { i, name, cursor } — applied to a FRESH read of kms.yaml after the (slow) network pulls
     for (let i = 0; i < declared.length; i++) {
       const decl = declared[i];
       if (typeof only === 'string' && decl.name !== only) continue;
       try {
         const r = await fw.runConnector(getConnector(decl.name, registry), { config: { ...shared, ...(decl.config || {}) }, cursor: decl.cursor ?? null, adapter: config.adapter, target, dry });
         if (!dry && JSON.stringify(normalize(r.cursor)) !== JSON.stringify(normalize(decl.cursor))) {
-          raw.connectors[i].cursor = r.cursor ?? null;
-          cursorChanged = true;
+          cursorChanges.push({ i, name: decl.name, cursor: r.cursor ?? null });
         }
         report.connectors.push({ name: decl.name, status: 'ok', dry: r.dry, pulled: r.pulled, candidates: r.candidates, stored: r.stored, updated: r.updated,
           collisions: r.collisions, collided: r.collided ?? [], invalid: r.invalid ?? [], retractions: r.retractions, errors: r.errors });
@@ -170,7 +169,19 @@ export const OPS = {
         else { report.failed++; report.connectors.push({ name: decl.name, status: 'failed', error: e.message }); }
       }
     }
-    if (!dry && cursorChanged) writeFileSync(kmsPath, yaml.dump(raw, { lineWidth: 120 }));
+    if (!dry && cursorChanges.length) {
+      // Re-read now: the pulls can take a while and kms.yaml may have been edited meanwhile. Apply only the cursor
+      // changes (matched by index AND name), then write atomically (tmp + rename) so a kill can't truncate the config.
+      const fresh = yaml.load(readFileSync(kmsPath, 'utf8'));
+      const skipped = [];
+      let applied = 0;
+      for (const { i, name, cursor } of cursorChanges) {
+        const entry = Array.isArray(fresh?.connectors) ? fresh.connectors[i] : undefined;
+        if (entry && entry.name === name) { entry.cursor = cursor; applied++; } else skipped.push(name);
+      }
+      if (applied) atomicWrite(kmsPath, yaml.dump(fresh, { lineWidth: 120 }));
+      if (skipped.length) report.cursorSkipped = skipped;
+    }
     return { ok: true, report };
   } },
 

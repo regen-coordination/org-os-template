@@ -6,18 +6,12 @@
 // grouped by target file so each registry is read+written once (linear, clean diffs).
 // encyclopedia-entry is the markdown special case, written under a generated kb/ subdir so it
 // can never overwrite a hand-authored article.
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
 import { REGISTRY_BINDINGS } from './bind.mjs';
-
-function atomicWrite(absPath, text) {
-  mkdirSync(dirname(absPath), { recursive: true });
-  const tmp = absPath + '.tmp';
-  writeFileSync(tmp, text);
-  renameSync(tmp, absPath);
-}
+import { atomicWrite } from './atomic-write.mjs';
 
 // Upsert many objects into one registry file: read once, upsert each by id, write once.
 function upsertRegistryMany(absPath, stem, objects) {
