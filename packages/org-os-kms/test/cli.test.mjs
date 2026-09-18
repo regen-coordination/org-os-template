@@ -39,6 +39,13 @@ test('dispatch dry-routes federate frontier', () => {
   assert.deepEqual(r, { verb: 'federate', args: ['frontier'], flags: {} });
 });
 
+test('trailing --dry is boolean; --dir takes a value; publish/ingest are verbs', () => {
+  const r = dispatch(['publish', '--dir', '/tmp/x', '--dry'], { dry: true });
+  assert.equal(r.verb, 'publish'); assert.equal(r.flags.dir, '/tmp/x'); assert.equal(r.flags.dry, true);
+  const i = dispatch(['ingest', '--connector', 'atproto', '--dry'], { dry: true });
+  assert.equal(i.verb, 'ingest'); assert.equal(i.flags.connector, 'atproto'); assert.equal(i.flags.dry, true);
+});
+
 test('render map builds map.json from federation.yaml (no kms.yaml needed)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'kms-map-'));
   wf(join(dir, 'federation.yaml'), 'identity:\n  name: tmp-os\n  type: Project\ndownstream:\n  - id: kid\n    name: Kid\n');

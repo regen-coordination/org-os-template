@@ -11,19 +11,21 @@ import { loadKmsConfig } from './config.mjs';
 import { buildMap } from './map.mjs';
 import { renderMapHtml, renderPortalIndex } from './render-map-html.mjs';
 import { fetchFrontier } from './frontier.mjs';
+import { OPS } from './ops.mjs';
 import * as fw from './framework.mjs';
 import { fileURLToPath } from 'node:url';
 import { resolve, join, dirname as pathDirname } from 'node:path';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init']);
+const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init', 'publish', 'ingest']);
 
 function parseFlags(argv) {
   const args = [], flags = {};
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
-    if (t.startsWith('--')) { flags[t.slice(2)] = argv[i + 1]; i++; }
-    else args.push(t);
+    if (!t.startsWith('--')) { args.push(t); continue; }
+    const next = argv[i + 1];
+    if (next === undefined || next.startsWith('--')) flags[t.slice(2)] = true; else { flags[t.slice(2)] = next; i++; }
   }
   return { args, flags };
 }
@@ -67,6 +69,8 @@ export function dispatch(argv, opts = {}) {
     }
     case 'promote':   return promote({ from: flags.from || '.', to: flags.to });
     case 'init':      return fw.initInstance({ dir, name: flags.name, adapter: flags.adapter || 'repo-data', target: flags.target || '.' });
+    case 'publish':   return OPS.publish.run({ dir, flags: { dry: flags.dry === true, apply: flags.apply === true } });
+    case 'ingest':    return OPS['ingest.pull'].run({ dir, flags: { dry: flags.dry === true, connector: flags.connector } });
   }
 }
 
