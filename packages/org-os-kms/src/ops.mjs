@@ -81,12 +81,16 @@ export const OPS = {
       const by_reason = {}; for (const r of rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
       report.gate = { passed: passed.length, rejected: rejected.length, by_reason };
     }
-    const { minted, items } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry, mintGeo: Boolean(config.geo?.space) });
+    // Mint ids to disk only when something will consume them (a PDS or the static surface); otherwise
+    // an instance with nowhere to publish would get tracked yaml rewritten on every close. The preview
+    // (in-memory ids, report.minted) is unchanged.
+    const at = config.atproto;
+    const hasTarget = Boolean(at?.did && at?.pds && at?.nsid_authority) || config.publish?.static !== false;
+    const { minted, items } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget, mintGeo: Boolean(config.geo?.space) });
     report.minted = minted.length;
 
     const manifest = readManifest(dir);
     let next = manifest;
-    const at = config.atproto;
     if (at?.did && at?.pds && at?.nsid_authority) {
       const plan = planPublish({ items, manifest, did: at.did, authority: at.nsid_authority });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };

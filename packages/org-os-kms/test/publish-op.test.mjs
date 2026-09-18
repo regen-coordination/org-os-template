@@ -134,3 +134,25 @@ test('--apply with no atproto config: not-configured, no manifest', async () => 
   assert.equal(res.report.atproto.status, 'not-configured');
   assert.ok(!existsSync(join(dir, 'data', 'kms-published.json')));
 });
+
+test('no publication target (static:false + no atproto): ids are NOT written to disk, minting is only previewed', async () => {
+  const dir = instance({ atproto: false });
+  const cfg = yaml.load(readFileSync(join(dir, 'kms.yaml'), 'utf8')); cfg.publish = { static: false }; writeFileSync(join(dir, 'kms.yaml'), yaml.dump(cfg));
+  const before = readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8');
+  const res = await OPS.publish.run({ dir, deps: { env: {} } });
+  assert.equal(res.ok, true);
+  assert.equal(res.report.minted, 2, 'preview count is still reported');
+  const disk = yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries;
+  assert.ok(!disk.a.id && !disk.b.id && !disk.i.id, 'no ids written');
+  assert.equal(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8'), before, 'tracked yaml untouched');
+  assert.ok(!existsSync(join(dir, 'public')));
+});
+
+test('a publication target (atproto only, or static only) still mints ids to disk', async () => {
+  // static:false but atproto configured (dry:false, plan mode) -> target exists
+  const dir = instance();
+  const cfg = yaml.load(readFileSync(join(dir, 'kms.yaml'), 'utf8')); cfg.publish = { static: false }; writeFileSync(join(dir, 'kms.yaml'), yaml.dump(cfg));
+  await OPS.publish.run({ dir, deps: { env: {} } });
+  const disk = yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries;
+  assert.ok(disk.a.id && disk.b.id);
+});
