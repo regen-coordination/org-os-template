@@ -29,9 +29,12 @@ function upsertRegistryMany(absPath, stem, objects) {
   if (!Array.isArray(doc[key])) doc[key] = [];
   const results = [];
   for (const obj of objects) {
-    const id = obj.id || fw.slugify(obj.title || '');
+    const slug = fw.slugify(obj.title || '');
+    const id = obj.id || slug;
     const row = { id, ...obj };
-    const i = doc[key].findIndex((e) => e.id === id);
+    // Match by the current id OR the title slug: a row bridged before the object was minted an id is
+    // keyed by the slug, and must migrate slug -> id in place rather than be duplicated.
+    const i = doc[key].findIndex((e) => e.id === id || e.id === slug);
     if (i >= 0) doc[key][i] = { ...doc[key][i], ...row };
     else doc[key].push(row);
     results.push({ registry: absPath, key, id, action: i >= 0 ? 'update' : 'insert' });

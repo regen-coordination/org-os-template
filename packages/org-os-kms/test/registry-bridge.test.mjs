@@ -93,3 +93,25 @@ test('bridge does not line-fold long scalars (diff-clean YAML, lineWidth:-1)', (
   const raw = readFileSync(join(dir, 'data/resources.yaml'), 'utf8');
   assert.ok(raw.includes(longVal), 'the long scalar stays on one line (not folded)');
 });
+
+test('minted id migrates the slug-keyed registry row in place (no duplicate row)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-mint-'));
+  const a = fw.getAdapter('repo-data');
+  // First bridge: the object has NO id yet, so its registry row is keyed by the title slug.
+  a.store(dir, [{ schema: 'resource', object: { title: 'Res One', maturity: 'raw' } }]);
+  mkdirSync(join(dir, 'data'), { recursive: true });
+  writeFileSync(join(dir, 'data/resources.yaml'), yaml.dump({ resources: [{ id: 'instance-only', title: 'Instance Only' }] }));
+  const ctx = { dir, config: { adapter: 'repo-data', target: '.' } };
+  bridge(ctx);
+  let doc = yaml.load(readFileSync(join(dir, 'data/resources.yaml'), 'utf8'));
+  assert.ok(doc.resources.some((e) => e.id === 'res-one'), 'first bridge keys the row by slug');
+  // Publish mints a UUID id for the same object; bridging again must reuse the slug row.
+  a.store(dir, [{ schema: 'resource', object: { id: 'uuid-1', title: 'Res One', maturity: 'raw' } }]);
+  bridge(ctx);
+  doc = yaml.load(readFileSync(join(dir, 'data/resources.yaml'), 'utf8'));
+  const rows = doc.resources.filter((e) => e.title === 'Res One');
+  assert.equal(rows.length, 1, 'exactly one row for the object');
+  assert.equal(rows[0].id, 'uuid-1', 'the row migrated slug -> uuid in place');
+  assert.deepEqual(doc.resources.find((e) => e.id === 'instance-only'), { id: 'instance-only', title: 'Instance Only' });
+  assert.equal(doc.resources.length, 2);
+});
