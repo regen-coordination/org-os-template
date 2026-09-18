@@ -187,3 +187,22 @@ test('plan mode with an empty selection just reports the counts (no refusal)', a
   assert.equal(res.report.atproto.deleted, 2);
   assert.deepEqual(log, []);
 });
+
+test('a login failure is a reported failure (ok:false, status failed), not a thrown exception; no manifest written', async () => {
+  const dir = instance();
+  const createClient = () => ({ async login() { throw new Error('boom pw'); }, async putRecord() { throw new Error('must not be called'); }, async deleteRecord() {} });
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient, env } });
+  assert.equal(res.ok, false);
+  assert.equal(res.report.atproto.status, 'failed');
+  assert.match(res.report.atproto.error, /boom/);
+  assert.ok(!res.report.atproto.error.includes('pw'), 'the app password is never echoed');
+  assert.equal(res.report.atproto.created, 2, 'plan counts are kept');
+  assert.ok(!existsSync(join(dir, 'data', 'kms-published.json')));
+  assert.ok(existsSync(join(dir, 'public', 'api', 'resource.json')), 'static surface still runs');
+});
+
+test('a throw out of client creation or a non-record apply error is also reported, not thrown', async () => {
+  const dir = instance();
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: () => { throw new Error('no pds'); }, env } });
+  assert.equal(res.ok, false); assert.equal(res.report.atproto.status, 'failed'); assert.match(res.report.atproto.error, /no pds/);
+});

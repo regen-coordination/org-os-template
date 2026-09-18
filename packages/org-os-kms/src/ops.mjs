@@ -102,12 +102,22 @@ export const OPS = {
         // Never let an unattended apply (close + publish.apply:true) turn an empty/misconfigured selection into a mass delete.
         return { ok: false, report: { ...report, atproto: { status: 'failed', reason: 'refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)', deleted: 0, wouldDelete: plan.delete.length } } };
       } else {
-        const client = deps.createClient({ pds: at.pds });
-        await client.login({ identifier: at.handle || at.did, password });
-        const applied = await applyPublish(plan, { client, did: at.did });
-        next = applied.manifest;
-        writeManifest(dir, next); // authoritative record of what is on the PDS: persist before anything that can throw
-        report.atproto = { status: applied.failures.length ? 'failed' : 'applied', ...applied.applied, skipped: plan.skip.length, failures: applied.failures };
+        let applied;
+        try {
+          const client = deps.createClient({ pds: at.pds });
+          await client.login({ identifier: at.handle || at.did, password });
+          applied = await applyPublish(plan, { client, did: at.did });
+        } catch (e) {
+          // A login/network failure is a reported failure, not an exception. Nothing is persisted here (applyPublish
+          // never returned, so there is no trustworthy manifest); the static surface below still runs from the last
+          // persisted manifest, exactly as in plan mode. Never echo the credential.
+          report.atproto = { status: 'failed', error: String(e.message).split(password).join('***'), ...counts };
+        }
+        if (applied) {
+          next = applied.manifest;
+          writeManifest(dir, next); // authoritative record of what is on the PDS: persist before anything that can throw
+          report.atproto = { status: applied.failures.length ? 'failed' : 'applied', ...applied.applied, skipped: plan.skip.length, failures: applied.failures };
+        }
       }
     }
     if (config.publish?.static === false) report.static = 'disabled';
