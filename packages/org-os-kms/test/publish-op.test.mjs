@@ -109,3 +109,28 @@ test('grc20Id only when geo.space is set', async () => {
   await OPS.publish.run({ dir, flags: { apply: true }, deps });
   assert.equal(yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries.a.grc20Id, undefined);
 });
+
+test('apply: manifest persisted even when the static surface throws; failure reported, ok false', async () => {
+  const dir = instance(); const log = [];
+  const cfg = yaml.load(readFileSync(join(dir, 'kms.yaml'), 'utf8')); delete cfg.publish.base_url; writeFileSync(join(dir, 'kms.yaml'), yaml.dump(cfg));
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.report.atproto.status, 'applied');
+  assert.equal(res.report.static.status, 'failed'); assert.match(res.report.static.error, /base_url/);
+  assert.equal(res.ok, false);
+  const manifest = JSON.parse(readFileSync(join(dir, 'data', 'kms-published.json'), 'utf8'));
+  assert.equal(Object.keys(manifest.objects).length, 2);
+});
+
+test('--apply with atproto configured but no ATPROTO_APP_PASSWORD: not-configured, no manifest', async () => {
+  const dir = instance();
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: () => { throw new Error('must not be called'); }, env: {} } });
+  assert.equal(res.report.atproto.status, 'not-configured');
+  assert.ok(!existsSync(join(dir, 'data', 'kms-published.json')));
+});
+
+test('--apply with no atproto config: not-configured, no manifest', async () => {
+  const dir = instance({ atproto: false });
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { env } });
+  assert.equal(res.report.atproto.status, 'not-configured');
+  assert.ok(!existsSync(join(dir, 'data', 'kms-published.json')));
+});

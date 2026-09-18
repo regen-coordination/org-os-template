@@ -57,7 +57,7 @@ export const OPS = {
 
   // publish: plan mode by default (what `close` runs); real PDS writes only with --apply
   // (flags.apply) or publish.apply:true in kms.yaml. Framework gate is the floor; the
-  // instance gate can only narrow. Manifest is written only when something was applied.
+  // instance gate can only narrow. Manifest is written only when applyPublish ran (right after it).
   'publish': { kind: 'exec', write: true, run: async (ctx) => {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
@@ -96,14 +96,17 @@ export const OPS = {
         await client.login({ identifier: at.handle || at.did, password });
         const applied = await applyPublish(plan, { client, did: at.did });
         next = applied.manifest;
+        writeManifest(dir, next); // authoritative record of what is on the PDS: persist before anything that can throw
         report.atproto = { status: applied.failures.length ? 'failed' : 'applied', ...applied.applied, skipped: plan.skip.length, failures: applied.failures };
       }
     }
     if (config.publish?.static === false) report.static = 'disabled';
-    else if (!dry) report.static = writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items, allItems: all, manifest: next, config });
+    else if (!dry) {
+      try { report.static = writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items, allItems: all, manifest: next, config }); }
+      catch (e) { report.static = { status: 'failed', error: e.message }; }
+    }
     else report.static = 'skipped (dry)';
-    if (!dry && apply) writeManifest(dir, next);
-    return { ok: report.atproto.status !== 'failed', report };
+    return { ok: report.atproto.status !== 'failed' && report.static?.status !== 'failed', report };
   } },
 
   // skill directives — judgment ops the agent runs; the executor collects them.
