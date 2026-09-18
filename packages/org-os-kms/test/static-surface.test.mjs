@@ -19,7 +19,7 @@ const allItems = [...items,
   { schema: 'source-system', ref: 's#self', object: { title: 'S', type: 'knowledge-garden', public_use: 'ok-with-caveat', url: 'https://kc', steward: 'x' } },
   { schema: 'source-system', ref: 's#priv', object: { title: 'P', type: 'database', public_use: 'internal-only' } }];
 const manifest = { version: 1, objects: { 'id-a': { slug: 'a', type: 'resource', rkey: 'id-a', atUri: 'at://d/c/id-a', cid: 'cid-a', hash: 'h', publishedAt: 't' } } };
-const config = { instance: 't', publish: { base_url: 'https://kc.example' }, atproto: { did: 'did:plc:me', nsid_authority: 'xyz.regencoordination.kb' }, geo: { parent_space: 'p', space: null },
+const config = { instance: 't', publish: { base_url: 'https://kc.example', types_opt_in: ['source-system'] }, atproto: { did: 'did:plc:me', nsid_authority: 'xyz.regencoordination.kb' }, geo: { parent_space: 'p', space: null },
   connectors: [{ name: 'atproto', config: { peers: ['did:plc:peer'] } }] };
 
 test('projected entries, absolute @context, merged knowledge.json, allowlisted .well-known', () => {
@@ -43,4 +43,31 @@ test('projected entries, absolute @context, merged knowledge.json, allowlisted .
 test('base_url is required', () => {
   const dir = setup();
   assert.throws(() => writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: {} } }), /base_url/);
+});
+
+test('source-system cards honor the opt-in type gate', () => {
+  const dir = setup();
+  writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: { base_url: 'https://kc.example' } } });
+  const km = JSON.parse(readFileSync(join(dir, 'public', '.well-known', 'knowledge.json'), 'utf8'));
+  assert.deepEqual(km.sources.map((s) => s.title), ['Existing']);
+});
+
+test('re-running removes api/ files for objects/schemas no longer published', () => {
+  const dir = setup();
+  const two = [...items, { schema: 'resource', ref: 'r#b', object: { title: 'B', type: 'resource', public_use: 'ok-with-caveat', id: 'id-b' } }];
+  writeStaticSurface({ dir, items: two, allItems: two, manifest, config });
+  assert.ok(existsSync(join(dir, 'public', 'api', 'resource', 'id-b.json')));
+  writeStaticSurface({ dir, items, allItems: items, manifest, config });
+  assert.ok(!existsSync(join(dir, 'public', 'api', 'resource', 'id-b.json')), 'dropped object removed');
+  assert.ok(existsSync(join(dir, 'public', 'api', 'resource', 'id-a.json')), 'kept object present');
+  writeStaticSurface({ dir, items: [], allItems: [], manifest, config });
+  assert.ok(!existsSync(join(dir, 'public', 'api', 'resource.json')), 'emptied schema index removed');
+  assert.ok(!existsSync(join(dir, 'public', 'api', 'resource', 'id-a.json')));
+});
+
+test('outDir must be a non-empty relative path inside dir', () => {
+  for (const outDir of ['../escape', '/abs', '']) {
+    const dir = setup();
+    assert.throws(() => writeStaticSurface({ dir, outDir, items, allItems, manifest, config }), /outDir/, `outDir=${JSON.stringify(outDir)}`);
+  }
 });
