@@ -5,6 +5,8 @@
 // reimplementing any framework logic. `write:true` marks ops whose failure must stop the
 // run (fail-hard); reads/renders are fail-soft.
 import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { bridge } from './registry-bridge.mjs';
@@ -16,6 +18,7 @@ import { planPublish, applyPublish } from './atproto/publish.mjs';
 import { createClient as defaultCreateClient } from './atproto/client.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { loadInstanceGate, buildGateContext, applyGate } from './gate.mjs';
+import { getConnector, CONNECTORS } from './connectors/index.mjs';
 
 export const OPS = {
   // write:true here = CRITICAL/fail-hard: if kms.yaml can't load, no downstream op can run.
@@ -107,6 +110,47 @@ export const OPS = {
     }
     else report.static = 'skipped (dry)';
     return { ok: report.atproto.status !== 'failed' && report.static?.status !== 'failed', report };
+  } },
+
+  // ingest.pull: CLI verb only (`org-os-kms ingest`), deliberately NOT bound to any lifecycle event.
+  // Fail-soft per connector: a failure is reported (status:'failed', report.failed) and the op still
+  // returns ok:true so one bad peer never blocks the rest. --dry stores nothing and never writes a cursor.
+  // kms.yaml is rewritten only when a cursor actually changed (yaml.dump drops the file's comments).
+  'ingest.pull': { kind: 'exec', write: true, run: async (ctx) => {
+    const dir = ctx.dir || '.';
+    const config = ctx.config || (ctx.config = loadKmsConfig(dir));
+    const registry = ctx.deps?.registry || CONNECTORS;
+    const dry = ctx.flags?.dry === true;
+    const only = ctx.flags?.connector;
+    const target = join(dir, config.target);
+    const declared = config.connectors || [];
+    if (typeof only === 'string' && !declared.some((d) => d.name === only)) {
+      return { ok: true, report: { connectors: [], failed: 0, warning: `no declared connector named ${only}` } };
+    }
+    const shared = { self: config.atproto?.did, nsid_authority: config.atproto?.nsid_authority, pds: config.atproto?.pds };
+    const report = { connectors: [], failed: 0 };
+    const kmsPath = join(dir, 'kms.yaml');
+    const raw = yaml.load(readFileSync(kmsPath, 'utf8'));
+    const normalize = (c) => (c == null || (typeof c === 'object' && !Array.isArray(c) && Object.keys(c).length === 0)) ? null : c;
+    let cursorChanged = false;
+    for (let i = 0; i < declared.length; i++) {
+      const decl = declared[i];
+      if (typeof only === 'string' && decl.name !== only) continue;
+      try {
+        const r = await fw.runConnector(getConnector(decl.name, registry), { config: { ...shared, ...(decl.config || {}) }, cursor: decl.cursor ?? null, adapter: config.adapter, target, dry });
+        if (!dry && JSON.stringify(normalize(r.cursor)) !== JSON.stringify(normalize(decl.cursor))) {
+          raw.connectors[i].cursor = r.cursor ?? null;
+          cursorChanged = true;
+        }
+        report.connectors.push({ name: decl.name, status: 'ok', dry: r.dry, pulled: r.pulled, candidates: r.candidates, stored: r.stored, updated: r.updated,
+          collisions: r.collisions, collided: r.collided ?? [], invalid: r.invalid ?? [], retractions: r.retractions, errors: r.errors });
+      } catch (e) {
+        if (e.code === 'NOT_IMPLEMENTED') report.connectors.push({ name: decl.name, status: 'not-implemented' });
+        else { report.failed++; report.connectors.push({ name: decl.name, status: 'failed', error: e.message }); }
+      }
+    }
+    if (!dry && cursorChanged) writeFileSync(kmsPath, yaml.dump(raw, { lineWidth: 120 }));
+    return { ok: true, report };
   } },
 
   // skill directives — judgment ops the agent runs; the executor collects them.
