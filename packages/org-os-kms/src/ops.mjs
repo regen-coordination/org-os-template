@@ -98,7 +98,10 @@ export const OPS = {
       const password = deps.env.ATPROTO_APP_PASSWORD;
       if (!password) report.atproto = { status: 'not-configured', reason: 'ATPROTO_APP_PASSWORD not set', ...counts };
       else if (dry || !apply) report.atproto = { status: 'planned', ...counts };
-      else {
+      else if (items.length === 0 && plan.delete.length > 0) {
+        // Never let an unattended apply (close + publish.apply:true) turn an empty/misconfigured selection into a mass delete.
+        return { ok: false, report: { ...report, atproto: { status: 'failed', reason: 'refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)', deleted: 0, wouldDelete: plan.delete.length } } };
+      } else {
         const client = deps.createClient({ pds: at.pds });
         await client.login({ identifier: at.handle || at.did, password });
         const applied = await applyPublish(plan, { client, did: at.did });

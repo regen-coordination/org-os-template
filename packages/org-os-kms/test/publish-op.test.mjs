@@ -156,3 +156,34 @@ test('a publication target (atproto only, or static only) still mints ids to dis
   const disk = yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries;
   assert.ok(disk.a.id && disk.b.id);
 });
+
+function emptySelectionInstance() {
+  const dir = instance();
+  writeFileSync(join(dir, 'data', 'kb', 'resource.yaml'), yaml.dump({ entries: { i: { title: 'I', type: 'resource', public_use: 'internal-only' } } }));
+  mkdirSync(join(dir, 'data'), { recursive: true });
+  const entry = (id) => ({ slug: id, type: 'resource', rkey: id, atUri: `at://did:plc:me/xyz.regencoordination.kb.resource/${id}`, cid: 'c', hash: 'h', publishedAt: '2026-01-01T00:00:00.000Z' });
+  writeFileSync(join(dir, 'data', 'kms-published.json'), JSON.stringify({ version: 1, objects: { 'old-1': entry('old-1'), 'old-2': entry('old-2') } }, null, 2));
+  return dir;
+}
+
+test('apply with an empty selection refuses to delete the whole published corpus', async () => {
+  const dir = emptySelectionInstance(); const log = [];
+  const manifestBefore = readFileSync(join(dir, 'data', 'kms-published.json'), 'utf8');
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.ok, false);
+  assert.deepEqual(log, [], 'no login, no delete');
+  assert.equal(res.report.atproto.status, 'failed');
+  assert.equal(res.report.atproto.wouldDelete, 2);
+  assert.equal(res.report.atproto.deleted, 0);
+  assert.match(res.report.atproto.reason, /refusing to delete every published record/);
+  assert.equal(readFileSync(join(dir, 'data', 'kms-published.json'), 'utf8'), manifestBefore, 'manifest untouched');
+});
+
+test('plan mode with an empty selection just reports the counts (no refusal)', async () => {
+  const dir = emptySelectionInstance(); const log = [];
+  const res = await OPS.publish.run({ dir, deps: { createClient: fakeClientFactory(log), env } });
+  assert.equal(res.ok, true);
+  assert.equal(res.report.atproto.status, 'planned');
+  assert.equal(res.report.atproto.deleted, 2);
+  assert.deepEqual(log, []);
+});
