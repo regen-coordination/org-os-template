@@ -74,12 +74,23 @@ export function dispatch(argv, opts = {}) {
   }
 }
 
+// Process exit code for a verb's result. `{error}` (unknown verb / bad subcommand) always fails; `publish` and
+// `ingest` also fail on `{ok:false}` (operator errors, failed publish, refused mass delete). Other verbs keep
+// their existing behaviour: some (e.g. render) return fail-soft `ok:false` deliberately.
+const FAIL_ON_NOT_OK = new Set(['publish', 'ingest']);
+export function exitCodeFor(verb, result) {
+  if (result && result.error) return 1;
+  if (FAIL_ON_NOT_OK.has(verb) && result && result.ok === false) return 1;
+  return 0;
+}
+
 // Entry point when run directly (robust to relative argv + spaces/encoding in the path).
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const result = await dispatch(process.argv.slice(2));
     console.log(JSON.stringify(result, null, 2));
-    if (result && result.error) process.exit(1); // unknown verb / bad subcommand
+    const code = exitCodeFor(process.argv[2], result); // {error} (unknown verb / bad subcommand) or publish/ingest ok:false
+    if (code) process.exit(code);
   } catch (e) {
     console.error(`✗ ${e.message}`);              // clean message, not a raw stack trace
     process.exit(1);

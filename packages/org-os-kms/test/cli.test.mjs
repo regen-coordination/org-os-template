@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dispatch } from '../src/cli.mjs';
+import { dispatch, exitCodeFor } from '../src/cli.mjs';
 import { join } from 'node:path';
 import { mkdtempSync, writeFileSync as wf, readFileSync as rf } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -54,4 +54,14 @@ test('render map builds map.json from federation.yaml (no kms.yaml needed)', () 
   const written = JSON.parse(rf(join(dir, 'out', 'map.json'), 'utf8'));
   assert.equal(written.self.id, 'tmp-os');
   assert.equal(written.nodes.length, 1);
+});
+
+test('exitCodeFor: publish/ingest exit 1 on ok:false; other verbs keep their fail-soft ok:false; {error} always exits 1', () => {
+  for (const v of ['publish', 'ingest']) {
+    assert.equal(exitCodeFor(v, { ok: false, report: {} }), 1);
+    assert.equal(exitCodeFor(v, { ok: true, report: {} }), 0);
+  }
+  for (const v of ['render', 'bridge', 'lifecycle', 'federate']) assert.equal(exitCodeFor(v, { ok: false }), 0);
+  for (const v of ['publish', 'ingest', 'render', 'frobnicate']) assert.equal(exitCodeFor(v, { error: 'x' }), 1);
+  assert.equal(exitCodeFor('publish', undefined), 0);
 });
