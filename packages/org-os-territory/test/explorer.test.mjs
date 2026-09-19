@@ -60,3 +60,35 @@ test('perspectives: the draft stream and the private note never leave, in any mo
   assert.ok(p.modes.units.peerWithPack.fields.units.includes('unit_id'));
   assert.equal(p.resourceRefsTravel, true, 'core resources keep unit_refs on the wire — the page says so');
 });
+
+// ── Task 4: streamsFor + the aggregator ──────────────────────────────────────────────────────────────────────────────
+import { streamsFor, REASONS } from '../explorer/capture/streams-for.mjs';
+import { capture, packFacts } from '../explorer/capture.mjs';
+
+test('streamsFor: names this place / names a place above it / covers this whole layer; nothing for an uninformed layer', () => {
+  const units = [...UNITS, { title: 'A custom site', type: 'territorial-unit', unit_id: 'custom:site:x', layer: 'custom', level: 'site' }];
+  const s = streamsFor(units, STREAMS, indexUnits(units));
+  const reason = (id, title) => (s[id].find((x) => x.title === title) || {}).reason;
+  assert.equal(reason('administrative:pais:catalunya', 'Administrative divisions (GeoJSON)'), REASONS.direct);
+  assert.equal(reason('administrative:municipi:vic', 'Administrative divisions (GeoJSON)'), REASONS.above);
+  assert.equal(reason('hydrological:basin:example-basin', 'Water layers (WFS)'), REASONS.layer);
+  assert.deepEqual(s['custom:site:x'], []);
+  assert.equal(new Set(s['administrative:municipi:vic'].map((x) => x.title)).size, s['administrative:municipi:vic'].length, 'a stream is listed once');
+});
+
+test('packFacts: refuses an entity whose description was mis-parsed into stray keys', () => {
+  const info = (entities) => ({ territory: { added: { entities }, manifest: { name: 'p', version: '1' } } });
+  assert.throws(() => packFacts(info({ x: { maps_to_core: 'place', description: 'cut (a', b: null } })), /exactly maps_to_core \+ description/);
+  assert.deepEqual(packFacts(info({ x: { maps_to_core: 'place', description: 'Whole.' } })).types, [{ name: 'x', mapsToCore: 'place', description: 'Whole.' }]);
+});
+
+test('capture: the five fact groups, serialisable, with the real pack descriptions', async () => {
+  const f = await capture();
+  assert.deepEqual(Object.keys(f), ['meta', 'territory', 'pack', 'perspectives', 'streamsFor']);
+  assert.deepEqual(JSON.parse(JSON.stringify(f)), f);
+  assert.deepEqual(f.pack.types.map((t) => [t.name, t.mapsToCore]), [['territorial-unit', 'place'], ['data-stream', 'artifact']]);
+  assert.equal(f.pack.optInLine, 'extensions: [org-os-territory]');
+  assert.equal(f.territory.privateNoteUnit, PRIVATE_NOTE_UNIT);
+  assert.deepEqual(Object.keys(f.streamsFor).sort(), UNITS.map((u) => u.unit_id).sort());
+  assert.ok(!('verified' in f) && !('attempts' in f) && !('matrix' in f), 'the proof scenarios are not part of the explorer');
+});
