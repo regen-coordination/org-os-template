@@ -6,6 +6,7 @@
 export {
   listSchemas, loadSchema, validateObject, isValid, schemaFields,
   toJsonLdContext, checkInvariants,
+  registerPack, resetPacks, registeredPacks, extensionEntities,
 } from '../../toolkit-framework/src/index.mjs';
 export {
   getAdapter, listAdapters, slugify, deriveIndex, isAwaitingReview,
@@ -17,6 +18,6 @@ export {
 export {
   prepare, acceptWorkOrder, classifySource, suggestSchemas,
 } from '../../toolkit-framework/src/ingest.mjs';
-export { isPublishable, publishableTypes, PUBLISHABLE_TYPES, OPT_IN_TYPES, ALL_TYPES, PUBLISHABLE_PUBLIC_USE, PRIVATE_FIELDS, publicView } from '../../toolkit-framework/src/publishable.mjs';
+export { isPublishable, publishableTypes, PUBLISHABLE_TYPES, OPT_IN_TYPES, ALL_TYPES, optInTypes, allTypes, PUBLISHABLE_PUBLIC_USE, PRIVATE_FIELDS, publicView } from '../../toolkit-framework/src/publishable.mjs';
 export { nsidFor, typeForNsid, generateAll, validateRecord, toRecord } from '../../toolkit-framework/src/lexicon.mjs';
 export { runConnector, NOT_IMPLEMENTED } from '../../toolkit-framework/src/connector.mjs';
