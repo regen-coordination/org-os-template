@@ -69,5 +69,5 @@ export function renderTour(v) {
 }
 
 export function renderApp(v) {
-  return `<p class="banner" id="banner" role="note">${esc(v.note)}</p>${renderTour(v)}<div class="cols">${renderBoard(v)}${renderPanel(v)}</div>${renderBar(v)}${renderDrawers(v)}<p class="sr" id="live" aria-live="polite">${esc(v.live)}</p>`;
+  return `<p class="banner" id="banner" role="note">${esc(v.note)}</p>${renderTour(v)}<div class="cols">${renderBoard(v)}${renderPanel(v)}</div>${renderBar(v)}${renderDrawers(v)}`;
 }

@@ -8,7 +8,10 @@
   function dispatch(action, focusKey) {
     const before = state.tour;
     state = reduce(state, action, facts);
-    root.innerHTML = renderApp(view(state, facts));
+    const v = view(state, facts);
+    root.innerHTML = renderApp(v);
+    const liveEl = document.getElementById('live'); // outside #app, so it persists across renders and announces changes
+    if (liveEl) liveEl.textContent = v.live;
     const key = state.tour !== null && state.tour !== before ? 'tour-h' : focusKey;
     const el = key && root.querySelector('[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
     if (el) el.focus();

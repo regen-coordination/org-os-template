@@ -264,9 +264,9 @@ test('renderTour + renderApp: no card outside the tour; a labelled non-modal dia
     s = reduce(s, { type: 'tour', value: 'next' }, f);
   }
   const app = R.renderApp(view(initialState(), f));
-  for (const id of ['banner', 'board', 'panel', 'bar', 'drawers', 'live']) assert.ok(app.includes(`id="${id}"`), id);
+  for (const id of ['banner', 'board', 'panel', 'bar', 'drawers']) assert.ok(app.includes(`id="${id}"`), id);
   assert.match(app, /id="banner" role="note">Illustrative sample/);
-  assert.match(app, /id="live" aria-live="polite"/);
+  assert.ok(!app.includes('id="live"'), 'the live region sits outside the re-rendered subtree (template.html), so it persists and announces');
 });
 
 // ── Task 9: the build ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -289,6 +289,7 @@ test('the page: one self-contained file — pre-rendered, facts embedded, script
   assert.ok(!/(?:src|href)\s*=\s*["']?https?:|url\(\s*["']?https?:|@import|\bfetch\(/i.test(html), 'no external resource, no fetch');
   assert.ok(!/position:\s*fixed/.test(html), 'embeddable: no fixed chrome');
   assert.match(html, /<main id="app"><p class="banner" id="banner"/, 'the first paint is pre-rendered');
+  assert.match(html, /<\/main>\s*<p class="sr" id="live" aria-live="polite"><\/p>/, 'one persistent live region, outside the re-rendered #app');
   assert.match(html, /data-action="tour" data-value="start" data-key="tour-start">Take the tour/);
   assert.match(html, /@media print/); assert.match(html, /prefers-reduced-motion/); assert.match(html, /prefers-color-scheme:dark/);
 });
