@@ -12,6 +12,14 @@
     el.setAttribute('aria-pressed', String(!dark));
   };
 
+  const pressOnly = (el) => {
+    const sibs = el.parentElement ? el.parentElement.querySelectorAll('[aria-pressed]') : [];
+    sibs.forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
+    el.setAttribute('aria-pressed', 'true');
+  };
+
+  ACTIONS['pick-pack'] = (el, f) => { pressOnly(el); setPanel('pack', renderPackPanel(f, el.dataset.which)); };
+
   // <<ACTIONS>>
 
   document.addEventListener('click', (e) => {

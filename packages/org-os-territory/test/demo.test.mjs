@@ -201,3 +201,46 @@ test('build writes the file where told and nowhere else', async () => {
   assert.equal(r.out, out);
   assert.ok(existsSync(out) && statSync(out).size === r.bytes);
 });
+
+function runApp(facts) {
+  const listeners = {}; const panels = {};
+  const doc = {
+    getElementById: () => ({ textContent: JSON.stringify(facts) }),
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+    querySelector: (sel) => { const m = /data-panel="([^"]+)"/.exec(sel); return m ? (panels[m[1]] ??= { innerHTML: '' }) : null; },
+    documentElement: { dataset: { theme: 'auto' } },
+  };
+  const win = { matchMedia: () => ({ matches: false }) };
+  vm.runInNewContext(stripExports(demoSrc('render.mjs')) + '\n' + demoSrc('app.js'), { document: doc, window: win });
+  const el = (dataset) => ({ dataset, setAttribute() {}, parentElement: { querySelectorAll: () => [] } });
+  return {
+    panels, doc,
+    click: (action, data = {}) => listeners.click({ target: { closest: () => el({ action, ...data }) } }),
+    change: (name, value, data = {}) => listeners.change({ target: { closest: () => ({ ...el({ change: name, ...data }), value }) } }),
+  };
+}
+
+test('section 2: the pack panel is rendered from the captured facts; the selector switches it; the theme toggle works', async () => {
+  const f = await getFacts();
+  const on = R.renderPackPanel(f, 'territory');
+  assert.match(on, /territorial-unit/);
+  assert.match(on, /maps_to_core/);
+  assert.ok(on.includes('<code>place</code>') && on.includes('<code>artifact</code>'));
+  assert.ok(on.includes('<code>unit_id</code>'), 'lexicon property table');
+  assert.match(on, /&gt;=0\.3\.0/, 'the manifest requires floor');
+  const off = R.renderPackPanel(f, 'none');
+  assert.match(off, /No pack loaded/);
+  assert.ok(off.includes(`${f.packInfo.none.lexiconCount} lexicons`));
+  assert.ok(!off.includes('unit_id'));
+  assert.ok(R.sections().some((s) => s.id === 'pack' && s.order === 2));
+
+  const app = runApp(f);
+  app.click('pick-pack', { which: 'none' });
+  assert.match(app.panels.pack.innerHTML, /No pack loaded/);
+  app.click('pick-pack', { which: 'territory' });
+  assert.match(app.panels.pack.innerHTML, /territorial-unit/);
+  app.click('toggle-theme');
+  assert.equal(app.doc.documentElement.dataset.theme, 'dark');
+  app.click('toggle-theme');
+  assert.equal(app.doc.documentElement.dataset.theme, 'light');
+});

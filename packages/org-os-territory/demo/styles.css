@@ -37,4 +37,6 @@ details.prov { margin: 10px 0 0; font-size: 14px; color: var(--muted); } details
 @media (max-width: 720px) { .seam { grid-template-columns: 1fr; } .arrow { transform: rotate(90deg); justify-self: center; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
 @media print { .toc, .btn, .skip { display: none; } body { background: #fff; color: #000; } section { break-inside: avoid; } }
+h4 { margin: 14px 0 4px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.card p { margin: 6px 0; }
 /* <<SECTION-CSS>> */

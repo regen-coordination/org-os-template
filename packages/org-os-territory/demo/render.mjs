@@ -45,3 +45,36 @@ ${provenance('Schema counts come from <code>listSchemas()</code> before and afte
 }
 
 register({ id: 'seam', order: 1, nav: '1 Seam', title: '1 · The seam', lead: 'What changed in the framework, and what did not.', render: renderSeam });
+
+export function seg(action, attr, items, current) {
+  return `<div class="seg" role="group">${items.map(([v, label]) => `<button type="button" class="btn" data-action="${esc(action)}" data-${esc(attr)}="${esc(v)}" aria-pressed="${v === current}">${esc(label)}</button>`).join('')}</div>`;
+}
+
+export function renderPackPanel(f, which) {
+  const p = f.packInfo;
+  if (which === 'none') {
+    const n = p.none;
+    return `<div class="card"><p>${chip('No pack loaded', 'warn')} The instance sees exactly the core: <strong>${esc(n.schemas.length)}</strong> schemas, <strong>${esc(n.lexiconCount)} lexicons</strong>, ${esc(Object.keys(n.bindings).length)} registry bindings.</p>
+<p class="muted">Opt-in types today: ${n.optInTypes.map((t) => code(t)).join(' ')}. The territory types are simply unknown — ${code('territorial-unit')} is not a schema here.</p></div>`;
+  }
+  const t = p.territory; const a = t.added;
+  const props = Object.entries(t.lexicon.defs.main.record.properties);
+  const req = t.lexicon.defs.main.record.required;
+  return `<div class="card"><p>${chip('org-os-territory loaded', 'ok')} <strong>${esc(t.schemas.length)}</strong> schemas (${esc(p.none.schemas.length)} core + ${esc(a.schemas.length)}), <strong>${esc(t.lexiconCount)} lexicons</strong> (${esc(p.none.lexiconCount)} + ${esc(a.lexicons)}). Kernel valid: ${chip(String(t.kernelValid), t.kernelValid ? 'ok' : 'bad')} Layer A untouched: ${chip(String(t.layerAUntouched), t.layerAUntouched ? 'ok' : 'bad')}</p>
+<h4>pack.yaml</h4>${pre(JSON.stringify(t.manifest, null, 2))}
+<h4>Layer-B entities it adds (each must map to a real core type)</h4>
+<table><thead><tr><th>entity</th><th>maps_to_core</th><th>description</th></tr></thead><tbody>${Object.entries(a.entities).map(([k, v]) => `<tr><td>${code(k)}</td><td>${code(v.maps_to_core)}</td><td>${esc(v.description)}</td></tr>`).join('')}</tbody></table>
+<h4>Publish-eligible (opt-in) types and registry bindings</h4>
+<p>${a.optInTypes.map((x) => code(x)).join(' ')} — <em>eligible, not published</em> until the instance lists them in <code>publish.types_opt_in</code>.</p>
+<table><thead><tr><th>schema</th><th>registry file</th></tr></thead><tbody>${Object.entries(a.bindings).map(([k, v]) => `<tr><td>${code(k)}</td><td>${code(v)}</td></tr>`).join('')}</tbody></table>
+<h4>The generated lexicon <code>${esc(t.lexicon.id)}</code> — flat: string, integer, array of strings</h4>
+<table><thead><tr><th>property</th><th>type</th><th>known values</th></tr></thead><tbody>${props.map(([k, v]) => `<tr><td>${code(k)}${req.includes(k) ? ' ' + chip('required') : ''}</td><td>${esc(v.type)}</td><td>${esc((v.knownValues || []).join(', '))}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+export function renderPack(f) {
+  return `${seg('pick-pack', 'which', [['none', 'No pack'], ['territory', 'org-os-territory']], 'territory')}
+<div data-panel="pack">${renderPackPanel(f, 'territory')}</div>
+${provenance('Measured by loading the pack through the real kms path (<code>loadExtensions</code>) and diffing <code>listSchemas()</code>, <code>extensionEntities()</code>, <code>optInTypes()</code>, <code>registryBindings()</code> and <code>generateAll()</code> before and after — <code>demo/capture/pack-info.mjs</code>.')}`;
+}
+
+register({ id: 'pack', order: 2, nav: '2 Load a pack', title: '2 · Load a pack', lead: 'Pick the instance configuration and see exactly what the framework registers.', render: renderPack });
