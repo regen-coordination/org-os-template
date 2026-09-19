@@ -17,7 +17,7 @@ import { attempts } from '../demo/capture/attempts.mjs';
 import { territory } from '../demo/capture/territory.mjs';
 import { verified } from '../demo/capture/verified.mjs';
 import { capture } from '../demo/capture.mjs';
-import { assemble, build, stripExports, safeJson } from '../demo/build.mjs';
+import { assemble, build, stripExports, safeJson, DEFAULT_OUT } from '../demo/build.mjs';
 import * as R from '../demo/render.mjs';
 
 beforeEach(() => reset());
@@ -369,4 +369,28 @@ test('section 5: a cross-layer unit pick clears the previous selection (exactly 
   assert.deepEqual(pressed.map((b) => b.dataset.id), ['landscape:unit:plana-de-vic']);
   assert.equal(osona.attrs['aria-pressed'], 'false');
   assert.match(panels.unit.innerHTML, /Plana de Vic/);
+});
+
+test('the whole page: seven sections in order, navigable, accessible basics, and the captured numbers are the ones on the page', async () => {
+  const f = await getFacts();
+  const html = assemble(f);
+  const ids = [...html.matchAll(/<section id="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids, ['seam', 'pack', 'guarantees', 'attempts', 'territory', 'federation', 'verified']);
+  for (const id of ids) {
+    assert.ok(html.includes(`<a href="#${id}">`), `nav link for ${id}`);
+    assert.ok(new RegExp(`<h2 id="${id}-h">`).test(html), `heading for ${id}`);
+  }
+  assert.match(html, /<html lang="en"/);
+  assert.match(html, /<title>[^<]+<\/title>/);
+  assert.equal((html.match(/<button(?![^>]*\stype=)/g) || []).length, 0, 'every button has an explicit type');
+  assert.ok(!/<img\b/.test(html), 'no images to describe');
+  assert.ok((html.match(/aria-pressed="(true|false)"/g) || []).length >= 15, 'segmented controls expose their state');
+  assert.ok(html.includes(`<strong>${f.packInfo.territory.lexiconCount} lexicons</strong>`));
+  assert.ok(html.includes(`<strong>${f.federation.peer.withPack.count}</strong>`));
+  for (const a of f.attempts) assert.ok(html.includes(R.esc(a.title)), `attempt "${a.id}" is selectable`);
+  assert.ok(Buffer.byteLength(html) < 300 * 1024);
+});
+
+test('the generator writes only to demo/dist by default', () => {
+  assert.ok(DEFAULT_OUT.endsWith(join('org-os-territory', 'demo', 'dist', 'index.html')));
 });

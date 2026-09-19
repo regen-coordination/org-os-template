@@ -63,3 +63,16 @@ downgrade-on-ingest for peers that do not load this pack.
 ```bash
 node --test
 ```
+
+## Demo
+
+A single-file HTML page that shows what extension packs and this pack do — every result on it captured from the real code, nothing mocked:
+
+```bash
+cd packages/org-os-territory
+npm run demo                        # runs the scenarios and the three package suites → demo/dist/index.html
+node demo/build.mjs --skip-suites   # faster: skips the suite counts
+node demo/build.mjs --out /tmp/demo.html
+```
+
+The build fails if any scenario's expectation is not met, so the page cannot show a result the code did not produce. The Catalunya sample is **illustrative** (example names, placeholder codes except `one_earth:PA20`, invented overlap shares, no geometry). `demo/dist/` is gitignored.

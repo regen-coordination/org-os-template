@@ -8,6 +8,7 @@ import * as R from './render.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (f) => readFileSync(join(here, f), 'utf8');
+export const DEFAULT_OUT = join(here, 'dist', 'index.html');
 // render.mjs is a plain ES module (the tests import it); the page inlines it as classic script text, so its `export` keywords go.
 export const stripExports = (src) => src.replace(/^export\s+(?=(?:const|function|async function)\b)/gm, '');
 // Facts travel inside <script type="application/json">: `<` and the JS line separators are escaped so the block can never end itself.
@@ -29,7 +30,7 @@ export function assemble(facts, src = {}) {
     .replace('/*__APP__*/', () => src.app ?? read('app.js'));
 }
 
-export async function build({ skipSuites = false, out = join(here, 'dist', 'index.html') } = {}) {
+export async function build({ skipSuites = false, out = DEFAULT_OUT } = {}) {
   const facts = await capture({ skipSuites });
   const html = assemble(facts);
   mkdirSync(dirname(out), { recursive: true });
