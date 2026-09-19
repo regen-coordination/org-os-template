@@ -33,3 +33,30 @@ test('sample-extra: exactly one draft stream and exactly one private note', () =
   assert.deepEqual(all.filter((o) => o.public_use !== 'ok-with-caveat').map(idOf), [DRAFT_STREAM.title]);
   assert.deepEqual(all.filter((o) => PRIVATE_FIELD in o).map(idOf), [PRIVATE_NOTE_UNIT]);
 });
+
+// ── Task 3: perspectives ─────────────────────────────────────────────────────────────────────────────────────────────
+import { perspectives, MODES } from '../explorer/capture/perspectives.mjs';
+
+test('perspectives: three share modes, published through the real publish op and received through the real connector', async () => {
+  const p = await perspectives();
+  assert.deepEqual(Object.keys(p.modes), MODES.map((m) => m.id));
+  const n = (side) => [side.units.length, side.streams.length, side.resources.length];
+  assert.deepEqual(n(p.modes.nothing.published), [0, 0, RESOURCES.length]);
+  assert.deepEqual(n(p.modes.units.published), [UNITS.length, 0, RESOURCES.length]);
+  assert.deepEqual(n(p.modes['units-streams'].published), [UNITS.length, STREAMS.length, RESOURCES.length]);
+  for (const m of Object.values(p.modes)) {
+    assert.deepEqual(n(m.peerWithPack), n(m.published), 'a peer with the pack receives exactly what was published');
+    assert.deepEqual(n(m.peerWithout), [0, 0, RESOURCES.length], 'a peer without the pack receives no pack type');
+  }
+});
+
+test('perspectives: the draft stream and the private note never leave, in any mode, on any side', async () => {
+  const p = await perspectives();
+  assert.deepEqual(p.neverLeaves, { streams: [DRAFT_STREAM.title], fields: [PRIVATE_FIELD] });
+  for (const m of Object.values(p.modes)) for (const side of Object.values(m)) {
+    assert.ok(!side.streams.includes(DRAFT_STREAM.title));
+    assert.ok(!Object.values(side.fields).flat().includes(PRIVATE_FIELD));
+  }
+  assert.ok(p.modes.units.peerWithPack.fields.units.includes('unit_id'));
+  assert.equal(p.resourceRefsTravel, true, 'core resources keep unit_refs on the wire — the page says so');
+});
