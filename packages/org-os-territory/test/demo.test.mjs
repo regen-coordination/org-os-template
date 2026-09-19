@@ -341,3 +341,32 @@ test('section 6: the stream catalogue, published extensions.yaml with the federa
   assert.match(h, /dropped/i);
   assert.ok(R.sections().some((s) => s.id === 'federation' && s.order === 6));
 });
+
+test('section 5: a cross-layer unit pick clears the previous selection (exactly one unit button is pressed)', async () => {
+  const f = await getFacts();
+  const listeners = {}; const panels = {};
+  const doc = {
+    getElementById: () => ({ textContent: JSON.stringify(f) }),
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+    querySelector: (sel) => { const m = /data-panel="([^"]+)"/.exec(sel); return m ? (panels[m[1]] ??= { innerHTML: '' }) : null; },
+    documentElement: { dataset: { theme: 'auto' } },
+  };
+  vm.runInNewContext(stripExports(demoSrc('render.mjs')) + '\n' + demoSrc('app.js'), { document: doc, window: { matchMedia: () => ({ matches: false }) } });
+  const layerA = { kids: [] }; const layerB = { kids: [] }; const schematic = { kids: [] };
+  for (const l of [layerA, layerB]) l.querySelectorAll = () => l.kids;
+  schematic.querySelectorAll = () => [...layerA.kids, ...layerB.kids];
+  const btn = (layer, id, pressed) => {
+    const b = { dataset: { action: 'pick-unit', id }, attrs: { 'aria-pressed': String(pressed) }, parentElement: layer };
+    b.setAttribute = (k, v) => { b.attrs[k] = v; };
+    b.closest = (sel) => (sel === '.schematic' ? schematic : b);
+    layer.kids.push(b); return b;
+  };
+  const osona = btn(layerA, 'administrative:comarca:osona', true);
+  btn(layerA, 'administrative:pais:catalunya', false);
+  const plana = btn(layerB, 'landscape:unit:plana-de-vic', false);
+  listeners.click({ target: { closest: () => plana } });
+  const pressed = schematic.querySelectorAll().filter((b) => b.attrs['aria-pressed'] === 'true');
+  assert.deepEqual(pressed.map((b) => b.dataset.id), ['landscape:unit:plana-de-vic']);
+  assert.equal(osona.attrs['aria-pressed'], 'false');
+  assert.match(panels.unit.innerHTML, /Plana de Vic/);
+});

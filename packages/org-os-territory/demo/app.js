@@ -12,8 +12,9 @@
     el.setAttribute('aria-pressed', String(!dark));
   };
 
-  const pressOnly = (el) => {
-    const sibs = el.parentElement ? el.parentElement.querySelectorAll('[aria-pressed]') : [];
+  const pressOnly = (el, scope) => {
+    const root = scope || el.parentElement;
+    const sibs = root ? root.querySelectorAll('[aria-pressed]') : [];
     sibs.forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
     el.setAttribute('aria-pressed', 'true');
   };
@@ -22,7 +23,7 @@
 
   ACTIONS['pick-matrix'] = (el, f) => { pressOnly(el); setPanel('matrix', renderMatrixPanel(f, el.dataset.id)); };
   ACTIONS['pick-attempt'] = (el, f) => { pressOnly(el); setPanel('attempt', renderAttemptPanel(f, el.dataset.id)); };
-  ACTIONS['pick-unit'] = (el, f) => { pressOnly(el); setPanel('unit', renderUnitPanel(f, el.dataset.id)); };
+  ACTIONS['pick-unit'] = (el, f) => { pressOnly(el, el.closest && el.closest('.schematic')); setPanel('unit', renderUnitPanel(f, el.dataset.id)); };
   ACTIONS['pick-overlap'] = (el, f) => { pressOnly(el); setPanel('overlap', renderOverlapPanel(f, el.dataset.id)); };
   // <<ACTIONS>>
 
