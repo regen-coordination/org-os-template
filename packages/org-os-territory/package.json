@@ -4,7 +4,8 @@
   "description": "org-os-kms extension pack — territory: territorial-unit (a bounded unit on a named layer) and data-stream (what a source system offers, by place and kind of work). Opt in with kms.yaml `extensions: [org-os-territory]`.",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "demo": "node demo/build.mjs"
   },
   "license": "MIT",
   "keywords": ["org-os", "org-os-kms", "extension-pack", "territory", "bioregion", "landscape-units", "knowledge-commons"]
