@@ -31,7 +31,7 @@ export function renderSeam(f) {
 <div class="stack"><div class="box core">core schemas <b>${esc(n.schemas.length)}</b></div></div>
 <p class="muted">Every instance inherits every type, and the framework copy drifts from its upstream.</p></div>
 <div class="arrow" aria-hidden="true">→</div>
-<div class="card"><h3>After</h3><p>Core first, then any pack the instance opts into with ${code('extensions: [org-os-territory]')}</p>
+<div class="card"><h3>After</h3><p>Core first, then any pack the instance opts into with ${code('extensions: [org-os-territory]')}.</p>
 <div class="stack"><div class="box core">core schemas <b>${esc(n.schemas.length)}</b></div>
 <div class="box pack">+ pack: ${t.added.schemas.map((s) => code(s)).join(' ')}</div></div>
 <p class="muted">Core wins on every name; a collision is a load error, never a shadow.</p></div></div>
