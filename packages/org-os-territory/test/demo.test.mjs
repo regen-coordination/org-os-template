@@ -302,3 +302,42 @@ test('section 7: suites, the no-pre-existing-test-modified check and the commit 
   assert.ok(!/not run in this build/i.test(ran));
   assert.ok(R.sections().some((s) => s.id === 'verified' && s.order === 7));
 });
+
+test('section 5: the schematic lists every unit by layer; a unit panel shows the real query answers; the overlap panels show the real validator errors; unknown refs are reported', async () => {
+  const f = await getFacts();
+  const t = R.renderTerritory(f);
+  assert.match(t, /not a map/i);
+  assert.match(t, /illustrative/i);
+  for (const u of f.territory.units) assert.ok(t.includes(R.esc(u.unit_id)), u.unit_id);
+  const osona = R.renderUnitPanel(f, 'administrative:comarca:osona');
+  assert.ok(osona.includes('Regenerative agriculture pilot (example)'), 'descendants include the municipality resource');
+  assert.match(osona, /includeDescendants/);
+  assert.ok(osona.includes('administrative:municipi:vic'));
+  const pv = R.renderUnitPanel(f, 'landscape:unit:plana-de-vic');
+  assert.ok(pv.includes('0.93') && pv.includes('0.42'));
+  assert.match(pv, /invented/i);
+  assert.match(t, /custom:site:ghost/);
+  assert.match(R.renderOverlapPanel(f, 'valid'), /valid/);
+  for (const flt of f.territory.overlaps.faults) for (const e of flt.errors) assert.ok(R.renderOverlapPanel(f, flt.id).includes(R.esc(e)), `${flt.id}: ${e}`);
+  assert.ok(R.sections().some((s) => s.id === 'territory' && s.order === 5));
+  const app = runApp(f);
+  app.click('pick-unit', { id: 'administrative:pais:catalunya' });
+  assert.match(app.panels.unit.innerHTML, /Catalonia-wide funding scan/);
+  app.click('pick-overlap', { id: 'same-layer' });
+  assert.match(app.panels.overlap.innerHTML, /same layer \(administrative\)/);
+});
+
+test('section 6: the stream catalogue, published extensions.yaml with the federateCheck verdict, the 14-vs-12 peer view, and inbound projection', async () => {
+  const f = await getFacts();
+  const h = R.renderFederation(f);
+  for (const s of f.territory.streams.streams) assert.ok(h.includes(R.esc(s.title)), s.title);
+  for (const p of f.territory.streams.providers) assert.ok(h.includes(R.esc(p.title)), p.title);
+  assert.match(h, /unverified/);
+  assert.match(h, /CC-BY-NC-4\.0/);
+  assert.ok(h.includes('territorial-unit:'), 'the published extensions.yaml');
+  assert.match(h, /incompatible/i);
+  assert.ok(h.includes('<strong>14</strong>') && h.includes('<strong>12</strong>'));
+  assert.ok(h.includes('territorialUnit') && h.includes('dataStream'));
+  assert.match(h, /dropped/i);
+  assert.ok(R.sections().some((s) => s.id === 'federation' && s.order === 6));
+});

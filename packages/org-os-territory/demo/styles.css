@@ -44,4 +44,11 @@ h4 { margin: 14px 0 4px; font-size: 14px; color: var(--muted); text-transform: u
 ul.fields { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 4px 0 10px; }
 .filepath { margin: 8px 0 0; } ol.commits { padding-left: 22px; font-size: 14px; } ol.commits li { margin: 2px 0; }
 [data-panel=attempt] .seg, .seg.wide { align-items: stretch; }
+.schematic { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+.layer { display: grid; grid-template-columns: 110px 1fr; gap: 10px; padding: 8px 0; border-top: 1px dashed var(--line); } .layer:first-of-type { border-top: 0; }
+.layer-name { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .05em; padding-top: 6px; }
+.layer-units { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn.unit { text-align: left; margin-left: calc(var(--d, 0) * 14px); display: inline-flex; flex-direction: column; line-height: 1.25; }
+.btn.unit small { color: inherit; opacity: .7; font-size: 11px; }
+@media (max-width: 720px) { .layer { grid-template-columns: 1fr; } }
 /* <<SECTION-CSS>> */

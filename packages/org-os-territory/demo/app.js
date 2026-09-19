@@ -22,6 +22,8 @@
 
   ACTIONS['pick-matrix'] = (el, f) => { pressOnly(el); setPanel('matrix', renderMatrixPanel(f, el.dataset.id)); };
   ACTIONS['pick-attempt'] = (el, f) => { pressOnly(el); setPanel('attempt', renderAttemptPanel(f, el.dataset.id)); };
+  ACTIONS['pick-unit'] = (el, f) => { pressOnly(el); setPanel('unit', renderUnitPanel(f, el.dataset.id)); };
+  ACTIONS['pick-overlap'] = (el, f) => { pressOnly(el); setPanel('overlap', renderOverlapPanel(f, el.dataset.id)); };
   // <<ACTIONS>>
 
   document.addEventListener('click', (e) => {

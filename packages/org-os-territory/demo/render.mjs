@@ -152,3 +152,60 @@ ${provenance('Suite counts are parsed from each package’s real <code>node --te
 
 register({ id: 'attempts', order: 4, nav: '4 Break it', title: '4 · Try to break it', lead: 'Every way of loading a pack wrong fails loudly, and says why.', render: renderAttempts });
 register({ id: 'verified', order: 7, nav: '7 Verified', title: '7 · Verified', lead: 'What was measured, not claimed.', render: renderVerified });
+
+const share = (n) => esc(String(n));
+
+export function renderUnitPanel(f, id) {
+  const t = f.territory; const u = t.units.find((x) => x.unit_id === id); const q = t.query[id];
+  const list = (a, empty) => (a.length ? `<ul>${a.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p class="muted">${esc(empty)}</p>`);
+  return `<div class="card"><h3>${esc(u.title)}</h3>
+<p>${code(u.unit_id)} ${chip(u.layer)} ${chip(u.level)} ${(u.codes || []).map((c) => chip(c)).join(' ')}</p>
+<p><strong>part_of chain</strong>: ${q.ancestors.length ? q.ancestors.map((a) => code(a)).join(' → ') : '<span class="muted">(top of its layer)</span>'}<br><strong>children</strong>: ${q.children.length ? q.children.map((a) => code(a)).join(' ') : '<span class="muted">none</span>'}</p>
+<div class="cols"><div><h4>objectsIn(unit, …, { includeDescendants: false })</h4>${list(q.exact, 'nothing is placed directly in this unit')}</div>
+<div><h4>objectsIn(unit, …) — includeDescendants defaults to true</h4>${list(q.withDescendants, 'nothing here or beneath')}</div></div>
+<h4>Overlaps with other layers ${chip('invented shares', 'warn')}</h4>
+${q.overlaps.length ? `<table><thead><tr><th>other unit</th><th>share of this unit</th><th>share of the other</th></tr></thead><tbody>${q.overlaps.map((o) => `<tr><td>${code(o.other)}</td><td>${share(o.shareSelf)}</td><td>${share(o.shareOther)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">no overlap recorded in the sample</p>'}</div>`;
+}
+
+export function renderOverlapPanel(f, id) {
+  const o = f.territory.overlaps;
+  const item = id === 'valid' ? { title: 'A valid sidecar', doc: o.valid.doc, errors: o.valid.result.errors, ok: o.valid.result.valid } : { ...o.faults.find((x) => x.id === id), ok: false };
+  return `<div class="card"><h3>${esc(item.title)}</h3>${pre(JSON.stringify(item.doc, null, 2))}
+<h4>What the real <code>validateOverlaps</code> returned</h4>${item.ok ? `<p>${chip('valid', 'ok')} no errors</p>` : `<ul>${item.errors.map((e) => `<li>${chip('error', 'bad')} ${esc(e)}</li>`).join('')}</ul>`}</div>`;
+}
+
+export function renderTerritory(f) {
+  const t = f.territory; const first = 'administrative:comarca:osona';
+  const rows = t.layers.map((layer) => `<div class="layer"><span class="layer-name">${esc(layer)}</span><div class="layer-units">${t.units.filter((u) => u.layer === layer).map((u) => `<button type="button" class="btn unit" style="--d:${esc(t.query[u.unit_id].ancestors.length)}" data-action="pick-unit" data-id="${esc(u.unit_id)}" aria-pressed="${u.unit_id === first}" title="${esc(u.unit_id)}">${esc(u.title)}<small>${esc(u.unit_id)}</small></button>`).join('')}</div></div>`).join('');
+  return `<p class="banner" role="note">${chip('illustrative', 'warn')} ${esc(t.note)}</p>
+<div class="schematic" role="group" aria-label="Territorial units by layer (schematic, not a map)"><p class="muted">Schematic — <strong>not a map</strong>. Indentation is <code>part_of</code> depth. Pick a unit.</p>${rows}</div>
+<div data-panel="unit">${renderUnitPanel(f, first)}</div>
+<h3>Unknown references are reported, never thrown</h3>
+<p>${t.unknownRefs.map((r) => `${code(r.resource)} points at ${code(r.ref)}, which is not in the tree`).join('; ')} — <code>unitsFor()</code> returns it under <code>unknown</code> and lets the instance decide whether that is an error.</p>
+<h3>The overlaps sidecar has a validator</h3>
+<p class="muted">Overlap shares are derived data in <code>data/territory-overlaps.json</code>, never published. The script that computes them from geometry comes in spec 2; this is the contract it must meet.</p>
+${seg('pick-overlap', 'id', [['valid', 'A valid sidecar'], ...t.overlaps.faults.map((x) => [x.id, x.title])], 'valid')}
+<div data-panel="overlap">${renderOverlapPanel(f, 'valid')}</div>
+${provenance('Every answer is precomputed by calling the real <code>indexUnits</code>, <code>unitsFor</code>, <code>objectsIn</code> and <code>validateOverlaps</code> for each unit and fault — <code>demo/capture/territory.mjs</code>. The sample is illustrative.')}`;
+}
+
+export function renderFederation(f) {
+  const t = f.territory; const g = f.federation;
+  const provTitle = Object.fromEntries(t.streams.providers.map((p) => [p.slug, p.title]));
+  const yamlLines = g.extensionsYaml.split('\n').length;
+  return `<h3>Data streams — what data exist for a place and a kind of work</h3>
+<p class="muted">A ${code('source-system')} is the provider; a ${code('data-stream')} is one thing it offers. Licences are shown only where verified.</p>
+<table><thead><tr><th>stream</th><th>provider</th><th>access</th><th>format</th><th>licence</th><th>trust</th><th>layers</th></tr></thead><tbody>${t.streams.streams.map((s) => `<tr><td>${esc(s.title)}</td><td>${esc(provTitle[s.source_system])}</td><td>${esc(s.access)}</td><td>${esc(s.format)}</td><td>${esc(s.licence)}</td><td>${esc(s.trust)}</td><td>${esc(s.layer_refs.join(', '))}</td></tr>`).join('')}</tbody></table>
+<h3>What a peer sees</h3>
+<div class="cols"><div class="card"><h4>The published <code>extensions.yaml</code></h4>
+<p>${chip('federateCheck', 'ok')} ${esc(g.federateCheck.compatible.length)} compatible, ${esc(g.federateCheck.incompatible.length)} incompatible — every entity maps to a real core type.</p>
+<details><summary>extensions.yaml as published (${esc(yamlLines)} lines)</summary>${pre(g.extensionsYaml)}</details></div>
+<div class="card"><h4>Collections a peer requests</h4>
+<p>With the pack: <strong>${esc(g.peer.withPack.count)}</strong> — the core ones plus ${g.peer.withPack.extra.map((x) => code(x)).join(' ')}.<br>Without it: <strong>${esc(g.peer.without.count)}</strong>. A peer that does not load the pack never asks for those two.</p>
+<p>An inbound ${code('territorial-unit')} record, with the pack, keeps ${g.inbound.withPack.keys.map((k) => code(k)).join(' ')} — the peer’s private <code>notes</code> is dropped. Without the pack: ${esc(g.inbound.withoutPack.mapped)} mapped — the record is dropped.</p></div></div>
+<p class="muted">Downgrading an unknown type to its core mapping on ingest is not built yet (spec 4).</p>
+${provenance('<code>federateCheck</code> runs over the real published file; the collection counts come from a fake-PDS run of the real atproto connector with and without the pack loaded; the inbound record goes through the connector’s real <code>map</code> — <code>demo/capture/federation.mjs</code>.')}`;
+}
+
+register({ id: 'territory', order: 5, nav: '5 Territory', title: '5 · The territory model', lead: 'Units on four layers, queried by place — over an illustrative sample.', render: renderTerritory });
+register({ id: 'federation', order: 6, nav: '6 Streams & federation', title: '6 · Data streams and federation', lead: 'What data exist for a place, and what a peer sees of an instance.', render: renderFederation });
