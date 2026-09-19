@@ -7,6 +7,8 @@ import { indexUnits } from '../src/units.mjs';
 import { validateOverlaps } from '../src/overlaps.mjs';
 import { packInfo } from '../demo/capture/pack-info.mjs';
 import { publishMatrix } from '../demo/capture/publish-matrix.mjs';
+import { oneProcess } from '../demo/capture/one-process.mjs';
+import { federation } from '../demo/capture/federation.mjs';
 
 beforeEach(() => reset());
 
@@ -68,4 +70,29 @@ test('publishMatrix: no pack → core only; unknown opt-in errors; pack not opte
   assert.deepEqual(cols(m['pack-units']), { resource: 1, territorialUnit: 1 });
   assert.ok(m['pack-units'].unitRecordKeys.includes('unit_id') && !m['pack-units'].unitRecordKeys.includes('notes'), 'notes is a private field');
   assert.deepEqual(cols(m['pack-units-streams']), { resource: 1, territorialUnit: 1, dataStream: 1 });
+});
+
+test('oneProcess: a pack-less instance in the same process publishes no pack type; the unfiltered call is what leaked; a dropped pack removes the stale file', async () => {
+  const r = await oneProcess();
+  assert.deepEqual(r.registeredPacks, ['org-os-territory']);
+  assert.deepEqual(r.withPack.contextTypes, ['territorial-unit', 'data-stream']);
+  assert.equal(r.withPack.hasExtensionsYaml, true);
+  assert.deepEqual(r.packless.contextTypes, []);
+  assert.equal(r.packless.hasExtensionsYaml, false);
+  assert.deepEqual(r.surfaceUsedToCall.unfiltered, ['territorial-unit', 'data-stream']);
+  assert.deepEqual(r.surfaceUsedToCall.filtered, []);
+  assert.deepEqual(r.stale, { before: true, after: false });
+});
+
+test('federation: extensions.yaml passes federateCheck; a peer with the pack asks for 14 collections, without it 12; inbound records are projected', async () => {
+  const f = await federation();
+  assert.match(f.extensionsYaml, /territorial-unit:/);
+  assert.deepEqual(f.federateCheck.incompatible, []);
+  assert.ok(f.federateCheck.compatible.includes('territorial-unit') && f.federateCheck.compatible.includes('data-stream'));
+  assert.equal(f.peer.withPack.count, 14);
+  assert.deepEqual(f.peer.withPack.extra, ['territorialUnit', 'dataStream']);
+  assert.equal(f.peer.without.count, 12);
+  assert.equal(f.inbound.withPack.schema, 'territorial-unit');
+  assert.ok(!f.inbound.withPack.keys.includes('notes') && f.inbound.withPack.keys.includes('unit_id'));
+  assert.equal(f.inbound.withoutPack.mapped, 0);
 });
