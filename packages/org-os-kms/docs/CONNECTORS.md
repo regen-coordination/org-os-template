@@ -45,7 +45,7 @@ Separately, the publication gate: only these types publish by default (`claim-ev
 
 ## 4. `.well-known` allowlist
 
-Only two files are written under `<static_dir>/.well-known/`: `dao.json` (copied from the instance root `.well-known/` if present) and `knowledge.json` (generated: the root file if any is merged with `did`, `geo`, `exchange.published_domains`/`subscribed_domains` and source cards). `meetings.json`, `members.json`, `activities.json` and any other root `.well-known` file are never copied.
+Only two files are written under `<static_dir>/.well-known/`: `dao.json` (copied from the instance root `.well-known/` if present) and `knowledge.json` (generated: the root file if any is merged with `did`, `geo`, `exchange.published_domains`/`subscribed_domains` and source cards). `exchange.subscribed_domains` is **empty unless `publish.disclose_subscriptions: true`** in `kms.yaml`: listing the peer DIDs and `static-json` base URLs discloses who this instance reads, so it is opt-in. `meetings.json`, `members.json`, `activities.json` and any other root `.well-known` file are never copied.
 
 ## 5. Static surface facts
 
