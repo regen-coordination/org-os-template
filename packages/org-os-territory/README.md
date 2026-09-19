@@ -76,3 +76,20 @@ node demo/build.mjs --out /tmp/demo.html
 ```
 
 The build fails if any scenario's expectation is not met, so the page cannot show a result the code did not produce. The Catalunya sample is **illustrative** (example names, placeholder codes except `one_earth:PA20`, invented overlap shares, no geometry). `demo/dist/` is gitignored.
+
+## Explorer
+
+An interactive page for people who work with places rather than with code: click a place to see
+what it holds, what it overlaps on other layers, which data exist for it, and what a peer
+organisation would see of it. A six-step tour runs over the same screen.
+
+```bash
+npm run explorer            # → explorer/dist/index.html (one self-contained file, not committed)
+npm run explorer -- --out /tmp/territory-explorer.html
+```
+
+Every answer on the page is recorded from the real code at build time (`explorer/capture.mjs`);
+the browser only switches between recorded answers. The sample is **illustrative** — example
+names, invented overlap shares, no geometry; the board is a schematic, not a map. The engineering
+verification report is the separate `npm run demo`; the explorer reuses its sample and capture
+plumbing and changes none of it.
