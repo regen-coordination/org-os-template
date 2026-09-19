@@ -1,0 +1,23 @@
+# data-stream — one thing a source system offers. The source-system card is the PROVIDER treated as a
+# peer (steward, reuse_conditions, update_rhythm, return_path live there); a data-stream is a specific
+# dataset, endpoint or feed of it, catalogued by the places and the kinds of work it serves — so
+# "what data exist for this unit and this kind of project" is answerable before any ingestion.
+id: data-stream
+version: 0.1.0
+extends: frontmatter
+description: A specific dataset, endpoint or feed offered by a source system.
+required: [title, source_system, access]
+fields:
+  source_system: { type: string }  # slug of the provider's source-system card — the Layer-A `sourced_from` edge
+  url: { type: string }            # the endpoint or download itself
+  access:
+    enum: [open-api, graphql, wfs, wms, download, scrape, manual]
+  format: { type: string }         # geojson, shp, csv, json…
+  licence: { type: string }        # SPDX-style short form (CC-BY-4.0); prose conditions stay on the source-system
+  trust:
+    enum: [official, verified-community, unverified]
+  cadence: { type: string }        # static, yearly, daily…
+  unit_refs: { type: array }       # unit_ids it covers
+  layer_refs: { type: array }      # layers it informs
+  relevant_for: { type: array }    # open vocabulary; seed: watershed, food-systems, restoration, energy, housing, participation, funding, governance
+  connector: { type: string }      # the connector that ingests it, or empty

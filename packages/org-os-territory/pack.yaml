@@ -1,0 +1,8 @@
+# org-os-kms extension pack manifest. The directory name and `name` must match.
+name: org-os-territory
+version: 0.1.0
+requires:
+  framework: ">=0.3.0"
+  kms: ">=0.1.0"
+# Publish-ELIGIBLE types (opt-in). An instance must still list them in kms.yaml publish.types_opt_in.
+types: [territorial-unit, data-stream]

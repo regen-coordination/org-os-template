@@ -1,0 +1,4 @@
+# What this pack contributes to an org-os instance that opts in.
+registry_bindings:
+  territorial-unit: data/territorial-units.yaml
+  data-stream: data/data-streams.yaml

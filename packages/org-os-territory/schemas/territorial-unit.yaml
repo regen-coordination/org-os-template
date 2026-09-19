@@ -1,0 +1,22 @@
+# territorial-unit — a bounded unit of territory on one named layer. Maps to the core `place` (Layer A).
+# Lexicon fields are FLAT (string | boolean | integer | array of strings): codes are "scheme:value"
+# strings, geometry is a file reference, and overlap SHARES live in the generated sidecar
+# data/territory-overlaps.json — derived data, not knowledge.
+id: territorial-unit
+version: 0.1.0
+extends: frontmatter
+description: A bounded territorial unit on a named layer; the thing `unit_refs` point at.
+required: [title, unit_id, layer, level]
+fields:
+  unit_id: { type: string }        # stable slug "<layer>:<level>:<name>", unique per instance; NOT the UUID `id` minted at publish
+  layer:
+    enum: [administrative, landscape, ecological, hydrological, custom]
+  level: { type: string }          # free within a layer (municipi, comarca, unit, catalogue-area, ecoregion, basin…) — local vocabulary by design
+  part_of: { type: string }        # same-layer parent unit_id — the Layer-A `part_of` predicate
+  overlaps_with: { type: array }   # cross-layer unit_ids — the Layer-A `overlaps_with` predicate (shares: see the sidecar)
+  codes: { type: array }           # "<scheme>:<value>" — idescat:08, observatori:…, one_earth:PA20, aca:…
+  geometry_ref: { type: string }   # repo-relative path to a GeoJSON file; never inline (records cap at 1 MB)
+  area_km2: { type: integer }
+  defined_by: { type: string }     # slug of the data-stream authoritative for this unit's boundary
+  node_did: { type: string }       # empty until the unit hatches into its own instance
+  node_repo: { type: string }      # same
