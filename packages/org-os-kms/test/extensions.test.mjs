@@ -12,6 +12,8 @@ import { mergeConnectors, CONNECTORS } from '../src/connectors/index.mjs';
 import { REGISTRY_BINDINGS, registryBindings, registerRegistryBindings, resetRegistryBindings } from '../src/bind.mjs';
 import { bridge } from '../src/registry-bridge.mjs';
 import { OPS } from '../src/ops.mjs';
+import { createAtprotoConnector } from '../src/atproto/connector.mjs';
+import { writeStaticSurface } from '../src/static/surface.mjs';
 
 const WIDGET = 'id: widget\nversion: 0.1.0\nextends: frontmatter\nrequired: [title]\nfields:\n  size: { type: string }\n';
 
@@ -154,4 +156,63 @@ test('ingest.pull reaches a pack connector by name', async () => {
   assert.equal(res.report.failed, 0);
   assert.equal(res.report.connectors[0].status, 'ok', JSON.stringify(res.report.connectors[0]));
   assert.equal(res.report.connectors[0].stored, 1);
+});
+
+const AUTH = 'org.example.kb';
+function fakePds(collectionsAsked) {
+  return () => ({
+    async getLatestCommit() { return { rev: 'r1' }; },
+    async listAllRecords({ collection }) {
+      collectionsAsked.push(collection);
+      return collection === `${AUTH}.widget` ? [{ uri: `at://did:plc:peer/${AUTH}.widget/1`, value: { $type: `${AUTH}.widget`, title: 'Peer widget', type: 'widget', notes: 'private' } }] : [];
+    },
+  });
+}
+
+test('atproto connector: a loaded pack\'s collection is listed and mapped; without the pack it is never requested', async () => {
+  const cfg = { peers: ['did:plc:peer'], pds: 'https://pds.test', nsid_authority: AUTH, self: 'did:plc:me' };
+  const asked0 = []; const c0 = createAtprotoConnector({ createClient: fakePds(asked0) });
+  await c0.pull(cfg, { cursor: null });
+  assert.ok(!asked0.includes(`${AUTH}.widget`));
+  assert.equal(asked0.length, 12);
+
+  const p = pkgs(); makePack(p, 'pack-a');
+  loadExtensions({ extensions: ['pack-a'] }, { packagesDir: p });
+  const asked1 = []; const c1 = createAtprotoConnector({ createClient: fakePds(asked1) });
+  const { records } = await c1.pull(cfg, { cursor: null });
+  assert.ok(asked1.includes(`${AUTH}.widget`)); assert.equal(asked1.length, 13);
+  const mapped = c1.map(records[0], cfg);
+  assert.equal(mapped[0].schema, 'widget');
+  assert.equal(mapped[0].object.notes, undefined, 'inbound pack records go through the same projection');
+  assert.equal(mapped[0].object.sourceUri, `at://did:plc:peer/${AUTH}.widget/1`);
+});
+
+function surfaceInstance(extra = {}) {
+  const inst = mkdtempSync(join(tmpdir(), 'kms-inst-'));
+  writeFileSync(join(inst, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', publish: { base_url: 'https://t.example' }, ...extra }));
+  return inst;
+}
+
+test('static surface: extensions.yaml is written for an instance with packs, and federateCheck accepts it', () => {
+  const p = pkgs(); makePack(p, 'pack-a');
+  const inst = surfaceInstance({ extensions: ['pack-a'] });
+  const config = loadKmsConfig(inst, { packagesDir: p });
+  const { files } = writeStaticSurface({ dir: inst, items: [], manifest: { objects: {} }, config });
+  assert.ok(files.includes('.well-known/extensions.yaml'));
+  const path = join(inst, 'public', '.well-known', 'extensions.yaml');
+  const doc = yaml.load(readFileSync(path, 'utf8'));
+  assert.equal(doc.entities.widget.maps_to_core, 'artifact');
+  assert.ok(doc.entities.resource, 'core Layer-B entities are included');
+  const check = fw.federateCheck({ extensionsPath: path });
+  assert.ok(check.compatible.includes('widget')); assert.deepEqual(check.incompatible, []);
+});
+
+test('static surface: an instance without packs writes no extensions.yaml — even if another instance registered one in this process', () => {
+  const p = pkgs(); makePack(p, 'pack-a');
+  loadExtensions({ extensions: ['pack-a'] }, { packagesDir: p }); // some other instance, same process
+  const inst = surfaceInstance();
+  const config = loadKmsConfig(inst);
+  const { files } = writeStaticSurface({ dir: inst, items: [], manifest: { objects: {} }, config });
+  assert.deepEqual(files.sort(), ['.well-known/knowledge.json', 'api/context.jsonld', 'api/index.json']);
+  assert.ok(!existsSync(join(inst, 'public', '.well-known', 'extensions.yaml')));
 });

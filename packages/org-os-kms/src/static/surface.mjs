@@ -1,6 +1,7 @@
 // packages/org-os-kms/src/static/surface.mjs — the non-AT-Proto publication target. Projected, allowlisted, absolute URLs, merged manifest.
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
+import yaml from 'js-yaml';
 import * as fw from '../framework.mjs';
 
 const WELL_KNOWN_ALLOW = ['dao.json'];
@@ -47,6 +48,15 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
   const sources = [...(km.sources || [])];
   for (const c of cards) if (!sources.some((s) => s.title === c.title)) sources.push(c);
   write('.well-known/knowledge.json', { ...km, did: config.atproto?.did ?? km.did, geo: config.geo ?? km.geo, exchange: { published_domains: authority ? schemas.map((s) => fw.nsidFor(s, authority)) : [], subscribed_domains: subscribed }, sources });
+
+  // Extension packs: publish this instance's Layer-B set (type names + maps_to_core only — no instance data) so a peer can
+  // run federateCheck({ extensionsPath }) against it. Keyed on THIS instance's packs, never on the process-wide registry,
+  // and written only when there are packs so a pack-less surface is unchanged.
+  if (config.packs?.length) {
+    mkdirSync(join(out, '.well-known'), { recursive: true });
+    writeFileSync(join(out, '.well-known', 'extensions.yaml'), yaml.dump({ entities: fw.extensionEntities({ packs: config.packs.map((p) => p.name) }) }));
+    files.push('.well-known/extensions.yaml');
+  }
 
   for (const f of WELL_KNOWN_ALLOW) {
     const src = join(dir, '.well-known', f);
