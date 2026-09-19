@@ -21,6 +21,7 @@
   ACTIONS['pick-pack'] = (el, f) => { pressOnly(el); setPanel('pack', renderPackPanel(f, el.dataset.which)); };
 
   ACTIONS['pick-matrix'] = (el, f) => { pressOnly(el); setPanel('matrix', renderMatrixPanel(f, el.dataset.id)); };
+  ACTIONS['pick-attempt'] = (el, f) => { pressOnly(el); setPanel('attempt', renderAttemptPanel(f, el.dataset.id)); };
   // <<ACTIONS>>
 
   document.addEventListener('click', (e) => {

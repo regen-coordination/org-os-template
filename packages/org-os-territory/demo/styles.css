@@ -42,4 +42,6 @@ h4 { margin: 14px 0 4px; font-size: 14px; color: var(--muted); text-transform: u
 .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 8px 0; }
 .res-bad { border-color: var(--bad); }
 ul.fields { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 4px 0 10px; }
+.filepath { margin: 8px 0 0; } ol.commits { padding-left: 22px; font-size: 14px; } ol.commits li { margin: 2px 0; }
+[data-panel=attempt] .seg, .seg.wide { align-items: stretch; }
 /* <<SECTION-CSS>> */

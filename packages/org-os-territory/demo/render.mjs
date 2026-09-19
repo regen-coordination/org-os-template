@@ -117,3 +117,38 @@ ${provenance('Two instances published in one process without resetting the regis
 }
 
 register({ id: 'guarantees', order: 3, nav: '3 Guarantees', title: '3 · The guarantees', lead: 'A pack can never widen what an instance publishes, and one instance never sees another’s pack.', render: renderGuarantees });
+
+export function renderAttemptPanel(f, id) {
+  const a = f.attempts.find((x) => x.id === id);
+  const files = Object.entries(a.files);
+  const naming = a.namesPack ? chip('the error names the pack', 'ok') : chip('names only the offending item — a known gap', 'warn');
+  return `<div class="card"><h3>${esc(a.title)}</h3><p class="muted">${esc(a.why)}</p>
+<h4>Input — exactly the files written to a temp packages directory, then loaded with <code>${esc(a.action)}</code></h4>
+${files.length ? files.map(([p, t]) => `<p class="filepath">${code(p)}</p>${pre(t)}`).join('') : '<p class="muted">(no files — the pack does not exist, or the name is rejected before any path is built)</p>'}
+<h4>What the real loader threw</h4>${pre(a.error)}
+<p>${naming}</p></div>`;
+}
+
+export function renderAttempts(f) {
+  const first = f.attempts[0].id;
+  return `<p class="muted">Eleven ways to get a pack wrong, each run for real against the loader. Pick one.</p>
+${seg('pick-attempt', 'id', f.attempts.map((a) => [a.id, a.title]), first)}
+<div data-panel="attempt">${renderAttemptPanel(f, first)}</div>
+${provenance('Each attempt writes its files to a temp packages directory and calls the real <code>loadExtensions</code> (and, for connectors, <code>loadPackConnectors</code> + <code>mergeConnectors</code>); the build fails if an attempt does not fail or fails with a different message — <code>demo/capture/attempts.mjs</code>.')}`;
+}
+
+export function renderVerified(f) {
+  const v = f.verified;
+  const suites = v.skipped
+    ? `<p>${chip('suites not run in this build', 'warn')} Rebuild without <code>--skip-suites</code> (<code>npm run demo</code>) to record the real pass counts here.</p>`
+    : `<table><thead><tr><th>suite</th><th>tests</th><th>pass</th><th>fail</th><th>skipped</th></tr></thead><tbody>${v.suites.map((s) => `<tr><td>${esc(s.name)}</td><td>${esc(s.tests)}</td><td>${esc(s.pass)}</td><td>${esc(s.fail)}</td><td>${esc(s.skipped)}</td></tr>`).join('')}</tbody></table>`;
+  return `<h3>Test suites</h3>${suites}
+<h3>No pre-existing test was modified</h3>
+<p>${chip(String(v.testDirsUnmodified), v.testDirsUnmodified ? 'ok' : 'bad')} <code>git diff ${esc(v.base.slice(0, 7))}..HEAD --diff-filter=MDR</code> over <code>packages/toolkit-framework/test</code> and <code>packages/org-os-kms/test</code> printed nothing: the branch adds tests and changes none that existed on <code>main</code>.</p>
+<h3>The branch — ${esc(v.commits.length)} commits over <code>${esc(v.base.slice(0, 7))}</code></h3>
+<ol class="commits">${v.commits.map((c) => `<li><code>${esc(c.slice(0, 7))}</code> ${esc(c.slice(8))}</li>`).join('')}</ol>
+${provenance('Suite counts are parsed from each package’s real <code>node --test</code> run; the diff check and the commit list are read from git — <code>demo/capture/verified.mjs</code>. The build fails if any suite has a failing test or a pre-existing test file was touched.')}`;
+}
+
+register({ id: 'attempts', order: 4, nav: '4 Break it', title: '4 · Try to break it', lead: 'Every way of loading a pack wrong fails loudly, and says why.', render: renderAttempts });
+register({ id: 'verified', order: 7, nav: '7 Verified', title: '7 · Verified', lead: 'What was measured, not claimed.', render: renderVerified });

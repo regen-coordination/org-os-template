@@ -271,3 +271,33 @@ test('section 3: each of the five configurations renders its captured result; th
   app.click('pick-matrix', { id: 'pack-units' });
   assert.match(app.panels.matrix.innerHTML, /territorialUnit/);
 });
+
+test('section 4: every attempt renders its real input and real error; the known gap is shown, not hidden; the selector switches', async () => {
+  const f = await getFacts();
+  for (const a of f.attempts) {
+    const h = R.renderAttemptPanel(f, a.id);
+    assert.ok(h.includes(R.esc(a.error)), `${a.id}: the real error appears verbatim (escaped)`);
+    assert.ok(h.includes(R.esc(a.title)));
+    for (const path of Object.keys(a.files)) assert.ok(h.includes(R.esc(path)), `${a.id}: file ${path}`);
+  }
+  assert.match(R.renderAttemptPanel(f, 'connector-core-name'), /known gap/i);
+  assert.match(R.renderAttemptPanel(f, 'schema-core-collision'), /names the pack/i);
+  assert.match(R.renderAttemptPanel(f, 'missing-pack'), /no files/i);
+  assert.ok(R.renderAttemptPanel(f, 'unquoted-yaml').includes('&lt;packages&gt;/bad-pack/pack.yaml'));
+  assert.ok(R.sections().some((s) => s.id === 'attempts' && s.order === 4));
+  const app = runApp(f);
+  app.click('pick-attempt', { id: 'unmet-requires' });
+  assert.match(app.panels.attempt.innerHTML, /requires framework &gt;=99\.0\.0/);
+});
+
+test('section 7: suites, the no-pre-existing-test-modified check and the commit list render from the facts; a skipped build says so', async () => {
+  const f = await getFacts();
+  const skipped = R.renderVerified(f);
+  assert.match(skipped, /not run in this build/i);
+  assert.match(skipped, /diff-filter/);
+  assert.ok(skipped.includes(f.verified.commits[0].slice(0, 7)));
+  const ran = R.renderVerified({ ...f, verified: { ...f.verified, skipped: false, suites: [{ name: 'toolkit-framework', tests: 205, pass: 205, fail: 0, skipped: 0 }, { name: 'org-os-kms', tests: 181, pass: 180, fail: 0, skipped: 1 }] } });
+  assert.ok(ran.includes('<td>205</td>') && ran.includes('org-os-kms'));
+  assert.ok(!/not run in this build/i.test(ran));
+  assert.ok(R.sections().some((s) => s.id === 'verified' && s.order === 7));
+});
