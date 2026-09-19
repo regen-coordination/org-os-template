@@ -162,7 +162,7 @@ export const OPS = {
         if (!dry && JSON.stringify(normalize(r.cursor)) !== JSON.stringify(normalize(decl.cursor))) {
           cursorChanges.push({ i, name: decl.name, cursor: r.cursor ?? null });
         }
-        report.connectors.push({ name: decl.name, status: 'ok', dry: r.dry, pulled: r.pulled, candidates: r.candidates, stored: r.stored, updated: r.updated,
+        report.connectors.push({ name: decl.name, status: 'ok', dry: r.dry, pulled: r.pulled, candidates: r.candidates, stored: r.stored, updated: r.updated, unchanged: r.unchanged,
           collisions: r.collisions, collided: r.collided ?? [], invalid: r.invalid ?? [], retractions: r.retractions, errors: r.errors });
       } catch (e) {
         if (e.code === 'NOT_IMPLEMENTED') report.connectors.push({ name: decl.name, status: 'not-implemented' });

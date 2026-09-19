@@ -68,8 +68,8 @@ test('runConnector end-to-end: pull #1 stores 6; an upstream edit upserts on pul
   // a human has reviewed this one locally (ai_assisted false), so the framework may keep maturity 'reviewed'
   a.update(dir, local().ref, { id: 'local-id-1', maturity: 'reviewed', public_use: 'ok-with-caveat', ai_assisted: false });
   const two = await run(createStaticJsonConnector({ fetchImpl: servedFrom({ 'protocols.json': withProtocolName('Nostr (renamed upstream)') }) }), one.cursor);
-  // runConnector upserts every re-pulled record that has a sourceUri (it does not diff), so all 6 update; none collide or duplicate.
-  assert.equal(two.updated, 6); assert.equal(two.collisions, 0); assert.equal(two.stored, 0); assert.deepEqual(two.invalid, []);
+  // runConnector skips a re-pulled record whose content is unchanged: only the renamed one updates, the other 5 are unchanged; none collide or duplicate.
+  assert.equal(two.updated, 1); assert.equal(two.unchanged, 5); assert.equal(two.collisions, 0); assert.equal(two.stored, 0); assert.deepEqual(two.invalid, []);
   const o = local().object;
   assert.equal(o.title, 'Nostr (renamed upstream)');
   assert.equal(o.id, 'local-id-1'); assert.equal(o.maturity, 'reviewed'); assert.equal(o.public_use, 'ok-with-caveat');

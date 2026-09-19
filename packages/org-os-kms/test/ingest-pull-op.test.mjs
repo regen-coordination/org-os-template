@@ -201,3 +201,13 @@ test('cursor change is skipped (and reported) when the connector entry moved/ren
   assert.equal(yaml.load(kmsText(dir)).connectors[0].cursor, null, 'not applied to a different entry');
   assert.deepEqual(res.report.cursorSkipped, ['good']);
 });
+
+test('a second pull of unchanged records reports them under unchanged, not updated', async () => {
+  const withOrigin = { ...good, name: 'orig', map: (r) => [{ schema: 'resource', object: { title: r.n, type: 'resource', sourceUri: 'at://p/x/1' } }] };
+  const dir = instance([{ name: 'orig', config: {}, cursor: null }]);
+  const first = await OPS['ingest.pull'].run({ dir, deps: { registry: { orig: withOrigin } } });
+  assert.equal(first.report.connectors[0].stored, 1);
+  const second = await OPS['ingest.pull'].run({ dir, deps: { registry: { orig: withOrigin } } });
+  const c = second.report.connectors[0];
+  assert.equal(c.pulled, 1); assert.equal(c.updated, 0); assert.equal(c.unchanged, 1);
+});
