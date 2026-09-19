@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "demo": "node demo/build.mjs"
+    "demo": "node demo/build.mjs",
+    "explorer": "node explorer/build.mjs"
   },
   "license": "MIT",
   "keywords": ["org-os", "org-os-kms", "extension-pack", "territory", "bioregion", "landscape-units", "knowledge-commons"]
