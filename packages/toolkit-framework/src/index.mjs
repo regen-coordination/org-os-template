@@ -61,6 +61,17 @@ export function registerPack({ name, schemaDir = null, entities = {}, types = []
       if (p.schemaDir && yamlNames(p.schemaDir).includes(s)) throw new Error(`pack schema "${s}" (${name}) collides with pack ${p.name}`);
     }
   }
+  const coreNames = new Set([
+    ...Object.keys(loadSchema('core-entities').entities || {}),
+    ...Object.keys(loadSchema('extension-entities').entities || {}),
+  ]);
+  for (const [e, def] of Object.entries(entities)) {
+    if (coreNames.has(e)) throw new Error(`pack entity "${e}" (${name}) collides with core`);
+    for (const p of getPacks().values()) {
+      if (p.entities && e in p.entities) throw new Error(`pack entity "${e}" (${name}) collides with pack ${p.name}`);
+    }
+    if (!isForkCompatible(def)) throw new Error(`pack entity "${e}" (${name}): maps_to_core "${def?.maps_to_core}" is not a core type`);
+  }
   const pack = { name, schemaDir, entities: { ...entities }, types: [...types] };
   setPack(name, pack);
   _cache.clear();
@@ -72,6 +83,16 @@ export function resetPacks() { clearPacks(); _cache.clear(); }
 
 /** The registered packs, in registration order. */
 export function registeredPacks() { return [...getPacks().values()]; }
+
+/** Layer-B entities: the core extension set plus the registered packs' (optionally only the named packs). */
+export function extensionEntities({ packs = null } = {}) {
+  const out = { ...(loadSchema('extension-entities').entities || {}) };
+  for (const p of getPacks().values()) {
+    if (packs && !packs.includes(p.name)) continue;
+    Object.assign(out, p.entities || {});
+  }
+  return out;
+}
 
 /** Is `value` a member of `axis` in the canonical state model (K1)? */
 export function isValid(axis, value) {
@@ -133,14 +154,14 @@ export function validateObject(schemaName, obj) {
 export function validateKernel() {
   const errors = [];
   const core = loadSchema('core-entities');
-  const ext = loadSchema('extension-entities');
+  const ext = { entities: extensionEntities() };
   const coreNames = new Set(Object.keys(core.entities || {}));
-  for (const [name, def] of Object.entries(ext.entities || {})) {
+  for (const [name, def] of Object.entries(ext.entities)) {
     if (!def.maps_to_core) errors.push(`extension "${name}" missing maps_to_core`);
     else if (!coreNames.has(def.maps_to_core)) errors.push(`extension "${name}" maps_to_core "${def.maps_to_core}" is not a core type`);
   }
   const kp = loadSchema('kernel-profile');
-  const allNames = new Set([...coreNames, ...Object.keys(ext.entities || {})]);
+  const allNames = new Set([...coreNames, ...Object.keys(ext.entities)]);
   for (const [name, def] of Object.entries(kp.objects || {})) {
     const t = String(def.type || '').split('/').pop();
     if (!allNames.has(t)) errors.push(`kernel object "${name}" references unknown type "${t}"`);
@@ -158,10 +179,8 @@ export function isForkCompatible(localType) {
 /** Generate a JSON-LD @context from the kernel (graph-compatible / AI-readable serialization). */
 export function toJsonLdContext(baseIri = 'https://regen-commons.org/ns/') {
   const ctx = { '@version': 1.1, '@vocab': baseIri };
-  for (const schemaName of ['core-entities', 'extension-entities']) {
-    const s = loadSchema(schemaName);
-    for (const name of Object.keys(s.entities || {})) ctx[name] = baseIri + name;
-  }
+  for (const name of Object.keys(loadSchema('core-entities').entities || {})) ctx[name] = baseIri + name;
+  for (const name of Object.keys(extensionEntities())) ctx[name] = baseIri + name;
   const rels = loadSchema('relationships');
   for (const group of Object.values(rels.groups || {})) {
     for (const p of Object.keys(group.predicates || {})) ctx[p] = { '@id': baseIri + p, '@type': '@id' };
