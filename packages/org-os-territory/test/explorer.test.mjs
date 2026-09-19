@@ -300,3 +300,37 @@ test('build writes the file where told and nowhere else', async () => {
   assert.equal(r.out, out); assert.ok(existsSync(out)); assert.ok(r.bytes < BUDGET);
   assert.match(DEFAULT_OUT, /explorer\/dist\/index\.html$/);
 });
+
+// ── Task 10: the wiring, driven without a browser ────────────────────────────────────────────────────────────────────
+// A minimal stand-in for the DOM: enough for app.js to read the facts, render into #app and receive events.
+function boot(html) {
+  const handlers = {}; const app = { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] }; const live = { textContent: '' };
+  const root = { dataset: { theme: 'auto' } };
+  const document = { documentElement: root, getElementById: (id) => (id === 'facts' ? { textContent: html.match(/id="facts">([\s\S]*?)<\/script>/)[1] } : id === 'app' ? app : id === 'live' ? live : null),
+    querySelector: () => null, addEventListener: (type, fn) => { handlers[type] = fn; } };
+  vm.runInNewContext(scriptOf(html), { document, window: {}, JSON, Array, Object, String, Boolean, Math, Set });
+  const el = (dataset, extra = {}) => { const e = { dataset, closest: (sel) => (sel === '[data-action]' ? (dataset.action ? e : null) : sel === '[data-change]' ? (dataset.change ? e : null) : null), setAttribute(k, v) { this[k] = v; }, classList: { contains: () => false }, ...extra }; return e; };
+  return { app, live, root, click: (dataset) => handlers.click({ target: el(dataset) }), change: (dataset, value) => handlers.change({ target: el(dataset, { value }) }), key: (key) => handlers.keydown({ key, target: el({}), preventDefault() {} }) };
+}
+
+test('app.js: a click selects, a change switches perspective, the tour runs and Esc ends it, the theme toggles — all through reduce/view/renderApp', async () => {
+  const page = boot(assemble(await facts()));
+  page.click({ action: 'select', id: CAT });
+  assert.match(page.app.innerHTML, /<h2 id="panel-h" class="">Catalunya<\/h2>[\s\S]*What's here \(3\)/);
+  assert.equal(page.live.textContent, 'Catalunya selected, 3 things here.', 'the persistent live region is updated outside #app');
+  page.change({ change: 'toggle-inside', key: 'inside' });
+  assert.match(page.app.innerHTML, /What's here \(1\)/);
+  page.change({ change: 'share', key: 'share:units' }, 'units');
+  page.change({ change: 'view', key: 'view:peer-nopack' }, 'peer-nopack');
+  assert.match(page.app.innerHTML, /They received 0 places/);
+  assert.match(page.live.textContent, /^Catalunya selected, 1 thing here\. A peer organisation without the territory pack\..*never asks for one\.$/);
+  assert.match(page.app.innerHTML, /<h2 id="panel-h" class="is-dimmed">Catalunya/);
+  page.click({ action: 'tour', value: 'start' });
+  assert.match(page.app.innerHTML, /Step 1 of 6/);
+  page.click({ action: 'tour', value: 'next' });
+  assert.match(page.app.innerHTML, /Step 2 of 6/);
+  page.key('Escape');
+  assert.ok(!page.app.innerHTML.includes('id="tour"'));
+  page.click({ action: 'theme' }); // the theme is not part of the model: no re-render, no throw
+  assert.ok(['light', 'dark'].includes(page.root.dataset.theme));
+});
