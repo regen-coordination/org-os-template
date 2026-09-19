@@ -298,8 +298,13 @@ test('section 7: suites, the no-pre-existing-test-modified check and the commit 
   const f = await getFacts();
   const skipped = R.renderVerified(f);
   assert.match(skipped, /not run in this build/i);
-  assert.match(skipped, /diff-filter/);
-  if (f.verified.commits.length) assert.ok(skipped.includes(f.verified.commits[0].split(' ')[0]));
+  assert.match(skipped, /<h3>No pre-existing test was modified<\/h3>/);
+  // Branch-specific output depends on whether the branch has commits over main, so it is asserted on explicit facts, never on git state.
+  const withBranch = R.renderVerified({ ...f, verified: { ...f.verified, commits: ['abcdef0 a subject', '1234567 another'] } });
+  assert.match(withBranch, /diff-filter=MDR/);
+  assert.match(withBranch, /printed nothing/);
+  assert.ok(withBranch.includes('<code>abcdef0</code> a subject') && withBranch.includes('<code>1234567</code> another'));
+  assert.match(withBranch, /2 commits over/);
   const ran = R.renderVerified({ ...f, verified: { ...f.verified, skipped: false, commits: ['abcdef0 a subject'], suites: [{ name: 'toolkit-framework', tests: 205, pass: 205, fail: 0, skipped: 0 }, { name: 'org-os-kms', tests: 181, pass: 180, fail: 0, skipped: 1 }] } });
   assert.ok(ran.includes('<td>205</td>') && ran.includes('org-os-kms'));
   assert.ok(!/not run in this build/i.test(ran));
@@ -312,7 +317,6 @@ test('section 7: on the base branch (no commits over main) the page says there i
   const onBase = R.renderVerified({ ...f, verified: { ...f.verified, commits: [] } });
   assert.match(onBase, /no branch diff to check/);
   assert.doesNotMatch(onBase, /printed nothing/);
-  if (f.verified.commits.length) assert.match(R.renderVerified(f), /printed nothing/);
 });
 
 test('section 5: the schematic lists every unit by layer; a unit panel shows the real query answers; the overlap panels show the real validator errors; unknown refs are reported', async () => {
