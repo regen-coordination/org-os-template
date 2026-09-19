@@ -109,7 +109,12 @@ Order per connector: describe, pull, map, validate, upsert/store, write the sour
 
 ### Ingested objects and `bridge` (read before running `close`)
 
-Ingested objects land `not-public-yet`, so they are outside the publication floor (section 3). But `bridge` is **not** gated by publication: it is bound earlier than `publish` in `close` (`bridge` runs before `publish`), and it copies **every** object of a bound schema into the org-os registries (`data/resources.yaml`, `data/source-systems.yaml`, `data/signals.yaml`, ...), whatever its `maturity` or `public_use`. `encyclopedia-entry` objects are written to the site's `src/content/docs/kb/<slug>.md` **unprojected**: `notes`, `reviewed_by`, `consent_note`, `id`, `sourceUri`, `viaUri` and every other field go into the page frontmatter, with no publication gate. Do **not** run `lifecycle close` after an `ingest` until the pulled objects have been reviewed (or the encyclopedia-entry pages are otherwise kept out of the built site).
+Ingested objects land `not-public-yet`, so they are outside the publication floor (section 3). `bridge` is bound earlier than `publish` in `close` and is **not** the publish path, so know what it does with them:
+
+- **Registry rows are still copied.** Every object of a bound schema is upserted into the org-os registries (`data/resources.yaml`, `data/source-systems.yaml`, `data/signals.yaml`, ...), whatever its `maturity` or `public_use`. Those are internal instance state, not a publication surface, and are not gated. If your site or `.well-known` generators read those registries, that is where a pulled object can surface.
+- **`encyclopedia-entry` pages are gated.** They are written to the site's `src/content/docs/kb/<slug>.md`, which is the public site. An entry whose `public_use` is `not-public-yet` or `internal-only`, or whose `maturity` is `held`, gets **no page**; it is listed under `report.withheld` (`{ schema, title, reason }`). An entry with no `public_use` at all is written as before.
+- **Existing pages are never deleted.** If an entry was bridged while publishable and later turns `held` or `internal-only`, its old page stays until you remove it; `bridge` only stops rewriting it.
+- **Pages for publishable entries are still unprojected.** Frontmatter is every field of the object, including `notes`, `reviewed_by`, `consent_note`, `id`, `sourceUri` and `viaUri`. Only the publication plane (`publish`) applies `publicView()`; `bridge` does not. Keep private material out of publishable entries' fields, or keep the `kb/` pages out of the built site.
 
 ## 11. Identity setup for a publisher
 
