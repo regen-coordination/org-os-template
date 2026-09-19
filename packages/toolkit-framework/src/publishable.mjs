@@ -26,7 +26,9 @@ export function publishableTypes(config = {}) {
 
 export function isPublishable(object, { schema = object?.type, types = PUBLISHABLE_TYPES } = {}) {
   if (!object || typeof object !== 'object') return false;
-  return types.includes(schema) && PUBLISHABLE_PUBLIC_USE.includes(object.public_use);
+  // `held` (set on an origin retraction, or by an operator to withhold) is the one maturity the floor
+  // refuses: it un-publishes on the next apply. Every other maturity is the instance gate's call.
+  return types.includes(schema) && PUBLISHABLE_PUBLIC_USE.includes(object.public_use) && object.maturity !== 'held';
 }
 
 export function publicView(object) {

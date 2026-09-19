@@ -41,7 +41,7 @@ The `ingest` report, per connector: `name`, `status`, `dry`, `pulled`, `candidat
 
 and `provenance.surfaced_by`. That list is the `PRIVATE_FIELDS` constant; read it there rather than trusting this copy if the framework version differs.
 
-Separately, the publication gate: only these types publish by default (`claim-evidence`, `concept-lineage`, `encyclopedia-entry`, `implementation-record`, `option-entry`, `organization`, `relationship-record`, `resource`, `signal`, `track`), `source-system` and `public-use-boundary` are opt-in via `publish.types_opt_in`, `person` is never publishable, and an object needs `public_use` of `ok-with-caveat`, `source-linked-unreviewed`, `reviewed-for-explanation` or `reviewed-for-guidance`. An optional instance gate (`publish.gate`) can only narrow this.
+Separately, the publication gate: only these types publish by default (`claim-evidence`, `concept-lineage`, `encyclopedia-entry`, `implementation-record`, `option-entry`, `organization`, `relationship-record`, `resource`, `signal`, `track`), `source-system` and `public-use-boundary` are opt-in via `publish.types_opt_in`, `person` is never publishable, and an object needs `public_use` of `ok-with-caveat`, `source-linked-unreviewed`, `reviewed-for-explanation` or `reviewed-for-guidance`, and its `maturity` must not be `held` (no other maturity is part of the floor). An optional instance gate (`publish.gate`) can only narrow this.
 
 ## 4. `.well-known` allowlist
 
@@ -104,16 +104,7 @@ Order per connector: describe, pull, map, validate, upsert/store, write the sour
 - **Invalid candidates are reported, not stored.** They appear under `invalid` (`{ title, errors }`).
 - **The cursor still advances past invalid and collided records.** They are not retried until the peer's data changes (a new `rev`, or a different body hash). Read `invalid` and `collided` in the `ingest` report; that is the only place they are surfaced.
 - **Retractions never delete.** A record that disappeared at the origin sets `maturity: held` and `review_needs: 'retracted at origin <sourceUri>'`. Matching is by `sourceUri`; for atproto that is the peer's record AT-URI, so a stored record that carries its own different `sourceUri` claim is not matched by a retraction.
-- **`held` does NOT unpublish.** The publication floor (section 3) looks at type and `public_use`, not `maturity`. If a reviewer already promoted an ingested object to a publishable `public_use`, and it is later retracted at the origin, this instance **keeps publishing it** (`review_needs` and `maturity` change locally only). To make retraction take effect, add an instance gate (`publish.gate` in `kms.yaml`, a module exporting `isPublishable(obj, ctx)`; it can only narrow the floor):
-
-  ```js
-  // gate.mjs
-  export function isPublishable(obj) {
-    return obj.maturity === 'held' ? { ok: false, reason: 'held (retracted at origin)' } : { ok: true };
-  }
-  ```
-
-  A rejected object also disappears from the next publish (deleted from the PDS when applying, dropped from the static surface).
+- **`held` unpublishes.** The publication floor (section 3) refuses `maturity: held`. If a reviewer already promoted an ingested object to a publishable `public_use` and it is later retracted at the origin, the next publish drops it: deleted from the PDS when applying, removed from the static surface. The same holds for an object an operator sets to `held` to withhold it. Only `held` is special: every other maturity is left to your instance gate (`publish.gate`), which can only narrow the floor.
 - **Cursor write-back.** After a successful (non-dry) pull the cursor is written into the matching `connectors[]` entry of `kms.yaml`, but only if some connector's cursor actually changed (an empty `{}` counts as `null`, so a peerless atproto connector causes no write). The write is **atomic and based on a fresh read**: `kms.yaml` is re-read after the pulls, only the cursor changes are applied to it (matched by connector index and name; a change whose entry moved or was renamed meanwhile is skipped and listed under `report.cursorSkipped`), and the file is written to `kms.yaml.tmp` then renamed, so a concurrent edit is not lost and a kill mid-write cannot truncate the config. It still re-serializes the whole file: **the first cursor write-back rewrites `kms.yaml` without its comments.** Keep commentary elsewhere. Failed and not-implemented connectors leave their cursor as it was.
 
 ### Ingested objects and `bridge` (read before running `close`)
