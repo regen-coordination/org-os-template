@@ -1,6 +1,10 @@
 // packages/org-os-territory/test/demo.test.mjs — the demo: sample data, real-run capture, renderer, built page.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFileSync, mkdtempSync, existsSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fw, loadExtensions, reset } from '../demo/capture/env.mjs';
 import { UNITS, RESOURCES, STREAMS, PROVIDERS, OVERLAPS_VALID, OVERLAP_FAULTS, SAMPLE_NOTE } from '../demo/sample.mjs';
 import { indexUnits } from '../src/units.mjs';
@@ -13,6 +17,8 @@ import { attempts } from '../demo/capture/attempts.mjs';
 import { territory } from '../demo/capture/territory.mjs';
 import { verified } from '../demo/capture/verified.mjs';
 import { capture } from '../demo/capture.mjs';
+import { assemble, build, stripExports, safeJson } from '../demo/build.mjs';
+import * as R from '../demo/render.mjs';
 
 beforeEach(() => reset());
 
@@ -152,4 +158,46 @@ test('capture: every section key is present, the whole thing serialises, and it 
   const json = JSON.stringify(facts);
   assert.ok(json.length < 150_000, `facts are ${json.length} chars`);
   assert.deepEqual(JSON.parse(json).matrix.map((m) => m.id), facts.matrix.map((m) => m.id));
+});
+
+let _facts;
+const getFacts = () => (_facts ??= capture({ skipSuites: true }));
+const demoSrc = (f) => readFileSync(new URL(`../demo/${f}`, import.meta.url), 'utf8');
+
+test('build helpers: safeJson can never end its script block; stripExports removes only export keywords', () => {
+  const nasty = { x: '</script><!--', y: String.fromCharCode(0x2028) };
+  const out = safeJson(nasty);
+  assert.ok(!out.includes('</script>') && !out.includes(String.fromCharCode(0x2028)));
+  assert.deepEqual(JSON.parse(out), nasty);
+  assert.equal(stripExports('export const a = 1;\nexport function b() {}\nexport async function c() {}\nconst d = 2;'), 'const a = 1;\nfunction b() {}\nasync function c() {}\nconst d = 2;');
+});
+
+test('the page: header, banner, theme control, the seam section, embedded facts; no external resources; compiles; within budget', async () => {
+  const facts = await getFacts();
+  const html = assemble(facts);
+  assert.match(html, /<section id="seam"/);
+  assert.match(html, /captured by running the real code/);
+  assert.match(html, /data-action="toggle-theme"/);
+  assert.match(html, /class="skip" href="#main"/);
+  const m = /<script type="application\/json" id="facts">([\s\S]*?)<\/script>/.exec(html);
+  assert.deepEqual(JSON.parse(m[1]), JSON.parse(JSON.stringify(facts)));
+  assert.equal((html.match(/<\/script>/g) || []).length, 2, 'exactly the facts block and the code block');
+  assert.doesNotThrow(() => new vm.Script(stripExports(demoSrc('render.mjs')) + '\n' + demoSrc('app.js')), 'the inlined code must compile');
+  assert.ok(!/(?:src|href)\s*=\s*["']https?:/i.test(html) && !/url\(\s*["']?https?:/i.test(html) && !/\bfetch\s*\(/.test(html), 'no external resources');
+  assert.ok(Buffer.byteLength(html) < 300 * 1024, 'under the size budget');
+});
+
+test('renderSeam: reads the core schema count and the pack-added schemas from the captured facts', async () => {
+  const f = await getFacts();
+  const h = R.renderSeam(f);
+  assert.ok(h.includes(`core schemas <b>${f.packInfo.none.schemas.length}</b>`));
+  for (const s of f.packInfo.territory.added.schemas) assert.ok(h.includes(`<code>${s}</code>`), s);
+  assert.match(h, /unchanged/);
+});
+
+test('build writes the file where told and nowhere else', async () => {
+  const out = join(mkdtempSync(join(tmpdir(), 'demo-out-')), 'index.html');
+  const r = await build({ skipSuites: true, out });
+  assert.equal(r.out, out);
+  assert.ok(existsSync(out) && statSync(out).size === r.bytes);
 });
