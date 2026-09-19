@@ -11,6 +11,8 @@ import { oneProcess } from '../demo/capture/one-process.mjs';
 import { federation } from '../demo/capture/federation.mjs';
 import { attempts } from '../demo/capture/attempts.mjs';
 import { territory } from '../demo/capture/territory.mjs';
+import { verified } from '../demo/capture/verified.mjs';
+import { capture } from '../demo/capture.mjs';
 
 beforeEach(() => reset());
 
@@ -131,4 +133,23 @@ test('territory: queries computed by the real helpers for every unit; unknown re
   assert.deepEqual(t.overlaps.valid.result, { valid: true, errors: [] });
   assert.ok(t.overlaps.faults.length >= 6 && t.overlaps.faults.every((f) => f.errors.length > 0));
   assert.equal(t.streams.streams.length, 5);
+});
+
+test('verified (--skip-suites): commit list and the no-pre-existing-test-modified check are real; suites are marked skipped', () => {
+  const v = verified({ skipSuites: true });
+  assert.equal(v.skipped, true);
+  assert.match(v.base, /^[0-9a-f]{40}$/);
+  assert.ok(v.commits.length >= 12, 'the branch has at least the twelve pack commits');
+  assert.equal(v.testDirsUnmodified, true);
+  assert.deepEqual(v.suites, []);
+});
+
+test('capture: every section key is present, the whole thing serialises, and it fits the page budget', async () => {
+  const facts = await capture({ skipSuites: true });
+  assert.deepEqual(Object.keys(facts), ['meta', 'packInfo', 'matrix', 'oneProcess', 'attempts', 'territory', 'federation', 'verified']);
+  assert.match(facts.meta.commit, /^[0-9a-f]{7,}$/);
+  assert.equal(facts.meta.node, process.version);
+  const json = JSON.stringify(facts);
+  assert.ok(json.length < 150_000, `facts are ${json.length} chars`);
+  assert.deepEqual(JSON.parse(json).matrix.map((m) => m.id), facts.matrix.map((m) => m.id));
 });
