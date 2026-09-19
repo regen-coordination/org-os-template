@@ -2,5 +2,5 @@
 # Layer-A core type, so a peer that does not know the type can downgrade it and still ingest the graph.
 # One unit type for every layer — an ecological unit is a territorial-unit with layer: ecological.
 entities:
-  territorial-unit: { maps_to_core: place,    description: A bounded territorial unit on a named layer (administrative, landscape, ecological, hydrological, custom). }
+  territorial-unit: { maps_to_core: place,    description: "A bounded territorial unit on a named layer (administrative, landscape, ecological, hydrological, custom)." }
   data-stream:      { maps_to_core: artifact, description: "A specific dataset, endpoint or feed offered by a source system, catalogued by the places and kinds of work it serves." }
