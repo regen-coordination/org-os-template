@@ -92,3 +92,42 @@ test('capture: the five fact groups, serialisable, with the real pack descriptio
   assert.deepEqual(Object.keys(f.streamsFor).sort(), UNITS.map((u) => u.unit_id).sort());
   assert.ok(!('verified' in f) && !('attempts' in f) && !('matrix' in f), 'the proof scenarios are not part of the explorer');
 });
+
+// ── Task 5: the tour data and reduce ─────────────────────────────────────────────────────────────────────────────────
+import { STEPS } from '../explorer/tour.mjs';
+import { initialState, reduce, view, VIEWS, SHARES } from '../explorer/model.mjs';
+
+let FACTS; // captured once: capture() is the slow part, and the model only reads it
+const facts = async () => (FACTS ||= await capture());
+const CAT = 'administrative:pais:catalunya'; const PLANA = 'landscape:unit:plana-de-vic';
+
+test('reduce: select, inside, view, share, drawer; anything unknown leaves the state untouched', async () => {
+  const f = await facts(); const s0 = initialState();
+  assert.deepEqual(s0, { selected: null, includeInside: true, view: 'you', share: 'nothing', drawer: null, tour: null });
+  assert.equal(reduce(s0, { type: 'select', id: PLANA }, f).selected, PLANA);
+  for (const bad of [{ type: 'select', id: 'custom:site:ghost' }, { type: 'view', value: 'god' }, { type: 'share', value: 'all' }, { type: 'drawer', value: 'x' }, { type: 'nope' }, null]) assert.equal(reduce(s0, bad, f), s0);
+  assert.equal(reduce(s0, { type: 'toggle-inside' }, f).includeInside, false);
+  assert.equal(reduce(s0, { type: 'set-inside', value: false }, f).includeInside, false);
+  assert.equal(reduce(s0, { type: 'view', value: 'peer-nopack' }, f).view, 'peer-nopack');
+  assert.equal(reduce(s0, { type: 'share', value: 'units' }, f).share, 'units');
+  const open = reduce(s0, { type: 'drawer', value: 'pack' }, f);
+  assert.equal(open.drawer, 'pack');
+  assert.equal(reduce(open, { type: 'drawer', value: 'pack' }, f).drawer, null, 'the same drawer button closes it');
+});
+
+test('tour: six steps; every action is one reduce understands; start / next / back / end walk them', async () => {
+  const f = await facts();
+  assert.equal(STEPS.length, 6);
+  for (const step of STEPS) for (const a of step.actions) assert.notEqual(reduce({ ...initialState(), drawer: 'about', includeInside: false, view: 'peer-nopack', share: 'units-streams', selected: 'hydrological:basin:example-basin' }, a, f), undefined);
+  let s = reduce(initialState(), { type: 'tour', value: 'start' }, f);
+  assert.deepEqual([s.tour, s.selected], [0, PLANA]);
+  s = reduce(s, { type: 'tour', value: 'next' }, f);
+  assert.deepEqual([s.tour, s.selected, s.includeInside], [1, CAT, true]);
+  assert.equal(reduce(s, { type: 'tour', value: 'back' }, f).tour, 0);
+  for (let i = 0; i < 3; i++) s = reduce(s, { type: 'tour', value: 'next' }, f);
+  assert.deepEqual([s.tour, s.share, s.view], [4, 'units', 'peer-pack']);
+  s = reduce(s, { type: 'tour', value: 'next' }, f);
+  assert.deepEqual([s.tour, s.view, s.drawer], [5, 'you', 'pack']);
+  assert.equal(reduce(s, { type: 'tour', value: 'next' }, f).tour, null, 'next on the last step finishes');
+  assert.equal(reduce(s, { type: 'tour', value: 'end' }, f).tour, null);
+});
