@@ -20,6 +20,9 @@ function instance(connectors, { extra = {} } = {}) {
   return dir;
 }
 const kmsText = (dir) => readFileSync(join(dir, 'kms.yaml'), 'utf8');
+// Cursors live in a sidecar (data/kms-cursors.json), never in kms.yaml: rewriting kms.yaml drops its comments.
+const CURSORS = (dir) => join(dir, 'data', 'kms-cursors.json');
+const cursors = (dir) => JSON.parse(readFileSync(CURSORS(dir), 'utf8')).cursors;
 const good = { name: 'good', protocol: 't', capabilities: { ingest: true }, describe: () => ({ title: 'G', type: 'dataset', steward: 's', return_path: 'g' }),
   pull: async (_c, { cursor }) => ({ records: [{ n: 'X' }], cursor: (cursor || 0) + 1 }), map: (r) => [{ schema: 'resource', object: { title: r.n, type: 'resource' } }] };
 const stub = { ...good, name: 'stub', pull: async () => { throw new NOT_IMPLEMENTED('stub'); } };
@@ -37,14 +40,15 @@ test('ingest.pull registered as a write op and NOT bound to close (CLI verb only
   assert.ok(!LIFECYCLE_BINDINGS.initialize.includes('ingest.pull'));
 });
 
-test('runs each connector, writes cursors back, continues past NOT_IMPLEMENTED', async () => {
+test('runs each connector, writes cursors to the sidecar, continues past NOT_IMPLEMENTED; kms.yaml untouched', async () => {
   const dir = instance([{ name: 'good', config: {}, cursor: null }, { name: 'stub', config: {}, cursor: null }]);
+  const before = kmsText(dir);
   const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good, stub } } });
   assert.equal(res.ok, true, JSON.stringify(res.report));
   assert.equal(res.report.connectors[0].stored, 1); assert.equal(res.report.connectors[1].status, 'not-implemented');
   assert.equal(res.report.failed, 0);
-  const cfg = yaml.load(kmsText(dir));
-  assert.equal(cfg.connectors[0].cursor, 1); assert.equal(cfg.connectors[1].cursor, null);
+  assert.deepEqual(cursors(dir), { good: 1 });
+  assert.equal(kmsText(dir), before, 'kms.yaml is never rewritten (comments survive)');
 });
 
 test('a failing connector does not stop the others; fail-soft: ok:true, failed counted', async () => {
@@ -54,8 +58,7 @@ test('a failing connector does not stop the others; fail-soft: ok:true, failed c
   assert.equal(res.report.failed, 1);
   assert.equal(res.report.connectors[0].status, 'failed'); assert.match(res.report.connectors[0].error, /boom/);
   assert.equal(res.report.connectors[1].stored, 1);
-  const cfg = yaml.load(kmsText(dir));
-  assert.equal(cfg.connectors[0].cursor, null); assert.equal(cfg.connectors[1].cursor, 1);
+  assert.deepEqual(cursors(dir), { good: 1 }, 'the failed connector gets no cursor');
 });
 
 test('an undeclared-in-registry connector name fails soft', async () => {
@@ -65,14 +68,14 @@ test('an undeclared-in-registry connector name fails soft', async () => {
   assert.match(res.report.connectors[0].error, /unknown connector: ghost/);
 });
 
-test('--dry: no store, no cursor write-back, kms.yaml byte-identical', async () => {
+test('--dry: no store, no cursor write-back, kms.yaml byte-identical, no sidecar', async () => {
   const dir = instance([{ name: 'good', config: {}, cursor: null }]);
   const before = kmsText(dir);
   const res = await OPS['ingest.pull'].run({ dir, flags: { dry: true }, deps: { registry: { good } } });
   assert.equal(res.report.connectors[0].dry, true); assert.equal(res.report.connectors[0].stored, 0);
   assert.equal(res.report.connectors[0].candidates, 1);
-  assert.equal(yaml.load(kmsText(dir)).connectors[0].cursor, null);
   assert.equal(kmsText(dir), before);
+  assert.equal(existsSync(CURSORS(dir)), false);
   assert.equal(yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries.x, undefined);
 });
 
@@ -83,12 +86,13 @@ test('--connector limits the run', async () => {
   assert.equal(res.report.connectors[0].name, 'good');
 });
 
-test('--connector: cursor write-back targets the right entry in the full declared list', async () => {
+test('--connector: only the named connector\'s cursor is written; the legacy kms.yaml cursor seeds it', async () => {
   const dir = instance([{ name: 'stub', config: {}, cursor: null }, { name: 'good', config: {}, cursor: 5 }]);
+  const before = kmsText(dir);
   const res = await OPS['ingest.pull'].run({ dir, flags: { connector: 'good' }, deps: { registry: { good, stub } } });
   assert.equal(res.report.connectors.length, 1);
-  const cfg = yaml.load(kmsText(dir));
-  assert.equal(cfg.connectors[0].cursor, null); assert.equal(cfg.connectors[1].cursor, 6);
+  assert.deepEqual(cursors(dir), { good: 6 });
+  assert.equal(kmsText(dir), before);
 });
 
 test('--connector naming an undeclared connector warns instead of silently succeeding', async () => {
@@ -118,7 +122,7 @@ test('slug collisions are reported under collided and not overwritten', async ()
   assert.equal(yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries.x.notes, 'mine');
 });
 
-test('kms.yaml is left byte-identical (comments survive) when no cursor changes', async () => {
+test('kms.yaml is left byte-identical (comments survive) and no sidecar is written when no cursor changes', async () => {
   const same = { ...good, name: 'same', pull: async (_c, { cursor }) => ({ records: [], cursor }) };
   const peerless = { ...good, name: 'peerless', pull: async () => ({ records: [], cursor: {} }) }; // atproto with no peers: {} for null
   const dir = instance([{ name: 'same', config: {}, cursor: null }, { name: 'peerless', config: {}, cursor: null }]);
@@ -127,13 +131,16 @@ test('kms.yaml is left byte-identical (comments survive) when no cursor changes'
   assert.equal(res.ok, true);
   assert.equal(kmsText(dir), before);
   assert.match(kmsText(dir), /# keep me/);
+  assert.equal(existsSync(CURSORS(dir)), false);
 });
 
-test('a real cursor change rewrites kms.yaml (documented: comments are lost)', async () => {
+test('a real cursor change writes the sidecar and leaves kms.yaml (and its comments) byte-identical', async () => {
   const dir = instance([{ name: 'good', config: {}, cursor: null }]);
+  const before = kmsText(dir);
   await OPS['ingest.pull'].run({ dir, deps: { registry: { good } } });
-  assert.doesNotMatch(kmsText(dir), /# keep me/);
-  assert.equal(yaml.load(kmsText(dir)).connectors[0].cursor, 1);
+  assert.equal(kmsText(dir), before);
+  assert.match(kmsText(dir), /# keep me/);
+  assert.deepEqual(cursors(dir), { good: 1 });
 });
 
 test('shared atproto identity is merged under each connector config (own config wins)', async () => {
@@ -174,30 +181,56 @@ test('flags.connector undefined still means all connectors; a named one still wo
   assert.equal(one.report.connectors.length, 1);
 });
 
-test('cursor write-back re-reads kms.yaml: a concurrent edit survives, the cursor lands, no tmp file is left', async () => {
+test('cursor write-back re-reads the sidecar: a cursor another run wrote meanwhile survives, ours lands, no tmp file is left', async () => {
   const dir = instance([{ name: 'good', config: {}, cursor: null }]);
-  const editing = { ...good, pull: async (_c, { cursor }) => {
-    const doc = yaml.load(kmsText(dir)); doc.added_meanwhile = true;               // an operator edit lands mid-run
-    writeFileSync(join(dir, 'kms.yaml'), yaml.dump(doc));
+  const racing = { ...good, pull: async (_c, { cursor }) => {
+    mkdirSync(join(dir, 'data'), { recursive: true });
+    writeFileSync(CURSORS(dir), JSON.stringify({ version: 1, cursors: { other: 9 } }));   // another process lands mid-run
     return { records: [{ n: 'X' }], cursor: (cursor || 0) + 1 };
   } };
-  const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good: editing } } });
+  const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good: racing } } });
   assert.equal(res.ok, true, JSON.stringify(res.report));
-  const cfg = yaml.load(kmsText(dir));
-  assert.equal(cfg.added_meanwhile, true, 'concurrent edit preserved');
-  assert.equal(cfg.connectors[0].cursor, 1, 'cursor written');
-  assert.ok(!existsSync(join(dir, 'kms.yaml.tmp')), 'no tmp file left behind');
+  assert.deepEqual(cursors(dir), { other: 9, good: 1 });
+  assert.ok(!existsSync(`${CURSORS(dir)}.tmp`), 'no tmp file left behind');
 });
 
-test('cursor change is skipped (and reported) when the connector entry moved/renamed since the read', async () => {
-  const dir = instance([{ name: 'good', config: {}, cursor: null }]);
-  const renaming = { ...good, pull: async () => {
-    const doc = yaml.load(kmsText(dir)); doc.connectors[0].name = 'renamed';
-    writeFileSync(join(dir, 'kms.yaml'), yaml.dump(doc));
-    return { records: [], cursor: 7 };
-  } };
-  const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good: renaming } } });
+test('connectors that share a name keep separate cursors (the second is keyed name#2)', async () => {
+  const dir = instance([{ name: 'good', config: {}, cursor: 10 }, { name: 'good', config: {}, cursor: 20 }]);
+  const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good } } });
   assert.equal(res.ok, true);
-  assert.equal(yaml.load(kmsText(dir)).connectors[0].cursor, null, 'not applied to a different entry');
-  assert.deepEqual(res.report.cursorSkipped, ['good']);
+  assert.deepEqual(cursors(dir), { good: 11, 'good#2': 21 });
+});
+
+test('a kms.yaml cursor is only the seed: with no sidecar entry the connector gets it; a sidecar entry wins', async () => {
+  const seen = [];
+  const spy = { ...good, name: 'spy', pull: async (_c, { cursor }) => { seen.push(cursor); return { records: [], cursor: (cursor || 0) + 1 }; } };
+  const dir = instance([{ name: 'spy', config: {}, cursor: 5 }]);
+  await OPS['ingest.pull'].run({ dir, deps: { registry: { spy } } });
+  assert.deepEqual(seen, [5], 'legacy kms.yaml cursor seeds the first pull');
+  assert.deepEqual(cursors(dir), { spy: 6 });
+  await OPS['ingest.pull'].run({ dir, deps: { registry: { spy } } });
+  assert.deepEqual(seen, [5, 6], 'sidecar wins over the stale kms.yaml value');
+});
+
+test('an unreadable sidecar is an operator error: nothing runs, nothing is overwritten', async () => {
+  const dir = instance([{ name: 'good', config: {}, cursor: null }]);
+  mkdirSync(join(dir, 'data'), { recursive: true });
+  writeFileSync(CURSORS(dir), '{ not json');
+  let pulled = false;
+  const watch = { ...good, pull: async () => { pulled = true; return { records: [], cursor: 1 }; } };
+  const res = await OPS['ingest.pull'].run({ dir, deps: { registry: { good: watch } } });
+  assert.equal(res.ok, false);
+  assert.match(res.report.error, /kms-cursors\.json/);
+  assert.equal(pulled, false);
+  assert.equal(readFileSync(CURSORS(dir), 'utf8'), '{ not json');
+});
+
+test('a second pull of unchanged records reports them under unchanged, not updated', async () => {
+  const withOrigin = { ...good, name: 'orig', map: (r) => [{ schema: 'resource', object: { title: r.n, type: 'resource', sourceUri: 'at://p/x/1' } }] };
+  const dir = instance([{ name: 'orig', config: {}, cursor: null }]);
+  const first = await OPS['ingest.pull'].run({ dir, deps: { registry: { orig: withOrigin } } });
+  assert.equal(first.report.connectors[0].stored, 1);
+  const second = await OPS['ingest.pull'].run({ dir, deps: { registry: { orig: withOrigin } } });
+  const c = second.report.connectors[0];
+  assert.equal(c.pulled, 1); assert.equal(c.updated, 0); assert.equal(c.unchanged, 1);
 });

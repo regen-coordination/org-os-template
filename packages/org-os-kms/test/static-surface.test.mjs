@@ -34,7 +34,7 @@ test('projected entries, absolute @context, merged knowledge.json, allowlisted .
   assert.deepEqual(km.domains, [{ id: 'd1', name: 'D' }], 'generate:schemas shape preserved');
   assert.deepEqual(km.sources.map((s) => s.title), ['Existing', 'S']);
   assert.equal(km.did, 'did:plc:me');
-  assert.deepEqual(km.exchange, { published_domains: ['xyz.regencoordination.kb.resource'], subscribed_domains: ['did:plc:peer'] });
+  assert.deepEqual(km.exchange, { published_domains: ['xyz.regencoordination.kb.resource'], subscribed_domains: [] }, 'who this instance reads is not disclosed by default');
   assert.ok(existsSync(join(dir, 'public', '.well-known', 'dao.json')));
   assert.ok(!existsSync(join(dir, 'public', '.well-known', 'meetings.json')), 'never copied');
   assert.ok(files.includes('api/context.jsonld'));
@@ -92,4 +92,22 @@ test('a root-authored did/geo survives when the config sets neither; config stil
   writeStaticSurface({ dir, items, allItems, manifest, config });
   assert.equal(pub('.well-known/knowledge.json').did, 'did:plc:me');
   assert.deepEqual(pub('.well-known/knowledge.json').geo, { parent_space: 'p', space: null });
+});
+
+test('publish.disclose_subscriptions: true lists the atproto peer DIDs and static-json base_urls under exchange.subscribed_domains', () => {
+  const dir = setup();
+  const cfg = { ...config, publish: { ...config.publish, disclose_subscriptions: true },
+    connectors: [{ name: 'atproto', config: { peers: ['did:plc:peer'] } }, { name: 'static-json', config: { base_url: 'https://haven.example' } }] };
+  writeStaticSurface({ dir, items, allItems, manifest, config: cfg });
+  const km = JSON.parse(readFileSync(join(dir, 'public', '.well-known', 'knowledge.json'), 'utf8'));
+  assert.deepEqual(km.exchange.subscribed_domains, ['did:plc:peer', 'https://haven.example']);
+});
+
+test('only an explicit true discloses: false, absent, or a truthy non-boolean does not', () => {
+  for (const v of [false, undefined, 'yes', 1]) {
+    const dir = setup();
+    writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: { ...config.publish, disclose_subscriptions: v } } });
+    const km = JSON.parse(readFileSync(join(dir, 'public', '.well-known', 'knowledge.json'), 'utf8'));
+    assert.deepEqual(km.exchange.subscribed_domains, [], String(v));
+  }
 });

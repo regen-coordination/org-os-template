@@ -41,7 +41,8 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
   const rootKm = join(dir, '.well-known', 'knowledge.json');
   const km = existsSync(rootKm) ? JSON.parse(readFileSync(rootKm, 'utf8')) : { '@context': 'https://www.daostar.org/schemas', type: 'KnowledgeManifest', domains: [], sources: [] };
   const authority = config.atproto?.nsid_authority;
-  const subscribed = (config.connectors || []).flatMap((c) => c.name === 'atproto' ? (c.config?.peers || []) : c.config?.base_url ? [c.config.base_url] : []);
+  // Who this instance reads (peer DIDs / source base_urls) is disclosed only on an explicit `publish.disclose_subscriptions: true`.
+  const subscribed = config.publish?.disclose_subscriptions !== true ? [] : (config.connectors || []).flatMap((c) => c.name === 'atproto' ? (c.config?.peers || []) : c.config?.base_url ? [c.config.base_url] : []);
   const cards = allItems.filter((i) => fw.publishableTypes(config).includes('source-system') && i.schema === 'source-system' && fw.PUBLISHABLE_PUBLIC_USE.includes(i.object.public_use)).map(({ object }) => ({ title: object.title, url: object.url, steward: object.steward }));
   const sources = [...(km.sources || [])];
   for (const c of cards) if (!sources.some((s) => s.title === c.title)) sources.push(c);

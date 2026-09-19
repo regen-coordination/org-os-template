@@ -20,7 +20,8 @@
               "private-steward-memory",
               "anonymized-lessons",
               "composted-patterns",
-              "never-publish-without-consent"
+              "never-publish-without-consent",
+              "requires-domain-review"
             ]
           },
           "consent_note": {

@@ -34,7 +34,7 @@ packages:
     in_framework: true
     promotion_status: "canonical"
     lifecycle_status: "active"
-    notes: "@regen-commons/toolkit-framework — portable, org-os-agnostic knowledge commons framework (semantic kernel, 22 schemas, the machine, 7 skills, 3 adapters). Develops in regen-toolkit; promoted here 2026-07-05. Consumed via org-os-kms. 100/100 tests."
+    notes: "@regen-commons/toolkit-framework — portable, org-os-agnostic knowledge commons framework (semantic kernel, 25 schemas, the machine, 7 skills, 3 adapters). Develops in regen-toolkit; promoted here 2026-07-05. Consumed via org-os-kms. 167/167 tests."
 
   - id: "org-os-kms"
     owner: "framework"

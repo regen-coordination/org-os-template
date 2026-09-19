@@ -33,13 +33,19 @@
               "convening",
               "podcast",
               "newsletter",
-              "dataset"
+              "dataset",
+              "blog",
+              "publication",
+              "organization",
+              "movement",
+              "platform"
             ]
           },
           "maturity": {
             "type": "string",
             "knownValues": [
               "raw",
+              "held",
               "draft",
               "candidate",
               "source-linked",

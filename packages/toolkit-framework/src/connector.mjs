@@ -12,6 +12,17 @@ export class NOT_IMPLEMENTED extends Error {
 // Local identity + review state that an origin update must never overwrite.
 const LOCAL_ONLY = ['id', 'maturity', 'public_use', 'review_needs'];
 
+// Not content: work_order is stamped with the pull time, and review_needs is SET by an update. Neither
+// may make an unchanged record look changed, or one peer rev bump re-flags the whole peer for review.
+const NOT_CONTENT = ['work_order', 'review_needs'];
+const sortKeys = (v) => (v && typeof v === 'object' && !Array.isArray(v)
+  ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => [k, sortKeys(x)]))
+  : Array.isArray(v) ? v.map(sortKeys) : v);
+function sameContent(a, b) {
+  const strip = (o) => { const c = { ...o }; for (const k of NOT_CONTENT) delete c[k]; return JSON.stringify(sortKeys(c)); };
+  return strip(a) === strip(b);
+}
+
 export async function runConnector(connector, { config, cursor, adapter, target, dry = false, now = () => new Date().toISOString() }) {
   const source = connector.describe(config);
   const { records, cursor: nextCursor, retracted = [], errors = [] } = await connector.pull(config, { cursor });
@@ -30,7 +41,7 @@ export async function runConnector(connector, { config, cursor, adapter, target,
   const lastByOrigin = new Map();
   mapped.forEach((m, idx) => { if (m.object.sourceUri) lastByOrigin.set(m.object.sourceUri, idx); });
 
-  const toStore = []; const toUpdate = []; const invalid = []; const collided = [];
+  const toStore = []; const toUpdate = []; const invalid = []; const collided = []; let unchanged = 0;
   mapped.forEach(({ schema, object }, idx) => {
     if (object.sourceUri && lastByOrigin.get(object.sourceUri) !== idx) return;
     const base = { ...object, ai_assisted: object.ai_assisted ?? true,
@@ -50,6 +61,9 @@ export async function runConnector(connector, { config, cursor, adapter, target,
       let violations = checkInvariants({ ...existing.object, ...patch }).violations;
       if (violations.length) { delete patch.ai_assisted; violations = checkInvariants({ ...existing.object, ...patch }).violations; }
       if (violations.length) { invalid.push({ title: object.title, errors: violations }); return; }
+      // What update() would write is what is already stored: nothing changed at the origin. Skip it entirely
+      // (no rewrite, no re-flag) so a reviewer's own review_needs and the stored work_order are left alone.
+      if (sameContent(existing.object, { ...existing.object, ...patch })) { unchanged++; return; }
       toUpdate.push({ ref: existing.ref, patch });
     } else {
       // Never clobber local data: a NEW candidate whose slug is already taken (locally or earlier in this batch) is skipped.
@@ -59,7 +73,7 @@ export async function runConnector(connector, { config, cursor, adapter, target,
       toStore.push({ schema, object: candidate });
     }
   });
-  const report = { source, pulled: records.length, candidates: toStore.length + toUpdate.length, invalid, stored: 0, updated: 0, collisions: collided.length, collided, cursor, retractions: 0, errors, dry };
+  const report = { source, pulled: records.length, candidates: toStore.length + toUpdate.length, unchanged, invalid, stored: 0, updated: 0, collisions: collided.length, collided, cursor, retractions: 0, errors, dry };
   if (dry) return report;
 
   for (const u of toUpdate) a.update(target, u.ref, u.patch);

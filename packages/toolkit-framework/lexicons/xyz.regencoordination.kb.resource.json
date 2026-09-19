@@ -22,6 +22,7 @@
             "type": "string",
             "knownValues": [
               "raw",
+              "held",
               "draft",
               "candidate",
               "source-linked",

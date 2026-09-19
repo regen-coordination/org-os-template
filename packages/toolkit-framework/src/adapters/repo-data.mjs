@@ -2,9 +2,9 @@
 // files under data/kb/. Deliberately does NOT touch an instance's existing
 // data/*.yaml (different shapes); @org-os/kms bridges the two.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import yaml from 'js-yaml';
-import { slugify, deriveIndex } from '../util.mjs';
+import { slugify, deriveIndex, sameStoredObject, isOwnKey } from '../util.mjs';
 import { hashContent } from '../workorder.mjs';
 import { toJsonLdContext } from '../index.mjs';
 
@@ -50,16 +50,34 @@ export const repoDataAdapter = {
 
   store(target, entries) {
     const stored = [];
+    const collisions = [];
     const byFile = new Map();
-    for (const { schema, object } of entries) {
+    for (const { schema, object, replaces } of entries) {
       const p = fileFor(target, schema);
       if (!byFile.has(p)) byFile.set(p, loadFile(p));
+      const reg = byFile.get(p).entries;
       const slug = slugFor(object);
-      byFile.get(p).entries[slug] = object;            // idempotent: same slug overwrites
-      stored.push(`${p}#${slug}`);
+      let key = slug;
+      // `replaces`: see kb-folder — honored only for an existing key in THIS schema's registry
+      // file that derives from the entry's slug; anything else falls through to the normal path.
+      const at = replaces ? replaces.lastIndexOf('#') : -1;
+      const rKey = at > 0 ? replaces.slice(at + 1) : null;
+      if (rKey !== null && resolve(replaces.slice(0, at)) === resolve(p) && reg[rKey] !== undefined && isOwnKey(rKey, slug)) {
+        reg[rKey] = object;
+        stored.push(replaces);
+        continue;
+      }
+      if (reg[key] !== undefined && !sameStoredObject(reg[key], object)) {
+        // Same title-slug, different object (B5): never clobber — give the
+        // newcomer a hash-suffixed key and report the collision.
+        key = `${slug}-${hashContent(yaml.dump(object)).slice(0, 8)}`;
+        collisions.push({ schema, slug, key });
+      }
+      reg[key] = object;                                // idempotent: same identity overwrites in place
+      stored.push(`${p}#${key}`);
     }
     for (const [p, doc] of byFile) atomicWrite(p, yaml.dump(doc));
-    return { stored };
+    return { stored, collisions };
   },
 
   list(target) {

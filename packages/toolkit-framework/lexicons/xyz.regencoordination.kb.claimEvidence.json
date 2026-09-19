@@ -23,6 +23,7 @@
             "type": "string",
             "knownValues": [
               "raw",
+              "held",
               "draft",
               "candidate",
               "source-linked",
@@ -116,6 +117,15 @@
           },
           "reviewed_by": {
             "type": "string"
+          },
+          "evidence_stance": {
+            "type": "string",
+            "knownValues": [
+              "supporting",
+              "qualifying",
+              "contradicting",
+              "neutral"
+            ]
           }
         }
       }

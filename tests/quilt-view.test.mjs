@@ -89,7 +89,7 @@ test("packageTiers routes packages to patch / sleeping / away", () => {
 });
 
 test("packageTiers uses PKG_DETAIL override, else derives from instances_using", () => {
-  assert.equal(PKG_DETAIL["toolkit-framework"][0], " 100/100 ✓ ");
+  assert.equal(PKG_DETAIL["toolkit-framework"][0], " 167/167 ✓ ");
   const tiers = packageTiers([
     { id: "mystery-pkg", in_framework: true, lifecycle_status: "active",
       promotion_status: "canonical", instances_using: ["refi-bcn-os", "refi-dao-os"], notes: "" },

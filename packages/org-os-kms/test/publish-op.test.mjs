@@ -206,3 +206,22 @@ test('a throw out of client creation or a non-record apply error is also reporte
   const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: () => { throw new Error('no pds'); }, env } });
   assert.equal(res.ok, false); assert.equal(res.report.atproto.status, 'failed'); assert.match(res.report.atproto.error, /no pds/);
 });
+
+test('an object that turns held after publishing is unpublished on the next apply; the rest are skipped', async () => {
+  const dir = instance(); const log = []; const deps = { createClient: fakeClientFactory(log), env };
+  await OPS.publish.run({ dir, flags: { apply: true }, deps });
+  const p = join(dir, 'data', 'kb', 'resource.yaml');
+  const doc = yaml.load(readFileSync(p, 'utf8'));
+  const heldRkey = doc.entries.a.id;
+  doc.entries.a.maturity = 'held';           // e.g. retracted at origin; public_use still clears the floor
+  writeFileSync(p, yaml.dump(doc));
+  log.length = 0;
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps });
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  assert.equal(res.report.atproto.deleted, 1);
+  assert.equal(res.report.atproto.skipped, 1);
+  assert.equal(res.report.atproto.created, 0);
+  assert.ok(log.some((e) => Array.isArray(e) && e[0] === 'del' && String(e[1]).includes(heldRkey.split(':').pop())), `expected a delete for ${heldRkey}: ${JSON.stringify(log)}`);
+  const api = JSON.parse(readFileSync(join(dir, 'public', 'api', 'resource.json'), 'utf8'));
+  assert.ok(!JSON.stringify(api).includes('"title":"A"'), 'held object is gone from the static surface too');
+});

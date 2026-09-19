@@ -49,3 +49,14 @@ test('identity + provenance fields exist on every default publishable schema', (
   for (const t of PUBLISHABLE_TYPES) { const f = schemaFields(t); for (const k of ['id', 'grc20Id', 'sourceUri', 'viaUri']) assert.ok(f[k], `${t} lacks ${k}`); }
   assert.equal(validateObject('resource', { title: 'x', type: 'resource', id: 'a-b', grc20Id: 'c', sourceUri: 'at://d/e/f' }).valid, true);
 });
+
+// D3: `held` is the one maturity the floor refuses. It is what an origin retraction sets
+// (and what an operator sets to withhold), so an object that turns held must stop publishing
+// even though its public_use still clears the floor. Every other maturity stays out of the floor.
+test('isPublishable refuses a held object even when public_use clears the floor; other maturities still pass', () => {
+  const ok = 'ok-with-caveat';
+  assert.equal(isPublishable({ type: 'resource', public_use: ok, maturity: 'held' }), false);
+  for (const maturity of ['raw', 'plausible', 'field-informed', 'reviewed']) {
+    assert.equal(isPublishable({ type: 'resource', public_use: ok, maturity }), true, maturity);
+  }
+});

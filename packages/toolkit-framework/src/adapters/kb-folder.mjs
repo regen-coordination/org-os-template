@@ -2,9 +2,9 @@
 // (objects/ + derived index.json + context.jsonld). Repo-agnostic, syncable,
 // graph-exportable. An adopter can point an ingestion at a bare directory.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, renameSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename, resolve } from 'node:path';
 import yaml from 'js-yaml';
-import { slugify, deriveIndex } from '../util.mjs';
+import { slugify, deriveIndex, sameStoredObject, isOwnKey } from '../util.mjs';
 import { toJsonLdContext } from '../index.mjs';
 import { hashContent } from '../workorder.mjs';
 
@@ -30,12 +30,31 @@ export const kbFolderAdapter = {
 
   store(target, entries) {
     const stored = [];
-    for (const { schema, object } of entries) {
-      const p = objectPath(target, schema, object);
+    const collisions = [];
+    for (const { schema, object, replaces } of entries) {
+      let p = objectPath(target, schema, object);
+      // `replaces`: the caller holds the ref a previous store() issued for this same object
+      // and wants the new version written THERE. Honored only for an existing file in this
+      // schema's own directory whose key derives from the entry's slug — a stale or foreign
+      // ref falls through to the normal path and can never redirect a write.
+      if (replaces && existsSync(replaces) && resolve(dirname(replaces)) === resolve(dirname(p))
+        && isOwnKey(basename(replaces, '.yaml'), basename(p, '.yaml'))) {
+        p = replaces;
+      } else if (existsSync(p)) {
+        const existing = yaml.load(readFileSync(p, 'utf8'));
+        if (!sameStoredObject(existing, object)) {
+          // Same title-slug, different object (B5): never clobber — write the
+          // newcomer to a hash-suffixed key and report the collision.
+          const suffix = hashContent(yaml.dump(object)).slice(0, 8);
+          const base = basename(p, '.yaml');
+          p = join(dirname(p), `${base}-${suffix}.yaml`);
+          collisions.push({ schema, slug: base, wroteTo: p });
+        }
+      }
       atomicWrite(p, yaml.dump(object));
       stored.push(p);
     }
-    return { stored };
+    return { stored, collisions };
   },
 
   list(target) {

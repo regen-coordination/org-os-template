@@ -44,16 +44,28 @@ function writeMarkdownDoc(absPath, obj) {
   return { doc: absPath };
 }
 
+// Markdown pages are the public site (frontmatter carries the object's fields). Never write one for an
+// object the publication floor would refuse for these reasons: still `not-public-yet` (e.g. freshly pulled
+// from a peer), `internal-only`, or `held` (retracted at origin / withheld). No declared public_use keeps the
+// old behavior. Registry rows are internal state and are not gated. Existing pages are never deleted.
+function withholdReason(obj) {
+  if (obj.public_use === 'not-public-yet' || obj.public_use === 'internal-only') return obj.public_use;
+  if (obj.maturity === 'held') return 'held';
+  return null;
+}
+
 export function bridge(ctx) {
   const { dir, config } = ctx;
   const items = fw.getAdapter(config.adapter).list(join(dir, config.target));
-  const report = { bridged: [], docs: [], skipped: [], errors: [] };
+  const report = { bridged: [], docs: [], withheld: [], skipped: [], errors: [] };
   const byRegistry = new Map(); // registryPath -> [objects]
 
   for (const { schema, object } of items) {
     const registry = REGISTRY_BINDINGS[schema];
     if (!registry) { if (!report.skipped.includes(schema)) report.skipped.push(schema); continue; }
     if (registry.endsWith('/')) {
+      const reason = withholdReason(object);
+      if (reason) { report.withheld.push({ schema, title: object.title, reason }); continue; }
       try {
         const slug = fw.slugify(object.title || 'untitled');
         report.docs.push(writeMarkdownDoc(join(dir, registry, `${slug}.md`), object).doc);

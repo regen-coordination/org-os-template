@@ -25,6 +25,7 @@
             "type": "string",
             "knownValues": [
               "raw",
+              "held",
               "draft",
               "candidate",
               "source-linked",
@@ -121,7 +122,12 @@
           },
           "confidence": {
             "type": "string",
-            "knownValues": []
+            "knownValues": [
+              "high",
+              "medium",
+              "low",
+              "unverified"
+            ]
           },
           "direction": {
             "type": "string",

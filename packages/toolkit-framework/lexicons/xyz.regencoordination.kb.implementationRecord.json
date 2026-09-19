@@ -23,6 +23,7 @@
             "type": "string",
             "knownValues": [
               "raw",
+              "held",
               "draft",
               "candidate",
               "source-linked",
@@ -150,6 +151,14 @@
               "ecological-mrv",
               "event",
               "failure-case"
+            ]
+          },
+          "record_stage": {
+            "type": "string",
+            "knownValues": [
+              "prospective",
+              "in-progress",
+              "retrospective"
             ]
           }
         }

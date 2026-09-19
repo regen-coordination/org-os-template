@@ -165,3 +165,44 @@ test('upsert onto a locally reviewed object stays within invariants (keeps local
   assert.equal(o.ai_assisted, false); assert.equal(o.maturity, 'reviewed'); assert.equal(o.id, 'local-id');
   assert.equal(o.notes, 'v2'); assert.match(o.review_needs, /updated at origin/);
 });
+
+// #5: an origin update that changes nothing is a no-op. work_order embeds a per-pull timestamp
+// and review_needs is set BY an update, so neither may make an unchanged record look changed
+// (otherwise one peer commit-rev bump re-flags the peer's whole corpus for review).
+const theRecord = (over = {}) => ({ title: 'Peer Note', type: 'resource', sourceUri: 'at://p/x/1', notes: 'n1', ...over });
+const pullOf = (object) => fake({ map: () => [{ schema: 'resource', object }] });
+const peerNote = (dir) => resources(dir).find(({ object }) => object.sourceUri === 'at://p/x/1');
+
+test('re-pulling an unchanged record is a no-op: not counted as updated, not re-flagged, stamps left alone', async () => {
+  const dir = instance();
+  await runConnector(pullOf(theRecord()), { ...ctx(dir), now: () => 't1' });
+  const before = peerNote(dir).object;
+  assert.equal(before.review_needs, undefined);
+  // same content, later pull, keys in a different order
+  const reordered = { notes: 'n1', sourceUri: 'at://p/x/1', type: 'resource', title: 'Peer Note' };
+  const out = await runConnector(pullOf(reordered), { ...ctx(dir), now: () => 't2' });
+  assert.equal(out.updated, 0); assert.equal(out.unchanged, 1); assert.equal(out.candidates, 0); assert.equal(out.stored, 0);
+  const after = peerNote(dir).object;
+  assert.equal(after.review_needs, undefined, 'not re-flagged');
+  assert.equal(after.work_order, before.work_order, 'per-pull stamp not rewritten by a no-op');
+  assert.deepEqual(after, before);
+});
+
+test('a real change at the origin is still applied and flagged after an unchanged pull', async () => {
+  const dir = instance();
+  await runConnector(pullOf(theRecord()), { ...ctx(dir), now: () => 't1' });
+  await runConnector(pullOf(theRecord()), { ...ctx(dir), now: () => 't2' });
+  const out = await runConnector(pullOf(theRecord({ notes: 'n2' })), { ...ctx(dir), now: () => 't3' });
+  assert.equal(out.updated, 1); assert.equal(out.unchanged, 0);
+  const o = peerNote(dir).object;
+  assert.equal(o.notes, 'n2'); assert.equal(o.review_needs, 'updated at origin'); assert.equal(o.work_order, 'connector:fake:t3');
+});
+
+test('a no-op pull leaves a reviewer-written review_needs alone', async () => {
+  const dir = instance();
+  await runConnector(pullOf(theRecord()), { ...ctx(dir), now: () => 't1' });
+  const { ref } = peerNote(dir);
+  getAdapter('repo-data').update(dir, ref, { review_needs: 'check the licence' });
+  await runConnector(pullOf(theRecord()), { ...ctx(dir), now: () => 't2' });
+  assert.equal(peerNote(dir).object.review_needs, 'check the licence');
+});
