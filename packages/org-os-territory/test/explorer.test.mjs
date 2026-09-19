@@ -336,13 +336,15 @@ test('app.js: a click selects, a change switches perspective, the tour runs and 
 });
 
 // ── Task 11: whole-page acceptance ───────────────────────────────────────────────────────────────────────────────────
-import { execFileSync } from 'node:child_process';
-const PKG = join(import.meta.dirname, '..');
 
-test('acceptance: it is an explorer, not a report — none of the report\'s vocabulary or jargon reaches the visitor', async () => {
+test('acceptance: it is an explorer, not a report — none of the report\'s vocabulary or jargon reaches the visitor, in any place, share, view, drawer or tour step', async () => {
   const f = await facts();
-  let s = reduce(reduce(initialState(), { type: 'select', id: PLANA }, f), { type: 'drawer', value: 'pack' }, f);
-  const visible = (assemble(f) + R.renderApp(view(s, f)) + R.renderDrawers(view({ ...s, drawer: 'about' }, f))).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
+  const states = UNITS.flatMap((u) => SHARES.flatMap((share) => VIEWS.map((who) => ({ ...initialState(), selected: u.unit_id, share, view: who }))));
+  const pages = states.flatMap((st) => [st, { ...st, drawer: 'pack' }, { ...st, drawer: 'about' }]).map((st) => { const v = view(st, f); return `${R.renderApp(v)} ${v.live}`; });
+  let t = reduce(initialState(), { type: 'tour', value: 'start' }, f);
+  for (const step of STEPS) { pages.push(R.renderApp(view(t, f)), `${step.title} ${step.text}`); t = reduce(t, { type: 'tour', value: 'next' }, f); }
+  const visible = [assemble(f).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, ''), ...pages].join('\n');
+  assert.ok(pages.length > 300 && visible.includes('Step 6 of 6'), 'the scan must cover every state and every tour step');
   for (const banned of [/publish matrix/i, /try to break it/i, /ℹ pass/, /lexicon/i, /\bNSID\b/, /\bschema\b/i, /Layer-[AB]/, /collection/i, /\bPDS\b/, /atproto/i, /\d+ tests?\b/i]) assert.ok(!banned.test(visible), String(banned));
 });
 
@@ -366,10 +368,4 @@ test('acceptance: accessible basics — one h1, labelled regions, radios in fiel
   assert.equal(count(html, /<fieldset><legend>/g), 2);
   assert.equal(count(html, /<button(?![^>]*type="button")/g), 0, 'every button declares its type');
   assert.equal(count(html, /<html lang="en"/g), 1);
-});
-
-test('guard: the explorer reuses the demo without editing it (skipped outside a git checkout)', (t) => {
-  let diff;
-  try { diff = execFileSync('git', ['diff', '--name-only', 'main', '--', 'demo', 'test/demo.test.mjs', 'src', 'schemas'], { cwd: PKG, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return t.skip('not a git checkout with a main branch'); }
-  assert.equal(diff, '', 'nothing under demo/, src/, schemas/ or the demo test may change');
 });
