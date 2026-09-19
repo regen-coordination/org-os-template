@@ -12,15 +12,16 @@ const runStep = (state, i, facts) => STEPS[i].actions.reduce((s, a) => reduce(s,
 export function reduce(state, action, facts) {
   const a = action || {};
   switch (a.type) {
-    case 'select': return a.id in facts.territory.query ? { ...state, selected: a.id } : state;
+    case 'select': return Object.hasOwn(facts.territory.query, a.id) ? { ...state, selected: a.id } : state;
     case 'toggle-inside': return { ...state, includeInside: !state.includeInside };
-    case 'set-inside': return { ...state, includeInside: Boolean(a.value) };
+    case 'set-inside': return typeof a.value === 'boolean' ? { ...state, includeInside: a.value } : state;
     case 'view': return VIEWS.includes(a.value) ? { ...state, view: a.value } : state;
     case 'share': return SHARES.includes(a.value) ? { ...state, share: a.value } : state;
     case 'drawer': return a.value === null || DRAWERS.includes(a.value) ? { ...state, drawer: state.drawer === a.value ? null : a.value } : state;
     case 'tour':
       if (a.value === 'start') return runStep({ ...state, drawer: null }, 0, facts);
-      if (a.value === 'end' || state.tour === null) return { ...state, tour: null };
+      if (state.tour === null) return state;
+      if (a.value === 'end') return { ...state, tour: null };
       if (a.value === 'next') return state.tour + 1 < STEPS.length ? runStep({ ...state, drawer: null }, state.tour + 1, facts) : { ...state, tour: null };
       if (a.value === 'back') return state.tour > 0 ? runStep({ ...state, drawer: null }, state.tour - 1, facts) : state;
       return state;

@@ -105,7 +105,10 @@ test('reduce: select, inside, view, share, drawer; anything unknown leaves the s
   const f = await facts(); const s0 = initialState();
   assert.deepEqual(s0, { selected: null, includeInside: true, view: 'you', share: 'nothing', drawer: null, tour: null });
   assert.equal(reduce(s0, { type: 'select', id: PLANA }, f).selected, PLANA);
-  for (const bad of [{ type: 'select', id: 'custom:site:ghost' }, { type: 'view', value: 'god' }, { type: 'share', value: 'all' }, { type: 'drawer', value: 'x' }, { type: 'nope' }, null]) assert.equal(reduce(s0, bad, f), s0);
+  const bads = [{ type: 'select', id: 'custom:site:ghost' }, { type: 'select', id: 'toString' }, { type: 'select', id: 'constructor' }, { type: 'view', value: 'god' }, { type: 'share', value: 'all' }, { type: 'drawer', value: 'x' }, { type: 'set-inside' }, { type: 'set-inside', value: 'banana' }, { type: 'tour', value: 'bogus' }, { type: 'tour', value: 'next' }, { type: 'tour', value: 'back' }, { type: 'tour', value: 'end' }, { type: 'nope' }, null];
+  for (const bad of bads) assert.equal(reduce(s0, bad, f), s0, JSON.stringify(bad));
+  const running = reduce(s0, { type: 'tour', value: 'start' }, f);
+  for (const bad of [{ type: 'tour', value: 'bogus' }, { type: 'tour', value: 'back' }]) assert.equal(reduce(running, bad, f), running, `while touring: ${JSON.stringify(bad)}`);
   assert.equal(reduce(s0, { type: 'toggle-inside' }, f).includeInside, false);
   assert.equal(reduce(s0, { type: 'set-inside', value: false }, f).includeInside, false);
   assert.equal(reduce(s0, { type: 'view', value: 'peer-nopack' }, f).view, 'peer-nopack');
@@ -118,13 +121,16 @@ test('reduce: select, inside, view, share, drawer; anything unknown leaves the s
 test('tour: six steps; every action is one reduce understands; start / next / back / end walk them', async () => {
   const f = await facts();
   assert.equal(STEPS.length, 6);
-  for (const step of STEPS) for (const a of step.actions) assert.notEqual(reduce({ ...initialState(), drawer: 'about', includeInside: false, view: 'peer-nopack', share: 'units-streams', selected: 'hydrological:basin:example-basin' }, a, f), undefined);
+  const probe = { ...initialState(), drawer: 'about', includeInside: false, view: 'peer-nopack', share: 'units-streams', selected: 'hydrological:basin:example-basin' };
+  for (const step of STEPS) for (const a of step.actions) assert.notEqual(reduce(probe, a, f), probe, `${step.title}: ${JSON.stringify(a)} must change a state that differs from it`);
   let s = reduce(initialState(), { type: 'tour', value: 'start' }, f);
   assert.deepEqual([s.tour, s.selected], [0, PLANA]);
   s = reduce(s, { type: 'tour', value: 'next' }, f);
   assert.deepEqual([s.tour, s.selected, s.includeInside], [1, CAT, true]);
   assert.equal(reduce(s, { type: 'tour', value: 'back' }, f).tour, 0);
-  for (let i = 0; i < 3; i++) s = reduce(s, { type: 'tour', value: 'next' }, f);
+  const seen = [];
+  for (let i = 0; i < 3; i++) { s = reduce(s, { type: 'tour', value: 'next' }, f); seen.push(s.selected); }
+  assert.deepEqual(seen, [PLANA, 'administrative:comarca:osona', 'administrative:comarca:osona'], 'steps 3-5 select what their text says');
   assert.deepEqual([s.tour, s.share, s.view], [4, 'units', 'peer-pack']);
   s = reduce(s, { type: 'tour', value: 'next' }, f);
   assert.deepEqual([s.tour, s.view, s.drawer], [5, 'you', 'pack']);
