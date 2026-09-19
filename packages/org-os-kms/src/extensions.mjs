@@ -13,7 +13,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** The directory holding org-os-kms and its siblings (toolkit-framework, packs). */
 export const PACKAGES_DIR = join(here, '..', '..');
 
-const readYaml = (p) => yaml.load(readFileSync(p, 'utf8')) || {};
+const readYaml = (p) => yaml.load(readFileSync(p, 'utf8'), { filename: p }) || {};
 const versionOf = (pkgDir) => JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')).version;
 const FOUND = { framework: () => versionOf(join(here, '..', '..', 'toolkit-framework')), kms: () => versionOf(join(here, '..')) };
 
@@ -67,7 +67,8 @@ export async function loadPackConnectors(packs = []) {
   for (const p of packs) {
     const entry = join(p.dir, 'connectors', 'index.mjs');
     if (!existsSync(entry)) continue;
-    const mod = await import(pathToFileURL(entry).href);
+    let mod;
+    try { mod = await import(pathToFileURL(entry).href); } catch (e) { throw new Error(`extension pack "${p.name}": connectors/index.mjs failed to load: ${e.message}`); }
     for (const [name, connector] of Object.entries(mod.CONNECTORS || {})) {
       if (owner[name]) throw new Error(`pack connector "${name}" (${p.name}) collides with pack ${owner[name]}`);
       owner[name] = p.name; out[name] = connector;

@@ -205,14 +205,33 @@ test('static surface: extensions.yaml is written for an instance with packs, and
   assert.ok(doc.entities.resource, 'core Layer-B entities are included');
   const check = fw.federateCheck({ extensionsPath: path });
   assert.ok(check.compatible.includes('widget')); assert.deepEqual(check.incompatible, []);
+  const ctx = JSON.parse(readFileSync(join(inst, 'public', 'api', 'context.jsonld'), 'utf8'));
+  assert.ok(ctx['@context'].widget, 'its own pack vocabulary is in its context');
 });
 
 test('static surface: an instance without packs writes no extensions.yaml — even if another instance registered one in this process', () => {
   const p = pkgs(); makePack(p, 'pack-a');
   loadExtensions({ extensions: ['pack-a'] }, { packagesDir: p }); // some other instance, same process
   const inst = surfaceInstance();
+  const stale = join(inst, 'public', '.well-known', 'extensions.yaml');
+  mkdirSync(join(inst, 'public', '.well-known'), { recursive: true }); writeFileSync(stale, 'entities: {}\n'); // left by an earlier run with packs
   const config = loadKmsConfig(inst);
   const { files } = writeStaticSurface({ dir: inst, items: [], manifest: { objects: {} }, config });
   assert.deepEqual(files.sort(), ['.well-known/knowledge.json', 'api/context.jsonld', 'api/index.json']);
-  assert.ok(!existsSync(join(inst, 'public', '.well-known', 'extensions.yaml')));
+  assert.ok(!existsSync(stale), 'a stale public extensions.yaml is dropped when the instance has no packs');
+  assert.ok(existsSync(join(inst, 'public', '.well-known', 'knowledge.json')));
+  const ctx = JSON.parse(readFileSync(join(inst, 'public', 'api', 'context.jsonld'), 'utf8'));
+  assert.equal(ctx['@context'].widget, undefined, "another instance's pack never reaches this instance's context");
+});
+
+test('a malformed pack.yaml error names the file', () => {
+  const p = pkgs(); const dir = makePack(p, 'pack-a');
+  writeFileSync(join(dir, 'pack.yaml'), 'name: pack-a\nrequires:\n  framework: >=0.3.0\n');
+  assert.throws(() => loadExtensions({ extensions: ['pack-a'] }, { packagesDir: p }), /pack\.yaml/);
+});
+
+test('a pack whose connectors/index.mjs throws on import is a hard error naming the pack', async () => {
+  const p = pkgs(); makePack(p, 'pack-a', { connectors: "throw new Error('boom');\n" });
+  const packs = loadExtensions({ extensions: ['pack-a'] }, { packagesDir: p });
+  await assert.rejects(() => loadPackConnectors(packs), /extension pack "pack-a": connectors\/index\.mjs failed to load: boom/);
 });

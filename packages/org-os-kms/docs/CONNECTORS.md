@@ -45,7 +45,7 @@ Separately, the publication gate: only these types publish by default (`claim-ev
 
 ## 4. `.well-known` allowlist
 
-Only two files are written under `<static_dir>/.well-known/` — three for an instance with extension packs (§13): `dao.json` (copied from the instance root `.well-known/` if present) and `knowledge.json` (generated: the root file if any is merged with `did`, `geo`, `exchange.published_domains`/`subscribed_domains` and source cards). `exchange.subscribed_domains` is **empty unless `publish.disclose_subscriptions: true`** in `kms.yaml`: listing the peer DIDs and `static-json` base URLs discloses who this instance reads, so it is opt-in. `meetings.json`, `members.json`, `activities.json` and any other root `.well-known` file are never copied. An instance whose `kms.yaml` declares `extensions` also gets `extensions.yaml`: its merged Layer-B entity set (type names and `maps_to_core` only, no instance data), which is the file a peer hands to `federate check`. An instance without packs does not get it.
+Only two files are written under `<static_dir>/.well-known/` — three for an instance with extension packs (§13): `dao.json` (copied from the instance root `.well-known/` if present) and `knowledge.json` (generated: the root file if any is merged with `did`, `geo`, `exchange.published_domains`/`subscribed_domains` and source cards). `exchange.subscribed_domains` is **empty unless `publish.disclose_subscriptions: true`** in `kms.yaml`: listing the peer DIDs and `static-json` base URLs discloses who this instance reads, so it is opt-in. `meetings.json`, `members.json`, `activities.json` and any other root `.well-known` file are never copied. An instance whose `kms.yaml` declares `extensions` also gets `extensions.yaml`: its merged Layer-B entity set (type names, `maps_to_core` and each entity's `description` — no instance data), which is the file a peer hands to `federate check`. An instance without packs does not get it.
 
 ## 5. Static surface facts
 
@@ -150,11 +150,12 @@ packages/<pack>/
   profile/profile.yaml      # optional: registry_bindings: { <schema>: data/<file>.yaml }
 ```
 
-- **Loaded at config load**, before any op (`loadKmsConfig` → `loadExtensions`). A pack that is missing, fails its `requires`, or collides with anything throws with the pack named; there is no half-loaded state.
+- **Loaded at config load**, before any op (`loadKmsConfig` → `loadExtensions`). A pack that is missing, fails its `requires`, or collides with anything throws with the pack named; no op runs against a half-loaded instance. (The failure is raised from `loadKmsConfig`, so the lifecycle stops and the CLI exits 1; packs registered before the failing one remain in the process registry until `resetPacks()`.)
 - **Core wins.** A pack schema, entity, connector or registry binding named like a core one (or like an earlier pack's) is a load error, never a shadow.
 - **Entities must map to a real Layer-A type** (`isForkCompatible`), or the pack refuses to load.
 - **`types` are publish-eligible, not published.** They join the opt-in set, so an instance must still list them in `publish.types_opt_in`. Installing a pack never widens what an instance publishes. The projection (`publicView`) and the floor apply to pack types exactly as to core ones.
 - **Lexicons** for pack types are generated under the instance's own `nsid_authority` (`<authority>.territorialUnit`).
 - **The `atproto` connector lists pack collections** once a pack is loaded, so two instances with the same pack exchange its records through the usual untrusted path. A peer **without** the pack never requests those collections; downgrading an unknown type to its `maps_to_core` on ingest is not implemented.
 - **A pack cannot** change a core schema, `frontmatter`, the axes or the relationships; add a Layer-A type; supply invariants or gates; touch `PRIVATE_FIELDS`; or depend on another pack.
-- Pack registration is per-process state. The CLI runs one instance per process; a host that walks several instances in one process should call `resetPacks()` between them.
+- Pack registration is per-process state. The CLI runs one instance per process; a host that walks several instances in one process should call `resetPacks()` **and `resetRegistryBindings()`** between them.
+- **A pack's `connectors/index.mjs` is executed.** `ingest` dynamically imports the entry module of every declared pack, whether or not a connector from it is configured. Everything else a pack ships (`pack.yaml`, `extension-entities.yaml`, `profile/profile.yaml`) is read as data. Vendor packs with the same care as `org-os-kms` itself.

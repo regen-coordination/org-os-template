@@ -74,6 +74,27 @@ test('pack entities are folded into the kernel and the JSON-LD context', () => {
   assert.ok(extensionEntities().resource, 'core Layer-B entities are still there');
 });
 
+test('toJsonLdContext can be scoped to named packs; the default (process-wide) is unchanged', () => {
+  registerPack({ name: 'p1', schemaDir: packDir({ widget: WIDGET }), entities: GOOD });
+  assert.equal(toJsonLdContext(undefined, { packs: [] })['@context'].widget, undefined);
+  assert.notEqual(toJsonLdContext(undefined, { packs: ['p1'] })['@context'].widget, undefined);
+  assert.notEqual(toJsonLdContext()['@context'].widget, undefined);
+});
+
+test('re-registering the same name + dir with different entities or types is an error; identical is idempotent', () => {
+  const dir = packDir({ widget: WIDGET });
+  const first = registerPack({ name: 'p1', schemaDir: dir, entities: GOOD, types: ['widget'] });
+  assert.equal(registerPack({ name: 'p1', schemaDir: dir, entities: GOOD, types: ['widget'] }), first);
+  assert.throws(() => registerPack({ name: 'p1', schemaDir: dir, entities: {}, types: ['widget'] }), /pack "p1" is already registered with different entities\/types/);
+  assert.throws(() => registerPack({ name: 'p1', schemaDir: dir, entities: GOOD, types: [] }), /pack "p1" is already registered with different entities\/types/);
+  assert.equal(registeredPacks().length, 1);
+});
+
+test('an entity named like an Object.prototype member is not a false collision with another pack', () => {
+  registerPack({ name: 'p1', schemaDir: null, entities: GOOD });
+  assert.doesNotThrow(() => registerPack({ name: 'p2', schemaDir: null, entities: { constructor: { maps_to_core: 'artifact' } } }));
+});
+
 test('no packs: the context and the entity set carry no pack names', () => {
   assert.equal(toJsonLdContext()['@context'].widget, undefined);
   assert.equal(extensionEntities().widget, undefined);

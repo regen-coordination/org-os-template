@@ -49,8 +49,9 @@ export function registerPack({ name, schemaDir = null, entities = {}, types = []
   if (!name || typeof name !== 'string') throw new Error('registerPack: name is required');
   const existing = getPacks().get(name);
   if (existing) {
-    if (existing.schemaDir === schemaDir) return existing;
-    throw new Error(`pack "${name}" is already registered from ${existing.schemaDir}`);
+    if (existing.schemaDir !== schemaDir) throw new Error(`pack "${name}" is already registered from ${existing.schemaDir}`);
+    if (JSON.stringify([existing.entities, existing.types]) !== JSON.stringify([{ ...entities }, [...types]])) throw new Error(`pack "${name}" is already registered with different entities/types`);
+    return existing;
   }
   if (schemaDir && !existsSync(schemaDir)) throw new Error(`pack "${name}": schema dir not found: ${schemaDir}`);
   const mine = schemaDir ? yamlNames(schemaDir) : [];
@@ -68,7 +69,7 @@ export function registerPack({ name, schemaDir = null, entities = {}, types = []
   for (const [e, def] of Object.entries(entities)) {
     if (coreNames.has(e)) throw new Error(`pack entity "${e}" (${name}) collides with core`);
     for (const p of getPacks().values()) {
-      if (p.entities && e in p.entities) throw new Error(`pack entity "${e}" (${name}) collides with pack ${p.name}`);
+      if (p.entities && Object.hasOwn(p.entities, e)) throw new Error(`pack entity "${e}" (${name}) collides with pack ${p.name}`);
     }
     if (!isForkCompatible(def)) throw new Error(`pack entity "${e}" (${name}): maps_to_core "${def?.maps_to_core}" is not a core type`);
   }
@@ -180,10 +181,10 @@ export function isForkCompatible(localType) {
 }
 
 /** Generate a JSON-LD @context from the kernel (graph-compatible / AI-readable serialization). */
-export function toJsonLdContext(baseIri = 'https://regen-commons.org/ns/') {
+export function toJsonLdContext(baseIri = 'https://regen-commons.org/ns/', { packs = null } = {}) {
   const ctx = { '@version': 1.1, '@vocab': baseIri };
   for (const name of Object.keys(loadSchema('core-entities').entities || {})) ctx[name] = baseIri + name;
-  for (const name of Object.keys(extensionEntities())) ctx[name] = baseIri + name;
+  for (const name of Object.keys(extensionEntities({ packs }))) ctx[name] = baseIri + name;
   const rels = loadSchema('relationships');
   for (const group of Object.values(rels.groups || {})) {
     for (const p of Object.keys(group.predicates || {})) ctx[p] = { '@id': baseIri + p, '@type': '@id' };

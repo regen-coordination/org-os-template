@@ -25,4 +25,4 @@ This is the adoption vehicle for ReFi DAO / ReFi BCN / future communities (build
 
 ## Extension packs
 
-Sibling packages that add typed schemas, entities, connectors and registry bindings without editing the framework — opt in with `kms.yaml` `extensions: [<pack>]`. First pack: [`org-os-territory`](../org-os-territory/README.md). Contract and rules: [`docs/CONNECTORS.md` §13](docs/CONNECTORS.md).
+Sibling packages that add typed schemas, entities, connectors and registry bindings without editing the framework — opt in with `kms.yaml` `extensions: [<pack>]`. First pack: [`org-os-territory`](../org-os-territory/README.md). Contract and rules: [`docs/CONNECTORS.md` §13](docs/CONNECTORS.md#13-extension-packs).

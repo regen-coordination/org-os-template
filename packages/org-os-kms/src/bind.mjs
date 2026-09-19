@@ -26,7 +26,7 @@ const packBindings = new Map(); // schema -> { pack, path }
 
 export function registerRegistryBindings(packName, map = {}) {
   for (const [schema, path] of Object.entries(map)) {
-    if (schema in REGISTRY_BINDINGS) throw new Error(`pack binding for "${schema}" (${packName}) collides with core`);
+    if (Object.hasOwn(REGISTRY_BINDINGS, schema)) throw new Error(`pack binding for "${schema}" (${packName}) collides with core`);
     const prev = packBindings.get(schema);
     if (prev && prev.pack !== packName) throw new Error(`pack binding for "${schema}" (${packName}) collides with pack ${prev.pack}`);
     packBindings.set(schema, { pack: packName, path });
@@ -51,8 +51,9 @@ export const LIFECYCLE_BINDINGS = {
 /** Group framework objects by their target org-os registry. */
 export function toOrgOsRegistries(objects = []) {
   const out = {};
+  const bindings = registryBindings();
   for (const o of objects) {
-    const target = registryBindings()[o.type] || 'data/misc.yaml';
+    const target = bindings[o.type] || 'data/misc.yaml';
     (out[target] ||= []).push(o);
   }
   return out;

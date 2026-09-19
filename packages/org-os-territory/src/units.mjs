@@ -45,7 +45,7 @@ export function unitsFor(obj, index) {
 export function objectsIn(unit_id, objects = [], index, { includeDescendants = true } = {}) {
   if (!index.byId.has(unit_id)) throw new Error(`unknown unit_id: ${unit_id}`);
   return objects.filter((o) => {
-    if (!includeDescendants) return refsOf(o).includes(unit_id);
+    if (!includeDescendants) return refsOf(o || {}).includes(unit_id);
     return unitsFor(o, index).units.includes(unit_id);
   });
 }

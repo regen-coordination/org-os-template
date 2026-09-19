@@ -56,3 +56,9 @@ test('objectsIn descends part_of by default and can be told not to', () => {
   assert.deepEqual(objectsIn('landscape:catalogue-area:comarques-centrals', all, ix).map((o) => o.title), ['C']);
   assert.throws(() => objectsIn('custom:site:ghost', all, ix), /unknown unit_id: custom:site:ghost/);
 });
+
+test('objectsIn with includeDescendants:false tolerates a null object', () => {
+  const ix = indexUnits(UNITS); const id = 'administrative:municipi:vic';
+  const inside = { unit_refs: [id] };
+  assert.deepEqual(objectsIn(id, [null, inside], ix, { includeDescendants: false }), [inside]);
+});

@@ -327,7 +327,7 @@ by place and kind of work, with a trust tier).
 
 **Status.** `in-dev`.
 
-**Links:** [pack README](../packages/org-os-territory/README.md) · [extension packs contract](../packages/org-os-kms/docs/CONNECTORS.md)
+**Links:** [pack README](../packages/org-os-territory/README.md) · [extension packs contract](../packages/org-os-kms/docs/CONNECTORS.md#13-extension-packs)
 
 ### org-os-hermes — Hermes Agent
 

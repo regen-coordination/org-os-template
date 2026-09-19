@@ -4,6 +4,7 @@ import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from '../framework.mjs';
 
+// Never add extensions.yaml here: it is GENERATED below from the instance's packs, never copied from a hand-authored root file.
 const WELL_KNOWN_ALLOW = ['dao.json'];
 
 export function writeStaticSurface({ dir, outDir = 'public', items, allItems = items, manifest, config }) {
@@ -18,7 +19,7 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
   rmSync(join(out, 'api'), { recursive: true, force: true });
   const write = (rel, data) => { const p = join(out, rel); mkdirSync(join(p, '..'), { recursive: true }); writeFileSync(p, JSON.stringify(data, null, 2) + '\n'); files.push(rel); };
 
-  write('api/context.jsonld', fw.toJsonLdContext());
+  write('api/context.jsonld', fw.toJsonLdContext(undefined, { packs: (config.packs || []).map((p) => p.name) }));
   const bySchema = new Map();
   for (const { schema, object } of items) {
     const m = manifest.objects[object.id];
@@ -56,7 +57,7 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
     mkdirSync(join(out, '.well-known'), { recursive: true });
     writeFileSync(join(out, '.well-known', 'extensions.yaml'), yaml.dump({ entities: fw.extensionEntities({ packs: config.packs.map((p) => p.name) }) }));
     files.push('.well-known/extensions.yaml');
-  }
+  } else rmSync(join(out, '.well-known', 'extensions.yaml'), { force: true });
 
   for (const f of WELL_KNOWN_ALLOW) {
     const src = join(dir, '.well-known', f);
