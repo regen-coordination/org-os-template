@@ -244,3 +244,30 @@ test('section 2: the pack panel is rendered from the captured facts; the selecto
   app.click('toggle-theme');
   assert.equal(app.doc.documentElement.dataset.theme, 'light');
 });
+
+test('section 3: each of the five configurations renders its captured result; the one-process panel shows the leak, the filtered call and the stale file', async () => {
+  const f = await getFacts();
+  const h = (id) => R.renderMatrixPanel(f, id);
+  assert.match(h('no-pack'), /resource/);
+  assert.ok(!/territorialUnit/.test(h('no-pack')));
+  assert.match(h('no-pack'), /extensions\.yaml/);
+  assert.match(h('no-pack-optin'), /unknown publishable type: territorial-unit/);
+  assert.match(h('pack-closed'), /nothing new published/i);
+  assert.ok(h('pack-closed').includes('cat.regenerant.kb.resource'));
+  assert.ok(!h('pack-closed').includes('cat.regenerant.kb.territorialUnit'));
+  assert.ok(h('pack-units').includes('cat.regenerant.kb.territorialUnit'));
+  assert.ok(h('pack-units').includes('<li><code>unit_id</code></li>'));
+  assert.ok(!h('pack-units').includes('<li><code>notes</code></li>'), 'the private notes field is never among the published fields');
+  assert.ok(h('pack-units-streams').includes('cat.regenerant.kb.dataStream'));
+  const o = R.renderOneProcess(f);
+  assert.match(o, /toJsonLdContext\(\)/);
+  assert.match(o, /packs: \[\]/);
+  assert.match(o, /stale/i);
+  assert.ok(R.sections().some((s) => s.id === 'guarantees' && s.order === 3));
+
+  const app = runApp(f);
+  app.click('pick-matrix', { id: 'no-pack-optin' });
+  assert.match(app.panels.matrix.innerHTML, /unknown publishable type/);
+  app.click('pick-matrix', { id: 'pack-units' });
+  assert.match(app.panels.matrix.innerHTML, /territorialUnit/);
+});

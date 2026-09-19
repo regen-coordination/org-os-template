@@ -78,3 +78,42 @@ ${provenance('Measured by loading the pack through the real kms path (<code>load
 }
 
 register({ id: 'pack', order: 2, nav: '2 Load a pack', title: '2 · Load a pack', lead: 'Pick the instance configuration and see exactly what the framework registers.', render: renderPack });
+
+const MATRIX_LABELS = [['no-pack', 'No pack'], ['no-pack-optin', 'No pack + opt-in listed'], ['pack-closed', 'Pack, not opted in'], ['pack-units', 'Pack, units opted in'], ['pack-units-streams', 'Pack, units + streams opted in']];
+
+export function renderMatrixPanel(f, id) {
+  const m = f.matrix.find((r) => r.id === id);
+  const cfg = `${m.pack ? 'extensions: [org-os-territory]\n' : ''}publish:\n  base_url: https://demo.invalid${m.optIn.length ? `\n  types_opt_in: [${m.optIn.join(', ')}]` : ''}`;
+  const head = `<div class="cols"><div><h4>The instance's kms.yaml (relevant lines)</h4>${pre(cfg)}<p class="muted">Same sample data every time: one resource, one unit carrying a private <code>notes</code> field, one public stream, one <code>not-public-yet</code> draft stream.</p></div>`;
+  if (m.error) return `${head}<div><h4>Result</h4><div class="card res-bad">${chip('hard error', 'bad')} <code>publish</code> refused to run:${pre(m.error)}<p class="muted">Opting in to a type the instance does not know is an error, not a silent no-op.</p></div></div></div>`;
+  const newTypes = m.collections.filter((c) => /territorialUnit|dataStream/.test(c.collection));
+  const verdict = newTypes.length ? chip(`${newTypes.length} pack type${newTypes.length > 1 ? 's' : ''} published — the instance opted in`, 'warn') : chip('nothing new published', 'ok');
+  return `${head}<div><h4>Result</h4><div class="card">${verdict}
+<p><strong>Records written to the fake PDS</strong></p>
+<table><thead><tr><th>collection</th><th>records</th></tr></thead><tbody>${m.collections.map((c) => `<tr><td>${code(c.collection)}</td><td>${esc(c.count)}</td></tr>`).join('')}</tbody></table>
+${m.unitRecordKeys ? `<p><strong>Fields of the published unit record</strong> (the sample carried a private <code>notes</code> field; it is not among these):</p><ul class="fields">${m.unitRecordKeys.map((k) => `<li><code>${esc(k)}</code></li>`).join('')}</ul>` : ''}
+<p><strong>Static surface</strong> — ${m.surfaceFiles.map((x) => code(x)).join(' ')} <span class="muted">+ ${esc(m.perItemFiles)} per-item files</span></p>
+<p>Pack types in <code>api/context.jsonld</code>: ${m.contextPackTypes.length ? m.contextPackTypes.map((x) => code(x)).join(' ') : chip('none')} · <code>extensions.yaml</code>: ${chip(m.hasExtensionsYaml ? 'present' : 'absent')}</p></div></div></div>`;
+}
+
+export function renderOneProcess(f) {
+  const o = f.oneProcess;
+  const list = (a) => (a.length ? a.map((x) => code(x)).join(' ') : chip('none', 'ok'));
+  return `<div class="cols"><div class="card"><h4>Instance A — the pack loaded</h4><p>types in its context: ${list(o.withPack.contextTypes)}<br><code>extensions.yaml</code>: ${chip(o.withPack.hasExtensionsYaml ? 'present' : 'absent')}</p></div>
+<div class="card"><h4>Instance B — no packs, same process</h4><p>types in its context: ${list(o.packless.contextTypes)}<br><code>extensions.yaml</code>: ${chip(o.packless.hasExtensionsYaml ? 'present' : 'absent', 'ok')}</p></div></div>
+<div class="card"><p>The process registry still holds ${o.registeredPacks.map((x) => code(x)).join(' ')} while B publishes. The call the static surface used to make, <code>toJsonLdContext()</code>, returns ${list(o.surfaceUsedToCall.unfiltered)} — that is what a pack-less instance would have published. It now makes <code>toJsonLdContext(undefined, { packs: [] })</code> for an instance with no packs, which returns ${list(o.surfaceUsedToCall.filtered)}.</p>
+<p>${chip('caught in review', 'warn')} <strong>This was a real defect</strong>: the whole-branch review found it (no single task review could see it); it is fixed and now covered by a test.</p>
+<p>A stale file is cleaned up too: an instance that had a pack and then dropped it had <code>extensions.yaml</code> ${chip(String(o.stale.before))} before republishing and ${chip(String(o.stale.after), 'ok')} after.</p></div>`;
+}
+
+export function renderGuarantees(f) {
+  return `<h3>Publish matrix — the same data, five configurations</h3>
+${seg('pick-matrix', 'id', MATRIX_LABELS, 'pack-units')}
+<div data-panel="matrix">${renderMatrixPanel(f, 'pack-units')}</div>
+${provenance('Each configuration is a temp instance published through the real <code>OPS.publish</code> op against a fake PDS client — <code>demo/capture/publish-matrix.mjs</code>.')}
+<h3>One process, two instances</h3>
+${renderOneProcess(f)}
+${provenance('Two instances published in one process without resetting the registry, then the unfiltered and filtered <code>toJsonLdContext</code> calls compared — <code>demo/capture/one-process.mjs</code>.')}`;
+}
+
+register({ id: 'guarantees', order: 3, nav: '3 Guarantees', title: '3 · The guarantees', lead: 'A pack can never widen what an instance publishes, and one instance never sees another’s pack.', render: renderGuarantees });

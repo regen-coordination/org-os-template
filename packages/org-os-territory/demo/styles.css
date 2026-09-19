@@ -39,4 +39,7 @@ details.prov { margin: 10px 0 0; font-size: 14px; color: var(--muted); } details
 @media print { .toc, .btn, .skip { display: none; } body { background: #fff; color: #000; } section { break-inside: avoid; } }
 h4 { margin: 14px 0 4px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .card p { margin: 6px 0; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 8px 0; }
+.res-bad { border-color: var(--bad); }
+ul.fields { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 4px 0 10px; }
 /* <<SECTION-CSS>> */
