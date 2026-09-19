@@ -13,7 +13,8 @@ function git(...args) {
 const lines = (s) => s.split('\n').filter(Boolean);
 
 function suite(name, dir) {
-  const r = spawnSync(process.execPath, ['--test'], { cwd: join(PACKAGES, dir), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=spec'], { cwd: join(PACKAGES, dir), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); // pin the reporter: Node 20–22 defaults to TAP off a TTY
+  expect(r.status === 0, `the ${name} suite exited with status ${r.status}: ${(r.stderr || '').slice(0, 500)}`);
   const grab = (k) => { const m = new RegExp(`^ℹ ${k} (\\d+)`, 'm').exec(r.stdout); expect(m, `could not read "${k}" from the ${name} suite output`); return Number(m[1]); };
   const s = { name, tests: grab('tests'), pass: grab('pass'), fail: grab('fail'), skipped: grab('skipped') };
   expect(s.fail === 0, `the ${name} suite has ${s.fail} failing tests`);

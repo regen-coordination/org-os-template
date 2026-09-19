@@ -5,10 +5,12 @@
   const ACTIONS = {};
   const setPanel = (name, html) => { const el = document.querySelector('[data-panel="' + name + '"]'); if (el) el.innerHTML = html; };
 
+  const isDark = () => { const r = document.documentElement; return r.dataset.theme === 'dark' || (r.dataset.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); };
+  const tb = document.querySelector('[data-action="toggle-theme"]'); if (tb) tb.setAttribute('aria-pressed', String(isDark()));
+
   ACTIONS['toggle-theme'] = (el) => {
-    const root = document.documentElement;
-    const dark = root.dataset.theme === 'dark' || (root.dataset.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    root.dataset.theme = dark ? 'light' : 'dark';
+    const dark = isDark();
+    document.documentElement.dataset.theme = dark ? 'light' : 'dark';
     el.setAttribute('aria-pressed', String(!dark));
   };
 

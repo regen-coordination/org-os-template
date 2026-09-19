@@ -1,11 +1,11 @@
 // packages/org-os-territory/test/demo.test.mjs — the demo: sample data, real-run capture, renderer, built page.
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync, mkdtempSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fw, loadExtensions, reset } from '../demo/capture/env.mjs';
+import { fw, loadExtensions, reset, cleanup } from '../demo/capture/env.mjs';
 import { UNITS, RESOURCES, STREAMS, PROVIDERS, OVERLAPS_VALID, OVERLAP_FAULTS, SAMPLE_NOTE } from '../demo/sample.mjs';
 import { indexUnits } from '../src/units.mjs';
 import { validateOverlaps } from '../src/overlaps.mjs';
@@ -21,6 +21,7 @@ import { assemble, build, stripExports, safeJson, DEFAULT_OUT } from '../demo/bu
 import * as R from '../demo/render.mjs';
 
 beforeEach(() => reset());
+after(() => cleanup());
 
 test('sample: labelled illustrative; every unit and stream validates against the REAL schemas', () => {
   assert.match(SAMPLE_NOTE, /illustrative/i);
@@ -145,7 +146,7 @@ test('verified (--skip-suites): commit list and the no-pre-existing-test-modifie
   const v = verified({ skipSuites: true });
   assert.equal(v.skipped, true);
   assert.match(v.base, /^[0-9a-f]{40}$/);
-  assert.ok(v.commits.length >= 12, 'the branch has at least the twelve pack commits');
+  assert.ok(Array.isArray(v.commits) && v.commits.every((c) => /^[0-9a-f]{7,} \S/.test(c)), 'each commit line is "<hash> <subject>"');
   assert.equal(v.testDirsUnmodified, true);
   assert.deepEqual(v.suites, []);
 });
@@ -228,6 +229,8 @@ test('section 2: the pack panel is rendered from the captured facts; the selecto
   assert.ok(on.includes('<code>place</code>') && on.includes('<code>artifact</code>'));
   assert.ok(on.includes('<code>unit_id</code>'), 'lexicon property table');
   assert.match(on, /&gt;=0\.3\.0/, 'the manifest requires floor');
+  assert.match(on, /flat: [a-z, ]*boolean/);
+  assert.ok(R.renderPack(f).includes('role="group" aria-label="Instance configuration"'), 'the selector is a labelled group');
   const off = R.renderPackPanel(f, 'none');
   assert.match(off, /No pack loaded/);
   assert.ok(off.includes(`${f.packInfo.none.lexiconCount} lexicons`));
@@ -296,11 +299,20 @@ test('section 7: suites, the no-pre-existing-test-modified check and the commit 
   const skipped = R.renderVerified(f);
   assert.match(skipped, /not run in this build/i);
   assert.match(skipped, /diff-filter/);
-  assert.ok(skipped.includes(f.verified.commits[0].slice(0, 7)));
-  const ran = R.renderVerified({ ...f, verified: { ...f.verified, skipped: false, suites: [{ name: 'toolkit-framework', tests: 205, pass: 205, fail: 0, skipped: 0 }, { name: 'org-os-kms', tests: 181, pass: 180, fail: 0, skipped: 1 }] } });
+  if (f.verified.commits.length) assert.ok(skipped.includes(f.verified.commits[0].split(' ')[0]));
+  const ran = R.renderVerified({ ...f, verified: { ...f.verified, skipped: false, commits: ['abcdef0 a subject'], suites: [{ name: 'toolkit-framework', tests: 205, pass: 205, fail: 0, skipped: 0 }, { name: 'org-os-kms', tests: 181, pass: 180, fail: 0, skipped: 1 }] } });
   assert.ok(ran.includes('<td>205</td>') && ran.includes('org-os-kms'));
   assert.ok(!/not run in this build/i.test(ran));
+  assert.ok(ran.includes('<code>abcdef0</code> a subject'));
   assert.ok(R.sections().some((s) => s.id === 'verified' && s.order === 7));
+});
+
+test('section 7: on the base branch (no commits over main) the page says there is no branch diff to check, instead of claiming an empty diff', async () => {
+  const f = await getFacts();
+  const onBase = R.renderVerified({ ...f, verified: { ...f.verified, commits: [] } });
+  assert.match(onBase, /no branch diff to check/);
+  assert.doesNotMatch(onBase, /printed nothing/);
+  if (f.verified.commits.length) assert.match(R.renderVerified(f), /printed nothing/);
 });
 
 test('section 5: the schematic lists every unit by layer; a unit panel shows the real query answers; the overlap panels show the real validator errors; unknown refs are reported', async () => {

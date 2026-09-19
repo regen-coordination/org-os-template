@@ -46,8 +46,8 @@ ${provenance('Schema counts come from <code>listSchemas()</code> before and afte
 
 register({ id: 'seam', order: 1, nav: '1 Seam', title: '1 · The seam', lead: 'What changed in the framework, and what did not.', render: renderSeam });
 
-export function seg(action, attr, items, current) {
-  return `<div class="seg" role="group">${items.map(([v, label]) => `<button type="button" class="btn" data-action="${esc(action)}" data-${esc(attr)}="${esc(v)}" aria-pressed="${v === current}">${esc(label)}</button>`).join('')}</div>`;
+export function seg(action, attr, items, current, label = '') {
+  return `<div class="seg" role="group"${label ? ` aria-label="${esc(label)}"` : ''}>${items.map(([v, label]) => `<button type="button" class="btn" data-action="${esc(action)}" data-${esc(attr)}="${esc(v)}" aria-pressed="${v === current}">${esc(label)}</button>`).join('')}</div>`;
 }
 
 export function renderPackPanel(f, which) {
@@ -67,12 +67,12 @@ export function renderPackPanel(f, which) {
 <h4>Publish-eligible (opt-in) types and registry bindings</h4>
 <p>${a.optInTypes.map((x) => code(x)).join(' ')} — <em>eligible, not published</em> until the instance lists them in <code>publish.types_opt_in</code>.</p>
 <table><thead><tr><th>schema</th><th>registry file</th></tr></thead><tbody>${Object.entries(a.bindings).map(([k, v]) => `<tr><td>${code(k)}</td><td>${code(v)}</td></tr>`).join('')}</tbody></table>
-<h4>The generated lexicon <code>${esc(t.lexicon.id)}</code> — flat: string, integer, array of strings</h4>
+<h4>The generated lexicon <code>${esc(t.lexicon.id)}</code> — flat: ${esc([...new Set(props.map(([, v]) => v.type))].join(', '))}</h4>
 <table><thead><tr><th>property</th><th>type</th><th>known values</th></tr></thead><tbody>${props.map(([k, v]) => `<tr><td>${code(k)}${req.includes(k) ? ' ' + chip('required') : ''}</td><td>${esc(v.type)}</td><td>${esc((v.knownValues || []).join(', '))}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 export function renderPack(f) {
-  return `${seg('pick-pack', 'which', [['none', 'No pack'], ['territory', 'org-os-territory']], 'territory')}
+  return `${seg('pick-pack', 'which', [['none', 'No pack'], ['territory', 'org-os-territory']], 'territory', 'Instance configuration')}
 <div data-panel="pack">${renderPackPanel(f, 'territory')}</div>
 ${provenance('Measured by loading the pack through the real kms path (<code>loadExtensions</code>) and diffing <code>listSchemas()</code>, <code>extensionEntities()</code>, <code>optInTypes()</code>, <code>registryBindings()</code> and <code>generateAll()</code> before and after — <code>demo/capture/pack-info.mjs</code>.')}`;
 }
@@ -108,7 +108,7 @@ export function renderOneProcess(f) {
 
 export function renderGuarantees(f) {
   return `<h3>Publish matrix — the same data, five configurations</h3>
-${seg('pick-matrix', 'id', MATRIX_LABELS, 'pack-units')}
+${seg('pick-matrix', 'id', MATRIX_LABELS, 'pack-units', 'Publish configuration')}
 <div data-panel="matrix">${renderMatrixPanel(f, 'pack-units')}</div>
 ${provenance('Each configuration is a temp instance published through the real <code>OPS.publish</code> op against a fake PDS client — <code>demo/capture/publish-matrix.mjs</code>.')}
 <h3>One process, two instances</h3>
@@ -132,7 +132,7 @@ ${files.length ? files.map(([p, t]) => `<p class="filepath">${code(p)}</p>${pre(
 export function renderAttempts(f) {
   const first = f.attempts[0].id;
   return `<p class="muted">${esc(f.attempts.length)} ways to get a pack wrong, each run for real against the loader. Pick one.</p>
-${seg('pick-attempt', 'id', f.attempts.map((a) => [a.id, a.title]), first)}
+${seg('pick-attempt', 'id', f.attempts.map((a) => [a.id, a.title]), first, 'Attempt to pick')}
 <div data-panel="attempt">${renderAttemptPanel(f, first)}</div>
 ${provenance('Each attempt writes its files to a temp packages directory and calls the real <code>loadExtensions</code> (and, for connectors, <code>loadPackConnectors</code> + <code>mergeConnectors</code>); the build fails if an attempt does not fail or fails with a different message — <code>demo/capture/attempts.mjs</code>.')}`;
 }
@@ -142,11 +142,15 @@ export function renderVerified(f) {
   const suites = v.skipped
     ? `<p>${chip('suites not run in this build', 'warn')} Rebuild without <code>--skip-suites</code> (<code>npm run demo</code>) to record the real pass counts here.</p>`
     : `<table><thead><tr><th>suite</th><th>tests</th><th>pass</th><th>fail</th><th>skipped</th></tr></thead><tbody>${v.suites.map((s) => `<tr><td>${esc(s.name)}</td><td>${esc(s.tests)}</td><td>${esc(s.pass)}</td><td>${esc(s.fail)}</td><td>${esc(s.skipped)}</td></tr>`).join('')}</tbody></table>`;
+  const onBase = v.commits.length === 0;
+  const diff = onBase
+    ? `<p>${chip('built on the base branch — no branch diff to check', 'warn')} <code>${esc(v.head)}</code> is <code>${esc(v.base.slice(0, 7))}</code> itself.</p>`
+    : `<p>${chip(String(v.testDirsUnmodified), v.testDirsUnmodified ? 'ok' : 'bad')} <code>git diff ${esc(v.base.slice(0, 7))}..HEAD --diff-filter=MDR</code> over <code>packages/toolkit-framework/test</code> and <code>packages/org-os-kms/test</code> printed nothing: the branch adds tests and changes none that existed on <code>main</code>.</p>
+<h3>The branch — ${esc(v.commits.length)} commits over <code>${esc(v.base.slice(0, 7))}</code></h3>
+<ol class="commits">${v.commits.map((c) => { const i = c.indexOf(' '); return `<li><code>${esc(c.slice(0, i))}</code> ${esc(c.slice(i + 1))}</li>`; }).join('')}</ol>`;
   return `<h3>Test suites</h3>${suites}
 <h3>No pre-existing test was modified</h3>
-<p>${chip(String(v.testDirsUnmodified), v.testDirsUnmodified ? 'ok' : 'bad')} <code>git diff ${esc(v.base.slice(0, 7))}..HEAD --diff-filter=MDR</code> over <code>packages/toolkit-framework/test</code> and <code>packages/org-os-kms/test</code> printed nothing: the branch adds tests and changes none that existed on <code>main</code>.</p>
-<h3>The branch — ${esc(v.commits.length)} commits over <code>${esc(v.base.slice(0, 7))}</code></h3>
-<ol class="commits">${v.commits.map((c) => `<li><code>${esc(c.slice(0, 7))}</code> ${esc(c.slice(8))}</li>`).join('')}</ol>
+${diff}
 ${provenance('Suite counts are parsed from each package’s real <code>node --test</code> run; the diff check and the commit list are read from git — <code>demo/capture/verified.mjs</code>. The build fails if any suite has a failing test or a pre-existing test file was touched.')}`;
 }
 
@@ -184,7 +188,7 @@ export function renderTerritory(f) {
 <p>${t.unknownRefs.map((r) => `${code(r.resource)} points at ${code(r.ref)}, which is not in the tree`).join('; ')} — <code>unitsFor()</code> returns it under <code>unknown</code> and lets the instance decide whether that is an error.</p>
 <h3>The overlaps sidecar has a validator</h3>
 <p class="muted">Overlap shares are derived data in <code>data/territory-overlaps.json</code>, never published. The script that computes them from geometry comes in spec 2; this is the contract it must meet.</p>
-${seg('pick-overlap', 'id', [['valid', 'A valid sidecar'], ...t.overlaps.faults.map((x) => [x.id, x.title])], 'valid')}
+${seg('pick-overlap', 'id', [['valid', 'A valid sidecar'], ...t.overlaps.faults.map((x) => [x.id, x.title])], 'valid', 'Overlaps document')}
 <div data-panel="overlap">${renderOverlapPanel(f, 'valid')}</div>
 ${provenance('Every answer is precomputed by calling the real <code>indexUnits</code>, <code>unitsFor</code>, <code>objectsIn</code> and <code>validateOverlaps</code> for each unit and fault — <code>demo/capture/territory.mjs</code>. The sample is illustrative.')}`;
 }

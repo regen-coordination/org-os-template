@@ -17,6 +17,7 @@ export const UNITS = [
   u('landscape:catalogue-area:comarques-centrals', 'Landscape catalogue: Comarques Centrals (example)'),
   u('landscape:unit:plana-de-vic', 'Plana de Vic (example unit)', 'landscape:catalogue-area:comarques-centrals', { codes: ['observatori:EXAMPLE-01'] }),
   u('landscape:unit:pla-de-bages', 'Pla de Bages (example unit)', 'landscape:catalogue-area:comarques-centrals', { codes: ['observatori:EXAMPLE-02'] }),
+  // PA20 code and title per One Earth (oneearth.org/bioregions/balearic-sea-west-mediterranean-mixed-forests-pa20), recorded in lf-work-os data/ideas.yaml; web-verified 2026-09-18.
   u('ecological:bioregion:pa20', 'Balearic Sea & West Mediterranean Mixed Forests', null, { codes: ['one_earth:PA20'] }),
   u('hydrological:basin:example-basin', 'Example river basin (illustrative)'),
 ];

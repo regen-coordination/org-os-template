@@ -1,6 +1,6 @@
 // demo/capture/env.mjs — shared plumbing for the capture scenarios: the REAL kms/framework imports, per-scenario registry reset,
 // fail-closed expectations, temp-dir instances and a fake PDS client. Nothing here touches the network or writes outside temp dirs.
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +22,10 @@ export const ENV = { ATPROTO_APP_PASSWORD: 'fake-not-a-secret' };
 
 export const reset = () => { fw.resetPacks(); resetRegistryBindings(); };
 export function expect(cond, msg) { if (!cond) throw new Error(`demo capture: ${msg}`); }
-export const temp = (prefix) => mkdtempSync(join(tmpdir(), `demo-${prefix}-`));
+// Every temp dir is remembered so `cleanup()` can remove them once the facts are captured (capture.mjs and the tests call it).
+const CREATED = [];
+export const temp = (prefix) => { const d = mkdtempSync(join(tmpdir(), `demo-${prefix}-`)); CREATED.push(d); return d; };
+export const cleanup = () => { for (const d of CREATED.splice(0)) rmSync(d, { recursive: true, force: true }); };
 export const tree = (root, rel = '') => readdirSync(join(root, rel), { withFileTypes: true })
   .flatMap((e) => e.isDirectory() ? tree(root, join(rel, e.name)) : [join(rel, e.name)]).sort();
 
