@@ -137,3 +137,54 @@ test('tour: six steps; every action is one reduce understands; start / next / ba
   assert.equal(reduce(s, { type: 'tour', value: 'next' }, f).tour, null, 'next on the last step finishes');
   assert.equal(reduce(s, { type: 'tour', value: 'end' }, f).tour, null);
 });
+
+// ── Task 6: view ─────────────────────────────────────────────────────────────────────────────────────────────────────
+const flat = (nodes) => nodes.flatMap((n) => [n, ...flat(n.children)]);
+const allNodes = (v) => v.layers.flatMap((l) => flat(l.roots));
+
+test('view: every unit is on the board once, selectable, and its panel is the recorded query', async () => {
+  const f = await facts();
+  assert.deepEqual(allNodes(view(initialState(), f)).map((n) => n.id).sort(), UNITS.map((u) => u.unit_id).sort());
+  assert.equal(view(initialState(), f).panel, null);
+  for (const u of UNITS) {
+    const v = view(reduce(initialState(), { type: 'select', id: u.unit_id }, f), f); const q = f.territory.query[u.unit_id];
+    assert.deepEqual(v.panel.here.map((x) => x.title), q.withDescendants);
+    assert.deepEqual(v.panel.ancestors.map((a) => a.id), q.ancestors);
+    assert.deepEqual(v.panel.overlaps.map((o) => o.id), q.overlaps.map((o) => o.other));
+    assert.deepEqual(v.panel.streams.map((s) => s.title), f.streamsFor[u.unit_id].map((s) => s.title));
+    assert.deepEqual(allNodes(v).filter((n) => n.selected).map((n) => n.id), [u.unit_id]);
+    assert.deepEqual(allNodes(v).filter((n) => n.ancestor).map((n) => n.id).sort(), [...q.ancestors].sort());
+  }
+});
+
+test('view: "include places inside it" switches between the two recorded answers (Catalunya: 3 ↔ 1)', async () => {
+  const f = await facts();
+  let s = reduce(initialState(), { type: 'select', id: CAT }, f);
+  assert.equal(view(s, f).panel.here.length, 3);
+  s = reduce(s, { type: 'toggle-inside' }, f);
+  assert.deepEqual(view(s, f).panel.here.map((x) => x.title), f.territory.query[CAT].exact);
+  assert.equal(view(s, f).panel.here.length, 1);
+  assert.equal(allNodes(view(s, f)).find((n) => n.id === CAT).count, 1, 'the badge follows the toggle');
+});
+
+test('view: for all 3 × 3 share/view combinations, what is dimmed is exactly what that peer did not receive', async () => {
+  const f = await facts(); const key = { 'peer-pack': 'peerWithPack', 'peer-nopack': 'peerWithout' };
+  for (const share of SHARES) for (const who of VIEWS) {
+    let s = reduce(reduce(initialState(), { type: 'share', value: share }, f), { type: 'view', value: who }, f);
+    s = reduce(s, { type: 'select', id: CAT }, f);
+    const v = view(s, f); const got = who === 'you' ? null : f.perspectives.modes[share][key[who]];
+    assert.deepEqual(allNodes(v).filter((n) => n.dimmed).map((n) => n.id).sort(), got ? UNITS.map((u) => u.unit_id).filter((id) => !got.units.includes(id)).sort() : [], `${share}/${who} units`);
+    assert.deepEqual(v.panel.streams.filter((x) => x.dimmed).map((x) => x.title), got ? v.panel.streams.map((x) => x.title).filter((t) => !got.streams.includes(t)) : [], `${share}/${who} streams`);
+    assert.ok(v.panel.here.every((r) => !r.dimmed), 'the sample resources are shareable core items: every peer receives them');
+    assert.deepEqual(v.bar.receivedCounts, got ? { units: got.units.length, streams: got.streams.length, resources: got.resources.length } : null);
+  }
+});
+
+test('view: the unknown ref is in the tray; the private note is flagged on its unit only; the tour card mirrors the step', async () => {
+  const f = await facts();
+  assert.deepEqual(view(initialState(), f).tray.map((x) => x.ref), ['custom:site:ghost']);
+  assert.equal(view(reduce(initialState(), { type: 'select', id: PLANA }, f), f).panel.privateNote, true);
+  assert.equal(view(reduce(initialState(), { type: 'select', id: CAT }, f), f).panel.privateNote, false);
+  const t = view(reduce(initialState(), { type: 'tour', value: 'start' }, f), f).tour;
+  assert.deepEqual([t.index, t.total, t.title, t.last], [0, 6, STEPS[0].title, false]);
+});
