@@ -131,7 +131,7 @@ ${files.length ? files.map(([p, t]) => `<p class="filepath">${code(p)}</p>${pre(
 
 export function renderAttempts(f) {
   const first = f.attempts[0].id;
-  return `<p class="muted">Eleven ways to get a pack wrong, each run for real against the loader. Pick one.</p>
+  return `<p class="muted">${esc(f.attempts.length)} ways to get a pack wrong, each run for real against the loader. Pick one.</p>
 ${seg('pick-attempt', 'id', f.attempts.map((a) => [a.id, a.title]), first)}
 <div data-panel="attempt">${renderAttemptPanel(f, first)}</div>
 ${provenance('Each attempt writes its files to a temp packages directory and calls the real <code>loadExtensions</code> (and, for connectors, <code>loadPackConnectors</code> + <code>mergeConnectors</code>); the build fails if an attempt does not fail or fails with a different message — <code>demo/capture/attempts.mjs</code>.')}`;

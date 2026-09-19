@@ -285,6 +285,7 @@ test('section 4: every attempt renders its real input and real error; the known 
   assert.match(R.renderAttemptPanel(f, 'missing-pack'), /no files/i);
   assert.ok(R.renderAttemptPanel(f, 'unquoted-yaml').includes('&lt;packages&gt;/bad-pack/pack.yaml'));
   assert.ok(R.sections().some((s) => s.id === 'attempts' && s.order === 4));
+  assert.ok(R.renderAttempts(f).includes(`${f.attempts.length} ways to get a pack wrong`), 'the attempts count is read from the facts');
   const app = runApp(f);
   app.click('pick-attempt', { id: 'unmet-requires' });
   assert.match(app.panels.attempt.innerHTML, /requires framework &gt;=99\.0\.0/);
