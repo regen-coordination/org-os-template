@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import yaml from 'js-yaml';
+import { getPacks, setPack, clearPacks } from './pack-registry.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const SCHEMA_DIR = join(here, '..', 'schemas');
@@ -14,24 +15,63 @@ export { checkInvariants } from './invariants.mjs';
 
 const _cache = new Map();
 
-/** Load a schema YAML by name (without extension), cached. */
+/** Core first, then each registered pack's schema dir, in registration order. */
+function schemaDirs() {
+  return [SCHEMA_DIR, ...[...getPacks().values()].map((p) => p.schemaDir).filter(Boolean)];
+}
+
+const yamlNames = (dir) => (existsSync(dir) ? readdirSync(dir) : [])
+  .filter((f) => f.endsWith('.yaml')).map((f) => f.replace(/\.yaml$/, ''));
+
+/** Load a schema YAML by name (without extension), cached. Core wins; packs are searched after it. */
 export function loadSchema(name) {
   if (_cache.has(name)) return _cache.get(name);
-  const path = join(SCHEMA_DIR, `${name}.yaml`);
-  if (!existsSync(path)) throw new Error(`schema not found: ${name} (${path})`);
+  const path = schemaDirs().map((d) => join(d, `${name}.yaml`)).find((p) => existsSync(p));
+  if (!path) throw new Error(`schema not found: ${name} (${join(SCHEMA_DIR, `${name}.yaml`)})`);
   const doc = yaml.load(readFileSync(path, 'utf8'));
   _cache.set(name, doc);
   return doc;
 }
 
-/** List available schema names. */
+/** List available schema names (core + registered packs). */
 export function listSchemas() {
-  if (!existsSync(SCHEMA_DIR)) return [];
-  return readdirSync(SCHEMA_DIR)
-    .filter((f) => f.endsWith('.yaml'))
-    .map((f) => f.replace(/\.yaml$/, ''))
-    .sort();
+  return [...new Set(schemaDirs().flatMap(yamlNames))].sort();
 }
+
+// --- extension packs: sibling packages that add schemas, Layer-B entities and opt-in types ---
+
+/**
+ * Register an extension pack. Core always wins: a pack schema named like a core schema (or like
+ * an earlier pack's) throws — it is never a shadow. Idempotent per { name, schemaDir }, because
+ * a host loads its config more than once per process.
+ */
+export function registerPack({ name, schemaDir = null, entities = {}, types = [] } = {}) {
+  if (!name || typeof name !== 'string') throw new Error('registerPack: name is required');
+  const existing = getPacks().get(name);
+  if (existing) {
+    if (existing.schemaDir === schemaDir) return existing;
+    throw new Error(`pack "${name}" is already registered from ${existing.schemaDir}`);
+  }
+  if (schemaDir && !existsSync(schemaDir)) throw new Error(`pack "${name}": schema dir not found: ${schemaDir}`);
+  const mine = schemaDir ? yamlNames(schemaDir) : [];
+  const core = new Set(yamlNames(SCHEMA_DIR));
+  for (const s of mine) {
+    if (core.has(s)) throw new Error(`pack schema "${s}" (${name}) collides with core`);
+    for (const p of getPacks().values()) {
+      if (p.schemaDir && yamlNames(p.schemaDir).includes(s)) throw new Error(`pack schema "${s}" (${name}) collides with pack ${p.name}`);
+    }
+  }
+  const pack = { name, schemaDir, entities: { ...entities }, types: [...types] };
+  setPack(name, pack);
+  _cache.clear();
+  return pack;
+}
+
+/** Drop every registered pack (tests; a host switching instances in one process). */
+export function resetPacks() { clearPacks(); _cache.clear(); }
+
+/** The registered packs, in registration order. */
+export function registeredPacks() { return [...getPacks().values()]; }
 
 /** Is `value` a member of `axis` in the canonical state model (K1)? */
 export function isValid(axis, value) {
