@@ -46,7 +46,7 @@ export function renderBar(v) {
   return `<section class="bar" id="bar" data-key="bar" tabindex="-1" aria-labelledby="bar-h"><h2 id="bar-h">Who sees what</h2>`
     + group('view', 'View as', VIEW_LABEL, b.view) + group('share', 'Of your territory, you share', SHARE_LABEL, b.share)
     + `<p class="sentence">${esc(b.sentence)}${b.receivedCounts ? ` They received ${b.receivedCounts.units} places, ${b.receivedCounts.streams} data streams and ${b.receivedCounts.resources} other items.` : ''}</p>`
-    + `<p class="floor">Never leaves, whatever you share: ${b.neverLeaves.streams.map((s) => `"${esc(s)}"`).join(', ')}; the private <code>${b.neverLeaves.fields.map(esc).join('</code>, <code>')}</code> on a place.</p>`
+    + `<p class="floor">Never leaves, whatever you share: ${b.neverLeaves.streams.map((s) => `“${esc(s)}”`).join(', ')}; the private <code>${b.neverLeaves.fields.map(esc).join('</code>, <code>')}</code> on a place.</p>`
     + `<p class="floor">Ordinary items (the projects placed here) are not part of the pack: they are shared by their own setting, not by this switch${b.resourceRefsTravel ? ' — and they keep their place references, which a peer without the pack cannot look up' : ''}.</p>`
     + `</section>`;
 }
