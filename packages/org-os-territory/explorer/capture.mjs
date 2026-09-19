@@ -26,9 +26,10 @@ export function packFacts(info) {
 export async function capture() {
   try {
     const t = territory();
+    const { overlaps, resources, ...kept } = t; // the report's overlap sidecar + break-it scenarios and the raw resources stay out of the page
     const facts = {
       meta: { commit: commit(), node: process.version, capturedAt: new Date().toISOString() },
-      territory: { ...t, extraNote: EXTRA_NOTE, privateNoteUnit: PRIVATE_NOTE_UNIT },
+      territory: { ...kept, extraNote: EXTRA_NOTE, privateNoteUnit: PRIVATE_NOTE_UNIT },
       pack: packFacts(packInfo()),
       perspectives: await perspectives(),
       streamsFor: streamsFor(t.units, t.streams.streams, indexUnits(t.units)),

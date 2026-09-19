@@ -84,6 +84,7 @@ what it holds, what it overlaps on other layers, which data exist for it, and wh
 organisation would see of it. A six-step tour runs over the same screen.
 
 ```bash
+cd packages/org-os-territory
 npm run explorer            # → explorer/dist/index.html (one self-contained file, not committed)
 npm run explorer -- --out /tmp/territory-explorer.html
 ```

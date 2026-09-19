@@ -14,10 +14,12 @@
     if (liveEl) liveEl.textContent = v.live;
     const key = state.tour !== null && state.tour !== before ? 'tour-h' : focusKey;
     const el = key && root.querySelector('[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
-    if (el) el.focus();
+    // a tour that just ended took its own button (Finish / Skip) with it: hand focus back to the button that opens it
+    const focus = el || (before !== null && state.tour === null ? document.querySelector('[data-key="tour-start"]') : null);
+    if (focus) focus.focus();
     const tour = document.getElementById('tour');
-    root.querySelectorAll('.is-tour-target').forEach((x) => x.classList.remove('is-tour-target'));
-    if (tour) { const t = root.querySelector('[data-key="' + tour.dataset.target + '"]'); if (t) t.classList.add('is-tour-target'); }
+    const target = tour && root.querySelector('[data-key="' + tour.dataset.target + '"]');
+    if (target) { target.classList.add('is-tour-target'); if (target.scrollIntoView) target.scrollIntoView({ block: 'nearest' }); }
   }
 
   const isDark = () => { const r = document.documentElement; return r.dataset.theme === 'dark' || (r.dataset.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); };
@@ -36,7 +38,7 @@
     dispatch(c === 'toggle-inside' ? { type: c } : { type: c, value: el.value }, el.dataset.key);
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && state.tour !== null) { dispatch({ type: 'tour', value: 'end' }, null); const b = document.querySelector('[data-key="tour-start"]'); if (b) b.focus(); return; }
+    if (e.key === 'Escape' && state.tour !== null) { dispatch({ type: 'tour', value: 'end' }, null); return; }
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     const row = e.target.closest && e.target.closest('.layer');
     if (!row || !e.target.classList.contains('unit')) return;

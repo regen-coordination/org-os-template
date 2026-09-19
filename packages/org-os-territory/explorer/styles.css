@@ -4,7 +4,7 @@
 *{box-sizing:border-box}body{margin:0;padding:1rem;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;position:relative}
 h1{margin:0;font-size:1.5rem}h2{font-size:1.1rem;margin:.2rem 0 .5rem}h3{font-size:.95rem;margin:1rem 0 .3rem}.sub,.meta,.caption,.step,.none{color:var(--mut);font-size:.9rem;margin:.2rem 0}
 .skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:.5rem;background:var(--card);padding:.3rem .6rem}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-button,input{font:inherit;color:inherit}button{background:var(--card);border:1px solid var(--line);border-radius:.4rem;padding:.3rem .6rem;cursor:pointer}:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button,input{font:inherit;color:inherit}button{background:var(--card);border:1px solid var(--line);border-radius:.4rem;padding:.3rem .6rem;cursor:pointer}:focus-visible,[tabindex="-1"]:focus{outline:3px solid var(--acc);outline-offset:2px}
 button.link{border:0;background:none;padding:0;color:var(--acc);text-decoration:underline}
 .banner{background:var(--warn-bg);border:1px solid var(--line);border-radius:.4rem;padding:.5rem .7rem;font-size:.9rem}
 .cols{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:1rem;align-items:start}@media (max-width:800px){.cols{grid-template-columns:1fr}}

@@ -6,6 +6,7 @@ export const EXTRA_NOTE = 'Also illustrative: every sample object is marked shar
 export const DRAFT_STREAM = { title: 'Draft stream (example, not public yet)', type: 'data-stream', source_system: 'aca', access: 'manual', public_use: 'not-public-yet' };
 export const PRIVATE_NOTE_UNIT = 'landscape:unit:plana-de-vic';
 export const PRIVATE_FIELD = 'notes';
+export const PRIVATE_VALUE = 'private editorial note (example)';
 
 export const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 /** How a record is recognised on both sides of a publish: a unit by unit_id, anything else by title. */
@@ -15,6 +16,6 @@ const entries = (list) => Object.fromEntries(list.map((o) => [slug(idOf(o)), sha
 
 export const EXPLORER_INSTANCE_DATA = {
   resource: entries(RESOURCES),
-  'territorial-unit': Object.fromEntries(UNITS.map((u) => [slug(u.unit_id), u.unit_id === PRIVATE_NOTE_UNIT ? { ...shareable(u), [PRIVATE_FIELD]: 'private editorial note (example)' } : shareable(u)])),
+  'territorial-unit': Object.fromEntries(UNITS.map((u) => [slug(u.unit_id), u.unit_id === PRIVATE_NOTE_UNIT ? { ...shareable(u), [PRIVATE_FIELD]: PRIVATE_VALUE } : shareable(u)])),
   'data-stream': { ...entries(STREAMS), [slug(DRAFT_STREAM.title)]: DRAFT_STREAM },
 };

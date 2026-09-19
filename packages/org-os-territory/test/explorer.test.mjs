@@ -13,7 +13,7 @@ beforeEach(() => reset());
 after(() => cleanup());
 
 // ── Task 2: sample-extra ─────────────────────────────────────────────────────────────────────────────────────────────
-import { EXPLORER_INSTANCE_DATA, EXTRA_NOTE, DRAFT_STREAM, PRIVATE_NOTE_UNIT, PRIVATE_FIELD, idOf, slug } from '../explorer/sample-extra.mjs';
+import { EXPLORER_INSTANCE_DATA, EXTRA_NOTE, DRAFT_STREAM, PRIVATE_NOTE_UNIT, PRIVATE_FIELD, PRIVATE_VALUE, idOf, slug } from '../explorer/sample-extra.mjs';
 
 test('sample-extra: labelled illustrative; composed from the demo sample; valid against the REAL schemas; unique identities', () => {
   assert.match(EXTRA_NOTE, /illustrative/i);
@@ -32,6 +32,7 @@ test('sample-extra: exactly one draft stream and exactly one private note', () =
   const all = Object.values(EXPLORER_INSTANCE_DATA).flatMap((e) => Object.values(e));
   assert.deepEqual(all.filter((o) => o.public_use !== 'ok-with-caveat').map(idOf), [DRAFT_STREAM.title]);
   assert.deepEqual(all.filter((o) => PRIVATE_FIELD in o).map(idOf), [PRIVATE_NOTE_UNIT]);
+  assert.equal(EXPLORER_INSTANCE_DATA['territorial-unit'][slug(PRIVATE_NOTE_UNIT)][PRIVATE_FIELD], PRIVATE_VALUE);
 });
 
 // ── Task 3: perspectives ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -89,6 +90,8 @@ test('capture: the five fact groups, serialisable, with the real pack descriptio
   assert.deepEqual(f.pack.types.map((t) => [t.name, t.mapsToCore]), [['territorial-unit', 'place'], ['data-stream', 'artifact']]);
   assert.equal(f.pack.optInLine, 'extensions: [org-os-territory]');
   assert.equal(f.territory.privateNoteUnit, PRIVATE_NOTE_UNIT);
+  assert.deepEqual(Object.keys(f.territory).sort(), ['extraNote', 'layers', 'note', 'privateNoteUnit', 'query', 'streams', 'units', 'unknownRefs'], 'the explorer carries no overlap sidecar, break-it scenarios or raw resources');
+  assert.ok(!JSON.stringify(f).includes('same layer'), 'none of the report\'s break-it error strings ships in the page');
   assert.deepEqual(Object.keys(f.streamsFor).sort(), UNITS.map((u) => u.unit_id).sort());
   assert.ok(!('verified' in f) && !('attempts' in f) && !('matrix' in f), 'the proof scenarios are not part of the explorer');
 });
@@ -167,17 +170,23 @@ test('view: "include places inside it" switches between the two recorded answers
   assert.equal(allNodes(view(s, f)).find((n) => n.id === CAT).count, 1, 'the badge follows the toggle');
 });
 
-test('view: for all 3 × 3 share/view combinations, what is dimmed is exactly what that peer did not receive', async () => {
+test('view: for all 3 × 3 share/view combinations, on a place with and without overlaps, what is dimmed is exactly what that peer did not receive', async () => {
   const f = await facts(); const key = { 'peer-pack': 'peerWithPack', 'peer-nopack': 'peerWithout' };
-  for (const share of SHARES) for (const who of VIEWS) {
+  for (const share of SHARES) for (const who of VIEWS) for (const sel of [CAT, PLANA]) {
     let s = reduce(reduce(initialState(), { type: 'share', value: share }, f), { type: 'view', value: who }, f);
-    s = reduce(s, { type: 'select', id: CAT }, f);
+    s = reduce(s, { type: 'select', id: sel }, f);
     const v = view(s, f); const got = who === 'you' ? null : f.perspectives.modes[share][key[who]];
-    assert.deepEqual(allNodes(v).filter((n) => n.dimmed).map((n) => n.id).sort(), got ? UNITS.map((u) => u.unit_id).filter((id) => !got.units.includes(id)).sort() : [], `${share}/${who} units`);
-    assert.deepEqual(v.panel.streams.filter((x) => x.dimmed).map((x) => x.title), got ? v.panel.streams.map((x) => x.title).filter((t) => !got.streams.includes(t)) : [], `${share}/${who} streams`);
+    const missing = (kind, ids) => (got ? ids.filter((id) => !got[kind].includes(id)) : []);
+    const at = `${share}/${who}/${sel}`;
+    assert.deepEqual(allNodes(v).filter((n) => n.dimmed).map((n) => n.id).sort(), missing('units', UNITS.map((u) => u.unit_id)).sort(), `${at} units`);
+    assert.equal(v.panel.dimmed, missing('units', [sel]).length === 1, `${at} panel title`);
+    assert.deepEqual(v.panel.overlaps.filter((o) => o.dimmed).map((o) => o.id), missing('units', v.panel.overlaps.map((o) => o.id)), `${at} overlaps`);
+    assert.deepEqual(v.panel.streams.filter((x) => x.dimmed).map((x) => x.title), missing('streams', v.panel.streams.map((x) => x.title)), `${at} streams`);
+    assert.deepEqual(v.tray.filter((x) => x.dimmed).map((x) => x.resource), missing('resources', v.tray.map((x) => x.resource)), `${at} tray`);
     assert.ok(v.panel.here.every((r) => !r.dimmed), 'the sample resources are shareable core items: every peer receives them');
     assert.deepEqual(v.bar.receivedCounts, got ? { units: got.units.length, streams: got.streams.length, resources: got.resources.length } : null);
   }
+  assert.ok(view(reduce(initialState(), { type: 'select', id: PLANA }, f), f).panel.overlaps.length > 0, 'the loop includes a place that has overlaps, so the overlaps check is not vacuous');
 });
 
 test('view: the unknown ref is in the tray; the private note is flagged on its unit only; the tour card mirrors the step', async () => {
@@ -235,8 +244,10 @@ test('renderBar: two radio groups reflecting the state; the peer sentence with r
   assert.match(you, /keep their place references, which a peer without the pack cannot look up/);
   let s = reduce(reduce(initialState(), { type: 'share', value: 'units' }, f), { type: 'view', value: 'peer-pack' }, f);
   assert.match(R.renderBar(view(s, f)), /They received 12 places, 0 data streams and 5 other items\./);
+  assert.match(R.renderBar(view(s, f)), /Never leaves, whatever you share: “Draft stream \(example, not public yet\)”/, 'the floor is stated in a peer view too');
   s = reduce(s, { type: 'view', value: 'peer-nopack' }, f);
   assert.match(R.renderBar(view(s, f)), /never asks for one\. They received 0 places, 0 data streams and 5 other items\./);
+  assert.match(R.renderBar(view(s, f)), /Never leaves, whatever you share: “Draft stream \(example, not public yet\)”/, 'and for a peer without the pack');
 });
 
 test('renderDrawers: closed by default; the pack drawer uses the captured descriptions and marks the fallback "not built yet"', async () => {
@@ -304,13 +315,18 @@ test('build writes the file where told and nowhere else', async () => {
 // ── Task 10: the wiring, driven without a browser ────────────────────────────────────────────────────────────────────
 // A minimal stand-in for the DOM: enough for app.js to read the facts, render into #app and receive events.
 function boot(html) {
-  const handlers = {}; const app = { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] }; const live = { textContent: '' };
+  const handlers = {}; const focused = []; const marked = []; const scrolled = []; const live = { textContent: '' };
+  const keyOf = (sel) => (sel.match(/^\[data-key="(.*)"\]$/) || [])[1];
+  const handle = (k) => ({ focus() { focused.push(k); }, classList: { add(c) { marked.push([k, c]); } }, scrollIntoView(o) { scrolled.push([k, o.block]); } });
+  const app = { innerHTML: '', querySelector(sel) { const k = keyOf(sel); return k && this.innerHTML.includes(`data-key="${k}"`) ? handle(k) : null; } };
   const root = { dataset: { theme: 'auto' } };
-  const document = { documentElement: root, getElementById: (id) => (id === 'facts' ? { textContent: html.match(/id="facts">([\s\S]*?)<\/script>/)[1] } : id === 'app' ? app : id === 'live' ? live : null),
-    querySelector: () => null, addEventListener: (type, fn) => { handlers[type] = fn; } };
+  const document = { documentElement: root,
+    getElementById: (id) => { if (id === 'facts') return { textContent: html.match(/id="facts">([\s\S]*?)<\/script>/)[1] }; if (id === 'app') return app; if (id === 'live') return live;
+      if (id === 'tour') { const m = app.innerHTML.match(/id="tour"[^>]*data-target="([^"]*)"/); return m ? { dataset: { target: m[1] } } : null; } return null; },
+    querySelector: (sel) => (keyOf(sel) === 'tour-start' ? handle('tour-start') : null), addEventListener: (type, fn) => { handlers[type] = fn; } };
   vm.runInNewContext(scriptOf(html), { document, window: {}, JSON, Array, Object, String, Boolean, Math, Set });
   const el = (dataset, extra = {}) => { const e = { dataset, closest: (sel) => (sel === '[data-action]' ? (dataset.action ? e : null) : sel === '[data-change]' ? (dataset.change ? e : null) : null), setAttribute(k, v) { this[k] = v; }, classList: { contains: () => false }, ...extra }; return e; };
-  return { app, live, root, click: (dataset) => handlers.click({ target: el(dataset) }), change: (dataset, value) => handlers.change({ target: el(dataset, { value }) }), key: (key) => handlers.keydown({ key, target: el({}), preventDefault() {} }) };
+  return { app, live, root, focused, marked, scrolled, click: (dataset) => handlers.click({ target: el(dataset) }), change: (dataset, value) => handlers.change({ target: el(dataset, { value }) }), key: (key) => handlers.keydown({ key, target: el({}), preventDefault() {} }) };
 }
 
 test('app.js: a click selects, a change switches perspective, the tour runs and Esc ends it, the theme toggles — all through reduce/view/renderApp', async () => {
@@ -335,6 +351,28 @@ test('app.js: a click selects, a change switches perspective, the tour runs and 
   assert.ok(['light', 'dark'].includes(page.root.dataset.theme));
 });
 
+test('app.js: focus goes where the visitor expects — the clicked control, the tour card, and back to "Take the tour" when the tour ends by Skip, Finish or Esc; the highlighted target is scrolled into view', async () => {
+  const page = boot(assemble(await facts()));
+  page.click({ action: 'select', id: CAT });
+  assert.equal(page.focused.at(-1), `unit:${CAT}`);
+  page.click({ action: 'tour', value: 'start', key: 'tour-start' });
+  assert.equal(page.focused.at(-1), 'tour-h');
+  assert.deepEqual(page.marked.at(-1), [`unit:${PLANA}`, 'is-tour-target']);
+  assert.deepEqual(page.scrolled.at(-1), [`unit:${PLANA}`, 'nearest']);
+  page.click({ action: 'tour', value: 'end', key: 'tour-end' });
+  assert.equal(page.focused.at(-1), 'tour-start', 'Skip');
+  page.click({ action: 'tour', value: 'start', key: 'tour-start' });
+  for (let i = 0; i < 5; i++) page.click({ action: 'tour', value: 'next', key: 'tour-next' });
+  assert.match(page.app.innerHTML, /Step 6 of 6/);
+  assert.deepEqual(page.marked.at(-1), ['drawer-pack', 'is-tour-target']);
+  page.click({ action: 'tour', value: 'next', key: 'tour-next' });
+  assert.ok(!page.app.innerHTML.includes('id="tour"'));
+  assert.equal(page.focused.at(-1), 'tour-start', 'Finish');
+  page.click({ action: 'tour', value: 'start', key: 'tour-start' });
+  page.key('Escape');
+  assert.equal(page.focused.at(-1), 'tour-start', 'Esc');
+});
+
 // ── Task 11: whole-page acceptance ───────────────────────────────────────────────────────────────────────────────────
 
 test('acceptance: it is an explorer, not a report — none of the report\'s vocabulary or jargon reaches the visitor, in any place, share, view, drawer or tour step', async () => {
@@ -344,7 +382,8 @@ test('acceptance: it is an explorer, not a report — none of the report\'s voca
   let t = reduce(initialState(), { type: 'tour', value: 'start' }, f);
   for (const step of STEPS) { pages.push(R.renderApp(view(t, f)), `${step.title} ${step.text}`); t = reduce(t, { type: 'tour', value: 'next' }, f); }
   const visible = [assemble(f).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, ''), ...pages].join('\n');
-  assert.ok(pages.length > 300 && visible.includes('Step 6 of 6'), 'the scan must cover every state and every tour step');
+  assert.equal(pages.length, UNITS.length * SHARES.length * VIEWS.length * 3 + STEPS.length * 2, 'the scan covers every place × share × view × drawer, and every tour step (card + text)');
+  assert.ok(visible.includes('Step 6 of 6'), 'including the last one');
   for (const banned of [/publish matrix/i, /try to break it/i, /ℹ pass/, /lexicon/i, /\bNSID\b/, /\bschema\b/i, /Layer-[AB]/, /collection/i, /\bPDS\b/, /atproto/i, /\d+ tests?\b/i]) assert.ok(!banned.test(visible), String(banned));
 });
 
@@ -355,9 +394,12 @@ test('acceptance: honesty — the banner is always there, every share on every p
     assert.match(html, /id="banner" role="note">Illustrative sample/);
     assert.equal(count(html, /% of theirs/g), count(html, /% of theirs <span class="tag">invented<\/span>/g), u.unit_id);
   }
-  const everything = SHARES.flatMap((share) => VIEWS.map((who) => R.renderApp(view({ ...initialState(), selected: PLANA, share, view: who, drawer: 'pack' }, f), f))).join('');
-  for (const unbuilt of [/hatch/i, /decidim/i, /geojson file|geometry_ref/i, /downgrad/i]) assert.ok(!unbuilt.test(everything), String(unbuilt));
-  assert.equal(count(everything, /not built yet/g), 9, 'the fallback sentence is marked wherever the pack drawer is open');
+  const everything = UNITS.flatMap((u) => SHARES.flatMap((share) => VIEWS.map((who) => R.renderApp(view({ ...initialState(), selected: u.unit_id, share, view: who, drawer: 'pack' }, f))))).join('');
+  // A source system's own name in the illustrative catalogue is a recorded fact, not an integration claim: "Decidim" may appear only as a recorded provider's title.
+  const withoutProviders = f.territory.streams.providers.reduce((text, p) => text.replaceAll(R.esc(p.title), ''), everything);
+  for (const unbuilt of [/hatch/i, /geojson file|geometry_ref/i, /downgrad/i]) assert.ok(!unbuilt.test(everything), String(unbuilt));
+  assert.ok(!/decidim/i.test(withoutProviders), 'no Decidim wording outside a provider\'s own recorded title');
+  assert.equal(count(everything, /not built yet/g), UNITS.length * SHARES.length * VIEWS.length, 'the fallback sentence is marked wherever the pack drawer is open');
 });
 
 test('acceptance: accessible basics — one h1, labelled regions, radios in fieldsets with legends, a skip link, a live region', async () => {

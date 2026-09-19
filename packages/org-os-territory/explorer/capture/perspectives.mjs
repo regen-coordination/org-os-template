@@ -1,7 +1,7 @@
 // explorer/capture/perspectives.mjs — who sees what. For each share mode the FULL sample is published through the REAL publish op to a fake
 // PDS, and exactly those records are served back to the REAL atproto connector (pull, then map) as a peer with the pack and as one without.
 import { loadExtensions, createAtprotoConnector, reset, expect, AUTH, makeInstance, runPublish } from '../../demo/capture/env.mjs';
-import { EXPLORER_INSTANCE_DATA, DRAFT_STREAM, PRIVATE_FIELD, idOf } from '../sample-extra.mjs';
+import { EXPLORER_INSTANCE_DATA, DRAFT_STREAM, PRIVATE_FIELD, PRIVATE_VALUE, idOf } from '../sample-extra.mjs';
 
 export const MODES = [
   { id: 'nothing', optIn: [] },
@@ -11,6 +11,12 @@ export const MODES = [
 const PUBLISHER = 'did:plc:demo';
 const PEER_CFG = { peers: [PUBLISHER], pds: 'https://pds.invalid', nsid_authority: AUTH, self: 'did:plc:reader' };
 const KIND = { 'territorial-unit': 'units', 'data-stream': 'streams', resource: 'resources' };
+/** Nothing on the wire — any record, any field — may carry the private note's text or the draft stream's title. */
+const leakCheck = (value, where) => {
+  const text = JSON.stringify(value);
+  expect(!text.includes(PRIVATE_VALUE), `the private note's text must never leave (${where})`);
+  expect(!text.includes(DRAFT_STREAM.title), `the draft stream must never leave (${where})`);
+};
 const empty = () => ({ units: [], streams: [], resources: [], fields: {} });
 
 function sort(objects) {
@@ -34,7 +40,9 @@ async function receive(log, withPack) {
   const connector = createAtprotoConnector({ createClient });
   const pulled = await connector.pull(PEER_CFG, { cursor: null });
   expect(pulled.errors.length === 0, `the peer pull must not error: ${JSON.stringify(pulled.errors)}`);
-  return sort(pulled.records.flatMap((r) => connector.map(r, PEER_CFG)));
+  const objects = pulled.records.flatMap((r) => connector.map(r, PEER_CFG));
+  leakCheck(objects, 'received by a peer');
+  return sort(objects);
 }
 
 export async function perspectives() {
@@ -45,6 +53,7 @@ export async function perspectives() {
     reset();
     const r = await runPublish(makeInstance({ extensions: ['org-os-territory'], optIn: m.optIn, data: EXPLORER_INSTANCE_DATA }));
     expect(r.ok, `publishing in mode "${m.id}" must succeed: ${r.error}`);
+    leakCheck(r.log.map((op) => op.record), `published, mode ${m.id}`);
     const typeOf = (op) => op.record.type;
     const published = sort(r.log.map((op) => ({ schema: typeOf(op), object: op.record })));
     const peerWithPack = await receive(r.log, true);
