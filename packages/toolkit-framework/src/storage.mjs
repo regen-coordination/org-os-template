@@ -2,7 +2,8 @@
 //
 // Adapter = {
 //   name: string,
-//   store(target, entries)      // entries: [{ schema, object, replaces? }] → { stored: [ref], collisions }; atomic per object; idempotent by id, else by content
+//   store(target, entries, opts?)  // opts.onCollision: 'suffix' (default, B5) | 'merge' (BR2, repo-data only)
+//                               // entries: [{ schema, object, replaces? }] → { stored: [ref], collisions }; atomic per object; idempotent by id, else by content
 //                               // replaces: a ref this adapter issued for the SAME object — the new version is written there (replace, not merge; same ref back).
 //                               // Honored only for an existing key of the entry's own schema whose key derives from its title slug; otherwise ignored.
 //   list(target)                // → [{ schema, object, ref }] — refs identical to what store() issued

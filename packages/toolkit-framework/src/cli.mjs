@@ -146,7 +146,7 @@ switch (cmd) {
       const dir = join(flags.dir, wo.id, 'accepted');
       const entries = readdirSync(dir).filter((f) => f.endsWith('.yaml'))
         .map((f) => yaml.load(readFileSync(join(dir, f), 'utf8')));
-      const { stored } = adapter.store(flags.target, entries);
+      const { stored } = adapter.store(flags.target, entries, { onCollision: cfg.store?.on_collision === 'merge' ? 'merge' : 'suffix' });
       saveWorkOrder(flags.dir, { ...wo, produced: stored });
       count += stored.length;
     }
