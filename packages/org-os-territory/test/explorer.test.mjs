@@ -188,3 +188,39 @@ test('view: the unknown ref is in the tray; the private note is flagged on its u
   const t = view(reduce(initialState(), { type: 'tour', value: 'start' }, f), f).tour;
   assert.deepEqual([t.index, t.total, t.title, t.last], [0, 6, STEPS[0].title, false]);
 });
+
+// ── Task 7: renderer — board, panel, tray ────────────────────────────────────────────────────────────────────────────
+import * as R from '../explorer/render.mjs';
+const count = (html, re) => (html.match(re) || []).length;
+
+test('renderBoard: every unit is a real labelled button; four layer rows; "not a map"; the tray names the unknown ref', async () => {
+  const f = await facts();
+  const html = R.renderBoard(view(reduce(initialState(), { type: 'select', id: PLANA }, f), f));
+  assert.equal(count(html, /<button type="button" class="unit[^"]*" data-action="select"/g), UNITS.length);
+  assert.equal(count(html, /class="layer"/g), 4);
+  for (const u of UNITS) assert.ok(html.includes(`data-key="unit:${u.unit_id}"`), u.unit_id);
+  assert.match(html, /aria-pressed="true" aria-label="Plana de Vic \(example unit\) — landscape, unit, 1 thing \(selected\)"/);
+  assert.equal(count(html, /is-overlapped/g), 3, 'Osona, Vic and PA20');
+  assert.match(html, /Schematic — not a map/);
+  assert.match(html, /Not placed anywhere[\s\S]*custom:site:ghost/);
+});
+
+test('renderPanel: empty prompt; then ancestors, the inside toggle, every share tagged invented, streams with steward / trust / licence', async () => {
+  const f = await facts();
+  assert.match(R.renderPanel(view(initialState(), f)), /Pick a place/);
+  const plana = R.renderPanel(view(reduce(initialState(), { type: 'select', id: PLANA }, f), f));
+  assert.match(plana, /inside Landscape catalogue/);
+  assert.match(plana, /93% of this place, 42% of theirs <span class="tag">invented<\/span>/);
+  assert.equal(count(plana, /class="tag">invented</g), 3, 'one tag per overlap');
+  assert.match(plana, /private note[\s\S]*never leaves/);
+  assert.ok(!plana.includes('data-change="toggle-inside"'), 'a leaf place has nothing inside it to include');
+  const cat = R.renderPanel(view(reduce(initialState(), { type: 'select', id: CAT }, f), f));
+  assert.match(cat, /<input type="checkbox" data-change="toggle-inside" data-key="inside" checked>/);
+  assert.match(cat, /looked after by Generalitat de Catalunya · download · trust: official · yearly · licence: CC-BY-4\.0/);
+  const basin = R.renderPanel(view(reduce(initialState(), { type: 'select', id: 'hydrological:basin:example-basin' }, f), f));
+  assert.match(basin, /covers this whole layer[\s\S]*licence: unverified/);
+});
+
+test('render: text from the facts is escaped', () => {
+  assert.equal(R.esc(`<b a="1">&'`), '&lt;b a=&quot;1&quot;&gt;&amp;&#39;');
+});
