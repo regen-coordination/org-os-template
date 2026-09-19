@@ -224,3 +224,47 @@ test('renderPanel: empty prompt; then ancestors, the inside toggle, every share 
 test('render: text from the facts is escaped', () => {
   assert.equal(R.esc(`<b a="1">&'`), '&lt;b a=&quot;1&quot;&gt;&amp;&#39;');
 });
+
+// ── Task 8: renderer — who sees what, drawers, tour card, the whole app ──────────────────────────────────────────────
+test('renderBar: two radio groups reflecting the state; the peer sentence with recorded counts; the floor is always stated', async () => {
+  const f = await facts();
+  const you = R.renderBar(view(initialState(), f));
+  assert.match(you, /name="view" value="you" data-change="view" data-key="view:you" checked/);
+  assert.match(you, /name="share" value="nothing" data-change="share" data-key="share:nothing" checked/);
+  assert.match(you, /Never leaves, whatever you share: “Draft stream \(example, not public yet\)”; the private <code>notes<\/code>/);
+  assert.match(you, /keep their place references, which a peer without the pack cannot look up/);
+  let s = reduce(reduce(initialState(), { type: 'share', value: 'units' }, f), { type: 'view', value: 'peer-pack' }, f);
+  assert.match(R.renderBar(view(s, f)), /They received 12 places, 0 data streams and 5 other items\./);
+  s = reduce(s, { type: 'view', value: 'peer-nopack' }, f);
+  assert.match(R.renderBar(view(s, f)), /never asks for one\. They received 0 places, 0 data streams and 5 other items\./);
+});
+
+test('renderDrawers: closed by default; the pack drawer uses the captured descriptions and marks the fallback "not built yet"', async () => {
+  const f = await facts();
+  const closed = R.renderDrawers(view(initialState(), f));
+  assert.match(closed, /data-key="drawer-pack" aria-expanded="false"/);
+  assert.ok(!closed.includes('class="drawer"'));
+  const pack = R.renderDrawers(view(reduce(initialState(), { type: 'drawer', value: 'pack' }, f), f));
+  for (const t of f.pack.types) assert.ok(pack.includes(R.esc(t.description)), t.name);
+  assert.match(pack, /could one day read a place as a plain <code>place<\/code>\. <span class="tag">not built yet<\/span> Today such a peer simply receives nothing/);
+  assert.match(pack, /extensions: \[org-os-territory\]/);
+  const about = R.renderDrawers(view(reduce(initialState(), { type: 'drawer', value: 'about' }, f), f));
+  assert.ok(about.includes(f.meta.commit) && about.includes('npm run demo') && /invented/.test(about));
+});
+
+test('renderTour + renderApp: no card outside the tour; a labelled non-modal dialog inside it; every step target exists in that step\'s page', async () => {
+  const f = await facts();
+  assert.equal(R.renderTour(view(initialState(), f)), '');
+  let s = reduce(initialState(), { type: 'tour', value: 'start' }, f);
+  for (let i = 0; i < STEPS.length; i++) {
+    const html = R.renderApp(view(s, f));
+    assert.match(html, new RegExp(`role="dialog" aria-modal="false" aria-labelledby="tour-h" data-target="${STEPS[i].target.replace(/[:]/g, '\\$&')}"`));
+    assert.ok(html.includes(`Step ${i + 1} of 6`));
+    assert.ok(html.includes(`data-key="${STEPS[i].target}"`), `step ${i + 1} points at something on the page: ${STEPS[i].target}`);
+    s = reduce(s, { type: 'tour', value: 'next' }, f);
+  }
+  const app = R.renderApp(view(initialState(), f));
+  for (const id of ['banner', 'board', 'panel', 'bar', 'drawers', 'live']) assert.ok(app.includes(`id="${id}"`), id);
+  assert.match(app, /id="banner" role="note">Illustrative sample/);
+  assert.match(app, /id="live" aria-live="polite"/);
+});
