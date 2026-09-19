@@ -1,10 +1,14 @@
 // packages/toolkit-framework/src/publishable.mjs — the publication gate (floor) and the outbound projection. Keyed on the adapter's schema, never object.type.
+import { getPacks } from './pack-registry.mjs';
 export const PUBLISHABLE_TYPES = Object.freeze([
   'claim-evidence', 'concept-lineage', 'encyclopedia-entry', 'implementation-record',
   'option-entry', 'organization', 'relationship-record', 'resource', 'signal', 'track',
 ]);
 export const OPT_IN_TYPES = Object.freeze(['source-system', 'public-use-boundary']);
 export const ALL_TYPES = Object.freeze([...PUBLISHABLE_TYPES, ...OPT_IN_TYPES]);
+// Pack types (extension packs) are publish-ELIGIBLE, never default-publishable: they join the opt-in set only.
+export function optInTypes() { return [...OPT_IN_TYPES, ...[...getPacks().values()].flatMap((p) => p.types || [])]; }
+export function allTypes() { return [...PUBLISHABLE_TYPES, ...optInTypes()]; }
 export const PUBLISHABLE_PUBLIC_USE = Object.freeze([
   'ok-with-caveat', 'source-linked-unreviewed', 'reviewed-for-explanation', 'reviewed-for-guidance',
 ]);
@@ -19,7 +23,7 @@ export function publishableTypes(config = {}) {
   const optOut = config.publish?.types_opt_out ?? [];
   for (const t of [...optIn, ...optOut]) {
     if (t === 'person') throw new Error('person is never publishable');
-    if (!ALL_TYPES.includes(t)) throw new Error(`unknown publishable type: ${t}`);
+    if (!allTypes().includes(t)) throw new Error(`unknown publishable type: ${t}`);
   }
   return [...new Set([...PUBLISHABLE_TYPES, ...optIn])].filter((t) => !optOut.includes(t));
 }

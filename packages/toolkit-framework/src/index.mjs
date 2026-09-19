@@ -72,6 +72,9 @@ export function registerPack({ name, schemaDir = null, entities = {}, types = []
     }
     if (!isForkCompatible(def)) throw new Error(`pack entity "${e}" (${name}): maps_to_core "${def?.maps_to_core}" is not a core type`);
   }
+  for (const t of types) {
+    if (!mine.includes(t)) throw new Error(`pack type "${t}" (${name}) has no schema in the pack`);
+  }
   const pack = { name, schemaDir, entities: { ...entities }, types: [...types] };
   setPack(name, pack);
   _cache.clear();

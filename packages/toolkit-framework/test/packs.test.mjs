@@ -98,3 +98,48 @@ test('extensionEntities({ packs }) keeps only the named packs', () => {
   const only = extensionEntities({ packs: ['p2'] });
   assert.ok(only.gadget); assert.equal(only.widget, undefined); assert.ok(only.resource);
 });
+
+import { PUBLISHABLE_TYPES, OPT_IN_TYPES, ALL_TYPES, optInTypes, allTypes, publishableTypes, isPublishable } from '../src/publishable.mjs';
+import { nsidFor, typeForNsid, generateAll } from '../src/lexicon.mjs';
+
+const AUTH = 'org.example.kb';
+const reg = () => registerPack({ name: 'p1', schemaDir: packDir({ widget: WIDGET }), entities: GOOD, types: ['widget'] });
+
+test('pack types join the opt-in set only; the frozen constants never change', () => {
+  reg();
+  assert.ok(optInTypes().includes('widget'));
+  assert.ok(allTypes().includes('widget'));
+  assert.ok(!PUBLISHABLE_TYPES.includes('widget'));
+  assert.deepEqual(OPT_IN_TYPES, ['source-system', 'public-use-boundary']);
+  assert.equal(ALL_TYPES.length, 12);
+});
+
+test('a pack type does not publish until the instance opts in — and does once it has', () => {
+  reg();
+  const obj = { title: 'W', type: 'widget', size: 'm', public_use: 'ok-with-caveat' };
+  assert.ok(!publishableTypes({}).includes('widget'));
+  assert.equal(isPublishable(obj, { schema: 'widget', types: publishableTypes({}) }), false);
+  const cfg = { publish: { types_opt_in: ['widget'] } };
+  assert.ok(publishableTypes(cfg).includes('widget'));
+  assert.equal(isPublishable(obj, { schema: 'widget', types: publishableTypes(cfg) }), true);
+});
+
+test('no packs: opting in to an unknown type is still an error, and the lists are the core lists', () => {
+  assert.throws(() => publishableTypes({ publish: { types_opt_in: ['widget'] } }), /unknown publishable type: widget/);
+  assert.deepEqual(allTypes(), [...ALL_TYPES]);
+  assert.equal(Object.keys(generateAll({ authority: AUTH })).length, 12);
+});
+
+test('lexicons: a pack type resolves by NSID and gets a generated lexicon', () => {
+  reg();
+  assert.equal(typeForNsid(nsidFor('widget', AUTH), AUTH), 'widget');
+  const docs = generateAll({ authority: AUTH });
+  assert.equal(Object.keys(docs).length, 13);
+  const doc = docs[`${AUTH}.widget`];
+  assert.deepEqual(doc.defs.main.record.properties.size, { type: 'string', knownValues: ['s', 'm', 'l'] });
+  assert.ok(doc.defs.main.record.required.includes('size') && doc.defs.main.record.required.includes('title'));
+});
+
+test('a pack type must have a schema in that pack', () => {
+  assert.throws(() => registerPack({ name: 'bad', schemaDir: packDir({ widget: WIDGET }), types: ['gadget'] }), /pack type "gadget" \(bad\) has no schema in the pack/);
+});

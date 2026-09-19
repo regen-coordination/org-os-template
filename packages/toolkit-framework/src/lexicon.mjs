@@ -1,6 +1,6 @@
 // packages/toolkit-framework/src/lexicon.mjs — yaml schema → AT Proto Lexicon. Generated, never hand-edited. Lexicon objects are open (unknown fields allowed).
 import { loadSchema } from './index.mjs';
-import { ALL_TYPES, publicView } from './publishable.mjs';
+import { allTypes, publicView } from './publishable.mjs';
 
 const MAX_RECORD_BYTES = 1_000_000;
 const camel = (s) => s.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
@@ -11,7 +11,7 @@ export function nsidFor(schema, authority) { return `${authority}.${camel(schema
 export function typeForNsid(nsid, authority) {
   if (!nsid || !nsid.startsWith(`${authority}.`)) return null;
   const schema = kebab(nsid.slice(authority.length + 1));
-  return ALL_TYPES.includes(schema) ? schema : null;
+  return allTypes().includes(schema) ? schema : null;
 }
 
 export function flattenSchema(name) {
@@ -49,7 +49,7 @@ export function generateLexicon(schema, { authority }) {
 
 export function generateAll({ authority }) {
   const out = {};
-  for (const t of ALL_TYPES) { const d = generateLexicon(t, { authority }); out[d.id] = d; }
+  for (const t of allTypes()) { const d = generateLexicon(t, { authority }); out[d.id] = d; }
   return out;
 }
 
