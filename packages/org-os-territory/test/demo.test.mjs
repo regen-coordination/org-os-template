@@ -9,6 +9,7 @@ import { packInfo } from '../demo/capture/pack-info.mjs';
 import { publishMatrix } from '../demo/capture/publish-matrix.mjs';
 import { oneProcess } from '../demo/capture/one-process.mjs';
 import { federation } from '../demo/capture/federation.mjs';
+import { attempts } from '../demo/capture/attempts.mjs';
 
 beforeEach(() => reset());
 
@@ -95,4 +96,18 @@ test('federation: extensions.yaml passes federateCheck; a peer with the pack ask
   assert.equal(f.inbound.withPack.schema, 'territorial-unit');
   assert.ok(!f.inbound.withPack.keys.includes('notes') && f.inbound.withPack.keys.includes('unit_id'));
   assert.equal(f.inbound.withoutPack.mapped, 0);
+});
+
+test('attempts: eleven real failures; each error names the pack or the offending item; only the core-connector collision names the item alone; no temp path leaks', async () => {
+  const list = await attempts();
+  assert.deepEqual(list.map((a) => a.id), ['schema-core-collision', 'entity-core-collision', 'entity-bad-map', 'connector-core-name', 'binding-core', 'type-no-schema', 'missing-pack', 'unmet-requires', 'path-traversal', 'unquoted-yaml', 'connector-import-throws']);
+  for (const a of list) {
+    assert.ok(a.error, `${a.id} must fail`);
+    assert.ok(a.namesPack || a.namesItem, `${a.id}: ${a.error}`);
+    assert.ok(!/demo-pk-/.test(a.error), `${a.id} leaks a temp path`);
+    assert.ok(a.title && a.why && a.action);
+  }
+  assert.deepEqual(list.filter((a) => !a.namesPack).map((a) => a.id), ['connector-core-name']);
+  assert.match(list.find((a) => a.id === 'unquoted-yaml').error, /<packages>\/bad-pack\/pack\.yaml/);
+  assert.match(list.find((a) => a.id === 'unmet-requires').error, /requires framework >=99\.0\.0, found \d+\.\d+\.\d+/);
 });
