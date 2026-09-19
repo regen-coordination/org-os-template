@@ -10,6 +10,7 @@ import { publishMatrix } from '../demo/capture/publish-matrix.mjs';
 import { oneProcess } from '../demo/capture/one-process.mjs';
 import { federation } from '../demo/capture/federation.mjs';
 import { attempts } from '../demo/capture/attempts.mjs';
+import { territory } from '../demo/capture/territory.mjs';
 
 beforeEach(() => reset());
 
@@ -110,4 +111,24 @@ test('attempts: eleven real failures; each error names the pack or the offending
   assert.deepEqual(list.filter((a) => !a.namesPack).map((a) => a.id), ['connector-core-name']);
   assert.match(list.find((a) => a.id === 'unquoted-yaml').error, /<packages>\/bad-pack\/pack\.yaml/);
   assert.match(list.find((a) => a.id === 'unmet-requires').error, /requires framework >=99\.0\.0, found \d+\.\d+\.\d+/);
+});
+
+test('territory: queries computed by the real helpers for every unit; unknown refs reported; every overlap fault yields its real error', () => {
+  const t = territory();
+  assert.match(t.note, /illustrative/i);
+  assert.deepEqual(t.layers, ['administrative', 'landscape', 'ecological', 'hydrological']);
+  assert.equal(Object.keys(t.query).length, t.units.length);
+  const q = t.query;
+  assert.deepEqual(q['landscape:unit:plana-de-vic'].exact, ['Regenerative agriculture pilot (example)']);
+  assert.deepEqual(q['administrative:comarca:osona'].exact, []);
+  assert.deepEqual(q['administrative:comarca:osona'].withDescendants, ['Regenerative agriculture pilot (example)']);
+  assert.equal(q['administrative:pais:catalunya'].exact.length, 1);
+  assert.equal(q['administrative:pais:catalunya'].withDescendants.length, 3);
+  assert.deepEqual(q['administrative:municipi:vic'].ancestors, ['administrative:comarca:osona', 'administrative:vegueria:catalunya-central', 'administrative:pais:catalunya']);
+  assert.deepEqual(q['administrative:comarca:osona'].children, ['administrative:municipi:vic', 'administrative:municipi:taradell']);
+  assert.ok(q['landscape:unit:plana-de-vic'].overlaps.some((o) => o.other === 'administrative:comarca:osona' && o.shareSelf === 0.93 && o.shareOther === 0.42));
+  assert.deepEqual(t.unknownRefs, [{ resource: 'Orphan note (example)', ref: 'custom:site:ghost' }]);
+  assert.deepEqual(t.overlaps.valid.result, { valid: true, errors: [] });
+  assert.ok(t.overlaps.faults.length >= 6 && t.overlaps.faults.every((f) => f.errors.length > 0));
+  assert.equal(t.streams.streams.length, 5);
 });
