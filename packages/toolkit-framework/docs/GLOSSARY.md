@@ -30,6 +30,7 @@ maps to a schema or architecture doc, the **In the framework** line points there
 
 - **Layer A / core entity** — the *smallest safe shared base*: ~15 broadly-useful entity types every fork inherits unchanged, kept stable + interoperable (aligned with Octo/BKC where feasible). The fork-compatibility contract. — In the framework: `schemas/core-entities.yaml`, `architecture/ontology-posture.md`.
 - **Layer B / extension entity** — opinionated Toolkit types, each declaring `maps_to_core` back to a Layer-A type; locally extensible without breaking interop. — In the framework: `schemas/extension-entities.yaml`.
+- **Extension pack** — a sibling package that adds object schemas, Layer-B entities and publish-eligible types to the framework through `registerPack`, without editing it. Core always wins: a name collision is a load error. Every pack entity must map to a real Layer-A type (`isForkCompatible`), and pack types join the *opt-in* set only — a pack can never make a type default-publishable or loosen a floor. — In the framework: `src/pack-registry.mjs`, `src/index.mjs` (`registerPack`).
 - **Minimum Operating Kernel (MOK)** — the five core working objects (Resource · Concept · Option · Deployment · Signal) as a v0.1 *authoring front door*. NOT a separate type system — a curated usage-layer subset of the full ontology (R3). — In the framework: `schemas/kernel-profile.yaml`, `architecture/kernel-objects.md`.
 
 ## Integrity & governance

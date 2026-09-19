@@ -314,6 +314,21 @@ connector layer for external sources.
 
 **Links:** [connector layer design](superpowers/specs/2026-07-19-org-os-kms-connector-layer-design.md)
 
+### org-os-territory — Territory Extension Pack
+
+**What it is.** An extension pack for org-os-kms that gives a knowledge instance a sense of place.
+`territorial-unit` (a bounded unit on a named layer: administrative, landscape, ecological,
+hydrological, custom; maps to the core `place`) and `data-stream` (what a source system offers,
+by place and kind of work, with a trust tier).
+
+**How it works.** A sibling package at `packages/org-os-territory/`, requiring
+`toolkit-framework >= 0.3.0` and `org-os-kms >= 0.1.0`. Opt in with `kms.yaml`
+`extensions: [org-os-territory]`; its types are publish-opt-in.
+
+**Status.** `in-dev`.
+
+**Links:** [pack README](../packages/org-os-territory/README.md) · [extension packs contract](../packages/org-os-kms/docs/CONNECTORS.md)
+
 ### org-os-hermes — Hermes Agent
 
 **What it is.** A local agent runtime with a Telegram gateway — the chat surface of an

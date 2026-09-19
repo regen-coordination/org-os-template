@@ -44,6 +44,14 @@ packages:
     lifecycle_status: "active"
     notes: "@org-os/kms — binds toolkit-framework into org-os (module src/bind.mjs + profile). Executable lifecycle, registry bridge, CLI, render, federation. Installed + activated in regen-toolkit 2026-07-05; refi-dao-os adopting. Depends on toolkit-framework. 44/44 tests. + map builder/frontier/vault-artifact (federation map, 2026-07)"
 
+  - id: "org-os-territory"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    lifecycle_status: "dormant"
+    notes: "@org-os/territory — org-os-kms extension pack: territorial-unit + data-stream. Depends on toolkit-framework >=0.3.0 and org-os-kms >=0.1.0. 18 tests; no instance has adopted it yet."
+
   - id: "instance-doctor"
     owner: "framework"
     instances_using: []

@@ -22,3 +22,7 @@ toOrgOsRegistries(frameworkObjects);           // { 'data/resources.yaml': [...]
 5. Federate via RegenOS (upstream/downstream; self-qualifying adoption).
 
 This is the adoption vehicle for ReFi DAO / ReFi BCN / future communities (build-plan SP11 / pipeline P9–P10). See `../toolkit-framework/framework`-side docs: PLACEMENT, FEEDBACK-LOOPS.
+
+## Extension packs
+
+Sibling packages that add typed schemas, entities, connectors and registry bindings without editing the framework — opt in with `kms.yaml` `extensions: [<pack>]`. First pack: [`org-os-territory`](../org-os-territory/README.md). Contract and rules: [`docs/CONNECTORS.md` §13](docs/CONNECTORS.md).
