@@ -334,3 +334,42 @@ test('app.js: a click selects, a change switches perspective, the tour runs and 
   page.click({ action: 'theme' }); // the theme is not part of the model: no re-render, no throw
   assert.ok(['light', 'dark'].includes(page.root.dataset.theme));
 });
+
+// ── Task 11: whole-page acceptance ───────────────────────────────────────────────────────────────────────────────────
+import { execFileSync } from 'node:child_process';
+const PKG = join(import.meta.dirname, '..');
+
+test('acceptance: it is an explorer, not a report — none of the report\'s vocabulary or jargon reaches the visitor', async () => {
+  const f = await facts();
+  let s = reduce(reduce(initialState(), { type: 'select', id: PLANA }, f), { type: 'drawer', value: 'pack' }, f);
+  const visible = (assemble(f) + R.renderApp(view(s, f)) + R.renderDrawers(view({ ...s, drawer: 'about' }, f))).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
+  for (const banned of [/publish matrix/i, /try to break it/i, /ℹ pass/, /lexicon/i, /\bNSID\b/, /\bschema\b/i, /Layer-[AB]/, /collection/i, /\bPDS\b/, /atproto/i, /\d+ tests?\b/i]) assert.ok(!banned.test(visible), String(banned));
+});
+
+test('acceptance: honesty — the banner is always there, every share on every place is tagged invented, no claim beyond the build', async () => {
+  const f = await facts();
+  for (const u of UNITS) {
+    const html = R.renderApp(view(reduce(initialState(), { type: 'select', id: u.unit_id }, f), f));
+    assert.match(html, /id="banner" role="note">Illustrative sample/);
+    assert.equal(count(html, /% of theirs/g), count(html, /% of theirs <span class="tag">invented<\/span>/g), u.unit_id);
+  }
+  const everything = SHARES.flatMap((share) => VIEWS.map((who) => R.renderApp(view({ ...initialState(), selected: PLANA, share, view: who, drawer: 'pack' }, f), f))).join('');
+  for (const unbuilt of [/hatch/i, /decidim/i, /geojson file|geometry_ref/i, /downgrad/i]) assert.ok(!unbuilt.test(everything), String(unbuilt));
+  assert.equal(count(everything, /not built yet/g), 9, 'the fallback sentence is marked wherever the pack drawer is open');
+});
+
+test('acceptance: accessible basics — one h1, labelled regions, radios in fieldsets with legends, a skip link, a live region', async () => {
+  const html = assemble(await facts()).replace(/<script>[\s\S]*?<\/script>/, '');
+  assert.equal(count(html, /<h1[ >]/g), 1);
+  assert.match(html, /<a class="skip" href="#app">/);
+  for (const id of ['board', 'panel', 'bar']) assert.match(html, new RegExp(`<section class="${id}" id="${id}"[^>]* aria-labelledby="${id}-h"`));
+  assert.equal(count(html, /<fieldset><legend>/g), 2);
+  assert.equal(count(html, /<button(?![^>]*type="button")/g), 0, 'every button declares its type');
+  assert.equal(count(html, /<html lang="en"/g), 1);
+});
+
+test('guard: the explorer reuses the demo without editing it (skipped outside a git checkout)', (t) => {
+  let diff;
+  try { diff = execFileSync('git', ['diff', '--name-only', 'main', '--', 'demo', 'test/demo.test.mjs', 'src', 'schemas'], { cwd: PKG, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return t.skip('not a git checkout with a main branch'); }
+  assert.equal(diff, '', 'nothing under demo/, src/, schemas/ or the demo test may change');
+});
