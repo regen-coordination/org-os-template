@@ -268,3 +268,34 @@ test('renderTour + renderApp: no card outside the tour; a labelled non-modal dia
   assert.match(app, /id="banner" role="note">Illustrative sample/);
   assert.match(app, /id="live" aria-live="polite"/);
 });
+
+// ── Task 9: the build ────────────────────────────────────────────────────────────────────────────────────────────────
+import { assemble, build, inlineModule, DEFAULT_OUT, MODULES } from '../explorer/build.mjs';
+const BUDGET = 300 * 1024;
+const scriptOf = (html) => html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const factsOf = (html) => JSON.parse(html.match(/<script type="application\/json" id="facts">([\s\S]*?)<\/script>/)[1]);
+
+test('inlineModule: import lines and export keywords go, nothing else', () => {
+  assert.equal(inlineModule(`import { a } from './a.mjs';\nexport const x = 1;\nexport function f() {}\nconst exported = 2;\n`), `\nconst x = 1;\nfunction f() {}\nconst exported = 2;\n`);
+  assert.deepEqual(MODULES, ['tour.mjs', 'model.mjs', 'render.mjs'], 'inlined in dependency order');
+});
+
+test('the page: one self-contained file — pre-rendered, facts embedded, script compiles, no external resource, within budget', async () => {
+  const f = await facts(); const html = assemble(f);
+  assert.ok(Buffer.byteLength(html) < BUDGET);
+  assert.deepEqual(factsOf(html), JSON.parse(JSON.stringify(f)));
+  assert.doesNotThrow(() => new vm.Script(scriptOf(html)));
+  assert.ok(!/^\s*(import|export)\s/m.test(scriptOf(html)));
+  assert.ok(!/(?:src|href)\s*=\s*["']?https?:|url\(\s*["']?https?:|@import|\bfetch\(/i.test(html), 'no external resource, no fetch');
+  assert.ok(!/position:\s*fixed/.test(html), 'embeddable: no fixed chrome');
+  assert.match(html, /<main id="app"><p class="banner" id="banner"/, 'the first paint is pre-rendered');
+  assert.match(html, /data-action="tour" data-value="start" data-key="tour-start">Take the tour/);
+  assert.match(html, /@media print/); assert.match(html, /prefers-reduced-motion/); assert.match(html, /prefers-color-scheme:dark/);
+});
+
+test('build writes the file where told and nowhere else', async () => {
+  const out = join(mkdtempSync(join(tmpdir(), 'explorer-out-')), 'x', 'index.html');
+  const r = await build({ out });
+  assert.equal(r.out, out); assert.ok(existsSync(out)); assert.ok(r.bytes < BUDGET);
+  assert.match(DEFAULT_OUT, /explorer\/dist\/index\.html$/);
+});
