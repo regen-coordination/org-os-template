@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
-import { REGISTRY_BINDINGS } from './bind.mjs';
+import { registryBindings } from './bind.mjs';
 import { atomicWrite } from './atomic-write.mjs';
 
 // Upsert many objects into one registry file: read once, upsert each by id, write once.
@@ -59,9 +59,10 @@ export function bridge(ctx) {
   const items = fw.getAdapter(config.adapter).list(join(dir, config.target));
   const report = { bridged: [], docs: [], withheld: [], skipped: [], errors: [] };
   const byRegistry = new Map(); // registryPath -> [objects]
+  const bindings = registryBindings();
 
   for (const { schema, object } of items) {
-    const registry = REGISTRY_BINDINGS[schema];
+    const registry = bindings[schema];
     if (!registry) { if (!report.skipped.includes(schema)) report.skipped.push(schema); continue; }
     if (registry.endsWith('/')) {
       const reason = withholdReason(object);

@@ -10,3 +10,11 @@ export function getConnector(name, registry = CONNECTORS) {
   if (!c) throw new Error(`unknown connector: ${name} (available: ${Object.keys(registry).join(', ')})`);
   return c;
 }
+
+/** Core connectors plus the loaded extension packs'. Core wins: a pack connector named like a core one is a load error. */
+export function mergeConnectors(packConnectors = {}) {
+  for (const name of Object.keys(packConnectors)) {
+    if (CONNECTORS[name]) throw new Error(`pack connector "${name}" collides with core`);
+  }
+  return { ...packConnectors, ...CONNECTORS };
+}

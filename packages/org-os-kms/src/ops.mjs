@@ -17,7 +17,8 @@ import { planPublish, applyPublish } from './atproto/publish.mjs';
 import { createClient as defaultCreateClient } from './atproto/client.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { loadInstanceGate, buildGateContext, applyGate } from './gate.mjs';
-import { getConnector, CONNECTORS } from './connectors/index.mjs';
+import { getConnector, mergeConnectors } from './connectors/index.mjs';
+import { loadPackConnectors } from './extensions.mjs';
 
 export const OPS = {
   // write:true here = CRITICAL/fail-hard: if kms.yaml can't load, no downstream op can run.
@@ -135,7 +136,7 @@ export const OPS = {
   'ingest.pull': { kind: 'exec', write: true, run: async (ctx) => {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
-    const registry = ctx.deps?.registry || CONNECTORS;
+    const registry = ctx.deps?.registry || mergeConnectors(await loadPackConnectors(config.packs));
     const dry = ctx.flags?.dry === true;
     const only = ctx.flags?.connector;
     // A bare `--connector` (parsed as true) or an empty value must never silently widen the run to every connector.

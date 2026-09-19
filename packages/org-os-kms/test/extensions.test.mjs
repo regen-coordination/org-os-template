@@ -1,13 +1,17 @@
 // packages/org-os-kms/test/extensions.test.mjs — kms.yaml `extensions:` resolves sibling packs and registers them before any op.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from '../src/framework.mjs';
 import { loadExtensions, loadPackConnectors } from '../src/extensions.mjs';
 import { loadKmsConfig } from '../src/config.mjs';
+import { mergeConnectors, CONNECTORS } from '../src/connectors/index.mjs';
+import { REGISTRY_BINDINGS, registryBindings, registerRegistryBindings, resetRegistryBindings } from '../src/bind.mjs';
+import { bridge } from '../src/registry-bridge.mjs';
+import { OPS } from '../src/ops.mjs';
 
 const WIDGET = 'id: widget\nversion: 0.1.0\nextends: frontmatter\nrequired: [title]\nfields:\n  size: { type: string }\n';
 
@@ -23,7 +27,7 @@ export function makePack(packagesDir, name, { manifest = {}, schemas = { widget:
 }
 const pkgs = () => mkdtempSync(join(tmpdir(), 'kms-pkgs-'));
 
-beforeEach(() => fw.resetPacks());
+beforeEach(() => { fw.resetPacks(); resetRegistryBindings(); });
 
 test('no extensions: nothing is registered and nothing is returned', () => {
   assert.deepEqual(loadExtensions({}), []);
@@ -101,4 +105,53 @@ test('loadPackConnectors imports each pack\'s connectors/index.mjs; packs cannot
   makePack(q, 'pack-b', { schemas: { gadget: WIDGET.replace('widget', 'gadget') }, entities: { gadget: { maps_to_core: 'artifact' } }, connectors: src('alpha') });
   const both = loadExtensions({ extensions: ['pack-a', 'pack-b'] }, { packagesDir: q });
   await assert.rejects(() => loadPackConnectors(both), /pack connector "alpha" \(pack-b\) collides with pack pack-a/);
+});
+
+test('mergeConnectors: pack connectors join the registry; a core name is a load error', () => {
+  const alpha = { name: 'alpha' };
+  const reg = mergeConnectors({ alpha });
+  assert.equal(reg.alpha, alpha); assert.equal(reg.atproto, CONNECTORS.atproto);
+  assert.deepEqual(mergeConnectors(), CONNECTORS);
+  assert.throws(() => mergeConnectors({ atproto: alpha }), /pack connector "atproto" collides with core/);
+});
+
+test('registry bindings: packs add their own; a core schema cannot be rebound; two packs cannot bind one schema', () => {
+  assert.deepEqual(registryBindings(), REGISTRY_BINDINGS);
+  registerRegistryBindings('pack-a', { widget: 'data/widgets.yaml' });
+  registerRegistryBindings('pack-a', { widget: 'data/widgets.yaml' }); // idempotent
+  assert.equal(registryBindings().widget, 'data/widgets.yaml');
+  assert.equal(REGISTRY_BINDINGS.widget, undefined, 'the core constant is never mutated');
+  assert.throws(() => registerRegistryBindings('pack-b', { resource: 'data/x.yaml' }), /pack binding for "resource" \(pack-b\) collides with core/);
+  assert.throws(() => registerRegistryBindings('pack-b', { widget: 'data/y.yaml' }), /pack binding for "widget" \(pack-b\) collides with pack pack-a/);
+});
+
+test('loadExtensions registers the profile\'s registry_bindings, and bridge writes the pack registry', () => {
+  const p = pkgs(); makePack(p, 'pack-a', { profile: { registry_bindings: { widget: 'data/widgets.yaml' } } });
+  const inst = mkdtempSync(join(tmpdir(), 'kms-inst-'));
+  mkdirSync(join(inst, 'data', 'kb'), { recursive: true });
+  writeFileSync(join(inst, 'data', 'kb', 'widget.yaml'), yaml.dump({ entries: { w: { title: 'W one', type: 'widget', size: 'm' } } }));
+  writeFileSync(join(inst, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', extensions: ['pack-a'] }));
+  const config = loadKmsConfig(inst, { packagesDir: p });
+  const res = bridge({ dir: inst, config });
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  assert.ok(!res.report.skipped.includes('widget'));
+  assert.ok(existsSync(join(inst, 'data', 'widgets.yaml')));
+  assert.match(readFileSync(join(inst, 'data', 'widgets.yaml'), 'utf8'), /W one/);
+});
+
+test('ingest.pull reaches a pack connector by name', async () => {
+  const src = "export const CONNECTORS = { alpha: { name: 'alpha', protocol: 'test', capabilities: { ingest: true },\n" +
+    "  describe: () => ({ title: 'Alpha source', type: 'dataset', steward: 's', return_path: 'r' }),\n" +
+    "  pull: async () => ({ records: [{ n: 1 }], cursor: 'c1', retracted: [], errors: [] }),\n" +
+    "  map: () => [{ schema: 'widget', object: { title: 'From alpha', type: 'widget', sourceUri: 'https://alpha.example/1' } }] } };\n";
+  const p = pkgs(); makePack(p, 'pack-a', { connectors: src });
+  const inst = mkdtempSync(join(tmpdir(), 'kms-inst-'));
+  mkdirSync(join(inst, 'data', 'kb'), { recursive: true });
+  writeFileSync(join(inst, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', extensions: ['pack-a'], connectors: [{ name: 'alpha', config: {} }] }));
+  const config = loadKmsConfig(inst, { packagesDir: p });
+  const res = await OPS['ingest.pull'].run({ dir: inst, config, flags: {} });
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  assert.equal(res.report.failed, 0);
+  assert.equal(res.report.connectors[0].status, 'ok', JSON.stringify(res.report.connectors[0]));
+  assert.equal(res.report.connectors[0].stored, 1);
 });

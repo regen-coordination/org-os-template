@@ -21,6 +21,27 @@ export const REGISTRY_BINDINGS = {
   'encyclopedia-entry': 'src/content/docs/kb/',
 };
 
+// Extension packs bind their OWN schemas to registries. The core map above is never mutated or overridden.
+const packBindings = new Map(); // schema -> { pack, path }
+
+export function registerRegistryBindings(packName, map = {}) {
+  for (const [schema, path] of Object.entries(map)) {
+    if (schema in REGISTRY_BINDINGS) throw new Error(`pack binding for "${schema}" (${packName}) collides with core`);
+    const prev = packBindings.get(schema);
+    if (prev && prev.pack !== packName) throw new Error(`pack binding for "${schema}" (${packName}) collides with pack ${prev.pack}`);
+    packBindings.set(schema, { pack: packName, path });
+  }
+}
+
+/** Core bindings plus the loaded packs'. */
+export function registryBindings() {
+  const out = { ...REGISTRY_BINDINGS };
+  for (const [schema, { path }] of packBindings) out[schema] = path;
+  return out;
+}
+
+export function resetRegistryBindings() { packBindings.clear(); }
+
 /** org-os session lifecycle -> ordered framework op-names (resolved by src/ops.mjs). */
 export const LIFECYCLE_BINDINGS = {
   initialize: ['config.load', 'index.rebuild', 'review.list', 'render.dashboard', 'render.site'],
@@ -31,7 +52,7 @@ export const LIFECYCLE_BINDINGS = {
 export function toOrgOsRegistries(objects = []) {
   const out = {};
   for (const o of objects) {
-    const target = REGISTRY_BINDINGS[o.type] || 'data/misc.yaml';
+    const target = registryBindings()[o.type] || 'data/misc.yaml';
     (out[target] ||= []).push(o);
   }
   return out;
@@ -46,7 +67,7 @@ export function profileManifest() {
     profile: 'org-os-kms',
     default_knowledge_system: '@regen-commons/toolkit-framework',
     schemas: listSchemas(),
-    registry_bindings: REGISTRY_BINDINGS,
+    registry_bindings: registryBindings(),
     lifecycle_bindings: LIFECYCLE_BINDINGS,
     federation: 'RegenOS — upstream/downstream + self-qualifying adoption',
     replaceable: true,
