@@ -1,0 +1,8 @@
+{
+  "name": "fixture-pi-package",
+  "pi": {
+    "extensions": ["extensions/org-os/index.ts", "extensions/vault-guard.ts"],
+    "skills": ["skills"],
+    "prompts": ["prompts/*.md"]
+  }
+}
