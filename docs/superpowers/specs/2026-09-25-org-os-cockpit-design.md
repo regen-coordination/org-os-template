@@ -290,9 +290,10 @@ type AgentEvent =
     tools/prompts/guard load as in Pi's own TUI; otherwise one info notice "org-os Pi tools not
     installed (pi-harness not landed)";
   - the workspace's `skills/` as an extra skill path unless its `.pi/settings.json` already lists it.
-- Pi's **project-trust** semantics under the SDK are settled by spike T2: if the SDK requires a
-  trust decision, the cockpit asks the operator once per workspace in a dialog — never grants
-  silently.
+- Pi's **project trust** (settled by spike T2, `packages/tui/VERIFIED.md`): the cockpit never grants
+  trust. Pi's own trust store decides whether a workspace's `.pi/` resources load; when a `.pi/`
+  directory exists the pane shows a notice telling the operator to trust it by running `pi` there
+  once. The cockpit's inline extension (guard + approvals) loads regardless.
 - Event mapping: `message_update/text_delta` → `text_delta`; `message_end` (assistant) →
   `assistant_end`; tool execution start/end → `tool_*` (summary = tool name + first 80 chars of the
   primary argument); `agent_end`/`agent_settled` → `status: idle`; exceptions → `status: error` +
@@ -354,8 +355,8 @@ expanded command to the pane.
 - **Approval notifications:** a permission request while the operator may not be looking →
   `herdr notification show "org-os: approval needed" --body "<tool> in <ws>" --sound request`.
 - **Plugin:** `packages/tui/herdr/herdr-plugin.toml` — `[[panes]] id="cockpit" placement="split"
-  command=["./scripts/cockpit.sh"]`; actions `open-cockpit` (split) and `open-cockpit-tab`
-  (idempotent tab, switches to an existing cockpit tab). Installed by the operator with
+  command=["./scripts/cockpit.sh"]`; actions `open-cockpit` (split) and `open-cockpit-tab` (new
+  tab; switching to an already-open cockpit tab is v1.1). Installed by the operator with
   `herdr plugin link <abs path>`; keybindings documented, never written into the operator's
   `config.toml` by the cockpit.
 - **Agent-state integrations** for launched hosts (`herdr integration install claude|pi|opencode`)
@@ -413,8 +414,8 @@ Launched hosts carry their own guard hooks. The cockpit adds no shell passthroug
 - **`packages/tui` core** — `bun test`: bus, config merge, fleet discovery on a fixture tree
   (hub/framework/instances/missing/extra), workspace reload on file change, every page resolver
   against fixtures, command expansion, gate decision table (incl. guard-block-beats-approval and
-  timeout-deny), launch strategy selection table, HerdrClient against a **fake `herdr` script** on
-  PATH (JSON fixtures shaped by `herdr api schema`), agent-to-workspace cwd mapping.
+  timeout-deny), launch strategy selection table, HerdrClient against an **injected fake runner**
+  (JSON fixtures shaped by `herdr api schema`), agent-to-workspace cwd mapping.
 - **Pi adapter** — `bun test` with a scripted fake model provider (mechanism from spike T2): a
   model turn emitting `bash("git stash list")` is **blocked** by the guard; a `write` call raises a
   permission request and honours allow/deny; events normalize to `AgentEvent`.
@@ -525,3 +526,11 @@ lives on `feat/pi-harness` in another worktree):
   `packages/harness-kit/README.md`, `packages/org-state/README.md`, a herdr row in
   `docs/HOST-INTEGRATION.md`.
 
+## 15. Revision log
+
+- **2026-09-25 (planning, after spikes T0–T4):** §6.2 project trust settled (no trust dialog; notice
+  instead); §7 tab action not idempotent in v1; §9 herdr tests use an injected runner. The plan also
+  adds: fleet-page "herdr agents" list whose rows focus the agent in herdr (§7 "enter on an agent
+  row"), an error boundary around the page view plus process-level error notices (§8), and a gate
+  `onSettle` hook so the approval dialog clears on timeout/cancel. Plan:
+  `docs/superpowers/plans/2026-09-25-org-os-cockpit.md`.
