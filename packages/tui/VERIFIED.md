@@ -15,3 +15,18 @@ Facts this package relies on, each checked by running code (not by reading docs 
 ## Acceptance (operator, pending)
 
 To be filled after the operator's first run inside herdr — see README "Acceptance".
+
+## Build verification — 2026-09-25 04:45 -03
+
+| Gate | Result |
+|---|---|
+| harness-kit tests | 9 pass |
+| org-state tests | 12 pass |
+| cloudflare-os-integration tests (via shims) | 84 pass / 2 fail (pre-existing, TZ-dependent, fail identically at the base commit) |
+| tui tests (bun + launcher) | 112 pass (108 bun + 4 launcher) |
+| root `npm test` | 582 pass |
+| validate:schemas / validate:structure | pass / pass |
+| `npm run page` × 7 | ok |
+| `--snapshot` fleet 160×40 / dashboard 80×24 | exit 0 / exit 0 |
+
+Not verified here (needs the operator): live herdr (plugin link, launch into splits, report-agent, notifications), a real Pi provider turn, `claude` launched with Max login, the acceptance list in README §10.
