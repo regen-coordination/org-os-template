@@ -54,6 +54,7 @@ test("watcher debounces changes", async () => {
   const { instA } = makeFleetFixture();
   let calls = 0;
   const stop = watchWorkspace(instA, () => calls++, { debounceMs: 200 });
+  await new Promise((r) => setTimeout(r, 150)); // let the FSEvents stream go live before writing (macOS)
   writeFileSync(join(instA, "HEARTBEAT.md"), "# changed\n");
   writeFileSync(join(instA, "memory", "2026-09-25.md"), "# new\n");
   await new Promise((r) => setTimeout(r, 800));
