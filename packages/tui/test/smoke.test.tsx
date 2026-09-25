@@ -9,4 +9,5 @@ test("OpenTUI Solid renders under the local Bun", async () => {
   ), { width: 40, height: 6 });
   await setup.renderOnce();
   expect(setup.captureCharFrame()).toContain("cockpit ready");
+  setup.renderer.destroy();
 });

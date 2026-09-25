@@ -1,12 +1,18 @@
-import { test, expect } from "bun:test";
+import { afterEach, test, expect } from "bun:test";
 import { testRender } from "@opentui/solid";
 import { App } from "../../src/ui/App";
 import { fakeCockpit } from "../helpers/fake-cockpit";
+
+const mounted: { renderer: { destroy(): void } }[] = [];
+afterEach(() => {
+  for (const t of mounted.splice(0)) t.renderer.destroy();
+});
 
 async function mount(width: number, height: number, over = {}) {
   const f = fakeCockpit(over);
   let quits = 0;
   const t = await testRender(() => <App cockpit={f.cockpit} onQuit={() => quits++} />, { width, height });
+  mounted.push(t);
   await t.renderOnce();
   return { ...f, t, quits: () => quits };
 }
