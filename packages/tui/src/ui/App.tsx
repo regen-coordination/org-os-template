@@ -54,13 +54,13 @@ export function App(props: AppProps) {
     try {
       return { lines: pageLines(page, pageWidth() - 2) };
     } catch (error) {
-      return { lines: [], error: error ?? new Error("page layout failed") };
+      return { lines: [], error };
     }
   });
   const lines = () => layoutResult().lines;
   const pageViewLines = () => {
     const r = layoutResult();
-    if (r.error) throw r.error;
+    if ("error" in r) throw r.error;
     return r.lines;
   };
   // The boundary's reset, captured while its fallback shows; refresh/switch/open retries the view.
