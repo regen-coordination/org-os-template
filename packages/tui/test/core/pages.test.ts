@@ -72,3 +72,19 @@ test("empty or missing workspaces render notices, unknown pages and ids too", as
   expect(resolvePage({ page: "nope" }, ctx).blocks[0]).toMatchObject({ kind: "notice", level: "error" });
   expect(resolvePage({ page: "project", id: "nope" }, ctx).blocks[0]).toMatchObject({ kind: "notice" });
 });
+
+test("Object.prototype names are unknown pages, not resolvers or sources", async () => {
+  const ctx = await ctxFor("inst-a");
+  for (const page of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    const p = resolvePage({ page }, ctx);
+    expect(p.title).toBe("Unknown page");
+    expect(p.blocks[0]).toMatchObject({ kind: "notice", level: "error" });
+    expect(sourceFor({ page }, ctx.ws)).toBe(null);
+  }
+});
+
+test("an empty this-week page says so in this week's terms", async () => {
+  const ctx = await ctxFor("fw");
+  const p = resolvePage({ page: "this-week" }, ctx);
+  expect(p.blocks).toEqual([{ kind: "notice", level: "info", text: "Nothing dated this week." }]);
+});

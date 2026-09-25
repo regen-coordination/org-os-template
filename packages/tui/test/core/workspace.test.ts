@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadWorkspace, parseGitStatus, readGitStatus, summarize, watchWorkspace } from "../../src/core/workspace";
 import { discoverFleet } from "../../src/core/fleet";
@@ -60,4 +60,69 @@ test("watcher debounces changes", async () => {
   await new Promise((r) => setTimeout(r, 800));
   stop();
   expect(calls).toBe(1);
+});
+
+test("watcher survives atomic-save replaces of root files and ignores unrelated root churn", async () => {
+  const { instA } = makeFleetFixture();
+  let calls = 0;
+  const stop = watchWorkspace(instA, () => calls++, { debounceMs: 100 });
+  const settle = () => new Promise((r) => setTimeout(r, 500));
+  const atomicSave = (text: string) => {
+    const tmp = join(instA, ".HEARTBEAT.md.tmp");
+    writeFileSync(tmp, text);
+    renameSync(tmp, join(instA, "HEARTBEAT.md"));
+  };
+  try {
+    await settle(); // let the FSEvents stream go live and drain the fixture's own writes (macOS)
+    calls = 0;
+    atomicSave("# one\n");
+    await settle();
+    expect(calls).toBe(1);
+    atomicSave("# two\n"); // the watcher on the replaced file would be dead by now
+    await settle();
+    expect(calls).toBe(2);
+    writeFileSync(join(instA, "notes.txt"), "unrelated\n");
+    await settle();
+    expect(calls).toBe(2);
+    mkdirSync(join(instA, "docs", "plans"), { recursive: true });
+    await settle();
+    const before = calls;
+    const stop2 = watchWorkspace(instA, () => calls++, { debounceMs: 100 });
+    await settle();
+    writeFileSync(join(instA, "docs", "plans", "QUEUE.md"), "# Queue\n");
+    await settle();
+    stop2();
+    expect(calls).toBeGreaterThan(before);
+  } finally {
+    stop();
+  }
+});
+
+test("watchWorkspace watches directories, never individual files, and filters root events by name", async () => {
+  const { instA } = makeFleetFixture();
+  mkdirSync(join(instA, "docs", "agent-plans"), { recursive: true });
+  const listeners = new Map<string, (event: string, filename: string | null) => void>();
+  let closed = 0;
+  const fakeWatch: any = (path: string, listener: (event: string, filename: string | null) => void) => {
+    listeners.set(path, listener);
+    return { close: () => closed++ };
+  };
+  let calls = 0;
+  const stop = watchWorkspace(instA, () => calls++, { debounceMs: 0, watch: fakeWatch });
+  expect([...listeners.keys()].sort()).toEqual([instA, join(instA, "data"), join(instA, "docs", "agent-plans"), join(instA, "memory")].sort());
+  const fireAndCount = async (dir: string, filename: string | null) => {
+    const before = calls;
+    listeners.get(dir)!("rename", filename);
+    await new Promise((r) => setTimeout(r, 5));
+    return calls - before;
+  };
+  expect(await fireAndCount(instA, "HEARTBEAT.md")).toBe(1); // atomic-save rename lands on the root watcher
+  expect(await fireAndCount(instA, "federation.yaml")).toBe(1);
+  expect(await fireAndCount(instA, ".HEARTBEAT.md.tmp")).toBe(0);
+  expect(await fireAndCount(instA, ".git")).toBe(0);
+  expect(await fireAndCount(join(instA, "data"), "projects.yaml")).toBe(1);
+  expect(await fireAndCount(join(instA, "docs", "agent-plans"), "QUEUE.md")).toBe(1);
+  expect(await fireAndCount(join(instA, "docs", "agent-plans"), "draft.md")).toBe(0);
+  stop();
+  expect(closed).toBe(4);
 });

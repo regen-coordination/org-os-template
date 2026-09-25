@@ -1,11 +1,22 @@
+import { createRenderEffect } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { PermissionAnswer, PermissionRequest } from "../../core/types";
 import { truncate } from "../format";
 import { theme } from "../theme";
 
+// Answer keys are ignored this long after a request appears, so a keystroke still in flight from
+// typing in the agent input can never approve a write.
+export const PERMISSION_ARM_MS = 250;
+
 export function PermissionDialog(props: { request: PermissionRequest; queued: number; workspaceLabel: string; width: number; onAnswer: (a: PermissionAnswer) => void }) {
+  let shownAt = Date.now();
+  createRenderEffect(() => {
+    void props.request.id; // re-arm for every request shown, including the next queued one
+    shownAt = Date.now();
+  });
   useKeyboard((k) => {
     if (k.ctrl || k.meta) return;
+    if (Date.now() - shownAt < PERMISSION_ARM_MS) return;
     if (k.name === "y") props.onAnswer("once");
     else if (k.name === "s") props.onAnswer("session");
     else if (k.name === "n" || k.name === "escape") props.onAnswer("deny");

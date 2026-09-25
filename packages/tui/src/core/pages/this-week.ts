@@ -15,6 +15,6 @@ export function thisWeekPage(ref: PageRef, ctx: PageContext): PageData {
   add("Meetings", s.meetings.thisWeek.map((m: any, i: number) => ({ key: `m${i}`, label: m.title, detail: m.date })));
   add("Funding deadlines (30 days)", funding.map((f: any, i: number) => ({ key: `f${i}`, label: f.title, detail: f.deadline, badge: `${f.daysLeft}d` })));
   if (s.funding.error) blocks.push(notice("warn", s.funding.error));
-  if (!blocks.length) blocks.push(notice("info", "Nothing dated in the next seven days."));
+  if (!blocks.length) blocks.push(notice("info", "Nothing dated this week."));
   return makePage(ref, "This week", blocks);
 }

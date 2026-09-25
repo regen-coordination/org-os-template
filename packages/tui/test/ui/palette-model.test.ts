@@ -24,3 +24,8 @@ test("fuzzy filtering ranks tight matches first", () => {
   expect(filterEntries(entries, "tasks")[0].label).toBe("Go to Tasks");
   expect(filterEntries(entries, "").length).toBe(entries.length);
 });
+
+test("the palette offers a new agent session", () => {
+  const entry = buildEntries(snap, actionsFor(null)).find((e) => e.label === "Agent: new session");
+  expect(entry?.action).toEqual({ kind: "command", command: { type: "agent-new-session" } });
+});

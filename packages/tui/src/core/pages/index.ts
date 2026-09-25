@@ -27,7 +27,7 @@ const RESOLVERS: Record<string, Resolver> = {
 };
 
 export function resolvePage(ref: PageRef, ctx: PageContext): PageData {
-  const resolver = RESOLVERS[ref.page];
+  const resolver = Object.hasOwn(RESOLVERS, ref.page) ? RESOLVERS[ref.page] : undefined;
   if (!resolver) return makePage(ref, "Unknown page", [notice("error", `No page called "${ref.page}". Open the palette (ctrl+p) for the list.`)]);
   try {
     return resolver(ref, ctx);
@@ -50,6 +50,6 @@ const SOURCES: Record<string, (ref: PageRef, ws: LoadedWorkspace) => string | nu
 
 export function sourceFor(ref: PageRef, ws: LoadedWorkspace | null): string | null {
   if (!ws) return null;
-  const rel = SOURCES[ref.page]?.(ref, ws) ?? null;
+  const rel = Object.hasOwn(SOURCES, ref.page) ? SOURCES[ref.page](ref, ws) : null;
   return rel ? join(ws.info.root, rel) : null;
 }

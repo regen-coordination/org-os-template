@@ -66,7 +66,8 @@ focus, most global keys stand down so you can type; what stays live is `ctrl+p` 
 | `q` | Quit (asks if an agent turn is running); `ctrl+c` twice always quits |
 
 Agent input: a single line — `enter` sends, `esc` leaves the input. Permission dialog: `y` allow
-once, `s` allow for session, `n` / `esc` deny.
+once, `s` allow for session, `n` / `esc` deny (ignored for the first 250 ms after a request
+appears, so a keystroke still in flight from the input never answers it).
 
 ## herdr
 

@@ -8,6 +8,7 @@ import { parseArgs } from "./core/args";
 import { Cockpit } from "./core/cockpit";
 import { configDir, loadConfig, loadUiState, saveUiState } from "./core/config";
 import { HerdrClient, herdrBin, inHerdr } from "./core/herdr";
+import { foregroundProblem } from "./core/launch";
 import { run } from "./core/proc";
 import type { ForegroundEffect } from "./core/types";
 import { App } from "./ui/App";
@@ -73,11 +74,13 @@ export async function main(argv = process.argv.slice(2), env: NodeJS.ProcessEnv 
   };
   const runForeground = async (fx: ForegroundEffect) => {
     renderer.suspend();
+    let problem: string | null = null;
     try {
-      spawnSync(fx.cmd, fx.args, { cwd: fx.cwd, stdio: "inherit" });
+      problem = foregroundProblem(fx.cmd, spawnSync(fx.cmd, fx.args, { cwd: fx.cwd, stdio: "inherit" }));
     } finally {
       renderer.resume();
     }
+    if (problem) cockpit.notice("warn", problem);
   };
   await render(() => <App cockpit={cockpit} onQuit={() => void quit()} runForeground={runForeground} initialAgentOpen={uiState.agentOpen ?? true} />, renderer);
   // The UI is up with the active workspace; the rest of the fleet and herdr load behind it.

@@ -191,7 +191,8 @@ export class Cockpit implements CockpitLike {
       page: this.page,
       canGoBack: (id ? this.history.get(id)?.length ?? 0 : 0) > 1,
       transcript: id ? this.transcripts.get(id) ?? [] : [],
-      agentStatus: id ? this.statuses.get(id) ?? "idle" : "idle",
+      // While an approval waits on the operator, the agent is blocked whatever it last reported.
+      agentStatus: !id ? "idle" : this.permissions.some((p) => p.workspace === id) ? "blocked" : this.statuses.get(id) ?? "idle",
       agentModel: id ? this.models.get(id) || null : null,
       agentAvailable: !!this.deps.backend,
       permissions: [...this.permissions],

@@ -24,6 +24,7 @@ export function buildEntries(snap: Pick<CockpitSnapshot, "fleet">, actions: Acti
       action: { kind: "command" as const, command: { type: "select-workspace" as const, id: r.info.id } },
     })),
     ...actions.map(actionEntry),
+    { id: "agent:new-session", label: "Agent: new session", action: { kind: "command", command: { type: "agent-new-session" } } },
     { id: "ui:agent", label: "Toggle agent pane", action: { kind: "ui", ui: "toggle-agent" } },
     { id: "ui:help", label: "Help", action: { kind: "ui", ui: "help" } },
   ];

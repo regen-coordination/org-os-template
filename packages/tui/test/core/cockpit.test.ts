@@ -75,12 +75,14 @@ test("permission requests surface, notify herdr, report blocked, and clear on an
   await tick();
   const [req] = cockpit.snapshot().permissions;
   expect(req).toMatchObject({ tool: "write", summary: "x.md", workspace: "inst-a" });
+  expect(cockpit.snapshot().agentStatus).toBe("blocked");
   expect(calls).toContain("notify org-os: approval needed");
   expect(calls).toContain("report blocked");
   await cockpit.dispatch({ type: "permission-answer", id: req.id, answer: "once" });
   expect(await decision).toEqual({ allow: true });
   await tick();
   expect(cockpit.snapshot().permissions).toEqual([]);
+  expect(cockpit.snapshot().agentStatus).toBe("idle");
   expect(calls.at(-1)).toBe("report idle");
   await cockpit.stop();
   expect(calls).toContain("release");

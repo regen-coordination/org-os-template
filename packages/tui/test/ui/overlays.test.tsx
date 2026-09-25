@@ -83,6 +83,8 @@ test("escape closes the palette without dispatching", async () => {
   expect(dispatched).toEqual([]);
 });
 
+const armDelay = () => new Promise((r) => setTimeout(r, 300));
+
 test("permission dialog answers by key and blocks other shortcuts", async () => {
   const req = { id: "p1", workspace: "hub", tool: "write", summary: "docs/plan.md", input: {} };
   const { t, dispatched } = await mount({ permissions: [req, { ...req, id: "p2" }] });
@@ -90,6 +92,7 @@ test("permission dialog answers by key and blocks other shortcuts", async () => 
   expect(f).toContain("Approval needed");
   expect(f).toContain("docs/plan.md");
   expect(f).toContain("1 more waiting");
+  await armDelay();
   t.mockInput.pressKey("j");
   t.mockInput.pressKey("s");
   await settle(t);
@@ -104,4 +107,28 @@ test("help overlay lists keys and closes on escape", async () => {
   t.mockInput.pressEscape();
   await settle(t);
   expect(t.captureCharFrame()).not.toContain("Keys");
+});
+
+test("a keystroke in flight when the permission dialog appears never answers it", async () => {
+  const req = { id: "p1", workspace: "hub", tool: "write", summary: "docs/plan.md", input: {} };
+  const { t, dispatched, set } = await mount();
+  set({ permissions: [req] });
+  await t.renderOnce();
+  t.mockInput.pressKey("y");
+  await settle(t);
+  expect(t.captureCharFrame()).toContain("Approval needed");
+  expect(dispatched).toEqual([]);
+  await armDelay();
+  t.mockInput.pressKey("y");
+  await settle(t);
+  expect(dispatched).toEqual([{ type: "permission-answer", id: "p1", answer: "once" }]);
+  set({ permissions: [{ ...req, id: "p2" }] }); // the next queued request re-arms the delay
+  await settle(t);
+  t.mockInput.pressKey("y");
+  await settle(t);
+  expect(dispatched.length).toBe(1);
+  await armDelay();
+  t.mockInput.pressKey("n");
+  await settle(t);
+  expect(dispatched.at(-1)).toEqual({ type: "permission-answer", id: "p2", answer: "deny" });
 });

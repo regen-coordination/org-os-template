@@ -100,3 +100,14 @@ export async function launchHost(req: LaunchRequest, deps: LaunchDeps): Promise<
   }
   return { ok: false, error: errors.join("; ") || "no launch strategy available", tried };
 }
+
+// Why a foreground command (a suspend-and-run host, the editor) did not finish cleanly, or null.
+export function foregroundProblem(
+  cmd: string,
+  r: { error?: Error & { code?: string }; status: number | null; signal?: string | null },
+): string | null {
+  if (r.error) return r.error.code === "ENOENT" ? `\`${cmd}\` not found` : `\`${cmd}\` could not start: ${r.error.message}`;
+  if (r.signal) return `\`${cmd}\` was stopped by ${r.signal}`;
+  if (r.status !== null && r.status !== 0) return `\`${cmd}\` exited with ${r.status}`;
+  return null;
+}

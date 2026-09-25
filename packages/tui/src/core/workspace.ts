@@ -1,5 +1,5 @@
-import { existsSync, watch as fsWatch, type FSWatcher } from "node:fs";
-import { join } from "node:path";
+import { statSync, watch as fsWatch, type FSWatcher } from "node:fs";
+import { basename, dirname, join } from "node:path";
 // @ts-ignore — plain .mjs without types
 import { readWorkspaceFiles, WATCH_PATHS, loadWorkspaceState, yamlErrors } from "../../../org-state/index.mjs";
 import { run as defaultRun, type Runner } from "./proc";
@@ -86,15 +86,25 @@ export function watchWorkspace(
     }, debounceMs);
   };
   const watchers: FSWatcher[] = [];
-  for (const rel of WATCH_PATHS as string[]) {
-    const abs = join(root, rel);
-    if (!existsSync(abs)) continue;
+  // Watch directories only (non-recursively), never single files: an editor that saves atomically
+  // (write a temp file, rename it over the original) replaces the inode a file watch hangs on.
+  const addDir = (dir: string, accept: (name: string) => boolean) => {
+    if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return;
     try {
-      watchers.push(watch(abs, fire));
+      watchers.push(watch(dir, (_event, filename) => {
+        if (filename == null || accept(String(filename))) fire();
+      }));
     } catch {
       // unwatchable path: the operator can still press r
     }
-  }
+  };
+  const paths = WATCH_PATHS as string[];
+  const rootNames = new Set(paths.filter((p) => !p.includes("/")));
+  addDir(root, (name) => rootNames.has(name));
+  for (const name of rootNames) addDir(join(root, name), () => true); // data/, memory/
+  const nested = new Map<string, Set<string>>(); // e.g. docs/plans → {QUEUE.md}
+  for (const rel of paths.filter((p) => p.includes("/"))) nested.set(dirname(rel), (nested.get(dirname(rel)) ?? new Set()).add(basename(rel)));
+  for (const [dir, names] of nested) addDir(join(root, dir), (name) => names.has(name));
   return () => {
     if (timer) clearTimeout(timer);
     for (const w of watchers) w.close();

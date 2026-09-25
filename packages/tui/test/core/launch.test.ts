@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { agentName, launchHost, viableStrategies, type LaunchEnv } from "../../src/core/launch";
+import { agentName, foregroundProblem, launchHost, viableStrategies, type LaunchEnv } from "../../src/core/launch";
 import type { Runner } from "../../src/core/proc";
 
 const le = (env: Record<string, string>, extra: Partial<LaunchEnv> = {}): LaunchEnv => ({
@@ -79,4 +79,13 @@ test("every strategy failing reports all errors", async () => {
     expect(out.tried).toEqual(["tmux", "ghostty"]);
     expect(out.error).toContain("tmux: no server");
   }
+});
+
+test("a foreground command that fails to start or exits non-zero is described for a notice", () => {
+  const enoent = Object.assign(new Error("spawnSync vi ENOENT"), { code: "ENOENT" });
+  expect(foregroundProblem("vi", { error: enoent, status: null, signal: null })).toBe("`vi` not found");
+  expect(foregroundProblem("vi", { error: new Error("EACCES"), status: null, signal: null })).toBe("`vi` could not start: EACCES");
+  expect(foregroundProblem("vi", { status: 127, signal: null })).toBe("`vi` exited with 127");
+  expect(foregroundProblem("claude", { status: null, signal: "SIGKILL" })).toBe("`claude` was stopped by SIGKILL");
+  expect(foregroundProblem("vi", { status: 0, signal: null })).toBe(null);
 });
