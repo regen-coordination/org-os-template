@@ -1,0 +1,23 @@
+{
+  "name": "@org-os/org-state",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure org-os workspace state: files map → structured state, loaders, and markdown pages (backs `npm run page`)",
+  "exports": {
+    ".": "./index.mjs",
+    "./build-state": "./build-state.mjs",
+    "./render-page": "./render-page.mjs",
+    "./parse-helpers": "./parse-helpers.mjs",
+    "./read-files": "./read-files.mjs"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "js-yaml": "4.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

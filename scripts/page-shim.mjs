@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { renderPage } from "../packages/cloudflare-os-integration/src/page-core/render-page.mjs";
+import { renderPage } from "../packages/org-state/render-page.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
