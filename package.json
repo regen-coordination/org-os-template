@@ -45,6 +45,7 @@
     "test:multica-bridge": "npm test --prefix packages/multica-bridge",
     "test:cloudflare-os-integration": "npm test --prefix packages/cloudflare-os-integration",
     "test:admin": "npm test --prefix packages/admin",
+    "test:harness-kit": "npm test --prefix packages/harness-kit",
     "generate:skills": "node scripts/generate-skills.mjs",
     "generate:quilt": "node scripts/generate-quilt.mjs",
     "sync:packages": "node scripts/sync-packages.mjs",

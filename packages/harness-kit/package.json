@@ -1,0 +1,17 @@
+{
+  "name": "@org-os/harness-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dependency-free helpers shared by org-os agent hosts: vault-guard bridge and workspace detection",
+  "exports": {
+    "./guard-bridge": "./guard-bridge.mjs",
+    "./workspace": "./workspace.mjs"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
