@@ -6,7 +6,7 @@ import { AgentPane } from "./AgentPane";
 import { Header } from "./Header";
 import { routeKey, type Focus } from "./keys";
 import { computeLayout, regionsFor } from "./layout";
-import { navCount, pageLines, targetAt } from "./page-model";
+import { navCount, pageLines, targetAt, type PageLine } from "./page-model";
 import { actionEntries, buildEntries, launchEntries, type PaletteEntry } from "./palette-model";
 import { PageView } from "./PageView";
 import { Rail } from "./Rail";
@@ -26,6 +26,8 @@ export type AppProps = {
 type Overlay = null | { kind: "palette"; title: string; entries: PaletteEntry[] } | { kind: "help" };
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+// Commands after which a crashed page view is rendered again.
+const RECOVERS_PAGE = new Set<Command["type"]>(["refresh", "select-workspace", "open-page", "back"]);
 
 export function App(props: AppProps) {
   const store = createCockpitStore(props.cockpit);
@@ -44,7 +46,30 @@ export function App(props: AppProps) {
 
   const pageWidth = () => Math.max(20, dims().width - layout().rail - (layout().agentOverlay ? 0 : layout().agent));
   const bodyHeight = () => Math.max(3, dims().height - 2);
-  const lines = createMemo(() => (snap().page ? pageLines(snap().page!, pageWidth() - 2) : []));
+  // A page that cannot be laid out must land in the page ErrorBoundary, not escape from App: the
+  // memo keeps the error, and only the read inside the boundary (pageViewLines) rethrows it.
+  const layoutResult = createMemo((): { lines: PageLine[]; error?: unknown } => {
+    const page = snap().page;
+    if (!page) return { lines: [] };
+    try {
+      return { lines: pageLines(page, pageWidth() - 2) };
+    } catch (error) {
+      return { lines: [], error: error ?? new Error("page layout failed") };
+    }
+  });
+  const lines = () => layoutResult().lines;
+  const pageViewLines = () => {
+    const r = layoutResult();
+    if (r.error) throw r.error;
+    return r.lines;
+  };
+  // The boundary's reset, captured while its fallback shows; refresh/switch/open retries the view.
+  let resetPage: (() => void) | null = null;
+  const recoverPage = () => {
+    const reset = resetPage;
+    resetPage = null;
+    reset?.();
+  };
   const dialogOpen = () => snap().permissions.length > 0;
   const modal = () => overlay() !== null || dialogOpen();
 
@@ -67,7 +92,12 @@ export function App(props: AppProps) {
 
   const dispatch = async (cmd: Command) => {
     const withCols = cmd.type === "launch" ? { ...cmd, paneCols: dims().width } : cmd;
-    const fx = await props.cockpit.dispatch(withCols);
+    let fx: ForegroundEffect | void;
+    try {
+      fx = await props.cockpit.dispatch(withCols);
+    } finally {
+      if (RECOVERS_PAGE.has(cmd.type)) recoverPage();
+    }
     if (fx && props.runForeground) await props.runForeground(fx);
   };
 
@@ -169,8 +199,13 @@ export function App(props: AppProps) {
         <Show when={layout().showRail}>
           <Rail rows={snap().fleet} activeId={snap().activeId} index={railIndex()} focused={focus() === "rail" && !modal()} width={layout().rail} />
         </Show>
-        <ErrorBoundary fallback={(err: Error) => <text fg={theme.error}>{`This view crashed: ${err?.message ?? err} — press r to reload, or switch workspace.`}</text>}>
-          <PageView page={snap().page} lines={lines()} cursor={cursor()} focused={focus() === "page" && !modal()} width={pageWidth()} height={bodyHeight()} />
+        <ErrorBoundary
+          fallback={(err: Error, reset: () => void) => {
+            resetPage = reset;
+            return <text fg={theme.error}>{`This view crashed: ${err?.message ?? err} — press r to reload, or switch workspace.`}</text>;
+          }}
+        >
+          <PageView page={snap().page} lines={pageViewLines()} cursor={cursor()} focused={focus() === "page" && !modal()} width={pageWidth()} height={bodyHeight()} />
         </ErrorBoundary>
         <Show when={layout().agent > 0 && !layout().agentOverlay}>
           <AgentPane snap={snap()} focused={focus() === "agent" && !modal()} width={layout().agent} height={bodyHeight()} onSubmit={(text) => void dispatch({ type: "agent-prompt", text })} />

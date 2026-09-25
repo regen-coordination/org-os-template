@@ -1,7 +1,7 @@
 import { afterEach, test, expect } from "bun:test";
 import { testRender } from "@opentui/solid";
 import { App } from "../../src/ui/App";
-import { fakeCockpit } from "../helpers/fake-cockpit";
+import { baseSnapshot, fakeCockpit } from "../helpers/fake-cockpit";
 
 const mounted: { renderer: { destroy(): void } }[] = [];
 afterEach(() => {
@@ -90,4 +90,31 @@ test("snapshot updates re-render", async () => {
   set({ activeName: "Renamed WS" });
   await settle(t);
   expect(t.captureCharFrame()).toContain("Renamed WS");
+});
+
+test("a crashed page view stays down until the operator refreshes, switches workspace or opens a page", async () => {
+  const { t, set, dispatched } = await mount(160, 45);
+  const good = baseSnapshot().page!;
+  const broken = { ...good, blocks: [{ kind: "list", heading: "Broken", items: null }] } as any;
+  set({ page: broken });
+  await settle(t);
+  expect(t.captureCharFrame()).toContain("This view crashed");
+  t.mockInput.pressKey("r"); // still broken: the fallback comes back instead of a crash
+  await settle(t);
+  expect(t.captureCharFrame()).toContain("This view crashed");
+  set({ page: good }); // a reload fixed the data, but the boundary waits for the operator
+  await settle(t);
+  expect(t.captureCharFrame()).toContain("This view crashed");
+  t.mockInput.pressKey("r");
+  await settle(t);
+  expect(t.captureCharFrame()).not.toContain("This view crashed");
+  expect(t.captureCharFrame()).toContain("Pay invoices");
+  set({ page: broken });
+  await settle(t);
+  expect(t.captureCharFrame()).toContain("This view crashed");
+  set({ page: good });
+  t.mockInput.pressKey("2"); // switching workspace recovers too
+  await settle(t);
+  expect(t.captureCharFrame()).toContain("Pay invoices");
+  expect(dispatched).toEqual([{ type: "refresh" }, { type: "refresh" }, { type: "select-workspace", id: "fw" }]);
 });
