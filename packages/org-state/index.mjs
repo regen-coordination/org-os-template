@@ -9,7 +9,7 @@ import { loadFunding } from "./loaders/funding.mjs";
 export { buildState, loadFederation } from "./build-state.mjs";
 export { renderPage, SUPPORTED_PAGES } from "./render-page.mjs";
 export { extractCheckboxes, daysUntil, getRelativeAge, parseFrontmatter } from "./parse-helpers.mjs";
-export { readWorkspaceFiles, listMemoryFiles, ROOT_FILES, WATCH_PATHS } from "./read-files.mjs";
+export { readWorkspaceFiles, listMemoryFiles, listProjectFiles, ROOT_FILES, WATCH_PATHS, MEMORY_LIMIT } from "./read-files.mjs";
 export { loadHeartbeat, listMemory, parseDecisions, loadQueue, loadFunding };
 export { QUEUE_PATHS } from "./loaders/plans.mjs";
 

@@ -75,3 +75,9 @@ test("malformed workspace degrades instead of throwing", () => {
   assert.ok(errs.some((e) => e.startsWith("data/projects.yaml:")));
   assert.deepEqual(yamlErrors(ws), []);
 });
+
+test("index.mjs re-exports MEMORY_LIMIT and listProjectFiles", async () => {
+  const idx = await import("../index.mjs");
+  assert.equal(idx.MEMORY_LIMIT, 60);
+  assert.equal(typeof idx.listProjectFiles, "function");
+});
