@@ -206,9 +206,9 @@ input has focus (then only `esc`, `ctrl+p`, `ctrl+c` are global).
 | `ctrl+x` | Abort the running agent turn |
 | `q` | Quit (asks if an agent turn is running); `ctrl+c` twice always quits |
 
-Agent input: `enter` sends, `shift+enter` newline (fallback `ctrl+j` where the terminal can't
-distinguish), `esc` leaves the input. **Permission dialog:** `y` allow once, `s` allow for session,
-`n` / `esc` deny.
+Agent input: a single line — `enter` sends, `esc` leaves the input (multi-line input is v1.1).
+**Permission dialog:** `y` allow once, `s` allow for session, `n` / `esc` deny; keys are ignored for
+~250 ms after the dialog appears so a keystroke in flight can't answer it.
 
 ### 5.3 Pages
 
@@ -534,3 +534,7 @@ lives on `feat/pi-harness` in another worktree):
   row"), an error boundary around the page view plus process-level error notices (§8), and a gate
   `onSettle` hook so the approval dialog clears on timeout/cancel. Plan:
   `docs/superpowers/plans/2026-09-25-org-os-cockpit.md`.
+- **2026-09-25 (after the final review):** §5.2 agent input is single-line in v1 (the shift+enter
+  newline was never built; README matches); the approval dialog ignores keys for ~250 ms after it
+  appears. Interactive mode mounts once the active workspace is loaded and loads the rest of the
+  fleet in the background (§8 "others lazily"); startup notices are buffered until the UI subscribes.
