@@ -2,13 +2,13 @@
 
 org-os ships first-class integrations for two agent hosts beyond the standalone CLI: **opencode** and **hermes**. Every host gets the same surface — call `org_os_page <id>` to render any org-os page in the conversation, and (where the host supports it) `org_os_tui` to launch the interactive TUI in a managed pane.
 
-> **Status (2026-04-25):** Integrations are **live today** via `scripts/page-shim.mjs`, which renders 7 pages (`dashboard`, `projects`, `tasks`, `instances`, `decisions`, `plans`, `this-week`) using the existing `scripts/initialize.mjs` JSON output and `DECISIONS.md`. When the full TUI renderer ships (Task 12 of `docs/agent-plans/tui-dashboard-implementation.md`), the `npm run page` script retargets to `packages/tui/src/modes/print.mjs` and unlocks the full ~25-page catalog. No changes required in opencode or hermes — they pick up the upgrade transparently.
+> **Status (2026-09-25):** Two surfaces are live. `npm run page <id>` (one-shot markdown for chat) is served by `scripts/page-shim.mjs`, which renders 7 pages (`dashboard`, `projects`, `tasks`, `instances`, `decisions`, `plans`, `this-week`) from `scripts/initialize.mjs` JSON through the shared renderers in `packages/org-state`. `npm run tui` is the **org-os cockpit** (`packages/tui`): an OpenTUI fleet view with an embedded, guarded Pi agent pane and herdr integration; `npm run tui -- --snapshot --page <id>` renders one frame headless to stdout for scripts and CI. Design: [`docs/superpowers/specs/2026-09-25-org-os-cockpit-design.md`](superpowers/specs/2026-09-25-org-os-cockpit-design.md) (it supersedes the Ink TUI plan). No changes are required in opencode or hermes — they keep calling the same two scripts.
 
 ## Compatibility matrix
 
 | Host          | Slash commands                       | Tools / mechanism                                                                                                                  |
 | ------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Standalone    | n/a                                  | `npm run tui` (interactive Ink), `npm run page <id>` (one-shot). Works in any terminal.                                              |
+| Standalone    | n/a                                  | `npm run tui` (the OpenTUI cockpit, `packages/tui`; `-- --snapshot` for one headless frame), `npm run page <id>` (one-shot markdown). Works in any terminal. |
 | Claude Code   | `/initialize`, `/close`              | Existing skill at `skills/org-os-init/`. Agent embeds `npm run page <id>` output for drill-downs.                                    |
 | **opencode**  | `/dashboard`, `/initialize`, `/org-projects`, `/org-decisions`, `/org-this-week` | [`packages/opencode-integration/`](../packages/opencode-integration/) — npm plugin (tools: `org_os_page`, `org_os_tui`) **plus** `commands/*.md` slash-command templates installed via `install-commands.sh`. |
 | **hermes**    | `/dashboard`, `/initialize`, `/org_os_pages` | [`packages/hermes-integration/`](../packages/hermes-integration/) — Python tool (`org_os_page`) **plus** three skills (`SKILL.md` + `skills/dashboard/`, `skills/initialize/`) auto-registered as slash commands by hermes. Install via `install.sh`. |
@@ -53,34 +53,33 @@ Full README: [`packages/hermes-integration/README.md`](../packages/hermes-integr
 
 ## Pages reachable
 
-The full list lives in `packages/tui-data/src/builtin-pages.mjs`. All hosts get the same pages.
+Host tools (`org_os_page`) call `npm run page <id>`, so every host gets the same pages.
 
-| Type | IDs |
+| Surface | Page IDs |
 |---|---|
-| Section | `dashboard`, `projects`, `tasks`, `plans`, `instances`, `federation`, `members`, `ideas`, `funding`, `calendar`, `memory`, `decisions`, `skills`, `packages` |
-| Entity | `project/<id>`, `instance/<id>`, `plan/<id>`, `idea/<id>`, `member/<id>`, `skill/<id>`, `package/<id>`, `decision/<slug>` |
-| Cross-cut | `health`, `this-week`, `promotions`, `attention` |
+| `npm run page <id>` (`scripts/page-shim.mjs` over `packages/org-state`) | `dashboard`, `projects`, `tasks`, `instances`, `decisions`, `plans`, `this-week` |
+| Cockpit (`npm run tui`, `packages/tui/src/core/pages/`; `--page <id>`) | `fleet`, `dashboard`, `tasks`, `projects`, `plans`, `decisions`, `memory`, `this-week`; entity pages `project`, `decision`, `memory` (by date) |
 
 ## Architecture
 
-Both integrations are intentionally thin shims over the same two entry points: `npm run page <id>` (one-shot render to stdout, ANSI-stripped, embeds in chat) and `npm run tui` (interactive Ink TUI). All page logic, data resolution, and navigation lives in `packages/tui-data/` and `packages/tui/`. Updating the TUI updates every host integration automatically.
+Both integrations are intentionally thin shims over the same two entry points: `npm run page <id>` (one-shot markdown to stdout, embeds in chat) and `npm run tui` (the interactive OpenTUI cockpit). Workspace reading and parsing live in `packages/org-state/` (plain Node, no UI), which both `scripts/page-shim.mjs` and the cockpit in `packages/tui/` build on — so a loader fix reaches every host integration automatically.
 
 ```
         ┌─────────────────────────┐
-        │  packages/tui-data      │  pure Node, no UI
-        │  loaders + manifest +   │
-        │  resolvers + actions    │
+        │  packages/org-state     │  pure Node, no UI
+        │  file readers, loaders, │
+        │  page renderers         │
         └────────────┬────────────┘
                      │
-       ┌─────────────┼─────────────────────────────┐
-       │             │                             │
-┌──────▼──────┐ ┌────▼──────┐ ┌──────────────────▼──────────────────┐
-│ packages/   │ │ scripts/  │ │  packages/{opencode,hermes}-        │
-│ tui (Ink)   │ │ initialize│ │  integration                        │
-│             │ │           │ │  (shim → npm run page / npm run tui)│
-│ interactive │ │ JSON for  │ │                                     │
-│ + print     │ │ /init     │ │  hosts: opencode, hermes            │
-└─────────────┘ └───────────┘ └─────────────────────────────────────┘
+       ┌─────────────┴───────────────┐
+       │                             │
+┌──────▼──────────┐ ┌────────────────▼────┐ ┌─────────────────────────────────────┐
+│ packages/tui    │ │ scripts/page-shim   │ │  packages/{opencode,hermes}-        │
+│ OpenTUI cockpit │ │ (+ initialize JSON) │ │  integration                        │
+│ npm run tui     │ │ npm run page <id>   │ │  (shim → npm run page / npm run tui)│
+│ + --snapshot    │ │ markdown for chat   │ │                                     │
+│                 │ │                     │ │  hosts: opencode, hermes            │
+└─────────────────┘ └─────────────────────┘ └─────────────────────────────────────┘
 ```
 
 ## Adding a new host

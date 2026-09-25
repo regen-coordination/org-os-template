@@ -65,9 +65,8 @@ focus, most global keys stand down so you can type; what stays live is `ctrl+p` 
 | `ctrl+x` | Abort the running agent turn |
 | `q` | Quit (asks if an agent turn is running); `ctrl+c` twice always quits |
 
-Agent input: `enter` sends, `shift+enter` newline (fallback `ctrl+j` where the terminal can't
-distinguish), `esc` leaves the input. Permission dialog: `y` allow once, `s` allow for session,
-`n` / `esc` deny.
+Agent input: a single line — `enter` sends, `esc` leaves the input. Permission dialog: `y` allow
+once, `s` allow for session, `n` / `esc` deny.
 
 ## herdr
 
@@ -150,8 +149,8 @@ in `claude`'s `.claude/settings.json`).
 - `launch.prefer` — one of `herdr`, `tmux`, `zellij`, `ghostty`, `suspend`.
 - `herdr.poll` / `herdr.pollMs` — whether to poll `herdr agent list`, and how often (minimum 1000ms).
 
-`state.json` in the same directory is cockpit-managed (last workspace, agent-pane open/closed) —
-don't hand-edit it.
+`state.json` in the same directory is cockpit-managed (last workspace, and whether you last left
+the agent pane open or closed) — don't hand-edit it.
 
 ## Safety
 

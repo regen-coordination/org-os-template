@@ -112,6 +112,7 @@ export function App(props: AppProps) {
     const open = !agentOpen();
     setAgentOpen(open);
     setFocus(open ? "agent" : "page");
+    void dispatch({ type: "set-agent-open", open });
   };
 
   const cycle = (delta: number) => {

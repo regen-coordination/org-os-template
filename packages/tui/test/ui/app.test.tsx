@@ -118,3 +118,13 @@ test("a crashed page view stays down until the operator refreshes, switches work
   expect(t.captureCharFrame()).toContain("Pay invoices");
   expect(dispatched).toEqual([{ type: "refresh" }, { type: "refresh" }, { type: "select-workspace", id: "fw" }]);
 });
+
+test("toggling the agent pane asks the cockpit to remember it", async () => {
+  const { t, dispatched } = await mount(160, 45);
+  t.mockInput.pressKey("a", { ctrl: true });
+  await settle(t);
+  expect(t.captureCharFrame()).not.toContain("AGENT · pi");
+  t.mockInput.pressKey("a", { ctrl: true });
+  await settle(t);
+  expect(dispatched).toEqual([{ type: "set-agent-open", open: false }, { type: "set-agent-open", open: true }]);
+});

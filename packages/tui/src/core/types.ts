@@ -45,4 +45,5 @@ export type Command =
   | { type: "agent-command"; name: LifecycleCommand; args?: string }
   | { type: "agent-abort" }
   | { type: "agent-new-session" }
-  | { type: "permission-answer"; id: string; answer: PermissionAnswer };
+  | { type: "permission-answer"; id: string; answer: PermissionAnswer }
+  | { type: "set-agent-open"; open: boolean };

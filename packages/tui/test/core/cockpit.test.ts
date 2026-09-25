@@ -363,3 +363,15 @@ test("a throwing listener becomes an error notice; a throwing notice listener ca
   expect(logged).toEqual([]);
   await cockpit.stop();
 });
+
+test("the agent-pane toggle and the last workspace persist together through saveUiState", async () => {
+  const saved: unknown[] = [];
+  const { cockpit } = make({ uiState: { agentOpen: true }, saveUiState: (s: unknown) => saved.push(s) });
+  await cockpit.start();
+  expect(saved.at(-1)).toEqual({ agentOpen: true, lastWorkspace: "inst-a" });
+  await cockpit.dispatch({ type: "set-agent-open", open: false });
+  expect(saved.at(-1)).toEqual({ agentOpen: false, lastWorkspace: "inst-a" });
+  await cockpit.dispatch({ type: "select-workspace", id: "fw" });
+  expect(saved.at(-1)).toEqual({ agentOpen: false, lastWorkspace: "fw" });
+  await cockpit.stop();
+});

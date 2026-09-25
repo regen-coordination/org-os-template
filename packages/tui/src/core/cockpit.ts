@@ -97,8 +97,10 @@ export class Cockpit implements CockpitLike {
   private emitQueued = false;
   private stopped = false;
   private reportingListenerError = false;
+  private uiState: UiState;
 
   constructor(private deps: CockpitDeps) {
+    this.uiState = { ...(deps.uiState ?? {}) };
     this.gate = new Gate({
       ask: (req) => this.onPermission(req),
       onSettle: (id) => {
@@ -278,6 +280,9 @@ export class Cockpit implements CockpitLike {
       case "permission-answer":
         this.gate.answer(cmd.id, cmd.answer);
         return;
+      case "set-agent-open":
+        this.saveUi({ agentOpen: cmd.open });
+        return;
     }
   }
 
@@ -318,9 +323,14 @@ export class Cockpit implements CockpitLike {
     this.history.set(id, hist);
     this.refreshPage();
     this.startWatch();
-    this.deps.saveUiState?.({ ...(this.deps.uiState ?? {}), lastWorkspace: id });
+    this.saveUi({ lastWorkspace: id });
     this.reportTitle();
     this.emitState();
+  }
+
+  private saveUi(patch: Partial<UiState>): void {
+    this.uiState = { ...this.uiState, ...patch };
+    this.deps.saveUiState?.(this.uiState);
   }
 
   private pushPage(ref: PageRef): void {
