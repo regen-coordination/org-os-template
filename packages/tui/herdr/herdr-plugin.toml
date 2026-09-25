@@ -1,0 +1,30 @@
+# herdr plugin manifest for the org-os cockpit. Operator installs it with
+#   herdr plugin link "<abs path to>/packages/tui/herdr"
+# and binds the actions in ~/.config/herdr/config.toml (see packages/tui/README.md).
+# Nothing here runs automatically: no [[events]] hooks.
+id = "org-os-cockpit"
+name = "org-os cockpit"
+version = "0.1.0"
+description = "org-os fleet cockpit (OpenTUI) in a herdr split or tab."
+min_herdr_version = "0.9.0"
+platforms = ["linux", "macos"]
+
+[[panes]]
+id = "cockpit"
+title = "org-os"
+placement = "split"
+command = ["./scripts/cockpit.sh"]
+
+[[actions]]
+id = "open-cockpit"
+platforms = ["linux", "macos"]
+title = "Open org-os cockpit"
+description = "Open the org-os cockpit in a split beside the current pane."
+command = ["bash", "scripts/open-cockpit.sh"]
+
+[[actions]]
+id = "open-cockpit-tab"
+platforms = ["linux", "macos"]
+title = "Open org-os cockpit (tab)"
+description = "Open the org-os cockpit in its own tab."
+command = ["bash", "scripts/open-cockpit-tab.sh"]
