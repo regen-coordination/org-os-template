@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,7 @@ const REPO = resolve(PKG, "../..");
 async function snapshot(args: string[], env: Record<string, string>) {
   const proc = Bun.spawn([process.execPath, "run", "src/main.tsx", "--snapshot", ...args], {
     cwd: PKG,
-    env: { ...process.env, ORG_OS_COCKPIT_HOME: mkdtempSync(join(tmpdir(), "ck-home-")), HERDR_ENV: "", ...env },
+    env: { ...process.env, ORG_OS_COCKPIT_HOME: env.ORG_OS_COCKPIT_HOME ?? mkdtempSync(join(tmpdir(), "ck-home-")), HERDR_ENV: "", ...env },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -35,3 +35,12 @@ test("snapshot of this repository's fleet page", async () => {
   expect(r.out).toContain("Fleet");
   expect(r.out).toContain("org-os");
 }, 60_000);
+
+test("a config.json error raised before the UI mounts still reaches the status bar", async () => {
+  const { fw, instA } = makeFleetFixture();
+  const home = mkdtempSync(join(tmpdir(), "ck-home-"));
+  writeFileSync(join(home, "config.json"), JSON.stringify({ launch: { prefer: "bogus" } }));
+  const r = await snapshot(["--framework", fw, "--width", "140", "--height", "32"], { ORG_OS_INVOKED_FROM: instA, ORG_OS_COCKPIT_HOME: home });
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("config.json launch.prefer");
+}, 30_000);

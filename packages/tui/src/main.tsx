@@ -36,13 +36,14 @@ export async function main(argv = process.argv.slice(2), env: NodeJS.ProcessEnv 
     watch: live ? undefined : null,
     saveUiState: live ? (s) => void saveUiState(dir, s) : undefined,
   });
+  // Notices raised before the UI mounts are held by the cockpit and replayed once it subscribes.
   errors.forEach((e) => cockpit.notice("warn", e));
   // Never let a stray async error take the cockpit down: surface it and keep running.
   process.on("unhandledRejection", (e) => cockpit.notice("error", `Unexpected error: ${(e as Error)?.message ?? e}`));
   process.on("uncaughtException", (e) => cockpit.notice("error", `Unexpected error: ${e.message}`));
-  await cockpit.start();
 
   if (args.snapshot) {
+    await cockpit.start(); // the snapshot prints the whole fleet, so everything loads first
     const setup = await testRender(() => <App cockpit={cockpit} onQuit={() => {}} initialAgentOpen={uiState.agentOpen ?? true} />, { width: args.width, height: args.height });
     await setup.renderOnce();
     await new Promise((r) => setTimeout(r, 10));
@@ -52,6 +53,7 @@ export async function main(argv = process.argv.slice(2), env: NodeJS.ProcessEnv 
     return 0;
   }
 
+  await cockpit.activateInitial();
   const renderer = await createCliRenderer({ exitOnCtrlC: false, targetFps: 30 });
   let quitting = false;
   const quit = async () => {
@@ -78,6 +80,8 @@ export async function main(argv = process.argv.slice(2), env: NodeJS.ProcessEnv 
     }
   };
   await render(() => <App cockpit={cockpit} onQuit={() => void quit()} runForeground={runForeground} initialAgentOpen={uiState.agentOpen ?? true} />, renderer);
+  // The UI is up with the active workspace; the rest of the fleet and herdr load behind it.
+  void cockpit.loadRest().catch((e) => cockpit.notice("error", `Loading the fleet failed: ${(e as Error).message}`));
   return null;
 }
 

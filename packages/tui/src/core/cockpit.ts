@@ -71,7 +71,8 @@ function shellQuote(parts: string[]): string {
 }
 
 export class Cockpit implements CockpitLike {
-  readonly events = new Emitter<CoreEvents>();
+  // Notices raised before the UI subscribes (config errors, the herdr warning) wait for it.
+  readonly events = new Emitter<CoreEvents>((type, error) => this.onListenerError(type, error), { buffer: ["notice"] });
   readonly gate: Gate;
   private fleet: WorkspaceInfo[] = [];
   private activeId: string | null = null;
@@ -95,6 +96,7 @@ export class Cockpit implements CockpitLike {
   private herdrWarned = false;
   private emitQueued = false;
   private stopped = false;
+  private reportingListenerError = false;
 
   constructor(private deps: CockpitDeps) {
     this.gate = new Gate({
@@ -109,7 +111,16 @@ export class Cockpit implements CockpitLike {
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
+  // Everything, in order: what --snapshot and tests use. The interactive cockpit instead awaits
+  // activateInitial(), mounts the UI, and runs loadRest() in the background.
   async start(): Promise<void> {
+    await this.activateInitial();
+    if (this.stopped) return;
+    await this.loadRest();
+  }
+
+  // Discover the fleet and load only the active workspace; `loading` stays true until loadRest() ends.
+  async activateInitial(): Promise<void> {
     const { fleet, errors } = discoverFleet(this.deps.frameworkRoot, this.deps.config);
     this.fleet = fleet;
     errors.forEach((e) => this.notice("warn", e));
@@ -121,16 +132,25 @@ export class Cockpit implements CockpitLike {
     this.loading = true;
     this.emitState();
     if (this.activeId) await this.activate(this.activeId, this.deps.flags?.page ? { page: this.deps.flags.page } : undefined);
-    if (this.stopped) return;
+  }
+
+  // Load the other workspaces' summaries, then set up herdr. A workspace that fails to load is
+  // reported and skipped; it is retried when the operator opens it.
+  async loadRest(): Promise<void> {
     for (const w of this.fleet) {
       if (this.stopped) return;
-      if (!this.loaded.has(w.id)) {
+      if (this.loaded.has(w.id)) continue;
+      try {
         await this.load(w.id);
-        if (this.stopped) return;
-        this.refreshPage();
-        this.emitState();
+      } catch (e) {
+        this.notice("warn", `Could not load ${w.label}: ${(e as Error).message}`);
+        continue;
       }
+      if (this.stopped) return;
+      this.refreshPage();
+      this.emitState();
     }
+    if (this.stopped) return;
     this.loading = false;
     if (this.deps.herdr) {
       await this.loadHints();
@@ -185,6 +205,18 @@ export class Cockpit implements CockpitLike {
   notice(level: NoticeLevel, text: string): void {
     if (this.stopped) return;
     this.events.emit("notice", { level, text });
+  }
+
+  // A failing listener must not scribble on the live renderer (console.error): report it as a
+  // notice instead. A failing notice listener has nowhere safe to report to, so it is dropped.
+  private onListenerError(type: keyof CoreEvents, error: unknown): void {
+    if (type === "notice" || this.reportingListenerError) return;
+    this.reportingListenerError = true;
+    try {
+      this.notice("error", `Internal error in a ${type} listener: ${(error as Error)?.message ?? error}`);
+    } finally {
+      this.reportingListenerError = false;
+    }
   }
 
   async dispatch(cmd: Command): Promise<ForegroundEffect | void> {

@@ -275,3 +275,91 @@ test("a session.prompt rejection does not crash the process and surfaces an erro
   expect(notices.some((n) => n.startsWith("error:") && n.includes("boom"))).toBe(true);
   await cockpit.stop();
 });
+
+test("notices emitted before anyone subscribes (config errors, the latched herdr warning) reach the first subscriber", async () => {
+  const fx = makeFleetFixture();
+  const herdr: any = { ...fakeHerdr().herdr, listAgents: async () => { throw new Error("socket gone"); } };
+  const cockpit = new Cockpit({
+    frameworkRoot: fx.fw,
+    invokedFrom: fx.instA,
+    config: structuredClone(DEFAULT_CONFIG),
+    env: { HERDR_ENV: "1" },
+    git: false,
+    watch: null,
+    herdr,
+  } as any);
+  cockpit.notice("warn", "config.json: Unexpected token");
+  await cockpit.start();
+  const got: string[] = [];
+  cockpit.events.on("notice", (n) => got.push(`${n.level}:${n.text}`));
+  expect(got[0]).toBe("warn:config.json: Unexpected token");
+  expect(got).toContain("warn:herdr unavailable: socket gone");
+  cockpit.notice("info", "later");
+  expect(got.at(-1)).toBe("info:later");
+  await cockpit.stop();
+});
+
+test("activateInitial shows the active page before the rest of the fleet loads in the background", async () => {
+  let releaseRest: (() => void) | null = null;
+  const restGate = new Promise<void>((r) => (releaseRest = r));
+  const { cockpit } = make({
+    loadWorkspace: async (info: any, opts: any) => {
+      if (info.id !== "inst-a") await restGate;
+      return realLoadWorkspace(info, opts);
+    },
+  });
+  await cockpit.activateInitial();
+  let s = cockpit.snapshot();
+  expect(s.activeId).toBe("inst-a");
+  expect(s.page?.title).toBe("Instance A");
+  expect(s.loading).toBe(true);
+  expect(s.fleet.find((r) => r.info.id === "hub")!.summary).toBe(null);
+  const rest = cockpit.loadRest();
+  await tick();
+  expect(cockpit.snapshot().loading).toBe(true);
+  releaseRest!();
+  await rest;
+  s = cockpit.snapshot();
+  expect(s.loading).toBe(false);
+  expect(s.fleet.every((r) => r.summary !== null)).toBe(true);
+  await cockpit.stop();
+});
+
+test("one workspace failing to load does not stall the background load", async () => {
+  const { cockpit, notices } = make({
+    loadWorkspace: async (info: any, opts: any) => {
+      if (info.id === "hub") throw new Error("EACCES");
+      return realLoadWorkspace(info, opts);
+    },
+  });
+  await cockpit.start();
+  expect(cockpit.snapshot().loading).toBe(false);
+  expect(cockpit.snapshot().fleet.find((r) => r.info.id === "fw")!.summary).not.toBe(null);
+  expect(notices.some((n) => n.startsWith("warn:") && n.includes("EACCES"))).toBe(true);
+  await cockpit.stop();
+});
+
+test("a throwing listener becomes an error notice; a throwing notice listener cannot recurse", async () => {
+  const { cockpit, notices } = make();
+  let noticeCalls = 0;
+  cockpit.events.on("state", () => {
+    throw new Error("bad state listener");
+  });
+  cockpit.events.on("notice", () => {
+    noticeCalls++;
+    throw new Error("bad notice listener");
+  });
+  const logged: unknown[] = [];
+  const original = console.error;
+  console.error = (...a: unknown[]) => void logged.push(a);
+  try {
+    await cockpit.start();
+    await tick();
+  } finally {
+    console.error = original;
+  }
+  expect(notices.some((n) => n.startsWith("error:") && n.includes("bad state listener"))).toBe(true);
+  expect(noticeCalls).toBe(notices.length);
+  expect(logged).toEqual([]);
+  await cockpit.stop();
+});
