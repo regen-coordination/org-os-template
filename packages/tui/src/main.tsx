@@ -57,9 +57,17 @@ export async function main(argv = process.argv.slice(2), env: NodeJS.ProcessEnv 
   const quit = async () => {
     if (quitting) return;
     quitting = true;
-    await cockpit.stop();
-    renderer.destroy();
-    process.exit(0);
+    try {
+      await cockpit.stop();
+    } catch (e) {
+      cockpit.notice("error", `Failed to stop cleanly: ${(e as Error).message}`);
+    } finally {
+      try {
+        renderer.destroy();
+      } finally {
+        process.exit(0);
+      }
+    }
   };
   const runForeground = async (fx: ForegroundEffect) => {
     renderer.suspend();
