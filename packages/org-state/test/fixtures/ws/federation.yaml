@@ -1,0 +1,8 @@
+identity:
+  name: "Fixture Org"
+  type: "LocalNode"
+network: "fixture-net"
+federation:
+  peers:
+    - name: "peer-a"
+      role: "hub"

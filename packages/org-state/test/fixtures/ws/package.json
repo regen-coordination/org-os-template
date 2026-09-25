@@ -1,0 +1,1 @@
+{ "name": "fixture-ws", "scripts": { "initialize": "node -e 1", "validate:schemas": "node -e 1", "deploy": "node -e 1" } }

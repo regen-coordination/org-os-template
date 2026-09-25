@@ -1,0 +1,8 @@
+projects:
+  - id: cockpit
+    title: "Cockpit"
+    status: "Develop"
+    lead: "luiz"
+  - id: garden
+    title: "Garden Party"
+    status: "Discovery"

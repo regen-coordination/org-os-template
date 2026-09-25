@@ -1,0 +1,9 @@
+funding_opportunities:
+  - name: "Gitcoin round"
+    deadline: "2026-10-05"
+    status: "open"
+  - name: "Old round"
+    deadline: "2026-01-01"
+    status: "open"
+  - name: "Applied grant"
+    status: "applied"
