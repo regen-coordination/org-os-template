@@ -27,6 +27,8 @@ Drop these into `.opencode/commands/` (project) or `~/.config/opencode/commands/
 
 Both surfaces shell out to `npm run page <id>` (and `npm run tui`) in the operator's org-os repo. The repo path is resolved from `directory` / `worktree` / `project.directory` in the opencode plugin context, falling back to `ORG_OS_ROOT` env var, then `process.cwd()`.
 
+> 2026-09-25: `npm run tui` now exists — it opens the OpenTUI cockpit (packages/tui), not the Ink design this README was written against.
+
 ## Installation
 
 ### Tools (plugin)

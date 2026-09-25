@@ -156,6 +156,30 @@ packages:
     lifecycle_status: "active"
     notes: "@paper-integration — thin MCP wire client (lib/paper.mjs) over Paper Desktop's local server + pure token planner (lib/tokens.mjs). npm run paper:doctor (zero metered calls) / paper:push-tokens (brand.yaml → Paper tokens, diffed, ≤3 calls) / paper:lint-tokens (1 call) / paper:call (passthrough). Ships modules/org-os-paper/module.yaml as module #5. Live verification and the refi-dao-os brief-02 prototype pending (VERIFIED.md)."
 
+  - id: "tui"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "org-os cockpit — fleet TUI (OpenTUI/Solid, Bun) with embedded Pi agent and herdr integration. Opt-in install: npm run tui:install. Spec 2026-09-25-org-os-cockpit-design.md."
+
+  - id: "harness-kit"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "Dependency-free guard bridge + workspace detection shared by agent hosts (cockpit; pi-integration once it lands)."
+
+  - id: "org-state"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "canonical"
+    lifecycle_status: "active"
+    notes: "Pure workspace state + loaders + markdown pages (page-core moved from cloudflare-os-integration 2026-09-25; shims kept). Backs npm run page."
+
   # --- Instance-originated packages (promotion candidates) ---
   - id: "dashboard"
     owner: "refi-bcn-os"

@@ -1,6 +1,10 @@
+---
+status: superseded
+---
+
 # TUI Dashboard Implementation Plan
 
-> **Release status (2026-08-28):** Deferred to v0.6+ — portfolio memo 2026-08-21 §4 row 6 (frozen behind admin-app M2 + named-demand trigger). Convergence: [v0.5 release masterplan](../superpowers/plans/2026-08-28-v0.5-release-masterplan.md).
+> **Superseded 2026-09-25** by [`2026-09-25-org-os-cockpit-design.md`](../superpowers/specs/2026-09-25-org-os-cockpit-design.md) — OpenTUI (not Ink), embedded Pi agent, herdr host. Content preserved for history.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Companion design spec: [`tui-dashboard.md`](tui-dashboard.md).
 

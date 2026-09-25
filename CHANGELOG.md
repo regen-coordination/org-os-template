@@ -32,6 +32,9 @@ racing `.git/index.lock` across registries).
 - **`tests/clone-framework-health.test.mjs`** gains a no-leak test, and **`packages/admin/tests/real-data.test.ts`**
   is new: it runs the admin app's own validator over this repository's real registries, which is
   the regression that would have caught every admin defect fixed below.
+- **`packages/tui`** — org-os cockpit: fleet TUI on OpenTUI with an embedded, guarded Pi agent pane, host launch (herdr/tmux/zellij/Ghostty), and a herdr plugin. `npm run tui:install`, `npm run tui`.
+- **`packages/harness-kit`** — shared fail-closed vault-guard bridge and workspace detection.
+- **`packages/org-state`** — page-core moved out of cloudflare-os-integration (re-export shims kept) plus heartbeat/memory/decisions/queue/funding loaders.
 
 ### Fixed
 

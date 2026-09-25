@@ -12,6 +12,7 @@ org-os ships first-class integrations for two agent hosts beyond the standalone 
 | Claude Code   | `/initialize`, `/close`              | Existing skill at `skills/org-os-init/`. Agent embeds `npm run page <id>` output for drill-downs.                                    |
 | **opencode**  | `/dashboard`, `/initialize`, `/org-projects`, `/org-decisions`, `/org-this-week` | [`packages/opencode-integration/`](../packages/opencode-integration/) — npm plugin (tools: `org_os_page`, `org_os_tui`) **plus** `commands/*.md` slash-command templates installed via `install-commands.sh`. |
 | **hermes**    | `/dashboard`, `/initialize`, `/org_os_pages` | [`packages/hermes-integration/`](../packages/hermes-integration/) — Python tool (`org_os_page`) **plus** three skills (`SKILL.md` + `skills/dashboard/`, `skills/initialize/`) auto-registered as slash commands by hermes. Install via `install.sh`. |
+| **herdr**     | n/a                                  | [`packages/tui/herdr`](../packages/tui/herdr) plugin + herdr CLI JSON — org-os cockpit in a split/tab via plugin; cockpit launches `claude`/`pi`/`opencode` into herdr panes; live agent badges; approval notifications. **Status:** v0.1 (2026-09-25), operator acceptance pending. |
 | tmux/zellij   | n/a                                  | Sibling pane, host-agnostic. None needed.                                                                                          |
 
 ## Why subprocess (not embedded UI)

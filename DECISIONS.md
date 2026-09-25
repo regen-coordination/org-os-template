@@ -14,6 +14,17 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-09-25 · org-os cockpit (OpenTUI · Pi · herdr) — operator directive un-freezes the TUI line
+
+- **Status:** active
+- **Scope:** framework / operator-ux / agent-runtime
+- **Decision:** Build the org-os cockpit: a fleet TUI on OpenTUI (Solid) in one Bun process — headless `core/` + `ui/` — reading every workspace's data plane directly, with an embedded **Pi** agent pane (SDK, in-process) whose tool calls pass the fail-closed vault guard and then operator approval — the Pi adapter never grants Pi project trust; `.pi/` project resources load only after the operator trusts the workspace directly in Pi — a launch path for the real `claude`/`pi`/`opencode` CLIs, and **herdr** as the host environment. Shared code lands as `packages/harness-kit` (guard bridge, workspace detection) and `packages/org-state` (page-core moved out of cloudflare-os-integration). Claude Agent SDK and opencode adapters are v1.1.
+- **Why:** The operator's daily-driver need, stated directly (2026-09-25), plus two convergences: the Pi harness spec (same day) makes Pi the natural embedded engine, and herdr is where the operator runs agents. The cockpit is the interactive mode of the CLI surface — no new server, no new write path — so the interfaces contract (2026-08-29) holds without amendment. The portfolio memo's row-6 trigger (admin M2 + daily-use gap or second operator) is **overridden by operator directive**, not fired. Alternatives: a daemon + thin client (a new server → contract amendment; too much infra for one operator), extending opencode's TUI (can't host fleet pages; drops the other backends), the frozen Ink design (superseded).
+- **Open:** OQ-1 — whether the pane may run on a Claude Max subscription; answered from Anthropic's current terms and Pi's auth docs before any pane auth UI is built. Until then: Pi's configured provider auth; Max via the launch path.
+- **Refs:** `docs/superpowers/specs/2026-09-25-org-os-cockpit-design.md`, `docs/superpowers/plans/2026-09-25-org-os-cockpit.md`, `docs/superpowers/specs/2026-09-25-pi-harness-design.md` (branch `feat/pi-harness`), `packages/tui/VERIFIED.md`.
+
+---
+
 ## 2026-08-29 · Buzz lane graduated to the hosted community relay
 
 - **Status:** active
