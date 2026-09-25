@@ -121,10 +121,12 @@ export class Cockpit implements CockpitLike {
     this.loading = true;
     this.emitState();
     if (this.activeId) await this.activate(this.activeId, this.deps.flags?.page ? { page: this.deps.flags.page } : undefined);
+    if (this.stopped) return;
     for (const w of this.fleet) {
       if (this.stopped) return;
       if (!this.loaded.has(w.id)) {
         await this.load(w.id);
+        if (this.stopped) return;
         this.refreshPage();
         this.emitState();
       }
@@ -132,7 +134,9 @@ export class Cockpit implements CockpitLike {
     this.loading = false;
     if (this.deps.herdr) {
       await this.loadHints();
+      if (this.stopped) return;
       await this.pollHerdr();
+      if (this.stopped) return;
       this.startPolling();
     }
     this.refreshPage();
@@ -179,6 +183,7 @@ export class Cockpit implements CockpitLike {
   }
 
   notice(level: NoticeLevel, text: string): void {
+    if (this.stopped) return;
     this.events.emit("notice", { level, text });
   }
 
@@ -217,7 +222,7 @@ export class Cockpit implements CockpitLike {
       case "agent-prompt": {
         const slash = parseSlash(cmd.text);
         if (slash) return this.dispatch({ type: "agent-command", name: slash.name, args: slash.args });
-        void this.sendToAgent(cmd.text);
+        void this.sendToAgent(cmd.text).catch((e) => this.notice("error", `agent: ${(e as Error).message}`));
         return;
       }
       case "agent-command": {
@@ -225,7 +230,9 @@ export class Cockpit implements CockpitLike {
         if (!info) return;
         const r = await expandCommand(info.root, cmd.name, cmd.args ?? "", { fallbackRoot: this.deps.frameworkRoot });
         if (!r.ok) return void this.notice("error", r.error);
-        void this.sendToAgent(r.text, `/${cmd.name}${cmd.args ? ` ${cmd.args}` : ""}`);
+        void this.sendToAgent(r.text, `/${cmd.name}${cmd.args ? ` ${cmd.args}` : ""}`).catch((e) =>
+          this.notice("error", `agent: ${(e as Error).message}`),
+        );
         return;
       }
       case "agent-abort": {
@@ -272,6 +279,7 @@ export class Cockpit implements CockpitLike {
   private async activate(id: string, ref?: PageRef): Promise<void> {
     this.activeId = id;
     if (!this.loaded.has(id)) await this.load(id);
+    if (this.stopped) return;
     const hist = this.history.get(id) ?? [];
     if (ref) hist.push(ref);
     else if (!hist.length) hist.push({ page: "dashboard" });
@@ -310,20 +318,24 @@ export class Cockpit implements CockpitLike {
   }
 
   private startWatch(): void {
+    if (this.stopped) return;
     this.stopWatch?.();
     this.stopWatch = null;
     if (this.deps.watch === null) return;
     const info = this.activeInfo();
     if (!info?.exists) return;
     const watch = this.deps.watch ?? watchWorkspace;
-    this.stopWatch = watch(info.root, () => void this.reload(info.id));
+    this.stopWatch = watch(info.root, () => {
+      void this.reload(info.id).catch((e) => this.notice("error", `reload: ${(e as Error).message}`));
+    });
   }
 
   private emitState(): void {
-    if (this.emitQueued) return;
+    if (this.stopped || this.emitQueued) return;
     this.emitQueued = true;
     queueMicrotask(() => {
       this.emitQueued = false;
+      if (this.stopped) return;
       this.events.emit("state", this.snapshot());
     });
   }
@@ -347,6 +359,10 @@ export class Cockpit implements CockpitLike {
     const p = backend
       .open({ workspace: info, resume, gate: this.gate })
       .then((session) => {
+        if (this.stopped) {
+          void session.dispose().catch(() => {});
+          return null;
+        }
         this.sessions.set(id, session);
         this.models.set(id, session.model ?? "");
         session.subscribe((e) => this.onAgentEvent(id, e));
@@ -366,7 +382,7 @@ export class Cockpit implements CockpitLike {
     const id = this.activeId;
     if (!id) return;
     const session = await this.ensureSession(id, "continue");
-    if (!session) return;
+    if (!session || this.stopped) return;
     await session.prompt(text, display);
   }
 
@@ -378,7 +394,9 @@ export class Cockpit implements CockpitLike {
     await old?.dispose().catch(() => {});
     this.transcripts.set(id, []);
     this.statuses.set(id, "idle");
+    this.permissions.filter((p) => p.workspace === id).forEach((p) => this.gate.answer(p.id, "deny"));
     this.gate.resetSession(id);
+    this.updateReport();
     await this.ensureSession(id, "new");
     this.emitState();
   }
@@ -388,7 +406,7 @@ export class Cockpit implements CockpitLike {
     if (e.type === "status") {
       this.statuses.set(id, e.status);
       this.updateReport();
-      if (e.status === "idle") void this.reload(id);
+      if (e.status === "idle") void this.reload(id).catch((err) => this.notice("error", `reload: ${(err as Error).message}`));
     }
     this.emitState();
   }
@@ -445,10 +463,11 @@ export class Cockpit implements CockpitLike {
   }
 
   private startPolling(): void {
-    if (!this.deps.config.herdr.poll || this.pollTimer) return;
+    if (this.stopped || !this.deps.config.herdr.poll || this.pollTimer) return;
     this.pollTimer = setInterval(() => {
+      if (this.stopped) return;
       if (Date.now() - this.lastActivity > IDLE_POLL_PAUSE_MS) return;
-      void this.pollHerdr();
+      void this.pollHerdr().catch((e) => this.notice("error", `herdr poll: ${(e as Error).message}`));
     }, this.deps.config.herdr.pollMs);
   }
 
@@ -506,7 +525,7 @@ export class Cockpit implements CockpitLike {
     if ("foreground" in outcome) return outcome.foreground;
     if (outcome.ok) {
       this.notice("info", `Launched ${host}: ${outcome.detail}`);
-      void this.pollHerdr();
+      void this.pollHerdr().catch((e) => this.notice("error", `herdr poll: ${(e as Error).message}`));
     } else {
       this.notice("error", `Could not launch ${host}: ${outcome.error}`);
     }
