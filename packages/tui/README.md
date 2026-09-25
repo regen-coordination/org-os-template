@@ -43,8 +43,10 @@ Flags:
 
 ## Keys
 
-Focus cycles with `tab` / `shift+tab` between rail, page and agent pane. Global keys work unless a
-text input has focus — then only `esc`, `ctrl+p`, `ctrl+c` are live.
+Focus cycles with `tab` / `shift+tab` between rail, page and agent pane. While the agent input has
+focus, most global keys stand down so you can type; what stays live is `ctrl+p` (palette), `ctrl+a`
+(toggle agent pane), `ctrl+n` (new session), `ctrl+x` (abort), `tab` / `shift+tab` (change focus),
+`esc` (leave the input) and `ctrl+c` (twice to quit).
 
 | Key | Action |
 |---|---|
@@ -165,6 +167,11 @@ don't hand-edit it.
   — anything else has to go through the guarded agent or the operator directly.
 - **Launched hosts keep their own hooks.** Launching `claude`, `pi` or `opencode` into a split/tab/
   window adds no shell passthrough — each host runs with its own configured hooks.
+- **Pi project trust is never granted by the cockpit.** A workspace's `.pi/` project resources
+  (extensions, skills, prompts, settings) load into the embedded pane only after the operator has
+  trusted that workspace in Pi itself (run `pi` there once); until then the pane shows a notice
+  that `.pi/` isn't loaded. The vault guard and the approval flow apply either way — they're wired
+  in as the cockpit's own inline extension, independent of Pi's project-trust decision.
 
 ## Auth & OQ-1
 
