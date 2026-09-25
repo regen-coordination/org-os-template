@@ -1,0 +1,25 @@
+{
+  "name": "@org-os/tui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "org-os cockpit: fleet TUI on OpenTUI with an embedded, guarded Pi agent and herdr integration",
+  "bin": {
+    "org-os-cockpit": "bin/cockpit.mjs"
+  },
+  "scripts": {
+    "start": "node bin/cockpit.mjs",
+    "test": "bun test && node --test test/launcher.nodetest.mjs"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@opentui/core": "0.5.12",
+    "@opentui/solid": "0.5.12",
+    "js-yaml": "4.1.0",
+    "solid-js": "1.9.12"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.87.1",
+    "bun": "1.4.2"
+  }
+}
