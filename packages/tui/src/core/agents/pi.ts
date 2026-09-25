@@ -1,6 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { createAgentSession, DefaultResourceLoader, getAgentDir, SessionManager } from "@earendil-works/pi-coding-agent";
+import {
+  createAgentSession,
+  DefaultResourceLoader,
+  getAgentDir,
+  hasTrustRequiringProjectResources,
+  ProjectTrustStore,
+  SessionManager,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 import { summarizeTool } from "../gate";
 import type { AgentEvent, WorkspaceInfo } from "../types";
 import { firstLine } from "../util";
@@ -26,14 +34,20 @@ export function piIntegrationDir(frameworkRoot: string): string | null {
   return existsSync(join(dir, "package.json")) ? dir : null;
 }
 
-export function extraSkillPaths(root: string): string[] {
+// `trusted` mirrors Pi's own project-trust gate (settings-manager.js:195-197): an
+// untrusted project's .pi/settings.json is never consulted, so we always add the
+// workspace skills ourselves in that case. Defaults to true so existing callers
+// that don't care about trust (e.g. this module's own tests) keep prior behaviour.
+export function extraSkillPaths(root: string, trusted = true): string[] {
   const skills = join(root, "skills");
   if (!existsSync(skills)) return [];
-  try {
-    const settings = JSON.parse(readFileSync(join(root, ".pi", "settings.json"), "utf8"));
-    if (Array.isArray(settings.skills) && settings.skills.some((s: unknown) => typeof s === "string" && s.replace(/\/$/, "") === "../skills")) return [];
-  } catch {
-    // no project settings: add the workspace skills ourselves
+  if (trusted) {
+    try {
+      const settings = JSON.parse(readFileSync(join(root, ".pi", "settings.json"), "utf8"));
+      if (Array.isArray(settings.skills) && settings.skills.some((s: unknown) => typeof s === "string" && s.replace(/\/$/, "") === "../skills")) return [];
+    } catch {
+      // no project settings: add the workspace skills ourselves
+    }
   }
   return [skills];
 }
@@ -95,7 +109,13 @@ class PiAgentSession implements AgentSession {
   readonly backend = "pi" as const;
   private listeners = new Set<(e: AgentEvent) => void>();
   private buffer: AgentEvent[] = [];
-  private working = false;
+  // Serializes prompt() calls: Pi's own session.prompt() rejects when called
+  // while a run is already streaming, and session.followUp() resolves as soon
+  // as the message is queued rather than when the run it belongs to settles.
+  // Each prompt() call chains onto this so a later call always starts its own
+  // fresh session.prompt() only after the previous run has fully settled, and
+  // its own returned promise resolves only when ITS run settles.
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(private session: any) {
     session.subscribe((raw: any) => {
@@ -113,7 +133,6 @@ class PiAgentSession implements AgentSession {
   }
 
   emit(e: AgentEvent): void {
-    if (e.type === "status") this.working = e.status === "working";
     if (!this.listeners.size) {
       this.buffer.push(e);
       return;
@@ -133,9 +152,17 @@ class PiAgentSession implements AgentSession {
 
   async prompt(text: string, display?: string): Promise<void> {
     this.emit({ type: "user", text: display ?? text });
+    // Chain onto the queue synchronously so a second prompt() called before the
+    // first has even started still waits behind it — never races Pi's own
+    // "already processing" guard.
+    const run = this.queue.then(() => this.runPrompt(text));
+    this.queue = run;
+    return run;
+  }
+
+  private async runPrompt(text: string): Promise<void> {
     try {
-      if (this.working) await this.session.followUp(text);
-      else await this.session.prompt(text);
+      await this.session.prompt(text);
     } catch (e) {
       const msg = (e as Error).message;
       this.emit({ type: "notice", level: "error", text: `pi: ${msg}` });
@@ -158,9 +185,19 @@ export type PiBackendOptions = {
   agentDir?: string;
   persistent?: boolean;
   model?: unknown;
-  settingsManager?: unknown;
+  // Typed (not `unknown`): open() reads .isProjectTrusted() off whichever
+  // instance ends up in play, whether supplied here (tests) or built internally.
+  settingsManager?: SettingsManager;
   extraFactories?: ((pi: any) => void)[];
 };
+
+// Mirrors Pi's own CLI trust resolution (main.js: the non-interactive branch of
+// createRuntime's projectTrusted computation) without the interactive prompt:
+// fail closed to untrusted whenever the workspace has trust-requiring resources
+// and the operator hasn't explicitly trusted it via `pi` itself.
+function resolveProjectTrust(cwd: string, agentDir: string): boolean {
+  return !hasTrustRequiringProjectResources(cwd) || new ProjectTrustStore(agentDir).get(cwd) === true;
+}
 
 export function piBackend(opts: PiBackendOptions): AgentBackend {
   return {
@@ -173,11 +210,17 @@ export function piBackend(opts: PiBackendOptions): AgentBackend {
       const agentDir = opts.agentDir ?? getAgentDir();
       const pkg = piIntegrationDir(opts.frameworkRoot);
       const res = pkg ? piPackageResources(pkg) : { extensions: [], skills: [], prompts: [] };
+      // One SettingsManager instance, shared by the loader and the session, so
+      // project trust is computed exactly once and both agree on it. When a
+      // caller supplies its own (tests), that instance's trust decision wins.
+      const settingsManager = opts.settingsManager ?? SettingsManager.create(cwd, agentDir, { projectTrusted: resolveProjectTrust(cwd, agentDir) });
+      const trusted = settingsManager.isProjectTrusted();
       const loader = new DefaultResourceLoader({
         cwd,
         agentDir,
+        settingsManager,
         additionalExtensionPaths: res.extensions,
-        additionalSkillPaths: [...res.skills, ...extraSkillPaths(cwd)],
+        additionalSkillPaths: [...res.skills, ...extraSkillPaths(cwd, trusted)],
         additionalPromptTemplatePaths: res.prompts,
         extensionFactories: [...(opts.extraFactories ?? []), cockpitExtension({ gate, workspace })],
       });
@@ -189,13 +232,15 @@ export function piBackend(opts: PiBackendOptions): AgentBackend {
         agentDir,
         resourceLoader: loader,
         sessionManager,
+        settingsManager,
         ...(opts.model ? { model: opts.model as any } : {}),
-        ...(opts.settingsManager ? { settingsManager: opts.settingsManager as any } : {}),
       });
       const wrapped = new PiAgentSession(session);
       if (!pkg) wrapped.emit({ type: "notice", level: "info", text: "org-os Pi tools aren't installed yet (pi-harness not landed). The vault guard and approvals still apply." });
       if (modelFallbackMessage) wrapped.emit({ type: "notice", level: "warn", text: `pi: ${modelFallbackMessage}` });
-      if (existsSync(join(cwd, ".pi"))) wrapped.emit({ type: "notice", level: "info", text: "This workspace's .pi/ resources load only after you trust it in Pi itself (run `pi` there once)." });
+      if (!trusted && existsSync(join(cwd, ".pi"))) {
+        wrapped.emit({ type: "notice", level: "info", text: "This workspace's .pi/ resources load only after you trust it in Pi itself (run `pi` there once)." });
+      }
       return wrapped;
     },
   };

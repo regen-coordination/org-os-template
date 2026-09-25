@@ -86,6 +86,60 @@ test("a model error surfaces as a notice", async () => {
   await session.dispose();
 });
 
+test("an untrusted workspace's .pi/extensions are never loaded; the untrusted notice fires", async () => {
+  // No opts.settingsManager here: piBackend must compute project trust itself
+  // (fresh agentDir → no trust.json entry → fail closed to untrusted).
+  const agentDir = mkdtempSync(join(tmpdir(), "ck-pi-agent-"));
+  const root = mkdtempSync(join(tmpdir(), "ck-pi-ws-"));
+  const marker = join(root, "marker.txt");
+  mkdirSync(join(root, ".pi", "extensions"), { recursive: true });
+  // A top-level side effect: if the loader ever imports this module (i.e. treats
+  // the project as trusted), the marker is written — proving the extension ran
+  // as arbitrary in-process code outside the gate.
+  writeFileSync(
+    join(root, ".pi", "extensions", "probe.ts"),
+    `import { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(marker)}, "loaded");\nexport default function (pi: any) {};\n`,
+  );
+  const faux = fauxProvider({ provider: "faux-untrusted", models: [{ id: "faux-1" }] });
+  faux.setResponses([fauxAssistantMessage("ok")]);
+  const gate: Gate = new Gate({ ask: () => {} });
+  const backend = piBackend({
+    frameworkRoot: FRAMEWORK,
+    agentDir,
+    persistent: false,
+    model: faux.getModel(),
+    extraFactories: [(pi: any) => pi.registerProvider(faux.provider)],
+  });
+  const workspace: WorkspaceInfo = { id: "u", label: "u", root, kind: "extra", exists: true, drift: 0 };
+  const session = await backend.open({ workspace, resume: "new", gate });
+  const events: AgentEvent[] = [];
+  session.subscribe((e) => events.push(e));
+  await session.prompt("hi");
+  expect(existsSync(marker)).toBe(false);
+  expect(events.some((e) => e.type === "notice" && e.text.includes("only after you trust it"))).toBe(true);
+  await session.dispose();
+});
+
+test("back-to-back prompts serialize: each promise settles only after its own run, no status:error", async () => {
+  const { session, events } = await setup([fauxAssistantMessage("first"), fauxAssistantMessage("second")]);
+  const a = session.prompt("a");
+  const b = session.prompt("b");
+  await a;
+  expect(events.filter((e) => e.type === "assistant_end")).toEqual([{ type: "assistant_end", text: "first" }]);
+  await b;
+  expect(events.filter((e) => e.type === "assistant_end")).toEqual([
+    { type: "assistant_end", text: "first" },
+    { type: "assistant_end", text: "second" },
+  ]);
+  expect(events.filter((e) => e.type === "user")).toEqual([
+    { type: "user", text: "a" },
+    { type: "user", text: "b" },
+  ]);
+  expect(events.some((e) => e.type === "status" && e.status === "error")).toBe(false);
+  expect(events.some((e) => e.type === "notice" && e.level === "error")).toBe(false);
+  await session.dispose();
+});
+
 test("mapPiEvent", () => {
   expect(mapPiEvent({ type: "agent_start" })).toEqual([{ type: "status", status: "working" }]);
   expect(mapPiEvent({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "x" } })).toEqual([{ type: "text_delta", delta: "x" }]);
@@ -111,4 +165,6 @@ test("pi package manifest and extra skill paths", () => {
   mkdirSync(join(root, ".pi"));
   writeFileSync(join(root, ".pi", "settings.json"), JSON.stringify({ skills: ["../skills", "!../skills/commands/**"] }));
   expect(extraSkillPaths(root)).toEqual([]);
+  // Untrusted: project .pi/settings.json is ignored, so the workspace skills are added regardless.
+  expect(extraSkillPaths(root, false)).toEqual([join(root, "skills")]);
 });
