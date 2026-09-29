@@ -14,6 +14,21 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-08-29 · `doctor sync`'s dirty-tree gate narrowed to the overlay's write set
+
+**Status:** active
+**Scope:** framework, instances, safety
+
+**Decision** — The snapshot-stage gate no longer refuses on *any* uncommitted file. It refuses only when an uncommitted path intersects what the run will write — the overlay plan's `add` + `update` set (`unchanged` is not a write). The refusal still fires after the snapshot ref is written and still names the exact colliding files; an uncommitted *deletion* of a file the overlay would restore counts as a collision; and when no plan can be computed the gate falls back to refusing any dirty tree. `--dry-run` stays fully read-only.
+
+**Why** — The refusal was written for `git pull --rebase`, which rewrites the whole working tree, so any dirty file was genuinely at risk. The file-level overlay writes a computed, narrow list; the gate never followed. Measured over the fleet: 3,256 uncommitted files across six instances, exactly one genuine collision — the coarse gate was holding seven instances hostage to work that was never in danger. The alternative (keep the coarse gate, ask operators to commit first) fails the very case the doctor exists for: production instances with hundreds of uncommitted files that are not the framework's business. The narrowing is safe only because it is pinned in both directions by tests and the plan builder is shared with the writer, so what the gate reasons about and what the overlay writes cannot drift.
+
+**Follow-on, same session** — Four instances synced under it (bread-coop-os 8→5 blockers, regen-coordination-os 9→8, dao-os 3→3, regen-toolkit 4→4). **None reached zero blockers, so none was stamped** — the handoff's acceptance is not met, and that is recorded rather than forced. The remaining blockers are instance-owned content the overlay may not touch, so v0.6 Active-1 propagation is gated on per-instance content repair, not on sync tooling. `refi-bcn-os` and `refi-dao-os` were deliberately not synced.
+
+**Refs** — `e70a9b8` (gate + tests), `7d7bbd3` (report + CHANGELOG), `memory/reports/fleet-sync-2026-08-29.md`, `docs/superpowers/plans/2026-08-29-v0.5.1-fleet-sync-handoff.md`, `memory/2026-09-28.md`
+
+---
+
 ## 2026-08-29 · Buzz lane graduated to the hosted community relay
 
 - **Status:** active
