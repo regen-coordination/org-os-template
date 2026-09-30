@@ -18,6 +18,11 @@ import { createClient as defaultCreateClient } from './atproto/client.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { loadInstanceGate, buildGateContext, applyGate } from './gate.mjs';
 import { getConnector, CONNECTORS } from './connectors/index.mjs';
+import { readGeoConfig } from './geo/config.mjs';
+import { readGeoRegistry, writeGeoRegistry, readVocabulary } from './geo/registry.mjs';
+import { planGeoRegistration } from './geo/plan.mjs';
+import { loadGeoSdk, publishEdit } from './geo/publisher.mjs';
+import { verifyIndexed } from './geo/verify.mjs';
 
 export const OPS = {
   // write:true here = CRITICAL/fail-hard: if kms.yaml can't load, no downstream op can run.
@@ -171,6 +176,76 @@ export const OPS = {
     }
     if (!dry && Object.keys(cursorChanges).length) writeCursors(dir, cursorChanges);
     return { ok: true, report };
+  } },
+
+  // geo.register / geo.verify: CLI verbs only (`org-os-kms geo register|verify`), never bound to a lifecycle event.
+  // Least-Geo path: Geo holds shared ids + indexing; content stays here. Selection = what `publish` selects AND
+  // is on the publication plane (in the publish manifest), narrowed to geo.types (+ geo.select). Plan by default;
+  // --apply needs geo.space/space_kind/author_space and GEO_PRIVATE_KEY. The registry is persisted right after the
+  // edit is sent, before verification (which only reads). Nothing is ever deleted from Geo: dropped entries are
+  // reported as orphaned.
+  'geo.register': { kind: 'exec', write: true, run: async (ctx) => {
+    const dir = ctx.dir || '.';
+    const config = ctx.config || (ctx.config = loadKmsConfig(dir));
+    const deps = { env: process.env, loadSdk: loadGeoSdk, publish: publishEdit, verify: verifyIndexed, fetchImpl: globalThis.fetch, ...(ctx.deps || {}) };
+    const apply = ctx.flags?.apply === true && ctx.flags?.dry !== true;
+    const { ok, errors, applyErrors, geo } = readGeoConfig(config);
+    if (!ok) return { ok: false, report: { status: 'invalid-config', errors } };
+
+    const all = fw.getAdapter(config.adapter).list(join(dir, config.target));
+    const types = fw.publishableTypes(config);
+    let items = all.filter(({ schema, object }) => fw.isPublishable(object, { schema, types }));
+    const gate = await loadInstanceGate(dir, config);
+    if (gate) items = applyGate(gate, items, buildGateContext(all)).passed;
+    const onPlane = readManifest(dir).objects;
+    items = items.filter(({ object }) => object.id && onPlane[object.id]);
+
+    let vocabularies;
+    try { vocabularies = geo.vocabularies.map((decl) => ({ decl, records: readVocabulary(join(dir, decl.path)) })); }
+    catch (e) { return { ok: false, report: { status: 'failed', error: e.message } }; }
+    const registry = readGeoRegistry(dir);
+    const plan = planGeoRegistration({ items, vocabularies, geo, registry });
+    const report = { network: geo.network, space: geo.space, create: plan.create.length, update: plan.update.length, skip: plan.skip.length, orphaned: plan.orphaned, warnings: plan.warnings };
+    if (!plan.ok) return { ok: false, report: { ...report, status: 'failed', errors: plan.errors } };
+    const pending = [...plan.create, ...plan.update];
+    if (!apply) return { ok: true, report: { ...report, status: 'planned', entities: pending.map(({ key, geoId, relations }) => ({ key, geoId, relations: relations.length })) } };
+    if (applyErrors.length) return { ok: false, report: { ...report, status: 'invalid-config', errors: applyErrors } };
+    if (!pending.length) return { ok: true, report: { ...report, status: 'nothing-to-do' } };
+    const key = deps.env.GEO_PRIVATE_KEY;
+    if (!key) return { ok: false, report: { ...report, status: 'not-configured', reason: 'GEO_PRIVATE_KEY not set — load it from the git-ignored env file into this shell' } };
+
+    let edit;
+    try {
+      const { sdk, accounts } = await deps.loadSdk();
+      edit = await deps.publish({ sdk, accounts, privateKey: key, geo, entities: pending, name: `${config.instance}: register ${pending.length} entities` });
+    } catch (e) { return { ok: false, report: { ...report, status: 'failed', error: String(e?.message ?? e).split(key).join('***') } }; }
+
+    const at = new Date().toISOString();
+    const next = { version: 1, network: geo.network, space: geo.space, entities: { ...registry.entities } };
+    for (const op of pending) next.entities[op.geoId] = { key: op.key, hash: op.hash, editId: edit.editId, cid: edit.cid, txHash: edit.txHash, registeredAt: at, indexed: false };
+    writeGeoRegistry(dir, next);
+    const sent = { editId: edit.editId, cid: edit.cid, txHash: edit.txHash };
+    if (edit.proposed) return { ok: true, report: { ...report, ...sent, status: 'proposed', note: 'DAO space: this edit is a proposal — vote in Geo, then run `geo verify`' } };
+    let v;
+    try { v = await deps.verify({ api: geo.api, space: geo.space, geoIds: pending.map((o) => o.geoId), fetchImpl: deps.fetchImpl }); }
+    catch (e) { return { ok: true, report: { ...report, ...sent, status: 'applied-unverified', error: e.message } }; }
+    for (const id of v.indexed) next.entities[id].indexed = true;
+    writeGeoRegistry(dir, next);
+    return { ok: true, report: { ...report, ...sent, status: v.missing.length ? 'applied-unverified' : 'applied', indexed: v.indexed.length, missing: v.missing } };
+  } },
+
+  'geo.verify': { kind: 'exec', write: true, run: async (ctx) => {
+    const dir = ctx.dir || '.';
+    const config = ctx.config || (ctx.config = loadKmsConfig(dir));
+    const deps = { verify: verifyIndexed, fetchImpl: globalThis.fetch, ...(ctx.deps || {}) };
+    const { geo } = readGeoConfig(config);
+    const registry = readGeoRegistry(dir);
+    const pending = Object.entries(registry.entities).filter(([, e]) => !e.indexed).map(([id]) => id);
+    if (!registry.space || !pending.length) return { ok: true, report: { status: 'nothing-to-do' } };
+    const v = await deps.verify({ api: geo.api, space: registry.space, geoIds: pending, fetchImpl: deps.fetchImpl });
+    for (const id of v.indexed) registry.entities[id].indexed = true;
+    if (v.indexed.length) writeGeoRegistry(dir, registry);
+    return { ok: true, report: { status: v.missing.length ? 'unverified' : 'verified', indexed: v.indexed.length, missing: v.missing } };
   } },
 
   // skill directives — judgment ops the agent runs; the executor collects them.

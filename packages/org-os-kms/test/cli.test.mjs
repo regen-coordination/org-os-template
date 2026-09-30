@@ -65,3 +65,9 @@ test('exitCodeFor: publish/ingest exit 1 on ok:false; other verbs keep their fai
   for (const v of ['publish', 'ingest', 'render', 'frobnicate']) assert.equal(exitCodeFor(v, { error: 'x' }), 1);
   assert.equal(exitCodeFor('publish', undefined), 0);
 });
+
+test('geo verb parses and fails the process on ok:false', async () => {
+  assert.deepEqual(dispatch(['geo', 'register', '--apply'], { dry: true }), { verb: 'geo', args: ['register'], flags: { apply: true } });
+  assert.equal(exitCodeFor('geo', { ok: false }), 1);
+  assert.equal(exitCodeFor('geo', { ok: true }), 0);
+});
