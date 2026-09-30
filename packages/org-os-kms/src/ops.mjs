@@ -23,6 +23,8 @@ import { readGeoRegistry, writeGeoRegistry, readVocabulary } from './geo/registr
 import { planGeoRegistration } from './geo/plan.mjs';
 import { loadGeoSdk, publishEdit } from './geo/publisher.mjs';
 import { verifyIndexed } from './geo/verify.mjs';
+import { scrubSecret } from './geo/scrub.mjs';
+import { isGeoId } from './geo/ids.mjs';
 
 export const OPS = {
   // write:true here = CRITICAL/fail-hard: if kms.yaml can't load, no downstream op can run.
@@ -115,7 +117,7 @@ export const OPS = {
           // A login/network failure is a reported failure, not an exception. Nothing is persisted here (applyPublish
           // never returned, so there is no trustworthy manifest); the static surface below still runs from the last
           // persisted manifest, exactly as in plan mode. Never echo the credential.
-          report.atproto = { status: 'failed', error: String(e.message).split(password).join('***'), ...counts };
+          report.atproto = { status: 'failed', error: scrubSecret(e.message, password), ...counts };
         }
         if (applied) {
           next = applied.manifest;
@@ -187,8 +189,9 @@ export const OPS = {
   'geo.register': { kind: 'exec', write: true, run: async (ctx) => {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
-    const deps = { env: process.env, loadSdk: loadGeoSdk, publish: publishEdit, verify: verifyIndexed, fetchImpl: globalThis.fetch, ...(ctx.deps || {}) };
+    const deps = { env: process.env, loadSdk: loadGeoSdk, publish: publishEdit, verify: verifyIndexed, writeRegistry: writeGeoRegistry, fetchImpl: globalThis.fetch, ...(ctx.deps || {}) };
     const apply = ctx.flags?.apply === true && !ctx.flags?.dry;
+    if (config.geo == null) return { ok: true, report: { status: 'not-configured', hint: 'add a geo: block to kms.yaml — CONNECTORS §13' } };
     const { ok, errors, applyErrors, geo } = readGeoConfig(config);
     if (!ok) return { ok: false, report: { status: 'invalid-config', errors } };
 
@@ -208,7 +211,8 @@ export const OPS = {
     const report = { network: geo.network, space: geo.space, create: plan.create.length, update: plan.update.length, skip: plan.skip.length, orphaned: plan.orphaned, warnings: plan.warnings };
     if (!plan.ok) return { ok: false, report: { ...report, status: 'failed', errors: plan.errors } };
     const pending = [...plan.create, ...plan.update];
-    if (!apply) return { ok: true, report: { ...report, status: 'planned', entities: pending.map(({ key, geoId, relations }) => ({ key, geoId, relations: relations.length })) } };
+    if (!apply) return { ok: true, report: { ...report, status: 'planned', spaceKind: geo.spaceKind, applyBlockers: applyErrors, ...(ctx.flags?.apply === true && ctx.flags?.dry ? { applyIgnored: true } : {}),
+      entities: pending.map(({ key, geoId, name, description, url, relations }) => ({ key, geoId, name, description, url, relations })) } };
     if (applyErrors.length) return { ok: false, report: { ...report, status: 'invalid-config', errors: applyErrors } };
     if (!pending.length) return { ok: true, report: { ...report, status: 'nothing-to-do' } };
     const key = deps.env.GEO_PRIVATE_KEY;
@@ -218,13 +222,17 @@ export const OPS = {
     try {
       const { sdk, accounts } = await deps.loadSdk();
       edit = await deps.publish({ sdk, accounts, privateKey: key, geo, entities: pending, name: `${config.instance}: register ${pending.length} entities` });
-    } catch (e) { return { ok: false, report: { ...report, status: 'failed', error: String(e?.message ?? e).split(key).join('***') } }; }
+    } catch (e) {
+      const msg = [e?.message ?? e, e?.cause?.message].filter(Boolean).join(' (cause: ') + (e?.cause?.message ? ')' : '');
+      return { ok: false, report: { ...report, status: 'failed', error: scrubSecret(msg, key) } };
+    }
 
     const at = new Date().toISOString();
     const next = { version: 1, network: geo.network, space: geo.space, entities: { ...registry.entities } };
     for (const op of pending) next.entities[op.geoId] = { key: op.key, hash: op.hash, editId: edit.editId, cid: edit.cid, txHash: edit.txHash, registeredAt: at, indexed: false };
-    writeGeoRegistry(dir, next);
     const sent = { editId: edit.editId, cid: edit.cid, txHash: edit.txHash };
+    try { deps.writeRegistry(dir, next); }
+    catch (e) { throw new Error(`geo: the edit was sent but data/kms-geo.json could not be written (${e.message}) — reconstruct it from editId ${sent.editId}, cid ${sent.cid}, txHash ${sent.txHash}`); }
     if (edit.proposed) return { ok: true, report: { ...report, ...sent, status: 'proposed', note: 'DAO space: this edit is a proposal — vote in Geo, then run `geo verify`' } };
     let v;
     try { v = await deps.verify({ api: geo.api, space: geo.space, geoIds: pending.map((o) => o.geoId), fetchImpl: deps.fetchImpl }); }
@@ -240,12 +248,14 @@ export const OPS = {
     const deps = { verify: verifyIndexed, fetchImpl: globalThis.fetch, ...(ctx.deps || {}) };
     const { geo } = readGeoConfig(config);
     const registry = readGeoRegistry(dir);
-    const pending = Object.entries(registry.entities).filter(([, e]) => !e.indexed).map(([id]) => id);
-    if (!registry.space || !pending.length) return { ok: true, report: { status: 'nothing-to-do' } };
+    const unindexed = Object.entries(registry.entities).filter(([, e]) => !e.indexed).map(([id]) => id);
+    const pending = unindexed.filter(isGeoId);
+    const invalid = unindexed.filter((id) => !isGeoId(id));
+    if (!registry.space || !pending.length) return { ok: true, report: { status: 'nothing-to-do', ...(invalid.length ? { invalid } : {}) } };
     const v = await deps.verify({ api: geo.api, space: registry.space, geoIds: pending, fetchImpl: deps.fetchImpl });
     for (const id of v.indexed) registry.entities[id].indexed = true;
     if (v.indexed.length) writeGeoRegistry(dir, registry);
-    return { ok: true, report: { status: v.missing.length ? 'unverified' : 'verified', indexed: v.indexed.length, missing: v.missing } };
+    return { ok: true, report: { status: v.missing.length ? 'unverified' : 'verified', indexed: v.indexed.length, missing: v.missing, ...(invalid.length ? { invalid } : {}) } };
   } },
 
   // skill directives — judgment ops the agent runs; the executor collects them.

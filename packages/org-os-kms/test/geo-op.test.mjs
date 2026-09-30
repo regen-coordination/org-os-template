@@ -50,6 +50,10 @@ test('plan mode (default): published objects + vocabulary planned, nothing writt
   const r = await OPS['geo.register'].run({ dir, flags: {}, deps: deps(log) });
   assert.equal(r.ok, true, JSON.stringify(r.report)); assert.equal(r.report.status, 'planned');
   assert.deepEqual(r.report.entities.map((e) => e.key).sort(), ['encyclopedia-entry:pub', 'refidao:topic:funding']);
+  const pub = r.report.entities.find((e) => e.key === 'encyclopedia-entry:pub');
+  assert.equal(pub.name, 'Pub'); assert.equal(pub.description, 's'); assert.equal(pub.url, 'https://k.example/concepts/pub');
+  assert.deepEqual(pub.relations, [{ toGeoId: r.report.entities.find((e) => e.key === 'refidao:topic:funding').geoId, propertyId: H('d') }]);
+  assert.equal(r.report.spaceKind, 'personal'); assert.deepEqual(r.report.applyBlockers, []); assert.equal(r.report.applyIgnored, undefined);
   assert.equal(log.length, 0); assert.ok(!existsSync(join(dir, 'data', 'kms-geo.json')));
 });
 
@@ -112,4 +116,43 @@ test('a truthy non-boolean --dry (parser swallowed a value) still only plans', a
   const log = [];
   const r = await OPS['geo.register'].run({ dir: instance(), flags: { dry: 'x', apply: true }, deps: deps(log) });
   assert.equal(r.report.status, 'planned'); assert.equal(log.length, 0);
+});
+
+test('plan report shows apply blockers, and says when --apply was ignored by --dry', async () => {
+  const r = await OPS['geo.register'].run({ dir: instance({ space: false }), flags: { apply: true, dry: true }, deps: deps([]) });
+  assert.equal(r.report.status, 'planned'); assert.equal(r.report.applyIgnored, true);
+  assert.match(r.report.applyBlockers.join(' '), /geo\.space/);
+});
+
+test('no geo: block → ok with status not-configured and a hint, not an empty plan', async () => {
+  const dir = instance();
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', publish: { static: false } }));
+  const r = await OPS['geo.register'].run({ dir, flags: {}, deps: deps([]) });
+  assert.equal(r.ok, true); assert.equal(r.report.status, 'not-configured'); assert.match(r.report.hint, /geo: block.*CONNECTORS/);
+});
+
+test('the key is masked without its 0x prefix and in other case; also in error.cause', async () => {
+  for (const msg of ['signer secretkey rejected', 'signer 0xSECRETKEY rejected', 'signer SECRETKEY rejected']) {
+    const r = await OPS['geo.register'].run({ dir: instance(), flags: { apply: true }, deps: deps([], { publishError: msg }) });
+    assert.ok(!/secretkey/i.test(r.report.error), r.report.error);
+  }
+  const d = deps([]); d.publish = async () => { throw new Error('outer', { cause: new Error('inner secretkey') }); };
+  const r = await OPS['geo.register'].run({ dir: instance(), flags: { apply: true }, deps: d });
+  assert.ok(!/secretkey/i.test(JSON.stringify(r.report)), JSON.stringify(r.report)); assert.match(r.report.error, /outer/);
+});
+
+test('registry write failing after the edit was sent rethrows with editId, cid and txHash', async () => {
+  const d = { ...deps([]), writeRegistry: () => { throw new Error('disk full'); } };
+  await assert.rejects(() => OPS['geo.register'].run({ dir: instance(), flags: { apply: true }, deps: d }),
+    (e) => /e1/.test(e.message) && /ipfs:\/\/c1/.test(e.message) && /0xtx/.test(e.message) && /disk full/.test(e.message));
+});
+
+test('geo verify: non-conforming registry keys are reported as invalid and never queried', async () => {
+  const dir = instance();
+  mkdirSync(join(dir, 'data'), { recursive: true });
+  writeFileSync(join(dir, 'data', 'kms-geo.json'), JSON.stringify({ version: 1, network: 'testnet', space: H('1'), entities: { [H('5')]: { key: 'a', indexed: false }, 'x") { id } evil: entity(id: "1': { key: 'b', indexed: false } } }));
+  const asked = [];
+  const r = await OPS['geo.verify'].run({ dir, deps: { verify: async ({ geoIds }) => { asked.push(...geoIds); return { indexed: geoIds, missing: [] }; } } });
+  assert.deepEqual(asked, [H('5')]); assert.deepEqual(r.report.invalid, ['x") { id } evil: entity(id: "1']);
+  assert.equal(r.report.status, 'verified');
 });
