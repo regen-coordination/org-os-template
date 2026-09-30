@@ -19,6 +19,8 @@ const aliasesOf = (rec) => {
   return [];
 };
 
+const tryGeoId = (id) => { try { return geoIdFromUuid(id); } catch { return null; } };
+
 export function planGeoRegistration({ items, vocabularies = [], geo, registry }) {
   const errors = []; const warnings = [];
   if (registry.space && geo.space && registry.space !== geo.space) errors.push(`${GEO_REGISTRY_PATH} belongs to space ${registry.space}; kms.yaml names space ${geo.space}. Use a new registry for a new space.`);
@@ -49,13 +51,13 @@ export function planGeoRegistration({ items, vocabularies = [], geo, registry })
   const typed = items.filter(({ schema }) => geo.types[schema]);
   const select = geo.select.length ? new Set(geo.select) : null;
   if (select) {
-    const known = new Set(typed.flatMap(({ ref, object }) => [object.id, slugFromRef(ref)].filter(Boolean)));
+    const known = new Set(typed.flatMap(({ ref, object }) => [object.id, tryGeoId(object.id), slugFromRef(ref)].filter(Boolean)));
     const unknown = geo.select.filter((s) => !known.has(s));
     if (unknown.length) errors.push(`geo.select names entries that are not selectable (unknown, unpublished, or of a type not in geo.types): ${unknown.join(', ')}`);
   }
   for (const { schema, ref, object } of typed) {
     const slug = slugFromRef(ref);
-    if (select && !select.has(object.id) && !select.has(slug)) continue;
+    if (select && !select.has(object.id) && !select.has(tryGeoId(object.id)) && !select.has(slug)) continue;
     if (!object.id) { errors.push(`${schema}:${slug} has no id — publish it before registering it in Geo`); continue; }
     let geoId;
     try { geoId = geoIdFromUuid(object.id); } catch (e) { errors.push(`${schema}:${slug}: ${e.message}`); continue; }

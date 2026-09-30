@@ -86,3 +86,9 @@ test('long descriptions are clipped to 300 characters on one line', () => {
   const d = planGeoRegistration({ items: it, vocabularies: vocab(), geo: geo(), registry: empty() }).create.find((o) => o.key.startsWith('encyclopedia')).description;
   assert.equal(d.length, 300); assert.ok(!d.includes('\n')); assert.ok(d.endsWith('…'));
 });
+
+test('a select entry given as a dashless 32-hex Geo id matches the object', () => {
+  const p = planGeoRegistration({ items: items(), vocabularies: vocab(), geo: geo({ select: ['11c13f3990c449b1b4acfca6a4c1f2ea'] }), registry: empty() });
+  assert.equal(p.ok, true, p.errors.join('; '));
+  assert.ok(p.create.some((o) => o.key === 'encyclopedia-entry:activation'));
+});
