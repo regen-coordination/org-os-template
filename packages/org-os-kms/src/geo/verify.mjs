@@ -6,14 +6,21 @@ export async function verifyIndexed({ api, space, geoIds, fetchImpl = globalThis
   const start = now();
   while (pending.size) {
     for (const id of [...pending]) {
-      const res = await fetchImpl(api, { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query: `{ entity(id: "${id}") { id spaceIds } }` }) });
-      const json = await res.json().catch(() => ({}));
-      const e = json?.data?.entity;
-      if (e && Array.isArray(e.spaceIds) && e.spaceIds.includes(space)) pending.delete(id);
+      const remaining = timeoutMs - (now() - start);
+      if (remaining <= 0) break;
+      try {
+        const res = await fetchImpl(api, { method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ query: `{ entity(id: "${id}") { id spaceIds } }` }),
+          signal: AbortSignal.timeout(Math.min(remaining, 15000)) });
+        const json = await res.json().catch(() => ({}));
+        const e = json?.data?.entity;
+        if (e && Array.isArray(e.spaceIds) && e.spaceIds.includes(space)) pending.delete(id);
+      } catch (_err) {
+        // request failed or timed out; treat as "not yet" and continue
+      }
     }
     if (!pending.size || now() - start >= timeoutMs) break;
-    await sleep(intervalMs);
+    await sleep(Math.min(intervalMs, timeoutMs - (now() - start)));
   }
   return { indexed: geoIds.filter((id) => !pending.has(id)), missing: [...pending] };
 }
