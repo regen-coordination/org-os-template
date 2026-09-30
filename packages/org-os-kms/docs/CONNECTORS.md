@@ -158,11 +158,13 @@ geo:
   select: []                       # optional: only these object ids or slugs
 ```
 
+`geo.parent_space` is accepted and informational: it is copied into `.well-known/knowledge.json` and is not used by `geo register`. `geo.domain`-style changes are additive (see Orphans below): if an object's relation changes (for example its `domain` now maps to another topic), the old relation **stays in Geo**, because writes only add. An instance with no `geo:` block at all gets `status: not-configured` with a hint (exit 0).
+
 `readGeoConfig` never throws for any shape of the block: malformed shapes become config errors (`status: invalid-config`, exit 1). Missing `space`, `space_kind`, `author_space` or `url_property` are errors only for `--apply`; a plan runs without them. The web-URL property id in the Geo SDK's SystemIds is `283127c96142468492ed90b0ebc7f29a`; an instance puts it in `geo.url_property`.
 
 ### Selection
 
-An object is registered when it is publishable (same rules as `publish`, including the instance gate), is **on the publication plane** (present in the publish manifest `data/kms-published.json`), has an `id` and a `title`, and its schema is listed in `geo.types`. When `geo.select` is non-empty it narrows the objects further (by `id` or slug); a name that matches nothing selectable is an error. Vocabulary entries are always planned, regardless of `select`.
+An object is registered when it is publishable (same rules as `publish`, including the instance gate), is **on the publication plane** (present in the publish manifest `data/kms-published.json`), has an `id` and a `title`, and its schema is listed in `geo.types`. When `geo.select` is non-empty it narrows the objects further (by `id`, the 32-hex Geo id, or slug); a name that matches nothing selectable is an error. Vocabulary entries are always planned, regardless of `select`.
 
 ### Ids
 
@@ -185,13 +187,13 @@ It is the proof of registration (nothing is written onto the objects, which woul
 
 ### `geo register`
 
-- **Plan** (default, also `--dry`; `--apply --dry` plans: `--dry` always wins, `apply = flags.apply && !flags.dry` in `ops.mjs`): reports `create`, `update`, `skip` counts, `orphaned`, `warnings` (for example a relation value with no vocabulary entry) and the pending entities. Writes nothing. `status: planned`. Plan errors give `status: failed` and exit 1.
-- **Apply** (`--apply`): needs the apply-only config above and `GEO_PRIVATE_KEY`, which is read **only from the environment** (load it from a git-ignored env file into the shell; it is never written anywhere and is masked if it appears in an error). Sends one edit with every pending entity. The registry is written right after the edit is sent, before verification.
+- **Plan** (default, also `--dry`; any presence of `--dry` means dry, even if the flag parser took the next word as its value, and `--apply --dry` plans with `applyIgnored: true`): reports `create`, `update`, `skip` counts, `orphaned`, `warnings` (for example a relation value with no vocabulary entry), `spaceKind`, `applyBlockers` (the config errors `--apply` would hit) and the pending entities with exactly what would leave the machine: `key`, `geoId`, `name`, `description`, `url` and `relations` (`{ toGeoId, propertyId, toSpace? }`). Writes nothing. `status: planned`. Plan errors give `status: failed` and exit 1.
+- **Apply** (`--apply`): needs the apply-only config above and `GEO_PRIVATE_KEY`, which is read **only from the environment** (load it from a git-ignored env file into the shell; it is never written anywhere and is masked, with or without its `0x` prefix and in any letter case, if it appears in an error or its cause). Sends one edit with every pending entity. The registry is written right after the edit is sent, before verification.
 - **Space kind.** `personal`: the edit is published and the transaction sent; then the run polls the Geo API. `dao`: the edit is sent as a **proposal** (FAST voting mode) and is never voted on from here; `status: proposed`, vote in Geo, then run `geo verify`.
-- **Statuses:** `planned` (also what a plan with nothing pending reports), `nothing-to-do` (only under `--apply`), `invalid-config`, `not-configured` (no key), `failed` (exit 1), `proposed`, `applied` (every entity indexed), `applied-unverified` (sent, not yet visible; run `geo verify`).
+- **Statuses:** `planned` (also what a plan with nothing pending reports), `nothing-to-do` (only under `--apply`), `invalid-config`, `not-configured` (no `geo:` block in `kms.yaml`, exit 0, with a `hint`; or no key under `--apply`), `failed` (exit 1), `proposed`, `applied` (every entity indexed), `applied-unverified` (sent, not yet visible; run `geo verify`).
 - **Orphans.** With `geo.select` set, previously registered objects that are not selected this run are reported as `orphaned`; so is any registry entry no longer planned. **Nothing is ever deleted from Geo.**
 - The Geo SDK (`@geoprotocol/geo-sdk@0.20.3`) and `viem` are loaded from the instance at run time, not from this package: `npm i -E @geoprotocol/geo-sdk@0.20.3 viem` there.
 
 ### `geo verify`
 
-Polls the open Geo GraphQL API (no auth) for every registry entry with `indexed: false` until it appears in the space (`Entity.spaceIds`), then marks it `indexed: true`. A failed request counts as "not yet"; each request is bounded by an abort timeout (at most 15 s) and the deadline (default 120 s, every 5 s) is checked inside a round. `status: verified` when all are indexed, `unverified` (with `missing`) otherwise, `nothing-to-do` when there is nothing pending or the registry has no space yet (it does not require `geo.space` in `kms.yaml`; it uses the registry's space). Both outcomes exit 0.
+Polls the open Geo GraphQL API (no auth) for every registry entry with `indexed: false` until it appears in the space (`Entity.spaceIds`), then marks it `indexed: true`. A failed request counts as "not yet"; each request is bounded by an abort timeout (at most 15 s) and the deadline (default 120 s, every 5 s) is checked inside a round. `status: verified` when all are indexed, `unverified` (with `missing`) otherwise, `nothing-to-do` when there is nothing pending or the registry has no space yet (it does not require `geo.space` in `kms.yaml`; it uses the registry's space). Both outcomes exit 0. Registry keys that are not 32-hex ids are reported under `invalid` and never sent in a query. If writing the registry fails after the edit was sent, the error carries `editId`, `cid` and `txHash` so the registry can be rebuilt by hand.
