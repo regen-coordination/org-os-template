@@ -82,3 +82,32 @@ test('map: handles non-string sourceUri and missing value safely', () => {
   const missingValue = { uri: `at://did:plc:peer/${RES}/rk3`, cid: 'x' };
   assert.deepEqual(c.map(missingValue, cfg), [], 'missing value returns empty');
 });
+
+function fakeFactory(calls, per = 4) {
+  return () => ({
+    async getLatestCommit() { return { rev: 'r1' }; },
+    async listAllRecords({ collection }) { calls.push(collection); return Array.from({ length: per }, (_, i) => ({ uri: `at://did:plc:peer/${collection}/k${i}`, value: {} })); },
+  });
+}
+const base = { peers: ['did:plc:peer'], pds: 'https://pds.test', nsid_authority: 'xyz.regencoordination.kb' };
+
+test('types restricts the collections listed', async () => {
+  const calls = [];
+  const c = createAtprotoConnector({ createClient: fakeFactory(calls) });
+  const r = await c.pull({ ...base, types: ['encyclopedia-entry'] }, { cursor: null });
+  assert.deepEqual(calls, ['xyz.regencoordination.kb.encyclopediaEntry']);
+  assert.equal(r.records.length, 4);
+});
+
+test('limit caps the records, stops listing early, and reports no retractions', async () => {
+  const calls = [];
+  const c = createAtprotoConnector({ createClient: fakeFactory(calls) });
+  const r = await c.pull({ ...base, limit: 6 }, { cursor: { 'did:plc:peer': { rev: 'old', seen: ['at://gone'] } } });
+  assert.equal(r.records.length, 6); assert.equal(calls.length, 2);
+  assert.deepEqual(r.retracted, []);
+});
+
+test('an unknown type name throws', async () => {
+  const c = createAtprotoConnector({ createClient: fakeFactory([]) });
+  await assert.rejects(() => c.pull({ ...base, types: ['encyclopedia'] }, { cursor: null }), /unknown types: encyclopedia/);
+});
