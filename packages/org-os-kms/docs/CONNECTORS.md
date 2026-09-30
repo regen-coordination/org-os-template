@@ -24,7 +24,7 @@ The `ingest` report, per connector: `name`, `status`, `dry`, `pulled`, `candidat
 
 `lifecycle close` (`bind.mjs`) ends with `publish` then `sync.push`. `publish` runs in **plan mode** unless `kms.yaml` has `publish.apply: true`: it makes no PDS writes and writes no manifest. Plan mode is **not read-only**. When not `--dry` it still:
 
-- mints `id` (and `grc20Id`, see section 9) into the source yaml for objects that pass the gate, but **only when a publication target exists**: `atproto.did`, `atproto.pds` and `atproto.nsid_authority` are all set, or `publish.static` is not `false`. An instance with neither (for example `regen-toolkit`: pull-only, `publish.static: false`) gets no yaml rewritten; the report's `minted` count is then only a preview; and
+- mints `id` (Geo ids are derived from it, see section 13) into the source yaml for objects that pass the gate, but **only when a publication target exists**: `atproto.did`, `atproto.pds` and `atproto.nsid_authority` are all set, or `publish.static` is not `false`. An instance with neither (for example `regen-toolkit`: pull-only, `publish.static: false`) gets no yaml rewritten; the report's `minted` count is then only a preview; and
 - regenerates the static surface (`<publish.static_dir>`, default `public/`) unless `publish.static: false`.
 
 `publish --dry` is the fully read-only mode: no ids minted, no static files written, no PDS calls, no manifest. Real PDS writes need `--apply` (or `publish.apply: true`), `atproto.did`, `atproto.pds`, `atproto.nsid_authority`, and `ATPROTO_APP_PASSWORD` in the environment; if any is missing the atproto part reports `not-configured` (or `planned` when only apply is missing). Publish is a write op inside `close`, so a failed static surface (for example a missing `publish.base_url`) or failed PDS writes stop the lifecycle before `sync.push`. A failed login or a network error during apply is reported as `atproto.status: 'failed'` with an `error` message (never the credential) and `ok: false`, not thrown; in that case no manifest is written (nothing trustworthy came back) while the static surface step still runs from the last persisted manifest.
@@ -71,6 +71,8 @@ connectors:
 - The connector uses **one PDS for all listed peers**. Resolving each peer's own PDS via DID documents, or reading from a relay, is **not implemented**; peers must be reachable on the configured PDS.
 - `atproto.did`, `atproto.nsid_authority` and `atproto.pds` are merged under each connector's own `config` (the connector's own keys win).
 - Cursor: `{ <did>: { rev, seen } }`. A peer whose commit `rev` is unchanged is skipped. A peer's full record list is compared to `seen` to detect retractions. A per-peer failure goes into the connector's `errors` and the other peers continue.
+- `config.types` (schema names) restricts which collections are listed; an unknown name makes the pull throw. `config.limit` (positive integer) caps the records per run and is meant for fixtures: a limited pull reports no retractions. `config.pds` on one declaration overrides the shared `atproto.pds`, so peers on different hosts need one declaration each (no DID-document resolution yet).
+- **A limited pull advances the cursor with only the limited subset.** A later unlimited pull on the same cursor skips that peer until the peer commits again, and `limit` is global across peers (later peers can get nothing). Use a throwaway cursor or a dedicated instance for fixture pulls.
 - Inbound records are treated as untrusted: they are passed through the same projection (private fields dropped), the peer's `id` is not kept, records claiming your own DID as origin are ignored, and a record that claims another listed peer as its origin is ignored.
 
 ## 8. Static JSON sources (`static-json` connector)
@@ -90,7 +92,7 @@ connectors:
 ## 9. Ids
 
 - `id` (UUIDv4) is the AT Proto record key (`rkey`) and the key of the publish manifest (`data/kms-published.json`). It is minted at first non-dry publish, and **only for objects that passed every gate**, and only when a publication target exists (section 2); never on `--dry`. The instance-registry bridge (`bridge`) matches an existing `data/<registry>.yaml` row by the object's `id` **or** its title slug, so a row bridged before the id was minted migrates from slug to id in place instead of being duplicated. The `id` is a field on the object in the source yaml, so git holds it.
-- `grc20Id` is minted only when `kms.yaml.geo.space` is set.
+- `grc20Id` is never minted at publish. An object's Geo id is its `id` without dashes (section 13); `grc20Id` is written onto objects only when an instance republishes every record (for ReFi DAO: Phase 3).
 - The publish plan compares the content hash of the projected record with the hash stored in the manifest under that `id`: unchanged is skipped, changed is an update (with a compare-and-swap on the stored `cid`), and manifest ids no longer present are deleted from the PDS.
 - **Correction to an earlier plan note.** The plan says `sameStoredObject` (`toolkit-framework/src/util.mjs`) compares by id once an id exists. That function does **not exist** in this version of the framework (`packages/toolkit-framework/src/util.mjs` in org-os has no such export, and the storage adapters simply overwrite an entry with the same slug). The claim only holds for older vendored framework copies that ship a `sameStoredObject` in `util.mjs` (which compares by `id` when both objects have one, otherwise by content hash). Check the copy you vendor. Regardless of the framework version, the connector layer never overwrites a local object with a new candidate that has the same slug (section 10).
 
@@ -128,3 +130,67 @@ Ingested objects land `not-public-yet`, so they are outside the publication floo
 ## 12. This plan
 
 `regen-toolkit` publishes nothing here: it is pull-only (`publish.apply` off, `atproto.did` unset), so it uses `ingest` and does not run `publish --apply`.
+
+## 13. Geo registration (`geo register`, `geo verify`)
+
+Scope is deliberately the least Geo: **ids and indexing only**. Geo holds a shared entity (id, name, short description, type, optional page link, relations) so peers and Geo can join on the same id; the content itself stays in git. `geo register` and `geo verify` are CLI verbs only (`org-os-kms geo register [--apply]`, `org-os-kms geo verify`); no lifecycle event runs them. Testnet only (`https://api-testnet.geobrowser.io/graphql` unless `geo.api` says otherwise); `geo.network` other than `testnet` is a config error. When Geo mainnet exists, re-register there with the same ids.
+
+### Config (`kms.yaml`, `geo:` block)
+
+```yaml
+geo:
+  network: testnet                 # only value accepted (default)
+  space: <32-hex space id>         # needed for --apply
+  space_kind: personal             # personal | dao (needed for --apply)
+  author_space: <32-hex personal space id>   # needed for --apply
+  url_property: <32-hex property id>         # needed for --apply when any type has a url
+  types:                           # object schema -> Geo type; only these schemas are registered
+    resource: { type_id: <32-hex>, url: 'https://example.org/resources/{slug}' }   # url optional, must contain {slug}
+  vocabularies:                    # controlled vocabularies registered as entities
+    - path: data/topics.json       # JSON list of { id, name, description?, aliases? } (or an object holding one list)
+      namespace: refidao:topic
+      type_id: <32-hex>
+      links:                       # optional relations from a vocabulary record to a Geo id
+        - { field: parent_geo_id, property_id: <32-hex>, to_space: <32-hex> }   # to_space optional
+  relations:                       # object field -> vocabulary entry
+    - { from_field: topic, to_vocabulary: refidao:topic, property_id: <32-hex> }
+  select: []                       # optional: only these object ids or slugs
+```
+
+`readGeoConfig` never throws for any shape of the block: malformed shapes become config errors (`status: invalid-config`, exit 1). Missing `space`, `space_kind`, `author_space` or `url_property` are errors only for `--apply`; a plan runs without them. The web-URL property id in the Geo SDK's SystemIds is `283127c96142468492ed90b0ebc7f29a`; an instance puts it in `geo.url_property`.
+
+### Selection
+
+An object is registered when it is publishable (same rules as `publish`, including the instance gate), is **on the publication plane** (present in the publish manifest `data/kms-published.json`), has an `id` and a `title`, and its schema is listed in `geo.types`. When `geo.select` is non-empty it narrows the objects further (by `id` or slug); a name that matches nothing selectable is an error. Vocabulary entries are always planned, regardless of `select`.
+
+### Ids
+
+- An object's Geo id is its `id` (UUID) without dashes, lowercase: one identity across git, AT Proto and Geo.
+- A vocabulary entry's id is a UUIDv8 of `namespace:key` (SHA-256, first 16 bytes, version and variant bits set). `derivedGeoId(namespace, key)` equals the GRC-20 codec's `derivedUuidFromString(namespace + ':' + key)`; for example `refidao:topic` / `carbon` is `c54f24051a1785a09712f81f17415cdd`. Each record's `id` and its `aliases` all resolve to the same entry, so objects can relate by value or alias; two entries claiming one value is an error.
+- A relation's id is the UUIDv8 of `kms:relation:<fromGeoId>:<propertyId>:<toGeoId>`, so re-sending upserts and never duplicates.
+- Two entities with the same Geo id are a plan error.
+
+Property values sent to Geo (the page link) carry `type: 'text'`; the SDK (0.20.3) requires it.
+
+### Registry: `data/kms-geo.json`
+
+```json
+{ "version": 1, "network": "testnet", "space": "<32-hex>",
+  "entities": { "<geoId>": { "key": "resource:my-slug", "hash": "...", "editId": "...", "cid": "...",
+                             "txHash": "0x...", "registeredAt": "<ISO>", "indexed": false } } }
+```
+
+It is the proof of registration (nothing is written onto the objects, which would change their AT Proto records). It is written atomically. A registry that names a different space or network than `kms.yaml` is a plan error: use a new registry for a new space. `hash` covers name, description (first of `summary`, `short_description`, `description`, one line, at most 300 characters), type, url and relations.
+
+### `geo register`
+
+- **Plan** (default, also `--dry`): reports `create`, `update`, `skip` counts, `orphaned`, `warnings` (for example a relation value with no vocabulary entry) and the pending entities. Writes nothing. `status: planned`. Plan errors give `status: failed` and exit 1.
+- **Apply** (`--apply`): needs the apply-only config above and `GEO_PRIVATE_KEY`, which is read **only from the environment** (load it from a git-ignored env file into the shell; it is never written anywhere and is masked if it appears in an error). Sends one edit with every pending entity. The registry is written right after the edit is sent, before verification.
+- **Space kind.** `personal`: the edit is published and the transaction sent; then the run polls the Geo API. `dao`: the edit is sent as a **proposal** (FAST voting mode) and is never voted on from here; `status: proposed`, vote in Geo, then run `geo verify`.
+- **Statuses:** `planned`, `nothing-to-do`, `invalid-config`, `not-configured` (no key), `failed` (exit 1), `proposed`, `applied` (every entity indexed), `applied-unverified` (sent, not yet visible; run `geo verify`).
+- **Orphans.** With `geo.select` set, previously registered objects that are not selected this run are reported as `orphaned`; so is any registry entry no longer planned. **Nothing is ever deleted from Geo.**
+- The Geo SDK (`@geoprotocol/geo-sdk@0.20.3`) and `viem` are loaded from the instance at run time, not from this package: `npm i -E @geoprotocol/geo-sdk@0.20.3 viem` there.
+
+### `geo verify`
+
+Polls the open Geo GraphQL API (no auth) for every registry entry with `indexed: false` until it appears in the space (`Entity.spaceIds`), then marks it `indexed: true`. A failed request counts as "not yet"; each request is bounded by an abort timeout (at most 15 s) and the deadline (default 120 s, every 5 s) is checked inside a round. `status: verified` when all are indexed, `unverified` (with `missing`) otherwise, `nothing-to-do` when there is nothing pending. Both outcomes exit 0.
