@@ -1,7 +1,8 @@
 // packages/org-os-kms/src/geo/registry.mjs — data/kms-geo.json: what this instance has registered in Geo, and where.
 // The proof of registration lives here, not on the objects (writing grc20Id onto objects would change their AT Proto records).
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { atomicWrite } from '../atomic-write.mjs';
 
 export const GEO_REGISTRY_PATH = 'data/kms-geo.json';
 
@@ -12,8 +13,7 @@ export function readGeoRegistry(dir) {
 
 export function writeGeoRegistry(dir, registry) {
   const p = join(dir, GEO_REGISTRY_PATH);
-  mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, JSON.stringify(registry, null, 2) + '\n');
+  atomicWrite(p, JSON.stringify(registry, null, 2) + '\n');
   return p;
 }
 

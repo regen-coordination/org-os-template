@@ -65,3 +65,27 @@ test('readVocabulary: an array, or an object holding one array', () => {
   assert.throws(() => readVocabulary(join(dir, 'content', 'c.json')), /no list of records/);
   assert.throws(() => readVocabulary(join(dir, 'content', 'missing.json')), /vocabulary file not found/);
 });
+
+test('types as array or string → config error, no throw', () => {
+  const r1 = readGeoConfig({ geo: { ...full, types: ['x'] } });
+  assert.equal(r1.ok, false);
+  assert.match(r1.errors.join(' '), /geo\.types must be a map/);
+  const r2 = readGeoConfig({ geo: { ...full, types: 'ab' } });
+  assert.equal(r2.ok, false);
+  assert.match(r2.errors.join(' '), /geo\.types must be a map/);
+});
+
+test('vocabularies and relations as non-array → config error, no throw', () => {
+  const r = readGeoConfig({ geo: { ...full, vocabularies: { a: 1 }, relations: 'x' } });
+  assert.equal(r.ok, false);
+  assert.match(r.errors.join(' '), /geo\.vocabularies must be a list/);
+  assert.match(r.errors.join(' '), /geo\.relations must be a list/);
+});
+
+test('null vocabulary entry → errors for that entry and undeclared vocabulary, no throw', () => {
+  const r = readGeoConfig({ geo: { ...full, vocabularies: [null], relations: [{ from_field: 'domain', to_vocabulary: 'refidao:topic', property_id: H('d') }] } });
+  assert.equal(r.ok, false);
+  const all = r.errors.join(' | ');
+  assert.match(all, /geo\.vocabularies\[0\]/);
+  assert.match(all, /not a declared vocabulary/);
+});
