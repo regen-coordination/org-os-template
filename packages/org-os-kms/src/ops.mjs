@@ -85,7 +85,7 @@ export const OPS = {
     // (in-memory ids, report.minted) is unchanged.
     const at = config.atproto;
     const hasTarget = Boolean(at?.did && at?.pds && at?.nsid_authority) || config.publish?.static !== false;
-    const { minted, items } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget, mintGeo: Boolean(config.geo?.space) });
+    const { minted, items } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget });
     report.minted = minted.length;
 
     const manifest = readManifest(dir);

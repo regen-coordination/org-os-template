@@ -104,10 +104,15 @@ test('without --apply, close-mode publish plans only: nothing on PDS, no manifes
   assert.ok(existsSync(join(dir, 'public', 'api', 'resource.json')));
 });
 
-test('grc20Id only when geo.space is set', async () => {
+test('publish never writes grc20Id, even with geo.space set', async () => {
   const dir = instance(); const deps = { createClient: fakeClientFactory([]), env };
+  const cfg = yaml.load(readFileSync(join(dir, 'kms.yaml'), 'utf8'));
+  cfg.geo = { parent_space: 'bd727a6ad6ec4a058f681ea9002a1fbf', space: '11111111111111111111111111111111' };
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump(cfg));
   await OPS.publish.run({ dir, flags: { apply: true }, deps });
-  assert.equal(yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries.a.grc20Id, undefined);
+  const disk = yaml.load(readFileSync(join(dir, 'data', 'kb', 'resource.yaml'), 'utf8')).entries;
+  assert.ok(disk.a.id);
+  assert.equal(disk.a.grc20Id, undefined);
 });
 
 test('apply: manifest persisted even when the static surface throws; failure reported, ok false', async () => {

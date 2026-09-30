@@ -55,10 +55,10 @@ test('assertRkey enforces the AT Proto rkey charset', () => {
   assert.throws(() => assertRkey(''), /rkey/);
 });
 
-test('grc20Id only when mintGeo', () => {
+test('never mints grc20Id: Geo ids are derived at registration (geo register), not minted at publish', () => {
   const dir = instance();
-  const a = ensureIds({ adapter: 'repo-data', target: dir, items: selected(dir), uuid: () => 'u' });
-  assert.equal(a.items.find((i) => i.object.title === 'Pub').object.grc20Id, undefined);
-  const b = ensureIds({ adapter: 'repo-data', target: dir, items: selected(dir), uuid: () => 'g', mintGeo: true });
-  assert.equal(b.items.find((i) => i.object.title === 'Pub').object.grc20Id, 'g');
+  const r = ensureIds({ adapter: 'repo-data', target: dir, items: selected(dir), uuid: () => 'g', mintGeo: true });
+  assert.equal(r.items.find((i) => i.object.title === 'Pub').object.grc20Id, undefined);
+  assert.equal(r.minted[0].grc20Id, undefined);
+  assert.equal(r.items.find((i) => i.object.title === 'Have').object.grc20Id, 'existing-geo', 'an existing value is left alone');
 });
