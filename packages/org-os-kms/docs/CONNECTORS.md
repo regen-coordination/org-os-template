@@ -158,7 +158,7 @@ geo:
   select: []                       # optional: only these object ids or slugs
 ```
 
-`geo.parent_space` is accepted and informational: it is copied into `.well-known/knowledge.json` and is not used by `geo register`. `geo.domain`-style changes are additive (see Orphans below): if an object's relation changes (for example its `domain` now maps to another topic), the old relation **stays in Geo**, because writes only add. An instance with no `geo:` block at all gets `status: not-configured` with a hint (exit 0).
+`geo.parent_space` is accepted and informational: it is copied into `.well-known/knowledge.json` and is not used by `geo register`. Writes are additive (see Orphans below): if an object's relation changes (for example its `domain` now maps to another topic), the old relation **stays in Geo**, because writes only add. An instance with no `geo:` block at all gets `status: not-configured` with a hint (exit 0).
 
 `readGeoConfig` never throws for any shape of the block: malformed shapes become config errors (`status: invalid-config`, exit 1). Missing `space`, `space_kind`, `author_space` or `url_property` are errors only for `--apply`; a plan runs without them. The web-URL property id in the Geo SDK's SystemIds is `283127c96142468492ed90b0ebc7f29a`; an instance puts it in `geo.url_property`.
 
