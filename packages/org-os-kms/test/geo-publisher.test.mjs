@@ -30,7 +30,7 @@ test('buildOps: one entity op per entity with its type and url value; determinis
   assert.equal(ops.length, 4);
   const ents = log.filter(([k]) => k === 'entity').map(([, p]) => p);
   assert.deepEqual(ents[0], { id: H('5'), name: 'Funding', description: 'd', types: [H('b')] });
-  assert.deepEqual(ents[1].values, [{ property: H('3'), value: 'https://k.example/concepts/a' }]);
+  assert.deepEqual(ents[1].values, [{ property: H('3'), type: 'text', value: 'https://k.example/concepts/a' }]);
   const rels = log.filter(([k]) => k === 'relation').map(([, p]) => p);
   assert.deepEqual(rels[0], { id: derivedGeoId('kms:relation', `${H('5')}:${H('c')}:${H('4')}`), fromEntity: H('5'), toEntity: H('4'), type: H('c'), toSpace: H('e') });
   assert.equal(rels[1].toSpace, undefined);

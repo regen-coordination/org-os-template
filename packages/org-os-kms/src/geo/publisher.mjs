@@ -12,7 +12,7 @@ export function buildOps(sdk, entities, geo) {
   const ops = [];
   for (const e of entities) {
     const params = { id: e.geoId, name: e.name, description: e.description, types: [e.typeId] };
-    if (e.url) params.values = [{ property: geo.urlProperty, value: e.url }];
+    if (e.url) params.values = [{ property: geo.urlProperty, type: 'text', value: e.url }];
     ops.push(...sdk.Ops.entities.create(params).ops);
     for (const r of e.relations) {
       const id = derivedGeoId('kms:relation', `${e.geoId}:${r.propertyId}:${r.toGeoId}`);   // re-sending upserts, never duplicates
