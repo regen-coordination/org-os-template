@@ -141,7 +141,7 @@ export const OPS = {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
     const registry = ctx.deps?.registry || CONNECTORS;
-    const dry = ctx.flags?.dry === true;
+    const dry = Boolean(ctx.flags?.dry);
     const only = ctx.flags?.connector;
     // A bare `--connector` (parsed as true) or an empty value must never silently widen the run to every connector.
     if (ctx.flags && 'connector' in ctx.flags && only !== undefined && (typeof only !== 'string' || !only.trim())) {

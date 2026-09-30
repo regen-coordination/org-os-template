@@ -70,7 +70,7 @@ export function dispatch(argv, opts = {}) {
     case 'promote':   return promote({ from: flags.from || '.', to: flags.to });
     case 'init':      return fw.initInstance({ dir, name: flags.name, adapter: flags.adapter || 'repo-data', target: flags.target || '.' });
     case 'publish':   return OPS.publish.run({ dir, flags: { dry: flags.dry !== undefined, apply: flags.apply === true } });
-    case 'ingest':    return OPS['ingest.pull'].run({ dir, flags: { dry: flags.dry === true, connector: flags.connector } });
+    case 'ingest':    return OPS['ingest.pull'].run({ dir, flags: { dry: flags.dry !== undefined, connector: flags.connector } });
     case 'geo': {
       if (args[0] === 'register') return OPS['geo.register'].run({ dir, flags: { dry: flags.dry !== undefined, apply: flags.apply === true } });
       if (args[0] === 'verify') return OPS['geo.verify'].run({ dir });
