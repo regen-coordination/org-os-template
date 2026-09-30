@@ -69,7 +69,7 @@ export const OPS = {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
     const deps = { createClient: defaultCreateClient, env: process.env, ...(ctx.deps || {}) };
-    const dry = ctx.flags?.dry === true;
+    const dry = Boolean(ctx.flags?.dry);
     const apply = ctx.flags?.apply === true || config.publish?.apply === true;
     const target = join(dir, config.target);
     const adapter = fw.getAdapter(config.adapter);
@@ -188,7 +188,7 @@ export const OPS = {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
     const deps = { env: process.env, loadSdk: loadGeoSdk, publish: publishEdit, verify: verifyIndexed, fetchImpl: globalThis.fetch, ...(ctx.deps || {}) };
-    const apply = ctx.flags?.apply === true && ctx.flags?.dry !== true;
+    const apply = ctx.flags?.apply === true && !ctx.flags?.dry;
     const { ok, errors, applyErrors, geo } = readGeoConfig(config);
     if (!ok) return { ok: false, report: { status: 'invalid-config', errors } };
 

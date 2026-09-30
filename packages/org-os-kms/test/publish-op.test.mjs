@@ -230,3 +230,9 @@ test('an object that turns held after publishing is unpublished on the next appl
   const api = JSON.parse(readFileSync(join(dir, 'public', 'api', 'resource.json'), 'utf8'));
   assert.ok(!JSON.stringify(api).includes('"title":"A"'), 'held object is gone from the static surface too');
 });
+
+test('a truthy non-boolean dry flag (parser swallowed a value) plans and never calls the client', async () => {
+  const dir = instance();
+  const res = await OPS.publish.run({ dir, flags: { dry: 'x', apply: true }, deps: { createClient: () => { throw new Error('must not be called'); }, env } });
+  assert.equal(res.report.dry, true); assert.equal(res.report.atproto.status, 'planned');
+});

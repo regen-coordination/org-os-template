@@ -71,3 +71,12 @@ test('geo verb parses and fails the process on ok:false', async () => {
   assert.equal(exitCodeFor('geo', { ok: false }), 1);
   assert.equal(exitCodeFor('geo', { ok: true }), 0);
 });
+
+test('any --dry (even one that swallowed a value) means dry: `geo register --dry x --apply` and `publish --dry x --apply` do not apply', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-cli-dry-'));
+  wf(join(dir, 'kms.yaml'), 'instance: t\nadapter: repo-data\ntarget: .\npublish:\n  static: false\ngeo:\n  network: testnet\n  types: {}\n');
+  const g = await dispatch(['geo', 'register', '--dir', dir, '--dry', 'x', '--apply']);
+  assert.equal(g.report.status, 'planned'); // apply would have been invalid-config (no space)
+  const p = await dispatch(['publish', '--dir', dir, '--dry', 'x', '--apply']);
+  assert.equal(p.report.dry, true);
+});

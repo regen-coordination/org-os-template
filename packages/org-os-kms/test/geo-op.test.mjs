@@ -107,3 +107,9 @@ test('a publish error is reported with the key scrubbed; nothing persisted', asy
   assert.ok(!r.report.error.includes('0xsecretkey')); assert.match(r.report.error, /\*\*\*/);
   assert.ok(!existsSync(join(dir, 'data', 'kms-geo.json')));
 });
+
+test('a truthy non-boolean --dry (parser swallowed a value) still only plans', async () => {
+  const log = [];
+  const r = await OPS['geo.register'].run({ dir: instance(), flags: { dry: 'x', apply: true }, deps: deps(log) });
+  assert.equal(r.report.status, 'planned'); assert.equal(log.length, 0);
+});
