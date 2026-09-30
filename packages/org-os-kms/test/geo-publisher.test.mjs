@@ -57,4 +57,5 @@ test('publishEdit: DAO space → proposeEdit (FAST), proposed: true, never votes
 
 test('loadGeoSdk: a missing package is a clear, actionable error', async () => {
   await assert.rejects(() => loadGeoSdk(async () => { throw new Error('Cannot find package'); }), /npm i -E @geoprotocol\/geo-sdk@0\.20\.3 viem/);
+  await assert.rejects(() => loadGeoSdk(async () => { throw new Error('Cannot find package'); }), /Cannot find package/);
 });

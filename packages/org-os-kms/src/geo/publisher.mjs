@@ -5,7 +5,7 @@ import { derivedGeoId } from './ids.mjs';
 
 export async function loadGeoSdk(importer = (m) => import(m)) {
   try { return { sdk: await importer('@geoprotocol/geo-sdk'), accounts: await importer('viem/accounts') }; }
-  catch { throw new Error('geo: @geoprotocol/geo-sdk is not installed in this instance — run: npm i -E @geoprotocol/geo-sdk@0.20.3 viem'); }
+  catch (e) { throw new Error(`geo: could not load @geoprotocol/geo-sdk / viem (${e.message}) — run: npm i -E @geoprotocol/geo-sdk@0.20.3 viem`); }
 }
 
 export function buildOps(sdk, entities, geo) {
