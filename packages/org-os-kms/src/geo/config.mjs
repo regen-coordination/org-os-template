@@ -32,7 +32,9 @@ export function readGeoConfig(config) {
   vocabularies.forEach((v, i) => {
     if (!v?.path || !v?.namespace) errors.push(`geo.vocabularies[${i}] needs path and namespace`);
     if (!isGeoId(v?.type_id)) errors.push(`geo.vocabularies[${i}].type_id must be a 32-hex Geo type id`);
-    (v?.links ?? []).forEach((l, j) => {
+    let links = v?.links ?? [];
+    if (v?.links !== undefined && !Array.isArray(v.links)) { errors.push(`geo.vocabularies[${i}].links must be a list`); links = []; }
+    links.forEach((l, j) => {
       if (!l?.field || !isGeoId(l?.property_id)) errors.push(`geo.vocabularies[${i}].links[${j}] needs field and a 32-hex property_id`);
       if (l?.to_space !== undefined && !isGeoId(l.to_space)) errors.push(`geo.vocabularies[${i}].links[${j}].to_space must be 32 hex`);
     });

@@ -140,6 +140,7 @@ Scope is deliberately the least Geo: **ids and indexing only**. Geo holds a shar
 ```yaml
 geo:
   network: testnet                 # only value accepted (default)
+  api: https://api-testnet.geobrowser.io/graphql   # optional; this is the default
   space: <32-hex space id>         # needed for --apply
   space_kind: personal             # personal | dao (needed for --apply)
   author_space: <32-hex personal space id>   # needed for --apply
@@ -180,17 +181,17 @@ Property values sent to Geo (the page link) carry `type: 'text'`; the SDK (0.20.
                              "txHash": "0x...", "registeredAt": "<ISO>", "indexed": false } } }
 ```
 
-It is the proof of registration (nothing is written onto the objects, which would change their AT Proto records). It is written atomically. A registry that names a different space or network than `kms.yaml` is a plan error: use a new registry for a new space. `hash` covers name, description (first of `summary`, `short_description`, `description`, one line, at most 300 characters), type, url and relations.
+It is the proof of registration (nothing is written onto the objects, which would change their AT Proto records). It is written atomically. A registry that names a different space or network than `kms.yaml` is a plan error: use a new registry for a new space. `hash` covers name, description (objects: the first of `summary`, `short_description`, `description`; vocabulary entries: `description` only; one line, at most 300 characters), type, url and relations.
 
 ### `geo register`
 
-- **Plan** (default, also `--dry`): reports `create`, `update`, `skip` counts, `orphaned`, `warnings` (for example a relation value with no vocabulary entry) and the pending entities. Writes nothing. `status: planned`. Plan errors give `status: failed` and exit 1.
+- **Plan** (default, also `--dry`; `--apply --dry` plans: `--dry` always wins, `apply = flags.apply && !flags.dry` in `ops.mjs`): reports `create`, `update`, `skip` counts, `orphaned`, `warnings` (for example a relation value with no vocabulary entry) and the pending entities. Writes nothing. `status: planned`. Plan errors give `status: failed` and exit 1.
 - **Apply** (`--apply`): needs the apply-only config above and `GEO_PRIVATE_KEY`, which is read **only from the environment** (load it from a git-ignored env file into the shell; it is never written anywhere and is masked if it appears in an error). Sends one edit with every pending entity. The registry is written right after the edit is sent, before verification.
 - **Space kind.** `personal`: the edit is published and the transaction sent; then the run polls the Geo API. `dao`: the edit is sent as a **proposal** (FAST voting mode) and is never voted on from here; `status: proposed`, vote in Geo, then run `geo verify`.
-- **Statuses:** `planned`, `nothing-to-do`, `invalid-config`, `not-configured` (no key), `failed` (exit 1), `proposed`, `applied` (every entity indexed), `applied-unverified` (sent, not yet visible; run `geo verify`).
+- **Statuses:** `planned` (also what a plan with nothing pending reports), `nothing-to-do` (only under `--apply`), `invalid-config`, `not-configured` (no key), `failed` (exit 1), `proposed`, `applied` (every entity indexed), `applied-unverified` (sent, not yet visible; run `geo verify`).
 - **Orphans.** With `geo.select` set, previously registered objects that are not selected this run are reported as `orphaned`; so is any registry entry no longer planned. **Nothing is ever deleted from Geo.**
 - The Geo SDK (`@geoprotocol/geo-sdk@0.20.3`) and `viem` are loaded from the instance at run time, not from this package: `npm i -E @geoprotocol/geo-sdk@0.20.3 viem` there.
 
 ### `geo verify`
 
-Polls the open Geo GraphQL API (no auth) for every registry entry with `indexed: false` until it appears in the space (`Entity.spaceIds`), then marks it `indexed: true`. A failed request counts as "not yet"; each request is bounded by an abort timeout (at most 15 s) and the deadline (default 120 s, every 5 s) is checked inside a round. `status: verified` when all are indexed, `unverified` (with `missing`) otherwise, `nothing-to-do` when there is nothing pending. Both outcomes exit 0.
+Polls the open Geo GraphQL API (no auth) for every registry entry with `indexed: false` until it appears in the space (`Entity.spaceIds`), then marks it `indexed: true`. A failed request counts as "not yet"; each request is bounded by an abort timeout (at most 15 s) and the deadline (default 120 s, every 5 s) is checked inside a round. `status: verified` when all are indexed, `unverified` (with `missing`) otherwise, `nothing-to-do` when there is nothing pending or the registry has no space yet (it does not require `geo.space` in `kms.yaml`; it uses the registry's space). Both outcomes exit 0.

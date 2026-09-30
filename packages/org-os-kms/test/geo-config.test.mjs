@@ -89,3 +89,9 @@ test('null vocabulary entry → errors for that entry and undeclared vocabulary,
   assert.match(all, /geo\.vocabularies\[0\]/);
   assert.match(all, /not a declared vocabulary/);
 });
+
+test('vocabulary links as a non-array → config error, no throw', () => {
+  const r = readGeoConfig({ geo: { vocabularies: [{ path: 'a', namespace: 'n', type_id: 'x', links: 's' }] } });
+  assert.equal(r.ok, false);
+  assert.match(r.errors.join(' '), /links must be a list/);
+});
