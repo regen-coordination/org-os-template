@@ -75,3 +75,10 @@ test('the fetch init carries a signal (AbortSignal)', async () => {
   }, intervalMs: 10, timeoutMs: 50, sleep: async () => {} });
   assert(signalSeen, 'expected fetch init to contain a signal property that is an AbortSignal');
 });
+
+test('ids that are not 32-hex are never queried and are reported as invalid', async () => {
+  const asked = [];
+  const r = await verifyIndexed({ api: 'u', space: H('1'), geoIds: [H('5'), '") { x }'], fetchImpl: async (_u, init) => { asked.push(init.body); return { json: async () => ({ data: { entity: { id: H('5'), spaceIds: [H('1')] } } }) }; }, sleep: async () => {} });
+  assert.equal(asked.length, 1); assert.ok(!asked[0].includes('{ x }'));
+  assert.deepEqual(r, { indexed: [H('5')], missing: [], invalid: ['") { x }'] });
+});
