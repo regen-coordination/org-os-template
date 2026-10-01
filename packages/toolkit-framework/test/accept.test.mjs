@@ -93,3 +93,27 @@ test('accept survives malformed candidate YAML — graceful per-file error, note
   assert.match(wo.error_notes, /broken\.yaml: invalid YAML/);
   assert.ok(!existsSync(join(woDir, id, 'accepted')), 'nothing partially accepted');
 });
+
+// Human-written material (e.g. a glossary definition a person wrote in the source) is not AI-drafted.
+// The born-rule allows ai_assisted: false only when provenance declares it: authorship: human-authored.
+test('accept allows ai_assisted: false when provenance.authorship is human-authored', () => {
+  const { woDir, id } = setup(['good-human-authored.yaml']);
+  const res = acceptWorkOrder({ workOrdersDir: woDir, id });
+  assert.equal(res.accepted, true, JSON.stringify(res.errors));
+  assert.equal(res.objects[0].object.ai_assisted, false);
+  assert.equal(res.objects[0].object.maturity, 'raw');
+});
+
+test('accept rejects ai_assisted: false without a human-authored declaration', () => {
+  const { woDir, id } = setup(['bad-unattributed-human.yaml']);
+  const res = acceptWorkOrder({ workOrdersDir: woDir, id });
+  assert.equal(res.accepted, false);
+  assert.match(res.errors.join(' | '), /ai_assisted: false requires provenance\.authorship: human-authored/);
+});
+
+test('accept rejects a candidate that does not state ai_assisted', () => {
+  const { woDir, id } = setup(['bad-missing-ai-assisted.yaml']);
+  const res = acceptWorkOrder({ workOrdersDir: woDir, id });
+  assert.equal(res.accepted, false);
+  assert.match(res.errors.join(' | '), /must set ai_assisted/);
+});
