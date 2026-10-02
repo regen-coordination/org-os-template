@@ -56,6 +56,7 @@ Lifecycle = how it moves; layers = what it's made of; the **mapping table** is t
 | [`kernel-objects.md`](kernel-objects.md) | The Minimum Operating Kernel (5 objects) — the curated contributor front door over the ontology. |
 | [`invariants.md`](invariants.md) | The 16 "preserve distinctions" rules + the minimum structural rule. The package's conformance surface. |
 | [`ontology-posture.md`](ontology-posture.md) | Two-layer semantic kernel + align-and-map (interoperable core + extensions; crosswalks, not adopt-as-base). |
+| [`ontology-core.md`](ontology-core.md) | How an instance binds to the kernel: the types it stores, what a page may show, one home per object, the twin rule, identity kept out. Instances inherit it and state their deltas. |
 | [`type-tag-discipline.md`](type-tag-discipline.md) | When something is a type vs a tag — the anti-sprawl rule that keeps the core small. |
 | [`fork-compatibility.md`](fork-compatibility.md) | How a forked commons stays interoperable (frozen core + namespaced extensions that map back). |
 
