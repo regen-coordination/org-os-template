@@ -1,0 +1,17 @@
+schema_version: "2.0"
+
+# Registro de governança — {{ org.name }}
+# As decisões ficam registradas em DECISIONS.md; as ratificadas que precisam de um
+# registro legível por máquina (propostas EIP-4824) são espelhadas aqui.
+# Os valores abaixo ficam em inglês: são lidos pelas ferramentas.
+
+governance:
+  model: "solo-maintainer"     # solo-maintainer (uma pessoa mantém) | steward-council (conselho) | multisig | assembly (assembleia) | conviction
+  current_phase: "bootstrap"   # bootstrap (início) | transition (transição) | active (em funcionamento) | sunset (encerramento)
+  infrastructure:
+    safe: null
+    hats_tree: null
+    gardens: null
+    snapshot: null
+  decisions: []
+  elections: []

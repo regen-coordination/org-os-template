@@ -1,0 +1,15 @@
+# templates/pt-BR/strings.yaml — as frases curtas que o clone-framework escreve
+# numa instância nova, em português do Brasil. Mesmas chaves de
+# templates/strings.yaml; a chave que faltar aqui sai em inglês.
+
+operator_name_todo: "TODO: nome de quem opera a instância"
+soul_mission_todo: "TODO: para que esta organização existe."
+network_purpose_named: "a rede {{ network.name }}"
+network_purpose_default: "esta rede"
+identity_body: "Veja `IDENTITY.md`: é lá que fica a identidade oficial."
+dao_description: "{{ org.name }} — uma instância do org-os"
+federation_header: "Gerado pelo clone-framework em {{ today }}."
+gitignore_comment: "# Rascunhos, anotações soltas e passagens de bastão fora do git (convenção da instância)"
+genesis_commit: "chore: instância criada a partir do framework org-os (genesis)"
+public_plane_commit: "chore: repositório público criado pelo clone-framework do org-os (genesis)"
+public_plane_return_path: "não definido — diga para onde as correções devem ir antes da primeira publicação"

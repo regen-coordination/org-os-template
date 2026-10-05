@@ -57,6 +57,41 @@ Fixture: `tests/fixtures/instance-config-kms.yaml`; guard: `tests/clone-kms.test
 What it does not do: connectors, AT Proto identity and peers stay hand-edited in
 `kms.yaml` (`packages/org-os-kms/docs/CONNECTORS.md`).
 
+### An instance that works in another language
+
+Add `org.language` (a BCP-47 tag; default `en`) and everything the clone writes comes
+out in that language — `README.md`, `GETTING-STARTED.md`, `CLAUDE.md`, `AGENTS.md` and
+the scaffold files (`IDENTITY.md`, `HEARTBEAT.md`, `DECISIONS.md`, `docs/plans/QUEUE.md`,
+`dashboard.yaml` comments, …). The language is recorded as `identity.language` in
+`federation.yaml`, and `CLAUDE.md` / `AGENTS.md` tell agents, in that language, to
+operate, write documents, memory and commit messages, and reply in it, while schema
+field names, record types, vendored `packages/` and code stay in English.
+
+```yaml
+org:
+  name: "brasil-regenerativo-os"
+  type: "Network"
+  language: "pt-BR"
+```
+
+Each file is looked up as `templates/<lang>/<file>` first and the English
+`templates/<file>` otherwise: the four templates, `partials/`, `scaffold/` (which mirrors
+the instance root) and `strings.yaml` (short strings, merged key by key). Shipped today:
+`pt-BR`. To add a language, add `templates/<lang>/` with whichever of those files you
+have translated and commit it — the clone reads committed content only.
+
+- A tag with no `templates/<lang>/` gets English files and a logged note; the language
+  is still recorded and agents are still told (in English) to work in it.
+- A value that is not a language tag is ignored with a note: English, nothing recorded.
+- An instance carries the English base and its own language's set, not the others.
+- A few labels stay in English in every language because tooling reads them:
+  `**Name:**` / `**Type:**` in `IDENTITY.md` and the first word of the four
+  `docs/plans/QUEUE.md` section headings. Copied framework docs (`docs/`, `BOOTSTRAP.md`,
+  skills, slash commands) and runtime output such as the `/initialize` dashboard are
+  not translated.
+
+Fixture: `tests/fixtures/instance-config-pt-br.yaml`; guard: `tests/clone-locale.test.mjs`.
+
 The in-place alternative, `npm run setup`, is an interactive TTY-only wizard for
 converting a fork you have already made. It is not the recommended newcomer path;
 see the README for the current caveat.

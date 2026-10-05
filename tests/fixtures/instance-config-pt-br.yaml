@@ -1,0 +1,28 @@
+# Clone config for an instance operated in Brazilian Portuguese (org.language).
+# Consumed only by tests/clone-locale.test.mjs.
+
+org:
+  name: "instancia-teste-os"
+  tagline: "Instância de teste — não é uma organização real"
+  type: "LocalNode"
+  short_description: "Instância de teste do gerador, em português."
+  emoji: "🧪"
+  license: "MIT"
+  language: "pt-BR"
+
+operator:
+  name: "Pessoa de Teste"
+  email: "teste@example.invalid"
+
+network:
+  name: "rede-teste"
+
+packages:
+  operations: true
+  webapps: false
+
+skills:
+  - bootstrap-interviewer
+  - org-os-init
+  - heartbeat-monitor
+  - knowledge-curator

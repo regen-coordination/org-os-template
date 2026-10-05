@@ -1,0 +1,59 @@
+# dashboard.yaml — controla o que o /initialize mostra para {{ org.name }}
+#
+# Todas as seções abaixo estão ligadas, com os mesmos valores que o /initialize
+# usa quando este arquivo não existe (loadDashboardConfig em
+# scripts/initialize.mjs). Use `show: false` para esconder uma seção; apague uma
+# chave para voltar ao valor padrão dela. As seções aparecem sempre na mesma
+# ordem, qualquer que seja a ordem aqui.
+
+schema_version: "2.0"
+
+sections:
+
+  header:
+    show: true
+    style: ascii            # faixa em ASCII no topo do painel
+
+  projects:
+    show: true              # data/projects.yaml, sem os arquivados e os concluídos
+    # max: 10               # limite de linhas (padrão: todas)
+
+  tasks:
+    show: true              # tarefas ativas do HEARTBEAT.md, por urgência
+    show_completed: true    # lista também as tarefas concluídas há pouco
+    # max: 8                # limite de tarefas por faixa de urgência (padrão: 8)
+
+  calendar:
+    show: true              # próximos itens de data/meetings.yaml + data/events.yaml
+    days: 7                 # quantos dias à frente mostrar
+
+  funding:
+    show: true              # prazos de data/funding-opportunities.yaml
+    horizon_days: 30        # só os prazos dentro deste número de dias
+
+  context:
+    show: true              # entradas mais recentes de memory/YYYY-MM-DD.md
+    max_entries: 3
+
+  plans:
+    show: true              # docs/plans/QUEUE.md
+    queued_preview: 2       # quantos planos da fila mostrar
+
+  pipelines:
+    show: true              # barras de etapas para ideias, financiamento, conhecimento, planos
+
+  knowledge_graph:
+    show: true              # situação de graphify-out/, quando um grafo já foi gerado
+
+  apps:
+    show: true              # aplicativos e espaços de trabalho conhecidos presentes nesta instância (some sozinha quando não há nenhum)
+
+  cheatsheet:
+    show: true              # comandos mais usados
+
+  federation:
+    show: true              # outras instâncias e upstream de federation.yaml
+
+  prompt:
+    show: true              # sugestões para "no que você quer trabalhar?"
+    suggestions: 3
