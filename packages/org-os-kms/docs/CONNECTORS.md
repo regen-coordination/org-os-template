@@ -159,3 +159,91 @@ packages/<pack>/
 - **A pack cannot** change a core schema, `frontmatter`, the axes or the relationships; add a Layer-A type; supply invariants or gates; touch `PRIVATE_FIELDS`; or depend on another pack.
 - Pack registration is per-process state. The CLI runs one instance per process; a host that walks several instances in one process should call `resetPacks()` **and `resetRegistryBindings()`** between them.
 - **A pack's `connectors/index.mjs` is executed.** `ingest` dynamically imports the entry module of every declared pack, whether or not a connector from it is configured. Everything else a pack ships (`pack.yaml`, `extension-entities.yaml`, `profile/profile.yaml`) is read as data. Vendor packs with the same care as `org-os-kms` itself.
+
+## 14. standard.site documents (`atproto.standard_site`)
+
+Opt-in. When enabled, every entry `publish` writes to the PDS is **also** written as a [standard.site](https://standard.site/) document, the shared long-form lexicon that Bluesky renders in timelines. Without the block (or with `enabled: false`) no code path runs and publish behaves exactly as before.
+
+```yaml
+atproto:
+  did: did:plc:...
+  handle: ...
+  pds: https://...
+  nsid_authority: xyz.example.kb
+  standard_site:
+    enabled: true
+    title: Brasil Regenerativo            # required: the publication's name
+    description: Comum de conhecimento…   # optional
+    url: https://brasilregenerativo.org   # site base URL; falls back to publish.base_url. Required one way or the other.
+    language: pt-BR                       # optional BCP-47 default for documents. Never assumed: no language, no `langs`.
+    language_field: idioma                # optional: an object field that carries a BCP-47 tag and wins over `language`
+    paths:                                # URL pattern per schema; {slug} {id} {schema}; must start with "/"
+      default: /kb/{slug}
+      resource: /recursos/{slug}
+    tag_fields: [domain, function]        # optional; this is the default
+    fields:                               # optional: override/add the description and body fields of a schema (e.g. a pack type)
+      territorial-unit: { description: summary, body: [summary] }
+    publication_rkey: 3abc...             # optional: adopt an existing publication record (a TID) instead of the derived one
+    show_in_discover: true                # optional → preferences.showInDiscover
+```
+
+### The record relationship
+
+| Record | Collection | Record key | Role |
+|---|---|---|---|
+| the entry | `<nsid_authority>.<camelCaseSchema>` | the object `id` (UUIDv4) | **Is** the entry. What peers pull. Its shape is not changed by this feature. |
+| its document | `site.standard.document` | a TID derived from the object `id` | The readable rendering. Points back to the entry and to the publication. |
+| the publication | `site.standard.publication` | a TID derived from the DID (or `publication_rkey`) | One per commons. |
+
+Both standard.site lexicons declare `key: tid`, so the UUID cannot be the document's record key. The key is a syntactically valid TID computed from a hash of the object id (`tidFor`): stable across republishes, but its embedded timestamp is not a real time (it is pinned to a past range).
+
+A document record:
+
+```json
+{
+  "$type": "site.standard.document",
+  "site": "at://<did>/site.standard.publication/<tid>",
+  "title": "Agrofloresta sintrópica",
+  "path": "/kb/agrofloresta-sintropica",
+  "description": "…",
+  "textContent": "…",
+  "tags": ["agroecologia"],
+  "langs": ["pt-BR"],
+  "content": { "$type": "<nsid_authority>.entryRef", "entry": { "uri": "at://<did>/<nsid_authority>.encyclopediaEntry/<id>", "cid": "…" }, "schema": "encyclopedia-entry" },
+  "publishedAt": "…",
+  "updatedAt": "…"
+}
+```
+
+- **Back-pointer.** `content` is the lexicon's open union; its value here is `<nsid_authority>.entryRef`, whose `entry` is a strongRef (`uri` + `cid`) to the entry record. In a plan the `cid` is absent (the entry may not exist yet); it is stamped at apply from the manifest. The web URL is the standard one: the publication's `url` + the document's `path`.
+- **Field mapping** (`FIELD_MAP` in `src/atproto/standard-site.mjs`, applied **after** `publicView()`, so private fields never reach a document): `title` ← `title`; `description` ← `summary` (encyclopedia-entry), `short_description` (concept-lineage), `claim`, `use_cases`, `context`, `starting_context`, `what_it_curates`; `textContent` ← the schema's prose fields joined as plain paragraphs, with no labels (a label would have to be in some language); `tags` ← `domain`, `function` (leading `#` removed). Schemas with no prose fields (`resource`, `organization`, `signal`, pack types without a `fields` mapping) still get a document: title, tags, path and the back-pointer.
+- **Withheld.** An entry with no `title` (a `relationship-record`, a `public-use-boundary`) gets no document; it is listed under `standard_site.withheld` with the reason. Its entry record is published as usual.
+- **Language.** The document lexicon has no language field. `langs` (an array of BCP-47 tags, the `app.bsky.feed.post` convention, also written by pckt) is emitted only when `language_field` or `language` gives one. Nothing reads it yet as far as we could verify.
+- **Dates.** `publishedAt` (required by the lexicon) is the time of the document's first publication, kept across updates; `updatedAt` is set on each later rewrite. The framework's schemas carry no publication date to use instead.
+- **Limits enforced at plan time:** title 500 graphemes / 5000 bytes (error), description 3000 graphemes / 30000 bytes (cut on a grapheme boundary, `…` appended), each tag 128 graphemes (error), record 1 MB (error). Text is never re-normalised.
+
+### Plan, apply, idempotency
+
+- Plan-first like the rest: `report.standard_site` is `{ status: 'planned', publication: 'create'|'update'|'skip', created, updated, deleted, skipped, withheld, warnings }`. With `--apply` it becomes `status: 'applied'` (or `'failed'`, with `failures`).
+- Order at apply: entries, then the publication (only when new or changed), then documents. A document is written only for an entry that is actually on the PDS. If the publication write fails, no document is written.
+- State lives in the same manifest, `data/kms-published.json`, under `standardSite: { publication, documents: { <id>: { rkey, atUri, cid, hash, entryCid, publishedAt } } }`. Unchanged documents are skipped; a document is rewritten (compare-and-swap on its `cid`) when its rendering changed **or** its entry got a new version (so the strongRef stays current); a document whose entry left the selection is deleted, exactly as the entry is. The mass-delete refusal (section 2) covers both.
+- **Validation never throws and never blocks the entries.** A bad `standard_site` block or an over-long title gives `standard_site: { status: 'invalid', errors }`, `ok: false` (exit 1), the entries are still published, and nothing standard.site is written (all-or-nothing, like the entry plan).
+- A `warnings` entry `no path pattern for <schema>` means that document has no `path`, so it has no web URL and cannot be verified or rendered as a card.
+- Turning `enabled` off later leaves the already-written documents, the publication and the manifest section untouched. There is no retract-all switch; delete the records by hand if needed.
+
+### Site-side verification (operator step, required)
+
+A reader only trusts these records if the **website** points back at them ([standard.site/docs/verification](https://standard.site/docs/verification/)). Bluesky will not render the enhanced card without it ([atproto discussion #4978](https://github.com/bluesky-social/atproto/discussions/4978)).
+
+1. **Publication:** `https://<url>/.well-known/site.standard.publication` must return the publication's AT-URI as the response body (for a publication under a path: `/.well-known/site.standard.publication/<path>`). `publish` writes exactly this file into the static surface (`<static_dir>/.well-known/site.standard.publication`) once the publication exists. That only helps if the static surface is served at the root of `url`; otherwise copy the value (`standardSite.publication.atUri` in the manifest) to wherever the site serves `.well-known`.
+2. **Each entry page** (the page at `url` + `path`) must contain, in the server-rendered `<head>` (crawlers do not run JavaScript):
+
+   ```html
+   <link rel="site.standard.document" href="at://<did>/site.standard.document/<tid>" />
+   <link rel="site.standard.publication" href="at://<did>/site.standard.publication/<tid>" />
+   ```
+
+   The document AT-URI for an entry is `standardSite.documents[<object id>].atUri` in `data/kms-published.json`. **Nothing in this package edits the site's HTML**: the site generator has to read the manifest and emit the tags.
+3. The page URL must really be `url` + `path`: set `paths` to match the site's routes (the `bridge` writes encyclopedia entries to `kb/<slug>`).
+
+Not done here: a cover image (`coverImage`) or publication `icon` (blobs are not uploaded), a rich `content` rendering (Leaflet, pckt and Offprint each use their own block types; there is no shared one in the lexicon), and posting to Bluesky. A card appears in a timeline only when a post embeds the page URL with `associatedRefs` to the document and publication; this package creates no posts.
