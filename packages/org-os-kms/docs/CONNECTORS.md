@@ -159,3 +159,51 @@ packages/<pack>/
 - **A pack cannot** change a core schema, `frontmatter`, the axes or the relationships; add a Layer-A type; supply invariants or gates; touch `PRIVATE_FIELDS`; or depend on another pack.
 - Pack registration is per-process state. The CLI runs one instance per process; a host that walks several instances in one process should call `resetPacks()` **and `resetRegistryBindings()`** between them.
 - **A pack's `connectors/index.mjs` is executed.** `ingest` dynamically imports the entry module of every declared pack, whether or not a connector from it is configured. Everything else a pack ships (`pack.yaml`, `extension-entities.yaml`, `profile/profile.yaml`) is read as data. Vendor packs with the same care as `org-os-kms` itself.
+
+## Two planes: a private canon and a public plane (`export`, `validate`)
+
+An instance may keep everything it knows in a private **canon** and publish only what passes a
+gate into a separate **public plane** — another instance, in another repository. The canon names
+its public plane in its own `kms.yaml`:
+
+```yaml
+planes:
+  public:
+    instance: my-commons-public      # the `instance:` the plane's kms.yaml must carry
+    dir: repos/my-commons-public     # optional; this is the default
+```
+
+- `org-os-kms export [--dir <canon>]` — lints the canon's source cards and boundaries, runs every
+  object through the publication gate (`src/planes/publication-gate.mjs`) and the framework floor,
+  mints ids in the canon for what passes, and writes only allowlisted fields into
+  `<plane>/data/kb/`. It refuses to write into the canon, into a directory whose `kms.yaml` is not
+  the named instance, or through a symlink. A refused export leaves the canon byte-identical.
+- `org-os-kms validate [--dir <canon>]` — re-gates what is published against the live canon: an
+  entry with no canon counterpart, one that no longer passes, a divergence, or a leaked private
+  field is an error (exit 1).
+
+**What the gate requires.** `maturity: reviewed` (or an operator's `publish: true`); a
+`source_lineage` that is a corpus path under a registered source card (`repos/<Repo>/…`, never a
+URL); no lineage under a held prefix or a consent boundary; a source card that is not internal,
+high-risk or unassessed. It never throws: an error is a refusal.
+
+**What is the public plane's to decide**, in its own `kms.yaml`:
+
+```yaml
+extensions: [org-os-territory]
+publish:
+  types_opt_in: [territorial-unit]   # pack types that may publish
+  public_fields:                     # fields added to the framework's allowlist
+    "*": [summary_es]                #   on every schema
+    resource: [bioma]                #   on one schema
+  nested_fields:
+    contato: [rede]                  # the public keys of an object-valued field
+```
+
+A field not on the allowlist is dropped, and `validate` reports it until its visibility is
+decided. An instance can only add fields; naming a private one (`notes`, `surfaced_by`,
+`reviewed_by`, …) is refused. The plane's own `data/kb/source-system.yaml` holds one card, the
+commons itself, and is published as it stands.
+
+**Not yet enforced:** `publish` (AT Proto) does not go through this gate and does not know which
+plane it is in. Run it only in the public plane, never in the canon.

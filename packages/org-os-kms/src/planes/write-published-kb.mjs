@@ -101,12 +101,12 @@ export function leakedPaths(value, prefix = "") {
 // the transform; the caller must drop the same two keys from the published side before comparing,
 // or every entry will show a spurious diff. The allowlist drops them too (BOOKKEEPING), so the two
 // sides cannot disagree about them.
-export function expectedPublishedEntry(schema, canonObj) {
+export function expectedPublishedEntry(schema, canonObj, fields) {
   const { type: _type, slug: _slug, ...rest } = canonObj ?? {};
-  return publicEntryFor(schema, rest);
+  return publicEntryFor(schema, rest, fields);
 }
 
-export function writePublishedKb({ selected, outDir }) {
+export function writePublishedKb({ selected, outDir, fields }) {
   const dir = path.join(outDir, "data", "kb");
   // Every write/mkdir/unlink below targets the commons, and each is routed through
   // assertInsideCommons individually — the up-front assertCommonsTarget check in export-commons.mjs
@@ -130,7 +130,7 @@ export function writePublishedKb({ selected, outDir }) {
     if (!bySchema.has(schema)) bySchema.set(schema, {});
     // The writer and the re-gate's `expectedPublishedEntry` transform must be the SAME call, not
     // two calls that happen to do the same thing — coupled by construction, not by convention.
-    bySchema.get(schema)[slug] = expectedPublishedEntry(schema, object);
+    bySchema.get(schema)[slug] = expectedPublishedEntry(schema, object, fields);
   }
   const written = [];
   for (const schema of [...bySchema.keys()].sort(cmp)) {
@@ -151,7 +151,7 @@ export function writePublishedKb({ selected, outDir }) {
   assertInsideCommons(outDir, artifactTarget);
   fs.writeFileSync(
     artifactTarget,
-    `${JSON.stringify(publicFieldsArtifact(), null, 2)}\n`,
+    `${JSON.stringify(publicFieldsArtifact(fields), null, 2)}\n`,
   );
   return { written, publicFields };
 }

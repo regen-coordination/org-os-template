@@ -160,8 +160,8 @@ export const CONTENT_FIELDS = {
  *  the projection shows its title, its citation and its review state until someone decides, field by
  *  field, what is public — exactly what the site does with a schema it has no component or
  *  FIELD_ORDER entry for. */
-export function allowedKeysFor(schema) {
-  return new Set([...(CONTENT_FIELDS[schema] ?? []), ...METADATA_FIELDS]);
+export function allowedKeysFor(schema, policy = DEFAULT_FIELD_POLICY) {
+  return new Set([...(policy.content[schema] ?? []), ...policy.star, ...METADATA_FIELDS]);
 }
 
 /** Loader bookkeeping, never part of what the writer reads from or emits. */
@@ -189,6 +189,61 @@ const KNOWN_PRIVATE = new Set(
   ),
 );
 
+/** The framework's own allowlist, with nothing added. Frozen: a policy is a value, never shared state. */
+export const DEFAULT_FIELD_POLICY = Object.freeze({
+  content: CONTENT_FIELDS,
+  star: Object.freeze([]),
+  nested: NESTED_FIELDS,
+});
+
+function fieldList(value, where) {
+  if (!Array.isArray(value) || value.some((f) => typeof f !== "string" || f === ""))
+    throw new Error(`publish.${where} must be a list of field names`);
+  for (const f of value) {
+    if (KNOWN_PRIVATE.has(f.toLowerCase()))
+      throw new Error(`publish.${where} names "${f}", a private field — an instance may add public fields, never publish a private one`);
+  }
+  return value;
+}
+
+/**
+ * The allowlist a public plane publishes with: the framework's lists plus what that plane's own
+ * kms.yaml adds under `publish`:
+ *
+ *   publish:
+ *     public_fields:
+ *       "*": [summary_es]          # on every schema
+ *       resource: [bioma]          # on this schema alone
+ *     nested_fields:
+ *       contato: [rede]            # the public keys of an object-valued field
+ *
+ * An instance can only ADD. It cannot remove a framework field, and it cannot name a field the
+ * framework holds private (KNOWN_PRIVATE, case-insensitively) — that is refused here, loudly,
+ * rather than silently stripped later by the writer.
+ */
+export function fieldPolicy(publish = {}) {
+  const extra = publish?.public_fields;
+  const nestedExtra = publish?.nested_fields;
+  if (extra === undefined && nestedExtra === undefined) return DEFAULT_FIELD_POLICY;
+  if (extra !== undefined && !isPlainObject(extra))
+    throw new Error('publish.public_fields must be a mapping of schema (or "*") to a list of field names');
+  if (nestedExtra !== undefined && !isPlainObject(nestedExtra))
+    throw new Error("publish.nested_fields must be a mapping of field to a list of its public keys");
+
+  const merge = (base, add) => [...new Set([...(base ?? []), ...add])];
+  const content = { ...CONTENT_FIELDS };
+  let star = [];
+  for (const [schema, fields] of Object.entries(extra ?? {})) {
+    const list = fieldList(fields, `public_fields.${schema}`);
+    if (schema === "*") star = merge([], list);
+    else content[schema] = merge(content[schema], list);
+  }
+  const nested = { ...NESTED_FIELDS };
+  for (const [key, fields] of Object.entries(nestedExtra ?? {}))
+    nested[key] = merge(nested[key], fieldList(fields, `nested_fields.${key}`));
+  return Object.freeze({ content, star: Object.freeze(star), nested });
+}
+
 /** A plain object: prototype is Object.prototype, or null. Anything else (Date, Buffer, RegExp,
  *  Map, Set, a class instance) is a leaf this module passes through unchanged — recursing into it
  *  via Object.entries() would rebuild it as an empty or wrong-shaped object. */
@@ -212,8 +267,8 @@ export function setOwn(obj, key, value) {
   });
 }
 
-function filterNested(key, value) {
-  const allowed = NESTED_FIELDS[key];
+function filterNested(key, value, policy) {
+  const allowed = policy.nested[key];
   const out = {};
   for (const k of allowed) {
     if (Object.prototype.hasOwnProperty.call(value, k))
@@ -234,8 +289,8 @@ function filterProvenance(value) {
 /** The published form of one canon object. `schema` decides the content set; everything not named
  *  is dropped. Insertion order follows the canon object, so an unchanged object produces an
  *  unchanged file — the diff of a re-export is the change, not a reshuffle. */
-export function publicEntryFor(schema, canonObject) {
-  const allowed = allowedKeysFor(schema);
+export function publicEntryFor(schema, canonObject, policy = DEFAULT_FIELD_POLICY) {
+  const allowed = allowedKeysFor(schema, policy);
   const out = {};
   for (const [k, v] of Object.entries(canonObject ?? {})) {
     if (BOOKKEEPING.has(k) || !allowed.has(k)) continue;
@@ -247,8 +302,8 @@ export function publicEntryFor(schema, canonObject) {
     }
     if (isPlainObject(v)) {
       // Fail closed: an object-valued content field publishes only through a per-key allowlist.
-      if (!NESTED_FIELDS[k]) continue;
-      const filtered = filterNested(k, v);
+      if (!policy.nested[k]) continue;
+      const filtered = filterNested(k, v, policy);
       if (Object.keys(filtered).length > 0) setOwn(out, k, filtered);
       continue;
     }
@@ -263,8 +318,8 @@ export function publicEntryFor(schema, canonObject) {
  *  (`notes`, `work_order`, `reviewed_by`, a case variant) is expected and silent; a surprising one
  *  is not. Does not recurse into a dropped key's value: the whole subtree is gone, so its shape is
  *  moot. `type`/`slug` are loader bookkeeping, not a decision. */
-export function unexpectedDrops(schema, canonObject) {
-  const allowed = allowedKeysFor(schema);
+export function unexpectedDrops(schema, canonObject, policy = DEFAULT_FIELD_POLICY) {
+  const allowed = allowedKeysFor(schema, policy);
   const out = [];
   for (const [k, v] of Object.entries(canonObject ?? {})) {
     if (BOOKKEEPING.has(k)) continue;
@@ -282,9 +337,9 @@ export function unexpectedDrops(schema, canonObject) {
       }
       continue;
     }
-    if (NESTED_FIELDS[k] && isPlainObject(v)) {
+    if (policy.nested[k] && isPlainObject(v)) {
       for (const nk of Object.keys(v)) {
-        if (!NESTED_FIELDS[k].includes(nk)) out.push(`${k}.${nk}`);
+        if (!policy.nested[k].includes(nk)) out.push(`${k}.${nk}`);
       }
       continue;
     }
@@ -301,19 +356,19 @@ export function unexpectedDrops(schema, canonObject) {
  *  outside it, another that the site's FIELD_ORDER cannot outrun it. Two lists in two repos would
  *  otherwise drift, and the failure is asymmetric — a field the site renders but the export drops
  *  is a blank block, a field the export allows but the site does not know shows nothing at all. */
-export function publicFieldsArtifact() {
+export function publicFieldsArtifact(policy = DEFAULT_FIELD_POLICY) {
   const content = {};
-  for (const schema of Object.keys(CONTENT_FIELDS).sort())
-    content[schema] = [...CONTENT_FIELDS[schema]];
+  for (const schema of Object.keys(policy.content).sort())
+    content[schema] = [...new Set([...policy.content[schema], ...policy.star])];
   return {
-    note: "Generated by lf-work-os scripts/kms/export-commons.mjs (scripts/kms/lib/public-fields.mjs). Do not edit here.",
+    note: "Generated by org-os-kms export from the canon (src/planes/public-fields.mjs + this plane's kms.yaml publish.public_fields). Do not edit here.",
     metadata: [...METADATA_FIELDS],
     provenance: [...PROVENANCE_FIELDS],
     instance: [...INSTANCE_FIELDS],
     nested: Object.fromEntries(
-      Object.keys(NESTED_FIELDS)
+      Object.keys(policy.nested)
         .sort()
-        .map((k) => [k, [...NESTED_FIELDS[k]]]),
+        .map((k) => [k, [...policy.nested[k]]]),
     ),
     content,
   };

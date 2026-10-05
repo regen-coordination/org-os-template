@@ -20,8 +20,8 @@ export function validateCommons({ root, outDir = resolvePublicPlane({ root }).di
   // framework's core default rather than crashing on ENOENT, since the "nothing published yet"
   // message below is the useful answer in that state.
   const cfgFile = path.join(outDir, 'kms.yaml');
-  const types = fs.existsSync(cfgFile) ? loadCommonsPolicy({ commonsDir: outDir }).types : undefined;
-  const errors = validatePublishedKb({ publishedDir, kb: loadKb(path.join(root, 'data', 'kb')), types });
+  const { types, fields } = fs.existsSync(cfgFile) ? loadCommonsPolicy({ commonsDir: outDir }) : {};
+  const errors = validatePublishedKb({ publishedDir, kb: loadKb(path.join(root, 'data', 'kb')), types, fields });
   if (errors.length) return { ok: false, errors, message: errors.join('\n') };
   const message = fs.existsSync(publishedDir)
     ? 'commons published store valid'

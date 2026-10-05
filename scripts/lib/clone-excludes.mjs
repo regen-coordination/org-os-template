@@ -204,6 +204,8 @@ export const EXCLUDE_FILES = new Set([
   "tests/clone-genesis.test.mjs",
   "tests/clone-framework.test.mjs",
   "tests/clone-framework-health.test.mjs",
+  "tests/clone-kms.test.mjs",
+  "tests/fixtures/instance-config-kms.yaml", // consumed only by tests/clone-kms.test.mjs
   // Guards modules/ — "Framework-side home of org-os modules" (modules/README.md);
   // scripts/modules.mjs itself calls modules/*/module.yaml "framework registry
   // source". No instance consumes it (no data/modules.yaml; the v5 module engine

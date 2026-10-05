@@ -89,6 +89,19 @@ if (kmsConfig) {
     console.error(`✗ Config has a kms block but packages.${missing.join(" and packages.")} ${missing.length > 1 ? "are" : "is"} not enabled — org-os-kms and toolkit-framework must both be vendored, side by side`);
     process.exit(1);
   }
+  const plane = kmsConfig.public_plane;
+  if (plane !== undefined) {
+    const canonName = kmsConfig.instance
+      || config.org.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    if (!plane || typeof plane.instance !== "string" || !/^[a-z0-9][a-z0-9._-]*$/i.test(plane.instance)) {
+      console.error("✗ kms.public_plane.instance must be a plain name (letters, digits, . _ -) — it becomes the directory repos/<instance>");
+      process.exit(1);
+    }
+    if (plane.instance === canonName) {
+      console.error(`✗ kms.public_plane.instance is "${plane.instance}", the canon's own name — the public plane is a different instance`);
+      process.exit(1);
+    }
+  }
   const absent = kmsExtensions.filter((e) => enabled[e] !== true);
   if (absent.length) {
     console.error(`✗ kms.extensions names ${absent.join(", ")}, which ${absent.length > 1 ? "are" : "is"} not enabled under packages — an extension pack is vendored like any other package`);
@@ -885,7 +898,63 @@ if (kmsConfig) {
     if (kmsExtensions.length) kms.extensions = kmsExtensions;
     if (kmsConfig.store) kms.store = kmsConfig.store;
     if (kmsConfig.federation_namespace) kms.federation_namespace = kmsConfig.federation_namespace;
+    // The public plane, when asked for: named in the canon's kms.yaml, and scaffolded as an
+    // instance of its own under repos/ (gitignored by the canon — it is a separate repository).
+    // It carries the same packs, so the types it opts into are known to it, and no gate.
+    const plane = kmsConfig.public_plane;
+    if (plane) kms.planes = { public: { instance: plane.instance } };
     writeFileSync(kmsPath, yaml.dump(kms));
+    if (plane) {
+      // A canon's own card must say what the publication gate needs of every source card: which
+      // corpus path it claims and whether that may publish. `init` cannot know it is stamping a
+      // canon, so its card claims nothing and the gate refuses every export as malformed control
+      // data. The canon is private: it claims its own checkout and holds it internal-only.
+      const cardsPath = path.join(target, "data", "kb", "source-system.yaml");
+      const cards = yaml.load(readFileSync(cardsPath, "utf-8"));
+      const selfSlug = String(kms.self_ref).split("#")[1];
+      Object.assign(cards.entries[selfSlug], {
+        container_role: "self",
+        origin_prefixes: [`repos/${instanceName}/`],
+        public_use: "internal-only",
+      });
+      writeFileSync(cardsPath, yaml.dump(cards));
+
+      const planeDir = path.join(target, "repos", plane.instance);
+      mkdirSync(planeDir, { recursive: true });
+      const pr = spawnSync("node", [cli, "init", "--name", plane.instance], { cwd: planeDir, encoding: "utf-8" });
+      if (pr.status !== 0) {
+        console.error(`✗ org-os-kms init failed for the public plane:\n${pr.stderr || pr.stdout}`);
+        process.exit(1);
+      }
+      const planeKmsPath = path.join(planeDir, "kms.yaml");
+      const planeKms = yaml.load(readFileSync(planeKmsPath, "utf-8"));
+      if (kmsExtensions.length) planeKms.extensions = kmsExtensions;
+      planeKms.publish = { ...(plane.types_opt_in ? { types_opt_in: plane.types_opt_in } : {}), apply: false };
+      writeFileSync(planeKmsPath, yaml.dump(planeKms));
+      // The plane's one card describes the commons itself and is PUBLISHED as it stands — the
+      // export never rewrites it and the re-gate holds it to a public shape: a publishable
+      // public_use, no maturity, no private field. `init`'s draft card is none of those, so the
+      // card is written here from the config, with the operator's words where given.
+      const planeCardsPath = path.join(planeDir, "data", "kb", "source-system.yaml");
+      writeFileSync(planeCardsPath, yaml.dump({
+        entries: {
+          [plane.instance]: {
+            title: plane.title || config.org.name,
+            type: "knowledge-garden",
+            ...(plane.url ? { url: plane.url } : {}),
+            steward: plane.steward || config.org.name,
+            return_path: plane.return_path || "unset — say where corrections go before the first publication",
+            public_use: "ok-with-caveat",
+          },
+        },
+      }));
+      log("stage 7b", `public plane: repos/${plane.instance} (instance "${plane.instance}")`);
+      if (!noGit) {
+        spawnSync("git", ["init", "-q"], { cwd: planeDir });
+        spawnSync("git", ["add", "-A"], { cwd: planeDir });
+        spawnSync("git", ["commit", "-q", "-m", "chore: public plane scaffolded by org-os clone-framework (genesis)"], { cwd: planeDir });
+      }
+    }
   }
 }
 

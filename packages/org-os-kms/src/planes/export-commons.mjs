@@ -126,7 +126,7 @@ export function exportCommons({ root, outDir, instance, uuid } = {}) {
   // actually makes any of them publish-eligible). Read AFTER assertCommonsTarget: that check is
   // what established this directory is the commons at all, and loading a pack a stranger's
   // kms.yaml named is not something to do before knowing whose kms.yaml it is.
-  const { types } = loadCommonsPolicy({ commonsDir: outDir });
+  const { types, fields } = loadCommonsPolicy({ commonsDir: outDir });
   const kb = loadKb(path.join(root, "data", "kb"));
 
   // Lint the canon's own control data BEFORE any verdict is computed. A malformed held_prefixes or
@@ -154,7 +154,7 @@ export function exportCommons({ root, outDir, instance, uuid } = {}) {
   }
   skipped.sort((a, b) => cmp(a.key, b.key));
   const sel = selectForPublication({ root, verdicts, uuid, types });
-  const pub = writePublishedKb({ selected: sel.selected, outDir });
+  const pub = writePublishedKb({ selected: sel.selected, outDir, fields });
   const floorRejected = [...sel.floorRejected].sort((a, b) =>
     cmp(a.key, b.key),
   );

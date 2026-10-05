@@ -105,3 +105,96 @@ test("a config with no kms block gets no kms.yaml", () => {
     rmSync(dst, { recursive: true, force: true });
   }
 });
+
+// — the two planes —
+
+const cli = path.resolve(__dirname, "..", "packages", "org-os-kms", "src", "cli.mjs");
+const withPlane = (mutate = () => {}) => variant((c) => {
+  c.kms.public_plane = { instance: "test-commons-publico", types_opt_in: ["territorial-unit"] };
+  mutate(c);
+});
+
+test("a kms.public_plane block yields a canon that names its public plane, and the plane scaffolded beside it", () => {
+  const v = withPlane();
+  const { dst, r } = clone(v.file);
+  try {
+    assert.equal(r.status, 0, r.stderr);
+    const canon = yaml.load(readFileSync(path.join(dst, "kms.yaml"), "utf-8"));
+    assert.deepEqual(canon.planes, { public: { instance: "test-commons-publico" } });
+    const planeDir = path.join(dst, "repos", "test-commons-publico");
+    const plane = yaml.load(readFileSync(path.join(planeDir, "kms.yaml"), "utf-8"));
+    assert.equal(plane.instance, "test-commons-publico");
+    assert.equal(plane.self_ref, "data/kb/source-system.yaml#test-commons-publico");
+    // The plane loads the same packs as the canon, and publishes only the types it opts into.
+    assert.deepEqual(plane.extensions, ["org-os-territory"]);
+    assert.deepEqual(plane.publish.types_opt_in, ["territorial-unit"]);
+    // The canon's own card is private and claims its own checkout — what the gate requires of every card.
+    const self = yaml.load(readFileSync(path.join(dst, "data/kb/source-system.yaml"), "utf-8")).entries["test-commons"];
+    assert.equal(self.container_role, "self");
+    assert.equal(self.public_use, "internal-only");
+    assert.deepEqual(self.origin_prefixes, ["repos/test-commons/"]);
+    // The plane's own card is published as it stands, so it is born in a public shape.
+    const card = yaml.load(readFileSync(path.join(planeDir, "data/kb/source-system.yaml"), "utf-8")).entries;
+    assert.deepEqual(Object.keys(card), ["test-commons-publico"]);
+    assert.equal(card["test-commons-publico"].public_use, "ok-with-caveat");
+    assert.equal(card["test-commons-publico"].title, "test-commons-os");
+    assert.equal(card["test-commons-publico"].maturity, undefined);
+    assert.equal(card["test-commons-publico"].notes, undefined);
+    // It is a projection: it names no public plane of its own.
+    assert.equal(plane.planes, undefined);
+  } finally {
+    rmSync(dst, { recursive: true, force: true });
+    rmSync(v.dir, { recursive: true, force: true });
+  }
+});
+
+test("a freshly cloned pair exports and re-gates cleanly: nothing to publish, nothing wrong", () => {
+  const v = withPlane();
+  const { dst, r } = clone(v.file);
+  try {
+    assert.equal(r.status, 0, r.stderr);
+    const run = (verb) => spawnSync("node", [cli, verb, "--dir", dst], { encoding: "utf-8" });
+    const exported = run("export");
+    assert.equal(exported.status, 0, exported.stderr + exported.stdout);
+    assert.deepEqual(JSON.parse(exported.stdout).written, []);
+    const validated = run("validate");
+    assert.equal(validated.status, 0, validated.stderr + validated.stdout);
+    assert.equal(JSON.parse(validated.stdout).ok, true);
+  } finally {
+    rmSync(dst, { recursive: true, force: true });
+    rmSync(v.dir, { recursive: true, force: true });
+  }
+});
+
+test("the public plane is its own repository: the canon's genesis commit does not contain it", () => {
+  const v = withPlane();
+  const dst = mkdtempSync(path.join(tmpdir(), "clone-kms-git-"));
+  rmSync(dst, { recursive: true, force: true });
+  try {
+    const r = spawnSync("node", [scriptPath, "--target", dst, "--config", v.file], { encoding: "utf-8" });
+    assert.equal(r.status, 0, r.stderr);
+    const tracked = spawnSync("git", ["ls-files"], { cwd: dst, encoding: "utf-8" }).stdout.split("\n");
+    assert.ok(tracked.includes("kms.yaml"), "the canon's kms.yaml is not in the genesis commit");
+    assert.equal(tracked.some((f) => f.startsWith("repos/test-commons-publico/")), false);
+    assert.ok(existsSync(path.join(dst, "repos", "test-commons-publico", ".git")), "the public plane is not a repository of its own");
+    assert.equal(spawnSync("git", ["status", "--porcelain"], { cwd: dst, encoding: "utf-8" }).stdout, "");
+  } finally {
+    rmSync(dst, { recursive: true, force: true });
+    rmSync(v.dir, { recursive: true, force: true });
+  }
+});
+
+test("a public plane named like the canon, or with a path in its name, is refused before anything is written", () => {
+  for (const bad of ["test-commons", "../elsewhere", "a/b", ""]) {
+    const v = withPlane((c) => { c.kms.public_plane.instance = bad; });
+    const { dst, r } = clone(v.file);
+    try {
+      assert.equal(r.status, 1, `"${bad}" was accepted`);
+      assert.match(r.stderr, /public_plane/);
+      assert.equal(existsSync(dst), false);
+    } finally {
+      rmSync(dst, { recursive: true, force: true });
+      rmSync(v.dir, { recursive: true, force: true });
+    }
+  }
+});

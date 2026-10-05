@@ -38,7 +38,19 @@ kms:
   instance: my-commons        # optional; defaults to a slug of org.name
   extensions: [org-os-territory]
   store: { on_collision: merge }   # optional
+  public_plane:                    # optional: a private canon + a separate public repository
+    instance: my-commons-public    # scaffolded at repos/my-commons-public, its own git repository
+    types_opt_in: [territorial-unit]   # optional: pack types the public plane publishes
+    title: "My Commons"            # optional: the plane's own published card
+    steward: "Who stewards it"
+    return_path: "Where corrections go"
+    url: "https://example.org"
 ```
+
+With `public_plane`, the instance is a **canon**: nothing leaves it except through the
+publication gate. `org-os-kms export` projects what passes into the public plane and
+`org-os-kms validate` re-checks what is published there against the live canon
+(`packages/org-os-kms/docs/CONNECTORS.md`, "Two planes").
 
 A `kms:` block whose packages are not enabled is refused before anything is written.
 Fixture: `tests/fixtures/instance-config-kms.yaml`; guard: `tests/clone-kms.test.mjs`.

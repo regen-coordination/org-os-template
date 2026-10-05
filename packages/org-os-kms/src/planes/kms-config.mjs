@@ -9,6 +9,7 @@ import yaml from 'js-yaml';
 import { publishableTypes, resetPacks } from '../framework.mjs';
 import { loadExtensions } from '../extensions.mjs';
 import { resetRegistryBindings } from '../bind.mjs';
+import { fieldPolicy } from './public-fields.mjs';
 
 // fileURLToPath (not URL.pathname): the checkout path may contain spaces.
 // src/planes → src → org-os-kms → packages: the directory this package is vendored into, beside its siblings.
@@ -16,8 +17,9 @@ const PACKAGES_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 
 /**
  * @param {{ commonsDir: string, packagesDir?: string }} opts
- * @returns {{ config: object, types: string[] }} config = the commons' parsed kms.yaml; types = the
- *   publish-eligible types under that config, after its declared packs are loaded.
+ * @returns {{ config: object, types: string[], fields: object }} config = the commons' parsed kms.yaml;
+ *   types = the publish-eligible types under that config, after its declared packs are loaded;
+ *   fields = the field allowlist it publishes with (the framework's, plus its publish.public_fields).
  */
 export function loadCommonsPolicy({ commonsDir, packagesDir = PACKAGES_DIR }) {
   const file = path.join(commonsDir, 'kms.yaml');
@@ -27,5 +29,5 @@ export function loadCommonsPolicy({ commonsDir, packagesDir = PACKAGES_DIR }) {
   resetPacks();
   resetRegistryBindings();
   loadExtensions(config, { packagesDir });
-  return { config, types: publishableTypes(config) };
+  return { config, types: publishableTypes(config), fields: fieldPolicy(config.publish) };
 }

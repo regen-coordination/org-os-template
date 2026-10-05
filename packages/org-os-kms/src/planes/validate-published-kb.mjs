@@ -205,7 +205,7 @@ function canonHasPublishableSchema(kb, schema) {
   );
 }
 
-function validateEntry(key, schema, slug, entry, kb, types) {
+function validateEntry(key, schema, slug, entry, kb, types, fields) {
   const errors = [];
 
   // Invariant: the commons' data/kb holds ONLY projected objects that passed both
@@ -242,7 +242,7 @@ function validateEntry(key, schema, slug, entry, kb, types) {
     // field — it is the same transform the writer itself applies.
     const { type: _type, slug: _slug, ...actualForDiff } = entry;
     const diffs = diffPaths(
-      expectedPublishedEntry(schema, canonObj),
+      expectedPublishedEntry(schema, canonObj, fields),
       actualForDiff,
     );
     if (diffs.length) {
@@ -255,10 +255,10 @@ function validateEntry(key, schema, slug, entry, kb, types) {
     // allowlisted would otherwise publish as nothing at all — silently, and only in the JSON-LD
     // surface and the pages, where a reader would find it missing long after the fact. Making it a
     // validation error means the canon must decide a new field's visibility before it ships.
-    const dropped = unexpectedDrops(schema, canonObj);
+    const dropped = unexpectedDrops(schema, canonObj, fields);
     if (dropped.length) {
       errors.push(
-        `${key}: canon field(s) not on the public allowlist (add to public-fields.mjs or mark private): ${dropped.join(", ")}`,
+        `${key}: canon field(s) not on the public allowlist (add to this plane's kms.yaml publish.public_fields or mark private): ${dropped.join(", ")}`,
       );
     }
   }
@@ -373,6 +373,7 @@ export function validatePublishedKb({
   publishedDir,
   kb,
   types = PUBLISHABLE_TYPES,
+  fields,
 }) {
   const errors = [];
   errors.push(
@@ -426,7 +427,7 @@ export function validatePublishedKb({
     }
     for (const [slug, entry] of Object.entries(entries)) {
       const key = `${schema}:${slug}`;
-      errors.push(...validateEntry(key, schema, slug, entry ?? {}, kb, types));
+      errors.push(...validateEntry(key, schema, slug, entry ?? {}, kb, types, fields));
     }
   }
   return errors;
