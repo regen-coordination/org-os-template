@@ -4,7 +4,8 @@
 // (kind:'skill'). This is what makes the declarative lifecycle actually run, without
 // reimplementing any framework logic. `write:true` marks ops whose failure must stop the
 // run (fail-hard); reads/renders are fail-soft.
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { bridge } from './registry-bridge.mjs';
@@ -15,6 +16,7 @@ import { ensureIds } from './identity.mjs';
 import { readManifest, writeManifest } from './manifest.mjs';
 import { planPublish, applyPublish } from './atproto/publish.mjs';
 import { createClient as defaultCreateClient } from './atproto/client.mjs';
+import { planStandardSite, applyStandardSite, wellKnownPath } from './atproto/standard-site.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { loadInstanceGate, buildGateContext, applyGate } from './gate.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
@@ -95,6 +97,11 @@ export const OPS = {
       const plan = planPublish({ items, manifest, did: at.did, authority: at.nsid_authority });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length };
+      // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
+      // an invalid one is reported (status 'invalid', ok:false) and nothing of it is written.
+      const ss = at.standard_site?.enabled === true ? planStandardSite({ items, entryPlan: plan, manifest, did: at.did, authority: at.nsid_authority, config }) : null;
+      const ssBase = ss?.ok ? { publication: ss.publication.action, created: ss.create.length, updated: ss.update.length, deleted: ss.delete.length, skipped: ss.skip.length, withheld: ss.withheld, warnings: ss.warnings } : null;
+      if (ss) report.standard_site = ss.ok ? { status: 'planned', ...ssBase } : { status: 'invalid', errors: ss.errors };
       const password = deps.env.ATPROTO_APP_PASSWORD;
       if (!password) report.atproto = { status: 'not-configured', reason: 'ATPROTO_APP_PASSWORD not set', ...counts };
       else if (dry || !apply) report.atproto = { status: 'planned', ...counts };
@@ -102,9 +109,9 @@ export const OPS = {
         // Never let an unattended apply (close + publish.apply:true) turn an empty/misconfigured selection into a mass delete.
         return { ok: false, report: { ...report, atproto: { status: 'failed', reason: 'refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)', deleted: 0, wouldDelete: plan.delete.length } } };
       } else {
-        let applied;
+        let applied; let client;
         try {
-          const client = deps.createClient({ pds: at.pds });
+          client = deps.createClient({ pds: at.pds });
           await client.login({ identifier: at.handle || at.did, password });
           applied = await applyPublish(plan, { client, did: at.did });
         } catch (e) {
@@ -114,9 +121,17 @@ export const OPS = {
           report.atproto = { status: 'failed', error: String(e.message).split(password).join('***'), ...counts };
         }
         if (applied) {
-          next = applied.manifest;
+          next = manifest.standardSite ? { ...applied.manifest, standardSite: manifest.standardSite } : applied.manifest; // the entry apply rebuilds the manifest; keep the standard.site section
           writeManifest(dir, next); // authoritative record of what is on the PDS: persist before anything that can throw
           report.atproto = { status: applied.failures.length ? 'failed' : 'applied', ...applied.applied, skipped: plan.skip.length, failures: applied.failures };
+          if (ss?.ok) {
+            try {
+              const done = await applyStandardSite(ss, { client, did: at.did, entries: next.objects, now: deps.now });
+              next = { ...next, standardSite: done.state };
+              writeManifest(dir, next);
+              report.standard_site = { ...ssBase, status: done.failures.length ? 'failed' : 'applied', ...done.applied, skipped: ss.skip.length, failures: done.failures };
+            } catch (e) { report.standard_site = { ...ssBase, status: 'failed', error: String(e.message).split(password).join('***') }; }
+          }
         }
       }
     }
@@ -124,9 +139,18 @@ export const OPS = {
     else if (!dry) {
       try { report.static = writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items, allItems: all, manifest: next, config }); }
       catch (e) { report.static = { status: 'failed', error: e.message }; }
+      // The publication's verification file (standard.site: /.well-known/site.standard.publication returns the record's AT-URI).
+      const pubUri = at?.standard_site?.enabled === true && next.standardSite?.publication?.atUri;
+      if (pubUri && report.static.files) {
+        try {
+          const rel = wellKnownPath(next.standardSite.publication.url);
+          const p = join(dir, config.publish?.static_dir || 'public', rel);
+          mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, pubUri); report.static.files.push(rel);
+        } catch (e) { report.static = { status: 'failed', error: e.message }; }
+      }
     }
     else report.static = 'skipped (dry)';
-    return { ok: report.atproto.status !== 'failed' && report.static?.status !== 'failed', report };
+    return { ok: report.atproto.status !== 'failed' && report.static?.status !== 'failed' && !['failed', 'invalid'].includes(report.standard_site?.status), report };
   } },
 
   // ingest.pull: CLI verb only (`org-os-kms ingest`), deliberately NOT bound to any lifecycle event.
