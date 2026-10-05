@@ -12,12 +12,14 @@ import { buildMap } from './map.mjs';
 import { renderMapHtml, renderPortalIndex } from './render-map-html.mjs';
 import { fetchFrontier } from './frontier.mjs';
 import { OPS } from './ops.mjs';
+import { exportCommons } from './planes/export-commons.mjs';
+import { validateCommons } from './planes/validate-commons.mjs';
 import * as fw from './framework.mjs';
 import { fileURLToPath } from 'node:url';
 import { resolve, join, dirname as pathDirname } from 'node:path';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init', 'publish', 'ingest']);
+const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init', 'publish', 'ingest', 'export', 'validate']);
 
 function parseFlags(argv) {
   const args = [], flags = {};
@@ -71,13 +73,17 @@ export function dispatch(argv, opts = {}) {
     case 'init':      return fw.initInstance({ dir, name: flags.name, adapter: flags.adapter || 'repo-data', target: flags.target || '.' });
     case 'publish':   return OPS.publish.run({ dir, flags: { dry: flags.dry === true, apply: flags.apply === true } });
     case 'ingest':    return OPS['ingest.pull'].run({ dir, flags: { dry: flags.dry === true, connector: flags.connector } });
+    // The two planes: `export` projects the canon (dir) through the publication gate into the public plane
+    // named by kms.yaml planes.public; `validate` re-gates what is published there against the live canon.
+    case 'export':    return { ok: true, ...exportCommons({ root: resolve(dir) }) };
+    case 'validate':  return validateCommons({ root: resolve(dir) });
   }
 }
 
 // Process exit code for a verb's result. `{error}` (unknown verb / bad subcommand) always fails; `publish` and
 // `ingest` also fail on `{ok:false}` (operator errors, failed publish, refused mass delete). Other verbs keep
 // their existing behaviour: some (e.g. render) return fail-soft `ok:false` deliberately.
-const FAIL_ON_NOT_OK = new Set(['publish', 'ingest']);
+const FAIL_ON_NOT_OK = new Set(['publish', 'ingest', 'validate']);
 export function exitCodeFor(verb, result) {
   if (result && result.error) return 1;
   if (FAIL_ON_NOT_OK.has(verb) && result && result.ok === false) return 1;
