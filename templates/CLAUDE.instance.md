@@ -5,7 +5,8 @@ This workspace is **{{ org.name }}**, an org-os instance: the operating system o
 > {{ org.short_description }}
 {{/if}}
 
-## Quick Start
+{{#if org.language}}{{> language }}
+{{/if}}## Quick Start
 
 **Read `MASTERPLAN.md` first.** It holds this organization's mandate, activations and priorities.
 

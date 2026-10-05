@@ -14,7 +14,10 @@ This file contains your mandate, activations, research directions, success metri
 
 ---
 
-## ⚠️ Workspace Safety — Before Any Destructive Git Op
+{{#if org.language}}{{> language }}
+---
+
+{{/if}}## ⚠️ Workspace Safety — Before Any Destructive Git Op
 
 **Read `docs/VAULT-SAFETY.md` before running any git operation that touches the working tree** (merge, rebase, pull, reset, checkout across branches, clean, stash, large `git add -A`).
 

@@ -1,0 +1,16 @@
+schema_version: "2.0"
+
+# Governance Registry — {{ org.name }}
+# Decisions are recorded in DECISIONS.md; ratified ones that need a machine-readable
+# record (EIP-4824 proposals) are mirrored here.
+
+governance:
+  model: "solo-maintainer"     # solo-maintainer | steward-council | multisig | assembly | conviction
+  current_phase: "bootstrap"   # bootstrap | transition | active | sunset
+  infrastructure:
+    safe: null
+    hats_tree: null
+    gardens: null
+    snapshot: null
+  decisions: []
+  elections: []

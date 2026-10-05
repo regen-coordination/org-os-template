@@ -1,0 +1,11 @@
+schema_version: "2.0"
+
+# Members Registry — seeded with the bootstrap operator; add your team.
+
+members:
+  - id: "operator"
+    name: {{ operator.name_json }}
+    role: "Operator"
+    layer: "core"
+    status: "active"
+    joined: "{{ today }}"

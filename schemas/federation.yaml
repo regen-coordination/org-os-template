@@ -37,6 +37,11 @@ identity:
     description: "Visual identifier emoji"
     required: false
 
+  language:
+    type: string
+    description: "Working language of the organization, as a BCP-47 tag (e.g. 'pt-BR'). Absent means English. Agents operate, write and reply in it; schema field names, record types and code stay in English. Stamped by clone-framework from the config's org.language."
+    required: false
+
   chain:
     type: string
     description: "Primary blockchain (CAIP-2 format, e.g., 'eip155:100' for Gnosis Chain)"

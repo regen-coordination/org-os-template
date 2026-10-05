@@ -1,0 +1,58 @@
+# dashboard.yaml — controls what /initialize shows for {{ org.name }}
+#
+# Every section below is on, with the same values /initialize uses when this
+# file is absent (loadDashboardConfig in scripts/initialize.mjs). Set
+# `show: false` to hide a section; delete a key to fall back to its default.
+# Sections always render in a fixed order, whatever the order here.
+
+schema_version: "2.0"
+
+sections:
+
+  header:
+    show: true
+    style: ascii            # ascii banner at the top of the dashboard
+
+  projects:
+    show: true              # data/projects.yaml, archived/done hidden
+    # max: 10               # cap rows (default: all)
+
+  tasks:
+    show: true              # HEARTBEAT.md active tasks by urgency
+    show_completed: true    # also list recently completed tasks
+    # max: 8                # cap tasks per tier (default: 8)
+
+  calendar:
+    show: true              # upcoming items from data/meetings.yaml + data/events.yaml
+    days: 7                 # look-ahead window in days
+
+  funding:
+    show: true              # data/funding-opportunities.yaml deadlines
+    horizon_days: 30        # only deadlines within this many days
+
+  context:
+    show: true              # latest memory/YYYY-MM-DD.md entries
+    max_entries: 3
+
+  plans:
+    show: true              # docs/plans/QUEUE.md
+    queued_preview: 2       # how many queued plans to preview
+
+  pipelines:
+    show: true              # stage bars for ideas, funding, knowledge, plans
+
+  knowledge_graph:
+    show: true              # graphify-out/ status, when a graph has been built
+
+  apps:
+    show: true              # known apps and workspaces present in this instance (self-hides when none)
+
+  cheatsheet:
+    show: true              # common commands
+
+  federation:
+    show: true              # federation.yaml peers + upstream
+
+  prompt:
+    show: true              # "what would you like to work on?" suggestions
+    suggestions: 3

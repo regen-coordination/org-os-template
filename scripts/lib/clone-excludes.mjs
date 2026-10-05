@@ -57,7 +57,7 @@ export const TOP_LEVEL_ALLOW = new Map([
   ["schemas", "JSON-LD / JSON schemas the validators read"],
   ["scripts", "the machinery every npm script runs"],
   ["skills", "skill definitions, filtered to the selected set in stage 5"],
-  ["templates", "render.mjs + templates render:templates reads"],
+  ["templates", "render.mjs + the templates, partials, scaffold files and strings clone-framework reads (other languages' sets pruned by isOtherLanguageTemplate)"],
   ["tests", "the instance's own day-one test suite (framework-only suites pruned below)"],
 ]);
 
@@ -206,6 +206,8 @@ export const EXCLUDE_FILES = new Set([
   "tests/clone-framework-health.test.mjs",
   "tests/clone-kms.test.mjs",
   "tests/fixtures/instance-config-kms.yaml", // consumed only by tests/clone-kms.test.mjs
+  "tests/clone-locale.test.mjs",
+  "tests/fixtures/instance-config-pt-br.yaml", // consumed only by tests/clone-locale.test.mjs
   // Guards modules/ — "Framework-side home of org-os modules" (modules/README.md);
   // scripts/modules.mjs itself calls modules/*/module.yaml "framework registry
   // source". No instance consumes it (no data/modules.yaml; the v5 module engine
@@ -245,6 +247,29 @@ export const EXCLUDE_FILES = new Set([
 export const PLACEHOLDER_FILES = new Set([
   "MEMORY.md", "HEARTBEAT.md", "IDENTITY.md", "MASTERPLAN.md",
 ]);
+
+/**
+ * A BCP-47-shaped language tag (`pt-BR`, `es`, `zh-Hant-TW`). Also what makes a
+ * directory under templates/ a LANGUAGE directory: `partials` and `scaffold`
+ * do not fit it (a primary subtag is two or three letters).
+ */
+export const LANGUAGE_TAG = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * templates/<lang>/… holds one language's templates, partials and scaffold
+ * files. An instance carries the English base (the fallback every lookup ends
+ * in) and its OWN language's set — never the others: an organisation working
+ * in Portuguese has no use for a Spanish README template, and an English one
+ * has none for either. Language-dependent, so it is applied by the generator
+ * beside isPathExcluded() rather than inside it.
+ * @param {string} rel       posix path relative to the framework root
+ * @param {string} language  the instance's language tag ("en" for the base)
+ */
+export function isOtherLanguageTemplate(rel, language) {
+  const parts = rel.split("/");
+  if (parts.length < 3 || parts[0] !== "templates" || !LANGUAGE_TAG.test(parts[1])) return false;
+  return parts[1].toLowerCase() !== String(language).toLowerCase();
+}
 
 const SECRET_FILE = /^(\.npmrc|\.netrc|\.pgpass|\.mcp\.json|credentials(\.[\w-]+)?\.json|.*\.(pem|key|p12|pfx))$/i;
 

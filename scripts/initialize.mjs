@@ -145,7 +145,7 @@ function loadIdentity(federation, toolsMd) {
 
   let mission = "";
   if (soulMd) {
-    const missionMatch = soulMd.match(/##\s*Mission[^\n]*\n+([^\n#]+)/i);
+    const missionMatch = soulMd.match(/##\s*(?:Mission|Missão)[^\n]*\n+([^\n#]+)/i);
     if (missionMatch) {
       mission = missionMatch[1]
         .trim()

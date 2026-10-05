@@ -6,10 +6,14 @@
  *   1. Validate target directory is empty (or --force)
  *   2. Copy COMMITTED (HEAD) framework files under declared top-level entries, minus the deny-list
  *   3. Strip framework-only registries (instances.yaml, packages-matrix, skills-matrix)
- *   4. Reset markdown placeholders (IDENTITY, MASTERPLAN, MEMORY, HEARTBEAT, README)
+ *   4. Reset markdown placeholders (IDENTITY, MASTERPLAN, MEMORY, HEARTBEAT, README) from templates/scaffold/
  *   5. Materialize packages + skills per config (sync-packages with --enabled)
  *   6. Write federation.yaml with instance identity + lineage stamp
  *   7. Render README + GETTING-STARTED + CLAUDE.md + AGENTS.md from templates
+ *
+ * Language: an optional `org.language` in the config (BCP-47, e.g. `pt-BR`; default
+ * `en`). Every template, partial, scaffold file and short string is looked up as
+ * templates/<lang>/<file> first and the English templates/<file> otherwise.
  *   7b. With a `kms:` block in the config: stamp kms.yaml + the self card (org-os-kms init)
  *   8. Git init + initial commit (skip with --no-git; skipped in non-git fallback unless --commit-unverified)
  *
@@ -31,7 +35,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { render } from "../templates/render.mjs";
-import { isExcluded, isPathExcluded, topLevelDecision } from "./lib/clone-excludes.mjs";
+import {
+  isExcluded, isPathExcluded, topLevelDecision, isOtherLanguageTemplate, LANGUAGE_TAG,
+} from "./lib/clone-excludes.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -269,6 +275,122 @@ function listFrameworkDir(relDir) {
   }
   return [...headIndex.keys()].filter((k) => k.startsWith(`${relDir}/`) && !k.slice(relDir.length + 1).includes("/"));
 }
+
+// === Language ===
+//
+// `org.language` names the language the organisation works in. What the
+// generator writes is looked up per language: templates/<lang>/<file> when the
+// framework has it, the English templates/<file> otherwise — the four
+// templates, their partials, the scaffold files (templates/scaffold/, what
+// stages 4, 4b and 6e write) and the short strings (templates/strings.yaml,
+// merged key by key). All of it is read from HEAD like any other template.
+//
+//   - no `org.language`, or `en`: English, and nothing about language is
+//     written anywhere — the output is what it was before languages existed.
+//   - a language the framework has templates for: its set, the language
+//     recorded in federation.yaml, agents told (in that language) to work in it.
+//   - a well-formed tag with no templates: English files, with a note; the
+//     language is still recorded and agents are still told, in English.
+//   - anything that is not a tag: English, with a note, nothing recorded. The
+//     value never reaches a path (LANGUAGE_TAG admits letters, digits and `-`).
+function frameworkHas(rel) {
+  if (!headIndex) return existsSync(path.join(frameworkRoot, rel));
+  const entry = headIndex.get(rel);
+  return Boolean(entry) && entry.mode !== "120000";
+}
+
+/** The language directories under templates/, as the framework spells them. */
+function templateLanguages() {
+  if (!headIndex) {
+    const abs = path.join(frameworkRoot, "templates");
+    return existsSync(abs)
+      ? readdirSync(abs, { withFileTypes: true }).filter((e) => e.isDirectory() && LANGUAGE_TAG.test(e.name)).map((e) => e.name)
+      : [];
+  }
+  const dirs = new Set();
+  for (const rel of headIndex.keys()) {
+    const parts = rel.split("/");
+    if (parts.length >= 3 && parts[0] === "templates" && LANGUAGE_TAG.test(parts[1])) dirs.add(parts[1]);
+  }
+  return [...dirs];
+}
+
+/** `pt-br` → `pt-BR`, `ZH-hant-tw` → `zh-Hant-TW`: the conventional BCP-47 casing. */
+function canonicalTag(tag) {
+  return tag.split("-").map((part, i) => {
+    if (i === 0) return part.toLowerCase();
+    if (part.length === 2) return part.toUpperCase();
+    if (part.length === 4) return part[0].toUpperCase() + part.slice(1).toLowerCase();
+    return part.toLowerCase();
+  }).join("-");
+}
+
+let language = "en"; // what the organisation works in, as recorded
+let templateLanguage = null; // the templates/<dir> its files come from, when the framework has one
+{
+  const requested = config.org.language;
+  if (requested != null && requested !== "") {
+    const tag = String(requested).trim();
+    if (!LANGUAGE_TAG.test(tag)) {
+      log("language", `org.language "${tag}" is not a language tag (BCP-47, e.g. pt-BR) — using English`);
+    } else if (tag.toLowerCase() !== "en") {
+      const dir = templateLanguages().find((d) => d.toLowerCase() === tag.toLowerCase());
+      if (dir) {
+        language = templateLanguage = dir;
+        log("language", `${language}: templates, scaffold files and strings from templates/${dir}/ (English where a file is missing)`);
+      } else {
+        language = canonicalTag(tag);
+        log("language", `no templates for "${language}" — files are written in English; the language is recorded and agents are told to work in it`);
+      }
+    }
+  }
+}
+// Empty for English: every `{{#if org.language}}` in a template is then inert.
+const instanceLanguage = language === "en" ? "" : language;
+
+// An instance carries the English base and its own language's set, no other.
+source.files = source.files.filter((f) => !isOtherLanguageTemplate(f.rel, templateLanguage || "en"));
+
+/** The instance-language version of a framework template path, or the path itself. */
+function localized(rel) {
+  if (!templateLanguage) return rel;
+  const candidate = `templates/${templateLanguage}/${rel.slice("templates/".length)}`;
+  return frameworkHas(candidate) ? candidate : rel;
+}
+
+// Short strings: the English catalogue, overridden key by key.
+const strings = {
+  ...yaml.load(readFrameworkFile("templates/strings.yaml")),
+  ...(localized("templates/strings.yaml") !== "templates/strings.yaml"
+    ? yaml.load(readFrameworkFile(localized("templates/strings.yaml")))
+    : {}),
+};
+const str = (key, data = {}) => render(String(strings[key] ?? ""), data);
+
+const today = new Date().toISOString().slice(0, 10);
+const operatorName = config.operator?.name || str("operator_name_todo");
+// What the scaffold files (templates/scaffold/, mirroring the instance root) are rendered with.
+const scaffoldData = {
+  org: {
+    name: config.org.name,
+    type: config.org.type,
+    emoji: config.org.emoji,
+    has_emoji: Boolean(config.org.emoji),
+    short_description: config.org.short_description || "",
+    language: instanceLanguage,
+  },
+  operator: {
+    name: operatorName,
+    name_json: JSON.stringify(operatorName),
+    email: config.operator?.email,
+    has_email: Boolean(config.operator?.email),
+  },
+  soul: { mission: config.org.short_description || str("soul_mission_todo") },
+  today,
+};
+const scaffold = (rel, extra = {}) =>
+  render(readFrameworkFile(localized(`templates/scaffold/${rel}`)), { ...scaffoldData, ...extra });
+
 if (source.mode === "filesystem") console.warn(FALLBACK_WARNING);
 for (const top of source.undeclared) {
   log("stage 2", `skipped undeclared top-level entry: ${top}`);
@@ -325,12 +447,10 @@ if (!dry) {
 }
 
 // === Stage 4: reset markdown placeholders ===
-const placeholders = {
-  "IDENTITY.md": `# IDENTITY.md — ${config.org.name}\n\n- **Name:** ${config.org.name}\n- **Type:** ${config.org.type}\n${config.org.emoji ? `- **Emoji:** ${config.org.emoji}\n` : ""}- **Short description:** ${config.org.short_description || ""}\n\n_Generated by clone-framework on ${new Date().toISOString().slice(0, 10)}. Edit freely._\n`,
-  "MASTERPLAN.md": `# MASTERPLAN.md — ${config.org.name}\n\n## Mandate\n\nTODO: define\n\n## Activations\n\n- TODO\n\n## Character\n\nTODO\n\n_Bootstrapped by clone-framework on ${new Date().toISOString().slice(0, 10)}._\n`,
-  "MEMORY.md": `# MEMORY.md — ${config.org.name}\n\n## Key Decisions\n\n- ${new Date().toISOString().slice(0, 10)}: Instance bootstrapped from org-os framework via clone-framework.\n\n## Active Context\n\nFresh start.\n`,
-  "HEARTBEAT.md": `# HEARTBEAT.md — ${config.org.name}\n\n## Active Tasks\n\n- [ ] Complete bootstrap interview (populate data/*.yaml)\n- [ ] Edit IDENTITY.md, SOUL.md, MASTERPLAN.md\n- [ ] Customize federation.yaml peers\n- [ ] Run \`npm run validate:structure\` and \`npm run selftest\`\n\n## System Health\n\nFresh bootstrap.\n`,
-};
+// The text lives in templates/scaffold/ (and templates/<lang>/scaffold/).
+const placeholders = Object.fromEntries(
+  ["IDENTITY.md", "MASTERPLAN.md", "MEMORY.md", "HEARTBEAT.md"].map((name) => [name, scaffold(name)]),
+);
 log("stage 4", `resetting ${Object.keys(placeholders).length} placeholder files`);
 if (!dry) {
   for (const [name, content] of Object.entries(placeholders)) {
@@ -347,18 +467,17 @@ if (!dry) {
 // framework's own SOUL — the Harbor Bakery B4/B5 leak, surviving in the
 // recommended path. Identity has to be stripped by construction, not by
 // operator diligence; tests/clone-framework-health.test.mjs pins it.
-const today = new Date().toISOString().slice(0, 10);
-const operatorName = config.operator?.name || "TODO: operator name";
+// Registries with no prose in them stay inline; the rest are scaffold files.
 const registryResets = {
-  "data/members.yaml": `schema_version: "2.0"\n\n# Members Registry — seeded with the bootstrap operator; add your team.\n\nmembers:\n  - id: "operator"\n    name: ${JSON.stringify(operatorName)}\n    role: "Operator"\n    layer: "core"\n    status: "active"\n    joined: "${today}"\n`,
-  "data/projects.yaml": `schema_version: "2.0"\n\n# Projects Registry — fill via the bootstrap-interviewer skill (BOOTSTRAP.md Phase 1).\n\nprojects: []\n`,
+  "data/members.yaml": scaffold("data/members.yaml"),
+  "data/projects.yaml": scaffold("data/projects.yaml"),
   "data/ideas.yaml": `schema_version: "2.0"\n\nideas: []\n`,
   "data/relationships.yaml": `schema_version: "2.0"\n\nrelationships: []\n`,
   "data/ecosystems.yaml": `ecosystems: []\n`,
-  "data/governance.yaml": `schema_version: "2.0"\n\n# Governance Registry — ${config.org.name}\n# Decisions are recorded in DECISIONS.md; ratified ones that need a machine-readable\n# record (EIP-4824 proposals) are mirrored here.\n\ngovernance:\n  model: "solo-maintainer"     # solo-maintainer | steward-council | multisig | assembly | conviction\n  current_phase: "bootstrap"   # bootstrap | transition | active | sunset\n  infrastructure:\n    safe: null\n    hats_tree: null\n    gardens: null\n    snapshot: null\n  decisions: []\n  elections: []\n`,
-  "SOUL.md": `# SOUL.md — Who We Are\n\n_This file defines the character, values, and voice of ${config.org.name}. It grounds the agent in the org's shared identity._\n\n---\n\n## Mission\n\n${config.org.short_description || "TODO: what this organization exists to do."}\n\n## Values\n\n- TODO\n\n## Voice\n\n- TODO\n\n_Seeded by clone-framework on ${today}; the bootstrap-interviewer pass (BOOTSTRAP.md Phase 1) gives this substance._\n`,
-  "USER.md": `# USER.md — About Your Operator\n\n_The person you're helping. Update as preferences surface through working together._\n\n---\n\n- **Name:** ${operatorName}\n${config.operator?.email ? `- **Email:** ${config.operator.email}\n` : ""}- **Role:** Operator\n\n_Seeded by clone-framework on ${today}._\n`,
-  "TOOLS.md": `# TOOLS.md — Local Tool Notes\n\n_Skills define how tools work. This file is for your specifics — the setup unique to this node. Never put credentials here — reference where they're stored._\n\n---\n\n## API Endpoints\n\n_(none configured yet)_\n\n## Channels\n\n_(none configured yet)_\n`,
+  "data/governance.yaml": scaffold("data/governance.yaml"),
+  "SOUL.md": scaffold("SOUL.md"),
+  "USER.md": scaffold("USER.md"),
+  "TOOLS.md": scaffold("TOOLS.md"),
 };
 log("stage 4b", `resetting ${Object.keys(registryResets).length} instance-owned registries + operator files`);
 if (!dry) {
@@ -388,77 +507,12 @@ if (!dry) {
   // stage 3. The instance gets every default section, documented, matching
   // loadDashboardConfig() in scripts/initialize.mjs (which is also what
   // /initialize does when the file is absent).
-  writeFileSync(path.join(target, "dashboard.yaml"), DASHBOARD_YAML(config.org.name));
+  writeFileSync(path.join(target, "dashboard.yaml"), scaffold("dashboard.yaml"));
 
   // knowledge/ is a declared top-level deny (its INDEX.md describes the
   // framework's own knowledge commons); the instance gets an empty index.
   mkdirSync(path.join(target, "knowledge"), { recursive: true });
-  writeFileSync(
-    path.join(target, "knowledge", "INDEX.md"),
-    `# Knowledge Index — ${config.org.name}\n\n_Navigation for this instance's knowledge base. Domains are declared in \`data/knowledge-manifest.yaml\`; \`npm run knowledge\` compiles pages and refreshes the indexes._\n\n_(no domains yet)_\n`,
-  );
-}
-
-function DASHBOARD_YAML(orgName) {
-  return `# dashboard.yaml — controls what /initialize shows for ${orgName}
-#
-# Every section below is on, with the same values /initialize uses when this
-# file is absent (loadDashboardConfig in scripts/initialize.mjs). Set
-# \`show: false\` to hide a section; delete a key to fall back to its default.
-# Sections always render in a fixed order, whatever the order here.
-
-schema_version: "2.0"
-
-sections:
-
-  header:
-    show: true
-    style: ascii            # ascii banner at the top of the dashboard
-
-  projects:
-    show: true              # data/projects.yaml, archived/done hidden
-    # max: 10               # cap rows (default: all)
-
-  tasks:
-    show: true              # HEARTBEAT.md active tasks by urgency
-    show_completed: true    # also list recently completed tasks
-    # max: 8                # cap tasks per tier (default: 8)
-
-  calendar:
-    show: true              # upcoming items from data/meetings.yaml + data/events.yaml
-    days: 7                 # look-ahead window in days
-
-  funding:
-    show: true              # data/funding-opportunities.yaml deadlines
-    horizon_days: 30        # only deadlines within this many days
-
-  context:
-    show: true              # latest memory/YYYY-MM-DD.md entries
-    max_entries: 3
-
-  plans:
-    show: true              # docs/plans/QUEUE.md
-    queued_preview: 2       # how many queued plans to preview
-
-  pipelines:
-    show: true              # stage bars for ideas, funding, knowledge, plans
-
-  knowledge_graph:
-    show: true              # graphify-out/ status, when a graph has been built
-
-  apps:
-    show: true              # known apps and workspaces present in this instance (self-hides when none)
-
-  cheatsheet:
-    show: true              # common commands
-
-  federation:
-    show: true              # federation.yaml peers + upstream
-
-  prompt:
-    show: true              # "what would you like to work on?" suggestions
-    suggestions: 3
-`;
+  writeFileSync(path.join(target, "knowledge", "INDEX.md"), scaffold("knowledge/INDEX.md"));
 }
 
 // === Stage 5: materialize packages + skills per config ===
@@ -555,7 +609,7 @@ if (configuredUpstream && !upstreamIsCanonical) {
 }
 
 const fedYaml = `# federation.yaml — ${config.org.name}
-# Generated by clone-framework on ${new Date().toISOString().slice(0, 10)}.
+# ${str("federation_header", { today: new Date().toISOString().slice(0, 10) })}
 
 version: "${frameworkMajorMinor}"
 spec: "organizational-os/${frameworkMajorMinor}"
@@ -564,7 +618,7 @@ identity:
   name: "${config.org.name}"
   type: "${config.org.type}"
   short_description: "${config.org.short_description || ""}"
-${config.org.emoji ? `  emoji: "${config.org.emoji}"\n` : ""}
+${config.org.emoji ? `  emoji: "${config.org.emoji}"\n` : ""}${instanceLanguage ? `  language: "${instanceLanguage}"\n` : ""}
 network: "${config.network?.name || ""}"
 
 peers: []
@@ -623,7 +677,7 @@ if (!dry) {
   mkdirSync(wellKnownDir, { recursive: true });
 
   const orgName = config.org.name;
-  const orgDescription = config.org.short_description || `${orgName} — an org-os instance`;
+  const orgDescription = config.org.short_description || str("dao_description", { org: { name: orgName } });
   const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   // {{BASE_URL}} is a bare HOST: the template owns the `https://` scheme, and
   // generate-all-schemas.mjs (new URL(daoURI).host) and setup-org-os.mjs both
@@ -728,66 +782,16 @@ if (!dry) {
     writeFileSync(path.join(target, d, ".gitkeep"), "");
   }
 
-  writeFileSync(
-    path.join(target, "docs", "plans", "QUEUE.md"),
-    `# Plan Queue — ${config.org.name}
-
-> Strategic (multi-session) plans live in \`docs/plans/*.md\` with YAML frontmatter and are indexed here.
-> Tactical (session-scoped) plans live in \`docs/superpowers/plans/\`; their specs in \`docs/superpowers/specs/\`.
-> Untracked scratch, drafts and handoffs go in \`docs/temp/\` (gitignored).
-> \`/close\` updates this file when a plan changes status.
-
-## Active
-
-_(none)_
-
-## Queued
-
-_(none)_
-
-## Backlog
-
-_(none)_
-
-## Completed
-
-_(none)_
-`,
-  );
+  writeFileSync(path.join(target, "docs", "plans", "QUEUE.md"), scaffold("docs/plans/QUEUE.md"));
 
   writeFileSync(
     path.join(target, "DECISIONS.md"),
-    `# DECISIONS.md — Key Decisions Log
-
-_Append-only log of significant decisions for ${config.org.name}. Most recent at top. Detailed session notes live in \`memory/YYYY-MM-DD.md\`. This file is the **authoritative source** for the agent's context on "what was decided and why" — \`MEMORY.md\` indexes; \`DECISIONS.md\` records._
-
-## Conventions
-
-Each decision is a section with these fields:
-
-- **Status** — \`active\` (in force) · \`superseded\` (replaced by a later decision) · \`withdrawn\` (rolled back) · \`proposed\` (under discussion, not yet ratified)
-- **Scope** — which area(s): identity / governance / federation / data-model / agent-runtime / publishing / etc.
-- **Decision** — the call, in one or two sentences
-- **Why** — the rationale, including alternatives considered and what made them lose
-- **Refs** — commits, files, plans, related decisions, session memory
-
-When a decision is superseded, mark it \`superseded\` and add a \`Superseded by:\` link to the newer decision. Do not delete; the trail is the value.
-
----
-
-## ${today} · Instance bootstrapped from org-os ${frameworkMajorMinor}
-
-- **Status:** active
-- **Scope:** identity
-- **Decision** — ${config.org.name} is generated from the org-os framework (v${frameworkVersion}) via \`clone-framework\`; lineage is stamped in \`federation.yaml.metadata\`.
-- **Why** — one honest setup path; the instance starts with its own empty registries, memory and plan queue, none of the framework's.
-- **Refs** — \`federation.yaml\`, \`docs/plans/QUEUE.md\`
-`,
+    scaffold("DECISIONS.md", { framework: { version: frameworkVersion, major_minor: frameworkMajorMinor } }),
   );
 
   const gitignorePath = path.join(target, ".gitignore");
   if (existsSync(gitignorePath) && !readFileSync(gitignorePath, "utf-8").includes("docs/temp/")) {
-    appendFileSync(gitignorePath, "\n# Untracked scratch, drafts and handoffs (instance convention)\ndocs/temp/\n");
+    appendFileSync(gitignorePath, `\n${str("gitignore_comment")}\ndocs/temp/\n`);
   }
 
   let repointed = 0;
@@ -831,8 +835,9 @@ When a decision is superseded, mark it \`superseded\` and add a \`Superseded by:
 // Templates and partials come from HEAD (readFrameworkFile), not the working
 // tree: an uncommitted template edit — or a secret pasted into one — must not
 // reach an instance or its genesis commit.
+// Partials: the English set, each replaced by the instance language's when it has one.
 const partials = Object.fromEntries(
-  listFrameworkDir("templates/partials")
+  [...listFrameworkDir("templates/partials"), ...(templateLanguage ? listFrameworkDir(`templates/${templateLanguage}/partials`) : [])]
     .filter((rel) => rel.endsWith(".md"))
     .map((rel) => [path.posix.basename(rel, ".md"), readFrameworkFile(rel)]),
 );
@@ -845,7 +850,11 @@ const renderData = {
     framework_version: frameworkMajorMinor,
     status: "bootstrap",
     license: config.org.license || "MIT",
-    network_purpose: config.network?.name ? `the ${config.network.name} network` : "this network",
+    network_purpose: config.network?.name
+      ? str("network_purpose_named", { network: { name: config.network.name } })
+      : str("network_purpose_default"),
+    language: instanceLanguage,
+    is_hub: config.org.type === "Hub",
   },
   framework: {
     url: upstreamUrl.replace(/\.git$/, ""),
@@ -854,19 +863,19 @@ const renderData = {
     network: config.network?.name || "",
     peers: [],
   },
-  identity: { body: "See `IDENTITY.md` for the canonical identity." },
+  identity: { body: str("identity_body") },
   systems_map: "",
   today: new Date().toISOString().slice(0, 10),
 };
 
-const readmeTmpl = readFrameworkFile("templates/README.instance.md");
-const gettingStartedTmpl = readFrameworkFile("templates/GETTING-STARTED.md");
+const readmeTmpl = readFrameworkFile(localized("templates/README.instance.md"));
+const gettingStartedTmpl = readFrameworkFile(localized("templates/GETTING-STARTED.md"));
 // The framework's CLAUDE.md tells every session it is in "the org-os
 // framework"; an instance gets its own, rendered like README.md.
-const claudeTmpl = readFrameworkFile("templates/CLAUDE.instance.md");
+const claudeTmpl = readFrameworkFile(localized("templates/CLAUDE.instance.md"));
 // AGENTS.md is where CLAUDE.md sends every session; the framework's copy calls
 // the workspace "the upstream framework", so it is rendered for instances too.
-const agentsTmpl = readFrameworkFile("templates/AGENTS.instance.md");
+const agentsTmpl = readFrameworkFile(localized("templates/AGENTS.instance.md"));
 
 log("stage 7", `rendering README.md + GETTING-STARTED.md + CLAUDE.md + AGENTS.md`);
 if (!dry) {
@@ -951,7 +960,7 @@ if (kmsConfig) {
             type: "knowledge-garden",
             ...(plane.url ? { url: plane.url } : {}),
             steward: plane.steward || config.org.name,
-            return_path: plane.return_path || "unset — say where corrections go before the first publication",
+            return_path: plane.return_path || str("public_plane_return_path"),
             public_use: "ok-with-caveat",
           },
         },
@@ -960,7 +969,7 @@ if (kmsConfig) {
       if (!noGit) {
         spawnSync("git", ["init", "-q"], { cwd: planeDir });
         spawnSync("git", ["add", "-A"], { cwd: planeDir });
-        spawnSync("git", ["commit", "-q", "-m", "chore: public plane scaffolded by org-os clone-framework (genesis)"], { cwd: planeDir });
+        spawnSync("git", ["commit", "-q", "-m", str("public_plane_commit")], { cwd: planeDir });
       }
     }
   }
@@ -976,10 +985,13 @@ if (!noGit && !dry && !skipGenesisCommit) {
   try {
     execSync("git init -q", { cwd: target });
     execSync("git add .", { cwd: target });
-    execSync(
-      `git -c user.email=clone-framework@org-os -c user.name=clone-framework commit -q -m "chore: bootstrap from org-os framework (genesis)"`,
-      { cwd: target },
+    // An argument, not a shell string: the message comes from the strings catalogue.
+    const committed = spawnSync(
+      "git",
+      ["-c", "user.email=clone-framework@org-os", "-c", "user.name=clone-framework", "commit", "-q", "-m", str("genesis_commit")],
+      { cwd: target, encoding: "utf-8" },
     );
+    if (committed.status !== 0) throw new Error(committed.stderr || "git commit failed");
     log("stage 8", `initial commit created`);
   } catch (e) {
     console.warn(`⚠ git init/commit failed: ${e.message}`);
