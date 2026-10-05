@@ -15,7 +15,7 @@ toOrgOsRegistries(frameworkObjects);           // { 'data/resources.yaml': [...]
 
 ## How instances are born (Loop 3)
 
-1. Instantiate the `org-os-kms` profile → an org-os instance with the framework wired in.
+1. Instantiate the `org-os-kms` profile → an org-os instance with the framework wired in. From the framework: a `kms:` block in the `clone-framework.mjs` config (`docs/SETUP-PATHS.md`). In an existing instance: vendor the packages and run `init`.
 2. Fill the instance slots (identity + domain content).
 3. Run the framework's skills (`capture-and-route`, …) over the domain's sources.
 4. `/close` runs `csis-review` + emits `contribution-record`s.

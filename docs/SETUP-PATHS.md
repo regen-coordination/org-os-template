@@ -23,6 +23,28 @@ A freshly cloned instance should report no blockers except `git-remote-absent`,
 which is expected until you create a repository for it. Anything else is a bug —
 `tests/clone-framework-health.test.mjs` guards exactly this.
 
+### An instance born as a knowledge system
+
+Add a `kms:` block to the config and the clone also applies the `org-os-kms` profile:
+it stamps `kms.yaml` and the instance's own source-system card, with the named
+extension packs switched on.
+
+```yaml
+packages:
+  toolkit-framework: true     # both are required by a kms block,
+  org-os-kms: true            # vendored side by side
+  org-os-territory: true      # every extension is a package too
+kms:
+  instance: my-commons        # optional; defaults to a slug of org.name
+  extensions: [org-os-territory]
+  store: { on_collision: merge }   # optional
+```
+
+A `kms:` block whose packages are not enabled is refused before anything is written.
+Fixture: `tests/fixtures/instance-config-kms.yaml`; guard: `tests/clone-kms.test.mjs`.
+What it does not do: connectors, AT Proto identity and peers stay hand-edited in
+`kms.yaml` (`packages/org-os-kms/docs/CONNECTORS.md`).
+
 The in-place alternative, `npm run setup`, is an interactive TTY-only wizard for
 converting a fork you have already made. It is not the recommended newcomer path;
 see the README for the current caveat.

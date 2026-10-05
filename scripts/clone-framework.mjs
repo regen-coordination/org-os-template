@@ -10,6 +10,7 @@
  *   5. Materialize packages + skills per config (sync-packages with --enabled)
  *   6. Write federation.yaml with instance identity + lineage stamp
  *   7. Render README + GETTING-STARTED + CLAUDE.md + AGENTS.md from templates
+ *   7b. With a `kms:` block in the config: stamp kms.yaml + the self card (org-os-kms init)
  *   8. Git init + initial commit (skip with --no-git; skipped in non-git fallback unless --commit-unverified)
  *
  * Usage:
@@ -75,6 +76,24 @@ if (!config.org || !config.org.name || !config.org.type) {
 
 function log(stage, msg) {
   console.log(`[${stage}] ${msg}`);
+}
+
+// A `kms:` block asks for an instance that is born a knowledge system (the org-os-kms
+// profile). Checked here, before stage 1, so a config that cannot work writes nothing.
+const kmsConfig = config.kms || null;
+const kmsExtensions = Array.isArray(kmsConfig?.extensions) ? kmsConfig.extensions : [];
+if (kmsConfig) {
+  const enabled = config.packages || {};
+  const missing = ["toolkit-framework", "org-os-kms"].filter((p) => enabled[p] !== true);
+  if (missing.length) {
+    console.error(`✗ Config has a kms block but packages.${missing.join(" and packages.")} ${missing.length > 1 ? "are" : "is"} not enabled — org-os-kms and toolkit-framework must both be vendored, side by side`);
+    process.exit(1);
+  }
+  const absent = kmsExtensions.filter((e) => enabled[e] !== true);
+  if (absent.length) {
+    console.error(`✗ kms.extensions names ${absent.join(", ")}, which ${absent.length > 1 ? "are" : "is"} not enabled under packages — an extension pack is vendored like any other package`);
+    process.exit(1);
+  }
 }
 
 // === Stage 1: target validation ===
@@ -842,6 +861,32 @@ if (!dry) {
   writeFileSync(path.join(target, "GETTING-STARTED.md"), render(gettingStartedTmpl, renderData, { partials }));
   writeFileSync(path.join(target, "CLAUDE.md"), render(claudeTmpl, renderData, { partials }));
   writeFileSync(path.join(target, "AGENTS.md"), render(agentsTmpl, renderData, { partials }));
+}
+
+// === Stage 7b: the knowledge system (only with a `kms:` block) ===
+// Stamps kms.yaml and the instance's own source-system card through org-os-kms's
+// `init`, so the result is identical to running it by hand. The framework's copy of
+// the CLI is used: the new instance has no node_modules yet. `init` knows nothing of
+// extension packs or store policy, so those are merged into kms.yaml afterwards.
+if (kmsConfig) {
+  const instanceName = kmsConfig.instance
+    || config.org.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  log("stage 7b", `knowledge system: instance "${instanceName}"${kmsExtensions.length ? `, extensions ${kmsExtensions.join(", ")}` : ""}`);
+  if (!dry) {
+    const cli = path.join(frameworkRoot, "packages", "org-os-kms", "src", "cli.mjs");
+    // Run from inside the instance: `init --dir <absolute>` writes an absolute self_ref.
+    const r = spawnSync("node", [cli, "init", "--name", instanceName], { cwd: target, encoding: "utf-8" });
+    if (r.status !== 0) {
+      console.error(`✗ org-os-kms init failed:\n${r.stderr || r.stdout}`);
+      process.exit(1);
+    }
+    const kmsPath = path.join(target, "kms.yaml");
+    const kms = yaml.load(readFileSync(kmsPath, "utf-8"));
+    if (kmsExtensions.length) kms.extensions = kmsExtensions;
+    if (kmsConfig.store) kms.store = kmsConfig.store;
+    if (kmsConfig.federation_namespace) kms.federation_namespace = kmsConfig.federation_namespace;
+    writeFileSync(kmsPath, yaml.dump(kms));
+  }
 }
 
 // === Stage 8: git init + initial commit ===

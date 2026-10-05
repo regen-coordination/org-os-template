@@ -1,0 +1,31 @@
+# Bootstrap config for an instance born as a knowledge system: the `kms:` block makes
+# clone-framework.mjs stamp kms.yaml and the self card, with the named extension packs on.
+org:
+  name: "test-commons-os"
+  tagline: "Selftest fixture — not a real org"
+  type: "RegionalNode"
+  short_description: "Selftest scaffold for a knowledge-system clone."
+  emoji: "🧪"
+  license: "MIT"
+
+operator:
+  name: "Test Operator"
+  email: "test@example.invalid"
+
+network:
+  name: "test-network"
+  upstream_url: "https://github.com/organizational-os/organizational-os-template.git"
+
+packages:
+  toolkit-framework: true
+  org-os-kms: true
+  org-os-territory: true
+
+skills:
+  - org-os-init
+
+kms:
+  instance: "test-commons"
+  extensions: [org-os-territory]
+  store:
+    on_collision: merge
