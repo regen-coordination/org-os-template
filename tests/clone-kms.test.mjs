@@ -140,8 +140,8 @@ test("a kms.public_plane block yields a canon that names its public plane, and t
     assert.equal(card["test-commons-publico"].title, "test-commons-os");
     assert.equal(card["test-commons-publico"].maturity, undefined);
     assert.equal(card["test-commons-publico"].notes, undefined);
-    // It is a projection: it names no public plane of its own.
-    assert.equal(plane.planes, undefined);
+    // It is a projection: it says so, names its canon, and names no public plane of its own.
+    assert.deepEqual(plane.planes, { role: "public", canon: "test-commons" });
   } finally {
     rmSync(dst, { recursive: true, force: true });
     rmSync(v.dir, { recursive: true, force: true });
@@ -160,6 +160,13 @@ test("a freshly cloned pair exports and re-gates cleanly: nothing to publish, no
     const validated = run("validate");
     assert.equal(validated.status, 0, validated.stderr + validated.stdout);
     assert.equal(JSON.parse(validated.stdout).ok, true);
+    // The roles hold from day one: the canon will not publish, and its plane re-gates clean.
+    const refused = run("publish");
+    assert.equal(refused.status, 1);
+    assert.equal(JSON.parse(refused.stdout).report.refused, "canon");
+    const planned = spawnSync("node", [cli, "publish", "--dir", path.join(dst, "repos", "test-commons-publico")], { encoding: "utf-8" });
+    assert.equal(planned.status, 0, planned.stderr + planned.stdout);
+    assert.deepEqual(JSON.parse(planned.stdout).report.regate, { status: "clean" });
   } finally {
     rmSync(dst, { recursive: true, force: true });
     rmSync(v.dir, { recursive: true, force: true });

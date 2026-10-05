@@ -293,5 +293,18 @@ decided. An instance can only add fields; naming a private one (`notes`, `surfac
 `reviewed_by`, …) is refused. The plane's own `data/kb/source-system.yaml` holds one card, the
 commons itself, and is published as it stands.
 
-**Not yet enforced:** `publish` (AT Proto) does not go through this gate and does not know which
-plane it is in. Run it only in the public plane, never in the canon.
+**Each plane knows what it is** (`src/planes/role.mjs`). A canon is the instance whose `kms.yaml`
+names a public plane; the public plane carries `planes: { role: public, canon: <instance> }`.
+
+- In a **canon**, `publish` is refused in every mode, before anything is listed, minted or
+  written. So is the `publish` step of `lifecycle close`, which stops there.
+- In a **public plane**, `publish` first re-gates the plane against its canon (the same check as
+  `validate`). A failure is refused in every mode. The canon is looked for two levels up
+  (`<canon>/repos/<plane>`) or at `planes.canon_dir`, and only counts if it names this plane. A
+  plane that cannot find its canon will plan but not apply; `planes.regate: false` is the
+  explicit way to publish from a plane on its own, and it is reported as `regate: disabled`.
+- In a public plane, `ingest` is refused: the plane receives only what its canon exports.
+- An instance with no `planes` key has no role and behaves as before.
+
+A store whose file name is the type (what `export` writes) carries no `type` on its objects;
+`publish` supplies it on the record without rewriting the file.

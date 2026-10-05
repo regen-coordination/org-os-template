@@ -929,7 +929,15 @@ if (kmsConfig) {
       const planeKmsPath = path.join(planeDir, "kms.yaml");
       const planeKms = yaml.load(readFileSync(planeKmsPath, "utf-8"));
       if (kmsExtensions.length) planeKms.extensions = kmsExtensions;
-      planeKms.publish = { ...(plane.types_opt_in ? { types_opt_in: plane.types_opt_in } : {}), apply: false };
+      // The static surface needs a base URL; without one it stays off rather than failing every publish.
+      planeKms.publish = {
+        ...(plane.types_opt_in ? { types_opt_in: plane.types_opt_in } : {}),
+        ...(plane.url ? { static: true, base_url: plane.url } : { static: false }),
+        apply: false,
+      };
+      // It says what it is and whose it is: `publish` here re-gates against that canon before writing,
+      // and `ingest` is refused (packages/org-os-kms/src/planes/role.mjs).
+      planeKms.planes = { role: "public", canon: instanceName };
       writeFileSync(planeKmsPath, yaml.dump(planeKms));
       // The plane's one card describes the commons itself and is PUBLISHED as it stands — the
       // export never rewrites it and the re-gate holds it to a public shape: a publishable

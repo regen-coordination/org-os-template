@@ -17,6 +17,7 @@ import { readManifest, writeManifest } from './manifest.mjs';
 import { planPublish, applyPublish } from './atproto/publish.mjs';
 import { createClient as defaultCreateClient } from './atproto/client.mjs';
 import { planStandardSite, applyStandardSite, wellKnownPath } from './atproto/standard-site.mjs';
+import { planeRole, regatePublicPlane } from './planes/role.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { loadInstanceGate, buildGateContext, applyGate } from './gate.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
@@ -69,9 +70,24 @@ export const OPS = {
     const deps = { createClient: defaultCreateClient, env: process.env, ...(ctx.deps || {}) };
     const dry = ctx.flags?.dry === true;
     const apply = ctx.flags?.apply === true || config.publish?.apply === true;
+    // The two planes (src/planes/role.mjs). A canon never publishes — in any mode, before anything is listed,
+    // minted or written: what leaves it leaves through `export`. A public plane re-gates itself against its
+    // canon first; a plane that fails is refused, and one that cannot find its canon may plan but not apply.
+    const role = planeRole(config);
+    if (role === 'canon') {
+      return { ok: false, report: { dry, refused: 'canon', reason: `this instance is a canon: it publishes nothing itself. Run \`export\` here, then \`publish\` in its public plane (${config.planes.public.instance}).` } };
+    }
+    let regate;
+    if (role === 'public') {
+      regate = regatePublicPlane(dir, config);
+      if (regate.status === 'failed') return { ok: false, report: { dry, refused: 'regate', regate, reason: 'this public plane holds something its canon would not publish today — run `validate` in the canon' } };
+      if (regate.status === 'canon-not-found' && apply && !dry) {
+        return { ok: false, report: { dry, refused: 'regate', regate, reason: 'this public plane cannot find its canon to re-gate against (planes.canon_dir), so it will not write. Set planes.regate: false to publish from the plane on its own.' } };
+      }
+    }
     const target = join(dir, config.target);
     const adapter = fw.getAdapter(config.adapter);
-    const report = { dry, atproto: { status: 'not-configured' }, static: null };
+    const report = { dry, ...(regate ? { regate } : {}), atproto: { status: 'not-configured' }, static: null };
 
     const all = adapter.list(target);
     const types = fw.publishableTypes(config);
@@ -94,12 +110,16 @@ export const OPS = {
     const manifest = readManifest(dir);
     let next = manifest;
     if (at?.did && at?.pds && at?.nsid_authority) {
-      const plan = planPublish({ items, manifest, did: at.did, authority: at.nsid_authority });
+      // In a store whose file name IS the type (repo-data; what `export` writes into a public plane), an
+      // object carries no `type` of its own — the record still must. Defaulted for the record only: the
+      // objects on disk are not rewritten.
+      const records = items.map((it) => (it.object.type ? it : { ...it, object: { type: it.schema, ...it.object } }));
+      const plan = planPublish({ items: records, manifest, did: at.did, authority: at.nsid_authority });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
       // an invalid one is reported (status 'invalid', ok:false) and nothing of it is written.
-      const ss = at.standard_site?.enabled === true ? planStandardSite({ items, entryPlan: plan, manifest, did: at.did, authority: at.nsid_authority, config }) : null;
+      const ss = at.standard_site?.enabled === true ? planStandardSite({ items: records, entryPlan: plan, manifest, did: at.did, authority: at.nsid_authority, config }) : null;
       const ssBase = ss?.ok ? { publication: ss.publication.action, created: ss.create.length, updated: ss.update.length, deleted: ss.delete.length, skipped: ss.skip.length, withheld: ss.withheld, warnings: ss.warnings } : null;
       if (ss) report.standard_site = ss.ok ? { status: 'planned', ...ssBase } : { status: 'invalid', errors: ss.errors };
       const password = deps.env.ATPROTO_APP_PASSWORD;
@@ -160,6 +180,11 @@ export const OPS = {
   'ingest.pull': { kind: 'exec', write: true, run: async (ctx) => {
     const dir = ctx.dir || '.';
     const config = ctx.config || (ctx.config = loadKmsConfig(dir));
+    // A public plane holds only what its canon exported through the gate; ingesting into it would put ungated
+    // objects one `publish` away from the world.
+    if (planeRole(config) === 'public') {
+      return { ok: false, report: { connectors: [], failed: 0, refused: 'public-plane', error: 'this instance is a public plane: it receives only what its canon exports. Ingest in the canon.' } };
+    }
     const registry = ctx.deps?.registry || mergeConnectors(await loadPackConnectors(config.packs));
     const dry = ctx.flags?.dry === true;
     const only = ctx.flags?.connector;
