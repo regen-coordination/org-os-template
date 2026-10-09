@@ -112,7 +112,7 @@ Full walkthrough with real output at every step: [`docs/GETTING-STARTED.md`](doc
 - **Compatibility engine** (`src/compatibility.mjs`) + **invariants** (`src/invariants.mjs`) + **lift ETL** (`src/lift.mjs`, CLI `lift`).
 - **The machine** — `init`/`ingest`/`store`/`kb`/`review`/`federate` (`src/instance.mjs`, `src/ingest.mjs`, `src/workorder.mjs`, `src/storage.mjs` + `src/adapters/`, `src/review.mjs`) — see [The machine (0.2)](#the-machine-02) above.
 - **7 agentic skills** — `register-source`, `map-ontology`, `capture-and-route`, `ingest`, `compose-journey`, `csis-review`, `review-promote`.
-- **Docs** — `architecture/` (layers, operating-loop, kernel-objects, problems-ToC, invariants, ontology-posture, fork-compatibility, type-tag-discipline), `process/` (8: principles, review, contribution, csis-safeguards, federation, roles, evolution-loop, ontology-change-process), `site/journey-model.md`.
+- **Docs** — `architecture/` (layers, operating-loop, kernel-objects, problems-ToC, invariants, ontology-posture, fork-compatibility, type-tag-discipline), `process/` (10: principles, review, contribution, csis-safeguards, federation, roles, evolution-loop, ontology-change-process, methodology-core, publication-policy-core), `site/journey-model.md`.
 
 ## Next — the dialectic (not framework-building)
 
