@@ -25,7 +25,8 @@ tests that do it.
    canonicalises to one key before any consent lookup; where several boundaries bind one document, the strictest wins.
 6. **Internal sources are a floor that context can only add to.** A hard-coded list of internal sources is unioned
    with whatever the context marks internal; an empty context never makes the gate more permissive. Matching may
-   over-block; it never under-blocks.
+   over-block; it never under-blocks. The check reads every source an object drew on, including sources inherited
+   through a merge; so does the fail-closed check on unresolvable provenance (property 1).
 7. **Review is required** — a reviewed maturity, or an explicit, auditable operator flag.
 
 ## 2 · Pages never say more than the API
