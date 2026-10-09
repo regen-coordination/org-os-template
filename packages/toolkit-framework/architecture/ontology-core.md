@@ -29,7 +29,8 @@ What an instance writes down is its **bindings** (which types it stores, where e
 An instance declares, in one table, **which framework types it stores, what each is for, and which of them
 publish**. A type it stores and never publishes is listed as such, with the rule that refuses it.
 
-- The set it may publish is the framework's (`PUBLISHABLE_TYPES`, plus the two opt-in types, in
+- The set it may publish is the framework's (`PUBLISHABLE_TYPES`, plus the opt-in types of `optInTypes()`:
+  `source-system`, `public-use-boundary` and every registered extension pack's types, in
   `../src/publishable.mjs`). An instance narrows that set; it does not widen it.
 - A type outside the framework's set is **proposed upstream first** (§7), and held to
   [`type-tag-discipline.md`](type-tag-discipline.md): a type only where it changes structure, otherwise a tag.
