@@ -4,12 +4,35 @@
 // tree: it reads refs, and adds or removes linked worktrees elsewhere.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const git = (dir, args) =>
   execFileSync('git', ['-C', dir, ...args], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 export function createGit(mainDir) {
   return {
+    /**
+     * The repository's primary checkout: mainDir itself unless mainDir is a
+     * linked worktree. A submodule keeps its git directory elsewhere and records
+     * its checkout in core.worktree, so that is read before falling back to the
+     * first entry of `git worktree list` (which would name the git directory).
+     */
+    primaryCheckout() {
+      try {
+        const common = git(mainDir, ['rev-parse', '--path-format=absolute', '--git-common-dir']).trim();
+        let configured = '';
+        try {
+          configured = git(mainDir, ['config', '--file', join(common, 'config'), '--get', 'core.worktree']).trim();
+        } catch {
+          // core.worktree is not set: an ordinary repository
+        }
+        if (configured) return resolve(common, configured);
+        const first = git(mainDir, ['worktree', 'list', '--porcelain']).split('\n')[0];
+        return first.startsWith('worktree ') ? first.slice('worktree '.length) : mainDir;
+      } catch {
+        return mainDir;
+      }
+    },
     resolves(ref) {
       try {
         git(mainDir, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);

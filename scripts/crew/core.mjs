@@ -156,15 +156,19 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
     assignmentBody(ctx, brief),
   );
 
+  // herdr starts worktree actions from the repository's primary checkout and
+  // refuses a linked worktree (linked_worktree_source). ctx.repoDir is that
+  // primary checkout when the main checkout is itself a linked worktree.
+  const repoDir = ctx.repoDir ?? ctx.mainDir;
   let step = 'worktree';
   let prompted = false;
   try {
     let opened;
     if (on) {
       ctx.git.addDetached(worktree, on);
-      opened = ctx.herdr.openWorktree({ cwd: ctx.mainDir, path: worktree, label: name });
+      opened = ctx.herdr.openWorktree({ cwd: repoDir, path: worktree, label: name });
     } else {
-      opened = ctx.herdr.createWorktree({ cwd: ctx.mainDir, branch: `crew/${id}`, base, path: worktree, label: name });
+      opened = ctx.herdr.createWorktree({ cwd: repoDir, branch: `crew/${id}`, base, path: worktree, label: name });
     }
     updateRecord(file, { pane: opened.pane_id, workspace: opened.workspace_id });
 

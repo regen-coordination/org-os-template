@@ -63,10 +63,12 @@ function main(argv) {
   };
 
   const mainDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const git = createGit(mainDir);
   const ctx = {
     mainDir,
+    repoDir: git.primaryCheckout(),
     herdr: createHerdr(),
-    git: createGit(mainDir),
+    git,
     env: process.env,
     cwd: process.cwd(),
     now: () => new Date(),

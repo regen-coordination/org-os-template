@@ -235,6 +235,12 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
    branch. On a dirty worktree it fails with error code `dirty_worktree_requires_force`.
 4. When the source repository has no open herdr workspace, `worktree create` also opens one for
    it. The launcher leaves that workspace alone.
+6. herdr refuses `worktree create` and `worktree open` when `--cwd` is itself a linked worktree
+   (`linked_worktree_source`: "New and open worktree actions start from the repo parent
+   workspace"). Found in the first smoke run. The launcher therefore passes herdr the
+   repository's primary checkout, while the roles and the trail stay in the main checkout. For a
+   submodule the primary checkout is read from `core.worktree`, because the first entry of
+   `git worktree list` names its git directory instead.
 5. `herdr agent list` returns every agent on the server; most of the operator's have no `name`.
    Crew agents are matched to assignments by `pane_id`.
 

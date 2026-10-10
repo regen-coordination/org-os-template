@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { CrewError } from '../../scripts/crew/roles.mjs';
 import { localDate, readRecord, readTrail, trailDir } from '../../scripts/crew/trail.mjs';
 import { nudge, seat } from '../../scripts/crew/core.mjs';
@@ -173,4 +173,18 @@ test('--on seats a reviewer on a detached copy of an existing branch', () => {
   assert.deepEqual(ctx.git.calls, [['addDetached', { path: a.worktree, ref: 'crew/some-branch' }]]);
   assert.deepEqual(ctx.herdr.calls[0], ['openWorktree', { cwd: root, path: a.worktree, label: 'reviewer' }]);
   assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'x', on: 'missing' }), /"missing" is not a branch or commit/);
+});
+
+test('herdr is pointed at the primary checkout when the main checkout is itself a linked worktree', () => {
+  // herdr refuses worktree actions that start from a linked worktree
+  // (error code linked_worktree_source), so they are given the repository's
+  // primary checkout instead. The trail and the roles stay in the main checkout.
+  const { root, ctx } = setup();
+  const linked = { ...ctx, repoDir: '/primary/checkout' };
+  ctx.git.refs.add('some-branch');
+  const a = seat(linked, { roleId: 'engineer', brief: 'x' });
+  seat(linked, { roleId: 'reviewer', brief: 'y', on: 'some-branch' });
+  assert.equal(ctx.herdr.calls.find((c) => c[0] === 'createWorktree')[1].cwd, '/primary/checkout');
+  assert.equal(ctx.herdr.calls.find((c) => c[0] === 'openWorktree')[1].cwd, '/primary/checkout');
+  assert.ok(a.worktree.includes(join('.wt', basename(root))), a.worktree);
 });
