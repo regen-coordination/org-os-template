@@ -42,3 +42,15 @@ test("an empty list still produces a readable report", () => {
   assert.match(out, /0 page\(s\) with covers/);
   assert.match(out, /No page has drifted/);
 });
+
+import { splitCovers, DIR_EXCLUDES } from "../src/lib/drift.mjs";
+
+test("splitCovers separates named files from directories, so documentation inside a directory can be left out", () => {
+  const isDir = (p) => ["packages/x", "scripts"].includes(p.replace(/\/$/, ""));
+  assert.deepEqual(splitCovers(["package.json", "packages/x", "scripts/", "docs/agent-plans/README.md"], isDir), {
+    files: ["package.json", "docs/agent-plans/README.md"],
+    dirs: ["packages/x", "scripts/"],
+  });
+  assert.ok(DIR_EXCLUDES.every((p) => p.startsWith(":(exclude")));
+  assert.ok(DIR_EXCLUDES.some((p) => p.includes("docs")));
+});

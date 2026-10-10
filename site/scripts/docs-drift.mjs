@@ -5,13 +5,22 @@
 import { execFileSync } from "node:child_process";
 import { PAGES } from "../src/data/docs-manifest.mjs";
 import { REPO_ROOT } from "../src/lib/repo.mjs";
-import { pagesToCheck, formatDriftReport } from "../src/lib/drift.mjs";
+import { statSync } from "node:fs";
+import { join } from "node:path";
+import { pagesToCheck, formatDriftReport, splitCovers, DIR_EXCLUDES } from "../src/lib/drift.mjs";
+
+const isDir = (p) => { try { return statSync(join(REPO_ROOT, p)).isDirectory(); } catch { return false; } };
+const diff = (verified, pathspecs) => execFileSync("git", ["diff", "--name-only", `${verified}..HEAD`, "--", ...pathspecs], {
+  cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
+}).split("\n").filter(Boolean);
 
 function changedPaths(verified, covers) {
-  const out = execFileSync("git", ["diff", "--name-only", `${verified}..HEAD`, "--", ...covers], {
-    cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
-  });
-  return out.split("\n").filter(Boolean);
+  const { files, dirs } = splitCovers(covers, isDir);
+  const found = new Set();
+  if (files.length > 0) for (const f of diff(verified, files)) found.add(f);
+  // Git has one exclude list per call, so directories go in a call of their own.
+  if (dirs.length > 0) for (const f of diff(verified, [...dirs, ...DIR_EXCLUDES])) found.add(f);
+  return [...found].sort();
 }
 
 const entries = pagesToCheck(PAGES).map((p) => {

@@ -10,6 +10,20 @@
 
 const short = (sha) => String(sha).slice(0, 7);
 
+/**
+ * Documentation and READMEs inside a covered directory are not the code a page
+ * describes. They are left out of directory covers only: a covers entry that
+ * names a file is compared as it is, whatever the file is.
+ */
+export const DIR_EXCLUDES = [":(exclude)docs", ":(exclude,glob)**/docs/**", ":(exclude,glob)**/README.md"];
+
+/** Split a covers list into named files and directories; `isDir` says which is which. */
+export function splitCovers(covers, isDir) {
+  const files = [], dirs = [];
+  for (const c of covers) (isDir(c) ? dirs : files).push(c);
+  return { files, dirs };
+}
+
 /** The pages worth asking git about: those that list `covers` and have a verified commit. */
 export function pagesToCheck(pages) {
   return pages.filter((p) => Array.isArray(p.covers) && p.covers.length > 0 && typeof p.verified === "string" && p.verified !== "");

@@ -87,7 +87,7 @@ jobs:
       # after the page was verified (spec §5.5). It reports and never blocks.
       - name: Docs drift report
         working-directory: site
-        run: npm run drift
+        run: npm run drift | tee -a "$GITHUB_STEP_SUMMARY"
         continue-on-error: true
 
       - name: Check version triplet consistency
