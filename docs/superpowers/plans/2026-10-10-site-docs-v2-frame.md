@@ -2706,3 +2706,6 @@ Not a task for a subagent — the handoff to the operator.
 - `site/scripts/docs-drift.mjs` and its CI step (spec §5.5).
 - Revisit the links unlinked in Task 3 when ECOSYSTEM, EIP4824-GUIDE and SETUP are verified: some may deserve a real target.
 - Anything Task 5 noted about the federation map under the dark theme.
+- Check that a `#fragment` on a link between docs names a heading that exists (the content pass renames headings).
+- Plan 3: merge with a merge commit, never squash or rebase — each `verified` commit must stay in `main`'s history.
+- Deferred minors from the plan 1 reviews are listed in the session ledger and in the plan 1 handoff.

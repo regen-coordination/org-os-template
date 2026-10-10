@@ -83,6 +83,7 @@ function built(href) {
   let path;
   try { path = decodeURIComponent(href.slice(BASE_PATH.length).split(/[#?]/)[0]); } catch { return false; }
   if (path === "" || path === "/") return existsSync(join(DIST, "index.html"));
+  if (path.split("/").includes("..")) return false;   // never let a link escape dist/
   const full = join(DIST, path);
   if (path.endsWith("/")) return existsSync(join(full, "index.html"));
   return (existsSync(full) && statSync(full).isFile()) || existsSync(join(full, "index.html"));
@@ -154,5 +155,44 @@ for (const p of PAGES) {
 }
 if (llmsLinks === 0) fail("llms check: matched 0 links — the pattern is stale");
 else console.log(llmsBad === 0 ? `llms check: ${llmsLinks} links OK, all ${PAGES.length} docs listed` : `llms check: ${llmsBad} problem(s)`);
+
+// ── 7. Docs have a body (independent of the build-time link guard) ───────
+// The article carries data-pagefind-body. Take it, drop the eyebrow and the
+// title, strip tags: if nothing is left the markdown did not render.
+let bodies = 0;
+for (const p of PAGES) {
+  const file = join(DIST, "docs", p.slug, "index.html");
+  if (!existsSync(file)) continue;   // already reported as MISSING
+  const html = readFileSync(file, "utf8");
+  const start = html.search(/<article\b[^>]*\bdata-pagefind-body\b[^>]*>/);
+  if (start === -1) continue;        // reported by the search-index check below
+  const open = html.indexOf(">", start) + 1;
+  const end = html.indexOf("</article>", open);
+  const text = html.slice(open, end === -1 ? undefined : end)
+    .replace(/<p\b[^>]*\beyebrow\b[^>]*>[\s\S]*?<\/p>/, "")
+    .replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/, "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+  if (text === "") fail(`EMPTY DOC: docs/${p.slug} — the page has no content (did its markdown fail to render?)`);
+  else bodies++;
+}
+if (PAGES.length === 0) fail("doc body check: the manifest has no pages");
+else console.log(bodies === PAGES.length ? `doc bodies: ${bodies} docs have content` : `doc bodies: ${PAGES.length - bodies} problem(s)`);
+
+// ── 8. The search index covers exactly the marked pages ───────────────────
+const marked = htmlFiles.filter((f) => /\bdata-pagefind-body\b/.test(readFileSync(f, "utf8")));
+let indexed = null;
+try {
+  const entry = JSON.parse(readFileSync(join(DIST, "pagefind", "pagefind-entry.json"), "utf8"));
+  indexed = Object.values(entry.languages ?? {}).reduce((n, l) => n + (l.page_count ?? 0), 0);
+} catch (e) { fail(`PAGEFIND: pagefind-entry.json unreadable — ${e.message}`); }
+let searchBad = 0;
+for (const p of PAGES) {
+  const f = join(DIST, "docs", p.slug, "index.html");
+  if (existsSync(f) && !marked.includes(f)) { fail(`PAGEFIND: docs/${p.slug} lacks data-pagefind-body, so it is not searchable`); searchBad++; }
+}
+if (marked.length < PAGES.length) { fail(`PAGEFIND: ${marked.length} marked page(s), fewer than the ${PAGES.length} manifest pages`); searchBad++; }
+if (indexed !== null && indexed !== marked.length) { fail(`PAGEFIND: the index holds ${indexed} page(s) but ${marked.length} built page(s) are marked`); searchBad++; }
+if (indexed !== null && searchBad === 0) console.log(`search index: ${indexed} pages indexed = ${marked.length} marked pages, all ${PAGES.length} docs among them`);
 
 process.exit(failed ? 1 : 0);
