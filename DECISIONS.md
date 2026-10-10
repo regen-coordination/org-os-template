@@ -14,6 +14,19 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-10-10 · The framework's agent team runs through herdr from role files; Paperclip is dropped
+
+**Status:** active
+**Scope:** framework, agent-runtime, operator-ux
+
+**Decision** — The team that builds org-os is defined in the repository: roles as files under `roles/`, grouped in circles, with the cooperative charter in `roles/README.md`. An agent is a live session seated in a role in a herdr pane, started by `npm run crew`, working in its own git worktree. The record is one file per assignment under `memory/crew/`. Version 1 is attended operation only. The local Paperclip company is no longer used for this; nothing in it is deleted.
+
+**Why** — Every Paperclip failure met in ten days of use traced to state held by its server: an interrupted run left a lease the API could not release, a stored copy of the operator's token went stale while the connection reported itself healthy, issues with the same title were silently deduplicated, and thirteen agents shared one checkout. herdr already supplies the runtime (named agents in panes, lifecycle states, worktrees) and uses the operator's own interactive login, so there is nothing to go stale. Alternatives considered: roles as Claude Code subagents (invisible, one checkout, one vendor) and a herdr plugin (moves the logic out of the repository into an API still at 0.9). A server would also have broken the 2026-08-29 rule that new interfaces are clients, never servers.
+
+**Refs** — `docs/superpowers/specs/2026-10-10-org-os-crew-design.md`, `docs/superpowers/plans/2026-10-10-org-os-crew.md`, `docs/CREW.md`, `modules/org-os-crew/module.yaml`
+
+---
+
 ## 2026-08-29 · `doctor sync`'s dirty-tree gate narrowed to the overlay's write set
 
 **Status:** active

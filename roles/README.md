@@ -5,28 +5,28 @@ a role, in a [herdr](https://herdr.dev) pane. Operator guide: [`docs/CREW.md`](.
 
 ## Vocabulary
 
-| Term | Meaning |
-|------|---------|
-| **Role** | A file describing a seat: its mandate, boundaries and defaults. Not a process. |
-| **Circle** | A group of roles, listed in [`circles.yaml`](circles.yaml). |
-| **Agent** | A live session seated in a role, in a herdr pane. |
-| **Assignment** | One piece of work given to one role, with its branch and its outcome. Recorded in `memory/crew/`. |
-| **Handoff** | A written request from one agent that another role take something on. |
+| Term              | Meaning                                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Role**          | A file describing a seat: its mandate, boundaries and defaults. Not a process.                             |
+| **Circle**        | A group of roles, listed in [`circles.yaml`](circles.yaml).                                                |
+| **Agent**         | A live session seated in a role, in a herdr pane.                                                          |
+| **Assignment**    | One piece of work given to one role, with its branch and its outcome. Recorded in `memory/crew/`.          |
+| **Handoff**       | A written request from one agent that another role take something on.                                      |
 | **Main checkout** | The checkout the operator runs `npm run crew` from. Its `roles/` and `memory/crew/` are the ones in force. |
-| **Operator** | The human at herdr. The operator holds final authority. |
+| **Operator**      | The human at herdr. The operator holds final authority.                                                    |
 
 ## A role file
 
 Frontmatter is read by the launcher; the body is read by the agent.
 
-| Field | Meaning |
-|-------|---------|
-| `id` | Matches the file name. Lowercase letters, digits, `-` or `_`; at most 28 characters. |
-| `circle` | An id from `circles.yaml`. |
-| `kind` | A herdr agent kind (`claude`, `codex`, `opencode`, …). |
-| `model` | Optional. Passed to the agent when its kind accepts a model argument. |
-| `may_seat` | Whether an agent in this role may seat other roles. |
-| `skills` | Optional. Skills the role is expected to use. |
+| Field      | Meaning                                                                              |
+| ---------- | ------------------------------------------------------------------------------------ |
+| `id`       | Matches the file name. Lowercase letters, digits, `-` or `_`; at most 28 characters. |
+| `circle`   | An id from `circles.yaml`.                                                           |
+| `kind`     | A herdr agent kind (`claude`, `codex`, `opencode`, …).                               |
+| `model`    | Optional. Passed to the agent when its kind accepts a model argument.                |
+| `may_seat` | Whether an agent in this role may seat other roles.                                  |
+| `skills`   | Optional. Skills the role is expected to use.                                        |
 
 To change a role in your instance, edit its file. To add one, add a file.
 

@@ -18,6 +18,10 @@ racing `.git/index.lock` across registries).
 
 ### Added
 
+- **Crew — role-based agents in herdr** (`npm run crew`, module `org-os-crew`). Roles are files
+  under `roles/`; an agent is a session seated in a role in a herdr pane, in its own git
+  worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
+  Guide: `docs/CREW.md`. Targets 0.6.0.
 - **`docs/ADOPT-WITH-AN-AGENT.md`** — the copy-paste recipe for driving setup from Claude Code,
   Cursor or a ChatGPT connector. Non-interactive end to end, so an agent can complete it without
   a TTY. Verified by executing it against a fresh clone of `main`.

@@ -182,6 +182,22 @@ package `packages/paper-integration/`
 
 ---
 
+### org-os-crew — Role-Based Agents in herdr
+
+**What it is.** The framework's own way of running a team of agents: roles are files under
+`roles/`, and an agent is a live session seated in a role in a [herdr](https://herdr.dev) pane,
+working in its own git worktree. Attended operation only: the operator is present.
+
+**How it works.** `npm run crew` (`scripts/crew.mjs`) seats, releases and lists agents by calling
+the herdr CLI; `scripts/crew/herdr.mjs` is the only file that does. Each assignment is one file
+under `memory/crew/`, committed like the rest of memory, and one agent asks another role for help
+by writing a handoff file there. Live state comes from herdr and everything else from the trail,
+so neither can go stale against the other. The `crew` skill is how a session uses it in plain
+language. No server and no database, which is the interfaces rule applied to agents.
+
+**Status.** `pilot`. Guide: [`docs/CREW.md`](CREW.md). Spec:
+[`2026-10-10-org-os-crew-design.md`](superpowers/specs/2026-10-10-org-os-crew-design.md).
+
 ## The v5 core tranche
 
 The seven modules the v5 spec migrates first. Each proves a different module shape; none has a

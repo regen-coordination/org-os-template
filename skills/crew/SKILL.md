@@ -25,15 +25,15 @@ said. Never work around a refusal**: not by calling herdr or git yourself, not b
 
 ## Which command
 
-| You want to | Run |
-|-------------|-----|
-| See who is seated, open handoffs, what needs attention | `npm run crew` |
-| Seat a role on a piece of work | `npm run crew -- seat <role> "<brief>"` |
-| Seat a reviewer on an existing branch | `npm run crew -- seat reviewer "<brief>" --on <branch>` |
-| Take a handoff another agent wrote | `npm run crew -- seat <role> --handoff <id>` |
-| Send the first prompt to an agent that stopped at a startup dialog | `npm run crew -- nudge <agent>` |
-| Close an assignment | `npm run crew -- release <agent>` |
-| Decline a handoff | `npm run crew -- handoff-close <id> --reason "<why>"` |
+| You want to                                                        | Run                                                     |
+| ------------------------------------------------------------------ | ------------------------------------------------------- |
+| See who is seated, open handoffs, what needs attention             | `npm run crew`                                          |
+| Seat a role on a piece of work                                     | `npm run crew -- seat <role> "<brief>"`                 |
+| Seat a reviewer on an existing branch                              | `npm run crew -- seat reviewer "<brief>" --on <branch>` |
+| Take a handoff another agent wrote                                 | `npm run crew -- seat <role> --handoff <id>`            |
+| Send the first prompt to an agent that stopped at a startup dialog | `npm run crew -- nudge <agent>`                         |
+| Close an assignment                                                | `npm run crew -- release <agent>`                       |
+| Decline a handoff                                                  | `npm run crew -- handoff-close <id> --reason "<why>"`   |
 
 If you are a **seated agent**, your assignment file gives you two commands with absolute paths,
 `report` and `handoff`. Use those exactly as written. Only the lead role and the operator may

@@ -256,6 +256,18 @@ Access at `http://localhost:3000` after running.
 
 ---
 
+### Crew — Role-Based Agents in herdr
+
+```bash
+npm run crew                                  # The board: seated agents, open handoffs
+npm run crew -- seat <role> "<brief>"         # Seat an agent in a role, in its own worktree
+npm run crew -- release <agent>               # Close an assignment; its branch is kept
+```
+
+Runs inside [herdr](https://herdr.dev) only. Full guide: [`docs/CREW.md`](CREW.md).
+
+---
+
 ### Paperclip Integration
 
 ```bash
