@@ -2,18 +2,20 @@
 // The prompt bar: the keys that work on this page, as key caps, in the corner —
 // after the system menus of early-2000s consoles. Every hint is also a control,
 // so it works with a pointer. Hidden until script runs (without script the keys
-// do nothing), on touch screens, and on narrow ones.
+// do nothing), on touch screens, and on narrow ones. The arrow keys act only
+// when nothing has focus (lib/shortcuts.mjs decides); the Theme hint is a
+// button only — the page has no single-letter key for it.
 interface Props { prev?: string; next?: string; }
 const { prev, next } = Astro.props;
 ---
 <div class="prompt-bar mono" role="group" aria-label="Keyboard shortcuts" data-pagefind-ignore hidden>
-  {prev && <a class="hint" href={prev} data-key="ArrowLeft"><kbd aria-hidden="true">←</kbd>Previous</a>}
-  {next && <a class="hint" href={next} data-key="ArrowRight"><kbd aria-hidden="true">→</kbd>Next</a>}
-  <button type="button" class="hint" data-key="/" data-press=".search-open"><kbd aria-hidden="true">/</kbd>Search</button>
-  <button type="button" class="hint" data-key="t" data-press=".theme-toggle"><kbd aria-hidden="true">T</kbd>Theme</button>
+  {prev && <a class="hint" href={prev} data-key="ArrowLeft" aria-keyshortcuts="ArrowLeft"><kbd aria-hidden="true">←</kbd>Previous</a>}
+  {next && <a class="hint" href={next} data-key="ArrowRight" aria-keyshortcuts="ArrowRight"><kbd aria-hidden="true">→</kbd>Next</a>}
+  <button type="button" class="hint" data-key="/" aria-keyshortcuts="/" data-press=".search-open"><kbd aria-hidden="true">/</kbd>Search</button>
+  <button type="button" class="hint" data-press=".theme-toggle"><span class="mark" aria-hidden="true">◐</span>Theme</button>
 </div>
 <script>
-  import { isTypingTarget } from "../lib/search.mjs";
+  import { pageShortcut } from "../lib/shortcuts.mjs";
 
   const bar = document.querySelector<HTMLElement>(".prompt-bar");
   if (bar) {
@@ -25,12 +27,14 @@ const { prev, next } = Astro.props;
       if (target) hint.addEventListener("click", () => document.querySelector<HTMLElement>(target)?.click());
     }
     document.addEventListener("keydown", (event) => {
-      if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
-      if (isTypingTarget(document.activeElement as HTMLElement | null)) return;
-      if (document.querySelector("dialog[open]")) return;
-      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-      if (key === "/") return; // Search.astro owns this key; the hint only shows it
-      const hint = hints.find((h) => h.dataset.key === key);
+      const active = document.activeElement;
+      const hintKey = pageShortcut(event, {
+        activeTag: active ? active.tagName : null,
+        barVisible: getComputedStyle(bar).display !== "none",
+        dialogOpen: document.querySelector("dialog[open]") !== null,
+      });
+      if (!hintKey) return;
+      const hint = hints.find((h) => h.dataset.key === hintKey);
       if (!hint) return;
       event.preventDefault();
       hint.dataset.struck = "";
@@ -66,6 +70,7 @@ const { prev, next } = Astro.props;
   background: var(--color-surface);
   transition: transform var(--t-fast), border-color var(--t-fast), box-shadow var(--t-med);
 }
+.hint .mark { display: inline-grid; place-items: center; min-width: 1.6em; color: var(--color-ink); }
 .hint:hover kbd, .hint[data-struck] kbd {
   border-color: var(--color-accent); transform: translateY(1px);
   box-shadow: 0 0 14px var(--color-glow);
