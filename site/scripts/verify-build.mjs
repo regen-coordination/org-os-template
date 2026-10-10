@@ -8,8 +8,8 @@ import { BASE_PATH, SITE_ORIGIN, SITE_URL } from "../base.config.mjs";
 import { PAGES, SECTIONS, ALLOW_UNVERIFIED } from "../src/data/docs-manifest.mjs";
 import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
-import { REPO_ROOT, commitExists } from "../src/lib/repo.mjs";
-import { idsIn, fragmentOf, fragmentVerdict } from "../src/lib/fragments.mjs";
+import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
+import { idsIn, fragmentOf, fragmentVerdict, stripCode } from "../src/lib/fragments.mjs";
 
 const DIST = "dist";
 let failed = false;
@@ -20,8 +20,9 @@ const problems = validateManifest(PAGES, SECTIONS, {
   fileExists: (p) => existsSync(join(REPO_ROOT, p)),
   commitExists,
   allowUnverified: ALLOW_UNVERIFIED,
+  trackedFiles: listRepoFiles(),
 });
-for (const p of problems) fail(`MANIFEST: ${p}`);
+for (const p of problems) fail(`MANIFEST: ${p.replace(/^manifest: /, "")}`);
 const unverified = PAGES.filter((p) => p.verified == null).length;
 console.log(
   problems.length === 0
@@ -110,16 +111,17 @@ const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const htmlFiles = readdirSync(DIST, { recursive: true })
   .filter((f) => f.endsWith(".html"))
   .map((f) => join(DIST, f));
-let internal = 0, bad = 0, fragments = 0, fragmentBad = 0;
+let internal = 0, bad = 0, samePage = 0, crossPage = 0, fragmentBad = 0;
 for (const file of htmlFiles) {
-  const html = readFileSync(file, "utf8");
+  // Text inside <code> and <pre> is a doc showing an example, not a link or a source.
+  const html = stripCode(readFileSync(file, "utf8"));
   for (const m of html.matchAll(ATTR)) {
     const href = m[2];
     if (href.startsWith("#")) {
       // A same-page fragment: the id must exist in this very page.
       const fragment = fragmentOf(href);
       if (fragment === null) continue;
-      fragments++;
+      samePage++;
       const verdict = fragmentVerdict(fragment, idsOfFile(file));
       if (!verdict.ok) { fail(`BROKEN FRAGMENT: ${file} → ${href} (${verdict.reason})`); fragmentBad++; }
       continue;
@@ -143,7 +145,7 @@ for (const file of htmlFiles) {
       const fragment = fragmentOf(href);
       const target = targetFile(href);
       if (fragment !== null && target !== null && target.endsWith(".html")) {
-        fragments++;
+        crossPage++;
         const verdict = fragmentVerdict(fragment, idsOfFile(target));
         if (!verdict.ok) { fail(`BROKEN FRAGMENT: ${file} → ${href} (${verdict.reason})`); fragmentBad++; }
       }
@@ -155,9 +157,12 @@ else console.log(bad === 0
   ? `link check: ${internal} internal links on ${htmlFiles.length} pages carry ${BASE_PATH || "/"} once and resolve`
   : `link check: ${bad} bad link(s)`);
 
-if (fragments === 0) fail("fragment check: matched 0 links with a #fragment — the pattern is stale");
-else console.log(fragmentBad === 0
-  ? `fragment check: ${fragments} links with a #fragment point at an id that exists in the built page`
+// Same-page and cross-page fragments are separate patterns: the skip link alone
+// would keep a single count above zero if the cross-page branch stopped matching.
+if (samePage === 0) fail("fragment check: matched 0 same-page #fragment links — the pattern is stale");
+if (crossPage === 0) fail("fragment check: matched 0 cross-page #fragment links — the pattern is stale");
+if (samePage > 0 && crossPage > 0) console.log(fragmentBad === 0
+  ? `fragment check: ${samePage} same-page and ${crossPage} cross-page links with a #fragment point at an id that exists in the built page`
   : `fragment check: ${fragmentBad} broken fragment(s)`);
 
 // ── 5. Redirects (check 5) ───────────────────────────────────────────────

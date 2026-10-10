@@ -80,3 +80,26 @@ test("lookups agree with each other", () => {
   const n = neighbours("setup");
   assert.ok(n.prev === null || typeof n.prev.slug === "string");
 });
+
+test("a covers path must match a tracked file when the tracked files are given", () => {
+  const tracked = ["scripts/a.mjs", "packages/x/src/b.mjs", ".claude/commands/close.md"];
+  const run = (covers) => validateManifest([page({ covers })], sections, { ...ok, trackedFiles: tracked });
+  assert.deepEqual(run(["scripts/a.mjs", "packages/x", "packages/x/src/", ".claude"]), []);
+  const bad = run(["scripts/missing.mjs"]);
+  assert.equal(bad.length, 1);
+  assert.match(bad[0], /covers "scripts\/missing\.mjs" matches no tracked file/);
+  // a mistyped prefix is not a directory match
+  assert.equal(run(["scripts/a"]).length, 1);
+});
+
+test("without the tracked files the covers paths are not matched", () => {
+  assert.deepEqual(validateManifest([page({ covers: ["nowhere"] })], sections, ok), []);
+});
+
+test("every covers path in the real manifest matches a tracked file", async () => {
+  const { listRepoFiles } = await import("../src/lib/repo.mjs");
+  const problems = validateManifest(PAGES, SECTIONS, {
+    fileExists: (p) => existsSync(join(repoRoot, p)), commitExists: () => true, allowUnverified: ALLOW_UNVERIFIED, trackedFiles: listRepoFiles(),
+  });
+  assert.deepEqual(problems, []);
+});

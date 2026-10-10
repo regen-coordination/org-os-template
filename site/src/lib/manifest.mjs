@@ -25,7 +25,7 @@ export function neighboursOf(pages, sections, slug) {
  * Every problem in a manifest, as messages a person can act on.
  * @param {{ fileExists: (path: string) => boolean, commitExists: (sha: string) => boolean, allowUnverified: boolean }} io
  */
-export function validateManifest(pages, sections, { fileExists, commitExists, allowUnverified }) {
+export function validateManifest(pages, sections, { fileExists, commitExists, allowUnverified, trackedFiles }) {
   const problems = [];
   const sectionIds = new Set(sections.map((s) => s.id));
   const slugs = new Set();
@@ -65,6 +65,12 @@ export function validateManifest(pages, sections, { fileExists, commitExists, al
 
     if (p.covers !== undefined && !(Array.isArray(p.covers) && p.covers.every(filled))) {
       problems.push(`${at} — covers must be a list of paths`);
+    } else if (Array.isArray(trackedFiles) && Array.isArray(p.covers)) {
+      // A covers path that names nothing would report "no changes" for ever.
+      for (const c of p.covers) {
+        const dir = c.replace(/\/+$/, "") + "/";
+        if (!trackedFiles.some((f) => f === c || f.startsWith(dir))) problems.push(`${at} — covers "${c}" matches no tracked file`);
+      }
     }
   }
   return problems;
