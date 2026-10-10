@@ -1,4 +1,5 @@
 ---
+import Search from "./Search.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import { withBase } from "../lib/base";
 interface Props { current?: string; }
@@ -23,6 +24,7 @@ const links = [
           </li>
         ))}
       </ul>
+      <Search />
       <ThemeToggle />
     </div>
   </div>

@@ -9,7 +9,7 @@ const doc = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml
 const modules = doc.modules;
 ---
 <Layout title="Modules" current="modules" description="The org-os v0.5 module roadmap.">
-  <div class="container">
+  <div class="container" data-pagefind-body>
     <p class="eyebrow">v0.5 roadmap</p>
     <h1>Modules</h1>
     <p class="prose">org-os v0.5 is a constellation of modules. Status is honest — badges show what ships today vs. what's planned.</p>

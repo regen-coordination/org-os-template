@@ -1,0 +1,95 @@
+---
+// Search. Without script this is a plain link to the docs index. With script
+// it opens a dialog and loads Pagefind's index on first use — nothing is
+// fetched until the viewer asks. Pagefind writes its files to dist/pagefind/
+// after `astro build`; they do not exist under `astro dev`, where the control
+// falls back to the link.
+import { withBase } from "../lib/base";
+---
+<a class="search-open mono" href={withBase("/docs")} data-base={withBase("/")}>Search <kbd>/</kbd></a>
+<dialog class="search-dialog" aria-label="Search the documentation">
+  <form method="dialog"><button class="search-close mono">Close</button></form>
+  <div id="search-ui"></div>
+</dialog>
+<script>
+  import { openSearch, isTypingTarget } from "../lib/search.mjs";
+
+  const link = document.querySelector<HTMLAnchorElement>(".search-open");
+  const dialog = document.querySelector<HTMLDialogElement>(".search-dialog");
+  let loading: Promise<void> | undefined;
+
+  function load(base: string): Promise<void> {
+    loading ??= new Promise<void>((resolve, reject) => {
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = `${base}pagefind/pagefind-ui.css`;
+      document.head.append(css);
+      const script = document.createElement("script");
+      script.src = `${base}pagefind/pagefind-ui.js`;
+      script.onload = () => {
+        try {
+          // baseUrl: Pagefind records addresses from the root of dist/, which
+          // do not carry the deploy base path.
+          new (window as any).PagefindUI({ element: "#search-ui", baseUrl: base, showSubResults: true, showImages: false });
+          resolve();
+        } catch (error) { reject(error); }
+      };
+      script.onerror = () => reject(new Error("pagefind-ui.js did not load"));
+      document.head.append(script);
+    });
+    // A failed load must be retryable, not cached as a permanent failure.
+    loading.catch(() => { loading = undefined; });
+    return loading;
+  }
+
+  if (link && dialog) {
+    const base = link.dataset.base!;
+    const open = (event: Event) => {
+      event.preventDefault();
+      openSearch({
+        load: () => load(base),
+        show: () => { dialog.showModal(); dialog.querySelector<HTMLInputElement>("input")?.focus(); },
+        fallback: () => { window.location.href = link.href; },
+      });
+    };
+    link.addEventListener("click", open);
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (dialog.open || isTypingTarget(document.activeElement as HTMLElement | null)) return;
+      open(event);
+    });
+  }
+</script>
+<style>
+/* Nav.astro's .nav-link styles are scoped to that component, so the control
+   carries its own. */
+.search-open { font-size: var(--text-sm); color: var(--color-muted); transition: color var(--t-fast); }
+.search-open:hover { color: var(--color-ink); }
+.search-open kbd {
+  font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--color-muted);
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-sm); padding: 0 0.3em; margin-left: 0.3em;
+}
+.search-dialog {
+  width: min(44rem, calc(100% - 2 * var(--gutter))); max-height: 80vh; margin: 10vh auto auto;
+  padding: var(--space-5); overflow-y: auto;
+  background: var(--color-surface); color: var(--color-ink-2);
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius); box-shadow: var(--shadow-2);
+  /* Pagefind UI reads these. */
+  --pagefind-ui-primary: var(--color-accent);
+  --pagefind-ui-text: var(--color-ink-2);
+  --pagefind-ui-background: var(--color-surface);
+  --pagefind-ui-border: var(--color-line-2);
+  --pagefind-ui-tag: var(--color-bg-2);
+  --pagefind-ui-border-width: 1px;
+  --pagefind-ui-border-radius: var(--radius);
+  --pagefind-ui-font: var(--font-body);
+  --pagefind-ui-scale: 0.85;
+}
+.search-dialog::backdrop { background: color-mix(in srgb, var(--color-ink) 45%, transparent); }
+.search-dialog form { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
+.search-close {
+  font-size: var(--text-xs); color: var(--color-muted); background: none; cursor: pointer;
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-sm); padding: 0.2rem 0.55rem;
+}
+.search-close:hover { color: var(--color-ink); }
+</style>
