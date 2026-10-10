@@ -3,7 +3,9 @@
 // Hidden until script runs: without script it could do nothing.
 import { THEME_KEY } from "../lib/theme-boot.mjs";
 ---
-<button type="button" class="theme-toggle mono" aria-pressed="false" data-key={THEME_KEY} hidden>Dark</button>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Dark theme" title="Dark theme" data-key={THEME_KEY} hidden>
+  <span class="track" aria-hidden="true"><span class="orb"></span></span>
+</button>
 <script>
   const root = document.documentElement;
   const button = document.querySelector<HTMLButtonElement>(".theme-toggle");
@@ -24,11 +26,29 @@ import { THEME_KEY } from "../lib/theme-boot.mjs";
   }
 </script>
 <style>
-.theme-toggle {
-  font-size: var(--text-sm); color: var(--color-muted); background: none; cursor: pointer;
-  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-sm);
-  padding: 0.2rem 0.55rem; transition: color var(--t-fast), border-color var(--t-fast);
+.theme-toggle { display: inline-flex; align-items: center; padding: 0; background: none; border: 0; cursor: pointer; border-radius: var(--radius-pill); }
+.track {
+  position: relative; display: block; width: 2.7rem; height: 1.45rem;
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  transition: border-color var(--t-fast), box-shadow var(--t-med);
 }
-.theme-toggle:hover { color: var(--color-ink); border-color: var(--color-ink-2); }
-.theme-toggle[aria-pressed="true"] { color: var(--color-accent); border-color: var(--color-accent); }
+.orb {
+  position: absolute; top: 50%; left: 0.2rem; width: 0.95rem; height: 0.95rem; border-radius: 50%;
+  translate: 0 -50%;
+  background: var(--color-sun);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-sun) 22%, transparent), 0 0 14px var(--color-sun);
+  transition: left var(--t-med), background var(--t-med), box-shadow var(--t-med);
+}
+/* pressed = dark: the knob crosses over and wanes to a crescent */
+.theme-toggle[aria-pressed="true"] .orb {
+  left: calc(100% - 1.15rem);
+  background: transparent;
+  box-shadow: inset -0.3rem -0.12rem 0 0 var(--color-ink), 0 0 12px var(--color-glow);
+}
+.theme-toggle:hover .track {
+  border-color: transparent;
+  background: linear-gradient(var(--color-surface-2), var(--color-surface-2)) padding-box, var(--gradient-iris) border-box;
+  box-shadow: 0 6px 20px -10px var(--color-glow);
+}
 </style>

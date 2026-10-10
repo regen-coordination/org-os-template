@@ -35,6 +35,11 @@ const links = [
   -webkit-backdrop-filter: saturate(1.4) blur(10px);
   border-bottom: var(--border-hair) solid var(--color-line);
 }
+/* An iridescent hairline under the nav */
+.nav::after {
+  content: ""; position: absolute; inset: auto 0 -1px 0; height: var(--border-hair);
+  background: var(--gradient-iris); opacity: 0.55; pointer-events: none;
+}
 .nav-right { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
 .nav-inner { display: flex; align-items: center; justify-content: space-between; min-height: 3.75rem; gap: var(--space-4); }
 .brand { font-weight: 600; color: var(--color-ink); font-size: var(--text-sm); letter-spacing: -0.01em; display: inline-flex; align-items: center; }
@@ -47,7 +52,7 @@ const links = [
 .nav-link { position: relative; color: var(--color-muted); padding: 0.35rem 0; transition: color var(--t-fast); }
 .nav-link::after {
   content: ""; position: absolute; left: 0; right: 100%; bottom: -2px; height: 1.5px;
-  background: var(--color-accent); transition: right var(--t-med);
+  background: var(--gradient-iris); transition: right var(--t-med);
 }
 .nav-link:hover { color: var(--color-ink); }
 .nav-link:hover::after { right: 0; }
@@ -55,6 +60,7 @@ const links = [
 .nav-link.active::after { right: 0; }
 
 @media (max-width: 640px) {
+  .nav-right { width: 100%; flex-wrap: nowrap; justify-content: space-between; gap: var(--space-3); }
   .nav ul { gap: var(--space-4); font-size: var(--text-xs); }
   .nav-inner { flex-wrap: wrap; min-height: 0; padding-block: var(--space-3); }
 }

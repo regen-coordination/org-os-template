@@ -8,6 +8,7 @@ import { withBase } from "../lib/base";
 import { THEME_BOOT } from "../lib/theme-boot.mjs";
 import Nav from "./Nav.astro";
 import Footer from "./Footer.astro";
+import PromptBar from "./PromptBar.astro";
 
 interface Props { title: string; description?: string; current?: string; noindex?: boolean; }
 const {
@@ -23,7 +24,7 @@ const {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content={description} />
-  <meta name="theme-color" content="#f6f4ed" />
+  <meta name="theme-color" content="#f5eee1" />
   <script is:inline set:html={THEME_BOOT}></script>
   {noindex && <meta name="robots" content="noindex" />}
   <title>{title} · org-os</title>
@@ -34,5 +35,16 @@ const {
   <Nav current={current} />
   <main id="main"><slot /></main>
   <Footer />
+  <slot name="prompt"><PromptBar /></slot>
+  <script>
+    // Cards marked .lit get a soft light that follows the pointer.
+    document.addEventListener("pointermove", (event) => {
+      const card = (event.target as Element | null)?.closest?.<HTMLElement>(".lit");
+      if (!card) return;
+      const box = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${event.clientX - box.left}px`);
+      card.style.setProperty("--my", `${event.clientY - box.top}px`);
+    }, { passive: true });
+  </script>
 </body>
 </html>

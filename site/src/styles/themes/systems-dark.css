@@ -1,25 +1,39 @@
 /* themes/systems-dark.css — dark variant. Mirrors the systems.css variable contract
  * one-for-one (site/test/theme-contrast.test.mjs checks that). Active when
- * <html data-theme="dark">. */
+ * <html data-theme="dark">. Warm near-black, with the same aura turned low. */
 :root[data-theme="dark"] {
-  --color-bg:        #0c0f13;
-  --color-bg-2:      #11151b;
-  --color-surface:   #12171e;
-  --color-surface-2: #161c24;
+  --color-bg:        #12100d;
+  --color-bg-2:      #17140f;
+  --color-surface:   #1a1611;
+  --color-surface-2: #1f1a14;
 
-  --color-ink:    #e7edf3;
-  --color-ink-2:  #c2cad3;
-  --color-muted:  #8b949e;
-  --color-faint:  #646c75;
+  --color-ink:    #f0e9dc;
+  --color-ink-2:  #cdc4b4;
+  --color-muted:  #9c9282;
+  --color-faint:  #74695a;
 
-  --color-line:   #232a32;
-  --color-line-2: #313a44;
-  --color-grid:   #171d24;
+  --color-line:   #2a241c;
+  --color-line-2: #3a3227;
+  --color-grid:   #1c1813;
 
-  --color-accent:      #46c46a;
-  --color-accent-soft: #6bd98a;
-  --color-accent-ink:  #0c0f13;
-  --color-accent-wash: rgba(70, 196, 106, 0.10);
+  --color-accent:      #62cf86;
+  --color-accent-soft: #86e0a3;
+  --color-accent-ink:  #12100d;
+  --color-accent-wash: rgba(98, 207, 134, 0.10);
+
+  --aura-1: rgba(255, 140, 80, 0.16);
+  --aura-2: rgba(150, 120, 255, 0.18);
+  --aura-3: rgba(80, 200, 140, 0.12);
+  --gradient-iris: linear-gradient(90deg, rgba(255, 150, 95, 0.8), rgba(165, 140, 255, 0.8), rgba(105, 215, 155, 0.8));
+
+  --color-glow: rgba(165, 140, 255, 0.42);      /* the light an element gives off when touched */
+  --color-sun:  #f0b35e;                     /* the theme switch's sun */
+
+  /* Grain — light specks, laid softly over the dark */
+  --grain-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 .95  0 0 0 0 .85  0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain-opacity: 0.10;
+  --grain-blend: soft-light;
+  --surface-veil: 78%;
 
   --font-display: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --font-mono:    "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;

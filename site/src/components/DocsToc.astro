@@ -21,6 +21,11 @@ const items = Astro.props.headings.filter((h) => h.depth === 2 || h.depth === 3)
 .docs-toc summary { cursor: pointer; color: var(--color-muted); margin-bottom: var(--space-2); }
 .docs-toc ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .docs-toc a { color: var(--color-muted); }
-.docs-toc a:hover { color: var(--color-accent); }
+.docs-toc a { display: block; padding-left: var(--space-3); border-left: var(--border-hair) solid transparent; transition: color var(--t-fast), border-color var(--t-fast); }
+.docs-toc a:hover { color: var(--color-ink); }
+/* set by the scroll-spy in DocsLayout.astro */
+.docs-toc a.active { color: var(--color-accent); border-left-color: var(--color-accent); }
+.docs-toc summary { list-style: none; }
+.docs-toc summary::-webkit-details-marker { display: none; }
 .docs-toc .sub { padding-left: var(--space-4); }
 </style>

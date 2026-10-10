@@ -4,7 +4,7 @@ import { withBase } from "../lib/base";
 interface Props { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
 const { id, name, status, summary, link } = Astro.props;
 ---
-<article class:list={["surface card ticked", status]} data-status={status}>
+<article class:list={["surface card ticked lit", status]} data-status={status}>
   <header class="head">
     <span class="id mono">{id}</span>
     <StatusBadge status={status} />
@@ -20,7 +20,6 @@ const { id, name, status, summary, link } = Astro.props;
   position: relative; overflow: hidden;
   padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3);
   box-shadow: var(--shadow-1);
-  transition: transform var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast);
 }
 /* status accent rail along the top edge */
 .card::after {
@@ -28,7 +27,6 @@ const { id, name, status, summary, link } = Astro.props;
   background: var(--color-line-2);
 }
 .card.live::after, .card.in-dev::after, .card.pilot::after { background: var(--color-accent); }
-.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); border-color: var(--color-line-2); }
 
 .head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
 .id { font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); color: var(--color-muted); }

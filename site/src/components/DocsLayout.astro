@@ -7,6 +7,9 @@ import Layout from "./Layout.astro";
 import DocsSidebar from "./DocsSidebar.astro";
 import DocsToc from "./DocsToc.astro";
 import DocsFooter from "./DocsFooter.astro";
+import PromptBar from "./PromptBar.astro";
+import { withBase } from "../lib/base";
+import { neighbours } from "../data/docs-manifest.mjs";
 import { sectionById } from "../data/docs-manifest.mjs";
 interface Heading { depth: number; slug: string; text: string; }
 interface Props {
@@ -14,6 +17,7 @@ interface Props {
   headings: Heading[];
 }
 const { page, headings } = Astro.props;
+const { prev, next } = neighbours(page.slug);
 ---
 <Layout title={page.title} description={page.summary} current="docs">
   <details class="docs-drawer">
@@ -25,19 +29,68 @@ const { page, headings } = Astro.props;
     <div class="docs-contents"><DocsToc headings={headings} /></div>
     <div class="docs-main">
       <article class="doc prose" data-pagefind-body>
-        <p class="eyebrow" data-pagefind-ignore>{sectionById(page.section).title}</p>
+        <p class="eyebrow trail" data-pagefind-ignore><a href={withBase("/docs")}>Docs</a><span aria-hidden="true">/</span>{sectionById(page.section).title}</p>
         <h1>{page.title}</h1>
         <slot />
       </article>
       <DocsFooter page={page} />
     </div>
   </div>
+  <PromptBar slot="prompt" prev={prev ? withBase(`/docs/${prev.slug}`) : undefined} next={next ? withBase(`/docs/${next.slug}`) : undefined} />
 </Layout>
 <script>
   // The contents list starts open so it works without script; on a narrow
   // screen it would push the article down, so close it there.
   const toc = document.querySelector<HTMLDetailsElement>(".docs-toc");
   if (toc && window.matchMedia("(max-width: 1099px)").matches) toc.open = false;
+
+  // Scroll-spy: mark the section being read in the contents list.
+  const links = new Map<string, HTMLAnchorElement>();
+  for (const a of document.querySelectorAll<HTMLAnchorElement>(".docs-toc a")) links.set(decodeURIComponent(a.hash.slice(1)), a);
+  const headings = [...links.keys()].map((id) => document.getElementById(id)).filter((h): h is HTMLElement => h !== null);
+  let current: string | undefined;
+  const spy = () => {
+    let id = headings[0]?.id;
+    for (const h of headings) { if (h.getBoundingClientRect().top <= 110) id = h.id; else break; }
+    if (id === current) return;
+    current = id;
+    for (const [key, a] of links) {
+      a.classList.toggle("active", key === id);
+      if (key === id) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
+    }
+  };
+  if (headings.length > 0) { window.addEventListener("scroll", spy, { passive: true }); spy(); }
+
+  // A copy button on every code block.
+  for (const pre of document.querySelectorAll<HTMLPreElement>(".doc pre")) {
+    const wrap = document.createElement("div");
+    wrap.className = "code-wrap";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy pill";
+    button.textContent = "Copy";
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(pre.querySelector("code")?.innerText ?? pre.innerText);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Select and copy";
+      }
+      window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
+    });
+    pre.replaceWith(wrap);
+    wrap.append(pre, button);
+  }
+
+  // A link mark on each section heading, shown when the heading is touched.
+  for (const h of document.querySelectorAll<HTMLElement>(".doc h2[id], .doc h3[id]")) {
+    const a = document.createElement("a");
+    a.className = "anchor";
+    a.href = `#${h.id}`;
+    a.setAttribute("aria-label", `Link to the section “${h.textContent?.trim()}”`);
+    a.textContent = "#";
+    h.append(a);
+  }
 </script>
 <style>
 .docs-drawer { display: none; }
@@ -51,6 +104,8 @@ const { page, headings } = Astro.props;
 .docs-contents { grid-area: contents; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
 
 .doc h1 { font-size: var(--text-3xl); margin-top: var(--space-3); }
+.trail a { color: inherit; }
+.trail a:hover { color: var(--color-ink); }
 .doc :global(h2) { margin-top: var(--space-10); scroll-margin-top: 5rem; }
 .doc :global(h3) { scroll-margin-top: 5rem; }
 .doc :global(table) { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--text-sm); }
@@ -60,6 +115,14 @@ const { page, headings } = Astro.props;
 .doc :global(ul), .doc :global(ol) { padding-left: var(--space-6); }
 .doc :global(li + li) { margin-top: var(--space-1); }
 .doc :global(img) { max-width: 100%; height: auto; }
+/* added by the script above */
+.doc :global(.code-wrap) { position: relative; }
+.doc :global(.code-wrap .copy) { position: absolute; top: var(--space-2); right: var(--space-2); opacity: 0; transition: opacity var(--t-fast), transform var(--t-fast), box-shadow var(--t-med); }
+.doc :global(.code-wrap:hover .copy), .doc :global(.code-wrap .copy:focus-visible) { opacity: 1; }
+@media (hover: none) { .doc :global(.code-wrap .copy) { opacity: 1; } }
+.doc :global(.anchor) { margin-left: 0.4em; color: var(--color-muted); opacity: 0; text-decoration: none; background: none; transition: opacity var(--t-fast), color var(--t-fast); }
+.doc :global(h2:hover .anchor), .doc :global(h3:hover .anchor), .doc :global(.anchor:focus-visible) { opacity: 1; }
+.doc :global(.anchor:hover) { color: var(--color-accent); }
 .doc :global(hr) { border: 0; border-top: var(--border-hair) solid var(--color-line); margin-block: var(--space-8); }
 
 @media (max-width: 1099px) {
@@ -72,7 +135,11 @@ const { page, headings } = Astro.props;
     display: block;
     background: var(--color-bg-2); border-bottom: var(--border-hair) solid var(--color-line);
   }
-  .docs-drawer summary { cursor: pointer; padding: var(--space-3) var(--gutter); font-size: var(--text-sm); color: var(--color-ink); }
+  .docs-drawer summary { cursor: pointer; padding: var(--space-3) var(--gutter); font-size: var(--text-sm); color: var(--color-ink);
+    display: flex; justify-content: space-between; align-items: center; list-style: none; }
+  .docs-drawer summary::-webkit-details-marker { display: none; }
+  .docs-drawer summary::after { content: "▾"; color: var(--color-muted); transition: transform var(--t-fast); }
+  .docs-drawer[open] summary::after { transform: rotate(180deg); }
   .docs-drawer :global(.docs-sidebar) { padding: var(--space-2) var(--gutter) var(--space-6); }
   .docs-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "contents" "main"; padding-top: var(--space-6); }
 }

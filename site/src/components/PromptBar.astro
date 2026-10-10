@@ -1,0 +1,75 @@
+---
+// The prompt bar: the keys that work on this page, as key caps, in the corner —
+// after the system menus of early-2000s consoles. Every hint is also a control,
+// so it works with a pointer. Hidden until script runs (without script the keys
+// do nothing), on touch screens, and on narrow ones.
+interface Props { prev?: string; next?: string; }
+const { prev, next } = Astro.props;
+---
+<div class="prompt-bar mono" role="group" aria-label="Keyboard shortcuts" data-pagefind-ignore hidden>
+  {prev && <a class="hint" href={prev} data-key="ArrowLeft"><kbd aria-hidden="true">←</kbd>Previous</a>}
+  {next && <a class="hint" href={next} data-key="ArrowRight"><kbd aria-hidden="true">→</kbd>Next</a>}
+  <button type="button" class="hint" data-key="/" data-press=".search-open"><kbd aria-hidden="true">/</kbd>Search</button>
+  <button type="button" class="hint" data-key="t" data-press=".theme-toggle"><kbd aria-hidden="true">T</kbd>Theme</button>
+</div>
+<script>
+  import { isTypingTarget } from "../lib/search.mjs";
+
+  const bar = document.querySelector<HTMLElement>(".prompt-bar");
+  if (bar) {
+    bar.hidden = false;
+    const hints = [...bar.querySelectorAll<HTMLElement>(".hint")];
+    // A hint that stands for another control presses that control.
+    for (const hint of hints) {
+      const target = hint.dataset.press;
+      if (target) hint.addEventListener("click", () => document.querySelector<HTMLElement>(target)?.click());
+    }
+    document.addEventListener("keydown", (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+      if (isTypingTarget(document.activeElement as HTMLElement | null)) return;
+      if (document.querySelector("dialog[open]")) return;
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      if (key === "/") return; // Search.astro owns this key; the hint only shows it
+      const hint = hints.find((h) => h.dataset.key === key);
+      if (!hint) return;
+      event.preventDefault();
+      hint.dataset.struck = "";
+      window.setTimeout(() => delete hint.dataset.struck, 180);
+      hint.click();
+    });
+  }
+</script>
+<style>
+.prompt-bar {
+  position: fixed; right: var(--gutter); bottom: var(--space-4); z-index: 40;
+  display: flex; align-items: center; gap: var(--space-5);
+  padding: 0.45rem 0.9rem; border-radius: var(--radius-pill);
+  border: var(--border-hair) solid var(--color-line);
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-1);
+  font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  color: var(--color-muted);
+}
+.prompt-bar[hidden] { display: none; }
+.hint {
+  display: inline-flex; align-items: center; gap: 0.6em;
+  background: none; border: 0; padding: 0; color: inherit; font: inherit;
+  letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+  transition: color var(--t-fast);
+}
+.hint:hover, .hint[data-struck] { color: var(--color-ink); }
+.hint kbd {
+  display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; padding: 0 0.35em;
+  font-family: var(--font-mono); font-size: 1em; color: var(--color-ink);
+  border: var(--border-hair) solid var(--color-line-2); border-bottom-width: 2px; border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  transition: transform var(--t-fast), border-color var(--t-fast), box-shadow var(--t-med);
+}
+.hint:hover kbd, .hint[data-struck] kbd {
+  border-color: var(--color-accent); transform: translateY(1px);
+  box-shadow: 0 0 14px var(--color-glow);
+}
+@media (max-width: 899px), (hover: none), print { .prompt-bar { display: none; } }
+@media (prefers-reduced-motion: reduce) { .hint:hover kbd, .hint[data-struck] kbd { transform: none; } }
+</style>

@@ -29,8 +29,9 @@ const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).fi
 .docs-sidebar ul { list-style: none; padding: 0; display: flex; flex-direction: column; }
 .docs-sidebar a {
   display: block; padding: var(--space-1) var(--space-3); color: var(--color-ink-2);
-  border-left: 2px solid var(--color-line); transition: color var(--t-fast), border-color var(--t-fast);
+  border-left: 2px solid var(--color-line); transition: color var(--t-fast), border-color var(--t-fast), padding-left var(--t-fast);
 }
-.docs-sidebar a:hover { color: var(--color-ink); border-left-color: var(--color-line-2); }
-.docs-sidebar a.active { color: var(--color-accent); border-left-color: var(--color-accent); font-weight: 500; }
+.docs-sidebar a:hover { color: var(--color-ink); border-left-color: var(--color-line-2); padding-left: calc(var(--space-3) + 3px); }
+.docs-sidebar a.active { color: var(--color-accent); border-left-color: var(--color-accent); font-weight: 500;
+  background: linear-gradient(90deg, var(--color-accent-wash), transparent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 </style>

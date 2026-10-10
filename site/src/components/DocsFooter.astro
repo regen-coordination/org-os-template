@@ -12,8 +12,8 @@ const fb = (kind: string) => feedbackUrl({ kind, title: page.title, source: page
 ---
 <footer class="docs-footer" data-pagefind-ignore>
   <nav class="pager" aria-label="Previous and next page">
-    {prev ? <a class="prev" href={withBase(`/docs/${prev.slug}`)}><span class="label">Previous</span>{prev.title}</a> : <span></span>}
-    {next ? <a class="next" href={withBase(`/docs/${next.slug}`)}><span class="label">Next</span>{next.title}</a> : <span></span>}
+    {prev ? <a class="prev lit" href={withBase(`/docs/${prev.slug}`)}><span class="label"><span class="arr" aria-hidden="true">← </span>Previous</span>{prev.title}</a> : <span></span>}
+    {next ? <a class="next lit" href={withBase(`/docs/${next.slug}`)}><span class="label">Next<span class="arr" aria-hidden="true"> →</span></span>{next.title}</a> : <span></span>}
   </nav>
   <p class="meta mono">
     {page.verified
@@ -24,8 +24,8 @@ const fb = (kind: string) => feedbackUrl({ kind, title: page.title, source: page
   </p>
   <p class="feedback">
     Was this page useful?
-    <a class="link" href={fb("useful")}>Yes</a>
-    <a class="link" href={fb("not-useful")}>No</a>
+    <a class="pill" href={fb("useful")}>Yes</a>
+    <a class="pill" href={fb("not-useful")}>No</a>
     <span aria-hidden="true"> · </span>
     <a class="link" href={fb("problem")}>Report a problem with this page</a>
   </p>
@@ -36,7 +36,9 @@ const fb = (kind: string) => feedbackUrl({ kind, title: page.title, source: page
 .pager { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .pager a { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4);
   border: var(--border-hair) solid var(--color-line); border-radius: var(--radius); background: var(--color-surface); color: var(--color-ink); }
-.pager a:hover { border-color: var(--color-accent); }
+.pager .arr { display: inline-block; transition: transform var(--t-fast); }
+.pager .prev:hover .arr { transform: translateX(-3px); }
+.pager .next:hover .arr { transform: translateX(3px); }
 .pager .label { color: var(--color-muted); }
 .pager .next { text-align: right; }
 .meta { font-size: var(--text-xs); }

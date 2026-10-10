@@ -3,7 +3,7 @@ import type { FederationNode } from "../lib/federation";
 interface Props { node: FederationNode; }
 const { node } = Astro.props;
 ---
-<article class="surface card ticked">
+<article class="surface card ticked lit">
   <header class="head">
     <span class="label type">{node.type}</span>
     <span class:list={["status mono", node.available ? "live" : "offline"]}>
@@ -25,9 +25,7 @@ const { node } = Astro.props;
 .card {
   padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3);
   box-shadow: var(--shadow-1);
-  transition: transform var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast);
 }
-.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); border-color: var(--color-line-2); }
 
 .head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
 .type { color: var(--color-accent); }

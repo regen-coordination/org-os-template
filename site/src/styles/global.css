@@ -21,11 +21,25 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-/* Fade the grid toward the edges so it reads as atmosphere, not a flat texture */
+/* Behind everything: an aura of soft colour, then the grid fading toward the
+   edges so it reads as atmosphere, not a flat texture. */
 body::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(125% 85% at 50% -8%, transparent 38%, var(--color-bg) 92%);
+  background:
+    radial-gradient(55% 42% at 10% -6%, var(--aura-1), transparent 72%),
+    radial-gradient(48% 40% at 92% 2%, var(--aura-2), transparent 72%),
+    radial-gradient(70% 45% at 50% 108%, var(--aura-3), transparent 72%),
+    radial-gradient(125% 85% at 50% -8%, transparent 38%, var(--color-bg) 92%);
 }
+/* Over everything: film grain. It never takes a click, and sits under dialogs
+   (the top layer). */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 90; pointer-events: none;
+  background-image: var(--grain-image);
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+}
+@media print { body::before, body::after { display: none; } }
 
 main { min-height: 64vh; display: block; }
 
@@ -38,7 +52,7 @@ h1, h2, h3, h4 {
   letter-spacing: var(--tracking-tight);
   text-wrap: balance;
 }
-h1 { font-size: var(--text-4xl); line-height: var(--leading-display); letter-spacing: var(--tracking-display); }
+h1 { text-shadow: 0 0 2.2em var(--aura-2); font-size: var(--text-4xl); line-height: var(--leading-display); letter-spacing: var(--tracking-display); }
 h2 { font-size: var(--text-2xl); }
 h3 { font-size: var(--text-lg); }
 h4 { font-size: var(--text-md); }
@@ -49,14 +63,14 @@ a { color: var(--color-accent); text-decoration: none; }
 /* Animated underline that draws in on hover (prose + inline links) */
 .link, .prose a {
   color: var(--color-accent);
-  background-image: linear-gradient(currentColor, currentColor);
+  background-image: var(--gradient-iris);
   background-position: 0 100%;
   background-repeat: no-repeat;
-  background-size: 0% var(--border-hair);
+  background-size: 0% 1.5px;
   transition: background-size var(--t-med);
   padding-bottom: 1px;
 }
-.link:hover, .prose a:hover { background-size: 100% var(--border-hair); }
+.link:hover, .prose a:hover { background-size: 100% 1.5px; }
 
 code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01", "cv01"; }
 
@@ -65,6 +79,7 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01",
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
+  box-shadow: 0 0 0 7px var(--color-accent-wash), 0 0 28px 2px var(--color-glow);
   border-radius: var(--radius-sm);
 }
 
@@ -99,7 +114,10 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01",
 /* Raised surface w/ corner ticks (engineering-drawing detail) */
 .surface {
   position: relative;
-  background: var(--color-surface);
+  /* Slightly veiled, so the aura breathes through a raised card */
+  background: color-mix(in srgb, var(--color-surface) var(--surface-veil), transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   border: var(--border-hair) solid var(--color-line);
   border-radius: var(--radius);
 }
@@ -157,3 +175,42 @@ code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01",
   transition: top var(--t-fast);
 }
 .skip-link:focus { top: var(--space-4); }
+
+/* ── Interaction ───────────────────────────────────────────── */
+/* Registered so the radius of a card's light can be animated. */
+@property --glow-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+/* .lit — a card that answers the pointer: a soft light follows it (--mx/--my
+   are set by the script in Layout.astro), the card lifts, its edge glows.
+   Without script the light opens from the top centre. */
+.lit {
+  background-image: radial-gradient(circle var(--glow-r) at var(--mx, 50%) var(--my, 0%), var(--color-glow), transparent 72%);
+  transition: --glow-r var(--t-slow), transform var(--t-fast), box-shadow var(--t-med), border-color var(--t-fast);
+}
+.lit:hover, .lit:focus-within {
+  --glow-r: 22rem;
+  transform: translateY(-3px);
+  border-color: var(--color-line-2);
+  box-shadow: var(--shadow-2), 0 0 0 1px var(--color-glow), 0 22px 60px -30px var(--color-glow);
+}
+
+/* .pill — a small rounded control whose edge turns iridescent when touched. */
+.pill {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.2;
+  padding: 0.3rem 0.8rem; color: var(--color-ink); cursor: pointer;
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  transition: transform var(--t-fast), box-shadow var(--t-med), border-color var(--t-fast);
+}
+.pill:hover {
+  border-color: transparent;
+  background: linear-gradient(var(--color-surface), var(--color-surface)) padding-box, var(--gradient-iris) border-box;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px -14px var(--color-glow);
+}
+.pill:active { transform: translateY(0) scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lit:hover, .lit:focus-within, .pill:hover, .pill:active { transform: none; }
+}

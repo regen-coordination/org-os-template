@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import Layout from "../components/Layout.astro";
 import Hero from "../components/Hero.astro";
 import SectionBlock from "../components/SectionBlock.astro";
+import Drift from "../components/Drift.astro";
 import FederationMapIsland from "../components/FederationMapIsland.astro";
 import { federationData } from "../lib/federation";
 import { withBase } from "../lib/base";
@@ -17,6 +18,7 @@ const statline = `v${VERSION} · ${federationData.nodes.length} instances · EIP
 const SHOWN = 4;
 ---
 <Layout title="Home" current="home" description="Documentation for operators of org-os instances.">
+  <Drift />
   <div class="container">
     <Hero eyebrow={landing.eyebrow} title={landing.title} subtitle={landing.subtitle} ctas={landing.ctas} statline={statline} />
   </div>
@@ -24,7 +26,7 @@ const SHOWN = 4;
   <SectionBlock index="01" eyebrow="Documentation" title="Where to look" href={withBase("/docs")} cta="All docs">
     <div class="grid">
       {sections.map((s) => (
-        <article class="surface ticked card">
+        <article class="surface ticked card lit">
           <h3><a href={withBase(`/docs/${s.pages[0].slug}`)}>{s.title}</a></h3>
           <p class="summary">{s.summary}</p>
           <ul>

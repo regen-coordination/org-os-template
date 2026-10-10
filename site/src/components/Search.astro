@@ -6,7 +6,7 @@
 // falls back to the link.
 import { withBase } from "../lib/base";
 ---
-<a class="search-open mono" href={withBase("/docs")} data-base={withBase("/")}>Search <kbd>/</kbd></a>
+<a class="search-open mono" href={withBase("/docs")} data-base={withBase("/")}><span class="words">Search<span class="more"> docs</span></span><kbd>/</kbd></a>
 <dialog class="search-dialog" aria-label="Search the documentation">
   <form method="dialog"><button class="search-close mono">Close</button></form>
   <div id="search-ui"></div>
@@ -67,8 +67,22 @@ import { withBase } from "../lib/base";
 <style>
 /* Nav.astro's .nav-link styles are scoped to that component, so the control
    carries its own. */
-.search-open { font-size: var(--text-sm); color: var(--color-muted); transition: color var(--t-fast); }
-.search-open:hover { color: var(--color-ink); }
+.search-open {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  min-width: 10.5rem; padding: 0.28rem 0.4rem 0.28rem 0.8rem;
+  font-size: var(--text-sm); color: var(--color-muted);
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+  transition: color var(--t-fast), border-color var(--t-fast), box-shadow var(--t-med);
+}
+.search-open:hover {
+  color: var(--color-ink); border-color: transparent;
+  background: linear-gradient(var(--color-surface), var(--color-surface)) padding-box, var(--gradient-iris) border-box;
+  box-shadow: 0 8px 24px -12px var(--color-glow);
+}
+/* on a phone there is no "/" key to hint at */
+.search-open .words { white-space: nowrap; }
+@media (max-width: 640px) { .search-open { min-width: 0; padding: 0.28rem 0.75rem; } .search-open kbd, .search-open .more { display: none; } }
 .search-open kbd {
   font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--color-muted);
   border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-sm); padding: 0 0.3em; margin-left: 0.3em;
@@ -89,7 +103,9 @@ import { withBase } from "../lib/base";
   --pagefind-ui-font: var(--font-body);
   --pagefind-ui-scale: 0.85;
 }
-.search-dialog::backdrop { background: color-mix(in srgb, var(--color-ink) 45%, transparent); }
+.search-dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 62%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+/* Pagefind marks the matched words; give them the site's own highlight */
+.search-dialog :global(mark) { background: var(--color-accent-wash); color: var(--color-accent); border-radius: var(--radius-sm); padding: 0 0.15em; box-shadow: 0 0 0 1px var(--color-accent-wash); }
 .search-dialog form { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
 .search-close {
   font-size: var(--text-xs); color: var(--color-muted); background: none; cursor: pointer;
