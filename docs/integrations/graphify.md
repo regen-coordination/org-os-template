@@ -2,7 +2,7 @@
 
 Graphify is an external command-line tool that turns a repository's code and documents into a queryable knowledge graph. org-os does not vendor it. The repository's side is small and real: a skill, two read-only scripts, a session-close step, and the committed output in `graphify-out/`.
 
-**Status:** active. The graph is committed, the dashboard reads it, and `/close` refreshes it when the CLI is installed. The committed graph is a snapshot of the last build (2026-07-22 per `cost.json`); `npm run graph:status` shows how far behind it is.
+**Status:** `live` (the vocabulary of [Modules](../MODULES.md)). The graph is committed, the dashboard reads it, and `/close` refreshes it when the CLI is installed. The committed graph is a snapshot of the last build (2026-07-22 per `cost.json`); `npm run graph:status` shows how far behind it is.
 
 ## What must be installed outside the repository
 
