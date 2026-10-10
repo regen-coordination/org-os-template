@@ -4,11 +4,11 @@ The projects and repositories around org-os, in three groups: org-os instances, 
 
 Honest scope: every org-os instance listed below is run by the maintainer. There is no independent organisation running an instance yet. "Ecosystem" describes the maintainer's own network of repositories and the communities they serve, not a field of adopters.
 
-Addresses: a public `https://` link appears only where this repository records one under an organisation's account. Some instance repositories have no address given here, either because none is recorded or because it is not published on this page. Reachability of the linked addresses was not checked.
+Addresses: a public `https://` link appears only where this repository records one under an organisation's account. Some instance repositories have no address given here, either because none is recorded or because it is not published on this page. Names written in code type are recorded in this repository but are not linked: the address was not published, or it did not answer when it was tried.
 
 ## Framework repositories
 
-The repository records several names for the framework and its template, and they disagree. `federation.yaml` names this repository's hub as `regen-coordination/org-os-template` (the git remote matches); `package.json` names `organizational-os/organizational-os-template`; `repos.manifest.json` lists [org-os-framework](https://github.com/regen-coordination/org-os-framework) and [org-os-template](https://github.com/regen-coordination/org-os-template); the `federation.yaml` peers list [organizational-os-framework](https://github.com/regen-coordination/organizational-os-framework) and [organizational-os](https://github.com/regen-coordination/organizational-os), both with `trust: full`. Which of these is canonical is not settled in the repository.
+The repository records several names for the framework and its template, and they disagree. `federation.yaml` names this repository's hub as `regen-coordination/org-os-template` (the git remote matches); `package.json` names `organizational-os/organizational-os-template`; `repos.manifest.json` lists [org-os-framework](https://github.com/regen-coordination/org-os-framework) and [org-os-template](https://github.com/regen-coordination/org-os-template); the `federation.yaml` peers list `organizational-os-framework` and `organizational-os`, both with `trust: full`. Which of these is canonical is not settled in the repository.
 
 ## Org-os instances
 
@@ -23,7 +23,7 @@ An instance is a repository that carries its own identity files, `data/`, `memor
 | [regen-toolkit](https://github.com/regen-coordination/regen-toolkit) (Regen Web3 Toolkit) | Project | beta | A nested instance with its own remote. Registered in `data/instances.yaml` as assess-only. |
 | bread-coop-os | Cooperative | alpha | A fictional acceptance-test instance for `clone:framework`. No remote. |
 
-[dao-os](https://github.com/regen-coordination/dao-os) is listed in the registry and in `federation.yaml` as a downstream entry, but the registry describes it as a DAO-module development platform, not an operational instance. It is the source of the DAO skills that are candidates for promotion into the framework ([SKILL-PROMOTION.md](SKILL-PROMOTION.md)).
+`dao-os` is listed in the registry and in `federation.yaml` as a downstream entry, but the registry describes it as a DAO-module development platform, not an operational instance. It is the source of the DAO skills that are candidates for promotion into the framework ([SKILL-PROMOTION.md](SKILL-PROMOTION.md)).
 
 ## Related projects
 
@@ -33,10 +33,10 @@ Repositories in the same network that are not themselves org-os instances. `repo
 |---|---|
 | [Regenerant-Catalunya](https://github.com/refibcn/Regenerant-Catalunya) | `repos.manifest.json` |
 | [ReFi-BCN-Website](https://github.com/refibcn/ReFi-BCN-Website) | `repos.manifest.json` |
-| [Local-ReFi-Toolkit](https://github.com/regen-coordination/local-refi-toolkit) | `repos.manifest.json` |
+| `Local-ReFi-Toolkit` | `repos.manifest.json` |
 | ReFi-Mediterranean | `data/instances.yaml`: the public website and knowledge base of the Mediterranean node, mounted at `repos/refi-mediterranean/`. |
 | grants-os | `federation.yaml`, `integrations.grants`, role `grants-platform`. |
-| [quartz-refi-template](https://github.com/organizational-os/quartz-refi-template) | `federation.yaml`, `integrations.publishing`, role `documentation-site`. |
+| `quartz-refi-template` | `federation.yaml`, `integrations.publishing`, role `documentation-site`. |
 
 ## External systems
 
@@ -44,9 +44,9 @@ Systems org-os talks to or builds on that are not org-os instances, from `federa
 
 | System | Role |
 |---|---|
-| [openclaw-source](https://github.com/organizational-os/openclaw-source) | The primary agent runtime named in `federation.yaml` (`openclaw` appears in the instance registry as an `AgentRuntime` with no repository recorded and no federation manifest). |
-| [regen_eliza-refi_dao](https://github.com/regen-coordination/regen_eliza-refi_dao) | An alternative, ElizaOS-based agent runtime. |
-| [koi-net](https://github.com/organizational-os/koi-net) and [koi-net-integration](https://github.com/organizational-os/koi-net-integration) | The KOI-net sync protocol and its TypeScript bridge, as named in `federation.yaml`. This repository carries its own client package, `packages/koi-bridge`; whether any instance runs it live was not verified. |
+| `openclaw-source` | The primary agent runtime named in `federation.yaml` (`openclaw` appears in the instance registry as an `AgentRuntime` with no repository recorded and no federation manifest). |
+| `regen_eliza-refi_dao` | An alternative, ElizaOS-based agent runtime. |
+| `koi-net` and `koi-net-integration` | The KOI-net sync protocol and its TypeScript bridge, as named in `federation.yaml`. This repository carries its own client package, `packages/koi-bridge`; whether any instance runs it live was not verified. |
 | OPAL | Transcript-to-schema extraction; its code lives in this repository under `integrations/opal/`. |
 | [Regen Commons](https://github.com/regen-coordination) | An ecosystem node on the federation map (`data/ecosystems.yaml`): the `regen-coordination` GitHub organisation. |
 | [ReFi Network](https://refidao.com) | An ecosystem node on the federation map. |
