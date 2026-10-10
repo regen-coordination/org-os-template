@@ -31,11 +31,11 @@ const { id, name, status, summary, link } = Astro.props;
 .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); border-color: var(--color-line-2); }
 
 .head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
-.id { font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); color: var(--color-faint); }
+.id { font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); color: var(--color-muted); }
 .name { margin: 0; }
 .summary { margin: 0; font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); flex: 1; }
 .more { font-size: var(--text-sm); color: var(--color-accent); margin-top: var(--space-1); }
-.more.muted { color: var(--color-faint); }
+.more.muted { color: var(--color-muted); }
 .more .arr { display: inline-block; transition: transform var(--t-fast); }
 .more:hover .arr { transform: translateX(3px); }
 </style>

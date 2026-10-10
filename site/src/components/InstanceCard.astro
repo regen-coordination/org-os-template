@@ -35,18 +35,18 @@ const { node } = Astro.props;
   letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--color-muted); }
 .status .pip { width: 6px; height: 6px; border-radius: 50%; }
 .status.live .pip { background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-wash); }
-.status.offline { color: var(--color-faint); }
+.status.offline { color: var(--color-muted); }
 .status.offline .pip { border: var(--border-hair) solid var(--color-faint); }
 
 .name { margin: 0; }
-.id { font-size: var(--text-sm); color: var(--color-faint); margin: 0; }
+.id { font-size: var(--text-sm); color: var(--color-muted); margin: 0; }
 .notes { font-size: var(--text-sm); color: var(--color-muted); margin: 0; line-height: var(--leading-snug);
   display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 .meta { font-size: var(--text-sm); display: grid; gap: 0.3rem; margin: 0;
   padding-top: var(--space-3); border-top: var(--border-hair) dashed var(--color-line); }
 .meta div { display: grid; grid-template-columns: 6.5rem 1fr; gap: var(--space-2); }
-.meta dt { color: var(--color-faint); } .meta dd { margin: 0; color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
+.meta dt { color: var(--color-muted); } .meta dd { margin: 0; color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
 
 .repo { font-size: var(--text-sm); color: var(--color-accent); margin-top: auto; }
 .repo .arr { display: inline-block; transition: transform var(--t-fast); }

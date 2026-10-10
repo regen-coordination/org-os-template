@@ -21,7 +21,7 @@ const { eyebrow, title, subtitle, ctas, statline } = Astro.props;
 .hero { padding: clamp(var(--space-16), 12vh, var(--space-32)) 0 var(--space-16); }
 .prompt { font-size: var(--text-sm); color: var(--color-muted); }
 .prompt .path { color: var(--color-accent); }
-.prompt .sym { color: var(--color-faint); }
+.prompt .sym { color: var(--color-muted); }
 .headline {
   font-size: var(--text-display); margin-top: var(--space-5);
   max-width: 18ch; letter-spacing: var(--tracking-display);
@@ -33,7 +33,7 @@ const { eyebrow, title, subtitle, ctas, statline } = Astro.props;
   margin-top: var(--space-12); padding-top: var(--space-4);
   border-top: var(--border-hair) dashed var(--color-line);
   font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
-  color: var(--color-faint); text-transform: uppercase;
+  color: var(--color-muted); text-transform: uppercase;
 }
 .statline .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent-soft);
   box-shadow: 0 0 0 0 var(--color-accent-wash); animation: ping 2.4s var(--ease-out) infinite; }
