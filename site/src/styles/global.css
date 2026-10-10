@@ -73,6 +73,8 @@ a { color: var(--color-accent); text-decoration: none; }
 .link:hover, .prose a:hover { background-size: 100% 1.5px; }
 
 code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01", "cv01"; }
+/* Commands must read exactly as typed: no ligatures, so "--flag" keeps its two hyphens and the space before it. */
+code, pre, kbd { font-variant-ligatures: none; }
 
 ::selection { background: var(--color-accent-wash); color: var(--color-ink); }
 
