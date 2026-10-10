@@ -35,13 +35,27 @@ export function fragmentVerdict(fragment, ids) {
 }
 
 /**
- * The page with the elements that show source text taken out. `<code>` and
- * `<pre>` hold text a doc may write as an example (`src="x.json"`), which the
- * link checks must not read as an attribute of a real element. The elements'
- * own attributes go with them: they carry no href or src.
+ * The page with the text of `<code>` and `<pre>` taken out. They hold text a
+ * doc may write as an example (`src="x.json"`), which the link checks must not
+ * read as an attribute of a real element. Markup nested inside them is real
+ * and stays, so a raw-HTML link written in a `<code>` is still checked. The
+ * element's own tags go: they carry no href or src. The name must end at a
+ * space or `>`, so `<code-block>` and `<pre-x>` are other elements.
  */
 export function stripCode(html) {
-  return html.replace(/<(pre|code)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+  return html.replace(/<(pre|code)(?=[\s>])[^>]*>([\s\S]*?)<\/\1\s*>/gi, (_all, _name, inner) => inner.match(/<[^>]*>/g)?.join("") ?? "");
+}
+
+/**
+ * Did the fragment check look at enough? Returns the failure text, or null.
+ * Same-page links always exist (the skip link), so their absence means the
+ * pattern is stale; a build with no cross-page link is legitimate, but one
+ * with no fragment link of either kind looked at nothing.
+ */
+export function fragmentCoverage(samePage, crossPage) {
+  if (samePage === 0 && crossPage === 0) return "fragment check: matched 0 #fragment links — the pattern is stale";
+  if (samePage === 0) return "fragment check: matched 0 same-page #fragment links — the pattern is stale";
+  return null;
 }
 
 /** The page without comments and the elements whose text is not markup (script, style, template, textarea). */

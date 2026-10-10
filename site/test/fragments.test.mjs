@@ -1,7 +1,7 @@
 // site/test/fragments.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { idsIn, fragmentOf, fragmentVerdict, stripCode } from "../src/lib/fragments.mjs";
+import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
 test("idsIn collects id attributes, double- and single-quoted, and anchor names", () => {
   const html = `<h2 id="setup">x</h2><div id='box' class="a"></div><a name="old"></a><p data-id="no">`;
@@ -54,4 +54,36 @@ test("stripCode handles several elements and attributes on the opening tag, and 
 test("idsIn ignores ids that appear only inside a script, style, template, textarea or comment", () => {
   const html = `<h2 id="real">x</h2><script>var s = '<h2 id="fake1">';</script><style>/* <p id="fake2"> */</style><template><p id="fake3"></p></template><textarea><p id="fake4"></textarea><!-- <p id="fake5"> -->`;
   assert.deepEqual([...idsIn(html)], ["real"]);
+});
+
+test("stripCode keeps a raw-HTML link written inside <code>, and drops only the text around it", () => {
+  const out = stripCode(`<p><code>src="x.json" <a href="rel/x" class="k">n</a> href="y"</code></p>`);
+  assert.ok(out.includes(`href="rel/x"`), "the nested link must still be checked");
+  assert.ok(!out.includes("x.json") && !out.includes(`href="y"`), "the example text goes");
+});
+
+test("stripCode keeps a link nested inside <pre><code>", () => {
+  const out = stripCode(`<pre class="c"><code><span>href="text"</span><a href="rel/z">z</a></code></pre><a href="/real">r</a>`);
+  assert.ok(out.includes(`href="rel/z"`) && out.includes(`href="/real"`));
+  assert.ok(!out.includes(`href="text"`));
+});
+
+test("stripCode does not treat <code-block> or <pre-x> as code or pre", () => {
+  const html = `<code-block><a href="rel/y">z</a></code><a href="/after">a</a>`;
+  assert.equal(stripCode(html), html);
+  const html2 = `<pre-x data="a" href="rel/q">t</pre-x>`;
+  assert.equal(stripCode(html2), html2);
+});
+
+test("fragmentCoverage: no cross-page fragment link is fine while same-page links were seen", () => {
+  assert.equal(fragmentCoverage(12, 0), null);
+  assert.equal(fragmentCoverage(12, 3), null);
+});
+
+test("fragmentCoverage fails when the check looked at no fragment link at all", () => {
+  assert.match(fragmentCoverage(0, 0), /matched 0 #fragment links/);
+});
+
+test("fragmentCoverage fails when same-page links vanish, because the skip link alone keeps that count above zero", () => {
+  assert.match(fragmentCoverage(0, 4), /0 same-page/);
 });

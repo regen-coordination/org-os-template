@@ -9,7 +9,7 @@ import { PAGES, SECTIONS, ALLOW_UNVERIFIED } from "../src/data/docs-manifest.mjs
 import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
-import { idsIn, fragmentOf, fragmentVerdict, stripCode } from "../src/lib/fragments.mjs";
+import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
 const DIST = "dist";
 let failed = false;
@@ -157,11 +157,11 @@ else console.log(bad === 0
   ? `link check: ${internal} internal links on ${htmlFiles.length} pages carry ${BASE_PATH || "/"} once and resolve`
   : `link check: ${bad} bad link(s)`);
 
-// Same-page and cross-page fragments are separate patterns: the skip link alone
-// would keep a single count above zero if the cross-page branch stopped matching.
-if (samePage === 0) fail("fragment check: matched 0 same-page #fragment links — the pattern is stale");
-if (crossPage === 0) fail("fragment check: matched 0 cross-page #fragment links — the pattern is stale");
-if (samePage > 0 && crossPage > 0) console.log(fragmentBad === 0
+// Same-page links always exist (the skip link); a build may have no cross-page
+// fragment link, but one that matched no fragment link at all looked at nothing.
+const coverageProblem = fragmentCoverage(samePage, crossPage);
+if (coverageProblem) fail(coverageProblem);
+else console.log(fragmentBad === 0
   ? `fragment check: ${samePage} same-page and ${crossPage} cross-page links with a #fragment point at an id that exists in the built page`
   : `fragment check: ${fragmentBad} broken fragment(s)`);
 
@@ -200,8 +200,8 @@ if (llmsLinks === 0) fail("llms check: matched 0 links — the pattern is stale"
 else console.log(llmsBad === 0 ? `llms check: ${llmsLinks} links OK, all ${PAGES.length} docs listed` : `llms check: ${llmsBad} problem(s)`);
 
 // ── 7. Docs have a body (independent of the build-time link guard) ───────
-// The article carries data-pagefind-body. Take it, drop the eyebrow and the
-// title, strip tags: if nothing is left the markdown did not render.
+// The article carries data-pagefind-body. Take it, drop the breadcrumb trail
+// (a <nav aria-label="Breadcrumb">) and the title, strip tags: if nothing is left the markdown did not render.
 let bodies = 0;
 for (const p of PAGES) {
   const file = join(DIST, "docs", p.slug, "index.html");
@@ -212,7 +212,7 @@ for (const p of PAGES) {
   const open = html.indexOf(">", start) + 1;
   const end = html.indexOf("</article>", open);
   const text = html.slice(open, end === -1 ? undefined : end)
-    .replace(/<p\b[^>]*\beyebrow\b[^>]*>[\s\S]*?<\/p>/, "")
+    .replace(/<nav\b[^>]*\baria-label="Breadcrumb"[^>]*>[\s\S]*?<\/nav>/, "")
     .replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/, "")
     .replace(/<[^>]*>/g, "")
     .trim();
