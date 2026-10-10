@@ -2709,3 +2709,44 @@ Not a task for a subagent — the handoff to the operator.
 - Check that a `#fragment` on a link between docs names a heading that exists (the content pass renames headings).
 - Plan 3: merge with a merge commit, never squash or rebase — each `verified` commit must stay in `main`'s history.
 - Deferred minors from the plan 1 reviews are listed in the session ledger and in the plan 1 handoff.
+
+## Carried over from the plan 1 reviews
+
+Found by the per-task and whole-branch reviews and deliberately not fixed in plan 1. None blocks
+the content pass; the first is the only one a reader would notice.
+
+**Do first in plan 2**
+- `site/src/components/SectionBlock.astro` `.idx` still colours text with `--color-faint`; change it
+  to `--color-muted` (the last text use of faint).
+- Nobody has looked at the site in a browser. The by-eye pass covers: the three/two/one-column docs
+  layout and the phone "Documentation menu"; the search dialog (`/`, results, `Esc`, script off);
+  the theme toggle and both themes; the federation map under the dark theme; home, docs index and
+  modules at desktop and phone width.
+
+**Verifier and resolver hardening**
+- The verifier's attribute pattern skips values containing the other quote character, unquoted
+  attributes, `srcset` and `action`; it counts the literal text `data-pagefind-body` anywhere in a
+  page; an image-only doc fails `EMPTY DOC`; output lines read `MANIFEST: manifest: …`.
+- `resolveDocLink`: a link to a directory drops its `#fragment`; a query-only link (`?x=1`)
+  resolves to the source's folder; the raw-image address assumes a GitHub `repoUrl`.
+- `validateManifest`: `covers` entries are not checked for path safety; a `source` containing glob
+  characters is not rejected; an empty slug also reports a duplicate.
+- The guard in `[...slug].astro` (`rendered === undefined`) depends on Astro's loader internals;
+  the verifier's `EMPTY DOC` check is now its backstop.
+
+**Small things**
+- Search: a retried failed load leaves dead `<link>`/`<script>` elements; the `/` hint shows
+  without script.
+- Theme: the `theme-color` meta is corrected only after the module script runs; the toggle's label
+  is a static "Dark".
+- Docs layout: the sidebar's section headings are `h2` and come before the page's `h1`; an empty
+  on-page-contents wrapper leaves a small gap.
+- `Redirect.astro`'s canonical link is root-relative; the "Edit this page" address is not
+  URL-encoded; `OLD_DOC_SLUGS` is written out in both the verifier and a test;
+  `scripts/render-templates.mjs:40` says `DOC_SPINE` mirrors the manifest, which nothing enforces.
+- `astro dev` watches the whole repository root (the loader's base), and does not clear the render
+  cache: after editing the manifest, run `npm run clean` and restart it.
+- Content, for the verification pass: `SETUP.md` names a different GitHub organisation;
+  `ECOSYSTEM.md` links a personal vault repository; `/get-started` now lands on unverified
+  `SETUP.md`.
+
