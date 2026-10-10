@@ -161,7 +161,7 @@ version: "1.2.0"
 Rules:
 - Skill version is independent of framework version.
 - A skill can bump patch without a framework release (via `patch` hotfix).
-- Promoting an instance-local skill to framework-canonical (see `docs/SKILL-PROMOTION.md`) starts it at `1.0.0` unless the source skill was already further along and well-maintained.
+- Promoting an instance-local skill to framework-canonical (see [`docs/SKILL-PROMOTION.md`](SKILL-PROMOTION.md)) starts it at `1.0.0` unless the source skill was already further along and well-maintained.
 
 ## Release process
 
@@ -243,9 +243,9 @@ a marker of why `version:check` now reads every surface it can.)
 
 - [semver.org](https://semver.org) — semantic versioning spec.
 - [keepachangelog.com](https://keepachangelog.com) — CHANGELOG format.
-- `docs/SKILL-PROMOTION.md` — how instance skills become canonical.
-- `docs/PACKAGE-LIFECYCLE.md` — package lifecycle states + sync mechanism.
-- `docs/DATA-MODEL.md` — registry schemas and their `schema_version` fields.
+- [`docs/SKILL-PROMOTION.md`](SKILL-PROMOTION.md) — how instance skills become canonical.
+- [`docs/PACKAGE-LIFECYCLE.md`](PACKAGE-LIFECYCLE.md) — package lifecycle states + sync mechanism.
+- [`docs/DATA-MODEL.md`](DATA-MODEL.md) — registry schemas and their `schema_version` fields.
 
 ---
 

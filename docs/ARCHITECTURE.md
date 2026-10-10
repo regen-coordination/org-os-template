@@ -61,7 +61,7 @@ Two design choices are visible in the code. First, an instance is a clone with i
 
 ### 6. Optional code: packages, modules, site
 
-`packages/` holds 22 directories of optional code (the admin app (docs/ADMIN-APP.md); the KMS; the federation map; the instance doctor; `regen-agents`, four specialist agents in TypeScript; integrations for OpenCode, Hermes, Buzz, Paper, Cloudflare and others). `federation.yaml`'s `packages:` map says which an instance enables, and `npm run sync:packages` copies them in. `modules/` has five `module.yaml` manifests (`org-os-berd`, `org-os-buzz`, `org-os-cloudflare-os`, `org-os-instance-doctor`, `org-os-paper`); `scripts/modules.mjs` reads them and writes `data/modules.yaml` and `.well-known/modules.json` in an instance. See [Packages](PACKAGES.md) and [Modules](MODULES.md). The core does not depend on any of them: an instance with none still has layers 1 to 4.
+`packages/` holds 22 directories of optional code (the [admin app](ADMIN-APP.md); the KMS; the [federation map](FEDERATION-MAP.md); the instance doctor; `regen-agents`, four specialist agents in TypeScript; integrations for OpenCode, Hermes, Buzz, Paper, Cloudflare and others). `federation.yaml`'s `packages:` map says which an instance enables, and `npm run sync:packages` copies them in. `modules/` has five `module.yaml` manifests (`org-os-berd`, `org-os-buzz`, `org-os-cloudflare-os`, `org-os-instance-doctor`, `org-os-paper`); `scripts/modules.mjs` reads them and writes `data/modules.yaml` and `.well-known/modules.json` in an instance. See [Packages](PACKAGES.md) and [Modules](MODULES.md). The core does not depend on any of them: an instance with none still has layers 1 to 4.
 
 ## Design principles the code bears out
 

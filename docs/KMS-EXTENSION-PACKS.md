@@ -4,7 +4,7 @@ An extension pack is a sibling package of `org-os-kms` that adds new typed knowl
 
 **Status:** pilot. The mechanism is built and tested (`packages/org-os-kms/src/extensions.mjs`). One pack exists, [`org-os-territory`](TERRITORY-PACK.md), and no instance runs it yet. `data/packages-matrix.yaml` lists it as `evaluating` and `dormant` with an empty `instances_using`.
 
-Read first: the knowledge system overview (`docs/KMS.md`) and the two planes and the publication gate (`docs/KMS-PLANES.md`). This page only covers the pack mechanism.
+Read first: the knowledge system overview ([`docs/KMS.md`](KMS.md)) and the two planes and the publication gate ([`docs/KMS-PLANES.md`](KMS-PLANES.md)). This page only covers the pack mechanism.
 
 ## What a pack is
 

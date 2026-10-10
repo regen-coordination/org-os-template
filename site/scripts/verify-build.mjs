@@ -9,6 +9,7 @@ import { PAGES, SECTIONS, ALLOW_UNVERIFIED } from "../src/data/docs-manifest.mjs
 import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists } from "../src/lib/repo.mjs";
+import { idsIn, fragmentOf, fragmentVerdict } from "../src/lib/fragments.mjs";
 
 const DIST = "dist";
 let failed = false;
@@ -29,11 +30,11 @@ console.log(
 );
 
 // ── 2. Required pages (check 3). The docs come from the manifest. ─────────
-// The eleven addresses the site served before the manifest; they must keep
+// The twelve addresses the site served before the manifest; they must keep
 // resolving whatever the manifest becomes (spec §3, "Addresses").
 const OLD_DOC_SLUGS = [
   "architecture", "modules", "agentic-architecture", "federation", "ecosystem", "data-model",
-  "eip4824", "package-lifecycle", "operator-guide", "adopt-with-an-agent", "rad-org-os",
+  "eip4824", "package-lifecycle", "operator-guide", "adopt-with-an-agent", "rad-org-os", "setup",
 ];
 const REQUIRED = [
   "index.html",
@@ -78,15 +79,28 @@ const wellPrefixed = (href) =>
   href.startsWith(`${BASE_PATH}#`) ||
   href.startsWith(`${BASE_PATH}?`);
 
-/** Is there a built file behind this (correctly prefixed) internal address? */
-function built(href) {
+/** The built file behind a (correctly prefixed) internal address, or null when there is none. */
+function targetFile(href) {
   let path;
-  try { path = decodeURIComponent(href.slice(BASE_PATH.length).split(/[#?]/)[0]); } catch { return false; }
-  if (path === "" || path === "/") return existsSync(join(DIST, "index.html"));
-  if (path.split("/").includes("..")) return false;   // never let a link escape dist/
+  try { path = decodeURIComponent(href.slice(BASE_PATH.length).split(/[#?]/)[0]); } catch { return null; }
+  if (path === "" || path === "/") {
+    const index = join(DIST, "index.html");
+    return existsSync(index) ? index : null;
+  }
+  if (path.split("/").includes("..")) return null;   // never let a link escape dist/
   const full = join(DIST, path);
-  if (path.endsWith("/")) return existsSync(join(full, "index.html"));
-  return (existsSync(full) && statSync(full).isFile()) || existsSync(join(full, "index.html"));
+  if (path.endsWith("/")) return existsSync(join(full, "index.html")) ? join(full, "index.html") : null;
+  if (existsSync(full) && statSync(full).isFile()) return full;
+  return existsSync(join(full, "index.html")) ? join(full, "index.html") : null;
+}
+/** Is there a built file behind this address? */
+const built = (href) => targetFile(href) !== null;
+
+// The ids each built page defines, read once, for the fragment check.
+const idCache = new Map();
+function idsOfFile(file) {
+  if (!idCache.has(file)) idCache.set(file, idsIn(readFileSync(file, "utf8")));
+  return idCache.get(file);
 }
 
 // Matches single- AND double-quoted attributes — a single-quoted emitter would
@@ -96,12 +110,21 @@ const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const htmlFiles = readdirSync(DIST, { recursive: true })
   .filter((f) => f.endsWith(".html"))
   .map((f) => join(DIST, f));
-let internal = 0, bad = 0;
+let internal = 0, bad = 0, fragments = 0, fragmentBad = 0;
 for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
   for (const m of html.matchAll(ATTR)) {
     const href = m[2];
-    if (href === "" || href.startsWith("#") || href.startsWith("//") || SCHEME.test(href)) continue;
+    if (href.startsWith("#")) {
+      // A same-page fragment: the id must exist in this very page.
+      const fragment = fragmentOf(href);
+      if (fragment === null) continue;
+      fragments++;
+      const verdict = fragmentVerdict(fragment, idsOfFile(file));
+      if (!verdict.ok) { fail(`BROKEN FRAGMENT: ${file} → ${href} (${verdict.reason})`); fragmentBad++; }
+      continue;
+    }
+    if (href === "" || href.startsWith("//") || SCHEME.test(href)) continue;
     if (!href.startsWith("/")) {
       // A relative address. Markdown links are rewritten by remark-doc-links;
       // one written as raw HTML inside a doc is not, and would 404 here.
@@ -115,12 +138,27 @@ for (const file of htmlFiles) {
     // non-idempotent prefix helper would create. Reject it explicitly.
     else if (BASE_PATH !== "" && rest !== "" && wellPrefixed(rest)) { fail(`DOUBLE-PREFIXED: ${file} → ${href}`); bad++; }
     else if (!built(href)) { fail(`BROKEN LINK: ${file} → ${href}`); bad++; }
+    else {
+      // The page exists; if the link names a fragment, that id must exist in it.
+      const fragment = fragmentOf(href);
+      const target = targetFile(href);
+      if (fragment !== null && target !== null && target.endsWith(".html")) {
+        fragments++;
+        const verdict = fragmentVerdict(fragment, idsOfFile(target));
+        if (!verdict.ok) { fail(`BROKEN FRAGMENT: ${file} → ${href} (${verdict.reason})`); fragmentBad++; }
+      }
+    }
   }
 }
 if (internal === 0) fail("link check: matched 0 internal links — the pattern is stale");
 else console.log(bad === 0
   ? `link check: ${internal} internal links on ${htmlFiles.length} pages carry ${BASE_PATH || "/"} once and resolve`
   : `link check: ${bad} bad link(s)`);
+
+if (fragments === 0) fail("fragment check: matched 0 links with a #fragment — the pattern is stale");
+else console.log(fragmentBad === 0
+  ? `fragment check: ${fragments} links with a #fragment point at an id that exists in the built page`
+  : `fragment check: ${fragmentBad} broken fragment(s)`);
 
 // ── 5. Redirects (check 5) ───────────────────────────────────────────────
 for (const { from, to } of REDIRECTS) {

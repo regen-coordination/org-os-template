@@ -65,8 +65,8 @@ test("the real manifest is valid against the working tree", () => {
   assert.deepEqual(problems, []);
 });
 
-test("the eleven addresses the site already serves are kept", () => {
-  for (const slug of ["architecture", "modules", "agentic-architecture", "federation", "ecosystem", "data-model", "eip4824", "package-lifecycle", "operator-guide", "adopt-with-an-agent", "rad-org-os"]) {
+test("the twelve addresses the site already serves are kept", () => {
+  for (const slug of ["architecture", "modules", "agentic-architecture", "federation", "ecosystem", "data-model", "eip4824", "package-lifecycle", "operator-guide", "adopt-with-an-agent", "rad-org-os", "setup"]) {
     assert.ok(pageBySlug(slug), `missing slug ${slug}`);
   }
 });

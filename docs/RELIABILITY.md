@@ -34,7 +34,7 @@ There are no age thresholds. Nothing computes healthy, drifted or dormant from `
 `npm run check:divergence` compares each of the framework's `scripts/*.mjs` and `*.js` files with the same-named file in each instance, by md5. Instances come from `data/instances.yaml` (sibling directories that have a `scripts/` folder) or from `--instances "path1,path2"`; `--script <name>` limits it to one script. It prints a result and never modifies files; with no instances found it says so and exits 0.
 
 - **IDENTICAL** — instance on canonical version
-- **DIVERGES** — local variant (intentional override, drift, or known divergence per `docs/SKILL-PROMOTION.md`)
+- **DIVERGES** — local variant (intentional override, drift, or known divergence per [`docs/SKILL-PROMOTION.md`](SKILL-PROMOTION.md))
 - **MISSING** — script not present in that instance (instance hasn't opted into the canonical pipeline)
 
 The operator resolves divergences by hand. There is no merge tooling.

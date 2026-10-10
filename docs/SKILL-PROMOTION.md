@@ -9,7 +9,7 @@ A skill becomes a **promotion candidate** when:
 1. **≥ 2 instances have implemented it** — independent validation that the pattern generalizes.
 2. **Generalizability review passes** — the skill's purpose is broader than one instance's domain.
 3. **Tests exist** — either in the originating instance or in the promotion PR.
-4. **Docs exist** — a `SKILL.md` following `docs/SKILL-SPECIFICATION.md`.
+4. **Docs exist** — a `SKILL.md` following [`docs/SKILL-SPECIFICATION.md`](SKILL-SPECIFICATION.md).
 
 Tracked in `data/skills-matrix.yaml` under `promotion_status: candidate`.
 
