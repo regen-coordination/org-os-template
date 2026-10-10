@@ -1,0 +1,19 @@
+# Circles group the crew's roles. Vocabulary and charter: roles/README.md.
+# max_agents caps how many crew agents may be seated at once.
+max_agents: 4
+circles:
+  - id: lead
+    name: Coordination
+    purpose: Carries goals from the operator to the circles and the circles' requests back.
+  - id: strategy
+    name: Strategy
+    purpose: Direction and political economy; gathers needs from the instances.
+  - id: research
+    name: Research
+    purpose: Answers questions from primary sources and turns findings into proposals.
+  - id: engineering
+    name: Engineering
+    purpose: Builds, verifies and reviews the framework's code.
+  - id: commons
+    name: Commons
+    purpose: Documentation, education and the consistency of the shared record.
