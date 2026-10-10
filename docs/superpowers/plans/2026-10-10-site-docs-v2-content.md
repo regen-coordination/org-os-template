@@ -10,18 +10,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-10-site-docs-v2-design.md` — §3 (structure), §5 (this plan), §1 (audience).
 
-**Written and started without the operator's review**, at their instruction to keep working overnight. Everything stays local and reviewable: one commit per unit, a ledger entry per page.
+**Written and started before the operator's review.** Everything stays local and reviewable: one commit per unit, a ledger entry per page.
 
 ## Global Constraints
 
-- Work only in the worktree `~/.cache/lf-worktrees/site-docs-v2`, branch `feat/site-docs-v2`. **Never push, never open a pull request.**
+- Work only in the separate worktree for branch `feat/site-docs-v2`. **Never push, never open a pull request.**
 - The audience is people who already run an org-os instance (spec §1). A page answers "how does this work, what do I run, what does the file look like".
 - **Another doc is never evidence.** A claim is confirmed by running the command or reading the code, on this branch.
 - Commands that change state (`clone:framework`, `federate add`, `sync`, `setup`, anything that writes) run only against a scratch directory under `.superpowers/sdd/2026-10-10-site-docs-v2-content/scratch/<unit>/`, never against this repository or a sibling instance. Never use `/tmp`. Never `git stash`, `git clean`, `git reset --hard`.
 - No file under `docs/` is moved or renamed. New pages are created directly under `docs/` in upper-case naming.
 - Voice (`SOUL.md`): plain, direct, technically precise, no marketing. Say what a thing does; give the command; show the file.
 - Honest scope stays wherever it applies: every instance today is run by the maintainer (single-operator dogfooding); the walkup "fork and answer an interview" setup path does not work for a newcomer (`docs/POSITIONING.md`, "Bootstrap status").
-- People appear in public roles only. No private paths (`03 Libraries/…`, home directories), no links to a personal vault repository, no secrets, no content from sibling instances.
+- People appear in public roles only. No private paths (vault folder names, home directories), no links to a personal vault repository, no secrets, no content from sibling instances.
 - Links between docs are written as relative file links (`[x](FEDERATION.md)`); the site rewrites them. A link to a file that is not tracked in this repository fails the build — link only to tracked files, or to `https://` addresses.
 - Only `http`, `https` and `mailto` links are allowed besides relative ones.
 - A unit agent does **not** run `npm run build` in `site/`, does **not** edit `site/`, and does **not** commit. It edits only the markdown files of its unit and writes its ledger fragment.

@@ -17,7 +17,7 @@ This page lists what can go wrong in an org-os instance and which check, if any,
 | **Manual** | Operator on demand | `npm run selftest` (see below) |
 | **Pre-commit** | Local commit, after `npm run install:hooks` | `validate:structure` always; `validate:schemas` if a `data/*.yaml` file is staged. `vault:audit` is not part of it. |
 | **Pre-push** | Local push, same installer | Refuses to push `agent/*` branches |
-| **CI** | Push to `main` or `release/**`; pull request to `main` | `.github/workflows/validate.yml`: `validate:structure`, `validate:schemas`, `analyze:instances`, `npm test`, `selftest` (which includes `check:divergence`), `test:admin`, `version:check`, and the site build and tests |
+| **CI** | Push to `main` or `release/**`; pull request to `main` | `.github/workflows/validate.yml`: `validate:structure`, `validate:schemas`, `analyze:instances`, `npm test`, `selftest` (which includes `check:divergence`), `test:admin`, `version:check`, the site build and tests, and a docs drift report that never blocks and is written to the run summary |
 | **Scheduled** | Weekly, Sunday 04:00 UTC | `.github/workflows/drift.yml`: `analyze:instances`, then commits any new report in `memory/reports/` |
 | **Pre-destructive** | Before a risky git operation | `vault:snapshot` (tracked files only; protect untracked notes first), run by the operator (see [VAULT-SAFETY.md](VAULT-SAFETY.md)); `vault:audit` afterwards |
 

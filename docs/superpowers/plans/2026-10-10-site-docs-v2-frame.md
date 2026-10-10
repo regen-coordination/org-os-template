@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- All work is in the worktree `~/.cache/lf-worktrees/site-docs-v2`, branch `feat/site-docs-v2`. Never work in `03 Libraries/org-os` itself.
+- All work is in a separate git worktree of this repository, on branch `feat/site-docs-v2`. Never work in the main checkout itself.
 - **Do not push the branch and do not open a pull request.** The deploy workflow runs on every push to `main`; publication is plan 3 and needs the operator's explicit go.
 - No file under `docs/` is moved or renamed. This plan edits three of them only to unlink dead links (Task 3).
 - Static Astro, no client framework. Astro stays on 5.x.
@@ -85,7 +85,7 @@
 - [ ] **Step 1: Install and confirm the baseline is green**
 
 ```bash
-cd ~/.cache/lf-worktrees/site-docs-v2
+cd <the worktree for feat/site-docs-v2>
 npm ci                                   # root (already done once; harmless)
 npm ci --prefix packages/org-os-federation-map
 npm ci --prefix site
@@ -2665,7 +2665,7 @@ and in `## Run`, change the `npm run build` comment to `# aggregate → astro bu
 - [ ] **Step 6: Run everything the CI runs**
 
 ```bash
-cd ~/.cache/lf-worktrees/site-docs-v2
+cd <the worktree for feat/site-docs-v2>
 npm test
 npm run validate:structure
 npm run version:check
