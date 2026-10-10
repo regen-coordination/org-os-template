@@ -265,3 +265,116 @@ export function closeHandoff(ctx, { target, reason }) {
   }
   return updateRecord(h.file, { status: 'declined', reason: reason.trim(), updated: stamp(ctx) });
 }
+
+export function release(ctx, { target, outcome = 'done' }) {
+  requireHerdr(ctx);
+  if (!['done', 'abandoned'].includes(outcome)) {
+    throw new CrewError(`The outcome must be done or abandoned, not "${outcome}".`);
+  }
+  const trail = readTrail(ctx.mainDir);
+  const caller = callerAssignment(ctx, trail);
+  if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
+    throw new CrewError(`The ${caller.role} role may not release agents. Report instead; the lead or the operator releases.`);
+  }
+  const a = findActive(trail, target, [...ACTIVE, 'failed']);
+  const live = ctx.herdr.listAgents().find((x) => a.pane && x.pane_id === a.pane);
+  if (live && live.state === 'working') {
+    throw new CrewError(`${a.agent} is still working. Wait for it to finish, or stop it in its pane first.`);
+  }
+
+  let removed = false;
+  let left = [];
+  if (!ctx.git.worktreeExists(a.worktree)) {
+    removed = true;
+  } else {
+    left = ctx.git.changes(a.worktree);
+    if (left.length === 0) {
+      try {
+        // herdr removes the worktree and closes the workspace it opened for it.
+        if (!a.workspace) throw new Error('no workspace recorded');
+        ctx.herdr.removeWorktree(a.workspace);
+        removed = true;
+      } catch {
+        try {
+          ctx.git.removeWorktree(a.worktree);
+          removed = true;
+        } catch (err) {
+          left = [`The worktree could not be removed: ${err.message || err}`];
+        }
+      }
+    }
+  }
+  const assignment = updateRecord(a.file, {
+    status: outcome === 'abandoned' ? 'abandoned' : 'released',
+    worktree_removed: removed,
+    updated: stamp(ctx),
+  });
+  return { assignment, removed, left };
+}
+
+export function board(ctx) {
+  requireHerdr(ctx);
+  const trail = readTrail(ctx.mainDir);
+  const byPane = new Map(ctx.herdr.listAgents().map((a) => [a.pane_id, a]));
+  const rows = [];
+  const needsRelease = [];
+  for (const a of trail.assignments) {
+    const live = a.pane ? byPane.get(a.pane) : null;
+    if (ACTIVE.includes(a.status) && live) {
+      rows.push({
+        agent: a.agent,
+        role: a.role,
+        state: live.state,
+        brief: a.brief.split('\n')[0],
+        branch: a.branch,
+        id: a.id,
+        created: a.created,
+      });
+    } else if (ACTIVE.includes(a.status) || a.status === 'failed') {
+      needsRelease.push({ id: a.id, status: a.status });
+    }
+  }
+  rows.sort((x, y) => (y.state === 'blocked') - (x.state === 'blocked') || String(x.created).localeCompare(String(y.created)));
+  const roleOf = new Map(trail.assignments.map((a) => [a.id, a.role]));
+  const handoffs = trail.handoffs
+    .filter((h) => h.status === 'open')
+    .map((h) => ({ id: h.id, from_role: roleOf.get(h.from) || h.from, to_role: h.to_role, brief: h.brief.split('\n')[0] }));
+  return { rows, handoffs, needsRelease, unreadable: trail.unreadable };
+}
+
+function age(created, now) {
+  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(created).getTime()) / 60000));
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 48 * 60) return `${Math.floor(minutes / 60)}h`;
+  return `${Math.floor(minutes / (24 * 60))}d`;
+}
+
+const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
+export function renderBoard(b, now) {
+  const out = [];
+  if (b.rows.length === 0) {
+    out.push('No crew agents are seated.');
+  } else {
+    const table = [
+      ['AGENT', 'ROLE', 'STATE', 'ASSIGNMENT', 'BRANCH', 'AGE'],
+      ...b.rows.map((r) => [r.agent, r.role, r.state, clip(r.brief, 32), clip(r.branch, 44), age(r.created, now)]),
+    ];
+    const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
+    for (const row of table) {
+      out.push(row.map((cell, i) => (i === row.length - 1 ? cell : cell.padEnd(widths[i] + 2))).join(''));
+    }
+  }
+  if (b.handoffs.length > 0) {
+    out.push('', `Open handoffs: ${b.handoffs.length}`);
+    for (const h of b.handoffs) out.push(`  ${h.from_role} → ${h.to_role}: "${clip(h.brief, 60)}"`);
+  }
+  if (b.needsRelease.length > 0) {
+    out.push('', `Needs release: ${b.needsRelease.length}`);
+    for (const a of b.needsRelease) {
+      out.push(`  ${a.id} (${a.status === 'failed' ? 'seating failed' : `trail says ${a.status}, no live agent`})`);
+    }
+  }
+  if (b.unreadable.length > 0) out.push('', `Could not read: ${b.unreadable.join(', ')}`);
+  return `${out.join('\n')}\n`;
+}
