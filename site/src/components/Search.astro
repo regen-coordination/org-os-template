@@ -43,8 +43,8 @@ import { withBase } from "../lib/base";
   }
 
   if (link && dialog) {
-    // With script the link opens a dialog: say so to assistive technology.
-    link.setAttribute("role", "button");
+    // With script the link opens a dialog: say so to assistive technology. It
+    // stays a link (Enter), so it keeps its role and promises no Space key.
     link.setAttribute("aria-haspopup", "dialog");
     const base = link.dataset.base!;
     const open = (event: Event) => {

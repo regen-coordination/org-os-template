@@ -29,7 +29,7 @@ const { prev, next } = neighbours(page.slug);
     <div class="docs-contents"><DocsToc headings={headings} /></div>
     <div class="docs-main">
       <article class="doc prose" data-pagefind-body>
-        <p class="eyebrow trail" data-pagefind-ignore><a href={withBase("/docs")}>Docs</a><span aria-hidden="true">/</span>{sectionById(page.section).title}</p>
+        <nav class="eyebrow trail" aria-label="Breadcrumb" data-pagefind-ignore><a href={withBase("/docs")}>Docs</a><span aria-hidden="true">/</span>{sectionById(page.section).title}</nav>
         <h1>{page.title}</h1>
         <slot />
       </article>
@@ -124,7 +124,8 @@ const { prev, next } = neighbours(page.slug);
 .doc :global(.code-wrap) { position: relative; }
 .doc :global(.code-wrap .copy) { position: absolute; top: var(--space-2); right: var(--space-2); opacity: 0; transition: opacity var(--t-fast), transform var(--t-fast), box-shadow var(--t-med); }
 .doc :global(.code-wrap:hover .copy), .doc :global(.code-wrap .copy:focus-visible) { opacity: 1; }
-@media (hover: none) { .doc :global(.code-wrap .copy) { opacity: 1; } }
+/* where there is no hover the button is always shown: give the block room so it covers no code */
+@media (hover: none) { .doc :global(.code-wrap .copy) { opacity: 1; } .doc :global(.code-wrap pre) { padding-top: var(--space-10); } }
 .doc :global(.anchor) { margin-left: 0.4em; color: var(--color-muted); opacity: 0; text-decoration: none; background: none; transition: opacity var(--t-fast), color var(--t-fast); }
 .doc :global(h2:hover .anchor), .doc :global(h3:hover .anchor), .doc :global(.anchor:focus-visible) { opacity: 1; }
 .doc :global(.anchor:hover) { color: var(--color-accent); }
