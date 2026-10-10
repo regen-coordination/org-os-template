@@ -2,7 +2,7 @@
 // The docs page: sidebar · article · on-page contents.
 //   ≥ 1100px  three columns
 //   ≥ 800px   sidebar and article; contents above the article
-//   < 800px   one column; the sidebar is a disclosure under the nav
+//   < 800px   one column; the sidebar is a disclosure in a bar under the nav
 import Layout from "./Layout.astro";
 import DocsSidebar from "./DocsSidebar.astro";
 import DocsToc from "./DocsToc.astro";
@@ -69,11 +69,10 @@ const { page, headings } = Astro.props;
 @media (max-width: 799px) {
   .docs-side { display: none; }
   .docs-drawer {
-    display: block; position: sticky; top: 3.75rem; z-index: calc(var(--z-nav) - 1);
+    display: block;
     background: var(--color-bg-2); border-bottom: var(--border-hair) solid var(--color-line);
   }
   .docs-drawer summary { cursor: pointer; padding: var(--space-3) var(--gutter); font-size: var(--text-sm); color: var(--color-ink); }
-  .docs-drawer[open] { max-height: calc(100vh - 3.75rem); overflow-y: auto; }
   .docs-drawer :global(.docs-sidebar) { padding: var(--space-2) var(--gutter) var(--space-6); }
   .docs-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "contents" "main"; padding-top: var(--space-6); }
 }
