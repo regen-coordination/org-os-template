@@ -7,8 +7,15 @@ is the recipe the agent follows. It uses only the **one recommended path**
 (`clone:framework`, non-interactive and config-driven); the `npm run setup`
 wizard needs a real interactive terminal and cannot be driven by an agent.
 
+The walkup path — fork the repository, run `npm run setup`, answer a guided
+interview in place — is **not a working path for a newcomer**: a clean-room
+test on 2026-08-21 found it broken in seven blocker-level ways and it has not
+been re-tested since. The clone is the supported route. Every instance that
+exists today is run by the framework's maintainer; this recipe has not yet been
+followed by an outside operator.
+
 Paste this whole page to your agent, or point it here, and say
-*"set up an org-os instance for &lt;my org&gt;."*
+*"set up an org-os instance for `<my org>`."*
 
 ---
 
@@ -27,7 +34,7 @@ npm install
 ```
 
 **2. Ask the operator, in conversation,** for: org name · org type
-(Cooperative / DAO / LocalNode / Hub / Project) · one-sentence description ·
+(free text, for example Cooperative, DAO, LocalNode, Hub, Project) · one-sentence description ·
 an emoji · operator name + email · federation network name (or none) · which
 operational packages they want (start with `operations: true` only) · which
 skills to include (the four below are a good default). Then write the answers
@@ -81,7 +88,11 @@ cd ../harbor-bakery-os
 npm install
 npm run generate:schemas && npm run validate:schemas
 npm run validate:structure
+git add -A && git commit -m "chore: generate schemas"
 ```
+
+The commit matters: `generate:schemas` leaves the new `.well-known/` files
+untracked, which the doctor reports as `working-tree-dirty`.
 
 **5. Verify with the doctor** — back in the framework directory, run the
 instance doctor against what you just made:
@@ -110,20 +121,33 @@ channels and data sources — that conversational pass is `BOOTSTRAP.md`
   depth.)
 - `.well-known/dao.json` — after `generate:schemas`, this is your public
   machine-readable identity. It should carry your name.
-- `federation.yaml` — the lineage stamp (`genesis_commit`) records exactly
-  which framework commit you were generated from. Keep it; it is how
-  `doctor assess` reasons about your instance's provenance.
+- `federation.yaml` — the lineage stamp: `metadata.genesis_commit` is the
+  framework repository's **root commit** (the same for every instance), and
+  `metadata.last_sync_commit` stays `null` until the first `doctor sync`
+  records the framework commit it applied. `doctor assess` reads both
+  (`never-synced` is the day-one warning). Keep them.
 
 ## Keeping the instance up to date
 
 From the framework checkout: `npm run doctor -- --dir ../your-org` any time —
-it is read-only and prints a scorecard. Framework sync: **v0.5 ships
-`doctor sync --dry-run` (plan only)**; the full sync lands with the v0.5.1
-file-level overlay (see `CHANGELOG.md` Known issues). Until then, treat sync
-plans as advisory.
+it is read-only and prints a scorecard. To update the instance from the
+framework:
+
+```bash
+npm run doctor -- sync --dir ../your-org --dry-run   # print the plan, change nothing
+npm run doctor -- sync --dir ../your-org             # snapshot, overlay, migrate, regenerate, receipt
+```
+
+`sync` is a file-level overlay: it copies framework-owned paths (`scripts/`,
+`templates/`, ...) in, never deletes, leaves what the organisation owns alone,
+and writes a receipt to `memory/reports/`. The overlay landed on `main` after
+the `v0.5.0` tag (see `CHANGELOG.md`, Unreleased), so a checkout of the tag only
+has the `--dry-run` plan. Run the dry run first and read it.
 
 ---
 
-*Verified end-to-end on 2026-08-29 against the v0.5.0 release candidate: a
-fresh scratch-directory run of steps 1–5 produced a valid instance whose only
-blocker was the expected missing remote.*
+*Checked on 2026-10-10 against the framework as it then stood on `main`: steps 3–5 run in a scratch directory with the config
+above. The clone wrote the instance; before `generate:schemas` the doctor showed
+two blockers (`git-remote-absent`, `structure-invalid`); after it, one
+(`git-remote-absent`). `npm install` inside the instance and a real remote were
+not exercised.*
