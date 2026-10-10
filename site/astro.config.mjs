@@ -1,5 +1,9 @@
 import { defineConfig } from "astro/config";
 import { SITE_ORIGIN, BASE_PATH } from "./base.config.mjs";
+import { PAGES } from "./src/data/docs-manifest.mjs";
+import { REPO_ROOT, REPO_URL, RELEASE_REF, listRepoFiles } from "./src/lib/repo.mjs";
+import remarkDocLinks from "./src/lib/remark-doc-links.mjs";
+import remarkStripTitle from "./src/lib/remark-strip-title.mjs";
 
 export default defineConfig({
   // Deployed as a GitHub Pages *project* page, so the site lives under a
@@ -9,5 +13,16 @@ export default defineConfig({
   base: BASE_PATH,
   output: "static",
   build: { format: "directory" },
+  markdown: {
+    remarkPlugins: [
+      remarkStripTitle,
+      // Markdown is rendered outside the page pipeline, so withBase() is not
+      // available to it; the plugin is given the base path directly.
+      [remarkDocLinks, {
+        pages: PAGES, repoRoot: REPO_ROOT, base: BASE_PATH,
+        repoUrl: REPO_URL, ref: RELEASE_REF, listFiles: listRepoFiles,
+      }],
+    ],
+  },
   vite: { server: { fs: { allow: [".."] } } },  // dev server may import ../packages/*
 });

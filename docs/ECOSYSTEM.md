@@ -19,7 +19,7 @@ This document is machine-readable for agents navigating the ecosystem. See [ECOS
 | Repo | Type | Relationship | Description |
 |------|------|--------------|-------------|
 | [organizational-os-template](https://github.com/luizfernandosg/organizational-os-template) | Template | Primary implementation | Fork + run setup; operational workspace with skills, memory, EIP-4824 |
-| [quartz-refi-template](../../quartz-refi-template/) | Template | Documentation base | Quartz-based site template; upstream for ReFi websites |
+| quartz-refi-template | Template | Documentation base | Quartz-based site template; upstream for ReFi websites |
 
 ---
 
@@ -27,8 +27,8 @@ This document is machine-readable for agents navigating the ecosystem. See [ECOS
 
 | Repo | Type | Relationship | Description |
 |------|------|--------------|-------------|
-| [openclaw-source](../../openclaw-source/) | Runtime | Primary | Agent runtime for org-os workspaces; AgentSkills-compatible |
-| [regen_eliza-refi_dao](../../regen_eliza-refi_dao/) | Runtime | Alternative | ElizaOS-based ReFi agent ecosystem |
+| openclaw-source | Runtime | Primary | Agent runtime for org-os workspaces; AgentSkills-compatible |
+| regen_eliza-refi_dao | Runtime | Alternative | ElizaOS-based ReFi agent ecosystem |
 
 ---
 
@@ -46,8 +46,8 @@ This document is machine-readable for agents navigating the ecosystem. See [ECOS
 
 | Repo | Type | Relationship | Description |
 |------|------|--------------|-------------|
-| [koi-net](../../koi-net/) | Protocol | Python package | KOI-NET protocol implementation |
-| [koi-net-integration](../../koi-net-integration/) | Bridge | TypeScript + Python | Integration layer for real-time knowledge sync in federation |
+| koi-net | Protocol | Python package | KOI-NET protocol implementation |
+| koi-net-integration | Bridge | TypeScript + Python | Integration layer for real-time knowledge sync in federation |
 
 ---
 
@@ -55,7 +55,7 @@ This document is machine-readable for agents navigating the ecosystem. See [ECOS
 
 | Repo | Type | Relationship | Description |
 |------|------|--------------|-------------|
-| [regen-coordination-hub](../../regen-coordination-hub/) | Hub | Coordinates nodes | Federation hub for Regen Coordination network |
+| regen-coordination-hub | Hub | Coordinates nodes | Federation hub for Regen Coordination network |
 
 ---
 
@@ -63,12 +63,12 @@ This document is machine-readable for agents navigating the ecosystem. See [ECOS
 
 | Repo | Type | Relationship | Description |
 |------|------|--------------|-------------|
-| [Regenerant-Catalunya](../../Regenerant-Catalunya/) | Program Node | Downstream of hub | Bioregional funding program; ReFi BCN |
-| [Local-ReFi-Toolkit](../../Local-ReFi-Toolkit/) | Resource Node | Downstream of hub | Playbooks, case studies, frameworks for local ReFi nodes |
-| [ReFi-BCN-Website](../../ReFi-BCN-Website/) | Website Node | Quartz site | ReFi Barcelona public presence |
-| [ReFi-DAO-Website](../../ReFi-DAO-Website/) | Website Node | Quartz site | ReFi DAO public presence |
-| [ReFi-Mediterranean](../../ReFi-Mediterranean/) | Website Node | Quartz site | ReFi Mediterranean network |
-| [ReFi-Barcelona](../../ReFi-Barcelona/) | Website | Quartz site | ReFi Barcelona knowledge base |
+| Regenerant-Catalunya | Program Node | Downstream of hub | Bioregional funding program; ReFi BCN |
+| Local-ReFi-Toolkit | Resource Node | Downstream of hub | Playbooks, case studies, frameworks for local ReFi nodes |
+| ReFi-BCN-Website | Website Node | Quartz site | ReFi Barcelona public presence |
+| ReFi-DAO-Website | Website Node | Quartz site | ReFi DAO public presence |
+| ReFi-Mediterranean | Website Node | Quartz site | ReFi Mediterranean network |
+| ReFi-Barcelona | Website | Quartz site | ReFi Barcelona knowledge base |
 
 ---
 
@@ -76,10 +76,10 @@ This document is machine-readable for agents navigating the ecosystem. See [ECOS
 
 | Repo | Type | Relationship | Description |
 |------|------|--------------|-------------|
-| [regen-toolkit](../../regen-toolkit/) | Content | Educational | Interconnected ReFi knowledge |
-| [regen-toolkit-interface](../../regen-toolkit-interface/) | App | Depends on regen-toolkit | React interface for regen toolkit |
-| [becoming-constellations](../../becoming-constellations/) | Knowledge Garden | Quartz | Philosophical knowledge garden |
-| [refi-vision-forum-posts](../../refi-vision-forum-posts/) | Content | Comms | Strategic vision posts for ReFi DAO, Regen Coordination |
+| regen-toolkit | Content | Educational | Interconnected ReFi knowledge |
+| regen-toolkit-interface | App | Depends on regen-toolkit | React interface for regen toolkit |
+| becoming-constellations | Knowledge Garden | Quartz | Philosophical knowledge garden |
+| refi-vision-forum-posts | Content | Comms | Strategic vision posts for ReFi DAO, Regen Coordination |
 
 ---
 

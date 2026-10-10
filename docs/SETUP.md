@@ -157,13 +157,13 @@ and `.claude/commands/` are read automatically.
 
 ## Next Steps
 
-- **Read Operator Guidebook**: [`OPERATOR-GUIDEBOOK.md`](OPERATOR-GUIDEBOOK.md)
+- **Read Operator Guidebook**: [`OPERATOR-GUIDEBOOK.md`](OPERATOR-GUIDE.md)
 - **Explore Packages**: [`PACKAGES.md`](PACKAGES.md)
-- **Understand EIP-4824**: [`EIP4824-GUIDE.md`](03%20Libraries/org-os/docs/EIP4824-GUIDE.md)
-- **See Framework**: [`../../organizational-os/packages/framework/`](../../organizational-os/packages/framework/)
+- **Understand EIP-4824**: [`EIP4824-GUIDE.md`](EIP4824-GUIDE.md)
+- **See Framework**: `../../organizational-os/packages/framework/`
 
 ## Getting Help
 
 - Check [GitHub Issues](https://github.com/organizational-os/organizational-os-template/issues)
 - Ask in [Discussions](https://github.com/organizational-os/organizational-os-template/discussions)
-- Review [Framework Documentation](../../organizational-os/packages/framework/docs/)
+- Review Framework Documentation

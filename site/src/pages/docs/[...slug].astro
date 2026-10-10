@@ -1,25 +1,29 @@
 ---
 import { getCollection, render } from "astro:content";
 import Layout from "../../components/Layout.astro";
-import { DOCS_ALLOWLIST, docByFile } from "../../data/docs-allowlist";
+import { PAGES, pageBySource, sectionById } from "../../data/docs-manifest.mjs";
 
 export async function getStaticPaths() {
   const all = await getCollection("docs");
-  // Only emit routes for allowlisted files; map filename id → friendly slug.
-  return all
-    .filter((entry) => docByFile(entry.id))
-    .map((entry) => {
-      const meta = docByFile(entry.id)!;
-      return { params: { slug: meta.slug }, props: { entry, meta } };
-    });
+  // The manifest decides; the loader must agree with it exactly. A source that
+  // exists but did not load (wrong case, a pattern that matched nothing) would
+  // otherwise publish one page fewer without a word.
+  const loaded = new Set(all.map((entry) => entry.id));
+  const missing = PAGES.filter((p) => !loaded.has(p.source)).map((p) => p.source);
+  if (missing.length > 0) throw new Error(`docs: in the manifest but not loaded:\n  ${missing.join("\n  ")}`);
+  return all.map((entry) => {
+    const page = pageBySource(entry.id);
+    if (!page) throw new Error(`docs: loaded ${entry.id}, which is not in the manifest`);
+    return { params: { slug: page.slug }, props: { entry, page } };
+  });
 }
-const { entry, meta } = Astro.props;
+const { entry, page } = Astro.props;
 const { Content } = await render(entry);
 ---
-<Layout title={meta.title} current="docs">
+<Layout title={page.title} description={page.summary} current="docs">
   <div class="container prose">
-    <p class="eyebrow">{meta.group}</p>
-    <h1>{meta.title}</h1>
+    <p class="eyebrow">{sectionById(page.section).title}</p>
+    <h1>{page.title}</h1>
     <article class="doc"><Content /></article>
   </div>
 </Layout>

@@ -82,7 +82,7 @@ Checks:
 2. Call `updateDaoURI()` with your daoURI
 3. Register with DAOstar indexer
 
-See [`../packages/web3/on-chain-registration/`](../packages/web3/on-chain-registration/) for details.
+See `../packages/web3/on-chain-registration/` for details.
 
 ## Interoperability
 
@@ -102,6 +102,6 @@ Your schemas enable:
 
 ## Related Documentation
 
-- Framework: [`../../organizational-os-framework/docs/02-standards/eip-4824-integration.md`](../../organizational-os-framework/docs/02-standards/eip-4824-integration.md)
-- Schemas: [`../../organizational-os-framework/schemas/`](../../organizational-os-framework/schemas/)
+- Framework: `../../organizational-os-framework/docs/02-standards/eip-4824-integration.md`
+- Schemas: `../../organizational-os-framework/schemas/`
 - Standard: https://eips.ethereum.org/EIPS/eip-4824

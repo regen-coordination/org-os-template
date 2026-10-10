@@ -1,20 +1,19 @@
 ---
 import Layout from "../../components/Layout.astro";
 import { withBase } from "../../lib/base";
-import { DOCS_ALLOWLIST } from "../../data/docs-allowlist";
-const groups = [...new Set(DOCS_ALLOWLIST.map((d) => d.group))];
+import { SECTIONS, pagesBySection } from "../../data/docs-manifest.mjs";
+const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).filter((s) => s.pages.length > 0);
 ---
-<Layout title="Docs" current="docs" description="org-os documentation — architecture, federation, data model, operating.">
+<Layout title="Docs" current="docs" description="org-os documentation for operators of instances.">
   <div class="container prose">
     <p class="eyebrow">Documentation</p>
     <h1>Docs</h1>
-    <p>Curated from the org-os framework docs. The full set lives in the <a href="https://github.com/regen-coordination/org-os-template/tree/main/docs">repo</a>.</p>
-    {groups.map((g) => (
+    {sections.map((s) => (
       <section>
-        <h2>{g}</h2>
+        <h2>{s.title}</h2>
         <ul>
-          {DOCS_ALLOWLIST.filter((d) => d.group === g).map((d) => (
-            <li><a href={withBase(`/docs/${d.slug}`)}>{d.title}</a></li>
+          {s.pages.map((p) => (
+            <li><a href={withBase(`/docs/${p.slug}`)}>{p.title}</a> — {p.summary}</li>
           ))}
         </ul>
       </section>
