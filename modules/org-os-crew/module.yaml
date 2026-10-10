@@ -1,0 +1,24 @@
+# org-os-crew — role-based agents seated in herdr panes.
+#
+# An IN-PLACE module: everything it owns already sits at its canonical path.
+# The external dependency (the herdr CLI, verified at 0.9.1) is recorded in
+# docs/CREW.md, not here — the v5 schema models module-to-module deps only.
+id: org-os-crew
+version: 0.1.0
+type: operational
+description: >-
+  The crew — roles as files under roles/, agents seated in herdr panes by
+  `npm run crew`, each in its own git worktree, with an assignment trail and
+  written handoffs under memory/crew/. Attended operation only. No server and
+  no database.
+dependencies:
+  - org-os-standards
+files:
+  roles: roles
+  scripts/crew.mjs: scripts/crew.mjs
+  scripts/crew: scripts/crew
+  skills/crew: skills/crew
+checks:
+  - file-exists: roles/circles.yaml
+  - file-exists: scripts/crew.mjs
+  - file-exists: skills/crew/SKILL.md

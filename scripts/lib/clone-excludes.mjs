@@ -54,6 +54,7 @@ export const TOP_LEVEL_ALLOW = new Map([
   ["packages", "package sources, filtered to the enabled set in stage 5"],
   ["repos", "home for linked-repo clones (README only; clones are gitignored)"],
   ["repos.manifest.json", "schema for clone:repos (reset to an empty list at genesis)"],
+  ["roles", "the crew's seats: circles, role files and the shared charter (module org-os-crew)"],
   ["schemas", "JSON-LD / JSON schemas the validators read"],
   ["scripts", "the machinery every npm script runs"],
   ["skills", "skill definitions, filtered to the selected set in stage 5"],

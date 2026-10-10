@@ -27,6 +27,13 @@ skills:
     promotion_status: "evaluating"
     notes: "Queues capital movements. Not yet activated in production instances; framework provides, awaiting adoption signal."
 
+  - id: "crew"
+    owner: "framework"
+    instances_using: []
+    in_framework: true
+    promotion_status: "evaluating"
+    notes: "Seat, coordinate and release role-based agents in herdr panes. Module org-os-crew. Replaces the Paperclip-hosted team for the framework's own work."
+
   - id: "paper-design"
     owner: "framework"
     instances_using: []

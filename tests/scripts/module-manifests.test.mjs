@@ -56,3 +56,13 @@ test('every non-glob path a manifest claims actually exists', () => {
     }
   }
 });
+
+test('org-os-crew owns the roles, the command and the skill in place', () => {
+  const manifest = yaml.load(readFileSync(join(modulesDir, 'org-os-crew', 'module.yaml'), 'utf-8'));
+  assert.equal(manifest.type, 'operational');
+  assert.deepEqual(Object.keys(manifest.files).sort(), ['roles', 'scripts/crew', 'scripts/crew.mjs', 'skills/crew']);
+  for (const [src, target] of Object.entries(manifest.files)) {
+    assert.equal(src, target, `files["${src}"] must be an identity mapping for an in-place module`);
+    assert.ok(existsSync(join(rootDir, src)), `${src} does not exist`);
+  }
+});
