@@ -9,12 +9,14 @@ import { THEME_KEY } from "../lib/theme-boot.mjs";
 <script>
   const root = document.documentElement;
   const button = document.querySelector<HTMLButtonElement>(".theme-toggle");
-  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
   if (button) {
     const paint = () => {
       button.setAttribute("aria-pressed", String(root.dataset.theme === "dark"));
-      // Keep the browser chrome in step with the page background.
-      if (meta) meta.content = getComputedStyle(root).getPropertyValue("--color-bg").trim();
+      // Layout wrote one meta per colour scheme; when the viewer's saved choice
+      // differs from the system setting, make all of them say the shown theme's colour.
+      const bg = getComputedStyle(root).getPropertyValue("--color-bg").trim();
+      for (const meta of metas) meta.content = bg;
     };
     button.hidden = false;
     paint();
@@ -26,10 +28,10 @@ import { THEME_KEY } from "../lib/theme-boot.mjs";
   }
 </script>
 <style>
-.theme-toggle { display: inline-flex; align-items: center; padding: 0; background: none; border: 0; cursor: pointer; border-radius: var(--radius-pill); }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2rem; padding: 0; background: none; border: 0; cursor: pointer; border-radius: var(--radius-pill); }
 .track {
   position: relative; display: block; width: 2.7rem; height: 1.45rem;
-  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-pill);
+  border: var(--border-hair) solid var(--color-faint); border-radius: var(--radius-pill);
   background: var(--color-surface-2);
   transition: border-color var(--t-fast), box-shadow var(--t-med);
 }

@@ -32,7 +32,7 @@
   --gradient-iris: linear-gradient(90deg, rgba(255, 158, 102, 0.9), rgba(168, 142, 255, 0.9), rgba(110, 205, 150, 0.9));
 
   --color-glow: rgba(150, 120, 255, 0.38);      /* the light an element gives off when touched */
-  --color-sun:  #d98a2b;                     /* the theme switch's sun */
+  --color-sun:  #b0650c;                     /* the theme switch's sun — 3:1 on --color-surface-2 */
 
   /* Grain — dark specks, multiplied into the paper */
   --grain-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15  0 0 0 0 .1  0 0 0 0 .05  0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");

@@ -29,7 +29,7 @@ for (const file of ["systems.css", "systems-dark.css"]) {
   const t = tokens(file);
 
   test(`${file}: defines every token the checks read`, () => {
-    for (const name of [...SURFACES, ...TEXT, "faint", "accent-ink"]) assert.ok(t[name], `--color-${name} missing or not a 6-digit hex`);
+    for (const name of [...SURFACES, ...TEXT, "faint", "accent-ink", "sun"]) assert.ok(t[name], `--color-${name} missing or not a 6-digit hex`);
   });
 
   test(`${file}: text colours reach 4.5:1 on every surface`, () => {
@@ -49,6 +49,14 @@ for (const file of ["systems.css", "systems-dark.css"]) {
       const r = ratio(t.faint, t[bg]);
       assert.ok(r >= 3, `--color-faint on --color-${bg} is ${r.toFixed(2)}:1`);
     }
+  });
+
+  test(`${file}: the theme switch's knob reaches 3:1 on its track, and the track's edge on the page (non-text contrast)`, () => {
+    const knob = file === "systems.css" ? t.sun : t.ink;   // dark theme draws the crescent in --color-ink
+    const rk = ratio(knob, t["surface-2"]);
+    assert.ok(rk >= 3, `knob on --color-surface-2 is ${rk.toFixed(2)}:1`);
+    const re = ratio(t.faint, t.bg);
+    assert.ok(re >= 3, `--color-faint (the track's edge) on --color-bg is ${re.toFixed(2)}:1`);
   });
 }
 
