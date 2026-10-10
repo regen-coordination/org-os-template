@@ -1,268 +1,75 @@
-# OPAL Integration
+# OPAL
 
-**Package:** `packages/opal-bridge/`  
-**Source:** [github.com/omniharmonic/opal](https://github.com/omniharmonic/opal) by **omniharmonic**  
-**Status:** ✅ **Complete & Ready**  
-**Type:** AI-powered Knowledge Garden
+**Status in short: do not rely on this yet.** The bridge's core is a stub, its command line writes nothing, and no instance uses it. Records elsewhere in the repository call it "production-ready"; the code does not support that.
 
----
+OPAL is an external project: a "knowledge garden" for Claude Code that extracts entities (people, organizations, patterns, concepts) from documents into a staging area that a person reviews before anything is kept. It is created by omniharmonic (per the bridge's own setup docs) and lives outside this repository. What org-os holds is a TypeScript bridge to it, in `integrations/opal/`.
 
-## What is OPAL?
+**Status:** planned for rollout. `data/packages-matrix.yaml` lists `opal-bridge` as `canonical` / `planned` (note: "Rollout planned (opal-rollout workstream)."), and `federation.yaml` calls it "production-ready; rollout pending". Read the second phrase with care: the bridge's core is a skeleton (see below), and no instance uses it.
 
-**OPAL** (Open Protocol Agent Librarian) is an **AI-powered knowledge garden** for Claude Code, created by [**omniharmonic**](https://github.com/omniharmonic):
+## Where the code is
 
-> *Extracts entities (people, orgs, patterns, concepts) from documents*
-> *Human-in-the-loop review before adding to knowledge base*
-> *23 slash commands for knowledge management*
-> *Local-first with Git-based persistence*
-> *Multi-template support (regen template for ecological knowledge)*
+| Path | What is there |
+|---|---|
+| `integrations/opal/` | The bridge: `package.json` (`@org-os/opal-bridge`, binary `opal-bridge`), `src/`, `tests/`, `docs/` (architecture, API reference, setup guide, workflows, FAQ), `examples/`, `scripts/`. This is the real location. |
+| `packages/opal-bridge/` | Only a deploy script (`scripts/deploy-to-node.sh`, which differs from the copy in `integrations/opal/scripts/`) and a CI workflow file. It has no source, no `package.json`. Earlier docs pointed here for the bridge; that was wrong. |
+| `packages/koi-opal-bridge/` | A separate, unfinished package joining OPAL and KOI. See [KOI](koi.md). |
 
-**Architecture Overview:**
+There is no module manifest under `modules/`, no skill under `skills/`, and no root npm script for OPAL.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  OPAL KNOWLEDGE FLOW                                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Content (meeting/docs)                                       │
-│       ↓                                                      │
-│  ┌──────────────┐                                           │
-│  │  /process    │  ← AI extracts entities                    │
-│  └──────┬───────┘                                           │
-│         ↓                                                    │
-│  ┌──────────────┐                                           │
-│  │  _staging/   │  ← Human review queue                      │
-│  │              │     (approve / reject / edit)               │
-│  └──────┬───────┘                                           │
-│         ↓                                                    │
-│  ┌──────────────┐                                           │
-│  │  knowledge/  │  ← Approved entities stored               │
-│  │              │     (people, orgs, patterns)               │
-│  └──────────────┘                                           │
-│                                                              │
-│  ┌────────────────────────────────────────┐                  │
-│  │ 23 Commands: /reflect, /handoff,    │                  │
-│  │ /quest, /ask, /activity, /save, ...   │                  │
-│  └────────────────────────────────────────┘                  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+## What must be installed outside the repository
 
----
-
-## Quick Start
-
-```
-org-os instance
-    └── packages/opal-bridge/
-        ├── src/
-        │   ├── cli.ts            # CLI: setup, process, review, ask, status
-        │   ├── index.ts          # Main OpalBridge class
-        │   └── integration/      # Org OS integration layers
-        │       ├── entity-mapper.ts      # OPAL ↔ org-os mapping
-        │       ├── git-sync.ts           # Branch management, PRs
-        │       ├── meeting-pipeline.ts   # Meeting processing
-        │       ├── schema-bridge.ts      # Template bridging
-        │       └── config-loader.ts      # Config merging
-        ├── tests/                # Full test suite
-        ├── docs/                 # Setup guide, workflows, API reference
-        └── examples/             # Usage examples
-```
-
----
-
-## Quick Start
-
-```bash
-# 1. Install dependencies
-cd packages/opal-bridge
-npm install
-npm run build
-
-# 2. Setup in an org-os instance
-npx opal-bridge setup --opal-path ../../opal --profile regen
-
-# 3. Process a meeting
-npx opal-bridge process content/meetings/2026-03-21.md
-
-# 4. Review extracted entities
-npx opal-bridge review --interactive
-
-# 5. Search knowledge base
-npx opal-bridge ask "What funding models do we use?"
-```
-
-**Knowledge Flow Diagram:**
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  OPAL → ORG-OS KNOWLEDGE PIPELINE                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  INPUT SOURCES                    PROCESSING                     │
-│  ┌──────────────┐                ┌──────────────┐               │
-│  │ content/     │ ──extract────► │   OPAL       │               │
-│  │ meetings/    │   (AI)         │  /process    │               │
-│  │     *.md     │                └──────┬───────┘               │
-│  └──────────────┘                       │                         │
-│                                         ↓                        │
-│  ┌──────────────┐                ┌──────────────┐               │
-│  │ data/*.yaml  │ ◄──────────── │   _staging/  │               │
-│  │ (structured) │   map to org   │  (entities)  │               │
-│  └──────────────┘                └──────┬───────┘               │
-│                                         │                         │
-│                                         ↓ HUMAN REVIEW            │
-│  OUTPUT                                ┌──────────────┐          │
-│  ┌──────────────┐ ◄───────────────── │  /review     │          │
-│  │ knowledge/   │    approve/edit    │  (manual)    │          │
-│  │ entities/    │ ◄──────────────────└──────────────┘          │
-│  │   people/    │                                               │
-│  │   orgs/      │                                               │
-│  │   concepts/  │                                               │
-│  └──────────────┘                                               │
-│                                                                  │
-│  GIT PERSISTENCE                                                 │
-│  ┌──────────────┐                                                │
-│  │ git commit   │  ← All changes versioned                       │
-│  │ "egregore:  │                                                │
-│  │  entities"  │                                                │
-│  └──────────────┘                                                │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Key Commands
-
-| Command | Purpose | Usage |
-|---------|---------|-------|
-| `/setup` | Initialize OPAL in instance | `npx opal-bridge setup` |
-| `/process` | Extract entities from content | `npx opal-bridge process <file>` |
-| `/review` | Human review of staging | `npx opal-bridge review` |
-| `/ask` | Search knowledge base | `npx opal-bridge ask <query>` |
-| `/status` | Show bridge health | `npx opal-bridge status` |
-
----
-
-## Configuration (federation.yaml)
+- **OPAL itself**, cloned somewhere the bridge can reach. The bridge checks that the OPAL directory exists and contains a `CLAUDE.md`, and fails with "OPAL not found" or "not properly initialized" otherwise. OPAL's own commands (`/process`, `/review`, `/ask`, `/quest`, `/handoff`) are its, not org-os's.
+- Node 18 or later, and `npm install` inside `integrations/opal/` followed by `npm run build` (not run here; the root install does not cover it).
+- A config file whose top-level key is `opal-bridge`, with `opal_path` and `profile`. The CLI reads `federation.yaml` by default (`-c <path>` changes it). It reads that top-level `opal-bridge` key and nothing else, so write it there:
 
 ```yaml
-knowledge-commons:
-  enabled: true
-  opal-bridge:
-    enabled: true
-    opal_path: "../../opal"        # Path to OPAL installation
-    profile: "regen"                # Template: regen, opl, default
-    auto_process: true              # Auto-extract on new content
-    review_required: true           # Human approval required
-    
-    # Meeting pipeline settings
-    meeting_sources:
-      - meetily
-      - otter
-      - fathom
-      - read_ai
+opal-bridge:
+  opal_path: "../opal"   # relative to the instance root, where you run the CLI
+  profile: "regen"
 ```
 
----
+A separate, larger loader in `src/integration/config-loader.ts` merges org-os and OPAL configuration and can write `federation.yaml`; the CLI does not use it.
 
-## Integration Points
+## Commands
 
-### Input Sources
-- `content/meetings/*.md` — Meeting transcripts
-- `content/docs/*.md` — Documents
-- `data/*.yaml` — Structured data (auto-converted)
+After `npm run build` inside `integrations/opal/`, run the built file with node from the instance root, so the default `federation.yaml` and `opal_path` resolve against it: `node integrations/opal/dist/cli.js <command>`. Do not use `npx opal-bridge`: the root `package.json` has no workspace or dependency for it, so `npx` would look for a package of that name on the public registry. (`npm link` inside `integrations/opal/` also installs the `opal-bridge` binary.)
 
-### Output Destinations
-- `knowledge/entities/` — Approved entities
-- `data/members.yaml` — People & organizations
-- `data/projects.yaml` — Projects & patterns
-- `knowledge/patterns/` — Recognized patterns
+| Command | What it does today |
+|---|---|
+| `status` | Prints a green "connected" with profile and pending count. This is not a real check: the underlying call is a stub that never fails, so it reports connected with nothing contacted. Only starting the bridge checks that the OPAL directory and its `CLAUDE.md` exist. Version is empty and count is always zero. |
+| `process <file>` | Reads the file and extracts entities with three regular expressions (two capitalised words as a person, "X DAO/Network/Council/Coop" as an organization, "Word wordtion/ing/ment" as a pattern), then prints them with a confidence fixed per type (0.7 person, 0.8 organization, 0.6 pattern). It does not call OPAL and writes nothing. |
+| `review` | Lists pending entities by reading OPAL's `_staging/` folder, but the parser returns an empty list, so it always reports none. It is a listing, not an interactive review. |
+| `approve <id>`, `reject <id>` | Print a success message ("Approved: ...") that is not true: they do not move or delete anything. |
+| `ask <query>` | Calls the same stub, so it returns no results. |
+| `quest`, `quest-continue`, `handoff`, `activity` | Print success text (for example "Updated quest", "Handoff created") while writing no quest or handoff file. |
 
-### Review Workflow
-```
-Content → OPAL /process → _staging/ → Human /review → Approved → knowledge/
-```
+There is no `setup` command and no `--opal-path` or `--profile` option; earlier versions of this page described both.
 
----
+## The integration layer
 
-## Meeting Pipeline
+`src/integration/` is the larger part of the package, about 4,000 lines in five modules, exported from `src/integration/index.ts`:
 
-**Supported Sources:**
-- **Meetily** — AI meeting notes
-- **Otter.ai** — Transcription service
-- **Fathom** — Video meeting analysis
-- **Read.ai** — Meeting intelligence
-- **Manual** — Markdown transcripts
+| Module | Purpose, from the source |
+|---|---|
+| `entity-mapper.ts` | Maps OPAL entities to org-os records (members, projects, patterns, meetings, decisions) and writes pattern markdown and YAML data files. |
+| `meeting-pipeline.ts` | Processes transcripts; recognises `meetily`, `otter`, `fathom`, `read` and manual sources by file name; writes YAML. One part is a labelled placeholder (calendar lookup). |
+| `git-sync.ts` | Branch, commit and pull-request handling over `git` and the `gh` CLI. |
+| `schema-bridge.ts` | Writes schema and bridge files between OPAL templates and org-os data. |
+| `config-loader.ts` | The configuration merge described above. |
 
-**Extraction:**
-- Attendees → `data/members.yaml`
-- Decisions → `data/meetings.yaml` decisions
-- Action Items → `data/meetings.yaml` action_items
-- Topics → `knowledge/topics/`
-- Key Points → `knowledge/insights/`
+The command-line tool does not call this layer. Whether it works end to end was not verified: it is exercised only by the package's tests, which need OPAL-shaped fixtures.
 
----
+## Tests
 
-## Without KOI
+`tests/` has two files (`opal-adapter.test.ts`, `integration.test.ts`, about 1,040 lines) with fixtures in `tests/fixtures/`, run with `npm test` inside `integrations/opal/`. Both import `OpalBridge` from `src/index.ts`, so they test the stubbed core. They were not run for this page: jest is not installed in the repository root and installing it needs the network. Treat the "full coverage" claims in the package's own `TESTING_SUMMARY.md` as unverified.
 
-OPAL bridge works **standalone** — no network required:
-- Local knowledge extraction and review
-- Git-based persistence
-- Human-in-the-loop for all additions
-- Instance-specific knowledge gardens
+## What it writes and where
 
-For network sharing, add KOI bridge separately.
+Today the CLI writes nothing. Designed output, in the integration layer: entity files under the instance's `knowledge/`, and edits to `data/` registries such as `members.yaml`, `projects.yaml` and `meetings.yaml`, after a person approves. Run it in a scratch copy first.
 
----
+## Not built or not verified
 
-## For Developers
-
-### Adding New Entity Types
-
-Edit `src/integration/entity-mapper.ts`:
-
-```typescript
-const entityMappers = {
-  person: (opalEntity) => ({
-    id: generateId('person', opalEntity.name),
-    name: opalEntity.name,
-    role: opalEntity.properties?.role,
-    organization: opalEntity.properties?.organization
-  }),
-  // Add your type here
-};
-```
-
-### Custom Templates
-
-Create `templates/<name>/`:
-- `dimensions.json` — Knowledge dimensions
-- `examples/` — Training examples
-- Update `federation.yaml`: `profile: "<name>"`
-
----
-
-## File References
-
-- Implementation: `packages/opal-bridge/`
-- Tests: `packages/opal-bridge/tests/`
-- Docs: `packages/opal-bridge/docs/`
-- Examples: `packages/opal-bridge/examples/`
-- Source OPAL: `../../opal/` (git submodule or cloned)
-
----
-
-## Status
-
-- ✅ **Core implementation:** 4,053 lines TypeScript
-- ✅ **Integration layers:** 111KB (entity mapper, git sync, meeting pipeline)
-- ✅ **Testing:** 15 test files, full coverage
-- ✅ **Documentation:** Setup guide, workflows, API reference
-- ✅ **Deployment scripts:** Hub and node deployment ready
-- 🟡 **Deployment:** Ready for testing in refi-bcn-os
-
----
-
-*OPAL bridge complete — AI-powered knowledge extraction with human review*
+- A real connection to OPAL: extraction, staging and approval are simulated or logged only.
+- The CLI-to-integration-layer wiring, and any auto-processing of new content.
+- Sync to KOI: see [KOI](koi.md).
+- `packages/opal-bridge/` does not build: its CI file expects a package that is not there, and GitHub only reads workflow files at the repository root `.github/`, so that file never runs.
