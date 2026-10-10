@@ -1,507 +1,76 @@
-# Organizational OS Package Registry
-
-> **Deprecated.** The conceptual package registry below is superseded by
-> [`docs/MODULES.md`](MODULES.md) — the v0.5 module catalog — and by the module system design in
-> [`2026-08-02-org-os-v5-modularization-design.md`](superpowers/specs/2026-08-02-org-os-v5-modularization-design.md).
-> Kept for reference until the v5 tranche has manifests. For the *lifecycle* of npm packages
-> (which is a different thing from modules), see [`PACKAGE-LIFECYCLE.md`](PACKAGE-LIFECYCLE.md).
-
-**Version:** 1.0.0  
-**Date:** 2026-03-21  
-**Applies to:** org-os v3.1+
-
----
-
-## Available Packages
-
-| Package | Status | Purpose | AI-Enhanced | Complexity |
-|---------|--------|---------|-------------|------------|
-| **knowledge_base** | ✅ Enabled by default | Core documentation and memory | Optional | Low |
-| **meetings** | 🆓 Optional | Meeting management, action items | Recommended | Low |
-| **projects** | 🆓 Optional | Project tracking with IDEA framework | Recommended | Medium |
-| **finances** | 🆓 Optional | Budget and expense tracking | Optional | Medium |
-| **coordination** | 🆓 Optional | Multi-org coordination tools | Recommended | Medium |
-| **webapps** | 🆓 Optional | Interactive operational tools | Optional | High |
-| **web3** | 🆓 Optional | Blockchain features (Safe, Hats, etc.) | Optional | High |
-| **egregore** | 🆓 Optional | AI memory layer for team coordination | ✅ Required | Medium |
-
-Legend: ✅ = required for function, 🆓 = optional, ❌ = not available
-
----
-
-## Package Details
-
-### knowledge_base
-
-**Status:** ✅ Enabled by default  
-**Type:** Core
-
-**What it provides:**
-- Base directory structure (`docs/`, `knowledge/`, `memory/`)
-- Template files (SOUL.md, IDENTITY.md, AGENTS.md)
-- Schema infrastructure (EIP-4824)
-- Git-based versioning
-
-**Cannot be disabled** — This is the foundation of org-os.
-
-**Files:**
-- `SOUL.md` — Mission, values, voice
-- `IDENTITY.md` — Organization identity
-- `AGENTS.md` — Agent runtime contract
-- `MEMORY.md` — Long-term organizational memory
-- `HEARTBEAT.md` — Active tasks and health checks
-- `docs/` — Documentation directory
-- `knowledge/` — Knowledge base directory
-- `memory/` — Daily log directory
-- `.well-known/` — EIP-4824 schemas
-
----
-
-### meetings
-
-**Status:** 🆓 Optional  
-**Type:** Operational
-
-**What it provides:**
-- Meeting note templates
-- Action item tracking
-- Attendee management
-- Decision logging
-- `meetings.json` schema output
-
-**Enable with:**
-```bash
-npm run setup
-# → Select "meetings" from packages
-```
-
-Or manual:
-```yaml
-# federation.yaml
-packages:
-  meetings: true
-```
-
-**Files added:**
-- `packages/operations/meetings/` — Templates and workflows
-- `data/meetings.yaml` — Meeting registry
-- `.well-known/meetings.json` — Schema output
-
-**AI Enhancement:**
-- Agents can parse meeting notes
-- Auto-extract action items
-- Auto-generate `meetings.json`
-
----
-
-### projects
-
-**Status:** 🆓 Optional  
-**Type:** Operational
-
-**What it provides:**
-- Project tracking with IDEA framework
-- Status workflows (IDEA: Initiate → Develop → Execute → Assess)
-- Budget allocation
-- Team assignment
-- `projects.json` schema output
-
-**Enable with:**
-```bash
-npm run setup
-# → Select "projects" from packages
-```
-
-Or manual:
-```yaml
-# federation.yaml
-packages:
-  projects: true
-```
-
-**Files added:**
-- `packages/operations/projects/` — Templates
-- `data/projects.yaml` — Project registry
-- `.well-known/projects.json` — Schema output
-
-**AI Enhancement:**
-- Agents track project status
-- Auto-generate status reports
-- Cross-reference with meetings
-
----
-
-### finances
-
-**Status:** 🆓 Optional  
-**Type:** Operational
-
-**What it provides:**
-- Budget tracking
-- Expense logging
-- Treasury overview
-- Payout management
-- `finances.json` schema output
-
-**Enable with:**
-```bash
-npm run setup
-# → Select "finances" from packages
-```
-
-Or manual:
-```yaml
-# federation.yaml
-packages:
-  finances: true
-```
-
-**Files added:**
-- `packages/operations/finances/` — Templates
-- `data/finances.yaml` — Financial registry
-- `.well-known/finances.json` — Schema output
-
-**Security Note:**
-- Financial data is sensitive — consider repo privacy
-- On-chain treasuries tracked separately (see web3 package)
-
----
-
-### coordination
-
-**Status:** 🆓 Optional  
-**Type:** Network
-
-**What it provides:**
-- Multi-organization coordination
-- Federation tools
-- Cross-org task tracking
-- Council governance support
-- Network topology management
-
-**Enable with:**
-```bash
-npm run setup
-# → Select "coordination" from packages
-```
-
-Or manual:
-```yaml
-# federation.yaml
-packages:
-  coordination: true
-```
-
-**Files added:**
-- `packages/operations/coordination/` — Templates
-- Enhanced `federation.yaml` features
-- Network-specific schemas
-
-**Use Cases:**
-- Hub-and-spoke networks (e.g., Regen Coordination)
-- Consortium governance
-- Cross-DAO collaboration
-
----
-
-### webapps
-
-**Status:** 🆓 Optional  
-**Type:** Interface
-
-**What it provides:**
-- Interactive operational tools
-- Web-based dashboards
-- API endpoints for data
-- Real-time collaboration features
-
-**Enable with:**
-```bash
-npm run setup
-# → Select "webapps" from packages
-```
-
-Or manual:
-```yaml
-# federation.yaml
-packages:
-  webapps: true
-```
-
-**Files added:**
-- `packages/webapps/` — Web application code
-- Deployment configurations
-- API schemas
-
-**Technical:**
-- React/Vue-based interfaces (configurable)
-- Fastify/Express backends
-- WebSocket support for real-time
-
----
-
-### web3
-
-**Status:** 🆓 Optional  
-**Type:** Infrastructure
-
-**What it provides:**
-- Blockchain integration (Safe, Hats, Gardens, etc.)
-- On-chain identity (EIP-4824)
-- Treasury management
-- Smart contract interaction
-
-**Enable with:**
-```bash
-npm run setup
-# → Select "web3" from packages
-```
-
-Or manual:
-```yaml
-# federation.yaml
-packages:
-  web3: true
-```
-
-**Files added:**
-- `packages/web3/` — Web3 utilities
-- Contract ABIs and addresses
-- Transaction templates
-
-**Security Note:**
-- Private keys stored in `TOOLS.md` (gitignored)
-- Multi-sig preferred for treasuries
-- Test on testnets first
-
-**Chains Supported:**
-- Ethereum mainnet
-- Gnosis Chain
-- Celo
-- Polygon
-- Others via configuration
-
----
-
-### egregore
-
-**Status:** 🆓 Optional  
-**Type:** AI Memory Layer
-
-**What it provides:**
-- Shared AI memory across sessions and team members
-- Git-based knowledge persistence
-- `/reflect`, `/handoff`, `/quest` commands
-- Works with Claude Code (native) and OpenCode (via adapter)
-
-**Enable with:**
-```bash
-npm run setup
-# → Choose path: "Egregore-assisted" (auto-enables)
-# Or manually select "egregore" from packages
-```
-
-Or manual:
-```yaml
-# federation.yaml
-packages:
-  egregore: true
-
-# Add submodule
-git submodule add https://github.com/Curve-Labs/egregore-core.git packages/egregore-core
-```
-
-**Files added:**
-- `packages/egregore-core/` — Egregore submodule
-- `packages/egregore-core/opencode-adapter/` — OpenCode compatibility
-- `egregore-memory/` — Git repo for AI memory (gitignored)
-
-**Runtimes Supported:**
-| Runtime | Support | Command Style |
-|---------|---------|---------------|
-| Claude Code | ✅ Native | `/reflect`, `/handoff` |
-| OpenCode | ✅ Via adapter | `/ask "Reflect: ..."` |
-| Cursor | ⚠️ Partial | File-based only |
-| OpenClaw | ✅ Compatible | Git-based memory |
-
-**See Also:**
-- `docs/SETUP-PATHS.md` — Path selection guide
-- `packages/egregore-core/README.md` — Egregore details
-- `packages/egregore-core/opencode-adapter/README.md` — OpenCode setup
-
----
-
-## Package Combinations
-
-### Minimal Setup
-```yaml
-packages:
-  knowledge_base: true  # Always enabled
-  meetings: false
-  projects: false
-  finances: false
-  coordination: false
-  webapps: false
-  web3: false
-  egregore: false
-```
-**Use case:** Documentation-only, simple governance
-
-### Standard Operations
-```yaml
-packages:
-  knowledge_base: true
-  meetings: true
-  projects: true
-  finances: true
-  coordination: false
-  webapps: false
-  web3: false
-  egregore: false
-```
-**Use case:** Most organizations, human-operated
-
-### AI-Enhanced Team
-```yaml
-packages:
-  knowledge_base: true
-  meetings: true
-  projects: true
-  finances: true
-  coordination: true
-  webapps: false
-  web3: false
-  egregore: true
-```
-**Use case:** Teams using AI assistants, async-heavy
-
-### Full Stack (DAO)
-```yaml
-packages:
-  knowledge_base: true
-  meetings: true
-  projects: true
-  finances: true
-  coordination: true
-  webapps: true
-  web3: true
-  egregore: true
-```
-**Use case:** Full DAO infrastructure, high complexity
-
----
-
-## Adding Custom Packages
-
-### Package Structure
-
-To add a custom package:
-
-1. **Create package directory:**
-```bash
-mkdir packages/your-package
-```
-
-2. **Add package.yaml metadata:**
-```yaml
-# packages/your-package/package.yaml
-name: "your-package"
-version: "1.0.0"
-description: "What this package does"
-type: "custom"  # operational | interface | infrastructure | custom
-dependencies: []  # Other packages required
-ai_enhanced: false  # Does this require AI to function?
-
-files:
-  - path: "templates/"
-    description: "Templates directory"
-  - path: "README.md"
-    description: "Package documentation"
-
-installation:
-  script: "./install.sh"  # Optional install script
-  post_setup: "echo 'Package installed'"
-```
-
-3. **Enable in federation.yaml:**
-```yaml
-packages:
-  your-package: true
-```
-
-4. **Document in this file** (PR to org-os if widely useful)
-
----
-
-## Package Versioning
-
-### Versioning Scheme
-
-Packages follow semantic versioning:
-- **Major:** Breaking changes (e.g., schema format change)
-- **Minor:** New features, backward compatible
-- **Patch:** Bug fixes, documentation updates
-
-### Updating Packages
-
-```bash
-# Check for updates
-npm run check:updates
-
-# Update a specific package
-npm run update:package egregore
-
-# Update all packages
-npm run update:packages
-```
-
-### Pinning Versions
-
-To pin a package version:
-```yaml
-# federation.yaml
-packages:
-  egregore: "1.2.3"  # Pin to specific version
-```
-
----
+# Packages
+
+A package is a directory under `packages/` holding code, templates or an app that an instance can carry. The framework repository has 22 of them. They are vendored: an instance gets a copy of the ones it enables, and the copy is its own to run. This page lists what is there, what each is, and how an instance gets one. Statuses come from `data/packages-matrix.yaml`; how they change is in [Package lifecycle](PACKAGE-LIFECYCLE.md).
+
+Packages are not the same as modules. A module (`modules/<id>/module.yaml`) is a manifest that switches a capability on and may point at a package; see [Modules](MODULES.md). Five modules exist. `org-os-buzz`, `org-os-paper`, `org-os-cloudflare-os` and `org-os-instance-doctor` each point at the package of the matching name; `org-os-berd` points at none.
+
+An earlier version of this page described a package registry of eight conceptual packages (`knowledge_base`, `meetings`, `projects`, `finances`, `coordination`, `webapps`, `web3`, `egregore`) enabled through `npm run setup`, with a `package.yaml` per package, `npm run check:updates` and `npm run update:package`. `check:updates` and `update:package(s)` do not exist, there is no `package.yaml` anywhere under `packages/`, and `web3`, `finances` and `coordination` have no directory in this repository. That text was removed. One part of it is still live: `npm run setup` (`scripts/setup-org-os.mjs`) offers `meetings`, `projects`, `finances`, `coordination`, `webapps` and `web3` and writes them into `federation.yaml` under `packages:`. Those keys do not match directory names (only `webapps` does), so a map written by `setup` is rejected by `sync:packages`. The clone is the supported route.
+
+## How an instance gets a package
+
+- **At clone time.** `npm run clone:framework` copies the framework and deletes every `packages/<id>/` that the clone config does not set to `true`. This is the supported route for a new instance; the fork-and-`npm run setup` route does not work for a newcomer (see [Setup paths](SETUP-PATHS.md) and the clean-room finding in `README.md`).
+- **Later.** Set `<id>: true` under `packages:` in the instance's `federation.yaml`, then run `npm run sync:packages` (copies from the framework; `--dry` previews, `--prune` removes packages that are not enabled). The key must be a real directory name under the framework's `packages/`. The `packages:` map in this repository's `federation.yaml` has `knowledge_base: true` and `meetings`, `projects`, `finances`, `coordination`, `webapps`, `web3` and `egregore` set to `false`. `knowledge_base` is not a directory under `packages/`, so `npm run sync:packages` run against this file exits with `Package "knowledge_base" enabled but not in framework`; of the other keys only `webapps` matches a directory, and setting `meetings`, `projects`, `finances`, `coordination`, `web3` or `egregore` to `true` fails the same way (confirmed against a scratch directory with `--enabled`). For the meetings and projects templates the id would be `operations`.
+
+## The 22 packages
+
+Lifecycle and promotion are the matrix values; "no entry" means the directory is not in `data/packages-matrix.yaml`.
+
+### Knowledge system
+
+| Package | Lifecycle / promotion | What it is |
+|---|---|---|
+| `org-os-kms` | active / canonical | `@org-os/kms`: binds the toolkit framework into org-os as a module and a default profile. Lifecycle, registry bridge, CLI, rendering, federation, map builder. [README](../packages/org-os-kms/README.md). |
+| `toolkit-framework` | active / canonical | `@regen-commons/toolkit-framework`: the portable, org-os-agnostic knowledge-commons framework (semantic kernel, schemas, skills, adapters) that `org-os-kms` consumes. [README](../packages/toolkit-framework/README.md). |
+| `org-os-territory` | dormant / evaluating | `@org-os/territory`: a kms extension pack adding `territorial-unit` and `data-stream` object types. No instance has adopted it. [README](../packages/org-os-territory/README.md). |
+| `org-os-federation-map` | active / canonical | `@org-os/federation-map`: a `<federation-map>` web component that draws the map JSON produced by `org-os-kms` `render map`. [README](../packages/org-os-federation-map/README.md). |
+
+### Instance tooling
+
+| Package | Lifecycle / promotion | What it is |
+|---|---|---|
+| `instance-doctor` | active / canonical | `@org-os/instance-doctor`: assesses an instance and syncs it from the framework. Run as `npm run doctor`. [README](../packages/instance-doctor/README.md). |
+| `admin` | no entry | `@org-os/admin`: local-first admin app for editing the `data/*.yaml` registries; each change is a git commit. Run as `npm run admin`. Binds `127.0.0.1`, no authentication. [README](../packages/admin/README.md). |
+| `dashboard` | planned / candidate | Static HTML organisational-health dashboard built from `scripts/initialize.mjs` output (`npm run generate:dashboard`). The matrix lists it as instance-owned and not yet promoted, though the directory is here; its README still carries a template placeholder and names one organisation. [README](../packages/dashboard/README.md). |
+| `operations` | active / canonical | Templates and scripts for meetings (`operations/meetings`) and projects (`operations/projects`, an Integrate, Develop, Execute, Archive framework). No `package.json`. |
+| `webapps` | active / canonical | Holds one page, `task-manager/` (`index.html`, `script.js`, `style.css`, `SPEC.md`): a small task viewer. No `package.json`. |
+
+### Agents
+
+| Package | Lifecycle / promotion | What it is |
+|---|---|---|
+| `agents-app` | dormant / canonical | `@org-os/agents-app`: Paperclip-based dashboard for operating agents over an org-os filesystem. [README](../packages/agents-app/README.md). |
+| `paperclip-agents-app` | dormant / canonical | `@org-os/paperclip-agents-app`: Paperclip as the agents application across instances. The matrix records that one instance's fork is ahead of this copy and a backport review is pending. [README](../packages/paperclip-agents-app/README.md). |
+| `regen-agents` | active / canonical | `@org-os/regen-agents`: four specialist agents for regenerative coordination (agriculture, commons governance, impact measurement, bioregional intelligence). [README](../packages/regen-agents/README.md). |
+| `multica-bridge` | no entry | `@org-os/multica-bridge`: an operator persona for the multica agent platform (phase 1, present) and a yaml-to-multica sync (phase 2, planned, not built). [README](../packages/multica-bridge/README.md). |
+| `egregore-core` | dormant / canonical | No upstream code: a README and an OpenCode adapter script (`opencode-adapter/`) for the Egregore shared-memory tool from Curve Labs. The upstream tool is not vendored here. [README](../packages/egregore-core/README.md). |
+
+### Host and tool integrations
+
+| Package | Lifecycle / promotion | What it is |
+|---|---|---|
+| `hermes-integration` | active / evaluating | Skill and Python tool that expose `org_os_page` to Hermes sessions. [README](../packages/hermes-integration/README.md). |
+| `opencode-integration` | active / evaluating | opencode plugin registering the `org_os_page` and `org_os_tui` tools and five slash-command templates. [README](../packages/opencode-integration/README.md). |
+| `buzz-integration` | active / evaluating | Wrapper over the pinned `buzz` binary for a signed session-digest lane: `npm run buzz:post`, `buzz:read`, `buzz:doctor`. Verification record: [VERIFIED.md](../packages/buzz-integration/VERIFIED.md). No README, no `package.json`. |
+| `paper-integration` | active / evaluating | Client for Paper Desktop's local MCP server plus a brand-token planner: `npm run paper:doctor`, `paper:push-tokens`, `paper:lint-tokens`, `paper:call`. Verification record: [VERIFIED.md](../packages/paper-integration/VERIFIED.md). No README, no `package.json`. |
+| `cloudflare-os-integration` | no entry | `@org-os/cloudflare-os-integration`: the org-os side of the Cloudflare OS integration (gatekeeper core, storage drivers, page core, blueprints). Test: `npm run test:cloudflare-os-integration`. [README](../packages/cloudflare-os-integration/README.md). |
+
+### Knowledge-network bridges
+
+| Package | Lifecycle / promotion | What it is |
+|---|---|---|
+| `koi-bridge` | dormant / canonical | `@org-os/koi-bridge`: KOI-net bridge for distributed knowledge graphs. Its README describes it as a skeleton needing testing. [README](../packages/koi-bridge/README.md). |
+| `koi-opal-bridge` | dormant / canonical | `@org-os/koi-opal-bridge`: bridge between OPAL knowledge gardens and KOI. [README](../packages/koi-opal-bridge/README.md). |
+| `opal-bridge` | planned / canonical | Only `scripts/deploy-to-node.sh`; the matrix marks the rollout as planned. |
+
+The lifecycle states are `active`, `dormant`, `planned` and `retired`. "Active" in the matrix header means used by at least one instance; several packages are marked active with no instance listed, so read it as "used or in active framework use"; it does not mean production-hardened. Today every instance is run by the maintainer.
+
+## What a package contains
+
+There is no required layout. Of the 22 directories, 16 have both a `package.json` and a `README.md`, `egregore-core` has only a README, and five have neither: `buzz-integration`, `paper-integration`, `opal-bridge`, `operations` (its READMEs are one level down) and `webapps`. There is no `package.yaml` manifest: a package is switched on by its key under `packages:` in `federation.yaml`, and a capability that needs more than copying (for example buzz or paper) also has a module manifest under `modules/`.
+
+To add a package to the framework: create `packages/<id>/` with a README, add a row to `data/packages-matrix.yaml` (`owner`, `in_framework: true`, `promotion_status`, `lifecycle_status`), and run `npm run validate:structure`, which rejects an unknown `lifecycle_status`. Whether it reaches other instances is then up to each instance's `packages:` map.
 
 ## Troubleshooting
 
-### "Package not found after setup"
-- Check: `cat federation.yaml | grep <package>`
-- Check: Does the package directory exist? `ls packages/`
-- Fix: Re-run `npm run setup` and select the package
-
-### "Schema generation failing for package"
-- Check: Is the package properly installed?
-- Check: Run `npm run validate:schemas` for errors
-- Fix: Check package documentation for dependencies
-
-### "Want to disable a package"
-```yaml
-# Edit federation.yaml
-packages:
-  meetings: false  # Was: true
-```
-Or re-run `npm run setup`.
-
-### "Package dependencies missing"
-Some packages require others:
-- `web3` often needs `finances` for treasury tracking
-- `coordination` benefits from `meetings` for council calls
-
-Check package documentation for dependency notes.
-
----
-
-## References
-
-- **Setup Script:** `scripts/setup-org-os.mjs`
-- **Federation Spec:** `federation.yaml`
-- **Setup Paths:** `docs/SETUP-PATHS.md`
-- **Egregore Package:** `packages/egregore-core/README.md`
-
----
-
-*Choose your packages. Build your stack.*
+- **`Package "x" enabled but not in framework`**: `x` is not a directory name under `packages/`. Use one of the names above.
+- **A package is present locally but you do not want it**: set it to `false` or remove it from `packages:`, then `npm run sync:packages -- --prune`.

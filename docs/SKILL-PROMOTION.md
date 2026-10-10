@@ -1,6 +1,6 @@
-# Skill Promotion
+# Skill promotion
 
-How a skill graduates from instance-local to framework-canonical.
+How a skill graduates from instance-local to framework-canonical, and how the registry that records it is checked. The registry is `data/skills-matrix.yaml`, a framework-only file (a cloned instance does not get it). The same process for packages is in [Package lifecycle](PACKAGE-LIFECYCLE.md).
 
 ## Criteria
 
@@ -13,14 +13,30 @@ A skill becomes a **promotion candidate** when:
 
 Tracked in `data/skills-matrix.yaml` under `promotion_status: candidate`.
 
+## Statuses
+
+`promotion_status` is the only status field in the skills matrix. `scripts/validate-structure.mjs` (check 9, run by `npm run validate:structure`) fails an entry whose value is not one of these five:
+
+| Status | Meaning |
+|---|---|
+| `canonical` | Shipped in the framework and adopted by at least one instance. |
+| `evaluating` | Shipped in the framework, no instance adoption yet. |
+| `candidate` | Proposed for promotion into the framework. |
+| `instance-specific` | Kept local to one instance, not generalisable. |
+| `deprecated` | Superseded; kept for compatibility. |
+
+Each entry also carries `owner`, `instances_using`, `in_framework` and `notes`. Only the status is validated. `npm run generate:skills` additionally reports a skill that is on disk but has no matrix row (today `knowledge-graph`) and a matrix row marked `in_framework` with no directory (today `commands`), and gives an unmapped workspace skill the status `evaluating` in `SKILLS.md`.
+
+Current counts (`data/skills-matrix.yaml`, 42 entries): 32 canonical, 4 evaluating (`capital-flow`, `paper-design`, `skills-curator`, `instance-doctor`), 5 candidate, 1 instance-specific (`notion-sync`). None is deprecated. The matrix header defines `candidate` as "present in at least two instances"; the five current candidates are each used by one instance (see below), so the field is applied as "proposed", not as that rule.
+
 ## Workflow
 
-1. **Detect** — `npm run analyze:instances` flags skills present in ≥ 2 instances but not in framework. Also flags skills present in any instance but not in `skills-matrix.yaml` (`unmapped_skill`).
+1. **Detect** — `npm run analyze:instances` scans each instance's `skills/` and, for every skill the framework does not have, reports `undeclared_skill` (not listed in the instance's `skills_extra`) and `unmapped_skill` (no row in `skills-matrix.yaml`). It does not count instances, so spotting a skill present in two is read off its report. It reads sibling instance checkouts, so it needs them on disk.
 2. **Triage** — maintainer reviews candidates in `data/skills-matrix.yaml`. For each, decide: promote, keep instance-specific, or deprecate.
 3. **Reconcile** — if two instances have divergent implementations, extract the common core. Leave instance-specific extensions in the instances.
 4. **Move** — copy the SKILL.md and any supporting files into `skills/<name>/`. Update `skills-matrix.yaml` to set `in_framework: true`, `promotion_status: canonical`, `owner: framework`.
-5. **Sync downstream** — instances adopt the framework version on their next sync. Their local copy can be removed.
-6. **Log** — add an entry to `MEMORY.md` → Key Decisions.
+5. **Sync downstream** — a new instance gets the skill at clone time (`npm run clone:framework`, per its `skills` list). An existing instance gets it through `npm run sync:upstream`, which is a git rebase and works only where the instance shares history with the framework. `npm run doctor -- sync` does not carry skills: its overlay covers `scripts/` and `templates/` only (`packages/instance-doctor/src/overlay.mjs`). Once the framework copy is in, the local copy can be removed.
+6. **Log** — record the decision in `MEMORY.md` under Key Decisions.
 
 ## Non-criteria
 
@@ -30,18 +46,19 @@ A skill is **not** a candidate just because:
 - The originating maintainer asks for it (patterns earn promotion through use, not advocacy).
 - It's popular in the broader ecosystem (if org-os instances don't use it, org-os doesn't need it).
 
-## Current Candidates (as of 2026-04-24)
+## Current candidates
 
-See `data/skills-matrix.yaml` for the authoritative list. Candidates at inauguration:
+`data/skills-matrix.yaml` is the authoritative list. The table was last compared with it on 2026-10-10:
 
-| Skill | Owner | Instances | Priority |
+| Skill | Owner | Instances | Note |
 |---|---|---|---|
-| `research` | refi-bcn-os | refi-bcn-os, refi-dao-os | High — meets ≥ 2 criterion |
-| `safe-treasury` | dao-os | dao-os | Medium — framework gap (treasury layer) |
-| `hats-governance` | dao-os | dao-os | Medium — framework gap |
-| `gardens-governance` | dao-os | dao-os | Medium — framework gap |
-| `karma-reputation` | dao-os | dao-os | Low — evaluate generality first |
-| `eip4824-identity` | dao-os | dao-os | Low — overlaps with framework's schema-generator, evaluate first |
+| `safe-treasury` | dao-os | dao-os | Framework has no treasury layer. |
+| `hats-governance` | dao-os | dao-os | Framework has no governance-protocol layer. |
+| `gardens-governance` | dao-os | dao-os | Same. |
+| `karma-reputation` | dao-os | dao-os | Evaluate generality first. |
+| `eip4824-identity` | dao-os | dao-os | Overlaps with the framework's `schema-generator`; evaluate first. |
+
+`research`, listed here in the first version as the high-priority candidate, has since been promoted: it is `canonical` and lives in `skills/research/`. `notion-sync` (owner `refi-bcn-os`) is `instance-specific`: its pattern is framework-worthy, the skill as written is bound to one workspace.
 
 ## Demotion
 
@@ -49,55 +66,21 @@ Skills can also move the other way: if a canonical skill stops being used or div
 
 ---
 
----
+## Framework feedback from instances
 
-## Instance feedback ledgers (added v0.5, WS-F4)
-
-Promotion has always assumed the signal flows one way: a skill proves itself in
-an instance, gets counted, and is promoted. But instances also produce *written
-feedback about the framework itself* — defects, gaps, and design objections found
-by running it for real. Until 2026-08-28 that channel was tracked nowhere upstream,
-so two ledgers accumulated for months without a single item reaching the framework's
-own queue.
-
-**Recognized ledgers:**
-
-| Ledger | Items | Notes |
-|---|---|---|
-| [`refi-bcn-os/docs/kms/FRAMEWORK-FEEDBACK.md`](../../refi-bcn-os/docs/kms/FRAMEWORK-FEEDBACK.md) | TF-1 … TF-6 | kms/toolkit feedback from production use |
-| [`refi-dao-os/docs/kms/FRAMEWORK-FEEDBACK.md`](../../refi-dao-os/docs/kms/FRAMEWORK-FEEDBACK.md) | ~18, A1 … F1 | includes two 🔴 data-loss items; F1 is a built-but-unsent dispatch package, re-targeted to `archive/feat-knowledge-commons` |
-
-**How a ledger item is handled.** Same shape as skill promotion — evidence first,
-then a verdict that is written down:
-
-1. **Registered** — the ledger is listed here. Being listed does not imply the
-   framework agrees with any item in it.
-2. **Triaged** — each item gets one of: *accepted* (enters `docs/agent-plans/QUEUE.md`
-   or `HEARTBEAT.md`), *instance-specific* (stays local, recorded as such), or
-   *declined* (with the reason, in the ledger, so it is not re-litigated).
-3. **Severity overrides the freeze.** A data-loss item is not subject to the
-   portfolio freeze table. The two 🔴 kms items are the live example: they ship as
-   documented Known Issues in `CHANGELOG.md [0.5.0]`, their fix targets **v0.5.1**,
-   and they **gate v0.6 Active-1** — the fleet is not synced onto a knowledge store
-   that can lose data. That is the WS-F4 decision, recorded in `DECISIONS.md`.
-
-**Status.** Registered 2026-08-28. Full triage of both ledgers is v0.6 work; only
-the severity carve-out above was actioned for v0.5.
-
-**Why this belongs in the promotion doc.** Promotion and feedback are the same
-loop read in opposite directions: one carries proven practice up from instances,
-the other carries proven problems. A framework that instruments only the first
-direction learns what works and never learns what does not.
+Instances also produce written feedback about the framework itself. Only one decision about it is recorded in this repository: the two data-loss defects in the kms layer, found in an instance, ship as documented Known Issues in `CHANGELOG.md` `[0.5.0]`, their fix targets 0.5.1, and they gate propagating the framework to the fleet (decision F4 in `DECISIONS.md`). The instance-side feedback ledgers themselves live in the instance repositories and are not described here.
 
 ---
 
-## Script-Level Reconciliation (added v3.5.0)
+## Script-level reconciliation
 
-The same promotion mechanism extends to **scripts**. The framework's `scripts/` directory grows by absorbing knowledge-pipeline and validation scripts proven across ≥2 instances.
+The same idea extends to **scripts**: the framework's `scripts/` directory absorbs knowledge-pipeline and validation scripts proven across two or more instances.
 
 Use `npm run check:divergence` to compare every instance's `scripts/<name>` against the framework canonical. The script never modifies files — it's purely advisory. Output classifies each instance script as `IDENTICAL`, `DIVERGES`, or `MISSING`.
 
-### Known divergences (as of v3.5.0 release)
+### Known divergences (recorded at the v3.5.0 release, not re-checked)
+
+The table below is a historical record. Re-deriving it needs the instance repositories checked out beside this one, which was not done for this page, so none of the hashes or instance states are verified; rerun `npm run check:divergence` for the current picture.
 
 | Script | Instance | Status | Notes |
 |---|---|---|---|
@@ -118,4 +101,4 @@ Use `npm run check:divergence` to compare every instance's `scripts/<name>` agai
 
 ### Normalizing per-instance configuration
 
-When a promoted script needs per-instance configuration (paths, terminology dictionaries, alias maps), externalize the configuration to a `data/*.yaml` file rather than editing the script. Example: `data/knowledge-aliases.yaml` consumed by `scripts/normalize-kb-frontmatter.mjs`. This keeps the framework version generic and lets instances configure without forking.
+When a promoted script needs per-instance configuration (paths, terminology dictionaries, alias maps), externalize the configuration to a `data/*.yaml` file rather than editing the script. Example: `scripts/normalize-kb-frontmatter.mjs` takes an aliases file (`--aliases <path>`, conventionally `data/knowledge-aliases.yaml`, which an instance supplies; the framework does not ship one). This keeps the framework version generic and lets instances configure without forking.
