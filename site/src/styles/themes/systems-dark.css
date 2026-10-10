@@ -1,6 +1,7 @@
 /* themes/systems-dark.css — dark variant. Mirrors the systems.css variable contract
- * one-for-one so the theme is a drop-in one-line swap (theme.css). */
-:root {
+ * one-for-one (site/test/theme-contrast.test.mjs checks that). Active when
+ * <html data-theme="dark">. */
+:root[data-theme="dark"] {
   --color-bg:        #0c0f13;
   --color-bg-2:      #11151b;
   --color-surface:   #12171e;

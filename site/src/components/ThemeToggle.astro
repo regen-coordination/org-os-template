@@ -1,0 +1,34 @@
+---
+// A button that switches between the two themes and remembers the choice.
+// Hidden until script runs: without script it could do nothing.
+import { THEME_KEY } from "../lib/theme-boot.mjs";
+---
+<button type="button" class="theme-toggle mono" aria-pressed="false" data-key={THEME_KEY} hidden>Dark</button>
+<script>
+  const root = document.documentElement;
+  const button = document.querySelector<HTMLButtonElement>(".theme-toggle");
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (button) {
+    const paint = () => {
+      button.setAttribute("aria-pressed", String(root.dataset.theme === "dark"));
+      // Keep the browser chrome in step with the page background.
+      if (meta) meta.content = getComputedStyle(root).getPropertyValue("--color-bg").trim();
+    };
+    button.hidden = false;
+    paint();
+    button.addEventListener("click", () => {
+      root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+      try { localStorage.setItem(button.dataset.key!, root.dataset.theme); } catch { /* storage blocked: the choice lasts for this page */ }
+      paint();
+    });
+  }
+</script>
+<style>
+.theme-toggle {
+  font-size: var(--text-sm); color: var(--color-muted); background: none; cursor: pointer;
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-sm);
+  padding: 0.2rem 0.55rem; transition: color var(--t-fast), border-color var(--t-fast);
+}
+.theme-toggle:hover { color: var(--color-ink); border-color: var(--color-ink-2); }
+.theme-toggle[aria-pressed="true"] { color: var(--color-accent); border-color: var(--color-accent); }
+</style>

@@ -11,7 +11,7 @@
   --color-ink:    #14171a;      /* headings, near-black */
   --color-ink-2:  #353a40;      /* body text */
   --color-muted:  #5b616a;      /* secondary */
-  --color-faint:  #969aa0;      /* captions, labels, leader lines */
+  --color-faint:  #7e8288;      /* captions, labels, leader lines — non-text; 3:1 */
 
   /* Lines */
   --color-line:   #e2dfd2;      /* hairline borders */
@@ -19,10 +19,10 @@
   --color-grid:   #e8e5d8;      /* atmospheric blueprint grid */
 
   /* Accent — regen green (swappable, spec §16) */
-  --color-accent:      #1c7d3b;
+  --color-accent:      #1a7738;
   --color-accent-soft: #2da856;
   --color-accent-ink:  #f8f6ef;
-  --color-accent-wash: rgba(28, 125, 59, 0.08);
+  --color-accent-wash: rgba(26, 119, 56, 0.08);
 
   /* Type */
   --font-display: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;

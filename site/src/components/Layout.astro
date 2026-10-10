@@ -5,6 +5,7 @@ import "../styles/tokens.css";
 import "../styles/theme.css";
 import "../styles/global.css";
 import { withBase } from "../lib/base";
+import { THEME_BOOT } from "../lib/theme-boot.mjs";
 import Nav from "./Nav.astro";
 import Footer from "./Footer.astro";
 
@@ -23,6 +24,7 @@ const {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content={description} />
   <meta name="theme-color" content="#f6f4ed" />
+  <script is:inline set:html={THEME_BOOT}></script>
   {noindex && <meta name="robots" content="noindex" />}
   <title>{title} · org-os</title>
   <link rel="icon" type="image/svg+xml" href={withBase("/favicon.svg")} />
