@@ -1,6 +1,8 @@
-# Connectors, ingest and the publication plane (operator guide)
+# Connectors, ingest and publishing
 
-How an org-os-kms instance pulls knowledge from other sources (`ingest`) and publishes its own (`publish`). Every statement here was checked against the source in `packages/org-os-kms/src/` and `packages/toolkit-framework/src/`; where something is a convention rather than code, it says so.
+How an org-os-kms instance pulls knowledge from other sources (`ingest`) and publishes its own (`publish`). Statements here were checked against the source in `packages/org-os-kms/src/` and `packages/toolkit-framework/src/` and the package tests, and the commands were run against a scratch instance; where something is a convention rather than code, it says so. For what the instance is and its other commands, see [KMS](../../../docs/KMS.md); for the canon, the public plane and the publication gate, [KMS-PLANES](../../../docs/KMS-PLANES.md).
+
+Run the CLI as `node packages/org-os-kms/src/cli.mjs <verb> …` (the commands below are written with the shorter `org-os-kms`, the name of the package's `bin`). It has no `--help`; an unknown verb prints `{"error": …}` and exits 1.
 
 ## 1. Verbs
 
@@ -18,13 +20,13 @@ org-os-kms publish [--apply] [--dry]            [--dir <instance>]
 
 The `ingest` report, per connector: `name`, `status`, `dry`, `pulled`, `candidates`, `stored`, `updated`, `unchanged`, `collisions`, `collided`, `invalid`, `retractions`, `errors`. Top level: `connectors`, `failed`, and, only when set, `warning` (unknown `--connector` name), or `error` (unusable `--connector` value, or an unreadable `data/kms-cursors.json`; nothing runs in either case).
 
-**Exit codes.** `publish` and `ingest` exit 1 when the report is `ok: false`: operator errors, a failed publish (failed login/apply, failed static surface, partial PDS failures) and the refused mass delete (section 2). Every other verb keeps its previous behaviour (exit 1 only for `{ error }` results such as an unknown verb or subcommand; e.g. `render` returns fail-soft `ok: false` deliberately and still exits 0). `ingest`'s per-connector failures are the exception described above: `ok: true`, exit 0, read `failed`/`errors`.
+**Exit codes.** `publish`, `ingest` and `validate` exit 1 when the result is `ok: false`: operator errors, a failed publish (failed login/apply, failed static surface, partial PDS failures) and the refused mass delete (section 2). Every other verb keeps fail-soft behaviour (exit 1 only for `{ error }` results such as an unknown verb or subcommand; e.g. `render` returns fail-soft `ok: false` deliberately and still exits 0). `ingest`'s per-connector failures are the exception described above: `ok: true`, exit 0, read `failed`/`errors`.
 
 ## 2. What `close` does (and does not) do
 
-`lifecycle close` (`bind.mjs`) ends with `publish` then `sync.push`. `publish` runs in **plan mode** unless `kms.yaml` has `publish.apply: true`: it makes no PDS writes and writes no manifest. Plan mode is **not read-only**. When not `--dry` it still:
+`lifecycle close` (declared in `bind.mjs`) ends with `publish` then `sync.push`; run from the CLI it currently stops at its `bridge` step, which reads a config that only `lifecycle initialize` loads (`errors: ["bridge: Cannot read properties of undefined (reading 'adapter')"]`), so run the verbs one at a time. The rest of this section describes what the `publish` verb does, which works on its own. `publish` runs in **plan mode** unless `kms.yaml` has `publish.apply: true`: it makes no PDS writes and writes no manifest. Plan mode is **not read-only**. When not `--dry` it still:
 
-- mints `id` (and `grc20Id`, see section 9) into the source yaml for objects that pass the gate, but **only when a publication target exists**: `atproto.did`, `atproto.pds` and `atproto.nsid_authority` are all set, or `publish.static` is not `false`. An instance with neither (for example `regen-toolkit`: pull-only, `publish.static: false`) gets no yaml rewritten; the report's `minted` count is then only a preview; and
+- mints `id` (and `grc20Id`, see section 9) into the source yaml for objects that pass the gate, but **only when a publication target exists**: `atproto.did`, `atproto.pds` and `atproto.nsid_authority` are all set, or `publish.static` is not `false`. An instance with neither (a pull-only instance with `publish.static: false`) gets no yaml rewritten; the report's `minted` count is then only a preview; and
 - regenerates the static surface (`<publish.static_dir>`, default `public/`) unless `publish.static: false`.
 
 `publish --dry` is the fully read-only mode: no ids minted, no static files written, no PDS calls, no manifest. Real PDS writes need `--apply` (or `publish.apply: true`), `atproto.did`, `atproto.pds`, `atproto.nsid_authority`, and `ATPROTO_APP_PASSWORD` in the environment; if any is missing the atproto part reports `not-configured` (or `planned` when only apply is missing). Publish is a write op inside `close`, so a failed static surface (for example a missing `publish.base_url`) or failed PDS writes stop the lifecycle before `sync.push`. A failed login or a network error during apply is reported as `atproto.status: 'failed'` with an `error` message (never the credential) and `ok: false`, not thrown; in that case no manifest is written (nothing trustworthy came back) while the static surface step still runs from the last persisted manifest.
@@ -41,11 +43,11 @@ The `ingest` report, per connector: `name`, `status`, `dry`, `pulled`, `candidat
 
 and `provenance.surfaced_by`. That list is the `PRIVATE_FIELDS` constant; read it there rather than trusting this copy if the framework version differs.
 
-Separately, the publication gate: only these types publish by default (`claim-evidence`, `concept-lineage`, `encyclopedia-entry`, `implementation-record`, `option-entry`, `organization`, `relationship-record`, `resource`, `signal`, `track`), `source-system` and `public-use-boundary` are opt-in via `publish.types_opt_in`, `person` is never publishable, and an object needs `public_use` of `ok-with-caveat`, `source-linked-unreviewed`, `reviewed-for-explanation` or `reviewed-for-guidance`, and its `maturity` must not be `held` (no other maturity is part of the floor). An optional instance gate (`publish.gate`) can only narrow this.
+This is the **framework floor**, and it is all that plain `publish` applies besides the optional instance gate: it does not look at `maturity` (beyond `held`) or at `source_lineage`, so a `draft` with a publishable `public_use` publishes. The stricter canon publication gate runs only in `export` and `validate` ([KMS-PLANES](../../../docs/KMS-PLANES.md)). The floor: only these types publish by default (`claim-evidence`, `concept-lineage`, `encyclopedia-entry`, `implementation-record`, `option-entry`, `organization`, `relationship-record`, `resource`, `signal`, `track`), `source-system` and `public-use-boundary` are opt-in via `publish.types_opt_in` (and `publish.types_opt_out` removes a type), `person` is never publishable, and an object needs `public_use` of `ok-with-caveat`, `source-linked-unreviewed`, `reviewed-for-explanation` or `reviewed-for-guidance`, and its `maturity` must not be `held` (no other maturity is part of the floor). An optional instance gate (`publish.gate`) can only narrow this.
 
 ## 4. `.well-known` allowlist
 
-Only two files are written under `<static_dir>/.well-known/` — three for an instance with extension packs (§13): `dao.json` (copied from the instance root `.well-known/` if present) and `knowledge.json` (generated: the root file if any is merged with `did`, `geo`, `exchange.published_domains`/`subscribed_domains` and source cards). `exchange.subscribed_domains` is **empty unless `publish.disclose_subscriptions: true`** in `kms.yaml`: listing the peer DIDs and `static-json` base URLs discloses who this instance reads, so it is opt-in. `meetings.json`, `members.json`, `activities.json` and any other root `.well-known` file are never copied. An instance whose `kms.yaml` declares `extensions` also gets `extensions.yaml`: its merged Layer-B entity set (type names, `maps_to_core` and each entity's `description` — no instance data), which is the file a peer hands to `federate check`. An instance without packs does not get it.
+Only these files are written under `<static_dir>/.well-known/`: `dao.json` (copied from the instance root `.well-known/` if present) and `knowledge.json` (generated: the root file if any is merged with `did`, `geo`, `exchange.published_domains`/`subscribed_domains` and source cards). `exchange.subscribed_domains` is **empty unless `publish.disclose_subscriptions: true`** in `kms.yaml`: listing the peer DIDs and `static-json` base URLs discloses who this instance reads, so it is opt-in. `meetings.json`, `members.json`, `activities.json` and any other root `.well-known` file are never copied. An instance whose `kms.yaml` declares `extensions` also gets `extensions.yaml` (§13): its merged Layer-B entity set (type names, `maps_to_core` and each entity's `description` — no instance data), which is the file a peer hands to `federate check`. An instance without packs does not get it. When standard.site is on (§14) and the publication exists, `site.standard.publication` is written there too.
 
 ## 5. Static surface facts
 
@@ -71,7 +73,7 @@ connectors:
 
 - A puller needs `atproto.pds` set in `kms.yaml` **even while `atproto.did` is null** (the did is only needed to publish, and to ignore your own records when pulling).
 - The connector uses **one PDS for all listed peers**. Resolving each peer's own PDS via DID documents, or reading from a relay, is **not implemented**; peers must be reachable on the configured PDS.
-- `atproto.did`, `atproto.nsid_authority` and `atproto.pds` are merged under each connector's own `config` (the connector's own keys win).
+- `atproto.did` (as `self`), `atproto.nsid_authority` and `atproto.pds` are merged under each connector's own `config` (the connector's own keys win).
 - Cursor: `{ <did>: { rev, seen } }`. A peer whose commit `rev` is unchanged is skipped. A peer's full record list is compared to `seen` to detect retractions. A per-peer failure goes into the connector's `errors` and the other peers continue.
 - Inbound records are treated as untrusted: they are passed through the same projection (private fields dropped), the peer's `id` is not kept, records claiming your own DID as origin are ignored, and a record that claims another listed peer as its origin is ignored.
 
@@ -83,18 +85,18 @@ connectors:
     cursor: null
 ```
 
-- Capability only: **no instance in this plan activates it.** The only mapper is `openhaven` (Open Haven `/api/protocols.json` becomes `resource`, `/api/affordances.json` becomes `signal`; domains are deliberately unmapped). Optional config: `index` (default `/api/index.json`) and `collections`.
+- The only mapper is `openhaven` (Open Haven `/api/protocols.json` becomes `resource`, `/api/affordances.json` becomes `signal`; domains are deliberately unmapped). Optional config: `index` (default `/api/index.json`) and `collections`.
 - Cursor: a sha256 over the index body plus every collection body, in fixed order. If it is unchanged nothing is pulled.
 - The mapper emits a stable https `sourceUri` per record, so re-pulled records **upsert** by `sourceUri` instead of colliding.
-- Because there is no per-record diff, `runConnector` flags **every** re-pulled record `review_needs: 'updated at origin'` even if its content is unchanged.
-- A locally `reviewed` object that has `ai_assisted: true` can never receive origin updates: the update is rejected by the AI-assisted is not human-reviewed invariant and reported under `invalid`.
+- When the hash changes the whole collection is re-pulled, but `runConnector` compares each record's content with what is stored and counts unchanged ones under `unchanged` without rewriting or re-flagging them (§10).
+- An origin update never overwrites a local `maturity`, `public_use`, `id` or `review_needs`. If the incoming `ai_assisted: true` would clash with a locally `reviewed` object (AI-assisted is not human-reviewed), the incoming `ai_assisted` is dropped and the local value kept; only if the merged object still violates an invariant is the update reported under `invalid`.
 
 ## 9. Ids
 
 - `id` (UUIDv4) is the AT Proto record key (`rkey`) and the key of the publish manifest (`data/kms-published.json`). It is minted at first non-dry publish, and **only for objects that passed every gate**, and only when a publication target exists (section 2); never on `--dry`. The instance-registry bridge (`bridge`) matches an existing `data/<registry>.yaml` row by the object's `id` **or** its title slug, so a row bridged before the id was minted migrates from slug to id in place instead of being duplicated. The `id` is a field on the object in the source yaml, so git holds it.
 - `grc20Id` is minted only when `kms.yaml.geo.space` is set.
 - The publish plan compares the content hash of the projected record with the hash stored in the manifest under that `id`: unchanged is skipped, changed is an update (with a compare-and-swap on the stored `cid`), and manifest ids no longer present are deleted from the PDS.
-- **Correction to an earlier plan note.** The plan says `sameStoredObject` (`toolkit-framework/src/util.mjs`) compares by id once an id exists. That function does **not exist** in this version of the framework (`packages/toolkit-framework/src/util.mjs` in org-os has no such export, and the storage adapters simply overwrite an entry with the same slug). The claim only holds for older vendored framework copies that ship a `sameStoredObject` in `util.mjs` (which compares by `id` when both objects have one, otherwise by content hash). Check the copy you vendor. Regardless of the framework version, the connector layer never overwrites a local object with a new candidate that has the same slug (section 10).
+- Storing an entry whose slug is already taken: the `repo-data` adapter treats it as the same object when both have an `id` and the ids are equal, or, lacking ids, when their content is identical (`sameStoredObject` in `toolkit-framework/src/util.mjs`); a different object with the same slug is stored under a hash-suffixed key and reported as a collision, unless `store.on_collision: merge` (read by the framework's own `store` command) is set. Separately, the connector layer never overwrites a local object with a new candidate that has the same slug (section 10).
 
 ## 10. Ingest semantics (`runConnector`, `toolkit-framework/src/connector.mjs`)
 
@@ -129,9 +131,11 @@ Ingested objects land `not-public-yet`, so they are outside the publication floo
 
 ## 12. This plan
 
-`regen-toolkit` publishes nothing here: it is pull-only (`publish.apply` off, `atproto.did` unset), so it uses `ingest` and does not run `publish --apply`.
+An instance that only pulls (`publish.apply` off, `atproto.did` unset, `publish.static: false`) uses `ingest` and never runs `publish --apply`. Nothing in the code requires an instance to do both.
 
 ## 13. Extension packs
+
+See also [KMS-EXTENSION-PACKS](../../../docs/KMS-EXTENSION-PACKS.md) and [TERRITORY-PACK](../../../docs/TERRITORY-PACK.md).
 
 A pack is a sibling package of `org-os-kms` that adds typed schemas, Layer-B entities, connectors and registry bindings **without editing the framework**. An instance opts in:
 
@@ -156,11 +160,13 @@ packages/<pack>/
 - **`types` are publish-eligible, not published.** They join the opt-in set, so an instance must still list them in `publish.types_opt_in`. Installing a pack never widens what an instance publishes. The projection (`publicView`) and the floor apply to pack types exactly as to core ones.
 - **Lexicons** for pack types are generated under the instance's own `nsid_authority` (`<authority>.territorialUnit`).
 - **The `atproto` connector lists pack collections** once a pack is loaded, so two instances with the same pack exchange its records through the usual untrusted path. A peer **without** the pack never requests those collections; downgrading an unknown type to its `maps_to_core` on ingest is not implemented.
-- **A pack cannot** change a core schema, `frontmatter`, the axes or the relationships; add a Layer-A type; supply invariants or gates; touch `PRIVATE_FIELDS`; or depend on another pack.
+- **What a pack can supply is only what the loader reads** (`src/extensions.mjs`): `pack.yaml`, `schemas/`, `extension-entities.yaml`, `profile/profile.yaml` `registry_bindings`, and `connectors/index.mjs`. There is no hook for invariants, gates or the private-field list, and a pack schema named like a core one is a load error.
 - Pack registration is per-process state. The CLI runs one instance per process; a host that walks several instances in one process should call `resetPacks()` **and `resetRegistryBindings()`** between them.
 - **A pack's `connectors/index.mjs` is executed.** `ingest` dynamically imports the entry module of every declared pack, whether or not a connector from it is configured. Everything else a pack ships (`pack.yaml`, `extension-entities.yaml`, `profile/profile.yaml`) is read as data. Vendor packs with the same care as `org-os-kms` itself.
 
 ## 14. standard.site documents (`atproto.standard_site`)
+
+See also [KMS-PUBLISHING](../../../docs/KMS-PUBLISHING.md).
 
 Opt-in. When enabled, every entry `publish` writes to the PDS is **also** written as a [standard.site](https://standard.site/) document, the shared long-form lexicon that Bluesky renders in timelines. Without the block (or with `enabled: false`) no code path runs and publish behaves exactly as before.
 
@@ -172,9 +178,9 @@ atproto:
   nsid_authority: xyz.example.kb
   standard_site:
     enabled: true
-    title: Brasil Regenerativo            # required: the publication's name
+    title: Example Commons               # required: the publication's name
     description: Comum de conhecimento…   # optional
-    url: https://brasilregenerativo.org   # site base URL; falls back to publish.base_url. Required one way or the other.
+    url: https://example.org             # site base URL; falls back to publish.base_url. Required one way or the other.
     language: pt-BR                       # optional BCP-47 default for documents. Never assumed: no language, no `langs`.
     language_field: idioma                # optional: an object field that carries a BCP-47 tag and wins over `language`
     paths:                                # URL pattern per schema; {slug} {id} {schema}; must start with "/"
@@ -244,15 +250,15 @@ A reader only trusts these records if the **website** points back at them ([stan
    ```
 
    The document AT-URI for an entry is `standardSite.documents[<object id>].atUri` in `data/kms-published.json`. **Nothing in this package edits the site's HTML**: the site generator has to read the manifest and emit the tags.
-3. The page URL must really be `url` + `path`: set `paths` to match the site's routes (the `bridge` writes encyclopedia entries to `kb/<slug>`).
+3. The page URL must really be `url` + `path`: set `paths` to match the site's routes (the `bridge` writes encyclopedia entries to `src/content/docs/kb/<slug>.md`).
 
 Not done here: a cover image (`coverImage`) or publication `icon` (blobs are not uploaded), a rich `content` rendering (Leaflet, pckt and Offprint each use their own block types; there is no shared one in the lexicon), and posting to Bluesky. A card appears in a timeline only when a post embeds the page URL with `associatedRefs` to the document and publication; this package creates no posts.
 
 ## Two planes: a private canon and a public plane (`export`, `validate`)
 
-An instance may keep everything it knows in a private **canon** and publish only what passes a
-gate into a separate **public plane** — another instance, in another repository. The canon names
-its public plane in its own `kms.yaml`:
+This section is a summary; [KMS-PLANES](../../../docs/KMS-PLANES.md) has the gate's refusal reasons, the field allowlist and the full sequence.
+
+An instance may keep everything it knows in a private **canon** and publish only what passes a gate into a separate **public plane**, another instance in another repository. The canon names its public plane in its own `kms.yaml`:
 
 ```yaml
 planes:
@@ -261,19 +267,10 @@ planes:
     dir: repos/my-commons-public     # optional; this is the default
 ```
 
-- `org-os-kms export [--dir <canon>]` — lints the canon's source cards and boundaries, runs every
-  object through the publication gate (`src/planes/publication-gate.mjs`) and the framework floor,
-  mints ids in the canon for what passes, and writes only allowlisted fields into
-  `<plane>/data/kb/`. It refuses to write into the canon, into a directory whose `kms.yaml` is not
-  the named instance, or through a symlink. A refused export leaves the canon byte-identical.
-- `org-os-kms validate [--dir <canon>]` — re-gates what is published against the live canon: an
-  entry with no canon counterpart, one that no longer passes, a divergence, or a leaked private
-  field is an error (exit 1).
+- `org-os-kms export [--dir <canon>]` lints the canon's source cards and boundaries, runs every object through the publication gate (`src/planes/publication-gate.mjs`) and the framework floor, mints ids in the canon for what passes, and writes only allowlisted fields into `<plane>/data/kb/`. It refuses to write into the canon, into a directory whose `kms.yaml` is not the named instance, or through a symlink or hard link. A refused export leaves the canon byte-identical.
+- `org-os-kms validate [--dir <canon>]` re-gates what is published against the live canon: an entry with no canon counterpart, one that no longer passes, a divergence, an unallowlisted canon field or a leaked private field is an error (exit 1).
 
-**What the gate requires.** `maturity: reviewed` (or an operator's `publish: true`); a
-`source_lineage` that is a corpus path under a registered source card (`repos/<Repo>/…`, never a
-URL); no lineage under a held prefix or a consent boundary; a source card that is not internal,
-high-risk or unassessed. It never throws: an error is a refusal.
+**What the gate requires.** An object is refused for any of: a boundary or source-card shape, `high_risk`, a blocked `public_use`; no `source_lineage`, or one that is not a canonically written corpus path (`repos/<Repo>/…`, never a URL); a lineage (including `provenance.origin` and `additional_provenance`) under a held prefix, on a consent boundary, or not claimed by any registered source card; a claiming card that is internal, high-risk, malformed or without a `public_use`. What is left passes if `maturity: reviewed` or the object carries `publish: true`. It never throws: an error is a refusal.
 
 **What is the public plane's to decide**, in its own `kms.yaml`:
 
@@ -288,23 +285,13 @@ publish:
     contato: [rede]                  # the public keys of an object-valued field
 ```
 
-A field not on the allowlist is dropped, and `validate` reports it until its visibility is
-decided. An instance can only add fields; naming a private one (`notes`, `surfaced_by`,
-`reviewed_by`, …) is refused. The plane's own `data/kb/source-system.yaml` holds one card, the
-commons itself, and is published as it stands.
+A field not on the allowlist is dropped, and `validate` reports it until its visibility is decided. An instance can only add fields; naming a private one (`notes`, `surfaced_by`, `reviewed_by`, …) is refused. The plane's own `data/kb/source-system.yaml` holds one card, the commons itself, and is published as it stands.
 
-**Each plane knows what it is** (`src/planes/role.mjs`). A canon is the instance whose `kms.yaml`
-names a public plane; the public plane carries `planes: { role: public, canon: <instance> }`.
+**Each plane knows what it is** (`src/planes/role.mjs`). A canon is the instance whose `kms.yaml` names a public plane; the public plane carries `planes: { role: public }` (the clone also writes `canon: <instance>`, which no code reads).
 
-- In a **canon**, `publish` is refused in every mode, before anything is listed, minted or
-  written. So is the `publish` step of `lifecycle close`, which stops there.
-- In a **public plane**, `publish` first re-gates the plane against its canon (the same check as
-  `validate`). A failure is refused in every mode. The canon is looked for two levels up
-  (`<canon>/repos/<plane>`) or at `planes.canon_dir`, and only counts if it names this plane. A
-  plane that cannot find its canon will plan but not apply; `planes.regate: false` is the
-  explicit way to publish from a plane on its own, and it is reported as `regate: disabled`.
-- In a public plane, `ingest` is refused: the plane receives only what its canon exports.
+- In a **canon**, `publish` is refused in every mode, before anything is listed, minted or written (`refused: canon`). So is the `publish` step of `lifecycle close`, which stops there.
+- In a **public plane**, `publish` first re-gates the plane against its canon (the same check as `validate`). A failure is refused in every mode (`refused: regate`). The canon is looked for two levels up (`<canon>/repos/<plane>`) or at `planes.canon_dir`, and only counts if it names this plane. A plane that cannot find its canon will plan but not apply; `planes.regate: false` is the explicit way to publish from a plane on its own, and it is reported as `regate: disabled`.
+- In a public plane, `ingest` is refused (`refused: public-plane`): the plane receives only what its canon exports.
 - An instance with no `planes` key has no role and behaves as before.
 
-A store whose file name is the type (what `export` writes) carries no `type` on its objects;
-`publish` supplies it on the record without rewriting the file.
+A store whose file name is the type (what `export` writes) carries no `type` on its objects; `publish` supplies it on the record without rewriting the file.
