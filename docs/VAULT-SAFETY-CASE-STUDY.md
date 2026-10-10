@@ -1,6 +1,6 @@
 # Workspace Safety — Case Study
 
-_The incident that produced [`VAULT-SAFETY.md`](VAULT-SAFETY.md). It lives in the framework repository; whether a generated instance carries a copy was not verified._
+_The incident that produced [`VAULT-SAFETY.md`](VAULT-SAFETY.md). It lives in the framework repository only; the clone leaves it out._
 
 **Summary:** On 2026-04-25, an agent ran `git stash --include-untracked` before an upstream merge to clean the working tree, completed the merge, and never popped the stash. Roughly 50 untracked notes, going back about 50 days, silently vanished from the working tree. Syncthing then propagated the deletions to other devices. Everything was eventually recovered — `.stversions/`, dangling git blobs, and the stash's untracked-files tree (`^3`) — but recovery took hours and several richer versions were nearly lost.
 

@@ -4,7 +4,7 @@ org-os is a way to run an organization as a git repository: its identity, data, 
 
 This page is a map. It says what an instance contains, what you run against it, and which page documents each part.
 
-**Framework repository versus a new instance.** This page maps the framework repository, which is itself an instance. A new instance made with `npm run clone:framework` starts from a subset: it gets blank identity, memory and data files, its own `federation.yaml`, and none of `modules/`, `integrations/`, `site/`, `VERSION.md`, `CHANGELOG.md` or the framework's `docs/agent-plans/`. Differences are called out below.
+**Framework repository versus a new instance.** This page maps the framework repository, which is itself an instance. A new instance made with `npm run clone:framework` starts from a subset: it gets blank identity, memory and data files, its own `federation.yaml`, and none of `modules/`, `integrations/`, `site/`, `VERSION.md`, `CHANGELOG.md` or the framework's own plan history (the `agent-plans` directory under `docs/`). Differences are called out below.
 
 **Honest scope.** Every instance today is operated by the maintainer. The config-driven cloning engine (`npm run clone:framework`) works; the "fork the repo and answer an interview in place" path (`npm run setup`) does not work for a newcomer. See [Setup](SETUP.md) for the path that does.
 
@@ -43,7 +43,7 @@ An agent reads these at the start of a session. `AGENTS.md` lists the ten-step s
 - `HEARTBEAT.md` is the live list of active tasks and health checks.
 - `memory/YYYY-MM-DD.md` are daily logs, appended to and never overwritten. A new instance starts with an empty `memory/` (a `.gitkeep`); the framework's own logs and its `memory/reports/` stay in the framework repository.
 
-Plans: the framework repository keeps them in `docs/agent-plans/` (queue: `docs/agent-plans/QUEUE.md`). A new instance gets `docs/plans/` (queue: `docs/plans/QUEUE.md`) and `docs/superpowers/{specs,plans,research}/`, empty. Documented in [File structure](FILE-STRUCTURE.md) and [Plans](PLANS.md).
+Plans: the framework repository keeps its own in the `agent-plans` directory under `docs/`, with its `QUEUE.md` there. A new instance gets `docs/plans/` (queue: `docs/plans/QUEUE.md`) and `docs/superpowers/{specs,plans,research}/`, empty. Documented in [File structure](FILE-STRUCTURE.md) and [Plans](PLANS.md).
 
 ### Data registries: `data/`
 
@@ -86,8 +86,8 @@ npm run initialize          # the same state as JSON (what agents read)
 npm run generate:schemas    # registries -> .well-known/
 npm run validate:schemas    # schema and identity checks
 npm run validate:structure  # file and folder structure
-npm run doctor              # read-only assessment of an instance
-npm run vault:snapshot -- "reason"   # permanent snapshot ref before any risky git operation
+npm run doctor -- --dir ../my-instance   # read-only assessment, from the framework checkout (an instance does not carry the doctor)
+npm run vault:snapshot -- "reason"   # permanent ref for tracked files before a risky git operation (not untracked files)
 ```
 
 In an agent host, `/initialize` opens a session and `/close` ends it (memory written, heartbeat updated, commit). Hosts and slash commands are covered in [Commands](COMMANDS.md) and [Host integration](HOST-INTEGRATION.md).
@@ -98,4 +98,6 @@ In an agent host, `/initialize` opens a session and `/close` ends it (memory wri
 - Run one day to day: [Operator guide](OPERATOR-GUIDE.md).
 - Connect it to other instances: [Federation](FEDERATION.md).
 - Guard against losing files: [Vault safety](VAULT-SAFETY.md).
+- Keep and publish knowledge: [The knowledge management system](KMS.md).
+- Check and update an instance: [Instance doctor](INSTANCE-DOCTOR.md).
 - Understand the design: [Architecture](ARCHITECTURE.md).

@@ -115,7 +115,7 @@ npm run doctor -- sync --dir ../my-instance
 
 If a stage fails, every later stage is skipped, nothing is re-stamped, and the receipt names the stage that stopped it. The exit code is 1.
 
-1. **snapshot.** Writes `refs/snapshots/<timestamp>-doctor-sync`, a commit of the whole working tree made with `git stash create -u` (it does not touch the tree, the index or the stash list). Always first. Then the dirty-tree gate: if uncommitted changes collide with a file the overlay would write, it fails here and names them.
+1. **snapshot.** Writes `refs/snapshots/<timestamp>-doctor-sync`, a commit of the tracked and staged files made with `git stash create` (the `-u` it passes has no effect, so untracked files are not in it; see [Workspace safety](VAULT-SAFETY.md)). It does not touch the tree, the index or the stash list. Always first. Then the dirty-tree gate: if uncommitted changes collide with a file the overlay would write, it fails here and names them.
 2. **ensure-upstream.** Adds the `upstream` remote, or rewrites it, to `https://github.com/regen-coordination/org-os-template.git`. Also corrects `federation.yaml` `upstream[0].url`, and commits that change on its own.
 3. **fetch.** `git fetch upstream`. Needs network access to the framework repository.
 4. **inject-machinery.** Copies `scripts/sync-upstream.mjs`, `scripts/validate-identity.mjs`, `scripts/validate-structure.mjs` and `scripts/doctor.mjs` from the framework, and commits them (explicit paths, never `git add -A`). This is the step that breaks the deadlock.
@@ -129,7 +129,7 @@ If a stage fails, every later stage is skipped, nothing is re-stamped, and the r
 
 - **Uncommitted work is safe unless it collides.** Only dirty files that the overlay would overwrite stop the run. Uncommitted `data/`, `memory/`, drafts and your own scripts do not. The doctor's own earlier output (injected machinery, an old receipt) does not count as dirt either, so it can retry after its own abort.
 - **Stages 6 to 9 are not committed.** After a run, `git status` in the instance shows the re-stamp, the regenerated `.well-known/`, the stamped `federation.yaml` and the receipt as uncommitted. Review and commit them yourself. Stages 2, 4 and 5 are committed, each separately, so each can be reverted alone.
-- **Undo.** The snapshot ref from stage 1 is a local commit of the working tree as it was before the run. List them with `git for-each-ref refs/snapshots`.
+- **Undo.** The snapshot ref from stage 1 is a local commit of the tracked files as they were before the run. Untracked files are not in it. List them with `git for-each-ref refs/snapshots`.
 - **It does not edit your `package.json`.** The overlay copies every file under `scripts/` and `templates/`, including scripts the clone had left out, but it does not add `package.json` entries for them. Those scripts exist but have no `npm run` name.
 - **Receipts are one per day.** A second run on the same date overwrites the first receipt, including an aborted run overwriting a successful one. Read the receipt before you re-run.
 

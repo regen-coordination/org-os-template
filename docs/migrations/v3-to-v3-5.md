@@ -28,7 +28,7 @@ The v3.5 release was themed "Consolidation + Ready for Real Orgs". See `CHANGELO
 npm run vault:snapshot -- "before v3.5 migration"
 
 # 2. Bring in the framework changes (refuses on a dirty tree; see `npm run sync:upstream` in COMMANDS.md)
-npm run sync:upstream
+npm run sync:upstream -- --yes
 
 # 3. Run the migration script directly (idempotent, additive)
 node scripts/migrations/v3-to-v3-5-consolidation.mjs

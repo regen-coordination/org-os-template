@@ -236,8 +236,8 @@ them are run by the maintainer; an external pilot is the open milestone.
 **What it is.** Workstream and task tracking: the projects registry, the plans queue, and the
 dashboard sections that render them.
 
-**How it works.** `data/projects.yaml` holds long-lived workstreams; `docs/agent-plans/`
-holds short-lived execution plans queued against them; `/initialize` renders the projects
+**How it works.** `data/projects.yaml` holds long-lived workstreams; the plans
+directory under `docs/` holds short-lived execution plans queued against them; `/initialize` renders the projects
 section (and `npm run initialize` the plans).
 
 **Status.** `live` — rests on the maintainer's own use in other instances; this repository cannot show it.

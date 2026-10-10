@@ -71,7 +71,7 @@ What it does not do, and what to know before using it:
 - **The write comes before the commit.** If the commit fails, for example a git hook rejects it, the file stays changed in the working tree and nothing is committed.
 - **No authentication.** Anything on the machine that can reach `localhost:4680` can write. The API has no origin or CORS check and reads the body as JSON whatever its content type. The risk from a web page open in your browser was not tested.
 - **It never pushes.** Commits stay local until you push.
-- **Not a gate.** It does not use the proposals queue; every save goes straight to the current branch. Take a snapshot first on a working tree you cannot lose, as in [Vault safety](VAULT-SAFETY.md).
+- **Not a gate.** It does not use the proposals queue; every save goes straight to the current branch. Commit or copy aside anything you cannot lose, then take a snapshot (tracked files only), as in [Vault safety](VAULT-SAFETY.md).
 
 ## The files
 

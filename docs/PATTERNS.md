@@ -41,7 +41,7 @@ This is guidance only. No script routes tasks to models, and the model names in 
 
 `AGENTS.md` §6 splits agent actions in two (`MASTERPLAN.md` §6 carries a separate, framework-development version of the same split). Autonomous, no approval: reading any file, writing `memory/`, `MEMORY.md` and `HEARTBEAT.md`, meeting notes and project pages, running `npm run generate:schemas`, answering in the active session, maintaining `federation.yaml` peer references. Needs operator approval: messages to outside parties, on-chain actions, publishing, changes to `IDENTITY.md`, `SOUL.md` or `AGENTS.md`, any financial action, adding or removing federation peers, changes to the safety policy itself. The rule of thumb in the file is "when in doubt, draft and present, don't execute".
 
-An instance may add a second layer (a council or team approval for treasury, partnerships and governance), documented in `IDENTITY.md`. The boundary is a policy for agents, not a permission system; the mechanical guard in this area is the vault safety tooling (`npm run vault:snapshot`, `npm run vault:audit`; see [VAULT-SAFETY.md](VAULT-SAFETY.md)).
+An instance may add a second layer (a council or team approval for treasury, partnerships and governance), documented in `IDENTITY.md`. The boundary is a policy for agents, not a permission system; the mechanical guard in this area is the vault safety tooling (`npm run vault:snapshot` for tracked files only, `npm run vault:audit`; see [VAULT-SAFETY.md](VAULT-SAFETY.md)).
 
 ## 6. Success metrics in MASTERPLAN.md
 

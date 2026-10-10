@@ -19,7 +19,7 @@ This page lists what can go wrong in an org-os instance and which check, if any,
 | **Pre-push** | Local push, same installer | Refuses to push `agent/*` branches |
 | **CI** | Push to `main` or `release/**`; pull request to `main` | `.github/workflows/validate.yml`: `validate:structure`, `validate:schemas`, `analyze:instances`, `npm test`, `selftest` (which includes `check:divergence`), `test:admin`, `version:check`, and the site build and tests |
 | **Scheduled** | Weekly, Sunday 04:00 UTC | `.github/workflows/drift.yml`: `analyze:instances`, then commits any new report in `memory/reports/` |
-| **Pre-destructive** | Before a risky git operation | `vault:snapshot`, run by the operator (see [VAULT-SAFETY.md](VAULT-SAFETY.md)); `vault:audit` afterwards |
+| **Pre-destructive** | Before a risky git operation | `vault:snapshot` (tracked files only; protect untracked notes first), run by the operator (see [VAULT-SAFETY.md](VAULT-SAFETY.md)); `vault:audit` afterwards |
 
 `npm run install:hooks` installs `.github/hooks/pre-commit.sh` and `scripts/git-hooks/pre-push` into the live hooks directory, once per clone; it does not overwrite a hook whose content differs unless run with `--force`. `scripts/operator-setup.sh` sets `core.hooksPath` to `scripts/hooks`; `install:hooks` resolves the hooks directory through git, so on a clone set up that way it targets `scripts/hooks/`, finds the main-blocking `pre-commit` there (different content) and refuses without `--force`. A separate hook, `scripts/hooks/pre-commit`, blocks commits to `main` for multi-operator clones; `scripts/operator-setup.sh` installs it. Another workflow, `generate-schemas.yml`, regenerates `.well-known/` daily.
 
@@ -56,7 +56,7 @@ The operator resolves divergences by hand. There is no merge tooling.
 
 ### Broken migration
 
-- `npm run migrate` runs the scripts in `scripts/migrations/` that apply between the instance's `framework_version` and the framework's version (`--dry` lists them). Each is written to be idempotent, so re-running should be safe
+- `npm run migrate` runs the scripts in `scripts/migrations/` that apply between the instance's `framework_version` and the framework's version (`--dry` lists them). On the 0.5 line it selects no script (the two that exist carry legacy numbers); see [Versioning](VERSIONING.md). Each is written to be idempotent, so re-running should be safe
 - The v3 to v3.5 migration logs to `memory/migrations-YYYY-MM-DD.md`; the other migration does not
 - Roll back by reverting the commit, then fix the migration
 

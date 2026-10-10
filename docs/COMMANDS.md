@@ -24,9 +24,9 @@ Slash commands are markdown files in `.claude/commands/`, the single source. `np
 | `npm run clone:framework -- --target <dir> --config <file>` | Generate a new instance from this framework. Also `--dry`, `--force`, `--no-git`, `--commit-unverified`. The recommended path; see [`SETUP.md`](SETUP.md) and [`ADOPT-WITH-AN-AGENT.md`](ADOPT-WITH-AN-AGENT.md). |
 | `npm run clone:manifest` | Regenerate `tests/clone-manifest.txt`, the file list a fresh clone must match. Framework maintainers. |
 | `npm run setup` | In-place wizard (org type, name, description, base URL, packages, agent runtime, network, emoji, Notion). Needs a real interactive terminal: an agent or non-TTY shell cannot drive it. It edits the repository where it runs, and it is not a working path for a newcomer (see `BOOTSTRAP.md` and `README.md`); use `clone:framework`. |
-| `npm run sync:upstream` | In an instance: pull framework changes (stages: dirty-tree refusal, `.sync-freeze` check, fetch, rebase, migrate, sync packages, validate, receipt in `memory/`). Options: `-- --yes`, `-- --dry`. Not for repositories that share no history with the framework. |
+| `npm run sync:upstream` | In an instance: pull framework changes (stages: dirty-tree refusal, `.sync-freeze` check, fetch, rebase, migrate, sync packages, validate, receipt in `memory/`). Options: `-- --yes` (required to actually sync; without it the command prints the commit count and changes nothing), `-- --dry`. Not for repositories that share no history with the framework. |
 | `npm run sync:packages` | Copy the packages enabled in `federation.yaml` from the framework into the instance. |
-| `npm run migrate` | Run every framework migration from the instance's `framework_version` up to the current one. `-- --dry` lists them. See [`VERSIONING.md`](VERSIONING.md). |
+| `npm run migrate` | Run every framework migration from the instance's `framework_version` up to the current one. `-- --dry` lists them. On the 0.5 line it selects no script (the two that exist carry legacy numbers); see [`VERSIONING.md`](VERSIONING.md). |
 | `npm run doctor` | Read-only assessment scorecard of an instance (`-- --dir <path>`, `--json`, `--strict`); `npm run doctor -- sync` repairs and syncs with a receipt (`--dry-run` shows the plan). |
 | `npm run install:hooks` | Install the versioned git hooks (pre-commit runs `validate:structure`, plus `validate:schemas` when `data/*.yaml` is staged; pre-push refuses to push `agent/*` branches). It does not block commits to `main`: only the `/commit` instructions and `scripts/hooks/pre-commit`, installed by `scripts/operator-setup.sh`, do. `-- --uninstall` removes them. |
 | `npm run bootstrap:local` | `clone:repos`, then `npm install`. |
@@ -50,7 +50,7 @@ Slash commands are markdown files in `.claude/commands/`, the single source. `np
 | `npm run generate:quilt` | Re-weave `docs/QUILT.md` from `data/*.yaml`. |
 | `npm run render:templates` | Render the framework's own README and GETTING-STARTED from `templates/`. |
 | `npm run generate:dashboard` | Write the static `packages/dashboard/dashboard.html` (`node packages/dashboard/generate.mjs --json` prints the raw state). |
-| `npm run admin` | Local admin app on `http://localhost:4680` for editing `data/*.yaml`; each save is a git commit. `npm run admin:dev` runs the server in watch mode. |
+| `npm run admin -- -- --repo ../my-instance` | Local admin app on `http://localhost:4680` for editing `data/*.yaml`; each save is a git commit. Run it from the framework checkout: an instance does not carry the app. See [Admin app](ADMIN-APP.md). `npm run admin:dev` runs the server in watch mode. |
 
 ## Vault safety
 
@@ -58,7 +58,7 @@ Run these before any merge, rebase, pull, reset or large checkout, and again aft
 
 | Command | What it does |
 |---|---|
-| `npm run vault:snapshot -- "<reason>"` | Save the whole working tree (tracked, untracked, ignored) to a permanent ref `refs/snapshots/<timestamp>-<slug>` without touching the tree or stashes. |
+| `npm run vault:snapshot -- "<reason>"` | Pin the files git already knows (tracked or staged, with their uncommitted edits) to a permanent ref `refs/snapshots/<timestamp>-<slug>`, without touching the tree or the stash list. **It does not hold untracked files**: commit them or copy them aside first (see [Workspace safety](VAULT-SAFETY.md)). |
 | `npm run vault:audit` | Compare the root content files against the latest snapshot; exit 1 if any disappeared. `-- <ref>` audits against a specific snapshot. |
 
 ## Knowledge base
@@ -115,7 +115,7 @@ These are in `package.json` but cannot work today. Do not rely on them.
 ## Tips
 
 - Commit messages: say what changed and why ("Add new team members and update meeting notes"), not "Update files".
-- Before anything that rewrites many files, `npm run vault:snapshot`, then `npm run vault:audit` afterwards.
+- Before anything that rewrites many files, protect untracked notes (commit or copy them aside), run `npm run vault:snapshot` (tracked files only), then `npm run vault:audit` afterwards.
 - Never `git stash`, `git clean` or `git reset --hard` in a workspace that holds untracked notes; the agent settings deny them.
 
 ## See also

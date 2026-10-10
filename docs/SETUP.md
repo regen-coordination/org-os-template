@@ -152,6 +152,6 @@ Set `org.language` to a BCP-47 tag and everything the clone writes comes out in 
 - [Packages](PACKAGES.md): what each package adds
 - [EIP-4824 guide](EIP4824-GUIDE.md): the published identity files
 - [Federation](FEDERATION.md): connecting instances
-- Keeping an instance current: from the framework checkout, `npm run doctor -- sync --dir ../harbor-bakery-os --dry-run` prints the plan; without `--dry-run` it snapshots, overlays framework-owned files, migrates, regenerates schemas and writes a receipt under `memory/reports/`.
+- Keeping an instance current: from the framework checkout, `npm run doctor -- sync --dir ../harbor-bakery-os --dry-run` prints the plan; without `--dry-run` it snapshots tracked files (not untracked ones), overlays framework-owned files, migrates, regenerates schemas and writes a receipt under `memory/reports/`.
 
 Issues and questions: <https://github.com/regen-coordination/org-os-template/issues>

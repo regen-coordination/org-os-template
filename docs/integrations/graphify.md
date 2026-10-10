@@ -51,7 +51,7 @@ org-os never writes into the graph; it builds it with the CLI and reads it.
 
 ## Not built
 
-- Generating `knowledge/` page stubs from the graph, and a lint cross-check against the graph. These are queued follow-ups (`docs/agent-plans/QUEUE.md`), not part of the skill. The existing `compile:knowledge` script does not read the graph.
+- Generating `knowledge/` page stubs from the graph, and a lint cross-check against the graph. These are queued follow-ups (in the queue of the framework's `agent-plans` directory under `docs/`), not part of the skill. The existing `compile:knowledge` script does not read the graph.
 - Per-instance graphs as federation objects, a multi-repo merge at the hub, and a KOI bridge for graphs. Planned only.
 
 ## Not verified against the code

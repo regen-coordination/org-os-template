@@ -22,7 +22,7 @@ The clone copies only what is committed at `HEAD` of the framework repository, a
 | `.well-known/` | The `*.json.template` files. Published `*.json` files are removed; `dao.json` is rendered for the new organisation; the rest come back on the first `npm run generate:schemas`. |
 | `.env.example`, `.gitignore`, `.prettierignore`, `LICENSE`, `BOOTSTRAP.md` | As is (`.gitignore` gains a `docs/temp/` line). |
 | `data/` | The registry files. `members`, `projects`, `ideas`, `relationships`, `ecosystems` and `governance` are reset to empty or to a scaffold. `instances.yaml`, `skills-matrix.yaml`, `packages-matrix.yaml` and `knowledge-gaps.yaml` are not carried over, and `data/federation/frontier/` is removed. |
-| `docs/` | The operator documentation. Framework history is left out: `docs/agent-plans/`, `docs/superpowers/`, `docs/sessions/`, `docs/research/`, `docs/QUEUE.md`, and a list of framework-only pages (`POSITIONING.md`, `ECOSYSTEM.md`, `RAD-ORG-OS.md`, `QUILT.md`, `VAULT-SAFETY-CASE-STUDY.md` and others named in `EXCLUDE_FILES`). |
+| `docs/` | The operator documentation. Framework history is left out: the framework's `agent-plans` directory, `docs/superpowers/`, `docs/sessions/`, `docs/research/`, `docs/QUEUE.md`, and a list of framework-only pages (`POSITIONING.md`, `ECOSYSTEM.md`, `RAD-ORG-OS.md`, `QUILT.md`, `VAULT-SAFETY-CASE-STUDY.md` and others named in `EXCLUDE_FILES`). |
 | `package.json`, `package-lock.json` | `package.json` is renamed for the new organisation, set to version `0.1.0` and `private: true`; npm scripts whose target file is not in the instance are dropped (20 of them in the test run for this page). |
 | `packages/` | Only the packages set to `true` under `packages:` in the clone config. With no `packages:` block, none. |
 | `skills/` | Only the skills listed under `skills:` in the config; every skill directory when the list is absent or empty. |
@@ -122,7 +122,7 @@ The machinery behind the npm scripts in `package.json`. The ones this page's sub
 
 ### `docs/`: documentation (optional)
 
-Operator and protocol documentation. Planning documents live in a directory whose name differs by tree: the framework repository keeps its own in `docs/agent-plans/` (with `QUEUE.md`), while a generated instance gets `docs/plans/` with an empty `QUEUE.md`, and the clone rewrites references to `docs/agent-plans/` in the instance's commands and docs to `docs/plans/`. See [PLANS.md](PLANS.md). Detail pages for ideas are written to `docs/ideas/<slug>.md` by the `idea-scout` skill (see [IDEA-HATCHING.md](IDEA-HATCHING.md)); that directory does not exist until the first idea is hatched.
+Operator and protocol documentation. Planning documents live in a directory whose name differs by tree: the framework repository keeps its own in the `agent-plans` directory under `docs/` (with a `QUEUE.md` there), while a generated instance gets `docs/plans/` with an empty `QUEUE.md`, and the clone rewrites references to the framework's directory in the instance's commands and docs to `docs/plans/`. See [PLANS.md](PLANS.md). Detail pages for ideas are written to `docs/ideas/<slug>.md` by the `idea-scout` skill (see [IDEA-HATCHING.md](IDEA-HATCHING.md)); that directory does not exist until the first idea is hatched.
 
 ### `repos/`: linked repositories (optional)
 

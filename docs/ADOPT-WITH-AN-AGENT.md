@@ -135,7 +135,7 @@ framework:
 
 ```bash
 npm run doctor -- sync --dir ../your-org --dry-run   # print the plan, change nothing
-npm run doctor -- sync --dir ../your-org             # snapshot, overlay, migrate, regenerate, receipt
+npm run doctor -- sync --dir ../your-org             # snapshot (tracked files only), overlay, migrate, regenerate, receipt
 ```
 
 `sync` is a file-level overlay: it copies framework-owned paths (`scripts/`,

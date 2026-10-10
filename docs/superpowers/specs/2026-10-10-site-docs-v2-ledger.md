@@ -89,7 +89,7 @@ The pass edited documentation only. Where a page was wrong because the code is w
 
 ### The two that matter most to an operator
 
-**(a) The workspace snapshot does not capture untracked files, and reports a clean tree when only untracked files are present.** `npm run vault:snapshot` builds its snapshot with a plumbing call that ignores the flag meant to include untracked files, so the snapshot tree holds tracked files only. In a scratch repository an untracked file was absent from the snapshot ref, and `npm run vault:audit` reported it only as "added". When the only changes are untracked files, the command prints that the working tree is clean. `doctor sync` has the same gap, because its snapshot stage uses the same call. The script's header and the older safety page promised the opposite, and the workspace-safety rules that agents are told to follow rely on this command to protect untracked notes. The safety page now has a "Known gap" section and a first step that protects untracked notes by hand (copy them aside, or commit them to a throwaway branch). Found by the workspace-safety unit (U05) and tested in a scratch repository; the review asked for and recorded an independent confirmation.
+**(a) The workspace snapshot does not capture untracked files, and reports a clean tree when only untracked files are present.** `npm run vault:snapshot` builds its snapshot with a plumbing call that ignores the flag meant to include untracked files, so the snapshot tree holds tracked files only. In a scratch repository an untracked file was absent from the snapshot ref, and `npm run vault:audit` reported it only as "added". When the only changes are untracked files, the command prints that the working tree is clean. `doctor sync` has the same gap, because its snapshot stage uses the same call. The script's header and the older safety page promised the opposite, and the workspace-safety rules that agents are told to follow rely on this command to protect untracked notes. The safety page now has a "Known gap" section and a first step that protects untracked notes by hand (copy them aside, or commit them to a throwaway branch). Found by the workspace-safety unit (U05) and tested in a scratch repository; the review asked for and recorded an independent confirmation. `AGENTS.md`, `templates/AGENTS.instance.md` and the cheatsheet partials still recommend the command without the caveat; they are not site pages and are left for the operator, together with the fix in the two scripts. The final review also found the same claim in the Commands, Architecture and Instance doctor pages; those are corrected.
 
 **(b) Running the knowledge system's publish directly on a canon applies only the basic check and publishes draft-maturity entries.** `org-os-kms publish` applies only the framework's own floor. On a canon, an entry that is still at draft maturity is published if its `public_use` allows it. The stricter canon gate (maturity, review) runs only in a plane's own publish, in `export` and in `validate`. An operator who publishes a canon straight to a server or a static surface can therefore publish entries that the two-plane model says must not leave. Found by the knowledge-system units (U10, U12); described on the planes and publishing pages.
 
@@ -728,7 +728,7 @@ Checked at: 33668237a177ae86438a353cff75b0987ceb8e25
 Checked at: 48cf5dd07515bbaa6cb2e2ed00f4d5db936f69d2 (HEAD when started; the brief named 214e2e4d06eed1f646c26ae938cb0d0c858af99f)
 
 ### docs/integrations/egregore.md
-- Fate: dropped (controller ruling: corrected file stays in the repository, not on the site; nothing an operator can run or configure)
+- Fate: dropped (ruling: corrected file stays in the repository, not on the site; nothing an operator can run or configure)
 - Changed:
   - Removed "Integrated & Active in a sibling instance", "production-ready", "Git submodule configured", the claimed `npm run setup` "Egregore-assisted" path, the federation.yaml block that nothing reads, the OPAL/KOI/MEMORY.md/HEARTBEAT integration claims, the `/decision` example, and the `(3 files)` count.
   - Stated what exists: README plus one 294-line CommonJS adapter, no tests, matrix status dormant; what is external (Egregore itself, its slash commands).
@@ -748,7 +748,7 @@ Checked at: 48cf5dd07515bbaa6cb2e2ed00f4d5db936f69d2 (HEAD when started; the bri
 - Not verified: upstream name, addresses, install commands (CLI not run, no network); marked in the page.
 
 ### docs/integrations/koi.md
-- Fate: dropped (controller ruling: corrected file stays in the repository, not on the site; nothing an operator can run or configure)
+- Fate: dropped (ruling: corrected file stays in the repository, not on the site; nothing an operator can run or configure)
 - Changed:
   - Removed the topology diagram, "planned commands" table, federation.yaml block (no code reads it), RID type table of examples, latency target, effort estimate, sibling-repository file references and the unverified coordinator URL.
   - Replaced "skeleton, implementation not started" with what the source shows: about 840 lines, RIDManager and EventManager complete, HTTP client written to assumed endpoints, git-sync only emits local events, CLI prints text, no tests, no jest config.
@@ -849,7 +849,7 @@ Checked at: 48cf5dd07515bbaa6cb2e2ed00f4d5db936f69d2 (HEAD when started; the bri
 - Manifest: slug `ecosystem` · title "Ecosystem" · section concepts · summary "Org-os instances, related projects and external systems, as recorded in this repository" · covers `federation.yaml, data/instances.yaml, data/ecosystems.yaml, repos.manifest.json`
 - Changed:
   - Restructured into instances / related projects / external systems; stated that every instance is run by the maintainer.
-  - Links only for organisation-owned repositories whose address is recorded (regen-coordination, ReFiDAO, refibcn, organizational-os); luizfernandosg/* repositories named in plain text; no local paths.
+  - Links only for organisation-owned repositories whose address is recorded (regen-coordination, ReFiDAO, refibcn, organizational-os); personal-account repositories named in plain text; no local paths.
   - Removed entries with no record in the repository: regen-toolkit-interface, becoming-constellations, refi-vision-forum-posts, ReFi-DAO-Website, regen-coordination-hub (is a sibling instance), ecosystem-canvas, the organizational-os-framework/template layer rows and the ASCII flow diagrams.
   - Added instances missing before: regen-toolkit (nested), a sibling instance (fictional test), a sibling instance; dao-os marked a dev platform, not an instance.
   - Dropped the link to ECOSYSTEM-MAP.md in the maintainer's vault.

@@ -24,8 +24,8 @@ The agent can also write on your behalf (record an idea, update a project status
 There is no hosted web dashboard, ideation board or content aggregator in this repository: the packages meant to provide the last two (`packages/ideation-board`, `packages/aggregator`) do not exist. What you can open in a browser today runs on your own machine:
 
 - **Static dashboard** — `npm run generate:dashboard` writes `packages/dashboard/dashboard.html`: projects, funding deadlines, `HEARTBEAT.md` tasks, recent memory, skills. Read-only.
-- **Admin app** — `npm run admin` serves a local editor for the `data/*.yaml` registries at `http://localhost:4680` (bound to 127.0.0.1, no login). It edits as well as reads: each save is a git commit on the current branch (`admin(<registry>): ...`). See `packages/admin/README.md`.
-- **Terminal pages** — `npm run page <id>` prints a page as markdown (`dashboard`, `projects`, `tasks`, `instances`, `decisions`, `this-week`, `plans`).
+- **Admin app** — `npm run admin -- -- --repo ../my-instance`, run from the framework checkout (an instance does not carry the app), serves a local editor for the `data/*.yaml` registries at `http://localhost:4680` (bound to 127.0.0.1, no login). It edits as well as reads: each save is a git commit on the current branch (`admin(<registry>): ...`). See [Admin app](ADMIN-APP.md).
+- **Terminal pages** — `npm run page <id>` prints a page as markdown (`dashboard`, `projects`, `tasks`, `instances`, `decisions`, `this-week`, `plans`). The `plans` page reads the framework's queue path and prints "QUEUE.md not found" in a generated instance; see [Host integration](HOST-INTEGRATION.md).
 
 ### Level 2: Guided Setup (Basic Computer Literacy)
 
@@ -57,10 +57,11 @@ npm run generate:schemas
 # Session dashboard as markdown
 npm run initialize:markdown
 
-# Assess the instance, read-only
-npm run doctor
+# Assess an instance, read-only: run from the framework checkout, pointing at the instance
+# (an instance does not carry the doctor; inside one the command exits 2)
+npm run doctor -- --dir ../my-instance
 
-# Snapshot the working tree before anything risky
+# Pin tracked files before anything risky (tracked files only; protect untracked notes first)
 npm run vault:snapshot -- "before <reason>"
 ```
 

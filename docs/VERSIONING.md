@@ -112,14 +112,14 @@ Breaking changes require:
 
 - Session memory writes (`memory/`), heartbeat updates (`HEARTBEAT.md`), dated reports.
 - Content of `data/*.yaml` — only the *shape* is versioned, not the entries.
-- Plan files (`docs/agent-plans/` on the older layout, `docs/plans/` in a fresh clone) — those have their own lifecycle.
+- Plan files (the `agent-plans` directory under `docs/` on the older layout, `docs/plans/` in a fresh clone) — those have their own lifecycle.
 
 ## Instance migration — pull-based
 
 The framework does **not** push changes to downstream instances. Each instance pulls at its own cadence:
 
 1. Framework ships a release (version bump + CHANGELOG + migration scripts + docs).
-2. Instance operator runs `npm run sync:upstream` (or git pulls the template remote).
+2. Instance operator runs `npm run sync:upstream -- --yes` (without `--yes` it prints the commit count and changes nothing; or git pulls the template remote).
 3. Instance operator runs `npm run migrate` — reads the local `framework_version` and runs the migration scripts whose range applies, idempotent. (Caveat: the two migration scripts that exist, `v2-to-v3-…` and `v3-to-v3-5-…`, are named in the legacy numbering. `migrate.mjs` reads the leading numbers of the file name as `2.0 → 3.0` and `3.0 → 3.0` and only runs a script whose end point is at or below the framework's major.minor. With the framework on `0.5`, neither runs; `npm run migrate -- --dry` on a current checkout lists none. See [the two migration guides](migrations/v3-to-v3-5.md).)
 4. Instance's `federation.yaml.metadata.framework_version` is updated to the new version. The migration scripts do not do this; `npm run doctor sync` re-stamps the version surfaces in its migrate stage.
 5. Framework hub (this repo) picks up the new state on next `npm run analyze:instances`.
@@ -184,7 +184,7 @@ gh run list --workflow=validate.yml --limit 1   # and a GREEN CI run on this com
 gh workflow disable drift.yml
 gh workflow disable generate-schemas.yml
 
-# 4. Snapshot, then bump. version:update rewrites the five version surfaces and
+# 4. Snapshot (tracked files only; protect untracked notes first), then bump. version:update rewrites the five version surfaces and
 #    promotes [Unreleased] → [<version>] — <date> with comparison links.
 npm run vault:snapshot -- "v0.5.1 release point"
 npm run version:update 0.5.1
@@ -256,7 +256,7 @@ Every instance carries a **lineage stamp** in `federation.yaml.metadata`:
 ```yaml
 metadata:
   framework_version: "0.5"       # major.minor of the framework this instance is on
-  genesis_commit: "<40-hex SHA>" # framework commit at clone time; immutable
+  genesis_commit: "<40-hex SHA>" # the framework's root commit; immutable
   last_sync_commit: "<SHA>|null" # framework commit pinned at last sync-upstream run
 ```
 
