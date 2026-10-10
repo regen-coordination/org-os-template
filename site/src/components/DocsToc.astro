@@ -27,5 +27,8 @@ const items = Astro.props.headings.filter((h) => h.depth === 2 || h.depth === 3)
 .docs-toc a.active { color: var(--color-accent); border-left-color: var(--color-accent); }
 .docs-toc summary { list-style: none; }
 .docs-toc summary::-webkit-details-marker { display: none; }
+.docs-toc summary { display: flex; justify-content: space-between; align-items: center; }
+.docs-toc summary::after { content: "▾"; transition: transform var(--t-fast); }
+.docs-toc[open] summary::after { transform: rotate(180deg); }
 .docs-toc .sub { padding-left: var(--space-4); }
 </style>

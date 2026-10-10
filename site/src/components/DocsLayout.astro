@@ -44,9 +44,12 @@ const { prev, next } = neighbours(page.slug);
   const toc = document.querySelector<HTMLDetailsElement>(".docs-toc");
   if (toc && window.matchMedia("(max-width: 1099px)").matches) toc.open = false;
 
+  // A malformed escape in a hash must not take the rest of this script down.
+  const safeDecode = (s: string) => { try { return decodeURIComponent(s); } catch { return s; } };
+
   // Scroll-spy: mark the section being read in the contents list.
   const links = new Map<string, HTMLAnchorElement>();
-  for (const a of document.querySelectorAll<HTMLAnchorElement>(".docs-toc a")) links.set(decodeURIComponent(a.hash.slice(1)), a);
+  for (const a of document.querySelectorAll<HTMLAnchorElement>(".docs-toc a")) links.set(safeDecode(a.hash.slice(1)), a);
   const headings = [...links.keys()].map((id) => document.getElementById(id)).filter((h): h is HTMLElement => h !== null);
   let current: string | undefined;
   const spy = () => {
@@ -68,6 +71,8 @@ const { prev, next } = neighbours(page.slug);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "copy pill";
+    button.setAttribute("aria-label", "Copy code");
+    button.setAttribute("aria-live", "polite");
     button.textContent = "Copy";
     button.addEventListener("click", async () => {
       try {
@@ -104,7 +109,7 @@ const { prev, next } = neighbours(page.slug);
 .docs-contents { grid-area: contents; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
 
 .doc h1 { font-size: var(--text-3xl); margin-top: var(--space-3); }
-.trail a { color: inherit; }
+.trail a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
 .trail a:hover { color: var(--color-ink); }
 .doc :global(h2) { margin-top: var(--space-10); scroll-margin-top: 5rem; }
 .doc :global(h3) { scroll-margin-top: 5rem; }
@@ -123,6 +128,7 @@ const { prev, next } = neighbours(page.slug);
 .doc :global(.anchor) { margin-left: 0.4em; color: var(--color-muted); opacity: 0; text-decoration: none; background: none; transition: opacity var(--t-fast), color var(--t-fast); }
 .doc :global(h2:hover .anchor), .doc :global(h3:hover .anchor), .doc :global(.anchor:focus-visible) { opacity: 1; }
 .doc :global(.anchor:hover) { color: var(--color-accent); }
+@media (hover: none) { .doc :global(.anchor) { display: none; } }
 .doc :global(hr) { border: 0; border-top: var(--border-hair) solid var(--color-line); margin-block: var(--space-8); }
 
 @media (max-width: 1099px) {

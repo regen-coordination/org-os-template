@@ -35,7 +35,7 @@ const fb = (kind: string) => feedbackUrl({ kind, title: page.title, source: page
   display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--text-sm); color: var(--color-muted); }
 .pager { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .pager a { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4);
-  border: var(--border-hair) solid var(--color-line); border-radius: var(--radius); background: var(--color-surface); color: var(--color-ink); }
+  border: var(--border-hair) solid var(--color-line); border-radius: var(--radius); background-color: var(--color-surface); color: var(--color-ink); }
 .pager .arr { display: inline-block; transition: transform var(--t-fast); }
 .pager .prev:hover .arr { transform: translateX(-3px); }
 .pager .next:hover .arr { transform: translateX(3px); }

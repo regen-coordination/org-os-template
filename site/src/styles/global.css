@@ -39,7 +39,9 @@ body::after {
   opacity: var(--grain-opacity);
   mix-blend-mode: var(--grain-blend);
 }
-@media print { body::before, body::after { display: none; } }
+@media print, (forced-colors: active) { body::before, body::after { display: none; } }
+/* The grain is the costliest layer: off on touch screens and when transparency is unwanted. */
+@media (hover: none), (prefers-reduced-transparency: reduce) { body::after { display: none; } }
 
 main { min-height: 64vh; display: block; }
 
@@ -71,6 +73,8 @@ a { color: var(--color-accent); text-decoration: none; }
   padding-bottom: 1px;
 }
 .link:hover, .prose a:hover { background-size: 100% 1.5px; }
+/* A link is told from the text around it by more than its colour. */
+.prose a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; text-decoration-color: color-mix(in srgb, currentColor 50%, transparent); }
 
 code, pre, .mono { font-family: var(--font-mono); font-feature-settings: "ss01", "cv01"; }
 /* Commands must read exactly as typed: no ligatures, so "--flag" keeps its two hyphens and the space before it. */

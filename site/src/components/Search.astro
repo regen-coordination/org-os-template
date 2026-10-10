@@ -6,7 +6,7 @@
 // falls back to the link.
 import { withBase } from "../lib/base";
 ---
-<a class="search-open mono" href={withBase("/docs")} data-base={withBase("/")}><span class="words">Search<span class="more"> docs</span></span><kbd>/</kbd></a>
+<a class="search-open mono" href={withBase("/docs")} data-base={withBase("/")}><span class="words">Search<span class="more"> docs</span></span><kbd aria-hidden="true">/</kbd></a>
 <dialog class="search-dialog" aria-label="Search the documentation">
   <form method="dialog"><button class="search-close mono">Close</button></form>
   <div id="search-ui"></div>
@@ -43,6 +43,9 @@ import { withBase } from "../lib/base";
   }
 
   if (link && dialog) {
+    // With script the link opens a dialog: say so to assistive technology.
+    link.setAttribute("role", "button");
+    link.setAttribute("aria-haspopup", "dialog");
     const base = link.dataset.base!;
     const open = (event: Event) => {
       event.preventDefault();
