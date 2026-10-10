@@ -83,5 +83,12 @@ jobs:
         working-directory: site
         run: npm test
 
+      # A report, not a gate: lists the docs pages whose covered code changed
+      # after the page was verified (spec §5.5). It reports and never blocks.
+      - name: Docs drift report
+        working-directory: site
+        run: npm run drift
+        continue-on-error: true
+
       - name: Check version triplet consistency
         run: npm run version:check
