@@ -7,7 +7,7 @@ import { PAGES } from "../src/data/docs-manifest.mjs";
 import { REPO_ROOT } from "../src/lib/repo.mjs";
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { pagesToCheck, formatDriftReport, splitCovers, DIR_EXCLUDES } from "../src/lib/drift.mjs";
+import { pagesToCheck, formatDriftReport, splitCovers, dirExcludes } from "../src/lib/drift.mjs";
 
 const isDir = (p) => { try { return statSync(join(REPO_ROOT, p)).isDirectory(); } catch { return false; } };
 const diff = (verified, pathspecs) => execFileSync("git", ["diff", "--name-only", `${verified}..HEAD`, "--", ...pathspecs], {
@@ -18,8 +18,10 @@ function changedPaths(verified, covers) {
   const { files, dirs } = splitCovers(covers, isDir);
   const found = new Set();
   if (files.length > 0) for (const f of diff(verified, files)) found.add(f);
-  // Git has one exclude list per call, so directories go in a call of their own.
-  if (dirs.length > 0) for (const f of diff(verified, [...dirs, ...DIR_EXCLUDES])) found.add(f);
+  // Git has one exclude list per call, so each kind of directory goes in a call of its own.
+  const groups = new Map();
+  for (const d of dirs) { const k = dirExcludes(d).join("\n"); groups.set(k, [...(groups.get(k) ?? []), d]); }
+  for (const [k, group] of groups) for (const f of diff(verified, [...group, ...k.split("\n")])) found.add(f);
   return [...found].sort();
 }
 

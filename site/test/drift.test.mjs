@@ -54,3 +54,16 @@ test("splitCovers separates named files from directories, so documentation insid
   assert.ok(DIR_EXCLUDES.every((p) => p.startsWith(":(exclude")));
   assert.ok(DIR_EXCLUDES.some((p) => p.includes("docs")));
 });
+
+import { dirExcludes } from "../src/lib/drift.mjs";
+
+test("documentation inside a covered templates/ path still counts toward drift", () => {
+  assert.ok(!dirExcludes("templates/scaffold/").some((p) => p.includes("docs/**")));
+  assert.ok(!dirExcludes("templates").some((p) => p.includes("docs/**")));
+  assert.ok(dirExcludes("templates/scaffold/").some((p) => p.includes("README.md")), "READMEs stay out");
+});
+
+test("other covered directories keep the full exclusion list", () => {
+  assert.deepEqual(dirExcludes("packages/instance-doctor"), DIR_EXCLUDES);
+  assert.deepEqual(dirExcludes("scripts/"), DIR_EXCLUDES);
+});

@@ -17,6 +17,16 @@ const short = (sha) => String(sha).slice(0, 7);
  */
 export const DIR_EXCLUDES = [":(exclude)docs", ":(exclude,glob)**/docs/**", ":(exclude,glob)**/README.md"];
 
+/**
+ * The exclusions for one covered directory. Under `templates/` the files named
+ * docs/ are shipped scaffold content (a generated instance's docs/plans/), which
+ * the file-structure page describes, so only READMEs are left out there.
+ */
+export function dirExcludes(dir) {
+  if (/^templates(\/|$)/.test(dir)) return DIR_EXCLUDES.filter((p) => p !== ":(exclude,glob)**/docs/**");
+  return DIR_EXCLUDES;
+}
+
 /** Split a covers list into named files and directories; `isDir` says which is which. */
 export function splitCovers(covers, isDir) {
   const files = [], dirs = [];
