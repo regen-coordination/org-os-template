@@ -355,8 +355,9 @@ test("docs/ in a clone no longer points at docs/agent-plans/", () => {
     assert.deepEqual(offenders, []);
     assert.match(readFileSync(path.join(dir, "docs", "PLANS.md"), "utf-8"), /docs\/plans\//);
   });
-  // The framework's own copy is untouched.
-  assert.match(readFileSync(path.join(rootDir, "docs", "PLANS.md"), "utf-8"), /docs\/agent-plans\//);
+  // The framework's own copy is untouched. (docs/PLANS.md itself names the directory without the
+  // literal path, so that page reads the same in a clone; FILE-STRUCTURE.md carries the literal.)
+  assert.match(readFileSync(path.join(rootDir, "docs", "FILE-STRUCTURE.md"), "utf-8"), /docs\/agent-plans\//);
 });
 
 test("no npm script in a clone cd's or --prefix'es into a directory the clone lacks", () => {

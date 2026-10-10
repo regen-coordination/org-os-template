@@ -26,7 +26,7 @@ modules:
   - id: org-os-paper
     name: Paper Design Canvas
     status: in-dev
-    summary: Brand tokens pushed into a Paper design file, drift-linted; agents draft on-brand compositions a human refines by hand. Package built, live verification pending.
+    summary: Brand tokens pushed into a Paper design file, drift-linted; agents draft on-brand compositions a human refines by hand. Package built; the token round trip was verified against a live Paper file on 2026-09-02, and drawing a composition is the remaining gate to pilot.
     link: /docs/modules
   - id: org-os-federation
     name: Federation
@@ -91,7 +91,7 @@ modules:
   - id: org-os-hermes
     name: Hermes Agent
     status: in-dev
-    summary: Integration with the Hermes agent runtime — an org-os page tool and three slash-command skills.
+    summary: "Integration with the Hermes agent runtime: an org-os page tool and three slash-command skills."
     link: /docs/modules
   - id: org-os-members-hub
     name: Members Hub

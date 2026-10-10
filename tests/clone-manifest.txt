@@ -76,6 +76,7 @@ data/members.yaml
 data/projects.yaml
 data/relationships.yaml
 data/sources.yaml
+docs/ADMIN-APP.md
 docs/ADOPT-WITH-AN-AGENT.md
 docs/AGENT-MODES.md
 docs/AGENTIC-ARCHITECTURE.md
@@ -85,12 +86,19 @@ docs/CHAT-INTERFACE.md
 docs/COMMANDS.md
 docs/DATA-MODEL.md
 docs/EIP4824-GUIDE.md
+docs/FEDERATION-MAP.md
 docs/FEDERATION.md
 docs/FILE-STRUCTURE.md
 docs/HOST-INTEGRATION.md
 docs/IDEA-HATCHING.md
+docs/INSTANCE-DOCTOR.md
+docs/KMS-EXTENSION-PACKS.md
+docs/KMS-PLANES.md
+docs/KMS-PUBLISHING.md
+docs/KMS.md
 docs/MODULES.md
 docs/OPERATOR-GUIDE.md
+docs/OVERVIEW.md
 docs/PACKAGE-LIFECYCLE.md
 docs/PACKAGES.md
 docs/PATTERNS.md
@@ -100,6 +108,7 @@ docs/SETUP-PATHS.md
 docs/SETUP.md
 docs/SKILL-PROMOTION.md
 docs/SKILL-SPECIFICATION.md
+docs/TERRITORY-PACK.md
 docs/TOOL-SETUP.md
 docs/VAULT-SAFETY.md
 docs/VERSIONING.md

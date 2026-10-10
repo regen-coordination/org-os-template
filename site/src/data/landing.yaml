@@ -8,4 +8,4 @@ ctas:
   - { label: "All docs", href: "/docs", variant: "ghost" }
   - { label: "Modules", href: "/modules", variant: "ghost" }
 intro: "New to org-os? It is a git-native workspace where an organization's knowledge, data and operations live as files that people and agents both work on. Every instance today is run by the maintainer; an unaffiliated pilot is the open milestone."
-intro_link: { label: "How the framework is put together", href: "/docs/architecture" }
+intro_link: { label: "What an instance contains", href: "/docs/overview" }
