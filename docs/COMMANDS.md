@@ -1,331 +1,127 @@
-# Organizational OS Commands
+# Commands
+
+Every command an operator runs: the slash commands an agent understands, and the `npm run` scripts in `package.json`. Run scripts from the instance root.
+
+## Slash commands
+
+Slash commands are markdown files in `.claude/commands/`, the single source. `npm run sync:commands` regenerates the copies other tools read (`.opencode/commands/`, `.cursor/commands/`, and `skills/commands/<name>/SKILL.md` for Hermes). They are instructions an agent follows, not shell commands: type them in Claude Code, OpenCode or Cursor.
+
+| Command | What it does |
+|---|---|
+| `/initialize` | Open a session: `git pull --rebase` (skipped offline or in an embedded repo), run `npm run initialize:markdown` for the dashboard, note the session context, wait for you. (`skills/initialize` is the same flow as a skill.) |
+| `/close` | Close a session: summarise, append to `memory/YYYY-MM-DD.md`, update `HEARTBEAT.md`, `MEMORY.md` and the plan queue, refresh the knowledge graph, commit, push. |
+| `/sync` | Vault-safe sync: fetch, fast-forward your operator trunk only, report drift against `main`. Never stashes, cleans or hard-resets. |
+| `/commit` | Guided commit on your operator trunk (refuses `main`): show changes, stage, conventional message, push. |
+| `/handoff` | Generate a copy-paste prompt that lets another operator pick up a piece of work from their own clone. |
+| `/skills` | Run `npm run generate:skills` and print `SKILLS.md`, with anomalies and promotion status. |
+
+`/sync` is not `npm run sync`: there is no `sync` script. The interactive helper `scripts/sync-github.mjs` exists but is not wired into `package.json`; run `node scripts/sync-github.mjs status|pull|push|full` if you want it.
+
+## Setting up and updating an instance
+
+| Command | What it does |
+|---|---|
+| `npm run clone:framework -- --target <dir> --config <file>` | Generate a new instance from this framework. Also `--dry`, `--force`, `--no-git`, `--commit-unverified`. The recommended path; see [`SETUP.md`](SETUP.md) and [`ADOPT-WITH-AN-AGENT.md`](ADOPT-WITH-AN-AGENT.md). |
+| `npm run clone:manifest` | Regenerate `tests/clone-manifest.txt`, the file list a fresh clone must match. Framework maintainers. |
+| `npm run setup` | In-place wizard (org type, name, description, base URL, packages, agent runtime, network, emoji, Notion). Needs a real interactive terminal: an agent or non-TTY shell cannot drive it. It edits the repository where it runs, and it is not a working path for a newcomer (see `BOOTSTRAP.md` and `README.md`); use `clone:framework`. |
+| `npm run sync:upstream` | In an instance: pull framework changes (stages: dirty-tree refusal, `.sync-freeze` check, fetch, rebase, migrate, sync packages, validate, receipt in `memory/`). Options: `-- --yes`, `-- --dry`. Not for repositories that share no history with the framework. |
+| `npm run sync:packages` | Copy the packages enabled in `federation.yaml` from the framework into the instance. |
+| `npm run migrate` | Run every framework migration from the instance's `framework_version` up to the current one. `-- --dry` lists them. See [`VERSIONING.md`](VERSIONING.md). |
+| `npm run doctor` | Read-only assessment scorecard of an instance (`-- --dir <path>`, `--json`, `--strict`); `npm run doctor -- sync` repairs and syncs with a receipt (`--dry-run` shows the plan). |
+| `npm run install:hooks` | Install the versioned git hooks (pre-commit runs `validate:structure`, plus `validate:schemas` when `data/*.yaml` is staged; pre-push refuses to push `agent/*` branches). It does not block commits to `main`: only the `/commit` instructions and `scripts/hooks/pre-commit`, installed by `scripts/operator-setup.sh`, do. `-- --uninstall` removes them. |
+| `npm run bootstrap:local` | `clone:repos`, then `npm install`. |
+| `npm run clone:repos` | Clone the repositories listed in `repos.manifest.json` into `repos/` (`node scripts/clone-linked-repos.mjs --dry-run` previews). |
+| `npm run index:repos` | Index the cloned repositories (`repos.index.manifest.json`); `--changed` limits it to changed repos. Same script as `knowledge:index`. |
+
+## Every day
+
+| Command | What it does |
+|---|---|
+| `npm run initialize` | Gather instance state as JSON (what `/initialize` reads). |
+| `npm run initialize:markdown` | The same state rendered as the markdown dashboard. |
+| `npm run page <id>` | One dashboard page as markdown: `dashboard`, `projects`, `tasks`, `instances`, `decisions`, `this-week`, `plans`. |
+| `npm run generate:schemas` | Regenerate the `.well-known/` JSON (EIP-4824 and the rest) from `data/*.yaml` and `federation.yaml`. Run after changing data. See [`EIP4824-GUIDE.md`](EIP4824-GUIDE.md). |
+| `npm run validate:schemas` | Identity and schema validation (`scripts/validate-identity.mjs`). |
+| `npm run validate:structure` | Check the file and folder structure. |
+| `npm run selftest` | Run every validator and optional capability check; exit 1 on a failure, exit 2 when there are only warnings (`-- --verbose`, `-- --skip <name>`). |
+| `npm run version:check` | Check that `package.json`, `federation.yaml`, `CHANGELOG.md`, `VERSION.md` and `MASTERPLAN.md` agree on the version. |
+| `npm run version:update <x.y.z>` | Bump the version across those files and roll the changelog; does not commit or tag. |
+| `npm run generate:skills` | Rebuild `SKILLS.md` and `.well-known/skills.json` from the skills found in the workspace. |
+| `npm run generate:quilt` | Re-weave `docs/QUILT.md` from `data/*.yaml`. |
+| `npm run render:templates` | Render the framework's own README and GETTING-STARTED from `templates/`. |
+| `npm run generate:dashboard` | Write the static `packages/dashboard/dashboard.html` (`node packages/dashboard/generate.mjs --json` prints the raw state). |
+| `npm run admin` | Local admin app on `http://localhost:4680` for editing `data/*.yaml`; each save is a git commit. `npm run admin:dev` runs the server in watch mode. |
+
+## Vault safety
+
+Run these before any merge, rebase, pull, reset or large checkout, and again after. See [`VAULT-SAFETY.md`](VAULT-SAFETY.md).
+
+| Command | What it does |
+|---|---|
+| `npm run vault:snapshot -- "<reason>"` | Save the whole working tree (tracked, untracked, ignored) to a permanent ref `refs/snapshots/<timestamp>-<slug>` without touching the tree or stashes. |
+| `npm run vault:audit` | Compare the root content files against the latest snapshot; exit 1 if any disappeared. `-- <ref>` audits against a specific snapshot. |
+
+## Knowledge base
+
+| Command | What it does |
+|---|---|
+| `npm run compile:knowledge` | Compile raw sources (meetings, projects, funding) into pages under `knowledge/`, then update the index. |
+| `npm run lint:knowledge` | Health checks on the knowledge base: structure, freshness, links, completeness. |
+| `npm run knowledge` | `compile:knowledge` then `lint:knowledge`. |
+| `npm run knowledge:compile` / `knowledge:lint` / `knowledge:update-index` | The same steps one at a time (`knowledge:compile` compiles without updating the index). |
+| `npm run knowledge:normalize` | Normalise knowledge-base frontmatter (titles, aliases, non-standard fields). |
+| `npm run knowledge:index` | Index linked repositories (same script as `index:repos`). |
+| `npm run graph:status` | Read-only stats on the Graphify graph (`graphify-out/graph.json`); never fails when it is missing. |
+| `npm run graph:gaps` | Extract knowledge gaps from the graph into `data/knowledge-gaps.yaml` (`-- --check` prints without writing). |
+| `npm run graph:update` | Run `graphify . --update` if the CLI is installed; otherwise print a pointer to [`integrations/graphify.md`](integrations/graphify.md). |
+
+## Federation and fleet
+
+| Command | What it does |
+|---|---|
+| `npm run analyze:instances` | Scan the instances in `data/instances.yaml` (framework only), compare declared and found state, write a drift report to `memory/reports/` (`-- --json`). |
+| `npm run check:divergence` | Advisory: compare each instance's copy of a framework script against the canonical one (`-- --instances "<a>,<b>"`, `-- --script <file>`). |
+| `npm run sync:agents` | Install the Berd agent personas from `.agents/agents/` to `~/.agents/agents/`. Flags: `--dry-run`, `--adopt`, `--source <dir>`, `--target <dir>`. |
+| `npm run sync:skills:berd` | Copy the curated skills into `.agents/skills/` for Berd. |
+| `npm run sync:commands` | Regenerate the other tools' command directories from `.claude/commands/`. |
+
+## Integrations
+
+| Command | What it does |
+|---|---|
+| `npm run buzz:doctor`, `buzz:post`, `buzz:read` | Buzz integration: check the connection, post a session digest, read since a point. See [`integrations/buzz.md`](integrations/buzz.md). |
+| `npm run paper:doctor`, `paper:call`, `paper:push-tokens`, `paper:lint-tokens` | Paper integration: check, call a tool, push or lint design tokens. See [`integrations/paper.md`](integrations/paper.md). |
+| `npm run paperclip` | Paperclip agents app, dev server (`tsx watch`). |
+
+## Development and tests
+
+| Command | What it does |
+|---|---|
+| `npm test` | `node --test "tests/**/*.test.mjs"`. |
+| `npm run test:multica-bridge`, `test:cloudflare-os-integration`, `test:admin` | Test suites of those packages. |
+| `npm run format` | `prettier --write`. |
+| `npm run deploy:pages` | Build deployable web-app packages into `_site/`. Its list of packages (`dashboard`, `ideation-board`, `aggregator`, `system-canvas`) mostly does not exist in this repository, so it currently has little to build. |
 
-**Quick reference for all org-os commands**
+## Scripts that are broken in this version
 
----
+These are in `package.json` but cannot work today. Do not rely on them.
 
-## 🚀 Core Commands
+- `npm run docs` — calls `npx quartz`, but the repository has no `quartz/` directory or Quartz config.
+- `npm run paperclip:server`, `npm run paperclip:build` — call `dev:server` and `build:ui` in `packages/paperclip-agents-app`, which defines neither (it has `dev`, `build`, `start`).
+- `npm run check` — runs the graph self-tests, then `tsc --noEmit`, then `prettier --check`. There is no root `tsconfig.json` (only package-level ones), so `tsc` prints its help instead of checking and the script cannot pass. Run `node scripts/graph-status.mjs --test`, `node scripts/graph-gaps.mjs --test` or `npx prettier . --check` directly.
+- `npm run build:site`, `npm run serve:site` — run Quartz inside `repos/refi-bcn-knowledge`, a repository that is not in `repos.manifest.json`, so `clone:repos` cannot produce it and nothing in this repository provides it.
+- `npm run sync` — does not exist (see the note under slash commands).
 
-### `/initialize` — Set Up Your Organization
+## Tips
 
-**Purpose**: Initial setup of your Organizational OS instance
+- Commit messages: say what changed and why ("Add new team members and update meeting notes"), not "Update files".
+- Before anything that rewrites many files, `npm run vault:snapshot`, then `npm run vault:audit` afterwards.
+- Never `git stash`, `git clean` or `git reset --hard` in a workspace that holds untracked notes; the agent settings deny them.
 
-```bash
-npm run setup
-```
+## See also
 
-**What it does**:
-
-- Guides you through organization setup (interactive)
-- Collects organizational identity information
-- Asks for organization type (DAO, Cooperative, Project, etc.)
-- Lets you select operational packages (meetings, projects, finances, etc.)
-- Generates EIP-4824 compliant schemas
-- Sets up Cursor AI rules (optional)
-
-**When to use**: First time setting up your org-os instance
-
-**Tips**:
-
-- Read `SOUL.md` and `IDENTITY.md` before running if you have organizational docs ready
-- You can re-run setup anytime to update configuration
-
----
-
-### `/sync` — Sync Local Changes to GitHub
-
-**Purpose**: Synchronize your local workspace with GitHub without needing git knowledge
-
-```bash
-# Interactive menu (default)
-npm run sync
-
-# Specific commands
-npm run sync -- status    # Check what changed
-npm run sync -- pull      # Get latest from GitHub
-npm run sync -- push      # Commit and push your changes
-npm run sync -- full      # Full sync (pull → status → commit → push)
-npm run sync -- help      # Show command help
-```
-
-#### What Each Option Does
-
-**Status** - See what has changed
-
-```bash
-npm run sync -- status
-```
-
-Shows:
-
-- Modified files
-- New files awaiting commit
-- Files ready to push
-
-**Pull** - Get latest changes from GitHub
-
-```bash
-npm run sync -- pull
-```
-
-Use this when:
-
-- Someone else made updates to the repository
-- You're starting your work day
-- You want the latest version before making changes
-
-**Push** - Commit and send your changes
-
-```bash
-npm run sync -- push
-```
-
-Process:
-
-1. Shows you what changed
-2. Asks permission to stage all changes
-3. Asks for a commit message
-4. Sends changes to GitHub
-
-**Full Sync** - Complete synchronization workflow
-
-```bash
-npm run sync -- full
-```
-
-Best for end-of-day or before starting work:
-
-1. ⬇️ Pulls latest changes from GitHub
-2. 📊 Shows what you've changed locally
-3. 💾 Asks if you want to commit & push
-4. 🚀 Sends everything to GitHub
-
-#### Interactive Mode (Default)
-
-```bash
-npm run sync
-```
-
-Presents a menu:
-
-```
-What would you like to do?
-  📊 Check status
-  ⬇️  Pull changes
-  🚀 Push changes
-  🔄 Full Sync
-  📚 Help
-```
-
-#### Common Workflows
-
-**Starting work**:
-
-```bash
-npm run sync -- pull      # Get latest changes
-npm run sync -- status    # See current state
-```
-
-**Ending work**:
-
-```bash
-npm run sync -- full      # Pull, see status, commit, push
-```
-
-**Quick push**:
-
-```bash
-npm run sync -- push      # Stage, commit, push
-```
-
-**Just checking**:
-
-```bash
-npm run sync -- status    # What changed locally?
-```
-
----
-
-### `/generate:schemas` — Generate EIP-4824 Schemas
-
-**Purpose**: Create organizational identity schemas from data files
-
-```bash
-npm run generate:schemas
-```
-
-**What it does**:
-
-- Reads your `data/members.yaml`, `data/projects.yaml`, etc.
-- Generates EIP-4824 compliant `.well-known/` schemas
-- Creates `dao.json`, `members.json`, `proposals.json`, etc.
-
-**When to use**: After updating any `data/` files
-
-**Tips**:
-
-- Run this before pushing changes to GitHub
-- Check that schemas are valid before deployment
-
----
-
-### `/validate:schemas` — Check Schema Compliance
-
-**Purpose**: Verify your organization schemas are valid
-
-```bash
-npm run validate:schemas
-```
-
-**What it checks**:
-
-- Schema format compliance
-- Required fields
-- Data type validation
-- EIP-4824 standard conformance
-
-**When to use**: Before deploying or publishing schemas
-
----
-
-## 🔄 Additional Commands
-
-### `/sync:upstream` — Sync with Template Updates
-
-```bash
-npm run sync:upstream
-```
-
-Pulls latest updates from the organizational-os template repository.
-
-Use when:
-
-- New template features are released
-- You want upstream improvements
-- Template bug fixes are available
-
----
-
-### `/clone:repos` — Clone Linked Repositories
-
-```bash
-npm run clone:repos
-```
-
-Clones repositories defined in `repos.manifest.json`.
-
-**Options**:
-
-```bash
-npm run clone:repos                    # Clone all repos
-node scripts/clone-linked-repos.mjs --dry-run  # Preview without cloning
-```
-
----
-
-### `/bootstrap:local` — Full Local Setup
-
-```bash
-npm run bootstrap:local
-```
-
-Complete bootstrap: clones repos + installs all dependencies.
-
-Use when setting up for the first time or after major updates.
-
----
-
-## 📋 Helper Commands
-
-### Check Code Quality
-
-```bash
-npm run check              # Type check and format check
-npm run format             # Auto-format all code
-```
-
----
-
-### Build Documentation
-
-```bash
-npm run docs               # Build and serve Quartz docs locally
-```
-
-Access at `http://localhost:3000` after running.
-
----
-
-### Paperclip Integration
-
-```bash
-npm run paperclip          # Run Paperclip app dev server
-npm run paperclip:server   # Run Paperclip backend server
-npm run paperclip:build    # Build Paperclip UI
-```
-
----
-
-## 💡 Usage Tips
-
-### For GitHub Beginners
-
-If you're new to git and GitHub, use these commands:
-
-```bash
-# At start of day
-npm run sync -- full
-
-# Throughout day
-npm run sync -- status
-
-# At end of day
-npm run sync -- push      # or: npm run sync -- full
-```
-
-### Commit Message Guidelines
-
-Use clear, descriptive messages:
-
-- ✅ Good: `"Add new team members and update meeting notes"`
-- ✅ Good: `"Update project status and deliverables"`
-- ❌ Vague: `"Update files"`
-- ❌ Vague: `"Changes"`
-
-### If Something Goes Wrong
-
-1. **Lost in git state?**
-
-   ```bash
-   npm run sync -- status    # Check what's happening
-   ```
-
-2. **Conflicting changes?**
-
-   ```bash
-   npm run sync -- pull      # Get latest
-   # Manually resolve conflicts in your editor
-   npm run sync -- push      # Re-commit after fixing
-   ```
-
-3. **Need to undo?**
-   ```bash
-   npm run sync -- help      # Review what you're about to do
-   ```
-
----
-
-## 🔗 See Also
-
-- **Setup Guide**: [`SETUP.md`](SETUP.md)
-- **Operator Guide**: [`OPERATOR-GUIDEBOOK.md`](OPERATOR-GUIDEBOOK.md)
-- **EIP-4824 Standard**: [`EIP4824-GUIDE.md`](EIP4824-GUIDE.md)
-- **Package Guide**: [`PACKAGES.md`](PACKAGES.md)
-
----
-
-## Getting Help
-
-- Review command help: `npm run sync -- help`
-- Check GitHub Issues: https://github.com/organizational-os/organizational-os-template/issues
-- Ask in Discussions: https://github.com/organizational-os/organizational-os-template/discussions
+- [`SETUP.md`](SETUP.md)
+- [`OPERATOR-GUIDE.md`](OPERATOR-GUIDE.md)
+- [`EIP4824-GUIDE.md`](EIP4824-GUIDE.md)
+- [`PACKAGES.md`](PACKAGES.md)
+- Issues: https://github.com/regen-coordination/org-os-template/issues
