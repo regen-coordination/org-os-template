@@ -118,8 +118,6 @@ code, pre, kbd { font-variant-ligatures: none; }
   position: relative;
   /* Slightly veiled, so the aura breathes through a raised card */
   background: color-mix(in srgb, var(--color-surface) var(--surface-veil), transparent);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
   border: var(--border-hair) solid var(--color-line);
   border-radius: var(--radius);
 }

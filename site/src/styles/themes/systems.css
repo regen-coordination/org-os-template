@@ -20,10 +20,10 @@
   --color-grid:   #e9dfcc;      /* atmospheric blueprint grid */
 
   /* Accent — regen green */
-  --color-accent:      #196f35;
+  --color-accent:      #176a32;
   --color-accent-soft: #2da856;
   --color-accent-ink:  #fbf6ec;
-  --color-accent-wash: rgba(25, 111, 53, 0.08);
+  --color-accent-wash: rgba(23, 106, 50, 0.08);
 
   /* Aura — soft light behind the page: peach, lilac, mint */
   --aura-1: rgba(255, 158, 102, 0.26);
@@ -36,7 +36,7 @@
 
   /* Grain — dark specks, multiplied into the paper */
   --grain-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15  0 0 0 0 .1  0 0 0 0 .05  0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --grain-opacity: 0.16;
+  --grain-opacity: 0.10;
   --grain-blend: multiply;
   --surface-veil: 82%;          /* how opaque a raised card is over the aura */
 
