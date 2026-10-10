@@ -6,26 +6,55 @@ import Layout from "../components/Layout.astro";
 import Hero from "../components/Hero.astro";
 import SectionBlock from "../components/SectionBlock.astro";
 import FederationMapIsland from "../components/FederationMapIsland.astro";
-import ModuleCard from "../components/ModuleCard.astro";
 import { federationData } from "../lib/federation";
 import { withBase } from "../lib/base";
+import { SECTIONS, pagesBySection } from "../data/docs-manifest.mjs";
+import { VERSION, REPO_URL } from "../lib/repo.mjs";
 
 const landing = yaml.load(readFileSync(resolve(process.cwd(), "src/data/landing.yaml"), "utf8")) as any;
-const mod = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as any;
-const teaserModules = mod.modules.slice(0, 3);
-const statline = `${federationData.nodes.length} instances · framework v0.5 · EIP-4824`;
+const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).filter((s) => s.pages.length > 0);
+const statline = `v${VERSION} · ${federationData.nodes.length} instances · EIP-4824`;
+const SHOWN = 4;
 ---
-<Layout title="Home" current="home">
+<Layout title="Home" current="home" description="Documentation for operators of org-os instances.">
   <div class="container">
     <Hero eyebrow={landing.eyebrow} title={landing.title} subtitle={landing.subtitle} ctas={landing.ctas} statline={statline} />
   </div>
-  <SectionBlock index="01" eyebrow="Federation" title="One OS, many nodes" href={withBase("/federation")} cta="Explore the network">
+
+  <SectionBlock index="01" eyebrow="Documentation" title="Where to look" href={withBase("/docs")} cta="All docs">
+    <div class="grid">
+      {sections.map((s) => (
+        <article class="surface ticked card">
+          <h3><a href={withBase(`/docs/${s.pages[0].slug}`)}>{s.title}</a></h3>
+          <p class="summary">{s.summary}</p>
+          <ul>
+            {s.pages.slice(0, SHOWN).map((p) => <li><a class="link" href={withBase(`/docs/${p.slug}`)}>{p.title}</a></li>)}
+          </ul>
+          {s.pages.length > SHOWN && <p class="more mono">+ {s.pages.length - SHOWN} more</p>}
+        </article>
+      ))}
+    </div>
+  </SectionBlock>
+
+  <SectionBlock index="02" eyebrow="Release" title={`Version ${VERSION}`} href={`${REPO_URL}/blob/main/CHANGELOG.md`} cta="Changelog">
+    <p class="prose">These docs describe org-os <code>v{VERSION}</code>. Each page says which commit it was checked against.</p>
+  </SectionBlock>
+
+  <SectionBlock index="03" eyebrow="Federation" title="One OS, many nodes" href={withBase("/federation")} cta="Explore the network">
     <FederationMapIsland mode="mini" />
   </SectionBlock>
-  <SectionBlock index="02" eyebrow="v0.5 roadmap" title="Modules" href={withBase("/modules")} cta="See all modules">
-    <div class="grid">{teaserModules.map((m: any) => <ModuleCard {...m} />)}</div>
-  </SectionBlock>
+
+  <section class="container intro">
+    <p class="prose">{landing.intro} <a class="link" href={withBase(landing.intro_link.href)}>{landing.intro_link.label}</a>.</p>
+  </section>
 </Layout>
 <style>
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: var(--space-5); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-5); }
+.card { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+.card h3 a { color: var(--color-ink); }
+.card h3 a:hover { color: var(--color-accent); }
+.card .summary { font-size: var(--text-sm); color: var(--color-muted); }
+.card ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); }
+.card .more { font-size: var(--text-xs); color: var(--color-muted); }
+.intro { margin-block: var(--space-16); color: var(--color-muted); }
 </style>

@@ -5,11 +5,9 @@ import { withBase } from "../lib/base";
 interface Props { current?: string; }
 const { current = "home" } = Astro.props;
 const links = [
+  { id: "docs", href: "/docs", label: "Docs" },
   { id: "modules", href: "/modules", label: "Modules" },
   { id: "federation", href: "/federation", label: "Federation" },
-  { id: "docs", href: "/docs", label: "Docs" },
-  { id: "get-started", href: "/get-started", label: "Get started" },
-  { id: "about", href: "/about", label: "About" },
 ];
 ---
 <nav class="nav">

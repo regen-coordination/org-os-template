@@ -1,8 +1,11 @@
-# Hero copy. Canon: docs/POSITIONING.md §1 (Definition). Edit there first, mirror here.
-eyebrow: "Framework · standards · federation"
-title: "An AI chief of staff for your organization — not just for you"
-subtitle: "Your org's knowledge, data, and operations as files any agent can read, act on, and federate. Single-operator dogfood today — external pilot is the open milestone. No SaaS, no lock-in — markdown, YAML, and git."
+# Home copy. The site's audience is people who already run an org-os instance
+# (spec 2026-10-10, §1). The pitch for newcomers lives in docs/POSITIONING.md.
+eyebrow: "docs"
+title: "Run your organization on org-os"
+subtitle: "Documentation for operators of org-os instances — setting one up, the daily session, keeping it current, and the reference for every file and registry."
 ctas:
-  - { label: "$ node scripts/clone-framework.mjs", href: "/get-started", variant: "solid" }
-  - { label: "/modules", href: "/modules", variant: "ghost" }
-  - { label: "/federation", href: "/federation", variant: "ghost" }
+  - { label: "Operator guide", href: "/docs/operator-guide", variant: "solid" }
+  - { label: "All docs", href: "/docs", variant: "ghost" }
+  - { label: "Modules", href: "/modules", variant: "ghost" }
+intro: "New to org-os? It is a git-native workspace where an organization's knowledge, data and operations live as files that people and agents both work on. Every instance today is run by the maintainer; an unaffiliated pilot is the open milestone."
+intro_link: { label: "How the framework is put together", href: "/docs/architecture" }

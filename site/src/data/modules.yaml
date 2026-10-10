@@ -1,7 +1,13 @@
 # Mirror of docs/MODULES.md — that file is canon; this one feeds /modules.
-# site/test/modules-catalog.test.mjs fails if an id here is missing from the catalog.
+# site/test/modules-catalog.test.mjs fails if the two lists differ, in either
+# direction, or if a status here disagrees with the catalog.
 # status: planned | in-dev | pilot | live
 modules:
+  - id: org-os-instance-doctor
+    name: Instance Assessment & Reliable Sync
+    status: pilot
+    summary: Is this instance healthy, and can it be updated safely? assess gives a read-only scorecard; sync repairs, then updates.
+    link: /docs/modules
   - id: org-os-cloudflare-os
     name: Cloudflare OS Integration
     status: pilot
@@ -27,6 +33,36 @@ modules:
     status: live
     summary: Peers, trust levels, lineage and drift across a network of sovereign instances.
     link: /docs/federation
+  - id: org-os-pm
+    name: Projects & Tasks
+    status: live
+    summary: Workstream and task tracking — the projects registry, the plans queue, and the dashboard sections that render them.
+    link: /docs/modules
+  - id: org-os-meeting-processor
+    name: Meeting Processor
+    status: live
+    summary: Transcript to structured meeting record to registry updates to knowledge base.
+    link: /docs/modules
+  - id: org-os-knowledge
+    name: Knowledge Commons
+    status: in-dev
+    summary: Compiling, linting, indexing and federating an org's knowledge.
+    link: /docs/modules
+  - id: org-os-funding
+    name: Funding
+    status: live
+    summary: Grant and funding-opportunity tracking with deadline surfacing.
+    link: /docs/modules
+  - id: org-os-heartbeat
+    name: Heartbeat
+    status: in-dev
+    summary: The instance's live pulse — the module that consumes every other module's health checks.
+    link: /docs/modules
+  - id: org-os-territory
+    name: Territory Extension Pack
+    status: in-dev
+    summary: An extension pack for org-os-kms that gives a knowledge instance a sense of place — territorial units and data streams.
+    link: /docs/modules
   - id: rad-org-os
     name: rad-org-os
     status: in-dev

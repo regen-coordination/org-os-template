@@ -4,15 +4,16 @@ import { resolve } from "node:path";
 import yaml from "js-yaml";
 import Layout from "../components/Layout.astro";
 import ModuleCard from "../components/ModuleCard.astro";
+import { withBase } from "../lib/base";
 interface Module { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
 const doc = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as { modules: Module[] };
 const modules = doc.modules;
 ---
-<Layout title="Modules" current="modules" description="The org-os v0.5 module roadmap.">
+<Layout title="Modules" current="modules" description="The org-os module catalog, with each module's status.">
   <div class="container" data-pagefind-body>
-    <p class="eyebrow">v0.5 roadmap</p>
+    <p class="eyebrow">Catalog</p>
     <h1>Modules</h1>
-    <p class="prose">org-os v0.5 is a constellation of modules. Status is honest — badges show what ships today vs. what's planned.</p>
+    <p class="prose">Every module in the <a class="link" href={withBase("/docs/modules")}>catalog</a>, with its status: planned (specified, not built), in-dev (being built), pilot (built and verified, not yet in production) or live.</p>
     <div class="grid">{modules.map((m) => <ModuleCard {...m} />)}</div>
   </div>
 </Layout>

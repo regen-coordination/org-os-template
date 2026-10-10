@@ -20,6 +20,15 @@ const modules = yaml.load(readFileSync(join(siteRoot, "src", "data", "modules.ya
 // Entry headings are "### <id> — <Name>"; the em-dash separator is load-bearing.
 const catalogIds = new Set([...catalog.matchAll(/^### ([a-z0-9-]+) — /gm)].map((m) => m[1]));
 
+// "**Status.** `pilot` — …" under each entry heading.
+const catalogStatus = new Map(
+  catalog.split(/^### /m).slice(1).flatMap((block) => {
+    const id = block.match(/^([a-z0-9-]+) — /)?.[1];
+    const status = block.match(/\*\*Status\.\*\* `([a-z-]+)`/)?.[1];
+    return id ? [[id, status]] : [];
+  }),
+);
+
 test("MODULES.md declares at least the tracked module", () => {
   assert.ok(catalogIds.has("org-os-cloudflare-os"), "catalog is missing org-os-cloudflare-os");
 });
@@ -39,4 +48,15 @@ test("every site module uses the shared status vocabulary", () => {
 test("site module ids are unique", () => {
   const ids = modules.map((m) => m.id);
   assert.equal(new Set(ids).size, ids.length, "duplicate module id in modules.yaml");
+});
+
+test("every module in the MODULES.md catalog appears on the site", () => {
+  const siteIds = new Set(modules.map((m) => m.id));
+  for (const id of catalogIds) assert.ok(siteIds.has(id), `MODULES.md has "${id}", modules.yaml does not`);
+});
+
+test("each site module carries the status the catalog gives it", () => {
+  for (const m of modules) {
+    assert.equal(m.status, catalogStatus.get(m.id), `"${m.id}": modules.yaml says ${m.status}, MODULES.md says ${catalogStatus.get(m.id)}`);
+  }
 });

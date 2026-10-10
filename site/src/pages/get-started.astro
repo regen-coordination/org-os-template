@@ -1,30 +1,5 @@
 ---
-import Layout from "../components/Layout.astro";
-import { withBase } from "../lib/base";
-const repo = "https://github.com/regen-coordination/org-os-template";
-const steps = [
-  { n: "01", title: "Clone the framework as a generator", body: "The one recommended path. Describe your org in a small YAML config; the engine materializes a fresh instance in a sibling directory — your identity, your package + skill selection, a lineage stamp back to the framework, and no framework content left behind.", code: "npm run clone:framework -- --target ../my-org --config my-org.yaml" },
-  { n: "02", title: "Let your agent drive it", body: "Claude Code, Cursor, or a connector setup is the normal case: you answer questions in plain language, the agent writes the config, runs the engine, and verifies the result. The recipe it follows is docs/adopt-with-an-agent — verified end-to-end against a fresh clone.", code: "npm run doctor -- --dir ../my-org   # acceptance: no blockers except the expected missing remote" },
-  { n: "03", title: "Publish your schemas, open a session", body: "Inside the new instance: generate your EIP-4824 descriptors, validate, then read GETTING-STARTED.md and run the bootstrap-interviewer skill to fill in members, projects and sources.", code: "npm run generate:schemas && npm run validate:schemas\n/initialize" },
-];
+import Redirect from "../components/Redirect.astro";
+import { redirectFor } from "../data/redirects.mjs";
 ---
-<Layout title="Get started" current="get-started" description="Spin up your own org-os instance.">
-  <div class="container prose">
-    <p class="eyebrow">Operators</p>
-    <h1>Give your org an operating system</h1>
-    <p>org-os is the canonical template. Downstream instances fork or sync from it. Requirements: Node ≥22, npm ≥10.9.2, git.</p>
-    {steps.map((s) => (
-      <section class="step">
-        <span class="mono n">{s.n}</span>
-        <div><h3>{s.title}</h3><p>{s.body}</p><pre class="mono">{s.code}</pre></div>
-      </section>
-    ))}
-    <p>Next: the <a href={withBase("/docs/adopt-with-an-agent")}>agent recipe</a>, the <a href={`${repo}/blob/main/BOOTSTRAP.md`}>BOOTSTRAP</a> sequence, and the <a href={withBase("/docs/operator-guide")}>Operator Guide</a>. (An in-place wizard, <code>npm run setup</code>, exists for real interactive terminals — nine prompts, not agent-drivable; prefer the engine.)</p>
-  </div>
-</Layout>
-<style>
-.step { display: flex; gap: var(--space-4); margin: var(--space-8) 0; }
-.step .n { color: var(--color-accent); font-size: var(--text-lg); }
-.step pre { background: var(--color-surface); border: 1px solid var(--color-line);
-  border-radius: var(--radius); padding: var(--space-3); overflow-x: auto; font-size: var(--text-sm); }
-</style>
+<Redirect to={redirectFor("/get-started")} />

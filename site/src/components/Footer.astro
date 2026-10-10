@@ -1,5 +1,6 @@
 ---
 import { withBase } from "../lib/base";
+import { VERSION } from "../lib/repo.mjs";
 const year = 2026; // build-stamped
 const repo = "https://github.com/regen-coordination/org-os-template";
 ---
@@ -13,18 +14,18 @@ const repo = "https://github.com/regen-coordination/org-os-template";
       <span class="label">Machine</span>
       <a class="link" href={withBase("/llms.txt")}>llms.txt</a>
       <a class="link" href={withBase("/federation.json")}>federation.json</a>
-      <a class="link" href={withBase("/.well-known/")}>.well-known</a>
+      <a class="link" href={withBase("/.well-known/dao.json")}>.well-known/dao.json</a>
     </nav>
     <nav class="col links mono" aria-label="Project">
       <span class="label">Project</span>
       <a class="link" href={repo}>Source</a>
       <a class="link" href={withBase("/docs")}>Docs</a>
-      <a class="link" href={withBase("/get-started")}>Get started</a>
+      <a class="link" href={withBase("/docs/setup")}>Setup</a>
     </nav>
   </div>
   <div class="container baseline mono">
     <span>MIT · {year}</span>
-    <span class="faint">v0.5 · pre-beta · self-hosting since 2026</span>
+    <span>v{VERSION} · pre-beta · self-hosting since 2026</span>
   </div>
 </footer>
 <style>
@@ -39,6 +40,5 @@ const repo = "https://github.com/regen-coordination/org-os-template";
 .baseline { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2);
   padding-block: var(--space-5); border-top: var(--border-hair) dashed var(--color-line);
   font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); color: var(--color-muted); text-transform: uppercase; }
-.baseline .faint { color: var(--color-faint); }
 @media (max-width: 720px) { .footer-inner { grid-template-columns: 1fr 1fr; } .footer-inner .col:first-child { grid-column: 1 / -1; } }
 </style>
