@@ -75,6 +75,14 @@ test("absolute and external links are left alone", () => {
   }
 });
 
+test("only http, https and mailto pass through; any other scheme is broken", () => {
+  for (const url of ["javascript:alert(1)", "JAVASCRIPT:alert(1)", "data:text/html,x", "vbscript:x"]) {
+    assert.deepEqual(from("docs/SETUP.md", url), { kind: "broken", href: url });
+  }
+  assert.equal(from("docs/SETUP.md", "HTTPS://example.org").kind, "external");
+  assert.equal(from("docs/SETUP.md", "MAILTO:a@b.c").kind, "external");
+});
+
 test("an image in the repo is served raw; a page is never used as an image", () => {
   assert.deepEqual(from("docs/SETUP.md", "img/map.png", { image: true }), { kind: "repo", href: "https://raw.githubusercontent.com/o/r/v0.5.1/docs/img/map.png" });
   assert.equal(from("docs/SETUP.md", "FEDERATION.md", { image: true }).href, "https://raw.githubusercontent.com/o/r/v0.5.1/docs/FEDERATION.md");

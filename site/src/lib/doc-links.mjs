@@ -5,6 +5,7 @@
 import { posix } from "node:path";
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const WEB_SCHEMES = /^(https?|mailto):/i;
 const encodePath = (p) => p.split("/").map(encodeURIComponent).join("/");
 
 /** Every ancestor directory of a list of repo-relative files. */
@@ -24,7 +25,10 @@ export function dirsOf(files) {
  * @returns {{ kind: "external" | "page" | "repo" | "broken", href: string }}
  */
 export function resolveDocLink({ url, sourcePath, pages, repoFiles, repoDirs, base, repoUrl, ref, image = false }) {
-  if (SCHEME.test(url) || url.startsWith("#") || url.startsWith("/")) return { kind: "external", href: url };
+  if (url.startsWith("#") || url.startsWith("/")) return { kind: "external", href: url };
+  if (SCHEME.test(url)) {
+    return WEB_SCHEMES.test(url) ? { kind: "external", href: url } : { kind: "broken", href: url };
+  }
 
   const cut = url.search(/[#?]/);
   const rawPath = cut === -1 ? url : url.slice(0, cut);

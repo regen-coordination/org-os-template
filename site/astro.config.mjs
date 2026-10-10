@@ -1,7 +1,7 @@
 import { defineConfig } from "astro/config";
 import { SITE_ORIGIN, BASE_PATH } from "./base.config.mjs";
 import { PAGES } from "./src/data/docs-manifest.mjs";
-import { REPO_ROOT, REPO_URL, RELEASE_REF, listRepoFiles } from "./src/lib/repo.mjs";
+import { REPO_ROOT, REPO_URL, SOURCE_REF, listRepoFiles } from "./src/lib/repo.mjs";
 import remarkDocLinks from "./src/lib/remark-doc-links.mjs";
 import remarkStripTitle from "./src/lib/remark-strip-title.mjs";
 
@@ -20,7 +20,7 @@ export default defineConfig({
       // available to it; the plugin is given the base path directly.
       [remarkDocLinks, {
         pages: PAGES, repoRoot: REPO_ROOT, base: BASE_PATH,
-        repoUrl: REPO_URL, ref: RELEASE_REF, listFiles: listRepoFiles,
+        repoUrl: REPO_URL, ref: SOURCE_REF, listFiles: listRepoFiles,
       }],
     ],
   },

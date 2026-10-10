@@ -159,7 +159,7 @@ Docs link to each other as files (`[…](ADOPT-WITH-AN-AGENT.md)`), which is rig
 broken on the site. A remark plugin resolves each relative link from the page's source path:
 
 - to a manifest page → its site address, with the base path and any `#fragment` kept;
-- to another file in the repo → its GitHub address at the release tag;
+- to another tracked file in the repo → its GitHub address at the commit being built (a tag would lag the deploy, which runs on every push to `main`);
 - to nothing → the build fails, naming the page and the link.
 
 Absolute and external links are left alone. The plugin is a pure function of (link, source path,
@@ -293,7 +293,7 @@ does not work for a newcomer (`POSITIONING.md`, "Bootstrap status").
 3. The operator reviews a local build of the whole site. The pull request is opened with CI green
    and the ledger attached.
 4. **Publication, on the operator's explicit go:** the `docs-feedback` label is created; the pull
-   request is merged — the deploy workflow runs on every push to `main`, so the merge is the
+   request is merged with a merge commit — never squashed or rebased, since each page's `verified` commit must stay in `main`'s history — the deploy workflow runs on every push to `main`, so the merge is the
    publication; then the tag `v0.5.1` is pushed.
 5. The live site is checked: every manifest page, search, the redirects, both themes, a phone
    width, the feedback links.

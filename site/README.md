@@ -22,7 +22,7 @@ on any link that skips (or doubles) the prefix.
 ## How it works
 
 - **Docs** are published from one manifest, `src/data/docs-manifest.mjs`: each entry names a markdown file anywhere in the repository, its address, title, section, order, summary and the commit it was checked against. Nothing is copied into `site/`. A file that is not in the manifest is not on the site.
-- **Links between docs** are written as file links (`[x](FEDERATION.md)`), as the repository needs. `src/lib/remark-doc-links.mjs` turns a link to a published page into its site address and a link to any other repo file into its GitHub address at the release tag. A link that resolves to nothing fails the build.
+- **Links between docs** are written as file links (`[x](FEDERATION.md)`), as the repository needs. `src/lib/remark-doc-links.mjs` turns a link to a published page into its site address and a link to any other repo file into its GitHub address at the commit being built. A link that resolves to nothing fails the build.
 - **Search** is Pagefind: `npm run build` indexes `dist/` after Astro builds it, and the index loads when the viewer first opens search. It does not exist under `npm run dev`, where Search falls back to the docs index — use `npm run build && npm run preview` to try it.
 - **Federation** is aggregated at build by `scripts/aggregate-federation.mjs` from `../data/instances.yaml` + each sibling instance's `.well-known/` → `src/data/federation.json` (gitignored, regenerated each build). A missing/unreadable sibling degrades gracefully (node flagged `available: false`); the build never fails. The aggregator also copies org-os's own `.well-known/*.json` into `public/.well-known/`.
 - **Themes**: light and dark, both loaded (`src/styles/theme.css`); `<html data-theme>` chooses, set before first paint by `src/lib/theme-boot.mjs` from the viewer's saved choice or the system setting. Palette/fonts/radius live in `src/styles/themes/`; structural tokens in `tokens.css`. `test/theme-contrast.test.mjs` holds both to WCAG AA.
@@ -56,7 +56,7 @@ path live in `base.config.mjs` (the single source of truth, consumed by
 `astro.config.mjs`, `verify-build.mjs`, and the root README render);
 `.github/workflows/deploy-pages.yml` deploys on every push to `main`.
 
-## Open decisions (see spec §16)
+## Open decisions
 
 A custom domain would be a new decision, made by changing `base.config.mjs`.
 Specs: `../docs/superpowers/specs/2026-06-17-org-os-website-design.md` (the first
