@@ -247,6 +247,7 @@ tests/repo-paths.test.mjs
 tests/scripts/crew-board.test.mjs
 tests/scripts/crew-cli.test.mjs
 tests/scripts/crew-flow.test.mjs
+tests/scripts/crew-git.test.mjs
 tests/scripts/crew-roles.test.mjs
 tests/scripts/crew-seat.test.mjs
 tests/scripts/crew-shipped-roles.test.mjs
