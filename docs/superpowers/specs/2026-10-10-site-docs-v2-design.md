@@ -29,7 +29,7 @@ site, reaches it from the sidebar or search, and can tell which commit the page 
 `v0.5.0`. Eleven of about 42 docs are on the site; nothing about the kms, the two planes,
 extension packs or the territory pack is surfaced; links between docs are broken on the site; and
 three pages are known to be wrong (`OPERATOR-GUIDE.md` level 1, `MODULES.md` on the admin app,
-`site/src/data/modules.yaml` missing six modules).
+`site/src/data/modules.yaml` missing seven modules).
 
 ## 2. Decisions
 
@@ -128,9 +128,10 @@ Setup page and `/about` to Overview. `/modules/rad-org-os` stays.
 
 Static Astro, no client framework. Each unit has one job.
 
-### 4.1 Manifest — `site/src/data/docs-manifest.ts`
+### 4.1 Manifest — `site/src/data/docs-manifest.mjs`
 
-Replaces `docs-allowlist.ts`. One entry per published page:
+Replaces `docs-allowlist.ts`. Plain JavaScript, so `node --test` and `verify-build.mjs` can import
+it without a TypeScript step. One entry per published page:
 
 | Field | Meaning |
 |---|---|
@@ -176,8 +177,8 @@ Wraps the existing `Layout`. Parts, each its own component:
   source file on GitHub; the stamp "Checked against `<short commit>`", linking to that commit;
   the feedback links (§4.7).
 
-At phone width the sidebar is a drawer opened from the nav (a `<details>`-based disclosure that
-works without script) and the on-page contents collapse above the article.
+At phone width the sidebar is a `<details>` disclosure in a bar under the nav, which works
+without script, and the on-page contents collapse above the article.
 
 ### 4.5 Search
 
@@ -188,7 +189,9 @@ index.
 
 ### 4.6 Dark theme
 
-`themes/systems-dark.css` is completed into a full theme. Both themes are imported; the active one
+`themes/systems-dark.css` is completed into a full theme. To meet AA on every surface, the light
+theme's accent is darkened slightly (`#1c7d3b` → `#1a7738`) and its faint colour raised
+(`#969aa0` → `#7e8288`, non-text use only). Both themes are imported; the active one
 is chosen by `data-theme` on `<html>`, set before first paint from the viewer's saved choice or
 the system setting. A toggle in the nav saves the choice. A test checks text and accent contrast
 in both themes against WCAG AA.
@@ -209,8 +212,9 @@ URL; it is unit-tested. The label is created in the repository as part of the re
 - **Home.** An operator's front door: the six sections as entry points with their summaries; the
   current version with a link to the changelog; the federation map as a small panel. The
   newcomer pitch is one paragraph linking to Overview.
-- **Modules.** Built from `docs/MODULES.md`, the six missing modules restored. The existing drift
-  test (`modules-catalog.test.mjs`) is kept and must pass.
+- **Modules.** `modules.yaml` stays a mirror of `docs/MODULES.md`, with the seven missing modules
+  restored. The drift test (`modules-catalog.test.mjs`) is tightened: the two lists must match in
+  both directions, and each status must equal the catalog's.
 - **Federation.** Unchanged apart from fresh data.
 - **Docs index.** The six sections with every page and its summary.
 - **Removed:** `/get-started`, `/about` (redirects, §3).
@@ -308,8 +312,10 @@ does not work for a newcomer (`POSITIONING.md`, "Bootstrap status").
 
 Three implementation plans, in order:
 
-1. **Frame** — §4, with the eleven current pages carried into the manifest unverified behind a
-   temporary flag, so the site builds throughout. The flag is removed in plan 2; check 2 of §4.9
+1. **Frame** — §4, with the eleven current pages plus Setup (the target of `/get-started`) carried
+   into the manifest unverified behind a temporary flag, so the site builds throughout. `/about`
+   redirects to the docs index until Overview exists. Dead links in those pages are unlinked so
+   the build passes. The flag is removed in plan 2; check 2 of §4.9
    is enforced from then on.
 2. **Content** — §5, section by section, in the order of §5.4.
 3. **Release** — §6.
