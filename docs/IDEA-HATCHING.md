@@ -1,170 +1,114 @@
-# IDEA-HATCHING.md — Knowledge → Ideas → Hatched Projects
-
-Version: 2.0.0
+# Idea hatching
 
 ## Overview
 
-org-os isn't just internal operations — it's a **coordination layer for ecosystem development**. An org consolidates its repos, knowledge, and community intelligence. From that base, it identifies ecosystem gaps and hatches projects to fill them.
+An org-os instance keeps a registry of ideas, `data/ideas.yaml`, and an agent skill that
+fills it from the instance's knowledge. An idea moves through a fixed list of statuses; the
+last working step, turning an approved idea into its own repository, is done by hand.
 
-## The Pipeline
+What exists today:
 
-```
-knowledge/               ideas/                  hatched repos
-┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐
-│ Blog posts   │    │ Community    │    │ Standalone project   │
-│ Podcast eps  │───▶│ submissions  │───▶│ repo with org-os     │
-│ Research     │    │ Agent-       │    │ workspace files,     │
-│ Meeting      │    │ surfaced     │    │ deployed agent,      │
-│ insights     │    │ gaps         │    │ community stewards   │
-└──────────────┘    └──────────────┘    └──────────────────────┘
-     (ingest)          (curate)              (hatch & develop)
-```
+- `data/ideas.yaml` — the registry (a new instance starts with `ideas: []`).
+- The `idea-scout` skill (`skills/idea-scout/SKILL.md`) — scans `knowledge/` for gaps and
+  writes `surfaced` entries.
+- The status vocabulary, which `npm run initialize` shows as an "Ideas" pipeline on the
+  dashboard (counts per status) and which `npm run generate:schemas` copies into
+  `.well-known/ideas.json`.
 
-## Stage 1: Knowledge → Idea Extraction
+What does not exist: a web app for submitting or voting on ideas, a script that hatches a
+repository, or any code that reads `votes`, `comments` or `compensation`. `docs/MODULES.md`
+lists the wider ideation system (`org-os-ideas`) as `planned`.
 
-The `knowledge-curator` skill processes external content (blog, podcast, meetings, docs) into structured knowledge pages in `knowledge/`.
-
-The `idea-scout` skill then scans knowledge for:
-- **Ecosystem gaps**: "there is no...", "missing...", "need for..."
-- **Repeated themes**: Topics appearing across multiple sources
-- **Unmet needs**: Problems described without solutions
-- **Emerging trends**: New patterns not yet addressed
-- **Cross-domain opportunities**: Insights from combining domains
-
-Surfaced ideas go into `data/ideas.yaml` with status `surfaced`.
-
-Community members can also submit ideas directly via:
-- The `ideation-board` web app
-- Markdown files in `ideas/`
-- Chat interface (Telegram bot)
-
-## Stage 2: Idea Lifecycle
+## The pipeline
 
 ```
-surfaced → proposed → approved → developing → hatched → archived
-   ↑          ↑          ↑           ↑           ↑
- agent    community   council    developers  repo created
+knowledge/  ──(idea-scout)──▶  data/ideas.yaml  ──(review, by people)──▶  a new repo
+                                 surfaced → proposed → approved → developing → hatched → archived
 ```
 
-### Status Definitions
+## Stage 1: knowledge → idea
 
-| Status | Who | What happens |
-|--------|-----|-------------|
+The `knowledge-curator` skill turns external content (posts, podcasts, meetings, documents)
+into pages under `knowledge/`. The `idea-scout` skill then reads
+`data/knowledge-manifest.yaml`, `data/ideas.yaml`, `data/projects.yaml`,
+`data/relationships.yaml` and the pages in `knowledge/`, and looks for:
+
+- ecosystem gaps ("there is no...", "missing...", "need for...")
+- themes repeated across sources
+- problems described without a solution
+- emerging patterns no project addresses
+- cross-domain opportunities
+
+It checks each candidate against existing ideas and projects for duplicates, then appends an
+entry with `status: "surfaced"` and `submitted_by: "agent"` to `data/ideas.yaml`. It also writes a
+detail page, `docs/ideas/<slug>.md` (the skill's header lists `docs/docs/ideas/`, but its
+procedure and template use `docs/ideas/`), and logs the session in `memory/YYYY-MM-DD.md`.
+You trigger it by asking ("scout ideas", "find ecosystem gaps"), usually after processing a batch
+of new content.
+
+People can add an entry to `data/ideas.yaml` by hand or by asking an agent; there is no other
+submission channel in the repository.
+
+## Stage 2: status lifecycle
+
+| Status | Who | Meaning |
+|--------|-----|---------|
 | `surfaced` | Agent | Detected from knowledge analysis. Needs human review. |
 | `proposed` | Community member | Formally proposed with champion(s). Open for discussion. |
-| `approved` | Council/community | Approved for development. Resources allocated. |
-| `developing` | Developers | Active development. May have working prototype. |
-| `hatched` | Operator/agent | Spawned as independent repo with org-os workspace. |
-| `archived` | Anyone | Completed, abandoned, or superseded. |
+| `approved` | Council or community | Approved for development; resources allocated. |
+| `developing` | Developers | Active development, possibly a prototype. |
+| `hatched` | Operator or agent | Spawned as an independent repo with an org-os workspace. |
+| `archived` | Anyone | Completed, abandoned or superseded. |
 
-### ideas.yaml Schema
+Nothing enforces the transitions or who may make them; they are a convention. The dashboard
+pipeline shows the first five statuses (`archived` entries are not drawn as a stage).
+
+### The entry
+
+The fields `idea-scout` writes. `hatched_repo`, `resources`, `compensation`, `votes` and `comments` are optional fields from the skill's template; no entry in this framework's `data/ideas.yaml` carries them yet, and no code reads them:
 
 ```yaml
 ideas:
   - id: "idea-042"
     title: "Carbon Credit Verification Toolkit"
-    status: "developing"
+    status: "developing"        # surfaced | proposed | approved | developing | hatched | archived
     source: "knowledge/carbon-markets/verification-gaps.md"
-    submitted_by: "agent"      # "agent" or member-id
+    submitted_by: "agent"       # "agent" or a member id
     champions: ["luiz", "monty"]
     ecosystem_gap: "No open-source MRV tools for small-scale projects"
     description: "Build an open-source toolkit for MRV at small scale"
-    hatched_repo: null
-    skills_needed: ["smart-contracts", "data-science", "field-ops"]
+    hatched_repo: null          # fill in when hatched
+    skills_needed: ["smart-contracts", "data-science"]
     resources: []
-    compensation:
-      model: null              # bounty | retroactive | grants | equity | null
-      pool: null
+    compensation: { model: null, pool: null }   # idea-scout writes it; no code reads it
     created: "2026-03-15"
     updated: "2026-03-15"
-    votes: 0
+    votes: 0                    # idea-scout writes it; no code reads it
     comments: []
 ```
 
-## Stage 3: Hatching — Idea → Project Repo
+The entries in this framework's own `data/ideas.yaml` use only the other fields. The ids there
+look like `idea-001-hatching-pipeline`, so the `idea-NNN` id is a convention, not a format.
 
-When an idea reaches `approved` status and development resources are available:
+## Stage 3: hatching, by hand
 
-### Hatching Process
+When an idea is `approved` and someone has capacity to build it, the steps are manual:
 
-1. **Scaffold repo**: Create new repo from org-os template
-2. **Pre-populate knowledge**: Copy relevant pages from parent org's `knowledge/`
-3. **Set identity**: Generate SOUL.md, IDENTITY.md from idea description
-4. **Link federation**: Add `federation.yaml` with upstream link to parent org
-5. **Register**: Add hatched_repo URL to the idea's `ideas.yaml` entry
-6. **Deploy agent**: The hatched repo has its own agent that inherits parent skills
+1. Create the new instance with `npm run clone:framework -- --target <dir> --config <config.yaml>`
+   (see [SETUP.md](SETUP.md)). It generates the identity files, an empty `data/`, and a
+   `federation.yaml` with a lineage stamp.
+2. Copy over the `knowledge/` pages from the parent that the project needs.
+3. Write the project's `IDENTITY.md`, `SOUL.md` and `MASTERPLAN.md` from the idea's description.
+4. Link the two instances in their `federation.yaml` files (the parent lists the new repo under
+   `downstream`, the new one lists the parent under `upstream`; see [FEDERATION.md](FEDERATION.md)).
+5. Set `hatched_repo` and `status: hatched` on the idea in the parent's `data/ideas.yaml`.
 
-### Federation Link
+None of steps 2–5 is scripted. A `hatched_from` key on a downstream entry would be only a note;
+no code reads it.
 
-The hatched repo federates back to the parent org:
+## Compensation
 
-```yaml
-# In hatched repo's federation.yaml
-federation:
-  upstream:
-    - repo: "github.com/refi-dao/refi-dao-os"
-      sync: true
-  network: "regen-coordination"
-```
-
-The parent org lists it as downstream:
-
-```yaml
-# In parent org's federation.yaml
-federation:
-  downstream:
-    - name: "MRV Toolkit"
-      repo: "github.com/refi-dao/mrv-toolkit"
-      hatched_from: "idea-042"
-```
-
-### What the Hatched Repo Gets
-
-- org-os workspace structure (AGENTS.md, SOUL.md, etc.)
-- Relevant knowledge from parent org
-- Core skills from the framework
-- Federation link back to parent
-- Initial MASTERPLAN.md based on the idea description
-- Community stewards from the idea's champions
-
-## Stage 4: Community Development
-
-Once hatched, the project repo is open for community contribution:
-
-- Community members deploy agents on the repo to develop it
-- The repo leverages the parent org's knowledge, skills, and workflows
-- Progress feeds back to the parent org via federation
-- The `ideation-board` shows hatching status
-
-## Compensation (Future-Ready)
-
-Not built in v2, but the data model supports future compensation:
-
-- `compensation.model` in ideas.yaml tracks reward mechanism
-- Links to `data/funding-opportunities.yaml` for grant-funded ideas
-- Links to `data/finances.yaml` for bounty pools
-- Gardens conviction voting can prioritize which ideas get funded
-
-Possible models:
-- **Bounty**: Fixed reward for completing the idea
-- **Retroactive**: Reward based on impact after completion
-- **Grants**: External funding secured for the idea
-- **Equity**: Share in the hatched project's value
-
-## Ideation Board Integration
-
-The `packages/ideation-board/` web app shows the full lifecycle:
-
-- Browse all ideas with status filters
-- Submit new ideas (web form)
-- Vote on ideas (community signal)
-- Track ideas through the pipeline
-- See hatched repos with links
-
-## Impact
-
-This pipeline transforms an org from a passive knowledge holder into an active ecosystem developer. By processing knowledge into ideas and hatching ideas into projects, the org takes agency in filling ecosystem gaps — coordinating community effort toward the most impactful opportunities.
-
----
-
-_Part of org-os v2.0.0 — see [AGENTIC-ARCHITECTURE.md](AGENTIC-ARCHITECTURE.md) for the broader agent model._
+`compensation.model` (`bounty`, `retroactive`, `grants`, `equity` or `null`) and
+`compensation.pool` are free-text fields for recording intent. Nothing in the framework pays,
+tracks or validates them. `data/funding-opportunities.yaml` and `data/finances.yaml` are separate
+registries; an idea can mention them but no field links them.
