@@ -945,7 +945,7 @@ git add README.md
 git -c commit.gpgsign=false commit -m "framework bump for sync test"
 # sync the instance
 cd "$TMP/instance"
-npm run sync:upstream -- --upstream "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+npm run sync:upstream -- --upstream "<workspace>/org-os"
 # verify
 cat SOUL.md   # should still say "instance-only soul"
 grep last_sync_commit federation.yaml   # should be set

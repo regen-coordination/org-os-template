@@ -15,7 +15,7 @@ created: 2026-05-02
 
 What today counts as "instance identity" is **a constellation of files** at the instance root, none of them cryptographic, none of them content-hashed, all of them human-edited markdown/yaml. There is no single primary key. Identity is constituted as the *agreement* between several independent declarations:
 
-1. **`SOUL.md`** — character, mission, values, voice, boundaries. Free-form prose. Last paragraph (`## Continuity`) explicitly says *"This file persists between sessions"* — i.e. SOUL is asserted, by self-reference, to be the carrier of trans-session identity. (`/Users/luizfernando/.../org-os/SOUL.md:62-64`.) **Marked `maintain_on_sync: true`** in `federation.yaml customizations:` (line 204-207) — this is the mechanism that keeps SOUL from being overwritten by `sync:upstream`.
+1. **`SOUL.md`** — character, mission, values, voice, boundaries. Free-form prose. Last paragraph (`## Continuity`) explicitly says *"This file persists between sessions"* — i.e. SOUL is asserted, by self-reference, to be the carrier of trans-session identity. (`~/.../org-os/SOUL.md:62-64`.) **Marked `maintain_on_sync: true`** in `federation.yaml customizations:` (line 204-207) — this is the mechanism that keeps SOUL from being overwritten by `sync:upstream`.
 
 2. **`IDENTITY.md`** — structured fields: `Name`, `Type`, `Emoji`, `daoURI`, `Primary Chain`, `Treasury`, `Hats Tree ID`, `Snapshot Space`, `Decision Model`, `Network`, `Node ID`, `Hub Role`, `Upstream`. For org-os today everything on-chain is `N/A (solo phase)`. `Node ID: org-os` is the closest thing to a federated handle. The file also encodes **evolution triggers** (solo→OSS→DAO) that change which fields fill in — identity-as-trajectory rather than identity-as-snapshot.
 
