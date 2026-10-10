@@ -1,0 +1,36 @@
+---
+// The six sections and their pages, from the manifest. Rendered twice by
+// DocsLayout (a column on wide screens, a disclosure on narrow ones); CSS shows
+// one of them, so only one is ever in the accessibility tree.
+import { withBase } from "../lib/base";
+import { SECTIONS, pagesBySection } from "../data/docs-manifest.mjs";
+interface Props { current: string; }
+const { current } = Astro.props;
+const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).filter((s) => s.pages.length > 0);
+---
+<nav class="docs-sidebar" aria-label="Documentation">
+  {sections.map((s) => (
+    <section>
+      <h2 class="label">{s.title}</h2>
+      <ul>
+        {s.pages.map((p) => (
+          <li>
+            <a href={withBase(`/docs/${p.slug}`)} class:list={{ active: p.slug === current }}
+               aria-current={p.slug === current ? "page" : undefined}>{p.title}</a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</nav>
+<style>
+.docs-sidebar { display: flex; flex-direction: column; gap: var(--space-6); font-size: var(--text-sm); }
+.docs-sidebar h2 { font-size: var(--text-2xs); font-weight: 500; color: var(--color-muted); margin-bottom: var(--space-2); }
+.docs-sidebar ul { list-style: none; padding: 0; display: flex; flex-direction: column; }
+.docs-sidebar a {
+  display: block; padding: var(--space-1) var(--space-3); color: var(--color-ink-2);
+  border-left: 2px solid var(--color-line); transition: color var(--t-fast), border-color var(--t-fast);
+}
+.docs-sidebar a:hover { color: var(--color-ink); border-left-color: var(--color-line-2); }
+.docs-sidebar a.active { color: var(--color-accent); border-left-color: var(--color-accent); font-weight: 500; }
+</style>

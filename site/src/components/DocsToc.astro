@@ -1,0 +1,26 @@
+---
+// On-page contents from the page's h2 and h3. A page with fewer than three is
+// short enough to scan, so nothing is rendered. Open by default; the script in
+// DocsLayout closes it on a narrow screen.
+interface Heading { depth: number; slug: string; text: string; }
+interface Props { headings: Heading[]; }
+const items = Astro.props.headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+{items.length >= 3 && (
+  <details class="docs-toc" open data-pagefind-ignore>
+    <summary class="label">On this page</summary>
+    <ul>
+      {items.map((h) => (
+        <li class:list={{ sub: h.depth === 3 }}><a href={`#${h.slug}`}>{h.text}</a></li>
+      ))}
+    </ul>
+  </details>
+)}
+<style>
+.docs-toc { font-size: var(--text-sm); }
+.docs-toc summary { cursor: pointer; color: var(--color-muted); margin-bottom: var(--space-2); }
+.docs-toc ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.docs-toc a { color: var(--color-muted); }
+.docs-toc a:hover { color: var(--color-accent); }
+.docs-toc .sub { padding-left: var(--space-4); }
+</style>

@@ -1,0 +1,80 @@
+---
+// The docs page: sidebar · article · on-page contents.
+//   ≥ 1100px  three columns
+//   ≥ 800px   sidebar and article; contents above the article
+//   < 800px   one column; the sidebar is a disclosure under the nav
+import Layout from "./Layout.astro";
+import DocsSidebar from "./DocsSidebar.astro";
+import DocsToc from "./DocsToc.astro";
+import DocsFooter from "./DocsFooter.astro";
+import { sectionById } from "../data/docs-manifest.mjs";
+interface Heading { depth: number; slug: string; text: string; }
+interface Props {
+  page: { source: string; slug: string; title: string; section: string; summary: string; verified: string | null };
+  headings: Heading[];
+}
+const { page, headings } = Astro.props;
+---
+<Layout title={page.title} description={page.summary} current="docs">
+  <details class="docs-drawer">
+    <summary class="mono">Documentation menu</summary>
+    <DocsSidebar current={page.slug} />
+  </details>
+  <div class="container-wide docs-grid">
+    <aside class="docs-side"><DocsSidebar current={page.slug} /></aside>
+    <div class="docs-contents"><DocsToc headings={headings} /></div>
+    <div class="docs-main">
+      <article class="doc prose" data-pagefind-body>
+        <p class="eyebrow" data-pagefind-ignore>{sectionById(page.section).title}</p>
+        <h1>{page.title}</h1>
+        <slot />
+      </article>
+      <DocsFooter page={page} />
+    </div>
+  </div>
+</Layout>
+<script>
+  // The contents list starts open so it works without script; on a narrow
+  // screen it would push the article down, so close it there.
+  const toc = document.querySelector<HTMLDetailsElement>(".docs-toc");
+  if (toc && window.matchMedia("(max-width: 1099px)").matches) toc.open = false;
+</script>
+<style>
+.docs-drawer { display: none; }
+.docs-grid {
+  display: grid; gap: var(--space-10); align-items: start; padding-top: var(--space-10);
+  grid-template-columns: 15rem minmax(0, 1fr) 13rem;
+  grid-template-areas: "side main contents";
+}
+.docs-side { grid-area: side; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+.docs-main { grid-area: main; min-width: 0; }
+.docs-contents { grid-area: contents; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+
+.doc h1 { font-size: var(--text-3xl); margin-top: var(--space-3); }
+.doc :global(h2) { margin-top: var(--space-10); scroll-margin-top: 5rem; }
+.doc :global(h3) { scroll-margin-top: 5rem; }
+.doc :global(table) { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--text-sm); }
+.doc :global(th), .doc :global(td) { border: var(--border-hair) solid var(--color-line); padding: var(--space-2) var(--space-3); text-align: left; vertical-align: top; }
+.doc :global(th) { background: var(--color-bg-2); color: var(--color-ink); }
+.doc :global(blockquote) { border-left: 2px solid var(--color-line-2); padding-left: var(--space-4); color: var(--color-muted); }
+.doc :global(ul), .doc :global(ol) { padding-left: var(--space-6); }
+.doc :global(li + li) { margin-top: var(--space-1); }
+.doc :global(img) { max-width: 100%; height: auto; }
+.doc :global(hr) { border: 0; border-top: var(--border-hair) solid var(--color-line); margin-block: var(--space-8); }
+
+@media (max-width: 1099px) {
+  .docs-grid { grid-template-columns: 15rem minmax(0, 1fr); grid-template-areas: "side contents" "side main"; row-gap: var(--space-6); }
+  .docs-contents { position: static; max-height: none; }
+}
+@media (max-width: 799px) {
+  .docs-side { display: none; }
+  .docs-drawer {
+    display: block; position: sticky; top: 3.75rem; z-index: calc(var(--z-nav) - 1);
+    background: var(--color-bg-2); border-bottom: var(--border-hair) solid var(--color-line);
+  }
+  .docs-drawer summary { cursor: pointer; padding: var(--space-3) var(--gutter); font-size: var(--text-sm); color: var(--color-ink); }
+  .docs-drawer[open] { max-height: calc(100vh - 3.75rem); overflow-y: auto; }
+  .docs-drawer :global(.docs-sidebar) { padding: var(--space-2) var(--gutter) var(--space-6); }
+  .docs-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "contents" "main"; padding-top: var(--space-6); }
+}
+</style>

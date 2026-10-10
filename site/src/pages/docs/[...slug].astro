@@ -1,7 +1,7 @@
 ---
 import { getCollection, render } from "astro:content";
-import Layout from "../../components/Layout.astro";
-import { PAGES, pageBySource, sectionById } from "../../data/docs-manifest.mjs";
+import DocsLayout from "../../components/DocsLayout.astro";
+import { PAGES, pageBySource } from "../../data/docs-manifest.mjs";
 
 export async function getStaticPaths() {
   const all = await getCollection("docs");
@@ -24,18 +24,8 @@ export async function getStaticPaths() {
   });
 }
 const { entry, page } = Astro.props;
-const { Content } = await render(entry);
+const { Content, headings } = await render(entry);
 ---
-<Layout title={page.title} description={page.summary} current="docs">
-  <div class="container prose">
-    <p class="eyebrow">{sectionById(page.section).title}</p>
-    <h1>{page.title}</h1>
-    <article class="doc"><Content /></article>
-  </div>
-</Layout>
-<style>
-.doc :global(h2) { margin-top: var(--space-8); }
-.doc :global(pre) { background: var(--color-surface); border: 1px solid var(--color-line);
-  border-radius: var(--radius); padding: var(--space-4); overflow-x: auto; }
-.doc :global(code) { font-size: var(--text-sm); }
-</style>
+<DocsLayout page={page} headings={headings}>
+  <Content />
+</DocsLayout>
