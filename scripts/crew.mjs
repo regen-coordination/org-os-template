@@ -4,14 +4,14 @@
 // Operator guide: docs/CREW.md. Design: docs/superpowers/specs/2026-10-10-org-os-crew-design.md.
 // All rules live in scripts/crew/core.mjs; this file parses arguments and wires
 // the real herdr and git adapters to it.
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { board, closeHandoff, handoff, nudge, release, renderBoard, report, seat } from './crew/core.mjs';
 import { createGit } from './crew/git.mjs';
-import { createHerdr } from './crew/herdr.mjs';
+import { createHerdr, HerdrError } from './crew/herdr.mjs';
 import { CrewError } from './crew/roles.mjs';
 
 const USAGE = `Usage: npm run crew -- <command>
@@ -28,6 +28,17 @@ const USAGE = `Usage: npm run crew -- <command>
 `;
 
 class UsageError extends Error {}
+
+// Paths are compared as prefixes, so both sides must be spelled the same way:
+// absolute, with symlinks resolved when the directory exists.
+function real(path) {
+  const absolute = resolve(path);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    return absolute;
+  }
+}
 
 function main(argv) {
   let parsed;
@@ -70,9 +81,9 @@ function main(argv) {
     herdr: createHerdr(),
     git,
     env: process.env,
-    cwd: process.cwd(),
+    cwd: real(process.cwd()),
     now: () => new Date(),
-    worktreeRoot: process.env.ORG_OS_WORKTREES || join(homedir(), '.org-os', 'worktrees'),
+    worktreeRoot: real(process.env.ORG_OS_WORKTREES || join(homedir(), '.org-os', 'worktrees')),
     scriptPath: join(mainDir, 'scripts', 'crew.mjs'),
   };
 
@@ -111,7 +122,12 @@ function main(argv) {
         target: need(first, 'release needs an agent name or assignment id.'),
         outcome: values.outcome ?? 'done',
       });
-      console.log(`${r.assignment.id} is ${r.assignment.status}. Its branch ${r.assignment.branch} is kept.`);
+      console.log(
+        r.assignment.detached
+          ? `${r.assignment.id} is ${r.assignment.status}. It worked on a detached copy of ${r.assignment.branch}; that branch is untouched.`
+          : `${r.assignment.id} is ${r.assignment.status}. Its branch ${r.assignment.branch} is kept.`,
+      );
+      if (r.rescued) console.log(`  Commits made in the detached copy were saved as branch ${r.rescued}.`);
       if (r.removed) {
         console.log('  The worktree was removed.');
       } else {
@@ -154,6 +170,10 @@ try {
   }
   if (err instanceof CrewError) {
     process.stderr.write(`${err.message}\n`);
+    process.exit(1);
+  }
+  if (err instanceof HerdrError) {
+    process.stderr.write(`herdr could not do that: ${err.message} (${err.code}).\n`);
     process.exit(1);
   }
   throw err;

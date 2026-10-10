@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { CrewError } from '../../scripts/crew/roles.mjs';
-import { localDate, readRecord, readTrail, trailDir } from '../../scripts/crew/trail.mjs';
-import { nudge, seat } from '../../scripts/crew/core.mjs';
+import { localDate, readRecord, readTrail, trailDir, writeRecord } from '../../scripts/crew/trail.mjs';
+import { nudge, release, seat } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot, writeRole } from '../helpers/crew-fixtures.mjs';
 
 const setup = (overrides) => {
@@ -187,4 +187,37 @@ test('herdr is pointed at the primary checkout when the main checkout is itself 
   assert.equal(ctx.herdr.calls.find((c) => c[0] === 'createWorktree')[1].cwd, '/primary/checkout');
   assert.equal(ctx.herdr.calls.find((c) => c[0] === 'openWorktree')[1].cwd, '/primary/checkout');
   assert.ok(a.worktree.includes(join('.wt', basename(root))), a.worktree);
+});
+
+test('a seating that is still in progress counts toward the cap', () => {
+  const { root, ctx } = setup(); // max_agents: 2
+  seat(ctx, { roleId: 'engineer', brief: 'one' });
+  // another seat command has written its record but not yet opened a pane
+  writeRecord(
+    join(trailDir(root), 'in-flight.md'),
+    { id: 'in-flight', status: 'seating', role: 'reviewer', agent: 'reviewer', branch: 'crew/in-flight', pane: null, worktree: '/nowhere' },
+    '## Brief\n\nx\n',
+  );
+  assert.throws(() => seat(ctx, { roleId: 'engineer', brief: 'three' }), /cap is 2/);
+});
+
+test('an agent whose assignment was released is still not the operator', () => {
+  const { ctx } = setup();
+  const eng = seat(ctx, { roleId: 'engineer', brief: 'build' });
+  ctx.git.dirty.set(eng.worktree, ['?? draft.md']);
+  release(ctx, { target: eng.id }); // worktree left behind, agent still alive in its pane
+  // from its worktree
+  assert.throws(() => seat(asAgent(ctx, eng), { roleId: 'reviewer', brief: 'x' }), /engineer role may not seat/);
+  // from its pane, wherever it has changed directory to
+  const wandered = { ...ctx, env: { HERDR_ENV: '1', HERDR_PANE_ID: eng.pane }, cwd: ctx.mainDir };
+  assert.throws(() => seat(wandered, { roleId: 'reviewer', brief: 'x' }), /engineer role may not seat/);
+});
+
+test('a reused pane id does not turn the operator into a stale assignment\'s agent', () => {
+  const { ctx } = setup();
+  const eng = seat(ctx, { roleId: 'engineer', brief: 'build' });
+  // herdr restarted: the crew agent is gone and the operator's own session now sits in a pane with that id
+  ctx.herdr.agents = [{ name: null, pane_id: eng.pane, workspace_id: 'op', state: 'idle', kind: 'claude' }];
+  const operator = { ...ctx, env: { HERDR_ENV: '1', HERDR_PANE_ID: eng.pane }, cwd: ctx.mainDir };
+  assert.equal(seat(operator, { roleId: 'reviewer', brief: 'x' }).seated_by, 'operator');
 });

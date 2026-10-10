@@ -1,7 +1,7 @@
 // tests/scripts/crew-trail.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -78,8 +78,14 @@ test('readTrail separates assignments, handoffs and unreadable files', () => {
   const root = tmp();
   assert.deepEqual(readTrail(root), { assignments: [], handoffs: [], unreadable: [] });
   const dir = trailDir(root);
-  writeRecord(join(dir, '2026-10-10-engineer-x.md'), { id: '2026-10-10-engineer-x', status: 'working' }, '## Brief\n\nBuild x.\n');
-  writeRecord(join(dir, 'handoff-2026-10-10-y.md'), { id: 'handoff-2026-10-10-y', status: 'open' }, '## Brief\n\nReview y.\n');
+  const A = { id: '2026-10-10-engineer-x', status: 'working', role: 'engineer', agent: 'engineer', branch: 'crew/x' };
+  const H = { id: 'handoff-2026-10-10-y', status: 'open', from: A.id, to_role: 'reviewer' };
+  writeRecord(join(dir, '2026-10-10-engineer-x.md'), A, '## Brief\n\nBuild x.\n');
+  writeRecord(join(dir, 'handoff-2026-10-10-y.md'), H, '## Brief\n\nReview y.\n');
+  // hand edits that drop a field the board needs, and a link to nowhere
+  writeRecord(join(dir, 'no-branch.md'), { id: 'no-branch', status: 'working', role: 'engineer', agent: null }, 'b');
+  writeRecord(join(dir, 'handoff-no-role.md'), { ...H, id: 'handoff-no-role', to_role: 7 }, 'b');
+  symlinkSync(join(dir, 'gone.md'), join(dir, 'dangling.md'));
   writeFileSync(join(dir, 'mangled.md'), '---\nid: [unclosed\n---\nbody\n');
   writeFileSync(join(dir, 'no-status.md'), '---\nid: no-status\n---\nbody\n');
   writeFileSync(join(dir, 'notes.txt'), 'ignored');
@@ -89,5 +95,14 @@ test('readTrail separates assignments, handoffs and unreadable files', () => {
     ['2026-10-10-engineer-x', 'Build x.', join(dir, '2026-10-10-engineer-x.md')],
   ]);
   assert.deepEqual(trail.handoffs.map((h) => h.id), ['handoff-2026-10-10-y']);
-  assert.deepEqual(trail.unreadable, ['mangled.md', 'no-status.md']);
+  assert.deepEqual(trail.unreadable, ['dangling.md', 'handoff-no-role.md', 'mangled.md', 'no-branch.md', 'no-status.md']);
+});
+
+test('freeId reserves the id it returns, so two callers never share one', () => {
+  const root = tmp();
+  const first = freeId(root, '2026-10-10-engineer-same');
+  const second = freeId(root, '2026-10-10-engineer-same');
+  assert.equal(first, '2026-10-10-engineer-same');
+  assert.equal(second, '2026-10-10-engineer-same-2');
+  assert.ok(existsSync(join(trailDir(root), `${first}.md`)));
 });

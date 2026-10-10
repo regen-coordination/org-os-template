@@ -27,15 +27,23 @@ export function requireHerdr(ctx) {
 const active = (trail) => trail.assignments.filter((a) => ACTIVE.includes(a.status));
 const stamp = (ctx) => isoLocal(ctx.now());
 
-/** The open assignment of whoever is running the command, or null for the operator. */
-export function callerAssignment(ctx, trail) {
-  const open = active(trail);
+/**
+ * The assignment of whoever is running the command, or null for the operator.
+ *
+ * A caller is an agent when it runs from an assignment's worktree, or from the
+ * pane recorded for an assignment while herdr still shows that agent, by name,
+ * in that pane. The name check keeps a reused pane id from turning the operator
+ * into a stale assignment's agent. Closed assignments count too: an agent whose
+ * assignment was released but which is still alive is not the operator.
+ */
+export function callerAssignment(ctx, trail, agents) {
   const pane = ctx.env.HERDR_PANE_ID;
-  return (
-    open.find((a) => pane && a.pane === pane) ||
-    open.find((a) => a.worktree && (ctx.cwd === a.worktree || ctx.cwd.startsWith(a.worktree + sep))) ||
-    null
-  );
+  const here = pane ? agents.find((x) => x.pane_id === pane) : null;
+  const inPane = (a) => Boolean(here) && a.pane === pane && here.name === a.agent;
+  const inWorktree = (a) => Boolean(a.worktree) && (ctx.cwd === a.worktree || ctx.cwd.startsWith(a.worktree + sep));
+  const newestFirst = [...trail.assignments].sort((x, y) => String(y.created).localeCompare(String(x.created)));
+  const mine = newestFirst.filter((a) => inPane(a) || inWorktree(a));
+  return mine.find((a) => ACTIVE.includes(a.status)) || mine[0] || null;
 }
 
 /** An assignment by id or by agent name. */
@@ -111,12 +119,13 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
     if (!on && taken.branch) on = taken.branch;
   }
 
-  const caller = callerAssignment(ctx, trail);
+  const caller = callerAssignment(ctx, trail, agents);
   if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
     throw new CrewError(`The ${caller.role} role may not seat other roles. Write a handoff instead: handoff ${roleId} "<brief>".`);
   }
   const livePanes = new Set(agents.map((a) => a.pane_id));
-  const seated = active(trail).filter((a) => livePanes.has(a.pane));
+  // A record still in `seating` has no pane yet but is about to take a seat.
+  const seated = active(trail).filter((a) => a.status === 'seating' || livePanes.has(a.pane));
   if (seated.length >= maxAgents) {
     throw new CrewError(`${seated.length} crew agents are already seated and the cap is ${maxAgents}. Release one first.`);
   }
@@ -212,7 +221,7 @@ export function nudge(ctx, { target }) {
 }
 
 function requireAgent(ctx, trail, what) {
-  const caller = callerAssignment(ctx, trail);
+  const caller = callerAssignment(ctx, trail, ctx.herdr.listAgents());
   if (!caller) {
     throw new CrewError(`Only a seated agent can ${what}. Run this from the agent's own pane or worktree.`);
   }
@@ -258,7 +267,7 @@ export function handoff(ctx, { toRole, brief, branch = null }) {
 export function closeHandoff(ctx, { target, reason }) {
   requireHerdr(ctx);
   const trail = readTrail(ctx.mainDir);
-  const caller = callerAssignment(ctx, trail);
+  const caller = callerAssignment(ctx, trail, ctx.herdr.listAgents());
   if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
     throw new CrewError(`The ${caller.role} role may not close handoffs. The lead or the operator does that.`);
   }
@@ -276,29 +285,49 @@ export function release(ctx, { target, outcome = 'done' }) {
     throw new CrewError(`The outcome must be done or abandoned, not "${outcome}".`);
   }
   const trail = readTrail(ctx.mainDir);
-  const caller = callerAssignment(ctx, trail);
+  const agents = ctx.herdr.listAgents();
+  const caller = callerAssignment(ctx, trail, agents);
   if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
     throw new CrewError(`The ${caller.role} role may not release agents. Report instead; the lead or the operator releases.`);
   }
   const a = findActive(trail, target, [...ACTIVE, 'failed']);
-  const live = ctx.herdr.listAgents().find((x) => a.pane && x.pane_id === a.pane);
+  const live = agents.find((x) => a.pane && x.pane_id === a.pane);
   if (live && live.state === 'working') {
     throw new CrewError(`${a.agent} is still working. Wait for it to finish, or stop it in its pane first.`);
   }
 
   let removed = false;
+  let rescued = null;
   let left = [];
   if (!ctx.git.worktreeExists(a.worktree)) {
     removed = true;
   } else {
     left = ctx.git.changes(a.worktree);
-    if (left.length === 0) {
+    if (a.detached) {
+      // A detached copy has no branch of its own. Commits made in it would be
+      // lost with the worktree, so they are saved to a branch first.
       try {
-        // herdr removes the worktree and closes the workspace it opened for it.
-        if (!a.workspace) throw new Error('no workspace recorded');
-        ctx.herdr.removeWorktree(a.workspace);
-        removed = true;
+        rescued = ctx.git.rescueDetached(a.worktree, `crew/${a.id}`);
+      } catch (err) {
+        left = [`Commits made in the detached copy could not be saved to a branch: ${err.message || err}`, ...left];
+      }
+    }
+    if (left.length === 0) {
+      let viaHerdr = false;
+      try {
+        // herdr removes the worktree and closes the workspace it opened for it,
+        // but only while that workspace id still names this worktree: after a
+        // herdr restart the id may belong to something else.
+        if (a.workspace && ctx.herdr.workspaceCheckout(a.workspace) === a.worktree) {
+          ctx.herdr.removeWorktree(a.workspace);
+          viaHerdr = true;
+        }
       } catch {
+        // fall through to git
+      }
+      if (viaHerdr) {
+        removed = true;
+      } else {
         try {
           ctx.git.removeWorktree(a.worktree);
           removed = true;
@@ -311,9 +340,10 @@ export function release(ctx, { target, outcome = 'done' }) {
   const assignment = updateRecord(a.file, {
     status: outcome === 'abandoned' ? 'abandoned' : 'released',
     worktree_removed: removed,
+    rescued_branch: rescued,
     updated: stamp(ctx),
   });
-  return { assignment, removed, left };
+  return { assignment, removed, left, rescued };
 }
 
 export function board(ctx) {

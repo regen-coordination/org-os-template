@@ -157,3 +157,54 @@ test('renderBoard shows hours and days, and an empty board', () => {
   const empty = makeCtx(makeRoot());
   assert.equal(renderBoard(board(empty), empty.now()), 'No crew agents are seated.\n');
 });
+
+test('release saves commits made in a detached copy to a branch before removing it', () => {
+  const { ctx, eng } = crew();
+  ctx.git.refs.add('feature');
+  const rev = seat(ctx, { roleId: 'reviewer', brief: 'Fix what you find', on: 'feature' });
+  ctx.git.unreachable.add(rev.worktree); // the agent committed on the detached HEAD
+  const r = release(ctx, { target: rev.id });
+  assert.equal(r.rescued, `crew/${rev.id}`);
+  assert.equal(r.assignment.rescued_branch, `crew/${rev.id}`);
+  assert.equal(r.removed, true);
+  const order = [...ctx.git.calls.map((c) => c[0]), ...ctx.herdr.calls.map((c) => c[0])];
+  assert.ok(order.includes('rescueDetached'));
+  // an ordinary seat has its own branch: nothing to rescue, and git is not asked
+  const plain = release(ctx, { target: eng.id });
+  assert.equal(plain.rescued, null);
+  assert.equal(ctx.git.calls.filter((c) => c[0] === 'rescueDetached').length, 1);
+});
+
+test('release leaves a detached copy alone when its commits could not be saved', () => {
+  const { ctx } = crew();
+  ctx.git.refs.add('feature');
+  const rev = seat(ctx, { roleId: 'reviewer', brief: 'Fix it', on: 'feature' });
+  ctx.git.rescueDetached = () => {
+    throw new Error('a branch named crew/x already exists');
+  };
+  const r = release(ctx, { target: rev.id });
+  assert.equal(r.removed, false);
+  assert.match(r.left[0], /could not be saved to a branch: a branch named crew\/x already exists/);
+  assert.ok(existsSync(rev.worktree));
+  assert.ok(!ctx.herdr.calls.some((c) => c[0] === 'removeWorktree'));
+});
+
+test('release does not ask herdr to remove a workspace that is no longer this assignment\'s', () => {
+  const { ctx, eng } = crew();
+  ctx.herdr.agents = [];
+  ctx.herdr.workspaces.set(eng.workspace, '/somewhere/else'); // the id now names another workspace
+  const r = release(ctx, { target: eng.id });
+  assert.equal(r.removed, true);
+  assert.ok(!ctx.herdr.calls.some((c) => c[0] === 'removeWorktree'));
+  assert.deepEqual(ctx.git.calls.at(-1), ['removeWorktree', { path: eng.worktree }]);
+});
+
+test('the board survives a trail file that lost a field', () => {
+  const { ctx, eng } = crew();
+  const file = readTrail(ctx.mainDir).assignments[0].file;
+  writeFileSync(file, `---\nid: ${eng.id}\nstatus: working\npane: ${eng.pane}\n---\n## Brief\n\nx\n`);
+  const b = board(ctx);
+  assert.deepEqual(b.rows, []);
+  assert.equal(b.unreadable.length, 1);
+  assert.match(renderBoard(b, ctx.now()), /Could not read: /);
+});

@@ -215,10 +215,14 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
 - Refuses while the agent's live state is `working`.
 - Sets the assignment to `released` (or `abandoned`) with a timestamp.
 - Leaves the branch in place. The branch is the deliverable; merging belongs to the operator.
-- Removes the worktree only when it has no uncommitted or untracked changes. Otherwise it lists
-  them and leaves the worktree. It never forces removal.
+- Removes the worktree only when it has no modified, untracked or git-ignored files (installed
+  dependencies aside); git would delete ignored files without asking. Otherwise it lists them
+  and leaves the worktree. It never forces removal.
+- For a detached assignment (`--on`), commits that are on no branch are first saved as
+  `crew/<assignment-id>`, since they would otherwise be lost with the worktree.
 - Closes only the herdr workspace the launcher created for that assignment, and only when the
-  worktree was removed.
+  worktree was removed. The recorded workspace id is used only while herdr still reports it open
+  on that worktree; otherwise the worktree is removed with git.
 
 ### 5.3 herdr behaviour, verified 2026-10-10 against herdr 0.9.1
 

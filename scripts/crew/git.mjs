@@ -47,10 +47,26 @@ export function createGit(mainDir) {
     worktreeExists(path) {
       return existsSync(path);
     },
+    /**
+     * Everything in the worktree that removing it would lose: modified,
+     * untracked and ignored files. Ignored files count (a `.env`, a draft in an
+     * ignored folder) because git removes them without asking; installed
+     * dependencies do not.
+     */
     changes(path) {
-      return git(path, ['status', '--porcelain'])
+      return git(path, ['status', '--porcelain', '--ignored'])
         .split('\n')
-        .filter((line) => line.trim() !== '');
+        .filter((line) => line.trim() !== '' && !/^!! (.*\/)?node_modules\/$/.test(line));
+    },
+    /**
+     * In a detached worktree: if HEAD is on no branch, create `branch` there and
+     * return its name; otherwise return null.
+     */
+    rescueDetached(path, branch) {
+      const head = git(path, ['rev-parse', 'HEAD']).trim();
+      if (git(path, ['for-each-ref', '--contains', head, 'refs/heads']).trim() !== '') return null;
+      git(mainDir, ['branch', branch, head]);
+      return branch;
     },
     // No force flag: git itself refuses a worktree with changes.
     removeWorktree(path) {

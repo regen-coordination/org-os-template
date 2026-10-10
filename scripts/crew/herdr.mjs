@@ -33,16 +33,27 @@ function run(args) {
   try {
     return JSON.parse(out).result ?? {};
   } catch {
-    return {};
+    return null; // the command succeeded but did not print JSON
   }
 }
 
-const opened = (r) => ({ pane_id: r.root_pane.pane_id, workspace_id: r.workspace.workspace_id });
+/** For answers the crew acts on: a reply that cannot be read is an error, never an empty result. */
+function need(result, field, what) {
+  if (!result || result[field] === undefined) {
+    throw new HerdrError('herdr_output', `herdr gave an answer that could not be read (${what})`);
+  }
+  return result;
+}
+
+const opened = (r) => {
+  need(need(r, 'root_pane', 'worktree'), 'workspace', 'worktree');
+  return { pane_id: r.root_pane.pane_id, workspace_id: r.workspace.workspace_id };
+};
 
 export function createHerdr() {
   return {
     listAgents() {
-      return (run(['agent', 'list']).agents || []).map((a) => ({
+      return need(run(['agent', 'list']), 'agents', 'agent list').agents.map((a) => ({
         name: a.name ?? null,
         pane_id: a.pane_id,
         workspace_id: a.workspace_id,
@@ -63,6 +74,10 @@ export function createHerdr() {
     },
     promptAgent(name, text) {
       run(['agent', 'prompt', name, text]);
+    },
+    /** The checkout a workspace is open on, or null when it is not a worktree workspace. */
+    workspaceCheckout(workspaceId) {
+      return run(['workspace', 'get', workspaceId])?.workspace?.worktree?.checkout_path ?? null;
     },
     removeWorktree(workspaceId) {
       run(['worktree', 'remove', '--workspace', workspaceId]);

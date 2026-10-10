@@ -7,6 +7,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { dirname, join } from 'node:path';
 import matter from 'gray-matter';
 
+const ASSIGNMENT_FIELDS = ['id', 'status', 'role', 'agent', 'branch'];
+const HANDOFF_FIELDS = ['id', 'status', 'from', 'to_role'];
+
 /** Statuses of an assignment that still holds a seat. */
 export const ACTIVE = ['seating', 'working', 'reported'];
 
@@ -42,10 +45,22 @@ export function isoLocal(date) {
   );
 }
 
+/**
+ * The first unused id among base, base-2, base-3 … The id is reserved by creating
+ * its file exclusively, so two commands running at once never share one.
+ */
 export function freeId(mainDir, base) {
-  let id = base;
-  for (let n = 2; existsSync(join(trailDir(mainDir), `${id}.md`)); n += 1) id = `${base}-${n}`;
-  return id;
+  const dir = trailDir(mainDir);
+  mkdirSync(dir, { recursive: true });
+  for (let n = 1; ; n += 1) {
+    const id = n === 1 ? base : `${base}-${n}`;
+    try {
+      writeFileSync(join(dir, `${id}.md`), '', { flag: 'wx' });
+      return id;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+    }
+  }
 }
 
 export function writeRecord(path, data, body) {
@@ -78,21 +93,26 @@ export function readTrail(mainDir) {
   if (!existsSync(dir)) return trail;
   for (const name of readdirSync(dir).sort()) {
     const file = join(dir, name);
-    if (!name.endsWith('.md') || !statSync(file).isFile()) continue;
+    if (!name.endsWith('.md')) continue;
+    const isHandoff = name.startsWith('handoff-');
     let record;
     try {
+      if (!statSync(file).isFile()) continue; // throws on a link to nowhere
       record = readRecord(file);
     } catch {
       trail.unreadable.push(name);
       continue;
     }
     const { data, body } = record;
-    if (typeof data.id !== 'string' || typeof data.status !== 'string') {
+    // Everything the board and the guardrails read must be there, so a hand
+    // edit that drops a field is reported instead of crashing a later step.
+    const required = isHandoff ? HANDOFF_FIELDS : ASSIGNMENT_FIELDS;
+    if (!required.every((field) => typeof data[field] === 'string')) {
       trail.unreadable.push(name);
       continue;
     }
     const entry = { ...data, file, brief: briefOf(body) };
-    (name.startsWith('handoff-') ? trail.handoffs : trail.assignments).push(entry);
+    (isHandoff ? trail.handoffs : trail.assignments).push(entry);
   }
   return trail;
 }

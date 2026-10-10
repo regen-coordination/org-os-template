@@ -10,6 +10,10 @@ There is no server and no database. If herdr restarts, nothing is stuck.
 herdr. Run everything from the checkout you normally work in; that checkout's `roles/` and
 `memory/crew/` are the ones in force.
 
+Worktrees are created under `~/.org-os/worktrees/`, outside the repository. To put them
+elsewhere, set `ORG_OS_WORKTREES` to an absolute path in your shell profile, so that every pane
+sees the same value.
+
 ## Seat an agent
 
 ```bash
@@ -70,10 +74,16 @@ most four crew agents are seated at once; change `max_agents` in `roles/circles.
 npm run crew -- release engineer
 ```
 
-The assignment is closed and **its branch is kept**: review and merge it yourself. The worktree
-is removed only if it has no uncommitted changes; otherwise the command lists them and leaves it.
-Release is refused while the agent is still working. Use `--outcome abandoned` for work you are
-dropping.
+The assignment is closed and **its branch is kept**: review and merge it yourself. Release is
+refused while the agent is still working. Use `--outcome abandoned` for work you are dropping.
+
+The worktree is removed only when nothing in it would be lost. Modified, untracked and
+git-ignored files all count (a `.env`, a draft in an ignored folder); installed dependencies do
+not. Otherwise the command lists what is there and leaves the worktree. When you have dealt with
+it, remove the worktree yourself with `git worktree remove <path>`.
+
+An agent seated with `--on` works on a detached copy and has no branch of its own. If it made
+commits, release saves them as a branch `crew/<assignment-id>` and tells you.
 
 Commit `memory/crew/` with the rest of your session's memory.
 

@@ -42,6 +42,7 @@ export function fakeHerdr(initialAgents = []) {
   const herdr = {
     agents: initialAgents.map((a) => ({ name: null, state: 'idle', kind: 'claude', ...a })),
     calls: [],
+    workspaces: new Map(), // workspace id -> checkout path
     failOn: null, // { method, code, message }
     fail(method) {
       if (herdr.failOn && herdr.failOn.method === method) {
@@ -58,6 +59,7 @@ export function fakeHerdr(initialAgents = []) {
       herdr.fail(method);
       n += 1;
       mkdirSync(opts.path, { recursive: true });
+      herdr.workspaces.set(`x${n}`, opts.path);
       return { pane_id: `x${n}:p1`, workspace_id: `x${n}` };
     },
     createWorktree(opts) {
@@ -75,6 +77,9 @@ export function fakeHerdr(initialAgents = []) {
       herdr.calls.push(['promptAgent', { name, text }]);
       herdr.fail('promptAgent');
     },
+    workspaceCheckout(workspaceId) {
+      return herdr.workspaces.get(workspaceId) ?? null;
+    },
     removeWorktree(workspaceId, path) {
       herdr.calls.push(['removeWorktree', { workspaceId }]);
       herdr.fail('removeWorktree');
@@ -89,6 +94,7 @@ export function fakeGit({ refs = ['main'] } = {}) {
   const git = {
     refs: new Set(refs),
     dirty: new Map(), // worktree path -> porcelain lines
+    unreachable: new Set(), // detached worktrees whose HEAD is on no branch
     calls: [],
     resolves(ref) {
       return git.refs.has(ref);
@@ -102,6 +108,10 @@ export function fakeGit({ refs = ['main'] } = {}) {
     },
     changes(path) {
       return git.dirty.get(path) || [];
+    },
+    rescueDetached(path, branch) {
+      git.calls.push(['rescueDetached', { path, branch }]);
+      return git.unreachable.has(path) ? branch : null;
     },
     removeWorktree(path) {
       git.calls.push(['removeWorktree', { path }]);

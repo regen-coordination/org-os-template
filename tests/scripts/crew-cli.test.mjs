@@ -5,6 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,4 +58,44 @@ test('seat accepts a brief given as several words', () => {
   const r = run(['seat', 'engineer', 'fix', 'the', 'thing', '--task', 't1', '--base', 'main']);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /inside herdr/);
+});
+
+// A stand-in `herdr` first on PATH, so the real adapter runs without a server.
+function stubHerdr(body) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'crew-stub-')));
+  writeFileSync(join(dir, 'herdr'), `#!/bin/sh\n${body}\n`);
+  chmodSync(join(dir, 'herdr'), 0o755);
+  return { HERDR_ENV: '1', HERDR_PANE_ID: 'op:p1', PATH: `${dir}:${process.env.PATH}`, ORG_OS_WORKTREES: join(dir, 'wt') };
+}
+
+test('a herdr error is reported in one sentence, not a stack trace', () => {
+  const env = stubHerdr(`echo '{"error":{"code":"server_down","message":"the server is not running"}}' >&2; exit 1`);
+  const r = run(['board'], env);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /^herdr could not do that: the server is not running \(server_down\)\.\n$/);
+  assert.equal(r.stdout, '');
+});
+
+test('an agent list that cannot be read is an error, not an empty crew', () => {
+  const env = stubHerdr(`echo 'notice: update available'`);
+  const r = run(['board'], env);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /^herdr could not do that: .*agent list/);
+  assert.doesNotMatch(r.stdout, /No crew agents/);
+});
+
+test('with a working herdr and no trail, the board is empty', () => {
+  const env = stubHerdr(`echo '{"result":{"agents":[]}}'`);
+  const r = run(['board'], env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /No crew agents are seated\./);
+});
+
+test('a worktree root reached through a symlink still refuses a script that lives under it', () => {
+  const env = stubHerdr(`echo '{"result":{"agents":[]}}'`);
+  const link = join(dirname(env.ORG_OS_WORKTREES), 'link');
+  symlinkSync(join(dirname(script), '..', '..'), link); // the directory that holds this checkout
+  const r = run(['board'], { ...env, ORG_OS_WORKTREES: link });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /assignment file/);
 });
