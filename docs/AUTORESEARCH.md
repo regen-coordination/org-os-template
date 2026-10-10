@@ -1,122 +1,38 @@
-# AUTORESEARCH.md — Autonomous Workspace Improvement Pattern
+# Autoresearch
 
-Version: 2.0.0
+org-os has one thing behind this idea: the `workspace-improver` skill (`skills/workspace-improver/SKILL.md`, tier `core`). It is a written procedure that an agent follows when the operator asks for it. There is no script, no npm command and no scheduled workflow that runs it, and no `memory/` file records a session run with it. The pattern is modelled on [karpathy/autoresearch](https://github.com/karpathy/autoresearch): a human-written direction file, one editable surface, a fixed way of measuring, and keep-or-revert.
 
-## Overview
+Status: pattern plus one skill, used manually. In `data/skills-matrix.yaml` it is `canonical` in the framework and listed as used by one instance (`refi-dao-os`).
 
-Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch), org-os adopts an **autonomous iterative improvement loop** where agents don't just operate within the workspace — they improve it.
+## How an operator runs it
 
-The autoresearch model: `program.md` (human-written instructions) guides an agent that modifies `train.py` (the single editable surface), runs experiments with fixed time budgets and clear metrics, and keeps/discards changes based on results. Humans wake up to improved systems.
+Open a session in the instance with an agent runtime and say one of the skill's trigger phrases: "improve workspace", "autoresearch", "autonomous improvement" or "find and fix gaps". The agent loads the skill and follows it. Nothing starts it on its own: `federation.yaml` has `proactive: false`, and the two scheduled workflows in `.github/workflows/` (a weekly drift report and a daily schema regeneration) do not run the skill.
 
-## Applied to org-os
+What you steer it with is `MASTERPLAN.md`. The skill reads its activations (§3) and research directions (§4), plus `HEARTBEAT.md` and the last three days of `memory/`. What the agent may change is bounded by the skill and by `MASTERPLAN.md` §6, so write what it must not touch there.
 
-| autoresearch concept | org-os equivalent | Role |
-|---------------------|-------------------|------|
-| `program.md` | `MASTERPLAN.md` | Human-written directions, activations, research agenda |
-| `train.py` | `data/*.yaml` + `skills/` + `knowledge/` | The editable surface agents improve |
-| `val_bpb` | HEARTBEAT.md metrics | Clear success criteria |
-| experiment log | `memory/YYYY-MM-DD.md` | What was tried, what worked |
+## The loop the skill describes
 
-## The Loop
+One improvement per cycle, in this order:
 
-```
-1. Read MASTERPLAN.md     → understand current directions
-2. Identify improvement   → knowledge gap, stale data, missing skill
-3. Make scoped change     → process a source, fill a gap, draft a skill
-4. Evaluate               → schemas pass? HEARTBEAT count down? coverage up?
-5. Log results            → memory/ with before/after metrics
-6. Keep or revert         → based on evaluation
-7. Repeat
-```
+1. Read `MASTERPLAN.md`, `HEARTBEAT.md` and recent `memory/`.
+2. Pick one improvement, by priority: an unchecked MASTERPLAN activation; data gaps in `data/*.yaml` (TBD or null values, `last_updated` older than seven days); knowledge gaps (`npm run compile:knowledge`, `npm run lint:knowledge`, coverage in `data/knowledge-manifest.yaml`, unprocessed entries in `data/sources.yaml`); schema health (`npm run validate:schemas`); pending `HEARTBEAT.md` tasks.
+3. Record baseline numbers.
+4. Make one scoped change.
+5. Run `npm run generate:schemas` and `npm run validate:schemas`, record the numbers again.
+6. Keep the change if the numbers held or improved, revert it if they regressed, and keep but flag for human review if unclear.
+7. Log it in `memory/YYYY-MM-DD.md` and update `HEARTBEAT.md`.
 
-## MASTERPLAN.md as program.md
+The log entry is a block headed `## Autoresearch Session [HH:MM]` with the improvement, direction, before, action, after, result (kept or reverted) and notes.
 
-MASTERPLAN.md is the most important human-authored file in org-os. It's how operators steer autonomous agent behavior over time.
+## What the agent may and may not change
 
-Operators write:
-- **Activations**: What the agent should focus on right now
-- **Research directions**: What knowledge gaps to fill, what processes to improve
-- **Success metrics**: How to evaluate whether improvements worked
-- **Boundaries**: What NOT to change autonomously
+May change: `data/*.yaml`, `knowledge/`, `memory/`, `skills/` (new definitions, marked draft), `.well-known/` (regenerated) and `HEARTBEAT.md`. Must not change without a human: `SOUL.md`, `IDENTITY.md`, `federation.yaml`, `MASTERPLAN.md`, `package.json`, `USER.md`. The skill also lists `ideas/` as writable; the framework has no `ideas/` directory (ideas live in `data/ideas.yaml`).
 
-Agents read MASTERPLAN.md at the start of every session and use it to prioritize improvement work.
+## What is not built
 
-## Scoped Modification
+- Automated metric collection. The metrics the skill names (HEARTBEAT unchecked count, knowledge coverage, data freshness, idea pipeline, data completeness) are measured by the agent reading files, not by a script. Only schema validation is a real command.
+- Scheduling. A session happens when someone starts one.
+- A track record. The framework's `MASTERPLAN.md` still lists "Autoresearch metrics: define and refine evaluation criteria for autonomous workspace improvement" as an open research direction (§4).
+- A framework-wide `knowledge/` to improve: in the framework repository it holds only `INDEX.md`, and `data/sources.yaml` is empty. The knowledge steps matter in instances that have populated them.
 
-Agents have a clearly defined editable surface:
-
-### May modify autonomously
-- `data/*.yaml` — Fill gaps, update stale records
-- `knowledge/` — Process new content, expand coverage
-- `memory/` — Log all activity
-- `skills/` — Draft new skill definitions
-- `ideas/` — Surface ideas from knowledge analysis
-- `.well-known/` — Regenerate schemas
-- `HEARTBEAT.md` — Update task status
-
-### Human-controlled (never modify autonomously)
-- `SOUL.md` — Organization identity and values
-- `IDENTITY.md` — Governance infrastructure
-- `federation.yaml` — Network relationships
-- `MASTERPLAN.md` — Strategic direction
-- `package.json` — Dependencies and scripts
-
-This mirrors autoresearch's constraint: agents modify `train.py` but never `prepare.py` or `program.md`.
-
-## Fixed Evaluation Surface
-
-Every improvement must be measured. Standard metrics:
-
-| Metric | Measurement | Target |
-|--------|------------|--------|
-| Schema validation | `npm run validate:schemas` | Pass |
-| HEARTBEAT pending | Count of unchecked `- [ ]` items | Decreasing |
-| Knowledge coverage | Domains with `comprehensive` coverage | Increasing |
-| Data freshness | Registries with `last_updated` within 7 days | Increasing |
-| Idea pipeline | Active ideas (surfaced → developing) | Growing |
-| Data completeness | Non-null required fields percentage | Increasing |
-
-## Experiment Logging
-
-Every improvement attempt is logged in `memory/YYYY-MM-DD.md`:
-
-```markdown
-## Autoresearch Session [HH:MM]
-
-### Improvement: [title]
-**Direction:** [MASTERPLAN activation or priority]
-**Before:** [metric = value]
-**Action:** [what was done]
-**After:** [metric = value]
-**Result:** Kept / Reverted
-**Notes:** [observations]
-```
-
-This creates an audit trail. Operators can review accumulated improvements on their next session.
-
-## Implementation
-
-The `workspace-improver` skill in `skills/workspace-improver/SKILL.md` implements this pattern. It:
-
-1. Reads MASTERPLAN.md for current directions
-2. Identifies the highest-priority improvement
-3. Measures baseline metrics
-4. Makes a scoped change
-5. Evaluates the result
-6. Keeps or reverts
-7. Logs everything
-
-See the skill definition for detailed procedure and examples.
-
-## Design Principles
-
-1. **One change per cycle**: Each improvement is independently evaluable and reversible
-2. **Measure first**: Always record baseline before changing anything
-3. **Clear boundaries**: Agents know exactly what they can and cannot modify
-4. **Human steering**: MASTERPLAN.md is the only way to change agent direction
-5. **Transparent logging**: Every action logged with before/after metrics
-6. **Conservative by default**: When in doubt, don't change — flag for human review
-
----
-
-_Part of org-os v2.0.0 — see [AGENTIC-ARCHITECTURE.md](AGENTIC-ARCHITECTURE.md) for the broader agent operating model._
+Related: [AGENTIC-ARCHITECTURE.md](AGENTIC-ARCHITECTURE.md) for the wider agent operating model.
