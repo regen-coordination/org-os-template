@@ -66,7 +66,7 @@ These terms are defined once in `roles/README.md` (the framework has no `CONTEXT
 | **Agent** | A live session seated in a role, in a herdr pane. |
 | **Assignment** | One piece of work given to one role, with its branch and its outcome. |
 | **Handoff** | A written request from one agent that another role take something on. |
-| **Main checkout** | The repository's primary working tree, the first entry of `git worktree list`. |
+| **Main checkout** | The checkout the operator runs `npm run crew` from: the one whose `scripts/crew.mjs` is executed. Its `roles/` and `memory/crew/` are the ones in force. |
 | **Operator** | The human at herdr. |
 
 "Crew" is the working name of the subsystem (script, module, trail folder). It may be renamed
@@ -86,8 +86,11 @@ roles/
 scripts/
   crew.mjs              # command entry point
   crew/
-    core.mjs            # pure logic: roles, guardrails, trail, board join
+    roles.mjs           # pure: circles, role parsing and validation
+    trail.mjs           # pure: assignment and handoff files
+    core.mjs            # pure: guardrails, seat, release, report, handoff, board
     herdr.mjs           # the only file that calls the herdr CLI
+    git.mjs             # the only file that calls git
 skills/crew/SKILL.md
 memory/crew/            # the trail: one file per assignment or handoff
 modules/org-os-crew/module.yaml
@@ -175,10 +178,12 @@ Steps, in order:
 3. **Write the assignment file** with status `seating` (section 6), before anything is created,
    so a later failure still leaves a record.
 4. **Create the worktree** on a new branch `crew/<assignment-id>` from `--base` (default `main`),
-   at `~/.org-os/worktrees/<repo-name>/<assignment-id>`. With `--on <branch>`, open a worktree of
-   that existing branch instead and create no branch (used for review).
+   at `~/.org-os/worktrees/<repo-name>/<assignment-id>`. With `--on <branch>`, create a
+   **detached** worktree at that branch's current commit instead and create no branch (used for
+   review). It is detached because git refuses to check one branch out in two worktrees.
 5. **Start the agent** in the worktree's herdr pane with the role's kind and model. Its name is
-   the role id, or `<id>-2`, `<id>-3` if that name is live.
+   the role id, or `<id>-2`, `<id>-3` if that name is taken by any live agent on the herdr
+   server, crew or not.
 6. **Prompt it once**: it is seated as this role; read the role file and the assignment file
    (both given as absolute paths); then begin. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
@@ -193,7 +198,7 @@ All enforced in `core.mjs`, not in the skill.
 | Guardrail | Rule |
 |-----------|------|
 | Inside herdr | Refuse unless `HERDR_ENV=1`. |
-| Concurrency cap | Refuse when the number of live seated agents equals the cap. Default 4, set by `max_agents` in `roles/circles.yaml`. |
+| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. Default 4, set by `max_agents` in `roles/circles.yaml`. |
 | Who may seat | A caller whose pane hosts no seated agent is the operator and may always seat. A caller whose pane hosts a seated agent may seat only if that agent's role has `may_seat: true`. The caller is identified from `HERDR_PANE_ID` joined to the trail. |
 | Base exists | Refuse if `--base` or `--on` does not resolve to a commit. |
 | Operator's tree untouched | The launcher never checks out, resets or cleans the main checkout. |
@@ -207,6 +212,7 @@ to bypass it can.
 npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
 ```
 
+- Refuses while the agent's live state is `working`.
 - Sets the assignment to `released` (or `abandoned`) with a timestamp.
 - Leaves the branch in place. The branch is the deliverable; merging belongs to the operator.
 - Removes the worktree only when it has no uncommitted or untracked changes. Otherwise it lists
@@ -214,17 +220,23 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
 - Closes only the herdr workspace the launcher created for that assignment, and only when the
   worktree was removed.
 
-### 5.3 To verify during planning
+### 5.3 herdr behaviour, verified 2026-10-10 against herdr 0.9.1
 
-Two herdr behaviours are assumed and must be confirmed against the installed CLI before the plan
-relies on them:
+Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to these facts.
 
-1. `herdr worktree create --path <outside the repo> --branch <new> --base <ref>` creates the
-   worktree and returns a pane at a shell prompt.
-2. `herdr worktree open --branch <existing>` does the same for an existing branch.
-
-If either does not hold, `herdr.mjs` creates the worktree with `git worktree add` and then opens
-it with herdr. Nothing outside `herdr.mjs` changes.
+1. `herdr worktree create --cwd <repo> --branch <new> --base <ref> --path <outside the repo>
+   --label <text> --no-focus` creates the branch and worktree, opens a new workspace, and
+   returns `result.root_pane.pane_id` and `result.workspace.workspace_id`.
+2. `herdr worktree open --branch <existing>` on a branch that is already checked out returns the
+   **existing** workspace with `already_open: true`. It cannot give a reviewer its own checkout,
+   which is why `--on` uses a detached worktree: `git worktree add --detach <path> <branch>`,
+   then `herdr worktree open --cwd <repo> --path <path>`.
+3. `herdr worktree remove --workspace <id>` removes the worktree and its workspace and keeps the
+   branch. On a dirty worktree it fails with error code `dirty_worktree_requires_force`.
+4. When the source repository has no open herdr workspace, `worktree create` also opens one for
+   it. The launcher leaves that workspace alone.
+5. `herdr agent list` returns every agent on the server; most of the operator's have no `name`.
+   Crew agents are matched to assignments by `pane_id`.
 
 ## 6. The trail
 
@@ -239,6 +251,9 @@ role: engineer
 agent: engineer
 kind: claude
 branch: crew/2026-10-10-engineer-kms-cursor-race
+detached: false
+pane: wF:p1
+workspace: wF
 worktree: /Users/…/.org-os/worktrees/org-os/2026-10-10-engineer-kms-cursor-race
 task: null
 handoff: null
@@ -260,9 +275,11 @@ and `abandoned`.
 **Who writes what:**
 
 - The launcher writes the file and every status except `reported`.
-- The agent appends its `## Report` and sets `reported` by running
-  `npm run crew -- report` from its worktree, which reads the report from standard input and
-  writes it to the right file. Agents do not edit trail files by hand.
+- The agent appends its `## Report` and sets `reported` by running the main checkout's script,
+  `node <main checkout>/scripts/crew.mjs report --file <path>` (or with the report on standard
+  input). The exact command, with absolute paths, is written into the assignment file under
+  `## Commands`. The main checkout's script is used because a fresh worktree has no installed
+  dependencies. Agents do not edit trail files by hand.
 - The operator commits `memory/crew/` at session close, like the rest of memory. Agents never
   commit the trail.
 
@@ -272,10 +289,10 @@ writes: `crew report` and `crew handoff`.
 ## 7. Handoffs
 
 ```
-npm run crew -- handoff <role> "<brief>" [--branch <branch>]
+node <main checkout>/scripts/crew.mjs handoff <role> "<brief>" [--branch <branch>]
 ```
 
-Run by any seated agent. It writes `memory/crew/handoff-<YYYY-MM-DD>-<slug>.md`:
+Run by any seated agent (`npm run crew -- handoff …` when run from the main checkout). It writes `memory/crew/handoff-<YYYY-MM-DD>-<slug>.md`:
 
 ```markdown
 ---
@@ -298,6 +315,8 @@ taken_by: null
   reviewer is seated with `--on <branch>` and its role forbids changes.
 - **Agents do not prompt each other.** The file is the message, so every exchange is on the trail.
 - A handoff can be declined: `crew handoff-close <file> --reason "<text>"` sets it to `declined`.
+- When a handoff names a branch and the seat command gives no `--on`, the receiving agent is
+  seated on that branch.
 
 ## 8. The board
 
@@ -344,6 +363,8 @@ is what makes a seated lead the agent that seats others. No separate dispatcher 
 | The first prompt times out or stalls | herdr states this does not prove non-delivery. The launcher never resends. The assignment stays `working`; the board shows the agent's real state. |
 | herdr restarts, or a pane is closed | The trail is intact. The board lists the assignment under "Needs release". `crew release` closes it. |
 | An agent meets a permission or question dialog | It shows as `blocked`. Only the operator answers it. |
+| The agent stops at a startup dialog (for example, trusting a new folder) | herdr reports `agent_not_ready`. The assignment is `working` with `prompted: false`; the first prompt was not sent. The operator answers the dialog, then runs `crew nudge <agent>` to send it. |
+| An agent runs its own worktree's copy of the script | Refused: a script living under the worktree root is not a main checkout. The assignment file names the right command. |
 | `crew report` or `crew handoff` is run outside a crew worktree | Refused: the caller cannot be matched to an assignment. |
 | A trail file is malformed | The board lists it by file name under a "Could not read" line and continues. |
 
@@ -365,7 +386,10 @@ is what makes a seated lead the agent that seats others. No separate dispatcher 
 - `modules/org-os-crew/module.yaml` owns, by identity mapping: `roles/`, `scripts/crew.mjs`,
   `scripts/crew/`, `skills/crew/`, `tests/scripts/crew-*.test.mjs`.
 - `package.json` gains one script: `"crew": "node scripts/crew.mjs"`.
-- `docs/COMMANDS.md` and `docs/MODULES.md` each gain an entry.
+- `roles` is declared in `TOP_LEVEL_ALLOW` in `scripts/lib/clone-excludes.mjs`, so new instances
+  receive the roles, and `tests/clone-manifest.txt` is regenerated.
+- `docs/CREW.md` is the operator guide and holds the manual smoke run. `docs/COMMANDS.md` and
+  `docs/MODULES.md` each gain an entry.
 - `DECISIONS.md` gains one entry: agents run through herdr from role files; Paperclip is dropped
   for the framework's own team.
 - `docs/agent-plans/QUEUE.md` gains the implementation plan and, queued behind it, the
@@ -375,8 +399,9 @@ is what makes a seated lead the agent that seats others. No separate dispatcher 
 
 ## 13. Testing
 
-- **`core.mjs` is pure** and takes the herdr adapter and the filesystem root as arguments. It is
-  unit-tested with `node --test` and a fake adapter. Cases:
+- **`roles.mjs`, `trail.mjs` and `core.mjs` are pure** and take the herdr adapter, the git
+  adapter and the filesystem root as arguments. They are
+  unit-tested with `node --test` and fake adapters. Cases:
   - role resolution and frontmatter validation (missing field, unknown circle, unknown kind);
   - each guardrail refusing and allowing;
   - agent naming when a seat is already taken;
@@ -386,7 +411,7 @@ is what makes a seated lead the agent that seats others. No separate dispatcher 
   - the board join: live with trail, trail without live (needs release), live without trail
     (ignored), malformed trail file.
 - **Shipped role files are validated by a test**, as module manifests are.
-- **`herdr.mjs` is not unit-tested.** It is covered by one documented manual smoke run in a named
+- **`herdr.mjs` and `git.mjs` are not unit-tested.** They are covered by one documented manual smoke run in a named
   herdr test session: seat an engineer on a throwaway branch, check the board, report, release,
   confirm the worktree is gone and the branch remains.
 
