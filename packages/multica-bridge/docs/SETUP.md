@@ -4,7 +4,7 @@ Runbook for Phases 0–1 of `docs/superpowers/specs/2026-07-24-multica-org-os-in
 Fill in the `<...>` fields as you go — this file is the reproducible record.
 
 **Pilot instance:** the org-os framework repo
-(`/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os`).
+(`<workspace>/org-os`).
 Everything here generalizes to any other instance by swapping that path.
 
 ## Machine state as checked 2026-08-01
@@ -105,7 +105,7 @@ Result: `<fill>`
 ## Step 7 — Install the git hooks on this machine
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 npm run install:hooks
 ls -l "$(git rev-parse --git-path hooks)/pre-push"
 ```
@@ -126,14 +126,14 @@ exact screens/fields you used so this is reproducible elsewhere.
    That file is the source of truth: when it changes, re-paste. Skip skill imports — org-os
    skills already ship inside the repo the agent works in.
 3. **Project** — title `org-os pilot`, with a **`local_directory`** resource pointing at
-   `/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os`, pinned to this
+   `<workspace>/org-os`, pinned to this
    Mac's daemon. If the resource lives under a differently-named UI control
    ("repository" / "directory"), note where you actually found it: `<fill>`
 
 Then record the identifiers:
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 cp config.example.yaml config.yaml
 multica project list --output json     # copy the org-os pilot project id into config.yaml
 ```
@@ -176,7 +176,7 @@ multica issue create \
 Then verify the operator actually obeyed its discipline:
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git branch --list 'agent/*'                        # expect agent/<KEY>
 git show "agent/<KEY>" --stat                      # ideas.yaml + memory/<date>.md (+ .well-known/* if regenerated)
 git status --short                                 # tree NOT left dirty

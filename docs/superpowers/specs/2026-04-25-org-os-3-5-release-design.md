@@ -520,7 +520,7 @@ Longer horizon (v3.7+):
 
 ### bread-coop-os context
 
-- `/Users/luizfernando/Desktop/Workspaces/Zettelkasten/260423 Opportunities with Unformal + agents for bread coop.md` — meeting notes with Luiz's commitment to clone bread-coop-OS template
+- `<vault>/260423 Opportunities with Unformal + agents for bread coop.md` — meeting notes with Luiz's commitment to clone bread-coop-OS template
 
 ### v3.0 release context
 

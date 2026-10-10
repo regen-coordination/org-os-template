@@ -49,7 +49,7 @@
 - [ ] **Step 1: Create the working branch**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git checkout -b feat/multica-operator
 ```
 
@@ -103,7 +103,7 @@ reconciles changes back. Yaml + git stay canonical.
 - [ ] **Step 4: Verify the test runner wiring (expect failure — no tests yet)**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -112,7 +112,7 @@ Expected: `node --test` reports 0 tests found (no `test/` dir yet). That's the r
 - [ ] **Step 5: Commit**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git add packages/multica-bridge/package.json packages/multica-bridge/README.md
 git commit -m "feat(multica-bridge): scaffold package for multica integration (MUL phase 1)"
 ```
@@ -173,7 +173,7 @@ test('every concrete repo file the persona references exists', () => {
 - [ ] **Step 2: Run it to make sure it fails**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -238,7 +238,7 @@ of truth. Treat everything in the working tree as precious.
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -247,7 +247,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git add packages/multica-bridge/test/persona.test.mjs packages/multica-bridge/personas/org-os-operator.md
 git commit -m "feat(multica-bridge): org-os operator persona + lint test"
 ```
@@ -294,7 +294,7 @@ test('destructive git ops are denied', () => {
 - [ ] **Step 2: Run it to make sure it fails**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -319,7 +319,7 @@ Rationale: these three are already forbidden for *every* session in this repo by
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -328,7 +328,7 @@ Expected: PASS (5 tests).
 - [ ] **Step 5: Manual probe that the deny actually bites**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 claude -p "Run exactly: git stash list" 2>&1 | tail -5
 ```
 
@@ -339,7 +339,7 @@ Expected: the response indicates the Bash call was blocked/denied by permission 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git add packages/multica-bridge/test/settings.test.mjs .claude/settings.json
 git commit -m "feat(multica-bridge): checked-in claude permission profile denying destructive git ops"
 ```
@@ -400,7 +400,7 @@ test('blocks a mixed push containing an agent ref', () => {
 - [ ] **Step 2: Run it to make sure it fails**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -432,7 +432,7 @@ exit $status
 - [ ] **Step 4: Make it executable and run the tests**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 chmod +x scripts/git-hooks/pre-push
 cd packages/multica-bridge && npm test
 ```
@@ -488,7 +488,7 @@ In the root `package.json` `scripts` block, add these two entries (keep existing
 - [ ] **Step 7: Install and verify the hook is live**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 npm run hooks:install
 ls -l "$(git rev-parse --git-path hooks)/pre-push"
 ```
@@ -498,7 +498,7 @@ Expected: `hooks: installed pre-push -> ...` and an executable file listing. The
 - [ ] **Step 8: Commit**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git add packages/multica-bridge/test/pre-push-hook.test.mjs scripts/git-hooks/pre-push scripts/install-git-hooks.mjs package.json
 git commit -m "feat(multica-bridge): versioned pre-push hook blocking agent/* publication + installer"
 ```
@@ -542,7 +542,7 @@ test('config example exists and parses', () => {
 - [ ] **Step 2: Run it to make sure it fails**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -559,7 +559,7 @@ multica:
   agent: org-os operator       # agent display name (see `multica agent list`)
   project: ""                  # project id — fill from `multica project list --output json`
 instance:
-  path: /Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os
+  path: <workspace>/org-os
 ```
 
 - [ ] **Step 4: Gitignore the local config**
@@ -573,7 +573,7 @@ packages/multica-bridge/config.yaml
 - [ ] **Step 5: Run the tests and make sure they pass**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 npm test
 ```
 
@@ -582,7 +582,7 @@ Expected: PASS (10 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git add packages/multica-bridge/test/config.test.mjs packages/multica-bridge/config.example.yaml .gitignore
 git commit -m "feat(multica-bridge): config template + test, gitignore local config"
 ```
@@ -654,7 +654,7 @@ Record what actually happened (versions, deviations, where the login code was fo
 - [ ] **Step 6: Commit**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git add packages/multica-bridge/docs/SETUP.md
 git commit -m "docs(multica-bridge): phase 0 self-host setup record"
 ```
@@ -673,12 +673,12 @@ Agent creation and project resources are UI operations (the CLI lists but does n
 
 - [ ] **Step 2: Create the agent** (UI): name `org-os operator`, runtime `claude`, instructions = the **full contents** of `packages/multica-bridge/personas/org-os-operator.md` (paste verbatim; note in SETUP.md that the persona file is the source of truth and UI must be re-pasted when it changes). Skip skill imports for now — org-os skills ship with the repo the agent works in; note this decision in SETUP.md.
 
-- [ ] **Step 3: Create the project** (UI): title `org-os pilot`. Then attach a **local_directory** resource pointing at `/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os`, pinned to this Mac's daemon. (If the resource UI is under a different name — "repository"/"directory" picker on the project or workspace settings — record the actual location in SETUP.md.)
+- [ ] **Step 3: Create the project** (UI): title `org-os pilot`. Then attach a **local_directory** resource pointing at `<workspace>/org-os`, pinned to this Mac's daemon. (If the resource UI is under a different name — "repository"/"directory" picker on the project or workspace settings — record the actual location in SETUP.md.)
 
 - [ ] **Step 4: Fill the local config**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/packages/multica-bridge"
+cd "<workspace>/org-os/packages/multica-bridge"
 cp config.example.yaml config.yaml
 multica project list --output json   # take the org-os pilot project id
 ```
@@ -696,7 +696,7 @@ Verify by assigning a throwaway issue whose entire content is: "Run exactly this
 The pre-push hook is only enforced where it has been installed — unlike `.claude/settings.json`, which applies the moment it is checked in. Before wiring a live agent:
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 npm run install:hooks
 ls -l "$(git rev-parse --git-path hooks)/pre-push"
 ```
@@ -715,7 +715,7 @@ Expected: `org-os operator` appears; issue list is empty but the command targets
 - [ ] **Step 6: Commit the SETUP.md additions**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git add packages/multica-bridge/docs/SETUP.md
 git commit -m "docs(multica-bridge): workspace/agent/local_directory wiring runbook"
 ```
@@ -743,7 +743,7 @@ multica issue create \
 - [ ] **Step 3: Verify the operator obeyed discipline**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 git branch --list 'agent/*'                     # expect agent/<KEY>
 git log "agent/<KEY>" --oneline -3              # commit referencing <KEY>
 git show "agent/<KEY>" --stat                   # data/ideas.yaml + memory/<date>.md (+ .well-known/* if schemas regenerated)
@@ -785,7 +785,7 @@ git commit -m "docs(multica-bridge): phase 1 smoke verified end-to-end"
 - [ ] **Step 1: Full verification**
 
 ```bash
-cd "/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os"
+cd "<workspace>/org-os"
 npm run test:multica-bridge
 npm run validate:structure
 ```

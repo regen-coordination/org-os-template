@@ -8,7 +8,7 @@ What flows through an org-os instance: **sources → registries → memory → s
 
 End-to-end ingestion-to-output trail in this codebase:
 
-1. **Source declared.** A new source is registered in `data/sources.yaml` (currently empty stub at `/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os/data/sources.yaml` — only an example commented out) or a repo is added to `repos.manifest.json` (9 entries) and pulled by `scripts/clone-linked-repos.mjs` into `repos/`. The source can be a Telegram channel, GitHub repo, blog feed, podcast, or — most commonly used today — a meeting transcript pasted into chat.
+1. **Source declared.** A new source is registered in `data/sources.yaml` (currently empty stub at `<workspace>/org-os/data/sources.yaml` — only an example commented out) or a repo is added to `repos.manifest.json` (9 entries) and pulled by `scripts/clone-linked-repos.mjs` into `repos/`. The source can be a Telegram channel, GitHub repo, blog feed, podcast, or — most commonly used today — a meeting transcript pasted into chat.
 
 2. **Ingest skill catches it.** Three skills handle ingestion based on type:
    - `skills/meeting-processor/SKILL.md` consumes raw transcripts → emits `packages/operations/meetings/YYMMDD <title>.md` (canonical v2 path).

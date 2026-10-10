@@ -16,7 +16,7 @@
 
 ## Execution context and constraints
 
-- **Working directory:** `/Users/luizfernando/Desktop/Workspaces/Zettelkasten/03 Libraries/org-os` (the org-os repo). All paths below are relative to it. Commit from inside this directory — never via the parent vault repo.
+- **Working directory:** `<workspace>/org-os` (the org-os repo). All paths below are relative to it. Commit from inside this directory — never via the parent vault repo.
 - **Vault safety** (`docs/VAULT-SAFETY.md`): this repo lives inside a live Obsidian vault. This plan is **purely additive**: new files plus exactly two one-line edits (`SOUL.md`, `README.md`). No `git stash`, no `git clean`, no `reset --hard`, no deletions, no moves.
 - **Branch:** work on the current branch (`align-org-os-v3-upstream` at plan time). Do not create a worktree inside the vault; do not switch branches with a dirty tree.
 - **Out of scope** (from the spec): rewriting the operational autopoiesis corpus; any `data/`/schema/code change; exhaustive scholarship in the notes (they are seeds); resolving the dialectic (it stays open).
