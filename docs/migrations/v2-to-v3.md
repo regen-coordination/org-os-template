@@ -1,17 +1,19 @@
 # Migration: v2.x → v3.0.0
 
-**Target audience:** any org-os instance running framework v2.x.
+> **Version numbering: this page speaks in the legacy line (`1.x → 2.x → 3.x → 3.5`).** In 2026-06 the framework renumbered itself to `0.5` (see [VERSIONING.md](../VERSIONING.md) and `VERSION.md`), and `0.5` is *later* than `3.5`. Everything below that says "v2", "v3" or "v3.0.0" names a milestone of the old line, not a version you can download now.
+>
+> **Does an operator still need this page?** Almost never. It matters only for an instance that still declares `framework_version: "2.x"` (or older) and still keeps plans in `docs/agent-plans/`. To bring such an instance onto the current framework, one route is `npm run sync:upstream` (step 1 below); `npm run doctor -- sync --dry-run` then `npm run doctor -- sync` is the other (see [VERSIONING.md](../VERSIONING.md)). Neither applies the frontmatter change below, so run the script in step 2 yourself. Fresh clones do not use `docs/agent-plans/` (they scaffold `docs/plans/`), and have nothing to migrate.
 
-**Estimated time:** 5 minutes. Idempotent — safe to re-run.
+**Estimated time:** a few minutes. The script is idempotent: re-running changes nothing the second time.
 
 ## What changed in v3.0.0
 
 See the full [CHANGELOG](../../CHANGELOG.md) entry. Migration-relevant summary:
 
 - Plans in `docs/agent-plans/` gained a `workstream:` frontmatter field linking them to a long-lived workstream in `data/projects.yaml`.
-- Three new framework-only registries exist on the framework repo (`data/instances.yaml`, `data/skills-matrix.yaml`, `data/packages-matrix.yaml`). **Instances do NOT need these** — they live on the framework/hub only.
-- Versioning system formalized. `package.json.version` is the single source of truth; `federation.yaml.metadata.framework_version` mirrors major.minor.
-- `federation.yaml` schema: `identity.role` field added (optional for instances); `downstream` array format clarified.
+- Three framework-only registries were added on the framework repo (`data/instances.yaml`, `data/skills-matrix.yaml`, `data/packages-matrix.yaml`). Instances do not need them.
+- Versioning was formalised: `package.json.version` is the single source of truth and `federation.yaml.metadata.framework_version` mirrors major.minor (still true, see [VERSIONING.md](../VERSIONING.md)).
+- `federation.yaml` gained an optional `identity.role` field and a clarified `downstream` array format (taken from the changelog, not re-checked here).
 
 ## Who needs to act
 
@@ -30,27 +32,31 @@ See the full [CHANGELOG](../../CHANGELOG.md) entry. Migration-relevant summary:
 From the instance repo root:
 
 ```bash
-# 1. Pull latest from the framework upstream
+# 1. Snapshot, then bring the instance up to date with the framework
+# (commit or copy aside any untracked notes first: the snapshot does not hold them)
+npm run vault:snapshot -- "before v2-to-v3 migration"
 npm run sync:upstream
 
-# 2. Run migrations (idempotent)
-npm run migrate
+# 2. Run the migration script directly (if the file is missing after step 1,
+#    copy it from a framework checkout: whether the sync brings it in was not verified)
+node scripts/migrations/v2-to-v3-workstream-frontmatter.mjs
 
 # 3. Review what changed
 git diff docs/agent-plans/
 
-# 4. Commit if satisfied
-git add -A && git commit -m "chore: migrate to framework v3.0.0"
+# 4. Commit if satisfied, naming the paths you changed
+git add docs/agent-plans && git commit -m "chore: migrate plans to workstream frontmatter"
 ```
 
-## What `npm run migrate` does
+Why step 2 runs the script by hand: `npm run migrate` selects scripts by the numbers at the start of the file name and compares them with the framework's version. `v2-to-v3-…` reads as `2.0 → 3.0`, which is never at or below the current `0.5`, so `npm run migrate` does not select it (`npm run migrate -- --dry` lists nothing on a current checkout). Run it with `node` as shown.
 
-1. Reads current framework version from `package.json` (code) and instance framework version from `federation.yaml.metadata.framework_version`.
-2. Runs every migration script in `scripts/migrations/` whose version range applies.
-3. For v2→v3, that's `v2-to-v3-workstream-frontmatter.mjs`:
-   - Scans every `docs/agent-plans/*.md`.
-   - Adds `workstream: <inferred>` frontmatter field if missing.
-   - Flags any file where the inference is uncertain for operator review.
+## What the script does
+
+`scripts/migrations/v2-to-v3-workstream-frontmatter.mjs`:
+
+- Scans every `docs/agent-plans/*.md` except `QUEUE.md` and `README.md`. If `docs/agent-plans/` does not exist the script stops with an error instead of skipping.
+- Adds a `workstream: <inferred>` field before the closing `---` if it is missing. The inference matches the plan `id` to a built-in map of plan ids and prefixes, and falls back to `v2-stabilization`, which is probably wrong for an instance with its own workstreams: review every plan it touched.
+- Flags files with no frontmatter, no `id`, or an inferred workstream that is not in `data/projects.yaml`.
 
 ## How to verify
 
@@ -71,10 +77,10 @@ Migrations are non-destructive (additive frontmatter only). To rollback:
 git checkout HEAD~1 -- docs/agent-plans/
 ```
 
-Or keep the changes — they don't break anything on a v2.x framework. Plans with an unknown `workstream` field are silently ignored by older tooling.
+This overwrites the files in that directory with their previous committed state, so use it only after the migration commit and only if nothing else changed there since. Or keep the changes: the added field is plain frontmatter, and tooling that does not know it should ignore it (not tested).
 
 ## If something goes wrong
 
 - The migration script prints every change it makes. Review the output.
 - If a plan gets the wrong workstream, edit it manually. The script is idempotent — it won't touch a plan that already has the field.
-- Open an issue at `github.com/regen-coordination/org-os-template`.
+- Open an issue at [github.com/regen-coordination/org-os-template](https://github.com/regen-coordination/org-os-template/issues).

@@ -112,7 +112,7 @@ Breaking changes require:
 
 - Session memory writes (`memory/`), heartbeat updates (`HEARTBEAT.md`), dated reports.
 - Content of `data/*.yaml` — only the *shape* is versioned, not the entries.
-- Plan files in `docs/agent-plans/` — those have their own lifecycle.
+- Plan files (`docs/agent-plans/` on the older layout, `docs/plans/` in a fresh clone) — those have their own lifecycle.
 
 ## Instance migration — pull-based
 
@@ -120,8 +120,8 @@ The framework does **not** push changes to downstream instances. Each instance p
 
 1. Framework ships a release (version bump + CHANGELOG + migration scripts + docs).
 2. Instance operator runs `npm run sync:upstream` (or git pulls the template remote).
-3. Instance operator runs `npm run migrate` — detects local `framework_version`, applies every migration script from there to the current framework version, idempotent.
-4. Instance's `federation.yaml.metadata.framework_version` is updated to the new version.
+3. Instance operator runs `npm run migrate` — reads the local `framework_version` and runs the migration scripts whose range applies, idempotent. (Caveat: the two migration scripts that exist, `v2-to-v3-…` and `v3-to-v3-5-…`, are named in the legacy numbering. `migrate.mjs` reads the leading numbers of the file name as `2.0 → 3.0` and `3.0 → 3.0` and only runs a script whose end point is at or below the framework's major.minor. With the framework on `0.5`, neither runs; `npm run migrate -- --dry` on a current checkout lists none. See [the two migration guides](migrations/v3-to-v3-5.md).)
+4. Instance's `federation.yaml.metadata.framework_version` is updated to the new version. The migration scripts do not do this; `npm run doctor sync` re-stamps the version surfaces in its migrate stage.
 5. Framework hub (this repo) picks up the new state on next `npm run analyze:instances`.
 
 > **Note (2026-08-02):** `npm run sync:upstream` is implemented and now
@@ -134,15 +134,15 @@ The framework does **not** push changes to downstream instances. Each instance p
 
 Migrations must be:
 - **Idempotent** — running twice does nothing the second time.
-- **Additive where possible** — never delete data without a `--destructive` flag.
-- **Logged** — append a line to `memory/migrations-YYYY-MM-DD.md` on the instance.
+- **Additive where possible** — the policy is to avoid deleting data. No `--destructive` flag exists in the shipped scripts; the policy is not enforced by code.
+- **Logged** — the policy is to append to `memory/migrations-YYYY-MM-DD.md` on the instance. Of the two shipped migrations only `v3-to-v3-5-consolidation.mjs` does so; `migrate.mjs` and the v2-to-v3 script do not.
 
 ## `MASTERPLAN.md` version vs framework version
 
 These are different and both matter:
 
 - `package.json.version` = framework version (shared by all instances of this codebase).
-- `MASTERPLAN.md` version header = that specific instance's agent-mandate version. A refi-bcn-os at `MASTERPLAN v2.0.0` and refi-dao-os at `v2.2.0` can both run framework `v3.0.0`. They describe the evolution of the *organization's mandate*, not the framework.
+- `MASTERPLAN.md` version header = that specific instance's agent-mandate version. Two instances at `MASTERPLAN` `v2.0.0` and `v2.2.0` can both run framework `0.5.0`. They describe the evolution of the *organization's mandate*, not the framework.
 
 Rule of thumb: if you changed how the framework works → framework version. If you changed what the organization wants its agent to do → MASTERPLAN version.
 
@@ -234,10 +234,10 @@ a marker of why `version:check` now reads every surface it can.)
 
 ## Enforcement
 
-`npm run validate:structure` fails if:
-- `package.json.version` is missing or malformed.
-- `federation.yaml.metadata.framework_version` does not equal `package.json.version` major.minor.
-- A `CHANGELOG.md` entry for the current version is missing when the tag exists.
+`npm run validate:structure` (section "Version Consistency") checks:
+- Fails if `package.json` has no `version`, or `federation.yaml` has no `metadata.framework_version`.
+- Fails if `package.json.version` major.minor differs from `framework_version`, except when `package.json.version` starts with `0.`: that case is skipped with a note, because on the `0.x` line an instance's own `package.json` version is independent of its framework pin. The cross-surface comparison is `npm run version:check`'s job.
+- Only warns (does not fail) if `CHANGELOG.md` has no `## [<version>]` heading for the current version.
 
 ## References
 
@@ -249,7 +249,7 @@ a marker of why `version:check` now reads every surface it can.)
 
 ---
 
-## Lineage stamp (v3.5+)
+## Lineage stamp (introduced on the legacy 3.5 line, still current)
 
 Every instance carries a **lineage stamp** in `federation.yaml.metadata`:
 

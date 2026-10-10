@@ -4,7 +4,9 @@
 
 > "Vault" in the script names (`vault:snapshot`, `vault:audit`) preserves the original vocabulary from the Obsidian-flavored hub where this protocol was born. The protocol applies to **any org-os workspace** where untracked content is precious — instances with operator-authored memory, daily notes, drafts, planning artifacts, or knowledge bases.
 
-**Why this exists:** an agent once stashed a workspace's untracked content before a merge and never popped it; weeks of notes vanished and a sync tool propagated the deletions to other devices. Recovery took hours. The framework keeps the full incident write-up in its own repository (`docs/VAULT-SAFETY-CASE-STUDY.md` at https://github.com/regen-coordination/org-os-template).
+**Why this exists:** an agent once stashed a workspace's untracked content before a merge and never popped it; weeks of notes vanished and a sync tool propagated the deletions to other devices. Recovery took hours. The incident is written up in [the case study](VAULT-SAFETY-CASE-STUDY.md).
+
+**What the tooling covers, and what it does not.** `npm run vault:snapshot` pins the files git already knows about (tracked or staged), including uncommitted edits to them, to a git ref. It does **not** capture untracked files (tested on this version; see "The Safe Pattern" below), so it gives no protection to new notes that were never added to git. What does protect untracked notes today is copying them aside or committing them (see "Protect untracked notes first"). `npm run vault:audit` checks only the content files at the workspace root. The rules below are the real protection; the scripts are a convenience.
 
 This protocol exists so that no agent ever does that again.
 
@@ -14,7 +16,7 @@ This protocol exists so that no agent ever does that again.
 
 These apply to **every command that touches the working tree** in any org-os workspace where untracked content matters (instances with `memory/`, daily notes, drafts, etc. — which is most of them):
 
-1. **Never `git stash` in the workspace.** Not `stash push`, not `stash --include-untracked`, not `stash --keep-index`. The workspace's working tree may include 50–90% precious untracked content. Stash hides it; you will forget to pop. Use a snapshot ref instead (see "Safe Pattern" below).
+1. **Never `git stash` in the workspace.** Not `stash push`, not `stash --include-untracked`, not `stash --keep-index`. The workspace's working tree may include 50–90% precious untracked content. Stash hides it; you will forget to pop. Protect untracked notes first (copy aside or commit them, see "Safe Pattern" below), and take a snapshot ref for the tracked files.
 
 2. **Never `git clean` in the workspace.** Not `clean -fd`, not `clean -fdx`, not `clean -i`. Those untracked files are content, not build artifacts.
 
@@ -36,25 +38,41 @@ If a workflow seems to require breaking one of these rules, stop and ask.
 
 ## The Safe Pattern (use this before any risky op)
 
-A risky op is anything that rewrites history or sweeps the working tree: merge, rebase, pull, reset, checkout across diverged branches, clean, stash, or large `git add -A` followed by selective unstaging.
+A risky op is anything that rewrites history or sweeps the working tree: merge, rebase, pull, reset, checkout across diverged branches, clean, stash, or large `git add -A` followed by selective unstaging. `npm run doctor sync` starts with a snapshot made the same way as `vault:snapshot` (so it has the same gap with untracked files); `npm run sync:upstream` refuses to run on a dirty working tree and tells you to snapshot and commit first.
 
-### One command (preferred)
+### Protect untracked notes first
+
+The snapshot below does not hold untracked files. Before any risky operation, check `git status --short` for lines starting `??`, then do one of these. Neither depends on the snapshot script:
+
+- copy them aside, outside the working tree, for example `cp -R "memory" "<a folder outside this workspace>/memory-copy"` (adjust to the paths that matter); or
+- commit them to a throwaway branch: `git switch -c backup/before-<reason>`, `git add <the untracked paths>`, `git commit -m "backup before <reason>"`, then switch back. A commit is permanent and recoverable from the reflog and the branch.
+
+Only then take the snapshot.
+
+### One command (tracked files)
 
 ```bash
 npm run vault:snapshot -- "before <reason>"
 ```
 
-This creates a permanent git ref at `refs/snapshots/<timestamp>-<reason>` capturing the entire working tree (tracked + untracked + ignored-but-present), without touching your tree. You stay on your current branch with all your edits intact. The snapshot is recoverable indefinitely via `git show refs/snapshots/<name>`.
+This creates a permanent git ref at `refs/snapshots/<timestamp>-<reason>` (the reason is lower-cased and cut to 60 characters in the ref name) without touching your tree or your stash list. You stay on your current branch with all your edits intact. If git sees no changes to tracked files, the script prints "Working tree clean" and points the ref at `HEAD`.
+
+**Known gap.** The ref points at a commit made by `git stash create`, which records the files git already knows about (tracked, or added to the index) plus your uncommitted edits to them. Untracked files are not in it, although the script passes `-u`. This was tested in a scratch repository on this version: an untracked `untracked.md` was absent from the snapshot tree, and `vault:audit` listed it only as "added". Untracked notes (new daily notes, drafts) are therefore not protected by the snapshot. Commit them, or copy them aside, before a risky operation. The script's own header comment still promises untracked and ignored files; that comment is wrong for the same reason.
+
+**The "Working tree clean" message is false reassurance here.** If your only precious content is untracked (new daily notes, say), git sees no tracked changes, the script prints "Working tree clean" and the ref points at `HEAD`, which holds none of those notes (reproduced in a scratch repository). The message does not mean there is nothing untracked.
+
+The snapshot is recoverable indefinitely via `git ls-tree -r <ref>` and `git cat-file -p`.
 
 ### Manual equivalent (if the script is unavailable)
 
 ```bash
-SNAP=$(git stash create --include-untracked) && \
-  git update-ref "refs/snapshots/$(date +%Y%m%d-%H%M%S)-manual" "$SNAP" && \
-  echo "Snapshot saved: refs/snapshots/$(date +%Y%m%d-%H%M%S)-manual"
+NAME="refs/snapshots/$(date +%Y%m%d-%H%M%S)-manual"
+SNAP=$(git stash create) && git update-ref "$NAME" "$SNAP" && echo "Snapshot saved: $NAME"
 ```
 
-`git stash create` (note: **create**, not `push`) writes a stash *object* without modifying your working tree or the stash list. Pinning it with `update-ref` makes it survive `git gc`.
+No output means no ref was made: `create` printed nothing because there were no tracked changes.
+
+`git stash create` (note: **create**, not `push`) writes a stash *object* without modifying your working tree or the stash list. Pinning it with `update-ref` makes it survive `git gc`. Like the script, it leaves untracked files out; the `--include-untracked` flag the earlier version of this page used has no effect on `create`.
 
 ### After the risky op — always verify
 
@@ -62,13 +80,15 @@ SNAP=$(git stash create --include-untracked) && \
 npm run vault:audit
 ```
 
-Compares current root-level content count against the latest snapshot. Loud failure (exit 1) if any file is missing.
+Compares the content files at the workspace root (`*.md`, `*.canvas`, `*.base`, `*.yaml`, `*.yml`) against the latest snapshot ref, or against a ref you name (`npm run vault:audit -- <ref>`). It exits 1 and lists the files if any are missing, and exits 2 if no snapshot exists. Files in subdirectories such as `memory/` and `data/` are inside the snapshot, but the audit does not compare them, and files that were never in the snapshot (untracked ones) cannot be reported as lost.
 
 ---
 
 ## Recovery Runbook (when content goes missing)
 
 Check sources in this order. **Do not delete or skip a source until the next one has been confirmed.**
+
+**Every restore command below overwrites its destination silently if the file already exists**, possibly with an older copy. Before restoring, run `ls "<filename>"`. If the file exists, restore to a different name (`> "<filename>.recovered"`), compare the two, and only then replace one with the other.
 
 ### 1. Snapshot refs (created by `npm run vault:snapshot`)
 
@@ -83,6 +103,8 @@ git cat-file -p <snapshot-ref>:"<filename>" > "<filename>"
 ```
 
 ### 2. Stash trees (especially `^3` for untracked content)
+
+This applies only when someone ran `git stash push`; snapshot refs from `vault:snapshot` have no `^3` parent.
 
 ```bash
 git stash list
@@ -109,16 +131,16 @@ The newest stversion is usually best, but verify content — if the loss propaga
 
 ### 4. Dangling git blobs (`git fsck`)
 
-When a commit gets orphaned (rebase, reset, dropped stash) its blobs become unreachable but stay in the object database for ~14 days.
+When a commit gets orphaned (rebase, reset, dropped stash) its blobs become unreachable but stay in the object database for about 14 days by default (git's `gc.pruneExpire`; it is not a guarantee).
 
 ```bash
-git fsck --unreachable --no-reflogs > /tmp/blobs.txt
+git fsck --unreachable --no-reflogs > "<a path outside the workspace>/unreachable-blobs.txt"
 # search blobs by content
 while read kind type hash; do
   [ "$kind" = "unreachable" ] && [ "$type" = "blob" ] && \
     git cat-file -p "$hash" 2>/dev/null | grep -q "<unique content marker>" && \
     echo "$hash"
-done < /tmp/blobs.txt
+done < "<a path outside the workspace>/unreachable-blobs.txt"
 ```
 
 Dump a blob:
@@ -134,6 +156,8 @@ git reflog show stash       # stash history (deleted entries still recoverable h
 ```
 
 ### 6. Agent worktrees
+
+Only if your agent tool keeps worktrees there; this repository has no `.claude/worktrees/` directory.
 
 ```bash
 ls .claude/worktrees/                                    # snapshots from prior agent sessions
@@ -158,7 +182,7 @@ Before you claim a risky op is complete, run:
 npm run vault:audit
 ```
 
-It should report **0 missing files vs. the pre-op snapshot**. If it doesn't, recover before doing anything else.
+It should report `missing:  0` against the pre-op snapshot. If it doesn't, recover before doing anything else. A clean audit does not prove untracked notes are safe, for the reason given above; check `git status` too.
 
 ---
 
