@@ -1,367 +1,331 @@
-# DATA-MODEL.md — org-os Data Model Specification
+# Data model
 
-Version: 2.0.0
+org-os keeps an organisation's structured data as YAML registries in `data/`. They are the source of truth: the `.well-known/` files, the `/initialize` dashboard and agent queries all read from them. After any change:
 
-## Overview
+```bash
+npm run generate:schemas && npm run validate:schemas
+```
 
-org-os structures all organizational data as YAML registries in `data/`. These files are the single source of truth — all schemas, dashboards, and agent queries read from them.
+For where these files sit in the tree, and which of them a new instance receives, see [FILE-STRUCTURE.md](FILE-STRUCTURE.md).
 
-After any data change: `npm run generate:schemas && npm run validate:schemas`
+## What the code actually checks
 
-### Conventions
+Read this before trusting a field table. The framework's scripts check far less than the tables below suggest.
 
-- Top-level key matches the filename (e.g., `members:` in `members.yaml`)
-- Each entry has a unique `id` field
-- Dates use ISO 8601 format (`YYYY-MM-DD`)
-- Status fields use lowercase kebab-case
-- Add `schema_version: "2.0"` header to each file
+- **`npm run validate:schemas`** (`scripts/validate-identity.mjs`) parses seven `.well-known/*.json` files and compares `IDENTITY.md` with `federation.yaml`. It does not read `data/*.yaml`; it also checks the lineage stamp in `federation.yaml` (`framework_version`, `genesis_commit`, `last_sync_commit`).
+- **`npm run validate:structure`** (`scripts/validate-structure.mjs`) checks that the files exist, and that every entry of `skills-matrix.yaml` and `packages-matrix.yaml` has a valid status. It does not check any other registry's fields.
+- **`npm run generate:schemas`** reads some registries and copies some fields into `.well-known/` (each registry section below says who reads it).
+- **The admin app** (`packages/admin`, `npm run admin`) validates an entry against `packages/admin/schemas/<registry>.schema.json` before saving it. Those JSON Schemas are the only machine-readable definition of the field names, types and enums below; the type, enum and "required" columns in this page come from them. Only `id` is required, and only in the collection registries; free-form fields (strings, numbers, lists, maps) are optional and accept `null`; an enum field must be omitted or hold one of the listed values. `finances`, `governance` and `knowledge-manifest` (the document registries) are read-only in the admin app. Extra fields are allowed. The enums are enforced only when an entry is saved through the admin app; real files already use values outside them (flagged below).
+- Everything else, including the example values, is convention.
 
----
+## Conventions
 
-## Registries (14 total)
+- A registry file is a YAML map. Most hold one list under a plural key (`members:`, `projects:`). The keys do not always match the filename: `funding-opportunities.yaml` uses `opportunities` (or `funding_opportunities`), `knowledge-manifest.yaml` uses `knowledge_manifest`, `knowledge-gaps.yaml` uses `gaps`, and `finances.yaml` has `budgets`, `expenses` and `revenues` at the top level, with no wrapper.
+- Entries in a list have an `id`, unique within the file. It is a free string; this repository's own members use `github:<handle>`.
+- Dates are ISO 8601 (`YYYY-MM-DD`).
+- Status vocabularies are per registry. They are not uniformly lower-case: the projects in this repository use `Discovery` and `Develop`.
+- Files carry a `schema_version: "2.0"` line. All of this repository's registries have it except `ecosystems.yaml`.
+- The files shipped in `data/` are mostly empty, and the empty ones (`finances`, `meetings`, `events`, `channels`, `assets`, `sources`, `funding-opportunities`, `knowledge-manifest`) end in a commented example entry; open the file to see one.
 
-### 1. members.yaml — People & Roles (Required)
+## Registries in `data/`
+
+This repository has 18 YAML files in `data/` (counted, not assumed). The validator knows 14 of them; three are framework-only; one, `ecosystems.yaml`, was not documented before.
+
+| File | Top-level key | Kind | Checked by `validate:structure` | Entries in this repository |
+|---|---|---|---|---|
+| `members.yaml` | `members` | list | required | 1 |
+| `projects.yaml` | `projects` | list | required | 13 |
+| `finances.yaml` | `budgets`, `expenses`, `revenues` | document | required | none |
+| `governance.yaml` | `governance` | document | required | 2 decisions |
+| `meetings.yaml` | `meetings` | list | required | none |
+| `ideas.yaml` | `ideas` | list | required | 9 |
+| `funding-opportunities.yaml` | `opportunities` or `funding_opportunities` | list | optional | none |
+| `relationships.yaml` | `relationships` | list | optional | 7 |
+| `sources.yaml` | `sources` | list | optional | none |
+| `knowledge-manifest.yaml` | `knowledge_manifest` | document | optional | none |
+| `events.yaml` | `events` | list | optional | none |
+| `channels.yaml` | `channels` | list | optional | none |
+| `assets.yaml` | `assets` | list | optional | none |
+| `knowledge-gaps.yaml` | `gaps` | list, generated | optional | 268 |
+| `ecosystems.yaml` | `ecosystems` | list | not checked | 3 |
+| `instances.yaml` | `instances` | list | not checked | 8 |
+| `skills-matrix.yaml` | `skills` | list | status values checked | 42 |
+| `packages-matrix.yaml` | `packages` | list | status values checked | 27 |
+
+The tables below give `Field`, `Type` and `Notes`. "date" means a string in `YYYY-MM-DD`. A field is optional unless the registry's "Required" line says otherwise.
+
+### members.yaml: people and roles
+
+Required field: `id`. Read by `generate:schemas` (only the `id` goes into `members.json`) and by the dashboard (`name`, `role`, `layer`, `status`, `joined`).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `name`, `role` | string | |
+| `layer` | `core` \| `contributor` \| `community` \| `observer` | |
+| `status` | `active` \| `inactive` \| `alumni` | dashboard defaults a missing status to `active` |
+| `joined`, `left` | date | |
+| `skills` | list of strings | |
+| `handles` | map of strings | e.g. `github`, `telegram`, `email` |
+| `affiliations` | list | |
+
+This repository's own entry also uses `pronouns`, `timezone` and `also_operates`, which no schema lists.
 
 ```yaml
 schema_version: "2.0"
 members:
-  - id: "luiz"
-    name: "Luiz Fernando"
-    role: "Core Steward"
-    layer: "core"              # core | contributor | community | observer
-    status: "active"           # active | inactive | alumni
-    joined: "2023-01-15"
-    left: null
-    skills: ["governance", "engineering", "coordination"]
-    handles:
-      github: "luizfernandosg"
-      telegram: "@luizfernando"
-      email: "luiz@example.com"
-    affiliations: []
+  - id: "operator"
+    name: "Your Name"
+    role: "Operator"
+    layer: "core"
+    status: "active"
+    joined: "2026-10-10"
 ```
 
-### 2. projects.yaml — Initiatives (Required)
+### projects.yaml: initiatives
 
-Uses the IDEA lifecycle: Idea → Develop → Execute → Archive
+Required field: `id`. `generate:schemas` copies each entry into `projects.json` unchanged (and adds any `content/projects/*.md` file with an `id` in its front matter, if that directory exists). The dashboard shows `title` (or `name`), `status` (default `idea`), `lead` and `owner`. This repository's projects also carry `members` and `researchArtifacts`.
 
-```yaml
-schema_version: "2.0"
-projects:
-  - id: "proj-001"
-    title: "Local Node Onboarding Program"
-    status: "execute"          # idea | develop | execute | archive
-    type: "program"            # program | initiative | workstream | experiment
-    lead: "luiz"
-    contributors: ["monty", "john"]
-    started: "2025-06-01"
-    target_completion: "2026-03-31"
-    description: "Streamline onboarding for new local ReFi nodes"
-    milestones:
-      - title: "Template finalized"
-        date: "2025-09-01"
-        status: "completed"
-    related_ideas: []
-    funding_source: null
-    tags: ["nodes", "onboarding"]
-```
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `title` | string | this repository's entries use `name` instead |
+| `status` | string | the vocabulary is the instance's own. Suggested: `idea`, `develop`, `execute`, `archive`. This repository uses `Discovery` and `Develop` |
+| `type` | string | suggested: `program`, `initiative`, `workstream`, `experiment` |
+| `lead` | string | a member `id` |
+| `contributors` | list of strings | member ids |
+| `started`, `target_completion` | date | this repository uses `startDate` |
+| `description` | string | |
+| `milestones` | list of maps | |
+| `related_ideas` | list of strings | idea ids |
+| `funding_source` | string | an opportunity `id` |
+| `tags` | list of strings | |
 
-### 3. finances.yaml — Budgets, Expenses, Revenues (Required)
+### finances.yaml: budgets, expenses, revenues
 
-```yaml
-schema_version: "2.0"
-finances:
-  treasury:
-    primary_safe: "0x..."
-    chain: "optimism"
-    balance_last_updated: "2026-03-01"
-  budgets:
-    - id: "budget-2026-h1"
-      period: "2026-H1"
-      total: 50000
-      currency: "USD"
-      allocations:
-        - category: "operations"
-          amount: 20000
-        - category: "grants"
-          amount: 30000
-  expenses:
-    - id: "exp-001"
-      date: "2026-01-15"
-      amount: 1500
-      currency: "USD"
-      category: "operations"
-      description: "Server hosting Q1"
-      approved_by: "council"
-  revenues:
-    - id: "rev-001"
-      date: "2026-02-01"
-      amount: 25000
-      currency: "USD"
-      source: "Gitcoin Round 22"
-      type: "grant"            # grant | donation | earned | investment
-```
+A document, not a list. **Use the flat shape**: `budgets:`, `expenses:` and `revenues:` at the top level, as the shipped file does. It is the only shape `generate:schemas` reads (`scripts/generate-all-schemas.mjs` reads `financesData?.budgets` and its siblings); the same top-level lists are what `finances.json` carries.
 
-### 4. governance.yaml — Elections & Decisions (Required)
+The two readers disagree:
 
-```yaml
-schema_version: "2.0"
-governance:
-  model: "steward-council"     # steward-council | multisig | assembly | conviction
-  current_phase: "active"      # bootstrap | transition | active | sunset
-  infrastructure:
-    safe: "0x..."
-    hats_tree: null
-    gardens: null
-    snapshot: null
-  decisions:
-    - id: "gov-001"
-      title: "Adopt Distributed Stewardship Model"
-      type: "proposal"         # proposal | election | amendment | emergency
-      status: "ratified"       # draft | voting | ratified | rejected | expired
-      date: "2026-03-22"
-      passed_by: "assembly"
-      summary: "Transition from founder-led to council-based governance"
-  elections:
-    - id: "election-001"
-      title: "Steward Council Election Q2 2026"
-      status: "upcoming"       # upcoming | nominations | voting | completed
-      nominations_open: "2026-04-09"
-      voting_start: "2026-04-16"
-      voting_end: "2026-04-23"
-      seats: 5
-      candidates: []
-```
+- The admin app looks for the lists under a `finances:` key (`topKey: 'finances'` in `packages/admin/server/registries.ts`; `readRegistry` returns `{}` when the key is absent). Its schema, `finances.schema.json`, lists `budgets` and the others as properties of that document. So in `npm run admin` the shipped flat file shows as an empty document. Nothing is lost: finances is a document registry and document registries are read-only in the admin app.
+- If you wrap the lists in `finances:`, the admin app shows them, but `generate:schemas` writes an empty `finances.json`. Do not wrap them.
 
-### 5. meetings.yaml — Meeting Records (Required)
+This page documents the generator's shape. The `treasury` map in the admin schema is ignored by `generate:schemas`.
 
-```yaml
-schema_version: "2.0"
-meetings:
-  - id: "mtg-20260301"
-    title: "Weekly Stewards Sync"
-    date: "2026-03-01"
-    type: "sync"               # sync | assembly | workshop | standup | ad-hoc
-    participants: ["luiz", "monty", "john"]
-    duration_minutes: 60
-    recording_url: null
-    transcript_path: null
-    summary: "Reviewed Q1 progress, discussed stewardship transition"
-    decisions:
-      - "Approved v3 governance proposal for community vote"
-    action_items:
-      - assignee: "luiz"
-        task: "Draft voter education materials"
-        due: "2026-03-08"
-        status: "completed"
-    tags: ["governance", "transition"]
-```
+The commented examples in the shipped file give these entry fields:
 
-### 6. ideas.yaml — Community Ideas & Hatching (Required)
+| List | Fields |
+|---|---|
+| `budgets` | `id`, `name`, `period`, `currency`, `totalAllocated` |
+| `expenses` | `id`, `date`, `amount`, `currency`, `category`, `description`, `recipient`, `status` |
+| `revenues` | `id`, `date`, `amount`, `currency`, `source`, `description`, `status` |
 
-```yaml
-schema_version: "2.0"
-ideas:
-  - id: "idea-001"
-    title: "Carbon Credit Verification Toolkit"
-    status: "proposed"         # surfaced | proposed | approved | developing | hatched | archived
-    source: "knowledge/carbon-markets/verification-gaps.md"
-    submitted_by: "agent"      # "agent" | "symbient" | member-id
-    champions: ["luiz"]
-    ecosystem_gap: "No open-source MRV tools for small-scale projects"
-    description: "Open-source toolkit for measuring, reporting, and verifying carbon credits"
-    hatched_repo: null
-    skills_needed: ["smart-contracts", "data-science"]
-    resources: []
-    compensation:
-      model: null              # bounty | retroactive | grants | equity | null
-      pool: null
-    created: "2026-03-15"
-    updated: "2026-03-15"
-    votes: 0
-    comments: []
-```
+The admin app types the three lists as lists of maps and enforces no entry fields.
 
-**Idea Lifecycle:** surfaced → proposed → approved → developing → hatched → archived. See `docs/IDEA-HATCHING.md`.
+### governance.yaml: decisions and elections
 
-**`submitted_by: "symbient"`** marks an entry surfaced by a symbient practice (Stage 1+, deep-weave only) — deliberately anonymous; it never identifies a particular being or habitat. See `skills/symbient/SKILL.md` → Surfacing rule.
+A document under the `governance` key. `generate:schemas` turns `governance.decisions` into `proposals.json` (keeping `id`, `title`, `type`, `status`, `date`, `summary`). Nothing in the scripts reads `elections`.
 
-### 7. funding-opportunities.yaml — Grants & Rounds (Optional)
+| Field | Type | Notes |
+|---|---|---|
+| `model` | string | the admin enum is `steward-council`, `multisig`, `assembly`, `conviction`; the scaffold and this repository use `solo-maintainer` |
+| `current_phase` | `bootstrap` \| `transition` \| `active` \| `sunset` | |
+| `infrastructure` | map | `safe`, `hats_tree`, `gardens`, `snapshot`, each `null` or a value |
+| `decisions` | list of maps | entry fields in use: `id`, `title`, `type`, `status`, `date`, `passed_by`, `summary`. `type` and `status` are free strings; this repository uses `amendment` and `ratified` |
+| `elections` | list of maps | free-form |
 
-```yaml
-schema_version: "2.0"
-funding_opportunities:
-  - id: "fund-001"
-    title: "Gitcoin GG24 Climate Round"
-    type: "grants-round"       # grants-round | rfp | bounty | retroactive | investment
-    platform: "gitcoin"
-    status: "open"             # upcoming | open | closed | awarded
-    deadline: "2026-04-15"
-    amount_available: 500000
-    currency: "USD"
-    relevance: "high"          # high | medium | low
-    url: "https://..."
-    notes: ""
-    applied: false
-    application_id: null
-```
+### meetings.yaml: meeting records
 
-### 8. relationships.yaml — Inter-Org Partnerships (Optional)
+Required field: `id`. Read by `generate:schemas` (all of them into `meetings.json`, the last 20 into `activities.json`) and the dashboard (`title`, `date`).
 
-```yaml
-schema_version: "2.0"
-relationships:
-  - id: "rel-001"
-    partner: "Regen Network"
-    type: "alliance"           # alliance | collaboration | funding | advisory | peer
-    status: "active"           # active | dormant | completed | proposed
-    since: "2024-06-01"
-    contact: "Gregory Landua"
-    description: "Shared knowledge commons and ecological credit methodology"
-    touchpoints:
-      - type: "quarterly-sync"
-        last: "2026-02-15"
-```
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `title` | string | |
+| `date` | date | |
+| `type` | `sync` \| `assembly` \| `workshop` \| `standup` \| `ad-hoc` | |
+| `participants` | list of strings | member ids |
+| `duration_minutes` | number | |
+| `recording_url`, `transcript_path`, `summary` | string | |
+| `decisions` | list of strings | |
+| `action_items` | list of maps | e.g. `assignee`, `task`, `due`, `status` |
+| `tags` | list of strings | |
 
-### 9. sources.yaml — Content Sources (Optional)
+### ideas.yaml: the ideas pipeline
 
-```yaml
-schema_version: "2.0"
-sources:
-  - id: "refi-blog"
-    name: "ReFi Blog"
-    type: "blog"               # blog | podcast | newsletter | github | forum | social
-    url: "https://blog.refidao.com"
-    feed_url: "https://blog.refidao.com/rss"
-    status: "active"           # active | paused | archived
-    last_synced: "2026-03-01"
-    sync_method: "rss"         # rss | api | manual | scrape
-    content_count: 45
-    tags: ["refi", "ecosystem"]
-```
+Required field: `id`. Lifecycle and the hatching process: [IDEA-HATCHING.md](IDEA-HATCHING.md). `generate:schemas` copies the entries into `ideas.json`.
 
-### 10. knowledge-manifest.yaml — Knowledge Commons (Optional)
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `title` | string | |
+| `status` | `surfaced` \| `proposed` \| `approved` \| `developing` \| `hatched` \| `archived` | dashboard defaults a missing status to `surfaced` |
+| `source` | string | a file path, such as a knowledge page; not a registry id |
+| `submitted_by` | string | `agent`, `symbient` or a member id |
+| `champions` | list of strings | |
+| `ecosystem_gap`, `description` | string | |
+| `hatched_repo` | string | |
+| `skills_needed` | list of strings | |
+| `resources` | list | |
+| `compensation` | map | |
+| `created`, `updated` | date | |
+| `votes` | number | |
+| `comments` | list | |
 
-```yaml
-schema_version: "2.0"
-knowledge_manifest:
-  domains:
-    - id: "carbon-markets"
-      name: "Carbon Markets & MRV"
-      description: "Carbon credit verification, measurement, reporting"
-      coverage: "partial"      # none | partial | comprehensive
-      page_count: 8
-      sources: ["refi-blog", "refi-podcast"]
-      last_updated: "2026-03-10"
-  exchange:
-    published_domains: ["carbon-markets"]
-    subscribed_domains: []
-```
+`submitted_by: "symbient"` marks an entry surfaced by a symbient practice (deep-weave only); it is deliberately anonymous and never identifies a particular being or habitat. See `skills/symbient/SKILL.md`.
 
-### 11. events.yaml — Events & Milestones (Optional, v2)
+### funding-opportunities.yaml: grants and rounds
 
-```yaml
-schema_version: "2.0"
-events:
-  - id: "event-001"
-    title: "Q2 Community Assembly"
-    type: "assembly"           # assembly | workshop | deadline | milestone | call | conference
-    date: "2026-06-15"
-    end_date: "2026-06-15"
-    recurrence: null           # weekly | monthly | quarterly | null
-    location: "online"         # online | [city] | hybrid
-    url: null
-    related_project: "proj-001"
-    participants: []
-    status: "upcoming"         # upcoming | completed | cancelled
-    notes: ""
-```
+Required field: `id`. The dashboard accepts either top-level key, `opportunities` or `funding_opportunities` (`scripts/initialize.mjs`), and so does the admin app. Two entry shapes are in use, and they do not agree:
 
-### 12. channels.yaml — Communication Channels (Optional, v2)
+- The shape the `funding-scout` skill writes and the shipped file's example shows: `id`, `platform`, `fund`, `deadline`, `domain`, `amount_range`, `matching`, `url`, `status` (`pending`, `applied`, `approved`, `rejected`, `expired`), `eligible`, `relevant_nodes`, `discovered_by`, `discovered_date`, `source_refs`, `notes`. This is what the top-level key `opportunities` goes with.
+- The shape the admin app's schema describes:
 
-```yaml
-schema_version: "2.0"
-channels:
-  - id: "telegram-main"
-    platform: "telegram"       # telegram | discord | forum | email | slack | signal | matrix
-    name: "Main Chat"
-    url: "https://t.me/example"
-    purpose: "General coordination and announcements"
-    visibility: "public"       # public | members | core | private
-    topics: []
-    managed_by: "core-stewards"
-    status: "active"           # active | archived | migrating
-```
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `title` | string | |
+| `type` | `grants-round` \| `rfp` \| `bounty` \| `retroactive` \| `investment` | |
+| `platform` | string | |
+| `status` | `upcoming` \| `open` \| `closed` \| `awarded` | |
+| `deadline` | date | |
+| `amount_available` | number | |
+| `currency` | string | |
+| `relevance` | `high` \| `medium` \| `low` | |
+| `url`, `notes` | string | |
+| `applied` | boolean | |
+| `application_id` | string | |
 
-### 13. assets.yaml — Organizational Assets (Optional, v2)
+The dashboard reads `deadline` and `status` from either shape: an entry whose deadline has passed is dropped, whatever its status; otherwise entries with status `applied` or `awarded` count as active, entries without a deadline count as active when their status is `active`, `applied` or `open`, and other future-dated entries are listed as upcoming.
 
-```yaml
-schema_version: "2.0"
-assets:
-  - id: "domain-example"
-    type: "domain"             # domain | account | credential | brand | tool | document | contract
-    name: "example.com"
-    platform: null
-    url: null
-    owner: "core-stewards"
-    status: "active"           # active | expired | pending | transferred
-    renewal_date: "2027-01-15"
-    notes: ""
-```
+### relationships.yaml: partnerships
 
-### 14. knowledge-gaps.yaml — Knowledge Graph Gaps (Generated, v2)
+Required field: `id`.
 
-Machine-generated by `scripts/graph-gaps.mjs` from `graphify-out/graph.json`. Only
-the `status` field is hand-edited (`open → curated | dismissed`). Consumed by the
-knowledge-curator skill.
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `partner` | string | |
+| `type` | `alliance` \| `collaboration` \| `funding` \| `advisory` \| `peer` | |
+| `status` | `active` \| `dormant` \| `completed` \| `proposed` | |
+| `since` | date | |
+| `contact`, `description` | string | |
+| `touchpoints` | list | this repository's entries use a list of strings |
 
-```yaml
-schema_version: "2.0"
-gaps:
-  - id: "a1b2c3d4e5f6"         # sha256(kind + sorted node_ids), 12 hex chars
-    kind: "weak-community"     # orphan | ambiguous-edge | weak-community
-    node_ids: ["docs_x_concept", "docs_y_concept"]
-    summary: "community 12: 8 nodes, cohesion 0.05 < 0.15"
-    status: "open"             # open | curated | dismissed
-    detected: "2026-07-22"
-```
+### sources.yaml: content sources
 
----
+Required field: `id`. Read by `generate:schemas` (`id`, `name`, `type`, `url` or `feed_url`, `status` go into `knowledge.json`).
 
-## Framework-Only Registries
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `name`, `url`, `feed_url` | string | |
+| `type` | `blog` \| `podcast` \| `newsletter` \| `github` \| `forum` \| `social` | |
+| `status` | `active` \| `paused` \| `archived` | |
+| `last_synced` | date | |
+| `sync_method` | `rss` \| `api` \| `manual` \| `scrape` | |
+| `content_count` | number | |
+| `tags` | list of strings | |
 
-Some registries are only relevant for the **framework repo** (and potentially network hubs) — they track cross-instance state, not local organizational data. Individual instances do **not** need these files.
+### knowledge-manifest.yaml: knowledge domains
 
-### instances.yaml — Downstream Instance State
+A document under `knowledge_manifest`, with no required fields. `npm run knowledge:update-index` updates page counts and dates in it; `generate:schemas` copies it into `knowledge.json`.
 
-Per-instance record of every downstream instance of this framework. Populated and updated by `npm run analyze:instances`.
+| Field | Type | Notes |
+|---|---|---|
+| `domains` | list of maps | entry fields in use: `id`, `name`, `description`, `coverage` (`none`, `partial`, `comprehensive`), `page_count`, `sources` (source ids), `last_updated` |
+| `exchange` | map | `published_domains` and `subscribed_domains`, lists of domain ids |
 
-Fields: `id`, `name`, `type`, `maturity` (`alpha|beta|production`), `repo`, `local_path`, `cloned`, `federation_network`, `federation_role`, `masterplan_version`, `framework_version`, `last_sync`, `agent_runtime[]`, `skills_extra[]`, `packages[]`, `data_registries_extra[]`, `drift[]`, `notes`.
+### events.yaml: events and milestones
 
-### skills-matrix.yaml — Cross-Instance Skill Catalog
+Required field: `id`. The dashboard reads `title`, `date`, `end_date`, `type`, `location`, `url`, `related_project`, `status` and hides cancelled events.
 
-Every skill across the federation, with `owner`, `instances_using[]`, `in_framework`, `promotion_status` (`canonical|candidate|evaluating|instance-specific`). Surfaces promotion candidates. See `docs/SKILL-PROMOTION.md`.
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `title` | string | |
+| `type` | `assembly` \| `workshop` \| `deadline` \| `milestone` \| `call` \| `conference` | |
+| `date`, `end_date` | date | |
+| `recurrence` | string | `weekly`, `monthly`, `quarterly` or `null` |
+| `location` | string | |
+| `url`, `notes` | string | |
+| `related_project` | string | a project `id` |
+| `participants` | list of strings | |
+| `status` | `upcoming` \| `completed` \| `cancelled` | |
 
-### packages-matrix.yaml — Cross-Instance Package Catalog
+### channels.yaml: communication channels
 
-Same shape as `skills-matrix.yaml` but for packages. Surfaces package divergence across instances.
+Required field: `id`. No script in `scripts/` reads this file; only the admin app does.
 
-### Extension Pattern for Instances
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `platform` | `telegram` \| `discord` \| `forum` \| `email` \| `slack` \| `signal` \| `matrix` | |
+| `name`, `url`, `purpose`, `managed_by` | string | |
+| `visibility` | `public` \| `members` \| `core` \| `private` | |
+| `topics` | list of strings | |
+| `status` | `active` \| `archived` \| `migrating` | |
 
-Instances MAY add their own registries beyond the canonical 14 (e.g., `tasks.yaml`, `pending-payouts.yaml`, `blog-articles.yaml`). When they do:
+### assets.yaml: organisational assets
 
-- Declare the extra registry in the framework's `data/instances.yaml` under `data_registries_extra[]` so drift monitoring knows about it.
-- Keep it out of `.well-known/` generation unless adding a `/well-known/` endpoint is intentional.
-- Follow canonical conventions (top-level key matches filename; `schema_version: "2.0"` header; entries with unique `id`).
+Required field: `id`. No script in `scripts/` reads this file; only the admin app does.
 
----
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | |
+| `type` | `domain` \| `account` \| `credential` \| `brand` \| `tool` \| `document` \| `contract` | record where a credential lives, never its value |
+| `name`, `platform`, `url`, `owner`, `notes` | string | |
+| `status` | `active` \| `expired` \| `pending` \| `transferred` | |
+| `renewal_date` | date | |
 
-## Recognized Extension Registries (Optional Patterns)
+### knowledge-gaps.yaml: gaps in the knowledge graph (generated)
 
-Instance-proven registry shapes worth reusing. Not part of the canonical 14; adopt as needed. (Consolidated from instance audits, 2026-07-15.)
+Written by `npm run graph:gaps` (`scripts/graph-gaps.mjs`) from `graphify-out/graph.json`. Only `status` is edited by hand; a re-run keeps the status and first-seen date of gaps it finds again, drops open gaps that are no longer detected, and keeps `curated` and `dismissed` ones. The dashboard shows the count of open gaps. Not copied into a new instance.
 
-### hermes-cron.yaml — Declarative Agent Cron Jobs
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | the first 12 hex characters of a SHA-256 over the gap's `kind` and its sorted `node_ids` |
+| `kind` | `orphan` \| `ambiguous-edge` \| `weak-community` | |
+| `node_ids` | list of strings | graph node ids |
+| `summary` | string | |
+| `status` | `open` \| `curated` \| `dismissed` | |
+| `detected` | date | |
 
-Proven in refi-bcn-os + refi-dao-os alongside `packages/hermes-integration`. Declares scheduled proactive-agent jobs (a chat gateway reconciles them on boot — e.g. `infra/hermes/entrypoint.sh`):
+### ecosystems.yaml: ecosystem nodes for the federation map
+
+A list under `ecosystems` with `id`, `name`, `url` and `sources` (ids of source systems the ecosystem groups). Read by the federation map (`packages/org-os-kms/src/map.mjs`), which draws each entry as an outer-ring node. It has no `schema_version` line, no admin schema and is not checked by any validator. A new instance receives it reset to an empty list.
+
+## Framework-only registries
+
+These track state across instances, not an organisation's own data. A new instance does not receive them, and `validate:structure` only warns when they are absent.
+
+### instances.yaml: downstream instances
+
+One entry per instance the framework knows of, maintained by hand and read by `npm run analyze:instances`, which compares it with the instances' directories and writes a drift report. Fields: `id`, `name`, `type`, `maturity` (`alpha`, `beta` or `production`), `repo`, `local_path`, `cloned`, `federation_network`, `federation_role`, `masterplan_version`, `framework_version`, `last_sync`, `agent_runtime` (list), `skills_extra` (list), `packages` (list), `data_registries_extra` (list), `drift` (list), `notes`. Every one of the eight entries here has all of these.
+
+### skills-matrix.yaml: skills across the federation
+
+Fields per entry: `id`, `owner`, `instances_using` (list), `in_framework` (boolean), `promotion_status`, `notes`. `promotion_status` is one of `canonical`, `evaluating`, `candidate`, `instance-specific`, `deprecated` (the set the validator accepts; the file's header lists the same five). See [SKILL-PROMOTION.md](SKILL-PROMOTION.md).
+
+### packages-matrix.yaml: packages across the federation
+
+The same fields as the skills matrix, plus `lifecycle_status`: `active`, `dormant`, `planned` or `retired`. The validator warns when it is missing and fails when it is anything else. See [PACKAGE-LIFECYCLE.md](PACKAGE-LIFECYCLE.md).
+
+## Registries created by the knowledge system
+
+When an instance runs the knowledge system (`packages/org-os-kms`), binding its framework schemas to org-os registries creates more files under `data/`: `resources.yaml`, `source-systems.yaml`, `option-library.yaml`, `tracks.yaml`, `deployments.yaml`, `implementation-memory.yaml`, `evolution-log.yaml`, `signals.yaml` and `contributions.yaml` (the mapping is `REGISTRY_BINDINGS` in `packages/org-os-kms/src/bind.mjs`). None exists in this repository's `data/`. Their fields are defined by the schemas in `packages/toolkit-framework/schemas/`, not by this page; the knowledge system is described in [KMS.md](KMS.md).
+
+## Instance extensions
+
+An instance may add registries of its own (`tasks.yaml`, `pending-payouts.yaml` and so on). Convention:
+
+- Declare the extra registry in `data_registries_extra` of the instance's entry in the framework's `data/instances.yaml`. `npm run analyze:instances` reports `undeclared_data_registry:<name>` for any `data/` YAML file that is neither in its built-in list of canonical registries nor declared. That list contains the first 13 registries above and the three framework-only ones; it does not contain `knowledge-gaps` or `ecosystems`.
+- Keep it out of `.well-known/` unless publishing an endpoint is intended: `generate:schemas` writes a fixed set of files and ignores everything else.
+- Follow the conventions above: `schema_version: "2.0"` and entries with a unique `id`.
+
+`data/instances.yaml` records these extension registries in use by sibling instances: `hermes-cron`, `orgs`, `figma-assets`, `tasks`, `pending-payouts`, `nodes`, `funds`, `initiatives`, `programs`, `option-library`, `ontology` and others. The shapes below are the ones described for them in earlier versions of this page; the files live in those instances, so they were not verified against code or data in this repository.
+
+**`hermes-cron.yaml`**: scheduled jobs for a proactive-agent gateway (see `packages/hermes-integration`).
 
 ```yaml
 schema_version: "1.0"
@@ -369,91 +333,41 @@ jobs:
   - id: "heartbeat-6h"
     schedule: "0 */6 * * *"      # cron, UTC
     deliver: "telegram"          # delivery channel
-    channel: null                # channel/topic id (instance-specific)
+    channel: null                # channel or topic id, instance-specific
     prompt: |
       Read HEARTBEAT.md and report anything urgent or overdue.
 ```
 
-Keep channel ids and prompts instance-side; the registry shape + boot-reconciliation contract is the reusable part.
+Keep channel ids and prompts in the instance; the reusable part is the shape. The `hermes-integration` README confirms only that this file name exists and that a symbient must never be given a job in it.
 
-### Hub-Type Federation Registries — nodes / funds / initiatives / programs
+**Hub registries** (`nodes.yaml`, `funds.yaml`, `initiatives.yaml`, `programs.yaml`): a network-of-networks graph for an instance that coordinates other organisations. Fields as described earlier: `nodes` (`id`, `name`, `network`, `type`, `location`, `status`, `repo`, `website`); `funds` (`id`, `type`, `network_chain`, `address`, `node` pointing to `nodes.id`, `signers`, `status`); `initiatives` (`id`, `name`, `networks`, `status`, `description`); `programs` (`id`, `name`, `category`, `status`).
 
-Proven in regen-coordination-os (Hub-type instance). A network-of-networks graph for hubs coordinating multiple orgs — cross-referencing member nodes, on-chain treasuries, shared initiatives, and funding programs:
+**Others** named in the same earlier audit: `orgs.yaml` (an external-organisation directory) and `figma-assets.yaml` (a design-asset registry with a share policy per asset).
 
-```yaml
-# nodes.yaml — member/network node registry
-nodes:
-  - id: "node-example"
-    name: ""
-    network: ""                  # which federation/network it belongs to
-    type: "LocalNode"
-    location: ""
-    status: "active"
-    repo: null
-    website: null
+## Cross-references
 
-# funds.yaml — on-chain fund instances
-funds:
-  - id: "fund-example"
-    type: "safe"                 # safe | gardens-pool | octant-vault | …
-    network_chain: ""
-    address: ""
-    node: "node-example"         # → nodes.yaml
-    signers: []
-    status: "active"
-
-# initiatives.yaml — cross-network initiatives
-initiatives:
-  - id: "initiative-example"
-    name: ""
-    networks: []
-    status: "active"
-    description: ""
-
-# programs.yaml — funding/coordination programs
-programs:
-  - id: "program-example"
-    name: ""
-    category: "funding/artifact-based"   # funding/yield-protocol | funding/streaming | …
-    status: "active"
-```
-
-Cross-references: `funds.node → nodes.id`, `initiatives.networks[] → nodes.network`, `programs ↔ funds`.
-
-### Other observed instance extensions
-
-- **`orgs.yaml`** (refi-bcn-os) — external-org/stakeholder directory with rings/clusters + JSON compile step for viz. Candidate for a future canonical `orgs.yaml` registry (generic shape, minus geography).
-- **`figma-assets.yaml`** (refi-dao-os) — design-asset registry with `share_policy` permission governance (`public-view-no-duplication | duplicatable | private | tbd`) and commons-linkage fields.
-
----
-
-## Schema Generation
-
-```bash
-npm run generate:schemas    # Generate .well-known/*.json from data/*.yaml
-npm run validate:schemas    # Validate EIP-4824 compliance
-npm run analyze:instances   # Framework-only — scan downstream instances and write drift report
-```
-
-## Notion Sync
-
-```bash
-npm run sync:notion         # Bidirectional sync with Notion databases
-```
-
-See `docs/TOOL-SETUP.md` for Notion configuration and field mapping.
-
-## Cross-References
+Fields that hold the id of an entry in another registry. These are the pairs the admin app checks when it saves (`REFS` in `packages/admin/server/schema.ts`):
 
 | From | To | Via field |
-|------|----|-----------|
-| projects.yaml | members.yaml | lead, contributors |
-| projects.yaml | ideas.yaml | related_ideas |
-| projects.yaml | funding-opportunities.yaml | funding_source |
-| meetings.yaml | members.yaml | participants |
-| ideas.yaml | knowledge-manifest.yaml | source |
-| events.yaml | projects.yaml | related_project |
+|---|---|---|
+| projects.yaml | members.yaml | `lead`, `contributors` |
+| projects.yaml | ideas.yaml | `related_ideas` |
+| projects.yaml | funding-opportunities.yaml | `funding_source` |
+| meetings.yaml | members.yaml | `participants` |
+| events.yaml | projects.yaml | `related_project` |
 
----
+`ideas.source` is not a cross-reference: it is a path to a knowledge file.
 
-_Part of org-os v2.0.0 — see [FILE-STRUCTURE.md](FILE-STRUCTURE.md) for directory layout._
+## Generating the `.well-known/` files
+
+```bash
+npm run generate:schemas    # .well-known/*.json from data/*.yaml and federation.yaml
+npm run validate:schemas    # the .well-known files parse; IDENTITY.md and federation.yaml agree
+npm run analyze:instances   # framework only: scan downstream instances, write a drift report to memory/reports/
+```
+
+Which `.well-known/` file comes from which source is in [FILE-STRUCTURE.md](FILE-STRUCTURE.md). The EIP-4824 side is in [EIP4824-GUIDE.md](EIP4824-GUIDE.md).
+
+## Notion
+
+The dashboard (`npm run initialize`) can read Notion databases into the projects, meetings and members it shows. There is no Notion sync that writes `data/*.yaml`: an earlier version of this page documented an `npm run sync:notion` script, which does not exist in `package.json` or `scripts/`. See [TOOL-SETUP.md](TOOL-SETUP.md).
