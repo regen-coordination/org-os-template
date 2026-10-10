@@ -10,7 +10,8 @@
   "scripts": {
     "aggregate": "node scripts/aggregate-federation.mjs",
     "dev": "npm run aggregate && astro dev",
-    "build": "npm run aggregate && astro build && npm run verify",
+    "clean": "node -e \"for (const d of ['.astro','node_modules/.astro','dist']) require('node:fs').rmSync(d,{recursive:true,force:true})\"",
+    "build": "npm run clean && npm run aggregate && astro build && npm run verify",
     "preview": "astro preview",
     "verify": "node scripts/verify-build.mjs",
     "test": "node --test"

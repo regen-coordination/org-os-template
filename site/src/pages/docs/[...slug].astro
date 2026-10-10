@@ -11,6 +11,12 @@ export async function getStaticPaths() {
   const loaded = new Set(all.map((entry) => entry.id));
   const missing = PAGES.filter((p) => !loaded.has(p.source)).map((p) => p.source);
   if (missing.length > 0) throw new Error(`docs: in the manifest but not loaded:\n  ${missing.join("\n  ")}`);
+  // The glob loader logs a render failure (a broken link, say) and carries on,
+  // storing the entry without `rendered`. Left alone that publishes an empty page.
+  const unrendered = all.filter((entry) => entry.rendered === undefined).map((entry) => entry.id);
+  if (unrendered.length > 0) {
+    throw new Error(`docs: markdown failed to render for:\n  ${unrendered.join("\n  ")}\nSee the [glob-loader] error above; for a broken link the plugin's message is there.`);
+  }
   return all.map((entry) => {
     const page = pageBySource(entry.id);
     if (!page) throw new Error(`docs: loaded ${entry.id}, which is not in the manifest`);

@@ -157,7 +157,7 @@ and `.claude/commands/` are read automatically.
 
 ## Next Steps
 
-- **Read Operator Guidebook**: [`OPERATOR-GUIDEBOOK.md`](OPERATOR-GUIDE.md)
+- **Read Operator Guidebook**: [`OPERATOR-GUIDE.md`](OPERATOR-GUIDE.md)
 - **Explore Packages**: [`PACKAGES.md`](PACKAGES.md)
 - **Understand EIP-4824**: [`EIP4824-GUIDE.md`](EIP4824-GUIDE.md)
 - **See Framework**: `../../organizational-os/packages/framework/`
