@@ -21,7 +21,7 @@ modules:
   - id: org-os-buzz
     name: Buzz Agent Lane
     status: pilot
-    summary: SHA-tagged signed session digests to a local Buzz relay on /close, read back on /initialize — built and verified end-to-end against a live relay, dogfood acceptance pending.
+    summary: SHA-tagged signed session digests to a Buzz relay on /close, read back on /initialize — built and verified end-to-end against a live relay, dogfood acceptance pending.
     link: /docs/modules
   - id: org-os-paper
     name: Paper Design Canvas
@@ -60,12 +60,12 @@ modules:
     link: /docs/modules
   - id: org-os-territory
     name: Territory Extension Pack
-    status: in-dev
+    status: pilot
     summary: An extension pack for org-os-kms that gives a knowledge instance a sense of place — territorial units and data streams.
     link: /docs/modules
   - id: rad-org-os
     name: rad-org-os
-    status: in-dev
+    status: planned
     summary: The sovereign distribution — org-os on Radicle, peer-to-peer. And the missing org layer for Radicle.
     link: /modules/rad-org-os
   - id: org-os-standards
@@ -91,7 +91,7 @@ modules:
   - id: org-os-hermes
     name: Hermes Agent
     status: in-dev
-    summary: Local agent runtime + Telegram gateway, replacing OpenClaw.
+    summary: Integration with the Hermes agent runtime — an org-os page tool and three slash-command skills.
     link: /docs/modules
   - id: org-os-members-hub
     name: Members Hub
