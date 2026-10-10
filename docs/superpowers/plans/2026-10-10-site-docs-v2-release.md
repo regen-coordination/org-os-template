@@ -15,6 +15,8 @@
 
 ## Task 1 — What the plan 2 reviews left (local, small)
 
+> **Done 2026-10-10** (commits `f0cde93`, `702fa5b`, `cee221c`, `83c44bb`; reviewed, approved), except the instance-docs line: excluding the framework-only pages from a clone would leave dangling links in about ten docs an instance keeps, so it needs link rewriting in the clone engine. Still open and minor: the theme switch's edge loses its guaranteed contrast while hovered; the plan 1 "small things" the task's report lists as left.
+
 - Theme switch: measure the knob's contrast against its track in both themes and its hit size (at least 24 by 24 CSS pixels); fix what fails.
 - Copy button: on a touch screen it sits over the first line of a code block; give the block top padding there, or move the button above it.
 - The trail above a doc's title is a `<p>`; make it a `<nav aria-label="Breadcrumb">` and keep the verifier's empty-doc check stripping it.
