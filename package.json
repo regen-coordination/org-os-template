@@ -51,6 +51,7 @@
     "render:templates": "node scripts/render-templates.mjs",
     "clone:framework": "node scripts/clone-framework.mjs",
     "clone:manifest": "node scripts/clone-manifest.mjs",
+    "crew": "node scripts/crew.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "docs": "npx quartz build --serve -d docs",
     "check": "node scripts/graph-status.mjs --test && node scripts/graph-gaps.mjs --test && tsc --noEmit && npx prettier . --check",
