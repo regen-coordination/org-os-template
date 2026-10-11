@@ -253,6 +253,12 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
   remove it, git is not used and the worktree is left. The reason names what was asked, and
   `release` again finishes it. After the removal request herdr may still be doing it; after the
   question nothing was removed.
+- A failed seating whose worktree step timed out (`failed_step: worktree`, `error_code:
+  herdr_timeout`) and whose worktree is not there yet is released with `worktree_removed:
+  false`, so the same `release <id>` finds it again: it removes the worktree if herdr made one
+  since, or, finding none, says so and sets `worktree_removed: true`. The first release does
+  not say the branch "was never created" when `may_remain` names it: it says the branch does
+  not exist now and may still appear.
 - A closed assignment whose record says `worktree_removed: false` but whose worktree is gone
   (herdr finished after release stopped waiting) is found by `release <id>`: the record is set to
   `worktree_removed: true` and the command says the worktree was already removed. Nothing is
@@ -465,7 +471,7 @@ Worktrees left behind: 1
 
 Sync conflict copies: 1
   2026-10-10-engineer-fix-the-cursor.sync-conflict-20261010-221500-ABCDEFG.md
-  Syncthing kept these when two machines changed a trail file at once. They are not read as records; merge them by hand and delete them.
+  Your file-sync tool (Syncthing) kept these when two machines changed the same assignment file in memory/crew/ at once. They are not read as records; merge them by hand and delete them.
 
 Could not read: notes.md
 ```

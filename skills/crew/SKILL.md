@@ -33,7 +33,7 @@ said. Never work around a refusal**: not by calling herdr or git yourself, not b
 | Seat a reviewer on an existing branch                              | `npm run crew -- seat reviewer "<brief>" --on <branch>` |
 | Take a handoff another agent wrote                                 | `npm run crew -- seat <role> --handoff <id>`            |
 | Take a handoff and build on its branch, not review it              | `npm run crew -- seat <role> --handoff <id> --base <ref>` |
-| Send the first prompt to an agent that stopped at a startup dialog | `npm run crew -- nudge <agent>`                         |
+| Send the first prompt to an agent that has not received it         | `npm run crew -- nudge <agent>`                         |
 | Close an assignment                                                | `npm run crew -- release <agent>`                       |
 | Decline a handoff                                                  | `npm run crew -- handoff-close <id> --reason "<why>"`   |
 

@@ -118,7 +118,7 @@ function assignmentBody(ctx, brief, role, named = null) {
         '  A brief that starts with a dash goes after `--`, after any flags: `seat <role> [--task <id>] -- "<brief>"`.',
         '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
         '  With `--handoff`, a handoff that names a branch seats a detached copy of it, unless you pass `--base`: then the agent gets a new branch from that base. `--base` and `--on` cannot be combined.',
-        `- Send the first prompt to an agent that stopped at a startup dialog: \`${cmd('nudge <agent|assignment>')}\``,
+        `- Send the first prompt to an agent that has not received it: \`${cmd('nudge <agent|assignment>')}\``,
         `- Close an assignment: \`${cmd('release <agent|assignment> [--outcome done|abandoned]')}\``,
         `- Decline an open handoff: \`${cmd('handoff-close <id|file> --reason "<text>"')}\``,
       ]
@@ -503,13 +503,17 @@ export function release(ctx, { target, outcome }) {
     throw new CrewError(`${a.agent} is still working. Wait for it to finish, or stop it in its pane first.`);
   }
 
+  // A seating that timed out while herdr was creating the worktree: herdr may
+  // finish after this release stops looking. The record then stays open to a
+  // second release (worktree_removed false) instead of claiming nothing remains.
+  const mayAppear = !closed && a.failed_step === 'worktree' && a.error_code === 'herdr_timeout' && !ctx.git.worktreeExists(a.worktree);
   let removed = false;
   let rescueFailed = false;
   let rescued = closed ? a.rescued_branch ?? null : null;
   let left = [];
   const worktreeExisted = ctx.git.worktreeExists(a.worktree);
   if (!worktreeExisted) {
-    removed = true;
+    removed = !mayAppear;
   } else {
     left = ctx.git.changes(a.worktree);
     if (a.detached) {
@@ -565,7 +569,9 @@ export function release(ctx, { target, outcome }) {
   const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
   // A closed record whose worktree is gone was finished by herdr: say so, once.
   const alreadyGone = closed && a.worktree_removed === false && !worktreeExisted;
-  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, branchKept: ctx.git.resolves(a.branch) };
+  // The same timed-out seating on the retry: nothing came, and now it is closed.
+  const neverCame = alreadyGone && a.failed_step === 'worktree' && a.error_code === 'herdr_timeout';
+  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, neverCame, mayAppear, branchKept: ctx.git.resolves(a.branch) };
 }
 
 /** What `release` tells the operator: one sentence per line, only what is true. */
@@ -582,7 +588,12 @@ export function releaseLines(r) {
       );
     }
   } else {
-    out.push(r.branchKept ? `  Its branch ${x.branch} is kept.` : `  Its branch ${x.branch} was never created, so there is no branch to keep.`);
+    // A failed worktree step names the branch among what may remain: it is not
+    // certain to be absent, so do not say it was never created.
+    const branchMayAppear = Array.isArray(x.may_remain) && x.may_remain.some((m) => m.startsWith('branch '));
+    if (r.branchKept) out.push(`  Its branch ${x.branch} is kept.`);
+    else if (branchMayAppear) out.push(`  Its branch ${x.branch} does not exist now; herdr may still create it, and crew never deletes a branch.`);
+    else out.push(`  Its branch ${x.branch} was never created, so there is no branch to keep.`);
   }
   if (r.rescued) {
     // On a failed retry the branch comes from an earlier release; this run saved nothing.
@@ -599,8 +610,11 @@ export function releaseLines(r) {
       out.push(`  herdr did not answer the worktree request and may still have been creating it when this release ran. If the worktree or branch ${x.branch} appears now, run release again.`);
     }
   }
-  if (r.removed) {
-    if (r.worktreeExisted) out.push('  The worktree was removed.');
+  if (r.mayAppear) {
+    out.push(`  There is no worktree at ${x.worktree} yet. Run release ${x.id} again once herdr has had time; if nothing has appeared it says so and closes this record.`);
+  } else if (r.removed) {
+    if (r.neverCame) out.push(`  There is still no worktree at ${x.worktree}, so nothing was removed; the record now says so.`);
+    else if (r.worktreeExisted) out.push('  The worktree was removed.');
     else if (r.alreadyGone) out.push(`  The worktree at ${x.worktree} was already removed, after the earlier release stopped waiting for herdr; the record now says so.`);
     else out.push(`  There was no worktree at ${x.worktree} to remove.`);
   } else {
@@ -692,7 +706,7 @@ export function renderBoard(b, now) {
   if (b.conflicts?.length > 0) {
     out.push('', `Sync conflict copies: ${b.conflicts.length}`);
     for (const name of b.conflicts) out.push(`  ${name}`);
-    out.push('  Syncthing kept these when two machines changed a trail file at once. They are not read as records; merge them by hand and delete them.');
+    out.push('  Your file-sync tool (Syncthing) kept these when two machines changed the same assignment file in memory/crew/ at once. They are not read as records; merge them by hand and delete them.');
   }
   if (b.unreadable.length > 0) out.push('', `Could not read: ${b.unreadable.join(', ')}`);
   return `${out.join('\n')}\n`;

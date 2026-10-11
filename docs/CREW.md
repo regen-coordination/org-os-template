@@ -65,7 +65,9 @@ release", and `release` closes it. A timed-out call is never retried.
 name what may be left: the branch `crew/<id>`, the checkout directory and a herdr workspace
 labelled with the agent's name. Crew never learns that workspace's id, so `release` cannot close
 it: close it in herdr yourself. After a timeout wait a little before `release`, since herdr may
-still be creating the worktree.
+still be creating the worktree. If it was a timeout, `release` leaves the record open to one more
+`release`: run it again later, and it removes the worktree if herdr made one, or says there is
+still none and closes the record. A branch that appeared in between is kept.
 
 **If herdr did not confirm the first prompt** (it timed out or failed after being sent), the
 command says it "may or may not have arrived". Look at the agent's pane: crew never resends,
