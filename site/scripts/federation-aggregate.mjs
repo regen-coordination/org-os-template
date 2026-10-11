@@ -4,7 +4,8 @@
 // maintainer's notes, local paths and drift flags beside each instance's name.
 // The site publishes three of its fields and nothing else (operator decision,
 // 2026-10-11). scripts/verify-build.mjs fails the build when anything more
-// reaches dist/.
+// reaches dist/. An entry the registry marks `listed: false` is not published
+// at all, and is in neither count (same decision).
 import yaml from "js-yaml";
 
 export function parseRegistry(registryYaml) {
@@ -36,17 +37,40 @@ export function isOperational(raw) {
   return raw?.maturity === "production";
 }
 
+// `listed` is the registry's own flag for "keep this entry off a public list":
+// optional, default true. Only the literal false unlists; a missing field, null
+// or a mistyped value leaves the entry on the list, where a reader will see it
+// and the mistake can be corrected. `listed` chooses what is published and is
+// not in PUBLIC_FIELDS: it never reaches the output.
+export function isListed(raw) {
+  return raw?.listed !== false;
+}
+
+// What the site says about the registry, by one rule, for the aggregator that
+// writes it and the verifier that checks it: the listed entries as public nodes,
+// how many they are, how many of them are operational, and the entries left out
+// (which the verifier looks for in what was built).
+export function registryView(registry) {
+  const listed = registry.filter(isListed);
+  return {
+    nodes: listed.map(publicInstance),
+    registered: listed.length,
+    operational: listed.filter(isOperational).length,
+    unlisted: registry.filter((raw) => !isListed(raw)).map(publicInstance),
+  };
+}
+
 const ROOT_NODE = {
   name: "org-os", type: "Framework", repo: "https://github.com/regen-coordination/org-os-template",
 };
 
 export function aggregate({ registryYaml, now }) {
-  const registry = parseRegistry(registryYaml);
+  const { nodes, registered, operational } = registryView(parseRegistry(registryYaml));
   return {
     root: ROOT_NODE,
-    nodes: registry.map(publicInstance),
-    registered: registry.length,
-    operational: registry.filter(isOperational).length,
+    nodes,
+    registered,
+    operational,
     operationalDefinition: OPERATIONAL_DEFINITION,
     generatedAt: now,
   };

@@ -9,8 +9,8 @@ import { PAGES, SECTIONS, ALLOW_UNVERIFIED } from "../src/data/docs-manifest.mjs
 import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
-import { parseRegistry, publicInstance, isOperational, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
-import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, RUN_LENGTH } from "./registry-leaks.mjs";
+import { parseRegistry, registryView, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
+import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, unlistedPrinted, countProblems, RUN_LENGTH } from "./registry-leaks.mjs";
 import { tablesOutsideRegion } from "../src/lib/table-scroll.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
@@ -66,12 +66,18 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
 
 // ── 3. The instance registry: only the agreed fields are published ────────
 // data/instances.yaml holds the maintainer's notes beside each instance's name.
-// The site publishes name, type and link (PUBLIC_FIELDS) and a count; nothing
-// else from the registry may be in dist/, in a page or in a data file.
+// The site publishes name, type and link (PUBLIC_FIELDS) and two counts; nothing
+// else from the registry may be in dist/, in a page or in a data file. An entry
+// marked `listed: false` is not on the list and in neither count: what is
+// expected below comes from registryView, the rule the aggregator writes by.
 {
   const registry = parseRegistry(readFileSync(join(REPO_ROOT, "data", "instances.yaml"), "utf8"));
-  const expected = registry.map(publicInstance);
-  const operational = registry.filter(isOperational).length;
+  const view = registryView(registry);
+  const { nodes: expected, registered, operational, unlisted } = view;
+  const leftOut = `${unlisted.length} marked listed: false left out`;
+  const reportUnlisted = (printed) => {
+    for (const { where, name } of unlistedPrinted(printed, unlisted)) fail(`REGISTRY: ${where} prints "${name}", which data/instances.yaml marks listed: false. An unlisted entry is not published: scripts/federation-aggregate.mjs must leave it out (isListed), and no page may add it by hand.`);
+  };
   const sameKeys = (node) => JSON.stringify(Object.keys(node ?? {})) === JSON.stringify(PUBLIC_FIELDS);
 
   // 3a. federation.json: the public fields and no others.
@@ -82,9 +88,12 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
     else {
       const extra = [fed.root, ...fed.nodes].filter((n) => !sameKeys(n));
       for (const n of extra) fail(`REGISTRY: federation.json carries fields outside the agreed list (${PUBLIC_FIELDS.join(", ")}) for "${n?.name}": ${Object.keys(n ?? {}).join(", ")}. Publish a field by adding it to PUBLIC_FIELDS in scripts/federation-aggregate.mjs, on the operator's decision.`);
-      if (JSON.stringify(fed.nodes) !== JSON.stringify(expected)) fail("REGISTRY: federation.json's nodes are not the registry's instances, in order, as name, type and repo. Run `npm run aggregate`.");
-      if (fed.operational !== operational) fail(`REGISTRY: federation.json says ${fed.operational} operational instance(s); the registry has ${operational} with maturity production.`);
-      if (extra.length === 0) console.log(`federation.json: ${fed.nodes.length} nodes, each with ${PUBLIC_FIELDS.join(", ")} and nothing else`);
+      reportUnlisted({ nodes: fed.nodes });
+      if (JSON.stringify(fed.nodes) !== JSON.stringify(expected)) fail("REGISTRY: federation.json's nodes are not the registry's listed instances, in order, as name, type and repo. Run `npm run aggregate`.");
+      if (fed.registered !== registered) fail(`REGISTRY: federation.json says ${fed.registered} registered instance(s); the registry has ${registered} that are not marked listed: false.`);
+      if (fed.operational !== operational) fail(`REGISTRY: federation.json says ${fed.operational} operational instance(s); the registry has ${operational} listed with maturity production.`);
+      if (/"listed"/.test(JSON.stringify(fed))) fail("REGISTRY: federation.json carries the registry's `listed` field. It chooses what is published and is not itself published.");
+      if (extra.length === 0) console.log(`federation.json: ${fed.nodes.length} nodes, each with ${PUBLIC_FIELDS.join(", ")} and nothing else; ${leftOut}`);
     }
   } catch (e) { fail(`federation.json: unreadable — ${e.message}`); }
 
@@ -94,8 +103,9 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
   const fedPage = existsSync(join(DIST, "federation/index.html")) ? noScript(readFileSync(join(DIST, "federation/index.html"), "utf8")) : "";
   const lines = [...fedPage.matchAll(/<li\b[^>]*\bdata-instance\b[^>]*>([\s\S]*?)<\/li>/g)].map((m) => visibleText(m[1]));
   const wanted = expected.map(instanceLine);
+  reportUnlisted({ lines });
   if (lines.length !== wanted.length) {
-    fail(`REGISTRY: the federation page lists ${lines.length} instance(s) in <li data-instance>; the registry has ${wanted.length}.`);
+    fail(`REGISTRY: the federation page lists ${lines.length} instance(s) in <li data-instance>; the registry has ${wanted.length} that are not marked listed: false.`);
   } else {
     let wrong = 0;
     for (const [i, line] of lines.entries()) {
@@ -103,8 +113,11 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
       wrong++;
       fail(`REGISTRY: the federation page says "${line}" for an instance; only its name, type and link may be printed: "${wanted[i]}".`);
     }
-    if (wrong === 0) console.log(`federation page: ${lines.length} instances, each printed as name, type and link`);
+    if (wrong === 0) console.log(`federation page: ${lines.length} instances, each printed as name, type and link; ${leftOut}`);
   }
+  const fedCounts = countProblems(fedPage, "the federation page", view);
+  for (const problem of fedCounts) fail(`REGISTRY: ${problem}`);
+  if (fedCounts.length === 0) console.log(`federation page: says ${registered} registered and ${operational} operational, as the registry gives them`);
   const status = visibleText(fedPage).match(/\b(offline|unreached|unreachable)\b/i);
   if (status) fail(`REGISTRY: the federation page says "${status[0]}". An instance whose checkout was not present at build has no status to show.`);
 
@@ -117,16 +130,17 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
     else console.log(`map.json: ${(map.nodes ?? []).length} nodes, none marked as not live`);
   } catch (e) { fail(`map.json: unreadable — ${e.message}`); }
 
-  // 3d. The home page's count is the operational count, with its definition beside it.
+  // 3d. The home page's counts are the registry's, operational and registered,
+  // with the definition of the first beside them.
   const home = existsSync(join(DIST, "index.html")) ? readFileSync(join(DIST, "index.html"), "utf8") : "";
-  const counts = [...home.matchAll(/<[^>]*\bdata-operational-count\b[^>]*>([\s\S]*?)<\//g)].map((m) => visibleText(m[1]));
-  if (counts.length === 0) fail("REGISTRY: the home page has no element marked data-operational-count.");
-  for (const c of counts) if (c !== String(operational)) fail(`REGISTRY: the home page counts ${c} instance(s); the registry has ${operational} with maturity production.`);
+  const homeCounts = countProblems(home, "the home page", view);
+  for (const problem of homeCounts) fail(`REGISTRY: ${problem}`);
   if (!visibleText(home).includes(OPERATIONAL_DEFINITION)) fail("REGISTRY: the home page shows an instance count without the definition of what it counts (OPERATIONAL_DEFINITION).");
-  else if (counts.length > 0) console.log(`home page: counts ${operational} operational instance(s) of ${registry.length} registered, with the definition`);
+  else if (homeCounts.length === 0) console.log(`home page: counts ${operational} operational instance(s) of ${registered} registered, with the definition`);
 
   // 3e. Nothing private anywhere in the build: no sentence of the registry's free
   // text, no excerpt of it (a run of RUN_LENGTH letters), no drift flag, no local path.
+  // The whole registry is read here, unlisted entries too: their notes are as private.
   const guard = registryGuard(registry);
   const TEXT_FILE = /\.(html|json|txt|xml|js|mjs|css|svg|webmanifest|md)$/;
   const textFiles = [];

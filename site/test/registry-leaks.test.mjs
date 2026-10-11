@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseRegistry } from "../scripts/federation-aggregate.mjs";
-import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, RUN_LENGTH } from "../scripts/registry-leaks.mjs";
+import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, unlistedPrinted, countProblems, RUN_LENGTH } from "../scripts/registry-leaks.mjs";
 
 const LONG = "Nested instance — lives at another-os/repos/x as a linked repo with its OWN git remote, on branch x-os, and every drift report before this entry was blind to it because the 'instances tracked' count never looked there.";
 const ENTRY = {
@@ -148,6 +148,49 @@ test("visibleText strips tags and decodes entities", () => {
 test("instanceLine is the only text an instance may have on the federation page", () => {
   assert.equal(instanceLine({ name: "ReFi X", type: "LocalNode", repo: "https://example.com/x" }), "ReFi X LocalNode repository");
   assert.equal(instanceLine({ name: "Bare", type: "Project", repo: null }), "Bare Project");
+});
+
+// ── an unlisted entry, and the counts ────────────────────────────────────
+
+const UNLISTED = [{ name: "Bread Example", type: "Cooperative", repo: null }, { name: "runtime-x", type: "AgentRuntime", repo: "https://example.com/r" }];
+
+test("unlistedPrinted finds an unlisted entry in federation.json and on the federation page, and says where", () => {
+  const found = unlistedPrinted({
+    nodes: [{ name: "ReFi X", type: "LocalNode", repo: null }, { name: "runtime-x", type: "AgentRuntime", repo: "https://example.com/r" }],
+    lines: ["ReFi X LocalNode", "Bread Example Cooperative", "RUNTIME-X"],
+  }, UNLISTED);
+  assert.deepEqual(found, [
+    { where: "federation.json", name: "runtime-x" },
+    { where: "the federation page's list", name: "Bread Example" },
+    { where: "the federation page's list", name: "runtime-x" },
+  ]);
+});
+
+test("unlistedPrinted finds nothing when only listed instances are printed, even one whose name begins like an unlisted one", () => {
+  const printed = { nodes: [{ name: "runtime-x-two", type: "Project", repo: null }], lines: ["runtime-x-two Project", "Bread Examples Cooperative"] };
+  assert.deepEqual(unlistedPrinted(printed, UNLISTED), []);
+  assert.deepEqual(unlistedPrinted({ nodes: [], lines: [] }, []), []);
+});
+
+test("countProblems passes a page whose marked counts are the registry's", () => {
+  const html = "<p><strong data-operational-count>2</strong> operational instances, of <span data-registered-count>6</span> registered.</p>";
+  assert.deepEqual(countProblems(html, "the home page", { registered: 6, operational: 2 }), []);
+});
+
+test("countProblems says which count is wrong, what the page says and what the registry gives", () => {
+  const html = "<p><strong data-operational-count>2</strong> operational, of <span data-registered-count> 8 </span> registered.</p>";
+  const problems = countProblems(html, "the home page", { registered: 6, operational: 2 });
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /the home page says 8 registered/);
+  assert.match(problems[0], /6/);
+  assert.match(problems[0], /listed: false/);
+});
+
+test("countProblems fails a page that prints a count without marking it, so a count is never unchecked", () => {
+  const problems = countProblems("<p>2 operational, of 6 registered.</p>", "the home page", { registered: 6, operational: 2 });
+  assert.equal(problems.length, 2);
+  assert.match(problems.join("\n"), /data-registered-count/);
+  assert.match(problems.join("\n"), /data-operational-count/);
 });
 
 // ── the measurement RUN_LENGTH is set from ───────────────────────────────

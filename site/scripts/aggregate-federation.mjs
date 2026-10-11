@@ -1,5 +1,6 @@
 // aggregate-federation.mjs — CLI: reads ../data/instances.yaml, writes src/data/federation.json
-// (name, type and link of each instance, and the counts; nothing else from the registry),
+// (name, type and link of each listed instance, and the counts; nothing else from the registry,
+// and nothing of an entry marked listed: false),
 // copies ../.well-known into public/.well-known. Resolves the org-os root from this script's location.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -17,7 +18,7 @@ if (missing.length > 0) {
   console.error(installMessage(missing, orgOsRoot));
   process.exit(1);
 }
-const { aggregate, quietMap } = await import("./federation-aggregate.mjs");
+const { aggregate, quietMap, parseRegistry, registryView } = await import("./federation-aggregate.mjs");
 const { buildMap } = await import("../../packages/org-os-kms/src/map.mjs");
 
 const registryPath = join(orgOsRoot, "data", "instances.yaml");
@@ -31,7 +32,8 @@ const fed = aggregate({ registryYaml, now: new Date().toISOString() });
 const outDir = join(siteRoot, "src", "data");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "federation.json"), JSON.stringify(fed, null, 2));
-console.log(`federation.json: ${fed.registered} registered, ${fed.operational} operational`);
+const leftOut = registryView(parseRegistry(registryYaml)).unlisted.length;
+console.log(`federation.json: ${fed.registered} registered, ${fed.operational} operational; ${leftOut} entr${leftOut === 1 ? "y" : "ies"} marked listed: false left out`);
 
 // quietMap: a node whose checkout was not here at build carries no status.
 const map = quietMap(buildMap({ dir: orgOsRoot, surface: "web", now: new Date().toISOString() }));

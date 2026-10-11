@@ -41,7 +41,7 @@ const SHOWN = 4;
         <p class="note intro">{landing.intro} <a class="link" href={withBase(landing.intro_link.href)}>{landing.intro_link.label}</a>.</p>
       </SectionBlock>
       <SectionBlock index="03" title="Federation" href={withBase("/federation")} cta="The network">
-        <p class="note"><strong data-operational-count>{federationData.operational}</strong> operational {federationData.operational === 1 ? "instance" : "instances"}, of {federationData.registered} registered. {federationData.operationalDefinition}</p>
+        <p class="note"><strong data-operational-count>{federationData.operational}</strong> operational {federationData.operational === 1 ? "instance" : "instances"}, of <span data-registered-count>{federationData.registered}</span> registered. {federationData.operationalDefinition}</p>
         <div class="map"><FederationMapIsland mode="mini" /></div>
       </SectionBlock>
     </div>

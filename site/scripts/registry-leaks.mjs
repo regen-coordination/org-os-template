@@ -229,3 +229,43 @@ export const REPOSITORY_LABEL = "repository";
 export function instanceLine(node) {
   return [node.name, node.type, node.repo ? REPOSITORY_LABEL : null].filter(Boolean).join(" ");
 }
+
+// An entry the registry marks `listed: false`, found where the site lists
+// instances: in federation.json's nodes or in a line of the federation page.
+// `unlisted` is registryView().unlisted. Each find says where: [{ where, name }].
+// A line is an entry's when it is the name alone or begins with the name and a
+// space, so a listed instance whose name merely starts the same way is not one.
+export function unlistedPrinted({ nodes = [], lines = [] }, unlisted) {
+  const found = [];
+  const same = (a, b) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+  for (const node of nodes) {
+    for (const u of unlisted) if (same(node?.name, u.name)) found.push({ where: "federation.json", name: u.name });
+  }
+  for (const line of lines) {
+    const text = line.trim().toLowerCase();
+    for (const u of unlisted) {
+      const name = u.name.trim().toLowerCase();
+      if (text === name || text.startsWith(`${name} `)) found.push({ where: "the federation page's list", name: u.name });
+    }
+  }
+  return found;
+}
+
+// The counts a page prints, each marked with an attribute so it can be read back:
+// data-registered-count and data-operational-count. Returns one sentence per
+// problem. A page given here must mark both, so a count is never printed unchecked.
+const COUNTS = [
+  { attribute: "data-registered-count", key: "registered", word: "registered", rule: "entries that are not marked listed: false" },
+  { attribute: "data-operational-count", key: "operational", word: "operational", rule: "listed entries with maturity production" },
+];
+export function countProblems(html, page, view) {
+  const problems = [];
+  for (const { attribute, key, word, rule } of COUNTS) {
+    const marked = [...html.matchAll(new RegExp(`<[^>]*\\b${attribute}\\b[^>]*>([\\s\\S]*?)</`, "g"))].map((m) => visibleText(m[1]));
+    if (marked.length === 0) problems.push(`${page} has no element marked ${attribute}; put the attribute on the element that prints the ${word} count, so the build can check it.`);
+    for (const said of marked) {
+      if (said !== String(view[key])) problems.push(`${page} says ${said} ${word}; data/instances.yaml has ${view[key]} (${rule}). Run \`npm run aggregate\`, and print the count from federation.json, not by hand.`);
+    }
+  }
+  return problems;
+}

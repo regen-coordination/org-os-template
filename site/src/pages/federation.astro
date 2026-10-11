@@ -13,7 +13,7 @@ import { federationData } from "../lib/federation";
     </header>
     <div class="map"><FederationMapIsland /></div>
     <h2 class="list-title">Registered instances</h2>
-    <p class="about">The {federationData.registered} entries of the framework's registry, by name, type and repository. {federationData.operational} are operational. {federationData.operationalDefinition}</p>
+    <p class="about">The <span data-registered-count>{federationData.registered}</span> instances the framework's registry lists, by name, type and repository. <span data-operational-count>{federationData.operational}</span> are operational. {federationData.operationalDefinition} An entry the registry marks as not listed, such as a test fixture, is not shown here and is in neither count.</p>
     <ul class="instances">
       {federationData.nodes.map((node) => <InstanceCard node={node} />)}
     </ul>
