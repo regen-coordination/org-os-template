@@ -111,7 +111,14 @@ export function fakeGit({ refs = ['main'] } = {}) {
     },
     rescueDetached(path, branch) {
       git.calls.push(['rescueDetached', { path, branch }]);
-      return git.unreachable.has(path) ? branch : null;
+      if (!git.unreachable.has(path)) return null;
+      // like the real adapter: a taken name gets a numeric suffix, and the
+      // commits are on a branch afterwards
+      let name = branch;
+      for (let n = 2; git.refs.has(name); n += 1) name = `${branch}-${n}`;
+      git.refs.add(name);
+      git.unreachable.delete(path);
+      return name;
     },
     removeWorktree(path) {
       git.calls.push(['removeWorktree', { path }]);

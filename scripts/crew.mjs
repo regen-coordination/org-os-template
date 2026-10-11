@@ -9,7 +9,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { board, closeHandoff, handoff, nudge, release, renderBoard, report, seat } from './crew/core.mjs';
+import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat } from './crew/core.mjs';
 import { createGit } from './crew/git.mjs';
 import { createHerdr, HerdrError } from './crew/herdr.mjs';
 import { CrewError } from './crew/roles.mjs';
@@ -120,26 +120,9 @@ function main(argv) {
     case 'release': {
       const r = release(ctx, {
         target: need(first, 'release needs an agent name or assignment id.'),
-        outcome: values.outcome ?? 'done',
+        outcome: values.outcome,
       });
-      const x = r.assignment;
-      console.log(`${x.id} is ${x.status}.`);
-      if (x.detached) {
-        console.log(
-          r.branchKept
-            ? `  It worked on a detached copy of ${x.branch}; that branch is untouched.`
-            : `  It worked on a detached copy of ${x.branch}, which is not a branch or commit in this repository.`,
-        );
-      } else {
-        console.log(r.branchKept ? `  Its branch ${x.branch} is kept.` : `  Its branch ${x.branch} was never created, so there is no branch to keep.`);
-      }
-      if (r.rescued) console.log(`  Commits made in the detached copy were saved as branch ${r.rescued}.`);
-      if (r.removed) {
-        console.log(r.worktreeExisted ? '  The worktree was removed.' : `  There was no worktree at ${x.worktree} to remove.`);
-      } else {
-        console.log(`  The worktree was left at ${x.worktree}:`);
-        for (const line of r.left) console.log(`    ${line}`);
-      }
+      for (const line of releaseLines(r)) console.log(line);
       return;
     }
     case 'report': {

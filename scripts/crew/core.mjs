@@ -288,9 +288,15 @@ const CLOSED = ['released', 'abandoned'];
 const leftBehind = (ctx, trail) =>
   trail.assignments.filter((a) => CLOSED.includes(a.status) && a.worktree_removed === false && ctx.git.worktreeExists(a.worktree));
 
-export function release(ctx, { target, outcome = 'done' }) {
+const OUTCOME_STATUS = { done: 'released', abandoned: 'abandoned' };
+
+/**
+ * `outcome` is undefined when the operator gave none: a first release then
+ * means done, and a retry keeps whatever was recorded.
+ */
+export function release(ctx, { target, outcome }) {
   requireHerdr(ctx);
-  if (!['done', 'abandoned'].includes(outcome)) {
+  if (outcome !== undefined && !(outcome in OUTCOME_STATUS)) {
     throw new CrewError(`The outcome must be done or abandoned, not "${outcome}".`);
   }
   const trail = readTrail(ctx.mainDir);
@@ -299,20 +305,25 @@ export function release(ctx, { target, outcome = 'done' }) {
   if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
     throw new CrewError(`The ${caller.role} role may not release agents. Report instead; the lead or the operator releases.`);
   }
+  const openStatuses = [...ACTIVE, 'failed'];
   let a;
-  try {
-    a = findActive(trail, target, [...ACTIVE, 'failed']);
-  } catch (err) {
-    // Not open: it may be a closed assignment whose worktree was left behind.
+  if (trail.assignments.some((x) => openStatuses.includes(x.status) && (x.id === target || x.agent === target))) {
+    a = findActive(trail, target, openStatuses); // may refuse: more than one open one matches
+  } else {
+    // Nothing open matched: it may be a closed assignment whose worktree was left behind.
     const left = leftBehind(ctx, trail).filter((x) => x.id === target || x.agent === target);
-    if (left.length === 0) throw err;
+    if (left.length === 0) findActive(trail, target, openStatuses); // throws the no-match error
     if (left.length > 1) {
       throw new CrewError(`More than one closed assignment of "${target}" still has a worktree. Use the assignment id: ${left.map((x) => x.id).join(', ')}.`);
     }
     a = left[0];
   }
   const closed = CLOSED.includes(a.status);
-  const live = agents.find((x) => a.pane && x.pane_id === a.pane);
+  if (closed && outcome !== undefined && OUTCOME_STATUS[outcome] !== a.status) {
+    throw new CrewError(`${a.id} is already ${a.status}; a retry only finishes removing the worktree.`);
+  }
+  // A closed assignment has no agent: its old pane id may belong to another one now.
+  const live = closed ? null : agents.find((x) => a.pane && x.pane_id === a.pane);
   if (live && live.state === 'working') {
     throw new CrewError(`${a.agent} is still working. Wait for it to finish, or stop it in its pane first.`);
   }
@@ -325,11 +336,13 @@ export function release(ctx, { target, outcome = 'done' }) {
     removed = true;
   } else {
     left = ctx.git.changes(a.worktree);
-    if (a.detached && !rescued) {
+    if (a.detached) {
       // A detached copy has no branch of its own. Commits made in it would be
-      // lost with the worktree, so they are saved to a branch first.
+      // lost with the worktree, so they are saved to a branch first. A retry
+      // asks again: commits made since the last release are on no branch yet.
+      // Nothing new to save keeps the branch recorded earlier.
       try {
-        rescued = ctx.git.rescueDetached(a.worktree, `crew/${a.id}`);
+        rescued = ctx.git.rescueDetached(a.worktree, `crew/${a.id}`) ?? rescued;
       } catch (err) {
         left = [`Commits made in the detached copy could not be saved to a branch: ${err.message || err}`, ...left];
       }
@@ -360,9 +373,35 @@ export function release(ctx, { target, outcome = 'done' }) {
     }
   }
   // A retry never changes how the assignment ended.
-  const status = closed ? a.status : outcome === 'abandoned' ? 'abandoned' : 'released';
+  const status = closed ? a.status : OUTCOME_STATUS[outcome ?? 'done'];
   const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
   return { assignment, removed, left, rescued, worktreeExisted, branchKept: ctx.git.resolves(a.branch) };
+}
+
+/** What `release` tells the operator: one sentence per line, only what is true. */
+export function releaseLines(r) {
+  const x = r.assignment;
+  const out = [`${x.id} is ${x.status}.`];
+  if (x.detached) {
+    // With no worktree there is nothing to say about a copy: a failed seating never made one.
+    if (r.worktreeExisted) {
+      out.push(
+        r.branchKept
+          ? `  It worked on a detached copy of ${x.branch}; that branch is untouched.`
+          : `  It worked on a detached copy of ${x.branch}, which is not a branch or commit in this repository.`,
+      );
+    }
+  } else {
+    out.push(r.branchKept ? `  Its branch ${x.branch} is kept.` : `  Its branch ${x.branch} was never created, so there is no branch to keep.`);
+  }
+  if (r.rescued) out.push(`  Commits made in the detached copy were saved as branch ${r.rescued}.`);
+  if (r.removed) {
+    out.push(r.worktreeExisted ? '  The worktree was removed.' : `  There was no worktree at ${x.worktree} to remove.`);
+  } else {
+    out.push(`  The worktree was left at ${x.worktree}:`);
+    for (const line of r.left) out.push(`    ${line}`);
+  }
+  return out;
 }
 
 export function board(ctx) {

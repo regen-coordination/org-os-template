@@ -1,10 +1,10 @@
 // tests/scripts/crew-board.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readTrail, trailDir } from '../../scripts/crew/trail.mjs';
-import { board, handoff, release, renderBoard, report, seat } from '../../scripts/crew/core.mjs';
+import { board, handoff, release, releaseLines, renderBoard, report, seat } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot } from '../helpers/crew-fixtures.mjs';
 
 function crew() {
@@ -257,7 +257,7 @@ test('a closed assignment whose worktree was removed is not on the board and is 
   assert.throws(() => release(ctx, { target: eng.id }), /No open assignment matches/);
 });
 
-test('a retried release of a detached copy does not try to save its commits a second time', () => {
+test('a retried release of a detached copy keeps the recorded branch when nothing new needs saving', () => {
   const { ctx } = crew();
   ctx.git.refs.add('feature');
   const rev = seat(ctx, { roleId: 'reviewer', brief: 'Fix it', on: 'feature' });
@@ -270,7 +270,110 @@ test('a retried release of a detached copy does not try to save its commits a se
   assert.equal(again.removed, true);
   assert.equal(again.rescued, `crew/${rev.id}`);
   assert.equal(readTrail(ctx.mainDir).assignments.find((a) => a.id === rev.id).rescued_branch, `crew/${rev.id}`);
-  assert.equal(ctx.git.calls.filter((c) => c[0] === 'rescueDetached').length, 1);
+});
+
+test('a retried release saves a commit made after the first release, under a new name', () => {
+  const { ctx } = crew();
+  ctx.git.refs.add('feature');
+  const rev = seat(ctx, { roleId: 'reviewer', brief: 'Fix it', on: 'feature' });
+  ctx.git.unreachable.add(rev.worktree);
+  ctx.git.dirty.set(rev.worktree, ['?? x']);
+  release(ctx, { target: rev.id });
+  // the operator commits the changes in the worktree: HEAD is on no branch again
+  ctx.git.dirty.delete(rev.worktree);
+  ctx.git.unreachable.add(rev.worktree);
+  const again = release(ctx, { target: rev.id });
+  assert.equal(again.rescued, `crew/${rev.id}-2`);
+  assert.equal(again.removed, true);
+  assert.ok(ctx.git.refs.has(`crew/${rev.id}`), 'the first rescue branch is not touched');
+  assert.equal(readTrail(ctx.mainDir).assignments.find((a) => a.id === rev.id).rescued_branch, `crew/${rev.id}-2`);
+});
+
+test('a retried release does not remove the worktree when the new commits could not be saved', () => {
+  const { ctx } = crew();
+  ctx.git.refs.add('feature');
+  const rev = seat(ctx, { roleId: 'reviewer', brief: 'Fix it', on: 'feature' });
+  ctx.git.unreachable.add(rev.worktree);
+  ctx.git.dirty.set(rev.worktree, ['?? x']);
+  release(ctx, { target: rev.id });
+  ctx.git.dirty.delete(rev.worktree);
+  ctx.git.rescueDetached = () => {
+    throw new Error('disk full');
+  };
+  const again = release(ctx, { target: rev.id });
+  assert.equal(again.removed, false);
+  assert.ok(existsSync(rev.worktree));
+  assert.equal(again.assignment.rescued_branch, `crew/${rev.id}`, 'the recorded branch survives a failed save');
+});
+
+test('a retry with an outcome that differs from the recorded one is refused; the same one, or none, proceeds', () => {
+  const { ctx, eng } = crew();
+  const original = ctx.herdr.removeWorktree;
+  ctx.herdr.removeWorktree = (ws) => original(ws, eng.worktree);
+  ctx.git.dirty.set(eng.worktree, [' M a.mjs']);
+  release(ctx, { target: eng.id, outcome: 'abandoned' });
+  ctx.herdr.agents = [];
+  assert.throws(
+    () => release(ctx, { target: eng.id, outcome: 'done' }),
+    new RegExp(`${eng.id} is already abandoned; a retry only finishes removing the worktree\.`),
+  );
+  assert.ok(existsSync(eng.worktree), 'a refused retry touches nothing');
+  const same = release(ctx, { target: eng.id, outcome: 'abandoned' });
+  assert.equal(same.assignment.status, 'abandoned');
+  ctx.git.dirty.delete(eng.worktree);
+  assert.equal(release(ctx, { target: eng.id }).removed, true);
+});
+
+test('a first release with no outcome means done', () => {
+  const { ctx, eng } = crew();
+  assert.equal(release(ctx, { target: eng.id }).assignment.status, 'released');
+});
+
+test('the closed-assignment fallback does not hide an ambiguous open name', () => {
+  const { ctx, eng } = crew();
+  const a = readTrail(ctx.mainDir).assignments[0];
+  // a closed record of the same agent whose worktree was left behind
+  const stale = join(trailDir(ctx.mainDir), 'stale.md');
+  const open = readTrail(ctx.mainDir).assignments[0];
+  mkdirSync(a.worktree + '-old', { recursive: true });
+  writeFileSync(
+    stale,
+    `---\nid: stale\nagent: ${a.agent}\nrole: engineer\nstatus: released\nworktree: ${a.worktree}-old\nworktree_removed: false\nbranch: b\npane: null\ncreated: '2026-10-10T10:00:00Z'\n---\n## Brief\n\nx\n`,
+  );
+  // two open assignments sharing the agent name
+  writeFileSync(join(trailDir(ctx.mainDir), 'twin.md'), readFileSync(open.file, 'utf-8').replace(`id: ${eng.id}`, 'id: twin'));
+  assert.throws(() => release(ctx, { target: a.agent }), /More than one open assignment has an agent named/);
+});
+
+test('a retry on a closed assignment does not consult the pane its agent once had', () => {
+  const { ctx, eng } = crew();
+  const original = ctx.herdr.removeWorktree;
+  ctx.herdr.removeWorktree = (ws) => original(ws, eng.worktree);
+  ctx.git.dirty.set(eng.worktree, [' M a.mjs']);
+  release(ctx, { target: eng.id });
+  // herdr now hands that pane id to some other agent that is working
+  ctx.herdr.agents = [{ pane_id: eng.pane, name: 'someone-else', state: 'working', workspace_id: 'ws-other' }];
+  ctx.git.dirty.delete(eng.worktree);
+  const r = release(ctx, { target: eng.id });
+  assert.equal(r.removed, true);
+});
+
+test('releaseLines says only what is true, one sentence per case', () => {
+  const base = { assignment: { id: 'a1', status: 'released', branch: 'crew/a1', detached: false, worktree: '/w/a1' } };
+  const say = (over, assignment = {}) => releaseLines({ ...base, branchKept: true, removed: true, worktreeExisted: true, left: [], rescued: null, ...over, assignment: { ...base.assignment, ...assignment } });
+  assert.deepEqual(say({}), ['a1 is released.', '  Its branch crew/a1 is kept.', '  The worktree was removed.']);
+  assert.match(say({ branchKept: false })[1], /was never created, so there is no branch to keep/);
+  assert.deepEqual(say({ worktreeExisted: false, branchKept: false }).slice(2), ['  There was no worktree at /w/a1 to remove.']);
+  const det = { detached: true, branch: 'feature' };
+  assert.equal(say({}, det)[1], '  It worked on a detached copy of feature; that branch is untouched.');
+  assert.match(say({ branchKept: false }, det)[1], /which is not a branch or commit in this repository/);
+  // a detached seating that failed had no worktree: it did not work on anything
+  const none = say({ worktreeExisted: false }, { ...det, status: 'released' });
+  assert.ok(!none.join('\n').includes('detached copy'));
+  assert.deepEqual(none.slice(1), ['  There was no worktree at /w/a1 to remove.']);
+  assert.ok(say({ rescued: 'crew/a1' }, det).includes('  Commits made in the detached copy were saved as branch crew/a1.'));
+  const kept = say({ removed: false, left: [' M x', '?? y'] });
+  assert.deepEqual(kept.slice(2), ['  The worktree was left at /w/a1:', '     M x', '    ?? y']);
 });
 
 test('releasing a failed seating says what is true: no worktree existed and no branch was made', () => {

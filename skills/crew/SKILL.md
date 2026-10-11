@@ -65,8 +65,10 @@ on the board.
   whose seating failed. Release each one once the operator has looked at its branch.
 - `STATUS` is the trail's word for the assignment (`seating`, `working`, `reported`); `STATE` is
   herdr's live view. `reported` with `idle` means the agent is done and awaits release.
-- **Worktrees left behind** lists closed assignments whose worktree still has changes in it. The
-  operator deals with the changes; then `release` on the same assignment retries the removal.
+- **Worktrees left behind** lists closed assignments whose worktree release could not remove (it
+  had changes in it, the removal failed, or its commits could not be saved). The operator deals
+  with what was listed; then `release` on the same assignment retries the removal. A retry keeps
+  the recorded outcome and refuses a different `--outcome`.
 - **Open handoffs** are requests waiting for the lead or the operator.
 
 ## Releasing

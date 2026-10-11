@@ -62,7 +62,8 @@ Open handoffs: 1
   `--handoff <id>`, or decline with `handoff-close <id> --reason "…"`.
 - **Needs release** lists assignments whose agent is gone or whose seating failed.
 - **Worktrees left behind** lists released or abandoned assignments whose worktree release kept
-  because it had changes in it. Run `release` on one again after you have dealt with the changes.
+  because it had changes in it, or because it could not be removed or its commits could not be
+  saved. Run `release` on one again after you have dealt with what the command listed.
 
 ## Let a lead coordinate
 
@@ -86,10 +87,13 @@ The worktree is removed only when nothing in it would be lost. Modified, untrack
 git-ignored files all count (a `.env`, a draft in an ignored folder); installed dependencies do
 not. Otherwise the command lists what is there and leaves the worktree. When you have dealt with
 it, run `release` on the same assignment again: it retries the removal, never forces it, and
-keeps the outcome (`released` or `abandoned`) it already recorded.
+keeps the outcome (`released` or `abandoned`) it already recorded. Giving `--outcome` on a retry
+that differs from the recorded one is refused; the same one, or none, is accepted.
 
 An agent seated with `--on` works on a detached copy and has no branch of its own. If it made
-commits, release saves them as a branch `crew/<assignment-id>` and tells you.
+commits, release saves them as a branch `crew/<assignment-id>` and tells you. A retry saves
+commits made since (for example ones you committed in the worktree) under `crew/<assignment-id>-2`
+and so on; an earlier rescue branch is never moved.
 
 Commit `memory/crew/` with the rest of your session's memory.
 
