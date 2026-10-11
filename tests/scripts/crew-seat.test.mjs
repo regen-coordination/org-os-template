@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { CrewError } from '../../scripts/crew/roles.mjs';
 import { localDate, readRecord, readTrail, trailDir, writeRecord } from '../../scripts/crew/trail.mjs';
-import { nudge, release, seat } from '../../scripts/crew/core.mjs';
+import { nudge, release, seat, typeYourself } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot, writeRole } from '../helpers/crew-fixtures.mjs';
 
 const setup = (overrides) => {
@@ -437,4 +437,27 @@ test('a failure at the start step does not claim a leftover workspace crew does 
   ctx.herdr.failOn = { method: 'startAgent', code: 'timeout', message: 'not detected' };
   assert.throws(() => seat(ctx, { roleId: 'engineer', brief: 'x' }), (err) => !/never learned/.test(err.message));
   assert.equal(readTrail(ctx.mainDir).assignments[0].may_remain, undefined);
+});
+
+test('the first prompt, one line, says where the reading list is and what to do when its section is missing', () => {
+  const { ctx } = setup();
+  seat(ctx, { roleId: 'engineer', brief: 'x' });
+  const { text } = ctx.herdr.calls.find((c) => c[0] === 'promptAgent')[1];
+  assert.doesNotMatch(text, /\n/);
+  assert.match(text, /at the root of your own worktree/);
+  assert.match(text, /if that section is missing, say so in your report and begin/);
+  // the section is still read before the brief is begun
+  assert.ok(text.indexOf('Before you begin') < text.indexOf('begin the work in the brief'), text);
+});
+
+test('what an operator is told to type says the same, and so does the sentence the command prints', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'promptAgent', code: 'timeout', message: 'no answer' };
+  const a = seat(ctx, { roleId: 'engineer', brief: 'x' });
+  ctx.herdr.failOn = null;
+  const typed = typeYourself(ctx, a);
+  assert.ok(typed.includes(join(ctx.mainDir, 'roles', 'README.md')), typed);
+  assert.match(typed, /at the root of your own worktree/);
+  assert.match(typed, /if that section is missing, say so in your report and begin/);
+  assert.throws(() => nudge(ctx, { target: 'engineer' }), (err) => err.message.includes(typed));
 });

@@ -9,11 +9,10 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat } from './crew/core.mjs';
+import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat, typeYourself } from './crew/core.mjs';
 import { createGit } from './crew/git.mjs';
 import { createHerdr, HerdrError } from './crew/herdr.mjs';
-import { CrewError, loadRole } from './crew/roles.mjs';
-import { trailDir } from './crew/trail.mjs';
+import { CrewError } from './crew/roles.mjs';
 
 const USAGE = `Usage: npm run crew -- <command>
 
@@ -118,10 +117,9 @@ function main(argv) {
       console.log(`  branch      ${a.branch}${a.detached ? ' (detached copy)' : ''}`);
       console.log(`  worktree    ${a.worktree}`);
       if (a.prompted === 'unconfirmed') {
-        const role = loadRole(ctx.mainDir, a.role);
         console.log(`  The first prompt to ${a.agent} may or may not have arrived: herdr did not confirm it.`);
         console.log(`  Look at ${a.agent}'s pane. If it has not started, type there:`);
-        console.log(`    Read ${role.path} (your role) and ${join(trailDir(ctx.mainDir), `${a.id}.md`)} (your assignment) in full, then begin the work in the brief.`);
+        console.log(`    ${typeYourself(ctx, a)}`);
         console.log('  Do not run nudge: it would send the prompt a second time.');
       } else if (!a.prompted) {
         console.log(`  ${a.agent} has not been given its first prompt. Answer any dialog in its pane, then run: npm run crew -- nudge ${a.agent}`);

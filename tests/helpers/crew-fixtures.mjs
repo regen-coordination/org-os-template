@@ -78,6 +78,7 @@ export function fakeHerdr(initialAgents = []) {
       herdr.fail('promptAgent');
     },
     workspaceCheckout(workspaceId) {
+      herdr.fail('workspaceCheckout');
       return herdr.workspaces.get(workspaceId) ?? null;
     },
     removeWorktree(workspaceId, path) {

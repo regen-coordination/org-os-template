@@ -135,8 +135,11 @@ commits made since (for example ones you committed in the worktree) under `crew/
 and so on; an earlier rescue branch is never moved. If a retry cannot save the new commits, it
 says that, names the branch an earlier release made, and leaves the worktree.
 
-If herdr does not answer within 60 seconds when release asks it to remove the worktree, the
-worktree is left, because herdr may still be removing it. Run `release` again a little later.
+If herdr does not answer within 60 seconds when release asks it which worktree its workspace is
+open on, or to remove the worktree, the worktree is left, because herdr may still be removing it,
+and the command says which of the two it was asking. Run `release` again a little later. If herdr
+had finished by then, the same `release <assignment>` says the worktree was already removed and
+closes the record; it no longer answers "No open assignment matches".
 
 Commit `memory/crew/` with the rest of your session's memory.
 

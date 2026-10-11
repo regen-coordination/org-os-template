@@ -87,7 +87,9 @@ Release when the agent has reported and the operator has what they need. The bra
 kept; merging is the operator's. The worktree is removed only when it has no uncommitted changes.
 If it is left behind, the command lists what is in it: show that list to the operator and stop.
 Do not remove the worktree yourself; once the operator has dealt with it, release again. If the
-list says herdr did not answer, nothing was wrong with the worktree: wait and release again.
+list says herdr did not answer, nothing was wrong with the worktree: wait and release again. If
+herdr had finished meanwhile, that release says the worktree was already removed and closes the
+record.
 After a seating that timed out, the worktree or agent may exist anyway: look at the board and
 release the assignment under "Needs release". If it timed out creating the worktree, wait a little
 first, and tell the operator that a herdr workspace may be left open that crew cannot close: the

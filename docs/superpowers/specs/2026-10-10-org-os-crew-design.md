@@ -195,8 +195,10 @@ Steps, in order:
    server, crew or not.
 6. **Prompt it once**: it is seated as this role; read the role file and the assignment file
    (both given as absolute paths), then the "Before you begin" section of `roles/README.md`
-   (absolute path in the main checkout) and the files it lists; then begin. `nudge` sends the same
-   prompt. The launcher does not wait for the turn.
+   (absolute path in the main checkout) and the files it lists, which are at the root of the
+   agent's own worktree, not the main checkout's; if the section is missing, say so in the
+   report and begin; then begin. The prompt is one line. `nudge` sends the same prompt, and the
+   "type this yourself" text of an unconfirmed prompt carries the same sentence. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
 
 Worktrees sit outside the repository on purpose. Instances often live inside a synced vault, and
@@ -237,8 +239,13 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
 - Closes only the herdr workspace the launcher created for that assignment, and only when the
   worktree was removed. The recorded workspace id is used only while herdr still reports it open
   on that worktree; otherwise the worktree is removed with git. If herdr does not answer
-  (`herdr_timeout`) while it is asked to remove the worktree, git is not used, because herdr may
-  still be doing it: the worktree is left, the reason is listed, and `release` again finishes it.
+  (`herdr_timeout`) while it is asked which worktree the workspace is open on, or asked to
+  remove it, git is not used, because herdr may still be doing it: the worktree is left, the
+  reason names what was asked, and `release` again finishes it.
+- A closed assignment whose record says `worktree_removed: false` but whose worktree is gone
+  (herdr finished after release stopped waiting) is found by `release <id>`: the record is set to
+  `worktree_removed: true` and the command says the worktree was already removed. Nothing is
+  removed and the recorded outcome is kept.
 
 ### 5.3 herdr behaviour, verified 2026-10-10 against herdr 0.9.1
 
