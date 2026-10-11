@@ -188,7 +188,9 @@ refused while the agent is still working. Use `--outcome abandoned` for work you
 
 The worktree is removed only when nothing in it would be lost. Modified, untracked and
 git-ignored files all count (a `.env`, a draft in an ignored folder); installed dependencies do
-not. Otherwise the command lists what is there and leaves the worktree. When you have dealt with
+not, a `node_modules/` directory at any depth (`packages/admin/node_modules/` as much as the root
+one). Build output (`dist/`, `.astro/`, generated files) is not dependencies and keeps the
+worktree. Otherwise the command lists what is there and leaves the worktree. When you have dealt with
 it, run `release` on the same assignment again: it retries the removal, never forces it, and
 keeps the outcome (`released` or `abandoned`) it already recorded. Giving `--outcome` on a retry
 that differs from the recorded one is refused; the same one, or none, is accepted.

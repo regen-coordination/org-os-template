@@ -67,6 +67,28 @@ test('changes lists untracked and ignored files, but not installed dependencies'
   assert.deepEqual(git.changes(repo).sort(), ['!! .env', '!! scratch/', '?? new.md']);
 });
 
+test('changes sets aside a node_modules directory at any depth, and nothing else that is ignored', () => {
+  const base = tmp();
+  sh(base, 'init', '-q', '-b', 'main', 'repo');
+  const repo = join(base, 'repo');
+  writeFileSync(join(repo, '.gitignore'), 'node_modules/\ndist/\n.astro/\n');
+  mkdirSync(join(repo, 'site'));
+  writeFileSync(join(repo, 'site', 'package.json'), '{}');
+  sh(repo, 'add', '.');
+  sh(repo, '-c', 'user.name=t', '-c', 'user.email=t@example.org', 'commit', '-q', '-m', 'init');
+  const git = createGit(repo);
+  for (const dir of ['node_modules', 'site/node_modules', 'packages/admin/node_modules', 'my pkg/node_modules']) {
+    mkdirSync(join(repo, dir, 'x'), { recursive: true });
+    writeFileSync(join(repo, dir, 'x', 'index.js'), '');
+  }
+  assert.deepEqual(git.changes(repo), [], 'dependencies at any depth are not work');
+  mkdirSync(join(repo, 'site', 'dist'));
+  writeFileSync(join(repo, 'site', 'dist', 'index.html'), '');
+  mkdirSync(join(repo, 'site', '.astro'));
+  writeFileSync(join(repo, 'site', '.astro', 'types.d.ts'), '');
+  assert.deepEqual(git.changes(repo).sort(), ['!! site/.astro/', '!! site/dist/'], 'build output keeps the worktree');
+});
+
 test('rescueDetached saves commits that are on no branch, and only those', () => {
   const base = tmp();
   sh(base, 'init', '-q', '-b', 'main', 'repo');

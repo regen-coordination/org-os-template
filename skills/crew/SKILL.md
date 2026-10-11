@@ -95,8 +95,8 @@ on the board.
 
 Release when the agent has reported and the operator has what they need. The branch is always
 kept; merging is the operator's. The worktree is removed only when nothing in it would be lost:
-modified, untracked and git-ignored files all keep it; installed dependencies (`node_modules/`) do
-not. If it is left behind, the command lists what is in it: show that list to the operator and stop.
+modified, untracked and git-ignored files all keep it; installed dependencies (a `node_modules/` at any depth) do
+not, while build output (`dist/`, `.astro/`, generated files) keeps it. If it is left behind, the command lists what is in it: show that list to the operator and stop.
 Do not remove the worktree yourself; once the operator has dealt with it, release again. If the
 list says herdr did not answer, nothing was wrong with the worktree: wait and release again. If
 herdr had finished meanwhile, that release says the worktree was already removed and closes the
