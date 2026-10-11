@@ -123,7 +123,7 @@ export const PAGES = [
     covers: ["packages/org-os-kms/src/atproto/", "packages/org-os-kms/src/ops.mjs", "packages/org-os-kms/src/static/", "packages/org-os-kms/src/manifest.mjs", "packages/toolkit-framework/src/publishable.mjs"] },
   { source: "docs/FEDERATION-MAP.md", slug: "federation-map", title: "Federation map", section: "knowledge", order: 70,
     summary: "map.json, the frontier fetch, the HTML artifact and the <federation-map> element",
-    verified: "5a6563df24f0a191a025b3c34a19e0fb9f20455f",
+    verified: "8587d2106d2be7b804914999cfcae2cf918381c4",
     covers: ["packages/org-os-kms/src/map.mjs", "packages/org-os-kms/src/frontier.mjs", "packages/org-os-kms/src/render-map-html.mjs", "packages/org-os-federation-map/src/", "site/scripts/aggregate-federation.mjs"] },
 
   { source: "docs/MODULES.md", slug: "modules", title: "Modules", section: "modules", order: 10,
@@ -214,7 +214,7 @@ export const PAGES = [
     covers: ["skills/workspace-improver", "MASTERPLAN.md", "data/skills-matrix.yaml"] },
   { source: "docs/ECOSYSTEM.md", slug: "ecosystem", title: "Ecosystem", section: "concepts", order: 50,
     summary: "Org-os instances, related projects and external systems, as recorded in this repository",
-    verified: "48cf5dd07515bbaa6cb2e2ed00f4d5db936f69d2",
+    verified: "8587d2106d2be7b804914999cfcae2cf918381c4",
     covers: ["federation.yaml", "data/instances.yaml", "data/ecosystems.yaml", "repos.manifest.json"] },
 ];
 

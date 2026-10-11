@@ -1,7 +1,7 @@
 ---
 id: site-tight
 title: "The org-os site, tightened (Design)"
-status: built 2026-10-11 on the steward's branch; seen only in headless screenshots; awaiting the operator's look
+status: built 2026-10-11 on the steward's branch; reviewed (PASS with findings, fixed the same day); seen only in headless pictures; awaiting the operator's look
 type: feature-spec
 created: 2026-10-11
 author: website steward (crew seat `website`)
@@ -37,9 +37,12 @@ Decoration that does neither is cut, and the space it held is given back.
 **Home.** The first screen says what org-os is, who the page is for, and what to do next:
 a label (`org-os · v<version> · docs for operators`), the headline, one sentence, two links
 (Operator guide, All docs) and, beside them, a panel of the three commands an operator runs
-most, each with what it does in the words of `docs/COMMANDS.md` and a link to its page. A test
-holds every command on the panel to the repository: an `npm run` name must be a script in the
-root `package.json`, a `/command` must have a file in `.claude/commands/`. Below: the six
+most, each with what it does in the words of `docs/COMMANDS.md` and a link to its page. Each
+command is printed under the place it is run. A test (`site/test/command-where.test.mjs`) holds
+every command to that place: one shown for an instance must be in what an instance receives
+(`tests/clone-manifest.txt`), with the file it runs and everything that file loads. The first
+version of this test read only the framework's root `package.json` and passed `npm run doctor`
+for an instance, where it exits 2. Below: the six
 sections as one ruled grid (title, one line, four links, "+ n more"); then one strip with the
 release on the left and the federation on the right (the operational count with its definition,
 the small map); then the newcomer paragraph. Four blocks, 64px apart.
@@ -132,26 +135,64 @@ A new test file, `site/test/design-tight.test.mjs`, written before the styles: t
 and classes appear nowhere under `site/src`; `Drift.astro` is gone; every `font-size` is a token
 or an `em`; no spacing token above `--space-16` exists or is used; `box-shadow` appears only for
 the focus ring and the search dialog; the home page's headline is at most eight words, its
-sentence at most forty, its links at most two; each command on the home panel exists in the
-repository. `npm run build`, `npm test` and `npm run drift` run at each commit.
+sentence at most forty, its links at most two. The same file reads the rules in their other spellings: no inline
+`style` attribute, no `font` shorthand but `inherit`, no gradient but one, no `drop-shadow`, no
+`translate(x, -n)`, and nothing moved by a `:hover` rule. The one gradient is the theme switch's
+knob in dark, a crescent drawn by a hard-edged `radial-gradient` of two palette colours: a shape,
+not a wash. `site/test/command-where.test.mjs` holds each command on the home panel to the place
+it is run. `npm run build`, `npm test` and `npm run drift` run at each commit.
 
 No dependency is added or upgraded. The Inter font package, installed and never imported, is
 left in `package.json`: removing it is a dependency change and the operator's to approve.
 
 ## 7. What has been seen, and what has not
 
-**Seen, as still pictures.** After the build, the steward rendered pages to PNG files with a
-headless Chrome using a throwaway profile (no window, no tab in anyone's browser) and read the
-pictures: the home page in both themes at 1280px and at 500px; a docs page in both themes at
-1360px and at 500px; the modules page at 1280px and 500px; the federation page at 1280px. One
-thing was changed on that evidence: the newcomer paragraph moved under the release note, where
-the first layout left a column empty.
+Three kinds of evidence, kept apart: **seen** is a still picture someone read; **measured** is a
+number read from a running page through Chrome's DevTools protocol; **not seen** is neither.
+Every picture came from a headless Chrome on a throwaway profile (no window, no tab in anyone's
+browser).
 
-**Not seen by anyone.** Any width under 500px (the headless window does not go narrower, so a
-real phone is unchecked); the search dialog open; hover and focus states; the theme switch
-being pressed; the federation map being used; the keyboard paths; a page with script off; any
-browser but Chrome. A still picture is not the operator's look (plan 3, task 2), which stands.
+**Seen by the steward (build, 2026-10-11).** The home page in both themes at 1280px and 500px; a
+docs page in both themes at 1360px and 500px; the modules page at 1280px and 500px; the
+federation page at 1280px. One thing was changed on that evidence: the newcomer paragraph moved
+under the release note, where the first layout left a column empty.
+
+**Seen and measured by the reviewer (review of `461cbe2`, 2026-10-11).** Twenty captures: home,
+`/docs/commands`, `/docs`, modules and federation, at 1280px and at 375px, light and dark.
+
+- No page scrolls sideways at either width (`documentElement.scrollWidth == innerWidth` on all
+  twenty). At 375px the nav wraps to two rows and works; the docs show a "Documentation menu" and
+  an "On this page" disclosure; the modules list becomes stacked rows.
+- Focus: 30 Tab stops on the home page (light) and 30 on `/docs/commands` (dark), each with a
+  2px outline in the accent colour. Nothing sets `outline: none`.
+- Landmarks and headings in document order on home, a docs page, modules and federation: no
+  level skipped. The sidebar's six lists each point at a label that exists.
+- `prefers-reduced-motion: reduce` stops the cursor's animation and sets `--t-fast` to 0ms.
+- The search dialog opens on the home page.
+- Two things were wrong at 375px. A wide docs table was cut with nothing to say so and could not
+  be scrolled by keyboard: fixed, see below. The federation map's labels are printed over each
+  other at 1280px ("organizational-os-framework" over "Regen Coordination", "DAO-OS" over "ReFi
+  Barcelona") and cannot be read at 375px: open, and it is the map package's
+  (`packages/org-os-federation-map`), handed to `engineer`.
+
+**Seen and measured by the steward after the review (2026-10-11).**
+
+- The home panel as it now reads, at 1280px in both themes and at 375px: each command under the
+  place it is run. The longest, `npm run doctor -- --dir ../my-instance`, fits on one line at 375px.
+- `/docs/commands` at 375px in both themes. Of its eight tables one is wider than the column
+  (396px in 339px). It carries `role="region"`, the name "Table: Command, What it does" and
+  `tabindex="0"`; the line "more columns: scroll sideways →" is printed above it and its right
+  edge is ruled. Focused, twelve presses of the right arrow moved it 57px, to its end, and the
+  line changed to "← more columns: scroll sideways". The seven tables that fit are not Tab stops.
+  At 1280px none of the eight is a Tab stop and no line is printed.
+
+**Not seen by anyone.** Hover states; the theme switch being pressed; the keyboard path through
+search results; the federation map being used; a page with script off (the table regions are in
+the built HTML, which the verifier checks, but no picture was taken); Safari and Firefox; a real
+phone; greyscale. A still picture is not the operator's look (plan 3, task 2), which stands.
 
 **As built, where it differs from §2.** The home page has three blocks under the first screen,
 not four: the newcomer paragraph sits inside the release block. The home headline wraps to three
-lines at 1280px.
+lines at 1280px and at 375px. The command panel's title is "Three commands, and where to run
+each", and each command is printed under its place ("to your agent", "in your instance", "in the
+framework checkout"), because one of the three, the doctor, is not run in an instance.

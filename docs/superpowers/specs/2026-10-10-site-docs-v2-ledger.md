@@ -967,3 +967,49 @@ its punctuation. Whether a document may restate a note is the operator's; the wo
 **The operational count.** The definition printed beside it now ends "The maintainer sets that
 value by hand; the site does not measure it." The registry's dates of last sync are not public
 fields, so the page cannot say how old the label is.
+
+### After the review of the tightened site (2026-10-11, later)
+
+**The home panel.** It said "Run in your instance" and listed `npm run doctor`. Checked by
+practice: a clone of the reference fixture was made in a scratch directory with
+`scripts/clone-framework.mjs --no-git`; in it `npm run doctor` printed "instance-doctor is not
+present in this checkout", `npm run validate:structure` ran and reported, and
+`node scripts/initialize.mjs --format=markdown` exited 0; from the framework checkout
+`npm run doctor -- --dir <the clone>` printed a scorecard. The panel now prints each command
+under the place it is run, and `site/test/command-where.test.mjs` reads `tests/clone-manifest.txt`.
+Could not check: an instance made before the clone engine, or one that vendored the doctor
+package; the test proves a command is present, not that it passes on a given instance.
+
+**`docs/ECOSYSTEM.md` and `docs/FEDERATION-MAP.md`, second pass (`b65fd8d`), read against the
+code and re-stamped at the merge, `8587d21`.**
+
+- ECOSYSTEM, each changed row beside its source: refi-bcn-os is a downstream entry with
+  `trust: "full"` (`federation.yaml`); the refi-med-os entry's note says its bootstrap is pending
+  and names `ReFiDAO/ReFi-Mediterranean`; `regen-toolkit` appears nowhere in `federation.yaml`
+  (`grep -c` gives 0) and `CHANGELOG.md` records its own remote, its place inside the
+  regen-coordination-os checkout and a sync that aborted with no `last_sync_commit`;
+  bread-coop-os has `repo: ""`, `README.md` line 21 says the engine produced it, and
+  `tests/fixtures/bread-coop-config.yaml` line 4 says "Fictional"; `docs/SKILL-PROMOTION.md`
+  lists the five skills with owner `dao-os`. The rest of the page was read beside the registry
+  (types and maturities of the six rows), `repos.manifest.json`, `data/ecosystems.yaml`,
+  `package.json` and the git remote: it holds.
+- FEDERATION-MAP: `site/package.json` has `build` as `clean` then `aggregate`, and `dev` as
+  `aggregate` first; the built `federation.json` has exactly the six keys the page names, and
+  `root` and each node have `name`, `type`, `repo`. Both imprecisions noted above are gone.
+- `npm run drift`: no page has drifted.
+
+**The excerpt length, measured.** The three restatements in the table above are gone from the
+document. On the real build the longest run any built file shares with a note is now 32 letters:
+`tests/fixtures/bread-coop-config.yaml`, the path of a public file, in the ecosystem page. Then
+29 (a repository address, a public field) and 24. `RUN_LENGTH` stays 40, and the sentence above
+that it "can drop to 32" was wrong: the longest single name inside a note is 36 letters, and a
+document may cite that name on its own account (`CHANGELOG.md` does), so 36 or less would fail a
+build on a name and not on an excerpt. 40 is that name and one joining word. The build now
+prints the measured number each time, and `site/test/registry-leaks.test.mjs` fails when the
+longest name moves. Does not catch, still: an excerpt of 39 letters or fewer that is not a whole
+sentence.
+
+**Wide tables.** Every markdown table in the docs (102) is built inside a region that can be
+focused and is named after its columns; the verifier fails on one outside. Seen at 375px on
+`/docs/commands` in both themes; measured there with the keyboard. Could not check: a table
+written as raw HTML (none exists; the verifier would report it), a screen reader, a real phone.

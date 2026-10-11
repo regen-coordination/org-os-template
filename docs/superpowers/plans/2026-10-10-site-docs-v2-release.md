@@ -1,6 +1,6 @@
 # Site and Docs v2 — Plan 3: the Release — Implementation Plan
 
-> **In progress.** Task 1 is done, and tasks 1b, 1c and 1d were added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
+> **In progress.** Task 1 is done, and tasks 1b, 1c, 1d and 1e were added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
 >
 > **Whose it is.** Since 2026-10-11 the website steward (crew seat `website`) carries this plan, by the operator's decision. The operator keeps the look by eye, the decisions of task 3, the pull request, the merge and the tag. The order of release is: the site lands on `main` as `0.5.1`; the crew (`feat/crew`) follows toward `0.6.0`, and the site is made ready for it on that branch afterwards.
 
@@ -49,6 +49,16 @@
 - The verifier's one exception (`QUOTED_BY_A_DOCUMENT`) is removed; `docs/FEDERATION-MAP.md` is re-stamped and `npm run drift` reports no drifted page.
 - The definition beside the operational count says the maturity is set by hand and not measured.
 - Left by it, for others: `docs/ECOSYSTEM.md` restates three registry notes in nearly their words (the ledger lists them); whether the registered list should name a test fixture and an agent runtime is the operator's, and needs a field in `data/instances.yaml` (`engineer`'s) if the answer is no.
+
+## Task 1e — What the review of the tightened site left (local)
+
+> **Done 2026-10-11** by the website steward, from the reviewer's findings 1 to 3 and 5 (PASS with findings on `461cbe2`) and `commons-steward`'s second pass on two documents (`b65fd8d`).
+
+- Each command on the home panel is printed under the place it is run; the doctor is shown as it is run from the framework checkout. A test reads what an instance receives (`site/scripts/command-where.mjs`, `site/test/command-where.test.mjs`).
+- `design-tight.test.mjs` reads the rules in their other spellings, each with a case that fails; one hover nudge it found is removed.
+- A wide docs table scrolls in a focusable, named region, with a cue in words; the verifier fails on a table outside one (`site/src/lib/table-scroll.mjs`).
+- `docs/ECOSYSTEM.md` and `docs/FEDERATION-MAP.md` re-stamped at `8587d21`; the excerpt length measured (32) and kept at 40, with the reason in the test file.
+- Left by it, for others: the federation map's labels collide (`packages/org-os-federation-map`, handed to `engineer`).
 
 ## Task 2 — The operator looks at it (by eye)
 
