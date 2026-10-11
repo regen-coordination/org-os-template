@@ -107,7 +107,7 @@ export function typeYourself(ctx, a) {
   return readingOrder(loadRole(ctx.mainDir, a.role).path, file, join(ctx.mainDir, 'roles', 'README.md'));
 }
 
-function assignmentBody(ctx, brief, role) {
+function assignmentBody(ctx, brief, role, named = null) {
   const cmd = (rest) => `node "${ctx.scriptPath}" ${rest}`;
   // A role that may seat works from its own worktree, where `npm run crew` is
   // refused, so it runs the main checkout's script by absolute path.
@@ -117,6 +117,7 @@ function assignmentBody(ctx, brief, role) {
         `- Seat an agent: \`${cmd('seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
         '  A brief that starts with a dash goes after `--`, after any flags: `seat <role> [--task <id>] -- "<brief>"`.',
         '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
+        '  With `--handoff`, a handoff that names a branch seats a detached copy of it, unless you pass `--base`: then the agent gets a new branch from that base. `--base` and `--on` cannot be combined.',
         `- Send the first prompt to an agent that stopped at a startup dialog: \`${cmd('nudge <agent|assignment>')}\``,
         `- Close an assignment: \`${cmd('release <agent|assignment> [--outcome done|abandoned]')}\``,
         `- Decline an open handoff: \`${cmd('handoff-close <id|file> --reason "<text>"')}\``,
@@ -127,6 +128,14 @@ function assignmentBody(ctx, brief, role) {
     '',
     brief.trim(),
     '',
+    ...(named
+      ? [
+          '## Handoff',
+          '',
+          `Handoff ${named.handoff} names branch ${named.branch}. You were not seated on a copy of it: your branch starts from ${named.base}.`,
+          '',
+        ]
+      : []),
     '## Commands',
     '',
     'Run these exactly as written. They are the only things you do outside your worktree.',
@@ -153,8 +162,15 @@ function handoffBrief(file) {
   return readRecord(file).body.replace(/^\s*## Brief[ \t]*\n+/, '').trim();
 }
 
-export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null, handoff: handoffTarget = null }) {
+/**
+ * `base` is null when the operator gave none: only then does a handoff's branch
+ * decide, and the new branch starts from `main`. An explicit base always wins.
+ */
+export function seat(ctx, { roleId, brief, task = null, base = null, on = null, handoff: handoffTarget = null }) {
   requireHerdr(ctx);
+  if (base !== null && on) {
+    throw new CrewError('--base and --on cannot be used together: --on seats a detached copy of an existing branch, --base starts a new branch from a ref. Use one of them.');
+  }
   const role = loadRole(ctx.mainDir, roleId);
   const { maxAgents } = loadCircles(ctx.mainDir);
   const trail = readTrail(ctx.mainDir);
@@ -166,8 +182,11 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
     if (taken.status !== 'open') throw new CrewError(`Handoff ${taken.id} is already ${taken.status}.`);
     if (taken.to_role !== role.id) throw new CrewError(`Handoff ${taken.id} is for the ${taken.to_role} role, not ${role.id}.`);
     if (!brief || !brief.trim()) brief = handoffBrief(taken.file);
-    if (!on && taken.branch) on = taken.branch;
+    // A handoff's branch seats a detached copy, unless the caller asked for a new
+    // branch from a base of their own: then the handoff is taken and only named.
+    if (!on && taken.branch && base === null) on = taken.branch;
   }
+  const handoffBranchNamed = taken && taken.branch && !on ? taken.branch : null;
 
   const caller = callerAssignment(ctx, trail, agents);
   if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
@@ -182,7 +201,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
   if (!brief || !brief.trim()) {
     throw new CrewError('A brief is required: say what the agent should do.');
   }
-  const ref = on || base;
+  const ref = on || base || 'main';
   if (!ctx.git.resolves(ref)) {
     throw new CrewError(`"${ref}" is not a branch or commit in this repository.`);
   }
@@ -212,7 +231,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
       created: isoLocal(now),
       updated: isoLocal(now),
     },
-    assignmentBody(ctx, brief, role),
+    assignmentBody(ctx, brief, role, handoffBranchNamed ? { handoff: taken.id, branch: handoffBranchNamed, base: ref } : null),
   );
 
   // herdr starts worktree actions from the repository's primary checkout and
@@ -234,7 +253,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
       opened = ctx.herdr.openWorktree({ cwd: repoDir, path: worktree, label: name });
     } else {
       herdrAsked = true;
-      opened = ctx.herdr.createWorktree({ cwd: repoDir, branch: `crew/${id}`, base, path: worktree, label: name });
+      opened = ctx.herdr.createWorktree({ cwd: repoDir, branch: `crew/${id}`, base: ref, path: worktree, label: name });
     }
     updateRecord(file, { pane: opened.pane_id, workspace: opened.workspace_id });
 

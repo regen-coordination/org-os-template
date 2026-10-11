@@ -26,7 +26,10 @@ told to read its role, its assignment, and the "Before you begin" section of `ro
 (by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md` in its worktree), then starts. Crew checks
 none of this; the agent reports what it read and what was absent.
 
-- `--base <ref>` starts the branch somewhere other than `main`.
+- `--base <ref>` starts the branch somewhere other than `main`. With `--handoff`, it also wins
+  over the branch the handoff names: the agent gets a new branch from `<ref>`, the handoff is
+  still taken, and the assignment file names the handoff's branch. Without `--base`, a handoff
+  that names a branch seats a detached copy of it. `--base` and `--on` cannot be combined.
 - `--on <branch>` seats the agent on a detached copy of an existing branch and creates no branch.
   Use it for review.
 - `--task <id>` records a task id from `data/tasks.yaml` on the assignment.

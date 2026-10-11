@@ -190,6 +190,10 @@ Steps, in order:
    at `~/.org-os/worktrees/<repo-name>/<assignment-id>`. With `--on <branch>`, create a
    **detached** worktree at that branch's current commit instead and create no branch (used for
    review). It is detached because git refuses to check one branch out in two worktrees.
+   A taken handoff that names a branch also seats a detached copy of it, as `--on` does, unless
+   `--base` is given: an explicit `--base` always wins, the agent gets a new branch from that
+   base, the handoff is still taken, and its branch is named in the assignment file. `--base`
+   together with `--on` is refused.
 5. **Start the agent** in the worktree's herdr pane with the role's kind and model. Its name is
    the role id, or `<id>-2`, `<id>-3` if that name is taken by any live agent on the herdr
    server, crew or not.
@@ -213,7 +217,7 @@ All enforced in `core.mjs`, not in the skill.
 | Inside herdr | Refuse unless `HERDR_ENV=1`. |
 | Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. Default 4, set by `max_agents` in `roles/circles.yaml`. |
 | Who may seat | A caller whose pane hosts no seated agent is the operator and may always seat. A caller whose pane hosts a seated agent may seat only if that agent's role has `may_seat: true`. The caller is identified from `HERDR_PANE_ID` joined to the trail. |
-| Base exists | Refuse if `--base` or `--on` does not resolve to a commit. |
+| Base exists | Refuse if `--base` or `--on` does not resolve to a commit. Refuse `--base` together with `--on`. |
 | Operator's tree untouched | The launcher never checks out, resets or cleans the main checkout. |
 
 The who-may-seat rule guards against drift. It is not a security boundary: an agent that sets out
