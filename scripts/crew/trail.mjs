@@ -94,6 +94,14 @@ export function readTrail(mainDir) {
   for (const name of readdirSync(dir).sort()) {
     const file = join(dir, name);
     if (!name.endsWith('.md')) continue;
+    // Syncthing keeps the losing side of a conflict as a copy of the file. It is
+    // not a record: counted, it would be a second assignment. It is listed with
+    // the unreadable files so the operator sees it and can merge it by hand,
+    // because it may hold the newer state. It is never deleted.
+    if (name.includes('.sync-conflict-')) {
+      trail.unreadable.push(name);
+      continue;
+    }
     const isHandoff = name.startsWith('handoff-');
     let record;
     try {
