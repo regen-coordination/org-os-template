@@ -69,3 +69,32 @@ test('every report must name the onboarding files read', () => {
   const text = readFileSync(join(rootDir, 'roles', 'README.md'), 'utf-8');
   assert.match(text, /Report before you stop\.\*\*[^]*?onboarding files/);
 });
+
+test('the lead, website and platform roles run on Opus 5.5 at high effort', () => {
+  for (const id of ['lead', 'website', 'platform']) {
+    const role = loadRole(rootDir, id);
+    assert.equal(role.model, 'claude-opus-5-5', `roles/${id}.md model`);
+    assert.equal(role.effort, 'high', `roles/${id}.md effort`);
+    assert.equal(role.kind, 'claude', `roles/${id}.md kind`);
+  }
+});
+
+test('the website and platform roles sit in engineering, may not seat, and name what to read first', () => {
+  for (const id of ['website', 'platform']) {
+    const role = loadRole(rootDir, id);
+    assert.equal(role.circle, 'engineering');
+    assert.equal(role.may_seat, false);
+    const text = readFileSync(role.path, 'utf-8');
+    assert.match(text, /## Before you begin/, `roles/${id}.md`);
+    assert.match(text, /docs\/superpowers\/(specs|plans)\//, `roles/${id}.md names no spec or plan`);
+    assert.match(text, /handoff/, `roles/${id}.md does not route other roles' work by handoff`);
+    assert.match(text, /deploy/, `roles/${id}.md does not forbid deploying`);
+  }
+});
+
+test('the specs and plans the platform role names exist in this tree', () => {
+  const text = readFileSync(join(rootDir, 'roles', 'platform.md'), 'utf-8');
+  const files = [...text.matchAll(/`((?:docs|packages)\/[A-Za-z0-9_.\/-]+\.md)`/g)].map((m) => m[1]);
+  assert.ok(files.length >= 3, `names ${files.length} files`);
+  for (const f of files) assert.ok(existsSync(join(rootDir, f)), `roles/platform.md names ${f}, which does not exist`);
+});

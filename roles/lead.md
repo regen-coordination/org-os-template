@@ -2,7 +2,8 @@
 id: lead
 circle: lead
 kind: claude
-model: opus
+model: claude-opus-5-5
+effort: high
 may_seat: true
 skills: [crew]
 ---

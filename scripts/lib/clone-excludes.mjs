@@ -190,6 +190,11 @@ export const EXCLUDE_FILES = new Set([
   "scripts/test-federation.sh", // hardcoded paths into the operator's own workspace
   // Fixtures whose only consumers are excluded suites.
   "tests/fixtures/bread-coop-config.yaml", // tests/instance-doctor
+  // Crew seats for developing the framework's OWN website and admin app: `site/` and
+  // packages/admin are not in an instance (the website and the platform are the
+  // framework repository's), so these two seats would mean nothing there.
+  "roles/website.md",
+  "roles/platform.md",
   // Renders the FRAMEWORK's README and session one-pager; imports site/ (excluded).
   "scripts/render-templates.mjs",
   "templates/README.framework.md",
