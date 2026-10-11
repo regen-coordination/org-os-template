@@ -15,7 +15,7 @@ seated_by: operator
 status: reported
 prompted: true
 created: '2026-10-10T21:07:05-03:00'
-updated: '2026-10-10T23:36:19-03:00'
+updated: '2026-10-11T02:01:03-03:00'
 ---
 ## Brief
 
@@ -160,3 +160,24 @@ For the operator to decide:
 ## Report — 2026-10-10T23:36:19-03:00
 
 Correction to the lead's presentation above, point 3. The count was wrong. Counted from the trail files in memory/crew/: the lead seat seated 19 assignments, not 21. By role: 9 engineer (1 failed seating, 7 work assignments of which one is still working, 1 presentation), 6 reviewer (5 reviews, 1 presentation), 2 researcher (1 research, 1 presentation), 2 commons-steward (1 documentation pass, 1 presentation). I wrote the first figure from memory instead of counting.
+
+## Report — lead — 2026-10-11T02:01:03-03:00
+
+# Lead: the unsubmitted first prompts of 2026-10-11, and what I did about them
+
+HEARTBEAT.md's first open crew item points here.
+
+**What happened.** Three seats in a row, all reviewers seated on a detached copy with `seat reviewer … --on <branch>` (assignments `2026-10-11-reviewer-review-titles-and-role-as-identity-the-c`, `-c-2` and `-c-3`, seated at about 01:06, 01:30 and 01:32), had their first prompt typed into the agent's input box and never submitted. herdr answered the prompt call as sent, so crew recorded `prompted: true`. Each agent sat `idle` with status `working`. Read with `herdr agent read reviewer`: the whole first prompt was in the box under the `❯`, with no turn started.
+
+**How long it went unseen.** About 25 minutes for the first. My board watch only reported changes, and "idle with no report" does not change. The watch now also reports an agent that stays idle with status working for five minutes.
+
+**What I tried, in order.**
+1. Released the first as abandoned and seated the review again: the second was stuck the same way.
+2. Hypothesis: the label calls, which had begun to succeed one merge earlier, disturbed the prompt. I reverted commit 0400773 in the main checkout (1534510) and seated a third time with the label refused again. It was stuck the same way, so the hypothesis was wrong. I restored the fix (26ddf60). Both commits are on feat/crew; the code after them is identical to the reviewed code.
+3. I sent one Enter key to the third reviewer's pane, `herdr agent send-keys reviewer enter`. Within about six seconds the agent was `working`, and it completed the review. This was a herdr command I ran myself, not a crew command. It was not a resend (the text was already there, which I had read) and not an answer to a dialog.
+
+**What is not known.** The cause. The seat before these three (a reviewer on a detached copy, 00:48) submitted normally, and so did the seat after them (a commons-steward on a new branch, with the new start arguments, 01:55). The operator left the machine at about 00:50, which fits the start but not the end. All three stuck seats were `--on` seats; that fits, but one earlier `--on` seat the same night was fine.
+
+**What crew should do** (for an engineer; nothing built): after prompting, look a few seconds later whether the agent left `idle`; when it has not, say so in the seat output and on the board rather than recording `prompted: true`; and give the lead and the operator a crew command that submits a prompt already sitting in the box, so the Enter is recorded on the trail and not pressed by hand. herdr's `agent prompt --wait` returns `agent_prompt_stalled` in this case and may be the simplest check.
+
+**Self-criticism.** I reverted a reviewed commit on a guess before testing the cheaper explanation by reading the pane a second time, and I left a seat idle for 25 minutes because my watch could not see stillness.
