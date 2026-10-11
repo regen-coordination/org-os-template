@@ -262,8 +262,10 @@ herdr's state, so they are yours to run once, with a throwaway pane. Note the ou
    checkout directory and branch may exist.
 5. **Which code does `herdr agent get <pane>` give for a pane with no agent?** Crew reads no code
    from it; it matches by listing.
-6. **Does herdr accept and show the label tokens?** Run the **Label check** in the smoke run
-   above with the sidebar rows from "See the crew in herdr's sidebar". Settles whether the
-   installed binary accepts `role`, `assignment` and `status`, shows them, and whether
-   `herdr agent get <name>` returns them. Then restart herdr and see whether they survive: crew
-   does not set them again.
+6. **Does herdr accept and show the label tokens?** Observed on 2026-10-11 against herdr 0.9.1:
+   it accepts `role`, `assignment` and `status`, and `herdr pane get`, `herdr agent get <name>`
+   and `herdr workspace get` return them under `tokens`. The id must come before `--source`; crew
+   sends it that way. Still open, and yours: restart herdr and see whether the tokens survive
+   (crew does not set them again), and whether the sidebar draws them, which needs the
+   **Label check** in the smoke run above with the sidebar rows from "See the crew in herdr's
+   sidebar".
