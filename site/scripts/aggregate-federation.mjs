@@ -1,4 +1,5 @@
-// aggregate-federation.mjs — CLI: reads ../data/instances.yaml, writes src/data/federation.json,
+// aggregate-federation.mjs — CLI: reads ../data/instances.yaml, writes src/data/federation.json
+// (name, type and link of each instance, and the counts; nothing else from the registry),
 // copies ../.well-known into public/.well-known. Resolves the org-os root from this script's location.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -16,7 +17,7 @@ if (missing.length > 0) {
   console.error(installMessage(missing, orgOsRoot));
   process.exit(1);
 }
-const { aggregate } = await import("./federation-aggregate.mjs");
+const { aggregate, quietMap } = await import("./federation-aggregate.mjs");
 const { buildMap } = await import("../../packages/org-os-kms/src/map.mjs");
 
 const registryPath = join(orgOsRoot, "data", "instances.yaml");
@@ -25,14 +26,15 @@ if (!existsSync(registryPath)) {
   process.exit(1);
 }
 const registryYaml = readFileSync(registryPath, "utf8");
-const fed = aggregate({ registryYaml, baseDir: orgOsRoot, now: new Date().toISOString() });
+const fed = aggregate({ registryYaml, now: new Date().toISOString() });
 
 const outDir = join(siteRoot, "src", "data");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "federation.json"), JSON.stringify(fed, null, 2));
-console.log(`federation.json: ${fed.nodes.length} nodes, ${fed.edges.length} edges (${fed.nodes.filter((n) => n.available).length} enriched)`);
+console.log(`federation.json: ${fed.registered} registered, ${fed.operational} operational`);
 
-const map = buildMap({ dir: orgOsRoot, surface: "web", now: new Date().toISOString() });
+// quietMap: a node whose checkout was not here at build carries no status.
+const map = quietMap(buildMap({ dir: orgOsRoot, surface: "web", now: new Date().toISOString() }));
 const mapJson = JSON.stringify(map, null, 2);
 writeFileSync(join(outDir, "map.json"), mapJson);
 mkdirSync(join(siteRoot, "public"), { recursive: true });

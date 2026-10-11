@@ -4,20 +4,23 @@ import FederationMapIsland from "../components/FederationMapIsland.astro";
 import InstanceCard from "../components/InstanceCard.astro";
 import { federationData } from "../lib/federation";
 ---
-<Layout title="Federation" current="federation" description="The org-os federation — instances, networks, and live-at-build state.">
+<Layout title="Federation" current="federation" description="The org-os federation — the map of its peers and the instances registered with the framework.">
   <div class="container">
     <p class="eyebrow">Federation</p>
     <h1>One OS, many nodes</h1>
-    <p class="prose">Each node is a sovereign org-os instance. Edges show framework lineage (dashed) and federation membership (solid). State is aggregated at build from each instance's <code>.well-known/</code>.</p>
+    <p class="prose">The map is drawn from this repository's <code>federation.yaml</code>: the peers, upstreams and downstreams org-os declares, and what they point to in turn.</p>
     <FederationMapIsland />
-    <p class="mono faint">Generated {federationData.generatedAt}</p>
-    <div class="grid">
+    <h2 class="list-title">Registered instances</h2>
+    <p class="prose">The {federationData.registered} entries of the framework's registry, by name, type and repository. {federationData.operational} are operational. {federationData.operationalDefinition}</p>
+    <ul class="instances">
       {federationData.nodes.map((node) => <InstanceCard node={node} />)}
-    </div>
+    </ul>
+    <p class="mono faint">Generated {federationData.generatedAt}</p>
   </div>
 </Layout>
 <style>
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-4); margin-top: var(--space-8); }
+.list-title { margin-top: var(--space-12); }
+.instances { list-style: none; padding: 0; margin-block: var(--space-5); max-width: 44rem;
+  border-top: var(--border-hair) solid var(--color-line); }
 .faint { color: var(--color-muted); font-size: var(--text-sm); }
 </style>

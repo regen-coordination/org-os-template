@@ -9,6 +9,8 @@ import { PAGES, SECTIONS, ALLOW_UNVERIFIED } from "../src/data/docs-manifest.mjs
 import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
+import { parseRegistry, publicInstance, isOperational, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
+import { privateTexts, findLeaks, visibleText, instanceLine } from "./registry-leaks.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
 const DIST = "dist";
@@ -61,13 +63,102 @@ for (const p of new Set(REQUIRED)) {
 }
 console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
 
-// ── 3. federation.json shape ─────────────────────────────────────────────
-try {
-  const fed = JSON.parse(readFileSync(join(DIST, "federation.json"), "utf8"));
-  if (fed.root?.id !== "org-os") fail("federation.json: root.id !== org-os");
-  if (!Array.isArray(fed.nodes) || fed.nodes.length === 0) fail("federation.json: no nodes");
-  else console.log(`federation.json: ${fed.nodes.length} nodes OK`);
-} catch (e) { fail(`federation.json: unreadable — ${e.message}`); }
+// ── 3. The instance registry: only the agreed fields are published ────────
+// data/instances.yaml holds the maintainer's notes beside each instance's name.
+// The site publishes name, type and link (PUBLIC_FIELDS) and a count; nothing
+// else from the registry may be in dist/, in a page or in a data file.
+{
+  const registry = parseRegistry(readFileSync(join(REPO_ROOT, "data", "instances.yaml"), "utf8"));
+  const expected = registry.map(publicInstance);
+  const operational = registry.filter(isOperational).length;
+  const sameKeys = (node) => JSON.stringify(Object.keys(node ?? {})) === JSON.stringify(PUBLIC_FIELDS);
+
+  // 3a. federation.json: the public fields and no others.
+  try {
+    const fed = JSON.parse(readFileSync(join(DIST, "federation.json"), "utf8"));
+    if (fed.root?.name !== "org-os") fail("federation.json: root.name !== org-os");
+    if (!Array.isArray(fed.nodes) || fed.nodes.length === 0) fail("federation.json: no nodes");
+    else {
+      const extra = [fed.root, ...fed.nodes].filter((n) => !sameKeys(n));
+      for (const n of extra) fail(`REGISTRY: federation.json carries fields outside the agreed list (${PUBLIC_FIELDS.join(", ")}) for "${n?.name}": ${Object.keys(n ?? {}).join(", ")}. Publish a field by adding it to PUBLIC_FIELDS in scripts/federation-aggregate.mjs, on the operator's decision.`);
+      if (JSON.stringify(fed.nodes) !== JSON.stringify(expected)) fail("REGISTRY: federation.json's nodes are not the registry's instances, in order, as name, type and repo. Run `npm run aggregate`.");
+      if (fed.operational !== operational) fail(`REGISTRY: federation.json says ${fed.operational} operational instance(s); the registry has ${operational} with maturity production.`);
+      if (extra.length === 0) console.log(`federation.json: ${fed.nodes.length} nodes, each with ${PUBLIC_FIELDS.join(", ")} and nothing else`);
+    }
+  } catch (e) { fail(`federation.json: unreadable — ${e.message}`); }
+
+  // 3b. The federation page: one line per instance, and that line is its name,
+  // its type and the word "repository" when it has a link. No status.
+  const noScript = (html) => html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ");
+  const fedPage = existsSync(join(DIST, "federation/index.html")) ? noScript(readFileSync(join(DIST, "federation/index.html"), "utf8")) : "";
+  const lines = [...fedPage.matchAll(/<li\b[^>]*\bdata-instance\b[^>]*>([\s\S]*?)<\/li>/g)].map((m) => visibleText(m[1]));
+  const wanted = expected.map(instanceLine);
+  if (lines.length !== wanted.length) {
+    fail(`REGISTRY: the federation page lists ${lines.length} instance(s) in <li data-instance>; the registry has ${wanted.length}.`);
+  } else {
+    let wrong = 0;
+    for (const [i, line] of lines.entries()) {
+      if (line === wanted[i]) continue;
+      wrong++;
+      fail(`REGISTRY: the federation page says "${line}" for an instance; only its name, type and link may be printed: "${wanted[i]}".`);
+    }
+    if (wrong === 0) console.log(`federation page: ${lines.length} instances, each printed as name, type and link`);
+  }
+  const status = visibleText(fedPage).match(/\b(offline|unreached|unreachable)\b/i);
+  if (status) fail(`REGISTRY: the federation page says "${status[0]}". An instance whose checkout was not present at build has no status to show.`);
+
+  // 3c. map.json: a node that was not read at build carries no `live: false`,
+  // which the map element would print as "unreached".
+  try {
+    const map = JSON.parse(readFileSync(join(DIST, "map.json"), "utf8"));
+    const flagged = (map.nodes ?? []).filter((n) => n.live === false);
+    if (flagged.length > 0) fail(`REGISTRY: map.json marks ${flagged.length} node(s) live: false (first: ${flagged[0].id}); the map would show them as unreached. scripts/aggregate-federation.mjs must write quietMap(map).`);
+    else console.log(`map.json: ${(map.nodes ?? []).length} nodes, none marked as not live`);
+  } catch (e) { fail(`map.json: unreadable — ${e.message}`); }
+
+  // 3d. The home page's count is the operational count, with its definition beside it.
+  const home = existsSync(join(DIST, "index.html")) ? readFileSync(join(DIST, "index.html"), "utf8") : "";
+  const counts = [...home.matchAll(/<[^>]*\bdata-operational-count\b[^>]*>([\s\S]*?)<\//g)].map((m) => visibleText(m[1]));
+  if (counts.length === 0) fail("REGISTRY: the home page has no element marked data-operational-count.");
+  for (const c of counts) if (c !== String(operational)) fail(`REGISTRY: the home page counts ${c} instance(s); the registry has ${operational} with maturity production.`);
+  if (!visibleText(home).includes(OPERATIONAL_DEFINITION)) fail("REGISTRY: the home page shows an instance count without the definition of what it counts (OPERATIONAL_DEFINITION).");
+  else if (counts.length > 0) console.log(`home page: counts ${operational} operational instance(s) of ${registry.length} registered, with the definition`);
+
+  // 3e. No private sentence anywhere in the build.
+  const texts = privateTexts(registry);
+  const TEXT_FILE = /\.(html|json|txt|xml|js|mjs|css|svg|webmanifest|md)$/;
+  const textFiles = [];
+  (function walk(dir) {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (TEXT_FILE.test(name)) textFiles.push(full);
+    }
+  })(DIST);
+  if (texts.length === 0) fail("REGISTRY: found no private text in data/instances.yaml to look for; the check would pass on anything.");
+  // A framework document that quotes the registry in its own text. The site follows
+  // the documents and does not rewrite them (commons-steward's), so each quotation is
+  // named here, printed on every build, and fails once it no longer matches.
+  const QUOTED_BY_A_DOCUMENT = [
+    { file: join(DIST, "docs/ecosystem/index.html"), text: "DAO-module development platform, not an operational instance",
+      source: "docs/ECOSYSTEM.md, which cites the registry's description of dao-os" },
+  ];
+  const used = new Set();
+  let leaked = 0;
+  for (const file of textFiles) {
+    for (const text of findLeaks(readFileSync(file, "utf8"), texts)) {
+      const quoted = QUOTED_BY_A_DOCUMENT.find((q) => q.file === file && q.text === text);
+      if (quoted) { used.add(quoted); continue; }
+      leaked++;
+      fail(`REGISTRY: ${file} contains text from a registry field outside the agreed list (${PUBLIC_FIELDS.join(", ")}): "${text}". Remove it from the page; data/instances.yaml is not public text.`);
+    }
+  }
+  for (const q of QUOTED_BY_A_DOCUMENT) {
+    if (used.has(q)) console.log(`registry check: 1 sentence allowed in ${q.file} — quoted by ${q.source}`);
+    else fail(`REGISTRY: the allowed quotation "${q.text}" is no longer in ${q.file}. Remove it from QUOTED_BY_A_DOCUMENT in scripts/verify-build.mjs.`);
+  }
+  if (texts.length > 0 && leaked === 0) console.log(`registry check: ${texts.length} private sentences from data/instances.yaml looked for in ${textFiles.length} built files, none found elsewhere`);
+}
 
 // ── 4. Links, on every built page (checks 4 and 6) ────────────────────────
 // The site deploys to a GitHub Pages project path. Astro applies `base` to the

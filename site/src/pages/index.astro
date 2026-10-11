@@ -14,7 +14,7 @@ import { VERSION, REPO_URL } from "../lib/repo.mjs";
 
 const landing = yaml.load(readFileSync(resolve(process.cwd(), "src/data/landing.yaml"), "utf8")) as any;
 const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).filter((s) => s.pages.length > 0);
-const statline = `v${VERSION} · ${federationData.nodes.length} instances · EIP-4824`;
+const statline = `v${VERSION} · EIP-4824`;
 const SHOWN = 4;
 ---
 <Layout title="Home" current="home" description="Documentation for operators of org-os instances.">
@@ -43,6 +43,7 @@ const SHOWN = 4;
   </SectionBlock>
 
   <SectionBlock index="03" eyebrow="Federation" title="One OS, many nodes" href={withBase("/federation")} cta="Explore the network">
+    <p class="prose count"><strong data-operational-count>{federationData.operational}</strong> operational {federationData.operational === 1 ? "instance" : "instances"}, of {federationData.registered} registered. {federationData.operationalDefinition}</p>
     <FederationMapIsland mode="mini" />
   </SectionBlock>
 
@@ -58,5 +59,7 @@ const SHOWN = 4;
 .card .summary { font-size: var(--text-sm); color: var(--color-muted); }
 .card ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); }
 .card .more { font-size: var(--text-xs); color: var(--color-muted); }
+.count { margin-bottom: var(--space-5); color: var(--color-muted); }
+.count strong { color: var(--color-ink); }
 .intro { margin-block: var(--space-16); color: var(--color-muted); }
 </style>

@@ -1,7 +1,10 @@
-// federation-aggregate.mjs — PURE, testable aggregation logic. No process I/O here
-// except the defensive disk reads in enrichFromDisk (which never throw).
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+// federation-aggregate.mjs — PURE, testable aggregation logic. No I/O.
+//
+// data/instances.yaml is the framework's working registry: it holds the
+// maintainer's notes, local paths and drift flags beside each instance's name.
+// The site publishes three of its fields and nothing else (operator decision,
+// 2026-10-11). scripts/verify-build.mjs fails the build when anything more
+// reaches dist/.
 import yaml from "js-yaml";
 
 export function parseRegistry(registryYaml) {
@@ -9,78 +12,59 @@ export function parseRegistry(registryYaml) {
   return Array.isArray(doc?.instances) ? doc.instances : [];
 }
 
-export function toNode(raw) {
+// The agreed list. A field that is not here is not published.
+export const PUBLIC_FIELDS = ["name", "type", "repo"];
+
+export function publicInstance(raw) {
   return {
-    id: raw.id,
     name: raw.name ?? raw.id,
     type: raw.type ?? "Instance",
-    maturity: raw.maturity ?? null,
-    role: raw.federation_role ?? null,
-    // `||` (not `??`) is intentional: the registry uses "" to mean "no network"
-    // (e.g. dao-os) — coerce empty string to null.
-    network: raw.federation_network || null,
-    frameworkVersion: raw.framework_version ?? null,
-    packages: Array.isArray(raw.packages) ? raw.packages : [],
-    drift: Array.isArray(raw.drift) ? raw.drift : [],
     repo: raw.repo ?? null,
-    notes: raw.notes ?? "",
-    localPath: raw.local_path ?? null,
-    available: false,
-    counts: {},
   };
 }
 
-function safeCount(path, key) {
-  try {
-    if (!existsSync(path)) return undefined;
-    const data = JSON.parse(readFileSync(path, "utf8"));
-    return Array.isArray(data?.[key]) ? data[key].length : undefined;
-  } catch {
-    return undefined;
-  }
-}
+// What the home page counts. The registry's lifecycle ends at `production`
+// (remote → cloned → synced → production); the entries before it include a test
+// fixture, an agent runtime and a development platform, which a reader would not
+// take "instances" to mean.
+export const OPERATIONAL_DEFINITION =
+  "An instance is counted as operational when the framework's registry, data/instances.yaml, records its maturity as production.";
 
-// Reads <instanceAbsPath>/.well-known/*.json defensively. Never throws.
-// `available` means "the instance's .well-known/ directory was found" (reachable),
-// NOT "has members/projects". `counts` is best-effort enrichment and may be empty
-// for a reachable instance that doesn't publish those schemas; consumers must treat
-// each count as optional (render only when defined) rather than as zero.
-export function enrichFromDisk(node, instanceAbsPath) {
-  const wk = join(instanceAbsPath, ".well-known");
-  if (!existsSync(wk)) return { ...node, available: false, counts: {} };
-  const counts = {};
-  const members = safeCount(join(wk, "members.json"), "members");
-  const projects = safeCount(join(wk, "projects.json"), "projects");
-  if (members !== undefined) counts.members = members;
-  if (projects !== undefined) counts.projects = projects;
-  return { ...node, available: true, counts };
-}
-
-export function deriveEdges(nodes, rootId) {
-  const edges = [];
-  const hubByNetwork = new Map();
-  for (const n of nodes) if (n.role === "hub" && n.network) hubByNetwork.set(n.network, n.id);
-  for (const n of nodes) {
-    if (n.frameworkVersion) edges.push({ from: n.id, to: rootId, kind: "framework" });
-    if (n.role === "spoke" && n.network && hubByNetwork.has(n.network)) {
-      edges.push({ from: n.id, to: hubByNetwork.get(n.network), kind: "federation" });
-    }
-  }
-  return edges;
+export function isOperational(raw) {
+  return raw?.maturity === "production";
 }
 
 const ROOT_NODE = {
-  id: "org-os", name: "org-os", type: "Framework", maturity: "production",
-  role: "root", network: null, frameworkVersion: null, packages: [], drift: [],
-  repo: "https://github.com/regen-coordination/org-os-template", notes: "Framework + standards + orchestration hub.",
-  localPath: ".", available: true, counts: {},
+  name: "org-os", type: "Framework", repo: "https://github.com/regen-coordination/org-os-template",
 };
 
-// baseDir = the org-os root (instances' local_path is relative to it).
-export function aggregate({ registryYaml, baseDir, now }) {
-  const nodes = parseRegistry(registryYaml)
-    .map(toNode)
-    .map((n) => (n.localPath ? enrichFromDisk(n, resolve(baseDir, n.localPath)) : n));
-  const edges = deriveEdges(nodes, ROOT_NODE.id);
-  return { root: ROOT_NODE, nodes, edges, generatedAt: now };
+export function aggregate({ registryYaml, now }) {
+  const registry = parseRegistry(registryYaml);
+  return {
+    root: ROOT_NODE,
+    nodes: registry.map(publicInstance),
+    registered: registry.length,
+    operational: registry.filter(isOperational).length,
+    operationalDefinition: OPERATIONAL_DEFINITION,
+    generatedAt: now,
+  };
+}
+
+// The map data marks a node `live: false` when its checkout was not beside this
+// repository at build time, which is always the case in CI, and the map element
+// prints that as a status. Not read at build is not a status: drop the false flag
+// and the empty `last_seen`, so the element says nothing. A node that was read
+// keeps `live: true`.
+export function quietMap(map) {
+  return {
+    ...map,
+    nodes: map.nodes.map((node) => {
+      const { live, last_seen, ...rest } = node;
+      return {
+        ...rest,
+        ...(live === true ? { live } : {}),
+        ...(last_seen != null ? { last_seen } : {}),
+      };
+    }),
+  };
 }
