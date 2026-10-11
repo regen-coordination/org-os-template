@@ -66,10 +66,15 @@ function freeName(roleId, agents) {
   return name;
 }
 
-function firstPrompt(rolePath, file) {
+// What every seat reads before its brief lives in one section of roles/README.md,
+// so an instance changes the list by editing that file. The script only points.
+const ONBOARDING = 'Before you begin';
+
+function firstPrompt(rolePath, file, readmePath) {
   return (
     `You are seated in the org-os crew. Read ${rolePath} (your role) and ${file} (your assignment) in full, ` +
-    'then begin the work in the brief. When you finish, follow the Commands section of the assignment file to report.'
+    `then read the "${ONBOARDING}" section of ${readmePath} and the files it lists, ` +
+    'and only then begin the work in the brief. When you finish, follow the Commands section of the assignment file to report.'
   );
 }
 
@@ -102,7 +107,7 @@ function assignmentBody(ctx, brief, role) {
     '  A brief that starts with a dash goes after `--`, after any flags: `handoff <role> [--branch <branch>] -- "<brief>"`.',
     ...lead,
     '',
-    `Shared boundaries and the charter: ${join(ctx.mainDir, 'roles', 'README.md')}`,
+    `Shared boundaries, the charter and the "${ONBOARDING}" section to read first: ${join(ctx.mainDir, 'roles', 'README.md')}`,
     '',
   ].join('\n');
 }
@@ -213,7 +218,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
 
     if (ready) {
       try {
-        ctx.herdr.promptAgent(name, firstPrompt(role.path, file));
+        ctx.herdr.promptAgent(name, firstPrompt(role.path, file, join(ctx.mainDir, 'roles', 'README.md')));
         prompted = true;
       } catch (err) {
         // herdr says a failed or timed-out prompt does not prove non-delivery,
@@ -241,7 +246,8 @@ function unconfirmedMessage(ctx, a, why) {
   return (
     `The first prompt to ${a.agent} may already have arrived: ${why}, and a timeout does not prove it was not delivered. ` +
     `Look at ${a.agent}'s pane. If it has not started, type there: ` +
-    `Read ${loadRole(ctx.mainDir, a.role).path} (your role) and ${a.file} (your assignment) in full, then begin the work in the brief.`
+    `Read ${loadRole(ctx.mainDir, a.role).path} (your role) and ${a.file} (your assignment) in full, ` +
+    `then read the "${ONBOARDING}" section of ${join(ctx.mainDir, 'roles', 'README.md')} and the files it lists, and only then begin the work in the brief.`
   );
 }
 
@@ -256,7 +262,7 @@ export function nudge(ctx, { target }) {
   }
   const rolePath = loadRole(ctx.mainDir, a.role).path;
   try {
-    ctx.herdr.promptAgent(a.agent, firstPrompt(rolePath, a.file));
+    ctx.herdr.promptAgent(a.agent, firstPrompt(rolePath, a.file, join(ctx.mainDir, 'roles', 'README.md')));
   } catch (err) {
     if (err.code === 'herdr_missing') {
       throw new CrewError(`The herdr command was not found on PATH, so nothing was sent to ${a.agent}. Fix that and run nudge again.`);

@@ -40,6 +40,10 @@ test('seat creates the worktree, starts the agent, prompts it and records the as
   assert.ok(prompt.text.includes(join(root, 'roles', 'engineer.md')), prompt.text);
   assert.ok(prompt.text.includes(file), prompt.text);
   assert.doesNotMatch(prompt.text, /\n/);
+  // Onboarding: the prompt points at the shared section and at what it lists.
+  assert.ok(prompt.text.includes(join(root, 'roles', 'README.md')), prompt.text);
+  assert.ok(prompt.text.includes('"Before you begin"'), prompt.text);
+  assert.ok(prompt.text.indexOf('Before you begin') < prompt.text.indexOf('begin the work in the brief'), prompt.text);
 
   const { body } = readRecord(file);
   assert.match(body, /## Brief\n\nFix the KMS cursor race/);
@@ -153,8 +157,30 @@ test('an agent waiting at a startup dialog is seated but not prompted, and nudge
   const prompt = ctx.herdr.calls.find((c) => c[0] === 'promptAgent')[1];
   assert.equal(prompt.name, 'engineer');
   assert.ok(prompt.text.includes(a.id));
+  assert.ok(prompt.text.includes(join(ctx.mainDir, 'roles', 'README.md')), prompt.text);
+  assert.ok(prompt.text.includes('"Before you begin"'), prompt.text);
   assert.throws(() => nudge(ctx, { target: 'engineer' }), /already been given its first prompt/);
   assert.throws(() => nudge(ctx, { target: 'nobody' }), /No open assignment/);
+});
+
+test('the assignment file closes by naming the Before you begin section', () => {
+  const { ctx } = setup();
+  const a = seat(ctx, { roleId: 'engineer', brief: 'x' });
+  const { body } = readRecord(join(trailDir(ctx.mainDir), `${a.id}.md`));
+  const last = body.trim().split('\n').pop();
+  assert.ok(last.includes(join(ctx.mainDir, 'roles', 'README.md')), last);
+  assert.ok(last.includes('Before you begin'), last);
+});
+
+test('what an operator is told to type for an unconfirmed prompt also names the section', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'promptAgent', code: 'timeout', message: 'no answer' };
+  seat(ctx, { roleId: 'engineer', brief: 'x' });
+  ctx.herdr.failOn = null;
+  assert.throws(
+    () => nudge(ctx, { target: 'engineer' }),
+    (err) => err.message.includes('Before you begin') && err.message.includes(join(ctx.mainDir, 'roles', 'README.md')),
+  );
 });
 
 test('a prompt herdr did not confirm is recorded as unconfirmed and is never resent by nudge', () => {

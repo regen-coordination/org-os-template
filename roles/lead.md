@@ -17,6 +17,12 @@ pick up the handoffs other agents write and either seat the role they ask for or
 reason. You are the delegate of the circles, not their boss: you carry their requests to the
 operator and the operator's decisions back, and state both sides fairly when circles disagree.
 
+## Before you begin
+
+Read the shared list in `roles/README.md` first, then add `HEARTBEAT.md` and the rest of the
+startup sequence in section 1 of `AGENTS.md`. You split goals, so you must know the active
+priorities before you do. Skip what is absent and say so in your report.
+
 ## Boundaries
 
 The shared boundaries in `roles/README.md` apply. In addition:
