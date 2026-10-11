@@ -59,14 +59,26 @@ export function createGit(mainDir) {
         .filter((line) => line.trim() !== '' && !/^!! (.*\/)?node_modules\/$/.test(line));
     },
     /**
-     * In a detached worktree: if HEAD is on no branch, create `branch` there and
-     * return its name; otherwise return null.
+     * In a detached worktree: if HEAD is on no branch, create a branch there and
+     * return its name; otherwise return null. `branch` is the name to use; when
+     * it is taken (an earlier rescue of the same worktree) a numeric suffix is
+     * added, so an earlier rescue branch is never moved.
      */
     rescueDetached(path, branch) {
       const head = git(path, ['rev-parse', 'HEAD']).trim();
       if (git(path, ['for-each-ref', '--contains', head, 'refs/heads']).trim() !== '') return null;
-      git(mainDir, ['branch', branch, head]);
-      return branch;
+      const taken = (name) => {
+        try {
+          git(mainDir, ['show-ref', '--verify', '--quiet', `refs/heads/${name}`]);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      let name = branch;
+      for (let n = 2; taken(name); n += 1) name = `${branch}-${n}`;
+      git(mainDir, ['branch', name, head]);
+      return name;
     },
     // No force flag: git itself refuses a worktree with changes.
     removeWorktree(path) {

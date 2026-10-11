@@ -82,3 +82,23 @@ test('rescueDetached saves commits that are on no branch, and only those', () =>
   assert.equal(sh(repo, 'rev-parse', 'crew/saved').trim(), head);
   assert.equal(git.rescueDetached(copy, 'crew/other'), null, 'now reachable from crew/saved');
 });
+
+test('rescueDetached never moves a branch that exists: commits made after an earlier rescue get a new name', () => {
+  const base = tmp();
+  sh(base, 'init', '-q', '-b', 'main', 'repo');
+  const repo = join(base, 'repo');
+  commit(repo);
+  const copy = join(base, 'copy');
+  sh(repo, 'worktree', 'add', '-q', '--detach', copy, 'main');
+  const git = createGit(repo);
+  commit(copy);
+  assert.equal(git.rescueDetached(copy, 'crew/saved'), 'crew/saved');
+  const first = sh(repo, 'rev-parse', 'crew/saved').trim();
+  commit(copy); // HEAD moves on, and is on no branch again
+  const head = sh(copy, 'rev-parse', 'HEAD').trim();
+  assert.equal(git.rescueDetached(copy, 'crew/saved'), 'crew/saved-2');
+  assert.equal(sh(repo, 'rev-parse', 'crew/saved').trim(), first, 'the first rescue branch is untouched');
+  assert.equal(sh(repo, 'rev-parse', 'crew/saved-2').trim(), head);
+  commit(copy);
+  assert.equal(git.rescueDetached(copy, 'crew/saved'), 'crew/saved-3');
+});
