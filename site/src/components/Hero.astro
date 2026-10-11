@@ -1,12 +1,14 @@
 ---
 // The home page's first screen: what org-os is, who the page is for, and what
 // to do next — two links, and the commands an operator runs most. The commands
-// come from src/data/landing.yaml; test/design-tight.test.mjs holds each one to
-// the repository (a script in the root package.json, or a file in .claude/commands/).
+// come from src/data/landing.yaml, each with the place it is run, printed in
+// words above it. test/command-where.test.mjs holds each one to that place: a
+// command shown for an instance must be in what an instance receives.
 import Button from "./Button.astro";
 import { withBase } from "../lib/base";
+import { WHERE } from "../../scripts/command-where.mjs";
 interface Cta { label: string; href: string; variant: "solid" | "ghost"; }
-interface Command { run: string; where: string; does: string; doc: string; }
+interface Command { run: string; where: keyof typeof WHERE; does: string; doc: string; }
 interface Props { label: string; title: string; subtitle: string; ctas: Cta[]; commands: Command[]; commandsTitle: string; }
 const { label, title, subtitle, ctas, commands, commandsTitle } = Astro.props;
 ---
@@ -23,7 +25,7 @@ const { label, title, subtitle, ctas, commands, commandsTitle } = Astro.props;
       {commands.map((c) => (
         <li>
           <a class="row" href={withBase(c.doc)}>
-            <span class="where label">{c.where}</span>
+            <span class="where label">{WHERE[c.where]}</span>
             <code class="run">{c.run}</code>
             <span class="does">{c.does}</span>
           </a>
@@ -46,10 +48,8 @@ const { label, title, subtitle, ctas, commands, commandsTitle } = Astro.props;
 .panel h2 { font-weight: 500; letter-spacing: var(--tracking-wide); }
 .panel ul { list-style: none; padding: 0; margin-top: var(--space-2); }
 .panel li + li { border-top: var(--border-hair) solid var(--color-line); }
-.row { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); column-gap: var(--space-3); row-gap: 0.15rem;
-  align-items: baseline; padding-block: var(--space-3); color: inherit; }
-.where { grid-row: 1 / span 2; }
-.run { font-size: var(--text-sm); color: var(--color-ink); font-weight: 500; transition: color var(--t-fast); }
+.row { display: grid; row-gap: var(--space-1); padding-block: var(--space-3); color: inherit; }
+.run { overflow-wrap: anywhere; font-size: var(--text-sm); color: var(--color-ink); font-weight: 500; transition: color var(--t-fast); }
 .does { font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); }
 .row:hover .run { color: var(--color-accent); }
 

@@ -111,16 +111,9 @@ test("the first screen offers commands: three, each with what it does and where 
   }
 });
 
-test("every command on the home page exists in the repository", () => {
-  const scripts = JSON.parse(readFileSync(join(REPO, "package.json"), "utf8")).scripts;
-  for (const { run } of landing.commands ?? []) {
-    const npm = run.match(/^npm run ([a-z0-9:-]+)$/);
-    const slash = run.match(/^\/([a-z0-9-]+)$/);
-    if (npm) assert.ok(scripts[npm[1]], `"${run}": the root package.json has no script "${npm[1]}"`);
-    else if (slash) assert.ok(existsSync(join(REPO, ".claude", "commands", `${slash[1]}.md`)), `"${run}": .claude/commands/${slash[1]}.md does not exist`);
-    else assert.fail(`"${run}" is neither "npm run <script>" nor "/<command>"`);
-  }
-});
+// Whether each command exists, and works where the page says to run it, is held
+// by test/command-where.test.mjs: it reads what an instance receives, which the
+// framework's package.json alone cannot say.
 
 test("every command on the home page links to a published docs page", async () => {
   const { pageBySlug } = await import("../src/data/docs-manifest.mjs");
