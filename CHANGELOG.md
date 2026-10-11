@@ -26,10 +26,10 @@ deletes this heading.
     list is there so an agent does not break a boundary a document states. Edit the list in
     `roles/README.md` to change it for your instance.
   - The board has a `STATUS` column (what the assignment's file says) beside `STATE` (what herdr
-    sees now). A `STATUS` of `working (first prompt not sent)` or `working (first prompt
-    unconfirmed)` marks an agent that may never have been told its task. The board also lists
-    "Worktrees left behind", for released assignments whose worktree was kept, and "Sync conflict
-    copies" (below).
+    sees now). A `STATUS` that ends in "first prompt not sent" or "first prompt unconfirmed" marks
+    an agent that may never have been told its task. The board also lists "Worktrees left
+    behind", for released assignments whose worktree was kept, and "Sync conflict copies"
+    (below).
   - `release` says only what is true: whether the branch was kept or never created, and whether
     the worktree was removed or left, and what held it back. Run it again on the same assignment
     after you have dealt with that; a retry never forces removal and refuses an `--outcome` that

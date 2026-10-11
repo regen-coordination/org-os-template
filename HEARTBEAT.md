@@ -47,6 +47,7 @@ Open items. Trail files are in `memory/crew/` of the main checkout; the reports 
 - [ ] **Small plain-language gap in code:** `renderBoard` in `scripts/crew/core.mjs` prints
       "Syncthing kept these … a trail file" without saying what either is; the documents now
       define them. Engineer's, with the next change to that file.
+
 ### Vault-safety guard over-matches `clean` (2026-08-21 — found during tonight's session, not yet fixed)
 
 - [x] ~~**Narrow `scripts/guards/deny-destructive-git.mjs`'s `clean` match to the git verb.**~~ — **done 2026-08-28 (WS-A A6)**: the tokenizer now matches `clean`/`stash`/`reset --hard` only in git *subcommand* position, so pathspecs and commit messages naming them are fine. Dashed libexec binaries, wrapper/chained forms and expansion-as-subcommand stay blocked; regression fixtures both ways in `tests/guards/`. One residual false positive is documented and accepted: a heredoc body that *quotes* a real git command still trips it, because the guard reads the whole command line and cannot tell a command from prose about one.
