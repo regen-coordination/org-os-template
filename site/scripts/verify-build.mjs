@@ -10,7 +10,7 @@ import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
 import { parseRegistry, publicInstance, isOperational, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
-import { registryGuard, findLeaks, visibleText, instanceLine, RUN_LENGTH } from "./registry-leaks.mjs";
+import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, RUN_LENGTH } from "./registry-leaks.mjs";
 import { tablesOutsideRegion } from "../src/lib/table-scroll.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
@@ -145,13 +145,18 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
     token: "a value (a flag or a local path)",
   };
   let leaked = 0;
+  let longest = { length: 0, text: "", file: "" };
   for (const file of textFiles) {
+    const run = longestSharedRun(readFileSync(file, "utf8"), guard);
+    if (run.length > longest.length) longest = { ...run, file };
     for (const leak of findLeaks(readFileSync(file, "utf8"), guard)) {
       leaked++;
       fail(`REGISTRY: ${file} contains ${WHAT[leak.kind]} from a registry field outside the agreed list (${PUBLIC_FIELDS.join(", ")}): "${leak.text}". Remove it from the page; data/instances.yaml is not public text. If a framework document says it, the document is to change (commons-steward), not this check.`);
     }
   }
   if (looked > 0 && leaked === 0) console.log(`registry check: ${guard.sentences.length} private sentences, ${guard.passages.length} notes (any ${RUN_LENGTH} letters in a row of one) and ${guard.tokens.length} flags and local paths from data/instances.yaml looked for in ${textFiles.length} built files, as written and with markup removed: none found`);
+  // The margin under RUN_LENGTH, measured on this build: what the documents share with a note in their own words.
+  if (leaked === 0) console.log(`registry check: the longest run any built file shares with a note is ${longest.length} letters ("${longest.text}", ${longest.file}); an excerpt is ${RUN_LENGTH} or more`);
 }
 
 // ── 4. Links, on every built page (checks 4 and 6) ────────────────────────

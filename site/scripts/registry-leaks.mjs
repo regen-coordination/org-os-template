@@ -14,10 +14,17 @@ import { PUBLIC_FIELDS } from "./federation-aggregate.mjs";
 // Shorter than this, a fragment ("Not yet pushed") could be anyone's words.
 const MIN_LENGTH = 16;
 // A run of this many letters and digits shared with a private note is an excerpt
-// of it: about fifty characters of prose. It cannot be much shorter while the
-// framework's documents describe the same instances in their own words: measured
-// on 2026-10-11, the longest run a built page shares with a note is 39 letters
-// (docs/ECOSYSTEM.md, "acceptance-test instance for clone:framework"), then 32.
+// of it: about fifty characters of prose. Two measurements set it (2026-10-11;
+// test/registry-leaks.test.mjs records both and fails when the second moves):
+//   32  the longest run any built file shares with a note today. It is the path
+//       of a public file, tests/fixtures/bread-coop-config.yaml, which
+//       docs/ECOSYSTEM.md cites and a note also names. verify-build.mjs prints
+//       this number at every build.
+//   36  the longest single name (a path, an address) inside a note. A document
+//       may cite that name on its own account, as CHANGELOG.md does, without
+//       quoting the note, so a threshold of 36 or less would fail a build on a name.
+// 40 is that name and four letters more: room for one joining word beside it
+// ("at", "in", "the"), and not for a second word of the note's own.
 export const RUN_LENGTH = 40;
 // A one-word value is looked for when it has a `_` or a `/` in it and is at least
 // this long: a drift flag (no_masterplan), a local path (../refi-bcn-os).
@@ -90,6 +97,7 @@ export function registryGuard(entries) {
   const sentences = new Set();
   const tokens = new Set();
   const passages = [];
+  const notes = [];
   for (const entry of entries) {
     for (const [field, value] of Object.entries(entry)) {
       if (PUBLIC_FIELDS.includes(field)) continue;
@@ -104,6 +112,7 @@ export function registryGuard(entries) {
           if (bare.length >= MIN_LENGTH) sentences.add(bare);
         }
         const p = passage(text);
+        notes.push(p);
         if (p.squeezed.length >= RUN_LENGTH) passages.push(p);
       }
     }
@@ -115,7 +124,7 @@ export function registryGuard(entries) {
       if (!runs.has(run)) runs.set(run, { index, i });
     }
   }
-  return { sentences: [...sentences], tokens: [...tokens], passages, runs };
+  return { sentences: [...sentences], tokens: [...tokens], passages, runs, notes };
 }
 
 const WORD_CHAR = /[\p{L}\p{N}_]/u;
@@ -166,6 +175,49 @@ export function findLeaks(builtText, guard) {
     }
   }
   return [...leaks.values()];
+}
+
+// The longest run of letters and digits one built file shares with any private
+// free text, read as findLeaks reads it: { length, text }, the text in the
+// registry's words. This is the measurement RUN_LENGTH is set from; the verifier
+// prints it at every build, so the margin is seen when a document moves.
+export function longestSharedRun(builtText, guard) {
+  const written = unescape(builtText);
+  const readings = [written];
+  if (written.includes("<")) readings.push(written.replace(/<[^>]*>/g, " "));
+  let best = { length: 0, text: "" };
+  for (const reading of readings) {
+    const squeezed = squeeze(normalize(reading));
+    // Is a run of `length` letters shared? If so, where in which note.
+    const shared = (length) => {
+      const grams = new Map();
+      for (const note of guard.notes) {
+        for (let i = 0; i + length <= note.squeezed.length; i++) {
+          const gram = note.squeezed.slice(i, i + length);
+          if (!grams.has(gram)) grams.set(gram, { note, i });
+        }
+      }
+      if (grams.size === 0) return null;
+      for (let i = 0; i + length <= squeezed.length; i++) {
+        const hit = grams.get(squeezed.slice(i, i + length));
+        if (hit) return hit;
+      }
+      return null;
+    };
+    // A shared run of n letters holds a shared run of every shorter length: search by halves.
+    let low = best.length, high = Math.max(0, ...guard.notes.map((n) => n.squeezed.length));
+    let found = null;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      const hit = shared(mid);
+      if (hit) { low = mid; found = hit; } else high = mid - 1;
+    }
+    if (found && low > best.length) {
+      const { note, i } = found;
+      best = { length: low, text: note.source.slice(note.at[i], note.at[i + low - 1] + 1) };
+    }
+  }
+  return best;
 }
 
 export function visibleText(html) {

@@ -3,7 +3,9 @@
 // to dist/.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { registryGuard, findLeaks, visibleText, instanceLine, RUN_LENGTH } from "../scripts/registry-leaks.mjs";
+import { readFileSync } from "node:fs";
+import { parseRegistry } from "../scripts/federation-aggregate.mjs";
+import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, RUN_LENGTH } from "../scripts/registry-leaks.mjs";
 
 const LONG = "Nested instance — lives at another-os/repos/x as a linked repo with its OWN git remote, on branch x-os, and every drift report before this entry was blind to it because the 'instances tracked' count never looked there.";
 const ENTRY = {
@@ -146,4 +148,60 @@ test("visibleText strips tags and decodes entities", () => {
 test("instanceLine is the only text an instance may have on the federation page", () => {
   assert.equal(instanceLine({ name: "ReFi X", type: "LocalNode", repo: "https://example.com/x" }), "ReFi X LocalNode repository");
   assert.equal(instanceLine({ name: "Bare", type: "Project", repo: null }), "Bare Project");
+});
+
+// ── the measurement RUN_LENGTH is set from ───────────────────────────────
+
+test("longestSharedRun measures the longest run of letters a text shares with a note, and quotes the note", () => {
+  // "resolve before sync" is 17 letters; with "It lives at the root" nothing longer is shared.
+  const short = longestSharedRun("<p>Commit your work and resolve before sync. It lives at the root.</p>", guard);
+  assert.equal(short.length, "resolvebeforesync".length);
+  assert.equal(short.text, "resolve before sync");
+  // through markup, case and an entity, like findLeaks
+  const marked = longestSharedRun("<p>THE <b>working</b> tree&nbsp;carries about</p>", guard);
+  assert.equal(marked.length, "theworkingtreecarries".length);
+  assert.equal(marked.text, "The working tree carries");
+  // a note of any length counts, not only those long enough to hold an excerpt
+  const g = registryGuard([{ name: "A", notes: "a brief private note" }]);
+  assert.equal(longestSharedRun("it was a brief private matter", g).length, "abriefprivate".length);
+  assert.deepEqual(longestSharedRun("12345 !!!", g), { length: 0, text: "" });
+});
+
+test("a run at the length of an excerpt is a leak, and one letter shorter is not: the measure and the check agree", () => {
+  const cut = (letters) => { let n = 0, i = 0; while (n < letters) { if (/[\p{L}\p{N}]/u.test(LONG[i])) n++; i++; } return LONG.slice(0, i); };
+  const under = `<p>${cut(RUN_LENGTH - 1)}</p>`;
+  const at = `<p>${cut(RUN_LENGTH)}</p>`;
+  assert.equal(longestSharedRun(under, guard).length, RUN_LENGTH - 1);
+  assert.deepEqual(findLeaks(under, guard), []);
+  assert.equal(longestSharedRun(at, guard).length, RUN_LENGTH);
+  assert.deepEqual(kinds(findLeaks(at, guard)), ["passage"]);
+});
+
+// ── why RUN_LENGTH is what it is ─────────────────────────────────────────
+// Measured on 2026-10-11 on the real build, after docs/ECOSYSTEM.md stopped
+// restating the registry's notes (b65fd8d): the longest run any built file
+// shares with a note is 32 letters, "tests/fixtures/bread-coop-config.yaml" in
+// dist/docs/ecosystem/index.html, the path of a public file that the document
+// cites and a note also names. `npm run build` prints the current number
+// ("registry check: the longest run any built file shares with a note is …").
+const MEASURED_ON_THE_BUILD = 32;
+// A name is one unbroken word of a note: a path, an address, an identifier. A
+// document can cite it without quoting the note, so the check must let it pass.
+const JOINING_WORD = 4;
+
+test("RUN_LENGTH is the longest single name in the registry's notes and room for one joining word, no more", () => {
+  const real = registryGuard(parseRegistry(readFileSync(new URL("../../data/instances.yaml", import.meta.url), "utf8")));
+  assert.ok(real.notes.length >= 8, `only ${real.notes.length} free texts read from data/instances.yaml`);
+  const squeezed = (word) => word.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").length;
+  const longestName = Math.max(...real.notes.flatMap((n) => n.source.split(/\s+/).map(squeezed)));
+  assert.equal(longestName, 36, "the longest name in a note changed: set RUN_LENGTH to it plus the joining word, and say so in scripts/registry-leaks.mjs");
+  assert.equal(RUN_LENGTH, longestName + JOINING_WORD);
+  assert.ok(RUN_LENGTH > MEASURED_ON_THE_BUILD, "the build would fail on what the documents say today");
+});
+
+test("a name from a note, cited with one joining word, is not an excerpt; with the note's next words it is", () => {
+  const g = registryGuard([{ name: "A", notes: "Nested instance that lives at another-organisation-os/repos/a-long-toolkit as a linked repository of its own." }]);
+  assert.equal("anotherorganisationosreposalongtoolkit".length, 38);
+  assert.deepEqual(findLeaks("<p>See <code>another-organisation-os/repos/a-long-toolkit</code> in the changelog.</p>", g), []);
+  assert.deepEqual(kinds(findLeaks("<p>It lives at another-organisation-os/repos/a-long-toolkit as a linked repository.</p>", g)), ["passage"]);
 });
