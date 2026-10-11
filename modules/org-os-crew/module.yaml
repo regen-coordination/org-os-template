@@ -20,6 +20,7 @@ files:
   skills/crew: skills/crew
   tests/helpers/crew-fixtures.mjs: tests/helpers/crew-fixtures.mjs
   tests/scripts/crew-board.test.mjs: tests/scripts/crew-board.test.mjs
+  tests/scripts/crew-cli-seat.test.mjs: tests/scripts/crew-cli-seat.test.mjs
   tests/scripts/crew-cli.test.mjs: tests/scripts/crew-cli.test.mjs
   tests/scripts/crew-flow.test.mjs: tests/scripts/crew-flow.test.mjs
   tests/scripts/crew-git.test.mjs: tests/scripts/crew-git.test.mjs

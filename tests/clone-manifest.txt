@@ -246,6 +246,7 @@ tests/quilt-view.test.mjs
 tests/render.test.mjs
 tests/repo-paths.test.mjs
 tests/scripts/crew-board.test.mjs
+tests/scripts/crew-cli-seat.test.mjs
 tests/scripts/crew-cli.test.mjs
 tests/scripts/crew-flow.test.mjs
 tests/scripts/crew-git.test.mjs
