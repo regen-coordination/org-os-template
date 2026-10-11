@@ -42,13 +42,17 @@ at the root of your own worktree, before you start the brief:
 
 Why these four: the mandate and priorities, the values and boundaries, what is active now, and
 the decision record that `MEMORY.md` names as authoritative. A task that looks local often
-touches a boundary stated there. `DECISIONS.md` is long and newest first: read its top entries
-and every entry your brief touches, not the whole file.
+touches a boundary stated there. `DECISIONS.md` is long and newest first: read its newest three
+entries, then search the file for words in your brief and read each entry that matches. You do not
+need the whole file.
 
 Read what exists. Instances differ and a new one may hold only a stub; a missing file is skipped,
 not an error, and nothing refuses to seat you for it. Name in your report what you read and what
 was absent. A role file may add files to this list and never shortens it. To change the list for
-your instance, edit this section; no code needs to change.
+your instance, edit this section. The launcher only names this section in the first prompt and does not read the list, so no
+launcher code changes. One test does read it: `tests/scripts/crew-shipped-roles.test.mjs` checks that the section still names the
+four files above and that every file it names exists, so an instance that removes one of the
+four from its list must change that test too.
 
 ## Shared boundaries
 
