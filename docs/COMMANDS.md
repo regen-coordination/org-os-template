@@ -259,16 +259,34 @@ Access at `http://localhost:3000` after running.
 ### Crew — Role-Based Agents in herdr
 
 ```bash
-npm run crew                                  # The board: seated agents, open handoffs
+npm run crew                                  # The board: seated agents, open handoffs, what needs attention
+npm run crew -- board --json                  # The same data, for scripts
 npm run crew -- seat <role> "<brief>"         # Seat an agent in a role, in its own worktree
-npm run crew -- release <agent>               # Close an assignment; its branch is kept
+npm run crew -- seat <role> "<brief>" --task <id> --base <ref> --on <branch> --handoff <id|file>
+                                              # Options: record a task, branch from <ref>, review a branch on a detached copy, answer a handoff
+npm run crew -- nudge <agent|assignment>      # Send the first prompt to an agent that stopped at a startup dialog
+npm run crew -- release <agent|assignment> [--outcome done|abandoned]
+                                              # Close an assignment; its branch is kept; the worktree is removed only if nothing in it would be lost
+npm run crew -- handoff-close <id|file> --reason "<text>"   # Decline an open handoff
+npm run crew -- report [--file <path>]        # Agents only: append a report to their assignment
+npm run crew -- handoff <role> "<brief>" [--branch <branch>]  # Agents only: ask another role to take something on
 ```
 
-Runs inside [herdr](https://herdr.dev) only. Full guide: [`docs/CREW.md`](CREW.md).
+A brief that starts with a dash is read as an option; put `--` before it, after any flags:
+`npm run crew -- seat <role> [--task <id>] -- "<brief>"`.
+
+Runs inside [herdr](https://herdr.dev) only; every command refuses outside it. `report` and
+`handoff` are for a seated agent, which runs them with the command written in its assignment
+file. Full guide: [`docs/CREW.md`](CREW.md).
 
 ---
 
 ### Paperclip Integration
+
+The framework's own agent team no longer runs on Paperclip; it runs through
+[crew](#crew--role-based-agents-in-herdr) (`DECISIONS.md`, 2026-10-10). These scripts remain
+until the Paperclip surfaces are removed in 0.6.0 (`DECISIONS.md`, 2026-08-29, and
+[the crew spec](superpowers/specs/2026-10-10-org-os-crew-design.md), section 11).
 
 ```bash
 npm run paperclip          # Run Paperclip app dev server
