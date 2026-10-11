@@ -220,7 +220,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
       }
     }
   } catch (err) {
-    updateRecord(file, { status: 'failed', failed_step: step, error: String(err.message || err), updated: stamp(ctx) });
+    updateRecord(file, { status: 'failed', failed_step: step, error: String(err.message || err), ...(err.code ? { error_code: String(err.code) } : {}), updated: stamp(ctx) });
     throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });

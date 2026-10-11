@@ -135,6 +135,7 @@ test('a failure starting the agent is recorded with the pane that was created', 
   const [a] = readTrail(ctx.mainDir).assignments;
   assert.equal(a.status, 'failed');
   assert.equal(a.failed_step, 'start');
+  assert.equal(a.error_code, 'timeout');
   assert.equal(a.pane, 'x1:p1');
 });
 
