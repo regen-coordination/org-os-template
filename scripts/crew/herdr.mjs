@@ -59,6 +59,10 @@ const isPaneBusy = (err) =>
   err instanceof HerdrError &&
   (err.code === PANE_BUSY || (!KNOWN_START_CODES.has(err.code) && /not an available shell/i.test(err.message)));
 
+// The `--source` crew reports metadata under (spec 5.3 item 13).
+const LABEL_SOURCE = 'crew';
+const tokenArgs = (tokens) => Object.entries(tokens).flatMap(([name, value]) => ['--token', `${name}=${value}`]);
+
 function pause(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
@@ -247,6 +251,17 @@ export function createHerdr({
     },
     promptAgent(name, text) {
       run(['agent', 'prompt', name, text]);
+    },
+    /**
+     * Display-only labels, shown where the operator's herdr config lists them.
+     * `source` names crew as the reporter; no ttl, so a label lasts as long as
+     * the pane. Short timeout: a label is never worth a minute of waiting.
+     */
+    labelPane(paneId, tokens) {
+      look(['pane', 'report-metadata', '--source', LABEL_SOURCE, ...tokenArgs(tokens), paneId]);
+    },
+    labelWorkspace(workspaceId, tokens) {
+      look(['workspace', 'report-metadata', '--source', LABEL_SOURCE, ...tokenArgs(tokens), workspaceId]);
     },
     /** The checkout a workspace is open on, or null when it is not a worktree workspace. */
     workspaceCheckout(workspaceId) {

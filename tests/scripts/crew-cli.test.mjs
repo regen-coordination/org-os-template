@@ -120,3 +120,12 @@ test('a brief that starts with a dash says to put -- before it, and works with i
   const h = run(['--help']);
   assert.match(h.stdout, /starts with a dash/);
 });
+
+test('the nudge help line is true of every cause that leaves a prompt unsent, not only a startup dialog', () => {
+  const r = run(['--help']);
+  const line = r.stdout.split('\n').find((l) => l.trimStart().startsWith('nudge '));
+  assert.ok(line, r.stdout);
+  assert.match(line, /that has not received it/);
+  assert.doesNotMatch(line, /startup dialog/);
+  assert.ok(line.length <= 110, `the line is ${line.length} characters`);
+});

@@ -25,14 +25,7 @@ Open items. The files these items cite are in `memory/crew/` of the main checkou
 `## Report` sections. They are committed by the operator at session close, so on another checkout
 they may not exist yet.
 
-- [ ] **Fix F-1 first — the advice after a timed-out worktree step is a dead end.** After
-      `worktree create` times out, `release` closes the record as `released` with
-      `worktree_removed: true`, and a second `release <id>` answers "No open assignment matches"
-      while herdr may still finish the worktree. Same output also says the branch "was never
-      created" and "may still have been creating". `scripts/crew/core.mjs` (message, record
-      write). Engineer's work; the code is wrong, not the docs. File in `memory/crew/`:
-      `2026-10-10-reviewer-review-the-herdr-adapter-rewrite-before.md`.
-- [ ] **F-2 to F-4 of the same review** (minor): a failed look replaces `agent_name_taken` with the
+- [ ] **F-2 to F-4 of the adapter review** (minor): a failed look replaces `agent_name_taken` with the
       look's own error (`scripts/crew/herdr.mjs`); seat prints nothing while it waits up to 30
       seconds and the documented bound understates the whole step; a closed record whose worktree
       is gone and `worktree_removed: false` is not on the board, a failed record's board line
@@ -47,9 +40,6 @@ they may not exist yet.
       reviewers a read-only herdr session or a recorded transcript of `agent start` failures
       (reviewer's); put the branches in flight in every documentation brief (commons-steward's).
       Files in `memory/crew/`: the three `2026-10-10-*-present-yourself-*.md`, item 6 of each.
-- [ ] **Small plain-language gap in code:** `renderBoard` in `scripts/crew/core.mjs` prints
-      "Syncthing kept these … a trail file" without saying what either is; the documents now
-      define them. Engineer's, with the next change to that file.
 
 ### Vault-safety guard over-matches `clean` (2026-08-21 — found during tonight's session, not yet fixed)
 

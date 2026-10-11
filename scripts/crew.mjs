@@ -22,7 +22,7 @@ const USAGE = `Usage: npm run crew -- <command>
                                                 --on seats a detached copy of a branch (review);
                                                 --base starts a new branch from a ref, and wins over
                                                 a handoff's branch. Not both.
-  nudge <agent|assignment>                      Send the first prompt to an agent that stopped at a startup dialog
+  nudge <agent|assignment>                      Send the first prompt to an agent that has not received it
   release <agent|assignment> [--outcome done|abandoned]
                                                 Close an assignment; remove its worktree if it has no changes
   report [--file <path>]                        (agents) Append a report to your assignment; reads stdin without --file
@@ -157,6 +157,7 @@ function main(argv) {
       }
       const a = report(ctx, { text });
       console.log(`Report recorded on ${a.id}.`);
+      for (const line of a.notes) console.log(line);
       return;
     }
     case 'handoff': {

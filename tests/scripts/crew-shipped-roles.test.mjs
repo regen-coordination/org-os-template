@@ -41,21 +41,45 @@ test('roles/README.md exists', () => {
   assert.ok(existsSync(join(rootDir, 'roles', 'README.md')));
 });
 
-// The "Before you begin" list is read by every seat. It is prose, so the test
-// reads the backticked names in the section and checks each one exists here.
+// The "Before you begin" list is read by every seat. The files it lists are the
+// backticked names on its bullet lines. Prose in the section may mention a file
+// too (DECISIONS.md is named in the paragraph after the list), so only the
+// bullets count: deleting a bullet must fail the test, not be hidden by prose.
 function beforeYouBegin() {
   const text = readFileSync(join(rootDir, 'roles', 'README.md'), 'utf-8');
   const m = text.match(/^## Before you begin\n([\s\S]*?)(?=^## )/m);
   return m ? m[1] : null;
 }
 
+function listedFiles(section) {
+  return section
+    .split('\n')
+    .filter((line) => /^\s*[-*] /.test(line))
+    .flatMap((line) => [...line.matchAll(/`([A-Za-z0-9_.\/-]+\.(?:md|yaml))`/g)].map((m) => m[1]));
+}
+
+const SHARED_LIST = ['MASTERPLAN.md', 'SOUL.md', 'MEMORY.md', 'DECISIONS.md'];
+
 test('roles/README.md has a "Before you begin" section that names files which exist', () => {
   const section = beforeYouBegin();
   assert.ok(section, 'roles/README.md has lost its "## Before you begin" section');
-  const files = [...section.matchAll(/`([A-Za-z0-9_.\/-]+\.(?:md|yaml))`/g)].map((m) => m[1]);
-  assert.ok(files.length >= 3, `the section names ${files.length} files`);
-  for (const f of files) assert.ok(existsSync(join(rootDir, f)), `"Before you begin" names ${f}, which does not exist`);
-  for (const f of ['MASTERPLAN.md', 'SOUL.md', 'MEMORY.md', 'DECISIONS.md']) assert.ok(files.includes(f), `the shared list lost ${f}`);
+  const files = listedFiles(section);
+  assert.ok(files.length >= 3, `the section lists ${files.length} files`);
+  for (const f of files) assert.ok(existsSync(join(rootDir, f)), `"Before you begin" lists ${f}, which does not exist`);
+  for (const f of SHARED_LIST) assert.ok(files.includes(f), `the shared list lost ${f}`);
+});
+
+test('the list check fails when a bullet is removed, even though prose still names the file', () => {
+  const section = beforeYouBegin();
+  assert.ok(section.includes('`DECISIONS.md` is long'), 'the prose that names DECISIONS.md is gone, so this test proves nothing');
+  const withoutBullet = section
+    .split('\n')
+    .filter((line) => line.trim() !== '- `DECISIONS.md`')
+    .join('\n');
+  assert.notEqual(withoutBullet, section, 'the DECISIONS.md bullet was not found to remove');
+  assert.ok(withoutBullet.includes('`DECISIONS.md`'), 'prose still names the file');
+  assert.ok(!listedFiles(withoutBullet).includes('DECISIONS.md'));
+  assert.ok(listedFiles(section).includes('DECISIONS.md'));
 });
 
 test('a role may add to the Before you begin list; lead adds HEARTBEAT.md and AGENTS.md', () => {

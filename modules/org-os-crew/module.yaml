@@ -24,6 +24,7 @@ files:
   tests/scripts/crew-flow.test.mjs: tests/scripts/crew-flow.test.mjs
   tests/scripts/crew-git.test.mjs: tests/scripts/crew-git.test.mjs
   tests/scripts/crew-herdr.test.mjs: tests/scripts/crew-herdr.test.mjs
+  tests/scripts/crew-label.test.mjs: tests/scripts/crew-label.test.mjs
   tests/scripts/crew-roles.test.mjs: tests/scripts/crew-roles.test.mjs
   tests/scripts/crew-seat.test.mjs: tests/scripts/crew-seat.test.mjs
   tests/scripts/crew-shipped-roles.test.mjs: tests/scripts/crew-shipped-roles.test.mjs

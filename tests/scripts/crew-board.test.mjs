@@ -537,3 +537,79 @@ test('a herdr timeout while looking up the workspace says that was what was aske
   second.ctx.herdr.failOn = { method: 'removeWorktree', code: 'herdr_timeout', message: 'no answer' };
   assert.match(release(second.ctx, { target: second.eng.id }).left[0], /asked to remove the worktree/);
 });
+
+test('the Syncthing line says what Syncthing is and what the file is, without the word trail', () => {
+  const { ctx, eng } = crew();
+  const name = `${eng.id}.sync-conflict-20261010-203105-ABCDEFG.md`;
+  writeFileSync(join(trailDir(ctx.mainDir), name), readFileSync(join(trailDir(ctx.mainDir), `${eng.id}.md`)));
+  const text = renderBoard(board(ctx), ctx.now());
+  const line = text.split('\n').find((l) => l.includes('Syncthing'));
+  assert.ok(line, text);
+  assert.match(line, /file-sync tool \(Syncthing\)/);
+  assert.match(line, /assignment file in memory\/crew\//);
+  assert.doesNotMatch(line, /trail/);
+});
+
+test('the board example in spec section 8 is exactly what renderBoard prints', () => {
+  const spec = readFileSync(join(import.meta.dirname, '..', '..', 'docs', 'superpowers', 'specs', '2026-10-10-org-os-crew-design.md'), 'utf-8');
+  const section = spec.slice(spec.indexOf('## 8. The board'));
+  const example = section.match(/```\n(AGENT[\s\S]*?)```/)[1];
+  const now = new Date('2026-10-10T12:00:00Z');
+  const ago = (minutes) => new Date(now.getTime() - minutes * 60000).toISOString();
+  const b = {
+    rows: [
+      { agent: 'reviewer', role: 'reviewer', state: 'blocked', status: 'working', prompted: true, created: ago(3),
+        brief: 'Review the cursor fix, and say whether it is safe to merge', branch: 'crew/2026-10-10-engineer-fix-the-cursor-race-in-kms' },
+      { agent: 'engineer', role: 'engineer', state: 'idle', status: 'reported', prompted: true, created: ago(18),
+        brief: 'Fix the cursor race in the kms ingest', branch: 'crew/2026-10-10-engineer-fix-the-cursor-race-in-kms' },
+    ],
+    handoffs: [{ from_role: 'engineer', to_role: 'researcher', brief: 'Confirm what the cursor contract promises' }],
+    needsRelease: [{ id: '2026-10-09-researcher-ibge-terms', status: 'working' }],
+    leftBehind: [{ id: '2026-10-09-engineer-ingest-retry', status: 'released', worktree: '/Users/alex/.org-os/worktrees/org-os/2026-10-09-engineer-ingest-retry' }],
+    conflicts: ['2026-10-10-engineer-fix-the-cursor.sync-conflict-20261010-221500-ABCDEFG.md'],
+    unreadable: ['notes.md'],
+  };
+  assert.equal(`${example}`, renderBoard(b, now));
+});
+
+test('a worktree step that timed out leaves the record open to a second release, which finishes it', () => {
+  const { ctx } = crew();
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'x' }));
+  ctx.herdr.failOn = null;
+  const failed = readTrail(ctx.mainDir).assignments.find((a) => a.status === 'failed');
+
+  const first = release(ctx, { target: failed.id });
+  const text = releaseLines(first).join('\n');
+  // the output does not contradict itself, and does not leave an empty "left at" list
+  assert.doesNotMatch(text, /never created/);
+  assert.doesNotMatch(text, /was left at/);
+  assert.match(text, new RegExp(`branch ${failed.branch} does not exist now`));
+  assert.match(text, /run release again/);
+  assert.equal(first.assignment.status, 'released');
+  assert.equal(first.assignment.worktree_removed, false);
+
+  // herdr finishes after release stopped waiting: the worktree appears
+  mkdirSync(failed.worktree, { recursive: true });
+  const second = release(ctx, { target: failed.id });
+  assert.equal(second.removed, true);
+  assert.equal(second.worktreeExisted, true);
+  assert.ok(!existsSync(failed.worktree));
+  assert.equal(readTrail(ctx.mainDir).assignments.find((a) => a.id === failed.id).worktree_removed, true);
+  assert.throws(() => release(ctx, { target: failed.id }), /No open assignment matches/);
+});
+
+test('a second release after a timed-out worktree step, with still nothing there, closes the record and says so truthfully', () => {
+  const { ctx } = crew();
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'x' }));
+  ctx.herdr.failOn = null;
+  const failed = readTrail(ctx.mainDir).assignments.find((a) => a.status === 'failed');
+  release(ctx, { target: failed.id });
+  const second = release(ctx, { target: failed.id });
+  assert.equal(second.removed, true);
+  const text = releaseLines(second).join('\n');
+  assert.match(text, /still no worktree at/);
+  assert.doesNotMatch(text, /after the earlier release stopped waiting for herdr/);
+  assert.equal(readTrail(ctx.mainDir).assignments.find((a) => a.id === failed.id).worktree_removed, true);
+});

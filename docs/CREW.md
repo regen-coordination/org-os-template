@@ -65,7 +65,9 @@ release", and `release` closes it. A timed-out call is never retried.
 name what may be left: the branch `crew/<id>`, the checkout directory and a herdr workspace
 labelled with the agent's name. Crew never learns that workspace's id, so `release` cannot close
 it: close it in herdr yourself. After a timeout wait a little before `release`, since herdr may
-still be creating the worktree.
+still be creating the worktree. If it was a timeout, `release` leaves the record open to one more
+`release`: run it again later, and it removes the worktree if herdr made one, or says there is
+still none and closes the record. A branch that appeared in between is kept.
 
 **If herdr did not confirm the first prompt** (it timed out or failed after being sent), the
 command says it "may or may not have arrived". Look at the agent's pane: crew never resends,
@@ -110,6 +112,49 @@ Open handoffs: 1
 - **Worktrees left behind** lists released or abandoned assignments whose worktree release kept
   because it had changes in it, or because it could not be removed or its commits could not be
   saved. Run `release` on one again after you have dealt with what the command listed.
+
+## See the crew in herdr's sidebar
+
+herdr's sidebar already lists every agent of every workspace, crew's among yours. Crew labels each
+one so you can tell which is which without opening the board. When it seats an agent, crew
+reports three display-only values to herdr for the agent's pane, and two for its workspace:
+
+| Value        | Shows                                                              | On                |
+| ------------ | ------------------------------------------------------------------ | ----------------- |
+| `role`       | the role id, such as `engineer`                                    | pane and workspace |
+| `assignment` | the first line of the brief, cut to 32 characters like the board   | pane and workspace |
+| `status`     | `working`, then `reported` when the agent runs `report`            | pane only          |
+
+Nothing shows until you ask herdr to. herdr's own config file is yours and crew never edits it.
+**This is your edit, in `~/.config/herdr/config.toml`:**
+
+```toml
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "workspace", "tab"],
+  ["$role", "$status"],
+  ["$assignment"],
+]
+
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", "workspace"],
+  ["$role", "$assignment"],
+  ["branch", "git_status"],
+]
+```
+
+Those are herdr's default rows with the label lines added; adjust them to taste. A `$name` row
+shows only on agents and workspaces that have the value, so your own agents are unchanged. Check
+the file with `herdr config check`.
+
+- A label is display only. If herdr refuses it, `seat` still seats the agent and says on one
+  line that the label could not be set; the board and the assignment file are unaffected.
+- `status` follows the assignment: `working` at seat, `reported` when the agent reports. It is not
+  the live state, which herdr already shows with the icon. Crew does not change it at `release`,
+  because release closes the workspace and the label goes with it, and it does not label a
+  seating that failed.
+- Labels last as long as the pane. Crew does not set them again after a herdr restart.
 
 ## Let a lead coordinate
 
@@ -179,6 +224,10 @@ usage. Use a throwaway brief.
 4. `npm run crew` while it works → one row, state `working`, then `idle` or `done`.
 5. When it reports: the assignment file in `memory/crew/` ends with a `## Report` section and
    its status is `reported`.
+   **Label check** (needs the config lines from "See the crew in herdr's sidebar"): the agent's
+   row in herdr's sidebar shows `engineer`, `Smoke run. Create SMOKE.md containing…` and
+   `working`, then `reported`. `herdr agent get engineer` is the read-only way to look; if the
+   sidebar shows nothing, the tokens are the first thing to inspect there.
 6. `npm run crew -- release engineer` → says the branch is kept and the worktree was removed.
    Releasing an assignment whose seating failed says instead that there was no branch or
    worktree.

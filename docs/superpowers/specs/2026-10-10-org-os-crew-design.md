@@ -211,6 +211,11 @@ Steps, in order:
    report and begin; then begin. The prompt is one line. `nudge` sends the same prompt, and the
    "type this yourself" text of an unconfirmed prompt carries the same sentence. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
+8. **Label the pane and the workspace** (5.3 item 13): role, a short assignment and the status, as
+   display-only herdr metadata. A refusal never fails the seat and never changes the record; the
+   output says in one line that the label could not be set. `report` moves the pane's `status` to
+   `reported` with one more call. `release` sets nothing: it closes the workspace, and the label
+   goes with it.
 
 Worktrees sit outside the repository on purpose. Instances often live inside a synced vault, and
 a worktree inside it would be copied to every device.
@@ -254,6 +259,12 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
   remove it, git is not used and the worktree is left. The reason names what was asked, and
   `release` again finishes it. After the removal request herdr may still be doing it; after the
   question nothing was removed.
+- A failed seating whose worktree step timed out (`failed_step: worktree`, `error_code:
+  herdr_timeout`) and whose worktree is not there yet is released with `worktree_removed:
+  false`, so the same `release <id>` finds it again: it removes the worktree if herdr made one
+  since, or, finding none, says so and sets `worktree_removed: true`. The first release does
+  not say the branch "was never created" when `may_remain` names it: it says the branch does
+  not exist now and may still appear.
 - A closed assignment whose record says `worktree_removed: false` but whose worktree is gone
   (herdr finished after release stopped waiting) is found by `release <id>`: the record is set to
   `worktree_removed: true` and the command says the worktree was already removed. Nothing is
@@ -329,6 +340,22 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
     after it stopped waiting, so the failed record names these in `may_remain` and the operator
     closes the workspace in herdr.
 
+13. **Labels.** `herdr pane report-metadata <pane> --source crew --token role=… --token
+    assignment=… --token status=…` and `herdr workspace report-metadata <workspace> --source crew
+    --token role=… --token assignment=…` (CLI reference at the `v0.9.1` tag; the installed
+    binary's `--help` lists the same options, and its schema gives at most 16 tokens, names
+    `[A-Za-z0-9_-]{1,32}` and a `ttl_ms` of at most 86 400 000). From the reference, not
+    observed: token values are trimmed and cut at 80 characters, a token call patches only the
+    names it gives, a token with no `--ttl-ms` stays until replaced or the pane closes, and a
+    pane or workspace accepts at most 32 distinct sources. Crew uses the tokens `role`,
+    `assignment` and `status`; the assignment is the first non-empty line of the brief, cut to
+    32 characters (the board's column), not herdr's 80, so a row stays one line. It sends no
+    `--ttl-ms` and no `--seq`. The workspace gets `role` and `assignment` only, since its
+    `status` would go stale. Every update sends the whole set. Tokens show only where the
+    operator's `[ui.sidebar.agents]` and `[ui.sidebar.spaces]` rows list `$role`, `$assignment`
+    and `$status`; that is the operator's own edit of `config.toml` (`docs/CREW.md`), which crew
+    never makes.
+
 Not verified against a live herdr, because each needs an experiment that changes herdr's state;
 they are in the smoke run of `docs/CREW.md`:
 
@@ -339,7 +366,10 @@ they are in the smoke run of `docs/CREW.md`:
 - that the installed 0.9.1 binary is built from the `v0.9.1` source tag;
 - what git leaves on a killed `git worktree add`;
 - which code `agent get <pane>` or `agent list` gives for a pane with no agent (crew uses the
-  list and reads no code from it).
+  list and reads no code from it);
+- that the installed binary accepts and shows the label tokens as the reference says, that
+  `herdr agent get <name>` returns them, and that a herdr restart keeps or drops them (crew does
+  not set them again). The smoke run in `docs/CREW.md` has the live check.
 
 ## 6. The trail
 
@@ -447,7 +477,7 @@ Worktrees left behind: 1
 
 Sync conflict copies: 1
   2026-10-10-engineer-fix-the-cursor.sync-conflict-20261010-221500-ABCDEFG.md
-  Syncthing kept these when two machines changed a trail file at once. They are not read as records; merge them by hand and delete them.
+  Your file-sync tool (Syncthing) kept these when two machines changed the same assignment file in memory/crew/ at once. They are not read as records; merge them by hand and delete them.
 
 Could not read: notes.md
 ```

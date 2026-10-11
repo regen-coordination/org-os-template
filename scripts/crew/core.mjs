@@ -124,7 +124,7 @@ function assignmentBody(ctx, brief, role, named = null) {
         '  A brief that starts with a dash goes after `--`, after any flags: `seat <role> [--task <id>] -- "<brief>"`.',
         '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
         '  With `--handoff`, a handoff that names a branch seats a detached copy of it, unless you pass `--base`: then the agent gets a new branch from that base. `--base` and `--on` cannot be combined.',
-        `- Send the first prompt to an agent that stopped at a startup dialog: \`${cmd('nudge <agent|assignment>')}\``,
+        `- Send the first prompt to an agent that has not received it: \`${cmd('nudge <agent|assignment>')}\``,
         `- Close an assignment: \`${cmd('release <agent|assignment> [--outcome done|abandoned]')}\``,
         `- Decline an open handoff: \`${cmd('handoff-close <id|file> --reason "<text>"')}\``,
       ]
@@ -319,7 +319,38 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
     throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${left}${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
-  return { ...updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) }), notes };
+  const record = updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
+  // `notes` is not part of the record: the lines the command prints for the operator.
+  setLabel(ctx, notes, { agent: name, role: role.id, brief, pane: record.pane, workspace: record.workspace, status: 'working' });
+  return { ...record, notes };
+}
+
+/**
+ * What herdr's sidebar shows for an agent: role, a short assignment and the
+ * status. The same width as the board's ASSIGNMENT column, so a first brief line
+ * of any length stays one readable row. The workspace gets role and assignment
+ * only: its status would go stale, and the pane's is the one that moves.
+ */
+function labelTokens({ role, brief, status }) {
+  const line = String(brief).split('\n').find((l) => l.trim()) ?? '';
+  return { role, assignment: clip(line.trim().replace(/\s+/g, ' '), BOARD_BRIEF_WIDTH), status };
+}
+
+/**
+ * Sets the pane label, and the workspace label when `workspace` is given. A
+ * label is only display: a refusal never changes the record or the outcome. A
+ * refusal adds one plain line to `notes`, which the command prints.
+ */
+function setLabel(ctx, notes, { agent, role, brief, pane, workspace, status }) {
+  const tokens = labelTokens({ role, brief, status });
+  try {
+    ctx.herdr.labelPane(pane, tokens);
+    if (workspace) {
+      ctx.herdr.labelWorkspace(workspace, { role: tokens.role, assignment: tokens.assignment });
+    }
+  } catch (err) {
+    notes.push(`The label for ${agent} could not be set in herdr (${String(err.message || err).split('\n')[0]}). The agent is seated and the assignment is unchanged; only herdr's sidebar lacks the label.`);
+  }
 }
 
 /** What a failed worktree step may have left behind, in the words the failed record and the message use. */
@@ -387,7 +418,10 @@ export function report(ctx, { text }) {
   const when = stamp(ctx);
   const next = { ...data, status: 'reported', updated: when };
   writeRecord(caller.file, next, `${body.trimEnd()}\n\n## Report — ${when}\n\n${text.trim()}\n`);
-  return next;
+  // The report is written; the label is one more call and may fail on its own.
+  const notes = [];
+  setLabel(ctx, notes, { agent: caller.agent, role: caller.role, brief: caller.brief, pane: caller.pane, status: 'reported' });
+  return { ...next, notes };
 }
 
 export function handoff(ctx, { toRole, brief, branch = null }) {
@@ -481,13 +515,17 @@ export function release(ctx, { target, outcome }) {
     throw new CrewError(`${a.agent} is still working. Wait for it to finish, or stop it in its pane first.`);
   }
 
+  // A seating that timed out while herdr was creating the worktree: herdr may
+  // finish after this release stops looking. The record then stays open to a
+  // second release (worktree_removed false) instead of claiming nothing remains.
+  const mayAppear = !closed && a.failed_step === 'worktree' && a.error_code === 'herdr_timeout' && !ctx.git.worktreeExists(a.worktree);
   let removed = false;
   let rescueFailed = false;
   let rescued = closed ? a.rescued_branch ?? null : null;
   let left = [];
   const worktreeExisted = ctx.git.worktreeExists(a.worktree);
   if (!worktreeExisted) {
-    removed = true;
+    removed = !mayAppear;
   } else {
     left = ctx.git.changes(a.worktree);
     if (a.detached) {
@@ -543,7 +581,9 @@ export function release(ctx, { target, outcome }) {
   const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
   // A closed record whose worktree is gone was finished by herdr: say so, once.
   const alreadyGone = closed && a.worktree_removed === false && !worktreeExisted;
-  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, branchKept: ctx.git.resolves(a.branch) };
+  // The same timed-out seating on the retry: nothing came, and now it is closed.
+  const neverCame = alreadyGone && a.failed_step === 'worktree' && a.error_code === 'herdr_timeout';
+  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, neverCame, mayAppear, branchKept: ctx.git.resolves(a.branch) };
 }
 
 /** What `release` tells the operator: one sentence per line, only what is true. */
@@ -560,7 +600,12 @@ export function releaseLines(r) {
       );
     }
   } else {
-    out.push(r.branchKept ? `  Its branch ${x.branch} is kept.` : `  Its branch ${x.branch} was never created, so there is no branch to keep.`);
+    // A failed worktree step names the branch among what may remain: it is not
+    // certain to be absent, so do not say it was never created.
+    const branchMayAppear = Array.isArray(x.may_remain) && x.may_remain.some((m) => m.startsWith('branch '));
+    if (r.branchKept) out.push(`  Its branch ${x.branch} is kept.`);
+    else if (branchMayAppear) out.push(`  Its branch ${x.branch} does not exist now; herdr may still create it, and crew never deletes a branch.`);
+    else out.push(`  Its branch ${x.branch} was never created, so there is no branch to keep.`);
   }
   if (r.rescued) {
     // On a failed retry the branch comes from an earlier release; this run saved nothing.
@@ -577,8 +622,11 @@ export function releaseLines(r) {
       out.push(`  herdr did not answer the worktree request and may still have been creating it when this release ran. If the worktree or branch ${x.branch} appears now, run release again.`);
     }
   }
-  if (r.removed) {
-    if (r.worktreeExisted) out.push('  The worktree was removed.');
+  if (r.mayAppear) {
+    out.push(`  There is no worktree at ${x.worktree} yet. Run release ${x.id} again once herdr has had time; if nothing has appeared it says so and closes this record.`);
+  } else if (r.removed) {
+    if (r.neverCame) out.push(`  There is still no worktree at ${x.worktree}, so nothing was removed; the record now says so.`);
+    else if (r.worktreeExisted) out.push('  The worktree was removed.');
     else if (r.alreadyGone) out.push(`  The worktree at ${x.worktree} was already removed, after the earlier release stopped waiting for herdr; the record now says so.`);
     else out.push(`  There was no worktree at ${x.worktree} to remove.`);
   } else {
@@ -629,6 +677,8 @@ function age(created, now) {
   return `${Math.floor(minutes / (24 * 60))}d`;
 }
 
+// The assignment column of the board and the assignment word of the herdr label.
+const BOARD_BRIEF_WIDTH = 32;
 const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 // A seated agent that may never have been told what to do must not look like any other row.
@@ -644,7 +694,7 @@ export function renderBoard(b, now) {
   } else {
     const table = [
       ['AGENT', 'ROLE', 'STATE', 'STATUS', 'ASSIGNMENT', 'BRANCH', 'AGE'],
-      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.brief, 32), clip(r.branch, 44), age(r.created, now)]),
+      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.brief, BOARD_BRIEF_WIDTH), clip(r.branch, 44), age(r.created, now)]),
     ];
     const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
     for (const row of table) {
@@ -668,7 +718,7 @@ export function renderBoard(b, now) {
   if (b.conflicts?.length > 0) {
     out.push('', `Sync conflict copies: ${b.conflicts.length}`);
     for (const name of b.conflicts) out.push(`  ${name}`);
-    out.push('  Syncthing kept these when two machines changed a trail file at once. They are not read as records; merge them by hand and delete them.');
+    out.push('  Your file-sync tool (Syncthing) kept these when two machines changed the same assignment file in memory/crew/ at once. They are not read as records; merge them by hand and delete them.');
   }
   if (b.unreadable.length > 0) out.push('', `Could not read: ${b.unreadable.join(', ')}`);
   return `${out.join('\n')}\n`;
