@@ -118,7 +118,9 @@ npm run crew -- seat lead "Goal: … Constraints: … Done when: …"
 ```
 
 The lead may seat other roles and take handoffs. Every other role can only ask, in writing. At
-most four crew agents are seated at once; change `max_agents` in `roles/circles.yaml`.
+most six crew agents are seated at once, so a lead and the five shipped roles can all stay seated.
+The number is `max_agents` in `roles/circles.yaml`; change it there. (The launcher assumes 4 only
+when that file has no `max_agents` line.)
 
 ## Release
 

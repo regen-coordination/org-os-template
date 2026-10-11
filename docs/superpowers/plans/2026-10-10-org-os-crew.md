@@ -20,7 +20,7 @@
 - **Statuses, verbatim:** assignments `seating`, `working`, `reported`, `released`, `failed`, `abandoned`; handoffs `open`, `taken`, `declined`.
 - **Paths, verbatim:** trail `memory/crew/<assignment-id>.md`; handoffs `memory/crew/handoff-<YYYY-MM-DD>-<slug>.md`; branch `crew/<assignment-id>`; worktree `<worktree root>/<repo-name>/<assignment-id>` with worktree root `~/.org-os/worktrees` unless `ORG_OS_WORKTREES` is set.
 - **Assignment id:** `<YYYY-MM-DD>-<role>-<slug>`, numeric suffix `-2`, `-3` on collision.
-- **Default concurrency cap:** 4 (`max_agents` in `roles/circles.yaml`).
+- **Default concurrency cap:** 4 (`max_agents` in `roles/circles.yaml`) when the plan was written; the operator raised the shipped value to 6 afterwards. The code's fallback for a file with no such field is still 4.
 - **Only `scripts/crew/herdr.mjs` calls `herdr`; only `scripts/crew/git.mjs` calls `git`.**
 - **Error messages are one plain sentence saying what happened and what to do.**
 - **Run focused tests per task** (`node --test tests/scripts/crew-<name>.test.mjs`). The full suite (`npm test`) is expected to fail on `tests/clone-genesis.test.mjs` until Task 8 regenerates the clone manifest.

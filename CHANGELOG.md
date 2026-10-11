@@ -16,6 +16,10 @@ deletes this heading.
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
   Guide: `docs/CREW.md`.
   What an operator should know:
+  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once, so the whole
+    crew (a lead and the five shipped roles) can stay seated. This is the default every new
+    instance receives; an instance changes it by editing that file. (The launcher's own fallback
+    of 4 applies only to a file with no `max_agents` line.)
   - Every seat starts by reading its role file, its assignment file and the "Before you begin"
     list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md`; `lead` also
     reads `HEARTBEAT.md` and `AGENTS.md`), and reports which it read and which were absent. The

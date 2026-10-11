@@ -216,7 +216,7 @@ All enforced in `core.mjs`, not in the skill.
 | Guardrail | Rule |
 |-----------|------|
 | Inside herdr | Refuse unless `HERDR_ENV=1`. |
-| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. Default 4, set by `max_agents` in `roles/circles.yaml`. |
+| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. The shipped `roles/circles.yaml` sets `max_agents: 6`, so the lead and the five shipped roles can all be seated. A file with no `max_agents` line falls back to 4 in `scripts/crew/roles.mjs`. |
 | Who may seat | A caller whose pane hosts no seated agent is the operator and may always seat. A caller whose pane hosts a seated agent may seat only if that agent's role has `may_seat: true`. The caller is identified from `HERDR_PANE_ID` joined to the trail. |
 | Base exists | Refuse if `--base` or `--on` does not resolve to a commit. Refuse `--base` together with `--on`. |
 | Operator's tree untouched | The launcher never checks out, resets or cleans the main checkout. |
