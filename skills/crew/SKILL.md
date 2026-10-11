@@ -16,7 +16,8 @@ metadata:
 
 The crew is a set of **roles** (files in `roles/`) that **agents** are seated in. Each agent runs
 in its own herdr pane and its own git worktree, on its own branch. Everything is recorded in
-`memory/crew/`. Vocabulary and the shared boundaries: `roles/README.md`. Operator guide:
+`memory/crew/`. Vocabulary, the shared boundaries and the "Before you begin" reading list every seat gets:
+`roles/README.md`. Operator guide:
 `docs/CREW.md`.
 
 All rules are enforced by `scripts/crew.mjs`. **When a command refuses, tell the operator what it
@@ -34,6 +35,9 @@ said. Never work around a refusal**: not by calling herdr or git yourself, not b
 | Send the first prompt to an agent that stopped at a startup dialog | `npm run crew -- nudge <agent>`                         |
 | Close an assignment                                                | `npm run crew -- release <agent>`                       |
 | Decline a handoff                                                  | `npm run crew -- handoff-close <id> --reason "<why>"`   |
+
+A brief that starts with a dash is read as an option: put `--` before it, after any flags
+(`seat <role> --task <id> -- "<brief>"`; the same for `handoff`).
 
 If you are a **seated agent**, your assignment file gives you two commands with absolute paths,
 `report` and `handoff`. Use those exactly as written. Only the lead role and the operator may
@@ -65,6 +69,12 @@ on the board.
   whose seating failed. Release each one once the operator has looked at its branch.
 - `STATUS` is the trail's word for the assignment (`seating`, `working`, `reported`); `STATE` is
   herdr's live view. `reported` with `idle` means the agent is done and awaits release.
+- A `STATUS` such as `working (first prompt not sent)` or `(first prompt unconfirmed)` means the
+  agent may never have been told what to do. Tell the operator; do not nudge an unconfirmed one
+  (the command refuses), and for an unsent one the operator may run `nudge`.
+- **Sync conflict copies** are trail files Syncthing duplicated. They are not read as records;
+  the operator merges them by hand. **Could not read** is a different thing: files that could not
+  be parsed.
 - **Worktrees left behind** lists closed assignments whose worktree release could not remove (it
   had changes in it, the removal failed, or its commits could not be saved). The operator deals
   with what was listed; then `release` on the same assignment retries the removal. A retry keeps
@@ -76,7 +86,10 @@ on the board.
 Release when the agent has reported and the operator has what they need. The branch is always
 kept; merging is the operator's. The worktree is removed only when it has no uncommitted changes.
 If it is left behind, the command lists what is in it: show that list to the operator and stop.
-Do not remove the worktree yourself; once the operator has dealt with it, release again.
+Do not remove the worktree yourself; once the operator has dealt with it, release again. If the
+list says herdr did not answer, nothing was wrong with the worktree: wait and release again.
+After a seating that timed out, the worktree or agent may exist anyway: look at the board and
+release the assignment under "Needs release".
 
 ## As the lead
 

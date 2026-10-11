@@ -76,7 +76,7 @@ test('freeId adds a numeric suffix on collision', () => {
 
 test('readTrail separates assignments, handoffs and unreadable files', () => {
   const root = tmp();
-  assert.deepEqual(readTrail(root), { assignments: [], handoffs: [], unreadable: [] });
+  assert.deepEqual(readTrail(root), { assignments: [], handoffs: [], unreadable: [], conflicts: [] });
   const dir = trailDir(root);
   const A = { id: '2026-10-10-engineer-x', status: 'working', role: 'engineer', agent: 'engineer', branch: 'crew/x' };
   const H = { id: 'handoff-2026-10-10-y', status: 'open', from: A.id, to_role: 'reviewer' };
@@ -107,7 +107,7 @@ test('freeId reserves the id it returns, so two callers never share one', () => 
   assert.ok(existsSync(join(trailDir(root), `${first}.md`)));
 });
 
-test('a sync-conflict copy of a trail file is not a record, and is listed so the operator sees it', () => {
+test('a sync-conflict copy of a trail file is not a record, and is listed as a conflict, not as unreadable', () => {
   const dir = tmp();
   const base = { id: 'a', status: 'working', role: 'engineer', agent: 'engineer', branch: 'crew/a' };
   writeRecord(join(trailDir(dir), 'a.md'), base, '## Brief\n\nx\n');
@@ -118,7 +118,8 @@ test('a sync-conflict copy of a trail file is not a record, and is listed so the
   const trail = readTrail(dir);
   assert.deepEqual(trail.assignments.map((x) => x.id), ['a']);
   assert.deepEqual(trail.handoffs.map((x) => x.id), ['handoff-b']);
-  assert.deepEqual(trail.unreadable.sort(), [
+  assert.deepEqual(trail.unreadable, []);
+  assert.deepEqual(trail.conflicts.sort(), [
     'a.sync-conflict-20261010-203105-ABCDEFG.md',
     'handoff-b.sync-conflict-20261010-203106-ABCDEFG.md',
   ]);
