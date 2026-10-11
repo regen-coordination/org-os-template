@@ -38,12 +38,33 @@ export function isOperational(raw) {
 }
 
 // `listed` is the registry's own flag for "keep this entry off a public list":
-// optional, default true. Only the literal false unlists; a missing field, null
-// or a mistyped value leaves the entry on the list, where a reader will see it
-// and the mistake can be corrected. `listed` chooses what is published and is
+// optional, default true. Only the literal false unlists, and a missing field
+// lists. A value that is neither true nor false never gets this far in a build:
+// listedProblems, below, stops it. `listed` chooses what is published and is
 // not in PUBLIC_FIELDS: it never reaches the output.
 export function isListed(raw) {
   return raw?.listed !== false;
+}
+
+// A `listed` that is there and is not a boolean is a mistake, and isListed alone
+// would publish the entry: `listed: "false"`, `no` and `0` are not the literal
+// false. The repository's test of the field does not run in the workflow that
+// deploys the site, so the build refuses here: aggregate() throws these
+// sentences and verify-build.mjs fails on them. One sentence per entry.
+export function listedProblems(registry) {
+  const kindOf = (value) =>
+    value === null || value === "" ? "empty"
+    : Array.isArray(value) ? "a list"
+    : typeof value === "object" ? "a mapping"
+    : `a ${typeof value}`;
+  const problems = [];
+  registry.forEach((raw, index) => {
+    if (!raw || typeof raw !== "object" || !("listed" in raw) || typeof raw.listed === "boolean") return;
+    const who = raw.id ?? raw.name;
+    const entry = who != null ? `"${who}"` : `entry ${index + 1}`;
+    problems.push(`data/instances.yaml: ${entry} has listed: ${JSON.stringify(raw.listed)} (${kindOf(raw.listed)}). \`listed\` must be the bare word true or false. Write \`listed: false\`, without quotes, to keep the entry off the public list, or remove the line to list it. Nothing was built: as written the entry would be published.`);
+  });
+  return problems;
 }
 
 // What the site says about the registry, by one rule, for the aggregator that
@@ -65,7 +86,10 @@ const ROOT_NODE = {
 };
 
 export function aggregate({ registryYaml, now }) {
-  const { nodes, registered, operational } = registryView(parseRegistry(registryYaml));
+  const registry = parseRegistry(registryYaml);
+  const mistyped = listedProblems(registry);
+  if (mistyped.length > 0) throw new Error(mistyped.join("\n"));
+  const { nodes, registered, operational } = registryView(registry);
   return {
     root: ROOT_NODE,
     nodes,

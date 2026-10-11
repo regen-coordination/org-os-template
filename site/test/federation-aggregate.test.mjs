@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { readFileSync } from "node:fs";
 import {
   parseRegistry, PUBLIC_FIELDS, publicInstance, isOperational, OPERATIONAL_DEFINITION, aggregate, quietMap,
-  isListed, registryView,
+  isListed, registryView, listedProblems,
 } from "../scripts/federation-aggregate.mjs";
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
@@ -40,6 +40,51 @@ test("an entry is unlisted only when listed is the literal false", () => {
     assert.equal(isListed({ listed }), true, `listed: ${JSON.stringify(listed)} must stay on the list`);
   }
   assert.equal(isListed({}), true);
+});
+
+// ── a mistyped listed (closing review of 6eacb24, finding 2) ─────────────
+// isListed alone publishes an entry whose `listed` is "false", no or 0, and the
+// verifier took its expected list from the same rule, so it agreed. The
+// repository's own test of the field (tests/scripts/instances-listed.test.mjs)
+// does not run in the workflow that deploys the site. So the site's build refuses.
+
+test("listedProblems is silent for true, false and an entry without the field", () => {
+  assert.deepEqual(listedProblems(parseRegistry(registryYaml)), []);
+  assert.deepEqual(listedProblems([{ id: "a", listed: true }, { id: "b", listed: false }, { id: "c" }]), []);
+});
+
+test("listedProblems names the entry and the value for every listed that is not a boolean, and says what to write", () => {
+  const wrong = [["\"false\"", "a string"], ["no", "a string"], ["off", "a string"], ["0", "a number"], ["", "empty"], ["[false]", "a list"], ["{ public: false }", "a mapping"]];
+  for (const [written, kind] of wrong) {
+    const registry = parseRegistry(`instances:\n  - id: "hidden-one"\n    name: "Hidden One"\n    listed: ${written}\n`);
+    const problems = listedProblems(registry);
+    assert.equal(problems.length, 1, `listed: ${written}`);
+    assert.match(problems[0], /data\/instances\.yaml/, written);
+    assert.match(problems[0], /"hidden-one"/, written);
+    assert.ok(problems[0].includes(`(${kind})`), `listed: ${written} should be called ${kind}: ${problems[0]}`);
+    assert.match(problems[0], /listed: false/, written);
+    assert.match(problems[0], /remove the line/, written);
+  }
+});
+
+test("listedProblems names an entry by its name, or by its place, when it has no id", () => {
+  assert.match(listedProblems([{ name: "Only A Name", listed: "no" }])[0], /"Only A Name"/);
+  assert.match(listedProblems([{ listed: true }, { listed: "no" }])[0], /entry 2/);
+});
+
+test("aggregate refuses a registry with a mistyped listed: nothing is written from it", () => {
+  const mistyped = registryYaml.replace("listed: false", 'listed: "false"');
+  assert.notEqual(mistyped, registryYaml);
+  assert.throws(() => aggregate({ registryYaml: mistyped, now: "2026-06-17T00:00:00Z" }), (error) => {
+    assert.match(error.message, /"unlisted-instance" has listed: "false" \(a string\)/);
+    assert.match(error.message, /Nothing was built/);
+    return true;
+  });
+});
+
+test("the real registry has no mistyped listed", () => {
+  const real = parseRegistry(readFileSync(new URL("../../data/instances.yaml", import.meta.url), "utf8"));
+  assert.deepEqual(listedProblems(real), []);
 });
 
 test("aggregate leaves an unlisted entry out of the list", () => {

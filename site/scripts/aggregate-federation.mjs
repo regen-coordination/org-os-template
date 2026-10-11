@@ -27,7 +27,14 @@ if (!existsSync(registryPath)) {
   process.exit(1);
 }
 const registryYaml = readFileSync(registryPath, "utf8");
-const fed = aggregate({ registryYaml, now: new Date().toISOString() });
+let fed;
+try {
+  fed = aggregate({ registryYaml, now: new Date().toISOString() });
+} catch (error) {
+  // A registry the site will not publish from, said in its own sentence (a mistyped `listed`).
+  console.error(`REGISTRY: ${error.message}`);
+  process.exit(1);
+}
 
 const outDir = join(siteRoot, "src", "data");
 mkdirSync(outDir, { recursive: true });

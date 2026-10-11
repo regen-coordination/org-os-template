@@ -9,7 +9,7 @@ import { PAGES, SECTIONS, ALLOW_UNVERIFIED } from "../src/data/docs-manifest.mjs
 import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
-import { parseRegistry, registryView, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
+import { parseRegistry, registryView, listedProblems, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
 import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, unlistedPrinted, countProblems, RUN_LENGTH } from "./registry-leaks.mjs";
 import { tablesOutsideRegion } from "../src/lib/table-scroll.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
@@ -72,6 +72,8 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
 // expected below comes from registryView, the rule the aggregator writes by.
 {
   const registry = parseRegistry(readFileSync(join(REPO_ROOT, "data", "instances.yaml"), "utf8"));
+  // A mistyped `listed` would publish the entry, and the expected list below would agree with it.
+  for (const problem of listedProblems(registry)) fail(`REGISTRY: ${problem}`);
   const view = registryView(registry);
   const { nodes: expected, registered, operational, unlisted } = view;
   const leftOut = `${unlisted.length} marked listed: false left out`;
