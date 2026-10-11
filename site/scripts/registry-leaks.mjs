@@ -3,7 +3,8 @@
 //
 // Three things are looked for, each as exactly as its length allows:
 //   a sentence  whole, with its punctuation: a short phrase is evidence only when
-//               it is the same phrase;
+//               it is the same phrase. Spaces, and characters a reader does not
+//               see (a soft hyphen, a zero-width space), are not compared;
 //   a passage   any run of RUN_LENGTH letters and digits of a longer note,
 //               whatever stands between them: this is what an excerpt leaves;
 //   a token     a one-word value no one would write by chance: a flag, a path.
@@ -30,7 +31,7 @@ export const RUN_LENGTH = 40;
 // this long: a drift flag (no_masterplan), a local path (../refi-bcn-os).
 const TOKEN_MIN_LENGTH = 8;
 
-const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", mdash: "—", ndash: "–", rarr: "→", hellip: "…", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”" };
+const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", shy: "\u00ad", ZeroWidthSpace: "\u200b", zwnj: "\u200c", zwj: "\u200d", NoBreak: "\u2060", hyphen: "\u2010", dash: "\u2010", mdash: "—", ndash: "–", rarr: "→", hellip: "…", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”" };
 
 function decode(text) {
   return text
@@ -53,17 +54,30 @@ function unescape(text) {
     .replace(/\\(["'\\/])/g, "$1");
 }
 
-// The typographer's characters, as the plain ones a note is typed with.
+// The typographer's characters, as the plain ones a note is typed with. The
+// hyphens are U+2010 (hyphen), U+2011 (non-breaking hyphen) and U+2012 (figure dash).
 function plainPunctuation(text) {
-  return text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/…/g, "...");
+  return text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[\u2010-\u2012–—]/g, "-").replace(/…/g, "...");
 }
 
-// One form for a page and for a private note: entities decoded, whitespace collapsed.
+// Characters that take no room on the page and so hide nothing from a reader,
+// only from a comparison: the soft hyphen (U+00AD, which a hyphenating plugin
+// writes by itself), the zero-width space, non-joiner and joiner (U+200B to
+// U+200D), the word joiner (U+2060) and the byte-order mark (U+FEFF).
+const UNSEEN = /[\u00ad\u200b-\u200d\u2060\ufeff]/g;
+
+// One form for a page and for a private note: entities decoded, the unseen
+// characters removed, whitespace collapsed.
 function normalize(text) {
-  return decode(text).replace(/\s+/g, " ").trim();
+  return decode(text).replace(UNSEEN, "").replace(/\s+/g, " ").trim();
 }
 // What two texts are compared by: case dropped, punctuation plain.
 const fold = (text) => plainPunctuation(text).toLowerCase();
+// A sentence is compared with its spaces taken out, on both sides: a zero-width
+// space can stand in place of a space as well as inside a word, and markup
+// between two letters is read as a space. The letters and the punctuation still
+// have to be the note's, in order.
+const tight = (text) => fold(text).replace(/\s+/g, "");
 // Letters and digits only: what is left of a passage however it was set.
 const squeeze = (text) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 
@@ -163,8 +177,9 @@ export function findLeaks(builtText, guard) {
   for (const reading of readings) {
     const text = normalize(reading);
     const folded = fold(text);
+    const packed = tight(text);
     for (const sentence of guard.sentences) {
-      if (folded.includes(fold(sentence))) { add("sentence", sentence); whole.add(squeeze(sentence)); }
+      if (packed.includes(tight(sentence))) { add("sentence", sentence); whole.add(squeeze(sentence)); }
     }
     for (const token of guard.tokens) if (hasToken(folded, token)) add("token", token);
   }

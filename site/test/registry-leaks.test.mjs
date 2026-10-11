@@ -114,6 +114,62 @@ test("findLeaks reads text held in an attribute, which is not visible text", () 
   assert.deepEqual(texts(findLeaks(html, guard)), ["Someone is Strategy Lead"]);
 });
 
+// ── closing review, finding 5: characters that are not seen ──────────────
+// A sentence shorter than an excerpt is matched whole, so one character inside
+// it that a reader does not see was enough to hide it: a soft hyphen (which a
+// hyphenating plugin writes by itself), a non-breaking hyphen, a zero-width space.
+
+test("findLeaks reads through a soft hyphen, as a character, an entity and an escape", () => {
+  for (const html of [
+    "<p>Someone is Strat\u00adegy Lead</p>",
+    "<p>Someone is Strat&shy;egy Lead</p>",
+    "<p>Someone is Strat&#173;egy Lead</p>",
+    "<p>Some&#xAD;one is Strategy Lead</p>",
+    '{"n":"Someone is Strat\\u00adegy Lead"}',
+  ]) assert.deepEqual(texts(findLeaks(html, guard)), ["Someone is Strategy Lead"], html);
+});
+
+test("findLeaks reads a non-breaking hyphen, and the other hyphens, as the plain one", () => {
+  for (const hyphen of ["\u2011", "\u2010", "&#8209;", "&#x2011;"]) {
+    const html = `<p>Cooperative${hyphen}in${hyphen}formation.</p>`;
+    assert.deepEqual(texts(findLeaks(html, guard)), ["Cooperative-in-formation"], html);
+  }
+});
+
+test("findLeaks reads through a zero-width space: inside a word, beside a space and in place of one", () => {
+  for (const html of [
+    "<p>Someone is Strat\u200begy Lead</p>",
+    "<p>Someone is \u200bStrategy Lead</p>",
+    "<p>Someone is\u200bStrategy\u200bLead</p>",
+    "<p>Someone is&#8203;Strategy Lead</p>",
+    "<p>Someone is&ZeroWidthSpace;Strategy Lead</p>",
+    '{"n":"Someone is\\u200bStrategy Lead"}',
+  ]) assert.deepEqual(texts(findLeaks(html, guard)), ["Someone is Strategy Lead"], html);
+});
+
+test("findLeaks reads through the other characters that take no room: joiners, the word joiner, a byte-order mark", () => {
+  for (const unseen of ["\u200c", "\u200d", "\u2060", "\ufeff"]) {
+    assert.deepEqual(texts(findLeaks(`<p>Someone is Strat${unseen}egy Lead</p>`, guard)), ["Someone is Strategy Lead"], `U+${unseen.codePointAt(0).toString(16)}`);
+  }
+});
+
+test("findLeaks finds a flag or a path with an unseen character inside it", () => {
+  assert.deepEqual(findLeaks("<li>no_master\u00adplan</li>", guard), [{ kind: "token", text: "no_masterplan" }]);
+  assert.deepEqual(findLeaks("<li>../refi\u2011x\u2011os</li>", guard), [{ kind: "token", text: "../refi-x-os" }]);
+  assert.deepEqual(findLeaks("<li>stub_\u200bidentity</li>", guard), [{ kind: "token", text: "stub_identity" }]);
+});
+
+test("a private note written with those characters is still found in a page written plainly", () => {
+  const g = registryGuard([{ name: "A", notes: "Coop\u00aderative\u2011in\u2011formation, quietly." }]);
+  // reported in the registry's own words, so with the hyphens the note was typed with
+  assert.deepEqual(texts(findLeaks("<p>Cooperative-in-formation, quietly</p>", g)), ["Cooperative\u2011in\u2011formation, quietly"]);
+});
+
+test("reading through spaces does not make a leak of other words: the letters and the punctuation must be the note's", () => {
+  assert.deepEqual(findLeaks("<p>Someone is the Strategy Lead. Someone, is Strategy Lead? Some one is a strategy leader.</p>", guard).filter((l) => l.text !== "Someone is Strategy Lead"), []);
+  assert.deepEqual(findLeaks("<p>Someone is the Strategy Lead. Someone is, Strategy Lead.</p>", guard), []);
+});
+
 // ── review finding 3: one-word values ────────────────────────────────────
 
 test("findLeaks finds a drift flag and a local path", () => {
