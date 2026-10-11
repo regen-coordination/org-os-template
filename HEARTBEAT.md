@@ -21,6 +21,32 @@ The framework's own agent team runs from the repository: roles are files under `
 the `feat/crew` branch (not on `main`), `roles/`, `docs/CREW.md`, `memory/crew/`. Status: module
 `pilot`, targets 0.6.0; the CHANGELOG's crew section says what releases it. Open items below.
 
+Open items. Trail files are in `memory/crew/` of the main checkout; the reports are in their
+`## Report` sections.
+
+- [ ] **Fix F-1 first — the advice after a timed-out worktree step is a dead end.** After
+      `worktree create` times out, `release` closes the record as `released` with
+      `worktree_removed: true`, and a second `release <id>` answers "No open assignment matches"
+      while herdr may still finish the worktree. Same output also says the branch "was never
+      created" and "may still have been creating". `scripts/crew/core.mjs` (message, record
+      write). Engineer's work; the code is wrong, not the docs. Trail:
+      `2026-10-10-reviewer-review-the-herdr-adapter-rewrite-before.md`.
+- [ ] **F-2 to F-4 of the same review** (minor): a failed look replaces `agent_name_taken` with the
+      look's own error (`scripts/crew/herdr.mjs`); seat prints nothing while it waits up to 30
+      seconds and the documented bound understates the whole step; a closed record whose worktree
+      is gone and `worktree_removed: false` is not on the board, a failed record's board line
+      omits `may_remain`, and `--base ""` is quietly taken as `main`. Same trail file.
+- [ ] **Run the five experiments against a live herdr** listed under "Experiments that settle what
+      is still unverified" in `docs/CREW.md`. Nobody has run them; the spec's section 5.3 lists
+      the same five as unverified. Operator's to run, with a throwaway pane.
+- [ ] **Proposals from the first presentation round, not yet decided:** run the smoke run in
+      `docs/CREW.md` after each merged branch that touches herdr (engineer's presentation); give
+      reviewers a read-only herdr session or a recorded transcript of `agent start` failures
+      (reviewer's); put the branches in flight in every documentation brief (commons-steward's).
+      Trail: the three `2026-10-10-*-present-yourself-*.md` files, item 6 of each.
+- [ ] **Small plain-language gap in code:** `renderBoard` in `scripts/crew/core.mjs` prints
+      "Syncthing kept these … a trail file" without saying what either is; the documents now
+      define them. Engineer's, with the next change to that file.
 ### Vault-safety guard over-matches `clean` (2026-08-21 — found during tonight's session, not yet fixed)
 
 - [x] ~~**Narrow `scripts/guards/deny-destructive-git.mjs`'s `clean` match to the git verb.**~~ — **done 2026-08-28 (WS-A A6)**: the tokenizer now matches `clean`/`stash`/`reset --hard` only in git *subcommand* position, so pathspecs and commit messages naming them are fine. Dashed libexec binaries, wrapper/chained forms and expansion-as-subcommand stay blocked; regression fixtures both ways in `tests/guards/`. One residual false positive is documented and accepted: a heredoc body that *quotes* a real git command still trips it, because the guard reads the whole command line and cannot tell a command from prose about one.
