@@ -29,7 +29,7 @@ said. Never work around a refusal**: not by calling herdr or git yourself, not b
 | You want to                                                        | Run                                                     |
 | ------------------------------------------------------------------ | ------------------------------------------------------- |
 | See who is seated, open handoffs, what needs attention             | `npm run crew`                                          |
-| Seat a role on a piece of work                                     | `npm run crew -- seat <role> "<brief>"`                 |
+| Seat a role on a piece of work                                     | `npm run crew -- seat <role> "<brief>" --title "<title>"` |
 | Seat a reviewer on an existing branch                              | `npm run crew -- seat reviewer "<brief>" --on <branch>` |
 | Take a handoff another agent wrote                                 | `npm run crew -- seat <role> --handoff <id>`            |
 | Take a handoff and build on its branch, not review it              | `npm run crew -- seat <role> --handoff <id> --base <ref>` |
@@ -64,8 +64,13 @@ The brief is everything the agent knows about the task. A good one has four part
 3. **Where to look**: the files, docs or commits worth reading. Point at them; do not paste them.
 4. **What done means**: the check that must pass, or the artifact that must exist.
 
-Keep the first line short and specific. It becomes the assignment's name, its branch and its row
-on the board.
+Keep the first line short and specific. It becomes the assignment's id and its branch.
+
+**Give every seat a `--title`**: what this agent is working on, in a few words, at most 24
+characters ("Cursor race in kms", "Review the label change"). It is the name the operator sees in
+herdr's sidebar and in the board's ASSIGNMENT column, and it names a second agent in the same
+role (`engineer-cursor-race-in-kms`), so two agents in one role do not look alike. Without one,
+crew cuts it from the brief, which is rarely as good. A longer title is refused.
 
 ## Reading the board
 
@@ -86,7 +91,7 @@ on the board.
   with what was listed; then `release` on the same assignment retries the removal. A retry keeps
   the recorded outcome and refuses a different `--outcome`.
 - **Open handoffs** are requests waiting for the lead or the operator.
-- crew also labels each agent's pane and workspace in herdr (role, short assignment, status),
+- crew also labels each agent's pane and workspace in herdr (role, title, status),
   shown only if the operator added the `$role`, `$assignment` and `$status` rows to their herdr
   config (`docs/CREW.md`). If `seat` says a label could not be set, the agent is seated anyway;
   tell the operator and carry on. Never edit their herdr config.

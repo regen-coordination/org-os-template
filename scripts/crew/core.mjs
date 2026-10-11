@@ -21,6 +21,12 @@ const EFFORT_ARGS = {
   claude: (effort) => ['--effort', effort],
 };
 
+// Claude Code's `-n, --name <name>` (`claude --help`, 2.1.296) gives the session a display name.
+// Only claude is verified; any other kind starts without a name argument.
+const NAME_ARGS = {
+  claude: (role, title) => ['--name', `${role}: ${title}`],
+};
+
 export function requireHerdr(ctx) {
   if (ctx.env.HERDR_ENV !== '1') {
     throw new CrewError('crew runs inside herdr. Open herdr and run this from one of its panes.');
@@ -77,12 +83,65 @@ export function findActive(trail, target, statuses = ACTIVE) {
   throw new CrewError(`No open assignment matches "${target}". Run the board to see agent names and assignment ids.`);
 }
 
-function freeName(roleId, agents) {
+// herdr's agent-name rule is [a-z][a-z0-9_-]{0,31}.
+const HERDR_NAME_MAX = 32;
+// The longest title: what an agent is working on, in a few words. 24 characters is what
+// herdr's sidebar shows at its default width of 26 beside a one-character marker.
+const TITLE_MAX = 24;
+
+const nameSlug = (text) =>
+  String(text)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/**
+ * The first agent of a role is named by the role id. A further one is named
+ * from its title, `<role>-<slug>`, so two agents of one role look different on
+ * the board and in `release`. A taken or empty slug falls back to `<role>-2`.
+ */
+function freeName(roleId, agents, title) {
   const taken = new Set(agents.map((a) => a.name).filter(Boolean));
-  let name = roleId;
-  for (let n = 2; taken.has(name); n += 1) name = `${roleId}-${n}`;
-  return name;
+  if (!taken.has(roleId)) return roleId;
+  const slug = nameSlug(title).slice(0, HERDR_NAME_MAX - roleId.length - 1).replace(/-+$/, '');
+  if (slug && !taken.has(`${roleId}-${slug}`)) return `${roleId}-${slug}`;
+  let n = 2;
+  while (taken.has(`${roleId}-${n}`)) n += 1;
+  return `${roleId}-${n}`;
 }
+
+const oneLine = (text) => String(text).replace(/\s+/g, ' ').trim();
+
+/** The brief's first line cut at a word boundary to the title limit; a single longer word is cut hard. */
+function deriveTitle(brief) {
+  const line = oneLine(String(brief).split('\n').find((l) => l.trim()) ?? '');
+  if (line.length <= TITLE_MAX) return line;
+  let out = '';
+  for (const word of line.split(' ')) {
+    const next = out ? `${out} ${word}` : word;
+    if (next.length > TITLE_MAX) break;
+    out = next;
+  }
+  out = out.replace(/[\s,;:.\-–—(]+$/, '');
+  return out || `${line.slice(0, TITLE_MAX - 1)}…`;
+}
+
+/** The title the operator gave, trimmed; refused when it is longer than the limit. Null when none was given. */
+function checkTitle(title) {
+  const t = title === null || title === undefined ? '' : oneLine(title);
+  if (t === '') return null;
+  if (t.length > TITLE_MAX) {
+    throw new CrewError(
+      `The title "${t}" is ${t.length} characters and the limit is ${TITLE_MAX}. Say what the agent works on in fewer words.`,
+    );
+  }
+  return t;
+}
+
+/** An assignment's title: the one on its record, or one cut from its brief for a record that has none. */
+const titleOf = (a) => (typeof a.title === 'string' && a.title.trim() ? a.title.trim() : deriveTitle(a.brief));
 
 // What every seat reads before its brief lives in one section of roles/README.md,
 // so an instance changes the list by editing that file. The script only points.
@@ -120,7 +179,8 @@ function assignmentBody(ctx, brief, role, named = null) {
   const lead = role.may_seat
     ? [
         `- See who is seated, open handoffs and what needs attention: \`${cmd('board')}\``,
-        `- Seat an agent: \`${cmd('seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
+        `- Seat an agent: \`${cmd('seat <role> "<brief>" --title "<short title>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
+        '  Give every seat a `--title` of at most 24 characters saying what it works on: it is the agent\'s name in herdr\'s sidebar and on the board.',
         '  A brief that starts with a dash goes after `--`, after any flags: `seat <role> [--task <id>] -- "<brief>"`.',
         '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
         '  With `--handoff`, a handoff that names a branch seats a detached copy of it, unless you pass `--base`: then the agent gets a new branch from that base. `--base` and `--on` cannot be combined.',
@@ -172,8 +232,9 @@ function handoffBrief(file) {
  * `base` is null when the operator gave none: only then does a handoff's branch
  * decide, and the new branch starts from `main`. An explicit base always wins.
  */
-export function seat(ctx, { roleId, brief, task = null, base = null, on = null, handoff: handoffTarget = null }) {
+export function seat(ctx, { roleId, brief, title: givenTitle = null, task = null, base = null, on = null, handoff: handoffTarget = null }) {
   requireHerdr(ctx);
+  const givenCheckedTitle = checkTitle(givenTitle);
   if (base !== null && on) {
     throw new CrewError('--base and --on cannot be used together: --on seats a detached copy of an existing branch, --base starts a new branch from a ref. Use one of them.');
   }
@@ -207,6 +268,7 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   if (!brief || !brief.trim()) {
     throw new CrewError('A brief is required: say what the agent should do.');
   }
+  const title = givenCheckedTitle ?? deriveTitle(brief);
   const ref = on || base || 'main';
   if (!ctx.git.resolves(ref)) {
     throw new CrewError(`"${ref}" is not a branch or commit in this repository.`);
@@ -216,13 +278,14 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   const id = freeId(ctx.mainDir, `${localDate(now)}-${role.id}-${slugify(brief)}`);
   const file = join(trailDir(ctx.mainDir), `${id}.md`);
   const worktree = join(ctx.worktreeRoot, basename(ctx.mainDir), id);
-  const name = freeName(role.id, agents);
+  const name = freeName(role.id, agents, title);
   writeRecord(
     file,
     {
       id,
       role: role.id,
       agent: name,
+      title,
       kind: role.kind,
       branch: on || `crew/${id}`,
       detached: Boolean(on),
@@ -271,6 +334,7 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
     else if (role.effort) {
       notes.push(`The ${role.id} role's effort (${role.effort}) was not applied: crew does not know how to pass an effort level to a ${role.kind} agent.`);
     }
+    if (NAME_ARGS[role.kind]) args.push(...NAME_ARGS[role.kind](role.id, title));
     let ready = true;
     try {
       ctx.herdr.startAgent({ name, kind: role.kind, pane_id: opened.pane_id, args });
@@ -321,19 +385,18 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
   const record = updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
   // `notes` is not part of the record: the lines the command prints for the operator.
-  setLabel(ctx, notes, { agent: name, role: role.id, brief, pane: record.pane, workspace: record.workspace, status: 'working' });
+  setLabel(ctx, notes, { agent: name, role: role.id, title, pane: record.pane, workspace: record.workspace, status: 'working' });
   return { ...record, notes };
 }
 
 /**
- * What herdr's sidebar shows for an agent: role, a short assignment and the
- * status. The same width as the board's ASSIGNMENT column, so a first brief line
- * of any length stays one readable row. The workspace gets role and assignment
- * only: its status would go stale, and the pane's is the one that moves.
+ * What herdr's sidebar shows for an agent: role, the assignment's title and the
+ * status. A title is at most 24 characters, so a row stays one readable line at
+ * herdr's default sidebar width. The workspace gets role and assignment only: its
+ * status would go stale, and the pane's is the one that moves.
  */
-function labelTokens({ role, brief, status }) {
-  const line = String(brief).split('\n').find((l) => l.trim()) ?? '';
-  return { role, assignment: clip(line.trim().replace(/\s+/g, ' '), BOARD_BRIEF_WIDTH), status };
+function labelTokens({ role, title, status }) {
+  return { role, assignment: title, status };
 }
 
 /**
@@ -341,8 +404,8 @@ function labelTokens({ role, brief, status }) {
  * label is only display: a refusal never changes the record or the outcome. A
  * refusal adds one plain line to `notes`, which the command prints.
  */
-function setLabel(ctx, notes, { agent, role, brief, pane, workspace, status }) {
-  const tokens = labelTokens({ role, brief, status });
+function setLabel(ctx, notes, { agent, role, title, pane, workspace, status }) {
+  const tokens = labelTokens({ role, title, status });
   try {
     ctx.herdr.labelPane(pane, tokens);
     if (workspace) {
@@ -420,7 +483,7 @@ export function report(ctx, { text }) {
   writeRecord(caller.file, next, `${body.trimEnd()}\n\n## Report — ${when}\n\n${text.trim()}\n`);
   // The report is written; the label is one more call and may fail on its own.
   const notes = [];
-  setLabel(ctx, notes, { agent: caller.agent, role: caller.role, brief: caller.brief, pane: caller.pane, status: 'reported' });
+  setLabel(ctx, notes, { agent: caller.agent, role: caller.role, title: titleOf(caller), pane: caller.pane, status: 'reported' });
   return { ...next, notes };
 }
 
@@ -652,6 +715,8 @@ export function board(ctx) {
         role: a.role,
         state: live.state,
         status: a.status,
+        // The title the operator or seat chose; null for a record made before titles.
+        title: typeof a.title === 'string' && a.title.trim() ? a.title.trim() : null,
         brief: a.brief.split('\n')[0],
         branch: a.branch,
         id: a.id,
@@ -677,7 +742,7 @@ function age(created, now) {
   return `${Math.floor(minutes / (24 * 60))}d`;
 }
 
-// The assignment column of the board and the assignment word of the herdr label.
+// The assignment column of the board: a title, or the first line of a brief that has none.
 const BOARD_BRIEF_WIDTH = 32;
 const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
@@ -694,7 +759,7 @@ export function renderBoard(b, now) {
   } else {
     const table = [
       ['AGENT', 'ROLE', 'STATE', 'STATUS', 'ASSIGNMENT', 'BRANCH', 'AGE'],
-      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.brief, BOARD_BRIEF_WIDTH), clip(r.branch, 44), age(r.created, now)]),
+      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.title || r.brief, BOARD_BRIEF_WIDTH), clip(r.branch, 44), age(r.created, now)]),
     ];
     const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
     for (const row of table) {

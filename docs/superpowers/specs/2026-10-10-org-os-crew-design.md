@@ -183,7 +183,7 @@ role by adding a file. There is no second lookup path and no merge of two files.
 ## 5. Seating an agent
 
 ```
-npm run crew -- seat <role> "<brief>" [--task <task-id>] [--base <ref>] [--handoff <id|file>] [--on <branch>]
+npm run crew -- seat <role> "<brief>" [--title "<short title>"] [--task <task-id>] [--base <ref>] [--handoff <id|file>] [--on <branch>]
 ```
 
 Steps, in order:
@@ -202,8 +202,16 @@ Steps, in order:
    base, the handoff is still taken, and its branch is named in the assignment file. `--base`
    together with `--on` is refused.
 5. **Start the agent** in the worktree's herdr pane with the role's kind and model. Its name is
-   the role id, or `<id>-2`, `<id>-3` if that name is taken by any live agent on the herdr
-   server, crew or not.
+   the role id when no live agent on the herdr server, crew or not, has it. A further agent in
+   the role is named `<role>-<slug of its title>` cut to herdr's name rule
+   (`[a-z][a-z0-9_-]{0,31}`), and only when that name is taken or the slug is empty is it
+   `<role>-2`, `<role>-3`. `release`, `nudge` and the board take either form, because they match
+   the `agent` field of the record. The **title** is what the agent works on, in at most 24
+   characters after trimming: `--title`, or the first line of the brief cut at a word boundary
+   (a first word longer than the limit is cut hard and ends in `…`). A longer `--title` is refused
+   before anything is written. It is stored on the record as `title`. For `claude` the start also
+   carries `--name "<role>: <title>"` (`claude --help`: `-n, --name`; accepted by a live
+   non-interactive call, 2026-10-11) so the session shows who it is; no other kind is given one.
 6. **Prompt it once**: it is seated as this role; read the role file and the assignment file
    (both given as absolute paths), then the "Before you begin" section of `roles/README.md`
    (absolute path in the main checkout) and the files it lists, which are at the root of the
@@ -211,7 +219,7 @@ Steps, in order:
    report and begin; then begin. The prompt is one line. `nudge` sends the same prompt, and the
    "type this yourself" text of an unconfirmed prompt carries the same sentence. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
-8. **Label the pane and the workspace** (5.3 item 13): role, a short assignment and the status, as
+8. **Label the pane and the workspace** (5.3 item 13): role, the title and the status, as
    display-only herdr metadata. A refusal never fails the seat and never changes the record; the
    output says in one line that the label could not be set. `report` moves the pane's `status` to
    `reported` with one more call. `release` sets nothing: it closes the workspace, and the label
@@ -348,8 +356,10 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
     observed: token values are trimmed and cut at 80 characters, a token call patches only the
     names it gives, a token with no `--ttl-ms` stays until replaced or the pane closes, and a
     pane or workspace accepts at most 32 distinct sources. Crew uses the tokens `role`,
-    `assignment` and `status`; the assignment is the first non-empty line of the brief, cut to
-    32 characters (the board's column), not herdr's 80, so a row stays one line. It sends no
+    `assignment` and `status`; the assignment is the title (at most 24 characters, 5, step 5)
+    and not herdr's 80, so a row stays one line at the default sidebar width of 26 (the binary's
+    `sidebar_width = 26`). A record made before titles has none, and `report` then cuts one from
+    its brief the same way `seat` would have. It sends no
     `--ttl-ms` and no `--seq`. The workspace gets `role` and `assignment` only, since its
     `status` would go stale. Every update sends the whole set. Tokens show only where the
     operator's `[ui.sidebar.agents]` and `[ui.sidebar.spaces]` rows list `$role`, `$assignment`
@@ -458,13 +468,16 @@ taken_by: null
 npm run crew            # same as: npm run crew -- board
 ```
 
-Output of `renderBoard` for made-up rows (the home directory in the path is invented). Values
-longer than 32 characters (assignment) or 44 (branch) are cut and end in `…`.
+Output of `renderBoard` for made-up rows (the home directory in the path is invented). The
+ASSIGNMENT column shows the record's `title`; a record made before titles has none and shows the
+first line of its brief, as the last row does. Values longer than 32 characters (assignment) or 44
+(branch) are cut and end in `…`.
 
 ```
-AGENT     ROLE      STATE    STATUS    ASSIGNMENT                        BRANCH                                        AGE
-reviewer  reviewer  blocked  working   Review the cursor fix, and say …  crew/2026-10-10-engineer-fix-the-cursor-rac…  3m
-engineer  engineer  idle     reported  Fix the cursor race in the kms …  crew/2026-10-10-engineer-fix-the-cursor-rac…  18m
+AGENT                 ROLE      STATE    STATUS    ASSIGNMENT                        BRANCH                                        AGE
+reviewer              reviewer  blocked  working   Review the cursor fix             crew/2026-10-10-engineer-fix-the-cursor-rac…  3m
+engineer-cursor-race  engineer  idle     reported  Cursor race in kms                crew/2026-10-10-engineer-fix-the-cursor-rac…  18m
+engineer              engineer  working  working   Fix the cursor race in the kms …  crew/2026-10-10-engineer-fix-the-cursor-rac…  40m
 
 Open handoffs: 1
   engineer → researcher: "Confirm what the cursor contract promises"

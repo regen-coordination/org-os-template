@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -128,4 +128,23 @@ test('the nudge help line is true of every cause that leaves a prompt unsent, no
   assert.match(line, /that has not received it/);
   assert.doesNotMatch(line, /startup dialog/);
   assert.ok(line.length <= 110, `the line is ${line.length} characters`);
+});
+
+test('the usage text shows --title and the limit, and seat takes it as a flag', () => {
+  const h = run(['--help']);
+  assert.match(h.stdout, /seat <role> "<brief>" \[--title "<short title>"\]/);
+  assert.match(h.stdout, /at most 24 characters/);
+  // refused for being outside herdr, which proves --title parsed
+  const r = run(['seat', 'engineer', 'fix', 'it', '--title', 'Fix it']);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /inside herdr/);
+});
+
+// The skill is the framework repository's; an instance may not have it.
+const skillPath = join(dirname(script), '..', 'skills', 'crew', 'SKILL.md');
+test('the crew skill tells its reader to give every seat a --title (skipped where the skill is absent)', { skip: !existsSync(skillPath) && 'skills/crew/SKILL.md is not in this tree' }, () => {
+  const text = readFileSync(skillPath, 'utf-8');
+  const section = text.slice(text.indexOf('## Writing a brief'), text.indexOf('## Reading the board'));
+  assert.match(section, /Give every seat a `--title`/);
+  assert.match(section, /24/);
 });

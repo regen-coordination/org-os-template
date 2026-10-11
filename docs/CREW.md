@@ -17,7 +17,7 @@ sees the same value.
 ## Seat an agent
 
 ```bash
-npm run crew -- seat engineer "Fix the cursor race in the kms ingest. Repro: tests/…; done when that test passes."
+npm run crew -- seat engineer "Fix the cursor race in the kms ingest. Repro: tests/…; done when that test passes." --title "Cursor race in kms"
 ```
 
 This creates a branch `crew/<date>-engineer-<slug>` from `main`, a worktree for it under
@@ -26,6 +26,11 @@ told to read its role, its assignment, and the "Before you begin" section of `ro
 (by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md` in its worktree), then starts. Crew checks
 none of this; the agent reports what it read and what was absent.
 
+- `--title "<short title>"` says in a few words what this agent is working on, at most 24
+  characters after trimming (a longer one is refused, and nothing is written). Give one: it is
+  the agent's name in herdr's sidebar and in the board's ASSIGNMENT column, and it names a second
+  agent of the same role. Without it, the title is the first line of the brief cut at a word
+  boundary to 24 characters, which is rarely as good as one you write.
 - `--base <ref>` starts the branch somewhere other than `main`. With `--handoff`, it also wins
   over the branch the handoff names: the agent gets a new branch from `<ref>`, the handoff is
   still taken, and the assignment file names the handoff's branch. Without `--base`, a handoff
@@ -36,6 +41,12 @@ none of this; the agent reports what it read and what was absent.
   (git calls this detached), because git will not check one branch out in two places. Use it
   for review.
 - `--task <id>` records a task id from `data/tasks.yaml` on the assignment.
+
+**Names.** The first agent in a role is named by the role id (`engineer`). A further agent in
+the same role is named from its title, `<role>-<title as a slug>`: `engineer-cursor-race-in-kms`,
+cut to herdr's limit of 32 characters, so two engineers do not look alike on the board. Only
+when that name is taken, or the title has nothing a name can hold, does it become `engineer-2`.
+`nudge`, `release` and the board take either form.
 
 Or ask your session: "seat an engineer on the cursor race". The `crew` skill writes the brief
 and runs the command.
@@ -119,11 +130,18 @@ herdr's sidebar already lists every agent of every workspace, crew's among yours
 one so you can tell which is which without opening the board. When it seats an agent, crew
 reports three display-only values to herdr for the agent's pane, and two for its workspace:
 
-| Value        | Shows                                                              | On                |
-| ------------ | ------------------------------------------------------------------ | ----------------- |
-| `role`       | the role id, such as `engineer`                                    | pane and workspace |
-| `assignment` | the first line of the brief, cut to 32 characters like the board   | pane and workspace |
-| `status`     | `working`, then `reported` when the agent runs `report`            | pane only          |
+| Value        | Shows                                                                         | On                 |
+| ------------ | ----------------------------------------------------------------------------- | ------------------ |
+| `role`       | the role id, such as `engineer`                                               | pane and workspace |
+| `assignment` | the assignment's title (`--title`, at most 24 characters; see "Seat an agent") | pane and workspace |
+| `status`     | `working`, then `reported` when the agent runs `report`                       | pane only          |
+
+**At the default width.** herdr's sidebar is 26 columns wide by default (`sidebar_width = 26`).
+A title of 24 characters, the longest crew allows, is one whole row there, with two columns to
+spare; a shorter one leaves more. A title is never cut by crew, and herdr cuts a row only past
+the sidebar's width, which a 24-character title does not reach. That a 24-character title fills
+one row without wrapping is read from the width and the rule, not yet seen in a live sidebar:
+the **Label check** in the smoke run is where to look.
 
 Nothing shows until you ask herdr to. herdr's own config file is yours and crew never edits it.
 **This is your edit, in `~/.config/herdr/config.toml`:**
@@ -231,8 +249,9 @@ usage. Use a throwaway brief.
 5. When it reports: the assignment file in `memory/crew/` ends with a `## Report` section and
    its status is `reported`.
    **Label check** (needs the config lines from "See the crew in herdr's sidebar"): the agent's
-   row in herdr's sidebar shows `engineer`, `Smoke run. Create SMOKE.md containing…` and
-   `working`, then `reported`. `herdr agent get engineer` is the read-only way to look; if the
+   row in herdr's sidebar shows `engineer`, `Smoke run. Create SMOKE.md` (the title cut from
+   the brief at a word boundary, since the smoke command gives none) and `working`, then
+   `reported`. `herdr agent get engineer` is the read-only way to look; if the
    sidebar shows nothing, the tokens are the first thing to inspect there.
 6. `npm run crew -- release engineer` → says the branch is kept and the worktree was removed.
    Releasing an assignment whose seating failed says instead that there was no branch or

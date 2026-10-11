@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { chmodSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRecord } from '../../scripts/crew/trail.mjs';
+import { readRecord, writeRecord } from '../../scripts/crew/trail.mjs';
 import { report, seat } from '../../scripts/crew/core.mjs';
 import { createHerdr } from '../../scripts/crew/herdr.mjs';
 import { asAgent, makeCtx, makeRoot } from '../helpers/crew-fixtures.mjs';
@@ -28,14 +28,22 @@ test('seat labels the pane and the workspace with role, a short assignment and t
   ]);
 });
 
-test('a long first line is cut to what the board shows, so it stays readable in a sidebar', () => {
+test('the label carries the title, not a 32-character cut of the brief', () => {
   const { ctx } = setup();
   const brief = 'Label each crew agent in herdr with its role and assignment, and close four small code items';
   seat(ctx, { roleId: 'engineer', brief });
   const { assignment } = ctx.herdr.labels[0].tokens;
-  assert.equal(assignment.length, 32);
-  assert.equal(assignment, 'Label each crew agent in herdr …');
-  assert.ok(brief.startsWith(assignment.slice(0, -1)));
+  assert.equal(assignment, 'Label each crew agent in');
+  assert.ok(assignment.length <= 24);
+  assert.ok(brief.startsWith(assignment));
+  const workspace = ctx.herdr.labels[1].tokens;
+  assert.equal(workspace.assignment, assignment);
+});
+
+test('a title the operator gave is the label, whatever the brief says', () => {
+  const { ctx } = setup();
+  seat(ctx, { roleId: 'engineer', brief: 'Label each crew agent in herdr with its role', title: 'Agent labels' });
+  assert.deepEqual(ctx.herdr.labels.map((l) => l.tokens.assignment), ['Agent labels', 'Agent labels']);
 });
 
 test('a label that herdr refuses never fails the seat or changes its status, and the output says so in one line', () => {
@@ -95,4 +103,16 @@ test('the adapter reports metadata from source crew, one --token per name, and n
     'pane', 'report-metadata', '--source', 'crew', '--token', 'role=engineer', '--token', 'assignment=Fix a=b', '--token', 'status=working', 'w1:p1',
     'workspace', 'report-metadata', '--source', 'crew', '--token', 'role=engineer', 'w1',
   ]);
+});
+
+test('report labels an assignment made before titles from a title cut from its brief', () => {
+  const { root, ctx } = setup();
+  const eng = seat(ctx, { roleId: 'engineer', brief: 'Fix the KMS cursor race in the ingest queue' });
+  const file = join(root, 'memory', 'crew', `${eng.id}.md`);
+  const { data, body } = readRecord(file);
+  delete data.title; // a record written before titles existed
+  writeRecord(file, data, body);
+  ctx.herdr.labels.length = 0;
+  report(asAgent(ctx, eng), { text: 'Done.' });
+  assert.equal(ctx.herdr.labels[0].tokens.assignment, 'Fix the KMS cursor race');
 });
