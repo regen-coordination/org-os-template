@@ -1102,3 +1102,48 @@ leaves them out.
   (`<li data-instance>`, `federation.json`) and at marked counts. It does not look for the two
   names in every built file, because two things print them on purpose today: `docs/ECOSYSTEM.md`
   and the map. A wider check waits on the operator's decision about the map.
+
+**What the final review left (2026-10-11, review of `163ffb1`).**
+
+- **The two corrected sentences** (`commons-steward`, `f12359f`). `docs/DATA-MODEL.md`, the
+  `listed` paragraph: only the literal `false` leaves an entry out; `true` or no `listed` keeps
+  it in; any other value stops `npm run build` in `site/` with a sentence naming the entry, and
+  nothing is built. `docs/FEDERATION-MAP.md`, step 1 of the aggregator: such a value stops the
+  run, which writes nothing. Both read against `isListed`, `listedProblems` and `aggregate` in
+  `site/scripts/federation-aggregate.mjs` and the `try` in `site/scripts/aggregate-federation.mjs`,
+  and both true. The commands were run, not only read: `test/listed-stop.test.mjs` runs the
+  aggregator on a scratch registry with `listed: "false"` and finds exit 1, the sentence, and
+  no `federation.json` or `map.json` written; with `listed: false` it finds exit 0 and the entry
+  left out. "Nothing is built" also rests on `site/package.json`: `build` chains its steps with
+  `&&` and `aggregate` is the second, after `clean`, so a stopped build also leaves no `dist/`.
+- **The lines that stop are now held** (low finding 1). The same test runs `verify-build.mjs`
+  in the scratch repository and reads the sentence there too. Each of four breaks fails it:
+  the verifier's `listedProblems` line removed; the aggregator's `try` removed (a stack trace
+  where the sentence should be); its `catch` printing and not exiting; `aggregate` not throwing.
+  Its limit: nothing is built in the scratch repository, so the verifier exits 1 there for
+  other reasons too. What holds its line is the sentence, printed for the mistyped value and
+  not for the proper one, not the exit code.
+- **Covers** (low finding 2). `data-model` now covers `site/scripts/federation-aggregate.mjs`
+  and `site/scripts/verify-build.mjs`; so does `federation-map`, which covered only the script
+  that calls them. Both re-stamped at `f12359f`. For `data-model`, nothing under its earlier
+  covers changed between `7a80443` and `f12359f` (`git diff --name-only`, empty), so what was
+  read is the `listed` paragraph, against both scripts. For `federation-map`, the whole section
+  on the site was read against them: the six things in `federation.json`, `PUBLIC_FIELDS`,
+  `isListed`, `quietMap`, and what the verifier fails on (steps 3a, 3b and 3e).
+- **Other pages that name a file under `site/` they do not cover.** Found by listing every
+  path beginning `site/` in each page's source that exists in the repository, and comparing it
+  with the page's covers. Not changed: none of these pages was read again in this round, and
+  a cover added to a page stamped earlier reports it as drifted at once.
+  - `federation` (`docs/FEDERATION.md`, stamped `214e2e4`) says the site's build
+    (`site/scripts/aggregate-federation.mjs`) copies `.well-known/` and reads sibling
+    instances the same way. The script changed four times since that stamp.
+  - `modules` (`docs/MODULES.md`, stamped `3366823`) names the same script in the site's card,
+    with `site/src/data/docs-manifest.mjs`, and names `site/src/data/modules.yaml` and
+    `site/test/modules-catalog.test.mjs` as the mirror and its test.
+  - `cloudflare-os` names `site/src/data/modules.yaml` in a step for a maintainer; it does not
+    describe the file.
+  - `federation-map` also names `site/package.json` (the order of `dev` and `build`) and
+    `site/src/components/FederationMapIsland.astro`. Both sentences were read in this round
+    and are true; neither file is a script and neither was added to its covers.
+  No test requires a page to cover the site files it names. One could (the list above is its
+  first run), once `federation` and `modules` have been read against the aggregator.

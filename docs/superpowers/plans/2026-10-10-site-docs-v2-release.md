@@ -1,12 +1,26 @@
 # Site and Docs v2 — Plan 3: the Release — Implementation Plan
 
-> **In progress.** Task 1 is done, and tasks 1b to 1g were added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
+> **In progress.** Task 1 is done, and tasks 1b to 1h were added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 is `engineer`'s and follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
 >
 > **Whose it is.** Since 2026-10-11 the website steward (crew seat `website`) carries this plan, by the operator's decision. The operator keeps the look by eye, the decisions of task 3, the pull request, the merge and the tag. The order of release is: the site lands on `main` as `0.5.1`; the crew (`feat/crew`) follows toward `0.6.0`, and the site is made ready for it on that branch afterwards.
 
 **Goal:** Publish the new site and docs in place, with `v0.5.1`.
 
 **Spec:** `docs/superpowers/specs/2026-10-10-site-docs-v2-design.md` §6. **Before it:** plans 1 (frame) and 2 (content), both complete on `feat/site-docs-v2`; ledger at `docs/superpowers/specs/2026-10-10-site-docs-v2-ledger.md`.
+
+## What is left, and whose (2026-10-11)
+
+Nothing local is open on the site. The final review passed the branch at `163ffb1` ("would publish as 0.5.1"), and task 1h closed its two low findings.
+
+| Task | What | Whose | Waits on |
+|---|---|---|---|
+| 2 | Look at the site by eye | the operator | nothing: it is next |
+| 3 | Eight decisions, listed under the task; two are about the map | the operator | nothing; the two about the map are easiest to make during the look |
+| 4 | Version surfaces to `0.5.1` | `engineer` (the files are outside `site/`) | task 2, and whatever task 3 changes |
+| 5 | Push and pull request | the operator | task 4 |
+| 6 | Label, merge with a merge commit, tag `v0.5.1` | the operator | task 5, CI green |
+| 7 | Check the live site | not assigned; the website steward carries this plan and can be seated for it | task 6 |
+| 8 | Afterwards, in `lf-work-os` | the operator (another repository) | task 7 |
 
 ## Global Constraints
 
@@ -81,11 +95,24 @@
 - Left by it, for others: `docs/DATA-MODEL.md` says any value of `listed` other than `false` "keeps the entry in"; the site's build now stops on one that is not a boolean (`commons-steward`'s sentence, handed off).
 - Left by it, for the operator: the two open decisions under task 3 below (the map draws the two unlisted entries; `map.json` carries paths in the operator's workspace).
 
+## Task 1h — What the final review left (local)
+
+> **Done 2026-10-11** by the website steward, from the final review of `163ffb1` (PASS; `memory/crew/2026-10-11-reviewer-review-the-five-commits-after-6eacb24-on.md` in the main checkout).
+
+- The two sentences `commons-steward` corrected (`f12359f`: `docs/DATA-MODEL.md`, the `listed` paragraph; `docs/FEDERATION-MAP.md`, the aggregator's step 1) were read against `site/scripts/federation-aggregate.mjs` and `site/scripts/aggregate-federation.mjs` and are true. This closes the line "Left by it, for others" of task 1g.
+- Low finding 1: `site/test/listed-stop.test.mjs` runs `aggregate-federation.mjs` and `verify-build.mjs` on a scratch repository whose registry has `listed: "false"` and reads the exit code and the sentence. It fails when the verifier's line is removed, when the aggregator's `try` is removed, when its `catch` does not exit, and when `aggregate` does not throw.
+- Low finding 2: the `data-model` page now covers `site/scripts/federation-aggregate.mjs` and `site/scripts/verify-build.mjs`, which its `listed` paragraph describes; `federation-map` had the same gap for the same two files and covers them too. Both re-stamped at `f12359f`.
+- Left by it, reported and not changed: three pages name a file under `site/` that they do not cover (`modules`, `federation`, `cloudflare-os`), and `federation-map` names two that are not scripts. The ledger lists them.
+
 ## Task 2 — The operator looks at it (by eye)
 
-`cd site && npm run build && npm run preview`, then `http://localhost:4321/org-os-template/`. Each section at desktop and phone width, both themes; keyboard through nav, sidebar, search, theme switch and prompt bar; one page with script off. The look and the interactive elements (one commit, `599b3db`, adjusted in `a195c76`) are a first pass made without the operator present: keep, dial down or drop.
+> **Open. Whose: the operator.** Next.
+
+A fresh checkout needs the three installs first (`site/README.md`). Then `cd site && npm run build && npm run preview`, and open `http://localhost:4321/org-os-template/`. Each section at desktop and phone width, both themes; keyboard through nav, sidebar, search, theme switch and prompt bar; one page with script off. The look and the interactive elements (one commit, `599b3db`, adjusted in `a195c76`) are a first pass made without the operator present: keep, dial down or drop.
 
 ## Task 3 — Decisions only the operator can make
+
+> **Open. Whose: the operator.** Eight, none decided. The last two are about the map and came from the closing review; the site changes nothing about either until the operator says.
 
 Listed in the ledger under "Found in the code, not fixed". Before publication, at least:
 - the workspace-snapshot command does not capture untracked files (the docs now say so; the script and the agent instructions that recommend it are unchanged);
@@ -98,6 +125,8 @@ Listed in the ledger under "Found in the code, not fixed". Before publication, a
 - `map.json` carries, for ring-2 nodes, `repo` values that are paths in the operator's own workspace (`03 Libraries/ReFi DAO`, `repos/egregore`), from the committed frontier cache (closing review, finding 6).
 
 ## Task 4 — Version surfaces (local)
+
+> **Open. Whose: `engineer`**, by handoff after the operator's look (task 2): the version files and `scripts/update-version.mjs` are outside `site/`. The website steward rebuilds afterwards and checks that the site shows `v0.5.1`.
 
 `VERSION.md`, `CHANGELOG.md` and the other surfaces `npm run version:check` reads move together to `0.5.1` (`npm run version:update` — read `scripts/update-version.mjs` first). The changelog entry names what landed since `v0.5.0`. Rebuild; the site shows `v0.5.1`. Commit.
 
