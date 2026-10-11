@@ -244,8 +244,8 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
 - Refuses while the agent's live state is `working`.
 - Sets the assignment to `released` (or `abandoned`) with a timestamp.
 - Leaves the branch in place. The branch is the deliverable; merging belongs to the operator.
-- Removes the worktree only when it has no modified, untracked or git-ignored files (installed
-  dependencies aside); git would delete ignored files without asking. Otherwise it lists them
+- Removes the worktree only when it has no modified, untracked or git-ignored files (a `node_modules/` directory at any
+  depth aside; build output is not set aside); git would delete ignored files without asking. Otherwise it lists them
   and leaves the worktree. It never forces removal.
 - For a detached assignment (`--on`), commits that are on no branch are first saved as
   `crew/<assignment-id>`, since they would otherwise be lost with the worktree.
@@ -367,9 +367,15 @@ they are in the smoke run of `docs/CREW.md`:
 - what git leaves on a killed `git worktree add`;
 - which code `agent get <pane>` or `agent list` gives for a pane with no agent (crew uses the
   list and reads no code from it);
-- that the installed binary accepts and shows the label tokens as the reference says, that
-  `herdr agent get <name>` returns them, and that a herdr restart keeps or drops them (crew does
-  not set them again). The smoke run in `docs/CREW.md` has the live check.
+- that a herdr restart keeps or drops the label tokens (crew does not set them again), and how
+  the sidebar draws them: that needs the operator's `config.toml` edit and the operator's eyes.
+
+Observed against the live herdr 0.9.1 (client and server) on 2026-10-11, on one pane and one
+workspace, tokens cleared afterwards: `report-metadata` takes the positional id **first** and
+`--source crew` after it. With the id last herdr answers `unknown option: crew`, and
+`--source=crew` gives `unknown option: --source=crew`. Values with spaces, `:`, `=` and `…`
+are accepted unchanged. `pane get`, `agent get` and `agent list` return the tokens under
+`tokens`; `workspace get` does too. `--clear-token` removes them.
 
 ## 6. The trail
 
