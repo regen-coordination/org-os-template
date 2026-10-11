@@ -116,6 +116,10 @@ a page are 64px apart, parts of a block 24 or 32, lines of a list 8 or 12.
 **Motion.** Colour and rule changes at 140ms. Nothing moves on load. `prefers-reduced-motion`
 still zeroes the durations.
 
+Both are read by `site/test/design-tight.test.mjs` since the closing review (2026-10-11): a radius
+is one of the three tokens or 50%, and the one animation is the cursor of the `~/org-os` mark,
+kept on purpose (§3) and stopped by `prefers-reduced-motion`.
+
 ## 5. Both themes
 
 The palettes are unchanged, so `theme-contrast.test.mjs` holds exactly what it held: every text

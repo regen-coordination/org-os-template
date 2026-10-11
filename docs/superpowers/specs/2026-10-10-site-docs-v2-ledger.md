@@ -1056,3 +1056,49 @@ leaves them out.
   page says "2 operational instances, of 6 registered" above a small map on which both names
   can be read.
 - Could not check: phone width, the dark theme, a screen reader's reading of the map's table.
+
+**What the closing review left (2026-10-11, review of `6eacb24`).**
+
+- **Page width.** Measured in headless Chrome (155, a throwaway profile, mobile emulation, the
+  site served from `dist/` under its base path) on the 51 built pages that are not redirects, by
+  `npm run widths`. Before: at 375px six pages were wider than the screen (`data-model` 404px,
+  `federation-map` 534, `federation` 447, `kms-connectors` 395, `migration-v2-to-v3` 380,
+  `versioning` 380: the reviewer's six, to the pixel) and at 320px fourteen (those, and `buzz`,
+  `cloudflare-os`, `file-structure`, `migration-v3-to-v3-5`, `modules`, `overview`, `plans`).
+  On every one the element reaching past the edge was inline `<code>` holding a path, an address
+  or a dotted field name; on `kms-connectors` it was `subscribed_domains` in a heading. After
+  the one rule (`.doc :not(pre) > code { overflow-wrap: break-word }`): each of the 51 pages is
+  exactly as wide as the screen at both widths. `break-word` and not `anywhere`, so a table's
+  narrowest width is unchanged and a wide table still scrolls in its region.
+- The measurement is kept as `npm run widths`; it needs Chrome on the machine and is not in the
+  build or in CI. The build's tests hold the rule in the stylesheet, not the widths: a new
+  cause of overflow that is not inline code in a doc (a wide image, a long word in a heading
+  outside `<code>`, a page that is not a doc) passes `npm test` and is caught only by running
+  `npm run widths`.
+- Could not check: a real phone, Safari, Firefox, text enlarged by the reader, widths under 320px.
+- **A mistyped `listed`.** `listed: "false"`, `no`, `off`, `0`, an empty value, a list and a
+  mapping each stop `npm run aggregate`, the first step of the build, with one sentence naming
+  the entry. Checked on the real registry by writing `listed: "false"` on `openclaw`, running
+  `npm run aggregate` (it stopped, and wrote no `federation.json` line) and `npm run verify`
+  (it fails with the same sentence first), then restoring the file. This corrects the line
+  above that says a mistyped `"false"` keeps the entry on the list: it no longer builds.
+  `docs/DATA-MODEL.md` still says "any other value, or none, keeps the entry in"; handed to
+  `commons-steward`.
+- **Characters that are not seen.** The reviewer's three (soft hyphen, non-breaking hyphen,
+  zero-width space between words) each have a case that failed on the old code. A sentence is
+  now compared without its spaces, so a zero-width space in place of a space is read too. The
+  real build still finds nothing (24 sentences, 8 notes, 14 flags and paths). Not looked for:
+  a letter replaced by one that looks like it; `site/README.md` says so.
+- **Corners and motion.** Every radius in the sources is one of the three tokens or 50%, and
+  the only animation is the mark's cursor; the test now reads both, with cases that fail.
+- Re-stamped at `14d0f46`: `federation-map`, read against the one covered path that changed
+  (`site/scripts/aggregate-federation.mjs`: `aggregate` is now called inside a `try`, and the
+  script exits with the registry's sentence when `listed` is mistyped). What the page says of
+  the script is still true: the install check comes first, it does three things, and step 1
+  reads the registry and leaves out the entries marked `listed: false`. The page does not say
+  that a mistyped `listed` stops the run; that is an omission, named in the handoff to
+  `commons-steward`, not a false claim.
+- **Left as it is: finding 3.** The unlisted guard looks where the site lists instances
+  (`<li data-instance>`, `federation.json`) and at marked counts. It does not look for the two
+  names in every built file, because two things print them on purpose today: `docs/ECOSYSTEM.md`
+  and the map. A wider check waits on the operator's decision about the map.

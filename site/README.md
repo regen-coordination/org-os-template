@@ -20,7 +20,18 @@ it and the command that fixes it (`scripts/installs.mjs`).
 npm run dev        # aggregates federation.json, then http://localhost:4321/org-os-template/
 npm run build      # aggregate → astro build → pagefind → verify  (static site → dist/)
 npm test           # unit tests (manifest, links, themes, search, feedback, federation, modules)
+npm run drift      # which pages cover a file that changed since the page was verified
+npm run widths     # after a build: every page, in headless Chrome, at 375 and 320px
 ```
+
+`npm run widths` (`scripts/page-widths.mjs`) fails, naming the page, its width and the element
+that reaches past the edge, when a built page scrolls sideways at a phone's width. It needs
+Chrome or Chromium on the machine (`CHROME=/path/to/chrome` to point at one) and uses no
+package: it serves `dist/` on a local port and starts Chrome headless on a profile it makes in
+the temp directory and removes. It is not part of `npm run build`, because a browser in the
+build would be a new dependency; run it before a release and after a change to a layout. What
+every `npm test` holds is the rule that fixed the pages it found
+(`test/page-width.test.mjs`: inline code in a doc may break inside a word).
 
 Requires Node ≥22. Build/dev must run from this directory (`site/`).
 
@@ -35,7 +46,7 @@ on any link that skips (or doubles) the prefix.
 - **Docs** are published from one manifest, `src/data/docs-manifest.mjs`: each entry names a markdown file anywhere in the repository, its address, title, section, order, summary and the commit it was checked against. Nothing is copied into `site/`. A file that is not in the manifest is not on the site.
 - **Links between docs** are written as file links (`[x](FEDERATION.md)`), as the repository needs. `src/lib/remark-doc-links.mjs` turns a link to a published page into its site address and a link to any other repo file into its GitHub address at the commit being built. A link that resolves to nothing fails the build.
 - **Search** is Pagefind: `npm run build` indexes `dist/` after Astro builds it, and the index loads when the viewer first opens search. It does not exist under `npm run dev`, where Search falls back to the docs index — use `npm run build && npm run preview` to try it.
-- **Federation**: `scripts/aggregate-federation.mjs` reads `../data/instances.yaml` and writes `src/data/federation.json` (gitignored, regenerated each build) with three fields per listed instance — name, type, repository (`PUBLIC_FIELDS` in `scripts/federation-aggregate.mjs`) — and two counts: registered, and operational (maturity `production`). An entry the registry marks `listed: false` is not written and is in neither count (`isListed`; only the literal `false` unlists). `registryView` in the same file is the one rule the aggregator writes by and the verifier checks by. The registry's other fields, its `notes` above all, are the maintainer's working record and are not published; see "The registry guard" below. The same script writes `map.json` from `packages/org-os-kms` (`buildMap`), dropping the `live: false` flag of nodes whose checkout was not present, and copies org-os's own `.well-known/*.json` into `public/.well-known/`.
+- **Federation**: `scripts/aggregate-federation.mjs` reads `../data/instances.yaml` and writes `src/data/federation.json` (gitignored, regenerated each build) with three fields per listed instance — name, type, repository (`PUBLIC_FIELDS` in `scripts/federation-aggregate.mjs`) — and two counts: registered, and operational (maturity `production`). An entry the registry marks `listed: false` is not written and is in neither count (`isListed`; only the literal `false` unlists). A `listed` that is neither `true` nor `false` (`"false"`, `no`, `0`, empty) stops the build with a sentence naming the entry (`listedProblems`): as written it would publish an entry meant to be hidden, and the repository's own test of the field does not run in the workflow that deploys the site. `registryView` in the same file is the one rule the aggregator writes by and the verifier checks by. The registry's other fields, its `notes` above all, are the maintainer's working record and are not published; see "The registry guard" below. The same script writes `map.json` from `packages/org-os-kms` (`buildMap`), dropping the `live: false` flag of nodes whose checkout was not present, and copies org-os's own `.well-known/*.json` into `public/.well-known/`.
 - **Themes**: light and dark, both loaded (`src/styles/theme.css`); `<html data-theme>` chooses, set before first paint by `src/lib/theme-boot.mjs` from the viewer's saved choice or the system setting. Palette/fonts/radius live in `src/styles/themes/`; structural tokens in `tokens.css`. `test/theme-contrast.test.mjs` holds both to WCAG AA.
 - **Design**: flat and tight — one short type scale and one spacing scale in `src/styles/tokens.css`, hairlines, one shadow (the search dialog). `test/design-tight.test.mjs` fails on a raw `font-size`, a spacing step above 64px, a stray shadow, or decoration that was cut; it reads the same rules in their other spellings (an inline `style`, the `font` shorthand, a gradient, `drop-shadow`, movement on hover), and holds the home page's first screen to its lengths. Spec: `../docs/superpowers/specs/2026-10-11-site-tight-design.md`.
 - **Commands on the home page** are each printed under the place they are run: to the agent, in the instance, or in the framework checkout. `scripts/command-where.mjs` says whether a command is present there, by reading what an instance receives (`../tests/clone-manifest.txt`) and following the script to every file it loads; `test/command-where.test.mjs` holds the page to it. It proves a command is present, not that it passes.
@@ -51,17 +62,18 @@ on any link that skips (or doubles) the prefix.
 
 What it looks for:
 
-- **A sentence** of a field's free text, whole (16 characters or more), whatever its case.
+- **A sentence** of a field's free text, whole (16 characters or more), whatever its case and its spacing: the letters and the punctuation must be the note's, in order.
 - **An excerpt**: any 40 letters and digits in a row of a note (`RUN_LENGTH`), whatever stands between them. This is what a note cut short for a card or a description leaves. Spaces, punctuation and case are ignored.
 - **A flag or a local path**: a one-word value of 8 characters or more with a `_` or a `/` in it. Today these are the `drift` flags (`no_masterplan`) and the `local_path` values (`../refi-bcn-os`).
 
-Each file is read twice, as written and with its markup removed, so text held in an attribute and text with tags between its words are both seen. HTML entities and the escapes of scripts and JSON (`\uXXXX`, `\xNN`, `\n`, `\"`) are decoded first; curly quotes and long dashes count as the plain ones.
+Each file is read twice, as written and with its markup removed, so text held in an attribute and text with tags between its words are both seen. HTML entities and the escapes of scripts and JSON (`\uXXXX`, `\xNN`, `\n`, `\"`) are decoded first; curly quotes, long dashes and the other hyphens (U+2010 to U+2012, the non-breaking hyphen among them) count as the plain ones; and the characters that take no room are removed before anything is compared: the soft hyphen, the zero-width space, joiner and non-joiner, the word joiner and the byte-order mark.
 
 What it does not look for, and why:
 
 - **One-word values that are ordinary words**: `maturity` (`production`), `federation_role` (`hub`), `federation_network`, and the names in `packages`, `skills_extra`, `data_registries_extra` and `agent_runtime`. The framework's documents use these words on their own account, so finding one on a page proves nothing.
 - **Dates, versions and booleans**: `last_sync`, `framework_version`, `masterplan_version`, `cloned`. A date on a page is anyone's date.
 - **An excerpt shorter than 40 letters** that is not a whole sentence. The length is set from two measurements (2026-10-11): the longest run any built file shares with a note is 32 letters, the path of a public file that `docs/ECOSYSTEM.md` cites; and the longest single name inside a note is 36 letters, which a document may cite without quoting the note. 40 is that name and one joining word. `npm run build` prints the first number each time; `test/registry-leaks.test.mjs` fails when the second moves.
+- **A letter written as another that looks like it** (a Cyrillic "о" for a Latin "o"), or a sentence with a word changed. Short sentences are still matched by their letters.
 - **A paraphrase**, and text in a file that is not text (the search index's compressed fragments, which are built from the pages that are read).
 
 For these the guard is the shape of what is printed, not the words: `federation.json` may carry only the public fields (step 3a), and each instance's line on the federation page may be only its name, type and link (step 3b). The same steps fail the build, naming the entry, when one marked `listed: false` is in `federation.json` or in the page's list, and when a count a page prints (marked `data-registered-count` or `data-operational-count`) is not the registry's. The map is not part of this: it is drawn from `federation.yaml`, which has no `listed`, and it still draws the two unlisted entries.

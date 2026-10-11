@@ -1,6 +1,6 @@
 # Site and Docs v2 — Plan 3: the Release — Implementation Plan
 
-> **In progress.** Task 1 is done, and tasks 1b, 1c, 1d and 1e were added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
+> **In progress.** Task 1 is done, and tasks 1b to 1g were added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
 >
 > **Whose it is.** Since 2026-10-11 the website steward (crew seat `website`) carries this plan, by the operator's decision. The operator keeps the look by eye, the decisions of task 3, the pull request, the merge and the tag. The order of release is: the site lands on `main` as `0.5.1`; the crew (`feat/crew`) follows toward `0.6.0`, and the site is made ready for it on that branch afterwards.
 
@@ -69,6 +69,18 @@
 - The sentences in `docs/DATA-MODEL.md` and `docs/FEDERATION-MAP.md` on what the site does with `listed` are corrected (the lead's call; nothing else in `docs/`). Five pages re-stamped at `7a80443`; `npm run drift` reports no drifted page.
 - Left by it, for the operator: the map still draws "Bread Cooperative" and "openclaw" as ring-1 instances, on the home page and on `/federation`, because it is drawn from `federation.yaml`; and `docs/ECOSYSTEM.md`, a published page, names both. The ledger says what a visitor sees.
 
+## Task 1g — What the closing review left (local)
+
+> **Done 2026-10-11** by the website steward, from the closing review of `6eacb24` (PASS, "would publish as 0.5.1"; `memory/crew/2026-10-11-reviewer-closing-review-of-the-site-branch-every-2.md` in the main checkout).
+
+- Finding 1: inline code in a doc may break inside a word (`DocsLayout.astro`). Measured in headless Chrome before and after, on all 51 built pages that are not redirects: six scrolled sideways at 375px and fourteen at 320px; none does now. `npm run widths` (`site/scripts/page-widths.mjs`) repeats the measurement and fails naming the page and the element; it needs Chrome, so it is not in `npm run build`. `site/test/page-width.test.mjs` holds the stylesheet rule at every `npm test`.
+- Finding 2: a `listed` that is not `true` or `false` stops the build in a sentence that names the entry (`listedProblems` in `site/scripts/federation-aggregate.mjs`; `aggregate` throws it, the verifier repeats it).
+- Finding 5: the leak check removes the characters a reader does not see (soft hyphen, zero-width space and its kin), reads the other hyphens as the plain one, and compares a sentence without its spaces; a case for each in `site/test/registry-leaks.test.mjs`.
+- Finding 4: `site/test/design-tight.test.mjs` reads every radius (a token or a circle; the themes' tokens are 4px and 2px) and every animation in any spelling (only the mark's cursor is kept, by name), each with cases that fail.
+- Finding 3, left as it is: the unlisted guard looks in `<li data-instance>` and `federation.json`, not for the two names anywhere on the site. `docs/ECOSYSTEM.md` names both on purpose and the map draws both, so a search for the names in every built file would fail today's build until the operator decides about those two. The ledger says so.
+- Left by it, for others: `docs/DATA-MODEL.md` says any value of `listed` other than `false` "keeps the entry in"; the site's build now stops on one that is not a boolean (`commons-steward`'s sentence, handed off).
+- Left by it, for the operator: the two open decisions under task 3 below (the map draws the two unlisted entries; `map.json` carries paths in the operator's workspace).
+
 ## Task 2 — The operator looks at it (by eye)
 
 `cd site && npm run build && npm run preview`, then `http://localhost:4321/org-os-template/`. Each section at desktop and phone width, both themes; keyboard through nav, sidebar, search, theme switch and prompt bar; one page with script off. The look and the interactive elements (one commit, `599b3db`, adjusted in `a195c76`) are a first pass made without the operator present: keep, dial down or drop.
@@ -81,7 +93,9 @@ Listed in the ledger under "Found in the code, not fixed". Before publication, a
 - the live `map.json` and `dao.json` point at a host under an unregistered GitHub organisation and expose personal vault links;
 - tracked agent persona files contain private vault paths;
 - two module statuses changed on the evidence (`rad-org-os` → planned; territory pack → pilot);
-- two integration pages (koi, egregore) are not on the site.
+- two integration pages (koi, egregore) are not on the site;
+- the map on the home page and on `/federation` draws "Bread Cooperative" and "openclaw" by name, above a list that says six: it is drawn from `federation.yaml`, which has no `listed` (closing review, 2026-10-11);
+- `map.json` carries, for ring-2 nodes, `repo` values that are paths in the operator's own workspace (`03 Libraries/ReFi DAO`, `repos/egregore`), from the committed frontier cache (closing review, finding 6).
 
 ## Task 4 — Version surfaces (local)
 
