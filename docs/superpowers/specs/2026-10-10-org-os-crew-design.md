@@ -146,8 +146,9 @@ works unchanged across kinds.
   files you read and any that were absent.
 
 `roles/README.md` also holds a section **Before you begin**: the files every seat reads before its
-brief, by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md` at the root of the agent's own
-worktree (mandate and priorities, values and boundaries, decisions in force). An instance changes
+brief, by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md` at the root of the
+agent's own worktree (mandate and priorities, values and boundaries, what is active, and the
+decision record). An instance changes
 the list by editing that file. A role file may add to it and never shortens it (`lead` adds
 `HEARTBEAT.md` and the rest of the `AGENTS.md` startup sequence). A missing file is skipped, not
 fatal: crew checks nothing and refuses nothing here, since the script carries rules and the role

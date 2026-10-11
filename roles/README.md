@@ -38,9 +38,12 @@ at the root of your own worktree, before you start the brief:
 - `MASTERPLAN.md`
 - `SOUL.md`
 - `MEMORY.md`
+- `DECISIONS.md`
 
-Why these three: the mandate and priorities, the values and boundaries, and the decisions in
-force. A task that looks local often touches a boundary stated there.
+Why these four: the mandate and priorities, the values and boundaries, what is active now, and
+the decision record that `MEMORY.md` names as authoritative. A task that looks local often
+touches a boundary stated there. `DECISIONS.md` is long and newest first: read its top entries
+and every entry your brief touches, not the whole file.
 
 Read what exists. Instances differ and a new one may hold only a stub; a missing file is skipped,
 not an error, and nothing refuses to seat you for it. Name in your report what you read and what

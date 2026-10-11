@@ -9,9 +9,10 @@ _Lightweight index for persistent organizational memory. Detailed notes live in 
 - **Identity:** `IDENTITY.md` (org-os framework + orchestration hub)
 - **Values:** `SOUL.md`
 - **Operator:** `USER.md` (Luiz Fernando, solo maintainer)
-- **Mandate:** `MASTERPLAN.md` (v2.0.0)
+- **Mandate:** `MASTERPLAN.md` (its task list moved to `HEARTBEAT.md` and `docs/agent-plans/QUEUE.md`)
 - **Decisions log:** `DECISIONS.md` (authoritative — what was decided and why)
 - **Active Tasks:** `HEARTBEAT.md`
+- **Crew (agent team):** `roles/` (roles and charter), `docs/CREW.md` (operator guide), `memory/crew/` (assignments and handoffs)
 - **Session notes:** `memory/YYYY-MM-DD.md`
 - **Members:** `data/members.yaml`
 - **Workstreams:** `data/projects.yaml`
@@ -35,6 +36,7 @@ _Lightweight index for persistent organizational memory. Detailed notes live in 
 - **[ongoing]** `federation-protocol` workstream — end-to-end sync exchange testing.
 - **[ongoing]** Multi-instance skill promotion review — `research` skill (2 instances), DAO modules (dao-os only).
 - **[ongoing]** Solo-maintainer phase — no treasury, no formal governance; adjust when first external contributor lands.
+- **[2026-10-10]** **Crew** — the framework's own agent team runs from the repository: roles are files under `roles/`, `npm run crew` seats an agent in a role in its own herdr pane and git worktree, and each assignment and handoff is a file under `memory/crew/`. Replaces the Paperclip-hosted team (`DECISIONS.md` 2026-10-10). Lives on the `feat/crew` branch and is not on `main`; module status `pilot`; targets 0.6.0. Every seated agent reads `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md` first, so keep this file true. Guide `docs/CREW.md`; spec `docs/superpowers/specs/2026-10-10-org-os-crew-design.md`. Open items are in `HEARTBEAT.md` under Crew.
 - **[2026-04-25]** `multica-integration` spec + 25-task plan committed, execution deferred. Pilots the self-installing package pattern for the queued `package-integration` Phase 3. See `docs/superpowers/specs/2026-04-25-multica-integration-design.md` and `docs/superpowers/plans/2026-04-25-multica-integration.md`.
 - **[2026-04-29]** New downstream instance scaffolded: `refi-med-os` (ReFi Mediterranean, LocalNode, alpha). Federated under the `refi-dao` network as a peer of refi-bcn-os and refi-dao-os. Hosted at `ReFiDAO/refi-med-os` (public). Public website + knowledge base (`ReFiDAO/ReFi-Mediterranean`) consolidated at `repos/refi-mediterranean/`. Instance is in pre-bootstrap state — operator runs `bootstrap-interviewer` from a one-pager. See `memory/2026-04-29.md`.
 - **[2026-08-02]** **Federation map ("the torch") shipped** — the federation layer got a face. New package `@org-os/federation-map`: a framework-agnostic `<federation-map>` web component rendering an instance's *external* world as rings by hop-distance (ring 1 federated instances · ring 2 frontier peers-of-peers · ring 3 sources/ecosystems), deliberately the counterpart to the internal note graph — two linked views joined by explicit portals, not one blended space. Data plane stays in `org-os-kms` (`render map`, `federate frontier`, `render map html`); the component never reads YAML. Three surfaces: site `/federation` + home mini, and a self-contained offline vault artifact openable in Obsidian. Frontier discovery fetches each peer's own `federation.yaml` one hop out, so unexplored territory renders as dim embers — the dark-forest torch. Final review caught and closed a Critical XSS where remote peer-manifest fields reached the panel via raw `innerHTML`. Spec: `docs/superpowers/specs/2026-07-19-federation-map-design.md` · `memory/2026-08-02.md`.

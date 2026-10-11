@@ -23,7 +23,7 @@ npm run crew -- seat engineer "Fix the cursor race in the kms ingest. Repro: tes
 This creates a branch `crew/<date>-engineer-<slug>` from `main`, a worktree for it under
 `~/.org-os/worktrees/`, a new herdr workspace, and an agent named `engineer` in it. The agent is
 told to read its role, its assignment, and the "Before you begin" section of `roles/README.md`
-(by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md` in its worktree), then starts. Crew checks
+(by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md` in its worktree), then starts. Crew checks
 none of this; the agent reports what it read and what was absent.
 
 - `--base <ref>` starts the branch somewhere other than `main`. With `--handoff`, it also wins

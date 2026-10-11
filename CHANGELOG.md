@@ -17,7 +17,7 @@ deletes this heading.
   Guide: `docs/CREW.md`.
   What an operator should know:
   - Every seat starts by reading its role file, its assignment file and the "Before you begin"
-    list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md`; `lead` also
+    list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md`; `lead` also
     reads `HEARTBEAT.md` and `AGENTS.md`), and reports which it read and which were absent. The
     list is there so an agent does not break a boundary a document states. Edit the list in
     `roles/README.md` to change it for your instance.

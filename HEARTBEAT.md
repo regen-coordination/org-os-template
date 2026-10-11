@@ -14,6 +14,13 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 ## Active Tasks
 
+### Crew — role-based agents in herdr (2026-10-10)
+
+The framework's own agent team runs from the repository: roles are files under `roles/`, and
+`npm run crew` seats an agent in a role in its own herdr pane and git worktree. Where it lives:
+the `feat/crew` branch (not on `main`), `roles/`, `docs/CREW.md`, `memory/crew/`. Status: module
+`pilot`, targets 0.6.0; the CHANGELOG's crew section says what releases it. Open items below.
+
 ### Vault-safety guard over-matches `clean` (2026-08-21 — found during tonight's session, not yet fixed)
 
 - [x] ~~**Narrow `scripts/guards/deny-destructive-git.mjs`'s `clean` match to the git verb.**~~ — **done 2026-08-28 (WS-A A6)**: the tokenizer now matches `clean`/`stash`/`reset --hard` only in git *subcommand* position, so pathspecs and commit messages naming them are fine. Dashed libexec binaries, wrapper/chained forms and expansion-as-subcommand stay blocked; regression fixtures both ways in `tests/guards/`. One residual false positive is documented and accepted: a heredoc body that *quotes* a real git command still trips it, because the guard reads the whole command line and cannot tell a command from prose about one.

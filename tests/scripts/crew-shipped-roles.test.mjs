@@ -55,7 +55,7 @@ test('roles/README.md has a "Before you begin" section that names files which ex
   const files = [...section.matchAll(/`([A-Za-z0-9_.\/-]+\.(?:md|yaml))`/g)].map((m) => m[1]);
   assert.ok(files.length >= 3, `the section names ${files.length} files`);
   for (const f of files) assert.ok(existsSync(join(rootDir, f)), `"Before you begin" names ${f}, which does not exist`);
-  for (const f of ['MASTERPLAN.md', 'SOUL.md', 'MEMORY.md']) assert.ok(files.includes(f), `the shared list lost ${f}`);
+  for (const f of ['MASTERPLAN.md', 'SOUL.md', 'MEMORY.md', 'DECISIONS.md']) assert.ok(files.includes(f), `the shared list lost ${f}`);
 });
 
 test('a role may add to the Before you begin list; lead adds HEARTBEAT.md and AGENTS.md', () => {
