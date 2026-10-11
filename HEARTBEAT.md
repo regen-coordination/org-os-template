@@ -32,10 +32,10 @@ they may not exist yet.
       the operator left the machine. To build: a few seconds after prompting, crew checks that the
       agent has left the idle state and says plainly when it has not; and a crew command submits
       the prompt already in the box, so nobody presses Enter in a pane by hand. The lead's account
-      is meant to be in the `## Report` sections of
-      `2026-10-10-lead-first-crew-cycle-clear-the-deferred-mino.md`; on 2026-10-11 it was not
-      there, and the brief that carried it is in the `## Brief` of
-      `2026-10-11-commons-steward-give-each-role-its-voice-and-bring-the-o.md`.
+      is the last `## Report` section of
+      `memory/crew/2026-10-10-lead-first-crew-cycle-clear-the-deferred-mino.md`. One Enter key
+      submitted the stuck prompt; `herdr agent prompt --wait` answers `agent_prompt_stalled` in
+      this case and may be the simplest check.
 - [ ] **From the review of the label call fix** (minor, can follow; reviewer's `## Report` in
       `2026-10-11-reviewer-review-the-label-call-fix-and-the-change.md`): F1 `release` stops with
       a stack trace when an ignored directory holds a folder it cannot read
