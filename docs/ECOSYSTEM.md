@@ -23,7 +23,7 @@ An instance is a repository that carries its own identity files, `data/`, `memor
 | [regen-toolkit](https://github.com/regen-coordination/regen-toolkit) (Regen Web3 Toolkit) | Project | beta | A nested instance with its own remote. Registered in `data/instances.yaml` as assess-only. |
 | bread-coop-os | Cooperative | alpha | A fictional acceptance-test instance for `clone:framework`. No remote. |
 
-`dao-os` is listed in the registry and in `federation.yaml` as a downstream entry, but the registry describes it as a DAO-module development platform, not an operational instance. It is the source of the DAO skills that are candidates for promotion into the framework ([SKILL-PROMOTION.md](SKILL-PROMOTION.md)).
+`dao-os` is listed in the registry and in `federation.yaml` as a downstream entry. The registry gives it type `Project`, maturity `beta` and `federation_role: dev-platform`, so it is not counted as an operational instance (an instance counts as operational only at maturity `production`). It is where the DAO skills are developed, and the source of the DAO skills that are candidates for promotion into the framework ([SKILL-PROMOTION.md](SKILL-PROMOTION.md)).
 
 ## Related projects
 
