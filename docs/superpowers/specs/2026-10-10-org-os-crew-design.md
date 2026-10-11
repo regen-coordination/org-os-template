@@ -142,7 +142,16 @@ works unchanged across kinds.
 - Work only inside your own worktree. The two exceptions are in section 6.
 - Never push, merge, open pull requests or post to any outside service.
 - Never run stash, clean or hard-reset operations (the framework's workspace-safety rules).
-- Report before stopping: append your report to your assignment file.
+- Report before stopping: append your report to your assignment file, and name the onboarding
+  files you read and any that were absent.
+
+`roles/README.md` also holds a section **Before you begin**: the files every seat reads before its
+brief, by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md` at the root of the agent's own
+worktree (mandate and priorities, values and boundaries, decisions in force). An instance changes
+the list by editing that file. A role file may add to it and never shortens it (`lead` adds
+`HEARTBEAT.md` and the rest of the `AGENTS.md` startup sequence). A missing file is skipped, not
+fatal: crew checks nothing and refuses nothing here, since the script carries rules and the role
+files carry judgment.
 
 ### 4.3 Shipped roles
 
@@ -185,7 +194,9 @@ Steps, in order:
    the role id, or `<id>-2`, `<id>-3` if that name is taken by any live agent on the herdr
    server, crew or not.
 6. **Prompt it once**: it is seated as this role; read the role file and the assignment file
-   (both given as absolute paths); then begin. The launcher does not wait for the turn.
+   (both given as absolute paths), then the "Before you begin" section of `roles/README.md`
+   (absolute path in the main checkout) and the files it lists; then begin. `nudge` sends the same
+   prompt. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
 
 Worktrees sit outside the repository on purpose. Instances often live inside a synced vault, and

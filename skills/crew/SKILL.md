@@ -16,7 +16,8 @@ metadata:
 
 The crew is a set of **roles** (files in `roles/`) that **agents** are seated in. Each agent runs
 in its own herdr pane and its own git worktree, on its own branch. Everything is recorded in
-`memory/crew/`. Vocabulary and the shared boundaries: `roles/README.md`. Operator guide:
+`memory/crew/`. Vocabulary, the shared boundaries and the "Before you begin" reading list every seat gets:
+`roles/README.md`. Operator guide:
 `docs/CREW.md`.
 
 All rules are enforced by `scripts/crew.mjs`. **When a command refuses, tell the operator what it
