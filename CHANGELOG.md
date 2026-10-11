@@ -53,6 +53,12 @@ deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" a
     Six answers prove that nothing was sent (herdr not installed, an empty prompt, an agent herdr
     cannot find or finds twice, an agent at an approval dialog, an agent not ready): the agent then
     counts as not prompted, and `nudge` works once the cause is dealt with.
+  - herdr's sidebar can show who is who. When `seat` starts an agent, crew reports its role, the
+    first line of its brief (cut to 32 characters) and its status (`working`, then `reported`)
+    to herdr for the agent's pane, and role and assignment for its workspace. They show only
+    after you add `$role`, `$assignment` and `$status` rows to your own herdr `config.toml`;
+    the lines are in `docs/CREW.md`, and crew never edits that file. If herdr refuses a label,
+    `seat` still seats the agent and says so on one line. Release is unchanged.
   - A herdr call that does not answer within 60 seconds fails with `herdr_timeout`; a failed
     assignment keeps herdr's error code beside its message. A seating that failed or timed out at
     the worktree step names what may be left behind (the branch, the checkout directory, and a

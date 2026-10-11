@@ -42,6 +42,7 @@ export function fakeHerdr(initialAgents = []) {
   const herdr = {
     agents: initialAgents.map((a) => ({ name: null, state: 'idle', kind: 'claude', ...a })),
     calls: [],
+    labels: [], // every label crew set: { on: 'pane' | 'workspace', id, tokens }
     workspaces: new Map(), // workspace id -> checkout path
     failOn: null, // { method, code, message }
     fail(method) {
@@ -76,6 +77,14 @@ export function fakeHerdr(initialAgents = []) {
     promptAgent(name, text) {
       herdr.calls.push(['promptAgent', { name, text }]);
       herdr.fail('promptAgent');
+    },
+    labelPane(paneId, tokens) {
+      herdr.fail('labelPane');
+      herdr.labels.push({ on: 'pane', id: paneId, tokens });
+    },
+    labelWorkspace(workspaceId, tokens) {
+      herdr.fail('labelWorkspace');
+      herdr.labels.push({ on: 'workspace', id: workspaceId, tokens });
     },
     workspaceCheckout(workspaceId) {
       herdr.fail('workspaceCheckout');

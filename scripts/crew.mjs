@@ -119,6 +119,7 @@ function main(argv) {
       console.log(`  assignment  ${a.id}`);
       console.log(`  branch      ${a.branch}${a.detached ? ' (detached copy)' : ''}`);
       console.log(`  worktree    ${a.worktree}`);
+      if (a.labelNote) console.log(`  ${a.labelNote}`);
       if (a.prompted === 'unconfirmed') {
         console.log(`  The first prompt to ${a.agent} may or may not have arrived: herdr did not confirm it.`);
         console.log(`  Look at ${a.agent}'s pane. If it has not started, type there:`);
@@ -156,6 +157,7 @@ function main(argv) {
       }
       const a = report(ctx, { text });
       console.log(`Report recorded on ${a.id}.`);
+      if (a.labelNote) console.log(a.labelNote);
       return;
     }
     case 'handoff': {

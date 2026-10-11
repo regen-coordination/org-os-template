@@ -205,6 +205,11 @@ Steps, in order:
    report and begin; then begin. The prompt is one line. `nudge` sends the same prompt, and the
    "type this yourself" text of an unconfirmed prompt carries the same sentence. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
+8. **Label the pane and the workspace** (5.3 item 13): role, a short assignment and the status, as
+   display-only herdr metadata. A refusal never fails the seat and never changes the record; the
+   output says in one line that the label could not be set. `report` moves the pane's `status` to
+   `reported` with one more call. `release` sets nothing: it closes the workspace, and the label
+   goes with it.
 
 Worktrees sit outside the repository on purpose. Instances often live inside a synced vault, and
 a worktree inside it would be copied to every device.
@@ -323,6 +328,22 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
     after it stopped waiting, so the failed record names these in `may_remain` and the operator
     closes the workspace in herdr.
 
+13. **Labels.** `herdr pane report-metadata <pane> --source crew --token role=… --token
+    assignment=… --token status=…` and `herdr workspace report-metadata <workspace> --source crew
+    --token role=… --token assignment=…` (CLI reference at the `v0.9.1` tag; the installed
+    binary's `--help` lists the same options, and its schema gives at most 16 tokens, names
+    `[A-Za-z0-9_-]{1,32}` and a `ttl_ms` of at most 86 400 000). From the reference, not
+    observed: token values are trimmed and cut at 80 characters, a token call patches only the
+    names it gives, a token with no `--ttl-ms` stays until replaced or the pane closes, and a
+    pane or workspace accepts at most 32 distinct sources. Crew uses the tokens `role`,
+    `assignment` and `status`; the assignment is the first non-empty line of the brief, cut to
+    32 characters (the board's column), not herdr's 80, so a row stays one line. It sends no
+    `--ttl-ms` and no `--seq`. The workspace gets `role` and `assignment` only, since its
+    `status` would go stale. Every update sends the whole set. Tokens show only where the
+    operator's `[ui.sidebar.agents]` and `[ui.sidebar.spaces]` rows list `$role`, `$assignment`
+    and `$status`; that is the operator's own edit of `config.toml` (`docs/CREW.md`), which crew
+    never makes.
+
 Not verified against a live herdr, because each needs an experiment that changes herdr's state;
 they are in the smoke run of `docs/CREW.md`:
 
@@ -333,7 +354,10 @@ they are in the smoke run of `docs/CREW.md`:
 - that the installed 0.9.1 binary is built from the `v0.9.1` source tag;
 - what git leaves on a killed `git worktree add`;
 - which code `agent get <pane>` or `agent list` gives for a pane with no agent (crew uses the
-  list and reads no code from it).
+  list and reads no code from it);
+- that the installed binary accepts and shows the label tokens as the reference says, that
+  `herdr agent get <name>` returns them, and that a herdr restart keeps or drops them (crew does
+  not set them again). The smoke run in `docs/CREW.md` has the live check.
 
 ## 6. The trail
 

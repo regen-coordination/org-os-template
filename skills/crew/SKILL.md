@@ -86,6 +86,10 @@ on the board.
   with what was listed; then `release` on the same assignment retries the removal. A retry keeps
   the recorded outcome and refuses a different `--outcome`.
 - **Open handoffs** are requests waiting for the lead or the operator.
+- crew also labels each agent's pane and workspace in herdr (role, short assignment, status),
+  shown only if the operator added the `$role`, `$assignment` and `$status` rows to their herdr
+  config (`docs/CREW.md`). If `seat` says a label could not be set, the agent is seated anyway;
+  tell the operator and carry on. Never edit their herdr config.
 
 ## Releasing
 

@@ -307,7 +307,39 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
     throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${left}${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
-  return updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
+  const record = updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
+  // Not part of the record: what the command prints when the label was refused.
+  const labelNote = setLabel(ctx, { agent: name, role: role.id, brief, pane: record.pane, workspace: record.workspace, status: 'working' });
+  return { ...record, labelNote };
+}
+
+/**
+ * What herdr's sidebar shows for an agent: role, a short assignment and the
+ * status. The same width as the board's ASSIGNMENT column, so a first brief line
+ * of any length stays one readable row. The workspace gets role and assignment
+ * only: its status would go stale, and the pane's is the one that moves.
+ */
+function labelTokens({ role, brief, status }) {
+  const line = String(brief).split('\n').find((l) => l.trim()) ?? '';
+  return { role, assignment: clip(line.trim().replace(/\s+/g, ' '), BOARD_BRIEF_WIDTH), status };
+}
+
+/**
+ * Sets the pane label, and the workspace label when `workspace` is given. A
+ * label is only display: a refusal never changes the record or the outcome. It
+ * returns one plain line for the operator, or null.
+ */
+function setLabel(ctx, { agent, role, brief, pane, workspace, status }) {
+  const tokens = labelTokens({ role, brief, status });
+  try {
+    ctx.herdr.labelPane(pane, tokens);
+    if (workspace) {
+      ctx.herdr.labelWorkspace(workspace, { role: tokens.role, assignment: tokens.assignment });
+    }
+    return null;
+  } catch (err) {
+    return `The label for ${agent} could not be set in herdr (${String(err.message || err).split('\n')[0]}). The agent is seated and the assignment is unchanged; only herdr's sidebar lacks the label.`;
+  }
 }
 
 /** What a failed worktree step may have left behind, in the words the failed record and the message use. */
@@ -375,7 +407,9 @@ export function report(ctx, { text }) {
   const when = stamp(ctx);
   const next = { ...data, status: 'reported', updated: when };
   writeRecord(caller.file, next, `${body.trimEnd()}\n\n## Report — ${when}\n\n${text.trim()}\n`);
-  return next;
+  // The report is written; the label is one more call and may fail on its own.
+  const labelNote = setLabel(ctx, { agent: caller.agent, role: caller.role, brief: caller.brief, pane: caller.pane, status: 'reported' });
+  return { ...next, labelNote };
 }
 
 export function handoff(ctx, { toRole, brief, branch = null }) {
@@ -617,6 +651,8 @@ function age(created, now) {
   return `${Math.floor(minutes / (24 * 60))}d`;
 }
 
+// The assignment column of the board and the assignment word of the herdr label.
+const BOARD_BRIEF_WIDTH = 32;
 const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 // A seated agent that may never have been told what to do must not look like any other row.
@@ -632,7 +668,7 @@ export function renderBoard(b, now) {
   } else {
     const table = [
       ['AGENT', 'ROLE', 'STATE', 'STATUS', 'ASSIGNMENT', 'BRANCH', 'AGE'],
-      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.brief, 32), clip(r.branch, 44), age(r.created, now)]),
+      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.brief, BOARD_BRIEF_WIDTH), clip(r.branch, 44), age(r.created, now)]),
     ];
     const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
     for (const row of table) {
