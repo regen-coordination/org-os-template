@@ -14,6 +14,19 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-10-11 · What the site's federation page prints from `data/instances.yaml`
+
+**Status:** active
+**Scope:** federation, data-model, framework
+
+**Decision** — Three calls by the operator. (1) The registry's `notes` field is printed nowhere on the site. (2) The federation page prints each instance's name, type and link, with no status. (3) An entry with `listed: false` is left out of the page's list and out of its count of registered instances.
+
+**Why** — `notes` holds working notes, including a named person's role, and the page would have published them on merge. The two entries set to `listed: false` are `bread-coop-os`, a fictional test cooperative, and `openclaw`, an agent runtime. The flag is display-only, so `analyze:instances`, the quilt and the dashboard still read both.
+
+**Refs** — given in the lead's assignment brief, `memory/crew/2026-10-11-commons-steward-describe-the-new-listed-field-of-data-in.md` (crew memory, in the main checkout); `docs/DATA-MODEL.md` (instances.yaml section); `tests/scripts/instances-listed.test.mjs`; `9cd5b2a` (the field). The site change that applies (2) and (3) had not landed when this was written.
+
+---
+
 ## 2026-08-29 · `doctor sync`'s dirty-tree gate narrowed to the overlay's write set
 
 **Status:** active
