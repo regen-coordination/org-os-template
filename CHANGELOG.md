@@ -10,7 +10,8 @@ This section describes work that exists only on the `feat/crew` branch. It sits 
 `[Unreleased]` on purpose: `npm run version:update 0.5.1` must not promote it into 0.5.1. Whoever
 merges `feat/crew` into `main` folds it into the section of the release that carries it and
 deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" are also in
-`MEMORY.md` (Active Context), `HEARTBEAT.md` (Crew) and the spec's Status line
+`MEMORY.md` (Active Context), `HEARTBEAT.md` (Crew), `docs/agent-plans/QUEUE.md` (item 8) and the
+spec's Status line
 (`docs/superpowers/specs/2026-10-10-org-os-crew-design.md`); remove them there in the same merge.
 
 - **Crew — role-based agents in herdr** (`npm run crew`, module `org-os-crew`). Roles are files
@@ -18,12 +19,20 @@ deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" a
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
   Guide: `docs/CREW.md`.
   What an operator should know:
-  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once. The five
-    shipped roles (the lead among them) take five seats, and the sixth allows a second agent in
-    one role, for example a reviewer while an engineer is still seated. This is the default every
-    new instance receives. Each seated agent is a full model session on the operator's own plan,
+  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once: the lead
+    and five working agents, and a second agent in one role takes one of the six, for example a
+    reviewer while an engineer is still seated. The framework repository ships seven roles, so six
+    seats do not hold every role at once; a new instance receives five of them. This is the
+    default every new instance receives. Each seated agent is a full model session on the operator's own plan,
     so an instance on a small plan lowers the number by editing `max_agents` in that file. (The
     launcher's own fallback of 4 applies only to a file with no `max_agents` line.)
+  - A role file may carry `effort` (`low`, `medium`, `high`, `xhigh` or `max`), passed to the
+    agent as `--effort` beside its model. It is passed to `claude` agents only; for any other
+    kind `seat` prints one line saying so and seats the agent anyway. A bad level is refused in
+    words. In the framework repository the lead and two new seats, `website` (owns `site/`, the
+    website and documentation site) and `platform` (owns `packages/admin/`, the admin app), run on
+    `claude-opus-5-5` at `high`. The two new roles are the framework repository's: a new instance
+    does not receive them, so it ships five roles.
   - Every seat starts by reading its role file, its assignment file and the "Before you begin"
     list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md`; `lead` also
     reads `HEARTBEAT.md` and `AGENTS.md`), and reports which it read and which were absent. The
@@ -41,7 +50,10 @@ deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" a
     worktree, or to remove it, the worktree is left and the message says which. After the removal
     request herdr may still be removing it; after the question nothing was removed. Run `release`
     again and, if herdr had finished, it says the worktree was already removed and closes the
-    record.
+    record. When the seating itself timed out while herdr was creating the worktree, the first
+    `release` says the branch does not exist now and may still appear (not "never created"), and
+    the record stays open: run `release` again later, and it removes the worktree if herdr made
+    one, or says there is still none and closes the record.
   - A new pane may not have reached its shell when `seat` starts the agent, and herdr then refuses
     with `agent_pane_busy`. `seat` looks at the pane each time it is refused and waits, for up to
     30 seconds, only while the shell is not yet in the foreground and no agent is there. It stops
@@ -53,6 +65,15 @@ deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" a
     Six answers prove that nothing was sent (herdr not installed, an empty prompt, an agent herdr
     cannot find or finds twice, an agent at an approval dialog, an agent not ready): the agent then
     counts as not prompted, and `nudge` works once the cause is dealt with.
+  - herdr's sidebar can show who is who. When `seat` starts an agent, crew reports its role, the
+    first line of its brief (cut to 32 characters) and its status (`working`, then `reported`)
+    to herdr for the agent's pane, and role and assignment for its workspace. They show only
+    after you add `$role`, `$assignment` and `$status` rows to your own herdr `config.toml`;
+    the lines are in `docs/CREW.md`, and crew never edits that file. If herdr refuses a label,
+    `seat` still seats the agent and says so on one line. Release is unchanged.
+  - `nudge`'s help line now says what is true: it sends the first prompt to an agent that has not
+    received it, whatever kept it from being sent. The board's line about sync-conflict copies
+    now says what Syncthing is and which file it copied.
   - A herdr call that does not answer within 60 seconds fails with `herdr_timeout`; a failed
     assignment keeps herdr's error code beside its message. A seating that failed or timed out at
     the worktree step names what may be left behind (the branch, the checkout directory, and a

@@ -116,6 +116,36 @@ test('an agent is started with its model only when its kind takes one', () => {
   assert.deepEqual(ctx.herdr.calls.filter((c) => c[0] === 'startAgent')[1][1].args, []);
 });
 
+test('an agent is started with its effort beside its model, for a kind that takes it', () => {
+  const { root, ctx } = setup();
+  writeRole(root, 'thinker', { model: 'claude-opus-5-5', effort: 'high' });
+  const a = seat(ctx, { roleId: 'thinker', brief: 'think' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'claude-opus-5-5', '--effort', 'high']);
+  assert.deepEqual(a.notes ?? [], []);
+});
+
+test('a role that sets no effort is started with no effort argument', () => {
+  const { ctx } = setup();
+  seat(ctx, { roleId: 'engineer', brief: 'build' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet']);
+});
+
+test('effort alone, with no model, is still passed to claude', () => {
+  const { root, ctx } = setup();
+  writeRole(root, 'thinker', { model: undefined, effort: 'max' });
+  seat(ctx, { roleId: 'thinker', brief: 'think' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--effort', 'max']);
+});
+
+test('a kind whose effort argument is not verified is seated without it and told so in one plain line', () => {
+  const { root, ctx } = setup();
+  writeRole(root, 'reader', { kind: 'codex', model: 'gpt', effort: 'high' });
+  const a = seat(ctx, { roleId: 'reader', brief: 'read' });
+  assert.equal(a.status, 'working');
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'gpt']);
+  assert.deepEqual(a.notes, ["The reader role's effort (high) was not applied: crew does not know how to pass an effort level to a codex agent."]);
+});
+
 test('a failure creating the worktree is recorded and nothing later runs', () => {
   const { ctx } = setup();
   ctx.herdr.failOn = { method: 'createWorktree', message: 'branch exists' };
