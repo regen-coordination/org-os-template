@@ -46,18 +46,23 @@ npm run crew
 ```
 
 ```
-AGENT     ROLE      STATE    ASSIGNMENT               BRANCH                                AGE
-reviewer  reviewer  blocked  Review the cursor fix    crew/2026-10-10-engineer-fix-the-c…   3m
-engineer  engineer  working  Fix the cursor race in…  crew/2026-10-10-engineer-fix-the-c…   18m
+AGENT     ROLE      STATE    STATUS    ASSIGNMENT               BRANCH                                AGE
+reviewer  reviewer  blocked  working   Review the cursor fix    crew/2026-10-10-engineer-fix-the-c…   3m
+engineer  engineer  idle     reported  Fix the cursor race in…  crew/2026-10-10-engineer-fix-the-c…   18m
 
 Open handoffs: 1
   engineer → researcher: "Confirm what the cursor contract promises"
 ```
 
-- `blocked` means the agent is waiting for you: a permission prompt or a question.
+- `STATE` is what herdr sees live. `blocked` means the agent is waiting for you: a permission
+  prompt or a question.
+- `STATUS` is what the assignment's trail file says: `seating`, `working` or `reported`. An
+  agent that is `idle` and `reported` has finished and is waiting for you to release it.
 - **Open handoffs** are requests one agent wrote for another role. Seat the role with
   `--handoff <id>`, or decline with `handoff-close <id> --reason "…"`.
 - **Needs release** lists assignments whose agent is gone or whose seating failed.
+- **Worktrees left behind** lists released or abandoned assignments whose worktree release kept
+  because it had changes in it. Run `release` on one again after you have dealt with the changes.
 
 ## Let a lead coordinate
 
@@ -80,7 +85,8 @@ refused while the agent is still working. Use `--outcome abandoned` for work you
 The worktree is removed only when nothing in it would be lost. Modified, untracked and
 git-ignored files all count (a `.env`, a draft in an ignored folder); installed dependencies do
 not. Otherwise the command lists what is there and leaves the worktree. When you have dealt with
-it, remove the worktree yourself with `git worktree remove <path>`.
+it, run `release` on the same assignment again: it retries the removal, never forces it, and
+keeps the outcome (`released` or `abandoned`) it already recorded.
 
 An agent seated with `--on` works on a detached copy and has no branch of its own. If it made
 commits, release saves them as a branch `crew/<assignment-id>` and tells you.
@@ -106,6 +112,8 @@ usage. Use a throwaway brief.
 5. When it reports: the assignment file in `memory/crew/` ends with a `## Report` section and
    its status is `reported`.
 6. `npm run crew -- release engineer` → says the branch is kept and the worktree was removed.
+   Releasing an assignment whose seating failed says instead that there was no branch or
+   worktree.
 7. `git branch --list 'crew/*'` shows the branch; `git worktree list` no longer shows the
    worktree; `npm run crew` → `No crew agents are seated.`
 8. Clean up the throwaway: delete the smoke branch and the smoke file in `memory/crew/`.

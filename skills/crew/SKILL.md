@@ -63,6 +63,10 @@ on the board.
   answers it. Tell the operator which agent, and do not answer for them.
 - **Needs release** lists assignments whose agent is gone (herdr restarted, a pane was closed) or
   whose seating failed. Release each one once the operator has looked at its branch.
+- `STATUS` is the trail's word for the assignment (`seating`, `working`, `reported`); `STATE` is
+  herdr's live view. `reported` with `idle` means the agent is done and awaits release.
+- **Worktrees left behind** lists closed assignments whose worktree still has changes in it. The
+  operator deals with the changes; then `release` on the same assignment retries the removal.
 - **Open handoffs** are requests waiting for the lead or the operator.
 
 ## Releasing
@@ -70,7 +74,7 @@ on the board.
 Release when the agent has reported and the operator has what they need. The branch is always
 kept; merging is the operator's. The worktree is removed only when it has no uncommitted changes.
 If it is left behind, the command lists what is in it: show that list to the operator and stop.
-Do not remove the worktree yourself.
+Do not remove the worktree yourself; once the operator has dealt with it, release again.
 
 ## As the lead
 
