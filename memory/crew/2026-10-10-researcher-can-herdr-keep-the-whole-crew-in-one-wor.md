@@ -12,10 +12,12 @@ worktree: >-
 task: null
 handoff: null
 seated_by: 2026-10-10-lead-first-crew-cycle-clear-the-deferred-mino
-status: reported
+status: released
 prompted: true
 created: '2026-10-10T23:43:53-03:00'
-updated: '2026-10-10T23:48:42-03:00'
+updated: '2026-10-11T00:24:34-03:00'
+worktree_removed: true
+rescued_branch: null
 ---
 ## Brief
 

@@ -3,10 +3,10 @@ id: handoff-2026-10-10-build-design-a-from-docs-research-2026-1
 from: 2026-10-10-researcher-can-herdr-keep-the-whole-crew-in-one-wor
 to_role: engineer
 branch: crew/2026-10-10-researcher-can-herdr-keep-the-whole-crew-in-one-wor
-status: open
+status: taken
 created: '2026-10-10T23:48:39-03:00'
-updated: '2026-10-10T23:48:39-03:00'
-taken_by: null
+updated: '2026-10-11T00:12:37-03:00'
+taken_by: 2026-10-11-engineer-label-each-crew-agent-in-herdr-with-its
 ---
 ## Brief
 
