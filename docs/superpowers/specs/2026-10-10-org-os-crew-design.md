@@ -1,7 +1,7 @@
 # org-os Crew — Roles and Agents Through herdr — Design Spec
 
 **Date:** 2026-10-10
-**Status:** Design approved in conversation, awaiting review of this document; pre-implementation
+**Status:** Implemented on the `feat/crew` branch; module status `pilot` (the smoke run in `docs/CREW.md` has not been run end to end against every path)
 **Owner:** roles, the crew launcher, the assignment trail
 **Companion to:** [interfaces spec](2026-08-29-org-os-interfaces-design.md) (new interfaces are clients, never servers) · [modularization spec](2026-08-02-org-os-v5-modularization-design.md) (module manifests)
 
@@ -146,8 +146,9 @@ works unchanged across kinds.
   files you read and any that were absent.
 
 `roles/README.md` also holds a section **Before you begin**: the files every seat reads before its
-brief, by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md` at the root of the agent's own
-worktree (mandate and priorities, values and boundaries, decisions in force). An instance changes
+brief, by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md` at the root of the
+agent's own worktree (mandate and priorities, values and boundaries, what is active, and the
+decision record). An instance changes
 the list by editing that file. A role file may add to it and never shortens it (`lead` adds
 `HEARTBEAT.md` and the rest of the `AGENTS.md` startup sequence). A missing file is skipped, not
 fatal: crew checks nothing and refuses nothing here, since the script carries rules and the role
@@ -176,7 +177,7 @@ role by adding a file. There is no second lookup path and no merge of two files.
 ## 5. Seating an agent
 
 ```
-npm run crew -- seat <role> "<brief>" [--task <task-id>] [--base <ref>] [--handoff <file>] [--on <branch>]
+npm run crew -- seat <role> "<brief>" [--task <task-id>] [--base <ref>] [--handoff <id|file>] [--on <branch>]
 ```
 
 Steps, in order:
@@ -215,7 +216,7 @@ All enforced in `core.mjs`, not in the skill.
 | Guardrail | Rule |
 |-----------|------|
 | Inside herdr | Refuse unless `HERDR_ENV=1`. |
-| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. Default 4, set by `max_agents` in `roles/circles.yaml`. |
+| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. The shipped `roles/circles.yaml` sets `max_agents: 6`, so the five shipped roles (the lead among them) take five seats and the sixth allows a second agent in one role, for example a reviewer while an engineer is still seated. Each seated agent is a full model session on the operator's own plan; a small plan lowers `max_agents`. A file with no `max_agents` line falls back to 4 in `scripts/crew/roles.mjs`. |
 | Who may seat | A caller whose pane hosts no seated agent is the operator and may always seat. A caller whose pane hosts a seated agent may seat only if that agent's role has `may_seat: true`. The caller is identified from `HERDR_PANE_ID` joined to the trail. |
 | Base exists | Refuse if `--base` or `--on` does not resolve to a commit. Refuse `--base` together with `--on`. |
 | Operator's tree untouched | The launcher never checks out, resets or cleans the main checkout. |
@@ -244,8 +245,9 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
   worktree was removed. The recorded workspace id is used only while herdr still reports it open
   on that worktree; otherwise the worktree is removed with git. If herdr does not answer
   (`herdr_timeout`) while it is asked which worktree the workspace is open on, or asked to
-  remove it, git is not used, because herdr may still be doing it: the worktree is left, the
-  reason names what was asked, and `release` again finishes it.
+  remove it, git is not used and the worktree is left. The reason names what was asked, and
+  `release` again finishes it. After the removal request herdr may still be doing it; after the
+  question nothing was removed.
 - A closed assignment whose record says `worktree_removed: false` but whose worktree is gone
   (herdr finished after release stopped waiting) is found by `release <id>`: the record is set to
   `worktree_removed: true` and the command says the worktree was already removed. Nothing is
@@ -266,14 +268,14 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
    branch. On a dirty worktree it fails with error code `dirty_worktree_requires_force`.
 4. When the source repository has no open herdr workspace, `worktree create` also opens one for
    it. The launcher leaves that workspace alone.
+5. `herdr agent list` returns every agent on the server; most of the operator's have no `name`.
+   Crew agents are matched to assignments by `pane_id`.
 6. herdr refuses `worktree create` and `worktree open` when `--cwd` is itself a linked worktree
    (`linked_worktree_source`: "New and open worktree actions start from the repo parent
    workspace"). Found in the first smoke run. The launcher therefore passes herdr the
    repository's primary checkout, while the roles and the trail stay in the main checkout. For a
    submodule the primary checkout is read from `core.worktree`, because the first entry of
    `git worktree list` names its git directory instead.
-5. `herdr agent list` returns every agent on the server; most of the operator's have no `name`.
-   Crew agents are matched to assignments by `pane_id`.
 7. `herdr agent start` into a pane that was created a moment ago can fail with code
    **`agent_pane_busy`** and the message "agent target pane <id> is not an available shell".
    Read from herdr's source (0.9.1, `agent_start_error_body`) and asserted on the wire by its own
@@ -404,14 +406,15 @@ taken_by: null
 ```
 
 - **Any agent may write a handoff. Only the lead or the operator acts on one**, with
-  `crew seat <role> --handoff <file>`. That links the new assignment to the handoff, sets the
+  `crew seat <role> --handoff <id|file>`. That links the new assignment to the handoff, sets the
   handoff to `taken`, and uses the handoff's brief when none is given.
 - **Review is an ordinary handoff.** The engineer hands off to `reviewer` naming its branch; the
   reviewer is seated with `--on <branch>` and its role forbids changes.
 - **Agents do not prompt each other.** The file is the message, so every exchange is on the trail.
-- A handoff can be declined: `crew handoff-close <file> --reason "<text>"` sets it to `declined`.
-- When a handoff names a branch and the seat command gives no `--on`, the receiving agent is
-  seated on that branch.
+- A handoff can be declined: `crew handoff-close <id|file> --reason "<text>"` sets it to `declined`.
+- When a handoff names a branch and the seat command gives neither `--on` nor `--base`, the
+  receiving agent is seated on a detached copy of that branch. With `--base <ref>` it gets a new
+  branch from `<ref>` instead, and the handoff is still taken (section 5, step 4).
 
 ## 8. The board
 
@@ -419,14 +422,28 @@ taken_by: null
 npm run crew            # same as: npm run crew -- board
 ```
 
-```
-AGENT       ROLE       STATE     ASSIGNMENT                     BRANCH                AGE
-lead        lead       idle      split the kms cursor work      crew/…-lead-kms       42m
-engineer    engineer   working   fix the kms cursor race        crew/…-engineer-kms   18m
-reviewer    reviewer   blocked   review engineer's branch       crew/…-engineer-kms    3m
+Output of `renderBoard` for made-up rows (the home directory in the path is invented). Values
+longer than 32 characters (assignment) or 44 (branch) are cut and end in `…`.
 
-Open handoffs: 1   engineer → researcher: "confirm cursor semantics"
-Needs release: 1   2026-10-09-researcher-ibge-terms (trail says working, no live agent)
+```
+AGENT     ROLE      STATE    STATUS    ASSIGNMENT                        BRANCH                                        AGE
+reviewer  reviewer  blocked  working   Review the cursor fix, and say …  crew/2026-10-10-engineer-fix-the-cursor-rac…  3m
+engineer  engineer  idle     reported  Fix the cursor race in the kms …  crew/2026-10-10-engineer-fix-the-cursor-rac…  18m
+
+Open handoffs: 1
+  engineer → researcher: "Confirm what the cursor contract promises"
+
+Needs release: 1
+  2026-10-09-researcher-ibge-terms (trail says working, no live agent)
+
+Worktrees left behind: 1
+  2026-10-09-engineer-ingest-retry (released; its worktree is still at /Users/alex/.org-os/worktrees/org-os/2026-10-09-engineer-ingest-retry)
+
+Sync conflict copies: 1
+  2026-10-10-engineer-fix-the-cursor.sync-conflict-20261010-221500-ABCDEFG.md
+  Syncthing kept these when two machines changed a trail file at once. They are not read as records; merge them by hand and delete them.
+
+Could not read: notes.md
 ```
 
 - **Live state** (`idle`, `working`, `blocked`, `done`, `unknown`) comes from `herdr agent list`
@@ -450,7 +467,7 @@ Needs release: 1   2026-10-09-researcher-ibge-terms (trail says working, no live
 
 - choosing a role from `roles/` for a piece of work;
 - writing a brief: the goal, what is already ruled out, the files worth reading, what done means;
-- the commands (`seat`, `release`, `report`, `handoff`, `handoff-close`, `board`) and when each applies;
+- the commands (`seat`, `nudge`, `release`, `report`, `handoff`, `handoff-close`, `board`) and when each applies;
 - what to do when a command refuses: report the refusal, never work around it.
 
 The skill carries judgment; the script carries the rules. The `lead` role lists this skill, which

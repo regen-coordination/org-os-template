@@ -1,6 +1,10 @@
 # Circles group the crew's roles. Vocabulary and charter: roles/README.md.
-# max_agents caps how many crew agents may be seated at once.
-max_agents: 4
+# max_agents caps how many crew agents may be seated at once. The five shipped roles (the
+# lead among them) take five seats; the sixth allows a second agent in one role, for
+# example a reviewer while an engineer is still seated. Each seated agent is a full model
+# session on your own plan: lower this number if your plan is small. A file with no
+# max_agents line falls back to 4 in scripts/crew/roles.mjs.
+max_agents: 6
 circles:
   - id: lead
     name: Coordination

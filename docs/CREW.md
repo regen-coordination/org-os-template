@@ -23,15 +23,18 @@ npm run crew -- seat engineer "Fix the cursor race in the kms ingest. Repro: tes
 This creates a branch `crew/<date>-engineer-<slug>` from `main`, a worktree for it under
 `~/.org-os/worktrees/`, a new herdr workspace, and an agent named `engineer` in it. The agent is
 told to read its role, its assignment, and the "Before you begin" section of `roles/README.md`
-(by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md` in its worktree), then starts. Crew checks
+(by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md` in its worktree), then starts. Crew checks
 none of this; the agent reports what it read and what was absent.
 
 - `--base <ref>` starts the branch somewhere other than `main`. With `--handoff`, it also wins
   over the branch the handoff names: the agent gets a new branch from `<ref>`, the handoff is
   still taken, and the assignment file names the handoff's branch. Without `--base`, a handoff
-  that names a branch seats a detached copy of it. `--base` and `--on` cannot be combined.
-- `--on <branch>` seats the agent on a detached copy of an existing branch and creates no branch.
-  Use it for review.
+  that names a branch seats a review copy of it (see `--on`). `--base` and `--on` cannot be
+  combined.
+- `--on <branch>` seats the agent on a review copy of an existing branch and creates no branch.
+  A review copy is a checkout of the branch's current commit that is not on the branch itself
+  (git calls this detached), because git will not check one branch out in two places. Use it
+  for review.
 - `--task <id>` records a task id from `data/tasks.yaml` on the assignment.
 
 Or ask your session: "seat an engineer on the cursor race". The `crew` skill writes the brief
@@ -73,7 +76,8 @@ agent then counts as not prompted, and `nudge` works once the cause is dealt wit
 has not started, type into its pane what the command printed (the role file and assignment file
 paths).
 
-A brief that starts with a dash is read as an option; put `--` before it, after any flags:
+A brief that starts with a dash is read as an option; put `--` before it, after any flags. The
+same holds for `handoff`:
 `npm run crew -- seat engineer --task t1 -- "-5 degrees is too cold"`.
 
 ## See what is happening
@@ -93,16 +97,16 @@ Open handoffs: 1
 
 - `STATE` is what herdr sees live. `blocked` means the agent is waiting for you: a permission
   prompt or a question.
-- `STATUS` is what the assignment's trail file says: `seating`, `working` or `reported`. An
+- `STATUS` is what the assignment's file in `memory/crew/` says: `seating`, `working` or `reported`. An
   agent that is `idle` and `reported` has finished and is waiting for you to release it.
 - **Open handoffs** are requests one agent wrote for another role. Seat the role with
   `--handoff <id>`, or decline with `handoff-close <id> --reason "…"`.
 - **Needs release** lists assignments whose agent is gone or whose seating failed.
 - A `STATUS` of `working (first prompt not sent)` or `working (first prompt unconfirmed)` marks
   an agent that may never have been told what to do. See the two cases under "Seat an agent".
-- **Sync conflict copies** lists copies Syncthing kept when two machines changed a trail file at
-  once. They are not read as records and are never deleted; merge each by hand, then delete it.
-  **Could not read** lists trail files that could not be parsed.
+- **Sync conflict copies** lists copies that Syncthing, the file-sync tool, kept when two machines
+  changed a file in `memory/crew/` at once. They are not read as records and are never deleted; merge each by hand, then delete it.
+  **Could not read** lists files in `memory/crew/` that could not be parsed.
 - **Worktrees left behind** lists released or abandoned assignments whose worktree release kept
   because it had changes in it, or because it could not be removed or its commits could not be
   saved. Run `release` on one again after you have dealt with what the command listed.
@@ -114,7 +118,11 @@ npm run crew -- seat lead "Goal: … Constraints: … Done when: …"
 ```
 
 The lead may seat other roles and take handoffs. Every other role can only ask, in writing. At
-most four crew agents are seated at once; change `max_agents` in `roles/circles.yaml`.
+most six crew agents are seated at once. The five shipped roles (the lead among them) take five
+seats; the sixth allows a second agent in one role, for example a reviewer while an engineer is
+still seated. Each seated agent is a full model session on your own plan, so on a small plan
+lower the number. It is `max_agents` in `roles/circles.yaml`; change it there. (The launcher
+assumes 4 only when that file has no `max_agents` line.)
 
 ## Release
 
@@ -132,16 +140,16 @@ it, run `release` on the same assignment again: it retries the removal, never fo
 keeps the outcome (`released` or `abandoned`) it already recorded. Giving `--outcome` on a retry
 that differs from the recorded one is refused; the same one, or none, is accepted.
 
-An agent seated with `--on` works on a detached copy and has no branch of its own. If it made
-commits, release saves them as a branch `crew/<assignment-id>` and tells you. A retry saves
-commits made since (for example ones you committed in the worktree) under `crew/<assignment-id>-2`
-and so on; an earlier rescue branch is never moved. If a retry cannot save the new commits, it
+An agent seated with `--on` works on a review copy and has no branch of its own, so its commits
+belong to no branch. If it made any, release saves them as a branch `crew/<assignment-id>` and
+tells you. A retry saves commits made since (for example ones you committed in the worktree)
+under `crew/<assignment-id>-2` and so on; a branch saved by an earlier release is never moved. If a retry cannot save the new commits, it
 says that, names the branch an earlier release made, and leaves the worktree.
 
 If herdr does not answer within 60 seconds when release asks it which worktree its workspace is
-open on, or to remove the worktree, the worktree is left, because herdr may still be removing it,
-and the command says which of the two it was asking. Run `release` again a little later. If herdr
-had finished by then, the same `release <assignment>` says the worktree was already removed and
+open on, or to remove the worktree, the worktree is left and the command says which of the two it
+was asking. After the removal request herdr may still be removing it; after the question nothing
+was removed. Run `release` again a little later. If herdr had finished by then, the same `release <assignment>` says the worktree was already removed and
 closes the record; it no longer answers "No open assignment matches".
 
 Commit `memory/crew/` with the rest of your session's memory.
