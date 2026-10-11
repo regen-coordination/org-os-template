@@ -16,14 +16,14 @@ An instance is a repository that carries its own identity files, `data/`, `memor
 
 | Instance | Type | Maturity | Notes |
 |---|---|---|---|
-| refi-bcn-os (ReFi Barcelona) | LocalNode | production | Cooperative in formation. |
+| refi-bcn-os (ReFi Barcelona) | LocalNode | production | A downstream entry in `federation.yaml`, trust `full`. |
 | refi-dao-os (ReFi DAO) | DAO | production | The registry gives it `federation_role: hub` in the `regen-coordination` network. |
 | [regen-coordination-os](https://github.com/regen-coordination/regen-coordination-os) (Regen Coordination) | Hub | beta | Hub of the `regen-coordination` network. |
-| [refi-med-os](https://github.com/ReFiDAO/refi-med-os) (ReFi Mediterranean) | LocalNode | alpha | Scaffolded from the framework; its bootstrap is not finished (identity, members and projects are placeholder stubs). |
-| [regen-toolkit](https://github.com/regen-coordination/regen-toolkit) (Regen Web3 Toolkit) | Project | beta | A nested instance with its own remote. Registered in `data/instances.yaml` as assess-only. |
-| bread-coop-os | Cooperative | alpha | A fictional acceptance-test instance for `clone:framework`. No remote. |
+| [refi-med-os](https://github.com/ReFiDAO/refi-med-os) (ReFi Mediterranean) | LocalNode | alpha | A downstream entry in `federation.yaml`; that entry records its bootstrap as pending. |
+| [regen-toolkit](https://github.com/regen-coordination/regen-toolkit) (Regen Web3 Toolkit) | Project | beta | Has its own repository and sits inside the regen-coordination-os checkout (`CHANGELOG.md`). It has no entry in `federation.yaml`. `CHANGELOG.md` records one sync run on it that stopped before it was stamped. |
+| bread-coop-os | Cooperative | alpha | Made by the framework's cloning engine (`README.md`). Its configuration, `tests/fixtures/bread-coop-config.yaml`, calls the organisation fictional. `federation.yaml` records no repository address for it. |
 
-`dao-os` is listed in the registry and in `federation.yaml` as a downstream entry. The registry gives it type `Project`, maturity `beta` and `federation_role: dev-platform`, so it is not counted as an operational instance (an instance counts as operational only at maturity `production`). It is where the DAO skills are developed, and the source of the DAO skills that are candidates for promotion into the framework ([SKILL-PROMOTION.md](SKILL-PROMOTION.md)).
+`dao-os` is listed in the registry and in `federation.yaml` as a downstream entry. The registry gives it type `Project`, maturity `beta` and `federation_role: dev-platform`, so it is not counted as an operational instance (an instance counts as operational only at maturity `production`). [SKILL-PROMOTION.md](SKILL-PROMOTION.md) lists five skills whose owner is `dao-os` (`safe-treasury`, `hats-governance`, `gardens-governance`, `karma-reputation` and `eip4824-identity`) as candidates for promotion into the framework.
 
 ## Related projects
 
@@ -34,7 +34,7 @@ Repositories in the same network that are not themselves org-os instances. `repo
 | [Regenerant-Catalunya](https://github.com/refibcn/Regenerant-Catalunya) | `repos.manifest.json` |
 | [ReFi-BCN-Website](https://github.com/refibcn/ReFi-BCN-Website) | `repos.manifest.json` |
 | `Local-ReFi-Toolkit` | `repos.manifest.json` |
-| ReFi-Mediterranean | `data/instances.yaml`: the public website and knowledge base of the Mediterranean node, mounted at `repos/refi-mediterranean/`. |
+| ReFi-Mediterranean | `federation.yaml`: the `ReFiDAO/ReFi-Mediterranean` repository, named on the refi-med-os entry. |
 | grants-os | `federation.yaml`, `integrations.grants`, role `grants-platform`. |
 | `quartz-refi-template` | `federation.yaml`, `integrations.publishing`, role `documentation-site`. |
 
