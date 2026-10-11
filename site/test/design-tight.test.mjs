@@ -159,6 +159,95 @@ test("each of those spellings is caught when it appears", () => {
   assert.deepEqual(spellings("src/components/Any.astro", astro(".a { font: inherit; --pagefind-ui-font: var(--font-body); translate: 0 -50%; } .a:hover { color: red; border-color: blue; }")), []);
 });
 
+// ── Corners and motion (closing review of 6eacb24, finding 4) ────────────
+// `border-radius: 12px` and an animation under any name but the two cut ones
+// passed every test above. The corner rule: a radius is one of the three tokens
+// or 50% (a circle), and the two the themes set are 4px and 2px. The motion
+// rule (spec, "Motion": nothing moves on load): no animation at all, in any
+// spelling, except the one the spec keeps by name, the cursor of the `~/org-os`
+// mark, which blinks and is stopped by prefers-reduced-motion.
+const MARK = "Nav.astro";
+function corners(css) {
+  const found = [];
+  for (const m of css.matchAll(/(?<![\w])(-*[a-z-]*radius)\s*:\s*([^;}]+)/g)) {
+    const [property, value] = [m[1], m[2].trim()];
+    if (/^--radius(-sm|-pill)?$/.test(property)) continue;   // the tokens themselves, read below
+    for (const part of value.split(/[\s/]+/)) {
+      if (!/^(var\(--radius(-sm|-pill)?\)|50%|0)$/.test(part)) found.push(`${property}: ${value}`);
+    }
+  }
+  return [...new Set(found)];
+}
+function motion(name, text) {
+  const css = name.endsWith(".css") ? text : [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join("\n");
+  const kept = name.endsWith(MARK) ? "blink" : null;
+  const found = [];
+  for (const m of css.matchAll(/@keyframes\s+([\w-]+)/g)) if (m[1] !== kept) found.push(`@keyframes ${m[1]}`);
+  for (const m of css.matchAll(/(?<![-\w])animation(-name)?\s*:\s*([^;}]+)/g)) {
+    const value = m[2].trim();
+    if (value === "none") continue;
+    if (kept && new RegExp(`(^|\\s)${kept}(\\s|$)`).test(value)) continue;
+    found.push(`animation${m[1] ?? ""}: ${value}`);
+  }
+  // Motion on load by other means: an entry style, a timeline, a page transition, a scripted animation.
+  for (const [what, pattern] of [
+    ["@starting-style", /@starting-style/], ["a scroll or view timeline", /(animation|scroll|view)-timeline/],
+    ["a view transition", /view-transition|ViewTransitions|ClientRouter|startViewTransition/], ["a scripted animation: .animate()", /\.animate\(/],
+  ]) if (pattern.test(text)) found.push(what);
+  return found;
+}
+
+test("corners: every radius is a token or a circle, and the themes set the tokens to 4px and 2px", () => {
+  let seen = 0;
+  for (const { name, css } of styles) {
+    seen += [...css.matchAll(/border[a-z-]*radius\s*:/g)].length;
+    assert.deepEqual(corners(css), [], name);
+  }
+  assert.ok(seen >= 15, `only ${seen} radius declarations found: the pattern stopped matching`);
+  for (const theme of ["systems.css", "systems-dark.css"]) {
+    const css = readFileSync(join(SRC, "styles", "themes", theme), "utf8");
+    assert.match(css, /--radius:\s*4px;/, theme);
+    assert.match(css, /--radius-sm:\s*2px;/, theme);
+  }
+  assert.match(tokens, /--radius-pill:\s*9999px;/);
+});
+
+test("a corner written as a number is caught, in each spelling", () => {
+  for (const [css, expected] of [
+    [".a { border-radius: 12px; }", /border-radius: 12px/],
+    [".a { border-radius: var(--radius) 1rem; }", /border-radius: var\(--radius\) 1rem/],
+    [".a { border-top-left-radius: 8px; }", /border-top-left-radius: 8px/],
+    [".a { border-start-start-radius: 0.5em; }", /border-start-start-radius/],
+    [".a { --pagefind-ui-border-radius: 8px; }", /--pagefind-ui-border-radius: 8px/],
+    [".a { border-radius: calc(var(--radius) * 3); }", /calc/],
+  ]) assert.match(corners(css).join("; "), expected, css);
+  assert.deepEqual(corners(".a { border-radius: var(--radius-sm); } .b { border-radius: 50%; } .c { border-radius: var(--radius) var(--radius) 0 0; } .d { --pagefind-ui-border-radius: var(--radius); }"), []);
+});
+
+test("motion: the only animation is the mark's cursor, and reduced motion stops it", () => {
+  for (const { name, text } of sources) assert.deepEqual(motion(name, text), [], name);
+  const mark = styles.find(({ name }) => name.endsWith(MARK)).css;
+  assert.match(mark, /@keyframes blink\b/);
+  assert.match(mark, /@media \(prefers-reduced-motion: reduce\) \{[^}]*animation: none/);
+});
+
+test("an animation under any other name, or by another means, is caught", () => {
+  const astro = (css, script = "") => `---\n---\n<p>x</p>\n${script}<style>\n${css}\n</style>\n`;
+  for (const [what, name, text, expected] of [
+    ["keyframes under a new name", "src/components/Hero.astro", astro("@keyframes fade-up { from { opacity: 0; } } .a { animation: fade-up 400ms both; }"), /@keyframes fade-up; animation: fade-up 400ms both/],
+    ["animation-name alone", "src/styles/any.css", ".a { animation-name: drift; animation-duration: 2s; }", /animation-name: drift/],
+    ["a second animation on the mark", `src/components/${MARK}`, astro("@keyframes blink { 50% { opacity: 0; } } @keyframes slide { to { opacity: 1; } } .a { animation: blink 1s infinite; } .b { animation: slide 1s; }"), /@keyframes slide; animation: slide 1s/],
+    ["the cursor's name used in another file", "src/components/Hero.astro", astro(".a { animation: blink 1s infinite; }"), /animation: blink 1s infinite/],
+    ["an entry style", "src/components/Hero.astro", astro("@starting-style { .a { opacity: 0; } }"), /@starting-style/],
+    ["a scroll timeline", "src/styles/any.css", ".a { animation-timeline: view(); }", /timeline/],
+    ["a page transition", "src/components/Layout.astro", `---\nimport { ClientRouter } from "astro:transitions";\n---\n<ClientRouter />\n`, /view transition/],
+    ["a scripted animation", "src/components/Hero.astro", astro("", "<script>document.body.animate([{ opacity: 0 }, { opacity: 1 }], 300);</script>\n"), /\.animate\(\)/],
+  ]) assert.match(motion(name, text).join("; "), expected, what);
+  // What is kept stays allowed: the cursor on the mark, and switching an animation off.
+  assert.deepEqual(motion(`src/components/${MARK}`, astro("@keyframes blink { 50% { opacity: 0; } } .cursor { animation: blink 1.1s steps(1) infinite; } @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }")), []);
+  assert.deepEqual(motion("src/styles/any.css", ".a { transition: color var(--t-fast); animation: none; }"), []);
+});
+
 // ── The home page's first screen ─────────────────────────────────────────
 const landing = yaml.load(readFileSync(join(SRC, "data", "landing.yaml"), "utf8"));
 const words = (s) => s.trim().split(/\s+/).length;
