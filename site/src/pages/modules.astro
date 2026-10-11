@@ -3,21 +3,38 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import yaml from "js-yaml";
 import Layout from "../components/Layout.astro";
-import ModuleCard from "../components/ModuleCard.astro";
+import ModuleRow from "../components/ModuleRow.astro";
 import { withBase } from "../lib/base";
-interface Module { id: string; name: string; status: "planned" | "in-dev" | "pilot" | "live"; summary: string; link: string | null; }
+type Status = "planned" | "in-dev" | "pilot" | "live";
+interface Module { id: string; name: string; status: Status; summary: string; link: string | null; }
 const doc = yaml.load(readFileSync(resolve(process.cwd(), "src/data/modules.yaml"), "utf8")) as { modules: Module[] };
 const modules = doc.modules;
+// The four statuses, most finished first, each with how many modules carry it.
+const STATUSES: { id: Status; means: string }[] = [
+  { id: "live", means: "in production" },
+  { id: "pilot", means: "built and verified, not yet in production" },
+  { id: "in-dev", means: "being built" },
+  { id: "planned", means: "specified, not built" },
+];
+const tally = STATUSES.map((s) => ({ ...s, count: modules.filter((m) => m.status === s.id).length }));
 ---
 <Layout title="Modules" current="modules" description="The org-os module catalog, with each module's status.">
   <div class="container" data-pagefind-body>
-    <p class="eyebrow">Catalog</p>
-    <h1>Modules</h1>
-    <p class="prose">Every module in the <a class="link" href={withBase("/docs/modules")}>catalog</a>, with its status: planned (specified, not built), in-dev (being built), pilot (built and verified, not yet in production) or live.</p>
-    <div class="grid">{modules.map((m) => <ModuleCard {...m} />)}</div>
+    <header class="page-head">
+      <p class="eyebrow">Catalog · {modules.length} modules</p>
+      <h1>Modules</h1>
+      <p class="lead">Every module in the <a class="link" href={withBase("/docs/modules")}>catalog</a>, with its status.</p>
+    </header>
+    <dl class="tally mono">
+      {tally.map((s) => <div><dt>{s.count} {s.id}</dt><dd>{s.means}</dd></div>)}
+    </dl>
+    <ul class="modules">{modules.map((m) => <ModuleRow {...m} />)}</ul>
   </div>
 </Layout>
 <style>
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--space-4); margin-top: var(--space-8); }
+.tally { display: flex; flex-wrap: wrap; column-gap: var(--space-8); row-gap: var(--space-2); margin-top: var(--space-6); font-size: var(--text-xs); }
+.tally div { display: flex; gap: var(--space-2); align-items: baseline; }
+.tally dt { color: var(--color-ink); font-weight: 500; }
+.tally dd { margin: 0; color: var(--color-muted); }
+.modules { list-style: none; padding: 0; margin-top: var(--space-5); border-top: var(--border-hair) solid var(--color-line-2); }
 </style>

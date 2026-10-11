@@ -37,6 +37,10 @@
 - The federation page prints each registered instance's name, type and link, and nothing else from `data/instances.yaml`; the registry's `notes` are in no built file; an instance whose checkout was not present at build has no status; the home page counts operational instances (maturity `production`) and prints that definition beside the number. The verifier fails the build on any of these.
 - Left by it, for others: `docs/FEDERATION-MAP.md` describes the old aggregation and `docs/ECOSYSTEM.md` quotes one sentence of the registry's notes (both `commons-steward`'s); `roles/website.md` on `feat/crew` names two installs where three are needed (`commons-steward`'s).
 
+## Task 1c — The tightened look (local)
+
+> **Done 2026-10-11** by the website steward, on the operator's request for "a new polished/tight version". Spec: `docs/superpowers/specs/2026-10-11-site-tight-design.md`; held by `site/test/design-tight.test.mjs`. It replaces the look pass of `599b3db` and `a195c76`: the atmospheric layers, the pointer light and the iridescent edges are cut, so the "keep, dial down or drop" question of task 2 is now asked of this version. It also closes two open minors: the theme switch's edge keeps its contrast while hovered, and the sidebar's section names are no longer headings before the page's `h1`.
+
 ## Task 2 — The operator looks at it (by eye)
 
 `cd site && npm run build && npm run preview`, then `http://localhost:4321/org-os-template/`. Each section at desktop and phone width, both themes; keyboard through nav, sidebar, search, theme switch and prompt bar; one page with script off. The look and the interactive elements (one commit, `599b3db`, adjusted in `a195c76`) are a first pass made without the operator present: keep, dial down or drop.

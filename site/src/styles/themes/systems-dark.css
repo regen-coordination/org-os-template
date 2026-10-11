@@ -1,6 +1,6 @@
 /* themes/systems-dark.css — dark variant. Mirrors the systems.css variable contract
  * one-for-one (site/test/theme-contrast.test.mjs checks that). Active when
- * <html data-theme="dark">. Warm near-black, with the same aura turned low. */
+ * <html data-theme="dark">. Warm near-black. */
 :root[data-theme="dark"] {
   --color-bg:        #12100d;
   --color-bg-2:      #17140f;
@@ -14,36 +14,22 @@
 
   --color-line:   #2a241c;
   --color-line-2: #3a3227;
-  --color-grid:   #1c1813;
 
   --color-accent:      #62cf86;
   --color-accent-soft: #86e0a3;
   --color-accent-ink:  #12100d;
   --color-accent-wash: rgba(98, 207, 134, 0.10);
 
-  --aura-1: rgba(255, 140, 80, 0.16);
-  --aura-2: rgba(150, 120, 255, 0.18);
-  --aura-3: rgba(80, 200, 140, 0.12);
-  --gradient-iris: linear-gradient(90deg, rgba(255, 150, 95, 0.8), rgba(165, 140, 255, 0.8), rgba(105, 215, 155, 0.8));
-
-  --color-glow: rgba(165, 140, 255, 0.42);      /* the light an element gives off when touched */
   --color-sun:  #f0b35e;                     /* the theme switch's sun */
-
-  /* Grain — light specks, laid softly over the dark */
-  --grain-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 .95  0 0 0 0 .85  0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --grain-opacity: 0.07;
-  --grain-blend: soft-light;
-  --surface-veil: 78%;
 
   --font-display: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --font-mono:    "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --font-body:    "Geist Variable", system-ui, sans-serif;
 
-  --radius: 5px;
-  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-sm: 2px;
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -20px rgba(0, 0, 0, 0.7);
+  --shadow-dialog: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -20px rgba(0, 0, 0, 0.7);
 
   color-scheme: dark;
 }

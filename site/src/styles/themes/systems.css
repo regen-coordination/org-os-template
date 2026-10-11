@@ -1,6 +1,5 @@
-/* themes/systems.css — light "technical-editorial" theme (primary).
- * Ink on warm, grainy paper; monospace-forward; a faint aura of colour behind
- * the page (proto-DAOcore: the schematic stays, the light around it softens). */
+/* themes/systems.css — light theme (primary). Ink on warm paper, regen green,
+ * monospace-forward. Flat: colour, hairlines and type carry the page. */
 :root {
   /* Surfaces — warm paper, layered */
   --color-bg:        #f5eee1;   /* page — warm paper */
@@ -17,7 +16,6 @@
   /* Lines */
   --color-line:   #e3d9c6;      /* hairline borders */
   --color-line-2: #cfc2aa;      /* stronger rules */
-  --color-grid:   #e9dfcc;      /* atmospheric blueprint grid */
 
   /* Accent — regen green */
   --color-accent:      #176a32;
@@ -25,32 +23,17 @@
   --color-accent-ink:  #fbf6ec;
   --color-accent-wash: rgba(23, 106, 50, 0.08);
 
-  /* Aura — soft light behind the page: peach, lilac, mint */
-  --aura-1: rgba(255, 158, 102, 0.26);
-  --aura-2: rgba(168, 142, 255, 0.20);
-  --aura-3: rgba(110, 205, 150, 0.20);
-  --gradient-iris: linear-gradient(90deg, rgba(255, 158, 102, 0.9), rgba(168, 142, 255, 0.9), rgba(110, 205, 150, 0.9));
-
-  --color-glow: rgba(150, 120, 255, 0.38);      /* the light an element gives off when touched */
   --color-sun:  #b0650c;                     /* the theme switch's sun — 3:1 on --color-surface-2 */
-
-  /* Grain — dark specks, multiplied into the paper */
-  --grain-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15  0 0 0 0 .1  0 0 0 0 .05  0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --grain-opacity: 0.10;
-  --grain-blend: multiply;
-  --surface-veil: 82%;          /* how opaque a raised card is over the aura */
 
   /* Type */
   --font-display: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --font-mono:    "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --font-body:    "Geist Variable", system-ui, sans-serif;
 
-  --radius: 5px;
-  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-sm: 2px;
 
-  /* Elevation — whisper-soft, warm-tinted */
-  --shadow-1: 0 1px 2px rgba(60, 40, 20, 0.05), 0 1px 1px rgba(60, 40, 20, 0.03);
-  --shadow-2: 0 1px 2px rgba(60, 40, 20, 0.05), 0 18px 40px -20px rgba(90, 60, 30, 0.26);
+  --shadow-dialog: 0 1px 2px rgba(60, 40, 20, 0.05), 0 18px 40px -20px rgba(90, 60, 30, 0.26);
 
   color-scheme: light;
 }

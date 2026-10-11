@@ -191,8 +191,8 @@ index.
 
 `themes/systems-dark.css` is completed into a full theme. To meet AA on every surface, the light
 theme's accent is darkened slightly (`#1c7d3b`, then `#1a7738`, now `#176a32` after the look
-pass) and its faint colour raised (`#969aa0`, now `#857a6b`, non-text use only). The light theme also
-has aura, grain and glow tokens that the first draft did not list. Both themes are imported; the active one
+pass) and its faint colour raised (`#969aa0`, now `#857a6b`, non-text use only). The aura, grain and glow tokens the look pass added to both
+themes were removed on 2026-10-11 (`2026-10-11-site-tight-design.md`); the palettes are unchanged. Both themes are imported; the active one
 is chosen by `data-theme` on `<html>`, set before first paint from the viewer's saved choice or
 the system setting. A toggle in the nav saves the choice. A test checks text and accent contrast
 in both themes against WCAG AA.

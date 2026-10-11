@@ -22,10 +22,10 @@ const { prev, next } = neighbours(page.slug);
 <Layout title={page.title} description={page.summary} current="docs">
   <details class="docs-drawer">
     <summary class="mono">Documentation menu</summary>
-    <DocsSidebar current={page.slug} />
+    <DocsSidebar current={page.slug} idPrefix="drawer" />
   </details>
   <div class="container-wide docs-grid">
-    <aside class="docs-side"><DocsSidebar current={page.slug} /></aside>
+    <aside class="docs-side"><DocsSidebar current={page.slug} idPrefix="side" /></aside>
     <div class="docs-contents"><DocsToc headings={headings} /></div>
     <div class="docs-main">
       <article class="doc prose" data-pagefind-body>
@@ -54,7 +54,7 @@ const { prev, next } = neighbours(page.slug);
   let current: string | undefined;
   const spy = () => {
     let id = headings[0]?.id;
-    for (const h of headings) { if (h.getBoundingClientRect().top <= 110) id = h.id; else break; }
+    for (const h of headings) { if (h.getBoundingClientRect().top <= 96) id = h.id; else break; }
     if (id === current) return;
     current = id;
     for (const [key, a] of links) {
@@ -100,40 +100,43 @@ const { prev, next } = neighbours(page.slug);
 <style>
 .docs-drawer { display: none; }
 .docs-grid {
-  display: grid; gap: var(--space-10); align-items: start; padding-top: var(--space-10);
-  grid-template-columns: 15rem minmax(0, 1fr) 13rem;
+  display: grid; gap: var(--space-8); align-items: start; padding-top: var(--space-8);
+  grid-template-columns: 14rem minmax(0, 1fr) 12rem;
   grid-template-areas: "side main contents";
 }
-.docs-side { grid-area: side; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+.docs-side, .docs-contents { position: sticky; top: calc(var(--nav-height) + var(--space-6)); max-height: calc(100vh - var(--nav-height) - var(--space-8)); overflow-y: auto; }
+.docs-side { grid-area: side; }
 .docs-main { grid-area: main; min-width: 0; }
-.docs-contents { grid-area: contents; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+.docs-contents { grid-area: contents; }
 
-.doc h1 { font-size: var(--text-3xl); margin-top: var(--space-3); }
+.doc h1 { margin-top: var(--space-2); }
+.trail { display: flex; gap: var(--space-2); color: var(--color-muted); }
 .trail a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
 .trail a:hover { color: var(--color-ink); }
-.doc :global(h2) { margin-top: var(--space-10); scroll-margin-top: 5rem; }
-.doc :global(h3) { scroll-margin-top: 5rem; }
-.doc :global(table) { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--text-sm); }
-.doc :global(th), .doc :global(td) { border: var(--border-hair) solid var(--color-line); padding: var(--space-2) var(--space-3); text-align: left; vertical-align: top; }
-.doc :global(th) { background: var(--color-bg-2); color: var(--color-ink); }
+/* A rule above each h2: a long page shows its structure when scrolled fast. */
+.doc :global(h2) { margin-top: var(--space-10); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--color-line); scroll-margin-top: calc(var(--nav-height) + var(--space-4)); }
+.doc :global(h3) { scroll-margin-top: calc(var(--nav-height) + var(--space-4)); }
+.doc :global(table) { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--text-sm); line-height: var(--leading-snug); }
+.doc :global(th), .doc :global(td) { border-bottom: var(--border-hair) solid var(--color-line); padding: var(--space-2) var(--space-3) var(--space-2) 0; text-align: left; vertical-align: top; }
+.doc :global(th) { color: var(--color-ink); font-family: var(--font-mono); font-weight: 500; border-bottom-color: var(--color-line-2); white-space: nowrap; }
 .doc :global(blockquote) { border-left: 2px solid var(--color-line-2); padding-left: var(--space-4); color: var(--color-muted); }
-.doc :global(ul), .doc :global(ol) { padding-left: var(--space-6); }
+.doc :global(ul), .doc :global(ol) { padding-left: var(--space-5); }
 .doc :global(li + li) { margin-top: var(--space-1); }
 .doc :global(img) { max-width: 100%; height: auto; }
 /* added by the script above */
 .doc :global(.code-wrap) { position: relative; }
-.doc :global(.code-wrap .copy) { position: absolute; top: var(--space-2); right: var(--space-2); opacity: 0; transition: opacity var(--t-fast), transform var(--t-fast), box-shadow var(--t-med); }
+.doc :global(.code-wrap .copy) { position: absolute; top: var(--space-2); right: var(--space-2); opacity: 0; transition: opacity var(--t-fast), border-color var(--t-fast), color var(--t-fast); }
 .doc :global(.code-wrap:hover .copy), .doc :global(.code-wrap .copy:focus-visible) { opacity: 1; }
 /* where there is no hover the button is always shown: give the block room so it covers no code */
 @media (hover: none) { .doc :global(.code-wrap .copy) { opacity: 1; } .doc :global(.code-wrap pre) { padding-top: var(--space-10); } }
-.doc :global(.anchor) { margin-left: 0.4em; color: var(--color-muted); opacity: 0; text-decoration: none; background: none; transition: opacity var(--t-fast), color var(--t-fast); }
+.doc :global(.anchor) { margin-left: 0.4em; color: var(--color-muted); opacity: 0; text-decoration: none; transition: opacity var(--t-fast), color var(--t-fast); }
 .doc :global(h2:hover .anchor), .doc :global(h3:hover .anchor), .doc :global(.anchor:focus-visible) { opacity: 1; }
 .doc :global(.anchor:hover) { color: var(--color-accent); }
 @media (hover: none) { .doc :global(.anchor) { display: none; } }
 .doc :global(hr) { border: 0; border-top: var(--border-hair) solid var(--color-line); margin-block: var(--space-8); }
 
 @media (max-width: 1099px) {
-  .docs-grid { grid-template-columns: 15rem minmax(0, 1fr); grid-template-areas: "side contents" "side main"; row-gap: var(--space-6); }
+  .docs-grid { grid-template-columns: 14rem minmax(0, 1fr); grid-template-areas: "side contents" "side main"; row-gap: var(--space-5); }
   .docs-contents { position: static; max-height: none; }
 }
 @media (max-width: 799px) {
@@ -145,9 +148,9 @@ const { prev, next } = neighbours(page.slug);
   .docs-drawer summary { cursor: pointer; padding: var(--space-3) var(--gutter); font-size: var(--text-sm); color: var(--color-ink);
     display: flex; justify-content: space-between; align-items: center; list-style: none; }
   .docs-drawer summary::-webkit-details-marker { display: none; }
-  .docs-drawer summary::after { content: "▾"; color: var(--color-muted); transition: transform var(--t-fast); }
-  .docs-drawer[open] summary::after { transform: rotate(180deg); }
+  .docs-drawer summary::after { content: "▾"; color: var(--color-muted); }
+  .docs-drawer[open] summary::after { content: "▴"; }
   .docs-drawer :global(.docs-sidebar) { padding: var(--space-2) var(--gutter) var(--space-6); }
-  .docs-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "contents" "main"; padding-top: var(--space-6); }
+  .docs-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "contents" "main"; padding-top: var(--space-5); }
 }
 </style>

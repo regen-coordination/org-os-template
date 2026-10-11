@@ -6,12 +6,14 @@ import { federationData } from "../lib/federation";
 ---
 <Layout title="Federation" current="federation" description="The org-os federation — the map of its peers and the instances registered with the framework.">
   <div class="container">
-    <p class="eyebrow">Federation</p>
-    <h1>One OS, many nodes</h1>
-    <p class="prose">The map is drawn from this repository's <code>federation.yaml</code>: the peers, upstreams and downstreams org-os declares, and what they point to in turn.</p>
-    <FederationMapIsland />
+    <header class="page-head">
+      <p class="eyebrow">Network</p>
+      <h1>Federation</h1>
+      <p class="lead">The map is drawn from this repository's <code class="code-inline">federation.yaml</code>: the peers, upstreams and downstreams org-os declares, and what they point to in turn.</p>
+    </header>
+    <div class="map"><FederationMapIsland /></div>
     <h2 class="list-title">Registered instances</h2>
-    <p class="prose">The {federationData.registered} entries of the framework's registry, by name, type and repository. {federationData.operational} are operational. {federationData.operationalDefinition}</p>
+    <p class="about">The {federationData.registered} entries of the framework's registry, by name, type and repository. {federationData.operational} are operational. {federationData.operationalDefinition}</p>
     <ul class="instances">
       {federationData.nodes.map((node) => <InstanceCard node={node} />)}
     </ul>
@@ -19,8 +21,10 @@ import { federationData } from "../lib/federation";
   </div>
 </Layout>
 <style>
+.map { margin-top: var(--space-8); }
 .list-title { margin-top: var(--space-12); }
+.about { margin-top: var(--space-2); max-width: var(--container-prose); font-size: var(--text-sm); color: var(--color-muted); }
 .instances { list-style: none; padding: 0; margin-block: var(--space-5); max-width: 44rem;
-  border-top: var(--border-hair) solid var(--color-line); }
-.faint { color: var(--color-muted); font-size: var(--text-sm); }
+  border-top: var(--border-hair) solid var(--color-line-2); }
+.faint { color: var(--color-muted); font-size: var(--text-xs); }
 </style>

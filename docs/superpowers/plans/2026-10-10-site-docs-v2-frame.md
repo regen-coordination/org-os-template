@@ -2744,8 +2744,8 @@ means exactly that: nobody has checked whether it is still so.
 - Theme: **closed** — the `theme-color` meta has a value before script (`cee221c`). **Open** — the
   toggle's label is a static "Dark theme" (`ThemeToggle.astro:6`; its state is carried by
   `aria-pressed`).
-- Docs layout: **open** — the sidebar's section headings are `h2` and come before the page's `h1`
-  (`DocsSidebar.astro:14`). An empty on-page-contents wrapper leaves a small gap (not looked at).
+- Docs layout: **closed 2026-10-11** — the sidebar's section names were `h2` headings before the
+  page's `h1`; they are now labels of their lists (`DocsSidebar.astro`). An empty on-page-contents wrapper leaves a small gap (not looked at).
 - **Open** — `Redirect.astro`'s canonical link is root-relative (line 15). **Open, outside
   `site/`** — `scripts/render-templates.mjs:40` says `DOC_SPINE` mirrors the manifest, which nothing
   enforces (`engineer`'s). **Closed** — `OLD_DOC_SLUGS` is written only in the verifier. The

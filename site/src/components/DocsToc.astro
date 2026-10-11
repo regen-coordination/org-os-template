@@ -18,17 +18,16 @@ const items = Astro.props.headings.filter((h) => h.depth === 2 || h.depth === 3)
 )}
 <style>
 .docs-toc { font-size: var(--text-sm); }
-.docs-toc summary { cursor: pointer; color: var(--color-muted); margin-bottom: var(--space-2); }
-.docs-toc ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.docs-toc a { color: var(--color-muted); }
-.docs-toc a { display: block; padding-left: var(--space-3); border-left: var(--border-hair) solid transparent; transition: color var(--t-fast), border-color var(--t-fast); }
+.docs-toc summary { cursor: pointer; color: var(--color-muted); margin-bottom: var(--space-2); list-style: none;
+  display: flex; justify-content: space-between; align-items: center; }
+.docs-toc summary::-webkit-details-marker { display: none; }
+.docs-toc summary::after { content: "▾"; }
+.docs-toc[open] summary::after { content: "▴"; }
+.docs-toc ul { list-style: none; padding: 0; display: flex; flex-direction: column; }
+.docs-toc a { display: block; padding: 0.15rem 0 0.15rem var(--space-3); color: var(--color-muted); line-height: var(--leading-snug);
+  border-left: var(--border-hair) solid var(--color-line); transition: color var(--t-fast), border-color var(--t-fast); }
 .docs-toc a:hover { color: var(--color-ink); }
 /* set by the scroll-spy in DocsLayout.astro */
 .docs-toc a.active { color: var(--color-accent); border-left-color: var(--color-accent); }
-.docs-toc summary { list-style: none; }
-.docs-toc summary::-webkit-details-marker { display: none; }
-.docs-toc summary { display: flex; justify-content: space-between; align-items: center; }
-.docs-toc summary::after { content: "▾"; transition: transform var(--t-fast); }
-.docs-toc[open] summary::after { transform: rotate(180deg); }
-.docs-toc .sub { padding-left: var(--space-4); }
+.docs-toc .sub a { padding-left: var(--space-6); }
 </style>

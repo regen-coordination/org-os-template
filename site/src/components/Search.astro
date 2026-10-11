@@ -72,17 +72,13 @@ import { withBase } from "../lib/base";
    carries its own. */
 .search-open {
   display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-4);
-  min-width: 10.5rem; padding: 0.28rem 0.4rem 0.28rem 0.8rem;
+  min-width: 10rem; padding: 0.2rem 0.4rem 0.2rem 0.75rem;
   font-size: var(--text-sm); color: var(--color-muted);
   border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
-  transition: color var(--t-fast), border-color var(--t-fast), box-shadow var(--t-med);
+  background: var(--color-surface);
+  transition: color var(--t-fast), border-color var(--t-fast);
 }
-.search-open:hover {
-  color: var(--color-ink); border-color: transparent;
-  background: linear-gradient(var(--color-surface), var(--color-surface)) padding-box, var(--gradient-iris) border-box;
-  box-shadow: 0 8px 24px -12px var(--color-glow);
-}
+.search-open:hover { color: var(--color-ink); border-color: var(--color-ink); }
 /* on a phone there is no "/" key to hint at */
 .search-open .words { white-space: nowrap; }
 @media (max-width: 640px) { .search-open { min-width: 0; padding: 0.28rem 0.75rem; } .search-open kbd, .search-open .more { display: none; } }
@@ -94,7 +90,7 @@ import { withBase } from "../lib/base";
   width: min(44rem, calc(100% - 2 * var(--gutter))); max-height: 80vh; margin: 10vh auto auto;
   padding: var(--space-5); overflow-y: auto;
   background: var(--color-surface); color: var(--color-ink-2);
-  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius); box-shadow: var(--shadow-2);
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius); box-shadow: var(--shadow-dialog);
   /* Pagefind UI reads these. */
   --pagefind-ui-primary: var(--color-accent);
   --pagefind-ui-text: var(--color-ink-2);
@@ -106,9 +102,9 @@ import { withBase } from "../lib/base";
   --pagefind-ui-font: var(--font-body);
   --pagefind-ui-scale: 0.85;
 }
-.search-dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 62%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.search-dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 80%, transparent); }
 /* Pagefind marks the matched words; give them the site's own highlight */
-.search-dialog :global(mark) { background: var(--color-accent-wash); color: var(--color-accent); border-radius: var(--radius-sm); padding: 0 0.15em; box-shadow: 0 0 0 1px var(--color-accent-wash); }
+.search-dialog :global(mark) { background: var(--color-accent-wash); color: var(--color-accent); border-radius: var(--radius-sm); padding: 0 0.15em; }
 .search-dialog form { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
 .search-close {
   font-size: var(--text-xs); color: var(--color-muted); background: none; cursor: pointer;

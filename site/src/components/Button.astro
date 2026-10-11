@@ -9,27 +9,12 @@ const { href, variant = "solid" } = Astro.props;
   display: inline-flex; align-items: center; gap: 0.5em;
   font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 500;
   letter-spacing: -0.01em; line-height: 1;
-  padding: 0.7rem 1.1rem; border-radius: var(--radius-sm);
+  padding: 0.65rem 1rem; border-radius: var(--radius-sm);
   border: var(--border-hair) solid transparent;
-  transition: transform var(--t-fast), box-shadow var(--t-fast),
-    border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+  transition: border-color var(--t-fast), color var(--t-fast), background-color var(--t-fast);
 }
-.btn { position: relative; overflow: hidden; }
-.btn.solid { background: var(--color-accent); color: var(--color-accent-ink); box-shadow: var(--shadow-1); }
-/* a sheen that crosses the solid button when it is touched */
-.btn.solid::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(105deg, transparent 35%, var(--color-accent-soft) 50%, transparent 65%);
-  opacity: 0.55; transform: translateX(-120%); transition: transform var(--t-slow);
-}
-.btn.solid:hover { transform: translateY(-2px); box-shadow: var(--shadow-2), 0 0 0 1px var(--color-accent), 0 10px 34px -8px var(--color-glow); }
-.btn.solid:hover::after { transform: translateX(120%); }
+.btn.solid { background: var(--color-accent); color: var(--color-accent-ink); border-color: var(--color-accent); }
+.btn.solid:hover { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-bg); }
 .btn.ghost { background: var(--color-surface); color: var(--color-ink); border-color: var(--color-line-2); }
-.btn.ghost:hover {
-  border-color: transparent; transform: translateY(-2px);
-  background: linear-gradient(var(--color-surface), var(--color-surface)) padding-box, var(--gradient-iris) border-box;
-  box-shadow: 0 10px 30px -14px var(--color-glow);
-}
-.btn:active { transform: translateY(0) scale(0.98); }
-@media (prefers-reduced-motion: reduce) { .btn:hover, .btn:active { transform: none; } .btn.solid::after { display: none; } }
+.btn.ghost:hover { border-color: var(--color-ink); }
 </style>

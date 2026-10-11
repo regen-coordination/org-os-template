@@ -37,6 +37,7 @@ on any link that skips (or doubles) the prefix.
 - **Search** is Pagefind: `npm run build` indexes `dist/` after Astro builds it, and the index loads when the viewer first opens search. It does not exist under `npm run dev`, where Search falls back to the docs index — use `npm run build && npm run preview` to try it.
 - **Federation**: `scripts/aggregate-federation.mjs` reads `../data/instances.yaml` and writes `src/data/federation.json` (gitignored, regenerated each build) with three fields per instance — name, type, repository (`PUBLIC_FIELDS` in `scripts/federation-aggregate.mjs`) — and two counts: registered, and operational (maturity `production`). The registry's other fields, its `notes` above all, are the maintainer's working record and are not published: the build fails if a sentence from one is found in any built file. The same script writes `map.json` from `packages/org-os-kms` (`buildMap`), dropping the `live: false` flag of nodes whose checkout was not present, and copies org-os's own `.well-known/*.json` into `public/.well-known/`.
 - **Themes**: light and dark, both loaded (`src/styles/theme.css`); `<html data-theme>` chooses, set before first paint by `src/lib/theme-boot.mjs` from the viewer's saved choice or the system setting. Palette/fonts/radius live in `src/styles/themes/`; structural tokens in `tokens.css`. `test/theme-contrast.test.mjs` holds both to WCAG AA.
+- **Design**: flat and tight — one short type scale and one spacing scale in `src/styles/tokens.css`, hairlines, one shadow (the search dialog). `test/design-tight.test.mjs` fails on a raw `font-size`, a spacing step above 64px, a stray shadow, or decoration that was cut; it also holds the home page's first screen to its lengths and each command on it to the repository. Spec: `../docs/superpowers/specs/2026-10-11-site-tight-design.md`.
 - **Feedback** is a link to a prefilled GitHub issue under the `docs-feedback` label (`src/lib/feedback.mjs`). No backend, no script.
 - **Graph**: the federation network on `/` and `/federation` is the `<federation-map>` web component.
 - **Machine layer**: `/llms.txt` (generated from the manifest), `/federation.json`, and the surfaced `/.well-known/` EIP-4824 schemas.
@@ -71,6 +72,7 @@ path live in `base.config.mjs` (the single source of truth, consumed by
 
 A custom domain would be a new decision, made by changing `base.config.mjs`.
 Specs: `../docs/superpowers/specs/2026-06-17-org-os-website-design.md` (the first
-version) and `../docs/superpowers/specs/2026-10-10-site-docs-v2-design.md` (this one).
+version), `../docs/superpowers/specs/2026-10-10-site-docs-v2-design.md` (the docs site)
+and `../docs/superpowers/specs/2026-10-11-site-tight-design.md` (its look).
 
 Built by the org-os framework. MIT.

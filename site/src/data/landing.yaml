@@ -1,11 +1,18 @@
 # Home copy. The site's audience is people who already run an org-os instance
 # (spec 2026-10-10, §1). The pitch for newcomers lives in docs/POSITIONING.md.
-eyebrow: "docs"
+# test/design-tight.test.mjs holds the lengths, and each command to the repository.
+label: "docs for operators"
 title: "Run your organization on org-os"
-subtitle: "Documentation for operators of org-os instances — setting one up, the daily session, keeping it current, and the reference for every file and registry."
+subtitle: "The documentation for people who run an org-os instance: setting one up, the daily session, keeping it current, and the reference for every file and registry."
 ctas:
   - { label: "Operator guide", href: "/docs/operator-guide", variant: "solid" }
   - { label: "All docs", href: "/docs", variant: "ghost" }
-  - { label: "Modules", href: "/modules", variant: "ghost" }
+# The three commands an operator runs most. `does` follows docs/COMMANDS.md.
+# `where`: "agent" is typed to the coding agent, "shell" in a terminal at the instance's root.
+commands_title: "Run in your instance"
+commands:
+  - { run: "/initialize", where: "agent", does: "Open a session: pull, show the dashboard, wait for you.", doc: "/docs/commands" }
+  - { run: "npm run doctor", where: "shell", does: "A read-only scorecard of the instance.", doc: "/docs/instance-doctor" }
+  - { run: "npm run validate:structure", where: "shell", does: "Check the file and folder structure.", doc: "/docs/commands" }
 intro: "New to org-os? It is a git-native workspace where an organization's knowledge, data and operations live as files that people and agents both work on. Every instance today is run by the maintainer; an unaffiliated pilot is the open milestone."
 intro_link: { label: "What an instance contains", href: "/docs/overview" }

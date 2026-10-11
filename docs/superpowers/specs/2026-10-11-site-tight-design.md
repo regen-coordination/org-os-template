@@ -1,7 +1,7 @@
 ---
 id: site-tight
 title: "The org-os site, tightened (Design)"
-status: design written 2026-10-11; build in progress on the steward's branch; awaiting the operator's look
+status: built 2026-10-11 on the steward's branch; seen only in headless screenshots; awaiting the operator's look
 type: feature-spec
 created: 2026-10-11
 author: website steward (crew seat `website`)
@@ -138,9 +138,20 @@ repository. `npm run build`, `npm test` and `npm run drift` run at each commit.
 No dependency is added or upgraded. The Inter font package, installed and never imported, is
 left in `package.json`: removing it is a dependency change and the operator's to approve.
 
-## 7. What nobody has seen
+## 7. What has been seen, and what has not
 
-All of it. The steward cannot open a browser. The checks prove the pages build, the links
-resolve, the tokens contrast and the rules above hold; they do not prove the pages look right.
-Layout at phone width, the wrap of the home panel, the density of the modules list, the map on
-the plain background and both themes all wait for the operator's eye (plan 3, task 2).
+**Seen, as still pictures.** After the build, the steward rendered pages to PNG files with a
+headless Chrome using a throwaway profile (no window, no tab in anyone's browser) and read the
+pictures: the home page in both themes at 1280px and at 500px; a docs page in both themes at
+1360px and at 500px; the modules page at 1280px and 500px; the federation page at 1280px. One
+thing was changed on that evidence: the newcomer paragraph moved under the release note, where
+the first layout left a column empty.
+
+**Not seen by anyone.** Any width under 500px (the headless window does not go narrower, so a
+real phone is unchecked); the search dialog open; hover and focus states; the theme switch
+being pressed; the federation map being used; the keyboard paths; a page with script off; any
+browser but Chrome. A still picture is not the operator's look (plan 3, task 2), which stands.
+
+**As built, where it differs from §2.** The home page has three blocks under the first screen,
+not four: the newcomer paragraph sits inside the release block. The home headline wraps to three
+lines at 1280px.

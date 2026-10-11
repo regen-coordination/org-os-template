@@ -1,42 +1,59 @@
 ---
+// The home page's first screen: what org-os is, who the page is for, and what
+// to do next — two links, and the commands an operator runs most. The commands
+// come from src/data/landing.yaml; test/design-tight.test.mjs holds each one to
+// the repository (a script in the root package.json, or a file in .claude/commands/).
 import Button from "./Button.astro";
+import { withBase } from "../lib/base";
 interface Cta { label: string; href: string; variant: "solid" | "ghost"; }
-interface Props { eyebrow: string; title: string; subtitle: string; ctas: Cta[]; statline?: string; }
-const { eyebrow, title, subtitle, ctas, statline } = Astro.props;
+interface Command { run: string; where: string; does: string; doc: string; }
+interface Props { label: string; title: string; subtitle: string; ctas: Cta[]; commands: Command[]; commandsTitle: string; }
+const { label, title, subtitle, ctas, commands, commandsTitle } = Astro.props;
 ---
-<header class="hero stagger">
-  <p class="prompt mono">
-    <span class="path">~/org-os</span><span class="sym"> $ </span><span class="cmd">{eyebrow}</span>
-  </p>
-  <h1 class="headline">{title}</h1>
-  <p class="lead sub">{subtitle}</p>
-  <div class="ctas">{ctas.map((c) => <Button href={c.href} variant={c.variant}>{c.label}</Button>)}</div>
-  {statline && (
-    <p class="statline mono" aria-label="status">
-      <span class="dot" aria-hidden="true"></span>{statline}
-    </p>
-  )}
+<header class="hero">
+  <div class="say">
+    <p class="eyebrow">{label}</p>
+    <h1 class="headline">{title}</h1>
+    <p class="lead sub">{subtitle}</p>
+    <div class="ctas">{ctas.map((c) => <Button href={c.href} variant={c.variant}>{c.label}</Button>)}</div>
+  </div>
+  <section class="surface panel" aria-labelledby="hero-commands">
+    <h2 class="label" id="hero-commands">{commandsTitle}</h2>
+    <ul>
+      {commands.map((c) => (
+        <li>
+          <a class="row" href={withBase(c.doc)}>
+            <span class="where label">{c.where}</span>
+            <code class="run">{c.run}</code>
+            <span class="does">{c.does}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
 </header>
 <style>
-.hero { padding: clamp(var(--space-16), 12vh, var(--space-32)) 0 var(--space-16); }
-.prompt { font-size: var(--text-sm); color: var(--color-muted); }
-.prompt .path { color: var(--color-accent); }
-.prompt .sym { color: var(--color-muted); }
-.headline {
-  font-size: var(--text-display); margin-top: var(--space-5);
-  max-width: 18ch; letter-spacing: var(--tracking-display);
+.hero {
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--space-12);
+  align-items: end; padding-block: var(--space-16) var(--space-12);
+  border-bottom: var(--border-hair) solid var(--color-line-2);
 }
-.sub { margin-top: var(--space-6); max-width: 52ch; font-size: var(--text-md); }
-.ctas { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-8); }
-.statline {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  margin-top: var(--space-12); padding-top: var(--space-4);
-  border-top: var(--border-hair) dashed var(--color-line);
-  font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
-  color: var(--color-muted); text-transform: uppercase;
+.headline { font-size: var(--text-display); line-height: var(--leading-display); margin-top: var(--space-4); max-width: 14ch; }
+.sub { margin-top: var(--space-5); max-width: 46ch; }
+.ctas { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-6); }
+
+.panel { padding: var(--space-4) var(--space-5) var(--space-2); background: var(--color-surface-2); }
+.panel h2 { font-weight: 500; letter-spacing: var(--tracking-wide); }
+.panel ul { list-style: none; padding: 0; margin-top: var(--space-2); }
+.panel li + li { border-top: var(--border-hair) solid var(--color-line); }
+.row { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); column-gap: var(--space-3); row-gap: 0.15rem;
+  align-items: baseline; padding-block: var(--space-3); color: inherit; }
+.where { grid-row: 1 / span 2; }
+.run { font-size: var(--text-sm); color: var(--color-ink); font-weight: 500; transition: color var(--t-fast); }
+.does { font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); }
+.row:hover .run { color: var(--color-accent); }
+
+@media (max-width: 860px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); padding-block: var(--space-10) var(--space-8); }
 }
-.statline .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent-soft);
-  box-shadow: 0 0 0 0 var(--color-accent-wash); animation: ping 2.4s var(--ease-out) infinite; }
-@keyframes ping { 0% { box-shadow: 0 0 0 0 var(--color-accent-wash); } 70%,100% { box-shadow: 0 0 0 9px transparent; } }
-@media (prefers-reduced-motion: reduce) { .statline .dot { animation: none; } }
 </style>

@@ -42,25 +42,5 @@ const colorDark = themeColor(darkTheme);
   <main id="main"><slot /></main>
   <Footer />
   <slot name="prompt"><PromptBar /></slot>
-  <script>
-    // Cards marked .lit get a soft light that follows the pointer.
-    // At most one write per animation frame, and only for a mouse.
-    let pending: PointerEvent | null = null;
-    document.addEventListener("pointermove", (event) => {
-      if (event.pointerType !== "mouse") return;
-      const queued = pending !== null;
-      pending = event;
-      if (queued) return;
-      requestAnimationFrame(() => {
-        const last = pending;
-        pending = null;
-        const card = (last?.target as Element | null)?.closest?.<HTMLElement>(".lit");
-        if (!last || !card) return;
-        const box = card.getBoundingClientRect();
-        card.style.setProperty("--mx", `${last.clientX - box.left}px`);
-        card.style.setProperty("--my", `${last.clientY - box.top}px`);
-      });
-    }, { passive: true });
-  </script>
 </body>
 </html>
