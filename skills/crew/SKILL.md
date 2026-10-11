@@ -37,7 +37,8 @@ said. Never work around a refusal**: not by calling herdr or git yourself, not b
 | Close an assignment                                                | `npm run crew -- release <agent>`                       |
 | Decline a handoff                                                  | `npm run crew -- handoff-close <id> --reason "<why>"`   |
 
-A handoff that names a branch seats a detached copy of it, which is right for a reviewer and wrong
+A handoff that names a branch seats a review copy of it (a checkout that is not on the branch;
+git calls it detached), which is right for a reviewer and wrong
 for an engineer asked to build on it: pass `--base <ref>` and the agent gets a new branch from
 that ref, with the handoff still taken. `--base` and `--on` cannot be combined.
 
@@ -77,7 +78,7 @@ on the board.
 - A `STATUS` such as `working (first prompt not sent)` or `(first prompt unconfirmed)` means the
   agent may never have been told what to do. Tell the operator; do not nudge an unconfirmed one
   (the command refuses), and for an unsent one the operator may run `nudge`.
-- **Sync conflict copies** are trail files Syncthing duplicated. They are not read as records;
+- **Sync conflict copies** are trail files that Syncthing, the file-sync tool, duplicated. They are not read as records;
   the operator merges them by hand. **Could not read** is a different thing: files that could not
   be parsed.
 - **Worktrees left behind** lists closed assignments whose worktree release could not remove (it

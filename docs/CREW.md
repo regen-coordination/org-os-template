@@ -29,9 +29,12 @@ none of this; the agent reports what it read and what was absent.
 - `--base <ref>` starts the branch somewhere other than `main`. With `--handoff`, it also wins
   over the branch the handoff names: the agent gets a new branch from `<ref>`, the handoff is
   still taken, and the assignment file names the handoff's branch. Without `--base`, a handoff
-  that names a branch seats a detached copy of it. `--base` and `--on` cannot be combined.
-- `--on <branch>` seats the agent on a detached copy of an existing branch and creates no branch.
-  Use it for review.
+  that names a branch seats a review copy of it (see `--on`). `--base` and `--on` cannot be
+  combined.
+- `--on <branch>` seats the agent on a review copy of an existing branch and creates no branch.
+  A review copy is a checkout of the branch's current commit that is not on the branch itself
+  (git calls this detached), because git will not check one branch out in two places. Use it
+  for review.
 - `--task <id>` records a task id from `data/tasks.yaml` on the assignment.
 
 Or ask your session: "seat an engineer on the cursor race". The `crew` skill writes the brief
@@ -73,7 +76,8 @@ agent then counts as not prompted, and `nudge` works once the cause is dealt wit
 has not started, type into its pane what the command printed (the role file and assignment file
 paths).
 
-A brief that starts with a dash is read as an option; put `--` before it, after any flags:
+A brief that starts with a dash is read as an option; put `--` before it, after any flags. The
+same holds for `handoff`:
 `npm run crew -- seat engineer --task t1 -- "-5 degrees is too cold"`.
 
 ## See what is happening
@@ -93,16 +97,16 @@ Open handoffs: 1
 
 - `STATE` is what herdr sees live. `blocked` means the agent is waiting for you: a permission
   prompt or a question.
-- `STATUS` is what the assignment's trail file says: `seating`, `working` or `reported`. An
+- `STATUS` is what the assignment's file in `memory/crew/` says: `seating`, `working` or `reported`. An
   agent that is `idle` and `reported` has finished and is waiting for you to release it.
 - **Open handoffs** are requests one agent wrote for another role. Seat the role with
   `--handoff <id>`, or decline with `handoff-close <id> --reason "…"`.
 - **Needs release** lists assignments whose agent is gone or whose seating failed.
 - A `STATUS` of `working (first prompt not sent)` or `working (first prompt unconfirmed)` marks
   an agent that may never have been told what to do. See the two cases under "Seat an agent".
-- **Sync conflict copies** lists copies Syncthing kept when two machines changed a trail file at
-  once. They are not read as records and are never deleted; merge each by hand, then delete it.
-  **Could not read** lists trail files that could not be parsed.
+- **Sync conflict copies** lists copies that Syncthing, the file-sync tool, kept when two machines
+  changed a file in `memory/crew/` at once. They are not read as records and are never deleted; merge each by hand, then delete it.
+  **Could not read** lists files in `memory/crew/` that could not be parsed.
 - **Worktrees left behind** lists released or abandoned assignments whose worktree release kept
   because it had changes in it, or because it could not be removed or its commits could not be
   saved. Run `release` on one again after you have dealt with what the command listed.
@@ -132,10 +136,10 @@ it, run `release` on the same assignment again: it retries the removal, never fo
 keeps the outcome (`released` or `abandoned`) it already recorded. Giving `--outcome` on a retry
 that differs from the recorded one is refused; the same one, or none, is accepted.
 
-An agent seated with `--on` works on a detached copy and has no branch of its own. If it made
-commits, release saves them as a branch `crew/<assignment-id>` and tells you. A retry saves
-commits made since (for example ones you committed in the worktree) under `crew/<assignment-id>-2`
-and so on; an earlier rescue branch is never moved. If a retry cannot save the new commits, it
+An agent seated with `--on` works on a review copy and has no branch of its own, so its commits
+belong to no branch. If it made any, release saves them as a branch `crew/<assignment-id>` and
+tells you. A retry saves commits made since (for example ones you committed in the worktree)
+under `crew/<assignment-id>-2` and so on; a branch saved by an earlier release is never moved. If a retry cannot save the new commits, it
 says that, names the branch an earlier release made, and leaves the worktree.
 
 If herdr does not answer within 60 seconds when release asks it which worktree its workspace is

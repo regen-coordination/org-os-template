@@ -263,7 +263,7 @@ npm run crew                                  # The board: seated agents, open h
 npm run crew -- board --json                  # The same data, for scripts
 npm run crew -- seat <role> "<brief>"         # Seat an agent in a role, in its own worktree
 npm run crew -- seat <role> "<brief>" --task <id> --base <ref> --on <branch> --handoff <id|file>
-                                              # Options: record a task, branch from <ref>, review a branch on a detached copy, answer a handoff
+                                              # Options: record a task, branch from <ref>, review a branch on a copy not on the branch, answer a handoff
 npm run crew -- nudge <agent|assignment>      # Send the first prompt to an agent that stopped at a startup dialog
 npm run crew -- release <agent|assignment> [--outcome done|abandoned]
                                               # Close an assignment; its branch is kept; the worktree is removed only if nothing in it would be lost
@@ -273,7 +273,7 @@ npm run crew -- handoff <role> "<brief>" [--branch <branch>]  # Agents only: ask
 ```
 
 A brief that starts with a dash is read as an option; put `--` before it, after any flags:
-`npm run crew -- seat <role> [--task <id>] -- "<brief>"`.
+`npm run crew -- seat <role> [--task <id>] -- "<brief>"`; the same for `handoff`.
 
 Runs inside [herdr](https://herdr.dev) only; every command refuses outside it. `report` and
 `handoff` are for a seated agent, which runs them with the command written in its assignment
