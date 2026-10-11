@@ -256,14 +256,12 @@ export function createHerdr({
      * Display-only labels, shown where the operator's herdr config lists them.
      * `source` names crew as the reporter; no ttl, so a label lasts as long as
      * the pane. Short timeout: a label is never worth a minute of waiting.
-     * The id comes first: herdr 0.9.1 reads options only after the positional
-     * id and answers `unknown option: crew` when `--source` precedes it.
      */
     labelPane(paneId, tokens) {
-      look(['pane', 'report-metadata', paneId, '--source', LABEL_SOURCE, ...tokenArgs(tokens)]);
+      look(['pane', 'report-metadata', '--source', LABEL_SOURCE, ...tokenArgs(tokens), paneId]);
     },
     labelWorkspace(workspaceId, tokens) {
-      look(['workspace', 'report-metadata', workspaceId, '--source', LABEL_SOURCE, ...tokenArgs(tokens)]);
+      look(['workspace', 'report-metadata', '--source', LABEL_SOURCE, ...tokenArgs(tokens), workspaceId]);
     },
     /** The checkout a workspace is open on, or null when it is not a worktree workspace. */
     workspaceCheckout(workspaceId) {

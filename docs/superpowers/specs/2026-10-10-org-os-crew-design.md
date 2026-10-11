@@ -367,15 +367,9 @@ they are in the smoke run of `docs/CREW.md`:
 - what git leaves on a killed `git worktree add`;
 - which code `agent get <pane>` or `agent list` gives for a pane with no agent (crew uses the
   list and reads no code from it);
-- that a herdr restart keeps or drops the label tokens (crew does not set them again), and how
-  the sidebar draws them: that needs the operator's `config.toml` edit and the operator's eyes.
-
-Observed against the live herdr 0.9.1 (client and server) on 2026-10-11, on one pane and one
-workspace, tokens cleared afterwards: `report-metadata` takes the positional id **first** and
-`--source crew` after it. With the id last herdr answers `unknown option: crew`, and
-`--source=crew` gives `unknown option: --source=crew`. Values with spaces, `:`, `=` and `…`
-are accepted unchanged. `pane get`, `agent get` and `agent list` return the tokens under
-`tokens`; `workspace get` does too. `--clear-token` removes them.
+- that the installed binary accepts and shows the label tokens as the reference says, that
+  `herdr agent get <name>` returns them, and that a herdr restart keeps or drops them (crew does
+  not set them again). The smoke run in `docs/CREW.md` has the live check.
 
 ## 6. The trail
 
