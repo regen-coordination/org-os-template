@@ -22,6 +22,9 @@ export const AGENT_KINDS = [
 export const ROLE_ID_PATTERN = /^[a-z][a-z0-9_-]{0,27}$/;
 export const DEFAULT_MAX_AGENTS = 4;
 
+// The levels `claude --effort` accepts (Claude Code `claude --help`).
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
 export function loadCircles(rootDir) {
   const path = join(rootDir, 'roles', 'circles.yaml');
   if (!existsSync(path)) {
@@ -52,6 +55,9 @@ export function validateRole(data, { fileId, circleIds }) {
   if (typeof data.may_seat !== 'boolean') errors.push('may_seat must be true or false');
   if (data.model !== undefined && (typeof data.model !== 'string' || data.model === '')) {
     errors.push('model, when given, must be a non-empty string');
+  }
+  if (data.effort !== undefined && !EFFORT_LEVELS.includes(data.effort)) {
+    errors.push(`effort ${JSON.stringify(data.effort)} is not a level; use one of ${EFFORT_LEVELS.join(', ')}`);
   }
   if (data.skills !== undefined && !(Array.isArray(data.skills) && data.skills.every((s) => typeof s === 'string'))) {
     errors.push('skills, when given, must be a list of skill names');
@@ -90,6 +96,7 @@ export function loadRole(rootDir, id) {
     circle: data.circle,
     kind: data.kind,
     model: data.model ?? null,
+    effort: data.effort ?? null,
     may_seat: data.may_seat,
     skills: data.skills ?? [],
     path,

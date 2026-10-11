@@ -15,6 +15,12 @@ const MODEL_ARGS = {
   opencode: (model) => ['--model', model],
 };
 
+// How each agent kind takes an effort level. Only `claude` is verified (`claude --effort
+// <level>`); a kind not listed is started without one and the seat says so.
+const EFFORT_ARGS = {
+  claude: (effort) => ['--effort', effort],
+};
+
 export function requireHerdr(ctx) {
   if (ctx.env.HERDR_ENV !== '1') {
     throw new CrewError('crew runs inside herdr. Open herdr and run this from one of its panes.');
@@ -245,6 +251,8 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   // true: sent and confirmed. false: never sent. 'unconfirmed': sent, but herdr
   // did not confirm it, which does not prove it did not arrive.
   let prompted = false;
+  // Plain lines for the operator about what the seat could not do; never an error.
+  const notes = [];
   try {
     let opened;
     if (on) {
@@ -259,6 +267,10 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
 
     step = 'start';
     const args = role.model && MODEL_ARGS[role.kind] ? MODEL_ARGS[role.kind](role.model) : [];
+    if (role.effort && EFFORT_ARGS[role.kind]) args.push(...EFFORT_ARGS[role.kind](role.effort));
+    else if (role.effort) {
+      notes.push(`The ${role.id} role's effort (${role.effort}) was not applied: crew does not know how to pass an effort level to a ${role.kind} agent.`);
+    }
     let ready = true;
     try {
       ctx.herdr.startAgent({ name, kind: role.kind, pane_id: opened.pane_id, args });
@@ -307,7 +319,7 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
     throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${left}${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
-  return updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
+  return { ...updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) }), notes };
 }
 
 /** What a failed worktree step may have left behind, in the words the failed record and the message use. */

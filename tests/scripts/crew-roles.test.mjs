@@ -48,6 +48,23 @@ test('validateRole names each problem', () => {
   assert.match(errs({ ...OK, skills: 'crew' }), /skills/);
 });
 
+test('validateRole accepts an effort level and refuses any other', () => {
+  for (const effort of ['low', 'medium', 'high', 'xhigh', 'max']) assert.deepEqual(validateRole({ ...OK, effort }, CTX), []);
+  const errs = (effort) => validateRole({ ...OK, effort }, CTX).join(' | ');
+  assert.match(errs('extreme'), /effort "extreme" is not a level.*low, medium, high, xhigh, max/);
+  assert.match(errs(''), /effort/);
+  assert.match(errs(3), /effort/);
+});
+
+test('loadRole returns the effort of a role, null when it sets none, and refuses a bad level in words', () => {
+  const root = makeRoot();
+  writeRole(root, 'thinker', { effort: 'high' });
+  assert.equal(loadRole(root, 'thinker').effort, 'high');
+  assert.equal(loadRole(root, 'engineer').effort, null);
+  writeRole(root, 'wild', { effort: 'extreme' });
+  assert.throws(() => loadRole(root, 'wild'), /roles\/wild\.md is not a valid role.*effort "extreme"/);
+});
+
 test('loadRole returns the role with defaults filled in', () => {
   const root = makeRoot();
   writeRole(root, 'researcher', { model: undefined });
