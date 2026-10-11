@@ -13,13 +13,22 @@ export class HerdrError extends Error {
   }
 }
 
-function run(args) {
+// Long enough for `agent start`, which waits for the agent to be detected.
+const DEFAULT_TIMEOUT_MS = 60000;
+
+function runHerdr(args, { bin, timeoutMs }) {
   let out;
   try {
-    out = execFileSync('herdr', args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    out = execFileSync(bin, args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'], timeout: timeoutMs });
   } catch (err) {
     if (err.code === 'ENOENT') {
       throw new HerdrError('herdr_missing', 'the herdr command was not found on PATH');
+    }
+    if (err.code === 'ETIMEDOUT') {
+      throw new HerdrError(
+        'herdr_timeout',
+        `herdr did not answer within ${Math.round(timeoutMs / 1000)} seconds (${args.slice(0, 2).join(' ')}), so crew stopped waiting for it`,
+      );
     }
     const text = String(err.stderr || err.stdout || err.message).trim();
     let parsed = null;
@@ -50,7 +59,12 @@ const opened = (r) => {
   return { pane_id: r.root_pane.pane_id, workspace_id: r.workspace.workspace_id };
 };
 
-export function createHerdr() {
+/**
+ * @param {{bin?: string, timeoutMs?: number}} [options] The binary and the time a
+ *   single call may take; both exist so the timeout can be tested without herdr.
+ */
+export function createHerdr({ bin = 'herdr', timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  const run = (args) => runHerdr(args, { bin, timeoutMs });
   return {
     listAgents() {
       return need(run(['agent', 'list']), 'agents', 'agent list').agents.map((a) => ({
