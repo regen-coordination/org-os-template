@@ -4,25 +4,17 @@ All notable changes to **org-os** (the framework) are documented here. The proje
 
 For the policy that governs what counts as a version bump, see [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
-## [Unreleased]
+## Crew — on `feat/crew`, targets 0.6.0, not on `main`
 
-**Staged for `0.5.1`.** Everything below is already on `main` but landed *after* the `v0.5.0`
-tag, so a clone of the tag does not have it. `npm run version:update 0.5.1` promotes this
-section to a dated release heading and rewrites the comparison links — the heading stays
-`[Unreleased]` until then because `version:check` reads the first `[X.Y.Z]` heading as the
-current release and would fail against `package.json`.
-
-Still open for 0.5.1, not yet done: the two 🔴 **kms data-loss** fixes, and the remaining admin
-defects (YAML reflow rewriting whole registries on a one-field edit; the per-registry write lock
-racing `.git/index.lock` across registries).
-
-### Added
+This section describes work that exists only on the `feat/crew` branch. It sits above
+`[Unreleased]` on purpose: `npm run version:update 0.5.1` must not promote it into 0.5.1. Whoever
+merges `feat/crew` into `main` folds it into the section of the release that carries it and
+deletes this heading.
 
 - **Crew — role-based agents in herdr** (`npm run crew`, module `org-os-crew`). Roles are files
   under `roles/`; an agent is a session seated in a role in a herdr pane, in its own git
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
-  Guide: `docs/CREW.md`. Targets 0.6.0. Built on the `feat/crew` branch; not yet merged into
-  `main`.
+  Guide: `docs/CREW.md`.
   What an operator should know about the first cycle's fixes:
   - The board has a `STATUS` column (what the assignment's file says) beside `STATE` (what herdr
     sees now), and a "Worktrees left behind" list for released assignments whose worktree was
@@ -41,6 +33,21 @@ racing `.git/index.lock` across registries).
   - A detached (`--on`) assignment's rescue branch `crew/<assignment-id>` is never moved; a taken
     name gets a `-2`, `-3` suffix.
   - A brief that starts with a dash needs `--` before it: `seat <role> -- "<brief>"`.
+
+## [Unreleased]
+
+**Staged for `0.5.1`.** Everything below is already on `main` but landed *after* the `v0.5.0`
+tag, so a clone of the tag does not have it. `npm run version:update 0.5.1` promotes this
+section to a dated release heading and rewrites the comparison links — the heading stays
+`[Unreleased]` until then because `version:check` reads the first `[X.Y.Z]` heading as the
+current release and would fail against `package.json`.
+
+Still open for 0.5.1, not yet done: the two 🔴 **kms data-loss** fixes, and the remaining admin
+defects (YAML reflow rewriting whole registries on a one-field edit; the per-registry write lock
+racing `.git/index.lock` across registries).
+
+### Added
+
 - **`docs/ADOPT-WITH-AN-AGENT.md`** — the copy-paste recipe for driving setup from Claude Code,
   Cursor or a ChatGPT connector. Non-interactive end to end, so an agent can complete it without
   a TTY. Verified by executing it against a fresh clone of `main`.
