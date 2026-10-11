@@ -21,7 +21,26 @@ racing `.git/index.lock` across registries).
 - **Crew — role-based agents in herdr** (`npm run crew`, module `org-os-crew`). Roles are files
   under `roles/`; an agent is a session seated in a role in a herdr pane, in its own git
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
-  Guide: `docs/CREW.md`. Targets 0.6.0.
+  Guide: `docs/CREW.md`. Targets 0.6.0. Built on the `feat/crew` branch; not yet merged into
+  `main`.
+  What an operator should know about the first cycle's fixes:
+  - The board has a `STATUS` column (what the assignment's file says) beside `STATE` (what herdr
+    sees now), and a "Worktrees left behind" list for released assignments whose worktree was
+    kept.
+  - `release` says only what is true: whether the branch was kept or never created, and whether
+    the worktree was removed or left, with the files that held it. Run it again on the same
+    assignment after you have dealt with them; a retry saves commits made since, never forces
+    removal, and refuses an `--outcome` that differs from the recorded one.
+  - `seat` waits up to 8 seconds for a new pane's shell before starting the agent. When herdr does
+    not confirm the first prompt, it says the prompt "may or may not have arrived" and tells you
+    to look at the pane; `nudge` refuses in that case so the prompt is not sent twice.
+  - A herdr call that does not answer within 60 seconds fails with `herdr_timeout`; a failed
+    assignment keeps herdr's error code beside its message.
+  - A Syncthing `.sync-conflict-` copy of a file in `memory/crew/` is listed under "Could not
+    read" instead of counting as a second assignment; merge it by hand.
+  - A detached (`--on`) assignment's rescue branch `crew/<assignment-id>` is never moved; a taken
+    name gets a `-2`, `-3` suffix.
+  - A brief that starts with a dash needs `--` before it: `seat <role> -- "<brief>"`.
 - **`docs/ADOPT-WITH-AN-AGENT.md`** — the copy-paste recipe for driving setup from Claude Code,
   Cursor or a ChatGPT connector. Non-interactive end to end, so an agent can complete it without
   a TTY. Verified by executing it against a fresh clone of `main`.
