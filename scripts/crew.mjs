@@ -12,7 +12,8 @@ import { parseArgs } from 'node:util';
 import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat } from './crew/core.mjs';
 import { createGit } from './crew/git.mjs';
 import { createHerdr, HerdrError } from './crew/herdr.mjs';
-import { CrewError } from './crew/roles.mjs';
+import { CrewError, loadRole } from './crew/roles.mjs';
+import { trailDir } from './crew/trail.mjs';
 
 const USAGE = `Usage: npm run crew -- <command>
 
@@ -25,6 +26,10 @@ const USAGE = `Usage: npm run crew -- <command>
   report [--file <path>]                        (agents) Append a report to your assignment; reads stdin without --file
   handoff <role> "<brief>" [--branch <branch>]  (agents) Ask another role to take something on
   handoff-close <id|file> --reason "<text>"     Decline an open handoff
+
+A brief that starts with a dash is read as an option. Put -- before it, after any flags:
+  seat <role> [--task <id>] -- "<brief>"
+  handoff <role> [--branch <branch>] -- "<brief>"
 `;
 
 class UsageError extends Error {}
@@ -60,7 +65,12 @@ function main(argv) {
       },
     });
   } catch (err) {
-    throw new UsageError(err.message);
+    // A word that starts with a dash is read as an option, brief or not.
+    const hint =
+      err.code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION'
+        ? '\nIf your brief starts with a dash, put -- before it (flags such as --task go before the --): seat <role> -- "<brief>".'
+        : '';
+    throw new UsageError(`${err.message}${hint}`);
   }
   const { values, positionals } = parsed;
   if (values.help) {
@@ -107,7 +117,13 @@ function main(argv) {
       console.log(`  assignment  ${a.id}`);
       console.log(`  branch      ${a.branch}${a.detached ? ' (detached copy)' : ''}`);
       console.log(`  worktree    ${a.worktree}`);
-      if (!a.prompted) {
+      if (a.prompted === 'unconfirmed') {
+        const role = loadRole(ctx.mainDir, a.role);
+        console.log(`  The first prompt to ${a.agent} may or may not have arrived: herdr did not confirm it.`);
+        console.log(`  Look at ${a.agent}'s pane. If it has not started, type there:`);
+        console.log(`    Read ${role.path} (your role) and ${join(trailDir(ctx.mainDir), `${a.id}.md`)} (your assignment) in full, then begin the work in the brief.`);
+        console.log('  Do not run nudge: it would send the prompt a second time.');
+      } else if (!a.prompted) {
         console.log(`  ${a.agent} has not been given its first prompt. Answer any dialog in its pane, then run: npm run crew -- nudge ${a.agent}`);
       }
       return;
@@ -126,7 +142,17 @@ function main(argv) {
       return;
     }
     case 'report': {
-      const text = values.file ? readFileSync(values.file, 'utf-8') : process.stdin.isTTY ? '' : readFileSync(0, 'utf-8');
+      let text;
+      if (values.file) {
+        try {
+          text = readFileSync(values.file, 'utf-8');
+        } catch (err) {
+          const why = { ENOENT: 'it does not exist', EISDIR: 'it is a directory, not a file', EACCES: 'permission was denied' }[err.code] || err.message;
+          throw new CrewError(`The report file ${values.file} could not be read: ${why}. Check the path and run the command again.`);
+        }
+      } else {
+        text = process.stdin.isTTY ? '' : readFileSync(0, 'utf-8');
+      }
       const a = report(ctx, { text });
       console.log(`Report recorded on ${a.id}.`);
       return;

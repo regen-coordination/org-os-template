@@ -18,6 +18,16 @@ files:
   scripts/crew.mjs: scripts/crew.mjs
   scripts/crew: scripts/crew
   skills/crew: skills/crew
+  tests/helpers/crew-fixtures.mjs: tests/helpers/crew-fixtures.mjs
+  tests/scripts/crew-board.test.mjs: tests/scripts/crew-board.test.mjs
+  tests/scripts/crew-cli.test.mjs: tests/scripts/crew-cli.test.mjs
+  tests/scripts/crew-flow.test.mjs: tests/scripts/crew-flow.test.mjs
+  tests/scripts/crew-git.test.mjs: tests/scripts/crew-git.test.mjs
+  tests/scripts/crew-herdr.test.mjs: tests/scripts/crew-herdr.test.mjs
+  tests/scripts/crew-roles.test.mjs: tests/scripts/crew-roles.test.mjs
+  tests/scripts/crew-seat.test.mjs: tests/scripts/crew-seat.test.mjs
+  tests/scripts/crew-shipped-roles.test.mjs: tests/scripts/crew-shipped-roles.test.mjs
+  tests/scripts/crew-trail.test.mjs: tests/scripts/crew-trail.test.mjs
 checks:
   - file-exists: roles/circles.yaml
   - file-exists: scripts/crew.mjs

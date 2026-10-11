@@ -106,3 +106,21 @@ test('freeId reserves the id it returns, so two callers never share one', () => 
   assert.equal(second, '2026-10-10-engineer-same-2');
   assert.ok(existsSync(join(trailDir(root), `${first}.md`)));
 });
+
+test('a sync-conflict copy of a trail file is not a record, and is listed so the operator sees it', () => {
+  const dir = tmp();
+  const base = { id: 'a', status: 'working', role: 'engineer', agent: 'engineer', branch: 'crew/a' };
+  writeRecord(join(trailDir(dir), 'a.md'), base, '## Brief\n\nx\n');
+  writeRecord(join(trailDir(dir), 'a.sync-conflict-20261010-203105-ABCDEFG.md'), base, '## Brief\n\nx\n');
+  const h = { id: 'handoff-b', status: 'open', from: 'a', to_role: 'reviewer' };
+  writeRecord(join(trailDir(dir), 'handoff-b.md'), h, '## Brief\n\ny\n');
+  writeRecord(join(trailDir(dir), 'handoff-b.sync-conflict-20261010-203106-ABCDEFG.md'), h, '## Brief\n\ny\n');
+  const trail = readTrail(dir);
+  assert.deepEqual(trail.assignments.map((x) => x.id), ['a']);
+  assert.deepEqual(trail.handoffs.map((x) => x.id), ['handoff-b']);
+  assert.deepEqual(trail.unreadable.sort(), [
+    'a.sync-conflict-20261010-203105-ABCDEFG.md',
+    'handoff-b.sync-conflict-20261010-203106-ABCDEFG.md',
+  ]);
+  assert.ok(existsSync(join(trailDir(dir), 'a.sync-conflict-20261010-203105-ABCDEFG.md')), 'never deleted');
+});

@@ -247,6 +247,13 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
    `git worktree list` names its git directory instead.
 5. `herdr agent list` returns every agent on the server; most of the operator's have no `name`.
    Crew agents are matched to assignments by `pane_id`.
+7. `herdr agent start` into a pane that was created a moment ago can fail with "agent target pane
+   <id> is not an available shell": the pane has not reached its shell prompt yet. Seating again
+   a moment later works. `startAgent` therefore retries this one error for up to 8 seconds, every
+   half second, and fails with herdr's text plus how long it waited when the time runs out. The
+   error is recognised by its message, because its code was not recorded when it was first seen.
+   `agent_not_ready` is a different state (the agent is there, stopped at a dialog) and is never
+   retried; nor is any other start error.
 
 ## 6. The trail
 

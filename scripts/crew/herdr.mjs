@@ -13,13 +13,36 @@ export class HerdrError extends Error {
   }
 }
 
-function run(args) {
+// Long enough for `agent start`, which waits for the agent to be detected.
+const DEFAULT_TIMEOUT_MS = 60000;
+
+// How long `startAgent` waits for a new pane to reach its shell, and how often it asks again.
+const DEFAULT_START_WAIT_MS = 8000;
+const DEFAULT_START_RETRY_MS = 500;
+
+// herdr refuses to start an agent in a pane that has not reached its shell prompt yet
+// ("agent target pane wP:p1 is not an available shell"). Its error code for this was never
+// recorded, so it is recognised by the message. agent_not_ready is a different thing
+// (the agent is there, stopped at a dialog) and is never matched here.
+const isPaneNotReady = (err) => err instanceof HerdrError && err.code !== 'agent_not_ready' && /not an available shell/i.test(err.message);
+
+function pause(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function runHerdr(args, { bin, timeoutMs }) {
   let out;
   try {
-    out = execFileSync('herdr', args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    out = execFileSync(bin, args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'], timeout: timeoutMs });
   } catch (err) {
     if (err.code === 'ENOENT') {
       throw new HerdrError('herdr_missing', 'the herdr command was not found on PATH');
+    }
+    if (err.code === 'ETIMEDOUT') {
+      throw new HerdrError(
+        'herdr_timeout',
+        `herdr did not answer within ${Math.round(timeoutMs / 1000)} seconds (${args.slice(0, 2).join(' ')}), so crew stopped waiting for it`,
+      );
     }
     const text = String(err.stderr || err.stdout || err.message).trim();
     let parsed = null;
@@ -50,7 +73,17 @@ const opened = (r) => {
   return { pane_id: r.root_pane.pane_id, workspace_id: r.workspace.workspace_id };
 };
 
-export function createHerdr() {
+/**
+ * @param {{bin?: string, timeoutMs?: number}} [options] The binary and the time a
+ *   single call may take; both exist so the timeout can be tested without herdr.
+ */
+export function createHerdr({
+  bin = 'herdr',
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  startWaitMs = DEFAULT_START_WAIT_MS,
+  startRetryMs = DEFAULT_START_RETRY_MS,
+} = {}) {
+  const run = (args) => runHerdr(args, { bin, timeoutMs });
   return {
     listAgents() {
       return need(run(['agent', 'list']), 'agents', 'agent list').agents.map((a) => ({
@@ -70,7 +103,24 @@ export function createHerdr() {
       return opened(run(['worktree', 'open', '--cwd', cwd, '--path', path, '--label', label, '--no-focus']));
     },
     startAgent({ name, kind, pane_id, args }) {
-      run(['agent', 'start', name, '--kind', kind, '--pane', pane_id, ...(args.length > 0 ? ['--', ...args] : [])]);
+      const cmd = ['agent', 'start', name, '--kind', kind, '--pane', pane_id, ...(args.length > 0 ? ['--', ...args] : [])];
+      const began = Date.now();
+      for (;;) {
+        try {
+          run(cmd);
+          return;
+        } catch (err) {
+          if (!isPaneNotReady(err)) throw err;
+          const waited = Date.now() - began;
+          if (waited + startRetryMs > startWaitMs) {
+            throw new HerdrError(
+              err.code,
+              `${err.message} (crew waited ${+(waited / 1000).toFixed(1)} seconds for the pane to reach its shell, then gave up)`,
+            );
+          }
+          pause(startRetryMs);
+        }
+      }
     },
     promptAgent(name, text) {
       run(['agent', 'prompt', name, text]);

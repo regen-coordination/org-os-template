@@ -135,6 +135,7 @@ test('a failure starting the agent is recorded with the pane that was created', 
   const [a] = readTrail(ctx.mainDir).assignments;
   assert.equal(a.status, 'failed');
   assert.equal(a.failed_step, 'start');
+  assert.equal(a.error_code, 'timeout');
   assert.equal(a.pane, 'x1:p1');
 });
 
@@ -156,12 +157,60 @@ test('an agent waiting at a startup dialog is seated but not prompted, and nudge
   assert.throws(() => nudge(ctx, { target: 'nobody' }), /No open assignment/);
 });
 
-test('a prompt that fails to send leaves the agent seated and unprompted', () => {
+test('a prompt herdr did not confirm is recorded as unconfirmed and is never resent by nudge', () => {
   const { ctx } = setup();
-  ctx.herdr.failOn = { method: 'promptAgent', code: 'agent_blocked', message: 'blocked' };
+  ctx.herdr.failOn = { method: 'promptAgent', code: 'timeout', message: 'no answer' };
   const a = seat(ctx, { roleId: 'engineer', brief: 'x' });
   assert.equal(a.status, 'working');
-  assert.equal(a.prompted, false);
+  assert.equal(a.prompted, 'unconfirmed');
+  ctx.herdr.failOn = null;
+  const before = ctx.herdr.calls.length;
+  assert.throws(
+    () => nudge(ctx, { target: 'engineer' }),
+    (err) => {
+      assert.ok(err instanceof CrewError);
+      assert.match(err.message, /may already have arrived/);
+      assert.match(err.message, /pane/);
+      return true;
+    },
+  );
+  assert.equal(ctx.herdr.calls.length, before, 'nudge must not send anything');
+});
+
+test('a nudge that herdr does not confirm is recorded as unconfirmed, so a second nudge cannot resend', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'startAgent', code: 'agent_not_ready', message: 'blocked at startup' };
+  seat(ctx, { roleId: 'engineer', brief: 'x' });
+  ctx.herdr.failOn = { method: 'promptAgent', code: 'timeout', message: 'no answer' };
+  assert.throws(() => nudge(ctx, { target: 'engineer' }), /may already have arrived: herdr did not confirm it/);
+  assert.equal(readTrail(ctx.mainDir).assignments[0].prompted, 'unconfirmed');
+  ctx.herdr.failOn = null;
+  assert.throws(() => nudge(ctx, { target: 'engineer' }), /may already have arrived/);
+});
+
+test('a record written with prompted true or false before this change still works', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'startAgent', code: 'agent_not_ready', message: 'blocked' };
+  const a = seat(ctx, { roleId: 'engineer', brief: 'x' });
+  ctx.herdr.failOn = null;
+  assert.equal(readRecord(a.file ?? join(trailDir(ctx.mainDir), `${a.id}.md`)).data.prompted, false);
+  assert.equal(nudge(ctx, { target: a.id }).prompted, true);
+});
+
+test('a role that may seat gets the lead commands in its assignment file, and others do not', () => {
+  const { root, ctx } = setup();
+  const lead = seat(ctx, { roleId: 'lead', brief: 'coordinate' });
+  const { body } = readRecord(join(trailDir(root), `${lead.id}.md`));
+  for (const verb of ['seat', 'release', 'nudge', 'handoff-close', 'board']) {
+    assert.ok(body.includes(`node "${ctx.scriptPath}" ${verb}`), `${verb} missing:\n${body}`);
+  }
+  assert.match(body, /--base/);
+  const eng = seat(ctx, { roleId: 'engineer', brief: 'build' });
+  const engBody = readRecord(join(trailDir(root), `${eng.id}.md`)).body;
+  for (const verb of ['seat', 'release', 'nudge', 'handoff-close', 'board']) {
+    assert.ok(!engBody.includes(`" ${verb}`), `${verb} must not be shown to a role that may not seat`);
+  }
+  assert.doesNotMatch(engBody, /--base/);
 });
 
 test('--on seats a reviewer on a detached copy of an existing branch', () => {
