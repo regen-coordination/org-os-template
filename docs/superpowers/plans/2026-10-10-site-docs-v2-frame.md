@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Done.** All eight tasks are in the code on `feat/site-docs-v2`. The 74 step boxes were ticked on 2026-10-11 by the website steward, from the code and not from a record of each step being run: the working session left them unticked. The evidence, task by task, is the table in [`../specs/2026-10-11-website-state-and-next.md`](../specs/2026-10-11-website-state-and-next.md), section 2. What the reviews left open is at the end of this file, with each item's state on 2026-10-11.
+
 **Goal:** Turn `site/` into a documentation site driven by one manifest — docs layout, working links between docs, search, a dark theme, feedback links, an operator's home page and stricter build checks — with the twelve pages it starts with still unverified.
 
 **Architecture:** A manifest (`site/src/data/docs-manifest.mjs`) is the only place that says what is published. The content loader, a remark plugin that rewrites file links, the sidebar, the docs index, `llms.txt`, the redirects and `verify-build.mjs` all read it. Logic lives in small pure `.mjs` modules under `site/src/lib/`, unit-tested with `node --test`; Astro components only render.
@@ -82,7 +84,7 @@
   - `ALLOW_UNVERIFIED: boolean`
   - `ORDERED: DocPage[]`, `pageBySlug(slug)`, `pageBySource(source)`, `pagesBySection(sectionId)`, `neighbours(slug)`, `sectionById(id)`
 
-- [ ] **Step 1: Install and confirm the baseline is green**
+- [x] **Step 1: Install and confirm the baseline is green**
 
 ```bash
 cd <the worktree for feat/site-docs-v2>
@@ -94,7 +96,7 @@ cd site && rm -rf .astro dist && npm run build && npm test
 
 Expected: the build ends with `llms check: … links OK` and exit 0; the tests all pass. If either fails before any change, stop and report — the baseline is not what this plan assumes.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `site/test/manifest.test.mjs`:
 
@@ -183,12 +185,12 @@ test("lookups agree with each other", () => {
 });
 ```
 
-- [ ] **Step 3: Run the tests to see them fail**
+- [x] **Step 3: Run the tests to see them fail**
 
 Run: `cd site && node --test test/manifest.test.mjs`
 Expected: FAIL — `Cannot find module …/src/lib/manifest.mjs`.
 
-- [ ] **Step 4: Write `site/src/lib/manifest.mjs`**
+- [x] **Step 4: Write `site/src/lib/manifest.mjs`**
 
 ```js
 // manifest.mjs — pure functions over a docs manifest. No filesystem, no git:
@@ -264,7 +266,7 @@ export function validateManifest(pages, sections, { fileExists, commitExists, al
 }
 ```
 
-- [ ] **Step 5: Write `site/src/data/docs-manifest.mjs`**
+- [x] **Step 5: Write `site/src/data/docs-manifest.mjs`**
 
 ```js
 // docs-manifest.mjs — the only place that decides what is on the site.
@@ -335,12 +337,12 @@ export const pagesBySection = (sectionId) => ORDERED.filter((p) => p.section ===
 export const neighbours = (slug) => neighboursOf(PAGES, SECTIONS, slug);
 ```
 
-- [ ] **Step 6: Run the tests to see them pass**
+- [x] **Step 6: Run the tests to see them pass**
 
 Run: `cd site && node --test test/manifest.test.mjs`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add site/src/lib/manifest.mjs site/src/data/docs-manifest.mjs site/test/manifest.test.mjs
@@ -371,7 +373,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `dirsOf(files: Iterable<string>) → Set<string>` — every ancestor directory
   - `resolveDocLink({ url, sourcePath, pages, repoFiles: Set<string>, repoDirs: Set<string>, base, repoUrl, ref, image?: boolean }) → { kind: "external" | "page" | "repo" | "broken", href: string }`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `site/test/doc-links.test.mjs`:
 
@@ -498,12 +500,12 @@ test("commitExists tells a real commit from a made-up one", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `cd site && node --test test/doc-links.test.mjs test/repo.test.mjs`
 Expected: FAIL — `Cannot find module …/src/lib/doc-links.mjs` (and `repo.mjs`).
 
-- [ ] **Step 3: Write `site/src/lib/doc-links.mjs`**
+- [x] **Step 3: Write `site/src/lib/doc-links.mjs`**
 
 ```js
 // doc-links.mjs — resolve one link found in one markdown file.
@@ -561,7 +563,7 @@ export function resolveDocLink({ url, sourcePath, pages, repoFiles, repoDirs, ba
 
 Note: `"//cdn.example.org/x.js"` is caught by the `startsWith("/")` test, which is what "left alone" requires.
 
-- [ ] **Step 4: Write `site/src/lib/repo.mjs`**
+- [x] **Step 4: Write `site/src/lib/repo.mjs`**
 
 ```js
 // repo.mjs — facts about the repository the site is built from.
@@ -599,12 +601,12 @@ export function commitExists(sha, root = REPO_ROOT) {
 }
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run: `cd site && node --test test/doc-links.test.mjs test/repo.test.mjs`
 Expected: PASS, 13 + 4 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add site/src/lib/doc-links.mjs site/src/lib/repo.mjs site/test/doc-links.test.mjs site/test/repo.test.mjs
@@ -634,7 +636,7 @@ After this task the site builds from the manifest, links between docs work, and 
   - `default remarkStripTitle()` — remark plugin; removes a leading `h1`.
   - The `docs` collection: entry `id` equals the manifest `source` exactly.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `site/test/remark-plugins.test.mjs`:
 
@@ -728,12 +730,12 @@ test("strip-title removes a leading h1 and nothing else", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `cd site && node --test test/remark-plugins.test.mjs`
 Expected: FAIL — `Cannot find module …/src/lib/remark-doc-links.mjs`.
 
-- [ ] **Step 3: Write `site/src/lib/remark-doc-links.mjs`**
+- [x] **Step 3: Write `site/src/lib/remark-doc-links.mjs`**
 
 ```js
 // remark-doc-links.mjs — rewrite file links in a doc into addresses that work
@@ -791,7 +793,7 @@ export default function remarkDocLinks({ pages, repoRoot, base, repoUrl, ref, li
 }
 ```
 
-- [ ] **Step 4: Write `site/src/lib/remark-strip-title.mjs`**
+- [x] **Step 4: Write `site/src/lib/remark-strip-title.mjs`**
 
 ```js
 // remark-strip-title.mjs — every doc opens with its own "# Title". The docs
@@ -807,12 +809,12 @@ export default function remarkStripTitle() {
 }
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run: `cd site && node --test test/remark-plugins.test.mjs`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 6: Point the loader at the manifest**
+- [x] **Step 6: Point the loader at the manifest**
 
 Replace `site/src/content.config.ts` with:
 
@@ -836,7 +838,7 @@ const docs = defineCollection({
 export const collections = { docs };
 ```
 
-- [ ] **Step 7: Register the plugins**
+- [x] **Step 7: Register the plugins**
 
 Replace `site/astro.config.mjs` with:
 
@@ -871,7 +873,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 8: Route from the manifest**
+- [x] **Step 8: Route from the manifest**
 
 Replace `site/src/pages/docs/[...slug].astro` with:
 
@@ -913,7 +915,7 @@ const { Content } = await render(entry);
 </style>
 ```
 
-- [ ] **Step 9: Move the docs index and `llms.txt` off the allowlist**
+- [x] **Step 9: Move the docs index and `llms.txt` off the allowlist**
 
 Replace `site/src/pages/docs/index.astro` with (Task 7 restyles it; this keeps it building):
 
@@ -989,12 +991,12 @@ git rm site/src/data/docs-allowlist.ts
 
 In `scripts/render-templates.mjs` line 40, change `site/src/data/docs-allowlist.ts` to `site/src/data/docs-manifest.mjs` in the comment. Nothing else on that line changes.
 
-- [ ] **Step 10: Build, and read the list of dead links**
+- [x] **Step 10: Build, and read the list of dead links**
 
 Run: `cd site && rm -rf .astro dist && npm run build`
 Expected: FAIL — `Broken link(s) in docs/…` for the first of `docs/ECOSYSTEM.md`, `docs/EIP4824-GUIDE.md`, `docs/SETUP.md`. These files link to folders outside the repository and to files that do not exist; the links were always dead on the site.
 
-- [ ] **Step 11: Repair the dead links**
+- [x] **Step 11: Repair the dead links**
 
 Two links in `docs/SETUP.md` have an obvious right target. Repoint them:
 
@@ -1046,7 +1048,7 @@ git diff --stat docs/
 
 Expected: three files changed, no `NOT FOUND` line. A `NOT FOUND` means the link is written another way in that file (a reference-style link, a trailing title): open the file, find it, and unlink it by hand the same way.
 
-- [ ] **Step 12: Build until it passes**
+- [x] **Step 12: Build until it passes**
 
 Run: `cd site && rm -rf .astro dist && npm run build`
 Expected: PASS. If the build names a dead link not listed in Step 11 (the list came from a text scan; the build is the authority), unlink it the same way — keep the text, drop the link — and rebuild. Record each extra one in the commit message.
@@ -1061,7 +1063,7 @@ ls dist/docs
 
 Expected: an `href="/org-os-template/docs/adopt-with-an-agent…"`; exactly `1`; thirteen entries (twelve page folders and `index.html`).
 
-- [ ] **Step 13: Run all tests and commit**
+- [x] **Step 13: Run all tests and commit**
 
 Run: `cd site && npm test`
 Expected: PASS.
@@ -1094,7 +1096,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `feedbackUrl({ kind: "useful" | "not-useful" | "problem", title, source, verified, repoUrl }) → string`
   - `<DocsLayout page={DocPage} headings={{ depth: number, slug: string, text: string }[]}>` with the article body as its default slot. The article element carries `data-pagefind-body` (Task 6 relies on it).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `site/test/feedback.test.mjs`:
 
@@ -1144,12 +1146,12 @@ test("an unknown kind is an error, not a silent default", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to see it fail**
+- [x] **Step 2: Run the test to see it fail**
 
 Run: `cd site && node --test test/feedback.test.mjs`
 Expected: FAIL — `Cannot find module …/src/lib/feedback.mjs`.
 
-- [ ] **Step 3: Write `site/src/lib/feedback.mjs`**
+- [x] **Step 3: Write `site/src/lib/feedback.mjs`**
 
 ```js
 // feedback.mjs — feedback is a prefilled GitHub issue. No backend, no script,
@@ -1180,12 +1182,12 @@ export function feedbackUrl({ kind, title, source, verified, repoUrl }) {
 }
 ```
 
-- [ ] **Step 4: Run the test to see it pass**
+- [x] **Step 4: Run the test to see it pass**
 
 Run: `cd site && node --test test/feedback.test.mjs`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 5: Write `site/src/components/DocsSidebar.astro`**
+- [x] **Step 5: Write `site/src/components/DocsSidebar.astro`**
 
 ```astro
 ---
@@ -1226,7 +1228,7 @@ const sections = SECTIONS.map((s) => ({ ...s, pages: pagesBySection(s.id) })).fi
 </style>
 ```
 
-- [ ] **Step 6: Write `site/src/components/DocsToc.astro`**
+- [x] **Step 6: Write `site/src/components/DocsToc.astro`**
 
 ```astro
 ---
@@ -1257,7 +1259,7 @@ const items = Astro.props.headings.filter((h) => h.depth === 2 || h.depth === 3)
 </style>
 ```
 
-- [ ] **Step 7: Write `site/src/components/DocsFooter.astro`**
+- [x] **Step 7: Write `site/src/components/DocsFooter.astro`**
 
 ```astro
 ---
@@ -1306,7 +1308,7 @@ const fb = (kind: string) => feedbackUrl({ kind, title: page.title, source: page
 </style>
 ```
 
-- [ ] **Step 8: Write `site/src/components/DocsLayout.astro`**
+- [x] **Step 8: Write `site/src/components/DocsLayout.astro`**
 
 ```astro
 ---
@@ -1391,7 +1393,7 @@ const { page, headings } = Astro.props;
 </style>
 ```
 
-- [ ] **Step 9: Use the layout on the docs page**
+- [x] **Step 9: Use the layout on the docs page**
 
 In `site/src/pages/docs/[...slug].astro`, replace everything from the line `const { entry, page } = Astro.props;` to the end of the file with:
 
@@ -1418,7 +1420,7 @@ import DocsLayout from "../../components/DocsLayout.astro";
 import { PAGES, pageBySource } from "../../data/docs-manifest.mjs";
 ```
 
-- [ ] **Step 10: Build and check the page**
+- [x] **Step 10: Build and check the page**
 
 Run: `cd site && rm -rf .astro dist && npm run build`
 Expected: PASS.
@@ -1434,7 +1436,7 @@ grep -o 'class="docs-toc' dist/docs/federation/index.html | wc -l           # 1 
 
 Then look at it: `npm run preview`, open `http://localhost:4321/org-os-template/docs/federation`. Check at 1300px, 900px and 400px wide: three columns, then two, then one with the "Documentation menu" disclosure; a wide table scrolls inside the article instead of widening the page.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add site/src/lib/feedback.mjs site/test/feedback.test.mjs site/src/components/Docs*.astro "site/src/pages/docs/[...slug].astro"
@@ -1461,7 +1463,7 @@ The light accent is `#1c7d3b`, which gives 4.39:1 on `--color-bg-2` and 4.47:1 o
   - `<ThemeToggle />` — a button with class `theme-toggle`.
   - `<html data-theme="light|dark">` on every page once script has run; light when it has not.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `site/test/theme-boot.test.mjs`:
 
@@ -1566,12 +1568,12 @@ test("the two themes define the same variables", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `cd site && node --test test/theme-boot.test.mjs test/theme-contrast.test.mjs`
 Expected: FAIL — `theme-boot.mjs` not found; and in the contrast file, `systems.css: text colours reach 4.5:1` fails with `--color-accent on --color-bg-2 is 4.39:1`, and the faint test fails for `systems.css`. The dark theme's contrast tests already pass.
 
-- [ ] **Step 3: Write `site/src/lib/theme-boot.mjs`**
+- [x] **Step 3: Write `site/src/lib/theme-boot.mjs`**
 
 ```js
 // theme-boot.mjs — the script that picks the theme before first paint.
@@ -1592,7 +1594,7 @@ export const THEME_BOOT = `(function () {
 })();`;
 ```
 
-- [ ] **Step 4: Make both themes active**
+- [x] **Step 4: Make both themes active**
 
 Replace `site/src/styles/theme.css` with:
 
@@ -1629,12 +1631,12 @@ In `site/src/styles/themes/systems.css`, change three values:
 
 (`--color-accent` was `#1c7d3b`, `--color-faint` was `#969aa0`, the wash was `rgba(28, 125, 59, 0.08)`. Nothing else in the file changes.)
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run: `cd site && node --test test/theme-boot.test.mjs test/theme-contrast.test.mjs`
 Expected: PASS, 5 + 9 tests.
 
-- [ ] **Step 6: Boot the theme in the layout**
+- [x] **Step 6: Boot the theme in the layout**
 
 In `site/src/components/Layout.astro`, add to the frontmatter imports:
 
@@ -1648,7 +1650,7 @@ and in `<head>`, directly after the `<meta name="theme-color" …>` line, add:
   <script is:inline set:html={THEME_BOOT}></script>
 ```
 
-- [ ] **Step 7: Write `site/src/components/ThemeToggle.astro`**
+- [x] **Step 7: Write `site/src/components/ThemeToggle.astro`**
 
 ```astro
 ---
@@ -1687,7 +1689,7 @@ import { THEME_KEY } from "../lib/theme-boot.mjs";
 </style>
 ```
 
-- [ ] **Step 8: Put the toggle in the nav**
+- [x] **Step 8: Put the toggle in the nav**
 
 In `site/src/components/Nav.astro`, add `import ThemeToggle from "./ThemeToggle.astro";` to the frontmatter, and change the markup so the list and the toggle sit together on the right:
 
@@ -1716,7 +1718,7 @@ and add to the `<style>` block:
 .nav-right { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
 ```
 
-- [ ] **Step 9: Build and look at both themes**
+- [x] **Step 9: Build and look at both themes**
 
 Run: `cd site && rm -rf .astro dist && npm run build && npm test`
 Expected: PASS.
@@ -1728,7 +1730,7 @@ grep -l 'data-theme' dist/_astro/*.css              # one stylesheet carries the
 
 `npm run preview`, then on `/org-os-template/` and `/org-os-template/docs/federation`: press the toggle, reload (the choice holds), and read a page in each theme — code blocks, tables, the sidebar's current page, the federation map panel. If the federation map does not follow the dark theme, do not fix it here: note it in the commit message for plan 2.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add site/src/lib/theme-boot.mjs site/src/components/ThemeToggle.astro site/src/components/Layout.astro site/src/components/Nav.astro site/src/styles site/test/theme-boot.test.mjs site/test/theme-contrast.test.mjs
@@ -1756,7 +1758,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `isTypingTarget(el: { tagName?: string, isContentEditable?: boolean } | null) → boolean`
   - `dist/pagefind/` after `npm run build` (Task 8 checks for it).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `site/test/search.test.mjs`:
 
@@ -1797,12 +1799,12 @@ test("the / shortcut is ignored while the viewer is typing", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to see it fail**
+- [x] **Step 2: Run the test to see it fail**
 
 Run: `cd site && node --test test/search.test.mjs`
 Expected: FAIL — `Cannot find module …/src/lib/search.mjs`.
 
-- [ ] **Step 3: Write `site/src/lib/search.mjs`**
+- [x] **Step 3: Write `site/src/lib/search.mjs`**
 
 ```js
 // search.mjs — the decisions behind the Search control, free of the DOM so
@@ -1832,12 +1834,12 @@ export function isTypingTarget(el) {
 }
 ```
 
-- [ ] **Step 4: Run the test to see it pass**
+- [x] **Step 4: Run the test to see it pass**
 
 Run: `cd site && node --test test/search.test.mjs`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Add Pagefind to the build**
+- [x] **Step 5: Add Pagefind to the build**
 
 ```bash
 cd site && npm install --save-dev pagefind@^1.5.0
@@ -1849,7 +1851,7 @@ In `site/package.json`, change the `build` script to:
     "build": "npm run aggregate && astro build && pagefind --site dist && npm run verify",
 ```
 
-- [ ] **Step 6: Write `site/src/components/Search.astro`**
+- [x] **Step 6: Write `site/src/components/Search.astro`**
 
 ```astro
 ---
@@ -1949,13 +1951,13 @@ import { withBase } from "../lib/base";
 </style>
 ```
 
-- [ ] **Step 7: Put Search in the nav, and index the modules page**
+- [x] **Step 7: Put Search in the nav, and index the modules page**
 
 In `site/src/components/Nav.astro`, add `import Search from "./Search.astro";` and place `<Search />` immediately before `<ThemeToggle />` inside `.nav-right`.
 
 In `site/src/pages/modules.astro`, change `<div class="container">` to `<div class="container" data-pagefind-body>`.
 
-- [ ] **Step 8: Build and try it**
+- [x] **Step 8: Build and try it**
 
 Run: `cd site && rm -rf .astro dist && npm run build && npm test`
 Expected: PASS; Pagefind's summary in the build log reports 13 pages indexed (twelve docs and the modules page — only elements marked `data-pagefind-body` are indexed).
@@ -1966,7 +1968,7 @@ ls dist/pagefind/pagefind.js dist/pagefind/pagefind-ui.js dist/pagefind/pagefind
 
 `npm run preview`; on any page press `/`, type `trust level`, and follow a result: the address must start with `/org-os-template/docs/`. Press `Esc` to close. Then turn script off in the browser and click Search: it goes to the docs index.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add site/package.json site/package-lock.json site/src/lib/search.mjs site/src/components/Search.astro site/src/components/Nav.astro site/src/pages/modules.astro site/test/search.test.mjs
@@ -1988,7 +1990,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: `SECTIONS`, `pagesBySection`, `pageBySlug` (Task 1); `VERSION`, `REPO_URL` (Task 2).
 - Produces: `REDIRECTS: { from: string, to: string }[]` from `site/src/data/redirects.mjs` (Task 8 checks them in the build output).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `site/test/redirects.test.mjs`:
 
@@ -2042,12 +2044,12 @@ test("each site module carries the status the catalog gives it", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `cd site && node --test test/redirects.test.mjs test/modules-catalog.test.mjs`
 Expected: FAIL — `redirects.mjs` not found; and `every module in the MODULES.md catalog appears on the site` fails with `MODULES.md has "org-os-instance-doctor", modules.yaml does not`.
 
-- [ ] **Step 3: Write `site/src/data/redirects.mjs`**
+- [x] **Step 3: Write `site/src/data/redirects.mjs`**
 
 ```js
 // redirects.mjs — addresses the site used to serve, and where they go now.
@@ -2066,7 +2068,7 @@ export const redirectFor = (from) => {
 };
 ```
 
-- [ ] **Step 4: Write `site/src/components/Redirect.astro` and the two pages**
+- [x] **Step 4: Write `site/src/components/Redirect.astro` and the two pages**
 
 `site/src/components/Redirect.astro`:
 
@@ -2114,7 +2116,7 @@ import { redirectFor } from "../data/redirects.mjs";
 <Redirect to={redirectFor("/about")} />
 ```
 
-- [ ] **Step 5: Restore the seven missing modules**
+- [x] **Step 5: Restore the seven missing modules**
 
 In `site/src/data/modules.yaml`, insert directly after the line `modules:`:
 
@@ -2172,7 +2174,7 @@ Change the two comment lines at the top of the file to:
 Run: `cd site && node --test test/redirects.test.mjs test/modules-catalog.test.mjs`
 Expected: PASS. If the status test names a module, `docs/MODULES.md` is canon: change `modules.yaml` to match it.
 
-- [ ] **Step 6: The nav**
+- [x] **Step 6: The nav**
 
 In `site/src/components/Nav.astro`, replace the `links` array with:
 
@@ -2184,7 +2186,7 @@ const links = [
 ];
 ```
 
-- [ ] **Step 7: The home page**
+- [x] **Step 7: The home page**
 
 Replace `site/src/data/landing.yaml` with:
 
@@ -2267,7 +2269,7 @@ const SHOWN = 4;
 </style>
 ```
 
-- [ ] **Step 8: The docs index**
+- [x] **Step 8: The docs index**
 
 Replace `site/src/pages/docs/index.astro` with:
 
@@ -2314,7 +2316,7 @@ h1 { margin-top: var(--space-3); }
 </style>
 ```
 
-- [ ] **Step 9: Modules page and footer**
+- [x] **Step 9: Modules page and footer**
 
 In `site/src/pages/modules.astro`, replace everything from the `<Layout …>` opening tag through the `<p class="prose">…</p>` line (five lines, ending just above the `<div class="grid">` line) with:
 
@@ -2335,7 +2337,7 @@ In `site/src/components/Footer.astro`:
 - change `<a class="link" href={withBase("/get-started")}>Get started</a>` to `<a class="link" href={withBase("/docs/setup")}>Setup</a>`;
 - change `<span class="faint">v0.5 · pre-beta · self-hosting since 2026</span>` to `<span>v{VERSION} · pre-beta · self-hosting since 2026</span>`, and delete the rule `.baseline .faint { color: var(--color-faint); }` from its `<style>` (the faint colour is not for text).
 
-- [ ] **Step 10: Build and read every page**
+- [x] **Step 10: Build and read every page**
 
 Run: `cd site && rm -rf .astro dist && npm run build && npm test`
 Expected: PASS.
@@ -2351,7 +2353,7 @@ Expected: `url=/org-os-template/docs/setup` and `url=/org-os-template/docs`; `20
 
 `npm run preview` and read: `/`, `/docs`, `/modules`, `/federation`, `/get-started` (lands on Setup), `/about` (lands on the docs index), in both themes and at phone width.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add site/src site/test
@@ -2374,7 +2376,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: `PAGES`, `SECTIONS`, `ALLOW_UNVERIFIED` (Task 1); `validateManifest` (Task 1); `REPO_ROOT`, `commitExists` (Task 2); `REDIRECTS` (Task 7); `dist/pagefind/` (Task 6).
 - Produces: `npm run verify` — exit 1 with a named line for each failure of spec §4.9.
 
-- [ ] **Step 1: Rewrite `site/scripts/verify-build.mjs`**
+- [x] **Step 1: Rewrite `site/scripts/verify-build.mjs`**
 
 ```js
 // verify-build.mjs — integrity checks on the static build. Runs after
@@ -2537,7 +2539,7 @@ else console.log(llmsBad === 0 ? `llms check: ${llmsLinks} links OK, all ${PAGES
 process.exit(failed ? 1 : 0);
 ```
 
-- [ ] **Step 2: Run it against a good build**
+- [x] **Step 2: Run it against a good build**
 
 Run: `cd site && rm -rf .astro dist && npm run build`
 Expected: PASS, ending with lines like:
@@ -2554,7 +2556,7 @@ llms check: … links OK, all 12 docs listed
 
 If `link check` reports a `BROKEN LINK` or `RELATIVE` line, it is a real defect that the old check could not see. Fix it at its source (a component's `href`, or a raw-HTML link in a doc — unlink it as in Task 3) and rebuild. Do not weaken the check.
 
-- [ ] **Step 3: Prove each check fails when it should**
+- [x] **Step 3: Prove each check fails when it should**
 
 Each of these breaks the build output or the manifest on purpose, confirms the named failure, and restores it. Run them one at a time from `site/`.
 
@@ -2596,7 +2598,7 @@ Expected: twelve `MANIFEST: … — not verified (no commit recorded)` lines, `e
 
 Finish with `npm run verify; echo "exit=$?"` — expected `exit=0` — and `git status --short site/src` — expected empty.
 
-- [ ] **Step 4: Give CI the history a `verified` commit needs**
+- [x] **Step 4: Give CI the history a `verified` commit needs**
 
 `actions/checkout@v4` fetches one commit by default, so `git cat-file -e <sha>^{commit}` would fail for every verified page. In both `.github/workflows/validate.yml` (line 14) and `.github/workflows/deploy-pages.yml` (line 33), replace
 
@@ -2617,7 +2619,7 @@ with
 
 Leave `drift.yml` and `generate-schemas.yml` as they are; they do not build the site.
 
-- [ ] **Step 5: Update `site/README.md`**
+- [x] **Step 5: Update `site/README.md`**
 
 Replace the section `## How it works` through the end of `## The generator seam` with:
 
@@ -2662,7 +2664,7 @@ version) and `../docs/superpowers/specs/2026-10-10-site-docs-v2-design.md` (this
 
 and in `## Run`, change the `npm run build` comment to `# aggregate → astro build → pagefind → verify  (static site → dist/)` and the `npm test` comment to `# unit tests (manifest, links, themes, search, feedback, federation, modules)`.
 
-- [ ] **Step 6: Run everything the CI runs**
+- [x] **Step 6: Run everything the CI runs**
 
 ```bash
 cd <the worktree for feat/site-docs-v2>
@@ -2674,7 +2676,7 @@ cd site && rm -rf .astro dist && npm run build && npm test
 
 Expected: every command exits 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add site/scripts/verify-build.mjs site/README.md .github/workflows/validate.yml .github/workflows/deploy-pages.yml
@@ -2712,21 +2714,23 @@ Not a task for a subagent — the handoff to the operator.
 
 ## Carried over from the plan 1 reviews
 
-Found by the per-task and whole-branch reviews and deliberately not fixed in plan 1. None blocks
-the content pass; the first is the only one a reader would notice.
+Found by the per-task and whole-branch reviews and deliberately not fixed in plan 1. Each item
+carries its state on 2026-10-11, read from the code by the website steward. "Not looked at"
+means exactly that: nobody has checked whether it is still so.
 
 **Do first in plan 2**
-- `site/src/components/SectionBlock.astro` `.idx` still colours text with `--color-faint`; change it
-  to `--color-muted` (the last text use of faint).
-- Nobody has looked at the site in a browser. The by-eye pass covers: the three/two/one-column docs
-  layout and the phone "Documentation menu"; the search dialog (`/`, results, `Esc`, script off);
-  the theme toggle and both themes; the federation map under the dark theme; home, docs index and
-  modules at desktop and phone width.
+- **Closed.** `site/src/components/SectionBlock.astro` `.idx` now colours its text with
+  `--color-muted` (line 26).
+- **Open — the operator's.** Nobody has looked at the site in a browser. The by-eye pass covers:
+  the three/two/one-column docs layout and the phone "Documentation menu"; the search dialog
+  (`/`, results, `Esc`, script off); the theme toggle and both themes; the federation map under
+  the dark theme; home, docs index and modules at desktop and phone width. This is plan 3, task 2.
 
-**Verifier and resolver hardening**
+**Verifier and resolver hardening** — not looked at, one by one, except where marked
 - The verifier's attribute pattern skips values containing the other quote character, unquoted
   attributes, `srcset` and `action`; it counts the literal text `data-pagefind-body` anywhere in a
-  page; an image-only doc fails `EMPTY DOC`; output lines read `MANIFEST: manifest: …`.
+  page; an image-only doc fails `EMPTY DOC`; output lines read `MANIFEST: manifest: …`
+  (**closed**: `verify-build.mjs` strips the doubled prefix).
 - `resolveDocLink`: a link to a directory drops its `#fragment`; a query-only link (`?x=1`)
   resolves to the source's folder; the raw-image address assumes a GitHub `repoUrl`.
 - `validateManifest`: `covers` entries are not checked for path safety; a `source` containing glob
@@ -2736,17 +2740,16 @@ the content pass; the first is the only one a reader would notice.
 
 **Small things**
 - Search: a retried failed load leaves dead `<link>`/`<script>` elements; the `/` hint shows
-  without script.
-- Theme: the `theme-color` meta is corrected only after the module script runs; the toggle's label
-  is a static "Dark".
-- Docs layout: the sidebar's section headings are `h2` and come before the page's `h1`; an empty
-  on-page-contents wrapper leaves a small gap.
-- `Redirect.astro`'s canonical link is root-relative; the "Edit this page" address is not
-  URL-encoded; `OLD_DOC_SLUGS` is written out in both the verifier and a test;
-  `scripts/render-templates.mjs:40` says `DOC_SPINE` mirrors the manifest, which nothing enforces.
+  without script. (not looked at)
+- Theme: **closed** — the `theme-color` meta has a value before script (`cee221c`). **Open** — the
+  toggle's label is a static "Dark theme" (`ThemeToggle.astro:6`; its state is carried by
+  `aria-pressed`).
+- Docs layout: **open** — the sidebar's section headings are `h2` and come before the page's `h1`
+  (`DocsSidebar.astro:14`). An empty on-page-contents wrapper leaves a small gap (not looked at).
+- **Open** — `Redirect.astro`'s canonical link is root-relative (line 15). **Open, outside
+  `site/`** — `scripts/render-templates.mjs:40` says `DOC_SPINE` mirrors the manifest, which nothing
+  enforces (`engineer`'s). **Closed** — `OLD_DOC_SLUGS` is written only in the verifier. The
+  "Edit this page" address is not URL-encoded (not looked at).
 - `astro dev` watches the whole repository root (the loader's base), and does not clear the render
-  cache: after editing the manifest, run `npm run clean` and restart it.
-- Content, for the verification pass: `SETUP.md` names a different GitHub organisation;
-  `ECOSYSTEM.md` links a personal vault repository; `/get-started` now lands on unverified
-  `SETUP.md`.
-
+  cache: after editing the manifest, run `npm run clean` and restart it. (not looked at)
+- Content: settled by the content pass; see the ledger.

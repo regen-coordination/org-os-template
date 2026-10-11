@@ -1,7 +1,7 @@
 ---
 id: website-state-and-next
 title: "The org-os website: where it stands and what comes next"
-status: proposal (awaiting operator decision)
+status: decided 2026-10-11 (pieces 1 and 2 done in 7a872e3 and 9bf41f2; piece 3 waits for the site to land; rows 2 to 4 and 6 of section 3 corrected in the record)
 type: state-report
 created: 2026-10-11
 author: website steward (crew seat `website`)

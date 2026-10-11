@@ -1,6 +1,8 @@
 # Site and Docs v2 — Plan 3: the Release — Implementation Plan
 
-> Not started. Every step from 5 on is an external action and waits for the operator's explicit go.
+> **In progress.** Task 1 is done, and a task 1b was added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
+>
+> **Whose it is.** Since 2026-10-11 the website steward (crew seat `website`) carries this plan, by the operator's decision. The operator keeps the look by eye, the decisions of task 3, the pull request, the merge and the tag. The order of release is: the site lands on `main` as `0.5.1`; the crew (`feat/crew`) follows toward `0.6.0`, and the site is made ready for it on that branch afterwards.
 
 **Goal:** Publish the new site and docs in place, with `v0.5.1`.
 
@@ -15,7 +17,7 @@
 
 ## Task 1 — What the plan 2 reviews left (local, small)
 
-> **Done 2026-10-10** (commits `f0cde93`, `702fa5b`, `cee221c`, `83c44bb`; reviewed, approved), except the instance-docs line: excluding the framework-only pages from a clone would leave dangling links in about ten docs an instance keeps, so it needs link rewriting in the clone engine. Still open and minor: the theme switch's edge loses its guaranteed contrast while hovered; the plan 1 "small things" the task's report lists as left.
+> **Done 2026-10-10** (commits `f0cde93`, `702fa5b`, `cee221c`, `83c44bb`; reviewed, approved), except the instance-docs line: excluding the framework-only pages from a clone would leave dangling links in about ten docs an instance keeps, so it needs link rewriting in the clone engine. Still open and minor: the theme switch's edge loses its guaranteed contrast while hovered (`ThemeToggle.astro:51`). The task's report, which listed the plan 1 "small things" it left, was kept in the working session's untracked folder and is not in the repository; the state of each small thing, read from the code on 2026-10-11, is now at the end of plan 1.
 
 - Theme switch: measure the knob's contrast against its track in both themes and its hit size (at least 24 by 24 CSS pixels); fix what fails.
 - Copy button: on a touch screen it sits over the first line of a code block; give the block top padding there, or move the button above it.
@@ -26,6 +28,14 @@
 - Drift report: the directory exclusion hides `templates/scaffold/docs/`, which the file-structure page covers.
 - Generated instances receive docs that describe framework-only things. Add one line at the top of an instance's docs saying so; this needs a small change in the clone engine and its tests.
 - The items under "Small things" in plan 1's closing section that are still open.
+
+## Task 1b — Two fixes the operator approved (local)
+
+> **Done 2026-10-11** by the website steward (commits `7a872e3`, `9bf41f2`), from the stock-take in `docs/superpowers/specs/2026-10-11-website-state-and-next.md`.
+
+- A fresh checkout builds, or says in one sentence which of the three installs is missing and the command that fixes it; `site/README.md` names the three in the order CI runs them (`site/scripts/installs.mjs`, `site/test/installs.test.mjs`).
+- The federation page prints each registered instance's name, type and link, and nothing else from `data/instances.yaml`; the registry's `notes` are in no built file; an instance whose checkout was not present at build has no status; the home page counts operational instances (maturity `production`) and prints that definition beside the number. The verifier fails the build on any of these.
+- Left by it, for others: `docs/FEDERATION-MAP.md` describes the old aggregation and `docs/ECOSYSTEM.md` quotes one sentence of the registry's notes (both `commons-steward`'s); `roles/website.md` on `feat/crew` names two installs where three are needed (`commons-steward`'s).
 
 ## Task 2 — The operator looks at it (by eye)
 

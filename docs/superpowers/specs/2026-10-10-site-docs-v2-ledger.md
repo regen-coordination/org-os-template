@@ -872,3 +872,42 @@ Checked at: 48cf5dd07515bbaa6cb2e2ed00f4d5db936f69d2 (HEAD when started; the bri
 - AUTORESEARCH: title `# Autoresearch`.
 - Open: AGENTS.md section 2 should be corrected (outside this unit).
 
+## After the content pass — 2026-10-11, the website steward
+
+Not part of the seventeen units. Recorded here because the ledger is where the site says what it
+checked and what it could not.
+
+**The pages the content pass never read.** The home page, the modules page and the federation
+page are not manifest pages and carry no `verified` stamp. The spec left the federation page
+"unchanged apart from fresh data", so no unit read it. Read on 2026-10-11 from the built files:
+
+- The federation page printed the `notes` field of `data/instances.yaml` whole for each of the
+  eight instances, and marked every one "offline" because no sibling checkout exists at build.
+  `federation.json` carried every registry field, notes included. **Changed** (`9bf41f2`): name,
+  type and repository only; no status; the verifier now holds it.
+- The home page said "8 instances", the row count of the registry. **Changed**: it counts the
+  instances whose maturity is `production` (two today) and prints the definition.
+- `map.json` held no registry notes (checked: `grep -c notes dist/map.json` → 0). It marked 32 of
+  35 nodes `live: false`, which the map element prints as "unreached". **Changed**: the site drops
+  the false flag when it writes the file.
+
+**Checked, by command.** `npm run build` in `site/` prints `registry check: 24 private sentences
+from data/instances.yaml looked for in 82 built files, none found elsewhere`.
+
+**Could not check.** What the map element shows in a browser after the change; the panel's text
+was read in `packages/org-os-federation-map/src/element.mjs:175` and not seen.
+
+**Found, not fixed (not the site's to fix).**
+
+- `docs/ECOSYSTEM.md:26` quotes the registry's description of `dao-os` ("a DAO-module development
+  platform, not an operational instance"). The verifier names it as an allowed quotation and
+  prints it on every build. Whether the sentence stays is `commons-steward`'s.
+- `docs/FEDERATION-MAP.md:121` says the site writes `buildMap`'s result as it is and that
+  `federation.json` is "the instance registry"; both changed in `9bf41f2`. The page covers
+  `site/scripts/aggregate-federation.mjs`, so `npm run drift` reports it as drifted until the
+  document is corrected and re-stamped. Handed to `commons-steward`.
+- The federation page lists all eight registry entries, among them a test fixture and an agent
+  runtime, by name and type. The operator's decision covers what is printed for each entry, not
+  which entries are listed; a field that says which entries are public would be a change to
+  `data/instances.yaml`, which is `engineer`'s.
+- A fresh checkout needs three installs, not the two `roles/website.md` names (`7a872e3`).

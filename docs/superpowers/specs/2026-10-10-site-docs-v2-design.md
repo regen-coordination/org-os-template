@@ -1,10 +1,10 @@
 ---
 id: site-docs-v2
 title: "org-os site and docs, second version — for operators (Design)"
-status: draft (awaiting operator review)
+status: built (plans 1 and 2 executed on feat/site-docs-v2; the operator's review by eye is plan 3, task 2)
 type: feature-spec
 created: 2026-10-10
-last_updated: 2026-10-10
+last_updated: 2026-10-11
 brainstorming_session: 2026-10-10
 operator: luizfernandosg
 location: org-os/site/ and org-os/docs/
@@ -216,7 +216,12 @@ URL; it is unit-tested. The label is created in the repository as part of the re
 - **Modules.** `modules.yaml` stays a mirror of `docs/MODULES.md`, with the seven missing modules
   restored. The drift test (`modules-catalog.test.mjs`) is tightened: the two lists must match in
   both directions, and each status must equal the catalog's.
-- **Federation.** Unchanged apart from fresh data.
+- **Federation.** The map, and the registered instances by name, type and repository. Amended
+  2026-10-11 on the operator's decision: nothing else from `data/instances.yaml` is published, an
+  instance that was not read at build has no status, and the home page counts operational
+  instances (maturity `production`) with that definition beside the number. The first draft of
+  this line read "Unchanged apart from fresh data", which left the page printing the registry's
+  notes.
 - **Docs index.** The six sections with every page and its summary.
 - **Removed:** `/get-started`, `/about` (redirects, §3).
 - **Nav:** Docs · Modules · Federation · search · theme toggle.
