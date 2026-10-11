@@ -15,7 +15,7 @@ seated_by: operator
 status: reported
 prompted: true
 created: '2026-10-10T21:07:05-03:00'
-updated: '2026-10-11T02:01:03-03:00'
+updated: '2026-10-11T02:22:16-03:00'
 ---
 ## Brief
 
@@ -181,3 +181,73 @@ HEARTBEAT.md's first open crew item points here.
 **What crew should do** (for an engineer; nothing built): after prompting, look a few seconds later whether the agent left `idle`; when it has not, say so in the seat output and on the board rather than recording `prompted: true`; and give the lead and the operator a crew command that submits a prompt already sitting in the box, so the Enter is recorded on the trail and not pressed by hand. herdr's `agent prompt --wait` returns `agent_prompt_stalled` in this case and may be the simplest check.
 
 **Self-criticism.** I reverted a reviewed commit on a guess before testing the cheaper explanation by reading the pane a second time, and I left a seat idle for 25 minutes because my watch could not see stillness.
+
+## Report — lead — 2026-10-11T02:14:16-03:00
+
+# Lead: overnight report, 2026-10-11 (the operator asleep from about 00:50)
+
+feat/crew is pushed at 140a633 with everything below merged. The website steward and the platform steward are seated and working on their first assignment, both on Opus 5.5 at high effort. Nothing went to main; no pull request was opened.
+
+## Merged and pushed overnight, each after a passing review
+
+| What | Verdicts |
+|---|---|
+| Labels, the effort field, the website and platform roles, the lead on Opus 5.5 high | two first reviews failed on one blocker each; the combined branch passed |
+| The label call the live herdr accepts (id before `--source`); release looks inside wholly ignored directories | pass |
+| `seat --title`, names from titles, the role as a Claude agent's system prompt | pass |
+| A `## Voice` section in all seven role files; "Website steward" and "Platform steward"; the open list brought up to date | pass, one sentence corrected, confirmed |
+
+On the final merged tree in the main checkout: `node --test "tests/scripts/crew-*.test.mjs"` 202 of 202, the manifest and clone tests 25 of 25, `npm run version:check` agrees. I ran these myself after each merge.
+
+## Seen working on the live herdr tonight
+
+- Labels: `herdr agent get` returns role, assignment and status for each seated agent; the assignment is the short title.
+- Titles and identity: the first agent seated with them quoted its system prompt back ("You are the commons steward of the org-os crew: role …").
+- Model and effort: both stewards' panes show "Opus 5.5 with high effort". The id `claude-opus-5-5` is accepted.
+- `seat --handoff --base`, and seating with `--title`.
+
+Not seen by anyone: how herdr's sidebar draws the labels (it needs the operator's own config.toml edit, written out in docs/CREW.md).
+
+## Things I did that the operator should know about
+
+1. **I sent one Enter key to an agent's pane myself** (`herdr agent send-keys reviewer enter`). Three reviewer seats in a row had their first prompt typed and never submitted while herdr said it was sent. The account, with what I tried, is the previous Report section of this file. It did not recur on the six seats since. Cause unknown.
+2. **I reverted a reviewed commit on a wrong guess and restored it** (1534510, then 26ddf60, both on feat/crew). The code after them is identical to what was reviewed.
+3. **About an hour was lost** to the stuck seats, 25 minutes of it because my board watch could not see an agent that stays idle.
+4. **A push I did not make** moved the remote to 63bab29 at 00:08:55 on 2026-10-11; I reported it at the time and still do not know who made it.
+
+## Waiting for the operator
+
+- **The stewards' proposals.** Each will leave a document on its own branch (docs/superpowers/specs/2026-10-11-website-state-and-next.md and …-platform-state-and-next.md) and a report. I told both: no building, no fixes, until the operator has read the proposal. I will not merge those branches; they are theirs to judge.
+- **"Steward", not "owner".** The commons-steward renamed the two new seats after the charter ("Nobody owns a file; roles steward areas"). Ids and file names are still `website` and `platform`.
+- **MASTERPLAN.md** still describes one "Framework Development Agent". Not edited; the steward's suggestion is in its report of 2026-10-10.
+- **The cap is 6 and there are 7 roles.** Left as decided.
+- **Two worktrees left behind**, both holding only installs and site build output: …/2026-10-11-engineer-bring-the-labels-branch-and-the-roles-br and …/2026-10-11-engineer-the-live-herdr-refuses-crew-s-label-call. Release keeps them by rule; removing them is the operator's.
+- **The trail contains this machine's home path** and is on a public remote, as the operator chose.
+- **Branches.** About thirty `crew/…` branches remain locally; all but the two stewards' are merged into feat/crew and can be deleted.
+
+## Open, recorded in HEARTBEAT.md under Crew
+
+The unsubmitted first prompt (first to fix: check that the agent left idle after prompting, and a crew command to submit a prompt already in the box). Then the smaller review findings, the five experiments against a live herdr nobody has run, and the proposals from the presentation round.
+
+## Criticism and self-criticism
+
+- The label code was merged on a stand-in binary's word and failed on its first live call; the reviewers had said each time that it was unverified. I should have had one agent run the call on its own pane before the first merge, which is what found the cause in ten minutes later.
+- I gave three wrong facts in briefs tonight (the platform's map board as built, "five shipped roles" plus a lead, the cause of the leftover worktree). Each was caught by a reviewer or an engineer who ran something. Each cost a round.
+- What worked: every branch had a reviewer who ran things, and five of the night's reviews failed a branch before it merged.
+
+## Report — lead — 2026-10-11T02:14:22-03:00
+
+Correction to the overnight report above: it says "about thirty" crew branches remain locally. Counted with `git branch --list "crew/*"`: 22.
+
+## Report — lead — 2026-10-11T02:22:16-03:00
+
+# Lead: the two stewards have reported (2026-10-11, about 02:22)
+
+Both first assignments are done; both agents are still seated for the operator, and neither branch is merged. No further work is seated.
+
+- **Website steward.** Document `docs/superpowers/specs/2026-10-11-website-state-and-next.md` on `crew/2026-10-11-website-take-stock-of-the-org-os-website-and-pro` (43a458a). Report: Report section of `memory/crew/2026-10-11-website-take-stock-of-the-org-os-website-and-pro.md`. Its question: which lands on main first, the crew or the site, and is the other session still carrying the release plan?
+- **Platform steward.** Document `docs/superpowers/specs/2026-10-11-platform-state-and-next.md` on `crew/2026-10-11-platform-take-stock-of-the-org-os-platform-the-ad` (6c74a6a). Report: Report section of `memory/crew/2026-10-11-platform-take-stock-of-the-org-os-platform-the-ad.md`. Its question: when the operator pictures the board, are the cards the organization's records, the running parts of the platform, or both?
+
+Two findings the operator should read before anything else: the site's federation page would publish working notes from `data/instances.yaml`, including a named person's role, the moment that branch is merged; and the admin app's write path accepted a request with a foreign Origin as far as the validator, lost commits under concurrent saves, and rewrites far more of a file than the field changed. Neither is fixed; both stewards were told to describe and not fix.
+
+The platform steward says it went outside its worktree in three ways: a scratch copy of `data/` in the session's temporary directory, a tab in the operator's Chrome pointed at localhost (closed afterwards), and a root `npm ci`. It named them itself.
