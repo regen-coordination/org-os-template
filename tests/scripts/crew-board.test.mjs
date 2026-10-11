@@ -464,3 +464,23 @@ test('a seated agent whose first prompt is unsent or unconfirmed is marked in th
   assert.equal(again.rows.find((r) => r.agent === 'reviewer').prompted, 'unconfirmed');
   assert.match(renderBoard(again, ctx.now()), /^reviewer\s.*working \(first prompt unconfirmed\)/m);
 });
+
+test('releasing a seating that timed out at the worktree step says the herdr workspace may remain and release may have raced herdr', () => {
+  const { ctx } = crew();
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'x' }));
+  ctx.herdr.failOn = null;
+  const failed = readTrail(ctx.mainDir).assignments.find((a) => a.status === 'failed');
+  const text = releaseLines(release(ctx, { target: failed.id })).join('\n');
+  assert.match(text, /never learned the id of the herdr workspace/);
+  assert.match(text, /labelled "reviewer"/);
+  assert.match(text, /may still have been creating/);
+
+  // a failure that was not a timeout still names the workspace, but does not claim a race
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'worktree_create_failed', message: 'git said no' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'y' }));
+  const second = readTrail(ctx.mainDir).assignments.find((a) => a.status === 'failed' && a.id !== failed.id);
+  const t2 = releaseLines(release(ctx, { target: second.id })).join('\n');
+  assert.match(t2, /never learned the id of the herdr workspace/);
+  assert.doesNotMatch(t2, /may still have been creating/);
+});

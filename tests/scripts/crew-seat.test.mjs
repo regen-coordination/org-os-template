@@ -354,3 +354,87 @@ test('every assignment file says a brief that starts with a dash goes after --',
   assert.match(engBody, /handoff <role>[^\n]*-- "<brief>"/);
   assert.doesNotMatch(engBody, /seat <role>/);
 });
+
+test('a prompt refused before anything was queued leaves prompted false, for every code that proves it', () => {
+  const codes = ['empty_agent_prompt', 'agent_not_found', 'agent_target_ambiguous', 'agent_blocked', 'agent_not_ready', 'herdr_missing'];
+  for (const code of codes) {
+    const { ctx } = setup();
+    ctx.herdr.failOn = { method: 'promptAgent', code, message: `herdr said ${code}` };
+    const a = seat(ctx, { roleId: 'engineer', brief: 'x' });
+    assert.equal(a.status, 'working', code);
+    assert.equal(a.prompted, false, code);
+  }
+});
+
+test('a prompt failure that may have been typed stays unconfirmed, and nudge refuses it', () => {
+  for (const code of ['agent_prompt_failed', 'timeout', 'agent_prompt_stalled', 'herdr_timeout', 'herdr_error']) {
+    const { ctx } = setup();
+    ctx.herdr.failOn = { method: 'promptAgent', code, message: `herdr said ${code}` };
+    assert.equal(seat(ctx, { roleId: 'engineer', brief: 'x' }).prompted, 'unconfirmed', code);
+    ctx.herdr.failOn = null;
+    assert.throws(() => nudge(ctx, { target: 'engineer' }), /may already have arrived/, code);
+  }
+});
+
+test('a nudge refused with a code that proves nothing was sent says so, keeps prompted false, and may be run again', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'startAgent', code: 'agent_not_ready', message: 'blocked at startup' };
+  seat(ctx, { roleId: 'engineer', brief: 'x' });
+  ctx.herdr.failOn = { method: 'promptAgent', code: 'agent_blocked', message: 'agent engineer is waiting at a dialog' };
+  assert.throws(
+    () => nudge(ctx, { target: 'engineer' }),
+    (err) => err instanceof CrewError && /nothing was sent/.test(err.message) && /waiting at a dialog/.test(err.message) && /nudge/.test(err.message),
+  );
+  assert.equal(readTrail(ctx.mainDir).assignments[0].prompted, false);
+  ctx.herdr.failOn = null;
+  assert.equal(nudge(ctx, { target: 'engineer' }).prompted, true);
+});
+
+test('a failed worktree create names what may be left, in the record and in the message', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'worktree_create_failed', message: 'git said no' };
+  let message = '';
+  assert.throws(() => seat(ctx, { roleId: 'engineer', brief: 'x' }), (err) => {
+    message = err.message;
+    return true;
+  });
+  const [a] = readTrail(ctx.mainDir).assignments;
+  assert.deepEqual(a.may_remain, [`branch ${a.branch}`, `checkout directory ${a.worktree}`, 'a herdr workspace labelled "engineer"']);
+  for (const piece of a.may_remain) assert.ok(message.includes(piece), `${piece} missing from: ${message}`);
+});
+
+test('a timed-out worktree create says herdr may still be creating it and that crew never learned the workspace', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  assert.throws(() => seat(ctx, { roleId: 'engineer', brief: 'x' }), (err) => {
+    assert.match(err.message, /never learned/);
+    assert.match(err.message, /wait/i);
+    return true;
+  });
+});
+
+test('a failed --on seating lists the checkout and workspace but no branch, and a git failure lists no workspace', () => {
+  const { ctx } = setup();
+  ctx.git.refs.add('feature');
+  ctx.herdr.failOn = { method: 'openWorktree', code: 'worktree_open_failed', message: 'could not open' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'x', on: 'feature' }));
+  const [a] = readTrail(ctx.mainDir).assignments;
+  assert.deepEqual(a.may_remain, [`checkout directory ${a.worktree}`, 'a herdr workspace labelled "reviewer"']);
+
+  const second = setup();
+  second.ctx.git.refs.add('feature');
+  second.ctx.git.addDetached = () => {
+    throw new Error('git worktree add failed');
+  };
+  assert.throws(() => seat(second.ctx, { roleId: 'reviewer', brief: 'x', on: 'feature' }));
+  const [b] = readTrail(second.ctx.mainDir).assignments;
+  assert.deepEqual(b.may_remain, [`checkout directory ${b.worktree}`]);
+  assert.deepEqual(second.ctx.herdr.calls, []);
+});
+
+test('a failure at the start step does not claim a leftover workspace crew does not know', () => {
+  const { ctx } = setup();
+  ctx.herdr.failOn = { method: 'startAgent', code: 'timeout', message: 'not detected' };
+  assert.throws(() => seat(ctx, { roleId: 'engineer', brief: 'x' }), (err) => !/never learned/.test(err.message));
+  assert.equal(readTrail(ctx.mainDir).assignments[0].may_remain, undefined);
+});

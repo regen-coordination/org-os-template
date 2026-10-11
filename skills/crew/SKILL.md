@@ -89,7 +89,9 @@ If it is left behind, the command lists what is in it: show that list to the ope
 Do not remove the worktree yourself; once the operator has dealt with it, release again. If the
 list says herdr did not answer, nothing was wrong with the worktree: wait and release again.
 After a seating that timed out, the worktree or agent may exist anyway: look at the board and
-release the assignment under "Needs release".
+release the assignment under "Needs release". If it timed out creating the worktree, wait a little
+first, and tell the operator that a herdr workspace may be left open that crew cannot close: the
+failure message and the release output name it.
 
 ## As the lead
 

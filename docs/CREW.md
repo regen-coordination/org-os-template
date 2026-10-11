@@ -42,18 +42,33 @@ npm run crew -- nudge engineer
 ```
 
 **A new pane that has not reached its shell yet** makes herdr refuse to start the agent
-("is not an available shell"). Seat waits for it, for up to 8 seconds, and only then fails; a
-failed record keeps herdr's `error` text and its `error_code`.
+(`agent_pane_busy`, "is not an available shell"). The same code also means the pane already has
+an agent. Seat looks at the pane each time it is refused: it waits, for up to 30 seconds, only
+while the pane's shell is not yet in the foreground and no agent is there, and fails at once
+when an agent is there. A failed record keeps herdr's `error` text and its `error_code`.
+
+**If an agent start is cut off** (herdr did not answer, or the connection broke), the agent may
+have started anyway. Seat looks at the pane with read-only herdr calls before deciding: an agent
+there means the seating went on, none means it failed and says it looked. It never starts twice.
 
 **If a seating step times out** (herdr did not answer within 60 seconds), the command says the
 worktree or agent may exist anyway. Look at `npm run crew`: the assignment is under "Needs
 release", and `release` closes it. A timed-out call is never retried.
 
+**If the worktree step fails or times out**, the command and the failed record (`may_remain`)
+name what may be left: the branch `crew/<id>`, the checkout directory and a herdr workspace
+labelled with the agent's name. Crew never learns that workspace's id, so `release` cannot close
+it: close it in herdr yourself. After a timeout wait a little before `release`, since herdr may
+still be creating the worktree.
+
 **If herdr did not confirm the first prompt** (it timed out or failed after being sent), the
 command says it "may or may not have arrived". Look at the agent's pane: crew never resends,
-and `nudge` refuses. The one exception is a herdr that is not on PATH: nothing can have been
-sent then, so the agent counts as not prompted and `nudge` works once herdr is back. If the agent has not started, type into its pane what the command printed
-(the role file and assignment file paths).
+and `nudge` refuses. The exceptions are the answers that prove nothing was queued: herdr not on
+PATH, an empty prompt, an agent herdr cannot find or that matches twice, an agent at an approval
+or question dialog (`agent_blocked`) and an agent that is not ready (`agent_not_ready`). The
+agent then counts as not prompted, and `nudge` works once the cause is dealt with. If the agent
+has not started, type into its pane what the command printed (the role file and assignment file
+paths).
 
 A brief that starts with a dash is read as an option; put `--` before it, after any flags:
 `npm run crew -- seat engineer --task t1 -- "-5 degrees is too cold"`.
@@ -150,3 +165,23 @@ usage. Use a throwaway brief.
 7. `git branch --list 'crew/*'` shows the branch; `git worktree list` no longer shows the
    worktree; `npm run crew` → `No crew agents are seated.`
 8. Clean up the throwaway: delete the smoke branch and the smoke file in `memory/crew/`.
+
+### Experiments that settle what is still unverified
+
+Crew's herdr handling was built from herdr 0.9.1's source and read-only calls. These change
+herdr's state, so they are yours to run once, with a throwaway pane. Note the outcome in
+`memory/` and, if it differs from the source, tell the engineer.
+
+1. **How long is a new pane busy?** Make a workspace the way crew does, then call
+   `herdr agent start probe --kind claude --pane <new pane>` once every 100 ms, saving each full
+   JSON error and `herdr pane process-info --pane <id>`. Settles whether herdr's own 2 second
+   retry should have covered the failure first seen, and whether 30 seconds is enough. Close the
+   probe workspace.
+2. **Does a killed start leave the agent?** Run `timeout 1 herdr agent start probe --kind claude
+   --pane <idle pane>`, then `herdr agent get <pane>` and a second start with the same name. The
+   source says the agent starts and the second start returns `agent_name_taken`.
+3. **Is the installed binary the `v0.9.1` source?** Compare a build or checksum.
+4. **What does a killed `git worktree add` leave?** Only the operator can say; crew assumes the
+   checkout directory and branch may exist.
+5. **Which code does `herdr agent get <pane>` give for a pane with no agent?** Crew reads no code
+   from it; it matches by listing.

@@ -24,6 +24,18 @@ export function requireHerdr(ctx) {
   }
 }
 
+// Codes herdr returns before it queues any input to the pane (herdr 0.9.1 source,
+// spec 5.3), plus a missing binary: each proves the prompt was not sent. Every
+// other failure, herdr_timeout included, may have been typed already.
+const PROMPT_NOT_SENT = new Set([
+  'herdr_missing',
+  'empty_agent_prompt',
+  'agent_not_found',
+  'agent_target_ambiguous',
+  'agent_blocked',
+  'agent_not_ready',
+]);
+
 const active = (trail) => trail.assignments.filter((a) => ACTIVE.includes(a.status));
 const stamp = (ctx) => isoLocal(ctx.now());
 
@@ -191,6 +203,9 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
   // primary checkout when the main checkout is itself a linked worktree.
   const repoDir = ctx.repoDir ?? ctx.mainDir;
   let step = 'worktree';
+  // Set just before herdr is asked to create or open the worktree: from then on
+  // it may have made things that crew was never told about.
+  let herdrAsked = false;
   // true: sent and confirmed. false: never sent. 'unconfirmed': sent, but herdr
   // did not confirm it, which does not prove it did not arrive.
   let prompted = false;
@@ -198,8 +213,10 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
     let opened;
     if (on) {
       ctx.git.addDetached(worktree, on);
+      herdrAsked = true;
       opened = ctx.herdr.openWorktree({ cwd: repoDir, path: worktree, label: name });
     } else {
+      herdrAsked = true;
       opened = ctx.herdr.createWorktree({ cwd: repoDir, branch: `crew/${id}`, base, path: worktree, label: name });
     }
     updateRecord(file, { pane: opened.pane_id, workspace: opened.workspace_id });
@@ -222,23 +239,48 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
         prompted = true;
       } catch (err) {
         // herdr says a failed or timed-out prompt does not prove non-delivery,
-        // so the prompt is never resent: not here, and not by nudge. Only a
-        // missing herdr binary proves nothing was sent; herdr's own refusals are
-        // not known well enough to trust.
-        prompted = err.code === 'herdr_missing' ? false : 'unconfirmed';
+        // so the prompt is never resent: not here, and not by nudge. Only the
+        // codes in PROMPT_NOT_SENT prove nothing was sent.
+        prompted = PROMPT_NOT_SENT.has(err.code) ? false : 'unconfirmed';
       }
     }
   } catch (err) {
-    updateRecord(file, { status: 'failed', failed_step: step, error: String(err.message || err), ...(err.code ? { error_code: String(err.code) } : {}), updated: stamp(ctx) });
+    // What a failed worktree step may have left, including a herdr workspace
+    // whose id crew never received.
+    const mayRemain = step === 'worktree' ? worktreeLeftovers({ id, on, worktree, name, herdrAsked }) : null;
+    updateRecord(file, {
+      status: 'failed',
+      failed_step: step,
+      error: String(err.message || err),
+      ...(err.code ? { error_code: String(err.code) } : {}),
+      ...(mayRemain ? { may_remain: mayRemain } : {}),
+      updated: stamp(ctx),
+    });
     // A call that timed out may still have happened: herdr was asked, and it never said no.
     const maybe =
       err.code === 'herdr_timeout'
-        ? ` herdr did not answer, so the ${step === 'start' ? 'agent' : 'worktree'} may exist anyway. Look at the board; if this assignment is under "Needs release", run release ${id} to close it.`
+        ? ` herdr did not answer, so the ${step === 'start' ? 'agent' : 'worktree'} may exist anyway.` +
+          (step === 'start'
+            ? ' Look at the board; if this assignment is under "Needs release", run release ' + id + ' to close it.'
+            : ' It may still be creating it: wait a little, look at the board, and run release ' + id + ' to close the assignment.')
         : '';
-    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${maybe}`);
+    const left = mayRemain
+      ? ` May still exist: ${mayRemain.join('; ')}.` +
+        (herdrAsked ? ' crew never learned the id of that herdr workspace, so release cannot close it: close it in herdr yourself.' : '')
+      : '';
+    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${left}${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
   return updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
+}
+
+/** What a failed worktree step may have left behind, in the words the failed record and the message use. */
+function worktreeLeftovers({ id, on, worktree, name, herdrAsked }) {
+  const out = [];
+  if (!on && herdrAsked) out.push(`branch crew/${id}`);
+  out.push(`checkout directory ${worktree}`);
+  if (herdrAsked) out.push(`a herdr workspace labelled "${name}"`);
+  return out;
 }
 
 /** What to tell the operator about a first prompt that may or may not have arrived. */
@@ -266,6 +308,13 @@ export function nudge(ctx, { target }) {
   } catch (err) {
     if (err.code === 'herdr_missing') {
       throw new CrewError(`The herdr command was not found on PATH, so nothing was sent to ${a.agent}. Fix that and run nudge again.`);
+    }
+    if (PROMPT_NOT_SENT.has(err.code)) {
+      // herdr refused before queueing any input: the prompt is still unsent and nudge may be run again.
+      throw new CrewError(
+        `herdr refused the first prompt before sending anything, so nothing was sent to ${a.agent}: ${err.message}. ` +
+          `Deal with that in ${a.agent}'s pane (an open dialog, or an agent still starting), then run nudge again.`,
+      );
     }
     // Attempted and not confirmed: from here on it is case (b), never resent.
     updateRecord(a.file, { prompted: 'unconfirmed', updated: stamp(ctx) });
@@ -462,6 +511,13 @@ export function releaseLines(r) {
         ? `  Commits saved by an earlier release are on branch ${r.rescued}.`
         : `  Commits made in the detached copy were saved as branch ${r.rescued}.`,
     );
+  }
+  if (x.failed_step === 'worktree' && Array.isArray(x.may_remain) && x.may_remain.some((m) => m.startsWith('a herdr workspace'))) {
+    // Seating failed while herdr was creating the worktree, before it gave crew a workspace id.
+    out.push(`  crew never learned the id of the herdr workspace that seating may have opened. If one labelled "${x.agent}" is open in herdr, close it there.`);
+    if (x.error_code === 'herdr_timeout') {
+      out.push(`  herdr did not answer the worktree request and may still have been creating it when this release ran. If the worktree or branch ${x.branch} appears now, run release again.`);
+    }
   }
   if (r.removed) {
     out.push(r.worktreeExisted ? '  The worktree was removed.' : `  There was no worktree at ${x.worktree} to remove.`);
