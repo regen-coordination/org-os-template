@@ -911,3 +911,59 @@ was read in `packages/org-os-federation-map/src/element.mjs:175` and not seen.
   which entries are listed; a field that says which entries are public would be a change to
   `data/instances.yaml`, which is `engineer`'s.
 - A fresh checkout needs three installs, not the two `roles/website.md` names (`7a872e3`).
+
+## After the Part A review — 2026-10-11, the website steward
+
+The reviewer passed Part A with three findings against the leak check; `commons-steward`
+corrected the two documents named above (`ff97a7b`, merged here as `5a6563d`).
+
+**The leak check, changed.** It now looks for three things (rules and reasons in
+`site/README.md`, "The registry guard"): a whole sentence whatever its case; any 40 letters in a
+row of a note, whatever stands between them; and the drift flags and local paths. Each file is
+read as written and with its markup removed, with `\uXXXX` escapes decoded. The exception for
+`docs/ECOSYSTEM.md` is gone, and no list of exceptions is left.
+
+**Checked, by command.** `npm run build` in `site/` prints `registry check: 24 private sentences,
+8 notes (any 40 letters in a row of one) and 14 flags and local paths from data/instances.yaml
+looked for in 82 built files, as written and with markup removed: none found`. Thirteen
+injections into the built home page, the reviewer's five among them: every one that should fail
+the verifier does, the control passes, and the page was restored byte for byte.
+
+**Could not check, or does not catch.**
+
+- An excerpt shorter than 40 letters that is not a whole sentence passes: "resolve that tree
+  before any propagation" (35 letters) was injected and the verifier exited 0. The length cannot
+  drop to 32 while `docs/ECOSYSTEM.md` reads as it does (next list).
+- One-word values that are ordinary words, dates, versions and booleans are not looked for.
+- No test ran on old code case by case: the new test file imports a function the old code does
+  not have, so against the old code it failed as a whole. The reviewer's table is the record of
+  what the old code let through.
+
+**`docs/FEDERATION-MAP.md`, read against the code and re-stamped at `5a6563d`.** The section "How
+the project site uses it" was read beside `site/scripts/aggregate-federation.mjs`,
+`federation-aggregate.mjs`, `installs.mjs`, `FederationMapIsland.astro`, `InstanceCard.astro` and
+the two pages. It holds, with two imprecisions that do not change what a reader would do:
+
+- "run … first by `npm run build`": `build` runs `clean` before `aggregate`. True of `dev`.
+- `federation.json` is said to hold the three fields and two counts; it also holds `root`,
+  `operationalDefinition` and `generatedAt`.
+
+Nothing else under the page's covers changed since `4b1151e`
+(`git diff --stat 4b1151e HEAD -- <covers>` names only `aggregate-federation.mjs`).
+
+**Found, not fixed (not the site's to fix).** `docs/ECOSYSTEM.md` still restates three of the
+registry's notes in nearly their words; it names `data/instances.yaml` as its source for one.
+
+| ECOSYSTEM.md | The note | Shared |
+| --- | --- | --- |
+| line 24, "acceptance-test instance for `clone:framework`" | "Acceptance-test instance for clone-framework.mjs" | 39 letters |
+| line 37, "mounted at `repos/refi-mediterranean/`" | "mounted at repos/refi-mediterranean/" | 32 letters |
+| line 20, "Cooperative in formation." | "Cooperative-in-formation." | the whole sentence but its hyphens |
+
+The check passes them: the first two are under 40 letters, and a whole sentence is matched with
+its punctuation. Whether a document may restate a note is the operator's; the wording is
+`commons-steward`'s. If the first two are reworded, `RUN_LENGTH` can drop to 32.
+
+**The operational count.** The definition printed beside it now ends "The maintainer sets that
+value by hand; the site does not measure it." The registry's dates of last sync are not public
+fields, so the page cannot say how old the label is.

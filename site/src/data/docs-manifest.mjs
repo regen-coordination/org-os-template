@@ -123,7 +123,7 @@ export const PAGES = [
     covers: ["packages/org-os-kms/src/atproto/", "packages/org-os-kms/src/ops.mjs", "packages/org-os-kms/src/static/", "packages/org-os-kms/src/manifest.mjs", "packages/toolkit-framework/src/publishable.mjs"] },
   { source: "docs/FEDERATION-MAP.md", slug: "federation-map", title: "Federation map", section: "knowledge", order: 70,
     summary: "map.json, the frontier fetch, the HTML artifact and the <federation-map> element",
-    verified: "4b1151e060ed4b064eedd41347b832da923d6819",
+    verified: "5a6563df24f0a191a025b3c34a19e0fb9f20455f",
     covers: ["packages/org-os-kms/src/map.mjs", "packages/org-os-kms/src/frontier.mjs", "packages/org-os-kms/src/render-map-html.mjs", "packages/org-os-federation-map/src/", "site/scripts/aggregate-federation.mjs"] },
 
   { source: "docs/MODULES.md", slug: "modules", title: "Modules", section: "modules", order: 10,

@@ -1,6 +1,6 @@
 # Site and Docs v2 — Plan 3: the Release — Implementation Plan
 
-> **In progress.** Task 1 is done, and a task 1b was added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
+> **In progress.** Task 1 is done, and tasks 1b, 1c and 1d were added and done on 2026-10-11. Tasks 2 and 3 are the operator's. Task 4 follows the operator's look. Every step from 5 on is an external action and waits for the operator's explicit go.
 >
 > **Whose it is.** Since 2026-10-11 the website steward (crew seat `website`) carries this plan, by the operator's decision. The operator keeps the look by eye, the decisions of task 3, the pull request, the merge and the tag. The order of release is: the site lands on `main` as `0.5.1`; the crew (`feat/crew`) follows toward `0.6.0`, and the site is made ready for it on that branch afterwards.
 
@@ -40,6 +40,15 @@
 ## Task 1c — The tightened look (local)
 
 > **Done 2026-10-11** by the website steward, on the operator's request for "a new polished/tight version". Spec: `docs/superpowers/specs/2026-10-11-site-tight-design.md`; held by `site/test/design-tight.test.mjs`. It replaces the look pass of `599b3db` and `a195c76`: the atmospheric layers, the pointer light and the iridescent edges are cut, so the "keep, dial down or drop" question of task 2 is now asked of this version. It also closes two open minors: the theme switch's edge keeps its contrast while hovered, and the sidebar's section names are no longer headings before the page's `h1`.
+
+## Task 1d — What the Part A review left (local)
+
+> **Done 2026-10-11** by the website steward, from the reviewer's findings 1 to 3 and `commons-steward`'s correction of two documents (`ff97a7b`).
+
+- The leak check finds an excerpt of a note (any 40 letters in a row), reads through markup, case and escapes, and looks for drift flags and local paths; `site/README.md` says what it does not look for and why (`site/scripts/registry-leaks.mjs`, `site/test/registry-leaks.test.mjs`).
+- The verifier's one exception (`QUOTED_BY_A_DOCUMENT`) is removed; `docs/FEDERATION-MAP.md` is re-stamped and `npm run drift` reports no drifted page.
+- The definition beside the operational count says the maturity is set by hand and not measured.
+- Left by it, for others: `docs/ECOSYSTEM.md` restates three registry notes in nearly their words (the ledger lists them); whether the registered list should name a test fixture and an agent runtime is the operator's, and needs a field in `data/instances.yaml` (`engineer`'s) if the answer is no.
 
 ## Task 2 — The operator looks at it (by eye)
 
