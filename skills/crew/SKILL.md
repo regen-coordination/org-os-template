@@ -35,6 +35,9 @@ said. Never work around a refusal**: not by calling herdr or git yourself, not b
 | Close an assignment                                                | `npm run crew -- release <agent>`                       |
 | Decline a handoff                                                  | `npm run crew -- handoff-close <id> --reason "<why>"`   |
 
+A brief that starts with a dash is read as an option: put `--` before it, after any flags
+(`seat <role> --task <id> -- "<brief>"`; the same for `handoff`).
+
 If you are a **seated agent**, your assignment file gives you two commands with absolute paths,
 `report` and `handoff`. Use those exactly as written. Only the lead role and the operator may
 seat, release, or close handoffs.
