@@ -279,6 +279,15 @@ export function closeHandoff(ctx, { target, reason }) {
   return updateRecord(h.file, { status: 'declined', reason: reason.trim(), updated: stamp(ctx) });
 }
 
+const CLOSED = ['released', 'abandoned'];
+
+/**
+ * Closed assignments whose worktree release could not remove and which is still
+ * on disk. Their recorded outcome is final; only the removal can be retried.
+ */
+const leftBehind = (ctx, trail) =>
+  trail.assignments.filter((a) => CLOSED.includes(a.status) && a.worktree_removed === false && ctx.git.worktreeExists(a.worktree));
+
 export function release(ctx, { target, outcome = 'done' }) {
   requireHerdr(ctx);
   if (!['done', 'abandoned'].includes(outcome)) {
@@ -290,20 +299,33 @@ export function release(ctx, { target, outcome = 'done' }) {
   if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
     throw new CrewError(`The ${caller.role} role may not release agents. Report instead; the lead or the operator releases.`);
   }
-  const a = findActive(trail, target, [...ACTIVE, 'failed']);
+  let a;
+  try {
+    a = findActive(trail, target, [...ACTIVE, 'failed']);
+  } catch (err) {
+    // Not open: it may be a closed assignment whose worktree was left behind.
+    const left = leftBehind(ctx, trail).filter((x) => x.id === target || x.agent === target);
+    if (left.length === 0) throw err;
+    if (left.length > 1) {
+      throw new CrewError(`More than one closed assignment of "${target}" still has a worktree. Use the assignment id: ${left.map((x) => x.id).join(', ')}.`);
+    }
+    a = left[0];
+  }
+  const closed = CLOSED.includes(a.status);
   const live = agents.find((x) => a.pane && x.pane_id === a.pane);
   if (live && live.state === 'working') {
     throw new CrewError(`${a.agent} is still working. Wait for it to finish, or stop it in its pane first.`);
   }
 
   let removed = false;
-  let rescued = null;
+  let rescued = closed ? a.rescued_branch ?? null : null;
   let left = [];
-  if (!ctx.git.worktreeExists(a.worktree)) {
+  const worktreeExisted = ctx.git.worktreeExists(a.worktree);
+  if (!worktreeExisted) {
     removed = true;
   } else {
     left = ctx.git.changes(a.worktree);
-    if (a.detached) {
+    if (a.detached && !rescued) {
       // A detached copy has no branch of its own. Commits made in it would be
       // lost with the worktree, so they are saved to a branch first.
       try {
@@ -337,13 +359,10 @@ export function release(ctx, { target, outcome = 'done' }) {
       }
     }
   }
-  const assignment = updateRecord(a.file, {
-    status: outcome === 'abandoned' ? 'abandoned' : 'released',
-    worktree_removed: removed,
-    rescued_branch: rescued,
-    updated: stamp(ctx),
-  });
-  return { assignment, removed, left, rescued };
+  // A retry never changes how the assignment ended.
+  const status = closed ? a.status : outcome === 'abandoned' ? 'abandoned' : 'released';
+  const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
+  return { assignment, removed, left, rescued, worktreeExisted, branchKept: ctx.git.resolves(a.branch) };
 }
 
 export function board(ctx) {
@@ -359,6 +378,7 @@ export function board(ctx) {
         agent: a.agent,
         role: a.role,
         state: live.state,
+        status: a.status,
         brief: a.brief.split('\n')[0],
         branch: a.branch,
         id: a.id,
@@ -373,7 +393,8 @@ export function board(ctx) {
   const handoffs = trail.handoffs
     .filter((h) => h.status === 'open')
     .map((h) => ({ id: h.id, from_role: roleOf.get(h.from) || h.from, to_role: h.to_role, brief: h.brief.split('\n')[0] }));
-  return { rows, handoffs, needsRelease, unreadable: trail.unreadable };
+  const leftover = leftBehind(ctx, trail).map((a) => ({ id: a.id, status: a.status, worktree: a.worktree }));
+  return { rows, handoffs, needsRelease, leftBehind: leftover, unreadable: trail.unreadable };
 }
 
 function age(created, now) {
@@ -391,8 +412,8 @@ export function renderBoard(b, now) {
     out.push('No crew agents are seated.');
   } else {
     const table = [
-      ['AGENT', 'ROLE', 'STATE', 'ASSIGNMENT', 'BRANCH', 'AGE'],
-      ...b.rows.map((r) => [r.agent, r.role, r.state, clip(r.brief, 32), clip(r.branch, 44), age(r.created, now)]),
+      ['AGENT', 'ROLE', 'STATE', 'STATUS', 'ASSIGNMENT', 'BRANCH', 'AGE'],
+      ...b.rows.map((r) => [r.agent, r.role, r.state, r.status, clip(r.brief, 32), clip(r.branch, 44), age(r.created, now)]),
     ];
     const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
     for (const row of table) {
@@ -408,6 +429,10 @@ export function renderBoard(b, now) {
     for (const a of b.needsRelease) {
       out.push(`  ${a.id} (${a.status === 'failed' ? 'seating failed' : `trail says ${a.status}, no live agent`})`);
     }
+  }
+  if (b.leftBehind.length > 0) {
+    out.push('', `Worktrees left behind: ${b.leftBehind.length}`);
+    for (const a of b.leftBehind) out.push(`  ${a.id} (${a.status}; its worktree is still at ${a.worktree})`);
   }
   if (b.unreadable.length > 0) out.push('', `Could not read: ${b.unreadable.join(', ')}`);
   return `${out.join('\n')}\n`;

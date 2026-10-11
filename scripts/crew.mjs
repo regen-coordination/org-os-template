@@ -122,16 +122,22 @@ function main(argv) {
         target: need(first, 'release needs an agent name or assignment id.'),
         outcome: values.outcome ?? 'done',
       });
-      console.log(
-        r.assignment.detached
-          ? `${r.assignment.id} is ${r.assignment.status}. It worked on a detached copy of ${r.assignment.branch}; that branch is untouched.`
-          : `${r.assignment.id} is ${r.assignment.status}. Its branch ${r.assignment.branch} is kept.`,
-      );
+      const x = r.assignment;
+      console.log(`${x.id} is ${x.status}.`);
+      if (x.detached) {
+        console.log(
+          r.branchKept
+            ? `  It worked on a detached copy of ${x.branch}; that branch is untouched.`
+            : `  It worked on a detached copy of ${x.branch}, which is not a branch or commit in this repository.`,
+        );
+      } else {
+        console.log(r.branchKept ? `  Its branch ${x.branch} is kept.` : `  Its branch ${x.branch} was never created, so there is no branch to keep.`);
+      }
       if (r.rescued) console.log(`  Commits made in the detached copy were saved as branch ${r.rescued}.`);
       if (r.removed) {
-        console.log('  The worktree was removed.');
+        console.log(r.worktreeExisted ? '  The worktree was removed.' : `  There was no worktree at ${x.worktree} to remove.`);
       } else {
-        console.log(`  The worktree was left at ${r.assignment.worktree}:`);
+        console.log(`  The worktree was left at ${x.worktree}:`);
         for (const line of r.left) console.log(`    ${line}`);
       }
       return;

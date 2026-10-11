@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readTrail, trailDir } from '../../scripts/crew/trail.mjs';
-import { board, handoff, release, renderBoard, seat } from '../../scripts/crew/core.mjs';
+import { board, handoff, release, renderBoard, report, seat } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot } from '../helpers/crew-fixtures.mjs';
 
 function crew() {
@@ -138,8 +138,8 @@ test('renderBoard prints a table, the handoffs and what needs attention', () => 
   const later = new Date(ctx.now().getTime() + 42 * 60 * 1000);
   const text = renderBoard(board(ctx), later);
   const lines = text.split('\n');
-  assert.match(lines[0], /^AGENT\s+ROLE\s+STATE\s+ASSIGNMENT\s+BRANCH\s+AGE$/);
-  assert.match(lines[1], /^engineer\s+engineer\s+idle\s+Build it\s+crew\/\S+\s+42m$/);
+  assert.match(lines[0], /^AGENT\s+ROLE\s+STATE\s+STATUS\s+ASSIGNMENT\s+BRANCH\s+AGE$/);
+  assert.match(lines[1], /^engineer\s+engineer\s+idle\s+working\s+Build it\s+crew\/\S+\s+42m$/);
   assert.match(text, /Open handoffs: 1\n  engineer → reviewer: "Review my branch"/);
   assert.match(text, /Could not read: mangled\.md/);
 
@@ -207,4 +207,86 @@ test('the board survives a trail file that lost a field', () => {
   assert.deepEqual(b.rows, []);
   assert.equal(b.unreadable.length, 1);
   assert.match(renderBoard(b, ctx.now()), /Could not read: /);
+});
+
+test('a row carries the trail status next to the live state, so a reported agent is not mistaken for an idle one', () => {
+  const { ctx, eng } = crew();
+  assert.equal(board(ctx).rows[0].status, 'working');
+  report(asAgent(ctx, eng), { text: 'Done.' });
+  const b = board(ctx);
+  assert.equal(b.rows[0].state, 'idle'); // live state still comes from herdr alone
+  assert.equal(b.rows[0].status, 'reported');
+  assert.match(renderBoard(b, ctx.now()).split('\n')[1], /\sidle\s+reported\s/);
+});
+
+test('a released assignment whose worktree was left behind is listed, and releasing it again retries the removal', () => {
+  const { ctx, eng } = crew();
+  const original = ctx.herdr.removeWorktree;
+  ctx.herdr.removeWorktree = (ws) => original(ws, eng.worktree); // the real adapter removes the directory
+  ctx.git.dirty.set(eng.worktree, [' M a.mjs']);
+  const first = release(ctx, { target: eng.id, outcome: 'abandoned' });
+  assert.equal(first.removed, false);
+  ctx.herdr.agents = [];
+
+  const b = board(ctx);
+  assert.deepEqual(b.leftBehind.map((a) => [a.id, a.status, a.worktree]), [[eng.id, 'abandoned', eng.worktree]]);
+  assert.match(renderBoard(b, ctx.now()), new RegExp(`Worktrees left behind: 1\\n  ${eng.id} \\(abandoned; its worktree is still at ${eng.worktree}\\)`));
+
+  // still dirty: nothing is forced, what is left is listed, the outcome is kept
+  const again = release(ctx, { target: eng.id });
+  assert.equal(again.removed, false);
+  assert.deepEqual(again.left, [' M a.mjs']);
+  assert.equal(again.assignment.status, 'abandoned');
+  assert.ok(existsSync(eng.worktree));
+
+  // the operator dealt with the changes: the retry removes it
+  ctx.git.dirty.delete(eng.worktree);
+  const done = release(ctx, { target: eng.id });
+  assert.equal(done.removed, true);
+  assert.equal(done.assignment.status, 'abandoned');
+  assert.equal(readTrail(ctx.mainDir).assignments[0].worktree_removed, true);
+  assert.ok(!existsSync(eng.worktree));
+  assert.deepEqual(board(ctx).leftBehind, []);
+  assert.throws(() => release(ctx, { target: eng.id }), /No open assignment matches/);
+});
+
+test('a closed assignment whose worktree was removed is not on the board and is refused', () => {
+  const { ctx, eng } = crew();
+  release(ctx, { target: eng.id });
+  assert.deepEqual(board(ctx).leftBehind, []);
+  assert.throws(() => release(ctx, { target: eng.id }), /No open assignment matches/);
+});
+
+test('a retried release of a detached copy does not try to save its commits a second time', () => {
+  const { ctx } = crew();
+  ctx.git.refs.add('feature');
+  const rev = seat(ctx, { roleId: 'reviewer', brief: 'Fix it', on: 'feature' });
+  ctx.git.unreachable.add(rev.worktree);
+  ctx.git.dirty.set(rev.worktree, ['?? x']);
+  const first = release(ctx, { target: rev.id });
+  assert.equal(first.rescued, `crew/${rev.id}`);
+  ctx.git.dirty.delete(rev.worktree);
+  const again = release(ctx, { target: rev.id });
+  assert.equal(again.removed, true);
+  assert.equal(again.rescued, `crew/${rev.id}`);
+  assert.equal(readTrail(ctx.mainDir).assignments.find((a) => a.id === rev.id).rescued_branch, `crew/${rev.id}`);
+  assert.equal(ctx.git.calls.filter((c) => c[0] === 'rescueDetached').length, 1);
+});
+
+test('releasing a failed seating says what is true: no worktree existed and no branch was made', () => {
+  const { ctx } = crew();
+  ctx.herdr.failOn = { method: 'createWorktree', message: 'boom' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'x' }));
+  ctx.herdr.failOn = null;
+  const failed = readTrail(ctx.mainDir).assignments.find((a) => a.status === 'failed');
+  const r = release(ctx, { target: failed.id });
+  assert.equal(r.worktreeExisted, false);
+  assert.equal(r.branchKept, false);
+  // an ordinary release does have both
+  const eng = readTrail(ctx.mainDir).assignments.find((a) => a.role === 'engineer');
+  ctx.git.refs.add(eng.branch);
+  const ok = release(ctx, { target: eng.id });
+  assert.equal(ok.worktreeExisted, true);
+  assert.equal(ok.removed, true);
+  assert.equal(ok.branchKept, true);
 });
