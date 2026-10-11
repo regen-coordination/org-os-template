@@ -39,6 +39,14 @@ command says it has not been prompted. Answer the dialog in the agent's pane, th
 npm run crew -- nudge engineer
 ```
 
+**If herdr did not confirm the first prompt** (it timed out or failed after being sent), the
+command says it "may or may not have arrived". Look at the agent's pane: crew never resends,
+and `nudge` refuses. If the agent has not started, type into its pane what the command printed
+(the role file and assignment file paths).
+
+A brief that starts with a dash is read as an option; put `--` before it, after any flags:
+`npm run crew -- seat engineer --task t1 -- "-5 degrees is too cold"`.
+
 ## See what is happening
 
 ```bash

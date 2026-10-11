@@ -99,3 +99,24 @@ test('a worktree root reached through a symlink still refuses a script that live
   assert.equal(r.status, 1);
   assert.match(r.stderr, /assignment file/);
 });
+
+test('report --file with a file that is not there is one plain sentence, not a stack', () => {
+  const r = run(['report', '--file', join(tmpdir(), 'crew-no-such-report.md')]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /^The report file .*crew-no-such-report\.md could not be read: it does not exist\./);
+  assert.doesNotMatch(r.stderr, /\n\s+at |ENOENT/);
+  assert.equal(r.stdout, '');
+});
+
+test('a brief that starts with a dash says to put -- before it, and works with it', () => {
+  const bad = run(['seat', 'engineer', '-5 degrees at noon']);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /starts with a dash/);
+  assert.match(bad.stderr, /seat <role> -- "<brief>"/);
+  // With -- the brief is a positional; refused later for being outside herdr, so parsing got through.
+  const ok = run(['seat', 'engineer', '--', '-5 degrees at noon']);
+  assert.equal(ok.status, 1);
+  assert.match(ok.stderr, /inside herdr/);
+  const h = run(['--help']);
+  assert.match(h.stdout, /starts with a dash/);
+});

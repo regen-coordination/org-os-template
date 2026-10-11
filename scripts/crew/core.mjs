@@ -73,7 +73,20 @@ function firstPrompt(rolePath, file) {
   );
 }
 
-function assignmentBody(ctx, brief) {
+function assignmentBody(ctx, brief, role) {
+  const cmd = (rest) => `node "${ctx.scriptPath}" ${rest}`;
+  // A role that may seat works from its own worktree, where `npm run crew` is
+  // refused, so it runs the main checkout's script by absolute path.
+  const lead = role.may_seat
+    ? [
+        `- See who is seated, open handoffs and what needs attention: \`${cmd('board')}\``,
+        `- Seat an agent: \`${cmd('seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
+        '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
+        `- Send the first prompt to an agent that stopped at a startup dialog: \`${cmd('nudge <agent|assignment>')}\``,
+        `- Close an assignment: \`${cmd('release <agent|assignment> [--outcome done|abandoned]')}\``,
+        `- Decline an open handoff: \`${cmd('handoff-close <id|file> --reason "<text>"')}\``,
+      ]
+    : [];
   return [
     '## Brief',
     '',
@@ -85,6 +98,7 @@ function assignmentBody(ctx, brief) {
     '',
     `- Report when you finish or cannot continue: \`node "${ctx.scriptPath}" report --file <path to your report>\``,
     `- Ask another role to take something on: \`node "${ctx.scriptPath}" handoff <role> "<brief>" [--branch <branch>]\``,
+    ...lead,
     '',
     `Shared boundaries and the charter: ${join(ctx.mainDir, 'roles', 'README.md')}`,
     '',
@@ -162,7 +176,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
       created: isoLocal(now),
       updated: isoLocal(now),
     },
-    assignmentBody(ctx, brief),
+    assignmentBody(ctx, brief, role),
   );
 
   // herdr starts worktree actions from the repository's primary checkout and
@@ -170,6 +184,8 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
   // primary checkout when the main checkout is itself a linked worktree.
   const repoDir = ctx.repoDir ?? ctx.mainDir;
   let step = 'worktree';
+  // true: sent and confirmed. false: never sent. 'unconfirmed': sent, but herdr
+  // did not confirm it, which does not prove it did not arrive.
   let prompted = false;
   try {
     let opened;
@@ -199,7 +215,8 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
         prompted = true;
       } catch {
         // herdr says a failed or timed-out prompt does not prove non-delivery,
-        // so the prompt is never resent here. The operator can nudge.
+        // so the prompt is never resent: not here, and not by nudge.
+        prompted = 'unconfirmed';
       }
     }
   } catch (err) {
@@ -210,13 +227,32 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
   return updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
 }
 
+/** What to tell the operator about a first prompt that may or may not have arrived. */
+function unconfirmedMessage(ctx, a, why) {
+  return (
+    `The first prompt to ${a.agent} may already have arrived: ${why}, and a timeout does not prove it was not delivered. ` +
+    `Look at ${a.agent}'s pane. If it has not started, type there: ` +
+    `Read ${loadRole(ctx.mainDir, a.role).path} (your role) and ${a.file} (your assignment) in full, then begin the work in the brief.`
+  );
+}
+
 export function nudge(ctx, { target }) {
   requireHerdr(ctx);
   const a = findActive(readTrail(ctx.mainDir), target);
+  if (a.prompted === 'unconfirmed') {
+    throw new CrewError(unconfirmedMessage(ctx, a, 'nudge would send it a second time'));
+  }
   if (a.prompted) {
     throw new CrewError(`${a.agent} has already been given its first prompt. Prompt it yourself in its pane if it needs more.`);
   }
-  ctx.herdr.promptAgent(a.agent, firstPrompt(loadRole(ctx.mainDir, a.role).path, a.file));
+  const rolePath = loadRole(ctx.mainDir, a.role).path;
+  try {
+    ctx.herdr.promptAgent(a.agent, firstPrompt(rolePath, a.file));
+  } catch {
+    // Attempted and not confirmed: from here on it is case (b), never resent.
+    updateRecord(a.file, { prompted: 'unconfirmed', updated: stamp(ctx) });
+    throw new CrewError(unconfirmedMessage(ctx, a, 'herdr did not confirm it'));
+  }
   return updateRecord(a.file, { prompted: true, updated: stamp(ctx) });
 }
 
