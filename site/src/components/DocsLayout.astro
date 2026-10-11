@@ -39,6 +39,8 @@ const { prev, next } = neighbours(page.slug);
   <PromptBar slot="prompt" prev={prev ? withBase(`/docs/${prev.slug}`) : undefined} next={next ? withBase(`/docs/${next.slug}`) : undefined} />
 </Layout>
 <script>
+  import { moreTo, HINTS } from "../lib/table-scroll.mjs";
+
   // The contents list starts open so it works without script; on a narrow
   // screen it would push the article down, so close it there.
   const toc = document.querySelector<HTMLDetailsElement>(".docs-toc");
@@ -87,6 +89,35 @@ const { prev, next } = neighbours(page.slug);
     wrap.append(pre, button);
   }
 
+  // A table wider than its column scrolls inside its region (built by
+  // src/lib/table-scroll.mjs, so it works without this script). Here: say so in
+  // words above the table and mark the edge that hides more; and where a table
+  // fits, take it out of the Tab order, since there is nothing to scroll. The
+  // words go above the table: a long table's foot is screens away from its head.
+  for (const region of document.querySelectorAll<HTMLElement>(".doc .table-scroll")) {
+    const name = region.getAttribute("aria-label") ?? "Table";
+    const hint = document.createElement("p");
+    hint.className = "table-hint label";
+    hint.setAttribute("aria-hidden", "true");   // the region's name and role already say it
+    hint.hidden = true;
+    region.before(hint);
+    const update = () => {
+      const more = moreTo(region);
+      const scrolls = region.scrollWidth - region.clientWidth > 1;
+      if (scrolls) {
+        region.setAttribute("role", "region"); region.setAttribute("aria-label", name); region.tabIndex = 0;
+      } else {
+        region.removeAttribute("role"); region.removeAttribute("aria-label"); region.removeAttribute("tabindex");
+      }
+      if (more) region.dataset.more = more; else delete region.dataset.more;
+      hint.hidden = !scrolls;
+      if (more) hint.textContent = HINTS[more];
+    };
+    region.addEventListener("scroll", update, { passive: true });
+    new ResizeObserver(update).observe(region);
+    update();
+  }
+
   // A link mark on each section heading, shown when the heading is touched.
   for (const h of document.querySelectorAll<HTMLElement>(".doc h2[id], .doc h3[id]")) {
     const a = document.createElement("a");
@@ -116,7 +147,14 @@ const { prev, next } = neighbours(page.slug);
 /* A rule above each h2: a long page shows its structure when scrolled fast. */
 .doc :global(h2) { margin-top: var(--space-10); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--color-line); scroll-margin-top: calc(var(--nav-height) + var(--space-4)); }
 .doc :global(h3) { scroll-margin-top: calc(var(--nav-height) + var(--space-4)); }
-.doc :global(table) { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--text-sm); line-height: var(--leading-snug); }
+/* A wide table scrolls in its own region, never the page. The region is focusable and named
+   (src/lib/table-scroll.mjs); the edge that hides more is ruled, and the script adds a line of words. */
+.doc :global(.table-scroll) { overflow-x: auto; border-inline: 2px solid transparent; }
+.doc :global(.table-scroll[data-more="right"]), .doc :global(.table-scroll[data-more="both"]) { border-right-color: var(--color-muted); }
+.doc :global(.table-scroll[data-more="left"]), .doc :global(.table-scroll[data-more="both"]) { border-left-color: var(--color-muted); }
+.doc :global(.table-hint) { text-align: right; color: var(--color-muted); }
+.doc :global(.table-hint + .table-scroll) { margin-top: var(--space-1); }
+.doc :global(table) { border-collapse: collapse; font-size: var(--text-sm); line-height: var(--leading-snug); }
 .doc :global(th), .doc :global(td) { border-bottom: var(--border-hair) solid var(--color-line); padding: var(--space-2) var(--space-3) var(--space-2) 0; text-align: left; vertical-align: top; }
 .doc :global(th) { color: var(--color-ink); font-family: var(--font-mono); font-weight: 500; border-bottom-color: var(--color-line-2); white-space: nowrap; }
 .doc :global(blockquote) { border-left: 2px solid var(--color-line-2); padding-left: var(--space-4); color: var(--color-muted); }

@@ -11,6 +11,7 @@ import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
 import { parseRegistry, publicInstance, isOperational, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
 import { registryGuard, findLeaks, visibleText, instanceLine, RUN_LENGTH } from "./registry-leaks.mjs";
+import { tablesOutsideRegion } from "../src/lib/table-scroll.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
 const DIST = "dist";
@@ -303,6 +304,21 @@ for (const p of PAGES) {
   if (text === "") fail(`EMPTY DOC: docs/${p.slug} — the page has no content (did its markdown fail to render?)`);
   else bodies++;
 }
+// ── 7b. A table scrolls in a region a keyboard can reach ─────────────────
+// A table wider than a phone scrolls sideways. src/lib/table-scroll.mjs wraps
+// every markdown table in a focusable, named region; a table written as raw
+// HTML in a document is not reached by it, and is reported here.
+let tablesSeen = 0;
+for (const p of PAGES) {
+  const file = join(DIST, "docs", p.slug, "index.html");
+  if (!existsSync(file)) continue;   // already reported as MISSING
+  const { tables, outside } = tablesOutsideRegion(readFileSync(file, "utf8"));
+  tablesSeen += tables;
+  if (outside > 0) fail(`TABLE WITHOUT A SCROLL REGION: docs/${p.slug} has ${outside} table(s) outside <div class="table-scroll" role="region" aria-label tabindex="0"> — on a narrow screen a keyboard cannot scroll them. Write the table in markdown in ${p.source}, or wrap it by hand.`);
+}
+if (tablesSeen === 0) fail("table check: no table found in any doc — the pattern stopped matching");
+else console.log(`tables: ${tablesSeen} in the docs, each in a focusable, named scroll region`);
+
 if (PAGES.length === 0) fail("doc body check: the manifest has no pages");
 else console.log(bodies === PAGES.length ? `doc bodies: ${bodies} docs have content` : `doc bodies: ${PAGES.length - bodies} problem(s)`);
 

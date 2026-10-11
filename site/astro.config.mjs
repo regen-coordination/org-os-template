@@ -4,6 +4,7 @@ import { PAGES } from "./src/data/docs-manifest.mjs";
 import { REPO_ROOT, REPO_URL, SOURCE_REF, listRepoFiles } from "./src/lib/repo.mjs";
 import remarkDocLinks from "./src/lib/remark-doc-links.mjs";
 import remarkStripTitle from "./src/lib/remark-strip-title.mjs";
+import rehypeTableScroll from "./src/lib/table-scroll.mjs";
 
 export default defineConfig({
   // Deployed as a GitHub Pages *project* page, so the site lives under a
@@ -23,6 +24,8 @@ export default defineConfig({
         repoUrl: REPO_URL, ref: SOURCE_REF, listFiles: listRepoFiles,
       }],
     ],
+    // A table wider than its column scrolls in a region that can be focused and is named.
+    rehypePlugins: [rehypeTableScroll],
   },
   vite: { server: { fs: { allow: [".."] } } },  // dev server may import ../packages/*
 });
