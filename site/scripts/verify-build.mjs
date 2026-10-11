@@ -10,7 +10,7 @@ import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
 import { parseRegistry, publicInstance, isOperational, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
-import { privateTexts, findLeaks, visibleText, instanceLine } from "./registry-leaks.mjs";
+import { registryGuard, findLeaks, visibleText, instanceLine, RUN_LENGTH } from "./registry-leaks.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
 
 const DIST = "dist";
@@ -124,8 +124,9 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
   if (!visibleText(home).includes(OPERATIONAL_DEFINITION)) fail("REGISTRY: the home page shows an instance count without the definition of what it counts (OPERATIONAL_DEFINITION).");
   else if (counts.length > 0) console.log(`home page: counts ${operational} operational instance(s) of ${registry.length} registered, with the definition`);
 
-  // 3e. No private sentence anywhere in the build.
-  const texts = privateTexts(registry);
+  // 3e. Nothing private anywhere in the build: no sentence of the registry's free
+  // text, no excerpt of it (a run of RUN_LENGTH letters), no drift flag, no local path.
+  const guard = registryGuard(registry);
   const TEXT_FILE = /\.(html|json|txt|xml|js|mjs|css|svg|webmanifest|md)$/;
   const textFiles = [];
   (function walk(dir) {
@@ -135,29 +136,21 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
       else if (TEXT_FILE.test(name)) textFiles.push(full);
     }
   })(DIST);
-  if (texts.length === 0) fail("REGISTRY: found no private text in data/instances.yaml to look for; the check would pass on anything.");
-  // A framework document that quotes the registry in its own text. The site follows
-  // the documents and does not rewrite them (commons-steward's), so each quotation is
-  // named here, printed on every build, and fails once it no longer matches.
-  const QUOTED_BY_A_DOCUMENT = [
-    { file: join(DIST, "docs/ecosystem/index.html"), text: "DAO-module development platform, not an operational instance",
-      source: "docs/ECOSYSTEM.md, which cites the registry's description of dao-os" },
-  ];
-  const used = new Set();
+  const looked = guard.sentences.length + guard.passages.length + guard.tokens.length;
+  if (looked === 0) fail("REGISTRY: found nothing private in data/instances.yaml to look for; the check would pass on anything.");
+  const WHAT = {
+    sentence: "a sentence",
+    passage: `an excerpt (${RUN_LENGTH} or more letters in a row)`,
+    token: "a value (a flag or a local path)",
+  };
   let leaked = 0;
   for (const file of textFiles) {
-    for (const text of findLeaks(readFileSync(file, "utf8"), texts)) {
-      const quoted = QUOTED_BY_A_DOCUMENT.find((q) => q.file === file && q.text === text);
-      if (quoted) { used.add(quoted); continue; }
+    for (const leak of findLeaks(readFileSync(file, "utf8"), guard)) {
       leaked++;
-      fail(`REGISTRY: ${file} contains text from a registry field outside the agreed list (${PUBLIC_FIELDS.join(", ")}): "${text}". Remove it from the page; data/instances.yaml is not public text.`);
+      fail(`REGISTRY: ${file} contains ${WHAT[leak.kind]} from a registry field outside the agreed list (${PUBLIC_FIELDS.join(", ")}): "${leak.text}". Remove it from the page; data/instances.yaml is not public text. If a framework document says it, the document is to change (commons-steward), not this check.`);
     }
   }
-  for (const q of QUOTED_BY_A_DOCUMENT) {
-    if (used.has(q)) console.log(`registry check: 1 sentence allowed in ${q.file} — quoted by ${q.source}`);
-    else fail(`REGISTRY: the allowed quotation "${q.text}" is no longer in ${q.file}. Remove it from QUOTED_BY_A_DOCUMENT in scripts/verify-build.mjs.`);
-  }
-  if (texts.length > 0 && leaked === 0) console.log(`registry check: ${texts.length} private sentences from data/instances.yaml looked for in ${textFiles.length} built files, none found elsewhere`);
+  if (looked > 0 && leaked === 0) console.log(`registry check: ${guard.sentences.length} private sentences, ${guard.passages.length} notes (any ${RUN_LENGTH} letters in a row of one) and ${guard.tokens.length} flags and local paths from data/instances.yaml looked for in ${textFiles.length} built files, as written and with markup removed: none found`);
 }
 
 // ── 4. Links, on every built page (checks 4 and 6) ────────────────────────

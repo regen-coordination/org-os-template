@@ -35,13 +35,36 @@ on any link that skips (or doubles) the prefix.
 - **Docs** are published from one manifest, `src/data/docs-manifest.mjs`: each entry names a markdown file anywhere in the repository, its address, title, section, order, summary and the commit it was checked against. Nothing is copied into `site/`. A file that is not in the manifest is not on the site.
 - **Links between docs** are written as file links (`[x](FEDERATION.md)`), as the repository needs. `src/lib/remark-doc-links.mjs` turns a link to a published page into its site address and a link to any other repo file into its GitHub address at the commit being built. A link that resolves to nothing fails the build.
 - **Search** is Pagefind: `npm run build` indexes `dist/` after Astro builds it, and the index loads when the viewer first opens search. It does not exist under `npm run dev`, where Search falls back to the docs index — use `npm run build && npm run preview` to try it.
-- **Federation**: `scripts/aggregate-federation.mjs` reads `../data/instances.yaml` and writes `src/data/federation.json` (gitignored, regenerated each build) with three fields per instance — name, type, repository (`PUBLIC_FIELDS` in `scripts/federation-aggregate.mjs`) — and two counts: registered, and operational (maturity `production`). The registry's other fields, its `notes` above all, are the maintainer's working record and are not published: the build fails if a sentence from one is found in any built file. The same script writes `map.json` from `packages/org-os-kms` (`buildMap`), dropping the `live: false` flag of nodes whose checkout was not present, and copies org-os's own `.well-known/*.json` into `public/.well-known/`.
+- **Federation**: `scripts/aggregate-federation.mjs` reads `../data/instances.yaml` and writes `src/data/federation.json` (gitignored, regenerated each build) with three fields per instance — name, type, repository (`PUBLIC_FIELDS` in `scripts/federation-aggregate.mjs`) — and two counts: registered, and operational (maturity `production`). The registry's other fields, its `notes` above all, are the maintainer's working record and are not published; see "The registry guard" below. The same script writes `map.json` from `packages/org-os-kms` (`buildMap`), dropping the `live: false` flag of nodes whose checkout was not present, and copies org-os's own `.well-known/*.json` into `public/.well-known/`.
 - **Themes**: light and dark, both loaded (`src/styles/theme.css`); `<html data-theme>` chooses, set before first paint by `src/lib/theme-boot.mjs` from the viewer's saved choice or the system setting. Palette/fonts/radius live in `src/styles/themes/`; structural tokens in `tokens.css`. `test/theme-contrast.test.mjs` holds both to WCAG AA.
 - **Design**: flat and tight — one short type scale and one spacing scale in `src/styles/tokens.css`, hairlines, one shadow (the search dialog). `test/design-tight.test.mjs` fails on a raw `font-size`, a spacing step above 64px, a stray shadow, or decoration that was cut; it also holds the home page's first screen to its lengths and each command on it to the repository. Spec: `../docs/superpowers/specs/2026-10-11-site-tight-design.md`.
 - **Feedback** is a link to a prefilled GitHub issue under the `docs-feedback` label (`src/lib/feedback.mjs`). No backend, no script.
 - **Graph**: the federation network on `/` and `/federation` is the `<federation-map>` web component.
 - **Machine layer**: `/llms.txt` (generated from the manifest), `/federation.json`, and the surfaced `/.well-known/` EIP-4824 schemas.
-- **Build checks**: `scripts/verify-build.mjs` fails the build on an invalid manifest, a page that did not build, a broken or unprefixed internal link on any page, a relative link left in the output, a redirect that does not land, or registry text outside the public fields in any built file.
+- **Build checks**: `scripts/verify-build.mjs` fails the build on an invalid manifest, a page that did not build, a broken or unprefixed internal link on any page, a relative link left in the output, a redirect that does not land, or registry text outside the public fields in any built file (next section).
+
+## The registry guard
+
+`scripts/verify-build.mjs` (step 3e) reads every text file in `dist/` and fails the build when it finds something from a field of `data/instances.yaml` that is not in `PUBLIC_FIELDS`. The rules are in `scripts/registry-leaks.mjs` and held by `test/registry-leaks.test.mjs`.
+
+What it looks for:
+
+- **A sentence** of a field's free text, whole (16 characters or more), whatever its case.
+- **An excerpt**: any 40 letters and digits in a row of a note (`RUN_LENGTH`), whatever stands between them. This is what a note cut short for a card or a description leaves. Spaces, punctuation and case are ignored.
+- **A flag or a local path**: a one-word value of 8 characters or more with a `_` or a `/` in it. Today these are the `drift` flags (`no_masterplan`) and the `local_path` values (`../refi-bcn-os`).
+
+Each file is read twice, as written and with its markup removed, so text held in an attribute and text with tags between its words are both seen. HTML entities and the escapes of scripts and JSON (`\uXXXX`, `\xNN`, `\n`, `\"`) are decoded first; curly quotes and long dashes count as the plain ones.
+
+What it does not look for, and why:
+
+- **One-word values that are ordinary words**: `maturity` (`production`), `federation_role` (`hub`), `federation_network`, and the names in `packages`, `skills_extra`, `data_registries_extra` and `agent_runtime`. The framework's documents use these words on their own account, so finding one on a page proves nothing.
+- **Dates, versions and booleans**: `last_sync`, `framework_version`, `masterplan_version`, `cloned`. A date on a page is anyone's date.
+- **An excerpt shorter than 40 letters** that is not a whole sentence. The length cannot be much lower while the documents describe the same instances: `docs/ECOSYSTEM.md` shares runs of 39 and 32 letters with two notes (measured 2026-10-11).
+- **A paraphrase**, and text in a file that is not text (the search index's compressed fragments, which are built from the pages that are read).
+
+For these the guard is the shape of what is printed, not the words: `federation.json` may carry only the public fields (step 3a), and each instance's line on the federation page may be only its name, type and link (step 3b).
+
+There is no list of exceptions. When a framework document quotes the registry, the document changes.
 
 ## Pages
 
