@@ -12,10 +12,12 @@ worktree: >-
 task: null
 handoff: null
 seated_by: 2026-10-10-lead-first-crew-cycle-clear-the-deferred-mino
-status: working
+status: released
 prompted: true
 created: '2026-10-11T00:42:19-03:00'
-updated: '2026-10-11T00:42:25-03:00'
+updated: '2026-10-11T01:51:40-03:00'
+worktree_removed: true
+rescued_branch: null
 ---
 ## Brief
 
@@ -54,3 +56,144 @@ Run these exactly as written. They are the only things you do outside your workt
   A brief that starts with a dash goes after `--`, after any flags: `handoff <role> [--branch <branch>] -- "<brief>"`.
 
 Shared boundaries, the charter and the "Before you begin" section to read first: /Users/luizfernando/.cache/lf-worktrees/org-os-crew/roles/README.md
+
+## Report — 2026-10-11T01:05:28-03:00
+
+Branch `crew/2026-10-11-engineer-seat-agents-as-their-role-readable-title`, from feat/crew at fa61f54. Four commits, parts apart, nothing pushed or merged:
+
+- `bb8ea43` Part A — titles
+- `b399891` Part B — identity (code and tests)
+- `d147158` Part B — docs, and the reversal of spec 4.1
+- `fbbcb37` Part C — command-line tests
+
+## What proves it
+
+```
+node --test "tests/scripts/crew-*.test.mjs"                                 tests 201, pass 201, fail 0 (172 on fa61f54)
+node --test tests/scripts/module-manifests.test.mjs tests/clone-genesis.test.mjs   tests 25, pass 25, fail 0
+npm run version:check            ✓ All version sources agree.
+npm run clone:manifest -- --check   ✓ clone manifest current (255 paths)
+```
+
+The mutation check for Part C: with `scripts/crew.mjs` printing the seat notes in reverse, the new
+command-line test fails; restored, it passes.
+
+## The exact start arguments (the stub `herdr` received them, `tests/scripts/crew-cli-seat.test.mjs`)
+
+For a `claude` role `thinker` with `model: claude-opus-5-5`, `effort: high`, seated with `--title "Cursor contract"`:
+
+```
+agent start thinker --kind claude --pane w1:p1 -- \
+  --model claude-opus-5-5 --effort high \
+  --name "thinker: Cursor contract" \
+  --append-system-prompt-file <worktree root>/<repo>/.identity/<assignment-id>.md
+```
+
+## Per item
+
+**A1 `--title`.** `seat` takes `--title`, trimmed, whitespace collapsed; more than 24 characters is
+refused before anything is written ("The title "…" is 25 characters and the limit is 24. Say what the
+agent works on in fewer words."). Without it: the brief's first line cut at a word boundary, and a
+first word longer than the limit is cut hard with `…`. Stored as `title` on the record. Tests:
+crew-seat (24 accepted, 25 refused and nothing written, trimmed, derived, hard cut, from a handoff
+brief).
+**A2 label and board.** The label's `assignment` token is the title; for a record with no title,
+`report` cuts one from its brief. The board row carries `title` (null for old records) and
+ASSIGNMENT shows it, else the brief's first line. Tests: crew-label, crew-board (old record
+renders). The spec's section 8 example is regenerated with a titled row, a titled row on a second
+engineer and an old record, and is still tested character for character.
+**A3 names.** First agent keeps the role id; a further one is `<role>-<slug of title>` cut to 32
+characters with a trailing dash dropped; `<role>-2` only when taken or the slug is empty. `release`,
+`nudge` and the board match the record's `agent` field, so both forms work (test in crew-seat).
+**A4 `--name`.** `--name "<role>: <title>"` for `claude` only (NAME_ARGS, a table like the model and
+effort ones).
+**A5 docs.** CREW.md (seat section, names, sidebar table, smoke label check), the spec (5 step 5
+and 8, 5.3 item 13, board example), the skill (table row and "Writing a brief" says to give a
+title), the lead's commands in the assignment file (`seat <role> "<brief>" --title …`), the usage
+text. At the default width: the binary has `sidebar_width = 26`, so a 24-character title is one
+whole row with two columns spare. That it renders on one row is from the width and the rule, not
+seen in a live sidebar; CREW.md says so.
+**B6 identity.** `composeIdentity` (core.mjs): two lines saying which seat (role, agent name,
+assignment id, assignment file path, role file path), the role file's body, then the three
+README sections by their `##` headings. Written by the new `scripts/crew/identity.mjs` (adapter,
+wired in `scripts/crew.mjs` as `ctx.identity`) to `<worktree root>/<repo>/.identity/<id>.md`:
+outside the worktree, not in memory/crew/, so readTrail never sees it (tested). Removed by
+`release`, also on a retry; a removal that fails is one line and does not undo the release. A
+failure to write it fails the seat at step `identity` before the worktree is made: the record says
+why, nothing exists to clean up, `release` closes it (tested). Real roles compose to about 7,500
+characters each with no missing section. I used `--append-system-prompt-file`, not the inline
+form, because arguments travel through `herdr agent start … -- <args>` and 7,500 characters is too
+long to quote.
+**B7 other kinds.** Unchanged: no file, no argument (tested with a `codex` role); the first prompt
+still names the role file, the assignment file and the reading list for every kind; it begins
+"You are the <role file's heading> of the org-os crew" (heading lower-cased only when it is a
+capitalised word: "commons steward").
+**B8 reports.** `## Report — <role> — <time>`, or `## Report — <role> (<agent>) — <time>` when the
+name differs. An old report without it is read and a new one appended after it (tested).
+**B9 spec.** Section 4.1 records the reversal with its reasons, section 5 steps 5 and 6, 5.3 item
+14 (the flag checks), section 6 (report heading), section 10 (identity failure row). CREW.md,
+the skill and the CHANGELOG say it.
+**B10 live flag checks.** Two calls, `claude -p --model haiku`, run from a scratch directory
+outside the repository (a third was not needed; my first attempt used `timeout`, which this
+machine lacks, and made no call):
+1. `--append-system-prompt-file seat.txt "Which seat are you? Answer in five words."` → `I am the test seat.`
+2. the same with `--name "engineer: Fix a thing"` added → `I am the test seat.`
+So the file form exists (it is not on its own line in `claude --help`, which only names
+`--append-system-prompt[-file]` under `--bare`) and its text reaches the model, and `--name` is
+accepted. I also read herdr 0.9.1's binary strings, read-only: it has the error
+`invalid_agent_argument` "agent arguments cannot be encoded safely for the target shell", so an
+argument with spaces is encoded or refused, not split.
+**C.** `tests/scripts/crew-cli-seat.test.mjs`: the real `scripts/crew.mjs` and adapters from a
+throwaway checkout with its own git repository, against a stand-in `herdr` that makes real git
+worktrees. `seat` prints the effort note first and the label note after; `report` prints its label
+note; start arguments as above; release removes the identity file. This test passes on fa61f54's
+code too: it covers behaviour that had no command-line test, so it cannot fail on the old code.
+The mutation above shows it can fail.
+
+## Which tests fail on fa61f54
+
+Items A1–A4, B6–B8 each have one that fails there (new arguments, names, labels, record fields,
+prompt, heading). Items A5 (CREW.md rows, CHANGELOG) and B9 (spec prose) are documents: the board
+example and the skill's `--title` line are tested; the rest cannot be, and I read them against the
+code. B10 is a procedure, not code.
+
+## Why the problem existed
+
+The first design handed the role over as a path "never through a flag specific to one kind" and
+named agents only by role id plus a number, with the label cut mechanically from the brief. Per-kind
+arguments already existed for model and effort, so that portability rule was already spent, and a
+brief's first 32 characters is not a name.
+
+## Design notes (where the code showed a decision wrong or open)
+
+- The brief lists "Before you begin" inside the role body's sections; the shipped role files do
+  not have one, it lives in `roles/README.md`. I carry the three README sections the brief names
+  and not "Before you begin": the first prompt still sends the agent there. Say if you want it in
+  the system prompt too (the lead's decision).
+- `readTrail` only reads top-level `.md` files, so a subdirectory of memory/crew/ would also have
+  been safe, but the operator commits memory/crew/ and these are per-session files: that is why they
+  sit beside the worktrees.
+- A `--title` that is whitespace only is treated as absent, not refused.
+- A resumed session (`claude --resume`) needs the flags again; crew does not restart agents.
+
+## Onboarding files read
+
+MASTERPLAN.md, SOUL.md, MEMORY.md, DECISIONS.md (newest entry and the matches for "crew"/"herdr"): all present.
+
+## Still unverified
+
+- Where `--name` shows in an interactive session (the help says prompt box, /resume picker and
+  terminal title); no interactive session was run, by instruction.
+- That herdr 0.9.1 starts claude and detects it as before with the extra arguments (the stub
+  receives them; the real `agent start` was not run).
+- A 24-character title on one row in a live sidebar, and what a `$role` row shows for a pane with no
+  value (already listed in CREW.md).
+- That `--append-system-prompt-file` content, 7,500 characters, behaves in an interactive session
+  as in `-p`.
+
+## What I would do differently
+
+Check how the CLI-level seat test would be built before writing the unit tests: the stand-in herdr
+that makes real worktrees would have caught the same things sooner than the fake adapter did.
+
+Hand-off to `reviewer` follows, naming this branch.
