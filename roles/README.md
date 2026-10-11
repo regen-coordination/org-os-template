@@ -29,6 +29,21 @@ Frontmatter is read by the launcher; the body is read by the agent.
 | `may_seat` | Whether an agent in this role may seat other roles.                                  |
 | `skills`   | Optional. Skills the role is expected to use.                                        |
 
+The body has these sections, in this order. `tests/scripts/crew-shipped-roles.test.mjs` checks
+that the shipped roles have Mandate, Boundaries and Done means.
+
+| Section         | What it holds                                                                        |
+| --------------- | ------------------------------------------------------------------------------------ |
+| `# <Name>`      | The first heading names the seat: the first prompt reads "You are the <name> of …".  |
+| `## Mandate`    | What the seat is for, and the lenses it judges its work through.                     |
+| `## Voice`      | Who the seat is, how it speaks, how it signs its work, and the one question it asks. |
+| `## Boundaries` | What it must not do, beyond the shared boundaries below.                             |
+| `## Done means` | What it leaves behind before it reports.                                             |
+
+`## Voice` is four to six lines, in the second person. A role may add sections of its own, such
+as "Before you begin" or "Install and check". A `claude` agent carries the whole body as its
+system prompt, so write each section as what the agent is, not as a document it reads once.
+
 To change a role in your instance, edit its file. To add one, add a file.
 
 ## Before you begin

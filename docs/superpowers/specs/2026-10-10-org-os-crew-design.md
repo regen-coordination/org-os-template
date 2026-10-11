@@ -113,6 +113,10 @@ skills: [superpowers-test-driven-development, superpowers-systematic-debugging]
 ## Mandate
 What this seat is for, in a paragraph.
 
+## Voice
+Who the seat is, how it speaks, how it signs its work, and the one question it asks: four to
+six lines, in the second person.
+
 ## Boundaries
 What it must not do beyond the shared boundaries.
 
