@@ -32,9 +32,9 @@ they may not exist yet.
       omits `may_remain`, `--base ""` is quietly taken as `main`, and the ambiguity message
       "More than one closed assignment … still has a worktree" also lists records whose worktree
       is already gone (`unfinishedRemoval`, `scripts/crew/core.mjs`). Same file in `memory/crew/`.
-- [ ] **Run the five experiments against a live herdr** listed under "Experiments that settle what
+- [ ] **Run the six experiments against a live herdr** listed under "Experiments that settle what
       is still unverified" in `docs/CREW.md`. Nobody has run them; the spec's section 5.3 lists
-      the same five as unverified. Operator's to run, with a throwaway pane.
+      the same six as unverified. Operator's to run, with a throwaway pane.
 - [ ] **Proposals from the first presentation round, not yet decided:** run the smoke run in
       `docs/CREW.md` after each merged branch that touches herdr (engineer's presentation); give
       reviewers a read-only herdr session or a recorded transcript of `agent start` failures

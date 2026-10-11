@@ -550,8 +550,11 @@ test('the Syncthing line says what Syncthing is and what the file is, without th
   assert.doesNotMatch(line, /trail/);
 });
 
-test('the board example in spec section 8 is exactly what renderBoard prints', () => {
-  const spec = readFileSync(join(import.meta.dirname, '..', '..', 'docs', 'superpowers', 'specs', '2026-10-10-org-os-crew-design.md'), 'utf-8');
+// The spec is the framework repository's: a new instance receives this test and not the spec.
+const specPath = join(import.meta.dirname, '..', '..', 'docs', 'superpowers', 'specs', '2026-10-10-org-os-crew-design.md');
+
+test('the board example in spec section 8 is exactly what renderBoard prints (skipped where the spec is absent, as in an instance)', { skip: !existsSync(specPath) && 'the crew design spec is not in this tree' }, () => {
+  const spec = readFileSync(specPath, 'utf-8');
   const section = spec.slice(spec.indexOf('## 8. The board'));
   const example = section.match(/```\n(AGENT[\s\S]*?)```/)[1];
   const now = new Date('2026-10-10T12:00:00Z');

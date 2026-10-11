@@ -131,7 +131,8 @@ Nothing shows until you ask herdr to. herdr's own config file is yours and crew 
 ```toml
 [ui.sidebar.agents]
 rows = [
-  ["state_icon", "workspace", "tab"],
+  ["state_icon", "machine", "workspace", "tab"],
+  ["agent"],
   ["$role", "$status"],
   ["$assignment"],
 ]
@@ -139,14 +140,19 @@ rows = [
 [ui.sidebar.spaces]
 rows = [
   ["state_icon", "workspace"],
-  ["$role", "$assignment"],
   ["branch", "git_status"],
+  ["$role", "$assignment"],
 ]
 ```
 
-Those are herdr's default rows with the label lines added; adjust them to taste. A `$name` row
-shows only on agents and workspaces that have the value, so your own agents are unchanged. Check
-the file with `herdr config check`.
+The first rows of each block are herdr's own defaults at v0.9.1, read from its configuration
+reference (`ui.sidebar.agents.rows` and `ui.sidebar.spaces.rows`); the lines after them are the
+label rows crew adds. Adjust them to taste. If you already have your own `rows`, add the `$` rows
+to yours instead of pasting this. Check the file with `herdr config check`.
+
+**Not confirmed:** herdr's reference documents `$name` tokens and does not say what a `$name` row
+shows for an agent or workspace that has no such value. The expectation is that it is left out,
+so your own agents are unchanged; look at the sidebar once and see.
 
 - A label is display only. If herdr refuses it, `seat` still seats the agent and says on one
   line that the label could not be set; the board and the assignment file are unaffected.
@@ -254,3 +260,8 @@ herdr's state, so they are yours to run once, with a throwaway pane. Note the ou
    checkout directory and branch may exist.
 5. **Which code does `herdr agent get <pane>` give for a pane with no agent?** Crew reads no code
    from it; it matches by listing.
+6. **Does herdr accept and show the label tokens?** Run the **Label check** in the smoke run
+   above with the sidebar rows from "See the crew in herdr's sidebar". Settles whether the
+   installed binary accepts `role`, `assignment` and `status`, shows them, and whether
+   `herdr agent get <name>` returns them. Then restart herdr and see whether they survive: crew
+   does not set them again.
