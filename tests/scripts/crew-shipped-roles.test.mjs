@@ -70,8 +70,12 @@ test('every report must name the onboarding files read', () => {
   assert.match(text, /Report before you stop\.\*\*[^]*?onboarding files/);
 });
 
+// The website and platform seats are the framework repository's: a new instance does not
+// receive their files (scripts/lib/clone-excludes.mjs), yet it does receive this test.
+const frameworkSeats = ['website', 'platform'].filter((id) => existsSync(join(rootDir, 'roles', `${id}.md`)));
+
 test('the lead, website and platform roles run on Opus 5.5 at high effort', () => {
-  for (const id of ['lead', 'website', 'platform']) {
+  for (const id of ['lead', ...frameworkSeats]) {
     const role = loadRole(rootDir, id);
     assert.equal(role.model, 'claude-opus-5-5', `roles/${id}.md model`);
     assert.equal(role.effort, 'high', `roles/${id}.md effort`);
@@ -80,7 +84,7 @@ test('the lead, website and platform roles run on Opus 5.5 at high effort', () =
 });
 
 test('the website and platform roles sit in engineering, may not seat, and name what to read first', () => {
-  for (const id of ['website', 'platform']) {
+  for (const id of frameworkSeats) {
     const role = loadRole(rootDir, id);
     assert.equal(role.circle, 'engineering');
     assert.equal(role.may_seat, false);
@@ -92,7 +96,7 @@ test('the website and platform roles sit in engineering, may not seat, and name 
   }
 });
 
-test('the specs and plans the platform role names exist in this tree', () => {
+test('the specs and plans the platform role names exist in this tree', { skip: !frameworkSeats.includes('platform') }, () => {
   const text = readFileSync(join(rootDir, 'roles', 'platform.md'), 'utf-8');
   const files = [...text.matchAll(/`((?:docs|packages)\/[A-Za-z0-9_.\/-]+\.md)`/g)].map((m) => m[1]);
   assert.ok(files.length >= 3, `names ${files.length} files`);
