@@ -4,8 +4,19 @@ The org-os framework website + docs + live federation — one static Astro site.
 
 ## Run
 
+The site needs three installs, in this order (the order CI runs them). Each
+installs from its lockfile; `--ignore-scripts` may be added to any of them.
+
 ```bash
-npm install        # one-time
+(cd .. && npm ci)                                   # the repository root: packages/org-os-kms loads js-yaml from here
+(cd ../packages/org-os-federation-map && npm ci)    # d3-force, for the <federation-map> element
+npm ci                                              # the site itself
+```
+
+With one missing, `npm run build` and `npm run dev` stop with a sentence naming
+it and the command that fixes it (`scripts/installs.mjs`).
+
+```bash
 npm run dev        # aggregates federation.json, then http://localhost:4321/org-os-template/
 npm run build      # aggregate → astro build → pagefind → verify  (static site → dist/)
 npm test           # unit tests (manifest, links, themes, search, feedback, federation, modules)

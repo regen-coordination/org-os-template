@@ -3,12 +3,21 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { aggregate } from "./federation-aggregate.mjs";
-import { buildMap } from "../../packages/org-os-kms/src/map.mjs";
+import { missingInstalls, installMessage } from "./installs.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));   // org-os/site/scripts
 const siteRoot = resolve(scriptDir, "..");                   // org-os/site
 const orgOsRoot = resolve(siteRoot, "..");                   // org-os
+
+// Everything below needs the three installs. Check them first and say which is
+// missing; the imports that need them are dynamic so this runs before they can fail.
+const missing = missingInstalls(orgOsRoot);
+if (missing.length > 0) {
+  console.error(installMessage(missing, orgOsRoot));
+  process.exit(1);
+}
+const { aggregate } = await import("./federation-aggregate.mjs");
+const { buildMap } = await import("../../packages/org-os-kms/src/map.mjs");
 
 const registryPath = join(orgOsRoot, "data", "instances.yaml");
 if (!existsSync(registryPath)) {
