@@ -90,8 +90,8 @@ on the board.
 ## Releasing
 
 Release when the agent has reported and the operator has what they need. The branch is always
-kept; merging is the operator's. The worktree is removed only when it has no uncommitted changes.
-If it is left behind, the command lists what is in it: show that list to the operator and stop.
+kept; merging is the operator's. The worktree is removed only when nothing in it would be lost:
+modified, untracked and git-ignored files all keep it. If it is left behind, the command lists what is in it: show that list to the operator and stop.
 Do not remove the worktree yourself; once the operator has dealt with it, release again. If the
 list says herdr did not answer, nothing was wrong with the worktree: wait and release again. If
 herdr had finished meanwhile, that release says the worktree was already removed and closes the
