@@ -25,7 +25,7 @@ Frontmatter is read by the launcher; the body is read by the agent.
 | `circle`   | An id from `circles.yaml`.                                                           |
 | `kind`     | A herdr agent kind (`claude`, `codex`, `opencode`, …).                               |
 | `model`    | Optional. Passed to the agent when its kind accepts a model argument.                |
-| `effort`   | Optional. `low`, `medium`, `high`, `xhigh` or `max`. Passed to `claude` agents only.  |
+| `effort`   | Optional. `low`, `medium`, `high`, `xhigh` or `max`. Passed to `claude` agents only. |
 | `may_seat` | Whether an agent in this role may seat other roles.                                  |
 | `skills`   | Optional. Skills the role is expected to use.                                        |
 
