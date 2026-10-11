@@ -9,33 +9,39 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 This section describes work that exists only on the `feat/crew` branch. It sits above
 `[Unreleased]` on purpose: `npm run version:update 0.5.1` must not promote it into 0.5.1. Whoever
 merges `feat/crew` into `main` folds it into the section of the release that carries it and
-deletes this heading.
+deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" are also in
+`MEMORY.md` (Active Context), `HEARTBEAT.md` (Crew) and the spec's Status line
+(`docs/superpowers/specs/2026-10-10-org-os-crew-design.md`); remove them there in the same merge.
 
 - **Crew — role-based agents in herdr** (`npm run crew`, module `org-os-crew`). Roles are files
   under `roles/`; an agent is a session seated in a role in a herdr pane, in its own git
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
   Guide: `docs/CREW.md`.
   What an operator should know:
-  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once, so the whole
-    crew (a lead and the five shipped roles) can stay seated. This is the default every new
-    instance receives; an instance changes it by editing that file. (The launcher's own fallback
-    of 4 applies only to a file with no `max_agents` line.)
+  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once. The five
+    shipped roles (the lead among them) take five seats, and the sixth allows a second agent in
+    one role, for example a reviewer while an engineer is still seated. This is the default every
+    new instance receives. Each seated agent is a full model session on the operator's own plan,
+    so an instance on a small plan lowers the number by editing `max_agents` in that file. (The
+    launcher's own fallback of 4 applies only to a file with no `max_agents` line.)
   - Every seat starts by reading its role file, its assignment file and the "Before you begin"
     list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md`; `lead` also
     reads `HEARTBEAT.md` and `AGENTS.md`), and reports which it read and which were absent. The
     list is there so an agent does not break a boundary a document states. Edit the list in
     `roles/README.md` to change it for your instance.
   - The board has a `STATUS` column (what the assignment's file says) beside `STATE` (what herdr
-    sees now). A `STATUS` that ends in "first prompt not sent" or "first prompt unconfirmed" marks
-    an agent that may never have been told its task. The board also lists "Worktrees left
+    sees now). A `STATUS` that reads `working (first prompt not sent)` or
+    `working (first prompt unconfirmed)` marks an agent that may never have been told its task. The board also lists "Worktrees left
     behind", for released assignments whose worktree was kept, and "Sync conflict copies"
     (below).
   - `release` says only what is true: whether the branch was kept or never created, and whether
     the worktree was removed or left, and what held it back. Run it again on the same assignment
     after you have dealt with that; a retry never forces removal and refuses an `--outcome` that
     differs from the recorded one. If herdr did not answer while release asked it about the
-    worktree, the worktree is left, because herdr may still be removing it; run `release` again
-    and, if herdr had finished, it says the worktree was already removed and closes the record.
+    worktree, or to remove it, the worktree is left and the message says which. After the removal
+    request herdr may still be removing it; after the question nothing was removed. Run `release`
+    again and, if herdr had finished, it says the worktree was already removed and closes the
+    record.
   - A new pane may not have reached its shell when `seat` starts the agent, and herdr then refuses
     with `agent_pane_busy`. `seat` looks at the pane each time it is refused and waits, for up to
     30 seconds, only while the shell is not yet in the foreground and no agent is there. It stops
@@ -64,6 +70,14 @@ deletes this heading.
     saves them as a branch `crew/<assignment-id>` and says so. An earlier saved branch is never
     moved: commits made since go to `crew/<assignment-id>-2`, then `-3`. An ordinary assignment
     commits to its own branch and has nothing to save.
+  - An existing instance does not receive the crew by `doctor sync`: its overlay writes only
+    `scripts/` and `templates/` (`FRAMEWORK_OWNED` in `packages/instance-doctor/src/overlay.mjs`),
+    so `scripts/crew.mjs` and `scripts/crew/` arrive and `roles/`, `docs/CREW.md` and
+    `skills/crew/` do not, and `package.json` is the instance's own. `npm run sync:upstream` is a
+    `git pull --rebase` and carries every file from `main`, but conflicts on files the instance
+    edited are the instance's to resolve. To use the crew, copy `roles/`, `docs/CREW.md` and
+    `skills/crew/` from the framework and add `"crew": "node scripts/crew.mjs"` to the `scripts`
+    in `package.json`. Without `roles/`, `crew` stops with "This repository has no crew roles".
   - A brief that starts with a dash needs `--` before it, after any flags:
     `seat <role> -- "<brief>"` and `handoff <role> -- "<brief>"`.
 

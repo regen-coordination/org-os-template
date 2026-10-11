@@ -118,9 +118,11 @@ npm run crew -- seat lead "Goal: … Constraints: … Done when: …"
 ```
 
 The lead may seat other roles and take handoffs. Every other role can only ask, in writing. At
-most six crew agents are seated at once, so a lead and the five shipped roles can all stay seated.
-The number is `max_agents` in `roles/circles.yaml`; change it there. (The launcher assumes 4 only
-when that file has no `max_agents` line.)
+most six crew agents are seated at once. The five shipped roles (the lead among them) take five
+seats; the sixth allows a second agent in one role, for example a reviewer while an engineer is
+still seated. Each seated agent is a full model session on your own plan, so on a small plan
+lower the number. It is `max_agents` in `roles/circles.yaml`; change it there. (The launcher
+assumes 4 only when that file has no `max_agents` line.)
 
 ## Release
 
@@ -145,9 +147,9 @@ under `crew/<assignment-id>-2` and so on; a branch saved by an earlier release i
 says that, names the branch an earlier release made, and leaves the worktree.
 
 If herdr does not answer within 60 seconds when release asks it which worktree its workspace is
-open on, or to remove the worktree, the worktree is left, because herdr may still be removing it,
-and the command says which of the two it was asking. Run `release` again a little later. If herdr
-had finished by then, the same `release <assignment>` says the worktree was already removed and
+open on, or to remove the worktree, the worktree is left and the command says which of the two it
+was asking. After the removal request herdr may still be removing it; after the question nothing
+was removed. Run `release` again a little later. If herdr had finished by then, the same `release <assignment>` says the worktree was already removed and
 closes the record; it no longer answers "No open assignment matches".
 
 Commit `memory/crew/` with the rest of your session's memory.

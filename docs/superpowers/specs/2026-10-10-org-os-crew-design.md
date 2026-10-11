@@ -216,7 +216,7 @@ All enforced in `core.mjs`, not in the skill.
 | Guardrail | Rule |
 |-----------|------|
 | Inside herdr | Refuse unless `HERDR_ENV=1`. |
-| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. The shipped `roles/circles.yaml` sets `max_agents: 6`, so the lead and the five shipped roles can all be seated. A file with no `max_agents` line falls back to 4 in `scripts/crew/roles.mjs`. |
+| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. The shipped `roles/circles.yaml` sets `max_agents: 6`, so the five shipped roles (the lead among them) take five seats and the sixth allows a second agent in one role, for example a reviewer while an engineer is still seated. Each seated agent is a full model session on the operator's own plan; a small plan lowers `max_agents`. A file with no `max_agents` line falls back to 4 in `scripts/crew/roles.mjs`. |
 | Who may seat | A caller whose pane hosts no seated agent is the operator and may always seat. A caller whose pane hosts a seated agent may seat only if that agent's role has `may_seat: true`. The caller is identified from `HERDR_PANE_ID` joined to the trail. |
 | Base exists | Refuse if `--base` or `--on` does not resolve to a commit. Refuse `--base` together with `--on`. |
 | Operator's tree untouched | The launcher never checks out, resets or cleans the main checkout. |
@@ -245,8 +245,9 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
   worktree was removed. The recorded workspace id is used only while herdr still reports it open
   on that worktree; otherwise the worktree is removed with git. If herdr does not answer
   (`herdr_timeout`) while it is asked which worktree the workspace is open on, or asked to
-  remove it, git is not used, because herdr may still be doing it: the worktree is left, the
-  reason names what was asked, and `release` again finishes it.
+  remove it, git is not used and the worktree is left. The reason names what was asked, and
+  `release` again finishes it. After the removal request herdr may still be doing it; after the
+  question nothing was removed.
 - A closed assignment whose record says `worktree_removed: false` but whose worktree is gone
   (herdr finished after release stopped waiting) is found by `release <id>`: the record is set to
   `worktree_removed: true` and the command says the worktree was already removed. Nothing is
@@ -411,8 +412,9 @@ taken_by: null
   reviewer is seated with `--on <branch>` and its role forbids changes.
 - **Agents do not prompt each other.** The file is the message, so every exchange is on the trail.
 - A handoff can be declined: `crew handoff-close <id|file> --reason "<text>"` sets it to `declined`.
-- When a handoff names a branch and the seat command gives no `--on`, the receiving agent is
-  seated on that branch.
+- When a handoff names a branch and the seat command gives neither `--on` nor `--base`, the
+  receiving agent is seated on a detached copy of that branch. With `--base <ref>` it gets a new
+  branch from `<ref>` instead, and the handoff is still taken (section 5, step 4).
 
 ## 8. The board
 
@@ -420,10 +422,13 @@ taken_by: null
 npm run crew            # same as: npm run crew -- board
 ```
 
+Output of `renderBoard` for made-up rows (the home directory in the path is invented). Values
+longer than 32 characters (assignment) or 44 (branch) are cut and end in `…`.
+
 ```
-AGENT     ROLE      STATE    STATUS    ASSIGNMENT               BRANCH                                AGE
-reviewer  reviewer  blocked  working   Review the cursor fix    crew/2026-10-10-engineer-fix-the-c…   3m
-engineer  engineer  idle     reported  Fix the cursor race in…  crew/2026-10-10-engineer-fix-the-c…   18m
+AGENT     ROLE      STATE    STATUS    ASSIGNMENT                        BRANCH                                        AGE
+reviewer  reviewer  blocked  working   Review the cursor fix, and say …  crew/2026-10-10-engineer-fix-the-cursor-rac…  3m
+engineer  engineer  idle     reported  Fix the cursor race in the kms …  crew/2026-10-10-engineer-fix-the-cursor-rac…  18m
 
 Open handoffs: 1
   engineer → researcher: "Confirm what the cursor contract promises"
@@ -432,7 +437,7 @@ Needs release: 1
   2026-10-09-researcher-ibge-terms (trail says working, no live agent)
 
 Worktrees left behind: 1
-  2026-10-09-engineer-ingest-retry (released; its worktree is still at /…/worktrees/org-os/2026-10-09-engineer-ingest-retry)
+  2026-10-09-engineer-ingest-retry (released; its worktree is still at /Users/alex/.org-os/worktrees/org-os/2026-10-09-engineer-ingest-retry)
 
 Sync conflict copies: 1
   2026-10-10-engineer-fix-the-cursor.sync-conflict-20261010-221500-ABCDEFG.md
