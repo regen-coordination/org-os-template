@@ -91,6 +91,7 @@ instances:
       - "no_federation_yaml"
       - "no_masterplan"
       - "stub_identity"
+    listed: false
     notes: "Agent runtime container. Not a data instance — provides the agent substrate that other instances invoke."
 
   - id: "regen-coordination-os"
@@ -151,6 +152,7 @@ instances:
     packages: ["operations"]
     data_registries_extra: []
     drift: []
+    listed: false
     notes: "Acceptance-test instance for clone-framework.mjs (v3.5). Bootstrapped 2026-05-16 with config at tests/fixtures/bread-coop-config.yaml. Worker-owned bread cooperative (fictional/test). Lineage stamp populated. Not yet pushed to a remote."
 
   - id: "regen-toolkit"
