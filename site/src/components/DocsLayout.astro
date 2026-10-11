@@ -161,6 +161,12 @@ const { prev, next } = neighbours(page.slug);
 .doc :global(ul), .doc :global(ol) { padding-left: var(--space-5); }
 .doc :global(li + li) { margin-top: var(--space-1); }
 .doc :global(img) { max-width: 100%; height: auto; }
+/* A long path or address in inline code has no place to break, and made the page wider than a phone
+   (six pages at 375px, fourteen at 320px). It may break inside a word. `break-word`, not `anywhere`:
+   it leaves a table's narrowest width alone, so a wide table still scrolls in its region and its
+   commands stay whole. A code block is not touched: it scrolls in its own box.
+   Held by test/page-width.test.mjs; measured by `npm run widths`. */
+.doc :global(:not(pre) > code) { overflow-wrap: break-word; }
 /* added by the script above */
 .doc :global(.code-wrap) { position: relative; }
 .doc :global(.code-wrap .copy) { position: absolute; top: var(--space-2); right: var(--space-2); opacity: 0; transition: opacity var(--t-fast), border-color var(--t-fast), color var(--t-fast); }

@@ -15,6 +15,7 @@
     "preview": "astro preview",
     "verify": "node scripts/verify-build.mjs",
     "drift": "node scripts/docs-drift.mjs",
+    "widths": "node scripts/page-widths.mjs",
     "test": "node --test"
   },
   "dependencies": {
