@@ -5,8 +5,11 @@ import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { CrewError } from '../../scripts/crew/roles.mjs';
 import { localDate, readRecord, readTrail, trailDir, writeRecord } from '../../scripts/crew/trail.mjs';
-import { nudge, release, seat, typeYourself } from '../../scripts/crew/core.mjs';
+import { handoff, nudge, release, seat, typeYourself } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot, writeRole } from '../helpers/crew-fixtures.mjs';
+
+// Where the stand-in identity store puts an assignment's system prompt (tests/helpers/crew-fixtures.mjs).
+const identityPath = (ctx, id) => join(ctx.worktreeRoot, 'identity', `${id}.md`);
 
 const setup = (overrides) => {
   const root = makeRoot();
@@ -34,7 +37,7 @@ test('seat creates the worktree, starts the agent, prompts it and records the as
   const [, create] = ctx.herdr.calls[0];
   assert.deepEqual(create, { cwd: root, branch: `crew/${id}`, base: 'main', path: a.worktree, label: 'engineer' });
   const [, start] = ctx.herdr.calls[1];
-  assert.deepEqual(start, { name: 'engineer', kind: 'claude', pane_id: 'x1:p1', args: ['--model', 'sonnet'] });
+  assert.deepEqual(start, { name: 'engineer', kind: 'claude', pane_id: 'x1:p1', args: ['--model', 'sonnet', '--name', 'engineer: Fix the KMS cursor race', '--append-system-prompt-file', identityPath(ctx, id)] });
   const [, prompt] = ctx.herdr.calls[2];
   const file = join(trailDir(root), `${id}.md`);
   assert.ok(prompt.text.includes(join(root, 'roles', 'engineer.md')), prompt.text);
@@ -84,11 +87,89 @@ test('the cap counts only live crew agents', () => {
   assert.equal(seat(ctx, { roleId: 'engineer', brief: 'three' }).status, 'working');
 });
 
-test('an agent name already live on the server gets a numeric suffix', () => {
+test('a further agent in a role is named from its title, and falls back to a number only when that is taken or empty', () => {
   const root = makeRoot();
   const ctx = makeCtx(root, { herdr: fakeHerdr([{ name: 'engineer', pane_id: 'o1:p1', workspace_id: 'o1' }]) });
-  assert.equal(seat(ctx, { roleId: 'engineer', brief: 'one' }).agent, 'engineer-2');
-  assert.equal(seat(ctx, { roleId: 'engineer', brief: 'two' }).agent, 'engineer-3');
+  assert.equal(seat(ctx, { roleId: 'engineer', brief: 'one', title: 'Fix the KMS cursor' }).agent, 'engineer-fix-the-kms-cursor');
+  // the same title again: that name is taken
+  assert.equal(seat(ctx, { roleId: 'engineer', brief: 'two', title: 'Fix the KMS cursor' }).agent, 'engineer-2');
+  // a title with nothing a name can hold
+  assert.equal(seat({ ...ctx, herdr: fakeHerdr([{ name: 'engineer', pane_id: 'o1:p1', workspace_id: 'o1' }]) }, { roleId: 'engineer', brief: 'three', title: '¡¡¡' }).agent, 'engineer-2');
+});
+
+test('the first agent in a role keeps the role id even when it has a title', () => {
+  const { ctx } = setup();
+  assert.equal(seat(ctx, { roleId: 'engineer', brief: 'x', title: 'Fix the cursor' }).agent, 'engineer');
+});
+
+test('a name from a title is cut to herdr\'s name rule', () => {
+  const { root, ctx } = setup();
+  const long = 'r'.repeat(28); // the longest role id leaves three characters for the title
+  writeRole(root, long);
+  ctx.herdr.agents.push({ name: long, pane_id: 'o1:p1', workspace_id: 'o1', state: 'idle', kind: 'claude' });
+  const a = seat(ctx, { roleId: long, brief: 'x', title: 'Fix: the (KMS) cursor' });
+  assert.match(a.agent, /^[a-z][a-z0-9_-]{0,31}$/);
+  assert.equal(a.agent, `${long}-fix`);
+  // a cut that would end on a dash drops the dash
+  const b = seat(ctx, { roleId: long, brief: 'y', title: 'Go on' });
+  assert.equal(b.agent, `${long}-go`);
+});
+
+test('release and nudge find an agent by either form of its name', () => {
+  const root = makeRoot();
+  const ctx = makeCtx(root, { herdr: fakeHerdr([{ name: 'engineer', pane_id: 'o1:p1', workspace_id: 'o1' }]) });
+  ctx.herdr.failOn = { method: 'startAgent', code: 'agent_not_ready', message: 'blocked at startup' };
+  const a = seat(ctx, { roleId: 'engineer', brief: 'x', title: 'Fix the cursor' });
+  assert.equal(a.agent, 'engineer-fix-the-cursor');
+  ctx.herdr.failOn = null;
+  assert.equal(nudge(ctx, { target: 'engineer-fix-the-cursor' }).prompted, true);
+  assert.equal(ctx.herdr.calls.find((c) => c[0] === 'promptAgent')[1].name, 'engineer-fix-the-cursor');
+  ctx.git.dirty.set(a.worktree, ['?? x']);
+  assert.equal(release(ctx, { target: 'engineer-fix-the-cursor' }).assignment.id, a.id);
+});
+
+test('a title is stored on the record, trimmed, and shown to the agent as given', () => {
+  const { ctx } = setup();
+  const a = seat(ctx, { roleId: 'engineer', brief: 'Fix the KMS cursor race', title: '  Fix  the cursor  ' });
+  assert.equal(a.title, 'Fix the cursor');
+  assert.equal(readTrail(ctx.mainDir).assignments[0].title, 'Fix the cursor');
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet', '--name', 'engineer: Fix the cursor', '--append-system-prompt-file', identityPath(ctx, a.id)]);
+});
+
+test('a title of exactly 24 characters is accepted and 25 is refused in a sentence that says the limit, writing nothing', () => {
+  const { root, ctx } = setup();
+  const ok = 'a'.repeat(24);
+  assert.equal(seat(ctx, { roleId: 'engineer', brief: 'x', title: ok }).title, ok);
+  const before = readTrail(root).assignments.length;
+  assert.throws(
+    () => seat(ctx, { roleId: 'reviewer', brief: 'x', title: 'a'.repeat(25) }),
+    (err) => err instanceof CrewError && /25 characters/.test(err.message) && /limit is 24/.test(err.message) && !/\n/.test(err.message),
+  );
+  assert.equal(readTrail(root).assignments.length, before);
+});
+
+test('without a title it is cut from the brief\'s first line at a word boundary', () => {
+  const { ctx } = setup();
+  const a = seat(ctx, { roleId: 'engineer', brief: 'Label each crew agent in herdr with its role\nand more' });
+  assert.equal(a.title, 'Label each crew agent in');
+  assert.ok(a.title.length <= 24);
+  const short = seat(ctx, { roleId: 'reviewer', brief: 'Review it.\nThen more' });
+  assert.equal(short.title, 'Review it.');
+});
+
+test('a first word longer than the limit is cut hard and ends in an ellipsis', () => {
+  const { ctx } = setup();
+  const a = seat(ctx, { roleId: 'engineer', brief: 'Supercalifragilisticexpialidocious plan' });
+  assert.equal(a.title.length, 24);
+  assert.ok(a.title.endsWith('…'));
+});
+
+test('a handoff with no brief of its own gets a title from the handoff brief', () => {
+  const { ctx } = setup();
+  const lead = seat(ctx, { roleId: 'lead', brief: 'coordinate' });
+  const h = handoff(asAgent(ctx, lead), { toRole: 'reviewer', brief: 'Review the cursor fix and say if it is safe' });
+  const rev = seat(ctx, { roleId: 'reviewer', brief: '', handoff: h.id });
+  assert.equal(rev.title, 'Review the cursor fix');
 });
 
 test('the same brief twice gives two assignment ids', () => {
@@ -108,8 +189,8 @@ test('only the operator and roles with may_seat can seat', () => {
 
 test('an agent is started with its model only when its kind takes one', () => {
   const { root, ctx } = setup();
-  seat(ctx, { roleId: 'lead', brief: 'coordinate' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'opus']);
+  const lead = seat(ctx, { roleId: 'lead', brief: 'coordinate' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'opus', '--name', 'lead: coordinate', '--append-system-prompt-file', identityPath(ctx, lead.id)]);
   writeRole(root, 'reader', { kind: 'gemini', model: 'pro' }); // no known model argument for gemini
   const a = seat(ctx, { roleId: 'reader', brief: 'read' });
   assert.equal(a.kind, 'gemini');
@@ -120,21 +201,23 @@ test('an agent is started with its effort beside its model, for a kind that take
   const { root, ctx } = setup();
   writeRole(root, 'thinker', { model: 'claude-opus-5-5', effort: 'high' });
   const a = seat(ctx, { roleId: 'thinker', brief: 'think' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'claude-opus-5-5', '--effort', 'high']);
+  assert.deepEqual(ctx.herdr.calls[1][1].args, [
+    '--model', 'claude-opus-5-5', '--effort', 'high', '--name', 'thinker: think', '--append-system-prompt-file', identityPath(ctx, a.id),
+  ]);
   assert.deepEqual(a.notes ?? [], []);
 });
 
 test('a role that sets no effort is started with no effort argument', () => {
   const { ctx } = setup();
-  seat(ctx, { roleId: 'engineer', brief: 'build' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet']);
+  const a = seat(ctx, { roleId: 'engineer', brief: 'build' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet', '--name', 'engineer: build', '--append-system-prompt-file', identityPath(ctx, a.id)]);
 });
 
 test('effort alone, with no model, is still passed to claude', () => {
   const { root, ctx } = setup();
   writeRole(root, 'thinker', { model: undefined, effort: 'max' });
-  seat(ctx, { roleId: 'thinker', brief: 'think' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--effort', 'max']);
+  const a = seat(ctx, { roleId: 'thinker', brief: 'think' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--effort', 'max', '--name', 'thinker: think', '--append-system-prompt-file', identityPath(ctx, a.id)]);
 });
 
 test('a kind whose effort argument is not verified is seated without it and told so in one plain line', () => {
@@ -261,6 +344,8 @@ test('a role that may seat gets the lead commands in its assignment file, and ot
     assert.ok(body.includes(`node "${ctx.scriptPath}" ${verb}`), `${verb} missing:\n${body}`);
   }
   assert.match(body, /--base/);
+  assert.match(body, /seat <role> "<brief>" --title "<short title>"/);
+  assert.match(body, /at most 24 characters/);
   const eng = seat(ctx, { roleId: 'engineer', brief: 'build' });
   const engBody = readRecord(join(trailDir(root), `${eng.id}.md`)).body;
   for (const verb of ['seat', 'release', 'nudge', 'handoff-close', 'board']) {

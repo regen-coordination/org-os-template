@@ -81,9 +81,10 @@ export function loadRole(rootDir, id) {
     throw new CrewError(`No role "${id}". Roles available: ${listRoleIds(rootDir).join(', ') || 'none'}.`);
   }
   let data;
+  let content;
   try {
     // The empty options object bypasses gray-matter's content cache.
-    ({ data } = matter(readFileSync(path, 'utf-8'), {}));
+    ({ data, content } = matter(readFileSync(path, 'utf-8'), {}));
   } catch (err) {
     throw new CrewError(`roles/${id}.md is not a valid role: its frontmatter could not be read (${err.message}).`);
   }
@@ -100,5 +101,31 @@ export function loadRole(rootDir, id) {
     may_seat: data.may_seat,
     skills: data.skills ?? [],
     path,
+    // The part the agent reads, and the name its own first heading gives the seat.
+    body: content.trim(),
+    heading: content.match(/^#[ \t]+(.+?)[ \t]*$/m)?.[1] ?? data.id,
   };
+}
+
+/**
+ * Sections of roles/README.md by their `## ` heading, text up to the next `## `.
+ * A missing file or a missing heading is reported in `missing`, never thrown: an
+ * instance may have edited the file, and a seat still goes ahead.
+ */
+export function loadReadmeSections(rootDir, names) {
+  const path = join(rootDir, 'roles', 'README.md');
+  const lines = existsSync(path) ? readFileSync(path, 'utf-8').split('\n') : [];
+  const found = [];
+  const missing = [];
+  for (const name of names) {
+    const start = lines.findIndex((l) => l.trimEnd() === `## ${name}`);
+    if (start === -1) {
+      missing.push(name);
+      continue;
+    }
+    let end = lines.findIndex((l, i) => i > start && /^## /.test(l));
+    if (end === -1) end = lines.length;
+    found.push({ name, text: lines.slice(start, end).join('\n').trim() });
+  }
+  return { path, found, missing };
 }

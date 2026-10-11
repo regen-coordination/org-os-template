@@ -4,7 +4,7 @@
 // adapters in ctx, or through the trail files under ctx.mainDir.
 // See docs/superpowers/specs/2026-10-10-org-os-crew-design.md §5–10.
 import { basename, join, sep } from 'node:path';
-import { CrewError, loadCircles, loadRole } from './roles.mjs';
+import { CrewError, loadCircles, loadReadmeSections, loadRole } from './roles.mjs';
 import { ACTIVE, freeId, isoLocal, localDate, readRecord, readTrail, slugify, trailDir, updateRecord, writeRecord } from './trail.mjs';
 
 // How each agent kind takes a model on its command line. A kind not listed here
@@ -20,6 +20,25 @@ const MODEL_ARGS = {
 const EFFORT_ARGS = {
   claude: (effort) => ['--effort', effort],
 };
+
+// Claude Code's `-n, --name <name>` (`claude --help`, 2.1.296) gives the session a display name.
+// Only claude is verified; any other kind starts without a name argument.
+const NAME_ARGS = {
+  claude: (role, title) => ['--name', `${role}: ${title}`],
+};
+
+// How a kind takes an appended system prompt from a file. Only `claude` is verified:
+// `claude --help` lists --append-system-prompt and --bare names --append-system-prompt[-file];
+// a live `claude -p --append-system-prompt-file <file>` call (2026-10-11) answered from it.
+// A file, not the text: arguments travel through `herdr agent start … -- <args>` and a
+// whole role is too long a string to quote. Any other kind gets the role file's path in
+// its first prompt, as before.
+const IDENTITY_ARGS = {
+  claude: (file) => ['--append-system-prompt-file', file],
+};
+
+// The sections of roles/README.md every seat carries in its system prompt.
+const IDENTITY_SECTIONS = ['Shared boundaries', 'What always needs the operator', 'The cooperative charter'];
 
 export function requireHerdr(ctx) {
   if (ctx.env.HERDR_ENV !== '1') {
@@ -77,12 +96,65 @@ export function findActive(trail, target, statuses = ACTIVE) {
   throw new CrewError(`No open assignment matches "${target}". Run the board to see agent names and assignment ids.`);
 }
 
-function freeName(roleId, agents) {
+// herdr's agent-name rule is [a-z][a-z0-9_-]{0,31}.
+const HERDR_NAME_MAX = 32;
+// The longest title: what an agent is working on, in a few words. 24 characters is what
+// herdr's sidebar shows at its default width of 26 beside a one-character marker.
+const TITLE_MAX = 24;
+
+const nameSlug = (text) =>
+  String(text)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/**
+ * The first agent of a role is named by the role id. A further one is named
+ * from its title, `<role>-<slug>`, so two agents of one role look different on
+ * the board and in `release`. A taken or empty slug falls back to `<role>-2`.
+ */
+function freeName(roleId, agents, title) {
   const taken = new Set(agents.map((a) => a.name).filter(Boolean));
-  let name = roleId;
-  for (let n = 2; taken.has(name); n += 1) name = `${roleId}-${n}`;
-  return name;
+  if (!taken.has(roleId)) return roleId;
+  const slug = nameSlug(title).slice(0, HERDR_NAME_MAX - roleId.length - 1).replace(/-+$/, '');
+  if (slug && !taken.has(`${roleId}-${slug}`)) return `${roleId}-${slug}`;
+  let n = 2;
+  while (taken.has(`${roleId}-${n}`)) n += 1;
+  return `${roleId}-${n}`;
 }
+
+const oneLine = (text) => String(text).replace(/\s+/g, ' ').trim();
+
+/** The brief's first line cut at a word boundary to the title limit; a single longer word is cut hard. */
+function deriveTitle(brief) {
+  const line = oneLine(String(brief).split('\n').find((l) => l.trim()) ?? '');
+  if (line.length <= TITLE_MAX) return line;
+  let out = '';
+  for (const word of line.split(' ')) {
+    const next = out ? `${out} ${word}` : word;
+    if (next.length > TITLE_MAX) break;
+    out = next;
+  }
+  out = out.replace(/[\s,;:.\-–—(]+$/, '');
+  return out || `${line.slice(0, TITLE_MAX - 1)}…`;
+}
+
+/** The title the operator gave, trimmed; refused when it is longer than the limit. Null when none was given. */
+function checkTitle(title) {
+  const t = title === null || title === undefined ? '' : oneLine(title);
+  if (t === '') return null;
+  if (t.length > TITLE_MAX) {
+    throw new CrewError(
+      `The title "${t}" is ${t.length} characters and the limit is ${TITLE_MAX}. Say what the agent works on in fewer words.`,
+    );
+  }
+  return t;
+}
+
+/** An assignment's title: the one on its record, or one cut from its brief for a record that has none. */
+const titleOf = (a) => (typeof a.title === 'string' && a.title.trim() ? a.title.trim() : deriveTitle(a.brief));
 
 // What every seat reads before its brief lives in one section of roles/README.md,
 // so an instance changes the list by editing that file. The script only points.
@@ -100,11 +172,36 @@ function readingOrder(rolePath, file, readmePath) {
   );
 }
 
-function firstPrompt(rolePath, file, readmePath) {
+// The seat's name as its own role file gives it: "Reviewer" is "the reviewer".
+const seatName = (heading) => (/^[A-Z][a-z]/.test(heading) ? heading[0].toLowerCase() + heading.slice(1) : heading);
+
+function firstPrompt(role, file, readmePath) {
   return (
-    `You are seated in the org-os crew. ${readingOrder(rolePath, file, readmePath)} ` +
+    `You are the ${seatName(role.heading)} of the org-os crew. ${readingOrder(role.path, file, readmePath)} ` +
     'When you finish, follow the Commands section of the assignment file to report.'
   );
+}
+
+/**
+ * What a claude agent carries as its system prompt: who it is, its role file's body
+ * and the sections of roles/README.md every seat obeys. Pure text; `missing` names
+ * the README sections that were not found, so the seat can say so.
+ */
+export function composeIdentity(ctx, { role, name, id, file }) {
+  const readme = loadReadmeSections(ctx.mainDir, IDENTITY_SECTIONS);
+  const text = [
+    `You are the ${seatName(role.heading)} of the org-os crew: role "${role.id}", agent name "${name}".`,
+    `Your assignment is "${id}" and its file is ${file}. Your role file is ${role.path}; read both again if this session is resumed or its context is compacted.`,
+    '',
+    role.body,
+    '',
+    `The sections below are the ones every seat obeys, from ${readme.path}.`,
+    '',
+    ...readme.found.flatMap((s) => [s.text, '']),
+  ]
+    .join('\n')
+    .trimEnd();
+  return { text: `${text}\n`, missing: readme.missing };
 }
 
 /** What an operator types into an agent's pane when the first prompt may not have arrived. */
@@ -120,7 +217,8 @@ function assignmentBody(ctx, brief, role, named = null) {
   const lead = role.may_seat
     ? [
         `- See who is seated, open handoffs and what needs attention: \`${cmd('board')}\``,
-        `- Seat an agent: \`${cmd('seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
+        `- Seat an agent: \`${cmd('seat <role> "<brief>" --title "<short title>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
+        '  Give every seat a `--title` of at most 24 characters saying what it works on: it is the agent\'s name in herdr\'s sidebar and on the board.',
         '  A brief that starts with a dash goes after `--`, after any flags: `seat <role> [--task <id>] -- "<brief>"`.',
         '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
         '  With `--handoff`, a handoff that names a branch seats a detached copy of it, unless you pass `--base`: then the agent gets a new branch from that base. `--base` and `--on` cannot be combined.',
@@ -172,8 +270,9 @@ function handoffBrief(file) {
  * `base` is null when the operator gave none: only then does a handoff's branch
  * decide, and the new branch starts from `main`. An explicit base always wins.
  */
-export function seat(ctx, { roleId, brief, task = null, base = null, on = null, handoff: handoffTarget = null }) {
+export function seat(ctx, { roleId, brief, title: givenTitle = null, task = null, base = null, on = null, handoff: handoffTarget = null }) {
   requireHerdr(ctx);
+  const givenCheckedTitle = checkTitle(givenTitle);
   if (base !== null && on) {
     throw new CrewError('--base and --on cannot be used together: --on seats a detached copy of an existing branch, --base starts a new branch from a ref. Use one of them.');
   }
@@ -207,6 +306,7 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   if (!brief || !brief.trim()) {
     throw new CrewError('A brief is required: say what the agent should do.');
   }
+  const title = givenCheckedTitle ?? deriveTitle(brief);
   const ref = on || base || 'main';
   if (!ctx.git.resolves(ref)) {
     throw new CrewError(`"${ref}" is not a branch or commit in this repository.`);
@@ -216,13 +316,14 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   const id = freeId(ctx.mainDir, `${localDate(now)}-${role.id}-${slugify(brief)}`);
   const file = join(trailDir(ctx.mainDir), `${id}.md`);
   const worktree = join(ctx.worktreeRoot, basename(ctx.mainDir), id);
-  const name = freeName(role.id, agents);
+  const name = freeName(role.id, agents, title);
   writeRecord(
     file,
     {
       id,
       role: role.id,
       agent: name,
+      title,
       kind: role.kind,
       branch: on || `crew/${id}`,
       detached: Boolean(on),
@@ -244,7 +345,7 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   // refuses a linked worktree (linked_worktree_source). ctx.repoDir is that
   // primary checkout when the main checkout is itself a linked worktree.
   const repoDir = ctx.repoDir ?? ctx.mainDir;
-  let step = 'worktree';
+  let step = IDENTITY_ARGS[role.kind] ? 'identity' : 'worktree';
   // Set just before herdr is asked to create or open the worktree: from then on
   // it may have made things that crew was never told about.
   let herdrAsked = false;
@@ -254,6 +355,18 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
   // Plain lines for the operator about what the seat could not do; never an error.
   const notes = [];
   try {
+    // The identity prompt is written before anything is created, so a failure to
+    // write it leaves a record that says why and no worktree or pane to clean up.
+    let identityFile = null;
+    if (IDENTITY_ARGS[role.kind]) {
+      if (!ctx.identity) throw new CrewError('crew was given nowhere to keep the identity prompt. This is a fault in the launcher, not in your role file.');
+      const composed = composeIdentity(ctx, { role, name, id, file });
+      identityFile = ctx.identity.write(id, composed.text);
+      for (const section of composed.missing) {
+        notes.push(`roles/README.md has no "${section}" section, so the ${role.id} agent's identity prompt lacks it. Its first prompt still names the file.`);
+      }
+      step = 'worktree';
+    }
     let opened;
     if (on) {
       ctx.git.addDetached(worktree, on);
@@ -271,6 +384,8 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
     else if (role.effort) {
       notes.push(`The ${role.id} role's effort (${role.effort}) was not applied: crew does not know how to pass an effort level to a ${role.kind} agent.`);
     }
+    if (NAME_ARGS[role.kind]) args.push(...NAME_ARGS[role.kind](role.id, title));
+    if (identityFile) args.push(...IDENTITY_ARGS[role.kind](identityFile));
     let ready = true;
     try {
       ctx.herdr.startAgent({ name, kind: role.kind, pane_id: opened.pane_id, args });
@@ -283,7 +398,7 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
 
     if (ready) {
       try {
-        ctx.herdr.promptAgent(name, firstPrompt(role.path, file, join(ctx.mainDir, 'roles', 'README.md')));
+        ctx.herdr.promptAgent(name, firstPrompt(role, file, join(ctx.mainDir, 'roles', 'README.md')));
         prompted = true;
       } catch (err) {
         // herdr says a failed or timed-out prompt does not prove non-delivery,
@@ -316,24 +431,24 @@ export function seat(ctx, { roleId, brief, task = null, base = null, on = null, 
       ? ` May still exist: ${mayRemain.join('; ')}.` +
         (herdrAsked ? ' crew never learned the id of that herdr workspace, so release cannot close it: close it in herdr yourself.' : '')
       : '';
-    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${left}${maybe}`);
+    const cleaned = step === 'identity' ? 'no worktree or agent was made' : 'nothing was cleaned up';
+    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; ${cleaned}.${left}${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
   const record = updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
   // `notes` is not part of the record: the lines the command prints for the operator.
-  setLabel(ctx, notes, { agent: name, role: role.id, brief, pane: record.pane, workspace: record.workspace, status: 'working' });
+  setLabel(ctx, notes, { agent: name, role: role.id, title, pane: record.pane, workspace: record.workspace, status: 'working' });
   return { ...record, notes };
 }
 
 /**
- * What herdr's sidebar shows for an agent: role, a short assignment and the
- * status. The same width as the board's ASSIGNMENT column, so a first brief line
- * of any length stays one readable row. The workspace gets role and assignment
- * only: its status would go stale, and the pane's is the one that moves.
+ * What herdr's sidebar shows for an agent: role, the assignment's title and the
+ * status. A title is at most 24 characters, so a row stays one readable line at
+ * herdr's default sidebar width. The workspace gets role and assignment only: its
+ * status would go stale, and the pane's is the one that moves.
  */
-function labelTokens({ role, brief, status }) {
-  const line = String(brief).split('\n').find((l) => l.trim()) ?? '';
-  return { role, assignment: clip(line.trim().replace(/\s+/g, ' '), BOARD_BRIEF_WIDTH), status };
+function labelTokens({ role, title, status }) {
+  return { role, assignment: title, status };
 }
 
 /**
@@ -341,8 +456,8 @@ function labelTokens({ role, brief, status }) {
  * label is only display: a refusal never changes the record or the outcome. A
  * refusal adds one plain line to `notes`, which the command prints.
  */
-function setLabel(ctx, notes, { agent, role, brief, pane, workspace, status }) {
-  const tokens = labelTokens({ role, brief, status });
+function setLabel(ctx, notes, { agent, role, title, pane, workspace, status }) {
+  const tokens = labelTokens({ role, title, status });
   try {
     ctx.herdr.labelPane(pane, tokens);
     if (workspace) {
@@ -379,9 +494,9 @@ export function nudge(ctx, { target }) {
   if (a.prompted) {
     throw new CrewError(`${a.agent} has already been given its first prompt. Prompt it yourself in its pane if it needs more.`);
   }
-  const rolePath = loadRole(ctx.mainDir, a.role).path;
+  const role = loadRole(ctx.mainDir, a.role);
   try {
-    ctx.herdr.promptAgent(a.agent, firstPrompt(rolePath, a.file, join(ctx.mainDir, 'roles', 'README.md')));
+    ctx.herdr.promptAgent(a.agent, firstPrompt(role, a.file, join(ctx.mainDir, 'roles', 'README.md')));
   } catch (err) {
     if (err.code === 'herdr_missing') {
       throw new CrewError(`The herdr command was not found on PATH, so nothing was sent to ${a.agent}. Fix that and run nudge again.`);
@@ -417,10 +532,12 @@ export function report(ctx, { text }) {
   const { data, body } = readRecord(caller.file);
   const when = stamp(ctx);
   const next = { ...data, status: 'reported', updated: when };
-  writeRecord(caller.file, next, `${body.trimEnd()}\n\n## Report — ${when}\n\n${text.trim()}\n`);
+  // Headed with who wrote it: the role, and the agent's name when that differs from it.
+  const who = caller.agent === caller.role ? caller.role : `${caller.role} (${caller.agent})`;
+  writeRecord(caller.file, next, `${body.trimEnd()}\n\n## Report — ${who} — ${when}\n\n${text.trim()}\n`);
   // The report is written; the label is one more call and may fail on its own.
   const notes = [];
-  setLabel(ctx, notes, { agent: caller.agent, role: caller.role, brief: caller.brief, pane: caller.pane, status: 'reported' });
+  setLabel(ctx, notes, { agent: caller.agent, role: caller.role, title: titleOf(caller), pane: caller.pane, status: 'reported' });
   return { ...next, notes };
 }
 
@@ -579,11 +696,19 @@ export function release(ctx, { target, outcome }) {
   // A retry never changes how the assignment ended.
   const status = closed ? a.status : OUTCOME_STATUS[outcome ?? 'done'];
   const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
+  // The identity prompt was only read when the agent started. A file that cannot be
+  // removed is reported, not fatal: it sits outside the repository and harms nothing.
+  let identityLeft = null;
+  try {
+    ctx.identity?.remove(a.id);
+  } catch (err) {
+    identityLeft = String(err.message || err);
+  }
   // A closed record whose worktree is gone was finished by herdr: say so, once.
   const alreadyGone = closed && a.worktree_removed === false && !worktreeExisted;
   // The same timed-out seating on the retry: nothing came, and now it is closed.
   const neverCame = alreadyGone && a.failed_step === 'worktree' && a.error_code === 'herdr_timeout';
-  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, neverCame, mayAppear, branchKept: ctx.git.resolves(a.branch) };
+  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, neverCame, mayAppear, identityLeft, branchKept: ctx.git.resolves(a.branch) };
 }
 
 /** What `release` tells the operator: one sentence per line, only what is true. */
@@ -633,6 +758,9 @@ export function releaseLines(r) {
     out.push(`  The worktree was left at ${x.worktree}:`);
     for (const line of r.left) out.push(`    ${line}`);
   }
+  if (r.identityLeft) {
+    out.push(`  The identity prompt file for ${x.agent} could not be removed (${r.identityLeft}). It is outside the repository and does no harm; delete it by hand.`);
+  }
   return out;
 }
 
@@ -652,6 +780,8 @@ export function board(ctx) {
         role: a.role,
         state: live.state,
         status: a.status,
+        // The title the operator or seat chose; null for a record made before titles.
+        title: typeof a.title === 'string' && a.title.trim() ? a.title.trim() : null,
         brief: a.brief.split('\n')[0],
         branch: a.branch,
         id: a.id,
@@ -677,7 +807,7 @@ function age(created, now) {
   return `${Math.floor(minutes / (24 * 60))}d`;
 }
 
-// The assignment column of the board and the assignment word of the herdr label.
+// The assignment column of the board: a title, or the first line of a brief that has none.
 const BOARD_BRIEF_WIDTH = 32;
 const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
@@ -694,7 +824,7 @@ export function renderBoard(b, now) {
   } else {
     const table = [
       ['AGENT', 'ROLE', 'STATE', 'STATUS', 'ASSIGNMENT', 'BRANCH', 'AGE'],
-      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.brief, BOARD_BRIEF_WIDTH), clip(r.branch, 44), age(r.created, now)]),
+      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.title || r.brief, BOARD_BRIEF_WIDTH), clip(r.branch, 44), age(r.created, now)]),
     ];
     const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
     for (const row of table) {

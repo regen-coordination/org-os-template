@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import matter from 'gray-matter';
+import { createIdentityStore } from '../../scripts/crew/identity.mjs';
 
 const CIRCLES = `max_agents: 2
 circles:
@@ -27,10 +28,27 @@ export function writeRole(root, id, overrides = {}) {
   return path;
 }
 
+// The shared sections of roles/README.md the identity prompt carries (spec 4.1).
+const README = `# Roles
+
+## Shared boundaries
+
+- Work only inside your own worktree.
+
+## What always needs the operator
+
+- merging into main
+
+## The cooperative charter
+
+1. Commons, not property.
+`;
+
 export function makeRoot() {
   const root = mkdtempSync(join(tmpdir(), 'crew-test-'));
   mkdirSync(join(root, 'roles'), { recursive: true });
   writeFileSync(join(root, 'roles', 'circles.yaml'), CIRCLES);
+  writeFileSync(join(root, 'roles', 'README.md'), README);
   writeRole(root, 'lead', { circle: 'lead', model: 'opus', may_seat: true });
   writeRole(root, 'engineer');
   writeRole(root, 'reviewer');
@@ -148,6 +166,7 @@ export function makeCtx(root, overrides = {}) {
     cwd: root,
     now: () => new Date('2026-10-10T12:00:00Z'),
     worktreeRoot: join(root, '.wt'),
+    identity: createIdentityStore(join(root, '.wt', 'identity')),
     scriptPath: join(root, 'scripts', 'crew.mjs'),
     ...overrides,
   };

@@ -6,19 +6,22 @@
 // the real herdr and git adapters to it.
 import { readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat, typeYourself } from './crew/core.mjs';
 import { createGit } from './crew/git.mjs';
+import { createIdentityStore } from './crew/identity.mjs';
 import { createHerdr, HerdrError } from './crew/herdr.mjs';
 import { CrewError } from './crew/roles.mjs';
 
 const USAGE = `Usage: npm run crew -- <command>
 
   board [--json]                                Show seated agents, open handoffs, what needs attention (default)
-  seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]
+  seat <role> "<brief>" [--title "<short title>"] [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]
                                                 Seat an agent in a role, in its own worktree.
+                                                --title says in at most 24 characters what it works on:
+                                                it names the agent in herdr's sidebar and on the board.
                                                 --on seats a detached copy of a branch (review);
                                                 --base starts a new branch from a ref, and wins over
                                                 a handoff's branch. Not both.
@@ -55,6 +58,7 @@ function main(argv) {
       allowPositionals: true,
       options: {
         task: { type: 'string' },
+        title: { type: 'string' },
         base: { type: 'string' },
         on: { type: 'string' },
         handoff: { type: 'string' },
@@ -87,6 +91,7 @@ function main(argv) {
 
   const mainDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const git = createGit(mainDir);
+  const worktreeRoot = real(process.env.ORG_OS_WORKTREES || join(homedir(), '.org-os', 'worktrees'));
   const ctx = {
     mainDir,
     repoDir: git.primaryCheckout(),
@@ -95,7 +100,9 @@ function main(argv) {
     env: process.env,
     cwd: real(process.cwd()),
     now: () => new Date(),
-    worktreeRoot: real(process.env.ORG_OS_WORKTREES || join(homedir(), '.org-os', 'worktrees')),
+    worktreeRoot,
+    // Beside the repository's worktrees and outside all of them and of memory/crew/.
+    identity: createIdentityStore(join(worktreeRoot, basename(mainDir), '.identity')),
     scriptPath: join(mainDir, 'scripts', 'crew.mjs'),
   };
 
@@ -110,6 +117,7 @@ function main(argv) {
       const a = seat(ctx, {
         roleId: first,
         brief: rest.join(' '),
+        title: values.title ?? null,
         task: values.task ?? null,
         base: values.base ?? null,
         on: values.on ?? null,
@@ -117,6 +125,7 @@ function main(argv) {
       });
       console.log(`Seated ${a.agent} as ${a.role}.`);
       console.log(`  assignment  ${a.id}`);
+      console.log(`  title       ${a.title}`);
       console.log(`  branch      ${a.branch}${a.detached ? ' (detached copy)' : ''}`);
       console.log(`  worktree    ${a.worktree}`);
       for (const line of a.notes) console.log(`  ${line}`);

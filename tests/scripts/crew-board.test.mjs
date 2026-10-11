@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readTrail, trailDir, updateRecord } from '../../scripts/crew/trail.mjs';
+import { readRecord, readTrail, trailDir, updateRecord, writeRecord } from '../../scripts/crew/trail.mjs';
 import { board, handoff, release, releaseLines, renderBoard, report, seat } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot } from '../helpers/crew-fixtures.mjs';
 
@@ -515,7 +515,7 @@ test('two closed records of one agent name that are both left or gone ask for th
   ctx.herdr.failOn = { method: 'removeWorktree', code: 'herdr_timeout', message: 'no answer' };
   release(ctx, { target: eng.id });
   const second = seat(ctx, { roleId: 'engineer', brief: 'Build another' });
-  assert.equal(second.agent, 'engineer-2'); // the first agent is still listed
+  assert.equal(second.agent, 'engineer-build-another'); // the first agent is still listed
   updateRecord(second.file ?? join(trailDir(ctx.mainDir), `${second.id}.md`), { agent: 'engineer', status: 'released', worktree_removed: false });
   rmSync(second.worktree, { recursive: true, force: true });
   assert.throws(() => release(ctx, { target: 'engineer' }), /More than one closed assignment of "engineer"/);
@@ -559,12 +559,15 @@ test('the board example in spec section 8 is exactly what renderBoard prints (sk
   const example = section.match(/```\n(AGENT[\s\S]*?)```/)[1];
   const now = new Date('2026-10-10T12:00:00Z');
   const ago = (minutes) => new Date(now.getTime() - minutes * 60000).toISOString();
+  const branch = 'crew/2026-10-10-engineer-fix-the-cursor-race-in-kms';
   const b = {
     rows: [
       { agent: 'reviewer', role: 'reviewer', state: 'blocked', status: 'working', prompted: true, created: ago(3),
-        brief: 'Review the cursor fix, and say whether it is safe to merge', branch: 'crew/2026-10-10-engineer-fix-the-cursor-race-in-kms' },
-      { agent: 'engineer', role: 'engineer', state: 'idle', status: 'reported', prompted: true, created: ago(18),
-        brief: 'Fix the cursor race in the kms ingest', branch: 'crew/2026-10-10-engineer-fix-the-cursor-race-in-kms' },
+        title: 'Review the cursor fix', brief: 'Review the cursor fix, and say whether it is safe to merge', branch },
+      { agent: 'engineer-cursor-race', role: 'engineer', state: 'idle', status: 'reported', prompted: true, created: ago(18),
+        title: 'Cursor race in kms', brief: 'Fix the cursor race in the kms ingest', branch },
+      { agent: 'engineer', role: 'engineer', state: 'working', status: 'working', prompted: true, created: ago(40),
+        title: null, brief: 'Fix the cursor race in the kms ingest, then the retry', branch },
     ],
     handoffs: [{ from_role: 'engineer', to_role: 'researcher', brief: 'Confirm what the cursor contract promises' }],
     needsRelease: [{ id: '2026-10-09-researcher-ibge-terms', status: 'working' }],
@@ -615,4 +618,21 @@ test('a second release after a timed-out worktree step, with still nothing there
   assert.match(text, /still no worktree at/);
   assert.doesNotMatch(text, /after the earlier release stopped waiting for herdr/);
   assert.equal(readTrail(ctx.mainDir).assignments.find((a) => a.id === failed.id).worktree_removed, true);
+});
+
+test('the board shows the title of a record that has one, and the brief\'s first line for an old record', () => {
+  const root = makeRoot();
+  const ctx = makeCtx(root);
+  const titled = seat(ctx, { roleId: 'engineer', brief: 'Fix the KMS cursor race in the ingest queue, then more', title: 'Cursor race' });
+  const old = seat(ctx, { roleId: 'reviewer', brief: 'Review the cursor fix and say whether it is safe' });
+  const file = join(trailDir(root), `${old.id}.md`);
+  const { data, body } = readRecord(file);
+  delete data.title;
+  writeRecord(file, data, body);
+  const b = board(ctx);
+  assert.equal(b.rows.find((r) => r.id === titled.id).title, 'Cursor race');
+  assert.equal(b.rows.find((r) => r.id === old.id).title, null);
+  const lines = renderBoard(b, ctx.now()).split('\n');
+  assert.match(lines.find((l) => l.startsWith('engineer')), /^engineer\s+engineer\s+idle\s+working\s+Cursor race\s+crew\//);
+  assert.match(lines.find((l) => l.startsWith('reviewer')), /Review the cursor fix and say w…/);
 });
