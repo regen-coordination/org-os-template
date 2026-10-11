@@ -32,9 +32,14 @@ said. Never work around a refusal**: not by calling herdr or git yourself, not b
 | Seat a role on a piece of work                                     | `npm run crew -- seat <role> "<brief>"`                 |
 | Seat a reviewer on an existing branch                              | `npm run crew -- seat reviewer "<brief>" --on <branch>` |
 | Take a handoff another agent wrote                                 | `npm run crew -- seat <role> --handoff <id>`            |
+| Take a handoff and build on its branch, not review it              | `npm run crew -- seat <role> --handoff <id> --base <ref>` |
 | Send the first prompt to an agent that stopped at a startup dialog | `npm run crew -- nudge <agent>`                         |
 | Close an assignment                                                | `npm run crew -- release <agent>`                       |
 | Decline a handoff                                                  | `npm run crew -- handoff-close <id> --reason "<why>"`   |
+
+A handoff that names a branch seats a detached copy of it, which is right for a reviewer and wrong
+for an engineer asked to build on it: pass `--base <ref>` and the agent gets a new branch from
+that ref, with the handoff still taken. `--base` and `--on` cannot be combined.
 
 A brief that starts with a dash is read as an option: put `--` before it, after any flags
 (`seat <role> --task <id> -- "<brief>"`; the same for `handoff`).
@@ -87,9 +92,13 @@ Release when the agent has reported and the operator has what they need. The bra
 kept; merging is the operator's. The worktree is removed only when it has no uncommitted changes.
 If it is left behind, the command lists what is in it: show that list to the operator and stop.
 Do not remove the worktree yourself; once the operator has dealt with it, release again. If the
-list says herdr did not answer, nothing was wrong with the worktree: wait and release again.
+list says herdr did not answer, nothing was wrong with the worktree: wait and release again. If
+herdr had finished meanwhile, that release says the worktree was already removed and closes the
+record.
 After a seating that timed out, the worktree or agent may exist anyway: look at the board and
-release the assignment under "Needs release".
+release the assignment under "Needs release". If it timed out creating the worktree, wait a little
+first, and tell the operator that a herdr workspace may be left open that crew cannot close: the
+failure message and the release output name it.
 
 ## As the lead
 

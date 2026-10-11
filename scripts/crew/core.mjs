@@ -24,6 +24,18 @@ export function requireHerdr(ctx) {
   }
 }
 
+// Codes herdr returns before it queues any input to the pane (herdr 0.9.1 source,
+// spec 5.3), plus a missing binary: each proves the prompt was not sent. Every
+// other failure, herdr_timeout included, may have been typed already.
+const PROMPT_NOT_SENT = new Set([
+  'herdr_missing',
+  'empty_agent_prompt',
+  'agent_not_found',
+  'agent_target_ambiguous',
+  'agent_blocked',
+  'agent_not_ready',
+]);
+
 const active = (trail) => trail.assignments.filter((a) => ACTIVE.includes(a.status));
 const stamp = (ctx) => isoLocal(ctx.now());
 
@@ -70,15 +82,32 @@ function freeName(roleId, agents) {
 // so an instance changes the list by editing that file. The script only points.
 const ONBOARDING = 'Before you begin';
 
-function firstPrompt(rolePath, file, readmePath) {
+// One sentence, shared by the first prompt and by what an operator types by hand.
+// The README path is the main checkout's; the files it lists are read from the
+// agent's own worktree, which the sentence says in so many words.
+function readingOrder(rolePath, file, readmePath) {
   return (
-    `You are seated in the org-os crew. Read ${rolePath} (your role) and ${file} (your assignment) in full, ` +
+    `Read ${rolePath} (your role) and ${file} (your assignment) in full, ` +
     `then read the "${ONBOARDING}" section of ${readmePath} and the files it lists, ` +
-    'and only then begin the work in the brief. When you finish, follow the Commands section of the assignment file to report.'
+    'which are at the root of your own worktree (if that section is missing, say so in your report and begin), ' +
+    'and only then begin the work in the brief.'
   );
 }
 
-function assignmentBody(ctx, brief, role) {
+function firstPrompt(rolePath, file, readmePath) {
+  return (
+    `You are seated in the org-os crew. ${readingOrder(rolePath, file, readmePath)} ` +
+    'When you finish, follow the Commands section of the assignment file to report.'
+  );
+}
+
+/** What an operator types into an agent's pane when the first prompt may not have arrived. */
+export function typeYourself(ctx, a) {
+  const file = join(trailDir(ctx.mainDir), `${a.id}.md`);
+  return readingOrder(loadRole(ctx.mainDir, a.role).path, file, join(ctx.mainDir, 'roles', 'README.md'));
+}
+
+function assignmentBody(ctx, brief, role, named = null) {
   const cmd = (rest) => `node "${ctx.scriptPath}" ${rest}`;
   // A role that may seat works from its own worktree, where `npm run crew` is
   // refused, so it runs the main checkout's script by absolute path.
@@ -88,6 +117,7 @@ function assignmentBody(ctx, brief, role) {
         `- Seat an agent: \`${cmd('seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
         '  A brief that starts with a dash goes after `--`, after any flags: `seat <role> [--task <id>] -- "<brief>"`.',
         '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
+        '  With `--handoff`, a handoff that names a branch seats a detached copy of it, unless you pass `--base`: then the agent gets a new branch from that base. `--base` and `--on` cannot be combined.',
         `- Send the first prompt to an agent that stopped at a startup dialog: \`${cmd('nudge <agent|assignment>')}\``,
         `- Close an assignment: \`${cmd('release <agent|assignment> [--outcome done|abandoned]')}\``,
         `- Decline an open handoff: \`${cmd('handoff-close <id|file> --reason "<text>"')}\``,
@@ -98,6 +128,14 @@ function assignmentBody(ctx, brief, role) {
     '',
     brief.trim(),
     '',
+    ...(named
+      ? [
+          '## Handoff',
+          '',
+          `Handoff ${named.handoff} names branch ${named.branch}. You were not seated on a copy of it: your branch starts from ${named.base}.`,
+          '',
+        ]
+      : []),
     '## Commands',
     '',
     'Run these exactly as written. They are the only things you do outside your worktree.',
@@ -124,8 +162,15 @@ function handoffBrief(file) {
   return readRecord(file).body.replace(/^\s*## Brief[ \t]*\n+/, '').trim();
 }
 
-export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null, handoff: handoffTarget = null }) {
+/**
+ * `base` is null when the operator gave none: only then does a handoff's branch
+ * decide, and the new branch starts from `main`. An explicit base always wins.
+ */
+export function seat(ctx, { roleId, brief, task = null, base = null, on = null, handoff: handoffTarget = null }) {
   requireHerdr(ctx);
+  if (base !== null && on) {
+    throw new CrewError('--base and --on cannot be used together: --on seats a detached copy of an existing branch, --base starts a new branch from a ref. Use one of them.');
+  }
   const role = loadRole(ctx.mainDir, roleId);
   const { maxAgents } = loadCircles(ctx.mainDir);
   const trail = readTrail(ctx.mainDir);
@@ -137,8 +182,11 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
     if (taken.status !== 'open') throw new CrewError(`Handoff ${taken.id} is already ${taken.status}.`);
     if (taken.to_role !== role.id) throw new CrewError(`Handoff ${taken.id} is for the ${taken.to_role} role, not ${role.id}.`);
     if (!brief || !brief.trim()) brief = handoffBrief(taken.file);
-    if (!on && taken.branch) on = taken.branch;
+    // A handoff's branch seats a detached copy, unless the caller asked for a new
+    // branch from a base of their own: then the handoff is taken and only named.
+    if (!on && taken.branch && base === null) on = taken.branch;
   }
+  const handoffBranchNamed = taken && taken.branch && !on ? taken.branch : null;
 
   const caller = callerAssignment(ctx, trail, agents);
   if (caller && !loadRole(ctx.mainDir, caller.role).may_seat) {
@@ -153,7 +201,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
   if (!brief || !brief.trim()) {
     throw new CrewError('A brief is required: say what the agent should do.');
   }
-  const ref = on || base;
+  const ref = on || base || 'main';
   if (!ctx.git.resolves(ref)) {
     throw new CrewError(`"${ref}" is not a branch or commit in this repository.`);
   }
@@ -183,7 +231,7 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
       created: isoLocal(now),
       updated: isoLocal(now),
     },
-    assignmentBody(ctx, brief, role),
+    assignmentBody(ctx, brief, role, handoffBranchNamed ? { handoff: taken.id, branch: handoffBranchNamed, base: ref } : null),
   );
 
   // herdr starts worktree actions from the repository's primary checkout and
@@ -191,6 +239,9 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
   // primary checkout when the main checkout is itself a linked worktree.
   const repoDir = ctx.repoDir ?? ctx.mainDir;
   let step = 'worktree';
+  // Set just before herdr is asked to create or open the worktree: from then on
+  // it may have made things that crew was never told about.
+  let herdrAsked = false;
   // true: sent and confirmed. false: never sent. 'unconfirmed': sent, but herdr
   // did not confirm it, which does not prove it did not arrive.
   let prompted = false;
@@ -198,9 +249,11 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
     let opened;
     if (on) {
       ctx.git.addDetached(worktree, on);
+      herdrAsked = true;
       opened = ctx.herdr.openWorktree({ cwd: repoDir, path: worktree, label: name });
     } else {
-      opened = ctx.herdr.createWorktree({ cwd: repoDir, branch: `crew/${id}`, base, path: worktree, label: name });
+      herdrAsked = true;
+      opened = ctx.herdr.createWorktree({ cwd: repoDir, branch: `crew/${id}`, base: ref, path: worktree, label: name });
     }
     updateRecord(file, { pane: opened.pane_id, workspace: opened.workspace_id });
 
@@ -222,32 +275,55 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
         prompted = true;
       } catch (err) {
         // herdr says a failed or timed-out prompt does not prove non-delivery,
-        // so the prompt is never resent: not here, and not by nudge. Only a
-        // missing herdr binary proves nothing was sent; herdr's own refusals are
-        // not known well enough to trust.
-        prompted = err.code === 'herdr_missing' ? false : 'unconfirmed';
+        // so the prompt is never resent: not here, and not by nudge. Only the
+        // codes in PROMPT_NOT_SENT prove nothing was sent.
+        prompted = PROMPT_NOT_SENT.has(err.code) ? false : 'unconfirmed';
       }
     }
   } catch (err) {
-    updateRecord(file, { status: 'failed', failed_step: step, error: String(err.message || err), ...(err.code ? { error_code: String(err.code) } : {}), updated: stamp(ctx) });
+    // What a failed worktree step may have left, including a herdr workspace
+    // whose id crew never received.
+    const mayRemain = step === 'worktree' ? worktreeLeftovers({ id, on, worktree, name, herdrAsked }) : null;
+    updateRecord(file, {
+      status: 'failed',
+      failed_step: step,
+      error: String(err.message || err),
+      ...(err.code ? { error_code: String(err.code) } : {}),
+      ...(mayRemain ? { may_remain: mayRemain } : {}),
+      updated: stamp(ctx),
+    });
     // A call that timed out may still have happened: herdr was asked, and it never said no.
     const maybe =
       err.code === 'herdr_timeout'
-        ? ` herdr did not answer, so the ${step === 'start' ? 'agent' : 'worktree'} may exist anyway. Look at the board; if this assignment is under "Needs release", run release ${id} to close it.`
+        ? ` herdr did not answer, so the ${step === 'start' ? 'agent' : 'worktree'} may exist anyway.` +
+          (step === 'start'
+            ? ' Look at the board; if this assignment is under "Needs release", run release ' + id + ' to close it.'
+            : ' It may still be creating it: wait a little, look at the board, and run release ' + id + ' to close the assignment.')
         : '';
-    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${maybe}`);
+    const left = mayRemain
+      ? ` May still exist: ${mayRemain.join('; ')}.` +
+        (herdrAsked ? ' crew never learned the id of that herdr workspace, so release cannot close it: close it in herdr yourself.' : '')
+      : '';
+    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${left}${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
   return updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
+}
+
+/** What a failed worktree step may have left behind, in the words the failed record and the message use. */
+function worktreeLeftovers({ id, on, worktree, name, herdrAsked }) {
+  const out = [];
+  if (!on && herdrAsked) out.push(`branch crew/${id}`);
+  out.push(`checkout directory ${worktree}`);
+  if (herdrAsked) out.push(`a herdr workspace labelled "${name}"`);
+  return out;
 }
 
 /** What to tell the operator about a first prompt that may or may not have arrived. */
 function unconfirmedMessage(ctx, a, why) {
   return (
     `The first prompt to ${a.agent} may already have arrived: ${why}, and a timeout does not prove it was not delivered. ` +
-    `Look at ${a.agent}'s pane. If it has not started, type there: ` +
-    `Read ${loadRole(ctx.mainDir, a.role).path} (your role) and ${a.file} (your assignment) in full, ` +
-    `then read the "${ONBOARDING}" section of ${join(ctx.mainDir, 'roles', 'README.md')} and the files it lists, and only then begin the work in the brief.`
+    `Look at ${a.agent}'s pane. If it has not started, type there: ${typeYourself(ctx, a)}`
   );
 }
 
@@ -266,6 +342,13 @@ export function nudge(ctx, { target }) {
   } catch (err) {
     if (err.code === 'herdr_missing') {
       throw new CrewError(`The herdr command was not found on PATH, so nothing was sent to ${a.agent}. Fix that and run nudge again.`);
+    }
+    if (PROMPT_NOT_SENT.has(err.code)) {
+      // herdr refused before queueing any input: the prompt is still unsent and nudge may be run again.
+      throw new CrewError(
+        `herdr refused the first prompt before sending anything, so nothing was sent to ${a.agent}: ${err.message}. ` +
+          `Deal with that in ${a.agent}'s pane (an open dialog, or an agent still starting), then run nudge again.`,
+      );
     }
     // Attempted and not confirmed: from here on it is case (b), never resent.
     updateRecord(a.file, { prompted: 'unconfirmed', updated: stamp(ctx) });
@@ -336,11 +419,13 @@ export function closeHandoff(ctx, { target, reason }) {
 const CLOSED = ['released', 'abandoned'];
 
 /**
- * Closed assignments whose worktree release could not remove and which is still
- * on disk. Their recorded outcome is final; only the removal can be retried.
+ * Closed assignments whose recorded removal did not finish. Those whose worktree
+ * is still on disk are `leftBehind`; the rest were finished by herdr after
+ * release stopped waiting. Their recorded outcome is final; only the removal can
+ * be retried, or, for a worktree already gone, the record closed.
  */
-const leftBehind = (ctx, trail) =>
-  trail.assignments.filter((a) => CLOSED.includes(a.status) && a.worktree_removed === false && ctx.git.worktreeExists(a.worktree));
+const unfinishedRemoval = (trail) => trail.assignments.filter((a) => CLOSED.includes(a.status) && a.worktree_removed === false);
+const leftBehind = (ctx, trail) => unfinishedRemoval(trail).filter((a) => ctx.git.worktreeExists(a.worktree));
 
 const OUTCOME_STATUS = { done: 'released', abandoned: 'abandoned' };
 
@@ -364,8 +449,10 @@ export function release(ctx, { target, outcome }) {
   if (trail.assignments.some((x) => openStatuses.includes(x.status) && (x.id === target || x.agent === target))) {
     a = findActive(trail, target, openStatuses); // may refuse: more than one open one matches
   } else {
-    // Nothing open matched: it may be a closed assignment whose worktree was left behind.
-    const left = leftBehind(ctx, trail).filter((x) => x.id === target || x.agent === target);
+    // Nothing open matched: it may be a closed assignment whose worktree release
+    // could not remove, or one herdr finished removing after release stopped
+    // waiting, so that only its record still says the worktree is there.
+    const left = unfinishedRemoval(trail).filter((x) => x.id === target || x.agent === target);
     if (left.length === 0) findActive(trail, target, openStatuses); // throws the no-match error
     if (left.length > 1) {
       throw new CrewError(`More than one closed assignment of "${target}" still has a worktree. Use the assignment id: ${left.map((x) => x.id).join(', ')}.`);
@@ -405,22 +492,28 @@ export function release(ctx, { target, outcome }) {
     }
     if (left.length === 0) {
       let viaHerdr = false;
-      let timedOut = false;
+      let timedOut = null; // what herdr was being asked when it did not answer
+      let asking = 'which worktree its workspace is open on';
       try {
         // herdr removes the worktree and closes the workspace it opened for it,
         // but only while that workspace id still names this worktree: after a
         // herdr restart the id may belong to something else.
         if (a.workspace && ctx.herdr.workspaceCheckout(a.workspace) === a.worktree) {
+          asking = 'to remove the worktree';
           ctx.herdr.removeWorktree(a.workspace);
           viaHerdr = true;
         }
       } catch (err) {
         // A timed-out herdr may still be removing the worktree: git must not race
         // it. Anything else falls through to git.
-        timedOut = err.code === 'herdr_timeout';
+        if (err.code === 'herdr_timeout') timedOut = asking;
       }
       if (timedOut) {
-        left = ['herdr did not answer when asked to remove the worktree and may still be doing it. Wait a little, then run release again.'];
+        left = [
+          timedOut === 'to remove the worktree'
+            ? 'herdr did not answer when asked to remove the worktree and may still be doing it. Wait a little, then run release again.'
+            : `herdr did not answer when asked ${timedOut}, so nothing was removed. Wait a little, then run release again.`,
+        ];
       } else if (viaHerdr) {
         removed = true;
       } else {
@@ -436,7 +529,9 @@ export function release(ctx, { target, outcome }) {
   // A retry never changes how the assignment ended.
   const status = closed ? a.status : OUTCOME_STATUS[outcome ?? 'done'];
   const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
-  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, branchKept: ctx.git.resolves(a.branch) };
+  // A closed record whose worktree is gone was finished by herdr: say so, once.
+  const alreadyGone = closed && a.worktree_removed === false && !worktreeExisted;
+  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, branchKept: ctx.git.resolves(a.branch) };
 }
 
 /** What `release` tells the operator: one sentence per line, only what is true. */
@@ -463,8 +558,17 @@ export function releaseLines(r) {
         : `  Commits made in the detached copy were saved as branch ${r.rescued}.`,
     );
   }
+  if (x.failed_step === 'worktree' && Array.isArray(x.may_remain) && x.may_remain.some((m) => m.startsWith('a herdr workspace'))) {
+    // Seating failed while herdr was creating the worktree, before it gave crew a workspace id.
+    out.push(`  crew never learned the id of the herdr workspace that seating may have opened. If one labelled "${x.agent}" is open in herdr, close it there.`);
+    if (x.error_code === 'herdr_timeout') {
+      out.push(`  herdr did not answer the worktree request and may still have been creating it when this release ran. If the worktree or branch ${x.branch} appears now, run release again.`);
+    }
+  }
   if (r.removed) {
-    out.push(r.worktreeExisted ? '  The worktree was removed.' : `  There was no worktree at ${x.worktree} to remove.`);
+    if (r.worktreeExisted) out.push('  The worktree was removed.');
+    else if (r.alreadyGone) out.push(`  The worktree at ${x.worktree} was already removed, after the earlier release stopped waiting for herdr; the record now says so.`);
+    else out.push(`  There was no worktree at ${x.worktree} to remove.`);
   } else {
     out.push(`  The worktree was left at ${x.worktree}:`);
     for (const line of r.left) out.push(`    ${line}`);

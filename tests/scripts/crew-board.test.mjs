@@ -1,7 +1,7 @@
 // tests/scripts/crew-board.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readTrail, trailDir, updateRecord } from '../../scripts/crew/trail.mjs';
 import { board, handoff, release, releaseLines, renderBoard, report, seat } from '../../scripts/crew/core.mjs';
@@ -463,4 +463,77 @@ test('a seated agent whose first prompt is unsent or unconfirmed is marked in th
   const again = board(ctx);
   assert.equal(again.rows.find((r) => r.agent === 'reviewer').prompted, 'unconfirmed');
   assert.match(renderBoard(again, ctx.now()), /^reviewer\s.*working \(first prompt unconfirmed\)/m);
+});
+
+test('releasing a seating that timed out at the worktree step says the herdr workspace may remain and release may have raced herdr', () => {
+  const { ctx } = crew();
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'x' }));
+  ctx.herdr.failOn = null;
+  const failed = readTrail(ctx.mainDir).assignments.find((a) => a.status === 'failed');
+  const text = releaseLines(release(ctx, { target: failed.id })).join('\n');
+  assert.match(text, /never learned the id of the herdr workspace/);
+  assert.match(text, /labelled "reviewer"/);
+  assert.match(text, /may still have been creating/);
+
+  // a failure that was not a timeout still names the workspace, but does not claim a race
+  ctx.herdr.failOn = { method: 'createWorktree', code: 'worktree_create_failed', message: 'git said no' };
+  assert.throws(() => seat(ctx, { roleId: 'reviewer', brief: 'y' }));
+  const second = readTrail(ctx.mainDir).assignments.find((a) => a.status === 'failed' && a.id !== failed.id);
+  const t2 = releaseLines(release(ctx, { target: second.id })).join('\n');
+  assert.match(t2, /never learned the id of the herdr workspace/);
+  assert.doesNotMatch(t2, /may still have been creating/);
+});
+
+test('a worktree herdr finished removing after a timed-out release is reported as already removed, and the record is closed', () => {
+  const { ctx, eng } = crew();
+  ctx.herdr.failOn = { method: 'removeWorktree', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  const first = release(ctx, { target: eng.id });
+  assert.equal(first.removed, false);
+  assert.equal(readTrail(ctx.mainDir).assignments[0].worktree_removed, false);
+
+  // herdr finished after crew stopped waiting
+  ctx.herdr.failOn = null;
+  rmSync(eng.worktree, { recursive: true, force: true });
+  ctx.herdr.agents = [];
+  assert.deepEqual(board(ctx).leftBehind, []);
+
+  const again = release(ctx, { target: eng.id });
+  assert.equal(again.removed, true);
+  assert.equal(again.worktreeExisted, false);
+  assert.equal(again.assignment.status, 'released');
+  assert.equal(readTrail(ctx.mainDir).assignments[0].worktree_removed, true);
+  assert.ok(!ctx.git.calls.some((c) => c[0] === 'removeWorktree'), 'nothing was left to remove');
+  assert.match(releaseLines(again).join('\n'), /already removed/);
+
+  // the record is closed for good
+  assert.throws(() => release(ctx, { target: eng.id }), /No open assignment matches/);
+});
+
+test('two closed records of one agent name that are both left or gone ask for the assignment id', () => {
+  const { ctx, eng } = crew();
+  ctx.herdr.failOn = { method: 'removeWorktree', code: 'herdr_timeout', message: 'no answer' };
+  release(ctx, { target: eng.id });
+  const second = seat(ctx, { roleId: 'engineer', brief: 'Build another' });
+  assert.equal(second.agent, 'engineer-2'); // the first agent is still listed
+  updateRecord(second.file ?? join(trailDir(ctx.mainDir), `${second.id}.md`), { agent: 'engineer', status: 'released', worktree_removed: false });
+  rmSync(second.worktree, { recursive: true, force: true });
+  assert.throws(() => release(ctx, { target: 'engineer' }), /More than one closed assignment of "engineer"/);
+});
+
+test('a herdr timeout while looking up the workspace says that was what was asked, not the removal', () => {
+  const { ctx, eng } = crew();
+  ctx.herdr.failOn = { method: 'workspaceCheckout', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  const r = release(ctx, { target: eng.id });
+  assert.equal(r.removed, false);
+  assert.ok(existsSync(eng.worktree));
+  assert.ok(!ctx.git.calls.some((c) => c[0] === 'removeWorktree'));
+  assert.match(r.left[0], /asked which worktree/);
+  assert.doesNotMatch(r.left[0], /asked to remove/);
+  assert.match(r.left[0], /release again/);
+
+  // and a timeout of the removal itself still says so
+  const second = crew();
+  second.ctx.herdr.failOn = { method: 'removeWorktree', code: 'herdr_timeout', message: 'no answer' };
+  assert.match(release(second.ctx, { target: second.eng.id }).left[0], /asked to remove the worktree/);
 });

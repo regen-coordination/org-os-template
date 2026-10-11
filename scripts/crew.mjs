@@ -9,17 +9,19 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat } from './crew/core.mjs';
+import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat, typeYourself } from './crew/core.mjs';
 import { createGit } from './crew/git.mjs';
 import { createHerdr, HerdrError } from './crew/herdr.mjs';
-import { CrewError, loadRole } from './crew/roles.mjs';
-import { trailDir } from './crew/trail.mjs';
+import { CrewError } from './crew/roles.mjs';
 
 const USAGE = `Usage: npm run crew -- <command>
 
   board [--json]                                Show seated agents, open handoffs, what needs attention (default)
   seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]
-                                                Seat an agent in a role, in its own worktree
+                                                Seat an agent in a role, in its own worktree.
+                                                --on seats a detached copy of a branch (review);
+                                                --base starts a new branch from a ref, and wins over
+                                                a handoff's branch. Not both.
   nudge <agent|assignment>                      Send the first prompt to an agent that stopped at a startup dialog
   release <agent|assignment> [--outcome done|abandoned]
                                                 Close an assignment; remove its worktree if it has no changes
@@ -109,7 +111,7 @@ function main(argv) {
         roleId: first,
         brief: rest.join(' '),
         task: values.task ?? null,
-        base: values.base ?? 'main',
+        base: values.base ?? null,
         on: values.on ?? null,
         handoff: values.handoff ?? null,
       });
@@ -118,10 +120,9 @@ function main(argv) {
       console.log(`  branch      ${a.branch}${a.detached ? ' (detached copy)' : ''}`);
       console.log(`  worktree    ${a.worktree}`);
       if (a.prompted === 'unconfirmed') {
-        const role = loadRole(ctx.mainDir, a.role);
         console.log(`  The first prompt to ${a.agent} may or may not have arrived: herdr did not confirm it.`);
         console.log(`  Look at ${a.agent}'s pane. If it has not started, type there:`);
-        console.log(`    Read ${role.path} (your role) and ${join(trailDir(ctx.mainDir), `${a.id}.md`)} (your assignment) in full, then begin the work in the brief.`);
+        console.log(`    ${typeYourself(ctx, a)}`);
         console.log('  Do not run nudge: it would send the prompt a second time.');
       } else if (!a.prompted) {
         console.log(`  ${a.agent} has not been given its first prompt. Answer any dialog in its pane, then run: npm run crew -- nudge ${a.agent}`);

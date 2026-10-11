@@ -190,13 +190,19 @@ Steps, in order:
    at `~/.org-os/worktrees/<repo-name>/<assignment-id>`. With `--on <branch>`, create a
    **detached** worktree at that branch's current commit instead and create no branch (used for
    review). It is detached because git refuses to check one branch out in two worktrees.
+   A taken handoff that names a branch also seats a detached copy of it, as `--on` does, unless
+   `--base` is given: an explicit `--base` always wins, the agent gets a new branch from that
+   base, the handoff is still taken, and its branch is named in the assignment file. `--base`
+   together with `--on` is refused.
 5. **Start the agent** in the worktree's herdr pane with the role's kind and model. Its name is
    the role id, or `<id>-2`, `<id>-3` if that name is taken by any live agent on the herdr
    server, crew or not.
 6. **Prompt it once**: it is seated as this role; read the role file and the assignment file
    (both given as absolute paths), then the "Before you begin" section of `roles/README.md`
-   (absolute path in the main checkout) and the files it lists; then begin. `nudge` sends the same
-   prompt. The launcher does not wait for the turn.
+   (absolute path in the main checkout) and the files it lists, which are at the root of the
+   agent's own worktree, not the main checkout's; if the section is missing, say so in the
+   report and begin; then begin. The prompt is one line. `nudge` sends the same prompt, and the
+   "type this yourself" text of an unconfirmed prompt carries the same sentence. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
 
 Worktrees sit outside the repository on purpose. Instances often live inside a synced vault, and
@@ -211,7 +217,7 @@ All enforced in `core.mjs`, not in the skill.
 | Inside herdr | Refuse unless `HERDR_ENV=1`. |
 | Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. Default 4, set by `max_agents` in `roles/circles.yaml`. |
 | Who may seat | A caller whose pane hosts no seated agent is the operator and may always seat. A caller whose pane hosts a seated agent may seat only if that agent's role has `may_seat: true`. The caller is identified from `HERDR_PANE_ID` joined to the trail. |
-| Base exists | Refuse if `--base` or `--on` does not resolve to a commit. |
+| Base exists | Refuse if `--base` or `--on` does not resolve to a commit. Refuse `--base` together with `--on`. |
 | Operator's tree untouched | The launcher never checks out, resets or cleans the main checkout. |
 
 The who-may-seat rule guards against drift. It is not a security boundary: an agent that sets out
@@ -237,8 +243,13 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
 - Closes only the herdr workspace the launcher created for that assignment, and only when the
   worktree was removed. The recorded workspace id is used only while herdr still reports it open
   on that worktree; otherwise the worktree is removed with git. If herdr does not answer
-  (`herdr_timeout`) while it is asked to remove the worktree, git is not used, because herdr may
-  still be doing it: the worktree is left, the reason is listed, and `release` again finishes it.
+  (`herdr_timeout`) while it is asked which worktree the workspace is open on, or asked to
+  remove it, git is not used, because herdr may still be doing it: the worktree is left, the
+  reason names what was asked, and `release` again finishes it.
+- A closed assignment whose record says `worktree_removed: false` but whose worktree is gone
+  (herdr finished after release stopped waiting) is found by `release <id>`: the record is set to
+  `worktree_removed: true` and the command says the worktree was already removed. Nothing is
+  removed and the recorded outcome is kept.
 
 ### 5.3 herdr behaviour, verified 2026-10-10 against herdr 0.9.1
 
@@ -263,13 +274,64 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
    `git worktree list` names its git directory instead.
 5. `herdr agent list` returns every agent on the server; most of the operator's have no `name`.
    Crew agents are matched to assignments by `pane_id`.
-7. `herdr agent start` into a pane that was created a moment ago can fail with "agent target pane
-   <id> is not an available shell": the pane has not reached its shell prompt yet. Seating again
-   a moment later works. `startAgent` therefore retries this one error for up to 8 seconds, every
-   half second, and fails with herdr's text plus how long it waited when the time runs out. The
-   error is recognised by its message, because its code was not recorded when it was first seen.
-   `agent_not_ready` is a different state (the agent is there, stopped at a dialog) and is never
-   retried; nor is any other start error.
+7. `herdr agent start` into a pane that was created a moment ago can fail with code
+   **`agent_pane_busy`** and the message "agent target pane <id> is not an available shell".
+   Read from herdr's source (0.9.1, `agent_start_error_body`) and asserted on the wire by its own
+   tests; the first smoke run recorded the message and not the code. The one code has **two
+   causes**: the pane's shell is not yet in the foreground (waiting helps), or the pane already
+   hosts an agent or a pending start (waiting never helps). herdr 0.9.1 retries this itself for
+   2 seconds, and only while it sees the shell initializing. herdr publishes no error contract:
+   the codes in this section are read from source and may change between releases.
+8. `herdr pane process-info --pane <id>` is read-only and returns
+   `result.process_info.{shell_pid, foreground_process_group_id, foreground_processes[]}`, each
+   process with `name`, `argv0`, `argv` and `pid` (shape observed live on 0.9.1; the process
+   `name` of a running claude was its version string, so crew also matches `argv0`). A pane is an
+   available shell, in herdr's own test, when the foreground process group is the shell's
+   (`foreground_process_group_id == shell_pid`) and nothing else is in it. herdr has no event or
+   field that says a shell reached its prompt.
+9. `startAgent` therefore retries `agent_pane_busy` only while, on each refusal, `pane
+   process-info` and `agent list` show **no agent on that pane** and the shell is **not yet** the
+   foreground. It stops at once, with herdr's text and a plain reason, when an agent is listed on
+   the pane or the agent's kind is in its foreground (cause two), or when the pane cannot be
+   inspected. A bare shell that holds the foreground and is still refused is tried once more (the
+   shell may have arrived between the two calls) and then reported. The wait is bounded at 30
+   seconds, herdr's own default start timeout, and the failure names what was still running. A
+   code that is not in herdr's known start codes and has the old message is treated the same way,
+   for a herdr that returns another code. `agent_not_ready` (the agent is there, stopped at a
+   dialog) and every other start error are never retried.
+10. **A cut-off start may have started the agent.** `agent.start` writes the launch command into
+    the pane and answers before any waiting; the waiting is done by the CLI. A crew-side kill
+    (`herdr_timeout`), herdr's own `timeout`, or `agent_start_transport_failed` leaves the command
+    running, and herdr's `timeout` clears the pending name without killing the process. So after
+    any of these `startAgent` looks, read-only (`agent list`, then `pane process-info`), for an
+    agent on that pane, and treats the seat as started if one is there. It never sends a second
+    start after a cut-off. A second start with the same name returns `agent_name_taken`, which
+    `startAgent` takes to mean the first one took only when the named agent is in that pane.
+11. **What `agent prompt` proves.** `empty_agent_prompt`, `agent_not_found`,
+    `agent_target_ambiguous`, `agent_blocked` and `agent_not_ready` are returned before any input is
+    queued (herdr source, `queue_agent_prompt`), so with a missing binary they prove nothing was
+    sent and leave `prompted: false`. `agent_prompt_failed` is raised both before and after the
+    write with the same code, and a failure after the text leaves a typed but unsubmitted prompt;
+    `timeout`, `agent_prompt_stalled`, `herdr_timeout` and anything unknown stay `unconfirmed`.
+12. **`worktree create` cut off.** On the server the create is a separate thread that runs `git
+    worktree add` and then opens the workspace; a caller that gives up does not cancel it, and no
+    code rolls it back. After a failure or timeout it may have left the branch, the checkout
+    directory and a herdr workspace (and, when the repository had none open, a workspace for it).
+    `worktree remove` never deletes the branch. Crew never receives the id of a workspace opened
+    after it stopped waiting, so the failed record names these in `may_remain` and the operator
+    closes the workspace in herdr.
+
+Not verified against a live herdr, because each needs an experiment that changes herdr's state;
+they are in the smoke run of `docs/CREW.md`:
+
+- why herdr's own 2 second retry did not cover the failure first seen (a slow shell, or a
+  foreground rc job that fails herdr's test): the 30 second ceiling is a bound, not a measurement;
+- that a killed `agent start` leaves the agent running and that a second start then returns
+  `agent_name_taken` (source says so; not observed);
+- that the installed 0.9.1 binary is built from the `v0.9.1` source tag;
+- what git leaves on a killed `git worktree add`;
+- which code `agent get <pane>` or `agent list` gives for a pane with no agent (crew uses the
+  list and reads no code from it).
 
 ## 6. The trail
 
@@ -398,10 +460,11 @@ is what makes a seated lead the agent that seats others. No separate dispatcher 
 
 | Situation | Behaviour |
 |-----------|-----------|
-| A seating step fails | The assignment becomes `failed`, recording the step, herdr's error text and, when herdr gave one, its `error_code`, and names anything already created (branch, worktree). No automatic retry or cleanup. |
-| A call times out (`herdr_timeout`, 60 s) during `worktree create/open` or `agent start` | Seating fails as above and says the worktree or agent may exist anyway, pointing to the board ("Needs release") and `release`. A timed-out call is never retried. |
-| `agent start` says the pane "is not an available shell" | Retried for up to 8 seconds; then it fails with herdr's text and how long it waited. Other start errors, `agent_not_ready` and timeouts are not retried. |
-| The first prompt fails, times out or stalls | herdr states this does not prove non-delivery. The launcher never resends. The assignment stays `working` with `prompted: 'unconfirmed'`, and `nudge` refuses. Only `herdr_missing` (the binary is not on PATH, so nothing can have been sent) leaves `prompted: false`, and `nudge` may then be run. |
+| A seating step fails | The assignment becomes `failed`, recording the step, herdr's error text and, when herdr gave one, its `error_code`. A failure at the worktree step also records `may_remain`: the branch, the checkout directory and a herdr workspace labelled with the agent name, which crew never learned the id of. No automatic retry or cleanup. |
+| A call times out (`herdr_timeout`, 60 s) during `worktree create/open` or `agent start` | Seating fails as above and says the worktree or agent may exist anyway, pointing to the board ("Needs release") and `release`. A timed-out worktree step may still be running in herdr: the message says to wait before releasing, and release repeats that the herdr workspace may remain. A timed-out call is never retried. |
+| `agent start` answers `agent_pane_busy` ("is not an available shell") | Retried only while `pane process-info` and `agent list` show a shell that is not yet in the foreground and no agent on the pane, for at most 30 seconds; then it fails with herdr's text, what was still running and how long it waited. A pane that already has an agent, or one that cannot be inspected, fails at once. Other start errors and `agent_not_ready` are not retried. |
+| An `agent start` is cut off (`herdr_timeout`, herdr's `timeout`, a transport failure) | Crew looks, read-only, for an agent on that pane. One there means the seat started; none means the start fails with the cut-off error and says it looked. A second start is never sent. |
+| The first prompt fails, times out or stalls | herdr states this does not prove non-delivery. The launcher never resends. The assignment stays `working` with `prompted: 'unconfirmed'`, and `nudge` refuses. Only a code that proves nothing was queued leaves `prompted: false` and lets `nudge` run: `empty_agent_prompt`, `agent_not_found`, `agent_target_ambiguous`, `agent_blocked`, `agent_not_ready` and `herdr_missing`. `agent_prompt_failed`, `timeout`, `agent_prompt_stalled` and `herdr_timeout` stay `unconfirmed`. |
 | `release` asks herdr to remove a worktree and herdr times out | The worktree is left, with the reason listed; `release` again finishes it. git does not remove it meanwhile. |
 | herdr restarts, or a pane is closed | The trail is intact. The board lists the assignment under "Needs release". `crew release` closes it. |
 | An agent meets a permission or question dialog | It shows as `blocked`. Only the operator answers it. |

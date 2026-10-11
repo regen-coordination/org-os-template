@@ -117,3 +117,61 @@ test('closeHandoff declines with a reason; only the operator or a lead may', () 
   assert.equal(closed.reason, 'Out of scope this week');
   assert.throws(() => closeHandoff(ctx, { target: h.id, reason: 'again' }), /already declined/);
 });
+
+test('--base wins over the branch a handoff names: a new branch from that base, the handoff taken, its branch named', () => {
+  const { root, ctx, eng } = crew();
+  ctx.git.refs.add(eng.branch);
+  ctx.git.refs.add('feat/base');
+  ctx.herdr.agents = []; // free the cap
+  const h = handoff(asAgent(ctx, eng), { toRole: 'engineer', brief: 'Build on my work', branch: eng.branch });
+  const b = seat(ctx, { roleId: 'engineer', brief: '', handoff: h.id, base: 'feat/base' });
+  assert.equal(b.handoff, h.id);
+  assert.equal(b.detached, false);
+  assert.equal(b.branch, `crew/${b.id}`);
+  const create = ctx.herdr.calls.filter((c) => c[0] === 'createWorktree').pop()[1];
+  assert.equal(create.base, 'feat/base');
+  assert.equal(create.branch, b.branch);
+  assert.ok(!ctx.herdr.calls.some((c) => c[0] === 'openWorktree'), 'no detached copy');
+  const body = readRecord(join(root, 'memory', 'crew', `${b.id}.md`)).body;
+  assert.match(body, /Build on my work/);
+  assert.ok(body.includes(`names branch ${eng.branch}`), body);
+  assert.ok(body.includes('feat/base'), body);
+  const stored = readTrail(ctx.mainDir).handoffs.find((x) => x.id === h.id);
+  assert.equal(stored.status, 'taken');
+  assert.equal(stored.taken_by, b.id);
+});
+
+test('an explicit --base main is explicit: it wins over a handoff branch just as any other ref does', () => {
+  const { ctx, eng } = crew();
+  ctx.git.refs.add(eng.branch);
+  ctx.herdr.agents = [];
+  const h = handoff(asAgent(ctx, eng), { toRole: 'engineer', brief: 'Start fresh', branch: eng.branch });
+  const b = seat(ctx, { roleId: 'engineer', brief: '', handoff: h.id, base: 'main' });
+  assert.equal(b.detached, false);
+  assert.equal(ctx.herdr.calls.filter((c) => c[0] === 'createWorktree').pop()[1].base, 'main');
+});
+
+test('without --base a handoff branch still seats a detached copy, as for a reviewer', () => {
+  const { ctx, eng } = crew();
+  ctx.git.refs.add(eng.branch);
+  ctx.herdr.agents = [];
+  const h = handoff(asAgent(ctx, eng), { toRole: 'reviewer', brief: 'Review it', branch: eng.branch });
+  const rev = seat(ctx, { roleId: 'reviewer', brief: '', handoff: h.id });
+  assert.equal(rev.detached, true);
+  assert.equal(rev.branch, eng.branch);
+  assert.doesNotMatch(readRecord(rev.file ?? join(ctx.mainDir, 'memory', 'crew', `${rev.id}.md`)).body, /names branch/);
+});
+
+test('--base together with --on is refused before anything is written or created', () => {
+  const { ctx } = crew();
+  ctx.git.refs.add('feat/base');
+  ctx.git.refs.add('other');
+  const before = readTrail(ctx.mainDir).assignments.length;
+  const calls = ctx.herdr.calls.length;
+  assert.throws(
+    () => seat(ctx, { roleId: 'reviewer', brief: 'x', base: 'feat/base', on: 'other' }),
+    (err) => /--base/.test(err.message) && /--on/.test(err.message),
+  );
+  assert.equal(readTrail(ctx.mainDir).assignments.length, before);
+  assert.equal(ctx.herdr.calls.length, calls);
+});
