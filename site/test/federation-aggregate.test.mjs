@@ -42,6 +42,13 @@ test("an instance is operational when the registry marks its maturity as product
   assert.match(OPERATIONAL_DEFINITION, /data\/instances\.yaml/);
 });
 
+// The registry's dates of last sync are not published, so the page cannot say how
+// old the label is; it can and must say that a person set it and nothing measures it.
+test("the definition says the maturity is set by hand and not measured", () => {
+  assert.match(OPERATIONAL_DEFINITION, /maintainer sets .* by hand/);
+  assert.match(OPERATIONAL_DEFINITION, /does not measure/);
+});
+
 test("aggregate counts the registered and the operational instances", () => {
   const fed = aggregate({ registryYaml, now: "2026-06-17T00:00:00Z" });
   assert.equal(fed.registered, 3);

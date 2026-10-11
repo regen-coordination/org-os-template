@@ -26,9 +26,11 @@ export function publicInstance(raw) {
 // What the home page counts. The registry's lifecycle ends at `production`
 // (remote → cloned → synced → production); the entries before it include a test
 // fixture, an agent runtime and a development platform, which a reader would not
-// take "instances" to mean.
+// take "instances" to mean. The label is the maintainer's judgement, not a
+// measurement, and the registry's dates of last sync are not published, so the
+// definition says who sets it.
 export const OPERATIONAL_DEFINITION =
-  "An instance is counted as operational when the framework's registry, data/instances.yaml, records its maturity as production.";
+  "An instance is counted as operational when the framework's registry, data/instances.yaml, records its maturity as production. The maintainer sets that value by hand; the site does not measure it.";
 
 export function isOperational(raw) {
   return raw?.maturity === "production";
