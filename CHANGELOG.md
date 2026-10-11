@@ -85,6 +85,13 @@ spec's Status line
     agent's name. An instance that has edited `roles/README.md` keeps working: the three sections
     are found by their `##` headings, and `seat` says when one is missing. The prompt is a file
     under `~/.org-os/worktrees/<repo>/.identity/`, removed by `release`.
+  - So a role file is the agent's identity, not a document it reads once, and every shipped role
+    file gains a `## Voice` section after its Mandate: who the seat is, how it speaks, how it
+    signs its work, and the one question it asks. The headings of the website and platform roles
+    are now "Website steward" and "Platform steward", so their first prompt reads "You are the
+    website steward of the org-os crew". An instance that has its own role files should add a
+    `## Voice` section to each; nothing refuses a role without one. `roles/README.md`'s "A role
+    file" section lists the sections.
   - `nudge`'s help line now says what is true: it sends the first prompt to an agent that has not
     received it, whatever kept it from being sent. The board's line about sync-conflict copies
     now says what Syncthing is and which file it copied.
