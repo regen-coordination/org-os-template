@@ -86,13 +86,18 @@ function logging() {
   return { bin, log: () => readFileSync(join(dir, 'log'), 'utf-8').trim().split('\n') };
 }
 
-test('the adapter reports metadata from source crew, one --token per name, and never sets a ttl', () => {
+// Observed accepted by the live herdr 0.9.1 (client and server) on 2026-10-11: the
+// positional id first, then `--source crew`. The earlier order, options first and
+// the id last, was refused with `unknown option: crew`; `--source=crew` with
+// `unknown option: --source=crew`. Values with spaces, `:`, `=` and `…` were
+// accepted unchanged and read back by `herdr pane get` under `tokens`.
+test('the adapter reports metadata with the id first, from source crew, one --token per name, and never sets a ttl', () => {
   const s = logging();
   const herdr = createHerdr({ bin: s.bin });
   herdr.labelPane('w1:p1', { role: 'engineer', assignment: 'Fix a=b', status: 'working' });
   herdr.labelWorkspace('w1', { role: 'engineer' });
   assert.deepEqual(s.log(), [
-    'pane', 'report-metadata', '--source', 'crew', '--token', 'role=engineer', '--token', 'assignment=Fix a=b', '--token', 'status=working', 'w1:p1',
-    'workspace', 'report-metadata', '--source', 'crew', '--token', 'role=engineer', 'w1',
+    'pane', 'report-metadata', 'w1:p1', '--source', 'crew', '--token', 'role=engineer', '--token', 'assignment=Fix a=b', '--token', 'status=working',
+    'workspace', 'report-metadata', 'w1', '--source', 'crew', '--token', 'role=engineer',
   ]);
 });
