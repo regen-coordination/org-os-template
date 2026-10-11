@@ -15,7 +15,12 @@ deletes this heading.
   under `roles/`; an agent is a session seated in a role in a herdr pane, in its own git
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
   Guide: `docs/CREW.md`.
-  What an operator should know about the fixes found in the first real use:
+  What an operator should know:
+  - Every seat starts by reading its role file, its assignment file and the "Before you begin"
+    list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md` and `MEMORY.md`; `lead` also
+    reads `HEARTBEAT.md` and `AGENTS.md`), and reports which it read and which were absent. The
+    list is there so an agent does not break a boundary a document states. Edit the list in
+    `roles/README.md` to change it for your instance.
   - The board has a `STATUS` column (what the assignment's file says) beside `STATE` (what herdr
     sees now). A `STATUS` of `working (first prompt not sent)` or `working (first prompt
     unconfirmed)` marks an agent that may never have been told its task. The board also lists
@@ -24,12 +29,27 @@ deletes this heading.
   - `release` says only what is true: whether the branch was kept or never created, and whether
     the worktree was removed or left, and what held it back. Run it again on the same assignment
     after you have dealt with that; a retry never forces removal and refuses an `--outcome` that
-    differs from the recorded one.
-  - `seat` waits up to 8 seconds for a new pane's shell before starting the agent. When herdr does
-    not confirm the first prompt, it says the prompt "may or may not have arrived" and tells you
-    to look at the pane; `nudge` refuses in that case so the prompt is not sent twice.
+    differs from the recorded one. If herdr did not answer while release asked it about the
+    worktree, the worktree is left, because herdr may still be removing it; run `release` again
+    and, if herdr had finished, it says the worktree was already removed and closes the record.
+  - A new pane may not have reached its shell when `seat` starts the agent, and herdr then refuses
+    with `agent_pane_busy`. `seat` looks at the pane each time it is refused and waits, for up to
+    30 seconds, only while the shell is not yet in the foreground and no agent is there. It stops
+    at once when an agent is already there. This replaces a fixed 8 second wait.
+  - A start that is cut off may have started the agent anyway, so `seat` looks at the pane before
+    deciding and never sends a second start.
+  - When herdr does not confirm the first prompt, `seat` says the prompt "may or may not have
+    arrived" and tells you to look at the pane; `nudge` refuses, so the prompt is not sent twice.
+    Six answers prove that nothing was sent (herdr not installed, an empty prompt, an agent herdr
+    cannot find or finds twice, an agent at an approval dialog, an agent not ready): the agent then
+    counts as not prompted, and `nudge` works once the cause is dealt with.
   - A herdr call that does not answer within 60 seconds fails with `herdr_timeout`; a failed
-    assignment keeps herdr's error code beside its message.
+    assignment keeps herdr's error code beside its message. A seating that failed or timed out at
+    the worktree step names what may be left behind (the branch, the checkout directory, and a
+    herdr workspace that crew cannot close, so you close it in herdr). A timed-out call is never
+    retried.
+  - `seat --handoff <id> --base <ref>` takes a handoff and builds on a new branch from `<ref>`,
+    where it used to seat a review copy of the handoff's branch. `--base` with `--on` is refused.
   - Syncthing, the file-sync tool, can keep a second copy of a file whose name contains
     `.sync-conflict-` when two machines change it at once. A copy of a file in `memory/crew/` is no
     longer counted as a second assignment: the board lists it under "Sync conflict copies" and

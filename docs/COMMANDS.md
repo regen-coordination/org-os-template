@@ -263,8 +263,8 @@ npm run crew                                  # The board: seated agents, open h
 npm run crew -- board --json                  # The same data, for scripts
 npm run crew -- seat <role> "<brief>"         # Seat an agent in a role, in its own worktree
 npm run crew -- seat <role> "<brief>" --task <id> --base <ref> --on <branch> --handoff <id|file>
-                                              # Options: record a task, branch from <ref>, review a branch on a copy not on the branch, answer a handoff
-npm run crew -- nudge <agent|assignment>      # Send the first prompt to an agent that stopped at a startup dialog
+                                              # Options: record a task, branch from <ref> (wins over a handoff's branch), review a branch on a copy not on the branch, answer a handoff
+npm run crew -- nudge <agent|assignment>      # Send the first prompt to an agent that did not get it (stopped at a startup dialog, or herdr was missing)
 npm run crew -- release <agent|assignment> [--outcome done|abandoned]
                                               # Close an assignment; its branch is kept; the worktree is removed only if nothing in it would be lost
 npm run crew -- handoff-close <id|file> --reason "<text>"   # Decline an open handoff
