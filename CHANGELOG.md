@@ -21,7 +21,8 @@ racing `.git/index.lock` across registries).
 - **Crew — role-based agents in herdr** (`npm run crew`, module `org-os-crew`). Roles are files
   under `roles/`; an agent is a session seated in a role in a herdr pane, in its own git
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
-  Guide: `docs/CREW.md`. Targets 0.6.0.
+  Guide: `docs/CREW.md`. Targets 0.6.0. Built on the `feat/crew` branch; not yet merged into
+  `main`.
   What an operator should know about the first cycle's fixes:
   - The board has a `STATUS` column (what the assignment's file says) beside `STATE` (what herdr
     sees now), and a "Worktrees left behind" list for released assignments whose worktree was
