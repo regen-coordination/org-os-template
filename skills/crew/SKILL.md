@@ -45,6 +45,10 @@ that ref, with the handoff still taken. `--base` and `--on` cannot be combined.
 A brief that starts with a dash is read as an option: put `--` before it, after any flags
 (`seat <role> --task <id> -- "<brief>"`; the same for `handoff`).
 
+For a `claude` agent the role is also its system prompt, so it keeps its role for the whole
+session; the first prompt still names the role file. Reports are headed with the role and the
+agent's name.
+
 If you are a **seated agent**, your assignment file gives you two commands with absolute paths,
 `report` and `handoff`. Use those exactly as written. Only the lead role and the operator may
 seat, release, or close handoffs.

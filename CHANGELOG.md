@@ -66,11 +66,25 @@ spec's Status line
     cannot find or finds twice, an agent at an approval dialog, an agent not ready): the agent then
     counts as not prompted, and `nudge` works once the cause is dealt with.
   - herdr's sidebar can show who is who. When `seat` starts an agent, crew reports its role, the
-    first line of its brief (cut to 32 characters) and its status (`working`, then `reported`)
+    title (see `--title` below) and its status (`working`, then `reported`)
     to herdr for the agent's pane, and role and assignment for its workspace. They show only
     after you add `$role`, `$assignment` and `$status` rows to your own herdr `config.toml`;
     the lines are in `docs/CREW.md`, and crew never edits that file. If herdr refuses a label,
     `seat` still seats the agent and says so on one line. Release is unchanged.
+  - `seat` takes `--title "<short title>"`: what the agent works on, at most 24 characters (a
+    longer one is refused; without it the title is cut from the brief's first line). The title is
+    the agent's label in herdr's sidebar, replacing the 32-character cut of the brief, and the
+    board's ASSIGNMENT column; a second agent in a role is named from it (`engineer-cursor-race`)
+    where it was `engineer-2`, and a `claude` session is named `<role>: <title>`. Records made
+    before titles have none and still render from their brief. Nothing to migrate.
+  - A `claude` agent now carries its role as its system prompt for the whole session
+    (`--append-system-prompt-file`): the role file's body, the shared boundaries, what always
+    needs the operator and the charter from `roles/README.md`, and which seat it is. Other kinds
+    behave as before, and every first prompt still names the role file. The first prompt now
+    begins "You are the reviewer of the org-os crew". A report is headed with the role and the
+    agent's name. An instance that has edited `roles/README.md` keeps working: the three sections
+    are found by their `##` headings, and `seat` says when one is missing. The prompt is a file
+    under `~/.org-os/worktrees/<repo>/.identity/`, removed by `release`.
   - `nudge`'s help line now says what is true: it sends the first prompt to an agent that has not
     received it, whatever kept it from being sent. The board's line about sync-conflict copies
     now says what Syncthing is and which file it copied.

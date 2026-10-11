@@ -132,9 +132,21 @@ Frontmatter fields, all required unless noted:
 | `may_seat` | Whether an agent in this role may seat other roles. `true` only for `lead` in the shipped set. |
 | `skills` | Optional. Names of skills the role is expected to use; advisory, read by the agent. |
 
-The frontmatter is read by the launcher. The body is read by the agent. The body is handed over
-as a file path in the first prompt, never through a flag specific to one agent kind, so a role
-works unchanged across kinds.
+The frontmatter is read by the launcher. The body is read by the agent, in two ways. Every kind
+is given the role file's path in the first prompt, so a role works unchanged across kinds and a
+session that is resumed or compacted can read it again. A kind whose flag is verified is also
+given the body as its system prompt (5, step 5): `claude` through `--append-system-prompt-file`.
+
+**Changed 2026-10-11.** This section used to say the body is handed over as a file path "never
+through a flag specific to one agent kind". It is reversed, for these reasons:
+
+- Per-kind arguments already exist (`model`, and `effort` for `claude`), so a role never worked
+  "unchanged" at the command line; the rule protected something already spent.
+- A role read once at the start of a session fades as the session grows, and an agent told once
+  to read a file is a generic session. The operator asked that an agent embody its role for the
+  whole session, and only the system prompt does that.
+- The role file is unchanged and still works for every kind. A kind without a verified flag gets
+  the file path in its first prompt, as before, and nothing else is different for it.
 
 ### 4.2 Shared boundaries
 
@@ -212,12 +224,29 @@ Steps, in order:
    before anything is written. It is stored on the record as `title`. For `claude` the start also
    carries `--name "<role>: <title>"` (`claude --help`: `-n, --name`; accepted by a live
    non-interactive call, 2026-10-11) so the session shows who it is; no other kind is given one.
-6. **Prompt it once**: it is seated as this role; read the role file and the assignment file
+   For a kind with a verified flag (`claude`), the start also carries the **identity prompt**,
+   composed by `composeIdentity` in `core.mjs` and written, before the worktree is created, by
+   `scripts/crew/identity.mjs` to `<worktree root>/<repo name>/.identity/<assignment-id>.md`:
+   outside the agent's worktree (an untracked file there would stop `release` removing it) and
+   not a `.md` file of `memory/crew/` (`readTrail` would read it as a record). It holds two lines
+   saying which seat this is (role, agent name, assignment id, the assignment file's path and the
+   role file's), the role file's body, and the `## Shared boundaries`, `## What always needs the
+   operator` and `## The cooperative charter` sections of `roles/README.md`, in that order. A
+   README that lacks one of the three still seats the agent and the output says which is missing.
+   It is passed as `--append-system-prompt-file <path>`: a file, because arguments travel through
+   `herdr agent start … -- <args>` and a whole role is too long to quote (herdr itself refuses an
+   argument it "cannot encode safely for the target shell", `invalid_agent_argument`). A failure
+   to write it fails the seat at step `identity`, recorded like any other step, before anything
+   exists to clean up. `release` removes the file; the file is read once, when the agent starts.
+6. **Prompt it once**: it is seated as this role, addressed by the role file's own first heading
+   ("You are the reviewer of the org-os crew"); read the role file and the assignment file
    (both given as absolute paths), then the "Before you begin" section of `roles/README.md`
    (absolute path in the main checkout) and the files it lists, which are at the root of the
    agent's own worktree, not the main checkout's; if the section is missing, say so in the
-   report and begin; then begin. The prompt is one line. `nudge` sends the same prompt, and the
-   "type this yourself" text of an unconfirmed prompt carries the same sentence. The launcher does not wait for the turn.
+   report and begin; then begin. The prompt is one line and is the same for every kind, so the
+   system prompt of step 5 is in addition to it: a session that is resumed or compacted can read
+   its role again from the path. `nudge` sends the same prompt, and the "type this yourself" text
+   of an unconfirmed prompt carries the same sentence. The launcher does not wait for the turn.
 7. **Set the assignment to `working`** and print the agent name, branch and worktree path.
 8. **Label the pane and the workspace** (5.3 item 13): role, the title and the status, as
    display-only herdr metadata. A refusal never fails the seat and never changes the record; the
@@ -366,6 +395,20 @@ Checked on a throwaway repository; `herdr.mjs` and `git.mjs` are written to thes
     and `$status`; that is the operator's own edit of `config.toml` (`docs/CREW.md`), which crew
     never makes.
 
+14. **Claude Code's flags, 2026-10-11, claude 2.1.296.** `claude --help` lists `--append-system-prompt
+    <prompt>` and `-n, --name <name>`, and names `--append-system-prompt[-file]` under `--bare`
+    without listing the file form on its own line. Two non-interactive calls from a scratch
+    directory outside the repository, on `--model haiku`: `claude -p --append-system-prompt-file
+    <file saying "answer: I am the test seat"> "Which seat are you? Answer in five words."`
+    answered `I am the test seat.`, so the file form exists and its text reaches the model; the
+    same call with `--name "engineer: Fix a thing"` added was accepted and answered the same.
+    Not observed: where `--name` shows in an interactive session (the help says the prompt box,
+    the `/resume` picker and the terminal title), and whether herdr's agent detection is
+    unaffected by the extra arguments (an interactive start through herdr was not run).
+    herdr 0.9.1's binary carries the error `invalid_agent_argument` ("agent arguments cannot be
+    encoded safely for the target shell"), so arguments with spaces are encoded by herdr or
+    refused; they are not split. Read from the binary's strings, not exercised.
+
 Not verified against a live herdr, because each needs an experiment that changes herdr's state;
 they are in the smoke run of `docs/CREW.md`:
 
@@ -408,7 +451,7 @@ updated: 2026-10-10T20:31:40-03:00
 ## Brief
 …
 
-## Report
+## Report — engineer (engineer-cursor-race) — 2026-10-10T21:02:11-03:00
 (appended by the agent)
 ```
 
@@ -418,13 +461,17 @@ and `abandoned`.
 **Who writes what:**
 
 - The launcher writes the file and every status except `reported`.
-- The agent appends its `## Report` and sets `reported` by running the main checkout's script,
+- The agent appends its report and sets `reported` by running the main checkout's script,
   `node <main checkout>/scripts/crew.mjs report --file <path>` (or with the report on standard
   input). The exact command, with absolute paths, is written into the assignment file under
   `## Commands`. The main checkout's script is used because a fresh worktree has no installed
   dependencies. Agents do not edit trail files by hand.
 - The operator commits `memory/crew/` at session close, like the rest of memory. Agents never
   commit the trail.
+
+A report is headed with who wrote it, beside the timestamp: `## Report — <role> — <time>`, or
+`## Report — <role> (<agent name>) — <time>` when the agent's name is not the role id. A report
+written before this had `## Report — <time>`; it is still read, and a new one is appended after it.
 
 The two things an agent may do outside its worktree are therefore both commands, not free
 writes: `crew report` and `crew handoff`.
@@ -526,6 +573,7 @@ is what makes a seated lead the agent that seats others. No separate dispatcher 
 
 | Situation | Behaviour |
 |-----------|-----------|
+| The identity prompt cannot be written (`claude` only) | Seating fails at step `identity`, before any worktree or pane is made, so nothing is left to clean up; the record says why and `release` closes it. |
 | A seating step fails | The assignment becomes `failed`, recording the step, herdr's error text and, when herdr gave one, its `error_code`. A failure at the worktree step also records `may_remain`: the branch, the checkout directory and a herdr workspace labelled with the agent name, which crew never learned the id of. No automatic retry or cleanup. |
 | A call times out (`herdr_timeout`, 60 s) during `worktree create/open` or `agent start` | Seating fails as above and says the worktree or agent may exist anyway, pointing to the board ("Needs release") and `release`. A timed-out worktree step may still be running in herdr: the message says to wait before releasing, and release repeats that the herdr workspace may remain. A timed-out call is never retried. |
 | `agent start` answers `agent_pane_busy` ("is not an available shell") | Retried only while `pane process-info` and `agent list` show a shell that is not yet in the foreground and no agent on the pane, for at most 30 seconds; then it fails with herdr's text, what was still running and how long it waited. A pane that already has an agent, or one that cannot be inspected, fails at once. Other start errors and `agent_not_ready` are not retried. |

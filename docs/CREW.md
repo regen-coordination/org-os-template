@@ -42,6 +42,17 @@ none of this; the agent reports what it read and what was absent.
   for review.
 - `--task <id>` records a task id from `data/tasks.yaml` on the assignment.
 
+**The role is the agent's identity.** For a `claude` agent, crew also starts the session with
+the role as an appended system prompt (`--append-system-prompt-file`): the role file's body, the
+"Shared boundaries", "What always needs the operator" and "The cooperative charter" sections of
+`roles/README.md`, and two lines saying which seat this is. The first prompt still names the role
+file, so a session that is resumed or compacted can read it again; other kinds (`codex`, …) get
+only the first prompt, as before. The prompt is a file under
+`~/.org-os/worktrees/<repo>/.identity/`, outside the agent's worktree, and `release` removes it.
+If `roles/README.md` has lost one of the three sections, `seat` says which and goes ahead. For
+`claude` the session is also named `<role>: <title>`, which Claude Code shows in its prompt box and
+`/resume` list.
+
 **Names.** The first agent in a role is named by the role id (`engineer`). A further agent in
 the same role is named from its title, `<role>-<title as a slug>`: `engineer-cursor-race-in-kms`,
 cut to herdr's limit of 32 characters, so two engineers do not look alike on the board. Only
@@ -246,8 +257,8 @@ usage. Use a throwaway brief.
 3. If it says the agent has not been prompted, answer the dialog in its pane and run
    `npm run crew -- nudge engineer`.
 4. `npm run crew` while it works → one row, state `working`, then `idle` or `done`.
-5. When it reports: the assignment file in `memory/crew/` ends with a `## Report` section and
-   its status is `reported`.
+5. When it reports: the assignment file in `memory/crew/` ends with a `## Report — engineer — <time>`
+   section and its status is `reported`.
    **Label check** (needs the config lines from "See the crew in herdr's sidebar"): the agent's
    row in herdr's sidebar shows `engineer`, `Smoke run. Create SMOKE.md` (the title cut from
    the brief at a word boundary, since the smoke command gives none) and `working`, then
