@@ -30,7 +30,7 @@ export const ALLOW_UNVERIFIED = false;
 export const PAGES = [
   { source: "docs/OVERVIEW.md", slug: "overview", title: "Overview", section: "start", order: 10,
     summary: "What org-os is, what an instance contains, and which page documents each part",
-    verified: "214e2e4d06eed1f646c26ae938cb0d0c858af99f",
+    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
     covers: ["IDENTITY.md", "federation.yaml", "data", "skills", ".well-known", "schemas", "templates", "package.json"] },
   { source: "docs/SETUP.md", slug: "setup", title: "Setup", section: "start", order: 20,
     summary: "Create an instance: clone the framework, generate from a config, check with the doctor, publish its schemas.",
@@ -123,7 +123,7 @@ export const PAGES = [
     covers: ["packages/org-os-kms/src/atproto/", "packages/org-os-kms/src/ops.mjs", "packages/org-os-kms/src/static/", "packages/org-os-kms/src/manifest.mjs", "packages/toolkit-framework/src/publishable.mjs"] },
   { source: "docs/FEDERATION-MAP.md", slug: "federation-map", title: "Federation map", section: "knowledge", order: 70,
     summary: "map.json, the frontier fetch, the HTML artifact and the <federation-map> element",
-    verified: "8587d2106d2be7b804914999cfcae2cf918381c4",
+    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
     covers: ["packages/org-os-kms/src/map.mjs", "packages/org-os-kms/src/frontier.mjs", "packages/org-os-kms/src/render-map-html.mjs", "packages/org-os-federation-map/src/", "site/scripts/aggregate-federation.mjs"] },
 
   { source: "docs/MODULES.md", slug: "modules", title: "Modules", section: "modules", order: 10,
@@ -169,7 +169,7 @@ export const PAGES = [
     covers: ["scripts/validate-structure.mjs", "scripts/lib/clone-excludes.mjs", "scripts/clone-framework.mjs", "scripts/generate-all-schemas.mjs", ".well-known/", "templates/scaffold/"] },
   { source: "docs/DATA-MODEL.md", slug: "data-model", title: "Data model", section: "reference", order: 20,
     summary: "Every data/*.yaml registry: top-level key, fields, types, who reads it, and what is not enforced",
-    verified: "ff1e1f2d4bdb0eff924946c987ebdd8fb7646028",
+    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
     covers: ["data/", "packages/admin/schemas/", "packages/admin/server/registries.ts", "scripts/generate-all-schemas.mjs", "scripts/validate-structure.mjs", "scripts/validate-identity.mjs", "scripts/initialize.mjs", "scripts/graph-gaps.mjs", "scripts/analyze-instances.mjs"] },
   { source: "docs/FEDERATION.md", slug: "federation", title: "Federation", section: "reference", order: 30,
     summary: "federation.yaml fields and who reads them, the lineage stamp, sync, drift report, .well-known, the map",
@@ -198,7 +198,7 @@ export const PAGES = [
 
   { source: "docs/ARCHITECTURE.md", slug: "architecture", title: "Architecture", section: "concepts", order: 10,
     summary: "The six layers of the framework, what is in each, and why it is built from files",
-    verified: "1914c74f282dd4e064937e4b11a709d089d9eae8",
+    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
     covers: ["AGENTS.md", "federation.yaml", "data/", ".well-known/", "skills/", "scripts/", "packages/", "modules/", ".claude/settings.json", ".github/workflows/generate-schemas.yml", ".github/workflows/drift.yml"] },
   { source: "docs/AGENTIC-ARCHITECTURE.md", slug: "agentic-architecture", title: "Agentic architecture", section: "concepts", order: 20,
     summary: "The ten-step startup sequence, what an agent may edit, skills, personas and hosts",
@@ -214,7 +214,7 @@ export const PAGES = [
     covers: ["skills/workspace-improver", "MASTERPLAN.md", "data/skills-matrix.yaml"] },
   { source: "docs/ECOSYSTEM.md", slug: "ecosystem", title: "Ecosystem", section: "concepts", order: 50,
     summary: "Org-os instances, related projects and external systems, as recorded in this repository",
-    verified: "8587d2106d2be7b804914999cfcae2cf918381c4",
+    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
     covers: ["federation.yaml", "data/instances.yaml", "data/ecosystems.yaml", "repos.manifest.json"] },
 ];
 

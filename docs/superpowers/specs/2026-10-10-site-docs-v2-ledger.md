@@ -1013,3 +1013,46 @@ sentence.
 focused and is named after its columns; the verifier fails on one outside. Seen at 375px on
 `/docs/commands` in both themes; measured there with the keyboard. Could not check: a table
 written as raw HTML (none exists; the verifier would report it), a screen reader, a real phone.
+
+**Unlisted entries (2026-10-11, the operator's decision).** `data/instances.yaml` has eight
+entries; two are marked `listed: false` (`bread-coop-os`, `openclaw`; `9cd5b2a`). The site now
+leaves them out.
+
+- Checked, on the build: `federation.json` has six nodes (ReFi Barcelona, ReFi DAO, DAO OS, Regen
+  Coordination, ReFi Mediterranean, Regen Web3 Toolkit), `registered` 6, `operational` 2, the same
+  six keys as before and no `listed`; the federation page has six `<li data-instance>`; the home
+  page says 2 operational of 6 registered. The verifier prints each of these.
+- Checked, that the guards fail: with `isListed` made to return true, seven tests of
+  `site/test/federation-aggregate.test.mjs` fail; with "Bread Cooperative" written into the built
+  list, "openclaw" into the built `federation.json` and an 8 into the home page's count,
+  `npm run verify` exits 1 with six `REGISTRY:` lines that name the entry and the count.
+- Checked, the rule: only the literal `false` unlists. A missing field, `null`, or a mistyped
+  `"false"` keeps the entry on the list (the root test `tests/scripts/instances-listed.test.mjs`
+  already fails on a value that is not a boolean).
+- The leak check still reads all eight entries: an unlisted entry's notes, flags and local path
+  are as private as any other's (24 sentences, 8 notes, 14 flags and paths, none found).
+- **The map is not changed, and it disagrees with the list.** It is drawn from `federation.yaml`
+  (`buildMap`), which has no `listed`. The built `map.json` has nine ring-1 instance nodes, among
+  them `bread-coop-os` ("Bread Cooperative", type Cooperative) and `openclaw` (type AgentRuntime),
+  each with no link and no counts. The `mini` map on the home page labels ring-1 nodes, so a
+  visitor reads both names there, beside "of 6 registered", and again on `/federation` above a
+  list of six. Whether the map should follow the list is the operator's; the change would be in
+  `packages/org-os-kms` or `federation.yaml` (`engineer`'s), not in `site/`.
+- `docs/ECOSYSTEM.md`, a published page, still has a row for bread-coop-os and a line for
+  openclaw. It is a document about the ecosystem and says the first is fictional; the decision
+  was about the federation page's list. Not changed; named here so it is a choice and not an
+  oversight.
+- Re-stamped at `7a80443`, each read against the one covered path that changed since its stamp
+  (`data/instances.yaml`, two added `listed: false` lines and nothing else, by `git diff`):
+  `data-model` (the `listed` paragraph beside `isListed`, `registryView` and the root test, which
+  passes; eight entries; `grep` finds no reader of `listed` in `scripts/` or `packages/*/src`, so
+  the drift analysis, the quilt and the dashboard do read every entry); `federation-map` (step 1
+  beside the built `federation.json` and the verifier); `overview`, `architecture` and
+  `ecosystem` (what each says of the registry does not depend on the new field: the file's
+  existence, its place in the framework repository, and the six rows' types and maturities).
+- Seen, in headless Chrome on a throwaway profile at 1280px, light theme, from `astro preview`:
+  `/federation` shows the map with "Bread Cooperative" and "openclaw" labelled as green ring-1
+  nodes, and below it "The 6 instances the framework's registry lists" and six rows; the home
+  page says "2 operational instances, of 6 registered" above a small map on which both names
+  can be read.
+- Could not check: phone width, the dark theme, a screen reader's reading of the map's table.

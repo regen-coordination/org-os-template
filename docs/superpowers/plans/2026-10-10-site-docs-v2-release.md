@@ -60,6 +60,15 @@
 - `docs/ECOSYSTEM.md` and `docs/FEDERATION-MAP.md` re-stamped at `8587d21`; the excerpt length measured (32) and kept at 40, with the reason in the test file.
 - Left by it, for others: the federation map's labels collide (`packages/org-os-federation-map`, handed to `engineer`).
 
+## Task 1f — Unlisted entries (local)
+
+> **Done 2026-10-11** by the website steward, on the operator's decision ("yes, drop the fixture and the runtime from the list"), from `engineer`'s field (`9cd5b2a`) and `commons-steward`'s paragraph (`b02ded3`).
+
+- An entry of `data/instances.yaml` marked `listed: false` is not in `federation.json` or on the federation page, and is in neither count: the page lists six, the home page says 2 operational of 6 registered (`site/scripts/federation-aggregate.mjs`, `isListed` and `registryView`).
+- The verifier takes its expected list and counts from `registryView`, checks `registered` (it did not before), reads the registered count back from both pages, and fails naming the entry when an unlisted one is printed.
+- The sentences in `docs/DATA-MODEL.md` and `docs/FEDERATION-MAP.md` on what the site does with `listed` are corrected (the lead's call; nothing else in `docs/`). Five pages re-stamped at `7a80443`; `npm run drift` reports no drifted page.
+- Left by it, for the operator: the map still draws "Bread Cooperative" and "openclaw" as ring-1 instances, on the home page and on `/federation`, because it is drawn from `federation.yaml`; and `docs/ECOSYSTEM.md`, a published page, names both. The ledger says what a visitor sees.
+
 ## Task 2 — The operator looks at it (by eye)
 
 `cd site && npm run build && npm run preview`, then `http://localhost:4321/org-os-template/`. Each section at desktop and phone width, both themes; keyboard through nav, sidebar, search, theme switch and prompt bar; one page with script off. The look and the interactive elements (one commit, `599b3db`, adjusted in `a195c76`) are a first pass made without the operator present: keep, dial down or drop.

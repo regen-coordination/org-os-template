@@ -221,7 +221,10 @@ URL; it is unit-tested. The label is created in the repository as part of the re
   instance that was not read at build has no status, and the home page counts operational
   instances (maturity `production`) with that definition beside the number. The first draft of
   this line read "Unchanged apart from fresh data", which left the page printing the registry's
-  notes.
+  notes. Amended again the same day, on the operator's decision ("drop the fixture and the
+  runtime from the list"): an entry the registry marks `listed: false` is not on the list, and
+  the registered and operational counts follow the list. The map is drawn from `federation.yaml`
+  and is not changed by this; it still draws both.
 - **Docs index.** The six sections with every page and its summary.
 - **Removed:** `/get-started`, `/about` (redirects, §3).
 - **Nav:** Docs · Modules · Federation · search · theme toggle.
