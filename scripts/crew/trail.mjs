@@ -89,17 +89,17 @@ export function briefOf(body) {
 
 export function readTrail(mainDir) {
   const dir = trailDir(mainDir);
-  const trail = { assignments: [], handoffs: [], unreadable: [] };
+  const trail = { assignments: [], handoffs: [], unreadable: [], conflicts: [] };
   if (!existsSync(dir)) return trail;
   for (const name of readdirSync(dir).sort()) {
     const file = join(dir, name);
     if (!name.endsWith('.md')) continue;
     // Syncthing keeps the losing side of a conflict as a copy of the file. It is
-    // not a record: counted, it would be a second assignment. It is listed with
-    // the unreadable files so the operator sees it and can merge it by hand,
-    // because it may hold the newer state. It is never deleted.
+    // not a record: counted, it would be a second assignment. It is listed on
+    // its own, apart from unreadable files, so the operator sees what it is and
+    // can merge it by hand, because it may hold the newer state. Never deleted.
     if (name.includes('.sync-conflict-')) {
-      trail.unreadable.push(name);
+      trail.conflicts.push(name);
       continue;
     }
     const isHandoff = name.startsWith('handoff-');

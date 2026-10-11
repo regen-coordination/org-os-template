@@ -81,6 +81,7 @@ function assignmentBody(ctx, brief, role) {
     ? [
         `- See who is seated, open handoffs and what needs attention: \`${cmd('board')}\``,
         `- Seat an agent: \`${cmd('seat <role> "<brief>" [--task <id>] [--base <ref>] [--on <branch>] [--handoff <id|file>]')}\``,
+        '  A brief that starts with a dash goes after `--`, after any flags: `seat <role> [--task <id>] -- "<brief>"`.',
         '  The new worktree starts from `main` unless you pass `--base <ref>`. If the code to work on is not on `main`, pass `--base` with its branch.',
         `- Send the first prompt to an agent that stopped at a startup dialog: \`${cmd('nudge <agent|assignment>')}\``,
         `- Close an assignment: \`${cmd('release <agent|assignment> [--outcome done|abandoned]')}\``,
@@ -98,6 +99,7 @@ function assignmentBody(ctx, brief, role) {
     '',
     `- Report when you finish or cannot continue: \`node "${ctx.scriptPath}" report --file <path to your report>\``,
     `- Ask another role to take something on: \`node "${ctx.scriptPath}" handoff <role> "<brief>" [--branch <branch>]\``,
+    '  A brief that starts with a dash goes after `--`, after any flags: `handoff <role> [--branch <branch>] -- "<brief>"`.',
     ...lead,
     '',
     `Shared boundaries and the charter: ${join(ctx.mainDir, 'roles', 'README.md')}`,
@@ -213,15 +215,22 @@ export function seat(ctx, { roleId, brief, task = null, base = 'main', on = null
       try {
         ctx.herdr.promptAgent(name, firstPrompt(role.path, file));
         prompted = true;
-      } catch {
+      } catch (err) {
         // herdr says a failed or timed-out prompt does not prove non-delivery,
-        // so the prompt is never resent: not here, and not by nudge.
-        prompted = 'unconfirmed';
+        // so the prompt is never resent: not here, and not by nudge. Only a
+        // missing herdr binary proves nothing was sent; herdr's own refusals are
+        // not known well enough to trust.
+        prompted = err.code === 'herdr_missing' ? false : 'unconfirmed';
       }
     }
   } catch (err) {
     updateRecord(file, { status: 'failed', failed_step: step, error: String(err.message || err), ...(err.code ? { error_code: String(err.code) } : {}), updated: stamp(ctx) });
-    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.`);
+    // A call that timed out may still have happened: herdr was asked, and it never said no.
+    const maybe =
+      err.code === 'herdr_timeout'
+        ? ` herdr did not answer, so the ${step === 'start' ? 'agent' : 'worktree'} may exist anyway. Look at the board; if this assignment is under "Needs release", run release ${id} to close it.`
+        : '';
+    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
   return updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
@@ -248,7 +257,10 @@ export function nudge(ctx, { target }) {
   const rolePath = loadRole(ctx.mainDir, a.role).path;
   try {
     ctx.herdr.promptAgent(a.agent, firstPrompt(rolePath, a.file));
-  } catch {
+  } catch (err) {
+    if (err.code === 'herdr_missing') {
+      throw new CrewError(`The herdr command was not found on PATH, so nothing was sent to ${a.agent}. Fix that and run nudge again.`);
+    }
     // Attempted and not confirmed: from here on it is case (b), never resent.
     updateRecord(a.file, { prompted: 'unconfirmed', updated: stamp(ctx) });
     throw new CrewError(unconfirmedMessage(ctx, a, 'herdr did not confirm it'));
@@ -365,6 +377,7 @@ export function release(ctx, { target, outcome }) {
   }
 
   let removed = false;
+  let rescueFailed = false;
   let rescued = closed ? a.rescued_branch ?? null : null;
   let left = [];
   const worktreeExisted = ctx.git.worktreeExists(a.worktree);
@@ -380,11 +393,13 @@ export function release(ctx, { target, outcome }) {
       try {
         rescued = ctx.git.rescueDetached(a.worktree, `crew/${a.id}`) ?? rescued;
       } catch (err) {
+        rescueFailed = true;
         left = [`Commits made in the detached copy could not be saved to a branch: ${err.message || err}`, ...left];
       }
     }
     if (left.length === 0) {
       let viaHerdr = false;
+      let timedOut = false;
       try {
         // herdr removes the worktree and closes the workspace it opened for it,
         // but only while that workspace id still names this worktree: after a
@@ -393,10 +408,14 @@ export function release(ctx, { target, outcome }) {
           ctx.herdr.removeWorktree(a.workspace);
           viaHerdr = true;
         }
-      } catch {
-        // fall through to git
+      } catch (err) {
+        // A timed-out herdr may still be removing the worktree: git must not race
+        // it. Anything else falls through to git.
+        timedOut = err.code === 'herdr_timeout';
       }
-      if (viaHerdr) {
+      if (timedOut) {
+        left = ['herdr did not answer when asked to remove the worktree and may still be doing it. Wait a little, then run release again.'];
+      } else if (viaHerdr) {
         removed = true;
       } else {
         try {
@@ -411,7 +430,7 @@ export function release(ctx, { target, outcome }) {
   // A retry never changes how the assignment ended.
   const status = closed ? a.status : OUTCOME_STATUS[outcome ?? 'done'];
   const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
-  return { assignment, removed, left, rescued, worktreeExisted, branchKept: ctx.git.resolves(a.branch) };
+  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, branchKept: ctx.git.resolves(a.branch) };
 }
 
 /** What `release` tells the operator: one sentence per line, only what is true. */
@@ -430,7 +449,14 @@ export function releaseLines(r) {
   } else {
     out.push(r.branchKept ? `  Its branch ${x.branch} is kept.` : `  Its branch ${x.branch} was never created, so there is no branch to keep.`);
   }
-  if (r.rescued) out.push(`  Commits made in the detached copy were saved as branch ${r.rescued}.`);
+  if (r.rescued) {
+    // On a failed retry the branch comes from an earlier release; this run saved nothing.
+    out.push(
+      r.rescueFailed
+        ? `  Commits saved by an earlier release are on branch ${r.rescued}.`
+        : `  Commits made in the detached copy were saved as branch ${r.rescued}.`,
+    );
+  }
   if (r.removed) {
     out.push(r.worktreeExisted ? '  The worktree was removed.' : `  There was no worktree at ${x.worktree} to remove.`);
   } else {
@@ -450,6 +476,8 @@ export function board(ctx) {
     const live = a.pane ? byPane.get(a.pane) : null;
     if (ACTIVE.includes(a.status) && live) {
       rows.push({
+        // true, false (never sent) or 'unconfirmed' (sent, not confirmed). An old record without it is not flagged.
+        prompted: a.prompted === false || a.prompted === 'unconfirmed' ? a.prompted : true,
         agent: a.agent,
         role: a.role,
         state: live.state,
@@ -469,7 +497,7 @@ export function board(ctx) {
     .filter((h) => h.status === 'open')
     .map((h) => ({ id: h.id, from_role: roleOf.get(h.from) || h.from, to_role: h.to_role, brief: h.brief.split('\n')[0] }));
   const leftover = leftBehind(ctx, trail).map((a) => ({ id: a.id, status: a.status, worktree: a.worktree }));
-  return { rows, handoffs, needsRelease, leftBehind: leftover, unreadable: trail.unreadable };
+  return { rows, handoffs, needsRelease, leftBehind: leftover, unreadable: trail.unreadable, conflicts: trail.conflicts };
 }
 
 function age(created, now) {
@@ -481,6 +509,12 @@ function age(created, now) {
 
 const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
+// A seated agent that may never have been told what to do must not look like any other row.
+function statusCell(r) {
+  if (r.status === 'reported' || r.prompted === true) return r.status;
+  return `${r.status} (first prompt ${r.prompted === false ? 'not sent' : 'unconfirmed'})`;
+}
+
 export function renderBoard(b, now) {
   const out = [];
   if (b.rows.length === 0) {
@@ -488,7 +522,7 @@ export function renderBoard(b, now) {
   } else {
     const table = [
       ['AGENT', 'ROLE', 'STATE', 'STATUS', 'ASSIGNMENT', 'BRANCH', 'AGE'],
-      ...b.rows.map((r) => [r.agent, r.role, r.state, r.status, clip(r.brief, 32), clip(r.branch, 44), age(r.created, now)]),
+      ...b.rows.map((r) => [r.agent, r.role, r.state, statusCell(r), clip(r.brief, 32), clip(r.branch, 44), age(r.created, now)]),
     ];
     const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
     for (const row of table) {
@@ -508,6 +542,11 @@ export function renderBoard(b, now) {
   if (b.leftBehind.length > 0) {
     out.push('', `Worktrees left behind: ${b.leftBehind.length}`);
     for (const a of b.leftBehind) out.push(`  ${a.id} (${a.status}; its worktree is still at ${a.worktree})`);
+  }
+  if (b.conflicts?.length > 0) {
+    out.push('', `Sync conflict copies: ${b.conflicts.length}`);
+    for (const name of b.conflicts) out.push(`  ${name}`);
+    out.push('  Syncthing kept these when two machines changed a trail file at once. They are not read as records; merge them by hand and delete them.');
   }
   if (b.unreadable.length > 0) out.push('', `Could not read: ${b.unreadable.join(', ')}`);
   return `${out.join('\n')}\n`;

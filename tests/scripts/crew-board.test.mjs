@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readTrail, trailDir } from '../../scripts/crew/trail.mjs';
+import { readTrail, trailDir, updateRecord } from '../../scripts/crew/trail.mjs';
 import { board, handoff, release, releaseLines, renderBoard, report, seat } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot } from '../helpers/crew-fixtures.mjs';
 
@@ -392,4 +392,75 @@ test('releasing a failed seating says what is true: no worktree existed and no b
   assert.equal(ok.worktreeExisted, true);
   assert.equal(ok.removed, true);
   assert.equal(ok.branchKept, true);
+});
+
+test('a herdr timeout while removing the worktree does not fall through to git; a later release finishes it', () => {
+  const { ctx, eng } = crew();
+  ctx.herdr.failOn = { method: 'removeWorktree', code: 'herdr_timeout', message: 'herdr did not answer within 60 seconds' };
+  const r = release(ctx, { target: eng.id });
+  assert.equal(r.assignment.status, 'released');
+  assert.equal(r.removed, false);
+  assert.ok(existsSync(eng.worktree));
+  assert.ok(!ctx.git.calls.some((c) => c[0] === 'removeWorktree'), 'git must not race herdr');
+  assert.match(r.left[0], /herdr did not answer/);
+  assert.match(r.left[0], /release/);
+  assert.equal(board(ctx).leftBehind.length, 1);
+
+  ctx.herdr.failOn = null;
+  const original = ctx.herdr.removeWorktree;
+  ctx.herdr.removeWorktree = (ws) => original(ws, eng.worktree);
+  const again = release(ctx, { target: eng.id });
+  assert.equal(again.removed, true);
+  assert.ok(!existsSync(eng.worktree));
+});
+
+test('a failed save on a retry does not say the commits were saved by this run', () => {
+  const { ctx } = crew();
+  ctx.git.refs.add('feature');
+  const rev = seat(ctx, { roleId: 'reviewer', brief: 'Fix it', on: 'feature' });
+  ctx.git.unreachable.add(rev.worktree);
+  ctx.git.dirty.set(rev.worktree, ['?? x']);
+  release(ctx, { target: rev.id });
+  ctx.git.rescueDetached = () => {
+    throw new Error('disk full');
+  };
+  const text = releaseLines(release(ctx, { target: rev.id })).join('\n');
+  assert.doesNotMatch(text, /were saved as branch/);
+  assert.match(text, new RegExp(`earlier release are on branch crew/${rev.id}`));
+  assert.match(text, /could not be saved to a branch: disk full/);
+});
+
+test('a sync-conflict copy has its own board line and its own field, apart from unreadable files', () => {
+  const { ctx, eng } = crew();
+  const name = `${eng.id}.sync-conflict-20261010-203105-ABCDEFG.md`;
+  writeFileSync(join(trailDir(ctx.mainDir), name), readFileSync(join(trailDir(ctx.mainDir), `${eng.id}.md`)));
+  writeFileSync(join(trailDir(ctx.mainDir), 'mangled.md'), '---\nid: [unclosed\n---\n');
+  const b = board(ctx);
+  assert.deepEqual(b.conflicts, [name]);
+  assert.deepEqual(b.unreadable, ['mangled.md']);
+  const text = renderBoard(b, ctx.now());
+  assert.match(text, /Could not read: mangled\.md\n/);
+  assert.match(text, new RegExp(`Sync conflict copies: 1\\n  ${name.replace(/\./g, '\\.')}`));
+  assert.match(text, /merge them by hand/);
+  assert.doesNotMatch(text.split('\n').find((l) => l.startsWith('Could not read')), /sync-conflict/);
+});
+
+test('a seated agent whose first prompt is unsent or unconfirmed is marked in the table and in --json', () => {
+  const { ctx } = crew(); // prompted: true
+  ctx.herdr.failOn = { method: 'startAgent', code: 'agent_not_ready', message: 'blocked' };
+  const seated = seat(ctx, { roleId: 'reviewer', brief: 'Look' });
+  ctx.herdr.failOn = null;
+  // herdr does list an agent that stopped at a startup dialog; the fake throws before adding it
+  ctx.herdr.agents.push({ name: 'reviewer', pane_id: seated.pane, workspace_id: seated.workspace, state: 'blocked', kind: 'claude' });
+  const b = board(ctx);
+  assert.deepEqual(b.rows.map((r) => [r.agent, r.prompted]).sort(), [['engineer', true], ['reviewer', false]]);
+  const text = renderBoard(b, ctx.now());
+  assert.match(text, /^reviewer\s.*working \(first prompt not sent\)/m);
+  assert.doesNotMatch(text.split('\n').find((l) => l.startsWith('engineer')), /prompt/);
+
+  const rev = readTrail(ctx.mainDir).assignments.find((a) => a.agent === 'reviewer');
+  updateRecord(rev.file, { prompted: 'unconfirmed' });
+  const again = board(ctx);
+  assert.equal(again.rows.find((r) => r.agent === 'reviewer').prompted, 'unconfirmed');
+  assert.match(renderBoard(again, ctx.now()), /^reviewer\s.*working \(first prompt unconfirmed\)/m);
 });
