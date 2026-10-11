@@ -43,9 +43,14 @@ npm run crew -- nudge engineer
 ("is not an available shell"). Seat waits for it, for up to 8 seconds, and only then fails; a
 failed record keeps herdr's `error` text and its `error_code`.
 
+**If a seating step times out** (herdr did not answer within 60 seconds), the command says the
+worktree or agent may exist anyway. Look at `npm run crew`: the assignment is under "Needs
+release", and `release` closes it. A timed-out call is never retried.
+
 **If herdr did not confirm the first prompt** (it timed out or failed after being sent), the
 command says it "may or may not have arrived". Look at the agent's pane: crew never resends,
-and `nudge` refuses. If the agent has not started, type into its pane what the command printed
+and `nudge` refuses. The one exception is a herdr that is not on PATH: nothing can have been
+sent then, so the agent counts as not prompted and `nudge` works once herdr is back. If the agent has not started, type into its pane what the command printed
 (the role file and assignment file paths).
 
 A brief that starts with a dash is read as an option; put `--` before it, after any flags:
@@ -73,6 +78,11 @@ Open handoffs: 1
 - **Open handoffs** are requests one agent wrote for another role. Seat the role with
   `--handoff <id>`, or decline with `handoff-close <id> --reason "…"`.
 - **Needs release** lists assignments whose agent is gone or whose seating failed.
+- A `STATUS` of `working (first prompt not sent)` or `working (first prompt unconfirmed)` marks
+  an agent that may never have been told what to do. See the two cases under "Seat an agent".
+- **Sync conflict copies** lists copies Syncthing kept when two machines changed a trail file at
+  once. They are not read as records and are never deleted; merge each by hand, then delete it.
+  **Could not read** lists trail files that could not be parsed.
 - **Worktrees left behind** lists released or abandoned assignments whose worktree release kept
   because it had changes in it, or because it could not be removed or its commits could not be
   saved. Run `release` on one again after you have dealt with what the command listed.
@@ -105,7 +115,11 @@ that differs from the recorded one is refused; the same one, or none, is accepte
 An agent seated with `--on` works on a detached copy and has no branch of its own. If it made
 commits, release saves them as a branch `crew/<assignment-id>` and tells you. A retry saves
 commits made since (for example ones you committed in the worktree) under `crew/<assignment-id>-2`
-and so on; an earlier rescue branch is never moved.
+and so on; an earlier rescue branch is never moved. If a retry cannot save the new commits, it
+says that, names the branch an earlier release made, and leaves the worktree.
+
+If herdr does not answer within 60 seconds when release asks it to remove the worktree, the
+worktree is left, because herdr may still be removing it. Run `release` again a little later.
 
 Commit `memory/crew/` with the rest of your session's memory.
 

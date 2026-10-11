@@ -220,9 +220,14 @@ npm run crew -- release <agent-name | assignment-id> [--outcome done|abandoned]
   and leaves the worktree. It never forces removal.
 - For a detached assignment (`--on`), commits that are on no branch are first saved as
   `crew/<assignment-id>`, since they would otherwise be lost with the worktree.
+- A retry that cannot save new commits says so and names only what is true of this run: commits
+  saved by an earlier release stay on their branch, the new ones are listed as not saved, and
+  the worktree is left.
 - Closes only the herdr workspace the launcher created for that assignment, and only when the
   worktree was removed. The recorded workspace id is used only while herdr still reports it open
-  on that worktree; otherwise the worktree is removed with git.
+  on that worktree; otherwise the worktree is removed with git. If herdr does not answer
+  (`herdr_timeout`) while it is asked to remove the worktree, git is not used, because herdr may
+  still be doing it: the worktree is left, the reason is listed, and `release` again finishes it.
 
 ### 5.3 herdr behaviour, verified 2026-10-10 against herdr 0.9.1
 
@@ -358,6 +363,12 @@ Needs release: 1   2026-10-09-researcher-ibge-terms (trail says working, no live
   listed under "Needs release". A live agent with no assignment is not shown as crew; it is the
   operator's own pane.
 - **`blocked` rows are listed first**, since they mean an agent is waiting on the operator.
+- **A seated agent whose first prompt is unsent or unconfirmed is marked.** Its STATUS cell reads
+  `working (first prompt not sent)` or `working (first prompt unconfirmed)`, and its `--json` row
+  carries `prompted: false` or `prompted: "unconfirmed"` (`true` for every other row).
+- **A sync-conflict copy of a trail file has its own line**, "Sync conflict copies", saying the
+  file is not read as a record and the operator merges it by hand. `--json` lists them under
+  `conflicts`, apart from `unreadable` ("Could not read": files that could not be parsed).
 - `--json` prints the same data for scripts and for the skill.
 
 ## 9. The skill
@@ -376,14 +387,18 @@ is what makes a seated lead the agent that seats others. No separate dispatcher 
 
 | Situation | Behaviour |
 |-----------|-----------|
-| A seating step fails | The assignment becomes `failed`, recording the step and herdr's error text, and names anything already created (branch, worktree). No automatic retry or cleanup. |
-| The first prompt times out or stalls | herdr states this does not prove non-delivery. The launcher never resends. The assignment stays `working`; the board shows the agent's real state. |
+| A seating step fails | The assignment becomes `failed`, recording the step, herdr's error text and, when herdr gave one, its `error_code`, and names anything already created (branch, worktree). No automatic retry or cleanup. |
+| A call times out (`herdr_timeout`, 60 s) during `worktree create/open` or `agent start` | Seating fails as above and says the worktree or agent may exist anyway, pointing to the board ("Needs release") and `release`. A timed-out call is never retried. |
+| `agent start` says the pane "is not an available shell" | Retried for up to 8 seconds; then it fails with herdr's text and how long it waited. Other start errors, `agent_not_ready` and timeouts are not retried. |
+| The first prompt fails, times out or stalls | herdr states this does not prove non-delivery. The launcher never resends. The assignment stays `working` with `prompted: 'unconfirmed'`, and `nudge` refuses. Only `herdr_missing` (the binary is not on PATH, so nothing can have been sent) leaves `prompted: false`, and `nudge` may then be run. |
+| `release` asks herdr to remove a worktree and herdr times out | The worktree is left, with the reason listed; `release` again finishes it. git does not remove it meanwhile. |
 | herdr restarts, or a pane is closed | The trail is intact. The board lists the assignment under "Needs release". `crew release` closes it. |
 | An agent meets a permission or question dialog | It shows as `blocked`. Only the operator answers it. |
 | The agent stops at a startup dialog (for example, trusting a new folder) | herdr reports `agent_not_ready`. The assignment is `working` with `prompted: false`; the first prompt was not sent. The operator answers the dialog, then runs `crew nudge <agent>` to send it. |
 | An agent runs its own worktree's copy of the script | Refused: a script living under the worktree root is not a main checkout. The assignment file names the right command. |
 | `crew report` or `crew handoff` is run outside a crew worktree | Refused: the caller cannot be matched to an assignment. |
 | A trail file is malformed | The board lists it by file name under a "Could not read" line and continues. |
+| A trail file has a sync-conflict copy | The copy is not read as a record. The board lists it under "Sync conflict copies" for the operator to merge by hand; it is never deleted. |
 
 ## 11. Paperclip and venture-commune
 
