@@ -6,11 +6,12 @@
 // the real herdr and git adapters to it.
 import { readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { board, closeHandoff, handoff, nudge, release, releaseLines, renderBoard, report, seat, typeYourself } from './crew/core.mjs';
 import { createGit } from './crew/git.mjs';
+import { createIdentityStore } from './crew/identity.mjs';
 import { createHerdr, HerdrError } from './crew/herdr.mjs';
 import { CrewError } from './crew/roles.mjs';
 
@@ -90,6 +91,7 @@ function main(argv) {
 
   const mainDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const git = createGit(mainDir);
+  const worktreeRoot = real(process.env.ORG_OS_WORKTREES || join(homedir(), '.org-os', 'worktrees'));
   const ctx = {
     mainDir,
     repoDir: git.primaryCheckout(),
@@ -98,7 +100,9 @@ function main(argv) {
     env: process.env,
     cwd: real(process.cwd()),
     now: () => new Date(),
-    worktreeRoot: real(process.env.ORG_OS_WORKTREES || join(homedir(), '.org-os', 'worktrees')),
+    worktreeRoot,
+    // Beside the repository's worktrees and outside all of them and of memory/crew/.
+    identity: createIdentityStore(join(worktreeRoot, basename(mainDir), '.identity')),
     scriptPath: join(mainDir, 'scripts', 'crew.mjs'),
   };
 

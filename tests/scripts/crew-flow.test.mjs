@@ -2,9 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { readRecord, readTrail } from '../../scripts/crew/trail.mjs';
+import { readRecord, readTrail, writeRecord } from '../../scripts/crew/trail.mjs';
 import { closeHandoff, handoff, report, seat } from '../../scripts/crew/core.mjs';
-import { asAgent, makeCtx, makeRoot } from '../helpers/crew-fixtures.mjs';
+import { asAgent, fakeHerdr, makeCtx, makeRoot } from '../helpers/crew-fixtures.mjs';
 
 function crew() {
   const root = makeRoot();
@@ -19,7 +19,7 @@ test('report appends the report and marks the assignment reported', () => {
   assert.equal(a.status, 'reported');
   const { body } = readRecord(eng.file ?? readTrail(ctx.mainDir).assignments[0].file);
   assert.match(body, /## Brief\n\nBuild it/);
-  assert.match(body, /## Report — \d{4}-\d\d-\d\dT[^\n]+\n\nDid it\.\nTests: 4 pass\.\n$/);
+  assert.match(body, /## Report — engineer — \d{4}-\d\d-\d\dT[^\n]+\n\nDid it\.\nTests: 4 pass\.\n$/);
 });
 
 test('a second report is appended, not written over the first', () => {
@@ -174,4 +174,28 @@ test('--base together with --on is refused before anything is written or created
   );
   assert.equal(readTrail(ctx.mainDir).assignments.length, before);
   assert.equal(ctx.herdr.calls.length, calls);
+});
+
+test('a report is headed with its role, and with the agent name when that differs', () => {
+  const root = makeRoot();
+  const ctx = makeCtx(root, { herdr: fakeHerdr([{ name: 'engineer', pane_id: 'o1:p1', workspace_id: 'o1' }]) });
+  const eng = seat(ctx, { roleId: 'engineer', brief: 'Build it', title: 'Cursor race' });
+  assert.equal(eng.agent, 'engineer-cursor-race');
+  report(asAgent(ctx, eng), { text: 'Did it.' });
+  const { body } = readRecord(readTrail(ctx.mainDir).assignments[0].file);
+  assert.match(body, /## Report — engineer \(engineer-cursor-race\) — \d{4}-\d\d-\d\dT/);
+});
+
+test('an old report with no author in its heading still reads, and a new one is appended after it', () => {
+  const { ctx, eng } = crew();
+  const file = readTrail(ctx.mainDir).assignments[0].file;
+  const { data, body } = readRecord(file);
+  writeRecord(file, data, `${body.trimEnd()}\n\n## Report — 2026-10-09T10:00:00+00:00\n\nOld words.\n`);
+  report(asAgent(ctx, eng), { text: 'New words.' });
+  const [a] = readTrail(ctx.mainDir).assignments;
+  assert.equal(a.brief, 'Build it');
+  assert.equal(a.status, 'reported');
+  const after = readRecord(file).body;
+  assert.match(after, /## Report — 2026-10-09T10:00:00\+00:00\n\nOld words\./);
+  assert.match(after, /## Report — engineer — [^\n]+\n\nNew words\./);
 });

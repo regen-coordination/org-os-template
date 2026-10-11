@@ -8,6 +8,9 @@ import { localDate, readRecord, readTrail, trailDir, writeRecord } from '../../s
 import { handoff, nudge, release, seat, typeYourself } from '../../scripts/crew/core.mjs';
 import { asAgent, fakeHerdr, makeCtx, makeRoot, writeRole } from '../helpers/crew-fixtures.mjs';
 
+// Where the stand-in identity store puts an assignment's system prompt (tests/helpers/crew-fixtures.mjs).
+const identityPath = (ctx, id) => join(ctx.worktreeRoot, 'identity', `${id}.md`);
+
 const setup = (overrides) => {
   const root = makeRoot();
   return { root, ctx: makeCtx(root, overrides) };
@@ -34,7 +37,7 @@ test('seat creates the worktree, starts the agent, prompts it and records the as
   const [, create] = ctx.herdr.calls[0];
   assert.deepEqual(create, { cwd: root, branch: `crew/${id}`, base: 'main', path: a.worktree, label: 'engineer' });
   const [, start] = ctx.herdr.calls[1];
-  assert.deepEqual(start, { name: 'engineer', kind: 'claude', pane_id: 'x1:p1', args: ['--model', 'sonnet', '--name', 'engineer: Fix the KMS cursor race'] });
+  assert.deepEqual(start, { name: 'engineer', kind: 'claude', pane_id: 'x1:p1', args: ['--model', 'sonnet', '--name', 'engineer: Fix the KMS cursor race', '--append-system-prompt-file', identityPath(ctx, id)] });
   const [, prompt] = ctx.herdr.calls[2];
   const file = join(trailDir(root), `${id}.md`);
   assert.ok(prompt.text.includes(join(root, 'roles', 'engineer.md')), prompt.text);
@@ -130,7 +133,7 @@ test('a title is stored on the record, trimmed, and shown to the agent as given'
   const a = seat(ctx, { roleId: 'engineer', brief: 'Fix the KMS cursor race', title: '  Fix  the cursor  ' });
   assert.equal(a.title, 'Fix the cursor');
   assert.equal(readTrail(ctx.mainDir).assignments[0].title, 'Fix the cursor');
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet', '--name', 'engineer: Fix the cursor']);
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet', '--name', 'engineer: Fix the cursor', '--append-system-prompt-file', identityPath(ctx, a.id)]);
 });
 
 test('a title of exactly 24 characters is accepted and 25 is refused in a sentence that says the limit, writing nothing', () => {
@@ -186,8 +189,8 @@ test('only the operator and roles with may_seat can seat', () => {
 
 test('an agent is started with its model only when its kind takes one', () => {
   const { root, ctx } = setup();
-  seat(ctx, { roleId: 'lead', brief: 'coordinate' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'opus', '--name', 'lead: coordinate']);
+  const lead = seat(ctx, { roleId: 'lead', brief: 'coordinate' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'opus', '--name', 'lead: coordinate', '--append-system-prompt-file', identityPath(ctx, lead.id)]);
   writeRole(root, 'reader', { kind: 'gemini', model: 'pro' }); // no known model argument for gemini
   const a = seat(ctx, { roleId: 'reader', brief: 'read' });
   assert.equal(a.kind, 'gemini');
@@ -198,21 +201,23 @@ test('an agent is started with its effort beside its model, for a kind that take
   const { root, ctx } = setup();
   writeRole(root, 'thinker', { model: 'claude-opus-5-5', effort: 'high' });
   const a = seat(ctx, { roleId: 'thinker', brief: 'think' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'claude-opus-5-5', '--effort', 'high', '--name', 'thinker: think']);
+  assert.deepEqual(ctx.herdr.calls[1][1].args, [
+    '--model', 'claude-opus-5-5', '--effort', 'high', '--name', 'thinker: think', '--append-system-prompt-file', identityPath(ctx, a.id),
+  ]);
   assert.deepEqual(a.notes ?? [], []);
 });
 
 test('a role that sets no effort is started with no effort argument', () => {
   const { ctx } = setup();
-  seat(ctx, { roleId: 'engineer', brief: 'build' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet', '--name', 'engineer: build']);
+  const a = seat(ctx, { roleId: 'engineer', brief: 'build' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--model', 'sonnet', '--name', 'engineer: build', '--append-system-prompt-file', identityPath(ctx, a.id)]);
 });
 
 test('effort alone, with no model, is still passed to claude', () => {
   const { root, ctx } = setup();
   writeRole(root, 'thinker', { model: undefined, effort: 'max' });
-  seat(ctx, { roleId: 'thinker', brief: 'think' });
-  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--effort', 'max', '--name', 'thinker: think']);
+  const a = seat(ctx, { roleId: 'thinker', brief: 'think' });
+  assert.deepEqual(ctx.herdr.calls[1][1].args, ['--effort', 'max', '--name', 'thinker: think', '--append-system-prompt-file', identityPath(ctx, a.id)]);
 });
 
 test('a kind whose effort argument is not verified is seated without it and told so in one plain line', () => {

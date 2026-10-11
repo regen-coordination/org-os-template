@@ -4,7 +4,7 @@
 // adapters in ctx, or through the trail files under ctx.mainDir.
 // See docs/superpowers/specs/2026-10-10-org-os-crew-design.md §5–10.
 import { basename, join, sep } from 'node:path';
-import { CrewError, loadCircles, loadRole } from './roles.mjs';
+import { CrewError, loadCircles, loadReadmeSections, loadRole } from './roles.mjs';
 import { ACTIVE, freeId, isoLocal, localDate, readRecord, readTrail, slugify, trailDir, updateRecord, writeRecord } from './trail.mjs';
 
 // How each agent kind takes a model on its command line. A kind not listed here
@@ -26,6 +26,19 @@ const EFFORT_ARGS = {
 const NAME_ARGS = {
   claude: (role, title) => ['--name', `${role}: ${title}`],
 };
+
+// How a kind takes an appended system prompt from a file. Only `claude` is verified:
+// `claude --help` lists --append-system-prompt and --bare names --append-system-prompt[-file];
+// a live `claude -p --append-system-prompt-file <file>` call (2026-10-11) answered from it.
+// A file, not the text: arguments travel through `herdr agent start … -- <args>` and a
+// whole role is too long a string to quote. Any other kind gets the role file's path in
+// its first prompt, as before.
+const IDENTITY_ARGS = {
+  claude: (file) => ['--append-system-prompt-file', file],
+};
+
+// The sections of roles/README.md every seat carries in its system prompt.
+const IDENTITY_SECTIONS = ['Shared boundaries', 'What always needs the operator', 'The cooperative charter'];
 
 export function requireHerdr(ctx) {
   if (ctx.env.HERDR_ENV !== '1') {
@@ -159,11 +172,36 @@ function readingOrder(rolePath, file, readmePath) {
   );
 }
 
-function firstPrompt(rolePath, file, readmePath) {
+// The seat's name as its own role file gives it: "Reviewer" is "the reviewer".
+const seatName = (heading) => (/^[A-Z][a-z]/.test(heading) ? heading[0].toLowerCase() + heading.slice(1) : heading);
+
+function firstPrompt(role, file, readmePath) {
   return (
-    `You are seated in the org-os crew. ${readingOrder(rolePath, file, readmePath)} ` +
+    `You are the ${seatName(role.heading)} of the org-os crew. ${readingOrder(role.path, file, readmePath)} ` +
     'When you finish, follow the Commands section of the assignment file to report.'
   );
+}
+
+/**
+ * What a claude agent carries as its system prompt: who it is, its role file's body
+ * and the sections of roles/README.md every seat obeys. Pure text; `missing` names
+ * the README sections that were not found, so the seat can say so.
+ */
+export function composeIdentity(ctx, { role, name, id, file }) {
+  const readme = loadReadmeSections(ctx.mainDir, IDENTITY_SECTIONS);
+  const text = [
+    `You are the ${seatName(role.heading)} of the org-os crew: role "${role.id}", agent name "${name}".`,
+    `Your assignment is "${id}" and its file is ${file}. Your role file is ${role.path}; read both again if this session is resumed or its context is compacted.`,
+    '',
+    role.body,
+    '',
+    `The sections below are the ones every seat obeys, from ${readme.path}.`,
+    '',
+    ...readme.found.flatMap((s) => [s.text, '']),
+  ]
+    .join('\n')
+    .trimEnd();
+  return { text: `${text}\n`, missing: readme.missing };
 }
 
 /** What an operator types into an agent's pane when the first prompt may not have arrived. */
@@ -307,7 +345,7 @@ export function seat(ctx, { roleId, brief, title: givenTitle = null, task = null
   // refuses a linked worktree (linked_worktree_source). ctx.repoDir is that
   // primary checkout when the main checkout is itself a linked worktree.
   const repoDir = ctx.repoDir ?? ctx.mainDir;
-  let step = 'worktree';
+  let step = IDENTITY_ARGS[role.kind] ? 'identity' : 'worktree';
   // Set just before herdr is asked to create or open the worktree: from then on
   // it may have made things that crew was never told about.
   let herdrAsked = false;
@@ -317,6 +355,18 @@ export function seat(ctx, { roleId, brief, title: givenTitle = null, task = null
   // Plain lines for the operator about what the seat could not do; never an error.
   const notes = [];
   try {
+    // The identity prompt is written before anything is created, so a failure to
+    // write it leaves a record that says why and no worktree or pane to clean up.
+    let identityFile = null;
+    if (IDENTITY_ARGS[role.kind]) {
+      if (!ctx.identity) throw new CrewError('crew was given nowhere to keep the identity prompt. This is a fault in the launcher, not in your role file.');
+      const composed = composeIdentity(ctx, { role, name, id, file });
+      identityFile = ctx.identity.write(id, composed.text);
+      for (const section of composed.missing) {
+        notes.push(`roles/README.md has no "${section}" section, so the ${role.id} agent's identity prompt lacks it. Its first prompt still names the file.`);
+      }
+      step = 'worktree';
+    }
     let opened;
     if (on) {
       ctx.git.addDetached(worktree, on);
@@ -335,6 +385,7 @@ export function seat(ctx, { roleId, brief, title: givenTitle = null, task = null
       notes.push(`The ${role.id} role's effort (${role.effort}) was not applied: crew does not know how to pass an effort level to a ${role.kind} agent.`);
     }
     if (NAME_ARGS[role.kind]) args.push(...NAME_ARGS[role.kind](role.id, title));
+    if (identityFile) args.push(...IDENTITY_ARGS[role.kind](identityFile));
     let ready = true;
     try {
       ctx.herdr.startAgent({ name, kind: role.kind, pane_id: opened.pane_id, args });
@@ -347,7 +398,7 @@ export function seat(ctx, { roleId, brief, title: givenTitle = null, task = null
 
     if (ready) {
       try {
-        ctx.herdr.promptAgent(name, firstPrompt(role.path, file, join(ctx.mainDir, 'roles', 'README.md')));
+        ctx.herdr.promptAgent(name, firstPrompt(role, file, join(ctx.mainDir, 'roles', 'README.md')));
         prompted = true;
       } catch (err) {
         // herdr says a failed or timed-out prompt does not prove non-delivery,
@@ -380,7 +431,8 @@ export function seat(ctx, { roleId, brief, title: givenTitle = null, task = null
       ? ` May still exist: ${mayRemain.join('; ')}.` +
         (herdrAsked ? ' crew never learned the id of that herdr workspace, so release cannot close it: close it in herdr yourself.' : '')
       : '';
-    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; nothing was cleaned up.${left}${maybe}`);
+    const cleaned = step === 'identity' ? 'no worktree or agent was made' : 'nothing was cleaned up';
+    throw new CrewError(`Seating failed at the ${step} step: ${err.message || err}. It is recorded in ${file}; ${cleaned}.${left}${maybe}`);
   }
   if (taken) updateRecord(taken.file, { status: 'taken', taken_by: id, updated: stamp(ctx) });
   const record = updateRecord(file, { status: 'working', prompted, updated: stamp(ctx) });
@@ -442,9 +494,9 @@ export function nudge(ctx, { target }) {
   if (a.prompted) {
     throw new CrewError(`${a.agent} has already been given its first prompt. Prompt it yourself in its pane if it needs more.`);
   }
-  const rolePath = loadRole(ctx.mainDir, a.role).path;
+  const role = loadRole(ctx.mainDir, a.role);
   try {
-    ctx.herdr.promptAgent(a.agent, firstPrompt(rolePath, a.file, join(ctx.mainDir, 'roles', 'README.md')));
+    ctx.herdr.promptAgent(a.agent, firstPrompt(role, a.file, join(ctx.mainDir, 'roles', 'README.md')));
   } catch (err) {
     if (err.code === 'herdr_missing') {
       throw new CrewError(`The herdr command was not found on PATH, so nothing was sent to ${a.agent}. Fix that and run nudge again.`);
@@ -480,7 +532,9 @@ export function report(ctx, { text }) {
   const { data, body } = readRecord(caller.file);
   const when = stamp(ctx);
   const next = { ...data, status: 'reported', updated: when };
-  writeRecord(caller.file, next, `${body.trimEnd()}\n\n## Report — ${when}\n\n${text.trim()}\n`);
+  // Headed with who wrote it: the role, and the agent's name when that differs from it.
+  const who = caller.agent === caller.role ? caller.role : `${caller.role} (${caller.agent})`;
+  writeRecord(caller.file, next, `${body.trimEnd()}\n\n## Report — ${who} — ${when}\n\n${text.trim()}\n`);
   // The report is written; the label is one more call and may fail on its own.
   const notes = [];
   setLabel(ctx, notes, { agent: caller.agent, role: caller.role, title: titleOf(caller), pane: caller.pane, status: 'reported' });
@@ -642,11 +696,19 @@ export function release(ctx, { target, outcome }) {
   // A retry never changes how the assignment ended.
   const status = closed ? a.status : OUTCOME_STATUS[outcome ?? 'done'];
   const assignment = updateRecord(a.file, { status, worktree_removed: removed, rescued_branch: rescued, updated: stamp(ctx) });
+  // The identity prompt was only read when the agent started. A file that cannot be
+  // removed is reported, not fatal: it sits outside the repository and harms nothing.
+  let identityLeft = null;
+  try {
+    ctx.identity?.remove(a.id);
+  } catch (err) {
+    identityLeft = String(err.message || err);
+  }
   // A closed record whose worktree is gone was finished by herdr: say so, once.
   const alreadyGone = closed && a.worktree_removed === false && !worktreeExisted;
   // The same timed-out seating on the retry: nothing came, and now it is closed.
   const neverCame = alreadyGone && a.failed_step === 'worktree' && a.error_code === 'herdr_timeout';
-  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, neverCame, mayAppear, branchKept: ctx.git.resolves(a.branch) };
+  return { assignment, removed, left, rescued, rescueFailed, worktreeExisted, alreadyGone, neverCame, mayAppear, identityLeft, branchKept: ctx.git.resolves(a.branch) };
 }
 
 /** What `release` tells the operator: one sentence per line, only what is true. */
@@ -695,6 +757,9 @@ export function releaseLines(r) {
   } else {
     out.push(`  The worktree was left at ${x.worktree}:`);
     for (const line of r.left) out.push(`    ${line}`);
+  }
+  if (r.identityLeft) {
+    out.push(`  The identity prompt file for ${x.agent} could not be removed (${r.identityLeft}). It is outside the repository and does no harm; delete it by hand.`);
   }
   return out;
 }

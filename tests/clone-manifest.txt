@@ -160,6 +160,7 @@ scripts/crew.mjs
 scripts/crew/core.mjs
 scripts/crew/git.mjs
 scripts/crew/herdr.mjs
+scripts/crew/identity.mjs
 scripts/crew/roles.mjs
 scripts/crew/trail.mjs
 scripts/deploy-pages.mjs
@@ -249,6 +250,7 @@ tests/scripts/crew-cli.test.mjs
 tests/scripts/crew-flow.test.mjs
 tests/scripts/crew-git.test.mjs
 tests/scripts/crew-herdr.test.mjs
+tests/scripts/crew-identity.test.mjs
 tests/scripts/crew-label.test.mjs
 tests/scripts/crew-roles.test.mjs
 tests/scripts/crew-seat.test.mjs
