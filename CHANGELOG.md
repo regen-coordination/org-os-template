@@ -18,12 +18,20 @@ deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" a
   worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
   Guide: `docs/CREW.md`.
   What an operator should know:
-  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once. The five
-    shipped roles (the lead among them) take five seats, and the sixth allows a second agent in
-    one role, for example a reviewer while an engineer is still seated. This is the default every
-    new instance receives. Each seated agent is a full model session on the operator's own plan,
+  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once: the lead
+    and five working agents, and a second agent in one role takes one of the six, for example a
+    reviewer while an engineer is still seated. The framework repository ships seven roles, so six
+    seats do not hold every role at once; a new instance receives five of them. This is the
+    default every new instance receives. Each seated agent is a full model session on the operator's own plan,
     so an instance on a small plan lowers the number by editing `max_agents` in that file. (The
     launcher's own fallback of 4 applies only to a file with no `max_agents` line.)
+  - A role file may carry `effort` (`low`, `medium`, `high`, `xhigh` or `max`), passed to the
+    agent as `--effort` beside its model. It is passed to `claude` agents only; for any other
+    kind `seat` prints one line saying so and seats the agent anyway. A bad level is refused in
+    words. In the framework repository the lead and two new seats, `website` (owns `site/`, the
+    website and documentation site) and `platform` (owns `packages/admin/`, the admin app), run on
+    `claude-opus-5-5` at `high`. The two new roles are the framework repository's: a new instance
+    does not receive them, so it ships five roles.
   - Every seat starts by reading its role file, its assignment file and the "Before you begin"
     list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md`; `lead` also
     reads `HEARTBEAT.md` and `AGENTS.md`), and reports which it read and which were absent. The

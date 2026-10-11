@@ -128,6 +128,7 @@ Frontmatter fields, all required unless noted:
 | `circle` | An id from `roles/circles.yaml`. |
 | `kind` | A herdr agent kind (`claude`, `codex`, `opencode`, …). |
 | `model` | Optional. Passed to the agent as its native model argument when the kind supports one. |
+| `effort` | Optional. One of `low`, `medium`, `high`, `xhigh`, `max`; refused with a plain sentence otherwise. Passed as `--effort <level>` beside the model, for `claude` only, the one kind whose command line is verified to take it. For any other kind it is not passed, seat says so in one line, and the seat still succeeds. |
 | `may_seat` | Whether an agent in this role may seat other roles. `true` only for `lead` in the shipped set. |
 | `skills` | Optional. Names of skills the role is expected to use; advisory, read by the agent. |
 
@@ -158,15 +159,20 @@ files carry judgment.
 
 | Role | Circle | Kind / model | May seat | Purpose |
 |------|--------|--------------|----------|---------|
-| `lead` | lead | claude / opus | yes | Takes a goal from the operator, splits it, seats roles, picks up handoffs. |
+| `lead` | lead | claude / claude-opus-5-5, effort high | yes | Takes a goal from the operator, splits it, seats roles, picks up handoffs. |
 | `engineer` | engineering | claude / sonnet | no | Implements a brief test-first on its branch. |
 | `reviewer` | engineering | claude / sonnet | no | Reviews another assignment's branch; changes nothing. |
 | `researcher` | research | claude / sonnet | no | Answers a question from primary sources; writes findings to a file. |
 | `commons-steward` | commons | claude / sonnet | no | Tends docs, knowledge and decisions records for consistency. |
+| `website` | engineering | claude / claude-opus-5-5, effort high | no | Owns the development of the website and documentation site (`site/`). Framework repository only. |
+| `platform` | engineering | claude / claude-opus-5-5, effort high | no | Owns the development of the admin app (`packages/admin/`). Framework repository only. |
 
 The strategy circle ships with no role in version 1; the circle exists so a role can be added as
-a file. Initial text for the five roles is carried over from the cooperative charter and the
-matching Paperclip agents' instructions (section 11).
+a file. Initial text for the first five roles is carried over from the cooperative charter and the
+matching Paperclip agents' instructions (section 11). `website` and `platform` are written for the
+framework repository: they name its `site/` and `packages/admin/`, which an instance does not
+have, so `scripts/lib/clone-excludes.mjs` leaves both files out of a new instance and an
+instance receives five roles.
 
 ### 4.4 Instance overrides
 
@@ -216,7 +222,7 @@ All enforced in `core.mjs`, not in the skill.
 | Guardrail | Rule |
 |-----------|------|
 | Inside herdr | Refuse unless `HERDR_ENV=1`. |
-| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. The shipped `roles/circles.yaml` sets `max_agents: 6`, so the five shipped roles (the lead among them) take five seats and the sixth allows a second agent in one role, for example a reviewer while an engineer is still seated. Each seated agent is a full model session on the operator's own plan; a small plan lowers `max_agents`. A file with no `max_agents` line falls back to 4 in `scripts/crew/roles.mjs`. |
+| Concurrency cap | Refuse when the number of live seated agents equals the cap. Only agents with an open assignment count; the operator's other herdr agents do not. The shipped `roles/circles.yaml` sets `max_agents: 6`, which seats the lead and five working agents, and a second agent in one role takes one of those six, for example a reviewer while an engineer is still seated. The framework repository ships seven roles, so the cap does not seat every role at once; a new instance receives five of them. Each seated agent is a full model session on the operator's own plan; a small plan lowers `max_agents`. A file with no `max_agents` line falls back to 4 in `scripts/crew/roles.mjs`. |
 | Who may seat | A caller whose pane hosts no seated agent is the operator and may always seat. A caller whose pane hosts a seated agent may seat only if that agent's role has `may_seat: true`. The caller is identified from `HERDR_PANE_ID` joined to the trail. |
 | Base exists | Refuse if `--base` or `--on` does not resolve to a commit. Refuse `--base` together with `--on`. |
 | Operator's tree untouched | The launcher never checks out, resets or cleans the main checkout. |

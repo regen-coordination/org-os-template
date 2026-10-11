@@ -118,9 +118,11 @@ npm run crew -- seat lead "Goal: … Constraints: … Done when: …"
 ```
 
 The lead may seat other roles and take handoffs. Every other role can only ask, in writing. At
-most six crew agents are seated at once. The five shipped roles (the lead among them) take five
-seats; the sixth allows a second agent in one role, for example a reviewer while an engineer is
-still seated. Each seated agent is a full model session on your own plan, so on a small plan
+most six crew agents are seated at once: the lead and five working agents, and a second agent in
+one role takes one of the six, for example a reviewer while an engineer is still seated. The
+framework repository ships seven roles, so six seats do not hold every role at once; a new
+instance receives five of them (`website` and `platform` are the framework repository's seats).
+Each seated agent is a full model session on your own plan, so on a small plan
 lower the number. It is `max_agents` in `roles/circles.yaml`; change it there. (The launcher
 assumes 4 only when that file has no `max_agents` line.)
 
@@ -156,7 +158,11 @@ Commit `memory/crew/` with the rest of your session's memory.
 
 ## Roles
 
-Edit a file in `roles/` to change a role; add a file to add one. `roles/README.md` explains the
+Edit a file in `roles/` to change a role; add a file to add one. A role can name the model it
+runs on (`model`) and how hard it thinks (`effort`: `low`, `medium`, `high`, `xhigh` or `max`).
+`effort` is passed to `claude` agents only: for any other kind, `seat` prints one line saying the
+effort was not applied and seats the agent anyway. In the framework repository the lead, `website`
+and `platform` run on `claude-opus-5-5` at `high`. `roles/README.md` explains the
 fields, what every seat reads first ("Before you begin", which you edit to change the list), the
 boundaries every role shares, and the charter.
 
