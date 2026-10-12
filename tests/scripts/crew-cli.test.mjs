@@ -1,0 +1,150 @@
+// tests/scripts/crew-cli.test.mjs
+//
+// The command's argument handling and exit codes. Nothing here reaches a real
+// herdr: every case is refused before an adapter is called.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const script = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'crew.mjs');
+const run = (args, env = {}) =>
+  spawnSync(process.execPath, [script, ...args], {
+    encoding: 'utf-8',
+    env: { ...process.env, HERDR_ENV: '', HERDR_PANE_ID: '', ...env },
+  });
+
+test('outside herdr every command is refused in one plain sentence', () => {
+  for (const args of [[], ['board'], ['seat', 'engineer', 'x'], ['release', 'engineer']]) {
+    const r = run(args);
+    assert.equal(r.status, 1, args.join(' '));
+    assert.match(r.stderr, /^crew runs inside herdr\./);
+    assert.doesNotMatch(r.stderr, /\n\s+at /); // no stack trace
+    assert.equal(r.stdout, '');
+  }
+});
+
+test('an unknown command or flag is a usage error', () => {
+  const unknown = run(['dance']);
+  assert.equal(unknown.status, 2);
+  assert.match(unknown.stderr, /Unknown command "dance"/);
+  assert.match(unknown.stderr, /Usage:/);
+  const flag = run(['seat', 'engineer', 'x', '--frobnicate']);
+  assert.equal(flag.status, 2);
+  assert.match(flag.stderr, /Usage:/);
+});
+
+test('missing arguments are usage errors that name what is missing', () => {
+  assert.match(run(['seat']).stderr, /seat needs a role/);
+  assert.match(run(['release']).stderr, /release needs an agent name or assignment id/);
+  assert.match(run(['nudge']).stderr, /nudge needs an agent name or assignment id/);
+  assert.match(run(['handoff']).stderr, /handoff needs a role/);
+  assert.match(run(['handoff-close']).stderr, /handoff-close needs a handoff/);
+  assert.equal(run(['seat']).status, 2);
+});
+
+test('--help prints the usage and exits 0', () => {
+  const r = run(['--help']);
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /Usage:/);
+  assert.match(r.stdout, /handoff-close/);
+});
+
+test('seat accepts a brief given as several words', () => {
+  // Refused for being outside herdr, which proves parsing got that far.
+  const r = run(['seat', 'engineer', 'fix', 'the', 'thing', '--task', 't1', '--base', 'main']);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /inside herdr/);
+});
+
+// A stand-in `herdr` first on PATH, so the real adapter runs without a server.
+function stubHerdr(body) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'crew-stub-')));
+  writeFileSync(join(dir, 'herdr'), `#!/bin/sh\n${body}\n`);
+  chmodSync(join(dir, 'herdr'), 0o755);
+  return { HERDR_ENV: '1', HERDR_PANE_ID: 'op:p1', PATH: `${dir}:${process.env.PATH}`, ORG_OS_WORKTREES: join(dir, 'wt') };
+}
+
+test('a herdr error is reported in one sentence, not a stack trace', () => {
+  const env = stubHerdr(`echo '{"error":{"code":"server_down","message":"the server is not running"}}' >&2; exit 1`);
+  const r = run(['board'], env);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /^herdr could not do that: the server is not running \(server_down\)\.\n$/);
+  assert.equal(r.stdout, '');
+});
+
+test('an agent list that cannot be read is an error, not an empty crew', () => {
+  const env = stubHerdr(`echo 'notice: update available'`);
+  const r = run(['board'], env);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /^herdr could not do that: .*agent list/);
+  assert.doesNotMatch(r.stdout, /No crew agents/);
+});
+
+test('with a working herdr and no trail, the board is empty', () => {
+  const env = stubHerdr(`echo '{"result":{"agents":[]}}'`);
+  const r = run(['board'], env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /No crew agents are seated\./);
+});
+
+test('a worktree root reached through a symlink still refuses a script that lives under it', () => {
+  const env = stubHerdr(`echo '{"result":{"agents":[]}}'`);
+  const link = join(dirname(env.ORG_OS_WORKTREES), 'link');
+  symlinkSync(join(dirname(script), '..', '..'), link); // the directory that holds this checkout
+  const r = run(['board'], { ...env, ORG_OS_WORKTREES: link });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /assignment file/);
+});
+
+test('report --file with a file that is not there is one plain sentence, not a stack', () => {
+  const r = run(['report', '--file', join(tmpdir(), 'crew-no-such-report.md')]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /^The report file .*crew-no-such-report\.md could not be read: it does not exist\./);
+  assert.doesNotMatch(r.stderr, /\n\s+at |ENOENT/);
+  assert.equal(r.stdout, '');
+});
+
+test('a brief that starts with a dash says to put -- before it, and works with it', () => {
+  const bad = run(['seat', 'engineer', '-5 degrees at noon']);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /starts with a dash/);
+  assert.match(bad.stderr, /seat <role> -- "<brief>"/);
+  // With -- the brief is a positional; refused later for being outside herdr, so parsing got through.
+  const ok = run(['seat', 'engineer', '--', '-5 degrees at noon']);
+  assert.equal(ok.status, 1);
+  assert.match(ok.stderr, /inside herdr/);
+  const h = run(['--help']);
+  assert.match(h.stdout, /starts with a dash/);
+});
+
+test('the nudge help line is true of every cause that leaves a prompt unsent, not only a startup dialog', () => {
+  const r = run(['--help']);
+  const line = r.stdout.split('\n').find((l) => l.trimStart().startsWith('nudge '));
+  assert.ok(line, r.stdout);
+  assert.match(line, /that has not received it/);
+  assert.doesNotMatch(line, /startup dialog/);
+  assert.ok(line.length <= 110, `the line is ${line.length} characters`);
+});
+
+test('the usage text shows --title and the limit, and seat takes it as a flag', () => {
+  const h = run(['--help']);
+  assert.match(h.stdout, /seat <role> "<brief>" \[--title "<short title>"\]/);
+  assert.match(h.stdout, /at most 24 characters/);
+  // refused for being outside herdr, which proves --title parsed
+  const r = run(['seat', 'engineer', 'fix', 'it', '--title', 'Fix it']);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /inside herdr/);
+});
+
+// The skill is the framework repository's; an instance may not have it.
+const skillPath = join(dirname(script), '..', 'skills', 'crew', 'SKILL.md');
+test('the crew skill tells its reader to give every seat a --title (skipped where the skill is absent)', { skip: !existsSync(skillPath) && 'skills/crew/SKILL.md is not in this tree' }, () => {
+  const text = readFileSync(skillPath, 'utf-8');
+  const section = text.slice(text.indexOf('## Writing a brief'), text.indexOf('## Reading the board'));
+  assert.match(section, /Give every seat a `--title`/);
+  assert.match(section, /24/);
+});

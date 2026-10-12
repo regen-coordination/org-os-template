@@ -54,6 +54,7 @@ export const TOP_LEVEL_ALLOW = new Map([
   ["packages", "package sources, filtered to the enabled set in stage 5"],
   ["repos", "home for linked-repo clones (README only; clones are gitignored)"],
   ["repos.manifest.json", "schema for clone:repos (reset to an empty list at genesis)"],
+  ["roles", "the crew's seats: circles, role files and the shared charter (module org-os-crew)"],
   ["schemas", "JSON-LD / JSON schemas the validators read"],
   ["scripts", "the machinery every npm script runs"],
   ["skills", "skill definitions, filtered to the selected set in stage 5"],
@@ -189,6 +190,11 @@ export const EXCLUDE_FILES = new Set([
   "scripts/test-federation.sh", // hardcoded paths into the operator's own workspace
   // Fixtures whose only consumers are excluded suites.
   "tests/fixtures/bread-coop-config.yaml", // tests/instance-doctor
+  // Crew seats for developing the framework's OWN website and admin app: `site/` and
+  // packages/admin are not in an instance (the website and the platform are the
+  // framework repository's), so these two seats would mean nothing there.
+  "roles/website.md",
+  "roles/platform.md",
   // Renders the FRAMEWORK's README and session one-pager; imports site/ (excluded).
   "scripts/render-templates.mjs",
   "templates/README.framework.md",

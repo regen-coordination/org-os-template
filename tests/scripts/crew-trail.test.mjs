@@ -1,0 +1,127 @@
+// tests/scripts/crew-trail.test.mjs
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  briefOf, freeId, isoLocal, localDate, readRecord, readTrail, slugify, trailDir, updateRecord, writeRecord,
+} from '../../scripts/crew/trail.mjs';
+
+const tmp = () => mkdtempSync(join(tmpdir(), 'crew-trail-'));
+
+test('slugify makes a short lowercase slug', () => {
+  assert.equal(slugify('Fix the KMS cursor race'), 'fix-the-kms-cursor-race');
+});
+
+test('slugify survives accents, slashes, emoji and length', () => {
+  assert.equal(slugify('Revisão do índice / seção 2'), 'revisao-do-indice-secao-2');
+  assert.equal(slugify('../../etc/passwd'), 'etc-passwd');
+  assert.equal(slugify('🚀🚀🚀'), 'work');
+  assert.equal(slugify(''), 'work');
+  const long = slugify('word '.repeat(100));
+  assert.ok(long.length <= 40, long);
+  assert.doesNotMatch(long, /^-|-$/);
+  assert.match(slugify('a\nb\tc'), /^a-b-c$/);
+});
+
+test('localDate and isoLocal format the local time', () => {
+  const d = new Date(2026, 9, 10, 20, 31, 5); // local time
+  assert.equal(localDate(d), '2026-10-10');
+  assert.match(isoLocal(d), /^2026-10-10T20:31:05[+-]\d\d:\d\d$/);
+});
+
+test('a record round-trips, and its timestamps stay strings', () => {
+  const path = join(trailDir(tmp()), 'a.md');
+  const data = { id: 'a', status: 'working', task: null, created: '2026-10-10T20:31:00-03:00' };
+  writeRecord(path, data, '## Brief\n\nDo the thing.');
+  const back = readRecord(path);
+  assert.deepEqual(back.data, data);
+  assert.equal(typeof back.data.created, 'string');
+  assert.equal(briefOf(back.body), 'Do the thing.');
+});
+
+test('updateRecord merges fields and keeps the body', () => {
+  const path = join(trailDir(tmp()), 'a.md');
+  writeRecord(path, { id: 'a', status: 'seating' }, '## Brief\n\nText.\n');
+  const data = updateRecord(path, { status: 'working', pane: 'w1:p1' });
+  assert.deepEqual(data, { id: 'a', status: 'working', pane: 'w1:p1' });
+  assert.equal(briefOf(readRecord(path).body), 'Text.');
+});
+
+test('two reads of the same file do not share an object', () => {
+  const path = join(trailDir(tmp()), 'a.md');
+  writeRecord(path, { id: 'a', status: 'working' }, '## Brief\n\nx\n');
+  const first = readRecord(path);
+  first.data.status = 'mutated';
+  assert.equal(readRecord(path).data.status, 'working');
+});
+
+test('briefOf stops at the next section and tolerates a brief that looks like frontmatter', () => {
+  assert.equal(briefOf('## Brief\n\nLine one.\nLine two.\n\n## Commands\n\n- x\n'), 'Line one.\nLine two.');
+  assert.equal(briefOf('no brief here'), '');
+  const path = join(trailDir(tmp()), 'a.md');
+  writeRecord(path, { id: 'a', status: 'working' }, '## Brief\n\n---\nid: fake\n---\n');
+  assert.equal(readRecord(path).data.id, 'a');
+});
+
+test('freeId adds a numeric suffix on collision', () => {
+  const root = tmp();
+  assert.equal(freeId(root, '2026-10-10-engineer-x'), '2026-10-10-engineer-x');
+  writeRecord(join(trailDir(root), '2026-10-10-engineer-x.md'), { id: 'x', status: 'working' }, 'b');
+  assert.equal(freeId(root, '2026-10-10-engineer-x'), '2026-10-10-engineer-x-2');
+  writeRecord(join(trailDir(root), '2026-10-10-engineer-x-2.md'), { id: 'x2', status: 'working' }, 'b');
+  assert.equal(freeId(root, '2026-10-10-engineer-x'), '2026-10-10-engineer-x-3');
+});
+
+test('readTrail separates assignments, handoffs and unreadable files', () => {
+  const root = tmp();
+  assert.deepEqual(readTrail(root), { assignments: [], handoffs: [], unreadable: [], conflicts: [] });
+  const dir = trailDir(root);
+  const A = { id: '2026-10-10-engineer-x', status: 'working', role: 'engineer', agent: 'engineer', branch: 'crew/x' };
+  const H = { id: 'handoff-2026-10-10-y', status: 'open', from: A.id, to_role: 'reviewer' };
+  writeRecord(join(dir, '2026-10-10-engineer-x.md'), A, '## Brief\n\nBuild x.\n');
+  writeRecord(join(dir, 'handoff-2026-10-10-y.md'), H, '## Brief\n\nReview y.\n');
+  // hand edits that drop a field the board needs, and a link to nowhere
+  writeRecord(join(dir, 'no-branch.md'), { id: 'no-branch', status: 'working', role: 'engineer', agent: null }, 'b');
+  writeRecord(join(dir, 'handoff-no-role.md'), { ...H, id: 'handoff-no-role', to_role: 7 }, 'b');
+  symlinkSync(join(dir, 'gone.md'), join(dir, 'dangling.md'));
+  writeFileSync(join(dir, 'mangled.md'), '---\nid: [unclosed\n---\nbody\n');
+  writeFileSync(join(dir, 'no-status.md'), '---\nid: no-status\n---\nbody\n');
+  writeFileSync(join(dir, 'notes.txt'), 'ignored');
+  mkdirSync(join(dir, 'sub.md'));
+  const trail = readTrail(root);
+  assert.deepEqual(trail.assignments.map((a) => [a.id, a.brief, a.file]), [
+    ['2026-10-10-engineer-x', 'Build x.', join(dir, '2026-10-10-engineer-x.md')],
+  ]);
+  assert.deepEqual(trail.handoffs.map((h) => h.id), ['handoff-2026-10-10-y']);
+  assert.deepEqual(trail.unreadable, ['dangling.md', 'handoff-no-role.md', 'mangled.md', 'no-branch.md', 'no-status.md']);
+});
+
+test('freeId reserves the id it returns, so two callers never share one', () => {
+  const root = tmp();
+  const first = freeId(root, '2026-10-10-engineer-same');
+  const second = freeId(root, '2026-10-10-engineer-same');
+  assert.equal(first, '2026-10-10-engineer-same');
+  assert.equal(second, '2026-10-10-engineer-same-2');
+  assert.ok(existsSync(join(trailDir(root), `${first}.md`)));
+});
+
+test('a sync-conflict copy of a trail file is not a record, and is listed as a conflict, not as unreadable', () => {
+  const dir = tmp();
+  const base = { id: 'a', status: 'working', role: 'engineer', agent: 'engineer', branch: 'crew/a' };
+  writeRecord(join(trailDir(dir), 'a.md'), base, '## Brief\n\nx\n');
+  writeRecord(join(trailDir(dir), 'a.sync-conflict-20261010-203105-ABCDEFG.md'), base, '## Brief\n\nx\n');
+  const h = { id: 'handoff-b', status: 'open', from: 'a', to_role: 'reviewer' };
+  writeRecord(join(trailDir(dir), 'handoff-b.md'), h, '## Brief\n\ny\n');
+  writeRecord(join(trailDir(dir), 'handoff-b.sync-conflict-20261010-203106-ABCDEFG.md'), h, '## Brief\n\ny\n');
+  const trail = readTrail(dir);
+  assert.deepEqual(trail.assignments.map((x) => x.id), ['a']);
+  assert.deepEqual(trail.handoffs.map((x) => x.id), ['handoff-b']);
+  assert.deepEqual(trail.unreadable, []);
+  assert.deepEqual(trail.conflicts.sort(), [
+    'a.sync-conflict-20261010-203105-ABCDEFG.md',
+    'handoff-b.sync-conflict-20261010-203106-ABCDEFG.md',
+  ]);
+  assert.ok(existsSync(join(trailDir(dir), 'a.sync-conflict-20261010-203105-ABCDEFG.md')), 'never deleted');
+});

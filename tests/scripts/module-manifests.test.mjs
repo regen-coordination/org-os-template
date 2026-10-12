@@ -56,3 +56,22 @@ test('every non-glob path a manifest claims actually exists', () => {
     }
   }
 });
+
+test('org-os-crew owns the roles, the command and the skill in place', () => {
+  const manifest = yaml.load(readFileSync(join(modulesDir, 'org-os-crew', 'module.yaml'), 'utf-8'));
+  assert.equal(manifest.type, 'operational');
+  const owned = Object.keys(manifest.files);
+  for (const path of ['roles', 'scripts/crew', 'scripts/crew.mjs', 'skills/crew']) assert.ok(owned.includes(path), `${path} not listed`);
+  // Spec §12: the module owns the crew tests and the fixtures they share. Every
+  // one on disk must be listed, so a new test file cannot be left out.
+  const onDisk = [
+    ...readdirSync(join(rootDir, 'tests', 'scripts')).filter((n) => /^crew-.*\.test\.mjs$/.test(n)).map((n) => `tests/scripts/${n}`),
+    'tests/helpers/crew-fixtures.mjs',
+  ];
+  for (const path of onDisk) assert.ok(owned.includes(path), `${path} is not listed in the module manifest`);
+  assert.ok(onDisk.length >= 9, 'expected the crew tests to be found');
+  for (const [src, target] of Object.entries(manifest.files)) {
+    assert.equal(src, target, `files["${src}"] must be an identity mapping for an in-place module`);
+    assert.ok(existsSync(join(rootDir, src)), `${src} does not exist`);
+  }
+});

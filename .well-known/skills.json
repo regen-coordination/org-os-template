@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-28T18:57:39.055Z",
+  "generated_at": "2026-10-10T23:41:25.888Z",
   "totals": {
-    "workspace": 35,
+    "workspace": 37,
     "user": 4,
     "plugin": 0
   },
@@ -40,6 +40,17 @@
       "source": "workspace",
       "description": "Monitor treasury state, queue transactions, and coordinate capital movements",
       "version": "1.0.0",
+      "owner": "framework",
+      "in_framework": true,
+      "promotion_status": "evaluating",
+      "instances_using": [],
+      "has_issues": false
+    },
+    {
+      "id": "crew",
+      "source": "workspace",
+      "description": "Seat, coordinate and release role-based agents in herdr panes. Use when the operator asks to seat a role on a piece of work, to see what the crew is doing, to hand work to another role, or to release an agent. Requires running inside herdr.",
+      "version": "0.1.0",
       "owner": "framework",
       "in_framework": true,
       "promotion_status": "evaluating",
@@ -131,7 +142,7 @@
     {
       "id": "instance-doctor",
       "source": "workspace",
-      "description": "Assess any org-os instance for identity, lineage, version, machinery, structure and freshness defects, then sync it reliably from the framework — the guided assess → read scorecard → sync → verify flow",
+      "description": "Assess any org-os instance for identity, lineage, version, machinery, structure and freshness defects, then sync it from the framework — the guided assess → read scorecard → sync → verify flow. Assess is proven across the live fleet; the file-level overlay sync is accepted end to end against a real instance",
       "version": "1.0.0",
       "owner": "framework",
       "in_framework": true,
@@ -245,6 +256,17 @@
         "refi-bcn-os",
         "refi-dao-os"
       ],
+      "has_issues": false
+    },
+    {
+      "id": "paper-design",
+      "source": "workspace",
+      "description": "Design an org's DESIGN.md compositions on a Paper canvas from its brand tokens, under a metered-call budget; pull Paper designs back into the repo as PNG/SVG/JSX. Use when asked to draft, refine or export a visual artifact (social card, poster, deck slide, page mock) in Paper.",
+      "version": "0.1.0",
+      "owner": "framework",
+      "in_framework": true,
+      "promotion_status": "evaluating",
+      "instances_using": [],
       "has_issues": false
     },
     {
@@ -528,6 +550,12 @@
       "kind": "no-frontmatter",
       "path": "skills/notion-cli/SKILL.md",
       "detail": "notion-cli/SKILL.md lacks YAML frontmatter"
+    },
+    {
+      "source": "user",
+      "kind": "missing-skill-md",
+      "path": "~/.claude/skills/synced",
+      "detail": "synced/SKILL.md not found"
     },
     {
       "source": "cross-source",

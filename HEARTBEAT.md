@@ -14,6 +14,58 @@ _Living checklist of active tasks and system health. Agents consult on every ses
 
 ## Active Tasks
 
+### Crew — role-based agents in herdr (2026-10-10)
+
+The framework's own agent team runs from the repository: roles are files under `roles/`, and
+`npm run crew` seats an agent in a role in its own herdr pane and git worktree. Where it lives:
+the `feat/crew` branch (not on `main`), `roles/`, `docs/CREW.md`, `memory/crew/`. Status: module
+`pilot`, targets 0.6.0; the CHANGELOG's crew section says what releases it. Open items below.
+
+Open items. The files these items cite are in `memory/crew/` of the main checkout, in their
+`## Report` sections. They are committed by the operator at session close, so on another checkout
+they may not exist yet.
+
+- [ ] **First to fix: a first prompt typed into the agent's box and never submitted, recorded as
+      sent** (found by the lead on 2026-10-11, cause not known). Three seats in a row had their
+      first prompt typed into the agent's input box and not submitted, while herdr answered that
+      the prompt was sent, so crew recorded `prompted: true` and the agents sat idle. It began when
+      the operator left the machine. To build: a few seconds after prompting, crew checks that the
+      agent has left the idle state and says plainly when it has not; and a crew command submits
+      the prompt already in the box, so nobody presses Enter in a pane by hand. The lead's account
+      is the last `## Report` section of
+      `memory/crew/2026-10-10-lead-first-crew-cycle-clear-the-deferred-mino.md`. One Enter key
+      submitted the stuck prompt; `herdr agent prompt --wait` answers `agent_prompt_stalled` in
+      this case and may be the simplest check.
+- [ ] **From the review of the label call fix** (minor, can follow; reviewer's `## Report` in
+      `2026-10-11-reviewer-review-the-label-call-fix-and-the-change.md`): F1 `release` stops with
+      a stack trace when an ignored directory holds a folder it cannot read
+      (`ignoredBeyondDependencies`, `scripts/crew/git.mjs`); F2 a large build tree beside
+      `node_modules` in an ignored directory is listed one line per file; F3 the staged-rename
+      handling in the same file has no test.
+- [ ] **From the review of titles and role as identity** (minor, can follow; reviewer's
+      `## Report` in `2026-10-11-reviewer-review-titles-and-role-as-identity-the-c-3.md`): F1 a
+      seat refused at the start step leaves its identity file until `release`; F2 a control
+      character in a title or in a brief's first line is refused by herdr only after the worktree
+      exists.
+- [ ] **F-2 to F-4 of the adapter review** (minor): a failed look replaces `agent_name_taken` with the
+      look's own error (`scripts/crew/herdr.mjs`); seat prints nothing while it waits up to 30
+      seconds and the documented bound understates the whole step; a closed record whose worktree
+      is gone and `worktree_removed: false` is not on the board, a failed record's board line
+      omits `may_remain`, `--base ""` is quietly taken as `main`, and the ambiguity message
+      "More than one closed assignment … still has a worktree" also lists records whose worktree
+      is already gone (`unfinishedRemoval`, `scripts/crew/core.mjs`). Source: the reviewer's report in
+      `2026-10-10-reviewer-review-the-herdr-adapter-rewrite-before.md`.
+- [ ] **Run the six experiments against a live herdr** listed under "Experiments that settle what
+      is still unverified" in `docs/CREW.md`. Nobody has run the first five. The sixth, whether herdr
+      accepts and shows the label tokens, was observed on 2026-10-11 and only two parts remain:
+      whether the tokens survive a herdr restart and whether the sidebar draws them. The spec's
+      section 5.3 lists the same six. Operator's to run, with a throwaway pane.
+- [ ] **Proposals from the first presentation round, not yet decided:** run the smoke run in
+      `docs/CREW.md` after each merged branch that touches herdr (engineer's presentation); give
+      reviewers a read-only herdr session or a recorded transcript of `agent start` failures
+      (reviewer's); put the branches in flight in every documentation brief (commons-steward's).
+      Files in `memory/crew/`: the three `2026-10-10-*-present-yourself-*.md`, item 6 of each.
+
 ### Vault-safety guard over-matches `clean` (2026-08-21 — found during tonight's session, not yet fixed)
 
 - [x] ~~**Narrow `scripts/guards/deny-destructive-git.mjs`'s `clean` match to the git verb.**~~ — **done 2026-08-28 (WS-A A6)**: the tokenizer now matches `clean`/`stash`/`reset --hard` only in git *subcommand* position, so pathspecs and commit messages naming them are fine. Dashed libexec binaries, wrapper/chained forms and expansion-as-subcommand stay blocked; regression fixtures both ways in `tests/guards/`. One residual false positive is documented and accepted: a heredoc body that *quotes* a real git command still trips it, because the guard reads the whole command line and cannot tell a command from prose about one.

@@ -1,0 +1,37 @@
+# org-os-crew — role-based agents seated in herdr panes.
+#
+# An IN-PLACE module: everything it owns already sits at its canonical path.
+# The external dependency (the herdr CLI, verified at 0.9.1) is recorded in
+# docs/CREW.md, not here — the v5 schema models module-to-module deps only.
+id: org-os-crew
+version: 0.1.0
+type: operational
+description: >-
+  The crew — roles as files under roles/, agents seated in herdr panes by
+  `npm run crew`, each in its own git worktree, with an assignment trail and
+  written handoffs under memory/crew/. Attended operation only. No server and
+  no database.
+dependencies:
+  - org-os-standards
+files:
+  roles: roles
+  scripts/crew.mjs: scripts/crew.mjs
+  scripts/crew: scripts/crew
+  skills/crew: skills/crew
+  tests/helpers/crew-fixtures.mjs: tests/helpers/crew-fixtures.mjs
+  tests/scripts/crew-board.test.mjs: tests/scripts/crew-board.test.mjs
+  tests/scripts/crew-cli-seat.test.mjs: tests/scripts/crew-cli-seat.test.mjs
+  tests/scripts/crew-cli.test.mjs: tests/scripts/crew-cli.test.mjs
+  tests/scripts/crew-flow.test.mjs: tests/scripts/crew-flow.test.mjs
+  tests/scripts/crew-git.test.mjs: tests/scripts/crew-git.test.mjs
+  tests/scripts/crew-herdr.test.mjs: tests/scripts/crew-herdr.test.mjs
+  tests/scripts/crew-identity.test.mjs: tests/scripts/crew-identity.test.mjs
+  tests/scripts/crew-label.test.mjs: tests/scripts/crew-label.test.mjs
+  tests/scripts/crew-roles.test.mjs: tests/scripts/crew-roles.test.mjs
+  tests/scripts/crew-seat.test.mjs: tests/scripts/crew-seat.test.mjs
+  tests/scripts/crew-shipped-roles.test.mjs: tests/scripts/crew-shipped-roles.test.mjs
+  tests/scripts/crew-trail.test.mjs: tests/scripts/crew-trail.test.mjs
+checks:
+  - file-exists: roles/circles.yaml
+  - file-exists: scripts/crew.mjs
+  - file-exists: skills/crew/SKILL.md

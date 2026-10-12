@@ -1,0 +1,178 @@
+// tests/helpers/crew-fixtures.mjs
+//
+// Shared by the crew-*.test.mjs suites: a throwaway repository root with a small
+// roster, and fake herdr / git adapters so scripts/crew/core.mjs runs without
+// either tool.
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import matter from 'gray-matter';
+import { createIdentityStore } from '../../scripts/crew/identity.mjs';
+
+const CIRCLES = `max_agents: 2
+circles:
+  - { id: lead, name: Coordination, purpose: Coordinates. }
+  - { id: engineering, name: Engineering, purpose: Builds. }
+`;
+
+export function writeRole(root, id, overrides = {}) {
+  // An override of undefined removes the field (YAML cannot write undefined).
+  const data = Object.fromEntries(
+    Object.entries({ id, circle: 'engineering', kind: 'claude', model: 'sonnet', may_seat: false, ...overrides }).filter(
+      ([, value]) => value !== undefined,
+    ),
+  );
+  const path = join(root, 'roles', `${id}.md`);
+  mkdirSync(join(root, 'roles'), { recursive: true });
+  writeFileSync(path, matter.stringify(`# ${id}\n\n## Mandate\n\nTest role.\n`, data));
+  return path;
+}
+
+// The shared sections of roles/README.md the identity prompt carries (spec 4.1).
+const README = `# Roles
+
+## Shared boundaries
+
+- Work only inside your own worktree.
+
+## What always needs the operator
+
+- merging into main
+
+## The cooperative charter
+
+1. Commons, not property.
+`;
+
+export function makeRoot() {
+  const root = mkdtempSync(join(tmpdir(), 'crew-test-'));
+  mkdirSync(join(root, 'roles'), { recursive: true });
+  writeFileSync(join(root, 'roles', 'circles.yaml'), CIRCLES);
+  writeFileSync(join(root, 'roles', 'README.md'), README);
+  writeRole(root, 'lead', { circle: 'lead', model: 'opus', may_seat: true });
+  writeRole(root, 'engineer');
+  writeRole(root, 'reviewer');
+  return root;
+}
+
+export function fakeHerdr(initialAgents = []) {
+  let n = 0;
+  const herdr = {
+    agents: initialAgents.map((a) => ({ name: null, state: 'idle', kind: 'claude', ...a })),
+    calls: [],
+    labels: [], // every label crew set: { on: 'pane' | 'workspace', id, tokens }
+    workspaces: new Map(), // workspace id -> checkout path
+    failOn: null, // { method, code, message }
+    fail(method) {
+      if (herdr.failOn && herdr.failOn.method === method) {
+        const err = new Error(herdr.failOn.message || `${method} failed`);
+        err.code = herdr.failOn.code || 'herdr_error';
+        throw err;
+      }
+    },
+    listAgents() {
+      return herdr.agents.map((a) => ({ ...a }));
+    },
+    open(method, opts) {
+      herdr.calls.push([method, opts]);
+      herdr.fail(method);
+      n += 1;
+      mkdirSync(opts.path, { recursive: true });
+      herdr.workspaces.set(`x${n}`, opts.path);
+      return { pane_id: `x${n}:p1`, workspace_id: `x${n}` };
+    },
+    createWorktree(opts) {
+      return herdr.open('createWorktree', opts);
+    },
+    openWorktree(opts) {
+      return herdr.open('openWorktree', opts);
+    },
+    startAgent(opts) {
+      herdr.calls.push(['startAgent', opts]);
+      herdr.fail('startAgent');
+      herdr.agents.push({ name: opts.name, pane_id: opts.pane_id, workspace_id: opts.pane_id.split(':')[0], state: 'idle', kind: opts.kind });
+    },
+    promptAgent(name, text) {
+      herdr.calls.push(['promptAgent', { name, text }]);
+      herdr.fail('promptAgent');
+    },
+    labelPane(paneId, tokens) {
+      herdr.fail('labelPane');
+      herdr.labels.push({ on: 'pane', id: paneId, tokens });
+    },
+    labelWorkspace(workspaceId, tokens) {
+      herdr.fail('labelWorkspace');
+      herdr.labels.push({ on: 'workspace', id: workspaceId, tokens });
+    },
+    workspaceCheckout(workspaceId) {
+      herdr.fail('workspaceCheckout');
+      return herdr.workspaces.get(workspaceId) ?? null;
+    },
+    removeWorktree(workspaceId, path) {
+      herdr.calls.push(['removeWorktree', { workspaceId }]);
+      herdr.fail('removeWorktree');
+      herdr.agents = herdr.agents.filter((a) => a.workspace_id !== workspaceId);
+      if (path) rmSync(path, { recursive: true, force: true });
+    },
+  };
+  return herdr;
+}
+
+export function fakeGit({ refs = ['main'] } = {}) {
+  const git = {
+    refs: new Set(refs),
+    dirty: new Map(), // worktree path -> porcelain lines
+    unreachable: new Set(), // detached worktrees whose HEAD is on no branch
+    calls: [],
+    resolves(ref) {
+      return git.refs.has(ref);
+    },
+    addDetached(path, ref) {
+      git.calls.push(['addDetached', { path, ref }]);
+      mkdirSync(path, { recursive: true });
+    },
+    worktreeExists(path) {
+      return existsSync(path);
+    },
+    changes(path) {
+      return git.dirty.get(path) || [];
+    },
+    rescueDetached(path, branch) {
+      git.calls.push(['rescueDetached', { path, branch }]);
+      if (!git.unreachable.has(path)) return null;
+      // like the real adapter: a taken name gets a numeric suffix, and the
+      // commits are on a branch afterwards
+      let name = branch;
+      for (let n = 2; git.refs.has(name); n += 1) name = `${branch}-${n}`;
+      git.refs.add(name);
+      git.unreachable.delete(path);
+      return name;
+    },
+    removeWorktree(path) {
+      git.calls.push(['removeWorktree', { path }]);
+      rmSync(path, { recursive: true, force: true });
+    },
+  };
+  return git;
+}
+
+/** The operator's context: inside herdr, in a pane that hosts no crew agent. */
+export function makeCtx(root, overrides = {}) {
+  return {
+    mainDir: root,
+    herdr: fakeHerdr(),
+    git: fakeGit(),
+    env: { HERDR_ENV: '1', HERDR_PANE_ID: 'op:p1' },
+    cwd: root,
+    now: () => new Date('2026-10-10T12:00:00Z'),
+    worktreeRoot: join(root, '.wt'),
+    identity: createIdentityStore(join(root, '.wt', 'identity')),
+    scriptPath: join(root, 'scripts', 'crew.mjs'),
+    ...overrides,
+  };
+}
+
+/** The same context as seen from a seated agent's pane. */
+export function asAgent(ctx, assignment) {
+  return { ...ctx, env: { ...ctx.env, HERDR_PANE_ID: assignment.pane }, cwd: assignment.worktree };
+}

@@ -4,6 +4,125 @@ All notable changes to **org-os** (the framework) are documented here. The proje
 
 For the policy that governs what counts as a version bump, see [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
+## Crew — on `feat/crew`, targets 0.6.0, not on `main`
+
+This section describes work that exists only on the `feat/crew` branch. It sits above
+`[Unreleased]` on purpose: `npm run version:update 0.5.1` must not promote it into 0.5.1. Whoever
+merges `feat/crew` into `main` folds it into the section of the release that carries it and
+deletes this heading. The words "not on `main`" or "on the `feat/crew` branch" are also in
+`MEMORY.md` (Active Context), `HEARTBEAT.md` (Crew), `docs/agent-plans/QUEUE.md` (item 8) and the
+spec's Status line
+(`docs/superpowers/specs/2026-10-10-org-os-crew-design.md`); remove them there in the same merge.
+
+- **Crew — role-based agents in herdr** (`npm run crew`, module `org-os-crew`). Roles are files
+  under `roles/`; an agent is a session seated in a role in a herdr pane, in its own git
+  worktree; assignments and handoffs are files under `memory/crew/`. Attended operation only.
+  Guide: `docs/CREW.md`.
+  What an operator should know:
+  - `roles/circles.yaml` ships `max_agents: 6`: up to six crew agents seated at once: the lead
+    and five working agents, and a second agent in one role takes one of the six, for example a
+    reviewer while an engineer is still seated. The framework repository ships seven roles, so six
+    seats do not hold every role at once; a new instance receives five of them. This is the
+    default every new instance receives. Each seated agent is a full model session on the operator's own plan,
+    so an instance on a small plan lowers the number by editing `max_agents` in that file. (The
+    launcher's own fallback of 4 applies only to a file with no `max_agents` line.)
+  - A role file may carry `effort` (`low`, `medium`, `high`, `xhigh` or `max`), passed to the
+    agent as `--effort` beside its model. It is passed to `claude` agents only; for any other
+    kind `seat` prints one line saying so and seats the agent anyway. A bad level is refused in
+    words. In the framework repository the lead and two new seats, `website` (owns `site/`, the
+    website and documentation site) and `platform` (owns `packages/admin/`, the admin app), run on
+    `claude-opus-5-5` at `high`. The two new roles are the framework repository's: a new instance
+    does not receive them, so it ships five roles.
+  - Every seat starts by reading its role file, its assignment file and the "Before you begin"
+    list in `roles/README.md` (by default `MASTERPLAN.md`, `SOUL.md`, `MEMORY.md` and `DECISIONS.md`; `lead` also
+    reads `HEARTBEAT.md` and `AGENTS.md`), and reports which it read and which were absent. The
+    list is there so an agent does not break a boundary a document states. Edit the list in
+    `roles/README.md` to change it for your instance.
+  - The board has a `STATUS` column (what the assignment's file says) beside `STATE` (what herdr
+    sees now). A `STATUS` that reads `working (first prompt not sent)` or
+    `working (first prompt unconfirmed)` marks an agent that may never have been told its task. The board also lists "Worktrees left
+    behind", for released assignments whose worktree was kept, and "Sync conflict copies"
+    (below).
+  - `release` says only what is true: whether the branch was kept or never created, and whether
+    the worktree was removed or left, and what held it back. Run it again on the same assignment
+    after you have dealt with that; a retry never forces removal and refuses an `--outcome` that
+    differs from the recorded one. If herdr did not answer while release asked it about the
+    worktree, or to remove it, the worktree is left and the message says which. After the removal
+    request herdr may still be removing it; after the question nothing was removed. Run `release`
+    again and, if herdr had finished, it says the worktree was already removed and closes the
+    record. When the seating itself timed out while herdr was creating the worktree, the first
+    `release` says the branch does not exist now and may still appear (not "never created"), and
+    the record stays open: run `release` again later, and it removes the worktree if herdr made
+    one, or says there is still none and closes the record.
+  - A new pane may not have reached its shell when `seat` starts the agent, and herdr then refuses
+    with `agent_pane_busy`. `seat` looks at the pane each time it is refused and waits, for up to
+    30 seconds, only while the shell is not yet in the foreground and no agent is there. It stops
+    at once when an agent is already there. This replaces a fixed 8 second wait.
+  - A start that is cut off may have started the agent anyway, so `seat` looks at the pane before
+    deciding and never sends a second start.
+  - When herdr does not confirm the first prompt, `seat` says the prompt "may or may not have
+    arrived" and tells you to look at the pane; `nudge` refuses, so the prompt is not sent twice.
+    Six answers prove that nothing was sent (herdr not installed, an empty prompt, an agent herdr
+    cannot find or finds twice, an agent at an approval dialog, an agent not ready): the agent then
+    counts as not prompted, and `nudge` works once the cause is dealt with.
+  - herdr's sidebar can show who is who. When `seat` starts an agent, crew reports its role, the
+    title (see `--title` below) and its status (`working`, then `reported`)
+    to herdr for the agent's pane, and role and assignment for its workspace. They show only
+    after you add `$role`, `$assignment` and `$status` rows to your own herdr `config.toml`;
+    the lines are in `docs/CREW.md`, and crew never edits that file. If herdr refuses a label,
+    `seat` still seats the agent and says so on one line. Release is unchanged.
+  - `seat` takes `--title "<short title>"`: what the agent works on, at most 24 characters (a
+    longer one is refused; without it the title is cut from the brief's first line). The title is
+    the agent's label in herdr's sidebar, replacing the 32-character cut of the brief, and the
+    board's ASSIGNMENT column; a second agent in a role is named from it (`engineer-cursor-race`)
+    where it was `engineer-2`, and a `claude` session is named `<role>: <title>`. Records made
+    before titles have none and still render from their brief. Nothing to migrate.
+  - A `claude` agent now carries its role as its system prompt for the whole session
+    (`--append-system-prompt-file`): the role file's body, the shared boundaries, what always
+    needs the operator and the charter from `roles/README.md`, and which seat it is. Other kinds
+    behave as before, and every first prompt still names the role file. The first prompt now
+    begins "You are the reviewer of the org-os crew". A report is headed with the role and the
+    agent's name. An instance that has edited `roles/README.md` keeps working: the three sections
+    are found by their `##` headings, and `seat` says when one is missing. The prompt is a file
+    under `~/.org-os/worktrees/<repo>/.identity/`, removed by `release`.
+  - So a role file is the agent's identity, not a document it reads once, and every shipped role
+    file gains a `## Voice` section after its Mandate: who the seat is, how it speaks, how it
+    signs its work, and the one question it asks. The headings of the website and platform roles
+    are now "Website steward" and "Platform steward", so their first prompt reads "You are the
+    website steward of the org-os crew". An instance that has its own role files should add a
+    `## Voice` section to each; nothing refuses a role without one. `roles/README.md`'s "A role
+    file" section lists the sections.
+  - `nudge`'s help line now says what is true: it sends the first prompt to an agent that has not
+    received it, whatever kept it from being sent. The board's line about sync-conflict copies
+    now says what Syncthing is and which file it copied.
+  - A herdr call that does not answer within 60 seconds fails with `herdr_timeout`; a failed
+    assignment keeps herdr's error code beside its message. A seating that failed or timed out at
+    the worktree step names what may be left behind (the branch, the checkout directory, and a
+    herdr workspace that crew cannot close, so you close it in herdr). A timed-out call is never
+    retried.
+  - `seat --handoff <id> --base <ref>` takes a handoff and builds on a new branch from `<ref>`,
+    where it used to seat a review copy of the handoff's branch. `--base` with `--on` is refused.
+  - Syncthing, the file-sync tool, can keep a second copy of a file whose name contains
+    `.sync-conflict-` when two machines change it at once. A copy of a file in `memory/crew/` is no
+    longer counted as a second assignment: the board lists it under "Sync conflict copies" and
+    never deletes it. Merge it by hand, then delete it. A file that cannot be parsed is listed
+    apart, under "Could not read".
+  - An assignment seated with `--on` works in a review copy: a checkout of an existing branch that
+    is not on that branch (git calls this detached). Its commits belong to no branch, so `release`
+    saves them as a branch `crew/<assignment-id>` and says so. An earlier saved branch is never
+    moved: commits made since go to `crew/<assignment-id>-2`, then `-3`. An ordinary assignment
+    commits to its own branch and has nothing to save.
+  - An existing instance does not receive the crew by `doctor sync`: its overlay writes only
+    `scripts/` and `templates/` (`FRAMEWORK_OWNED` in `packages/instance-doctor/src/overlay.mjs`),
+    so `scripts/crew.mjs` and `scripts/crew/` arrive and `roles/`, `docs/CREW.md` and
+    `skills/crew/` do not, and `package.json` is the instance's own. `npm run sync:upstream` is a
+    `git pull --rebase` and carries every file from `main`, but conflicts on files the instance
+    edited are the instance's to resolve. To use the crew, copy `roles/`, `docs/CREW.md` and
+    `skills/crew/` from the framework and add `"crew": "node scripts/crew.mjs"` to the `scripts`
+    in `package.json`. Without `roles/`, `crew` stops with "This repository has no crew roles".
+  - A brief that starts with a dash needs `--` before it, after any flags:
+    `seat <role> -- "<brief>"` and `handoff <role> -- "<brief>"`.
+
 ## [Unreleased]
 
 **Staged for `0.5.1`.** Everything below is already on `main` but landed *after* the `v0.5.0`
