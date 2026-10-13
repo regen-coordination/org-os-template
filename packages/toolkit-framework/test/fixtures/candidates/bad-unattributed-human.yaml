@@ -1,0 +1,12 @@
+# ai_assisted: false without provenance.authorship: human-authored — the claim is not declared
+schema: source-system
+object:
+  title: Unattributed Wiki
+  type: wiki
+  steward: Fixture Collective
+  return_path: none
+  maturity: raw
+  ai_assisted: false
+  provenance:
+    origin: "test/fixtures/transcript.md"
+    authorship: ai-assisted

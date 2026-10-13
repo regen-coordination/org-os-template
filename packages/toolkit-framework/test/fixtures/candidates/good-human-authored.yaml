@@ -1,0 +1,15 @@
+# a definition a person wrote in the source, carried verbatim — not AI-drafted
+schema: source-system
+object:
+  title: Human Wiki
+  type: wiki
+  steward: Fixture Collective
+  url: https://human-wiki.example.org
+  return_path: contribute via pull requests
+  reuse_conditions: CC-BY-SA
+  maturity: raw
+  ai_assisted: false
+  provenance:
+    origin: "test/fixtures/transcript.md"
+    transformation: quoted
+    authorship: human-authored

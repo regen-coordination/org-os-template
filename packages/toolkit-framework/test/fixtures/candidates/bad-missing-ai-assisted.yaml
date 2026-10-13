@@ -1,0 +1,10 @@
+# ai_assisted absent — must be stated either way
+schema: source-system
+object:
+  title: Silent Wiki
+  type: wiki
+  steward: Fixture Collective
+  return_path: none
+  maturity: raw
+  provenance:
+    origin: "test/fixtures/transcript.md"
