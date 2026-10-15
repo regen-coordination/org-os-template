@@ -111,3 +111,21 @@ test('only an explicit true discloses: false, absent, or a truthy non-boolean do
     assert.deepEqual(km.exchange.subscribed_domains, [], String(v));
   }
 });
+
+test('geo: only the public pointers (network, space, parent_space) reach knowledge.json — apply-only fields never do', () => {
+  const geo = { parent_space: 'p', space: 's', space_kind: 'dao', author_space: 'personal', network: 'testnet', url_property: 'u', types: {}, vocabularies: [{ path: 'v.json', type_id: 't' }] };
+  const dir = setup();
+  writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, geo } });
+  const km = JSON.parse(readFileSync(join(dir, 'public', '.well-known', 'knowledge.json'), 'utf8'));
+  assert.deepEqual(km.geo, { parent_space: 'p', space: 's', network: 'testnet' });
+  // a root-authored manifest gets the same filter
+  const dir2 = setup();
+  writeFileSync(join(dir2, '.well-known', 'knowledge.json'), JSON.stringify({ '@context': 'https://www.daostar.org/schemas', type: 'KnowledgeManifest', domains: [], sources: [], geo }));
+  writeStaticSurface({ dir: dir2, items, allItems, manifest, config: { instance: 't', publish: { base_url: 'https://kc.example' } } });
+  const km2 = JSON.parse(readFileSync(join(dir2, 'public', '.well-known', 'knowledge.json'), 'utf8'));
+  assert.deepEqual(km2.geo, { parent_space: 'p', space: 's', network: 'testnet' });
+  // nothing public → no geo key at all
+  const dir3 = setup();
+  writeStaticSurface({ dir: dir3, items, allItems, manifest, config: { ...config, geo: { author_space: 'personal' } } });
+  assert.equal('geo' in JSON.parse(readFileSync(join(dir3, 'public', '.well-known', 'knowledge.json'), 'utf8')), false);
+});
