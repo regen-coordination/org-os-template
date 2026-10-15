@@ -6,6 +6,9 @@ import * as fw from '../framework.mjs';
 
 // Never add extensions.yaml here: it is GENERATED below from the instance's packs, never copied from a hand-authored root file.
 const WELL_KNOWN_ALLOW = ['dao.json'];
+// Geo pointers anyone may read. Everything else under `geo:` (author_space — a personal space —, space_kind, property/type ids, vocabularies) is apply-only config.
+const GEO_PUBLIC = new Set(['network', 'space', 'parent_space']);
+const publicGeo = (g) => { if (!g || typeof g !== 'object') return undefined; const out = Object.fromEntries(Object.entries(g).filter(([k]) => GEO_PUBLIC.has(k))); return Object.keys(out).length ? out : undefined; };
 
 export function writeStaticSurface({ dir, outDir = 'public', items, allItems = items, manifest, config }) {
   const baseUrl = config.publish?.base_url?.replace(/\/$/, '');
@@ -48,7 +51,7 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
   const cards = allItems.filter((i) => fw.publishableTypes(config).includes('source-system') && i.schema === 'source-system' && fw.PUBLISHABLE_PUBLIC_USE.includes(i.object.public_use)).map(({ object }) => ({ title: object.title, url: object.url, steward: object.steward }));
   const sources = [...(km.sources || [])];
   for (const c of cards) if (!sources.some((s) => s.title === c.title)) sources.push(c);
-  write('.well-known/knowledge.json', { ...km, did: config.atproto?.did ?? km.did, geo: config.geo ?? km.geo, exchange: { published_domains: authority ? schemas.map((s) => fw.nsidFor(s, authority)) : [], subscribed_domains: subscribed }, sources });
+  write('.well-known/knowledge.json', { ...km, did: config.atproto?.did ?? km.did, geo: publicGeo(config.geo ?? km.geo), exchange: { published_domains: authority ? schemas.map((s) => fw.nsidFor(s, authority)) : [], subscribed_domains: subscribed }, sources });
 
   // Extension packs: publish this instance's Layer-B set (type names + maps_to_core only — no instance data) so a peer can
   // run federateCheck({ extensionsPath }) against it. Keyed on THIS instance's packs, never on the process-wide registry,
