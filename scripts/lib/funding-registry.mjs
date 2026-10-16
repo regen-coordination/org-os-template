@@ -4,6 +4,7 @@
 // Entries missing a required field, or with an out-of-range enum, are dropped rather than
 // published (one bad entry would make the whole file invalid). The dropped entries are listed
 // on a non-enumerable `dropped` property of the result, so JSON.stringify never publishes it.
+// A flow whose pool is not one of the published pools is dropped the same way.
 const asText = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v);
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o?.[k] != null).map((k) => [k, asText(o[k])]));
 const blank = (v) => v == null || v === '';
@@ -29,9 +30,14 @@ export function fundingRegistry(funding, identity) {
 
   const pools = keep('pool', funding.pools, (p) => pick(p, ['id', 'name', 'rule', 'started', 'ended', 'url']), (p) =>
     missing(p, ['id', 'name']) ?? (!blank(p.rule) && !POOL_RULES.includes(p.rule) ? badEnum('rule', p.rule, POOL_RULES) : null));
+  // A flow may name only a pool published here; a dangling pool id would point at nothing.
+  const poolIds = new Set(pools.map((p) => p.id));
   const flows = keep('flow', funding.flows, (f) => ({ ...pick(f, ['id', 'type', 'pool', 'amount_usd', 'date', 'evidence']), to: pick(f.to, ['name', 'url', 'addresses']) }), (f) =>
-    missing(f, ['id', 'type', 'date']) ?? (!FLOW_TYPES.includes(f.type) ? badEnum('type', f.type, FLOW_TYPES) : null) ?? (blank(f.to?.name) ? 'missing to.name' : null));
-  const calls = keep('call', funding.calls, (c) => pick(c, ['id', 'title', 'url', 'closes', 'call_type', 'amount', 'region']), (c) =>
+    missing(f, ['id', 'type', 'date']) ?? (!FLOW_TYPES.includes(f.type) ? badEnum('type', f.type, FLOW_TYPES) : null) ?? (blank(f.to?.name) ? 'missing to.name' : null)
+      ?? (!blank(f.pool) && !poolIds.has(f.pool) ? `pool "${f.pool}" is not a listed pool` : null));
+  // A call's amount is free text ("5k EUR", "up to 3000"); a bare YAML number is published as text.
+  const callFields = (c) => { const out = pick(c, ['id', 'title', 'url', 'closes', 'call_type', 'amount', 'region']); if (out.amount != null) out.amount = String(out.amount); return out; };
+  const calls = keep('call', funding.calls, callFields, (c) =>
     missing(c, ['id', 'title', 'call_type']) ?? (!CALL_TYPES.includes(c.call_type) ? badEnum('call_type', c.call_type, CALL_TYPES) : null));
 
   const registry = { '@context': 'https://www.daostar.org/schemas', type: 'FundingRegistry', org, pools, flows, calls };

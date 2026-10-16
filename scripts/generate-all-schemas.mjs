@@ -9,7 +9,6 @@ import path from 'path';
 import yaml from 'js-yaml';
 import matter from 'gray-matter';
 import { fileURLToPath } from 'url';
-import { fundingRegistry } from './lib/funding-registry.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -401,12 +400,15 @@ function generateIdeas() {
   console.log(`✓ Generated ideas.json (${(ideasData?.ideas || []).length} ideas)`);
 }
 
-// Generate funding.json from data/funding.yaml (pools run, flows given, calls open)
-function generateFunding() {
+// Generate funding.json from data/funding.yaml (pools run, flows given, calls open).
+// The registry module is imported only when the instance has a funding file, so an instance
+// without one (or cloned before scripts/lib/funding-registry.mjs existed) needs no such module.
+async function generateFunding() {
   const fundingPath = path.join(rootDir, 'data', 'funding.yaml');
   if (!fs.existsSync(fundingPath)) {
     return;
   }
+  const { fundingRegistry } = await import('./lib/funding-registry.mjs');
   const registry = fundingRegistry(yaml.load(fs.readFileSync(fundingPath, 'utf-8')), federationContent?.identity);
   if (!registry) {
     console.warn('⚠ funding.json not written: data/funding.yaml is empty or gives no org id/name (and federation.yaml identity has none)');
@@ -474,7 +476,7 @@ try {
   generateActivities();
   generateContracts();
   generateIdeas();
-  generateFunding();
+  await generateFunding();
   generateKnowledge();
 
   console.log('\n✓ All schemas generated successfully!');

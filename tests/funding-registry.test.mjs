@@ -61,3 +61,20 @@ test('entries that would break the schema are dropped and reported, not publishe
 test('no org id and name anywhere, no registry', () => {
   assert.equal(fundingRegistry({ flows: [] }, {}), null);
 });
+
+test('a call amount is published as a string', () => {
+  const r = fundingRegistry({ calls: [{ id: 'c', title: 'C', call_type: 'civic', amount: 5000 }, { id: 'd', title: 'D', call_type: 'civic', amount: '5k EUR' }] }, { id: 'n', name: 'N' });
+  assert.equal(r.calls[0].amount, '5000');
+  assert.equal(r.calls[1].amount, '5k EUR');
+});
+
+test('a flow naming a pool that is not listed is dropped and reported', () => {
+  const flow = { type: 'contribution', date: '2026-10-01', to: { name: 'X' } };
+  const r = fundingRegistry({
+    pools: [{ id: 'p1', name: 'P1' }, { id: 'bad', name: 'Bad', rule: 'lottery' }],
+    flows: [{ ...flow, id: 'in-p1', pool: 'p1' }, { ...flow, id: 'no-pool' }, { ...flow, id: 'ghost', pool: 'p9' }, { ...flow, id: 'in-bad', pool: 'bad' }],
+  }, { id: 'n', name: 'N' });
+  assert.deepEqual(r.flows.map((f) => f.id), ['in-p1', 'no-pool']);
+  assert.deepEqual(r.dropped.filter((d) => d.kind === 'flow').map((d) => d.id), ['ghost', 'in-bad']);
+  assert.match(r.dropped.find((d) => d.id === 'ghost').reason, /pool "p9" is not a listed pool/);
+});

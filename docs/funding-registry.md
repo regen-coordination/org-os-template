@@ -23,9 +23,12 @@ Only these fields are published. Never list individual donors: the generator doe
 co-fund reads the file and shows the records as self-published by the instance.
 
 Entries that would make the file invalid are skipped, with a `⚠` warning naming each: a flow needs
-`id`, `type` (`contribution` or `pledge`), `date` and `to.name`; a pool needs `id` and `name` (and
+`id`, `type` (`contribution` or `pledge`), `date` and `to.name`, and its `pool`, if given, must be
+the `id` of a pool listed in the same file; a pool needs `id` and `name` (and
 `rule`, if given, is one of `matching`, `direct`, `retro`, `stream`, `other`); a call needs `id`,
 `title` and `call_type` (`web3`, `public`, `philanthropic`, `civic`). With no org id and name (in
-the file or in `federation.yaml` identity) nothing is written.
+the file or in `federation.yaml` identity) nothing is written. A call's `amount` is published as
+text.
 
-An instance needs `scripts/lib/funding-registry.mjs` alongside `scripts/generate-all-schemas.mjs`.
+An instance with a `data/funding.yaml` needs `scripts/lib/funding-registry.mjs` alongside
+`scripts/generate-all-schemas.mjs`; one without it does not (the module is loaded only then).
