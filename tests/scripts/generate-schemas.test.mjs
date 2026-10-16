@@ -27,6 +27,9 @@ function setupInstance() {
   const root = mkdtempSync(path.join(tmpdir(), 'generate-schemas-'));
   mkdirSync(path.join(root, 'scripts'));
   copyFileSync(REAL_SCRIPT, path.join(root, 'scripts', 'generate-all-schemas.mjs'));
+  // The generator imports its pure helpers from scripts/lib/.
+  mkdirSync(path.join(root, 'scripts', 'lib'));
+  copyFileSync(path.join(ORG_ROOT, 'scripts', 'lib', 'funding-registry.mjs'), path.join(root, 'scripts', 'lib', 'funding-registry.mjs'));
   symlinkSync(nodeModulesDir(), path.join(root, 'node_modules'), 'dir');
 
   mkdirSync(path.join(root, '.well-known'));

@@ -103,6 +103,7 @@ docs/SKILL-SPECIFICATION.md
 docs/TOOL-SETUP.md
 docs/VAULT-SAFETY.md
 docs/VERSIONING.md
+docs/funding-registry.md
 docs/integrations/BROWSE-INTEGRATION.md
 docs/integrations/berd.md
 docs/integrations/egregore.md
@@ -163,6 +164,7 @@ scripts/initialize.mjs
 scripts/install-hooks.mjs
 scripts/lib/clone-excludes.mjs
 scripts/lib/discover-skills.mjs
+scripts/lib/funding-registry.mjs
 scripts/lib/quilt-compose.mjs
 scripts/lib/quilt-view.mjs
 scripts/lint-knowledge.mjs
@@ -221,6 +223,7 @@ tests/clone-excludes.test.mjs
 tests/discover-skills.test.mjs
 tests/fixtures/instance-config.yaml
 tests/fixtures/skills-empty/.gitkeep
+tests/funding-registry.test.mjs
 tests/generate-quilt.test.mjs
 tests/guards/deny-destructive-git.test.mjs
 tests/helpers/instance-fixtures.mjs
