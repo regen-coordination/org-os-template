@@ -409,11 +409,15 @@ function generateFunding() {
   }
   const registry = fundingRegistry(yaml.load(fs.readFileSync(fundingPath, 'utf-8')), federationContent?.identity);
   if (!registry) {
+    console.warn('⚠ funding.json not written: data/funding.yaml is empty or gives no org id/name (and federation.yaml identity has none)');
     return;
+  }
+  for (const d of registry.dropped) {
+    console.warn(`⚠ funding.yaml: skipped ${d.kind} ${d.id ?? '(no id)'} — ${d.reason}`);
   }
   const outputPath = path.join(rootDir, '.well-known', 'funding.json');
   fs.writeFileSync(outputPath, JSON.stringify(registry, null, 2));
-  console.log(`✓ Generated funding.json (${registry.pools.length} pools, ${registry.flows.length} flows, ${registry.calls.length} calls)`);
+  console.log(`✓ Generated funding.json (${registry.pools.length} pools, ${registry.flows.length} flows, ${registry.calls.length} calls, ${registry.dropped.length} skipped)`);
 }
 
 // Generate knowledge.json
