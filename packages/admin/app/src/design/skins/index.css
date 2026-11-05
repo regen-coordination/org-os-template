@@ -1,0 +1,5 @@
+/* Every skin the client ships. Add a skin by adding its file here and its entry in index.ts. House comes
+   first: its blocks also answer to the plain :root, which ties with another skin's own light block, and a
+   tie goes to the later sheet (skins.test.ts holds the order). */
+@import './house.css';
+@import './bare.css';

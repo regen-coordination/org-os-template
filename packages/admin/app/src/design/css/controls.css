@@ -1,0 +1,203 @@
+/* Controls (spec §7.1–7.4), ported from the approved gallery's controls with every raw value a token.
+   Hover only where a pointer can hover; press scales, never a disabled control; transitions name their
+   properties; coarse pointers get 44px targets. */
+
+/* Icons (§3.9): one outline set; the stroke comes from the skin, the size from the --ic-* tokens. */
+.i { flex: none; fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
+.i-xs { width: var(--ic-xs); height: var(--ic-xs); }
+.i-sm { width: var(--ic-sm); height: var(--ic-sm); }
+.i-md { width: var(--ic); height: var(--ic); }
+.i-lg { width: var(--ic-lg); height: var(--ic-lg); }
+[dir=rtl] .i-mirror { scale: -1 1; }
+.i-solid { fill: currentColor; stroke: none; }
+
+/* Button (§7.1): secondary by default; primary is ink (C-2); ghost is mute until hovered. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-5); flex: none;
+  height: var(--h-ctl); padding: 0 var(--sp-8); border-radius: var(--radius-ctl);
+  font: var(--fw-medium) var(--fs-ui)/var(--lh-ui) var(--font-btn); white-space: nowrap; text-decoration: none; cursor: pointer;
+  background: var(--raised); color: var(--ink); border: var(--rule-w) solid var(--rule-strong); box-shadow: var(--shadow-card);
+  transition-property: background-color, border-color, color, opacity, scale; transition-duration: var(--dur-1); transition-timing-function: var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.btn.has-ico { padding-inline-start: var(--sp-7); }
+.btn.primary { background: var(--solid); color: var(--on-solid); border-color: var(--solid); }
+.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--mute); }
+.btn.icon { width: var(--h-ctl); padding: 0; }
+.btn.sm { height: var(--h-ctl-sm); padding: 0 var(--sp-7); font-size: var(--fs-tiny); }
+.btn.sm.icon { width: var(--h-ctl-sm); padding: 0; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: var(--o-disabled); cursor: not-allowed; }
+.btn[aria-busy="true"] { cursor: progress; }
+/* press: only when motion is welcome; under reduced motion a press does not scale (§3.7) */
+@media (prefers-reduced-motion: no-preference) {
+  .btn:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]):active { scale: var(--press-scale); transition-duration: var(--dur-press); transition-timing-function: ease-out; }
+}
+@media (hover: hover) {
+  .btn:not(:disabled):not([aria-disabled="true"]):hover { background: var(--wash); }
+  .btn.primary:not(:disabled):not([aria-disabled="true"]):hover { background: var(--solid); opacity: var(--o-hover); }
+  .btn.ghost:not(:disabled):not([aria-disabled="true"]):hover { background: var(--wash); color: var(--ink); }
+}
+@media (pointer: coarse) {
+  .btn, .btn.sm { height: var(--h-ctl-touch); padding: 0 var(--sp-10); }
+  .btn.icon, .btn.sm.icon { width: var(--h-ctl-touch); padding: 0; }
+}
+
+/* A busy button and a loading note lead with the one spinner, the reading ring, drawn in css/states.css. */
+
+/* kbd (§7.3) */
+kbd { display: inline-flex; align-items: center; justify-content: center; min-inline-size: var(--h-kbd); block-size: var(--h-kbd); padding: 0 var(--sp-4);
+  font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--sans); color: var(--faint); background: var(--raised);
+  border: var(--rule-w) solid var(--rule-strong); border-block-end-width: var(--rule-w-heavy); border-radius: var(--radius-xs); }
+
+/* Inputs (§7.2): label above, hint or error under, the old value struck under a staged one. */
+.field { display: grid; gap: var(--sp-5); min-width: 0; }
+.field-l { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5); font: var(--fw-medium) var(--fs-label)/var(--lh-label) var(--sans); color: var(--mute); }
+.input { block-size: var(--h-input); inline-size: 100%; min-width: 0; padding: 0 var(--sp-7); border-radius: var(--radius-input);
+  background: var(--input-fill); border: var(--input-bw) solid var(--input-edge); color: var(--ink);
+  font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--sans); transition: border-color var(--dur-1) var(--ease); }
+.input::placeholder { color: var(--faint); }
+.input:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); border-color: var(--focus); }
+.input[aria-invalid="true"] { border-color: var(--attn); }
+.input:disabled { opacity: var(--o-disabled); cursor: not-allowed; }
+.input.mono-in { font-family: var(--mono); font-size: var(--fs-code); font-variant-numeric: tabular-nums slashed-zero; }
+textarea.input { block-size: auto; min-block-size: var(--h-textarea); padding: var(--sp-6) var(--sp-7); resize: vertical; }
+@media (max-width: 759px) { .input, .input.mono-in { font-size: var(--fs-sub); } }
+.hint { font-size: var(--fs-tiny); color: var(--faint); }
+.err-msg { display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-tiny); color: var(--attn); }
+.was-line { display: block; min-width: 0; overflow-wrap: anywhere; }
+.was-line .was { display: inline; margin: 0; font: var(--fw-regular) var(--fs-code)/var(--lh-row) var(--mono); color: var(--faint);
+  text-decoration: line-through; text-decoration-thickness: var(--rule-w); }
+
+/* Stepper (a threshold): − the number + and "of N" after it. */
+.stepper { display: inline-flex; align-items: center; gap: var(--sp-5); }
+.stepper .input { inline-size: calc(var(--h-input) * 2); text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.stepper .input::-webkit-inner-spin-button, .stepper .input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.stepper .btn.icon { height: var(--h-input); width: var(--h-input); }
+@media (pointer: coarse) { .stepper .btn.icon { height: var(--h-ctl-touch); width: var(--h-ctl-touch); } }
+.stepper-of { color: var(--mute); white-space: nowrap; }
+
+/* Choices: a checkbox or a radio in its own box (moss when on), and the wizard's choice card. */
+.choice { display: inline-flex; align-items: center; gap: var(--sp-6); color: var(--ink); cursor: pointer; }
+.choice-box { display: inline-grid; place-items: center; flex: none; }
+.choice-box > * { grid-area: 1 / 1; }
+.choice-box input { appearance: none; margin: 0; inline-size: var(--h-check); block-size: var(--h-check); background: var(--raised);
+  border: var(--stroke-w) solid var(--edge); cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), border-width var(--dur-1) var(--ease); }
+.choice-box input[type="checkbox"] { border-radius: var(--radius-xs); }
+.choice-box input[type="radio"] { border-radius: var(--radius-chip); }
+.choice-box input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+.choice-box input[type="radio"]:checked { border: var(--radio-dot) solid var(--accent); }
+.choice-box input:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.choice-box input:disabled { opacity: var(--o-disabled); cursor: not-allowed; }
+.choice-box .i { color: var(--on-accent); visibility: hidden; pointer-events: none; }
+.choice-box input:checked + .i { visibility: visible; }
+.choice-text { min-width: 0; }
+.choice-hint { color: var(--mute); font-size: var(--fs-meta); }
+.choice-card { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--sp-7); padding: var(--sp-9) var(--sp-10);
+  background: var(--raised); border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius);
+  transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
+.choice-card .choice-box { margin-block-start: var(--sp-2); }
+.choice-card .choice-t { font-weight: var(--fw-medium); }
+.choice-card .choice-hint { display: block; margin-block-start: var(--sp-2); }
+.choice-card:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 var(--sp-3) var(--accent-soft); }
+
+/* Segmented (§7.3): a wash track, the chosen segment raised. Data words read --font-data, so a skin may set them. */
+.seg { display: inline-flex; gap: var(--sp-2); padding: var(--sp-2); background: var(--wash); border-radius: calc(var(--radius-ctl) + var(--sp-2));
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--font-data); font-variant-numeric: var(--data-nums); }
+.seg button { display: inline-flex; align-items: center; gap: var(--sp-5); block-size: var(--h-ctl-sm); padding: 0 var(--sp-7);
+  background: transparent; border: 0; border-radius: var(--radius-ctl); color: var(--mute); font: inherit; cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
+/* the pressed one also carries a transparent outline: nothing in light or dark, the system's colour in forced colours,
+   where the raised background is dropped and the choice would otherwise not show */
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--ink); box-shadow: var(--shadow-card);
+  outline: var(--rule-w) solid transparent; outline-offset: calc(-1 * var(--rule-w)); }
+@media (hover: hover) { .seg button[aria-pressed="false"]:hover { color: var(--ink); } }
+@media (pointer: coarse) { .seg button { block-size: var(--h-ctl-touch); } }
+
+/* Tabs (§7.3): the chosen one ink with a 2px ink underline on the hairline; the bar scrolls inside itself. The
+   hairline is the bar's background, so the underline sits on it without spilling out of the scrolling box. */
+.tabs { display: flex; gap: var(--sp-11); overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+  background: linear-gradient(var(--rule), var(--rule)) bottom / 100% var(--rule-w) no-repeat local;
+  font: var(--fw-medium) var(--fs-ui)/var(--lh-ui) var(--font-data); font-variant-numeric: var(--data-nums); }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs [role="tab"] { display: inline-flex; align-items: center; gap: var(--sp-5); flex: none; block-size: var(--h-tab); padding: 0;
+  background: transparent; border: 0; border-block-end: var(--rule-w-heavy) solid transparent; color: var(--mute); font: inherit;
+  white-space: nowrap; text-decoration: none; cursor: pointer; transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease); }
+.tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-block-end-color: var(--ink); }
+.tabs [role="tab"]:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.tabs .cnt { color: var(--faint); }
+@media (hover: hover) { .tabs [role="tab"][aria-selected="false"]:hover { color: var(--ink); } }
+/* 44px on a coarse pointer (§13), after the rule it grows: the Proposals tabs on a phone (L4a final review I-2). */
+@media (pointer: coarse) { .tabs [role="tab"] { block-size: var(--h-ctl-touch); } }
+
+/* Menu (§7.3): the pop surface; items 32px, radius = the menu's less its padding; a trailing hint, reason or moss check. */
+.menu-wrap { position: relative; display: inline-flex; }
+.menu { min-inline-size: var(--w-menu); padding: var(--sp-4); background: var(--pop); color: var(--ink); text-align: start;
+  border: var(--rule-w) solid transparent; border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); overscroll-behavior: contain; }
+.menu-wrap > .menu { position: absolute; inset-block-start: calc(100% + var(--sp-4)); inset-inline-end: 0; z-index: 30; }
+.menu-children { display: flex; flex-direction: column; gap: var(--sp-4); }
+.menu .mi { display: flex; align-items: center; gap: var(--sp-6); inline-size: 100%; block-size: var(--h-ctl); padding: 0 var(--sp-6);
+  background: transparent; border: 0; border-radius: calc(var(--radius-pop) - var(--sp-4)); color: var(--ink);
+  font: var(--fw-regular) var(--fs-ui)/var(--lh-ui) var(--sans); text-align: start; text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease); }
+.menu .mi .i { inline-size: var(--ic-menu); block-size: var(--ic-menu); color: var(--mute); }
+.menu .mi .end { margin-inline-start: auto; padding-inline-start: var(--sp-8); display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--faint); font-size: var(--fs-tiny); }
+.menu .mi .end .i { color: var(--accent); }
+.menu .mi:focus, .menu .mi.on { background: var(--wash); }
+.menu .mi:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.menu .mi[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+@media (hover: hover) { .menu .mi:not([aria-disabled="true"]):hover { background: var(--wash); } }
+/* 44px on a coarse pointer (§13): view as, the identity menu, Appearance (L4a final review I-2). */
+@media (pointer: coarse) { .menu .mi { block-size: var(--h-ctl-touch); } }
+.menu .sep { block-size: var(--rule-w); margin: var(--sp-4) calc(-1 * var(--sp-4)); background: var(--rule); }
+.menu .mh { padding: var(--sp-6) var(--sp-6) var(--sp-4); font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--mono);
+  letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+
+/* Tooltip (§7.3): ink pill above its trigger, after 400ms on hover or focus; Esc dismisses it. */
+.tip-wrap { position: relative; display: inline-flex; }
+.tip { inline-size: max-content; max-inline-size: var(--w-tip); padding: var(--sp-4) var(--sp-6); border-radius: var(--radius-sm);
+  background: var(--solid); color: var(--on-solid); font: var(--fw-medium) var(--fs-tiny)/var(--lh-row) var(--sans);
+  text-align: start; white-space: normal; overflow-wrap: anywhere; }
+.tip-wrap > .tip { position: absolute; inset-block-end: calc(100% + var(--sp-5)); inset-inline-start: 0; z-index: 40; pointer-events: none; }
+
+/* Note (§7.4): glyph + 13px line; faint for empty and not yet, clay for an error. */
+.note { display: flex; align-items: flex-start; gap: var(--sp-6); margin: var(--sp-6) 0; min-width: 0;
+  font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); overflow-wrap: anywhere; }
+.note > .i, .note > .spin { margin-block-start: var(--sp-2); }
+.note-t { min-width: 0; }
+.note-empty, .note-notYet { color: var(--faint); }
+.note-error { color: var(--attn); }
+.note-act button { padding: 0; background: transparent; border: 0; font: inherit; cursor: pointer; }
+.note-act a, .note-act button { color: var(--ink); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: var(--sp-3); text-decoration-thickness: from-font; }
+.empty { margin: var(--sp-6) 0; color: var(--faint); overflow-wrap: anywhere; }
+.note-block { display: grid; justify-items: start; gap: var(--sp-6); padding: var(--sp-12) var(--sp-11);
+  border: var(--rule-w) dashed var(--rule-strong); border-radius: var(--radius); }
+.note-block-t { margin: 0; font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--ink); }
+.note-block-l { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--faint); }
+
+/* Confirm dialog: a modal pop surface over the scrim; the confirm names what goes and is ink, never clay (C-3). */
+.dialog { width: min(calc(100vw - 2 * var(--sp-10)), calc(var(--w-inspector) + var(--sp-15))); padding: var(--sp-12);
+  background: var(--pop); color: var(--ink); border: var(--rule-w) solid transparent; border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); }
+.dialog::backdrop { background: var(--scrim); }
+.dialog-t { margin: 0 0 var(--sp-6); font: var(--fw-strong) var(--fs-sub)/var(--lh-title) var(--sans); text-wrap: balance; }
+.dialog-b { margin: 0; color: var(--mute); text-wrap: pretty; }
+.dialog-f { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-6); margin-block-start: var(--sp-12); }
+.dialog-inline { position: static; inline-size: auto; max-inline-size: none; margin: 0; } /* a /parts specimen, open in place */
+/* The dialog as a sheet for a short form (New board, Import from a sheet): wider, scrolled inside the viewport, its
+   body in ink (a form, not a sentence), and a note at the foot's start, beside the buttons. */
+.dialog-wide { width: min(calc(100vw - 2 * var(--sp-10)), var(--w-palette)); max-height: calc(100dvh - 2 * var(--sp-10)); overflow: auto; }
+.dialog-wide .dialog-b { color: var(--ink); }
+.dialog-f-note { align-items: center; }
+.dialog-note { margin: 0; margin-inline-end: auto; font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
+.dialog-note code { font: var(--fs-meta) var(--mono); }
+
+/* Menus and popovers (§3.7): enter with opacity and a 4px drop over --dur-2; leave with opacity only. Under
+   reduced motion they only cross-fade. Last in the file, so [hidden] wins over any display set above. */
+.popover { transition: opacity var(--dur-2) var(--ease), translate var(--dur-2) var(--ease), display var(--dur-2) allow-discrete, overlay var(--dur-2) allow-discrete; }
+@starting-style { .popover { opacity: 0; translate: 0 calc(-1 * var(--sp-4)); } }
+.popover[hidden] { display: none; opacity: 0; transition: opacity var(--dur-out) var(--ease), display var(--dur-out) allow-discrete; }
+@media (prefers-reduced-motion: reduce) {
+  .popover { transition: opacity var(--dur-1) var(--ease), display var(--dur-1) allow-discrete, overlay var(--dur-1) allow-discrete; }
+  .popover[hidden] { transition: opacity var(--dur-1) var(--ease), display var(--dur-1) allow-discrete; }
+}

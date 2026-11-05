@@ -1,0 +1,96 @@
+/* States (spec §6.1, §6.2, §7.8, §7.13, §7.14), ported from the approved gallery's atoms with every raw value a
+   token: the marks, the reading ring, loading skeletons, the kind tile and the meter. Moss is selected, staged
+   and yours; clay needs a person, failed or stale; ink is what is done. Every mark is a shape and a word. */
+
+/* The marks (§6.1, §7.8): an 8px shape, hidden from a screen reader, then a 12/500 word in the mark's colour. */
+.smark { display: inline-flex; align-items: baseline; gap: var(--sp-5); color: var(--mute); white-space: nowrap;
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--label-font); text-transform: var(--label-case); letter-spacing: var(--ls-label); }
+/* the word, not the shape, gives a mark its baseline: marks of different shapes line up in a row of text */
+.smark-shape, .mark-shape { display: inline-block; flex: none; align-self: center; inline-size: var(--mark); block-size: var(--mark); }
+.smark-needs, .smark-stale, .smark-failed { color: var(--attn); }
+.smark-staged, .smark-draft, .smark-selected { color: var(--accent); }
+.smark-closed { color: var(--faint); }
+.smark-needs > .smark-shape, .mark.warn > .mark-shape { border-radius: var(--radius-chip); background: var(--attn); }
+.smark-staged > .smark-shape { border-radius: var(--radius-mark); background: var(--accent); }
+.smark-stale > .smark-shape { border-radius: var(--radius-mark); border: var(--stroke-w) solid var(--attn); }
+.smark-draft > .smark-shape { border-radius: var(--radius-mark); border: var(--stroke-w) dashed var(--accent); }
+.smark-open > .smark-shape { border-radius: var(--radius-chip); border: var(--stroke-w) solid var(--mute); }
+.smark-ok > .smark-shape { border-radius: var(--radius-chip); background: var(--mute); }
+.smark-aged > .smark-shape { border-radius: var(--radius-chip); border: var(--stroke-w) dashed var(--faint); }
+.smark-failed > .smark-shape, .mark.alert > .mark-shape { inline-size: var(--w-mark-bar); block-size: var(--mark-bar); border-radius: var(--radius-mark-bar); background: var(--attn); }
+.smark-closed > .smark-shape { inline-size: var(--w-mark-bar); block-size: var(--mark-bar); border-radius: var(--radius-mark-bar); background: var(--faint); }
+.smark-done > .smark-shape { inline-size: var(--mark-check); block-size: var(--mark-check); }
+.smark-done > .smark-shape::before { content: ""; display: block; inline-size: var(--mark-tick-w); block-size: var(--mark-tick-h); margin-inline-start: var(--mark-tick-x);
+  border: solid var(--mute); border-width: 0 var(--stroke-w) var(--stroke-w) 0; rotate: 45deg; }
+/* running is the reading ring itself, at the mark's size */
+.smark-running > .spin { inline-size: var(--mark); block-size: var(--mark); }
+/* selected and faint are a row's or a node's treatment, not a glyph: the word in moss, or the word in --faint (dimmed,
+   and still 4.5:1: opacity would take it under, 1.4.3) */
+.smark-selected > .smark-shape, .smark-faint > .smark-shape { display: none; }
+.smark-faint { color: var(--faint); }
+
+/* 0.6's attention marker (Mark): warn draws as needs, alert as failed; the text keeps its line and its size. */
+.mark { display: inline-flex; align-items: baseline; }
+.mark > .mark-shape { margin-inline-end: var(--sp-5); }
+.mark.alert .mark-text { color: var(--attn); }
+
+/* The reading ring (§3.7, §6.1 running): a three-quarter circle in the text's colour. The one spinner: busy buttons,
+   loading notes, the running mark and read ages draw it. It stands still under reduced motion, a ¾ ring beside its word. */
+.spin { display: inline-block; flex: none; inline-size: var(--ic-sm); block-size: var(--ic-sm); border-radius: var(--radius-chip);
+  border: var(--stroke-w) solid currentColor; border-inline-end-color: transparent; animation: spin var(--dur-spin) linear infinite; }
+@keyframes spin { to { rotate: 1turn; } }
+.spinner { display: inline-flex; align-items: center; gap: var(--sp-5); color: var(--mute); }
+
+/* Loading (§6.2): first load only. Rows of the element's own shape at its real height, so nothing jumps; --wash bars
+   that breathe (opacity 1 → --o-breathe, 1.4 s alternate) only while the region is busy. */
+.skel { display: grid; min-width: 0; }
+.skel[data-shape="card"], .skel[data-shape="node"] { gap: var(--sp-6); }
+.skel-bar { display: block; block-size: var(--h-skel); border-radius: var(--radius-skel); background: var(--wash); }
+.skel[aria-busy="true"] .skel-bar { animation: breathe var(--dur-breathe) var(--ease) infinite alternate; }
+@keyframes breathe { to { opacity: var(--o-breathe); } }
+.skel-row { display: grid; align-items: center; gap: var(--sp-8); min-width: 0; }
+.skel-main { display: grid; gap: var(--sp-6); min-width: 0; }
+.skel-bar.skel-s { block-size: var(--h-skel-sub); }
+.skel-t { inline-size: 46%; }
+.skel-s { inline-size: 28%; }
+.skel-row:nth-child(3n+2) .skel-t { inline-size: 60%; }
+.skel-row:nth-child(3n+2) .skel-s { inline-size: 34%; }
+.skel-row:nth-child(3n) .skel-t { inline-size: 52%; }
+.skel-row:nth-child(3n) .skel-s { inline-size: 40%; }
+.skel-e { inline-size: var(--w-skel-end); }
+/* a two-line row (§9.2): the kind tile, two lines, the end */
+.skel-row-row { grid-template-columns: var(--h-ktile) minmax(0, 1fr) auto; min-block-size: var(--h-row); padding: var(--sp-7) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule); }
+/* a table row (§10.2): one line and the end */
+.skel-row-row-1 { grid-template-columns: minmax(0, 1fr) auto; min-block-size: var(--h-row-1); padding: 0 var(--sp-10); border-block-start: var(--rule-w) solid var(--rule); }
+.skel-row-row-1 .skel-e { inline-size: var(--w-skel-end-1); }
+.skel-row-row:first-child, .skel-row-row-1:first-child { border-block-start: 0; }
+/* a card (board card, library entry): eyebrow, title, a line */
+.skel-row-card { gap: var(--sp-6); padding: var(--sp-10); background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); }
+/* a map node (§8.3): kind, name, the meta line, at the node's width */
+.skel-row-node { gap: var(--sp-6); inline-size: 100%; max-inline-size: var(--w-node); padding: var(--sp-8); background: var(--raised);
+  border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius); box-shadow: var(--shadow-raise); }
+.skel-row-card .skel-k, .skel-row-node .skel-k { inline-size: 30%; }
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  .skel[aria-busy="true"] .skel-bar { animation: none; }
+}
+
+/* Kind tile (§7.14): the kind's glyph, mute, on --wash. 28 in a row, 32 on Needs you, 40 on a record header.
+   Attention is clay on --attn-soft; moss on --accent-soft is an outcome done or added. */
+.ktile { display: grid; place-items: center; flex: none; background: var(--wash); color: var(--mute); }
+.ktile-row { inline-size: var(--h-ktile); block-size: var(--h-ktile); border-radius: var(--radius-sm); }
+.ktile-needs { inline-size: var(--h-ktile-needs); block-size: var(--h-ktile-needs); border-radius: var(--radius-ktile-needs); }
+.ktile-header { inline-size: var(--h-ktile-header); block-size: var(--h-ktile-header); border-radius: var(--radius); }
+.ktile-attn { background: var(--attn-soft); color: var(--attn); }
+.ktile-moss { background: var(--accent-soft); color: var(--accent); }
+
+/* Meter (§7.13): 12×4 segments up to 12 — done in ink, yours in moss, the rest the track — or a 96×4 bar with an
+   ink fill. Hidden from a screen reader; its words beside it say it. */
+.meter-w { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); min-width: 0; }
+.meter { display: inline-flex; align-items: center; gap: var(--sp-3); flex: none; }
+.meter > i { display: block; inline-size: var(--w-meter-seg); block-size: var(--h-meter); border-radius: var(--radius-meter); background: var(--rule-strong); }
+.meter > i.on { background: var(--ink); }
+.meter > i.you { background: var(--accent); }
+.meter.bar { position: relative; overflow: hidden; inline-size: var(--w-meter-bar); block-size: var(--h-meter); border-radius: var(--radius-meter); background: var(--rule-strong); }
+.meter-fill { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: var(--radius-meter); background: var(--ink); }
+.meter-l { font-size: var(--fs-tiny); color: var(--mute); font-variant-numeric: var(--data-nums); white-space: nowrap; }

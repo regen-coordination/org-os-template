@@ -1,0 +1,37 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "safe": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "to": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "value": "0",
+      "data": "0xa9059cbb",
+      "operation": 0,
+      "nonce": 8,
+      "executionDate": null,
+      "submissionDate": "2026-10-15T09:00:00Z",
+      "transactionHash": null,
+      "safeTxHash": "0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe",
+      "proposer": "0x00000000000000000000000000000000000000A1",
+      "executor": null,
+      "isExecuted": false,
+      "isSuccessful": null,
+      "confirmationsRequired": 2,
+      "trusted": true,
+      "dataDecoded": {
+        "method": "transfer",
+        "parameters": []
+      },
+      "confirmations": [
+        {
+          "owner": "0x00000000000000000000000000000000000000A1",
+          "submissionDate": "2026-10-15T09:00:00Z",
+          "signatureType": "EOA"
+        }
+      ]
+    }
+  ],
+  "countUniqueNonce": 1
+}

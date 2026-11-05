@@ -1,19 +1,15 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { handleEvent, type ServerEvent } from './events.ts'
 
-/** Live refresh: external edits (Obsidian, agents, git) invalidate cached queries. */
-export function useRegistryEvents(): void {
+/** Live refresh: external edits (Obsidian, agents, git), resource changes and job output. */
+export function useServerEvents(): void {
   const queryClient = useQueryClient()
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     const socket = new WebSocket(`${proto}://${location.host}/api/events`)
     socket.onmessage = event => {
-      const msg = JSON.parse(event.data as string) as { type: string; registry?: string }
-      if (msg.type === 'registry-changed' && msg.registry) {
-        void queryClient.invalidateQueries({ queryKey: ['registry', msg.registry] })
-        void queryClient.invalidateQueries({ queryKey: ['registries'] })
-        void queryClient.invalidateQueries({ queryKey: ['status'] })
-      }
+      try { handleEvent(JSON.parse(event.data as string) as ServerEvent, queryClient) } catch { /* a message this page does not know */ }
     }
     return () => socket.close()
   }, [queryClient])

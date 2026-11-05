@@ -1,12 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { serve } from '@hono/node-server'
-import { serveStatic } from '@hono/node-server/serve-static'
-import { WebSocketServer } from 'ws'
-import type { Server } from 'node:http'
-import { createApp } from './app.ts'
-import { watchData } from './watcher.ts'
+import { readHosted, startServer } from './serve.ts'
 
 function arg(flag: string, fallback: string): string {
   const i = process.argv.indexOf(flag)
@@ -21,21 +16,23 @@ if (!existsSync(resolve(repo, 'data')) || !existsSync(resolve(repo, 'federation.
   process.exit(1)
 }
 
-const app = createApp(repo)
 const appDist = fileURLToPath(new URL('../app/dist', import.meta.url))
-if (existsSync(appDist)) {
-  app.use('/*', serveStatic({ root: appDist }))
-  app.get('*', serveStatic({ path: 'index.html', root: appDist })) // SPA fallback
-} else {
+if (!existsSync(appDist)) {
   console.warn('app/dist missing — run `npm run build` for the UI (API still available)')
 }
 
-const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port }, info => {
-  console.log(`org-os admin → http://localhost:${info.port}  (repo: ${repo})`)
-})
+const hosted = readHosted(process.argv, process.env)
+const running = await startServer({ repo, port, appDist, hosted })
+console.log(`org-os admin → http://localhost:${running.port}  (repo: ${repo}${hosted ? ', hosted' : ''})`)
 
-const wss = new WebSocketServer({ server: server as Server, path: '/api/events' })
-watchData(repo, registry => {
-  const msg = JSON.stringify({ type: 'registry-changed', registry })
-  for (const client of wss.clients) if (client.readyState === client.OPEN) client.send(msg)
-})
+// Ending the server ends its jobs first (close does it). A second signal while that waits
+// is the operator insisting: leave at once.
+let stopping = false
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+  process.on(signal, () => {
+    if (stopping) process.exit(1)
+    stopping = true
+    console.error('org-os admin: stopping (ending running jobs)…')
+    running.close().then(() => process.exit(0), () => process.exit(1))
+  })
+}

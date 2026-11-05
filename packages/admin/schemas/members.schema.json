@@ -1,88 +1,70 @@
 {
   "$id": "orgos://registry/members",
   "type": "object",
-  "required": [
-    "id"
-  ],
+  "required": ["id"],
   "additionalProperties": true,
-  "x-order": [
-    "id",
-    "name",
-    "role",
-    "layer",
-    "status",
-    "joined"
+  "x-order": ["id", "name", "kind", "role", "layer", "status", "joined"],
+  "x-groups": [
+    { "label": "Who", "fields": ["name", "kind", "role"] },
+    { "label": "Where they stand", "fields": ["layer", "status", "joined"] },
+    { "label": "Reaching them", "fields": ["email"], "optional": true }
   ],
   "properties": {
     "id": {
+      "title": "Id",
+      "description": "A short name, unique in this file, never changed once set.",
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "$comment": "Opaque: unique within this file, never parsed or rewritten. Real instances use github:…, did:…, exampledao:role:… and bare slugs. Identity across instances goes through handles."
     },
-    "name": {
-      "type": [
-        "string",
-        "null"
-      ]
+    "name": { "title": "Name", "description": "What the person, agent or organisation is called.", "type": ["string", "null"] },
+    "kind": {
+      "title": "Kind",
+      "description": "A person, an agent, an organisation or a role. Left empty, a person.",
+      "enum": ["person", "agent", "organization", "role", null],
+      "$comment": "Absent or null reads as person, and so does `type: individual`, as some instances write it. Agents (crew seats) are kind agent."
     },
-    "role": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
+    "role": { "title": "Role", "description": "What they do here, in a few words.", "type": ["string", "null"] },
     "layer": {
-      "enum": [
-        "core",
-        "contributor",
-        "community",
-        "observer"
-      ]
+      "title": "Layer",
+      "description": "How close they are to the core of the work.",
+      "type": ["string", "null"],
+      "minLength": 1,
+      "$comment": "Open vocabulary. The framework's default words are the examples; an instance may use its own (dao-global, network, funders…).",
+      "examples": ["core", "contributor", "community", "observer"]
     },
-    "status": {
-      "enum": [
-        "active",
-        "inactive",
-        "alumni"
-      ]
-    },
-    "joined": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "format": "date"
-    },
-    "left": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "format": "date"
-    },
-    "skills": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      }
+    "status": { "title": "Status", "description": "Whether they take part now.", "enum": ["active", "inactive", "alumni"] },
+    "joined": { "title": "Joined", "description": "When they joined.", "type": ["string", "null"], "format": "date" },
+    "left": { "title": "Left", "description": "When they left, if they have.", "type": ["string", "null"], "format": "date" },
+    "skills": { "title": "Skills", "description": "What they bring.", "type": ["array", "null"], "items": { "type": "string" } },
+    "email": {
+      "title": "Email",
+      "description": "An address to reach them. Commits made with it are recognised as theirs.",
+      "type": ["string", "null"],
+      "$comment": "Read as handles.email, and as a handles.git candidate (the vault hub writes it here)."
     },
     "handles": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "additionalProperties": {
-        "type": "string"
-      }
+      "title": "Handles",
+      "description": "How they are recognised: the emails their commits are made with (git) and their accounts (address).",
+      "type": ["object", "null"],
+      "$comment": "How an actor is recognised. git: the emails commits are made with (one or a list); address: CAIP-10 accounts (one or a list).",
+      "properties": {
+        "git": {
+          "anyOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          ]
+        },
+        "address": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}:[-.%a-zA-Z0-9]{1,128}$" },
+            { "type": "array", "items": { "type": "string", "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}:[-.%a-zA-Z0-9]{1,128}$" } }
+          ]
+        }
+      },
+      "additionalProperties": { "type": "string" }
     },
-    "affiliations": {
-      "type": [
-        "array",
-        "null"
-      ]
-    }
+    "affiliations": { "title": "Affiliations", "description": "Other organisations they belong to.", "type": ["array", "null"] }
   },
   "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
 }

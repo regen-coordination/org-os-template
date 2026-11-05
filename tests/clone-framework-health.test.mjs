@@ -119,13 +119,19 @@ test('the clone carries no framework registry content — identity stripped by c
     assert.ok(!/gnosis|llamarpc/i.test(tools), 'the framework\'s API endpoints must not ship in an instance');
 
     // The catch-all: the maintainer's handle appearing anywhere in the
-    // instance's data/ or identity files is a leak by definition.
+    // instance's data/ or identity files is a leak by definition. The name and
+    // handle are read from the framework's own IDENTITY.md, so the test names no one.
+    const maintainer = /\*\*Maintainer:\*\*\s*(.+?)\s*\(github\.com\/([\w-]+)\)/
+      .exec(readFileSync(path.join(rootDir, 'IDENTITY.md'), 'utf-8'));
+    assert.ok(maintainer, 'IDENTITY.md must state the maintainer as "**Maintainer:** Name (github.com/handle)"');
+    const [, maintainerName, maintainerHandle] = maintainer;
     for (const rel of ['data/members.yaml', 'data/projects.yaml', 'data/ideas.yaml',
                        'data/ecosystems.yaml', 'data/relationships.yaml', 'USER.md', 'SOUL.md']) {
       const p = path.join(dir, rel);
       if (!existsSync(p)) continue;
+      const text = readFileSync(p, 'utf-8');
       assert.ok(
-        !/luizfernandosg|Luiz Fernando/.test(readFileSync(p, 'utf-8')),
+        !text.includes(maintainerHandle) && !text.includes(maintainerName),
         `maintainer identity leaked into ${rel}`,
       );
     }

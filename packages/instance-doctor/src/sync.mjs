@@ -8,15 +8,19 @@
  * wrapper that gets an instance into a state where sync-upstream can run, then
  * runs it, then proves the result.
  *
- * Nine stages, aborting on the first failure (B9): no stage may leave the
+ * Ten stages, aborting on the first failure (B9): no stage may leave the
  * instance half-migrated, and the receipt records the stage that stopped it.
  *
  *   snapshot          a recoverable git ref of the whole working tree
  *   ensure-upstream   add or rewrite the `upstream` remote to the canonical URL
  *   fetch             fetch it
- *   inject-machinery  copy the framework's sync machinery into the instance
+ *   inject-machinery  copy the framework's sync machinery into the instance, and vendor
+ *                     the standards generator into scripts/lib/ (as clone stage 5 does)
  *   overlay           copy framework-owned paths in (replaces the rebase)
  *   migrate           framework migrations + the 3.x→0.5 re-baseline re-stamp
+ *   declare-visibility  write data/visibility.yaml keeping what .well-known/ shows is published today, as its own commit
+ *                       (none when dao.json carries the L8 generator's mark: that output is L8's, not 0.6's)
+ *                       (DAO-OS L8, Q55, R31); never when the file has git history
  *   generate-schemas  republish .well-known/
  *   re-assess         run the full B1-B6 battery again
  *   receipt           write the dated receipt and stamp last_sync_commit
@@ -34,6 +38,7 @@ import {
 } from './checks/machinery.mjs';
 import { milestoneOrdinal, TEMPLATE_PACKAGE_NAME } from './checks/versions.mjs';
 import { FRAMEWORK_OWNED } from './overlay.mjs';
+import { STANDARDS_SOURCE_DIR, STANDARDS_VENDOR_DIR } from '../../../scripts/lib/standards-vendor.mjs';
 
 export const STAGE_IDS = [
   'snapshot',
@@ -42,6 +47,7 @@ export const STAGE_IDS = [
   'inject-machinery',
   'overlay',
   'migrate',
+  'declare-visibility',
   'generate-schemas',
   're-assess',
   'receipt',
@@ -76,9 +82,10 @@ export function planSync(snapshot) {
 
   const restampNeeded =
     declared !== null && fwShort !== null && milestoneOrdinal(declared) !== milestoneOrdinal(fwShort);
+  const migrations = `run the framework's migrations (node <framework>/scripts/migrate.mjs <instance> --target ${fwVersion})`;
   const migrateDetail = restampNeeded
-    ? `run framework migrations, then re-stamp the version surfaces ${declared} → ${fwShort} (the re-baseline; without it the re-assess fails B3)`
-    : `run framework migrations; version surfaces already read ${declared ?? '(none)'}`;
+    ? `${migrations}, then re-stamp the version surfaces ${declared} → ${fwShort} (the re-baseline; without it the re-assess fails B3)`
+    : `${migrations}; version surfaces already read ${declared ?? '(none)'}`;
 
   return [
     {
@@ -92,7 +99,10 @@ export function planSync(snapshot) {
     {
       id: 'inject-machinery',
       title: 'Install the sync machinery',
-      detail: `copy from the framework: ${CANONICAL_MACHINERY.join(', ')}`,
+      detail:
+        `copy from the framework: ${CANONICAL_MACHINERY.join(', ')}; and vendor the standards generator into ` +
+        `${STANDARDS_VENDOR_DIR}/ (${STANDARDS_SOURCE_DIR}/standards/ less index.mjs and validate.mjs, and every module ` +
+        `they import), so the instance's generate:schemas builds its own .well-known/`,
     },
     {
       id: 'overlay',
@@ -100,6 +110,15 @@ export function planSync(snapshot) {
       detail: `copy framework-owned paths (${FRAMEWORK_OWNED.join(', ')}) over the instance's, leaving everything the org owns untouched`,
     },
     { id: 'migrate', title: 'Migrate', detail: migrateDetail },
+    {
+      id: 'declare-visibility',
+      title: 'Declare what the instance publishes',
+      detail:
+        'when data/visibility.yaml is absent and has no git history, write one declaring public only what the instance\'s ' +
+        '.well-known/ shows 0.6 published (R31), as its own commit (chore(visibility): declare what this instance already ' +
+        'publishes) for the org to confirm, edit or revert; a no-op when the file exists, has history, there is no 0.6 output, ' +
+        'or .well-known/dao.json carries the L8 generator\'s mark (L8-C18: the files are L8\'s, not 0.6\'s)',
+    },
     { id: 'generate-schemas', title: 'Regenerate schemas', detail: 'npm run generate:schemas' },
     {
       id: 're-assess',
@@ -280,6 +299,7 @@ export function renderReceipt({
   abortStage,
   lastSyncCommit,
   reassess,
+  declaration = null,
   dryRun = false,
 }) {
   const lines = [];
@@ -305,6 +325,21 @@ export function renderReceipt({
     lines.push(`- ${icon} \`${s.id}\` — ${s.status}${s.detail ? `: ${s.detail}` : ''}`);
   }
   lines.push('');
+
+  if (declaration?.committed) {
+    lines.push('## Publication decision for the org');
+    lines.push('');
+    lines.push(
+      `The doctor wrote \`data/visibility.yaml\` in its own commit (\`${declaration.commit}\`: ${declaration.subject}). ` +
+        'It declares public what this instance published before DAO-OS L8, whose default is `members`. ' +
+        'This is a publication decision: confirm it, edit it, or revert that commit to publish less.',
+    );
+    lines.push('');
+    lines.push('```yaml');
+    lines.push(declaration.text.trimEnd());
+    lines.push('```');
+    lines.push('');
+  }
 
   if (reassess) {
     lines.push('## Post-sync assessment');

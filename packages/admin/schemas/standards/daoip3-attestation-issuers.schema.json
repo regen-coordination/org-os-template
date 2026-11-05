@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "org-os/standards/daoip3-attestation-issuers",
+  "$comment": "Transcribed from the attestationIssuers document in DAOIP-3 at fec9462: https://github.com/metagov/daostar/blob/fec9462c5e10d79a5a43c7649630e3db24b9e672/DAOIPs/daoip-3.md No field with no value: null and \"\" are refused anywhere (EIP-4824: a field with no value SHOULD be removed rather than left empty or null).",
+  "type": "object",
+  "properties": {
+    "@context": {
+      "const": "http://www.daostar.org/schemas"
+    },
+    "attestationIssuers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "AttestationIssuer"
+          },
+          "name": {
+            "$ref": "#/$defs/str"
+          },
+          "issuer": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "issuer"
+        ],
+        "additionalProperties": {
+          "$ref": "#/$defs/value"
+        }
+      }
+    }
+  },
+  "required": [
+    "@context",
+    "attestationIssuers"
+  ],
+  "additionalProperties": {
+    "$ref": "#/$defs/value"
+  },
+  "$defs": {
+    "str": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        }
+      ]
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/value"
+      }
+    }
+  }
+}

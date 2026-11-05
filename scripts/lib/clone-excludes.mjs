@@ -100,7 +100,9 @@ export const TOP_LEVEL_DENY = new Map([
 
 /**
  * Files the generator writes itself, relative to the instance root. Together
- * with the tracked, allowed, non-excluded framework files this is the COMPLETE
+ * with the tracked, allowed, non-excluded framework files and the standards
+ * generator stage 5 vendors into scripts/lib/ (computed from its imports by
+ * scripts/lib/standards-vendor.mjs, so not listed here) this is the COMPLETE
  * set of files a fresh clone (--no-git) may contain; tests/clone-genesis.test.mjs
  * fails by name on anything else.
  */
@@ -141,6 +143,7 @@ export const EXCLUDE_DIRS = new Set([
   // The framework's history and self-description inside docs/.
   "docs/sessions",
   "docs/research",
+  "docs/design", // the framework's own design references (the DAO-OS element gallery); the look ships as code
   // The framework operator's own OpenCode agents (they describe a personal
   // notes vault, not an organisation). Commands + opencode.json stay.
   ".opencode/agents",
@@ -221,6 +224,44 @@ export const EXCLUDE_FILES = new Set([
   // /org-os/ match against the no-arg (self-checkout) path — true only when
   // the checkout being validated IS the framework.
   "tests/scripts/validate-identity-target.test.mjs",
+  // validate:data runs from the framework against any instance, and needs
+  // packages/admin (its schemas and ajv), which an instance does not receive.
+  // The doctor runs the framework's copy (0.6 F1, interfaces ruling R-2), so
+  // neither the script nor its suite ships; stage 6d then drops the npm script.
+  "scripts/validate-data.mjs",
+  "tests/scripts/validate-data.test.mjs",
+  // DAO-OS L5 Task 10: rule 4 in git (lib/data-validate.mjs, lib/visibility.mjs); the same reason.
+  "tests/scripts/validate-data.visibility.test.mjs",
+  // validate:governance (0.6 F2) reads the same admin modules and is run the same way,
+  // by the framework against any instance; neither the script nor its suite ships.
+  "scripts/validate-governance.mjs",
+  "tests/scripts/validate-governance.test.mjs",
+  // P2's ledger suites (0.6 P2) and the helper that writes their histories with the admin server's own functions.
+  "tests/scripts/validate-governance.ledger.test.mjs",
+  "tests/scripts/validate-governance.solo.test.mjs",
+  "tests/scripts/validate-governance.closings.test.mjs",
+  "tests/scripts/validate-governance.merges.test.mjs",
+  // DAO-OS L5 Task 10: the house's commits, hat readings and Org-Hat (lib/hat-readings.mjs, lib/proposals.mjs); the same reason.
+  "tests/scripts/validate-governance.hats.test.mjs",
+  "tests/scripts/fixtures/ledger-write.mjs",
+  // The pre-commit hook's linked-worktree skip (0.6 P2 final review I1): the hook ships, but this suite pins
+  // the framework's reason for the skip, the admin's branch builds, which an instance does not receive.
+  "tests/scripts/pre-commit-hook.test.mjs",
+  // The governance migration ships (it is standalone, js-yaml only), but its suite runs both
+  // framework validators on what it wrote, which an instance cannot.
+  "tests/scripts/migration-governance-rules.test.mjs",
+  // claim-handle writes one line into data/members.yaml for the admin app's W2a wizard, and runs
+  // from the framework against the instance the app serves, because it needs packages/admin (the
+  // members schema and ajv). The same reason, so neither the script nor its suite ships.
+  "scripts/claim-handle.mjs",
+  "tests/scripts/claim-handle.test.mjs",
+  // generate:schemas DOES ship (DAO-OS L8, Q56): stage 5 vendors the standards builder into the instance's
+  // scripts/lib/, and the instance's script and generate-schemas.yml workflow run that copy. These suites do not:
+  // they read packages/admin (the generator suite symlinks it beside the script; the vendor suite computes the set
+  // from it), and the equivalence suite clones the framework.
+  "tests/scripts/generate-schemas.test.mjs",
+  "tests/scripts/standards-vendor.test.mjs",
+  "tests/clone-standards.test.mjs",
   // .github/workflows/ triaged file-by-file 2026-09-13 (fix round 1, Task 7):
   // framework-project workflows excluded by full path; generic CI stays.
   // - deploy-pages.yml: builds and deploys the framework's own site/ (Astro,
@@ -235,7 +276,7 @@ export const EXCLUDE_FILES = new Set([
   // - validate.yml: same analyze:instances step, plus installs for
   //   packages/admin and packages/org-os-federation-map (neither present in
   //   an instance) and a site/ Astro build. Framework-only as a whole.
-  // - generate-schemas.yml KEPT: runs only `npm run generate:schemas` against
+  // - generate-schemas.yml KEPT: runs only `npm run generate:schemas` (the standards builder stage 5 vendors) against
   //   this instance's own data/*.yaml — generic CI any instance would want,
   //   no framework-only reference.
   ".github/workflows/deploy-pages.yml",

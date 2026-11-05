@@ -1,0 +1,153 @@
+/* The workspace (§10.1–§10.4; the gallery's "work" section): the page editor's bar and body, the save state, the
+   selection toolbar, the slash menu, the comment thread, the composer and the mention picker. Every length is a
+   token; the editor reads its own container, never the viewport's width (CC-15, E-18): under 760px of it the bar
+   keeps the path's end, the save glyph, presence and the visibility control, the title is 26px and the body's
+   padding 16 (E-13). Drawing only — the editor engine and persistence are L6's. */
+
+/* A page and its thread side by side; the thread goes under the page when the two do not fit */
+.ed-page { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-12); min-width: 0; }
+.ed-page > .ed { flex: 1 1 var(--w-ed-min); }
+.ed-page > .thread { flex: 0 1 var(--w-thread); }
+
+/* The editor: a raised surface that is its own container */
+.ed { container: ed / inline-size; min-width: 0; background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; }
+
+/* The bar, 48px: the path, then the save state, presence, the visibility control and the comments toggle */
+.ed-bar { display: flex; align-items: center; gap: var(--sp-8); block-size: var(--h-ed-bar); padding: 0 var(--sp-10); border-block-end: var(--rule-w) solid var(--rule); min-width: 0; }
+.ed-crumbs { flex: 1; }
+.ed-tools { display: flex; align-items: center; gap: var(--sp-6); flex: none; }
+.ed-cmts { gap: var(--sp-3); padding-inline: var(--sp-5); }
+.ed-cmts-n { font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); font-variant-numeric: tabular-nums; }
+
+/* The save state (§10.1): 12, glyph and words; faint when saved, moss when staged, clay when it needs someone */
+.save-wrap { display: inline-flex; align-items: center; gap: var(--sp-6); min-width: 0; }
+/* on one line until its place is narrower than its words, then they wrap beside the glyph (1.4.10) */
+.save { display: inline-flex; align-items: center; gap: var(--sp-4); max-inline-size: 100%; font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--faint); }
+.save .spin { inline-size: var(--h-spin-age); block-size: var(--h-spin-age); }
+.save-staged { color: var(--accent); }
+.save-bad { color: var(--attn); }
+
+/* The body: the prose measure plus gutters, centred; the meta line; the title in Fraunces 32 */
+.ed-body { box-sizing: border-box; max-inline-size: calc(var(--w-prose) + 2 * var(--sp-13)); margin: 0 auto; padding: var(--sp-14) var(--sp-13) var(--sp-15); }
+.ed-meta { display: flex; flex-wrap: wrap; gap: var(--sp-4); margin-block-end: var(--sp-8); font-size: var(--fs-tiny); line-height: var(--lh-row); color: var(--faint); }
+.ed-title { margin: 0 0 var(--sp-11); font: var(--fw-regular) var(--fs-page)/var(--lh-greet) var(--display); font-variation-settings: "SOFT" var(--soft);
+  letter-spacing: var(--ls-page); text-wrap: balance; overflow-wrap: anywhere; }
+
+/* Prose: Geist 16/1.65; H2 Sans 600 20, H3 Sans 600 16; links underlined in --edge */
+.ed-prose { font: var(--fw-regular) var(--fs-sub)/var(--lh-prose) var(--sans); color: var(--ink); text-wrap: pretty; }
+.ed-prose p { margin: 0 0 var(--sp-10); max-inline-size: var(--w-prose); }
+.ed-prose h2 { margin: var(--sp-13) 0 var(--sp-8); font: var(--fw-strong) var(--fs-h2)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); }
+.ed-prose h3 { margin: var(--sp-12) 0 var(--sp-6); font: var(--fw-strong) var(--fs-sub)/var(--lh-title) var(--sans); }
+.ed-prose ul, .ed-prose ol { margin: 0 0 var(--sp-10); padding-inline-start: var(--sp-11); }
+.ed-prose li { margin-block-end: var(--sp-4); }
+.ed-prose a { color: inherit; text-decoration: underline; text-decoration-color: var(--edge); text-decoration-thickness: from-font; text-underline-offset: var(--sp-3); }
+.ed-prose a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); border-radius: var(--radius-xs); }
+
+/* The editing affordances: the current block's rule, the selection, commented text (and the one a comment shows) */
+.ed-cur { border-inline-start: var(--rule-w-heavy) solid var(--focus); padding-inline-start: calc(var(--sp-6) - var(--rule-w-heavy)); margin-inline-start: calc(-1 * var(--sp-6)); }
+.ed-sel { background: var(--accent-soft); border-radius: var(--radius-mark); box-shadow: 0 0 0 var(--sp-2) var(--accent-soft); }
+.ed-cmt { background: var(--attn-soft); color: inherit; border-block-end: var(--stroke-w) solid var(--attn); }
+.ed-cmt.on { box-shadow: 0 0 0 var(--sp-2) var(--attn-soft); }
+
+/* A callout: --sunken, radius 10, a glyph, 14px */
+.ed-callout { display: flex; gap: var(--sp-8); margin: 0 0 var(--sp-10); padding: var(--sp-9) var(--sp-10); background: var(--sunken); border-radius: var(--radius);
+  font-size: var(--fs-body); line-height: var(--lh-body); }
+.ed-callout > .i { flex: none; margin-block-start: var(--sp-3); color: var(--mute); }
+.ed-callout-t { min-width: 0; }
+
+/* An embedded record or view: a bordered block; a record's eyebrow head (glyph, name · kind, the read's age) and rows */
+.ed-embed { margin: 0 0 var(--sp-10); background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); overflow: hidden; }
+.ed-embed-h { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-10); border-block-end: var(--rule-w) solid var(--rule);
+  font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--mute); }
+.ed-embed-end { margin-inline-start: auto; }
+.ed-erows { margin: 0; }
+.ed-erow { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-block-size: var(--h-erow); padding: 0 var(--sp-10);
+  font-size: var(--fs-meta); line-height: var(--lh-row); }
+.ed-erow + .ed-erow { border-block-start: var(--rule-w) solid var(--rule); }
+.ed-erow dt { min-width: 0; font-weight: var(--fw-medium); }
+.ed-erow dd { margin: 0; text-align: end; }
+.ed-embed-view { padding: var(--sp-8) var(--sp-10); }
+
+/* The selection toolbar: --pop, radius 10; toggles show --wash when on */
+.selbar { display: inline-flex; align-items: stretch; gap: var(--sp-2); padding: var(--sp-3); background: var(--pop); border-radius: var(--radius); box-shadow: var(--shadow-pop); }
+.selbar-b { display: inline-grid; place-items: center; inline-size: var(--h-selbar-b); block-size: var(--h-selbar-b); padding: 0; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--ink); cursor: pointer; transition: background-color var(--dur-1) var(--ease); }
+.selbar-b.on { background: var(--wash); }
+.selbar-b:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.selbar-sep { inline-size: var(--rule-w); margin: var(--sp-4) var(--sp-2); background: var(--rule); }
+@media (hover: hover) { .selbar-b:hover { background: var(--wash); } }
+@media (pointer: coarse) { .selbar-b { inline-size: var(--h-ctl-touch); block-size: var(--h-ctl-touch); } }
+
+/* The slash menu and the mention picker: the menu's pop surface, a listbox of its items */
+.ed-pop-l { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-radius: calc(var(--radius-pop) - var(--sp-4)); }
+.ed-pop-l:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); }
+.ed-pop-empty { margin: 0; padding: var(--sp-5) var(--sp-6) var(--sp-6); font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--faint); }
+.ed-slash { inline-size: var(--w-slash); max-inline-size: 100%; box-sizing: border-box; }
+.mpop { inline-size: var(--w-mpop); max-inline-size: 100%; box-sizing: border-box; }
+.mpop-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mpop-sub { margin-inline-start: auto; padding-inline-start: var(--sp-6); font-size: var(--fs-tiny); color: var(--faint); }
+
+/* The comment thread: a panel beside the page, or a sheet from the bottom over the scrim */
+.thread { display: grid; min-width: 0; background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; }
+.thread-h { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-9) var(--sp-10) var(--sp-4); }
+.thread-h .vis { margin-inline-start: auto; }
+.thread-t { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); }
+.thread-n { font-weight: var(--fw-regular); color: var(--faint); font-size: var(--fs-tiny); }
+.thread-empty { margin: 0; padding: var(--sp-6) var(--sp-10) var(--sp-9); font-size: var(--fs-meta); color: var(--faint); }
+.thread-l { margin: 0; padding: 0; list-style: none; }
+.thread-i + .thread-i { border-block-start: var(--rule-w) solid var(--rule); }
+.thread-sheet { position: fixed; box-sizing: border-box; inset-block: auto 0; inset-inline: 0; margin: 0; padding: 0; border: 0; inline-size: auto; max-inline-size: none;
+  max-block-size: var(--h-sheet-max); overflow: auto; background: var(--raised); border-start-start-radius: var(--radius-lg); border-start-end-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop); padding-block-end: env(safe-area-inset-bottom); }
+.thread-sheet::backdrop { background: var(--scrim); }
+.thread-sheet > .thread { border: 0; border-radius: 0; }
+.thread-sheet-inline { position: absolute; z-index: 1; max-block-size: 100%; }
+
+/* A comment: the 28px monogram, who and when, the passage it is about, the body 14/1.5, its actions */
+.av-lg { inline-size: var(--h-av-lg); block-size: var(--h-av-lg); font-size: var(--fs-micro); }
+.cmt { display: grid; grid-template-columns: var(--h-av-lg) minmax(0, 1fr); gap: var(--sp-7); padding: var(--sp-9) var(--sp-10); }
+.cmt-main { min-width: 0; }
+.cmt-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-6); }
+.cmt-who { font: var(--fw-medium) var(--fs-ui)/var(--lh-row) var(--sans); }
+.cmt-at, .cmt-state { font: var(--fw-regular) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--faint); }
+.cmt-state.save-bad { display: inline-flex; align-items: center; gap: var(--sp-3); font-weight: var(--fw-medium); color: var(--attn); }
+.cmt-q { display: block; margin: var(--sp-3) 0 0; padding: 0; border: 0; background: transparent; color: var(--mute); font: var(--fw-regular) var(--fs-meta)/var(--lh-row) var(--sans);
+  text-align: start; cursor: pointer; text-decoration: underline; text-decoration-color: var(--attn); text-decoration-thickness: from-font; text-underline-offset: var(--sp-3); }
+.cmt-q:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); border-radius: var(--radius-xs); }
+.cmt-b { margin: var(--sp-3) 0 0; font-size: var(--fs-body); line-height: var(--lh-body); text-wrap: pretty; overflow-wrap: anywhere; }
+.cmt-sending .cmt-b, .cmt-not-sent .cmt-b { color: var(--mute); }
+.cmt-f { display: flex; flex-wrap: wrap; gap: var(--sp-10); margin-block-start: var(--sp-6); }
+.cmt-a { padding: 0; border: 0; background: transparent; color: var(--mute); font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); cursor: pointer; border-radius: var(--radius-xs); }
+.cmt-a-ink { color: var(--ink); }
+.cmt-a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { .cmt-a:hover, .cmt-q:hover { color: var(--ink); } }
+@media (pointer: coarse) {
+  .cmt-a { position: relative; }
+  .cmt-a::after { content: ""; position: absolute; inset-inline: calc(-1 * var(--sp-4)); inset-block: calc((var(--lh-tiny) * var(--fs-tiny) - var(--h-ctl-touch)) / 2); }
+}
+.cmt-reply { padding-block-start: 0; padding-inline-start: var(--pad-reply); }
+.cmt-resolved { display: flex; align-items: center; gap: var(--sp-5); padding: var(--sp-7) var(--sp-10); font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+.cmt-resolved .cmt-a { color: var(--mute); }
+
+/* The composer: the monogram, then a box edged in --edge that takes the focus ring */
+.composer { display: grid; grid-template-columns: var(--h-av-lg) minmax(0, 1fr); gap: var(--sp-7); padding: var(--sp-9) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule); }
+.cmt-reply-box > .composer { padding: 0 var(--sp-10) var(--sp-9) 0; border: 0; }
+.composer-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); min-width: 0; }
+.composer-box { display: grid; gap: var(--sp-6); padding: var(--sp-6) var(--sp-7); background: var(--input-fill); border: var(--rule-w) solid var(--edge); border-radius: var(--radius-input); }
+.composer-box:focus-within { border-color: var(--focus); outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); }
+.composer-t { display: block; inline-size: 100%; box-sizing: border-box; min-block-size: var(--h-composer); padding: 0; border: 0; background: transparent; resize: vertical;
+  color: var(--ink); font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--sans); outline: none; }
+.composer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-6); }
+.composer-hint { font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+/* the phone's 16px, so a focused box does not zoom the page (as controls.css's .input) */
+@container frame (max-width: 759px) { .composer-t { font-size: var(--fs-sub); } }
+
+/* Under 760px of the editor (§10.1 phone, E-13) */
+@container ed (max-width: 759px) {
+  .ed-bar { gap: var(--sp-6); padding: 0 var(--sp-8); }
+  .ed-crumbs li:not(:last-child) { display: none; }
+  .ed-crumbs li:last-child::before { content: none; }
+  .ed-bar .save-w { position: absolute; inline-size: var(--sp-1); block-size: var(--sp-1); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .ed-title { font-size: var(--fs-page-narrow); }
+  .ed-body { padding: var(--sp-12) var(--sp-10) var(--sp-13); }
+}

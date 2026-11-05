@@ -64,6 +64,12 @@ Useful flags: `--json` (machine-readable, for CI), `--strict` (warnings fail
 too), `--no-validators` (skip the two validator subprocesses when you want a
 fast read).
 
+In an instance, `npm run validate:schemas` scans `.well-known/` for leaks but
+cannot check the standards schemas (the vendored generator has no ajv), so
+`--strict` cannot pass there by design. For the strict check, run the
+framework's validator against the instance:
+`node <framework>/scripts/validate-identity.mjs <this instance> --strict`.
+
 Exit codes: `0` no blockers · `1` blockers found · `2` bad usage.
 
 ### 2. Read the scorecard
@@ -98,7 +104,7 @@ npm run doctor -- sync --dir ../refi-med-os --dry-run
 ```
 
 `--dry-run` is genuinely read-only — safe against dirty production trees. It
-prints the nine stages with exactly what each will do to this instance.
+prints the ten stages with exactly what each will do to this instance.
 
 > **Status:** the full sync works. Stage 5 used to delegate to a
 > `git pull --rebase upstream main` that assumes the instance is a *fork* —
@@ -107,7 +113,7 @@ prints the nine stages with exactly what each will do to this instance.
 > is why v0.5.0 shipped with the claim narrowed). Since v0.5.1 stage 5 is a
 > **file-level overlay**: framework-owned paths copied in, everything the org
 > owns left alone, the lineage stamp recording which framework commit was
-> applied. Accepted end to end against refi-med-os with all nine stages green
+> applied. Accepted end to end against a production instance with all stages green (nine at the time; `declare-visibility` came after)
 > (`memory/reports/overlay-acceptance-2026-08-29.md`). Re-running is a clean
 > no-op.
 
@@ -117,7 +123,7 @@ Then run it:
 npm run doctor -- sync --dir ../refi-med-os
 ```
 
-The nine stages:
+The ten stages:
 
 1. **snapshot** — a recoverable ref of the whole working tree, always written
    first, even if the run aborts a moment later.
@@ -128,10 +134,32 @@ The nine stages:
    This is the step that breaks the deadlock.
 5. **overlay** — copy the framework-owned paths (scripts/, templates/) over the
    instance's. Never touches data/, memory/, identity files or .well-known/.
-6. **migrate** — framework migrations, plus the cross-scheme version re-stamp.
-7. **generate-schemas** — republish `.well-known/`.
-8. **re-assess** — the full battery again.
-9. **receipt** — `memory/reports/sync-receipt-<date>.md` and the lineage stamp.
+6. **migrate** — the framework's runner against the instance
+   (`node <framework>/scripts/migrate.mjs <instance> --target <framework version>`),
+   then the cross-scheme version re-stamp.
+7. **declare-visibility** — DAO-OS L8 publishes only what `data/visibility.yaml`
+   declares public, and its default is `members`. When the instance has no such
+   file, this stage writes one that declares public only what the instance's
+   `.well-known/` shows it publishes today (R31): `members.json` → members (ids
+   public, every other member field `members`), `proposals.json` → governance
+   (its description and rules `members`: 0.6 published decision rows only),
+   `contracts.json` → systems, `meetings.json`, `projects.json`, `finances.json`,
+   `ideas.json` → their collections, `knowledge.json` → knowledge-manifest and
+   sources — each only when the instance has the registry (`data/<name>.yaml`,
+   or `content/<name>/*.md` for meetings and projects). It is its own commit
+   `chore(visibility): declare what this instance already publishes`, a
+   publication decision for the org: confirm it, edit it, or revert that commit
+   to publish less. `--dry-run` prints the file; the receipt repeats it under
+   "Publication decision for the org". Left alone: an instance that already has
+   the file, one whose `data/visibility.yaml` has any git history (so a revert
+   stays reverted), one with no 0.6 output (a clone's lone `dao.json` is
+   not one), and one whose `.well-known/dao.json` carries the L8 generator's
+   mark (`"x-org-os": { "generator": … }`, L8-C18): its `members.json`,
+   `proposals.json` … were written by L8, even empty, and show nothing 0.6
+   published.
+8. **generate-schemas** — republish `.well-known/`.
+9. **re-assess** — the full battery again.
+10. **receipt** — `memory/reports/sync-receipt-<date>.md` and the lineage stamp.
 
 **If a stage fails, everything after it is skipped.** Nothing is re-stamped and
 the receipt names the stage that stopped it. A half-migrated instance is worse

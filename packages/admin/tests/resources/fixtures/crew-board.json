@@ -1,0 +1,19 @@
+{
+  "rows": [
+    { "prompted": true, "boxCheckSkipped": false, "agent": "platform", "role": "platform", "state": "working",
+      "status": "seated", "title": "write path", "brief": "Fix the admin write path.", "branch": "crew/a-platform",
+      "id": "2026-10-11-platform-write-path", "created": "2026-10-11T02:00:00-03:00" },
+    { "prompted": true, "boxCheckSkipped": false, "agent": "reviewer", "role": "reviewer", "state": "blocked",
+      "status": "seated", "title": null, "brief": "Review the write path.", "branch": "crew/b-reviewer",
+      "id": "2026-10-11-reviewer-review", "created": "2026-10-11T03:00:00-03:00" }
+  ],
+  "handoffs": [
+    { "id": "handoff-1", "from_role": "website", "to_role": "platform", "brief": "Labels overlap on the map." }
+  ],
+  "needsAttention": [],
+  "needsRelease": [ { "id": "2026-10-10-lead-first-cycle", "status": "seated" } ],
+  "leftBehind": [],
+  "processesWhy": null,
+  "unreadable": [],
+  "conflicts": []
+}

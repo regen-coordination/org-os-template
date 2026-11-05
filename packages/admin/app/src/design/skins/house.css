@@ -1,0 +1,462 @@
+/* The skin "house": the DAO-OS house look (L4 element-set spec section 3), the shipped default. Warm paper,
+   raised surfaces, one moss for what is selected, staged or yours, one clay for what needs a person, ink for
+   the one primary action. Same shape as bare.css: every token bare defines, one declaration per line, plus
+   the house's own. Light first; dark under the system preference unless the browser chose light, and dark
+   whenever it chose dark (the two dark blocks hold the same values; contrast.test.ts checks they agree).
+   Each block also answers to a bare :root, so the page is drawn in house from the first byte, before any
+   script has set data-skin. index.css imports this file first: its plain :root blocks tie with another
+   skin's light block, and a tie goes to the later sheet. */
+:root,
+:root[data-skin="house"] {
+  /* colour, light */
+  --paper: #f4f2ec;
+  --ink: #1c1d1a;
+  --mute: #57554e;
+  --faint: #6b685f;
+  --rule: #e2dfd6;
+  --wash: #ebe8e0;
+  --attn: #a8452a;
+  --raised: #fdfcf9;
+  --edge: #827e73;
+  --solid: #1c1d1a;
+  --on-solid: #fdfcf9;
+  --focus: #2e5c4a;
+  --pop: #fdfcf9; /* menus, palette, sheets, popovers */
+  --sunken: #efede6; /* wells, the map canvas, board columns, group rows */
+  --wash-strong: #e2ded4; /* address chip hover, avatar fill: ink text only */
+  --rule-strong: #d6d2c7; /* secondary-button and chip outline, node outline, tree connectors (decoration) */
+  --on-accent: #ffffff; /* text on moss or clay fills */
+  --attn-soft: #f6e5dc; /* attention tile, stale op row, warn address, failed outcome strip */
+  --map-dot: #d9d5ca; /* the dot grid behind maps (decoration) */
+  /* roles a skin may draw apart from the ones above */
+  --accent: #2e5c4a; /* moss: selection, staged, yours, value moving */
+  --accent-soft: #e2ebe4; /* selected row or node ring, the "you" mention, executed outcome strip */
+  --row-hover: var(--wash);
+  --nav-ink: var(--mute);
+  --nav-on-bg: var(--wash);
+  --input-fill: var(--raised);
+  --input-edge: var(--edge);
+  --block-bg: var(--raised);
+  color-scheme: light;
+
+  /* type */
+  --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-micro: .6875rem;
+  --fs-av: .625rem; /* the two letters of a presence monogram, Sans 600 10 (§7.12) */
+  --fs-tiny: .75rem;
+  --fs-label: .75rem;
+  --fs-meta: .8125rem;
+  --fs-code: .78125rem;
+  --fs-ui: .8125rem;
+  --fs-body: .875rem;
+  --fs-sub: 1rem;
+  --fs-title: 1.5rem;
+  --fs-greet: 1.75rem;
+  --fs-page: 2rem;
+  --fs-amount: 2rem;
+  --fs-d-hero: clamp(2.5rem, 1.25rem + 4.2vw, 4.75rem);
+  --fs-d-sec: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+  --fs-d-card: 1.5rem;
+  --fs-d-lead: clamp(1.1875rem, 1.05rem + .5vw, 1.375rem);
+  --fs-d-body: 1.0625rem;
+  --fs-d-fig: clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem);
+  --fs-d-fact: 1.625rem;
+  --lh-body: 1.5;
+  --lh-code: 1.6;
+  --lh-title: 1.25;
+  --lh-row: 1.35;
+  --lh-prose: 1.65;
+  --lh-d-hero: 1.02;
+  --lh-d-sec: 1.1;
+  --lh-d-lead: 1.45;
+  --lh-greet: 1.15; /* Home's line and a page title in the editor */
+  --lh-ui: 1; /* buttons, tabs, segments, kbd: one line, centred by the control (§3.3 fs-ui, fs-micro) */
+  --lh-label: 1.3; /* field labels and column heads (§3.3 fs-label) */
+  --lh-tiny: 1.2; /* chips, status words, ages, counts (§3.3 fs-tiny) */
+  --lh-addr-full: 1.4; /* the full address, wrapped (§7.5) */
+  --ws-unit: -.25em; /* the no-break space before a unit, narrowed: a mono space (.6em) less this is the gallery's .35em gap (§7.7) */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-strong: 600;
+  --fw-display: 350; /* Fraunces only, and only at 28px and up */
+  --ls-label: 0;
+  --ls-node: var(--ls-eyebrow); /* a node's kind is an eyebrow */
+  --ls-name: -.005em;
+  --ls-title: -.015em;
+  --ls-eyebrow: .08em;
+  --ls-display: -.025em;
+  --ls-d-sec: -.02em;
+  --ls-amount: -.02em; /* a large amount, in Fraunces (§7.7) */
+  --ls-av: .02em; /* a monogram's letters (§7.12) */
+  --soft: 50; /* Fraunces' SOFT axis */
+  --soft-hero: 80; /* the door hero */
+  --soft-sec: 60; /* door section heads */
+
+  /* space */
+  --sp-1: 1px;
+  --sp-2: 2px;
+  --sp-3: 3px;
+  --sp-4: 4px;
+  --sp-5: 6px;
+  --sp-6: 8px;
+  --sp-7: 10px;
+  --sp-8: 12px;
+  --sp-9: 14px;
+  --sp-10: 16px;
+  --sp-11: 20px;
+  --sp-12: 24px;
+  --sp-13: 32px;
+  --sp-14: 40px;
+  --sp-15: 56px;
+  --sp-16: 72px;
+  --sp-17: 96px;
+  --sp-18: 128px;
+
+  /* rules, marks, corners, depth, motion */
+  --rule-w: 1px;
+  --rule-w-heavy: 2px;
+  --rule-w-mark: 3px;
+  --stroke-w: 1.5px; /* a drawn ring or outline that matches the icon stroke: the spinner, a radio */
+  --mark: 8px;
+  --mark-bar: 2px;
+  --w-mark-bar: 9px; /* the failed and closed bar, 9×2 (§6.1) */
+  --radius-mark: 2px; /* the staged, stale and draft squares (§6.1) */
+  --radius-mark-bar: 1px;
+  --mark-check: 10px; /* the done mark's box; its tick is drawn by the three lengths below */
+  --mark-tick-w: 4px;
+  --mark-tick-h: 7px;
+  --mark-tick-x: 3px;
+  --grip: 12px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-ctl: 7px;
+  --radius-pop: 12px;
+  --radius-lg: 16px;
+  --radius-plate: 22px;
+  --shadow-card: 0 1px 0 rgba(28,29,26,.03), 0 1px 3px rgba(28,29,26,.05);
+  --shadow-raise: 0 1px 0 rgba(28,29,26,.03), 0 10px 28px -14px rgba(28,29,26,.28);
+  --shadow-pop: 0 0 0 1px rgba(28,29,26,.06), 0 18px 44px -14px rgba(28,29,26,.30), 0 4px 10px -4px rgba(28,29,26,.08);
+  --scrim: rgba(28,29,26,.32);
+  --o-disabled: .45;
+  --o-dim: .38;
+  --o-inert: .6;
+  --o-hover: .88; /* a primary button under the pointer (§7.1) */
+  --o-breathe: .55; /* a loading skeleton's faint end (§3.7) */
+  --o-proposed: .5; /* a proposed or prepared band in the fund flow, moss at half (§9.8) */
+  --dash: 3 3;
+  --dur: var(--dur-1);
+  --dur-1: 120ms;
+  --dur-press: 150ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-flow: 1100ms;
+  --dur-out: 150ms; /* a menu or popover leaving: opacity only (§3.7) */
+  --dur-spin: 800ms; /* one turn of the reading ring */
+  --dur-breathe: 1400ms; /* a loading skeleton's breath, one way (§3.7) */
+  --ease: cubic-bezier(.2,0,0,1);
+  --press-scale: .96;
+  --dur-copy: 300ms; /* the address chip's glyph, copy → check: a cross-fade (§7.5) */
+  --scale-copy: .25; /* the glyph that is not shown, at this scale */
+  --blur-copy: 4px; /* and blurred this much */
+
+  /* structure: widths and heights of the shell and its parts */
+  --w-nav: 240px;
+  --w-rail: 56px;
+  --w-kind: 80px;
+  --w-label: 120px;
+  --w-dt: 72px;
+  --w-field-label-min: 96px; /* a field row's label column, at its narrowest (§9.3) */
+  --w-field-label-max: 132px; /* and at its widest */
+  --w-inspector: 360px;
+  --w-aside: 280px;
+  --w-palette: 640px;
+  --w-panel: 300px;
+  --w-panel-form: 464px; /* a right-slot panel holding a form (Propose): a field row's two columns (420) and its padding (E-55) */
+  --w-content: 1040px;
+  --w-prose: 68ch;
+  --w-door: 1120px;
+  --w-parts: 1272px; /* a /parts group page: the approved gallery's content width, 1320 less its 24px gutters (R-12) */
+  --w-spec-two: 520px; /* a /parts card in a group laid out two a row, at its narrowest (the gallery's spec-grid two) */
+  --w-node: 200px;
+  --w-node-min: 148px;
+  --w-node-big: 236px; /* the main Safe on the DAO map (§8.3); map/layers.ts LAYOUT.big */
+  --h-node: 56px; /* a map node's height: a name and a line of facts (§8.3); map/layers.ts LAYOUT.nodeH */
+  --h-node-big: 84px; /* the main Safe's: its eyebrow, the display name, the facts; LAYOUT.bigH */
+  --h-node-tag: 18px; /* a node's "staged" or "not deployed" pill, and its order badge (§8.3) */
+  --h-attn-dot: 10px; /* the clay dot at a node's top-end corner (§8.3) */
+  --ring-attn-dot: 2.5px; /* the canvas-coloured ring that parts it from the node */
+  --w-attn-ring: 1.25px; /* the clay ring that grows from it twice */
+  --ic-node-f: 11px; /* the clock or alert glyph leading a node's facts */
+  --stroke-edge: 1.25; /* an edge, 3:1 on the canvas (§8.4) */
+  --stroke-edge-on: 1.75; /* an edge on the selected path, or a flow's path */
+  --stroke-flow: 3; /* the travelling dash (§8.5) */
+  --dash-flow-dot: .1; /* its dot, round-capped */
+  --dash-flow-gap: 11; /* the gap after each */
+  --dash-flow: var(--dash-flow-dot) var(--dash-flow-gap); /* one run moves it two periods (map.css hflow) */
+  --dash-bad: 4 4; /* an invalid edge on the compose canvas */
+  --o-edge-dim: .3; /* an edge off the selected path */
+  --o-ring: .9; /* the attention ring as it starts */
+  --dur-ring: 2400ms; /* one run of it */
+  --map-grid: 18px; /* the dot grid behind the map */
+  --map-dot-r: 1px; /* a dot of it */
+  --map-dot-fade: 1.3px; /* and its soft edge */
+  --fs-node-k: .625rem; /* the big node's eyebrow, Mono 10 */
+  --fs-node-big: 1.0625rem; /* the big node's name, Fraunces 17 */
+  --fs-node-big-narrow: .9375rem; /* and on a narrow map, 15 */
+  --fs-node-narrow: .625rem; /* a node's facts on a narrow map, Mono 10 */
+  --fs-node-tag: .65625rem; /* a node's tag, Sans 500 10.5 */
+  --lh-node: 1.25; /* a node's name */
+  --lh-node-f: 1.3; /* its facts */
+  --lh-node-big: 1.2; /* the big node's name */
+  --ls-node-big: -.01em;
+  --pad-elabel: 3px 5px; /* an edge label's pill (§8.4) */
+  --radius-group: 14px; /* the linked group's dashed frame */
+  --h-mini: 188px; /* the small map in the inspector (§8.6) */
+  --h-mini-page: 220px; /* and on a record page */
+  --map-grid-mini: 14px; /* its dot grid */
+  --ic-mini: 12px; /* a small-map pill's glyph */
+  --h-mini-dot: 8px; /* a small-map neighbour's attention dot */
+  --ring-mini-dot: 2px; /* the canvas-coloured ring that parts it from the pill */
+  --w-shelf: 200px; /* the compose canvas's Place shelf (§8.7) */
+  --w-shelf-item-min: 140px; /* a shelf item, at its narrowest, in the row the shelf becomes under 820px */
+  --h-shelf-item: 34px; /* a shelf item */
+  --radius-cmp: 8px; /* a shelf item's corners, and the invalid connection's note */
+  --w-cmp-insp: 280px; /* the compose canvas's inspector column */
+  --h-cmp-canvas: 440px; /* the compose canvas, at least */
+  --w-cmp-node: 190px; /* a node on it; elements/compose/compose.ts COMPOSE.nodeW */
+  --h-handle: 9px; /* a connection handle at the selected node's sides */
+  --w-cmp-note: 210px; /* the invalid connection's note, at its widest */
+  --h-sheet-max: 88dvh; /* the inspector's bottom sheet on the phone, at its tallest (§5.10) */
+  --w-tile: 180px;
+  --w-kcol: 280px;
+  --w-kcol-min: 240px; /* a board column, at its narrowest (§10.2) */
+  --radius-kcard: 8px; /* a board card's corners */
+  --h-kdrop: 44px; /* the slot a dragged card would drop into */
+  --lift-rotate: -1deg; /* a lifted board card's tilt (none under reduced motion) */
+  --h-cal-day: 96px; /* a calendar day, at least (§10.2) */
+  --h-cal-date: 22px; /* its date's circle */
+  --h-ev: 20px; /* an event pill */
+  --radius-ev: 5px; /* its corners */
+  /* the workspace (§10.1–§10.4) */
+  --h-ed-bar: 48px; /* the page editor's bar (§10.1) */
+  --w-ed-min: 560px; /* the editor beside its thread, at its narrowest; under it the thread goes below */
+  --fs-page-narrow: 1.625rem; /* a page's title under 760px of the editor, 26 (§10.1 phone) */
+  --fs-h2: 1.25rem; /* a page's H2, Sans 600 20 (§10.1) */
+  --ls-page: -.02em; /* a page's title in the editor (§3.3 fs-page) */
+  --h-erow: 44px; /* a row of an embedded record */
+  --h-selbar-b: 28px; /* a selection toolbar button */
+  --w-slash: 260px; /* the slash menu */
+  --w-mpop: 280px; /* the mention picker (§10.4) */
+  --w-thread: 320px; /* the comment thread beside a page (§10.3); the editor beside it keeps 760 in /parts at 1440 */
+  --h-av-lg: 28px; /* a comment's monogram (§10.3) */
+  --pad-reply: 54px; /* a reply's indent: under its comment's body (§10.3) */
+  --h-composer: 40px; /* the composer's text, at least */
+  --w-menu: 220px; /* a menu's narrowest */
+  --w-tip: 32ch; /* a tooltip's widest (§7.3) */
+  --w-chip: 24ch;
+  --w-filter: 14em;
+  --w-token-input: 10em;
+  --h-topbar: 52px;
+  --h-row: 56px;
+  --h-row-1: 40px;
+  --h-thead: 36px; /* a table view's sticky head (§10.2) */
+  --h-trow-grp: 32px; /* a table view's group row */
+  --h-need: 72px; /* a Needs you row, at least (§9.4) */
+  --h-call-n: 22px; /* a prepared call's number square (§9.6) */
+  --h-tl-mark: 22px; /* a proposal timeline's step marker (§9.5) */
+  --h-tl-dot: 10px; /* a compact timeline's dot, in rows and on the door (§9.5) */
+  --w-tl-join: 14px; /* and the line that joins two dots */
+  --h-rt-row: 44px; /* a role tree's row, at least (§9.7) */
+  --h-rt-tg: 18px; /* its chevron toggle */
+  --h-rt-hat: 26px; /* its hat disc */
+  --pad-rt-indent: 22px; /* the indent of the hats inside a hat */
+  --w-rt-elbow: 9px; /* a connector's elbow, from the vertical to the row */
+  --w-ff: 980px; /* the fund flow at its widest (§9.8) */
+  --h-tray: 56px;
+  --h-bottombar: 60px;
+  --h-ctl: 32px;
+  --h-ctl-touch: 44px;
+  --h-input: 36px;
+  --h-chip: 22px;
+  --h-addr: 24px;
+  --h-ctl-sm: 26px; /* a small button inside dense rows and cards; a segment (§7.1, §7.3) */
+  --h-viewas: 28px; /* the view-as control in the top bar (§5.9) */
+  --h-org: 36px; /* the org switcher at the sidebar's head (§5.2) */
+  --h-seal: 22px; /* the org's seal on --solid */
+  --h-side-sub: 28px; /* a Workspace collection under its section (§5.2 item 4) */
+  --pad-side-sub: 34px; /* and its indent */
+  --h-rail-a: 40px; /* a rail target, 40×40 (§5.3) */
+  --fs-rail-count: .625rem; /* a rail count, the 10px superscript (§5.3) */
+  --h-hatmark: 24px; /* the identity's hat circle (§5.2 item 6) */
+  --h-dot: 6px; /* the unread-mentions dot on the notifications button (§5.5) */
+  --h-phonebar: 48px; /* the phone bar, the frame's top under 760px (§5.1, §5.4) */
+  --h-badge: 16px; /* the bottom bar's count badge on Needs you (§5.4) */
+  --radius-badge: 8px; /* and its corners: a pill */
+  --fs-badge: .625rem; /* and its figure, Sans 600 10 */
+  --w-grab: 36px; /* the More sheet's grab handle, 36×4 (§5.4) */
+  --h-grab: 4px;
+  --radius-grab: 2px;
+  --w-specimen-phone: 390px; /* a /parts frame specimen on a phone, as wide as the gallery's */
+  --h-specimen: 860px; /* a /parts frame specimen, as tall as the gallery's */
+  --h-specimen-short: 640px; /* the rail specimen */
+  --h-tab: 36px; /* a tab (§7.3) */
+  --h-kbd: 18px; /* a key cap (§7.3) */
+  --h-check: 16px; /* a checkbox or a radio (§7.2) */
+  --radio-dot: 5px; /* the moss border of a chosen radio (§7.2) */
+  --h-ktile: 28px; /* the kind tile in a row (§7.14) */
+  --h-ktile-needs: 32px; /* on Needs you */
+  --h-ktile-header: 40px; /* on a record header */
+  --radius-ktile-needs: 8px;
+  --radius-well: 8px; /* the payload's well (§9.6) */
+  --w-meter-seg: 12px; /* one segment of a meter, 12×4 (§7.13) */
+  --h-meter: 4px;
+  --w-meter-bar: 96px; /* the meter over 12, a bar */
+  --radius-meter: 2px;
+  --w-chain-glyph: 7px; /* the chain chip's hollow circle (§7.6) */
+  --w-chain-bar: 3px; /* one of the three bars of the several-chains glyph, 3×6, 1px apart */
+  --h-chain-bars: 6px;
+  --h-spin-age: 11px; /* the reading ring in a read age (§7.9) */
+  --h-av: 24px; /* a presence monogram, a circle (§7.12) */
+  --h-av-sm: 20px; /* a row's presence stack: a page others have open, in a list (C6) */
+  --ring-av: 2px; /* the --paper ring that parts monograms in a stack, and the pen badge from its monogram */
+  --h-av-pen: 12px; /* the editing badge on a monogram */
+  --h-skel: 10px; /* a loading skeleton's bar (§6.2) */
+  --h-skel-sub: 8px; /* its second line */
+  --radius-skel: 5px;
+  --w-skel-end: 52px; /* the bar at a row's end */
+  --w-skel-end-1: 40px; /* the bar at a table row's end */
+  --w-row-age: 84px; /* a Systems row's read-age column (§9.2) */
+  --w-signin: 420px; /* the sign-in card, at its widest (§11.4) */
+  --h-signin-go: 40px; /* its full-width primary, Sign in with Ethereum */
+  --h-door-top: 76px; /* the door's top bar (§12.1) */
+  --w-door-seal: 26px; /* its wordmark's square, the org's mark on --solid */
+  --h-lib-card: 172px; /* a library entry card, at least (§11.1) */
+  --w-lib-card: 260px; /* and at its narrowest, in the shelf's grid */
+  --fs-lib-t: .9375rem; /* its title, Sans 600 15 */
+  --w-wiz-rail: 220px; /* a wizard's step rail (§11.3) */
+  --h-wiz-dot: 20px; /* a step's numbered circle */
+  --fs-wiz-n: .65625rem; /* its number, Mono 500 10.5 */
+  --fs-wiz-h: 1.25rem; /* a wizard screen's question, Sans 600 20 */
+  --radius-door-seal: 7px;
+  --fs-d-mark: 1.1875rem; /* the wordmark's name, Fraunces 500 19 */
+  --w-door-label: 240px; /* a section's sticky label column (§12.4) */
+  --w-door-lead: 34em; /* a section's lead, at its widest */
+  --w-door-desc: 42ch; /* the hero's description */
+  --lh-d-body: 1.6; /* the door's body and description */
+  --fs-d-row: 1.1875rem; /* a ledger row's title, Fraunces 19 */
+  --fs-d-hat: 1.125rem; /* a hat's name, Fraunces 18 */
+  --lh-d-row: 1.3;
+  --radius-door-card: 18px; /* a pool card and the treasury's panels */
+  --w-door-dot: 20px; /* a signer's dot */
+  --w-door-dot-ring: 1.5px;
+  --w-door-id: 120px; /* the ledger's id column */
+  --h-log: 260px;
+  --h-embed: 480px;
+  --h-canvas-chrome: 140px;
+  --h-canvas-min: 360px;
+  --h-canvas-small: 260px;
+  --h-cell: 120px;
+  --h-kcol: 80px;
+  --h-textarea: 4em;
+  --h-palette-top: 12vh;
+  --h-pal-in: 52px; /* the palette's input row (§5.7) */
+  --h-pal-list: 380px; /* its results, at most, before they scroll */
+  --w-keymap-col: 190px; /* a key map column, at least (§5.8) */
+  --h-keymap-row: 30px; /* a key map row */
+
+  /* icons: one stroke set on a 24 grid */
+  --ic-xs: 13px;
+  --ic-sm: 14px;
+  --ic: 16px;
+  --ic-lg: 20px;
+  --ic-menu: 15px; /* a menu item's glyph (§7.3) */
+  --ic-pen: 8px; /* the pen inside the editing badge (§7.12) */
+  --ic-band: 15px; /* the eye on the view-as band (§5.9) */
+  --ic-chev: 12px; /* the chevron on the visibility control (§7.10) */
+  --ic-pal: 18px; /* the search glyph in the palette's input (§5.7) */
+  --stroke-pen: 2; /* its stroke, heavier so 8px still reads */
+  --icon-stroke: 1.5;
+
+  /* the parts of a look that are not a colour or a length */
+  --focus-w: 2px;
+  --label-case: none;
+  --label-font: var(--sans);
+  --font-btn: var(--sans);
+  --nav-on-weight: var(--fw-medium);
+  --input-bw: 1px;
+  --radius-chip: 999px;
+  --radius-input: 7px;
+  --radius-step: 50%; /* the shape of a wizard step marker */
+  /* pieces of a look that markup carries: house shows the org's seal */
+  --block-pad: var(--sp-10);
+  --divider: var(--rule);
+  --nav-pad: 0 var(--sp-6);
+  --brand-dot-display: inline-flex;
+  --input-pad: 0 var(--sp-8); /* the padding inside a field */
+  --input-w: 100%; /* a field's width in its cell */
+  --font-data: var(--sans); /* the family of what carries data: status, dates, chips, segments, tabs, the menu's counts */
+  --data-nums: tabular-nums; /* the figures of that data: tabular-nums lines columns of numbers up */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]),
+  :root[data-skin="house"]:not([data-theme="light"]) {
+    --paper: #121412;
+    --ink: #ecebe5;
+    --mute: #aeaca3;
+    --faint: #9a978e;
+    --rule: #2b2f2c;
+    --wash: #232725;
+    --attn: #e8916a;
+    --raised: #1a1d1b;
+    --edge: #727771;
+    --solid: #ecebe5;
+    --on-solid: #121412;
+    --focus: #8fc2a6;
+    --pop: #1f2321;
+    --sunken: #0e100f;
+    --wash-strong: #2c312e;
+    --rule-strong: #3a3f3b;
+    --on-accent: #0e1a13;
+    --attn-soft: #33231b;
+    --map-dot: #262a27;
+    --accent: #8fc2a6;
+    --accent-soft: #1b2b23;
+    --shadow-card: 0 1px 0 rgba(0,0,0,.25);
+    --shadow-raise: 0 1px 0 rgba(0,0,0,.25), 0 12px 30px -14px rgba(0,0,0,.75);
+    --shadow-pop: 0 0 0 1px rgba(236,235,229,.07), 0 22px 50px -14px rgba(0,0,0,.8);
+    --scrim: rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"],
+:root[data-skin="house"][data-theme="dark"] {
+  --paper: #121412;
+  --ink: #ecebe5;
+  --mute: #aeaca3;
+  --faint: #9a978e;
+  --rule: #2b2f2c;
+  --wash: #232725;
+  --attn: #e8916a;
+  --raised: #1a1d1b;
+  --edge: #727771;
+  --solid: #ecebe5;
+  --on-solid: #121412;
+  --focus: #8fc2a6;
+  --pop: #1f2321;
+  --sunken: #0e100f;
+  --wash-strong: #2c312e;
+  --rule-strong: #3a3f3b;
+  --on-accent: #0e1a13;
+  --attn-soft: #33231b;
+  --map-dot: #262a27;
+  --accent: #8fc2a6;
+  --accent-soft: #1b2b23;
+  --shadow-card: 0 1px 0 rgba(0,0,0,.25);
+  --shadow-raise: 0 1px 0 rgba(0,0,0,.25), 0 12px 30px -14px rgba(0,0,0,.75);
+  --shadow-pop: 0 0 0 1px rgba(236,235,229,.07), 0 22px 50px -14px rgba(0,0,0,.8);
+  --scrim: rgba(0,0,0,.55);
+  color-scheme: dark;
+}

@@ -24,7 +24,13 @@
       ]
     },
     "type": {
-      "enum": [
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "assembly",
         "workshop",
         "deadline",
@@ -81,7 +87,13 @@
       }
     },
     "status": {
-      "enum": [
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "upcoming",
         "completed",
         "cancelled"

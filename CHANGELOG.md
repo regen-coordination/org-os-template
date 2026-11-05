@@ -6,15 +6,48 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
-**Staged for `0.5.1`.** Everything below is already on `main` but landed *after* the `v0.5.0`
-tag, so a clone of the tag does not have it. `npm run version:update 0.5.1` promotes this
-section to a dated release heading and rewrites the comparison links — the heading stays
-`[Unreleased]` until then because `version:check` reads the first `[X.Y.Z]` heading as the
-current release and would fail against `package.json`.
+_(Append changes here as they land.)_
 
-Still open for 0.5.1, not yet done: the two 🔴 **kms data-loss** fixes, and the remaining admin
-defects (YAML reflow rewriting whole registries on a one-field edit; the per-registry write lock
-racing `.git/index.lock` across registries).
+## [0.6.0] — 2026-11-05
+
+**0.6 adds the house:** `packages/admin`, one Hub per org over its records, rules, proposals and
+systems, and the framework pieces it stands on. Everything under *Added*, *Fixed* and *Changed*
+below also ships here: it landed on `main` after the `v0.5.0` tag and was staged for a 0.5.1
+that this release replaces.
+
+**If your instance syncs from `main` HEAD, pin it to `v0.5.0` before this merges**, then upgrade
+on purpose: sync, then `node scripts/migrate.mjs --dry --target 0.6` to see what the 0.6
+migrations will do, then the same without `--dry`. The migrations ask before writing anything
+they inferred.
+
+### 0.6
+
+- **The house (`packages/admin`).** Records, rules, proposals, systems and boards, drawn with one
+  element set (spec: `docs/superpowers/specs/2026-10-29-dao-os-l4-element-set-design.md`;
+  gallery: `docs/design/dao-os-element-gallery.html`). A sign-in page and a read-only mode;
+  records shown by their declared visibility. The change engine stages, applies and replays
+  edits. The proposals ledger records approve, object and vote events, and the rule evaluator
+  decides them. Readers for Safe, Hats, Gardens and Snapshot, tested on recorded fixtures. It
+  replaces the old admin app's components.
+- **Canonical records.** Roles and handles in `data/members.yaml`, systems from
+  `infrastructure`, `validate:data` with its schemas, and `claim-handle`.
+- **Governance rules.** `roles` and `rules` in `data/governance.yaml`, a solo default, and
+  `validate:governance`.
+- **Migrations 0.5 → 0.6.** Canonical records and governance rules, run by `migrate` and the
+  instance doctor, which also declares each field's visibility.
+- **Standards.** The `.well-known/` generator (EIP-4824 `dao.json` and its members, projects and
+  proposals) honours field visibility and is vendored into clones.
+- **Clones** copy committed files only, checked against `tests/clone-manifest.txt`.
+- **Example fixtures.** The house's fixtures are an example org ("Example DAO") with synthetic
+  addresses and transaction hashes.
+- **Design and history.** The architecture is
+  `docs/superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md`. How 0.6 was
+  built: `docs/superpowers/history/org-os-0.6.md`.
+
+**Known issues**, carried from the 0.5.1 staging notes and not re-checked on 0.6: the two 🔴
+**kms data-loss** fixes are still open. The two 0.5 admin defects (YAML reflow rewriting a
+whole registry on a one-field edit, and the per-registry write lock racing `.git/index.lock`) have
+not been re-checked against the house.
 
 ### Added
 
@@ -347,7 +380,8 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/regen-coordination/org-os-template/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/regen-coordination/org-os-template/compare/archive/v3.5.0...v0.5.0
 [3.5.0]: https://github.com/regen-coordination/org-os-template/compare/v3.0.0...v3.5.0
 [3.0.0]: https://github.com/regen-coordination/org-os-template/compare/v2.0.0...v3.0.0

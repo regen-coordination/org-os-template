@@ -1,0 +1,380 @@
+/* Collection views (§10.2; the gallery's "views" section): the view header, the table, the list, the board and the
+   calendar. Every length is a token; a view reads its own container, never the viewport's width (CC-15, E-8): under
+   600px of its width the table is cards, the board a grouped list and the calendar an agenda, and none scrolls
+   sideways. */
+
+/* The header: the view tabs, then the filter chips, + Filter, the sort and the one primary, pushed to the end */
+.vlist { min-width: 0; }
+.vhead { display: grid; gap: var(--sp-6); margin-block-end: var(--sp-8); min-width: 0; }
+.vbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); min-width: 0; }
+.vbar .tabs { gap: var(--sp-10); min-width: 0; max-width: 100%; }
+.vbar-end { margin-inline-start: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5); min-width: 0; }
+.vhead-meta { font-family: var(--font-data); font-size: var(--fs-tiny); color: var(--faint); }
+
+/* A filter chip: a --wash pill, the field mute, the rest ink, its remove × faint; + Filter is dashed */
+.fchip { display: inline-flex; align-items: center; gap: var(--sp-4); block-size: var(--h-ctl-sm); padding-block: 0;
+  padding-inline: var(--sp-7) var(--sp-5); border: var(--rule-w) solid transparent; border-radius: var(--radius-chip); background: var(--wash);
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--ink); white-space: nowrap; }
+.fchip-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fchip-k { color: var(--mute); font-weight: var(--fw-regular); }
+.fchip-x { display: inline-grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--faint); border-radius: var(--radius-chip); cursor: pointer; }
+.fchip-x:focus-visible, .fchip-add:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); }
+.fchip-add { background: transparent; border-color: var(--rule-strong); border-style: dashed; color: var(--mute); padding-inline: var(--sp-7);
+  cursor: pointer; transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease); }
+@media (hover: hover) { .fchip-add:hover { color: var(--ink); border-color: var(--edge); } .fchip-x:hover { color: var(--ink); } }
+@media (pointer: coarse) {
+  .fchip-x, .fchip-add { position: relative; }
+  .fchip-x::after, .fchip-add::after { content: ""; position: absolute; inset-inline: 0; inset-block: calc((var(--h-ctl-sm) - var(--h-ctl-touch)) / 2); }
+}
+
+/* The filter form + Filter opens: the field, the condition, the value, Add filter */
+.vfilter { display: flex; flex-wrap: wrap; align-items: end; gap: var(--sp-6) var(--sp-8); padding: var(--sp-8); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); background: var(--raised); min-width: 0; }
+.vfilter-f { display: grid; gap: var(--sp-3); min-width: 0; }
+.vfilter-v { flex: 1 1 var(--w-filter); }
+.vfilter-l { font-size: var(--fs-tiny); color: var(--mute); }
+.vfilter-acts { display: flex; gap: var(--sp-5); }
+
+/* The table: the view's own container, a raised surface, radius 10 */
+.tv { container: tview / inline-size; min-width: 0; }
+.tv-table { inline-size: 100%; border-collapse: separate; border-spacing: 0; background: var(--raised); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); font-size: var(--fs-body); }
+/* the 36px sticky head, 12/500 faint; the sorted column ink with its chevron */
+.tv-table th { block-size: var(--h-thead); padding: 0 var(--sp-8); text-align: start; vertical-align: middle; white-space: nowrap;
+  font: var(--fw-medium) var(--fs-label)/var(--lh-ui) var(--sans); color: var(--faint); border-block-end: var(--rule-w) solid var(--rule); }
+.tv-table thead th { position: sticky; inset-block-start: 0; z-index: 1; background: var(--raised); }
+.tv-table thead th:first-child { border-start-start-radius: var(--radius); }
+.tv-table thead th:last-child { border-start-end-radius: var(--radius); }
+.tv-table th.tv-sorted { color: var(--ink); }
+.tv-sort { display: inline-flex; align-items: center; gap: var(--sp-3); padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.tv-sort:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); border-radius: var(--radius-sm); }
+.tv-chev { display: inline-flex; transition: rotate var(--dur-1) var(--ease); }
+.tv-desc { rotate: 180deg; }
+/* 40px rows; numbers and dates in Mono, end-aligned */
+.tv-table td { block-size: var(--h-row-1); padding: 0 var(--sp-8); vertical-align: middle; border-block-end: var(--rule-w) solid var(--rule);
+  overflow-wrap: anywhere; transition: background-color var(--dur-1) var(--ease); }
+.tv-table tbody:last-child tr:last-child td { border-block-end: 0; }
+.tv-table .n { font-family: var(--mono); font-size: var(--fs-meta); font-variant-numeric: tabular-nums slashed-zero; white-space: nowrap; }
+.tv-table .r { text-align: end; }
+.tv-table .k { color: var(--faint); font-size: var(--fs-label); white-space: nowrap; }
+.tv-table td[data-card="title"] { font-weight: var(--fw-medium); }
+.tv-table a { color: var(--ink); text-decoration: none; }
+@media (hover: hover) { .tv-table a:hover { text-decoration: underline; } .tv-table tbody tr:not(.tv-grp):hover td { background: var(--row-hover); } }
+/* a group row: --sunken, the group's name and its count */
+.tv-grp th { block-size: var(--h-trow-grp); background: var(--sunken); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); }
+.tv-grp-c { margin-inline-start: var(--sp-5); color: var(--faint); font-variant-numeric: tabular-nums; }
+/* selected: the soft fill, the moss bar at the row's start */
+.tv-table tr.tv-sel td { background: var(--accent-soft); }
+.tv-table tr.tv-sel td:first-child { position: relative; }
+.tv-table tr.tv-sel td:first-child::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; inline-size: var(--rule-w-heavy); background: var(--accent); }
+.tv-table tr[aria-selected] { cursor: pointer; }
+/* a cell of the grid: the focus ring inset, so it never hides under its neighbours */
+.tv-table [data-cell]:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.tv-table td[data-editable] { cursor: text; }
+/* an inline edit: the input fills the cell */
+.tv-table td.tv-editing { padding: 0 var(--sp-3); }
+.tv-in { block-size: calc(var(--h-row-1) - var(--sp-6)); }
+/* a staged cell: a 2px moss underline and the word */
+.tv-table td.tv-staged { position: relative; }
+.tv-table td.tv-staged::after { content: ""; position: absolute; inset-inline: 0; inset-block-end: 0; block-size: var(--rule-w-heavy); background: var(--accent); }
+.tv-st { margin-inline-start: var(--sp-6); }
+/* an overdue date: clay, and its word */
+.tv-table td.tv-late { color: var(--attn); }
+.tv-late-w { font-family: var(--sans); }
+/* the checkbox column: where a pointer can hover, hidden until its row is hovered, it is focused, or a row is picked;
+   on a touch screen always drawn */
+.tv-table .tv-cb { inline-size: var(--h-check); padding-inline: var(--sp-8) 0; }
+.tv-check { inline-size: var(--h-check); block-size: var(--h-check); margin: 0; accent-color: var(--accent); transition: opacity var(--dur-1) var(--ease); }
+.tv-check:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); }
+@media (hover: hover) { .tv:not([data-picking]) .tv-table tr:not(:hover) .tv-check:not(:checked):not(:focus-visible) { opacity: 0; } }
+@media (pointer: coarse) { .tv-table .tv-cb { inline-size: var(--h-ctl-touch); } }
+
+/* Under 600px of the view: each row a card — the title, the "project · owner · due" line, the status at the end */
+@container tview (max-width: 599px) {
+  .tv-table, .tv-table tbody { display: block; }
+  .tv-table thead, .tv-table .tv-cb { display: none; }
+  .tv-table tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3) var(--sp-8); min-block-size: var(--h-row);
+    padding: var(--sp-7) var(--sp-10); border-block-end: var(--rule-w) solid var(--rule); }
+  .tv-table tbody:last-child tr:last-child { border-block-end: 0; }
+  .tv-table tr::after { content: ""; order: 3; flex-basis: 100%; }
+  .tv-table td { display: block; block-size: auto; padding: 0; border: 0; text-align: start; }
+  .tv-table td[data-card="title"] { order: 1; flex: 1 1 0; min-width: 0; }
+  .tv-table td[data-card="status"] { order: 2; flex: none; }
+  .tv-table td[data-card="meta"] { order: 4; font-family: var(--sans); font-size: var(--fs-meta); color: var(--mute); }
+  .tv-table td[data-card="meta"]:empty, .tv-table td[data-card="none"] { display: none; }
+  .tv-table td[data-card="meta"]:not(:empty) ~ td[data-card="meta"]:not(:empty)::before { content: "· "; color: var(--faint); }
+  .tv-table td.tv-late { color: var(--attn); }
+  .tv-table tr.tv-sel { position: relative; background: var(--accent-soft); }
+  .tv-table tr.tv-sel::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; inline-size: var(--rule-w-heavy); background: var(--accent); }
+  .tv-table tr.tv-sel td { background: transparent; }
+  .tv-table tr.tv-sel td:first-child::before { display: none; }
+  .tv-table tr.tv-grp { min-block-size: 0; padding-block: var(--sp-5); background: var(--sunken); }
+  .tv-table tr.tv-grp::after { content: none; }
+  .tv-grp th { display: block; block-size: auto; padding: 0; border: 0; background: transparent; }
+}
+/* The board: columns 240–280 on --sunken, radius 10, wrapping rather than scrolling sideways (§13) */
+.kb { container: kb / inline-size; position: relative; min-width: 0; }
+.kb-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--w-kcol-min), var(--w-kcol))); gap: var(--sp-8); align-items: start; }
+.kcol { display: grid; align-content: start; gap: var(--sp-6); padding: var(--sp-6); border-radius: var(--radius); background: var(--sunken); min-width: 0; }
+/* a column's head: its mark, its name, the count, + New at the end */
+.kcol-h { display: flex; align-items: center; gap: var(--sp-5); min-block-size: var(--h-ctl-sm); padding-inline: var(--sp-4);
+  font: var(--fw-medium) var(--fs-ui)/var(--lh-ui) var(--sans); color: var(--ink); }
+.kcol-n { min-width: 0; overflow-wrap: anywhere; }
+.kcol-c { color: var(--faint); font-weight: var(--fw-regular); font-variant-numeric: tabular-nums; }
+.kcol-new { margin-inline-start: auto; }
+.kcol-l { display: grid; gap: var(--sp-6); margin: 0; padding: 0; list-style: none; min-width: 0; }
+/* a card: raised, radius 8 — the title, two facts and presence, its staged mark; Move to… at its top end */
+.kcard { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-6) var(--sp-4); padding: var(--sp-7) var(--sp-8); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius-kcard); background: var(--raised); box-shadow: var(--shadow-card); min-width: 0;
+  transition: box-shadow var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease); }
+.kcard > * { grid-column: 1 / -1; }
+.kcard > .kcard-t { grid-column: 1; }
+.kcard:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); }
+.kcard-t { min-width: 0; font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); overflow-wrap: anywhere; }
+.kcard-t a { color: var(--ink); text-decoration: none; }
+@media (hover: hover) { .kcard-t a:hover { text-decoration: underline; } }
+.kcard-f { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); min-width: 0; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--mute); }
+.kcard-f .pres { margin-inline-start: auto; }
+/* Move to…: a quiet glyph at the card's top end, the words in the grouped list */
+.kmv { grid-column: 2; grid-row: 1; align-self: start; margin-block: calc(-1 * var(--sp-3)); margin-inline-end: calc(-1 * var(--sp-4)); }
+.kmv .btn { height: var(--h-ctl-sm); padding-inline: var(--sp-4); border-color: transparent; background: transparent;
+  box-shadow: none; color: var(--mute); font-size: var(--fs-tiny); }
+.kmv-t { display: none; }
+@media (pointer: coarse) { .kmv .btn { height: var(--h-ctl-touch); } }
+/* a staged move: the 2px moss bar at the card's start (§6.2) */
+.kcard-staged::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; inline-size: var(--rule-w-heavy); background: var(--accent);
+  border-start-start-radius: var(--radius-kcard); border-end-start-radius: var(--radius-kcard); }
+.kcard-moving { opacity: var(--o-dim); }
+/* a lift: the card pops and tilts; its origin a dashed ghost; the column under the pointer a moss dashed slot */
+.kcard-lift { box-shadow: var(--shadow-pop); rotate: var(--lift-rotate); border-color: var(--rule-strong); z-index: 2; }
+.kcard-ghost { opacity: var(--o-dim); border-style: dashed; box-shadow: none; }
+.kcard-float { position: absolute; z-index: 3; margin: 0; pointer-events: none; }
+.kdrop { block-size: var(--h-kdrop); border: var(--stroke-w) dashed var(--accent); border-radius: var(--radius-kcard); background: var(--accent-soft); }
+.kb-refused { margin-block-start: var(--sp-8); }
+
+/* Under 600px of the board: a grouped list on one raised surface — each column a group head, each card a row */
+@container kb (max-width: 599px) {
+  .kb-cols { display: block; border: var(--rule-w) solid var(--rule); border-radius: var(--radius); background: var(--raised); }
+  .kcol { display: block; padding: 0; border-radius: 0; background: transparent; }
+  .kcol + .kcol { border-block-start: var(--rule-w) solid var(--rule); }
+  .kcol-h { padding: var(--sp-8) var(--sp-10) var(--sp-4); font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--faint); }
+  .kcol-c::before { content: "· "; }
+  .kcol-l { display: block; }
+  .kcard { grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-2) var(--sp-8); align-items: center; min-block-size: var(--h-row);
+    padding: var(--sp-7) var(--sp-10); border: 0; border-block-start: var(--rule-w) solid var(--rule); border-radius: 0; background: transparent; box-shadow: none; }
+  .kcard > * { grid-column: 1; }
+  .kcard > .kmv { grid-column: 2; grid-row: 1 / span 3; align-self: center; margin: 0; }
+  .kcard-staged::before { border-radius: 0; }
+  .kmv .btn { padding-inline: var(--sp-7); border-color: var(--rule-strong); background: var(--raised); color: var(--ink); }
+  .kmv .btn .i { display: none; }
+  .kmv-t { display: inline; }
+  .kdrop { margin: var(--sp-4) var(--sp-10); }
+}
+
+/* The calendar: the month's title and its arrows, then the grid — seven columns parted by 1px rules, radius 10 */
+.cal { container: cal / inline-size; min-width: 0; }
+.cal-h { display: flex; align-items: center; gap: var(--sp-6); margin-block-end: var(--sp-8); min-width: 0; }
+.cal-t { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); color: var(--ink); }
+.cal-nav { margin-inline-start: auto; display: flex; align-items: center; gap: var(--sp-4); }
+.cal-box { border: var(--rule-w) solid var(--rule); border-radius: var(--radius); overflow: hidden; background: var(--raised); }
+.cal-grid { inline-size: 100%; table-layout: fixed; border-collapse: collapse; border-style: hidden; }
+.cal-grid th, .cal-grid td { border: var(--rule-w) solid var(--rule); }
+.cal-grid th { padding: var(--sp-6); text-align: start; font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--faint); }
+/* a day: 96 at least, its date in a 22px circle; today an ink disc; outside the month on --sunken, the date faint */
+.cal-day { block-size: var(--h-cal-day); padding: var(--sp-5); vertical-align: top; background: var(--raised); min-width: 0; }
+.cal-day:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.cal-d { display: grid; place-items: center; inline-size: var(--h-cal-date); block-size: var(--h-cal-date); border-radius: var(--radius-chip);
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); font-variant-numeric: tabular-nums; }
+.cal-out { background: var(--sunken); }
+.cal-out .cal-d { color: var(--faint); }
+.cal-today .cal-d { background: var(--solid); color: var(--on-solid); }
+.cal-evs { display: grid; gap: var(--sp-3); margin: var(--sp-3) 0 0; padding: 0; list-style: none; min-width: 0; }
+.cal-evs > li { min-width: 0; }
+/* an event: a 20px pill, its glyph and its title cut to the cell; overdue clay; staged with the moss bar */
+.cal-ev { position: relative; display: flex; align-items: center; gap: var(--sp-4); block-size: var(--h-ev); padding-inline: var(--sp-4);
+  border-radius: var(--radius-ev); background: var(--wash); font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--ink); min-width: 0; overflow: hidden; }
+.cal-ev .i { flex: none; color: var(--mute); }
+.cal-ev-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cal-ev-late { background: var(--attn-soft); color: var(--attn); }
+.cal-ev-late .i { color: var(--attn); }
+.cal-ev-staged::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; inline-size: var(--rule-w-heavy); background: var(--accent); }
+/* "+N more": it opens the day */
+.cal-more { display: flex; align-items: center; block-size: var(--h-ev); padding: 0 var(--sp-4); border: 0; background: transparent; color: var(--mute);
+  font: inherit; font-size: var(--fs-tiny); cursor: pointer; }
+@media (hover: hover) { .cal-more:hover { color: var(--ink); text-decoration: underline; } }
+@media (pointer: coarse) {
+  .cal-more { position: relative; }
+  .cal-more::after { content: ""; position: absolute; inset-inline: 0; inset-block: calc((var(--h-ev) - var(--h-ctl-touch)) / 2); }
+}
+/* the agenda, drawn under 600px of the calendar: day headings over data rows */
+.cal-agenda { display: none; }
+.agenda-sec { display: grid; gap: var(--sp-4); }
+.agenda-day { margin: 0; padding: var(--sp-6) var(--sp-4) 0; font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--faint); }
+.agenda-today { color: var(--ink); }
+@container cal (max-width: 599px) {
+  .cal-box { display: none; }
+  .cal-agenda { display: grid; gap: var(--sp-8); }
+}
+
+@media (prefers-reduced-motion: reduce) { .tv-chev { transition: none; } .kcard { transition: none; } .kcard-lift { rotate: none; } }
+
+/* The Hub's own pages (C6). Home's head (§14.1, the gallery's greet): the day as an eyebrow, the line in the display
+   face at --fs-greet, how the Systems were read under it, its parts apart by a faint dot. */
+.greet { display: grid; gap: var(--sp-5); min-width: 0; }
+.greet-day { font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.greet-t { margin: 0; font: var(--fw-regular) var(--fs-greet)/var(--lh-greet) var(--display); font-variation-settings: "SOFT" var(--soft);
+  letter-spacing: var(--ls-title); color: var(--ink); overflow-wrap: anywhere; }
+.greet-s { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-6); margin: 0; font-size: var(--fs-meta); color: var(--mute); }
+.greet-sep { color: var(--faint); }
+.greet .rh-acts { margin-block-start: var(--sp-6); }
+
+/* Home's setup checklist (design pass 2026-11-04 §1b): a raised surface under the head, its title and "n of m" with the
+   meter, then the items in three columns on its own width (one on a phone): a tick or a dashed circle, the item, and
+   its next step at the end. */
+.setup { container: setup / inline-size; display: grid; gap: var(--sp-6); min-width: 0; margin-block: var(--sp-11) 0;
+  padding: var(--sp-10) var(--sp-11); background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-lg); }
+.setup-h { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6) var(--sp-8); }
+.setup-t { margin: 0; font: var(--fw-strong) var(--fs-sub)/var(--lh-title) var(--sans); overflow-wrap: anywhere; }
+.setup-m { margin-inline-start: auto; }
+.setup-who { margin: 0; font-size: var(--fs-meta); color: var(--faint); }
+.setup-cl { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 var(--sp-11); margin: 0; padding: 0; list-style: none; }
+@container setup (min-width: 640px) { .setup-cl { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.setup-i { display: flex; align-items: center; gap: var(--sp-6); min-width: 0; min-block-size: var(--h-ctl); border-block-end: var(--rule-w) solid var(--rule);
+  font-size: var(--fs-body); }
+.setup-i > .i { flex: none; color: var(--faint); }
+.setup-done > .i { color: var(--accent); }
+.setup-l { min-width: 0; overflow-wrap: anywhere; }
+.setup-done .setup-l { color: var(--faint); }
+.setup-a { margin-inline-start: auto; flex: none; font-size: var(--fs-meta); font-weight: var(--fw-medium); color: var(--accent); text-underline-offset: var(--sp-3); }
+@media (pointer: coarse) { .setup-i { min-block-size: var(--h-ctl-touch); } }
+.board-note { margin: var(--sp-6) 0 0; font-size: var(--fs-meta); color: var(--mute); }
+
+/* A metric block (§14.2): the amount large, then what it is, then its read age */
+.bmetric { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-4) var(--sp-8); margin: var(--sp-6) 0 0; min-width: 0; }
+.bmetric-l { font-size: var(--fs-meta); color: var(--mute); }
+.bmetric-t { overflow-wrap: anywhere; }
+
+/* Cards in a block (Treasury's prepared transactions): one under the other */
+.blk-cards { display: grid; gap: var(--sp-10); min-width: 0; }
+
+/* A canvas board (P4 §5): each block where its place puts it, on the canvas's own surface; cells are a gap apart
+   (boards/layout.ts GAP), so no two touch */
+.board.canvas { position: relative; overflow: auto; min-block-size: var(--h-canvas-min); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); background: var(--paper); }
+.board.canvas > .cell { position: absolute; overflow: auto; }
+
+/* A record block's actions under its fields (blocks/record: Edit, then Save and Cancel while editing) */
+.blk-acts { display: flex; gap: var(--sp-6); flex-wrap: wrap; margin: var(--sp-7) 0 0; }
+
+/* A board (§14.1 section page; P4 §5): its blocks in 12 columns, on a canvas, or in one column. On a phone the board
+   is a flow (Board.tsx reads the frame, §5.4), so nothing here asks the viewport. */
+.board { margin-block-start: var(--sp-11); min-width: 0; }
+/* the gap between blocks is --sp-11, the board gap the README names beside the canvas's own (spec §3.4; C10 put back
+   0.6's token, which C9 had moved to --sp-10) */
+.board.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: minmax(var(--h-cell), auto); gap: var(--sp-11); }
+.board.flow { display: flex; flex-direction: column; gap: var(--sp-11); }
+.board > .cell { min-width: 0; }
+.board.grid > .cell:empty { display: none; } /* a quiet block with no rows leaves no row behind */
+
+/* The block frame (§14.2): the section head, the body and the foot inside the block's surface (--block-bg, radius 10,
+   --block-pad; bare draws none). A bare block (the page heads it) is the body alone. */
+.bf { display: grid; gap: var(--sp-8); min-width: 0; background: var(--block-bg); border-radius: var(--radius); padding: var(--block-pad); }
+.bf > .sect-h { margin: 0; }
+.bf .sect-t .sect-n { margin-inline-start: var(--sp-4); font-weight: var(--fw-regular); }
+.bf-body { min-width: 0; }
+.bf-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+/* A Foot that draws nothing (a list with no New) leaves no gap behind (final review M-1). */
+.bf-foot:empty { display: none; }
+/* a lone block's foot, drawn by the page under its head (Board.tsx BareFoot) */
+.rh ~ .bf-foot { margin-block-start: var(--sp-8); }
+.bf-bare { min-width: 0; }
+.bf .ed-prose p, .bf .ed-prose ul { margin-block-end: var(--sp-8); }
+.bf .ed-prose > :last-child { margin-block-end: 0; }
+
+
+/* Arrange (§14.2): 0.6's machine, redrawn. The toolbar and the review sit under the page head; each block gets a bar
+   (the grip, its name, Move to…, Settings, Remove) over its inert content. The picked block is the drop target: moss
+   dashed on --accent-soft (§10.2's drop target), with "picked up" said in words by the live region. */
+.arr-tools, .arr-review { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-8); min-width: 0; margin-block-start: var(--sp-9);
+  padding: var(--sp-8) var(--sp-10); background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); }
+.arr-review { display: grid; align-items: start; gap: var(--sp-6); }
+.arr-review-t { margin: 0; font-size: var(--fs-meta); color: var(--mute); }
+.arr-review-l { margin: 0; padding-inline-start: var(--sp-10); font-size: var(--fs-meta); }
+.arr-f { display: grid; gap: var(--sp-3); min-width: 0; }
+.arr-l { font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--mute); }
+.arr-name-f { flex: 1 1 var(--w-filter); }
+.arr-acts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); margin-inline-start: auto; }
+.arr-said { margin: var(--sp-6) 0 0; font-size: var(--fs-meta); color: var(--mute); }
+.arr { position: relative; block-size: 100%; min-width: 0; border-radius: var(--radius); outline-offset: var(--sp-2); }
+.arr:focus-visible { outline: var(--focus-w) solid var(--focus); }
+.arr.picked { outline: var(--rule-w-heavy) dashed var(--accent); outline-offset: var(--sp-2); background: var(--accent-soft); }
+.arr-bar { display: flex; align-items: center; gap: var(--sp-6); min-width: 0; padding-block-end: var(--sp-4); font-size: var(--fs-meta); color: var(--mute); }
+.arr-grip { display: inline-grid; place-items: center; flex: none; inline-size: var(--h-ctl-sm); block-size: var(--h-ctl-sm); padding: 0;
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius-ctl); background: var(--raised); color: var(--mute); cursor: grab; touch-action: none; }
+.arr-grip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.arr-grip:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.arr-grip:disabled { cursor: default; opacity: var(--o-inert); }
+@media (hover: hover) { .arr-grip:not(:disabled):hover { color: var(--ink); border-color: var(--rule-strong); } }
+.arr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-medium); color: var(--ink); }
+.arr-mv { white-space: nowrap; }
+.arr-body { opacity: var(--o-inert); }
+.arr-size { position: absolute; inset-inline-end: 0; inset-block-end: 0; inline-size: var(--grip); block-size: var(--grip);
+  border-inline-end: var(--rule-w-heavy) solid var(--edge); border-block-end: var(--rule-w-heavy) solid var(--edge); border-end-end-radius: var(--radius-ctl);
+  cursor: nwse-resize; touch-action: none; }
+/* 44px on a coarse pointer (§13), after the rule it enlarges */
+@media (pointer: coarse) { .arr-grip { inline-size: var(--h-ctl-touch); block-size: var(--h-ctl-touch); } }
+
+/* A table's lead cell (blocks/columns.tsx, CC-4): the record's name, then its staged, stale or running mark */
+.tv-lead { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2) var(--sp-6); max-inline-size: 100%; min-width: 0; }
+.tv-lead > a, .tv-lead > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+
+/* Block settings (§14.2, E-71): the inspector's frame, at the panel's width */
+.insp.insp-settings { inline-size: var(--w-panel); }
+.set-fields { display: contents; }
+
+/* Boards (spec 2026-11-04 §2): the head's search field and New board's key cap; a board's drawing (its frame and its
+   blocks as boxes, from its own config: boards/BoardThumb.tsx), in a row in the tile's place and larger on the New
+   board sheet's layout tiles; a section's live count or its dashed "empty"; on a phone (under 560px of the list) a
+   row keeps its name and its count. Boxes are borders, which forced colours keep. */
+.boards-find { flex: 1 1 calc(var(--w-tile) * 1.2); max-inline-size: var(--w-panel); min-width: 0; }
+.btn-kbd { display: inline-flex; margin-inline-start: var(--sp-5); }
+.btn.primary .btn-kbd kbd { color: inherit; border-color: currentColor; background: transparent; }
+.boards-said { margin: var(--sp-6) 0 0; font-size: var(--fs-meta); color: var(--mute); }
+.boards-fold { margin-block-start: var(--sp-5); }
+/* its label names every folded section: it wraps inside the column at 320 instead of running past it (e2e:reflow) */
+.boards-fold .btn.sm { height: auto; min-block-size: var(--h-ctl-sm); max-inline-size: 100%; white-space: normal; text-align: start; padding-block: var(--sp-3); }
+@media (pointer: coarse) { .boards-fold .btn.sm { min-block-size: var(--h-ctl-touch); } }
+.bthumb { position: relative; display: block; inline-size: calc(var(--h-ktile) * 1.5); block-size: var(--h-ktile); flex: none;
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius-sm); background: var(--sunken); }
+.bthumb-tile { inline-size: 100%; block-size: calc(var(--h-ktile) * 2.2); }
+.bthumb-b { position: absolute; border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius-sm); background: var(--raised); }
+.brow.brow-thumb { grid-template-columns: calc(var(--h-ktile) * 1.5) minmax(0, 1fr) auto; }
+.brow-n { font-variant-numeric: tabular-nums; color: var(--mute); }
+.brow-empty { display: inline-flex; align-items: center; gap: var(--sp-4); color: var(--faint); }
+.brow-dot { inline-size: var(--mark); block-size: var(--mark); border: var(--stroke-w) dashed var(--faint); border-radius: var(--radius-chip); }
+@container rows (max-width: 559px) {
+  .brow, .brow.brow-thumb { grid-template-columns: minmax(0, 1fr) auto; }
+  .brow > .ktile, .brow > .bthumb, .brow .drow-s { display: none; }
+  .drow-li-act:has(> .brow) { grid-template-columns: minmax(0, 1fr); }
+  .drow-li-act:has(> .brow) > .drow-act { display: none; }
+}
+
+/* The New board sheet: the layout tiles (a radio each, the tile its label; the chosen one in a heavier ink edge and a
+   check, so not by colour alone), the name with the id that follows it, where to start from. */
+.nb { display: grid; gap: var(--sp-10); min-width: 0; }
+.nb-l { margin: 0; color: var(--mute); }
+.nb-lay { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--w-tile) * .8)), 1fr)); gap: var(--sp-6);
+  min-width: 0; margin: 0; padding: 0; border: 0; }
+.nb-legend { grid-column: 1 / -1; margin-block-end: var(--sp-4); padding: 0; font-size: var(--fs-meta); font-weight: var(--fw-medium); }
+.nb-tile { position: relative; display: grid; gap: var(--sp-5); align-content: start; min-width: 0; padding: var(--sp-6);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); background: var(--raised); cursor: pointer; }
+.nb-tile:has(.nb-radio:checked) { border-color: var(--ink); outline: var(--rule-w) solid var(--ink); outline-offset: calc(-2 * var(--rule-w)); }
+.nb-tile:has(.nb-radio:focus-visible) { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); }
+.nb-radio { position: absolute; inset-block-start: var(--sp-4); inset-inline-end: var(--sp-4); margin: 0; opacity: 0; }
+.nb-tx { display: grid; gap: var(--sp-2); min-width: 0; }
+.nb-tn { display: inline-flex; align-items: center; gap: var(--sp-4); font-weight: var(--fw-medium); }
+.nb-tl { font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
+.nb-id { display: block; margin-block-start: var(--sp-3); font-size: var(--fs-meta); color: var(--faint); }
+.nb-id code { font: var(--fs-meta) var(--mono); color: var(--mute); }
+.nb-from { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); min-width: 0; }
+.nb-copy { flex: 1 1 calc(var(--w-tile) * .8); min-width: 0; }

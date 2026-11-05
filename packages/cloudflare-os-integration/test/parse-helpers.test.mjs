@@ -5,9 +5,9 @@ import { extractCheckboxes, daysUntil, getRelativeAge, parseFrontmatter } from "
 const NOW = new Date("2026-08-08T12:00:00Z");
 
 test("extractCheckboxes parses categories, due dates, assignees", () => {
-  const md = "## Ops\n- [ ] Ship it (due: 2026-08-10) @luiz\n- [x] Done thing\n### Governance\n- [ ] Vote\n- [ ] _(placeholder)_\n";
+  const md = "## Ops\n- [ ] Ship it (due: 2026-08-10) @steward_a\n- [x] Done thing\n### Governance\n- [ ] Vote\n- [ ] _(placeholder)_\n";
   assert.deepEqual(extractCheckboxes(md), [
-    { text: "Ship it", done: false, category: "Ops", due: "2026-08-10", assignee: "luiz" },
+    { text: "Ship it", done: false, category: "Ops", due: "2026-08-10", assignee: "steward_a" },
     { text: "Done thing", done: true, category: "Ops", due: null, assignee: null },
     { text: "Vote", done: false, category: "Governance", due: null, assignee: null },
   ]);

@@ -11,7 +11,7 @@
 // end-to-end is WS-H acceptance against real instances, not a unit test.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync, copyFileSync, readdirSync, symlinkSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -19,6 +19,8 @@ import { runSync, porcelainPath, foreignDirtyEntries } from '../../packages/inst
 import { realIo } from '../../packages/instance-doctor/src/io.mjs';
 import { STAGE_IDS } from '../../packages/instance-doctor/src/sync.mjs';
 import { makeInstance, git } from '../helpers/instance-fixtures.mjs';
+import { ORG_ROOT, nodeModulesDir } from '../helpers/repo-paths.mjs';
+import { standardsVendorSet, diskSource } from '../../scripts/lib/standards-vendor.mjs';
 
 const OK = { ok: true, out: '' };
 
@@ -223,6 +225,50 @@ test('the migrate stage re-stamps the version surfaces onto the current line', (
   assert.match(migrate.detail, /federation\.yaml/);
 });
 
+// The 0.6 migration is reachable only with a 0.x target: an instance's own
+// package.json version (0.1.0, 1.0.0...) and its framework_version ("3.0") select
+// nothing. So the stage runs the framework's runner, pointed at the instance, with
+// the framework's version as the target, and only then re-stamps.
+test('the migrate stage runs the framework\'s runner with --target, before the re-stamp', () => {
+  const io = fakeIo();
+  let restampAt = -1;
+  const write = io.writeText;
+  io.writeText = (p, contents) => {
+    if (p.endsWith('federation.yaml') && /framework_version: "0\.5"/.test(contents) && restampAt < 0) restampAt = io.calls.length;
+    write(p, contents);
+  };
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(r.aborted, false, JSON.stringify(r.stages, null, 2));
+
+  const migrateAt = io.calls.findIndex(([k, , c]) => k === 'run' && c.includes('migrate'));
+  assert.deepEqual(io.calls[migrateAt], ['run', '/tmp/org-os', 'node /tmp/org-os/scripts/migrate.mjs /tmp/instance --target 0.5.0']);
+  assert.ok(restampAt > migrateAt, `re-stamp at ${restampAt}, migrate at ${migrateAt}`);
+  assert.ok(!io.calls.some(([k, , c]) => k === 'run' && c.startsWith('npm run migrate')), 'the instance\'s own npm script is not the path');
+});
+
+test('a framework checkout without the runner stops the sync before anything is re-stamped', () => {
+  const io = fakeIo({ exists: (p) => !String(p).endsWith(path.join('scripts', 'migrate.mjs')) });
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(r.abortStage, 'migrate');
+  assert.match(r.stages.find((s) => s.id === 'migrate').detail, /no scripts\/migrate\.mjs/);
+  const fed = io.written[path.join('/tmp/instance', 'federation.yaml')] ?? '';
+  assert.doesNotMatch(fed, /framework_version: "0\.5"/);
+});
+
+test('a failed migration stops the sync before anything is re-stamped', () => {
+  const io = fakeIo({
+    run: (cmd, args, dir) => {
+      io.calls.push(['run', dir, `${cmd} ${args.join(' ')}`]);
+      return args.some((a) => String(a).endsWith('migrate.mjs')) ? { ok: false, out: 'boom' } : OK;
+    },
+  });
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(r.abortStage, 'migrate');
+  assert.match(r.stages.find((s) => s.id === 'migrate').detail, /migrate failed: boom/);
+  const fed = io.written[path.join('/tmp/instance', 'federation.yaml')] ?? '';
+  assert.doesNotMatch(fed, /framework_version: "0\.5"/);
+});
+
 test('the receipt stage stamps last_sync_commit to the framework head', () => {
   const io = fakeIo();
   runSync(fakeSnapshot(), {}, io);
@@ -329,7 +375,7 @@ test('a failing stage stops forward motion and every later stage is skipped', ()
   assert.equal(byId.snapshot, 'ok');
   assert.equal(byId['ensure-upstream'], 'ok');
   assert.equal(byId.fetch, 'failed');
-  for (const later of ['inject-machinery', 'overlay', 'migrate', 'generate-schemas', 're-assess']) {
+  for (const later of ['inject-machinery', 'overlay', 'migrate', 'declare-visibility', 'generate-schemas', 're-assess']) {
     assert.equal(byId[later], 'skipped', `${later} must not run after an abort`);
   }
 });
@@ -588,6 +634,7 @@ test('the local stages work against real repositories', () => {
     mkdirSync(path.join(frameworkDir, 'scripts'), { recursive: true });
     writeFileSync(path.join(frameworkDir, 'scripts', 'sync-upstream.mjs'), '// the real thing\n');
     writeFileSync(path.join(frameworkDir, 'scripts', 'validate-identity.mjs'), '// the real thing\n');
+    writeFileSync(path.join(frameworkDir, 'scripts', 'migrate.mjs'), '// the real thing\n');
 
     const snapshot = {
       dir: instance,
@@ -627,6 +674,218 @@ test('the local stages work against real repositories', () => {
     assert.match(git(instance, ['for-each-ref', 'refs/snapshots/', '--format=%(refname)']), /refs\/snapshots\//);
     assert.ok(existsSync(result.receiptPath));
     assert.match(readFileSync(result.receiptPath, 'utf-8'), /completed/);
+  } finally {
+    for (const d of [instance, upstreamRepo, frameworkDir]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+// The migrate stage end to end: the real runner and the real 0.6 migration, in a
+// temporary framework checkout, against a temporary instance still on "3.0".
+test('doctor sync reaches the 0.6 migration on an instance still on the old numbering', () => {
+  const SAFE = '0x1111111111111111111111111111111111111111';
+  const instance = makeInstance({
+    frameworkVersion: '3.0',
+    remotes: { upstream: 'https://github.com/regen-coordination/org-os-template.git' },
+    files: {
+      'data/governance.yaml': `governance:\n  model: "consensus"\n  infrastructure:\n    safe: "${SAFE}"\n    chain: "eip155:42220"\n`,
+    },
+  });
+  const upstreamRepo = mkdtempSync(path.join(tmpdir(), 'doctor-upstream-'));
+  const frameworkDir = mkdtempSync(path.join(tmpdir(), 'doctor-framework-'));
+  try {
+    writeFileSync(path.join(upstreamRepo, 'README.md'), '# framework\n');
+    git(upstreamRepo, ['init', '--quiet', '--initial-branch=main']);
+    git(upstreamRepo, ['config', 'user.email', 'fixture@org-os.test']);
+    git(upstreamRepo, ['config', 'user.name', 'org-os fixture']);
+    git(upstreamRepo, ['add', '.']);
+    git(upstreamRepo, ['commit', '--quiet', '-m', 'framework: initial']);
+
+    // The framework stand-in: its real runner and migrations, js-yaml beside them.
+    mkdirSync(path.join(frameworkDir, 'scripts', 'migrations'), { recursive: true });
+    for (const rel of ['scripts/sync-upstream.mjs', 'scripts/migrate.mjs']) {
+      copyFileSync(path.join(ORG_ROOT, rel), path.join(frameworkDir, rel));
+    }
+    for (const f of readdirSync(path.join(ORG_ROOT, 'scripts', 'migrations'))) {
+      copyFileSync(path.join(ORG_ROOT, 'scripts', 'migrations', f), path.join(frameworkDir, 'scripts', 'migrations', f));
+    }
+    writeFileSync(path.join(frameworkDir, 'package.json'), JSON.stringify({ name: 'org-os', version: '0.6.0' }));
+    symlinkSync(nodeModulesDir(), path.join(frameworkDir, 'node_modules'), 'dir');
+
+    const snapshot = {
+      dir: instance,
+      name: 'Acme Co',
+      federation: { metadata: { framework_version: '3.0' } },
+      federationRaw: readFileSync(path.join(instance, 'federation.yaml'), 'utf-8'),
+      packageJson: JSON.parse(readFileSync(path.join(instance, 'package.json'), 'utf-8')),
+      packageJsonRaw: readFileSync(path.join(instance, 'package.json'), 'utf-8'),
+      versionMd: null,
+      git: { isRepo: true, remotes: { upstream: 'https://github.com/regen-coordination/org-os-template.git' }, dirtyCount: 0 },
+      machinery: {},
+      framework: { dir: frameworkDir, version: '0.6.0', headSha: 'f'.repeat(40) },
+    };
+    // Real io, the runner included; only npm (generate:schemas) and the re-assessment are stubbed.
+    const io = {
+      ...realIo,
+      run: (cmd, args, dir) => (cmd === 'node' ? realIo.run(cmd, args, dir) : { ok: true, out: 'stubbed' }),
+      reassess: () => ({ status: 'OK', summary: { blockers: 0, warnings: 0, checks: 6 } }),
+      today: () => '2026-10-17',
+    };
+    const result = runSync(snapshot, { upstreamUrl: upstreamRepo }, io);
+    assert.equal(result.aborted, false, JSON.stringify(result.stages, null, 2));
+
+    // Migrated while the instance still said 3.0 (a re-stamp first would have selected nothing)...
+    const systems = readFileSync(path.join(instance, 'data', 'systems.yaml'), 'utf-8');
+    assert.match(systems, new RegExp(`address: "${SAFE}"`));
+    assert.match(systems, /chain: "eip155:42220"/);
+    // ...and re-stamped after.
+    assert.match(readFileSync(path.join(instance, 'federation.yaml'), 'utf-8'), /framework_version: "0\.6"/);
+    // The framework checkout was only read.
+    assert.equal(existsSync(path.join(frameworkDir, 'data', 'systems.yaml')), false);
+  } finally {
+    for (const d of [instance, upstreamRepo, frameworkDir]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+// --- the standards generator travels with the machinery (DAO-OS L8, Q56) ------
+//
+// An instance does not carry packages/admin, where the builder of .well-known/ lives. inject-machinery vendors the
+// same set clone stage 5 does (scripts/lib/standards-vendor.mjs): packages/admin/lib/standards/ less the ajv modules,
+// and the closure of their relative imports, mapped into scripts/lib/.
+
+/** A fake framework holding a tiny standards builder, readable through the io bag. */
+function standardsIo(builder, rest = {}) {
+  const fw = (rel) => `/tmp/org-os/${rel}`;
+  const files = Object.fromEntries(Object.entries(builder).map(([rel, text]) => [fw(rel), text]));
+  return fakeIo({
+    // Nothing under packages/ but the builder given; every other framework file reads as the default fixture's.
+    readText: (p) => {
+      const s = String(p);
+      if (s in files) return files[s];
+      return s.startsWith('/tmp/org-os/') && !s.startsWith('/tmp/org-os/packages/') ? 'FRAMEWORK CONTENT' : null;
+    },
+    exists: (p) => !String(p).startsWith('/tmp/org-os/packages/') || p in files,
+    listFiles: (root, prefix) => {
+      if (prefix === 'scripts/') return ['scripts/doctor.mjs'];
+      return Object.keys(builder).filter((rel) => rel.startsWith(prefix));
+    },
+    ...rest,
+  });
+}
+const BUILDER = {
+  'packages/admin/lib/standards/build.mjs': "import { p } from './project.mjs'\n",
+  'packages/admin/lib/standards/load.mjs': "import { readFileSync } from 'node:fs'\nimport { r } from '../registries.mjs'\n",
+  'packages/admin/lib/standards/project.mjs': "import { v } from '../visibility.mjs'\n",
+  'packages/admin/lib/standards/index.mjs': "import { validateStandards } from './validate.mjs'\n",
+  'packages/admin/lib/standards/validate.mjs': "import Ajv from 'ajv'\n",
+  'packages/admin/lib/visibility.mjs': 'export const v = 1\n',
+  'packages/admin/lib/registries.mjs': 'export const r = 1\n',
+};
+const VENDORED = [
+  'scripts/lib/registries.mjs', 'scripts/lib/standards/build.mjs', 'scripts/lib/standards/load.mjs',
+  'scripts/lib/standards/project.mjs', 'scripts/lib/visibility.mjs',
+];
+
+test('inject-machinery vendors the standards generator into scripts/lib/ and commits it with the machinery', () => {
+  const io = standardsIo(BUILDER);
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(r.aborted, false, JSON.stringify(r.stages, null, 2));
+
+  const copies = io.calls.filter(([k]) => k === 'copy').map(([, from, to]) => [from, to]);
+  for (const rel of VENDORED) {
+    const from = `/tmp/org-os/packages/admin/lib/${rel.slice('scripts/lib/'.length)}`;
+    assert.ok(copies.some(([f, t]) => f === from && t === path.join('/tmp/instance', rel)), `${from} → ${rel}`);
+  }
+  assert.ok(!copies.some(([, t]) => /standards\/(index|validate)\.mjs$/.test(t)), 'the ajv modules are never vendored');
+
+  const add = io.calls.find(([k, , c]) => k === 'git' && c.startsWith('add -- scripts/sync-upstream.mjs'));
+  assert.ok(add, JSON.stringify(io.calls.filter(([k]) => k === 'git')));
+  for (const rel of VENDORED) assert.ok(add[2].split(' ').includes(rel), `${rel} is staged by name`);
+
+  const [commit] = machineryCommits(io);
+  assert.match(commit[2], /the standards generator \(5 files into scripts\/lib\/, from packages\/admin\/lib\/\)/);
+  const stage = r.stages.find((s) => s.id === 'inject-machinery');
+  assert.match(stage.detail, /installed and committed .*doctor\.mjs and the standards generator \(5 files into scripts\/lib\/\)/);
+});
+
+test('a builder the vendored copy could not run stops inject-machinery before anything is copied', () => {
+  const io = standardsIo({ ...BUILDER, 'packages/admin/lib/standards/build.mjs': "import yaml from 'js-yaml'\n" });
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(r.aborted, true);
+  assert.equal(r.abortStage, 'inject-machinery');
+  assert.match(r.stages.find((s) => s.id === 'inject-machinery').detail, /could not vendor the standards generator: .*"js-yaml"/);
+  assert.deepEqual(io.calls.filter(([k]) => k === 'copy'), [], 'nothing half-copied');
+});
+
+test('a framework that predates the standards builder injects the sync machinery alone', () => {
+  const io = standardsIo({});
+  const r = runSync(fakeSnapshot({ federationRaw: CANONICAL_FED_RAW }), {}, io);
+  assert.equal(r.aborted, false, JSON.stringify(r.stages, null, 2));
+  assert.ok(!io.calls.some(([k, , to]) => k === 'copy' && String(to).includes('scripts/lib/')));
+  assert.doesNotMatch(r.stages.find((s) => s.id === 'inject-machinery').detail, /standards generator/);
+});
+
+test('against real repositories, the vendored generator lands committed and loads in the instance with no packages', () => {
+  const instance = makeInstance({
+    frameworkVersion: '0.6',
+    remotes: { upstream: 'https://github.com/regen-coordination/org-os-template.git' },
+  });
+  const upstreamRepo = mkdtempSync(path.join(tmpdir(), 'doctor-upstream-'));
+  const frameworkDir = mkdtempSync(path.join(tmpdir(), 'doctor-framework-'));
+  try {
+    writeFileSync(path.join(upstreamRepo, 'README.md'), '# framework\n');
+    git(upstreamRepo, ['init', '--quiet', '--initial-branch=main']);
+    git(upstreamRepo, ['config', 'user.email', 'fixture@org-os.test']);
+    git(upstreamRepo, ['config', 'user.name', 'org-os fixture']);
+    git(upstreamRepo, ['add', '.']);
+    git(upstreamRepo, ['commit', '--quiet', '-m', 'framework: initial']);
+
+    // The framework stand-in: sync machinery, and the REAL standards builder with the modules it imports.
+    mkdirSync(path.join(frameworkDir, 'scripts'), { recursive: true });
+    for (const rel of ['scripts/sync-upstream.mjs', 'scripts/migrate.mjs']) writeFileSync(path.join(frameworkDir, rel), '// the real thing\n');
+    const { files } = standardsVendorSet(diskSource(ORG_ROOT));
+    for (const rel of [...files.map((f) => f.from), 'packages/admin/lib/standards/index.mjs', 'packages/admin/lib/standards/validate.mjs']) {
+      mkdirSync(path.dirname(path.join(frameworkDir, rel)), { recursive: true });
+      copyFileSync(path.join(ORG_ROOT, rel), path.join(frameworkDir, rel));
+    }
+
+    const snapshot = {
+      dir: instance,
+      name: 'Acme Co',
+      federation: { metadata: { framework_version: '0.6' } },
+      federationRaw: readFileSync(path.join(instance, 'federation.yaml'), 'utf-8'),
+      packageJson: JSON.parse(readFileSync(path.join(instance, 'package.json'), 'utf-8')),
+      packageJsonRaw: readFileSync(path.join(instance, 'package.json'), 'utf-8'),
+      versionMd: null,
+      git: { isRepo: true, remotes: { upstream: 'https://github.com/regen-coordination/org-os-template.git' }, dirtyCount: 0 },
+      machinery: {},
+      framework: { dir: frameworkDir, version: '0.6.0', headSha: 'f'.repeat(40) },
+    };
+    const io = {
+      ...realIo,
+      run: () => ({ ok: true, out: 'stubbed' }),
+      reassess: () => ({ status: 'OK', summary: { blockers: 0, warnings: 0, checks: 6 } }),
+      today: () => '2026-10-29',
+    };
+    const result = runSync(snapshot, { upstreamUrl: upstreamRepo }, io);
+    assert.equal(result.aborted, false, JSON.stringify(result.stages, null, 2));
+
+    const commit = git(instance, ['log', '--format=%H', '--grep', 'install framework sync machinery']).split('\n')[0];
+    assert.ok(commit, 'the machinery commit exists');
+    const committed = git(instance, ['show', '--name-only', '--format=', commit]).split('\n');
+    for (const f of files) {
+      assert.ok(committed.includes(f.to), `${f.to} is in the machinery commit`);
+      assert.equal(readFileSync(path.join(instance, f.to), 'utf-8'), readFileSync(path.join(ORG_ROOT, f.from), 'utf-8'));
+    }
+    assert.equal(existsSync(path.join(instance, 'scripts', 'lib', 'standards', 'index.mjs')), false);
+    assert.equal(existsSync(path.join(instance, 'scripts', 'lib', 'standards', 'validate.mjs')), false);
+
+    // The closure is complete: the core and the loader import in the instance, which has no node_modules at all.
+    const load = realIo.run('node', ['--input-type=module', '-e',
+      "const b = await import('./scripts/lib/standards/build.mjs'); const l = await import('./scripts/lib/standards/load.mjs');" +
+      "console.log(typeof b.buildCore, typeof b.planWrites, typeof l.loadStandardsInput)"], instance);
+    assert.equal(existsSync(path.join(instance, 'node_modules')), false);
+    assert.ok(load.ok, load.out);
+    assert.equal(load.out, 'function function function');
   } finally {
     for (const d of [instance, upstreamRepo, frameworkDir]) rmSync(d, { recursive: true, force: true });
   }

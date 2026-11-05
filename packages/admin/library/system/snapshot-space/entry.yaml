@@ -1,0 +1,28 @@
+id: system:snapshot-space
+shelf: system
+title: Snapshot space
+summary: The org's Snapshot space, as a framed link. The platform does not read its votes.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [governance]
+  domain: [decisions]
+  audience: [member]
+  maturity: raw
+related: [system:link]
+config:
+  properties:
+    id: { type: string, default: snapshot-space, description: The id the org will call it by. }
+    name: { type: string, description: What it is called here. }
+    url: { type: string, description: The address of the space. }
+  required: [id, name, url]
+installs:
+  - op: create
+    record: "systems:${config.id}"
+    value:
+      id: "${config.id}"
+      name: "${config.name}"
+      url: "${config.url}"
+      kind: snapshot-space

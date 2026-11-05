@@ -12,26 +12,73 @@
     "type",
     "duration_minutes"
   ],
+  "x-groups": [
+    {
+      "label": "What it was",
+      "fields": [
+        "title",
+        "type",
+        "date",
+        "duration_minutes"
+      ]
+    },
+    {
+      "label": "Who",
+      "fields": [
+        "participants"
+      ]
+    },
+    {
+      "label": "What came of it",
+      "fields": [
+        "summary",
+        "action_items"
+      ],
+      "optional": true
+    }
+  ],
   "properties": {
     "id": {
+      "title": "Id",
+      "description": "A short name, unique in this file.",
       "type": "string",
       "minLength": 1
     },
     "title": {
+      "title": "Title",
+      "description": "What the meeting was, in a few words.",
       "type": [
         "string",
         "null"
       ]
     },
     "date": {
+      "title": "Date",
+      "description": "When it was: a date, or a date and a time.",
       "type": [
         "string",
         "null"
       ],
-      "format": "date"
+      "anyOf": [
+        {
+          "format": "date"
+        },
+        {
+          "format": "date-time"
+        }
+      ],
+      "$comment": "A date, or a date and time (an instance may record the start time)."
     },
     "type": {
-      "enum": [
+      "title": "Kind",
+      "description": "What sort of meeting it was.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "$comment": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "sync",
         "assembly",
         "workshop",
@@ -40,6 +87,8 @@
       ]
     },
     "participants": {
+      "title": "Participants",
+      "description": "Who took part.",
       "type": [
         "array",
         "null"
@@ -49,48 +98,93 @@
       }
     },
     "duration_minutes": {
+      "title": "Length",
+      "description": "How long it lasted, in minutes.",
       "type": [
         "number",
         "null"
       ]
     },
     "recording_url": {
+      "title": "Recording",
+      "description": "A link to the recording.",
       "type": [
         "string",
         "null"
       ]
     },
     "transcript_path": {
+      "title": "Transcript",
+      "description": "Where the transcript is kept, as a path in the repository.",
       "type": [
         "string",
         "null"
       ]
     },
     "summary": {
+      "title": "Summary",
+      "description": "What happened, in a few sentences.",
+      "x-format": "textarea",
       "type": [
         "string",
         "null"
       ]
     },
     "decisions": {
+      "title": "Decisions",
+      "description": "What was decided.",
       "type": [
         "array",
         "null"
       ],
       "items": {
-        "type": "string"
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
       }
     },
     "action_items": {
+      "title": "Action items",
+      "description": "Who does what, by when.",
       "type": [
         "array",
         "null"
       ],
       "items": {
-        "type": "object"
+        "title": "Action item",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ],
+        "properties": {
+          "task": {
+            "title": "Task"
+          },
+          "assignee": {
+            "title": "Who"
+          },
+          "due": {
+            "title": "By",
+            "x-format": "date"
+          },
+          "status": {
+            "title": "Status"
+          }
+        }
       }
     },
     "tags": {
+      "title": "Tags",
+      "description": "Words to find it by.",
       "type": [
         "array",
         "null"

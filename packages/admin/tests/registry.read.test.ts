@@ -22,7 +22,7 @@ describe('readRegistry', () => {
     const reg = readRegistry(repo, 'projects')
     expect(reg.kind).toBe('collection')
     expect(reg.entries).toHaveLength(1)
-    expect(reg.entries![0]).toMatchObject({ id: 'proj-001', lead: 'luiz' })
+    expect(reg.entries![0]).toMatchObject({ id: 'proj-001', lead: 'steward-a' })
   })
   it('reads a document registry as an object', () => {
     const reg = readRegistry(repo, 'finances')

@@ -138,14 +138,34 @@ for (const file of optionalDataFiles) {
 // --- 4. .well-known/ Schemas ---
 console.log('\n4. .well-known/ Schemas');
 
+// Every file required here is standards output, derived by generate:schemas (DAO-OS L8: the builder's
+// STANDARD_FILES). Every id in it is built from identity.daoURI, so with no daoURI the generator writes nothing
+// (L8-C16) and none of them is required; never a placeholder daoURI, which would publish a fake host. With a
+// daoURI, they are. A federation.yaml that cannot be read keeps the requirement (section 6 reports it).
 const expectedSchemas = [
   'dao.json',
   'members.json',
   'projects.json',
 ];
 
-for (const file of expectedSchemas) {
-  check(`.well-known/${file} exists`, fileExists(`.well-known/${file}`));
+let daoURISet = true;
+if (fileExists('federation.yaml')) {
+  try {
+    const daoURI = loadYaml(readFileSync(join(rootDir, 'federation.yaml'), 'utf-8'))?.identity?.daoURI;
+    daoURISet = typeof daoURI === 'string' && daoURI.trim() !== '';
+  } catch {
+    daoURISet = true;
+  }
+} else {
+  daoURISet = false;
+}
+
+if (daoURISet) {
+  for (const file of expectedSchemas) {
+    check(`.well-known/${file} exists`, fileExists(`.well-known/${file}`));
+  }
+} else {
+  console.log(`  · standards output not generated: identity.daoURI is not set (L8-C16), so .well-known/${expectedSchemas.join(', ')} are not required`);
 }
 
 // Check schemas are valid JSON
