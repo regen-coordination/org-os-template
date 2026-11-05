@@ -760,10 +760,12 @@ const reachableByOp = (file) => STAGED.has(/^data\/([^/]+)\.yaml$/.exec(file)?.[
 // ── Merges with no Org-Proposal (P2 spec §3.10 H3, M-e, M-1; §3.12) ──────────
 const FILES = { governance: 'data/governance.yaml', members: 'data/members.yaml', systems: 'data/systems.yaml', proposals: LEDGER };
 const FORMAT = '--format=%x1e%H%x1f%P%x1f%ae%x1f%cI%x1f%s%x1f%B%x1f';
-/** `git log --first-parent -m --name-only` in FORMAT, as commits: the files are each one's change against its first parent. */
+/** `git log --first-parent -m --name-only` in FORMAT, as commits: the files are each one's change against its first parent.
+ *  The date is %cI written one way: git 2.5x prints UTC as `Z` where older git printed `+00:00`, and the
+ *  findings quote it, so the same history reads the same under either. */
 const commitsOf = (text) => text.split('\x1e').slice(1).map((record) => {
   const [hash, parents, email, date, subject, body, rest] = record.split('\x1f');
-  return { hash, parents: parents.split(' ').filter(Boolean), email: email.trim(), date, subject, message: body, files: rest.split('\n').map((f) => f.trim()).filter(Boolean) };
+  return { hash, parents: parents.split(' ').filter(Boolean), email: email.trim(), date: date.replace(/Z$/, '+00:00'), subject, message: body, files: rest.split('\n').map((f) => f.trim()).filter(Boolean) };
 });
 /** The texts of git's blobs, by blob id: one read for each file however many commits share it. */
 const blobs = new Map();
