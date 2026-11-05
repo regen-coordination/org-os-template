@@ -1,0 +1,31 @@
+# The Treasury (L4 spec §14.1): the main Safe's System header is its head (boards/TreasuryHead.tsx); then its
+# balances by chain, the prepared transactions that wait on signers, where its value went in the last 90 days (the
+# Safe's transfers read, C12, Q59: not drawn when nothing moved), and the decisions that moved money. An instance
+# replaces it with a board of id "treasury" in data/boards.yaml.
+id: treasury
+name: Treasury
+audience: members
+layout: flow
+blocks:
+  - id: balances
+    type: balances
+    title: Balances
+    view: { empty: "No balances read yet: the Treasury’s Safe is read from data/systems.yaml." }
+  - id: prepared
+    type: prepared
+    title: Waiting on signers
+    view: { count: title, empty: "No prepared transaction waits on signers." }
+  - id: flow
+    type: fundflow
+    title: Fund flow
+    view: { quiet: true, note: "the last 90 days" }
+  - id: moved
+    type: recently
+    title: Decisions that moved money
+    source: { recently: money }
+    view: { limit: 8, empty: "No decision has moved money yet." }
+  - id: list
+    type: list
+    title: Systems in the treasury
+    source: { section: treasury }
+    view: { switch: true, filter: true, new: true }

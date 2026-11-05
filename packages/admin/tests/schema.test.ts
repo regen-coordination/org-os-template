@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { makeFixtureRepo, removeFixtureRepo } from './fixtures.ts'
 import { loadSchema, validateEntity } from '../server/schema.ts'
 
@@ -21,12 +23,19 @@ describe('validateEntity', () => {
     expect(r.valid).toBe(true)
   })
   it('reports enum violations with a field path', () => {
-    // members.layer is a genuine closed vocabulary. projects.status is NOT:
-    // its enum was removed once real data proved every instance defines its
-    // own lifecycle words (see tests/real-data.test.ts).
-    const r = validateEntity(repo, 'members', { id: 'm2', layer: 'wizard' })
+    // members.status is a closed vocabulary. members.layer is not, since 0.6
+    // (an instance uses words of its own), nor projects.status: real data
+    // proved every instance defines its own words (see tests/real-data.test.ts).
+    const r = validateEntity(repo, 'members', { id: 'm2', status: 'wizard' })
     expect(r.valid).toBe(false)
-    expect(r.errors).toContainEqual(expect.objectContaining({ field: 'layer' }))
+    expect(r.errors).toContainEqual(expect.objectContaining({ field: 'status' }))
+  })
+  it('accepts an instance-defined member layer', () => {
+    expect(validateEntity(repo, 'members', { id: 'm3', layer: 'dao-global' }).valid).toBe(true)
+  })
+  it('a warning never refuses a save', () => {
+    expect(validateEntity(repo, 'systems', { id: 's1', kind: 'notion-db', name: 'Notes', url: 'https://notion.example/x' }))
+      .toEqual({ valid: true, errors: [] })
   })
   it('accepts an instance-defined project status', () => {
     const r = validateEntity(repo, 'projects', { id: 'p3', status: 'Discovery' })
@@ -50,5 +59,19 @@ describe('validateEntity', () => {
     // fixture has no funding-opportunities.yaml
     const r = validateEntity(repo, 'projects', { id: 'p2', status: 'idea', funding_source: 'fund-001' })
     expect(r.valid).toBe(true)
+  })
+})
+
+describe('the ids a write is checked against', () => {
+  it('never hold "undefined" or "": an entry with no id is not an id', () => {
+    const own = makeFixtureRepo()
+    try {
+      writeFileSync(join(own, 'data', 'members.yaml'), 'members:\n  - name: "No id"\n  - id: ""\n    name: "Empty id"\n  - id: "ana"\n')
+      expect(validateEntity(own, 'projects', { id: 'p9', status: 'idea', lead: 'undefined' }).errors)
+        .toContainEqual({ field: 'lead', message: 'no member with id "undefined" in members' })
+      expect(validateEntity(own, 'projects', { id: 'p9', status: 'idea', lead: '' }).errors)
+        .toContainEqual({ field: 'lead', message: 'no member with id "" in members' })
+      expect(validateEntity(own, 'projects', { id: 'p9', status: 'idea', lead: 'ana' }).valid).toBe(true)
+    } finally { removeFixtureRepo(own) }
   })
 })

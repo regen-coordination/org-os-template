@@ -1,0 +1,66 @@
+/* The plate (design pass, spec 2026-11-04 §1): an empty place that says what goes here. A dashed raised surface, flat;
+   on its own width two columns (the words, then the example), one under 640px of it. The example is greyed, marked
+   "example" and hidden from assistive tech; the file is a footnote. Every value a token; dark from the skin. Forced colours keep every rule and the dashed edge (a border takes the system's text colour). */
+.plate { container: plate / inline-size; min-width: 0; padding: var(--sp-12); background: var(--raised);
+  border: var(--rule-w) dashed var(--rule-strong); border-radius: var(--radius-lg); }
+.plate-in { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-12); min-width: 0; }
+.plate-main { display: grid; justify-items: start; align-content: start; gap: var(--sp-8); min-width: 0; }
+@container plate (min-width: 640px) {
+  .plate-wide { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
+}
+.plate-tag { margin: 0; font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.plate-t { margin: 0; font: var(--fw-regular) var(--fs-d-card)/var(--lh-title) var(--display); font-variation-settings: "SOFT" var(--soft);
+  letter-spacing: var(--ls-title); text-wrap: balance; overflow-wrap: anywhere; }
+.plate-l { margin: 0; max-inline-size: var(--w-prose); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--mute); overflow-wrap: anywhere; }
+.plate-l .vis-field { vertical-align: baseline; }
+.plate-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+.plate-a { font-size: var(--fs-meta); color: var(--mute); text-underline-offset: var(--sp-3); }
+@media (hover: hover) { .plate-a:hover { color: var(--ink); } }
+
+/* the first steps: a number in a --wash disc, the step, its line in faint */
+.plate-steps { display: grid; gap: var(--sp-6); margin: 0; padding: 0; list-style: none; }
+.plate-steps > li { display: grid; grid-template-columns: var(--h-ktile) minmax(0, 1fr); gap: var(--sp-7); align-items: start; }
+.plate-n { display: grid; place-items: center; inline-size: var(--h-ktile); block-size: var(--h-ktile); border-radius: var(--radius-chip);
+  background: var(--wash); color: var(--mute); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--mono); font-variant-numeric: tabular-nums; }
+.plate-s { display: grid; gap: var(--sp-2); min-width: 0; font-size: var(--fs-body); line-height: var(--lh-row); }
+.plate-s-t { color: var(--ink); }
+.plate-s-l { font-size: var(--fs-meta); color: var(--faint); }
+
+/* What a good entry looks like: the first example as field rows, said to be an example */
+.plate-good { display: grid; gap: var(--sp-5); inline-size: 100%; }
+.plate-good-t { margin: 0; font-size: var(--fs-meta); color: var(--faint); }
+
+/* the example and the footnote */
+.plate-side { display: grid; align-content: start; gap: var(--sp-6); min-width: 0; }
+.plate-ex { min-width: 0; overflow: hidden; background: var(--paper); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); }
+.plate-ex-h { display: flex; justify-content: space-between; gap: var(--sp-6); padding: var(--sp-7) var(--sp-8); border-block-end: var(--rule-w) solid var(--rule);
+  font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.plate-ex-tag { padding: var(--sp-2) var(--sp-5); border: var(--rule-w) dashed var(--rule-strong); border-radius: var(--radius-chip); }
+.plate-ex-r { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .8fr); gap: var(--sp-7); padding: var(--sp-7) var(--sp-8);
+  border-block-start: var(--rule-w) solid var(--rule); font-size: var(--fs-meta); color: var(--faint); }
+.plate-ex-h + .plate-ex-r { border-block-start: 0; }
+.plate-ex-r > span { min-width: 0; overflow-wrap: anywhere; }
+.plate-ex-1 { color: var(--mute); }
+.plate-ex-3 { text-align: end; font-family: var(--font-data); font-variant-numeric: var(--data-nums); }
+/* on a phone's width the example keeps its title and its end */
+@container plate (max-width: 420px) {
+  .plate-in { gap: var(--sp-10); }
+  .plate-ex-r { grid-template-columns: minmax(0, 1fr) auto; }
+  .plate-ex-2 { display: none; }
+}
+.plate-foot { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--faint); overflow-wrap: anywhere; }
+.plate-foot code { font-family: var(--mono); font-size: var(--fs-code); color: var(--mute); }
+.plate .note-error code { font-family: var(--mono); font-size: var(--fs-code); }
+
+/* Import from a sheet (spec 2026-11-04 §1c): the sheet's paste box, its file field and the preview. The whole body
+   takes a drop; while a file is held over it, its edge goes dashed (a border: forced colours keep it). */
+.imp { display: grid; gap: var(--sp-8); min-width: 0; padding: var(--sp-2); border: var(--rule-w) dashed transparent; border-radius: var(--radius); }
+.imp-over { border-color: var(--rule-strong); background: var(--wash); }
+.imp-l { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); overflow-wrap: anywhere; }
+.imp-f { display: grid; gap: var(--sp-3); min-width: 0; }
+.imp-fl { font-size: var(--fs-meta); font-weight: var(--fw-medium); color: var(--ink); }
+.imp-text { font: var(--fs-meta)/var(--lh-row) var(--mono); }
+.imp-preview { display: grid; gap: var(--sp-6); min-width: 0; }
+.imp-t { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); }
+.imp-problems { margin: 0; padding: 0; list-style: none; color: var(--attn); white-space: normal; }
+.imp-sum { font-variant-numeric: tabular-nums; } /* the preview's count of ready and held rows */

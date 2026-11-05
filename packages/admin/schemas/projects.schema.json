@@ -14,24 +14,62 @@
     "started",
     "target_completion"
   ],
+  "x-groups": [
+    {
+      "label": "What it is",
+      "fields": [
+        "title",
+        "description",
+        "type"
+      ]
+    },
+    {
+      "label": "Who",
+      "fields": [
+        "lead",
+        "contributors"
+      ]
+    },
+    {
+      "label": "Where it stands",
+      "fields": [
+        "status",
+        "started",
+        "target_completion"
+      ]
+    },
+    {
+      "label": "Milestones",
+      "fields": [
+        "milestones"
+      ],
+      "optional": true
+    }
+  ],
   "properties": {
     "id": {
+      "title": "Id",
+      "description": "A short name, unique in this file.",
       "type": "string",
       "minLength": 1
     },
     "title": {
+      "title": "Title",
+      "description": "What people call it.",
       "type": [
         "string",
         "null"
       ]
     },
     "status": {
+      "title": "Status",
+      "description": "Where it stands today. You move it along as it grows.",
       "type": [
         "string",
         "null"
       ],
       "minLength": 1,
-      "description": "Lifecycle stage. DATA-MODEL suggests idea -> develop -> execute -> archive, but the vocabulary is instance-defined and real instances differ (this repo uses Discovery/Develop; regen-coordination uses Develop/Execute/Integrate; refi-dao uses Backlog/Planning/In Progress/Ongoing/Done/Icebox). Not an enum: a hardcoded one rejected every project in every instance checked.",
+      "$comment": "Lifecycle stage. DATA-MODEL suggests idea -> develop -> execute -> archive, but the vocabulary is instance-defined and real instances differ (Discovery/Develop in one; Develop/Execute/Integrate in another; Backlog/Planning/In Progress/Ongoing/Done/Icebox in a third). Not an enum: a hardcoded one rejected every project in every instance checked.",
       "examples": [
         "idea",
         "develop",
@@ -40,12 +78,14 @@
       ]
     },
     "type": {
+      "title": "Kind",
+      "description": "Its shape: a programme, a project, a workstream, an experiment.",
       "type": [
         "string",
         "null"
       ],
       "minLength": 1,
-      "description": "Project shape. Instance-defined; DATA-MODEL suggests the examples below.",
+      "$comment": "Project shape. Instance-defined; DATA-MODEL suggests the examples below.",
       "examples": [
         "program",
         "initiative",
@@ -54,12 +94,16 @@
       ]
     },
     "lead": {
+      "title": "Lead",
+      "description": "The person accountable for it.",
       "type": [
         "string",
         "null"
       ]
     },
     "contributors": {
+      "title": "Contributors",
+      "description": "Who else works on it.",
       "type": [
         "array",
         "null"
@@ -69,6 +113,8 @@
       }
     },
     "started": {
+      "title": "Started",
+      "description": "When the work began.",
       "type": [
         "string",
         "null"
@@ -76,6 +122,8 @@
       "format": "date"
     },
     "target_completion": {
+      "title": "Aim to finish",
+      "description": "When it should be done, if there is a date.",
       "type": [
         "string",
         "null"
@@ -83,21 +131,41 @@
       "format": "date"
     },
     "description": {
+      "title": "Summary",
+      "description": "What it is, in a sentence or two.",
+      "x-format": "textarea",
       "type": [
         "string",
         "null"
       ]
     },
     "milestones": {
+      "title": "Milestones",
+      "description": "Steps on the way, each with a date.",
       "type": [
         "array",
         "null"
       ],
       "items": {
-        "type": "object"
+        "title": "Milestone",
+        "type": "object",
+        "properties": {
+          "title": {
+            "title": "What"
+          },
+          "date": {
+            "title": "When",
+            "x-format": "date"
+          },
+          "status": {
+            "title": "Status"
+          }
+        }
       }
     },
     "related_ideas": {
+      "title": "Ideas",
+      "description": "The ideas it grew from or carries forward.",
       "type": [
         "array",
         "null"
@@ -107,18 +175,25 @@
       }
     },
     "funding_source": {
+      "title": "Funding source",
+      "description": "The funding opportunity that pays for it.",
       "type": [
         "string",
         "null"
       ]
     },
     "tags": {
+      "title": "Tags",
+      "description": "Words to find it by.",
       "type": [
         "array",
         "null"
       ],
       "items": {
-        "type": "string"
+        "type": [
+          "string",
+          "number"
+        ]
       }
     }
   },

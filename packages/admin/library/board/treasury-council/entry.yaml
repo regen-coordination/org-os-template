@@ -1,0 +1,48 @@
+id: board:treasury-council
+shelf: board
+title: Treasury & council
+summary: One Safe, what waits on signers, runway, the council's open items.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [treasury]
+  domain: [operations]
+  audience: [steward]
+  maturity: raw
+requires:
+  - system-kind:safe
+related: [system:safe, rules:treasury-safe]
+config:
+  properties:
+    system: { type: string, default: treasury-safe, description: The id, in data/systems.yaml, of the Safe it reads. }
+  required: [system]
+installs:
+  - op: create
+    record: boards:treasury-council
+    value:
+      id: treasury-council
+      name: Treasury & council
+      audience: members
+      layout: grid
+      blocks:
+        - { id: safe, type: system, title: The Safe, source: { system: "${config.system}" }, place: { col: 1, span: 7, row: 1 } }
+        - id: threshold
+          type: metric
+          title: Signers needed
+          source: { system: "${config.system}", fact: threshold }
+          view: { label: signers needed }
+          place: { col: 8, span: 5, row: 1 }
+        - id: needs
+          type: list
+          title: Needs you
+          source: { where: { needs: { not: 2 } }, sort: "needs, changed" }
+          view: { empty: Nothing needs you. }
+          place: { col: 1, span: 6, row: 2 }
+        - id: treasury
+          type: list
+          title: Treasury
+          source: { section: treasury }
+          view: { filter: true }
+          place: { col: 7, span: 6, row: 2 }

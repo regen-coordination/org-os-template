@@ -45,7 +45,7 @@ test('contribution-record carries the source_system_reciprocity hook (K5)', () =
   assert.ok('source_system_reciprocity' in s.fields, 'reciprocity hook present');
   const ok = validateObject('contribution-record', {
     title: 'added Gitcoin source-system card', type: 'contribution-record',
-    contributor: 'luiz', what: 'source-system card', where_it_appears: 'data/source-systems.yaml',
+    contributor: 'steward-a', what: 'source-system card', where_it_appears: 'data/source-systems.yaml',
     labor_kind: 'capture',
   });
   assert.equal(ok.valid, true, ok.errors.join('; '));

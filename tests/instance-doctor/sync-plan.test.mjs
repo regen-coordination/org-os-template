@@ -197,6 +197,8 @@ test('the plan runs the stages in the order the masterplan specifies', () => {
       // paths in instead. See packages/instance-doctor/src/overlay.mjs.
       'overlay',
       'migrate',
+      // DAO-OS L8 (Q55): keeps today's publication when data/visibility.yaml is absent.
+      'declare-visibility',
       'generate-schemas',
       're-assess',
       'receipt',
@@ -248,11 +250,21 @@ test('the migrate stage announces the cross-scheme re-stamp it will perform', ()
   assert.match(stage.detail, /0\.5/);
 });
 
+test('the migrate stage names the target it migrates to', () => {
+  const stage = planSync(baseSnapshot()).find((s) => s.id === 'migrate');
+  assert.match(stage.detail, /scripts\/migrate\.mjs <instance> --target 0\.5\.0/);
+});
+
 test('the plan lists exactly the machinery files it will inject', () => {
   const stage = planSync(baseSnapshot()).find((s) => s.id === 'inject-machinery');
   assert.match(stage.detail, /sync-upstream\.mjs/);
   assert.match(stage.detail, /validate-identity\.mjs/);
   assert.match(stage.detail, /doctor\.mjs/);
+});
+
+test('the plan says the standards generator is vendored into scripts/lib/ with the machinery', () => {
+  const stage = planSync(baseSnapshot()).find((s) => s.id === 'inject-machinery');
+  assert.match(stage.detail, /vendor the standards generator into scripts\/lib\/ \(packages\/admin\/lib\/standards\/ less index\.mjs and validate\.mjs, and every module they import\)/);
 });
 
 // --- the receipt ---------------------------------------------------------

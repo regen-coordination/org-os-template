@@ -1,0 +1,28 @@
+id: system:repo
+shelf: system
+title: Code repository
+summary: The org's code repository, as a framed link. The platform does not read it.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [knowledge]
+  domain: [operations]
+  audience: [member]
+  maturity: raw
+related: [system:link]
+config:
+  properties:
+    id: { type: string, default: repo, description: The id the org will call it by. }
+    name: { type: string, description: What it is called here. }
+    url: { type: string, description: The address of the repository. }
+  required: [id, name, url]
+installs:
+  - op: create
+    record: "systems:${config.id}"
+    value:
+      id: "${config.id}"
+      name: "${config.name}"
+      url: "${config.url}"
+      kind: repo

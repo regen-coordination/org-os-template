@@ -1,0 +1,13 @@
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    { "tokenAddress": null, "token": null, "balance": "10000000000000000000" },
+    {
+      "tokenAddress": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "token": { "name": "Celo Dollar", "symbol": "cUSD", "decimals": 18, "logoUri": "https://safe-transaction-assets.safe.global/tokens/logos/0x765DE816845861e75A25fCA122bb6898B8B1282a.png" },
+      "balance": "2500000000000000000"
+    }
+  ]
+}

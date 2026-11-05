@@ -1,0 +1,33 @@
+{
+  "$id": "orgos://registry/visibility",
+  "type": "object",
+  "additionalProperties": false,
+  "x-order": ["collections", "defaults"],
+  "properties": {
+    "collections": {
+      "type": ["object", "null"],
+      "description": "Per registry name: the level its records have in git (default: public or members; `level` is read as a synonym) and single fields made stricter (fields: public, members, hat:<hat ref> or role:<role id>; a hat or role field's values live in the private store, L5 spec §9.2). A collection not listed is members.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "not": { "required": ["default", "level"] },
+        "properties": {
+          "default": { "enum": ["public", "members"] },
+          "level": { "enum": ["public", "members"] },
+          "fields": {
+            "type": ["object", "null"],
+            "additionalProperties": { "type": "string", "pattern": "^(public|members|hat:.+|role:[a-z][a-z0-9_-]*)$" }
+          }
+        }
+      }
+    },
+    "defaults": {
+      "type": ["object", "null"],
+      "description": "L5's defaults for data kept outside git. They change no git record. contact: the hat or role that keeps contact details (L5 spec §9.2).",
+      "properties": {
+        "contact": { "type": "string", "pattern": "^(hat:.+|role:[a-z][a-z0-9_-]*)$" }
+      },
+      "additionalProperties": { "type": "string", "pattern": "^(public|members|hat:.+|role:[a-z][a-z0-9_-]*)$" }
+    }
+  }
+}

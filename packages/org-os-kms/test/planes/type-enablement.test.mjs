@@ -124,7 +124,7 @@ const sourceSystems = {
     held_prefixes: ['repos/Regenerant-Catalunya/docs/'],
     public_use: 'ok-with-caveat',
   },
-  'lf-work': { title: 'lf-work', url: 'https://github.com/luizfernandosg/lf-work-os', public_use: 'internal-only' },
+  'lf-work': { title: 'lf-work', url: 'https://github.com/example-org/lf-work-os', public_use: 'internal-only' },
 };
 
 /** The card set with the ONE card that claims the object's lineage patched — the card-side rules

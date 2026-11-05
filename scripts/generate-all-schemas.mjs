@@ -1,463 +1,136 @@
 #!/usr/bin/env node
-
 /**
- * Generate all EIP-4824 compliant schemas from operational data
+ * generate-all-schemas.mjs — an instance's .well-known/ from its records (DAO-OS L8): the EIP-4824 documents
+ * (dao.json, members, proposals, activities, contracts), governance.md, DAOIP-5 grant pools and applications, DAOIP-3
+ * attestation issuers, and the org-os extras (meetings, projects, finances, ideas, knowledge). Public records and
+ * fields only, as data/visibility.yaml says: what is not public is counted ("withheld: …"), never written.
+ *
+ * Usage: node scripts/generate-all-schemas.mjs [target-dir]
+ *   target-dir: the instance to generate (default: this script's own checkout)
+ *
+ * The builder is found, in order, at
+ *   1. ../packages/admin/lib/standards/ (the framework: the builder with its schema check), or
+ *   2. ./lib/standards/ (an instance's vendored copy: the same builder, no schema check — no ajv there).
+ * Neither: it refuses (exit 2). It never falls back to 0.6's generator, which published everything.
+ *
+ * Exit codes: 0 written (or nothing to generate: no identity.daoURI — each standard file left in .well-known/ by an
+ * earlier generator is named in a warning, and kept) · 1 nothing written (a withheld value would have
+ * been published, the daoURI is not an https URL, or federation.yaml cannot be read) · 2 cannot run.
+ * It writes the files the builder produced, removes the standard files it did not produce (a pool that is gone, the
+ * live-copy-only applications.json), and touches nothing else under .well-known/ — no template, no other file.
  */
 
-import fs from 'fs';
-import path from 'path';
+import { existsSync, statSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import matter from 'gray-matter';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const arg = process.argv.slice(2).find((a) => !a.startsWith('-'));
+const root = path.resolve(arg ?? path.join(scriptDir, '..'));
+if (!existsSync(root) || !statSync(root).isDirectory()) {
+  console.error(`✗ no such directory: ${root}`);
+  process.exit(2);
+}
 
-// Read federation.yaml to get identity values
-const federationPath = path.join(rootDir, 'federation.yaml');
-const federationRaw = fs.readFileSync(federationPath, 'utf-8');
-const federationContent = yaml.load(federationRaw);
-const daoURI = federationContent?.identity?.daoURI || 'https://org.example.com/.well-known/dao.json';
-// {{BASE_URL}} in .well-known/*.json.template is a bare HOST — the templates
-// own the `https://` scheme. clone-framework.mjs (stage 6c) and
-// setup-org-os.mjs substitute a host too; keep all three in agreement.
-let baseUrl = 'org.example.com';
+// js-yaml's default schema less its timestamps: a date stays the string the record wrote, as with the server's parser.
+const NO_DATES = yaml.CORE_SCHEMA.extend({
+  implicit: [yaml.types.merge],
+  explicit: [yaml.types.binary, yaml.types.omap, yaml.types.pairs, yaml.types.set],
+});
+const parseYaml = (text) => yaml.load(text, { schema: NO_DATES });
+
+const NOTHING = '· nothing generated: identity.daoURI is not set — every id is built from it';
+/** The builder's STANDARD_FILES (lib/standards/build.mjs; a test keeps them equal): named here because without a
+ *  daoURI the builder is not loaded. */
+const STANDARD_FILES = ['dao.json', 'members.json', 'proposals.json', 'activities.json', 'contracts.json', 'governance.md',
+  'grant-pools.json', 'applications.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json',
+  'ideas.json', 'knowledge.json'];
+
+/** Nothing to build (R32): say so, and name each standard file still in .well-known/ — written by an earlier
+ *  generator (0.6), never refreshed now. Nothing is removed: they are the organisation's to keep or delete. */
+function nothingToGenerate() {
+  console.log(NOTHING);
+  for (const f of STANDARD_FILES) {
+    if (existsSync(path.join(root, '.well-known', f))) {
+      console.log(`  ⚠ .well-known/${f}: left by an earlier generator and not refreshed without identity.daoURI; not removed`);
+    }
+  }
+  process.exit(0);
+}
+
+// Without a daoURI there is nothing to build (every id is built from it), with or without a builder.
+let federation;
 try {
-  const daoUrl = new URL(daoURI);
-  baseUrl = daoUrl.host;
-} catch {
-  baseUrl = 'org.example.com';
-}
-const orgName = federationContent?.identity?.name || 'Organization';
-const orgType = federationContent?.identity?.type || 'Organization';
-
-// Read dao.json to get organization info
-const daoJsonPath = path.join(rootDir, '.well-known', 'dao.json');
-let daoJson = {};
-if (fs.existsSync(daoJsonPath)) {
-  daoJson = JSON.parse(fs.readFileSync(daoJsonPath, 'utf-8'));
-}
-
-console.log('Generating EIP-4824 schemas...');
-
-// Generate dao.json from .well-known/dao.json.template + federation identity
-function generateDao() {
-  const templatePath = path.join(rootDir, '.well-known', 'dao.json.template');
-  const outputPath = path.join(rootDir, '.well-known', 'dao.json');
-
-  if (!fs.existsSync(templatePath)) {
-    return;
-  }
-
-  // Only render when the identity block provides a daoURI — without it there is
-  // no real base URL, and rendering would overwrite a hand-curated dao.json
-  // with example.com placeholders.
-  if (!federationContent?.identity?.daoURI) {
-    console.log('· Skipped dao.json (identity.daoURI not set — keeping existing file)');
-    return;
-  }
-
-  // The canonical field is `short_description` (see clone-framework.mjs,
-  // render-templates.mjs, and the genesis config) — `description` is kept as a
-  // fallback so a manifest using either spelling isn't silently dropped. This
-  // key used to read `identity.description` only, which is never set by any
-  // generator, so the boilerplate fallback always fired — invisibly, because
-  // generateDao() early-returns until an instance sets identity.daoURI. Found
-  // 2026-09-16 during a PersonalNode instance activation: setting daoURI for the
-  // first time surfaced that the crafted short_description was being silently
-  // replaced by generic boilerplate in the published dao.json.
-  const description =
-    federationContent?.identity?.short_description ||
-    federationContent?.identity?.description ||
-    `${orgName} operational identity surface for governance, members, projects, and coordination.`;
-  let template = fs.readFileSync(templatePath, 'utf-8');
-  template = template.replace(/{{ORGANIZATION_NAME}}/g, orgName);
-  template = template.replace(/{{ORGANIZATION_DESCRIPTION}}/g, description);
-  template = template.replace(/{{BASE_URL}}/g, baseUrl);
-
-  const generated = JSON.parse(template);
-  generated.type = orgType;
-  fs.writeFileSync(outputPath, JSON.stringify(generated, null, 2));
-  console.log('✓ Generated dao.json');
-}
-
-// Generate members.json
-function generateMembers() {
-  const membersPath = path.join(rootDir, 'data', 'members.yaml');
-  if (!fs.existsSync(membersPath)) {
-    return;
-  }
-
-  const membersData = yaml.load(fs.readFileSync(membersPath, 'utf-8'));
-  const members = (membersData?.members || []).map(m => ({
-    id: m.id
-  }));
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "DAO",
-    "members": members
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'members.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log('✓ Generated members.json');
-}
-
-// Generate meetings.json
-function generateMeetings() {
-  const meetingsYamlPath = path.join(rootDir, 'data', 'meetings.yaml');
-  const meetingsDir = path.join(rootDir, 'content', 'meetings');
-
-  const meetings = [];
-
-  if (fs.existsSync(meetingsYamlPath)) {
-    const meetingsData = yaml.load(fs.readFileSync(meetingsYamlPath, 'utf-8'));
-    if (Array.isArray(meetingsData?.meetings)) {
-      meetings.push(...meetingsData.meetings);
-    }
-  }
-
-  const files = fs.existsSync(meetingsDir)
-    ? fs.readdirSync(meetingsDir).filter(f => f.endsWith('.md'))
-    : [];
-
-  for (const file of files) {
-    const filePath = path.join(meetingsDir, file);
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const { data } = matter(content);
-
-    if (!data.id) continue;
-
-    // Extract action items from content
-    const actionItems = [];
-    const actionItemRegex = /- \[ \] (.+?)(?: \(@([A-Za-z0-9:_.\/-]+)(?:, due: (\d{4}-\d{2}-\d{2}))?\))?(?: #([A-Za-z0-9:_./-]+))?/g;
-    let match;
-    while ((match = actionItemRegex.exec(content)) !== null) {
-      actionItems.push({
-        id: match[4] || `action-${actionItems.length + 1}`,
-        description: match[1],
-        assignee: match[2] || null,
-        status: "pending",
-        dueDate: match[3] || null
-      });
-    }
-
-    // Extract decisions
-    const decisions = [];
-    const decisionRegex = /- \[ \] (.+?)(?: #([A-Za-z0-9:_./-]+))?/g;
-    const decisionsSection = content.match(/## Decisions\s+([\s\S]*?)(?=##|$)/);
-    if (decisionsSection) {
-      let decisionMatch;
-      while ((decisionMatch = decisionRegex.exec(decisionsSection[1])) !== null) {
-        decisions.push({
-          id: decisionMatch[2] || `decision-${decisions.length + 1}`,
-          description: decisionMatch[1],
-          consensus: false
-        });
-      }
-    }
-
-    meetings.push({
-      id: data.id,
-      type: data.type || "meeting",
-      title: data.title || file.replace('.md', ''),
-      date: data.date || new Date().toISOString(),
-      participants: data.participants || [],
-      status: data.status || "planned",
-      agenda: `https://${baseUrl}/meetings/${data.id}#agenda`,
-      notes: `https://${baseUrl}/meetings/${data.id}`,
-      decisions: decisions,
-      actionItems: actionItems
-    });
-  }
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "MeetingRegistry",
-    "meetings": meetings
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'meetings.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log(`✓ Generated meetings.json (${meetings.length} meetings)`);
-}
-
-// Generate projects.json
-function generateProjects() {
-  const projectsDir = path.join(rootDir, 'content', 'projects');
-  const projectsYamlPath = path.join(rootDir, 'data', 'projects.yaml');
-  
-  const projects = [];
-
-  // Read from YAML file
-  if (fs.existsSync(projectsYamlPath)) {
-    const projectsData = yaml.load(fs.readFileSync(projectsYamlPath, 'utf-8'));
-    if (projectsData?.projects) {
-      projects.push(...projectsData.projects);
-    }
-  }
-
-  // Read from markdown files
-  if (fs.existsSync(projectsDir)) {
-    const files = fs.readdirSync(projectsDir).filter(f => f.endsWith('.md'));
-    
-    for (const file of files) {
-      const filePath = path.join(projectsDir, file);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const { data } = matter(content);
-
-      if (!data.id) continue;
-
-      // Extract tasks
-      const tasks = [];
-      const taskRegex = /- \[ \] (.+?)(?: \(@([A-Za-z0-9:_.\/-]+)\))?(?: #([A-Za-z0-9:_./-]+))?/g;
-      let taskMatch;
-      while ((taskMatch = taskRegex.exec(content)) !== null) {
-        tasks.push({
-          id: taskMatch[3] || `task-${tasks.length + 1}`,
-          description: taskMatch[1],
-          assignee: taskMatch[2] || null,
-          status: "todo",
-          priority: "medium"
-        });
-      }
-
-      // Extract milestones
-      const milestones = [];
-      const milestoneRegex = /- \[ \] (.+?) \(due: (\d{4}-\d{2}-\d{2})\)(?: #([A-Za-z0-9:_./-]+))?/g;
-      const milestonesSection = content.match(/### Milestones\s+([\s\S]*?)(?=###|$)/);
-      if (milestonesSection) {
-        let milestoneMatch;
-        while ((milestoneMatch = milestoneRegex.exec(milestonesSection[1])) !== null) {
-          milestones.push({
-            id: milestoneMatch[3] || `milestone-${milestones.length + 1}`,
-            title: milestoneMatch[1],
-            status: "pending",
-            dueDate: milestoneMatch[2]
-          });
-        }
-      }
-
-      projects.push({
-        id: data.id,
-        type: data.type || "project",
-        name: data.name || file.replace('.md', ''),
-        description: data.description || '',
-        status: data.status || "Integrate",
-        lead: data.lead || null,
-        members: data.members || [],
-        startDate: data.startDate || null,
-        endDate: data.endDate || null,
-        milestones: milestones,
-        tasks: tasks,
-        budget: data.budget || null,
-        relatedProposals: data.relatedProposals || []
-      });
-    }
-  }
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "ProjectRegistry",
-    "projects": projects
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'projects.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log(`✓ Generated projects.json (${projects.length} projects)`);
-}
-
-// Generate finances.json
-function generateFinances() {
-  const financesPath = path.join(rootDir, 'data', 'finances.yaml');
-  if (!fs.existsSync(financesPath)) {
-    return;
-  }
-
-  const financesData = yaml.load(fs.readFileSync(financesPath, 'utf-8'));
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "FinancialRegistry",
-    "budgets": financesData?.budgets || [],
-    "expenses": financesData?.expenses || [],
-    "revenues": financesData?.revenues || []
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'finances.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log(`✓ Generated finances.json`);
-}
-
-// Generate proposals.json
-function generateProposals() {
-  const govPath = path.join(rootDir, 'data', 'governance.yaml');
-  let decisions = [];
-
-  if (fs.existsSync(govPath)) {
-    const govData = yaml.load(fs.readFileSync(govPath, 'utf-8'));
-    decisions = (govData?.governance?.decisions || []).map(d => ({
-      id: d.id,
-      title: d.title,
-      type: d.type || "proposal",
-      status: d.status || "draft",
-      date: d.date || null,
-      summary: d.summary || ""
-    }));
-  }
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "ProposalRegistry",
-    "proposals": decisions
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'proposals.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log(`✓ Generated proposals.json (${decisions.length} proposals)`);
-}
-
-// Generate activities.json
-function generateActivities() {
-  const activities = [];
-
-  // Pull from meetings
-  const meetingsPath = path.join(rootDir, 'data', 'meetings.yaml');
-  if (fs.existsSync(meetingsPath)) {
-    const meetingsData = yaml.load(fs.readFileSync(meetingsPath, 'utf-8'));
-    for (const m of (meetingsData?.meetings || []).slice(-20)) {
-      activities.push({
-        id: m.id,
-        type: "meeting",
-        title: m.title || m.id,
-        date: m.date,
-        summary: m.summary || null
-      });
-    }
-  }
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "ActivityLog",
-    "activities": activities
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'activities.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log(`✓ Generated activities.json (${activities.length} activities)`);
-}
-
-// Generate contracts.json (placeholder)
-function generateContracts() {
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "contracts": []
-  };
-
-  // Try to extract contract addresses from federation.yaml
-  if (fs.existsSync(federationPath)) {
-    const id = federationContent?.identity || {};
-    if (id.safe) {
-      schema.contracts.push({
-        type: "safe",
-        address: id.safe,
-        chain: id.chain || null
-      });
-    }
-    if (id.gardens) {
-      schema.contracts.push({
-        type: "gardens",
-        address: id.gardens,
-        chain: id.chain || null
-      });
-    }
-  }
-
-  const outputPath = path.join(rootDir, '.well-known', 'contracts.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log('✓ Generated contracts.json');
-}
-
-// Generate ideas.json
-function generateIdeas() {
-  const ideasPath = path.join(rootDir, 'data', 'ideas.yaml');
-  if (!fs.existsSync(ideasPath)) {
-    return;
-  }
-
-  const ideasData = yaml.load(fs.readFileSync(ideasPath, 'utf-8'));
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "IdeaRegistry",
-    "ideas": ideasData?.ideas || []
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'ideas.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log(`✓ Generated ideas.json (${(ideasData?.ideas || []).length} ideas)`);
-}
-
-// Generate knowledge.json
-function generateKnowledge() {
-  const manifestPath = path.join(rootDir, 'data', 'knowledge-manifest.yaml');
-  if (!fs.existsSync(manifestPath)) return;
-
-  const manifestData = yaml.load(fs.readFileSync(manifestPath, 'utf-8'));
-  const km = manifestData?.knowledge_manifest || {};
-
-  const sourcesPath = path.join(rootDir, 'data', 'sources.yaml');
-  const sourcesData = fs.existsSync(sourcesPath)
-    ? yaml.load(fs.readFileSync(sourcesPath, 'utf-8'))
-    : {};
-
-  const schema = {
-    "@context": "https://www.daostar.org/schemas",
-    "type": "KnowledgeManifest",
-    "domains": (km.domains || []).map(d => ({
-      id: d.id,
-      name: d.name,
-      description: d.description || "",
-      coverage: d.coverage || "none",
-      page_count: d.page_count || 0,
-      sources: d.sources || [],
-      last_updated: d.last_updated || null
-    })),
-    "exchange": {
-      published_domains: km.exchange?.published_domains || [],
-      subscribed_domains: km.exchange?.subscribed_domains || []
-    },
-    "sources": (sourcesData?.sources || []).map(s => ({
-      id: s.id,
-      name: s.name,
-      type: s.type,
-      url: s.url || s.feed_url || null,
-      status: s.status
-    }))
-  };
-
-  const outputPath = path.join(rootDir, '.well-known', 'knowledge.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schema, null, 2));
-  console.log(`✓ Generated knowledge.json (${schema.domains.length} domains)`);
-}
-
-// Run all generators
-try {
-  generateDao();
-  generateMembers();
-  generateMeetings();
-  generateProjects();
-  generateFinances();
-  generateProposals();
-  generateActivities();
-  generateContracts();
-  generateIdeas();
-  generateKnowledge();
-
-  console.log('\n✓ All schemas generated successfully!');
-} catch (error) {
-  console.error('Error generating schemas:', error);
+  const file = path.join(root, 'federation.yaml');
+  federation = existsSync(file) ? parseYaml(readFileSync(file, 'utf-8')) : undefined;
+} catch (err) {
+  console.error(`✗ federation.yaml cannot be read as YAML (${String(err?.message ?? err).split('\n')[0]}); nothing written`);
   process.exit(1);
+}
+const daoURI = federation?.identity?.daoURI;
+if (typeof daoURI !== 'string' || daoURI.trim() === '') nothingToGenerate();
+
+/** The builder: the framework's (with the schema check), else an instance's vendored core. */
+async function findBuilder() {
+  const reasons = [];
+  const places = [
+    { dir: new URL('../packages/admin/lib/standards/', import.meta.url), checked: true },
+    { dir: new URL('./lib/standards/', import.meta.url), checked: false },
+  ];
+  for (const { dir, checked } of places) {
+    if (!existsSync(fileURLToPath(dir))) continue;
+    try {
+      const core = await import(new URL('build.mjs', dir).href);
+      const { loadStandardsInput } = await import(new URL('load.mjs', dir).href);
+      const build = checked ? (await import(new URL('index.mjs', dir).href)).buildStandards : core.buildCore;
+      return { build, load: loadStandardsInput, planWrites: core.planWrites, checked };
+    } catch (err) {
+      reasons.push(`${path.relative(root, fileURLToPath(dir)) || '.'}: ${String(err?.message ?? err).split('\n')[0]}`);
+    }
+  }
+  return { reasons };
+}
+
+const builder = await findBuilder();
+if (!builder.build) {
+  console.error('✗ generate:schemas needs the org-os standards builder (packages/admin or scripts/lib/standards)');
+  for (const r of builder.reasons) console.error(`  could not load ${r}`);
+  if (builder.reasons.some((r) => r.startsWith('packages'))) console.error('  run: npm ci --prefix packages/admin');
+  process.exit(2);
+}
+
+console.log(`generate:schemas — ${root}`);
+if (!builder.checked) console.log("· schemas not checked here (no ajv): run the framework's validate:schemas against this instance");
+
+const { input, problems: loaded } = builder.load(root, { parseYaml });
+if (!input) nothingToGenerate();
+const out = builder.build(input);
+const plan = builder.planWrites(out);
+
+const problems = [...loaded, ...out.problems];
+for (const p of problems.filter((p) => p.level === 'warn')) console.log(`  ⚠ ${p.file}: ${p.text}`);
+for (const p of problems.filter((p) => p.level === 'error')) console.log(`  ✗ ${p.file}: ${p.text}`);
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+for (const w of out.withheld) console.log(`withheld: ${w.collection} ${plural(w.records, 'record')}, ${plural(w.fields, 'field')}`);
+
+if (plan.refuse) {
+  console.error('✗ nothing written: the errors above stop every file (a withheld value would be published, or no id can be built)');
+  process.exit(1);
+}
+
+const dir = path.join(root, '.well-known');
+mkdirSync(dir, { recursive: true });
+for (const [name, text] of Object.entries(plan.write)) writeFileSync(path.join(dir, name), text);
+for (const name of plan.remove) {
+  const file = path.join(dir, name);
+  if (existsSync(file)) {
+    rmSync(file);
+    console.log(`· removed .well-known/${name} (nothing to publish in it)`);
+  }
+}
+console.log(`✓ wrote ${plural(Object.keys(plan.write).length, 'file')} to .well-known/: ${Object.keys(plan.write).join(', ')}`);
+if (problems.some((p) => p.level === 'error')) {
+  console.log('  ✗ lines above: written, but not conformant — fix the records, then run npm run validate:schemas');
 }

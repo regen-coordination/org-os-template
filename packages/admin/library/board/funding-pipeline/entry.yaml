@@ -1,0 +1,41 @@
+id: board:funding-pipeline
+shelf: board
+title: Funding pipeline
+summary: Opportunities by stage, with their deadlines.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [funding]
+  domain: [operations]
+  audience: [steward]
+  maturity: raw
+related: [board:funding]
+installs:
+  - op: create
+    record: boards:funding-pipeline
+    value:
+      id: funding-pipeline
+      name: Funding pipeline
+      audience: members
+      layout: grid
+      blocks:
+        - id: count
+          type: metric
+          title: Opportunities
+          source: { kind: funding }
+          view: { label: in the register }
+          place: { col: 1, span: 4, row: 1 }
+        - id: stages
+          type: kanban
+          title: By stage
+          source: { kind: funding }
+          view: { group: status, columns: [pending, applied, approved, rejected, expired] }
+          place: { col: 1, span: 12, row: 2 }
+        - id: all
+          type: list
+          title: All opportunities
+          source: { kind: funding }
+          view: { filter: true }
+          place: { col: 1, span: 12, row: 3 }

@@ -10,8 +10,14 @@ npm run doctor -- sync --dir ../refi-med-os
 ```
 
 **Status:** `assess` is proven across the live fleet, and the **file-level
-overlay** sync is accepted end to end against a real instance (all nine stages
-green, identity and root commit intact —
+overlay** sync is accepted end to end against a real instance. `sync` runs ten
+stages — snapshot, ensure-upstream, fetch, inject-machinery, overlay, migrate,
+declare-visibility (DAO-OS L8: declares public what `.well-known/` shows the
+instance already publishes, as its own commit for the org to confirm or revert;
+nothing when `dao.json` carries the L8 generator's mark `x-org-os`, since then
+those files are L8's output, not 0.6's),
+generate-schemas, re-assess, receipt; the acceptance run had all of them green
+but declare-visibility, which came after (identity and root commit intact —
 `memory/reports/overlay-acceptance-2026-08-29.md`). The overlay replaced a
 history-based rebase that assumed fork lineage and stranded scaffolded
 instances mid-rebase.

@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "org-os/standards/daoip5-grant-pools",
+  "$comment": "Transcribed from the Grant Pool JSON-LD Schema in DAOIP-5 at c71b94b: https://github.com/metagov/daostar/blob/c71b94ba47cd9d09bae9afb530bdb70c640e25cc/DAOIPs/daoip-5.md . Funding mechanism enum is the template's list, in its order. extensions per https://github.com/metagov/daostar/blob/944052f1c35de24d2de7a42e62452403dc05cfad/DAOIPs/x-daoip-5.md No field with no value: null and \"\" are refused anywhere (EIP-4824: a field with no value SHOULD be removed rather than left empty or null).",
+  "type": "object",
+  "properties": {
+    "@context": {
+      "const": "http://www.daostar.org/schemas"
+    },
+    "name": {
+      "$ref": "#/$defs/str"
+    },
+    "type": {
+      "$ref": "#/$defs/str"
+    },
+    "grantPools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "GrantPool"
+          },
+          "id": {
+            "$ref": "#/$defs/str"
+          },
+          "name": {
+            "$ref": "#/$defs/str"
+          },
+          "description": {
+            "$ref": "#/$defs/str"
+          },
+          "grantFundingMechanism": {
+            "enum": [
+              "Direct Grants",
+              "Quadratic Funding",
+              "Streaming Quadratic Funding",
+              "Retro Funding",
+              "Conviction Voting",
+              "Self-Curated Registries",
+              "Gift Circles",
+              "Social Media-Based Capital Allocation",
+              "Futarchy",
+              "Assurance Contracts",
+              "Cookie Jar",
+              "Impact Attestations",
+              "Stokvel",
+              "Request for Proposal",
+              "Delegated Domain Allocation",
+              "Evolutionary Grants Games",
+              "Direct to Contract Incentives",
+              "Angel Investment",
+              "Dominant Assurance Contracts",
+              "Community Currencies",
+              "Universal Basic Income",
+              "Bounties",
+              "Gnosis Safe",
+              "Waqf",
+              "Ranked Choice Voting",
+              "Honour",
+              "Mutual Aid Networks",
+              "Bonding Curves",
+              "Zakat",
+              "Decentralized Validators",
+              "Revnets"
+            ]
+          },
+          "isOpen": {
+            "type": "boolean"
+          },
+          "closeDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "applicationsURI": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "governanceURI": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "attestationIssuersURI": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "requiredCredentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/str"
+            }
+          },
+          "totalGrantPoolSize": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "$ref": "#/$defs/str"
+                },
+                "denomination": {
+                  "$ref": "#/$defs/str"
+                }
+              },
+              "required": [
+                "amount",
+                "denomination"
+              ],
+              "additionalProperties": {
+                "$ref": "#/$defs/value"
+              }
+            }
+          },
+          "totalGrantPoolSizeInUSD": {
+            "$ref": "#/$defs/str"
+          },
+          "email": {
+            "$ref": "#/$defs/str"
+          },
+          "image": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "coverImage": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "extensions": {
+            "$ref": "#/$defs/extensions"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name",
+          "description",
+          "grantFundingMechanism",
+          "isOpen",
+          "applicationsURI",
+          "totalGrantPoolSize",
+          "totalGrantPoolSizeInUSD"
+        ],
+        "additionalProperties": {
+          "$ref": "#/$defs/value"
+        }
+      }
+    }
+  },
+  "required": [
+    "@context",
+    "name",
+    "type",
+    "grantPools"
+  ],
+  "additionalProperties": {
+    "$ref": "#/$defs/value"
+  },
+  "$defs": {
+    "str": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        }
+      ]
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/value"
+      }
+    }
+  }
+}

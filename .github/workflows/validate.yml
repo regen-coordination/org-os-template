@@ -12,6 +12,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # validate:governance reads the history; a shallow clone has none to judge.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,6 +57,17 @@ jobs:
       # failure here is a real failure and must not be swallowed.
       - name: Validate schemas
         run: npm run validate:schemas
+
+      # Every data/*.yaml against the admin schemas (needs the admin deps above).
+      # Errors fail the run; warnings are printed and do not.
+      - name: Validate data
+        run: npm run validate:data
+
+      # The rules are well-formed and the history agrees with them (0.6 F2). CI=true makes
+      # a commit that went around the loop an error; locally it is a warning.
+      # The checkout above is full-depth so that it has history to read.
+      - name: Validate governance
+        run: npm run validate:governance
 
       - name: Analyze instances
         run: npm run analyze:instances

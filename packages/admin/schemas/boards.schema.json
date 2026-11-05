@@ -1,0 +1,31 @@
+{
+  "$id": "orgos://registry/boards",
+  "type": "object",
+  "required": ["id", "name", "layout", "blocks"],
+  "additionalProperties": false,
+  "x-order": ["id", "name", "audience", "layout", "blocks"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Lower case, digits and hyphens. A built-in board's id (home, projects, organization…) replaces that board." },
+    "name": { "type": "string", "minLength": 1, "description": "The board's title. \"{org}\" is replaced by the org's name." },
+    "audience": { "type": "string", "minLength": 1, "description": "members, council, public, or a role id from governance.yaml. Until sign-in every local actor sees every board." },
+    "layout": { "enum": ["grid", "canvas", "flow"] },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "source": { "type": "object" },
+          "view": { "type": "object" },
+          "text": { "type": "string" },
+          "place": { "type": "object" }
+        }
+      }
+    }
+  },
+  "$comment": "data/boards.yaml (P4 spec §5.1). Block types, sources, views and places are checked by lib/board-query.mjs validateBoard, which validateEntry runs for this registry."
+}

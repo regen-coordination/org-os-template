@@ -18,7 +18,13 @@
       "minLength": 1
     },
     "platform": {
-      "enum": [
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "telegram",
         "discord",
         "forum",

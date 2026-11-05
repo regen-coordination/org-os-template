@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "org-os/standards/eip4824-dao",
+  "$comment": "Transcribed from the DAO / Entity JSON-LD Schema in EIP-4824 at 7e42221: https://github.com/ethereum/ERCs/blob/7e4222187c557efb31d728ded3ac4716342164fc/ERCS/erc-4824.md . Embedded subsidiary documents: a field and its URI-suffixed twin SHOULD NOT appear together. No field with no value: null and \"\" are refused anywhere (EIP-4824: a field with no value SHOULD be removed rather than left empty or null).",
+  "type": "object",
+  "properties": {
+    "@context": {
+      "const": "http://www.daostar.org/schemas"
+    },
+    "type": {
+      "$ref": "#/$defs/str"
+    },
+    "name": {
+      "$ref": "#/$defs/str"
+    },
+    "description": {
+      "$ref": "#/$defs/str"
+    },
+    "membersURI": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "proposalsURI": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "activityLogURI": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "contractsURI": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "governanceURI": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "members": {
+      "$ref": "#/$defs/value"
+    },
+    "proposals": {
+      "$ref": "#/$defs/value"
+    },
+    "activityLog": {
+      "$ref": "#/$defs/value"
+    },
+    "contracts": {
+      "$ref": "#/$defs/value"
+    },
+    "grantPoolsURI": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "attestationIssuersURI": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions"
+    }
+  },
+  "required": [
+    "@context",
+    "type",
+    "name"
+  ],
+  "additionalProperties": {
+    "$ref": "#/$defs/value"
+  },
+  "allOf": [
+    {
+      "not": {
+        "required": [
+          "members",
+          "membersURI"
+        ]
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "proposals",
+          "proposalsURI"
+        ]
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "activityLog",
+          "activityLogURI"
+        ]
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "contracts",
+          "contractsURI"
+        ]
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "governance",
+          "governanceURI"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "str": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        }
+      ]
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/value"
+      }
+    }
+  }
+}

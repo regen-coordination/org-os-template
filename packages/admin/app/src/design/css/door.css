@@ -1,0 +1,153 @@
+/* The public door (§12; the gallery's "door" section). Its own voice (§4): Fraunces for heads, leads and figures, Geist
+   for body and meta, Mono for addresses; generous space. The door is a page outside the frame, so its one breakpoint,
+   900px, is the viewport's (CC-15's exemption). Every length is a token. */
+
+.door-page { background: var(--paper); color: var(--ink); min-height: 100dvh; }
+.door { max-inline-size: var(--w-door); margin-inline: auto; padding-inline: var(--sp-13); }
+.door-notice { margin: 0; padding: var(--sp-7) var(--sp-13); background: var(--wash); color: var(--mute); font-size: var(--fs-meta);
+  line-height: var(--lh-body); text-align: center; text-wrap: pretty; }
+.door-eyebrow { margin: 0; font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--faint); overflow-wrap: anywhere; }
+
+/* 1. The top: the wordmark, the sections, Members; Menu under 900 */
+.door-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-10); min-block-size: var(--h-door-top); }
+.door-mark { display: inline-flex; align-items: center; gap: var(--sp-7); min-width: 0; }
+.door-seal { display: grid; place-items: center; flex: none; inline-size: var(--w-door-seal); block-size: var(--w-door-seal);
+  border-radius: var(--radius-door-seal); background: var(--solid); color: var(--on-solid); overflow: hidden; }
+.door-seal img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.door-name { font: var(--fw-medium) var(--fs-d-mark)/var(--lh-ui) var(--display); font-variation-settings: "SOFT" var(--soft);
+  letter-spacing: var(--ls-title); overflow-wrap: anywhere; }
+.door-nav { display: flex; align-items: center; gap: var(--sp-12); font-size: var(--fs-meta); color: var(--mute); }
+.door-nav-a { color: inherit; text-decoration: none; white-space: nowrap; }
+.door-nav-a:focus-visible, .door-sheet-a:focus-visible, .door-row a:focus-visible, .door-foot a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.door-menu { display: none; position: relative; }
+.door-menu > summary { list-style: none; cursor: pointer; }
+.door-menu > summary::-webkit-details-marker { display: none; }
+.door-sheet { position: absolute; inset-inline-end: 0; inset-block-start: calc(100% + var(--sp-4)); z-index: 30; display: grid; gap: var(--sp-1);
+  min-inline-size: var(--w-door-label); padding: var(--sp-6); background: var(--pop); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); box-shadow: var(--shadow-raise); }
+.door-sheet-a { display: flex; align-items: center; block-size: var(--h-ctl-touch); padding-inline: var(--sp-8); border-radius: var(--radius-sm);
+  color: var(--ink); font-size: var(--fs-body); text-decoration: none; }
+@media (hover: hover) {
+  .door-nav-a:hover, .door-foot a:hover { color: var(--ink); }
+  .door-sheet-a:hover { background: var(--wash); }
+  .door-row-w a:hover { text-decoration: underline; }
+}
+
+/* 2. The hero: two columns 1.25 : 1, bottom-aligned; the H1 with one moss phrase; the facts, figure over label */
+.door-hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sp-14); align-items: end;
+  padding-block: var(--sp-16) var(--sp-14); }
+.door-h1 { margin: var(--sp-10) 0 0; font: var(--fw-display) var(--fs-d-hero)/var(--lh-d-hero) var(--display); font-variation-settings: "SOFT" var(--soft-hero);
+  letter-spacing: var(--ls-display); text-wrap: balance; overflow-wrap: anywhere; }
+.door-h1 em { font-style: italic; color: var(--accent); }
+.door-desc { margin: 0; max-inline-size: var(--w-door-desc); color: var(--mute); font-size: var(--fs-d-body); line-height: var(--lh-d-body); text-wrap: pretty; }
+.door-facts { display: flex; flex-wrap: wrap; gap: var(--sp-13); margin: var(--sp-12) 0 0; padding: 0; list-style: none; }
+.door-fact { display: grid; gap: var(--sp-4); min-width: 0; }
+.door-fact-f { font: var(--fw-regular) var(--fs-d-fact)/var(--lh-ui) var(--display); font-variation-settings: "SOFT" var(--soft); font-variant-numeric: lining-nums; }
+.door-fact-l { color: var(--mute); font-size: var(--fs-tiny); line-height: var(--lh-tiny); }
+
+/* 3. The map plate */
+.door-plate { background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-plate); box-shadow: var(--shadow-raise); overflow: hidden; }
+.door-plate-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--sp-6) var(--sp-10); padding: var(--sp-12) var(--sp-12) 0; }
+.door-plate-t { margin: 0; font: var(--fw-regular) var(--fs-d-card)/var(--lh-title) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-title); }
+.door-plate .hmap-canvas { border: 0; border-radius: 0; background-color: transparent; }
+/* the map before it lays itself out (on the server, without script): its nodes as a still list of the same links */
+.door-map-still { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin: 0; padding: var(--sp-12); list-style: none; }
+.door-map-still > li { min-width: 0; }
+
+/* 4. The numbered sections: the sticky label column, the lead, the section's elements */
+.door-sec { display: grid; grid-template-columns: var(--w-door-label) minmax(0, 1fr); gap: var(--sp-14); padding-block: var(--sp-17) var(--sp-15);
+  border-block-start: var(--rule-w) solid var(--rule); }
+.door-plate + .door-sec { border-block-start: 0; }
+.door-sec-l { align-self: start; position: sticky; inset-block-start: var(--sp-12); min-width: 0; }
+.door-sec-no { margin: 0; font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-name); color: var(--faint); }
+.door-sec-t { margin: var(--sp-6) 0 0; font: var(--fw-display) var(--fs-d-sec)/var(--lh-d-sec) var(--display); font-variation-settings: "SOFT" var(--soft-sec);
+  letter-spacing: var(--ls-d-sec); overflow-wrap: anywhere; }
+.door-sec-c { min-width: 0; }
+.door-lead { margin: 0 0 var(--sp-13); max-inline-size: var(--w-door-lead); font: var(--fw-regular) var(--fs-d-lead)/var(--lh-d-lead) var(--display);
+  font-variation-settings: "SOFT" var(--soft); text-wrap: pretty; }
+
+/* 01 the hats, flat, indented by level; never a wearer */
+.door-hats { margin: 0; padding: 0; list-style: none; border-block-start: var(--rule-w) solid var(--rule); }
+.door-hat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-10); align-items: baseline; padding-block: var(--sp-9);
+  border-block-end: var(--rule-w) solid var(--rule); }
+.door-hat-n { font: var(--fw-regular) var(--fs-d-hat)/var(--lh-d-row) var(--display); font-variation-settings: "SOFT" var(--soft); overflow-wrap: anywhere; }
+.door-hat[data-level="1"] .door-hat-n { padding-inline-start: var(--sp-12); }
+.door-hat[data-level="2"] .door-hat-n { padding-inline-start: var(--sp-14); }
+.door-hat[data-level="3"] .door-hat-n { padding-inline-start: var(--sp-16); }
+.door-hat-l { color: var(--mute); font-size: var(--fs-meta); text-align: end; }
+
+/* 02 and 03: the pool cards and the treasury's two panels */
+.door-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-10); }
+.door-card { display: grid; gap: var(--sp-10); align-content: start; min-width: 0; padding: var(--sp-12); background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius-door-card); }
+.door-card-t { margin: 0; font: var(--fw-regular) var(--fs-d-card)/var(--lh-title) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-title);
+  overflow-wrap: anywhere; }
+.door-card-p { margin: 0; color: var(--mute); font-size: var(--fs-meta); line-height: var(--lh-body); }
+.door-fig { margin: 0; }
+.door-fig .amt { display: inline-flex; align-items: baseline; gap: var(--sp-5); }
+.door-fig .amt-v { font: var(--fw-display) var(--fs-d-fig)/var(--lh-ui) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-display);
+  font-variant-numeric: lining-nums; }
+.door-fig .amt-u { font: var(--fw-regular) var(--fs-tiny)/var(--lh-ui) var(--mono); color: var(--mute); }
+.door-pool-r { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-6) var(--sp-8); color: var(--mute); font-size: var(--fs-meta); }
+.door-pool-p { min-width: 0; }
+.door-note { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); margin: var(--sp-10) 0 0; max-inline-size: var(--w-prose);
+  color: var(--mute); font-size: var(--fs-meta); line-height: var(--lh-body); }
+.door-dots { display: flex; flex-wrap: wrap; gap: var(--sp-5); }
+.door-dot { inline-size: var(--w-door-dot); block-size: var(--w-door-dot); border-radius: var(--radius-chip); border: var(--w-door-dot-ring) solid var(--accent); }
+.door-dot.is-on { background: var(--accent); }
+.door-card .addr-full { max-inline-size: 100%; }
+.door-age { margin: 0; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+
+/* 04 and 05: the ledgers */
+.door-ledger { margin: 0; padding: 0; list-style: none; border-block-start: var(--rule-w) solid var(--rule); }
+.door-row { display: grid; grid-template-columns: var(--w-door-id) minmax(0, 1fr) auto; gap: var(--sp-11); align-items: baseline;
+  padding: var(--sp-11) var(--sp-4); border-block-end: var(--rule-w) solid var(--rule); }
+.door-row-w { grid-template-columns: minmax(0, 1fr) auto; }
+.door-row-id { font: var(--fw-regular) var(--fs-tiny)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--faint); }
+.door-row-m { display: grid; gap: var(--sp-3); min-width: 0; }
+.door-row-t { font: var(--fw-regular) var(--fs-d-row)/var(--lh-d-row) var(--display); font-variation-settings: "SOFT" var(--soft); color: var(--ink);
+  text-decoration: none; overflow-wrap: anywhere; }
+.door-row-s { color: var(--mute); font-size: var(--fs-meta); }
+.door-pill { display: inline-flex; align-items: center; block-size: var(--h-chip); padding-inline: var(--sp-6); border: var(--rule-w) solid var(--rule-strong);
+  border-radius: var(--radius-chip); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); white-space: nowrap; }
+.door-pill.is-done { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+/* What is not public, in its place: a lock and "Members only", nothing more (§6.3) */
+.door-mo { display: inline-flex; align-items: center; gap: var(--sp-5); margin: 0; padding: var(--sp-6) var(--sp-8); border: var(--rule-w) dashed var(--rule-strong);
+  border-radius: var(--radius-sm); color: var(--mute); font-size: var(--fs-meta); }
+
+/* 5. The foot */
+.door-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-6) var(--sp-10); margin-block-start: var(--sp-15);
+  padding-block: var(--sp-13) var(--sp-14); border-block-start: var(--rule-w) solid var(--rule); color: var(--mute); font-size: var(--fs-tiny); }
+.door-foot-p { margin: 0; min-width: 0; }
+.door-foot a { color: inherit; }
+.door-uri { font-family: var(--mono); overflow-wrap: anywhere; }
+
+/* 44px on a coarse pointer (§13), after the rules they enlarge */
+@media (pointer: coarse) {
+  .door-nav-a, .door-foot a, .door-row-w a { display: inline-flex; align-items: center; min-block-size: var(--h-ctl-touch); }
+  .door-menu > summary, .door-members { min-block-size: var(--h-ctl-touch); min-inline-size: var(--h-ctl-touch); }
+}
+
+/* Under 900px of the viewport: one column, the label above its lead, the sections fold into Menu; Members stays */
+@media (max-width: 899px) {
+  .door { padding-inline: var(--sp-10); }
+  .door-notice { padding-inline: var(--sp-10); }
+  .door-nav-a { display: none; }
+  .door-menu { display: block; }
+  .door-hero { grid-template-columns: minmax(0, 1fr); gap: var(--sp-11); padding-block: var(--sp-13); }
+  .door-facts { gap: var(--sp-11); }
+  .door-plate-h { padding: var(--sp-10) var(--sp-10) 0; }
+  .door-sec { grid-template-columns: minmax(0, 1fr); gap: var(--sp-10); padding-block: var(--sp-15) var(--sp-13); }
+  .door-sec-l { position: static; }
+  .door-lead { margin-block-end: var(--sp-11); }
+  .door-cards { grid-template-columns: minmax(0, 1fr); }
+  .door-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .door-row-id { grid-column: 1 / -1; }
+}
+
+/* /parts/door: the door in a box of its own, and a door's sections listed */
+.pg-door { border: var(--rule-w) solid var(--rule); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-raise); }
+.pg-door .door-page { min-height: 0; }
+.pg-door-secs { display: grid; gap: var(--sp-6); margin: 0; padding: 0; list-style: none; }

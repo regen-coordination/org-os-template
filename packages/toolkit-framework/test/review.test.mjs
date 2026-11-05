@@ -27,11 +27,11 @@ test('promote to reviewed requires a reviewer, clears ai_assisted, stamps review
   assert.throws(() => promote({ adapter: 'kb-folder', target: kb, ref, maturity: 'reviewed' }),
     /--reviewer is required/);
   const { object } = promote({ adapter: 'kb-folder', target: kb, ref, maturity: 'reviewed',
-    reviewer: 'luiz', date: '2026-07-05' });
+    reviewer: 'steward-a', date: '2026-07-05' });
   assert.equal(object.maturity, 'reviewed');
   assert.equal(object.ai_assisted, false, 'human review clears the flag (invariant); provenance.authorship keeps the history');
   assert.equal(object.last_reviewed, '2026-07-05');
-  assert.equal(object.reviewed_by, 'luiz');
+  assert.equal(object.reviewed_by, 'steward-a');
   assert.equal(reviewQueue({ adapter: 'kb-folder', target: kb }).length, 0);
 });
 

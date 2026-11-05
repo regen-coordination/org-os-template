@@ -1,0 +1,57 @@
+/* The new-record form (design pass, spec 2026-11-04 §3, Option A): the schema's groups as sections of field rows in the
+   main column, the preview, who decides and Save beside them in the aside (the proposal page's .pp, which wraps the
+   aside under the main when the two do not fit). Every value a token; flat; dark from the skin. Forced colours keep the
+   rules: nothing here is drawn by a background alone. */
+.form { align-items: flex-start; }
+
+/* the id under the title: faint, following it, and its edit */
+.form-id { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-4) var(--sp-5); flex-basis: 100%; min-width: 0;
+  font-size: var(--fs-meta); color: var(--faint); }
+.form-id-k { font: var(--fw-regular) var(--fs-tiny)/var(--lh-tiny) var(--mono); }
+.form-id-v { font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--mute); overflow-wrap: anywhere; min-width: 0; }
+.form-id-edit { all: unset; cursor: pointer; color: var(--mute); text-decoration: underline; text-underline-offset: var(--sp-3); }
+/* a 24px target at least (WCAG 2.5.8; e2e:a11y target-size), the word centred in it */
+.form-id-edit { display: inline-block; min-block-size: var(--sp-12); min-inline-size: var(--sp-12); line-height: var(--sp-12); text-align: center; }
+.form-id-edit:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--sp-1); }
+@media (hover: hover) { .form-id-edit:hover { color: var(--ink); } }
+.form-id > .input { flex: 1 1 100%; }
+.form-id > .note { flex-basis: 100%; margin: 0; }
+
+/* choices: the segmented control wraps on a narrow row (390, 320, 200 % text) and Other's field sits under it */
+.form-choice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5); flex-basis: 100%; min-width: 0; }
+.form-choice > .seg { flex-wrap: wrap; max-inline-size: 100%; }
+.form-choice > .input { flex: 1 1 100%; }
+
+/* a list of objects: a row of inputs each, its remove at the end, then + Add */
+.form-rows { display: grid; justify-items: start; gap: var(--sp-5); flex-basis: 100%; min-width: 0; }
+.form-rows-l { display: grid; gap: var(--sp-5); inline-size: 100%; margin: 0; padding: 0; list-style: none; }
+.form-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5); min-width: 0; }
+.form-cell { display: grid; gap: var(--sp-2); flex: 1 1 var(--w-token-input); min-width: 0; }
+.form-cell-k { font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--mute); }
+.form-cell > .input { inline-size: 100%; min-width: 0; }
+.form-row > .btn { align-self: flex-end; }
+
+/* the fold: what it holds, in faint, then Show n more */
+.form-more { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-5) var(--sp-8);
+  margin-block-start: var(--sp-11); padding-block-start: var(--sp-8); border-block-start: var(--rule-w) solid var(--rule); min-width: 0; }
+.form-more-l { min-width: 0; font-size: var(--fs-meta); color: var(--faint); overflow-wrap: anywhere; }
+
+/* the preview: a raised card that reads as the record will */
+.form-prev { display: grid; gap: var(--sp-6); min-width: 0; padding: var(--sp-10); background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); }
+.form-prev-t { margin: 0; font: var(--fw-strong) var(--fs-h2)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); text-wrap: balance; overflow-wrap: anywhere; }
+.form-prev-s { margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--mute); overflow-wrap: anywhere; }
+
+/* who decides, then the actions */
+.form-decide { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); overflow-wrap: anywhere; }
+.form-decide b { font-weight: var(--fw-strong); color: var(--ink); }
+.form-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+
+/* a group's one field drawn bare under its head (the group and the field share a label, DP-41): the control, then its
+   help and its error, as a field row's value draws them */
+.form-solo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5) var(--sp-6); min-width: 0; }
+.form-solo > .fields-help { flex-basis: 100%; margin: 0; max-inline-size: var(--w-prose); font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); }
+.form-solo > .note { flex-basis: 100%; margin: 0; }
+
+/* Option B, the stepped form, on the wizard frame: Check's preview, then who decides, above the frame's foot */
+.form-check { display: grid; gap: var(--sp-8); min-width: 0; }

@@ -1,9 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>org-os admin</title>
+    <script>
+      /* Choose the skin before the stylesheet is used, so the first frame is already drawn in it. The
+         viewer's choice, else the instance default (%VITE_ORG_OS_SKIN% is filled in at build; left as
+         written when unset); none set means the stylesheet's house (its plain :root). main.tsx checks
+         it against the skins the client ships. The key is skin.ts's SKIN_KEY. */
+      (function () {
+        var v = null;
+        try { v = localStorage.getItem('org-os-admin.skin'); } catch (e) {}
+        if (!/^[a-z0-9-]+$/.test(v || '')) v = '%VITE_ORG_OS_SKIN%';
+        if (/^[a-z0-9-]+$/.test(v)) document.documentElement.dataset.skin = v;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

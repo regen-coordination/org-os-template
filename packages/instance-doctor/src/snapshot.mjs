@@ -242,10 +242,14 @@ export function readInstance(dir, { frameworkDir, runValidators = true, now = Da
       ? {
           structure: runValidator(fw, path.join('scripts', 'validate-structure.mjs'), root),
           schemas: runValidator(fw, path.join('scripts', 'validate-identity.mjs'), root),
+          data: runValidator(fw, path.join('scripts', 'validate-data.mjs'), root),
+          governance: runValidator(fw, path.join('scripts', 'validate-governance.mjs'), root),
         }
       : {
           structure: { ran: false, reason: 'skipped (--no-validators)' },
           schemas: { ran: false, reason: 'skipped (--no-validators)' },
+          data: { ran: false, reason: 'skipped (--no-validators)' },
+          governance: { ran: false, reason: 'skipped (--no-validators)' },
         },
 
     framework: {

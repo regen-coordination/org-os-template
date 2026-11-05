@@ -1,2 +1,11 @@
 node_modules/
 app/dist/
+.scratch/
+# e2e screenshot baselines: stored locally by `npm run e2e:parts -- --update`, never committed (ruling R-3)
+app/e2e/parts/
+# e2e sign-in screenshots (tests/e2e/signin.mts): local only, never committed (Q39)
+app/e2e/signin/
+# route shots of the acceptance walk (`npm run e2e:routes -- --update`): stored locally, never committed (Q39)
+app/e2e/routes/
+# the reflow walk's text-200 % and forced-colours shots, for the operator: stored locally, never committed
+app/e2e/reflow/

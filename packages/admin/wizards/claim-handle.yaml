@@ -1,0 +1,23 @@
+# W2a: the git address becomes a member's handle (wizards spec §5.4a).
+# This file is the wizard; lib/machines/wizard.mjs walks it and the page draws it.
+id: claim-handle
+title: Claim your handle
+summary: Tell this app which member you are, so it lets you edit.
+intro:
+  body: >-
+    This app knows you by the email git commits with here. No member of this organisation holds that
+    address yet, so everything is read-only. Pick the member that is you, and the app adds your address
+    to that member's record.
+  writes: Nothing. You choose, and you see the exact line, before anything is written.
+steps:
+  - id: who
+    title: Which member are you?
+    ask: Pick the member that is you. Only members who hold no git address yet are listed.
+    writes: Nothing yet. The next screen shows the exact line.
+review:
+  title: Check the line
+  ask: This is the line that will be written, the address as git reports it, and the commit that will record it.
+  writes: One line in data/members.yaml, and one commit that records it. You can undo it with git revert.
+done:
+  title: You are {member}
+  body: This page is editable now. The commit names the rule it used, bootstrap/claim.

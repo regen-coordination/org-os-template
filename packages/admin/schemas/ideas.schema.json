@@ -13,18 +13,48 @@
     "created",
     "votes"
   ],
+  "x-groups": [
+    {
+      "label": "What it is",
+      "fields": [
+        "title",
+        "description",
+        "ecosystem_gap"
+      ]
+    },
+    {
+      "label": "Who",
+      "fields": [
+        "submitted_by",
+        "champions"
+      ]
+    },
+    {
+      "label": "Where it stands",
+      "fields": [
+        "status",
+        "created"
+      ]
+    }
+  ],
   "properties": {
     "id": {
+      "title": "Id",
+      "description": "A short name, unique in this file.",
       "type": "string",
       "minLength": 1
     },
     "title": {
+      "title": "Title",
+      "description": "The idea, in a few words.",
       "type": [
         "string",
         "null"
       ]
     },
     "status": {
+      "title": "Status",
+      "description": "How far it has come.",
       "enum": [
         "surfaced",
         "proposed",
@@ -35,18 +65,24 @@
       ]
     },
     "source": {
+      "title": "Source",
+      "description": "Where it came from: a meeting, a note, a file.",
       "type": [
         "string",
         "null"
       ]
     },
     "submitted_by": {
+      "title": "Submitted by",
+      "description": "Who brought it.",
       "type": [
         "string",
         "null"
       ]
     },
     "champions": {
+      "title": "Champions",
+      "description": "Who carries it forward.",
       "type": [
         "array",
         "null"
@@ -56,24 +92,33 @@
       }
     },
     "ecosystem_gap": {
+      "title": "Gap it fills",
+      "description": "What is missing that it would bring.",
       "type": [
         "string",
         "null"
       ]
     },
     "description": {
+      "title": "Description",
+      "description": "The idea, in a sentence or two.",
+      "x-format": "textarea",
       "type": [
         "string",
         "null"
       ]
     },
     "hatched_repo": {
+      "title": "Hatched repository",
+      "description": "Where it lives now, once it has become a project.",
       "type": [
         "string",
         "null"
       ]
     },
     "skills_needed": {
+      "title": "Skills needed",
+      "description": "What it would take.",
       "type": [
         "array",
         "null"
@@ -83,18 +128,24 @@
       }
     },
     "resources": {
+      "title": "Resources",
+      "description": "Links and materials.",
       "type": [
         "array",
         "null"
       ]
     },
     "compensation": {
+      "title": "Compensation",
+      "description": "How the work on it would be paid.",
       "type": [
         "object",
         "null"
       ]
     },
     "created": {
+      "title": "Created",
+      "description": "When it was written down.",
       "type": [
         "string",
         "null"
@@ -102,6 +153,8 @@
       "format": "date"
     },
     "updated": {
+      "title": "Updated",
+      "description": "When it last changed.",
       "type": [
         "string",
         "null"
@@ -109,12 +162,16 @@
       "format": "date"
     },
     "votes": {
+      "title": "Votes",
+      "description": "How many support it.",
       "type": [
         "number",
         "null"
       ]
     },
     "comments": {
+      "title": "Comments",
+      "description": "What people said about it.",
       "type": [
         "array",
         "null"

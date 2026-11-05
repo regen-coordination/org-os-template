@@ -1,0 +1,128 @@
+/* The chain atoms (spec §7.5–7.7, §7.9), ported from the approved gallery's data atoms with every raw value a
+   token: the address chip, the chain chip, the amount and the read age. Geist Mono, tabular, slashed zero, for
+   whatever a person might copy; never a chain's logo or colour; clay only for a warning or a failed read. */
+
+/* Address chip (§7.5): 24px on --wash, Mono 12.5 ink, a 13px faint copy glyph that cross-fades to a moss check
+   when copied (scale, opacity, blur; 300ms; only opacity, at once, under reduced motion). A button, never a link. */
+.addr-wrap { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); min-width: 0; max-inline-size: 100%; }
+.addr { position: relative; display: inline-flex; align-items: center; gap: var(--sp-5); flex: none; block-size: var(--h-addr);
+  padding-block: 0; padding-inline: var(--sp-6) var(--sp-5); border: 0; border-radius: var(--radius-sm); background: var(--wash); color: var(--ink);
+  font: var(--fw-regular) var(--fs-code)/var(--lh-ui) var(--mono); font-variant-numeric: tabular-nums slashed-zero; white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease); }
+.addr:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { .addr:not(.addr-full):hover { background: var(--wash-strong); } }
+/* a coarse pointer gets a 44px target around the 24px chip */
+@media (pointer: coarse) { .addr::after { content: ""; position: absolute; inset-inline: 0; inset-block: calc((var(--h-addr) - var(--h-ctl-touch)) / 2); } }
+.addr-name { font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); }
+.addr-t { min-width: 0; }
+.addr-ic { position: relative; display: inline-grid; flex: none; inline-size: var(--ic-xs); block-size: var(--ic-xs); color: var(--faint); }
+.addr-ic > span { grid-area: 1 / 1; display: grid; }
+.addr-ic .i { transition: opacity var(--dur-copy) var(--ease), scale var(--dur-copy) var(--ease), filter var(--dur-copy) var(--ease); }
+/* each glyph is hidden (small, clear, blurred) only in the state it is not shown in, and grows back from there */
+.addr-ok .i { color: var(--accent); }
+.addr:not([data-copied]) .addr-ok .i, .addr[data-copied] .addr-cp .i { opacity: 0; scale: var(--scale-copy); filter: blur(var(--blur-copy)); }
+@media (prefers-reduced-motion: reduce) {
+  .addr-ic .i { transition-property: opacity; scale: 1 !important; filter: none !important; }
+}
+/* warn: clay on --attn-soft, the alert glyph where the copy glyph was (the zero address, not a contract) */
+/* a still chip (inside a link: a Systems row, E-36): the chip's look, no control of its own */
+.addr-still { cursor: inherit; }
+.addr-warn { background: var(--attn-soft); color: var(--attn); }
+.addr-warn .addr-ic { color: var(--attn); }
+/* full (record pages, the door's treasury): the whole address, wrapping anywhere, on no fill */
+.addr-full { flex: 0 1 auto; min-width: 0; block-size: auto; padding: 0; background: transparent; font-size: var(--fs-tiny); line-height: var(--lh-addr-full);
+  white-space: normal; overflow-wrap: anywhere; text-align: start; }
+/* the clipboard refused: the whole value, selectable in one go, for the person's own copy */
+.addr-sel { min-width: 0; font: var(--fw-regular) var(--fs-tiny)/var(--lh-addr-full) var(--mono); font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--ink); overflow-wrap: anywhere; user-select: all; }
+/* the context menu and the chains' list open under their chip, at its end, as a Menu does */
+.addr-wrap > .menu { position: absolute; inset-block-start: calc(100% + var(--sp-4)); inset-inline-end: 0; z-index: 30; }
+
+/* Chain chip (§7.6): a 22px pill, 1px --rule-strong on --raised, 12/500 mute, a 7px hollow circle. Several chains
+   draw three bars and open a list of their names; a test network is dashed; chains that disagree are clay. */
+.chain-wrap { position: relative; display: inline-flex; min-width: 0; }
+.chain { display: inline-flex; align-items: center; gap: var(--sp-5); flex: none; block-size: var(--h-chip); padding: 0 var(--sp-6);
+  border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius-chip); background: var(--raised); color: var(--mute);
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); white-space: nowrap; }
+button.chain { cursor: default; }
+button.chain:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (pointer: coarse) { button.chain { position: relative; } button.chain::after { content: ""; position: absolute; inset-inline: 0; inset-block: calc((var(--h-chip) - var(--h-ctl-touch)) / 2); } }
+.chain-glyph { flex: none; inline-size: var(--w-chain-glyph); block-size: var(--w-chain-glyph); border-radius: var(--radius-chip); border: var(--stroke-w) solid var(--faint); }
+.chain-multi .chain-glyph { inline-size: calc(3 * var(--w-chain-bar) + 2 * var(--sp-1)); block-size: var(--h-chain-bars); border: 0; border-radius: var(--radius-xs);
+  background: repeating-linear-gradient(to right, var(--faint) 0 var(--w-chain-bar), transparent var(--w-chain-bar) calc(var(--w-chain-bar) + var(--sp-1))); }
+.chain-test { border-style: dashed; }
+.chain-split { border-color: var(--attn); color: var(--attn); }
+.chain-split .chain-glyph { border-color: var(--attn); }
+.chain-id { font-family: var(--mono); font-weight: var(--fw-regular); }
+/* the names a several-chains chip opens: chips without a glyph, on the pop surface */
+.chain-list { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); min-width: 0; }
+.chain-pop { position: absolute; inset-block-start: calc(100% + var(--sp-4)); inset-inline-end: 0; z-index: 30; inline-size: max-content;
+  max-inline-size: var(--w-kcol); padding: var(--sp-6); background: var(--pop); border: var(--rule-w) solid transparent;
+  border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); }
+
+/* Amount (§7.7): Mono 500 12.5 tabular with a slashed zero, then the unit in 400 mute after a no-break space,
+   narrowed to the gallery's gap. Body is 14; large is Fraunces 350 32 with the unit in Mono 12. */
+.amt { font: var(--fw-medium) var(--fs-code)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--ink); white-space: nowrap; }
+.amt-u { font-weight: var(--fw-regular); color: var(--mute); word-spacing: var(--ws-unit); }
+.amt-body { font-size: var(--fs-body); }
+.amt-display { font: var(--fw-display) var(--fs-amount)/var(--lh-ui) var(--display); font-variation-settings: "SOFT" var(--soft);
+  letter-spacing: var(--ls-amount); font-variant-numeric: lining-nums tabular-nums; }
+.amt-display .amt-u { font: var(--fw-regular) var(--fs-tiny) var(--mono); letter-spacing: 0; }
+.amt-aged { color: var(--mute); }
+.amt-none { color: var(--faint); font-weight: var(--fw-regular); }
+.amt-none .amt-u { word-spacing: normal; } /* "not read yet" is words, not a unit: its spaces keep their width */
+
+/* Read age (§7.9): 12 faint; aged is mute with the clock, failed is clay with the alert; reading turns the ring. */
+.age { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint);
+  white-space: nowrap; font-variant-numeric: tabular-nums; }
+.age .spin { inline-size: var(--h-spin-age); block-size: var(--h-spin-age); }
+.age-aged { color: var(--mute); }
+.age-failed { color: var(--attn); }
+
+/* Mention (§7.11): inline at the text's own size, a --wash pill radius 4, ink 500; "@" faint. You is moss on
+   --accent-soft; a record or a page leads with its 13px glyph in mute; one the reader may not see is dashed and
+   faint, with no title. A link: focus always visible; hover underlines (no fill — only ink sits on --wash-strong). */
+.mention { display: inline-flex; align-items: baseline; gap: var(--sp-1); padding: 0 var(--sp-3); border-radius: var(--radius-xs);
+  background: var(--wash); color: var(--ink); font-weight: var(--fw-medium); white-space: nowrap; text-decoration: none; max-inline-size: 100%; }
+.mention-t { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mention:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { .mention:hover { text-decoration: underline; } }
+.mention-at { color: var(--faint); }
+.mention-rec { gap: var(--sp-3); align-items: center; }
+.mention-rec .i { color: var(--mute); align-self: center; }
+.mention-you { background: var(--accent-soft); color: var(--accent); }
+.mention-you .mention-at { color: var(--accent); }
+.mention-gone { background: transparent; color: var(--faint); font-weight: var(--fw-regular); border: var(--rule-w) dashed var(--rule-strong); }
+
+/* Presence (§7.12): 24px monograms, Sans 600 10 ink on --wash-strong, a 2px --paper ring, overlapping 4px, the first
+   on top; "+N" outlined on --raised; editing adds a 12px --solid badge with an 8px pen at the bottom end. */
+.av { position: relative; display: inline-grid; place-items: center; flex: none; inline-size: var(--h-av); block-size: var(--h-av);
+  border-radius: var(--radius-chip); background: var(--wash-strong); color: var(--ink);
+  font: var(--fw-strong) var(--fs-av)/var(--lh-ui) var(--sans); letter-spacing: var(--ls-av); }
+.pres { display: inline-flex; align-items: center; isolation: isolate; }
+.pres .av { box-shadow: 0 0 0 var(--ring-av) var(--paper); }
+.pres .av + .av { margin-inline-start: calc(-1 * var(--sp-4)); }
+.pres .av:nth-child(1) { z-index: 4; }
+.pres .av:nth-child(2) { z-index: 3; }
+.pres .av:nth-child(3) { z-index: 2; }
+.pres .av:nth-child(4) { z-index: 1; }
+.pres-sm .av { inline-size: var(--h-av-sm); block-size: var(--h-av-sm); }
+.av-more { background: var(--raised); color: var(--mute); border: var(--rule-w) solid var(--rule-strong); }
+.av-pen { position: absolute; inset-block-end: calc(-1 * var(--sp-3)); inset-inline-end: calc(-1 * var(--sp-3)); display: grid; place-items: center;
+  inline-size: var(--h-av-pen); block-size: var(--h-av-pen); border-radius: var(--radius-chip); background: var(--solid); color: var(--on-solid);
+  box-shadow: 0 0 0 var(--ring-av) var(--paper); }
+.av-pen .i { inline-size: var(--ic-pen); block-size: var(--ic-pen); stroke-width: var(--stroke-pen); }
+
+/* Visibility marker (§7.10): a 14px glyph and the word, 12/500 mute — Public, Members, Hat: Ops. A restricted
+   field's value (§6.3) is the same mark in faint with the lock. As a control (the editor bar, a record header) it is
+   a 26px outlined button with a 12px faint chevron; a widening in flight shows its target in moss. */
+.vis { display: inline-flex; align-items: center; gap: var(--sp-4); min-width: 0; font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans);
+  color: var(--mute); white-space: nowrap; }
+.vis-field { color: var(--faint); }
+.vis-to { color: var(--accent); }
+.vis-ctl { position: relative; block-size: var(--h-ctl-sm); padding: 0 var(--sp-6); border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius-ctl);
+  background: var(--raised); cursor: pointer; transition: background-color var(--dur-1) var(--ease); }
+.vis-ctl > .i-xs { inline-size: var(--ic-chev); block-size: var(--ic-chev); color: var(--faint); }
+.vis-ctl:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { .vis-ctl:hover { background: var(--wash); } }
+@media (pointer: coarse) { .vis-ctl::after { content: ""; position: absolute; inset-inline: 0; inset-block: calc((var(--h-ctl-sm) - var(--h-ctl-touch)) / 2); } }

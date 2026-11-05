@@ -1,0 +1,16 @@
+id: rules:solo
+shelf: rules
+title: Solo maintainer
+summary: What an org has until it writes rules. Every member who is a person decides alone.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [governance]
+  domain: [decisions]
+  audience: [steward]
+  maturity: raw
+related: [rules:approve-one-maintainer]
+# No installs: the solo rule is the implied default (F2 section 3.5). Writing it out would turn a default into
+# a file people have to keep up.

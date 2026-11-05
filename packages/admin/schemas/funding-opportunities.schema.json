@@ -14,19 +14,58 @@
     "amount_available",
     "relevance"
   ],
+  "x-groups": [
+    {
+      "label": "What it is",
+      "fields": [
+        "title",
+        "type",
+        "platform",
+        "url"
+      ]
+    },
+    {
+      "label": "Where it stands",
+      "fields": [
+        "status",
+        "deadline",
+        "relevance"
+      ]
+    },
+    {
+      "label": "Money",
+      "fields": [
+        "amount_available",
+        "currency"
+      ],
+      "optional": true
+    }
+  ],
   "properties": {
     "id": {
+      "title": "Id",
+      "description": "A short name, unique in this file.",
       "type": "string",
       "minLength": 1
     },
     "title": {
+      "title": "Title",
+      "description": "The programme or round, as the funder names it.",
       "type": [
         "string",
         "null"
       ]
     },
     "type": {
-      "enum": [
+      "title": "Kind",
+      "description": "What sort of funding it is.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "$comment": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "grants-round",
         "rfp",
         "bounty",
@@ -35,13 +74,23 @@
       ]
     },
     "platform": {
+      "title": "Platform",
+      "description": "Where it runs: a grants platform, a foundation.",
       "type": [
         "string",
         "null"
       ]
     },
     "status": {
-      "enum": [
+      "title": "Status",
+      "description": "Where it stands now.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "$comment": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "upcoming",
         "open",
         "closed",
@@ -49,25 +98,32 @@
       ]
     },
     "deadline": {
+      "title": "Deadline",
       "type": [
         "string",
         "null"
       ],
-      "format": "date"
+      "description": "A date (YYYY-MM-DD), or a word where there is none: rolling, TBD."
     },
     "amount_available": {
+      "title": "Amount available",
+      "description": "How much the round holds, as a number.",
       "type": [
         "number",
         "null"
       ]
     },
     "currency": {
+      "title": "Currency",
+      "description": "The currency of the amount: USD, EUR, a token.",
       "type": [
         "string",
         "null"
       ]
     },
     "relevance": {
+      "title": "Relevance",
+      "description": "How well it fits the work.",
       "enum": [
         "high",
         "medium",
@@ -75,24 +131,33 @@
       ]
     },
     "url": {
+      "title": "Link",
+      "description": "Where to read about it and apply.",
       "type": [
         "string",
         "null"
       ]
     },
     "notes": {
+      "title": "Notes",
+      "description": "Anything worth keeping in mind.",
+      "x-format": "textarea",
       "type": [
         "string",
         "null"
       ]
     },
     "applied": {
+      "title": "Applied",
+      "description": "Whether an application went in.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "application_id": {
+      "title": "Application id",
+      "description": "The funder's reference for the application.",
       "type": [
         "string",
         "null"

@@ -14,6 +14,19 @@ Each decision is a section with these fields:
 
 ---
 
+## 2026-10-16 · 0.6 is the platform release (amends 2026-08-21)
+
+**Status:** active
+**Scope:** framework, operator-ux, governance, data-model
+
+**Decision** — 0.6 is the platform release defined in `docs/superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md`: the platform frames every part of an org (records, running parts, outside systems), every change runs through the org's own rules, and the framework is rebuilt around the definitions the platform, modules and agents share. The 2026-08-21 external-pilot gate remains 0.6's release test, now run through the platform. The freeze lifts for this programme only (platform P1–P5, framework F1–F3, and the module engine). Every other frozen workstream stays frozen.
+
+**Why** — The gate exists to test the value proposition with an outside operator. The platform is what that operator would actually use, so building it under the gate strengthens the test rather than going around it. Alternatives lost: deferring the framework work to 0.7 splits the definitions from their first client and leaves the platform building against a model it would then have to migrate; dropping the gate removes the only experiment that can falsify the value proposition.
+
+**Refs** — `docs/superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md`, `docs/superpowers/specs/2026-10-15-platform-board-design.md`, `docs/superpowers/specs/2026-08-29-org-os-interfaces-design.md` (§3, amended), `docs/agent-plans/2026-08-21-portfolio-decision-memo.md`, the 2026-08-21 entry below
+
+---
+
 ## 2026-08-29 · `doctor sync`'s dirty-tree gate narrowed to the overlay's write set
 
 **Status:** active
@@ -125,6 +138,7 @@ When a decision is superseded, mark it `superseded` and add a `Superseded by:` l
 ## 2026-08-21 — External-validation milestone
 
 **Status:** active
+**Amended by:** 2026-10-16 · 0.6 is the platform release (gate kept; freeze lifted for that programme only)
 **Scope:** framework, public-surfaces
 
 **Decision:** org-os's next version milestone (v0.6) is gated on one

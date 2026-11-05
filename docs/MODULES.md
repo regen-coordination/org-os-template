@@ -33,9 +33,12 @@ from inside an instance or, more usefully, from the framework against a sibling.
 **How it works.** Six checks read one snapshot of the instance and each return
 `BLOCKER`/`WARN`/`OK` with a remediation hint: identity coherence and template leakage, lineage
 stamps, cross-scheme version surfaces, machinery integrity, structure/schemas via the
-framework's own validators, and freshness. `sync` then runs nine stages — snapshot,
-ensure-upstream, fetch, inject-machinery, sync-upstream, migrate, generate-schemas, re-assess,
-receipt — aborting on the first failure so an instance is never left half-migrated.
+framework's own validators, and freshness. `sync` then runs ten stages — snapshot,
+ensure-upstream, fetch, inject-machinery, overlay, migrate, declare-visibility (DAO-OS L8:
+declares public what `.well-known/` shows the instance already publishes, as its own commit;
+nothing once `dao.json` carries the L8 generator's mark),
+generate-schemas, re-assess, receipt — aborting on the first failure so an instance is never
+left half-migrated.
 
 The `--dir` hub mode is the point. As of the 2026-08-28 sweep **no instance could run
 `sync-upstream.mjs`** — missing in three, a 178-byte no-op in a fourth, aimed at a divergent
@@ -195,7 +198,9 @@ file-structure spec, and the module engine itself.
 **How it works.** Everything else depends on it. It ships `scripts/modules.mjs`,
 `schemas/module.schema.json`, and the validators wired into `npm run validate:schemas` and
 `npm run validate:structure` — so the module system reaches instances through the same
-materialization path as every other capability.
+materialization path as every other capability. In an instance, `validate:schemas` checks for
+leaks but not the standards schemas (no ajv there), so `--strict` cannot pass; run the
+framework's `scripts/validate-identity.mjs <instance> --strict` for the strict check.
 
 **Status.** `in-dev` — manifest validation and the schema ship today; registry loading, `add`,
 `adopt`, drift and health checks are Phase 1–3.

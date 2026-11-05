@@ -1,0 +1,215 @@
+/* The DAO map (L4 element-set spec section 8): the canvas, its nodes in every state, its edges and their labels,
+   attention and value moving, the caption; and the machine diagrams /parts draws with the same nodes and edges.
+   Laid out by the map's own width (container map: narrow under 680px of it), never the viewport's (CC-15). The
+   house map's React Flow rules stay under .hmap, the one map React Flow draws (0.6's are gone, C10). */
+
+.hmap { container: map / inline-size; display: grid; gap: var(--sp-8); min-width: 0; }
+.hmap-canvas { position: relative; min-block-size: var(--h-canvas-small); overflow: hidden;
+  background-color: var(--sunken); background-image: radial-gradient(var(--map-dot) var(--map-dot-r), transparent var(--map-dot-fade));
+  background-size: var(--map-grid) var(--map-grid); background-position: calc(var(--map-grid) / 2) calc(var(--map-grid) / 2);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius-lg); }
+.hmap-canvas:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.hmap-canvas > .note-block { margin: var(--sp-12); }
+.hmap-tools { position: absolute; inset-block-start: var(--sp-8); inset-inline-end: var(--sp-8); z-index: 5; display: flex; gap: var(--sp-4); }
+.hmap-tools .btn { background: var(--raised); }
+/* a node's move mode (C6 fix I-1): the nudge buttons, Done and Cancel, at the canvas's bottom start */
+.hmap-move { position: absolute; inset-block-end: var(--sp-8); inset-inline-start: var(--sp-8); z-index: 5; display: flex; flex-wrap: wrap;
+  gap: var(--sp-4); max-inline-size: calc(100% - 2 * var(--sp-8)); padding: var(--sp-4); background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-raise); }
+.hmap .react-flow__node { cursor: default; }
+.hmap .react-flow__handle { opacity: 0; pointer-events: none; }
+.hmap-linked { position: absolute; box-sizing: border-box; pointer-events: none; border: var(--rule-w) dashed var(--rule-strong); border-radius: var(--radius-group); }
+.hmap-linked-k { position: absolute; inset-block-start: var(--sp-6); inset-inline-start: var(--sp-8);
+  font: var(--fw-medium) var(--fs-node-k)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+
+/* a node (§8.3): one line of name, one of facts; the laid-out height (map/layers.ts LAYOUT) */
+.hnode { position: relative; box-sizing: border-box; inline-size: 100%; block-size: var(--h-node); min-width: 0; display: grid; align-content: center; gap: var(--sp-3);
+  padding: var(--sp-7) var(--sp-8); text-align: start; text-decoration: none; color: var(--ink); cursor: pointer;
+  background: var(--raised); border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius); box-shadow: var(--shadow-raise);
+  transition-property: border-color, box-shadow, opacity; transition-duration: var(--dur-2); transition-timing-function: var(--ease); }
+.hnode:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { button.hnode:hover, a.hnode:hover { border-color: var(--edge); } }
+.hnode.hnode-big { block-size: var(--h-node-big); padding: var(--sp-9) var(--sp-10); border-color: var(--edge); }
+.hnode-t { display: flex; align-items: center; gap: var(--sp-5); min-width: 0; }
+.hnode-g { display: inline-flex; flex: none; color: var(--mute); }
+.hnode-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--fw-medium) var(--fs-ui)/var(--lh-node) var(--sans); color: var(--ink); }
+.hnode-n.hnode-display { font: var(--fw-regular) var(--fs-node-big)/var(--lh-node-big) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-node-big); }
+/* the main Safe's eyebrow follows the name in the text (its name says them in that order, 2.5.3) and is drawn above it */
+.hnode-k { order: -1; font: var(--fw-medium) var(--fs-node-k)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.hnode-f { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: var(--fs-micro)/var(--lh-node-f) var(--mono); font-variant-numeric: tabular-nums; color: var(--mute); }
+.hnode-f > .spin { margin-inline-end: var(--sp-4); vertical-align: middle; }
+.hnode-lead { display: inline-flex; margin-inline-end: var(--sp-4); vertical-align: middle; }
+.hnode-lead .i { inline-size: var(--ic-node-f); block-size: var(--ic-node-f); }
+.hnode-more { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--fs-micro)/var(--lh-node-f) var(--mono); color: var(--faint); }
+
+/* its states */
+.hnode.is-selected { border-color: var(--accent); box-shadow: 0 0 0 var(--rule-w-mark) var(--accent-soft), var(--shadow-raise); }
+.hnode.is-staged { border: var(--stroke-w) solid var(--accent); }
+.hnode.is-linked, .hnode.is-empty-hat { background: transparent; border-style: dashed; box-shadow: none; }
+.hnode.is-empty-hat .hnode-n { color: var(--mute); }
+.hnode.is-draft { border: var(--stroke-w) dashed var(--accent); box-shadow: none; }
+.hnode.is-failed .hnode-f { color: var(--attn); }
+/* off the lit path: the words in --faint (4.5:1 on the node, 1.4.3), the glyphs, tags and dot at --o-dim; opacity over
+   the words would take them under 4.5:1 (C11, axe color-contrast) */
+.hnode.is-dim { border-color: var(--rule); box-shadow: none; }
+.hnode.is-dim :is(.hnode-n, .hnode-f, .hnode-k, .hnode-more) { color: var(--faint); }
+.hnode.is-dim :is(.hnode-g, .hnode-lead, .hnode-tag, .hnode-order, .hnode-dot) { opacity: var(--o-dim); }
+.hnode-tag { position: absolute; inset-block-start: calc(var(--h-node-tag) / -2); inset-inline-start: var(--sp-8); box-sizing: border-box; display: inline-flex; align-items: center;
+  block-size: var(--h-node-tag); padding: 0 var(--sp-5); border-radius: var(--radius-chip); white-space: nowrap;
+  font: var(--fw-medium) var(--fs-node-tag)/var(--lh-ui) var(--sans); background: var(--accent); color: var(--on-accent); }
+.hnode-tag.hnode-tag-draft { background: var(--sunken); color: var(--accent); border: var(--rule-w) dashed var(--accent); }
+.hnode-tag.hnode-tag-plain { background: var(--raised); color: var(--mute); border: var(--rule-w) solid var(--rule-strong); }
+.hnode-order { position: absolute; inset-block-start: calc(var(--h-node-tag) / -2); inset-inline-end: var(--sp-8); box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+  inline-size: var(--h-node-tag); block-size: var(--h-node-tag); border-radius: var(--radius-chip);
+  font: var(--fw-strong) var(--fs-node-k)/var(--lh-ui) var(--mono); background: var(--solid); color: var(--on-solid); }
+.hnode-dot { position: absolute; inset-block-start: calc(var(--h-attn-dot) / -2); inset-inline-end: calc(var(--h-attn-dot) / -2);
+  inline-size: var(--h-attn-dot); block-size: var(--h-attn-dot); border-radius: var(--radius-chip);
+  background: var(--attn); box-shadow: 0 0 0 var(--ring-attn-dot) var(--sunken); }
+.hnode-dot::after { content: ""; position: absolute; inset: calc(-1 * var(--sp-4)); border-radius: var(--radius-chip); border: var(--w-attn-ring) solid var(--attn); opacity: 0; }
+/* the dot opens the inspector at the need: a 44px target on a coarse pointer (§13) */
+@media (pointer: coarse) { .hnode-dot::before { content: ""; position: absolute; inset: calc((var(--h-attn-dot) - var(--h-ctl-touch)) / 2); } }
+
+/* edges (§8.4) and value moving (§8.5) */
+.hedge { fill: none; stroke: var(--edge); stroke-width: var(--stroke-edge);
+  transition-property: stroke, stroke-width, opacity; transition-duration: var(--dur-2); transition-timing-function: var(--ease); }
+.hedge.is-on, .hedge.is-path { stroke: var(--accent); stroke-width: var(--stroke-edge-on); }
+.hedge.is-dim { opacity: var(--o-edge-dim); }
+.hedge.is-bad { stroke: var(--attn); stroke-dasharray: var(--dash-bad); }
+.hedge-dash { fill: none; stroke: var(--accent); stroke-width: var(--stroke-flow); stroke-linecap: round; stroke-dasharray: var(--dash-flow); }
+.hdiag-head { fill: var(--edge); }
+.hlabel { position: absolute; pointer-events: none; white-space: nowrap; padding: var(--pad-elabel); border-radius: var(--radius-xs);
+  font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--mono); color: var(--mute); background: var(--sunken); }
+.hlabel.is-on { color: var(--accent); }
+.hlabel.is-dim { opacity: var(--o-edge-dim); }
+
+/* motion, finite: the attention ring runs twice, the dash three times; none under reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  .hnode-dot::after { animation-name: hring; animation-duration: var(--dur-ring); animation-timing-function: var(--ease); animation-iteration-count: 2; }
+  .hedge-dash { animation-name: hflow; animation-duration: var(--dur-flow); animation-timing-function: linear; animation-iteration-count: 3; }
+  .hedge-dash.is-against { animation-direction: reverse; }
+}
+@keyframes hring { 0% { scale: .6; opacity: var(--o-ring); } 80%, 100% { scale: 2.2; opacity: 0; } }
+@keyframes hflow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: calc(-2 * (var(--dash-flow-dot) + var(--dash-flow-gap))); } }
+
+/* the caption (§8.5) */
+.hcap { display: flex; gap: var(--sp-8); align-items: flex-start; padding: var(--sp-9) var(--sp-10); font-size: var(--fs-meta); color: var(--mute);
+  background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop); }
+.hcap-b { min-width: 0; }
+.hcap b { font-weight: var(--fw-medium); color: var(--ink); }
+.hcap-f { font: var(--fs-tiny) var(--mono); color: var(--faint); }
+.hcap p { margin: var(--sp-2) 0 0; }
+
+/* a narrow map: nodes drop their glyph and set their facts smaller (§8.2) */
+@container map (max-width: 679px) {
+  .hnode { padding: var(--sp-6); }
+  .hnode-g { display: none; }
+  .hnode-n { font-size: var(--fs-tiny); }
+  .hnode-f { font-size: var(--fs-node-narrow); }
+  .hnode.hnode-big { padding: var(--sp-7) var(--sp-6); }
+  .hnode-n.hnode-display { font-size: var(--fs-node-big-narrow); }
+  .hlabel { font-size: var(--fs-node-narrow); }
+}
+
+/* a machine diagram (§14.2): its states are map nodes, its transitions map edges */
+.hdiag { margin: var(--sp-4) 0 var(--sp-9); overflow-x: auto; }
+.hdiag-pic { position: relative; margin: var(--sp-10) 0 var(--sp-14); } /* below: room for the transitions that loop back under the last row */
+.hdiag-pic > svg { position: absolute; inset: 0; overflow: visible; }
+.hdiag-pic > .hnode { position: absolute; cursor: default; box-shadow: none; }
+.hdiag-pic > .hnode.hnode-initial { border: var(--rule-w-heavy) solid var(--edge); }
+.hdiag-pic > .hnode.hnode-final { border: var(--rule-w-mark) double var(--edge); }
+.hdiag-pic > .hlabel { z-index: 1; }
+
+/* the small map (§8.6): the record, outlined in ink, and up to six one-hop neighbours on a fixed radial template —
+   above-start, above-end, below-start, below-end, start, end — joined to it by straight lines; 188 tall in the
+   inspector, 220 on the record page */
+.mini-w { display: grid; gap: var(--sp-4); min-width: 0; }
+.mini { position: relative; min-width: 0; overflow: hidden;
+  background-color: var(--sunken); background-image: radial-gradient(var(--map-dot) var(--map-dot-r), transparent var(--map-dot-fade));
+  background-size: var(--map-grid-mini) var(--map-grid-mini); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); }
+.mini-inspector { block-size: var(--h-mini); }
+.mini-page { block-size: var(--h-mini-page); }
+.mini > svg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; }
+.mini > svg line { stroke: var(--edge); stroke-width: var(--stroke-edge); vector-effect: non-scaling-stroke; }
+.mini:dir(rtl) > svg { scale: -1 1; }
+.mini-at { position: absolute; z-index: 1; display: flex; max-inline-size: 36%; translate: -50% -50%; }
+.mini:dir(rtl) .mini-at { translate: 50% -50%; }
+.mini-at-centre { inset-inline-start: 50%; inset-block-start: 50%; max-inline-size: 40%; }
+.mini-at-above-start { inset-inline-start: 20%; inset-block-start: 20%; }
+.mini-at-above-end { inset-inline-start: 80%; inset-block-start: 20%; }
+.mini-at-below-start { inset-inline-start: 20%; inset-block-start: 80%; }
+.mini-at-below-end { inset-inline-start: 80%; inset-block-start: 80%; }
+.mini-at-start, .mini:dir(rtl) .mini-at-start { inset-inline-start: var(--sp-4); inset-block-start: 50%; max-inline-size: 24%; translate: 0 -50%; }
+.mini-at-end, .mini:dir(rtl) .mini-at-end { inset-inline-end: var(--sp-4); inset-block-start: 50%; max-inline-size: 24%; translate: 0 -50%; }
+.mini-n { position: relative; display: flex; align-items: center; gap: var(--sp-4); max-inline-size: 100%; min-width: 0; box-sizing: border-box;
+  padding: var(--sp-4) var(--sp-6); white-space: nowrap; text-decoration: none; color: var(--ink);
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-node) var(--sans);
+  background: var(--raised); border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius-ctl); box-shadow: var(--shadow-card); }
+.mini-n > .i { flex: none; inline-size: var(--ic-mini); block-size: var(--ic-mini); color: var(--mute); }
+.mini-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mini-n.is-me { border-color: var(--ink); font-weight: var(--fw-strong); }
+.mini-dot { position: absolute; inset-block-start: calc(var(--h-mini-dot) / -2); inset-inline-end: calc(var(--h-mini-dot) / -2);
+  inline-size: var(--h-mini-dot); block-size: var(--h-mini-dot); border-radius: var(--radius-chip); background: var(--attn); box-shadow: 0 0 0 var(--ring-mini-dot) var(--sunken); }
+a.mini-n:focus-visible, .mini-more:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { a.mini-n:hover { border-color: var(--edge); } }
+.mini-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+.mini-more { font-size: var(--fs-meta); color: var(--mute); }
+/* a neighbour and "+N on the map" are 44px targets on a coarse pointer (§13) */
+@media (pointer: coarse) {
+  a.mini-n::after { content: ""; position: absolute; inset-block: calc((100% - var(--h-ctl-touch)) / 2); inset-inline: 0; }
+  .mini-more { display: inline-flex; align-items: center; min-block-size: var(--h-ctl-touch); }
+}
+
+/* the compose canvas (§8.7): the Place shelf, the canvas, the selected node's inspector, and the foot; under 820px of
+   its own width the shelf wraps in a row above, the inspector goes below, and the refused connection's note leaves its
+   edge for the canvas's foot, where the canvas's scroll cannot take it out of view (container compose; B9 M-6) */
+.cmp { container: compose / inline-size; min-width: 0; }
+.cmp-shell { display: grid; grid-template-columns: var(--w-shelf) minmax(0, 1fr) var(--w-cmp-insp); overflow: hidden;
+  background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-lg); }
+.cmp-shell.cmp-read { grid-template-columns: minmax(0, 1fr) var(--w-cmp-insp); }
+.cmp-shelf { display: grid; align-content: start; gap: var(--sp-4); min-width: 0; padding: var(--sp-10) var(--sp-8); border-inline-end: var(--rule-w) solid var(--rule); }
+.cmp-eyebrow { margin-block-end: var(--sp-4); font: var(--fw-medium) var(--fs-node-k)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.cmp-item { display: flex; align-items: center; gap: var(--sp-6); block-size: var(--h-shelf-item); min-width: 0; box-sizing: border-box; padding: 0 var(--sp-6);
+  font: var(--fw-regular) var(--fs-ui)/var(--lh-ui) var(--sans); color: var(--ink); text-align: start; cursor: grab;
+  background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-cmp); }
+.cmp-item > .i { flex: none; color: var(--mute); }
+.cmp-item-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-grip { display: inline-flex; margin-inline-start: auto; color: var(--faint); }
+.cmp-item:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { .cmp-item:hover { border-color: var(--edge); } }
+@media (pointer: coarse) { .cmp-item { block-size: var(--h-ctl-touch); } }
+.cmp-canvas { position: relative; min-width: 0; min-block-size: var(--h-cmp-canvas); overflow: auto;
+  background-color: var(--sunken); background-image: radial-gradient(var(--map-dot) var(--map-dot-r), transparent var(--map-dot-fade));
+  background-size: var(--map-grid) var(--map-grid); }
+.cmp-canvas:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.cmp-plane { position: relative; }
+.cmp-plane > svg { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.cmp-node { position: absolute; z-index: 1; inline-size: var(--w-cmp-node); translate: -50% -50%; touch-action: none; }
+.cmp-node > .hnode { cursor: grab; }
+.cmp-node > .hnode.cmp-target { outline: var(--focus-w) dashed var(--accent); outline-offset: var(--focus-w); }
+.cmp-handle { position: absolute; z-index: 2; box-sizing: border-box; inline-size: var(--h-handle); block-size: var(--h-handle); cursor: crosshair;
+  background: var(--raised); border: var(--stroke-w) solid var(--accent); border-radius: var(--radius-chip); }
+.cmp-handle-n { inset-block-start: calc(var(--h-handle) / -2); inset-inline-start: calc(50% - var(--h-handle) / 2); }
+.cmp-handle-s { inset-block-end: calc(var(--h-handle) / -2); inset-inline-start: calc(50% - var(--h-handle) / 2); }
+.cmp-handle-e { inset-inline-end: calc(var(--h-handle) / -2); inset-block-start: calc(50% - var(--h-handle) / 2); }
+.cmp-handle-w { inset-inline-start: calc(var(--h-handle) / -2); inset-block-start: calc(50% - var(--h-handle) / 2); }
+@media (pointer: coarse) { .cmp-handle::after { content: ""; position: absolute; inset: calc((var(--h-handle) - var(--h-ctl-touch)) / 2); } }
+.cmp-bad { position: absolute; z-index: 3; display: flex; align-items: flex-start; gap: var(--sp-4); box-sizing: border-box; max-inline-size: var(--w-cmp-note);
+  margin-block-start: var(--sp-6); margin-inline-start: var(--sp-6); padding: var(--sp-5) var(--sp-7); font-size: var(--fs-tiny); line-height: var(--lh-ui); color: var(--attn);
+  background: var(--pop); border-radius: var(--radius-cmp); box-shadow: var(--shadow-pop); }
+.cmp-bad > .i { flex: none; }
+.cmp-insp { min-width: 0; border-inline-start: var(--rule-w) solid var(--rule); }
+.cmp-hint { margin: 0; padding: var(--sp-10); font-size: var(--fs-meta); color: var(--faint); }
+.cmp-foot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); padding: var(--sp-7) var(--sp-10);
+  border-block-start: var(--rule-w) solid var(--rule); font-size: var(--fs-meta); color: var(--mute); }
+.cmp-acts { display: inline-flex; flex-wrap: wrap; gap: var(--sp-4); margin-inline-start: auto; }
+@container compose (max-width: 819px) {
+  .cmp-shell, .cmp-shell.cmp-read { grid-template-columns: minmax(0, 1fr); }
+  .cmp-shelf { grid-template-columns: repeat(auto-fill, minmax(var(--w-shelf-item-min), 1fr)); border-inline-end: 0; border-block-end: var(--rule-w) solid var(--rule); }
+  .cmp-eyebrow { grid-column: 1 / -1; }
+  .cmp-insp { border-inline-start: 0; border-block-start: var(--rule-w) solid var(--rule); }
+  /* the canvas a column: the plane, then the note in the flow at its foot (static: the edge's left and top are not read) */
+  .cmp-canvas { display: flex; flex-direction: column; }
+  .cmp-plane { flex: none; }
+  .cmp-bad { position: static; max-inline-size: none; margin: auto var(--sp-6) var(--sp-6); }
+}

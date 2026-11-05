@@ -7,7 +7,8 @@
  *   2. Copy COMMITTED (HEAD) framework files under declared top-level entries, minus the deny-list
  *   3. Strip framework-only registries (instances.yaml, packages-matrix, skills-matrix)
  *   4. Reset markdown placeholders (IDENTITY, MASTERPLAN, MEMORY, HEARTBEAT, README) from templates/scaffold/
- *   5. Materialize packages + skills per config (sync-packages with --enabled)
+ *   5. Materialize packages + skills per config (sync-packages with --enabled); vendor the standards generator
+ *      into scripts/lib/ (packages/admin does not travel; the instance generates its own .well-known/)
  *   6. Write federation.yaml with instance identity + lineage stamp
  *   7. Render README + GETTING-STARTED + CLAUDE.md + AGENTS.md from templates
  *
@@ -38,6 +39,7 @@ import { render } from "../templates/render.mjs";
 import {
   isExcluded, isPathExcluded, topLevelDecision, isOtherLanguageTemplate, LANGUAGE_TAG,
 } from "./lib/clone-excludes.mjs";
+import { standardsVendorSet } from "./lib/standards-vendor.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -528,6 +530,28 @@ if (!dry) {
         rmSync(path.join(targetPackagesDir, entry.name), { recursive: true, force: true });
       }
     }
+  }
+}
+
+// The standards generator (DAO-OS L8, Q56). The builder of .well-known/ lives in packages/admin, which an instance
+// does not receive, so its pure core — packages/admin/lib/standards/ less the two ajv modules, and every module those
+// files import — is vendored into scripts/lib/ with the layout kept. The instance's own `generate:schemas` (and its
+// generate-schemas.yml workflow) then writes the bytes the framework's copy writes. Read from HEAD like every other
+// framework byte; the set is computed from the imports (scripts/lib/standards-vendor.mjs), never listed here.
+const vendorTexts = new Map();
+const vendored = standardsVendorSet({
+  read: (rel) => {
+    if (!vendorTexts.has(rel)) vendorTexts.set(rel, frameworkHas(rel) ? readFrameworkFile(rel) : null);
+    return vendorTexts.get(rel);
+  },
+  list: listFrameworkDir,
+});
+log("stage 5", `vendored the standards generator: ${vendored.files.length} files into scripts/lib/${dry ? " (dry)" : ""}`);
+if (!dry) {
+  for (const { from, to } of vendored.files) {
+    const d = path.join(target, to);
+    mkdirSync(path.dirname(d), { recursive: true });
+    writeFileSync(d, vendorTexts.get(from));
   }
 }
 

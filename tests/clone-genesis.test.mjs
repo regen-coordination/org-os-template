@@ -20,6 +20,7 @@ import {
   isPathExcluded, topLevelDecision, GENERATED_FILES, TOP_LEVEL_ALLOW, TOP_LEVEL_DENY,
 } from "../scripts/lib/clone-excludes.mjs";
 import { MANIFEST_PATH, parseManifest, clonePaths } from "../scripts/clone-manifest.mjs";
+import { standardsVendorSet, diskSource } from "../scripts/lib/standards-vendor.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cloneScript = path.join(rootDir, "scripts", "clone-framework.mjs");
@@ -286,11 +287,14 @@ function gitLsFiles(root) {
 
 test("containment: every file in a fresh clone is a declared, committed framework file or a generator-written one", () => {
   const tracked = new Set(gitLsFiles(rootDir));
+  // Stage 5 writes the standards generator into scripts/lib/ (DAO-OS L8, Q56): each file a committed framework module.
+  const vendoredFrom = new Map(standardsVendorSet(diskSource(rootDir)).files.map((f) => [f.to, f.from]));
   withClone((dir) => {
     const strays = listFiles(dir)
       .filter((rel) => rel !== "node_modules") // the test's own symlink, see withClone
       .filter((rel) => {
         if (GENERATED_FILES.has(rel)) return false;
+        if (vendoredFrom.has(rel) && tracked.has(vendoredFrom.get(rel))) return false;
         const copyable = tracked.has(rel)
           && topLevelDecision(rel.split("/")[0]) === "allow"
           && !isPathExcluded(rel);

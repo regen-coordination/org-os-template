@@ -6,9 +6,8 @@
   "membersURI": "https://{{BASE_URL}}/.well-known/members.json",
   "proposalsURI": "https://{{BASE_URL}}/.well-known/proposals.json",
   "activityLogURI": "https://{{BASE_URL}}/.well-known/activities.json",
-  "governanceURI": "https://{{BASE_URL}}/governance",
+  "governanceURI": "https://{{BASE_URL}}/.well-known/governance.md",
   "contractsURI": "https://{{BASE_URL}}/.well-known/contracts.json",
   "meetingsURI": "https://{{BASE_URL}}/.well-known/meetings.json",
-  "projectsURI": "https://{{BASE_URL}}/.well-known/projects.json",
   "financesURI": "https://{{BASE_URL}}/.well-known/finances.json"
 }
