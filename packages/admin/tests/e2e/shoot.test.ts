@@ -61,6 +61,8 @@ describe('the screen harness', () => {
 
   // The committed record is re-shot from the example fixtures and comes back after 0.6.0
   // (docs/superpowers/history/org-os-0.6.md); until then there is none to weigh.
+  // When PR B commits the re-shot record, require it again: make this a plain `it` whose first line is
+  // `expect(committed.length).toBeGreaterThan(0)`, so a record that goes missing fails here instead of skipping.
   const RECORD_DIR = fileURLToPath(new URL('../../../../docs/design/house-record/', import.meta.url))
   const committed = existsSync(RECORD_DIR) ? readdirSync(RECORD_DIR).filter(f => f.endsWith('.webp')) : []
   it.skipIf(committed.length === 0)('keeps every committed record within 150 KiB', () => {

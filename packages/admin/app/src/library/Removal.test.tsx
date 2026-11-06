@@ -90,7 +90,8 @@ describe('Removal', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
     // C10 (ledger; E-81, §13): the refusal is a clay note, not an alert, and it is said once through the polite region
     expect((await screen.findByText('This was removed on 2026-10-29.')).closest('.note-error')).not.toBeNull()
-    expect(voice.said).toEqual(['This was removed on 2026-10-29.'])
+    // announce() runs in an effect after the note is drawn: wait for it, as a loaded machine can find the note first
+    await waitFor(() => expect(voice.said).toEqual(['This was removed on 2026-10-29.']))
     voice.stop()
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -112,7 +113,7 @@ describe('Removal', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
     const said = await screen.findByText('Since you opened this, systems:test-link was edited. Look again and remove, or go back.')
     expect(said.closest('.note-error')).not.toBeNull() // C10: a clay note, not an alert (§13), said through the polite region
-    expect(voice.said).toContain('Since you opened this, systems:test-link was edited. Look again and remove, or go back.')
+    await waitFor(() => expect(voice.said).toContain('Since you opened this, systems:test-link was edited. Look again and remove, or go back.'))
     voice.stop()
     expect(screen.queryByText(API)).toBeNull()
     expect(document.body.textContent).not.toContain('take')

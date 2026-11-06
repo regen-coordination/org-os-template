@@ -187,6 +187,7 @@ scripts/lib/standards/ids.mjs
 scripts/lib/standards/load.mjs
 scripts/lib/standards/project.mjs
 scripts/lib/standards/proposals.mjs
+scripts/lib/test-failures.mjs
 scripts/lib/visibility.mjs
 scripts/lib/yaml-util.mjs
 scripts/lint-knowledge.mjs
@@ -261,6 +262,7 @@ tests/scripts/modules.test.mjs
 tests/scripts/sync-agents.test.mjs
 tests/scripts/sync-skills-berd.test.mjs
 tests/scripts/sync-upstream.test.mjs
+tests/scripts/test-failures.test.mjs
 tests/scripts/validate-identity.test.mjs
 tests/scripts/validate-structure.test.mjs
 tests/scripts/version-check-surfaces.test.mjs

@@ -207,8 +207,9 @@ describe('EntryPreview (§11.2)', () => {
       const voice = heard()
       fireEvent.click(screen.getByRole('button', { name: ADD }))
       expect((await screen.findByText('The change could not be read.')).closest('.note-error')).toBeTruthy()
-      // not an alert (§13, C10): the refused Add is said once through the page's polite region
-      expect(voice.said).toEqual(['The change could not be read.'])
+      // not an alert (§13, C10): the refused Add is said once through the page's polite region. announce() runs in
+      // an effect after the note is drawn, so wait for it: under load the note can be found before the effect ran.
+      await waitFor(() => expect(voice.said).toEqual(['The change could not be read.']))
       voice.stop()
     })
 

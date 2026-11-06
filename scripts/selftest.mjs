@@ -23,6 +23,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { failDetail } from "./lib/test-failures.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -103,15 +104,12 @@ function run(name, cmd, args, { optional = false, skipKey = null } = {}) {
   if (result.status === 0) {
     results.push({ name, status: "PASS", detail: "" });
   } else {
-    const tail = (result.stderr || result.stdout || "")
-      .trim()
-      .split("\n")
-      .slice(-3)
-      .join(" | ");
+    // The failing tests' names when the output has them (vitest, node --test),
+    // else the output's last lines: scripts/lib/test-failures.mjs.
     results.push({
       name,
       status: "FAIL",
-      detail: `exit ${result.status}: ${tail}`,
+      detail: failDetail(result.status, result.stdout, result.stderr),
     });
   }
 }

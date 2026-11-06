@@ -6,7 +6,26 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
-_(Append changes here as they land.)_
+### Fixed
+
+- **`selftest` names the test that failed.** A failed check now reports the failing tests' names
+  (vitest's `FAIL` headers, node --test's spec and TAP reports; `scripts/lib/test-failures.mjs`),
+  where it printed the output's last three lines. On `main` at `3e12c24f` that tail was only a
+  code frame line, `213|     })`.
+- **Three admin tests no longer race the polite region.** `EntryPreview` and `Removal` say a
+  refusal through `announce()`, which runs in an effect after the note is drawn. The tests checked
+  what was said as soon as the note was found, which a loaded machine can do before the effect
+  runs. They now wait for it.
+
+### Changed
+
+- **CI `Validate` may run 30 minutes, up from 20.** A green run takes 18–19 minutes since 0.6.
+
+### Notes
+
+- The record-weight check (`packages/admin/tests/e2e/shoot.test.ts`) skips while
+  `docs/design/house-record/` is empty. Make it required again when the re-shot record is
+  committed (PR B); the test's comment says how.
 
 ## [0.6.0] — 2026-11-05
 

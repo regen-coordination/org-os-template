@@ -9,7 +9,9 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30, not 20: with the house's tests (selftest's test:admin, the site build and its tests) a green
+    # run takes 18-19 minutes (19m03s on #21, 18m36s on main at 3e12c24f), too close to 20.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
