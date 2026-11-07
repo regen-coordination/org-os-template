@@ -142,7 +142,7 @@ What it checks and withholds:
 | `kms.yaml` | you | the configuration above |
 | `data/kms-published.json` | `publish --apply` | the manifest: per object `slug`, `type`, `rkey`, `atUri`, `cid`, `hash`, `publishedAt`; and `standardSite: { publication, documents }`. Commit it; it is the only record of what is on the PDS. |
 | `<static_dir>/api/**` | `publish` (not `--dry`) | JSON-LD per type and per entry, regenerated and wiped each run |
-| `<static_dir>/.well-known/knowledge.json`, `dao.json` | `publish` | a manifest of published domains and sources; `dao.json` is copied if present at the instance root |
+| `<static_dir>/.well-known/knowledge.json`, `dao.json` | `publish` | a manifest of published domains and sources, plus the public Geo pointers (`network`, `space`, `parent_space`; the rest of `geo:` stays out); `dao.json` is copied if present at the instance root |
 | `<static_dir>/.well-known/site.standard.publication` | `publish` | the publication's AT-URI |
 | `<static_dir>/.well-known/extensions.yaml` | `publish` | the extension-pack entity names and what they map to; written only when the instance has packs, and removed otherwise |
 | source YAML under the store | `publish` | minted `id` fields, and a minted `grc20Id` for each object when `geo.space` is set in `kms.yaml` (tracked files change; review the diff) |

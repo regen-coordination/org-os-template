@@ -12,8 +12,11 @@ What exists today:
 - The `idea-scout` skill (`skills/idea-scout/SKILL.md`) — scans `knowledge/` for gaps and
   writes `surfaced` entries.
 - The status vocabulary, which `npm run initialize` shows as an "Ideas" pipeline on the
-  dashboard (counts per status) and which `npm run generate:schemas` copies into
-  `.well-known/ideas.json`.
+  dashboard (counts per status).
+- `.well-known/ideas.json`, which `npm run generate:schemas` writes with the ideas
+  `data/visibility.yaml` makes public (`extraDocs` in `packages/admin/lib/standards/extras.mjs`).
+  Ideas are members-only unless that file says otherwise, so by default the list is empty, and
+  without `identity.daoURI` nothing is written. See [EIP4824-GUIDE.md](EIP4824-GUIDE.md).
 
 What does not exist: a web app for submitting or voting on ideas, a script that hatches a
 repository, or any code that reads `votes`, `comments` or `compensation`. `docs/MODULES.md`
