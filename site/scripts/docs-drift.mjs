@@ -35,4 +35,4 @@ const entries = pagesToCheck(PAGES).map((p) => {
 });
 
 process.stdout.write(formatDriftReport(entries));
-process.exit(0);
+process.exitCode = 0; // not process.exit(): it drops what a pipe has not yet taken of a long report
