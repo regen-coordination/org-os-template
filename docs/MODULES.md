@@ -17,7 +17,11 @@ data template, an integration — or a bundle of all five. A module is meant to 
 is and which files it owns. Five modules have a manifest in `modules/` today; the other
 fifteen entries below are catalog entries with no manifest. The idea that each instance
 tracks which modules it has installed, at what version, and whether they have drifted
-(`data/modules.yaml`) is not built: no instance has that file.
+(`data/modules.yaml`) is not built: no instance has that file. The [admin app](ADMIN-APP.md)
+reads the manifests on its Modules board
+(`packages/admin/server/resources/adapters/modules.ts`): it lists each `modules/*/module.yaml`,
+stats its `file-exists` checks, and offers each `command` check as an operation it runs only when
+asked (`server/operations/catalogue.ts`). It does not install, version or track modules.
 
 **Status vocabulary:** `planned` (specified, not built) · `in-dev` (being built) ·
 `pilot` (built and verified, not yet running in production) · `live` (in production use).
@@ -36,8 +40,10 @@ from inside an instance or, more usefully, from the framework against a sibling.
 
 **How it works.** Six checks read one snapshot of the instance and each return
 `BLOCKER`/`WARN`/`OK` with a remediation hint: identity coherence and template leakage, lineage
-stamps, cross-scheme version surfaces, machinery integrity, structure/schemas via the
-framework's own validators, and freshness. `sync` then runs ten stages — snapshot,
+stamps, cross-scheme version surfaces, machinery integrity, structure, and freshness. The
+structure check runs the framework's validators as subprocesses: `validate-structure`,
+`validate-identity`, and since 0.6 `validate-data` and `validate-governance`
+(`packages/instance-doctor/src/checks/structure.mjs`). `sync` then runs ten stages — snapshot,
 ensure-upstream, fetch, inject-machinery, overlay, migrate, declare-visibility (DAO-OS L8:
 declares public what `.well-known/` shows the instance already publishes, as its own commit;
 nothing once `dao.json` carries the L8 generator's mark),
@@ -52,12 +58,13 @@ it. (The maintainer's 2026-08-28 sweep of which instances could run `sync-upstre
 not reproducible from this repository.)
 
 Every check is a pure function over a snapshot and every side effect is injected, which is why
-the suite runs without a network: `tests/instance-doctor/` has 167 tests, all passing on this
-branch.
+the suite runs without a network: `tests/instance-doctor/` has 207 test cases (not run for this
+page).
 
-**Status.** `pilot` — built, and the suite passes offline. A run against the maintainer's real
-instances is the acceptance gate to `live`; no acceptance report is recorded in this
-repository.
+**Status.** `pilot` — built. The overlay sync was accepted end to end against one of the
+maintainer's instances, with the nine stages it had then
+(`memory/reports/overlay-acceptance-2026-08-29.md`); `declare-visibility` came after. Every
+instance is run by the maintainer, so nobody else has yet run `sync` against one.
 
 **Links:** [manifest](../modules/org-os-instance-doctor/module.yaml) ·
 [operator skill](../skills/instance-doctor/SKILL.md) ·
@@ -210,7 +217,14 @@ file-structure spec, and the module engine itself.
 `npm run validate:structure`. Today `scripts/modules.mjs` validates a manifest and does
 nothing else (see the note at the top); `tests/scripts/modules.test.mjs` and
 `tests/scripts/module-manifests.test.mjs` cover it and `modules/README.md` describes the state.
-In an instance, `validate:schemas` checks for leaks but not the standards schemas (no ajv
+In 0.6 the builder of `.well-known/` is `packages/admin/lib/standards/`, which
+`scripts/generate-all-schemas.mjs` loads; it writes nothing while `identity.daoURI` is unset, and
+`validate:structure` then stops requiring the files. An instance does not receive
+`packages/admin`, so the clone and the instance doctor vendor the builder's pure core into its
+`scripts/lib/` (`scripts/lib/standards-vendor.mjs`). Two validators joined in 0.6:
+`validate:data` (every `data/*.yaml` against the admin schemas) and `validate:governance` (the
+rules are well-formed and the history agrees with them); both run from the framework, since they
+need `packages/admin`. In an instance, `validate:schemas` checks for leaks but not the standards schemas (no ajv
 there), so `--strict` cannot pass; run the framework's `scripts/validate-identity.mjs <instance>
 --strict` for the strict check.
 
@@ -383,17 +397,23 @@ is a plan, not something this repository shows: `federation.yaml` still lists `o
 
 ### org-os-admin — Admin App
 
-**What it is.** The framework's first read-**write** web surface: editing an instance's
-registries through schema-driven forms.
+**What it is.** The local platform for an instance, which 0.6 made the centre of the framework:
+its records, the rules that decide changes to them, proposals, boards, and the outside systems
+it reads.
 
-**How it works.** A Hono API plus a Vite/React SPA writing comment-preserving YAML and
-committing every change to git. The layered proposals the design describes are not built.
+**How it works.** A Hono server and a React app in `packages/admin/`, run from the framework
+checkout against an instance (`npm run admin -- --repo <instance>`, on `127.0.0.1:4680`).
+Saving a record stages a change; the rules in `data/governance.yaml` decide whether it is applied
+as one commit or proposed and later ratified as a merge. [The admin app](ADMIN-APP.md) describes
+it in full.
 
-**Status.** `in-dev` — milestone M1 is on this branch in `packages/admin/` (`npm run admin`,
-on `127.0.0.1:4680`), with 47 test cases written; proposals, the canvas view and any auth are
-later milestones. See [the admin app](ADMIN-APP.md).
+**Status.** `in-dev` — not built: editing `data/governance.yaml`, `data/finances.yaml`,
+`data/knowledge-manifest.yaml`, `data/visibility.yaml`, `IDENTITY.md` and `federation.yaml`
+(shown read only), serving on any address but `127.0.0.1`, and regenerating `.well-known/` after
+a change. An instance does not receive the package.
 
 **Links:** [admin app](ADMIN-APP.md) ·
+[0.6 architecture](superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md) ·
 [design spec](superpowers/specs/2026-07-23-admin-app-design.md) · package `packages/admin/`
 
 ---
@@ -424,8 +444,10 @@ no federated view of ideas across instances.
 **What it is.** Membership, roles, and contribution surfaces for an instance.
 
 **How it works.** It will read the CRM registries and render who is here, what they hold, and
-what they have contributed — the human-facing counterpart to `org-os-crm`'s data. Nothing for
-it exists yet beyond the `data/members.yaml` registry.
+what they have contributed — the human-facing counterpart to `org-os-crm`'s data. What exists
+is the `data/members.yaml` registry and the admin app, which lists and edits member records on
+its People board and maps a signed-in wallet to a member (`handles.wallet`); the contribution
+surfaces and the module as a unit are not built.
 
 **Status.** `planned`.
 
@@ -439,7 +461,7 @@ it exists yet beyond the `data/members.yaml` registry.
 | **org-os-comms**      | Telegram and channel connectivity                                            |
 | **org-os-koi**        | KOI-net bridges and the OPAL integration                                     |
 | **org-os-egregore**   | `packages/egregore-core`                                                     |
-| **org-os-web3**       | Safe, Hats, and Gardens integrations                                         |
+| **org-os-web3**       | Safe, Hats, and Gardens integrations (the admin app's `server/systems/` drivers already read them) |
 
 ---
 
@@ -450,5 +472,5 @@ Deliberate exclusions, so the boundary stays legible:
 - **`workspace-improver`, `schema-generator`** — framework-maintenance tooling, absorbed into
   `org-os-standards`.
 - **`packages/dashboard`, `webapps`, `agents-app`, `regen-agents`** — apps that _consume_
-  modules. They stay npm workspaces.
+  modules. They stay packages under `packages/` (see [Packages](PACKAGES.md)).
 - **`site/`** — a deployment, not a capability.
