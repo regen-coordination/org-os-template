@@ -159,6 +159,46 @@ test('--dry-run still renders the receipt text so the operator can read the plan
   assert.match(r.receipt, /re-stamp the version surfaces 3\.0 → 0\.5/);
 });
 
+// --- .sync-freeze: the instance's own pin ---------------------------------
+
+/** An io bag over an instance that carries .sync-freeze with `text`. */
+function frozenIo(text) {
+  const io = fakeIo();
+  const read = io.readText;
+  io.readText = (p) => (p === path.join('/tmp/instance', '.sync-freeze') ? text : read(p));
+  return io;
+}
+
+test('a frozen instance is refused before the snapshot: no git call, no write, no receipt', () => {
+  const io = frozenIo('pinned to v0.5.0 until the operator moves it\n');
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(r.aborted, true);
+  assert.equal(r.abortStage, '.sync-freeze');
+  assert.deepEqual(r.frozen, { reason: 'pinned to v0.5.0 until the operator moves it' });
+  assert.equal(io.calls.length, 0, `a frozen instance must not be touched: ${JSON.stringify(io.calls)}`);
+  assert.equal(r.receiptPath, null);
+  assert.deepEqual(r.stages.map((s) => s.id), STAGE_IDS);
+  assert.ok(r.stages.every((s) => s.status === 'skipped' && s.detail.includes('pinned to v0.5.0')));
+});
+
+test('an empty .sync-freeze still freezes, as it does for sync-upstream', () => {
+  const r = runSync(fakeSnapshot(), {}, frozenIo(''));
+  assert.equal(r.aborted, true);
+  assert.deepEqual(r.frozen, { reason: '(no reason given)' });
+});
+
+test('--dry-run over a frozen instance names the freeze and still writes nothing', () => {
+  const io = frozenIo('release QA');
+  const r = runSync(fakeSnapshot(), { dryRun: true }, io);
+  assert.deepEqual(r.frozen, { reason: 'release QA' });
+  assert.equal(io.calls.length, 0);
+});
+
+test('no .sync-freeze, no freeze', () => {
+  assert.equal(runSync(fakeSnapshot(), { dryRun: true }, fakeIo()).frozen, null);
+  assert.equal(runSync(fakeSnapshot(), {}, fakeIo()).frozen, undefined);
+});
+
 // --- the happy path ------------------------------------------------------
 
 test('a clean run executes every stage in order and writes a receipt', () => {

@@ -109,6 +109,20 @@ export function visibilityDeclarationFor(dir, io) {
   };
 }
 
+/** The instance's own pin, at its root; sync-upstream.mjs reads the same file (its stage 2). */
+export const SYNC_FREEZE_FILE = '.sync-freeze';
+
+/**
+ * `{ reason }` when the instance carries `.sync-freeze`, else null. A frozen instance has asked not to be synced:
+ * sync-upstream.mjs refuses it (exit 2) and `doctor sync` refuses it too, before the snapshot, so it gets no ref, no
+ * commit and no receipt. The reason is the file's text as the operator wrote it.
+ */
+export function syncFreezeOf(dir, io) {
+  const raw = io.readText(path.join(dir, SYNC_FREEZE_FILE));
+  if (raw === null || raw === undefined) return null;
+  return { reason: String(raw).trim() || '(no reason given)' };
+}
+
 /** Where a receipt lands. `memory/reports/` matches the framework's convention. */
 export function receiptPathFor(dir, today) {
   return path.join(dir, 'memory', 'reports', `sync-receipt-${today}.md`);
@@ -234,11 +248,14 @@ export function runSync(snapshot, opts = {}, io) {
   const dir = snapshot.dir;
   const upstreamUrl = opts.upstreamUrl ?? CANONICAL_UPSTREAM_URL;
 
+  const frozen = syncFreezeOf(dir, io);
+
   if (opts.dryRun) {
     const stages = plan.map((s) => ({ ...s, status: 'planned' }));
     const { text: declarationText } = visibilityDeclarationFor(dir, io);
     return {
       declarationText,
+      frozen,
       dryRun: true,
       aborted: false,
       abortStage: null,
@@ -254,6 +271,17 @@ export function runSync(snapshot, opts = {}, io) {
         dryRun: true,
       }),
     };
+  }
+
+  // Frozen: refuse before the first stage. Nothing is written, not even the receipt, since the instance asked to be
+  // left as it is.
+  if (frozen) {
+    const stages = plan.map((s) => ({
+      ...s,
+      status: 'skipped',
+      detail: `skipped — ${SYNC_FREEZE_FILE} is present: ${frozen.reason}`,
+    }));
+    return { dryRun: false, aborted: true, abortStage: SYNC_FREEZE_FILE, frozen, stages, reassess: null, receiptPath: null, receipt: null };
   }
 
   const results = [];
