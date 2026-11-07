@@ -1,0 +1,245 @@
+/* Rows and records (§9.1, §9.3; the gallery's "rows" section): the section head, the record header and the field
+   rows. Every length is a token; an element reads its own container, never the viewport's width (CC-15). */
+
+/* Section head (the gallery's sec-h): the label in Sans 600 14, its count faint, an end slot pushed to the end */
+.sect { margin-block-start: var(--sp-11); min-width: 0; }
+.sect:first-child { margin-block-start: 0; }
+.sect-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-6); margin: 0 0 var(--sp-8); min-width: 0; }
+/* the head in the skin's label face and case, its count and end in its data face (E-79: the house's are its Sans, bare's
+   its mono capitals, as 0.6 drew a section label) */
+.sect-t { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-label) var(--label-font); letter-spacing: var(--ls-name); text-transform: var(--label-case); }
+.sect-n { color: var(--faint); font-family: var(--font-data); font-size: var(--fs-meta); font-variant-numeric: tabular-nums; }
+.sect-end { margin-inline-start: auto; display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); font-family: var(--font-data); font-size: var(--fs-meta); color: var(--mute); }
+.sect-note { color: var(--faint); }
+.sect-end a { color: var(--mute); }
+@media (hover: hover) { .sect-end a:hover { color: var(--ink); } }
+@media (pointer: coarse) {
+  .sect-end a { position: relative; }
+  .sect-end a::after { content: ""; position: absolute; inset-inline: 0; top: 50%; min-block-size: var(--h-ctl-touch); translate: 0 -50%; }
+}
+
+/* Record header (§9.1): a record's top line (id in Mono, state mark, route pill, visibility), the title, the meta and
+   who else is here, the actions. PageHead draws its title, meta and buttons the same way. */
+.rh { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); min-width: 0; }
+.rh-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6) var(--sp-8); font-size: var(--fs-tiny); color: var(--mute); }
+.rh-id { font: var(--fw-regular) var(--fs-tiny)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--mute); }
+.rh-route, .prow-route { display: inline-flex; align-items: center; block-size: var(--h-chip); padding: 0 var(--sp-6); border: var(--rule-w) solid var(--rule-strong);
+  border-radius: var(--radius-chip); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); white-space: nowrap; }
+/* The header's route pill wraps when the header is narrower than its sentence (a phone, 1.4.10), and stays a pill. */
+.rh-route { box-sizing: border-box; max-inline-size: 100%; block-size: auto; min-block-size: var(--h-chip); padding-block: var(--sp-2); white-space: normal; }
+.rh-title { margin: 0; font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); text-wrap: balance; overflow-wrap: anywhere; }
+.rh-about { margin: 0; max-inline-size: var(--w-prose); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--mute); overflow-wrap: anywhere; }
+.rh-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) 0; min-width: 0; font-family: var(--font-data); font-size: var(--fs-meta); color: var(--mute); }
+.rh-m + .rh-m::before { content: "·"; margin-inline: var(--sp-5); color: var(--faint); }
+.rh-pres { display: inline-flex; align-items: center; gap: var(--sp-4); }
+.rh-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+
+/* A System's header: the 40px tile, the eyebrow, the title, the facts line; its actions wrap under the title below
+   560px of its own width */
+.rh-sys { container: rhead / inline-size; }
+.rh-grid { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-10); align-items: start; }
+.rh-main { min-width: 0; }
+.rh-eyebrow { font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.rh-sys .rh-title { margin-block-start: var(--sp-4); }
+.rh-facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); margin-block-start: var(--sp-6); }
+.rh-gov { font-size: var(--fs-meta); color: var(--mute); }
+@container rhead (max-width: 559px) {
+  .rh-grid { grid-template-columns: auto minmax(0, 1fr); }
+  .rh-grid > .rh-acts { grid-column: 1 / -1; }
+}
+
+/* Field rows (§9.3): a two-column dl, the label 96–132px (13 mute), the value (14), a hairline between pairs.
+   Staged: the moss bar and the old value struck; stale: the clay bar. Labels stack above values under 420px. */
+.fields-w { container: field / inline-size; min-width: 0; }
+.fields { display: grid; grid-template-columns: minmax(var(--w-field-label-min), var(--w-field-label-max)) minmax(0, 1fr); column-gap: var(--sp-10); margin: 0; }
+.fields > dt, .fields > dd { margin: 0; padding: var(--sp-6) 0; border-block-start: var(--rule-w) solid var(--rule); min-width: 0; overflow-wrap: anywhere; }
+.fields > dt { display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-meta); color: var(--mute); }
+.fields > dt > .i { flex: none; color: var(--faint); }
+.fields > dt:has(+ dd textarea) { align-items: flex-start; }
+.fields > dd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5) var(--sp-6); font-size: var(--fs-body); }
+.fields > dt:first-of-type, .fields > dd:first-of-type { border-block-start: 0; }
+.fields > dd.staged { border-inline-start: var(--rule-w-heavy) solid var(--accent); padding-inline-start: var(--sp-6); }
+.fields > dd.stale { border-inline-start: var(--rule-w-heavy) solid var(--attn); padding-inline-start: var(--sp-6); }
+/* the value is one run (struck old value, then the new): its text and links flow as text, never as flex items */
+.fields-v { min-width: 0; }
+/* an input takes the value column's whole width, wrapped in its own box or not (the reference tokens: E-65) */
+.fields-v:has(input:not([type=checkbox]), select, textarea) { flex-basis: 100%; }
+.fields .was { display: inline-block; margin-inline-end: var(--sp-6); font: var(--fw-regular) var(--fs-code)/var(--lh-row) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--faint); }
+.fields .was s { text-decoration-thickness: var(--rule-w); }
+.fields > dd > .note { flex-basis: 100%; margin: 0; }
+/* a field's help (the new-record form: its schema description), a line under the value in mute */
+.fields > dd > .fields-help { flex-basis: 100%; margin: 0; max-inline-size: var(--w-prose); font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); }
+/* a restricted value (§6.3): "Ops only" in faint; the lock is the label's */
+.fields > dd > .vis-field { font: var(--fw-regular) var(--fs-meta)/var(--lh-body) var(--sans); }
+.fields > dd > .vis-field > .i { display: none; }
+@container field (max-width: 419px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .fields > dd { border-block-start: 0; padding-block-start: 0; }
+}
+
+/* 0.6's raw inputs inside field rows (ConfirmBox, the proposal page, BlockSettings), drawn as controls.css's .input
+   is, from the skin's input tokens (its padding and width in a cell too), until L4c swaps them for design/inputs */
+.fields input:not([type=checkbox]), .fields select, .fields textarea {
+  block-size: var(--h-input); inline-size: var(--input-w); min-width: 0; padding: var(--input-pad); border-radius: var(--radius-input);
+  background: var(--input-fill); border: solid var(--input-edge); border-width: var(--input-bw); color: var(--ink);
+  font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--sans); }
+.fields input::placeholder, .fields textarea::placeholder { color: var(--faint); }
+.fields input:not([type=checkbox]):focus-visible, .fields select:focus-visible, .fields textarea:focus-visible {
+  outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); border-color: var(--focus); }
+.fields [aria-invalid="true"] { border-color: var(--attn); }
+.fields input:disabled, .fields select:disabled, .fields textarea:disabled { opacity: var(--o-disabled); cursor: not-allowed; }
+.fields textarea { block-size: auto; min-block-size: var(--h-textarea); padding-block: var(--sp-6); resize: vertical;
+  font: var(--fw-regular) var(--fs-code)/var(--lh-code) var(--mono); }
+.fields textarea.prose { font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--sans); }
+/* the phone's 16px, so a focused input does not zoom the page (as controls.css's .input) */
+@container frame (max-width: 759px) {
+  .fields input:not([type=checkbox]), .fields select, .fields textarea, .fields textarea.prose { font-size: var(--fs-sub); }
+}
+
+/* Data rows (§9.2): a list in a raised surface, radius 10, a hairline between rows. A row is 56px at least, padded
+   10 16: the kind tile (28), the main (title 14/500, second line 13 mute), the trailing facts and marks. The list is
+   the `rows` container: a Systems row lays its columns out by the list's width, never the viewport's. */
+.dlist { container: rows / inline-size; min-width: 0; background: var(--raised); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.dlist-ul { list-style: none; margin: 0; padding: 0; }
+.drow { position: relative; display: grid; grid-template-columns: var(--h-ktile) minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8);
+  min-block-size: var(--h-row); padding: var(--sp-7) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule);
+  color: var(--ink); text-decoration: none; transition: background-color var(--dur-1) var(--ease); }
+.drow-li:first-child > .drow { border-block-start: 0; border-start-start-radius: var(--radius); border-start-end-radius: var(--radius); }
+.drow-li:last-child > .drow { border-end-start-radius: var(--radius); border-end-end-radius: var(--radius); }
+/* A row with an action of its own (Boards' Copy to yours): the row's link, then the action, on the same hairline */
+.drow-li-act { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; }
+.drow-act { display: flex; align-items: center; padding-inline-end: var(--sp-10); border-block-start: var(--rule-w) solid var(--rule); }
+.drow-li-act:first-child > .drow-act { border-block-start: 0; }
+.drow-main { display: grid; min-width: 0; }
+.drow-t { font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); color: var(--ink); letter-spacing: var(--ls-name); overflow-wrap: anywhere; }
+.drow-s { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-6); min-width: 0; margin-block-start: var(--sp-2);
+  font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); }
+.drow-s .was { font: var(--fw-regular) var(--fs-code)/var(--lh-row) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--faint); }
+.drow-s .was s { text-decoration-thickness: var(--rule-w); }
+.drow-end { display: flex; align-items: center; gap: var(--sp-10); color: var(--mute); font-size: var(--fs-meta); white-space: nowrap; }
+@media (hover: hover) { a.drow:hover { background: var(--row-hover); } }
+.drow:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); border-radius: var(--radius-sm); }
+/* selected: the soft moss fill and a 2px moss bar at the start; closed and faint: the whole row dimmed */
+.drow-sel { background: var(--accent-soft); }
+.drow-sel::before { content: ""; position: absolute; inset-block: var(--sp-5); inset-inline-start: 0; inline-size: var(--rule-w-heavy);
+  border-radius: var(--radius-mark); background: var(--accent); }
+/* Dimmed (closed, not in this list; §6.2): the words in --faint, which holds 4.5:1 on the raised list (1.4.3), and the
+   glyphs, tiles and marks at --o-dim. Opacity over the words would take them under 4.5:1 (C11, axe color-contrast). */
+.drow.o-dim :is(.drow-t, .drow-s, .drow-s *, .drow-end) { color: var(--faint); }
+.drow.o-dim :is(svg, .ktile, .av, .smark-shape) { opacity: var(--o-dim); }
+
+/* The Systems row (§9.2): tile · name and kind · chain · address · state · read age (end-aligned, 84). Under 760px
+   of its list the chain moves into the second line and the address and the age drop. */
+.sysrow { grid-template-columns: var(--h-ktile) minmax(0, 1.6fr) minmax(0, .9fr) minmax(0, 1fr) minmax(0, 1fr) var(--w-row-age); }
+.sysrow > .drow-end { display: contents; }
+.sysrow-chain, .sysrow-addr, .sysrow-state, .sysrow-age { display: flex; align-items: center; min-width: 0; }
+.sysrow-age { justify-self: end; }
+.sysrow-id { font: var(--fw-regular) var(--fs-code)/var(--lh-row) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sysrow-k { display: none; }
+/* A list's column head (the Systems list's Name · Chain · Where · State · Read): the row's grid, 11 faint, a hairline
+   under it; under 760px of the list, where the row folds, it goes */
+.dlist-head > .drow.dlist-h { min-block-size: 0; padding-block: var(--sp-5); border-block-start: 0; border-block-end: var(--rule-w) solid var(--rule);
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--faint); }
+@container rows (max-width: 759px) {
+  .sysrow { grid-template-columns: var(--h-ktile) minmax(0, 1fr) auto; }
+  .sysrow-chain, .sysrow-addr, .sysrow-age { display: none; }
+  .sysrow-k { display: inline-flex; }
+  .dlist-head { display: none; }
+}
+
+/* The inspector (§5.10): beside a list or the map at 1200 of frame width and over, a raised column with a start
+   hairline that runs the column's height, its content one sticky inner column. Under 1200 the same column sits in a
+   modal sheet (Inspector.tsx chooses by the frame's width): from the end over the scrim at 760–1199, from the bottom
+   on the phone, at most 88% of the height. Head: kind tile, the kind as an eyebrow, the name (Sans 600 16), close ×. */
+.insp { inline-size: var(--w-inspector); flex: none; align-self: stretch; min-width: 0; box-sizing: border-box;
+  background: var(--raised); border-inline-start: var(--rule-w) solid var(--rule); font-size: var(--fs-ui); }
+.insp-in { position: sticky; inset-block-start: 0; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
+.insp-h { display: flex; align-items: flex-start; gap: var(--sp-8); padding: var(--sp-10) var(--sp-10) var(--sp-8); }
+.insp-hm { flex: 1; min-width: 0; }
+.insp-k { font: var(--fw-medium) var(--fs-node-k)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.insp-t { margin: var(--sp-2) 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: var(--fw-strong) var(--fs-sub)/var(--lh-title) var(--sans); letter-spacing: var(--ls-name); color: var(--ink); }
+.insp-b { display: grid; gap: var(--sp-11); min-width: 0; padding: 0 var(--sp-10) var(--sp-10); }
+.insp-acts { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+/* opened at a need (E-46): the need first, in clay, before the small map */
+.insp-need { margin: 0; font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.insp-sheet { position: fixed; box-sizing: border-box; margin: 0; padding: 0; border: 0; max-inline-size: none; max-block-size: none;
+  overflow-y: auto; overscroll-behavior: contain; background: var(--raised); color: var(--ink); box-shadow: var(--shadow-pop); }
+.insp-sheet::backdrop { background: var(--scrim); }
+.insp-sheet .insp { inline-size: auto; border-inline-start: 0; }
+.insp-sheet .insp-in { position: static; max-height: none; }
+.insp-side { inset-block: 0; inset-inline: auto 0; inline-size: min(var(--w-inspector), 100%); block-size: 100dvh; }
+.insp-bottom { inset-block: auto 0; inset-inline: 0; inline-size: auto; max-block-size: var(--h-sheet-max); padding-block-end: env(safe-area-inset-bottom);
+  border-start-start-radius: var(--radius-lg); border-start-end-radius: var(--radius-lg); }
+/* a /parts specimen: the sheet open in place over its own scrim */
+.insp-sheet-inline { position: absolute; z-index: 41; }
+.insp-scrim { position: absolute; inset: 0; z-index: 40; background: var(--scrim); }
+
+/* The record page (§14.1): the main column and Touches beside it, which wraps under the main when the two do not fit
+   (a wrap by the page's own width, never a width query). Its actions under a System's header; the staged-under-you
+   card; the source in a Mono well, edited in place */
+.rp { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-13); margin-block-start: var(--sp-11); min-width: 0; }
+.rp-main { flex: 999 1 var(--w-ed-min); min-width: 0; }
+.rp-aside { flex: 1 1 var(--w-aside); display: grid; gap: var(--sp-11); align-content: start; min-width: 0; }
+.rp-acts { margin-block-start: var(--sp-8); }
+.rp-stale { display: grid; gap: var(--sp-6); margin-block: var(--sp-8); min-width: 0; }
+.rp-stale > .note { margin: 0; }
+.rp-yaml { min-block-size: var(--h-log); }
+/* A Mono well (a YAML source, a command, a job's log, a nested value): --sunken, a hairline, radius 8, Mono 12, wrapped */
+.mono-well { display: block; margin: var(--sp-6) 0 0; padding: var(--sp-8) var(--sp-9); background: var(--sunken); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius-well); font: var(--fs-tiny)/var(--lh-code) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--ink);
+  white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.fields .mono-well { margin: 0; flex-basis: 100%; }
+
+/* Operations (§14.1): each a button named by what it does, its effect faint beside it, a held one's reason under it;
+   past runs as a list; a job's log: its status mark and Cancel, what it said, the log in a Mono well that scrolls */
+.ops, .ops-runs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-6); min-width: 0; }
+.ops-i { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-8); min-width: 0; }
+.ops-k { margin: 0; font-size: var(--fs-meta); color: var(--faint); overflow-wrap: anywhere; }
+.ops-why { flex-basis: 100%; font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
+.joblog { display: grid; gap: var(--sp-6); margin-block-start: var(--sp-8); min-width: 0; }
+.joblog-h { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); }
+.joblog-said { margin: 0; font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
+.joblog .note { margin: 0; }
+.joblog-out { margin: 0; max-block-size: var(--h-log); overflow: auto; overscroll-behavior: contain; }
+
+/* An operation's past run, a button drawn as text (Operations: its log opens under it) */
+.x { all: unset; cursor: pointer; font: var(--fs-meta) var(--font-data); font-variant-numeric: var(--data-nums); color: var(--mute); }
+.x:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--sp-1); }
+
+/* A list field's values as tokens, each with its remove button, then the input that adds one (record/FieldInput) */
+.tokens { display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: baseline; }
+.token { font: var(--fs-meta) var(--font-data); font-variant-numeric: var(--data-nums); border: var(--rule-w) solid var(--edge); padding: 0 var(--sp-4);
+  border-radius: var(--radius-chip); }
+.token button { all: unset; cursor: pointer; margin-left: var(--sp-4); }
+.token button:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--sp-1); }
+.tokens input { width: var(--w-token-input); }
+
+/* A record's fields card (parts/Card: a record with no schema to draw it): its marks said above its field rows */
+.card-marks { display: flex; gap: var(--sp-7); margin: var(--sp-4) 0; }
+
+/* A plain ruled table (the tray's staged changes, a machine's transitions, the block contracts on /parts), in a block
+   that scrolls inside itself once it is wider than its place (design/Scroll: then a labelled region a keyboard can
+   focus), not the page */
+.rows { width: 100%; border-collapse: collapse; }
+.rows th, .rows td { text-align: left; vertical-align: baseline; padding: var(--sp-5) var(--sp-7) var(--sp-5) 0; border-bottom: var(--rule-w) solid var(--rule); }
+.rows th { font: var(--fw-regular) var(--fs-label) var(--label-font); text-transform: var(--label-case); letter-spacing: var(--ls-label); color: var(--faint); }
+.rows thead th { border-bottom: var(--rule-w) solid var(--divider); }
+.rows td.n, .rows th.n { font: var(--fs-meta) var(--font-data); font-variant-numeric: var(--data-nums); color: var(--mute); white-space: nowrap; }
+.rows a { color: var(--ink); text-decoration: none; font-weight: var(--fw-medium); }
+@media (hover: hover) { .rows a:hover { text-decoration: underline; } .rows tbody tr:hover td { background: var(--row-hover); } }
+.scroll[role="region"] { overflow-x: auto; }
+.scroll:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(var(--focus-w) * -1); }
+
+/* A System's reads (§14.2 DriverView): each section's rows as field rows or a table (a long cell is utilities.css's
+   two-line .clip, the whole text in its title); a link System's address in Mono, embedded only where its driver says so */
+.drv { min-width: 0; }
+/* the first read section under a block's head, or under the record page's sections */
+.drv > .sect:first-child { margin-block-start: var(--sp-8); }
+.rp-main > .drv > .sect:first-child { margin-block-start: var(--sp-11); }
+.drv > .note:first-child { margin-block-start: 0; }
+.drv-link { margin: 0; overflow-wrap: anywhere; }
+.drv-embed { display: block; inline-size: 100%; block-size: var(--h-embed); margin-block-start: var(--sp-8); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); background: var(--raised); }

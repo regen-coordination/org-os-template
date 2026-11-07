@@ -15,6 +15,8 @@
 
 import path from 'node:path';
 
+import yaml from 'js-yaml';
+
 import { CANONICAL_MACHINERY, CANONICAL_UPSTREAM_URL, normalizeRepoUrl, CANONICAL_UPSTREAM_SLUG } from './checks/machinery.mjs';
 import { FRAMEWORK_OWNED, isInstanceOwned, overlayPlan } from './overlay.mjs';
 import {
@@ -24,6 +26,88 @@ import {
   restampVersionSurfaces,
   stampLineage,
 } from './sync.mjs';
+import {
+  DECLARATION_REGISTRIES,
+  MARKDOWN_REGISTRIES,
+  OUTPUT_FILES,
+  VISIBILITY_COMMIT_SUBJECT,
+  VISIBILITY_FILE,
+  GENERATOR_MARK_KEY,
+  declareVisibility,
+  isGeneratedByL8,
+  visibilityFileFor,
+} from './visibility-declaration.mjs';
+import { standardsVendorSet, STANDARDS_SOURCE_DIR, STANDARDS_VENDOR_DIR } from '../../../scripts/lib/standards-vendor.mjs';
+
+/**
+ * The framework checkout as standardsVendorSet() reads it, through the io bag: a file's text (null when absent)
+ * and the files directly under a directory.
+ */
+export function frameworkSource(io, frameworkDir) {
+  return {
+    read: (rel) => io.readText(path.join(frameworkDir, rel)) ?? null,
+    list: (relDir) =>
+      io.listFiles(frameworkDir, `${relDir}/`).filter((rel) => !rel.slice(relDir.length + 1).includes('/')),
+  };
+}
+
+/**
+ * What the declare-visibility stage would write, read through the io bag (Ruling R31). `{ exists, text, reason }`:
+ * `exists` when data/visibility.yaml is already there; `text` null when there is nothing to write, and then `reason`
+ * says why. Nothing is written when the file has any git history (declared before, perhaps reverted: a revert
+ * stays reverted), when `.well-known/` holds no 0.6 output, or when its dao.json carries the L8 generator's mark
+ * (L8-C18: the files are L8's, not 0.6's).
+ */
+export function visibilityDeclarationFor(dir, io) {
+  if (io.readText(path.join(dir, VISIBILITY_FILE)) !== null) {
+    return { exists: true, text: null, reason: `${VISIBILITY_FILE} already exists — nothing to declare` };
+  }
+  if (isGeneratedByL8(io.readText(path.join(dir, '.well-known', 'dao.json')))) {
+    return {
+      exists: false,
+      text: null,
+      reason:
+        `.well-known/dao.json carries the L8 generator's mark (${GENERATOR_MARK_KEY}) — its files were written by the L8 ` +
+        `generator, not by 0.6, so they show nothing 0.6 published; nothing to declare`,
+    };
+  }
+  const published = OUTPUT_FILES.filter((f) => io.readText(path.join(dir, '.well-known', f)) !== null);
+  if (published.length === 0) {
+    return { exists: false, text: null, reason: `no 0.6 output in .well-known/ (${OUTPUT_FILES.join(', ')}) — nothing published today, nothing to declare` };
+  }
+  const history = io.git(dir, ['log', '--format=%H', '--', VISIBILITY_FILE]);
+  if (!history.ok) {
+    return { exists: false, text: null, reason: `${VISIBILITY_FILE}'s git history cannot be read (${history.out}) — nothing declared` };
+  }
+  if (history.out.trim() !== '') {
+    return {
+      exists: false,
+      text: null,
+      reason: `${VISIBILITY_FILE} has git history (declared before, then removed or reverted) — the org's call stands; nothing declared`,
+    };
+  }
+  const registries = {};
+  for (const name of DECLARATION_REGISTRIES) {
+    const raw = io.readText(path.join(dir, visibilityFileFor(name)));
+    if (raw === null || raw === undefined) continue;
+    try {
+      registries[name] = yaml.load(raw) ?? {};
+    } catch {
+      registries[name] = {}; // present but unreadable: its file exists, so it was published; no members fields to read
+    }
+  }
+  for (const name of MARKDOWN_REGISTRIES) {
+    if (registries[name] !== undefined) continue;
+    const md = typeof io.listFiles === 'function' ? io.listFiles(dir, `content/${name}/`) : [];
+    if (md.some((rel) => rel.endsWith('.md'))) registries[name] = {};
+  }
+  const text = declareVisibility({ hasVisibilityFile: false, hasVisibilityHistory: false, published, registries });
+  return {
+    exists: false,
+    text,
+    reason: text === null ? `the 0.6 output in .well-known/ (${published.join(', ')}) maps to no registry this instance has — nothing to declare` : null,
+  };
+}
 
 /** Where a receipt lands. `memory/reports/` matches the framework's convention. */
 export function receiptPathFor(dir, today) {
@@ -152,7 +236,9 @@ export function runSync(snapshot, opts = {}, io) {
 
   if (opts.dryRun) {
     const stages = plan.map((s) => ({ ...s, status: 'planned' }));
+    const { text: declarationText } = visibilityDeclarationFor(dir, io);
     return {
+      declarationText,
       dryRun: true,
       aborted: false,
       abortStage: null,
@@ -175,6 +261,7 @@ export function runSync(snapshot, opts = {}, io) {
   let abortStage = null;
   let reassess = null;
   let lastSyncCommit = null;
+  let declaration = null;
 
   // Carried between the migrate and receipt stages so federation.yaml is
   // written once, with both the re-stamp and the lineage stamp applied.
@@ -315,9 +402,23 @@ export function runSync(snapshot, opts = {}, io) {
     },
 
     'inject-machinery'() {
+      const frameworkDir = snapshot.framework.dir;
+
+      // The standards generator (DAO-OS L8, Q56): the instance does not carry packages/admin, where the builder
+      // of .well-known/ lives, so the same set clone stage 5 vendors is copied into scripts/lib/ — computed from
+      // the framework's imports by the one function both use. Computed before anything is copied, so a builder
+      // the vendored copy could not run stops the stage with nothing half-written. Empty for a framework that
+      // predates the builder.
+      let generator;
+      try {
+        generator = standardsVendorSet(frameworkSource(io, frameworkDir)).files;
+      } catch (e) {
+        return { status: 'failed', detail: `could not vendor the standards generator: ${e.message}` };
+      }
+
       const copied = [];
       for (const rel of CANONICAL_MACHINERY) {
-        const from = path.join(snapshot.framework.dir, rel);
+        const from = path.join(frameworkDir, rel);
         if (!io.exists(from)) continue;
         io.copy(from, path.join(dir, rel));
         copied.push(rel);
@@ -325,6 +426,11 @@ export function runSync(snapshot, opts = {}, io) {
       if (copied.length === 0) {
         return { status: 'failed', detail: 'the framework checkout carries none of the sync machinery' };
       }
+      for (const { from, to } of generator) io.copy(path.join(frameworkDir, from), path.join(dir, to));
+      const vendored = generator.map((f) => f.to);
+      const generatorNote = vendored.length
+        ? ` and the standards generator (${vendored.length} files into ${STANDARDS_VENDOR_DIR}/)`
+        : '';
 
       // Commit what we just wrote. Injecting machinery dirties the working
       // tree, and the very next stage (sync-upstream) refuses to run on a dirty
@@ -344,27 +450,32 @@ export function runSync(snapshot, opts = {}, io) {
         .map(porcelainPath)
         .filter((rel) => RECEIPT_RE.test(rel));
 
-      const toStage = [...new Set([...copied, ...leftoverReceipts])];
+      const toStage = [...new Set([...copied, ...vendored, ...leftoverReceipts])];
       const staged = io.git(dir, ['add', '--', ...toStage]);
       if (!staged.ok) return { status: 'failed', detail: `could not stage machinery: ${staged.out}` };
 
       const pending = io.git(dir, ['diff', '--cached', '--name-only']);
       if (pending.ok && pending.out) {
         const head = String(snapshot.framework?.headSha ?? '').slice(0, 12) || 'unknown';
+        const generatorFiles = vendored.length
+          ? `\n\nAnd the standards generator (${vendored.length} files into ${STANDARDS_VENDOR_DIR}/, from ${STANDARDS_SOURCE_DIR}/):\n` +
+            `${vendored.join(', ')}. The instance's generate:schemas builds its .well-known/\n` +
+            `with this copy; packages/admin, where the framework keeps it, does not travel.`
+          : '';
         const message =
           `chore(sync): install framework sync machinery\n\n` +
           `Copied from the org-os framework at ${head} by \`doctor sync\`\n` +
-          `(@org-os/instance-doctor). Files: ${copied.join(', ')}.\n\n` +
+          `(@org-os/instance-doctor). Files: ${copied.join(', ')}.${generatorFiles}\n\n` +
           `The instance could not sync itself without these; sync-upstream.mjs was\n` +
           `missing, stubbed, or stale here. Revert this commit to undo the injection.`;
         const committed = io.git(dir, ['commit', '-m', message]);
         if (!committed.ok) {
           return { status: 'failed', detail: `could not commit machinery: ${committed.out}` };
         }
-        return { status: 'ok', detail: `installed and committed ${copied.join(', ')}` };
+        return { status: 'ok', detail: `installed and committed ${copied.join(', ')}${generatorNote}` };
       }
 
-      return { status: 'ok', detail: `${copied.join(', ')} already current — nothing to commit` };
+      return { status: 'ok', detail: `${copied.join(', ')}${generatorNote} already current — nothing to commit` };
     },
 
     // Replaces the history-based sync (v0.5.1). The old stage shelled out to
@@ -433,7 +544,20 @@ export function runSync(snapshot, opts = {}, io) {
     },
 
     migrate() {
-      const migrated = io.run('npm', ['run', 'migrate', '--if-present'], dir);
+      // The framework's runner, pointed at the instance, the way the doctor runs
+      // the framework's validators (snapshot.mjs runValidator). Not the
+      // instance's own `npm run migrate`: its default target is the instance's
+      // package.json version (0.1.0, 1.0.0... across the fleet), which selects
+      // nothing, and many instances have no such script. The target is the
+      // framework's version; the runner reads a pre-0.5 framework_version as
+      // 0.5, so this runs BEFORE the re-stamp below changes it.
+      const frameworkDir = snapshot.framework?.dir;
+      const runner = frameworkDir ? path.join(frameworkDir, 'scripts', 'migrate.mjs') : null;
+      if (!runner || !io.exists(runner)) {
+        return { status: 'failed', detail: 'the framework checkout carries no scripts/migrate.mjs: nothing was migrated, so nothing is re-stamped' };
+      }
+      const target = snapshot.framework.version;
+      const migrated = io.run('node', [runner, dir, '--target', target], frameworkDir);
       if (!migrated.ok) return { status: 'failed', detail: `migrate failed: ${migrated.out}` };
 
       // The cross-scheme re-stamp. Without it the final re-assess fails B3:
@@ -462,9 +586,31 @@ export function runSync(snapshot, opts = {}, io) {
       return {
         status: 'ok',
         detail: restamped.changed.length
-          ? `migrations applied; re-stamped ${restamped.changed.join(', ')} to ${snapshot.framework.version}`
-          : 'migrations applied; version surfaces already current',
+          ? `migrations to ${target} applied; re-stamped ${restamped.changed.join(', ')} to ${snapshot.framework.version}`
+          : `migrations to ${target} applied; version surfaces already current`,
       };
+    },
+
+    'declare-visibility'() {
+      const { text, reason } = visibilityDeclarationFor(dir, io);
+      if (text === null) return { status: 'ok', detail: reason };
+      io.writeText(path.join(dir, VISIBILITY_FILE), text);
+      const staged = io.git(dir, ['add', '--', VISIBILITY_FILE]);
+      if (!staged.ok) return { status: 'failed', detail: `could not stage ${VISIBILITY_FILE}: ${staged.out}` };
+      const message =
+        `${VISIBILITY_COMMIT_SUBJECT}\n\n` +
+        `Written by \`doctor sync\` (@org-os/instance-doctor). DAO-OS L8 publishes only what ${VISIBILITY_FILE}\n` +
+        `declares public, and its default is \`members\`; this file declares public what the instance's\n` +
+        `.well-known/ shows it already published (R31), so the first regeneration does not publish less.\n\n` +
+        `This is a publication decision for the org to confirm, edit or revert (L8 rule 2, Q55). To publish\n` +
+        `less, set a collection to \`members\` in ${VISIBILITY_FILE}. Reverting this commit returns these\n` +
+        `collections to the default, \`members\`; the doctor does not write ${VISIBILITY_FILE} again once\n` +
+        `it has any history, so a revert stays reverted.`;
+      const committed = io.git(dir, ['commit', '-m', message, '--', VISIBILITY_FILE]);
+      if (!committed.ok) return { status: 'failed', detail: `could not commit ${VISIBILITY_FILE}: ${committed.out}` };
+      const head = io.git(dir, ['rev-parse', '--short', 'HEAD']);
+      declaration = { committed: true, text, subject: VISIBILITY_COMMIT_SUBJECT, commit: head.ok && head.out ? head.out : 'HEAD' };
+      return { status: 'ok', detail: `wrote and committed ${VISIBILITY_FILE} — a publication decision for the org to confirm or revert` };
     },
 
     'generate-schemas'() {
@@ -531,6 +677,7 @@ export function runSync(snapshot, opts = {}, io) {
     abortStage,
     lastSyncCommit,
     reassess,
+    declaration,
   });
 
   const receiptPath = receiptPathFor(dir, today);

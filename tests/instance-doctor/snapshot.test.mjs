@@ -159,6 +159,8 @@ test('running the validators is opt-in and reports their real results', () => {
     assert.equal(s.validators.structure.ran, true);
     assert.equal(s.validators.schemas.ran, true);
     assert.equal(typeof s.validators.schemas.exitCode, 'number');
+    assert.equal(s.validators.data.ran, true);
+    assert.equal(typeof s.validators.data.exitCode, 'number');
   });
 });
 

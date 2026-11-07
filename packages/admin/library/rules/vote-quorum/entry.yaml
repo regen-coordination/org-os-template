@@ -1,0 +1,22 @@
+id: rules:vote-quorum
+shelf: rules
+title: Vote with a quorum
+summary: Members vote for 7 days; a change passes with 3 votes cast and 60% yes.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [governance]
+  domain: [decisions]
+  audience: [member]
+  maturity: raw
+related: [rules:consent-7d]
+installs:
+  - op: update
+    record: governance:governance
+    set:
+      roles:
+        member: { all: true }
+      rules:
+        - { id: vote, applies_to: [all], propose: member, decide: { by: member, method: vote, window: P7D, quorum: 3, threshold: 0.6 } }

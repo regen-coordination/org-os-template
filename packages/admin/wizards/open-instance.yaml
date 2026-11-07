@@ -1,0 +1,64 @@
+# W1, first screens (wizards spec §5.4): open an organization. It collects the answers the framework's own
+# clone command reads and shows that command at the review. It runs nothing: creating a folder is a new
+# write path the platform does not have yet. Stops before "how it decides" and "starting set", which need
+# the library and F2's rules, and before "run". lib/open-instance.mjs makes the config; a test asks the
+# command itself whether it accepts it.
+id: open-instance
+title: Open an organization
+summary: Answer a few questions and get the command that builds a new organization's repository. Runs nothing yet.
+intro:
+  body: >-
+    Each screen is one step. Your answers are kept as a draft outside any repository, so you can close
+    the tab and come back. At the end you get the command the framework already has, with the config it
+    reads. This app does not run it for you yet.
+  writes: Nothing. Your answers are kept as a draft; no repository, folder or file of an organization is touched.
+steps:
+  - id: start
+    title: What do you want to do?
+    ask: Choose one.
+    writes: Nothing.
+    doors:
+      - { value: open, label: Open a new organization, help: Start from the framework. You answer a few questions; it builds the repository. }
+      - { value: adopt, label: Adopt a repository I already have, help: Point at an existing org-os repository and check what it lacks., later: true }
+      - { value: join, label: Join a federation as a peer, help: Add this organization to a network you already belong to., later: true }
+  - id: org
+    title: About the organization
+    ask: What it is called, what kind it is, and where its repository will be made.
+    writes: Nothing yet.
+    fields:
+      - { id: name, label: Name, kind: text, required: true }
+      - id: type
+        label: Kind
+        kind: choice
+        required: true
+        help: Sets which pages and words the new repository starts with.
+        options:
+          - { value: Cooperative, label: Cooperative, help: Members own and run it together. }
+          - { value: DAO, label: DAO, help: Governance runs on-chain. }
+          - { value: LocalNode, label: Local node, help: Works within one place. }
+          - { value: RegionalNode, label: Regional node, help: Works across a region. }
+          - { value: PersonalNode, label: Personal node, help: "One person's own practice, portfolio or garden." }
+          - { value: Project, label: Project, help: A focused initiative. }
+      - { id: description, label: One line, kind: text, required: true }
+      - id: language
+        label: Language
+        kind: choice
+        options:
+          - { value: en, label: English }
+          - { value: pt-BR, label: Português (Brasil) }
+      - { id: license, label: Licence, kind: text, help: "An SPDX identifier, as in a LICENSE file. MIT unless you say otherwise." }
+      - { id: folder, label: Folder to create, kind: text, required: true, help: The command refuses a folder that already holds files. It never deletes or overwrites. }
+  - id: you
+    title: Who is setting this up?
+    ask: The first member's name and the email git commits with.
+    writes: Nothing yet.
+    fields:
+      - { id: operatorName, label: Your name, kind: text, required: true }
+      - { id: email, label: Git email, kind: email, required: true, help: "Links you to the first member record, so the platform lets you edit." }
+review:
+  title: The command, and the file it reads
+  ask: Save the draft as draft.yaml, then run the command from the framework's folder. This app does not run it.
+  writes: Nothing. This app has no way to create a folder yet, so it shows the command and runs none of it.
+done:
+  title: Draft kept
+  body: Your answers are kept as a draft.

@@ -1,0 +1,24 @@
+/* What every skin shares: the reset and the document's own type, drawn from the skin's tokens. No value
+   here is a number a skin cannot change. */
+* { box-sizing: border-box; }
+/* The root keeps the browser's own font size (16px), as the gallery does: every rem token is drawn at its size.
+   The body text is set on body only. */
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font: var(--fs-body)/var(--lh-body) var(--sans); }
+a { color: var(--ink); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--sp-1); }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; -webkit-text-size-adjust: 100%; font-optical-sizing: auto; }
+.display { font-family: var(--display); font-variation-settings: "SOFT" var(--soft); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+@media (max-width: 759px) {
+  input, select, textarea { font-size: var(--fs-sub); }
+}
+/* Motion: colour, fill, edge, depth and fade ease by the skin's own duration (bare's is 0s, so it draws none).
+   Menus and popovers keep their cross-fade (controls.css); under reduced motion nothing else moves. */
+a, button, input, select, textarea, .token {
+  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+@media (prefers-reduced-motion: reduce) { *:not(.popover) { transition-duration: 0s !important; } }

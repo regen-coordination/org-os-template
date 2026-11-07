@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "org-os/standards/eip4824-contracts",
+  "$comment": "Transcribed from the Contracts JSON-LD Schema in EIP-4824 at 7e42221: https://github.com/ethereum/ERCs/blob/7e4222187c557efb31d728ded3ac4716342164fc/ERCS/erc-4824.md No field with no value: null and \"\" are refused anywhere (EIP-4824: a field with no value SHOULD be removed rather than left empty or null).",
+  "type": "object",
+  "properties": {
+    "@context": {
+      "const": "https://www.daostar.org/schemas"
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/str"
+          },
+          "name": {
+            "$ref": "#/$defs/str"
+          },
+          "description": {
+            "$ref": "#/$defs/str"
+          },
+          "extensions": {
+            "$ref": "#/$defs/extensions"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": {
+          "$ref": "#/$defs/value"
+        }
+      }
+    }
+  },
+  "required": [
+    "@context",
+    "contracts"
+  ],
+  "additionalProperties": {
+    "$ref": "#/$defs/value"
+  },
+  "$defs": {
+    "str": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        }
+      ]
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/value"
+      }
+    }
+  }
+}

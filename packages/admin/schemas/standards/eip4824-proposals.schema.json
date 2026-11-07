@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "org-os/standards/eip4824-proposals",
+  "$comment": "Transcribed from the Proposals JSON-LD Schema in EIP-4824 at 7e42221: https://github.com/ethereum/ERCs/blob/7e4222187c557efb31d728ded3ac4716342164fc/ERCS/erc-4824.md . extensions per DAOIP-5 x-daoip-5 at 944052f: https://github.com/metagov/daostar/blob/944052f1c35de24d2de7a42e62452403dc05cfad/DAOIPs/x-daoip-5.md No field with no value: null and \"\" are refused anywhere (EIP-4824: a field with no value SHOULD be removed rather than left empty or null).",
+  "type": "object",
+  "properties": {
+    "@context": {
+      "const": "https://www.daostar.org/schemas"
+    },
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "proposal"
+          },
+          "id": {
+            "$ref": "#/$defs/str"
+          },
+          "name": {
+            "$ref": "#/$defs/str"
+          },
+          "status": {
+            "$ref": "#/$defs/str"
+          },
+          "contentURI": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "discussionURI": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "CallDataEVM"
+                },
+                "operation": {
+                  "enum": [
+                    "call",
+                    "delegatecall"
+                  ]
+                },
+                "from": {
+                  "$ref": "#/$defs/str"
+                },
+                "to": {
+                  "$ref": "#/$defs/str"
+                },
+                "value": {
+                  "$ref": "#/$defs/str"
+                },
+                "data": {
+                  "$ref": "#/$defs/str"
+                }
+              },
+              "required": [
+                "type",
+                "operation",
+                "from",
+                "to",
+                "value",
+                "data"
+              ],
+              "additionalProperties": {
+                "$ref": "#/$defs/value"
+              }
+            }
+          },
+          "extensions": {
+            "$ref": "#/$defs/extensions"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name",
+          "status"
+        ],
+        "additionalProperties": {
+          "$ref": "#/$defs/value"
+        }
+      }
+    }
+  },
+  "required": [
+    "@context",
+    "proposals"
+  ],
+  "additionalProperties": {
+    "$ref": "#/$defs/value"
+  },
+  "$defs": {
+    "str": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/value"
+          }
+        }
+      ]
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/value"
+      }
+    }
+  }
+}

@@ -1,0 +1,278 @@
+/* Governance and chain (§9.5–9.8; the gallery's "gov" section). B5 draws the prepared-transaction card (§9.6); B4 the
+   proposal timeline, its compact form, the proposal row, the rule status and the event list; B6 the role tree and the
+   fund flow. Every length is a token; each element reads its own container,
+   never the viewport's width (CC-15). */
+
+/* The prepared-transaction card: raised, radius 10, the card shadow; its own container, narrow under 520px */
+.ptx { container: prepared / inline-size; min-width: 0; overflow: hidden; background: var(--raised); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); box-shadow: var(--shadow-card); }
+/* the head: the tile · the title (14/500) and its line · the chain chip and the signatures, or the state's mark */
+.ptx-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8); padding: var(--sp-10) var(--sp-10) var(--sp-9); }
+.ptx-main { min-width: 0; }
+.ptx-t { font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); overflow-wrap: anywhere; }
+.ptx-s { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-5); font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); }
+.ptx-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-6); }
+/* a failed read keeps the last count: the meter goes mute beside the failed age */
+.ptx-mute .meter > i.on, .ptx-mute .meter > i.you, .ptx-mute .meter-fill { background: var(--mute); }
+
+/* the calls: numbered on a 22px --wash square in Mono, the title, "from <chip> to <chip>", the amount at the end */
+.ptx-calls { list-style: none; margin: 0; padding: 0; }
+.ptx-call { display: grid; grid-template-columns: var(--h-call-n) minmax(0, 1fr) fit-content(50%); align-items: start; gap: var(--sp-8); padding: var(--sp-9) var(--sp-10);
+  border-block-start: var(--rule-w) solid var(--rule); }
+.ptx-n { display: grid; place-items: center; inline-size: var(--h-call-n); block-size: var(--h-call-n); border-radius: var(--radius-sm); background: var(--wash);
+  font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--mono); color: var(--mute); }
+.ptx-cm { min-width: 0; }
+.ptx-ct { font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); overflow-wrap: anywhere; }
+.ptx-cs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-5); margin-block-start: var(--sp-5); font-size: var(--fs-tiny); color: var(--faint); }
+.ptx-call > .amt { padding-block-start: var(--sp-2); }
+/* an amount too long for its place (above 2^53, say) wraps, at most half the call wide, never clipped by the card */
+.ptx-call > .amt, .ptx-sums > .amt { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.ptx-none { margin: 0; padding: var(--sp-9) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule); font-size: var(--fs-meta); color: var(--mute); }
+
+/* the total, in a sunken strip: its plain words, then the sum per unit */
+.ptx-total { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-8); padding: var(--sp-8) var(--sp-10);
+  background: var(--sunken); border-block-start: var(--rule-w) solid var(--rule); font-size: var(--fs-meta); color: var(--mute); }
+.ptx-sums { display: inline-flex; flex-wrap: wrap; gap: var(--sp-8); min-width: 0; }
+
+/* the payload: a closed <details>, a sunken well of dt/dd pairs in Mono 12/1.6, the data wrapped */
+.ptx-payload { border-block-start: var(--rule-w) solid var(--rule); }
+.ptx-payload > summary { display: flex; align-items: center; gap: var(--sp-5); padding: var(--sp-8) var(--sp-10); list-style: none; cursor: pointer;
+  font: var(--fw-medium) var(--fs-meta)/var(--lh-row) var(--sans); color: var(--mute); }
+@media (pointer: coarse) { .ptx-payload > summary { min-block-size: var(--h-ctl-touch); } }
+.ptx-payload > summary::-webkit-details-marker { display: none; }
+.ptx-payload > summary:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.ptx-payload > summary > .i { transition: rotate var(--dur-1) var(--ease); }
+.ptx-payload[open] > summary > .i { rotate: 90deg; }
+.ptx-well { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-2) var(--sp-10); margin: 0 var(--sp-10) var(--sp-10); padding: var(--sp-8) var(--sp-9);
+  background: var(--sunken); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-well); font: var(--fs-tiny)/var(--lh-code) var(--mono);
+  font-variant-numeric: tabular-nums slashed-zero; color: var(--ink); overflow-wrap: anywhere; }
+.ptx-well > dt { color: var(--faint); }
+.ptx-well > dd { min-width: 0; margin: 0; }
+
+/* the foot: the key and the line the house always says, then Copy payload (ghost) and Open in Safe (primary) */
+.ptx-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); padding: var(--sp-8) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule); }
+.ptx-never { display: inline-flex; align-items: center; gap: var(--sp-5); font-size: var(--fs-meta); color: var(--mute); }
+.ptx-never > .i { flex: none; color: var(--faint); }
+.ptx-acts { display: flex; gap: var(--sp-6); margin-inline-start: auto; }
+/* a refused clipboard: the JSON shown whole, for the person's own copy */
+.ptx-sel { margin: 0 var(--sp-10) var(--sp-10); padding: var(--sp-8) var(--sp-9); background: var(--sunken); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius-well); font: var(--fs-tiny)/var(--lh-code) var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+
+/* the outcome strip after read back: moss when it matched, clay when it failed or differs; the hash chip on it takes
+   the --raised fill, for contrast on moss (R-11) */
+.ptx-out { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); padding: var(--sp-8) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule);
+  background: var(--accent-soft); color: var(--accent); font-size: var(--fs-meta); }
+.ptx-out-bad { background: var(--attn-soft); color: var(--attn); }
+/* the glyph and its words keep one line together; the words wrap beside the glyph, and the hash chip follows them */
+.ptx-out-t { display: inline-flex; align-items: center; gap: var(--sp-6); min-width: 0; }
+.ptx-out-t > .i { flex: none; }
+.ptx-out .addr { background: var(--raised); }
+
+@container prepared (max-width: 519px) {
+  .ptx-h { grid-template-columns: auto minmax(0, 1fr); }
+  .ptx-end { grid-column: 1 / -1; justify-content: flex-start; }
+  .ptx-call { grid-template-columns: var(--h-call-n) minmax(0, 1fr); }
+  .ptx-call > .amt { grid-column: 2; padding-block-start: 0; }
+  .ptx-acts { inline-size: 100%; margin-inline-start: 0; }
+  .ptx-acts > .btn { flex: 1; }
+}
+
+/* The proposal timeline (§9.5): 22px markers joined by a 1px line, ink once the step is passed. Done is an ink disc
+   with the on-solid check; now an ink ring with an ink centre; waiting the strong rule's ring, its text mute 400;
+   yours a moss disc; failed a clay ring with a cross, its text clay; not needed a dashed ring. */
+.tl { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.tl-step { position: relative; display: grid; grid-template-columns: var(--h-tl-mark) minmax(0, 1fr); gap: var(--sp-8); padding-block-end: var(--sp-11); }
+.tl-step:last-child { padding-block-end: 0; }
+.tl-step::before { content: ""; position: absolute; inset-inline-start: calc((var(--h-tl-mark) - var(--rule-w)) / 2); inset-block: calc(var(--h-tl-mark) + var(--sp-2)) var(--sp-2);
+  inline-size: var(--rule-w); background: var(--rule-strong); }
+.tl-step:last-child::before { display: none; }
+.tl-done::before { background: var(--ink); }
+.tl-mk { box-sizing: border-box; display: grid; place-items: center; inline-size: var(--h-tl-mark); block-size: var(--h-tl-mark); border-radius: var(--radius-chip);
+  border: var(--stroke-w) solid var(--rule-strong); background: var(--raised); color: var(--on-solid); }
+.tl-done > .tl-mk { background: var(--solid); border-color: var(--solid); }
+.tl-current > .tl-mk { border-color: var(--ink); }
+.tl-current > .tl-mk::after { content: ""; inline-size: var(--mark); block-size: var(--mark); border-radius: var(--radius-chip); background: var(--ink); }
+.tl-yours > .tl-mk { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tl-failed > .tl-mk { border-color: var(--attn); color: var(--attn); }
+.tl-not-needed > .tl-mk { border-style: dashed; }
+.tl-b { min-width: 0; }
+.tl-t { padding-block-start: var(--sp-2); font: var(--fw-medium) var(--fs-body)/var(--lh-label) var(--sans); overflow-wrap: anywhere; }
+.tl-waiting .tl-t, .tl-not-needed .tl-t { color: var(--mute); font-weight: var(--fw-regular); }
+.tl-failed .tl-t { color: var(--attn); }
+/* the second line: the meter and its words, a date, who, a reference in Mono; it wraps, never widens the aside */
+.tl-s { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-6); margin-block-start: var(--sp-2); min-width: 0;
+  font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
+.tl-s .meter-l { font-size: inherit; white-space: normal; }
+.tl-s .mono { font: var(--fs-tiny)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+
+/* The compact form, for rows and the door: 10px dots joined by 14px lines, then one phrase */
+.tlc { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-6); min-width: 0; }
+.tlc-dots { display: inline-flex; align-items: center; flex: none; }
+.tlc-dots > i { box-sizing: border-box; flex: none; inline-size: var(--h-tl-dot); block-size: var(--h-tl-dot); border-radius: var(--radius-chip);
+  border: var(--stroke-w) solid var(--rule-strong); background: var(--raised); }
+.tlc-dots > i.d { background: var(--ink); border-color: var(--ink); }
+/* now: the ink ring, a ring of the surface inside it, the ink centre */
+.tlc-dots > i.n { padding: var(--sp-2); border-color: var(--ink); background: var(--ink); background-clip: content-box; }
+.tlc-dots > i.y { background: var(--accent); border-color: var(--accent); }
+.tlc-dots > i.f { border-color: var(--attn); background: var(--attn-soft); }
+.tlc-dots > i.s { border-style: dashed; }
+.tlc-dots > b { flex: none; inline-size: var(--w-tl-join); block-size: var(--stroke-w); background: var(--rule-strong); }
+.tlc-dots > b.d { background: var(--ink); }
+.tlc-l { font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--mute); font-variant-numeric: var(--data-nums); white-space: nowrap; }
+
+/* A proposal row (§9.2): the id in Mono, the route pill, the compact timeline and the meter in its second line; the
+   route is a rule's sentence, so its pill wraps rather than spill. Under 760px of its list the end (the deadline and
+   the marks) moves under the main, where the title keeps the row's width. */
+.prow .prow-route { max-inline-size: 100%; block-size: auto; min-block-size: var(--h-chip); padding-block: var(--sp-1); white-space: normal; line-height: var(--lh-tiny); }
+@container rows (max-width: 759px) {
+  .prow { grid-template-columns: var(--h-ktile) minmax(0, 1fr); }
+  .prow > .drow-end { grid-column: 2; flex-wrap: wrap; gap: var(--sp-2) var(--sp-8); }
+}
+.prow-id { font: var(--fw-regular) var(--fs-tiny)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--faint); }
+.prow-late { color: var(--attn); }
+
+.prow-yours .meter-l { color: var(--accent); }
+
+/* Proposals (§14.1): the three tabs over their part; the foot line of what the last fetch says, on --sunken as the
+   tray's foot is, with Sync and Share at its end; a decision as a ledger row; a rule as a field row with where it is
+   written; governance.yaml and a decision's text in a Mono well */
+.gov-panel { margin-block-start: var(--sp-10); min-width: 0; }
+.sync-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6) var(--sp-8); margin-block-start: var(--sp-8); padding: var(--sp-6) var(--sp-10);
+  background: var(--sunken); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); min-width: 0; }
+.sync-line { display: inline-flex; align-items: center; gap: var(--sp-5); flex: 1 1 auto; min-width: 0; font-size: var(--fs-meta); color: var(--mute); overflow-wrap: anywhere; }
+.sync-line > .i { flex: none; color: var(--faint); }
+.sync-acts { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-inline-start: auto; }
+.dec-word { font-size: var(--fs-meta); color: var(--mute); }
+.dec-text { margin-block-start: var(--sp-8); min-width: 0; }
+.rule-s { display: block; overflow-wrap: anywhere; }
+.rule-src { display: block; margin-block-start: var(--sp-2); font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); overflow-wrap: anywhere; }
+.gov-src { margin: var(--sp-8) 0 0; }
+.gov-well { margin: var(--sp-6) 0 0; padding: var(--sp-8) var(--sp-9); background: var(--sunken); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-well);
+  font: var(--fs-tiny)/var(--lh-code) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+
+/* The proposal page (§14.1): the main column and the aside beside it. The aside wraps under the main when the two do
+   not fit, by the page's own width (a wrap, not a width query); beside it, the main takes what is left. */
+.pp { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-13); margin-block-start: var(--sp-11); min-width: 0; }
+.pp-main { flex: 999 1 var(--w-ed-min); min-width: 0; }
+.pp-aside { flex: 1 1 var(--w-aside); display: grid; gap: var(--sp-11); align-content: start; min-width: 0; }
+.pp-body { margin-block-end: var(--sp-11); }
+.pp-prose { margin: 0; max-inline-size: var(--w-prose); font-size: var(--fs-body); line-height: var(--lh-body); white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: pretty; }
+.pp-restricted { color: var(--mute); }
+.pp-warn { color: var(--attn); }
+.pp-overall { margin: var(--sp-6) 0 0; overflow-wrap: anywhere; }
+.pp-btns { display: flex; flex-wrap: wrap; gap: var(--sp-6); align-items: baseline; margin: var(--sp-6) 0; }
+.pp-why { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.pp-cards { display: grid; gap: var(--sp-8); margin-block-end: var(--sp-8); min-width: 0; }
+/* Changes: a record's field change rows under its name; the old value struck, an arrow, the new */
+.pp-op + .pp-op { margin-block-start: var(--sp-10); }
+.pp-rec { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-6); margin: 0 0 var(--sp-4); font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); min-width: 0; }
+.pp-opk { font: var(--fw-regular) var(--fs-tiny)/var(--lh-tiny) var(--mono); color: var(--faint); }
+.pp-to { margin-inline: var(--sp-4); color: var(--faint); }
+.pp-stale { margin: var(--sp-6) 0 0; }
+.pp-diff { margin: var(--sp-6) 0 0; }
+/* the actions but the header's primary, one to a row, each with why it is held; the vote a radio group in a row */
+.pp-acts { list-style: none; margin: 0; padding: 0; }
+.pp-acts > li { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-7); align-items: center; padding: var(--sp-6) 0; border-block-start: var(--rule-w) solid var(--rule); }
+.pp-acts > li:first-child { border-block-start: 0; padding-block-start: 0; }
+.pp-form { flex-basis: 100%; display: grid; gap: var(--sp-6); min-width: 0; }
+.pp-vote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-8); margin: 0; padding: 0; border: 0; min-width: 0; }
+.pp-vote-l { float: inline-start; margin-inline-end: var(--sp-8); padding: 0; font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--mute); }
+.pp-said { margin: var(--sp-6) 0 0; }
+.pp-said:empty { margin: 0; }
+/* the propose step's line under its fields: what it writes, every member reads */
+.pp-git { margin: var(--sp-6) 0 0; overflow-wrap: anywhere; }
+
+/* A rule's status (§14.2 "rule sentence + meter"): the sentence, then the mark, the meter and what is missing; the
+   tally by name and the clock under them */
+.rst-list { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.rst { list-style: none; margin: 0; padding: var(--sp-8) 0; border-block-start: var(--rule-w) solid var(--rule); min-width: 0; }
+.rst:first-child { border-block-start: 0; padding-block-start: 0; }
+.rst-s { margin: 0; font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); overflow-wrap: anywhere; }
+.rst-m { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-8); margin: var(--sp-4) 0 0; font-size: var(--fs-meta); color: var(--mute); }
+.rst-x { min-width: 0; overflow-wrap: anywhere; }
+.rst-meta { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-8); margin: var(--sp-3) 0 0; font-size: var(--fs-tiny); color: var(--faint); }
+
+/* A proposal's events (§14.1): drawn as a comment thread is (workspace.css's .thread and .cmt) — who, what was done
+   and when, and an argument, a comment or a system's detail under it on the rule's inline-start bar, ink for an
+   objection's argument; the server's readings take the Systems glyph in place of a monogram */
+.evs-w { display: block; }
+.evt-h { margin: 0; overflow-wrap: anywhere; }
+.evt-at { font-variant-numeric: var(--data-nums); white-space: nowrap; }
+.evt-notes { font-size: var(--fs-tiny); color: var(--mute); }
+.evt-d { margin: var(--sp-4) 0 0; padding-inline-start: var(--sp-8); border-inline-start: var(--rule-w-heavy) solid var(--rule); font-size: var(--fs-meta);
+  color: var(--mute); white-space: pre-wrap; overflow-wrap: anywhere; }
+.evt-object .evt-d { color: var(--ink); }
+.evt-sys { background: var(--wash); color: var(--mute); }
+
+/* The role tree (§9.7): an APG tree, its own container. Rows 44px at least: the 18px chevron, the 26px hat disc (raised,
+   the strong rule), the name (14/500) and its id (Mono 12 faint), the wearers at the end. The hats inside a hat hang
+   from one 1px vertical by 9px elbows; the last hangs from an L that stops at its row, so a wrapped row or an open hat
+   under it never runs the line past it. */
+.rt { container: roles / inline-size; min-width: 0; }
+.rt-tree, .rt-group { list-style: none; margin: 0; padding: 0; }
+.rt-group { padding-inline-start: var(--pad-rt-indent); }
+.rt-item { position: relative; }
+.rt-group > li::before { content: ""; position: absolute; inset-inline-start: calc(-1 * var(--w-rt-elbow)); inset-block: 0; inline-size: var(--rule-w);
+  background: var(--rule-strong); }
+.rt-group > li:last-child::before { display: none; }
+.rt-row { position: relative; display: grid; grid-template-columns: var(--h-rt-tg) var(--h-rt-hat) minmax(0, 1fr) auto; align-items: center;
+  gap: var(--sp-5); min-block-size: var(--h-rt-row); padding: var(--sp-4) var(--sp-6); border-radius: var(--radius-sm); cursor: default; }
+.rt-group > li > .rt-row::before { content: ""; box-sizing: border-box; position: absolute; inset-inline-start: calc(-1 * var(--w-rt-elbow)); inset-block-start: 0; block-size: 50%;
+  inline-size: var(--w-rt-elbow); border-block-end: var(--rule-w) solid var(--rule-strong); }
+.rt-group > li:last-child > .rt-row::before { border-inline-start: var(--rule-w) solid var(--rule-strong); }
+/* the focus ring is the row's, not the whole subtree's: moved, never removed */
+.rt-row:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.rt-tg { position: relative; display: grid; place-items: center; inline-size: var(--h-rt-tg); block-size: var(--h-rt-tg); border-radius: var(--radius-xs); color: var(--faint); }
+.rt-tg > .i { transition: rotate var(--dur-1) var(--ease); }
+.rt-row[aria-expanded="true"] .rt-tg > .i { rotate: 90deg; }
+@media (pointer: coarse) { .rt-tg::after { content: ""; position: absolute; inset: calc((var(--h-rt-tg) - var(--h-ctl-touch)) / 2); } }
+.rt-hat { box-sizing: border-box; display: grid; place-items: center; inline-size: var(--h-rt-hat); block-size: var(--h-rt-hat); border-radius: var(--radius-chip);
+  border: var(--rule-w) solid var(--rule-strong); background: var(--raised); color: var(--mute); }
+.rt-nm { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2) var(--sp-6); min-width: 0; }
+.rt-n { font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); overflow-wrap: anywhere; }
+.rt-id, .rt-n-id { font-family: var(--mono); font-size: var(--fs-tiny); font-variant-numeric: tabular-nums slashed-zero; }
+.rt-id { color: var(--faint); overflow-wrap: anywhere; }
+.rt-n-id { font-weight: var(--fw-medium); }
+.rt-wear { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3) var(--sp-6); min-width: 0; font-size: var(--fs-meta);
+  color: var(--mute); }
+.rt-pres { display: inline-flex; align-items: center; }
+.rt-pres > .av-more { margin-inline-start: calc(-1 * var(--sp-4)); box-shadow: 0 0 0 var(--ring-av) var(--paper); }
+/* an empty hat: the dashed disc, the name mute; yours: the moss outline; selected: the soft fill */
+.rt-empty .rt-hat { border-style: dashed; background: transparent; color: var(--faint); }
+.rt-empty .rt-n { color: var(--mute); }
+.rt-yours .rt-hat { border-color: var(--accent); color: var(--accent); }
+.rt-sel { background: var(--accent-soft); }
+@media (hover: hover) { .rt-row:hover { background: var(--row-hover); } .rt-row.rt-sel:hover { background: var(--accent-soft); } }
+/* under 520px the wearers move under the name: the row keeps its first line at the top, the disc, chevron and name
+   level on it, and the elbow meets the disc rather than the row's middle */
+@container roles (max-width: 519px) {
+  .rt-row { grid-template-columns: var(--h-rt-tg) var(--h-rt-hat) minmax(0, 1fr); align-items: start; }
+  .rt-wear { grid-column: 3; justify-content: flex-start; }
+  .rt-tg { margin-block-start: calc((var(--h-rt-hat) - var(--h-rt-tg)) / 2); }
+  .rt-nm { min-block-size: var(--h-rt-hat); align-content: center; }
+  .rt-group > li > .rt-row::before { block-size: calc(var(--sp-4) + var(--h-rt-hat) / 2); }
+}
+
+/* The fund flow (§9.8): its own container. Bands are the strong rule's cubic paths, their widths the data's (an
+   attribute on each path, never this sheet); proposed and prepared bands are moss at half. Nodes are 52px
+   rounded boxes, the name in Sans and the amount in Mono; the Safe's box takes the edge colour. Under 600px it is a
+   list of rows. */
+.ff { container: flow / inline-size; min-width: 0; }
+.ff-svg { display: block; inline-size: 100%; max-inline-size: var(--w-ff); block-size: auto; margin-inline: auto; }
+.ff-band { fill: none; stroke: var(--rule-strong); }
+.ff-band-on { stroke: var(--accent); opacity: var(--o-proposed); }
+.ff-nd { fill: var(--raised); stroke: var(--rule-strong); }
+.ff-safe { stroke: var(--edge); }
+.ff-svg text { fill: var(--ink); font-family: var(--sans); font-size: var(--fs-meta); }
+.ff-svg text.ff-m { fill: var(--mute); font-family: var(--mono); font-size: var(--fs-micro); font-variant-numeric: tabular-nums slashed-zero; }
+.ff-svg text.ff-e { fill: var(--faint); font-family: var(--mono); font-size: var(--fs-micro); letter-spacing: var(--ls-eyebrow); }
+.ff-svg text.ff-sn { font-family: var(--display); font-size: var(--fs-d-body); }
+.ff-list { display: none; list-style: none; margin: 0; padding: 0; }
+.ff-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2) var(--sp-4); padding: var(--sp-8) 0; border-block-start: var(--rule-w) solid var(--rule);
+  font-size: var(--fs-body); }
+.ff-row:first-child { border-block-start: 0; }
+.ff-path { font-weight: var(--fw-medium); overflow-wrap: anywhere; }
+@container flow (max-width: 599px) {
+  .ff-svg { display: none; }
+  .ff-list { display: block; }
+}

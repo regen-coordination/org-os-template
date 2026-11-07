@@ -1,0 +1,21 @@
+# The home board (L4 spec §14.1): Home's line and the day are its head (boards/HomeHead.tsx); then what waits on you,
+# every System as rows with List · Map, and what happened recently. Projects, crew and the operations live in
+# Workspace and the Instance group now. An instance replaces it with a board of id "home" in data/boards.yaml.
+id: home
+name: "{org}"
+audience: members
+layout: flow
+blocks:
+  - id: needs
+    type: needs
+    title: Needs you
+    view: { count: title, limit: 5, link: { href: /needs, label: "All →" } }
+  - id: systems
+    type: systems
+    title: Systems
+    view: { count: title }
+  - id: recently
+    type: recently
+    title: Recently
+    source: { recently: all }
+    view: { limit: 6, empty: "Nothing decided or executed yet." }

@@ -1,0 +1,187 @@
+/* /parts (ruling L4-R1): the index, and the Tokens group, ported from the approved gallery's tokens section
+   with every raw value replaced by a house token. The Blocks and Machines groups' helpers are at the end. */
+
+/* the index */
+.parts-lede { margin: 0 0 var(--sp-12); color: var(--mute); max-width: var(--w-prose); text-wrap: pretty; }
+.parts-index { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--w-kcol)), 1fr)); gap: var(--sp-4) var(--sp-12); }
+.parts-index li { min-width: 0; padding: var(--sp-6) 0; border-bottom: var(--rule-w) solid var(--rule); }
+.parts-index a { color: var(--ink); font-weight: var(--fw-medium); }
+.parts-index-note { color: var(--faint); font-size: var(--fs-meta); }
+
+/* Tokens */
+.tk { display: grid; gap: var(--sp-14); min-width: 0; }
+.tk-lede { margin: 0; color: var(--mute); max-width: var(--w-prose); text-wrap: pretty; }
+.tk-lede code { font: var(--fs-code) var(--mono); }
+.tk-part { min-width: 0; container-type: inline-size; }
+.tk-h { font: var(--fw-strong) var(--fs-ui)/var(--lh-row) var(--sans); margin: 0 0 var(--sp-8); display: flex; align-items: baseline; gap: var(--sp-8); flex-wrap: wrap; }
+.tk-h span { font-weight: var(--fw-regular); color: var(--faint); font-size: var(--fs-tiny); }
+.tk-cap, .tk-type dt, .tk-motion dt { font: var(--fw-medium) var(--fs-micro)/var(--lh-row) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); margin: 0; }
+
+.tk-sws { margin: 0; padding: var(--sp-10); list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--w-inspector)), 1fr)); gap: var(--sp-6) var(--sp-13);
+  background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop); }
+.tk-sw { display: grid; grid-template-columns: var(--sp-15) minmax(0, 1fr) auto; gap: var(--sp-8); align-items: center; font-size: var(--fs-tiny); min-width: 0; }
+.tk-chip { display: block; inline-size: var(--sp-15); block-size: var(--h-addr); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-sm); overflow: hidden; }
+.tk-sw-t { min-width: 0; overflow-wrap: anywhere; font: var(--fw-regular) var(--fs-tiny)/var(--lh-row) var(--mono); }
+.tk-sw-t b { font-weight: var(--fw-medium); color: var(--ink); }
+.tk-role { font-family: var(--sans); color: var(--mute); }
+.tk-r { font: var(--fs-micro) var(--mono); color: var(--mute); text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.tk-type { margin: 0; display: grid; grid-template-columns: var(--w-tile) minmax(0, 1fr); gap: var(--sp-6) var(--sp-12); align-items: baseline; }
+.tk-type dt { padding-top: var(--sp-4); }
+.tk-type dd { margin: 0; min-width: 0; overflow-wrap: anywhere; border-bottom: var(--rule-w) solid var(--rule); padding-bottom: var(--sp-8); }
+@container (max-width: 560px) { .tk-type { grid-template-columns: minmax(0, 1fr); } .tk-type dd { margin-bottom: var(--sp-6); } }
+.tk-hero { font: var(--fw-display) var(--fs-d-hero)/var(--lh-d-hero) var(--display); font-variation-settings: "SOFT" var(--soft-hero); letter-spacing: var(--ls-display); }
+.tk-hero em { color: var(--accent); }
+.tk-dsec { font: var(--fw-display) var(--fs-d-sec)/var(--lh-d-sec) var(--display); font-variation-settings: "SOFT" var(--soft-sec); letter-spacing: var(--ls-d-sec); }
+.tk-lead { font: var(--fw-regular) var(--fs-d-lead)/var(--lh-d-lead) var(--display); font-variation-settings: "SOFT" var(--soft); }
+.tk-greet { font: var(--fw-regular) var(--fs-greet)/var(--lh-greet) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-title); }
+.tk-title { font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); text-wrap: balance; }
+.tk-body { font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--sans); }
+.tk-body b { font-weight: var(--fw-medium); }
+.tk-body span { color: var(--mute); }
+.tk-prose { margin: 0; max-width: var(--w-prose); font: var(--fw-regular) var(--fs-sub)/var(--lh-prose) var(--sans); text-wrap: pretty; }
+.tk-meta { font: var(--fw-regular) var(--fs-meta)/var(--lh-row) var(--sans); color: var(--mute); }
+.tk-code { font: var(--fw-regular) var(--fs-code)/var(--lh-code) var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.tk-eyebrow { font: var(--fw-medium) var(--fs-micro) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+
+/* two cards a row on a wide page, as the gallery draws them; one on a narrow one */
+.tk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--w-inspector) + 2 * var(--sp-13))), 1fr)); gap: var(--sp-8); }
+.tk-card { background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop); padding: var(--sp-10); display: grid; gap: var(--sp-8); align-content: start; min-width: 0; }
+.tk-note { margin: 0; color: var(--faint); font-size: var(--fs-tiny); }
+.tk-scale, .tk-radii, .tk-depths { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; }
+.tk-scale { align-items: flex-end; gap: var(--sp-6); }
+.tk-scale li, .tk-radii li { display: grid; gap: var(--sp-4); justify-items: center; font: var(--fs-micro) var(--mono); color: var(--faint); }
+.tk-scale i { display: block; background: var(--accent-soft); border: var(--rule-w) solid var(--accent); }
+.tk-radii { gap: var(--sp-10); }
+.tk-radii i { display: block; inline-size: var(--sp-15); block-size: var(--h-ctl-touch); background: var(--wash); border: var(--rule-w) solid var(--rule-strong); }
+.tk-radii [data-r=radius-xs] { border-radius: var(--radius-xs); }
+.tk-radii [data-r=radius-sm] { border-radius: var(--radius-sm); }
+.tk-radii [data-r=radius-ctl] { border-radius: var(--radius-ctl); }
+.tk-radii [data-r=radius] { border-radius: var(--radius); }
+.tk-radii [data-r=radius-pop] { border-radius: var(--radius-pop); }
+.tk-radii [data-r=radius-lg] { border-radius: var(--radius-lg); }
+.tk-radii [data-r=radius-plate] { border-radius: var(--radius-plate); }
+.tk-depths { gap: var(--sp-12); }
+.tk-depths li { inline-size: var(--w-node-min); block-size: var(--h-kcol); border-radius: var(--radius); background: var(--raised); display: grid; place-items: center; font: var(--fs-micro) var(--mono); color: var(--mute); }
+.tk-depths [data-depth=flat] { border: var(--rule-w) solid var(--rule); }
+.tk-depths [data-depth=card] { border: var(--rule-w) solid var(--rule); box-shadow: var(--shadow-card); }
+.tk-depths [data-depth=raise] { border: var(--rule-w) solid var(--rule-strong); box-shadow: var(--shadow-raise); }
+.tk-depths [data-depth=pop] { border: var(--rule-w) solid transparent; background: var(--pop); box-shadow: var(--shadow-pop); }
+.tk-motion { margin: 0; display: grid; gap: var(--sp-6); }
+.tk-motion > div { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); flex-wrap: wrap; border-bottom: var(--rule-w) dashed var(--rule); padding-bottom: var(--sp-5); }
+.tk-motion > div:last-child { border-bottom: 0; }
+.tk-motion dd { margin: 0; font: var(--fs-code) var(--mono); }
+
+/* a group's page (/parts/:group) as near the approved gallery's width as the frame allows (ruling R-12, R-12b):
+   where the frame has its sidebar, main's inline padding narrows to the gallery's 24px gutter, and the group takes
+   the rest, up to the gallery's 1272px; narrower, main keeps its own padding */
+.pg-page { max-inline-size: var(--w-parts); margin-inline: auto; min-width: 0; }
+@media (min-width: 1100px) { .main:has(> .pg-page) { padding-inline: var(--sp-12); } }
+
+/* Controls, and the element groups after it: the gallery's spec cards — an eyebrow caption, then the element
+   in its states, one state a row. Hover, focus and pressed are drawn by the pg-* wrappers, not by a pointer. */
+.pg { display: grid; gap: var(--sp-13); min-width: 0; }
+.pg-lede { margin: 0; color: var(--mute); max-width: var(--w-prose); text-wrap: pretty; }
+/* four cards a row in a 1120px main column, as the gallery's four; one under 390 */
+.pg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--w-aside) - var(--sp-12))), 1fr)); gap: var(--sp-8); }
+/* a group laid out two a row (rows), as the gallery's spec-grid two; one under its narrowest */
+.pg-grid.pg-two { grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--w-spec-two)), 1fr)); }
+.pg-heads { display: grid; gap: var(--sp-12); min-width: 0; }
+/* a group's element beside a phone-wide column of its other states (needs), as the gallery's side-by; one column
+   below the frame's sidebar width */
+.pg-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-12); align-items: start; min-width: 0; }
+@container frame (min-width: 1100px) { .pg-side { grid-template-columns: minmax(0, 1fr) var(--w-specimen-phone); } }
+.pg-side-col { display: grid; gap: var(--sp-10); align-content: start; min-width: 0; }
+.pg-side-col .note { margin: 0; padding-inline: var(--sp-4); }
+.pg-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-8); align-content: start; min-width: 0; padding: var(--sp-10); container-type: inline-size;
+  background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop); }
+.pg-cap { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono);
+  letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.pg-states { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); }
+.pg-state { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-8); min-height: calc(var(--h-ctl) - var(--sp-2));
+  padding-bottom: var(--sp-5); border-bottom: var(--rule-w) dashed var(--rule); }
+.pg-state:last-child { border-bottom: 0; }
+.pg-state .note { margin: 0; }
+.pg-state > .skel { flex: 1 1 100%; } /* a skeleton takes the card's width, under its state's name */
+.pg-demo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); min-width: 0; }
+.pg-choices { display: grid; gap: var(--sp-6); }
+.pg-tip { padding-block-start: var(--sp-13); }
+.pg-hover .btn { background: var(--wash); }
+.pg-hover .btn.primary { background: var(--solid); opacity: var(--o-hover); }
+.pg-hover .addr { background: var(--wash-strong); }
+.pg-focus .btn { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.pg-focus .input { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); border-color: var(--focus); }
+.pg-press .btn { scale: var(--press-scale); }
+.drow.pg-hover { background: var(--row-hover); }
+.drow.pg-focus { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); border-radius: var(--radius-sm); }
+
+/* The frame group (A10): each specimen is the house frame at a fixed width, framed as the gallery frames it — a
+   rounded, raised box that clips what the frame draws, as tall as the gallery's (the rail's shorter). */
+.pg-frame { min-width: 0; overflow: hidden; border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop);
+  background: var(--paper); box-shadow: var(--shadow-raise); }
+.pg-frame > .frame { block-size: var(--h-specimen); }
+.pg-frame.short > .frame { block-size: var(--h-specimen-short); }
+.pg-frame.pg-phone { inline-size: 100%; max-inline-size: var(--w-specimen-phone); }
+/* the palette and the key map in place (A12): the palette on the scrim; beside it, in a card, the empty line and the
+   key map, flat (a hairline, no shadow), as the gallery draws them; one column on a phone */
+.pg-pal { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-10); }
+@container frame (min-width: 1100px) { .pg-pal { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pg-pal-scrim { display: grid; justify-items: center; align-content: start; min-width: 0; padding: var(--sp-13) var(--sp-10);
+  background: var(--scrim); border-radius: var(--radius-pop); }
+.pg-pal-col { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--sp-10); min-width: 0; padding: var(--sp-10);
+  background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop); }
+.pg-pal-col .pal { inline-size: 100%; box-shadow: none; border-color: var(--rule); }
+/* /parts/map: the node anatomy on the canvas colour, a caption over each node; the map at a phone's width */
+.pg-anatomy { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--w-tile)), 1fr)); gap: var(--sp-14) var(--sp-10);
+  padding: var(--sp-13) var(--sp-12) var(--sp-12); background: var(--sunken); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-lg); }
+.pg-anat { display: grid; gap: var(--sp-6); align-content: start; min-width: 0; }
+.pg-mapview { display: grid; gap: var(--sp-8); justify-items: start; min-width: 0; }
+.pg-mapview > :not(.seg) { justify-self: stretch; }
+.pg-phone-map { inline-size: 100%; max-inline-size: var(--w-specimen-phone); }
+.pg-sub { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-8); font: var(--fw-strong) var(--fs-ui)/var(--lh-label) var(--sans); }
+.pg-sub span { font-weight: var(--fw-regular); font-size: var(--fs-tiny); color: var(--faint); }
+.pg-home { display: grid; gap: var(--sp-5); }
+.pg-home .tk-greet { margin: 0; }
+.pg-home-s { margin: 0; color: var(--mute); font-size: var(--fs-meta); }
+.pg-rec { display: grid; gap: var(--sp-6); }
+.pg-rec-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+.pg-rec-t { margin: 0; font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); }
+.pg-state .who { padding: 0; } /* presence's "signed-in as": the identity's face, flush in its row */
+
+/* The tray group (A13): the expanded change on its own surface beside the collapsed bars and the discard question,
+   as the gallery's two columns; one column on a phone. Each bar is drawn as the gallery draws it, a rounded surface;
+   on a phone it is the phone's card (frame.css). */
+.pg-tray { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-8); align-items: start; }
+@container frame (min-width: 1100px) { .pg-tray { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pg-tray-x { min-width: 0; overflow: hidden; border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop); box-shadow: var(--shadow-card); }
+.pg-tray-col { display: grid; gap: var(--sp-8); align-content: start; min-width: 0; }
+.pg-tray-bar { border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop); box-shadow: var(--shadow-card); }
+/* a sign-in specimen: its state's name over the card (§11.4) */
+.pg-signin { display: grid; gap: var(--sp-6); align-content: start; min-width: 0; }
+/* /parts/lib: a wizard specimen under its state's name, and one as narrow as a phone (§11.3) */
+.pg-wiz { display: grid; gap: var(--sp-6); align-content: start; min-width: 0; }
+.pg-phone-wiz { inline-size: 100%; max-inline-size: var(--w-specimen-phone); }
+.pg-card .dialog-inline { padding: 0; border: 0; background: none; box-shadow: none; }
+/* /parts/rows' inspector beside a list, and on the phone (B9) */
+.pg-insp { display: flex; align-items: stretch; min-width: 0; }
+.pg-insp > .dlist { flex: 1; align-self: flex-start; min-width: 0; }
+.pg-insp > .insp { max-inline-size: 100%; } /* the specimen beside its list never outgrows a phone's card (1.4.10) */
+.pg-phone-sheet { position: relative; inline-size: 100%; max-inline-size: var(--w-specimen-phone); block-size: var(--h-specimen-short); overflow: hidden; background: var(--paper); border: var(--rule-w) solid var(--rule); }
+.pg-phone-sheet .insp-bottom { max-block-size: 88%; }
+/* /parts/map-compose: the small map as wide as the inspector */
+.pg-mini-insp { max-inline-size: var(--w-inspector); }
+/* /parts/views: a table as narrow as a phone, drawn as cards (§10.2) */
+.pg-narrow { max-inline-size: var(--w-specimen-phone); }
+
+/* The Blocks and Machines groups (0.6's parts the house still draws): a row of specimens, a labelled input, each
+   block type's states in three columns (one under 760px of the frame), a caption over each */
+.parts-row { display: flex; flex-wrap: wrap; gap: var(--sp-8); align-items: baseline; margin: var(--sp-7) 0; }
+/* a full card's field rows are their own container (B1): a container has no width of its own to give a flex row,
+   so the full cards share the row instead of shrinking to nothing */
+.parts-row > .card.full { flex: 1 1 var(--w-aside); min-width: 0; }
+.parts-in { display: inline-flex; gap: var(--sp-6); align-items: baseline; font: var(--fs-label) var(--label-font); text-transform: var(--label-case); color: var(--faint); }
+.parts-in input, .parts-in select { font: var(--fs-ui) var(--sans); color: var(--ink); background: var(--input-fill); border: solid var(--input-edge); border-width: var(--input-bw);
+  border-radius: var(--radius-input); padding: var(--sp-1) var(--sp-2); }
+.parts-dens h3, .parts-blocks h3, .parts-machine h3 { margin: var(--sp-10) 0 var(--sp-4); font-weight: var(--fw-regular); }
+.parts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 var(--sp-12); }
+@container frame (max-width: 759px) { .parts-grid { grid-template-columns: minmax(0, 1fr); } }

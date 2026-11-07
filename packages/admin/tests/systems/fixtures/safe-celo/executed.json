@@ -1,0 +1,70 @@
+{
+  "count": 8,
+  "next": "https://api.safe.global/tx-service/celo/api/v1/safes/0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60/multisig-transactions/?executed=true&limit=5&offset=5",
+  "previous": null,
+  "results": [
+    {
+      "safe": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "to": "0x9641d764fc13c8B624c04430C7356C1C7C8102e2",
+      "value": "0",
+      "data": "0x8d80ff0a",
+      "operation": 1,
+      "nonce": 7,
+      "executionDate": "2026-09-15T14:01:17Z",
+      "submissionDate": "2026-09-15T14:00:25.320622Z",
+      "transactionHash": "0x337a578e281306764c2d818188a24a000fbaa9ca32d035f9363bac1c45f1711f",
+      "safeTxHash": "0x3ecf8585971b06c17fbc8cdb871303eb775876c6075707fffe528b51fe9a99c6",
+      "isExecuted": true,
+      "isSuccessful": true,
+      "confirmationsRequired": 2,
+      "dataDecoded": {
+        "method": "multiSend",
+        "parameters": []
+      },
+      "confirmations": [
+        {
+          "owner": "0x00000000000000000000000000000000000000A1",
+          "submissionDate": "2026-09-15T14:00:25.354294Z",
+          "signatureType": "EOA"
+        },
+        {
+          "owner": "0x00000000000000000000000000000000000000A4",
+          "submissionDate": "2026-09-15T14:01:17Z",
+          "signatureType": "APPROVED_HASH"
+        }
+      ]
+    },
+    {
+      "safe": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "to": "0x59b37275C844F8eBbc6FDBa7A4781d6a5D74dE80",
+      "value": "0",
+      "data": null,
+      "operation": 0,
+      "nonce": 6,
+      "executionDate": "2026-09-15T13:58:21Z",
+      "submissionDate": "2026-09-15T13:57:55.523805Z",
+      "transactionHash": "0xa8f326d4432c21c5e9ced8cbdf6fea51845b2c3e2cda61725359de186f7f0461",
+      "safeTxHash": "0x6e631a1f70df15c81285213dc4bd670bbd9f3dde6e535fc0a33a23b05a01810f",
+      "isExecuted": true,
+      "isSuccessful": true,
+      "confirmationsRequired": 2,
+      "dataDecoded": {
+        "method": "fallback",
+        "parameters": []
+      },
+      "confirmations": [
+        {
+          "owner": "0x00000000000000000000000000000000000000A4",
+          "submissionDate": "2026-09-15T13:57:55.55Z",
+          "signatureType": "EOA"
+        },
+        {
+          "owner": "0x00000000000000000000000000000000000000A1",
+          "submissionDate": "2026-09-15T13:58:21Z",
+          "signatureType": "APPROVED_HASH"
+        }
+      ]
+    }
+  ],
+  "countUniqueNonce": 8
+}

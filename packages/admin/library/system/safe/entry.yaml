@@ -1,0 +1,32 @@
+id: system:safe
+shelf: system
+title: Safe multisig
+summary: Frames a Safe, with its signers, pending transactions and balances. It reads; it never signs.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [treasury]
+  domain: [operations]
+  audience: [steward]
+  maturity: field-informed
+related: [board:treasury-council, rules:treasury-safe]
+config:
+  properties:
+    id: { type: string, default: treasury-safe, description: The id the org will call it by. }
+    name: { type: string, description: What the Safe is called here. }
+    chain: { type: string, description: "The chain, as CAIP-2: eip155:42220 is Celo." }
+    address: { type: string, description: The Safe's 0x address. }
+  required: [id, name, chain, address]
+installs:
+  - op: create
+    record: "systems:${config.id}"
+    value:
+      id: "${config.id}"
+      name: "${config.name}"
+      chain: "${config.chain}"
+      address: "${config.address}"
+      kind: safe
+      driver: safe
+      section: organization/treasury

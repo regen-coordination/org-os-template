@@ -37,10 +37,13 @@ from inside an instance or, more usefully, from the framework against a sibling.
 **How it works.** Six checks read one snapshot of the instance and each return
 `BLOCKER`/`WARN`/`OK` with a remediation hint: identity coherence and template leakage, lineage
 stamps, cross-scheme version surfaces, machinery integrity, structure/schemas via the
-framework's own validators, and freshness. `sync` then runs nine stages — snapshot,
-ensure-upstream, fetch, inject-machinery, overlay, migrate, generate-schemas, re-assess,
-receipt — aborting on the first failure so an instance is never left half-migrated. The
-`overlay` stage copies the framework-owned paths over the instance's; it replaces the
+framework's own validators, and freshness. `sync` then runs ten stages — snapshot,
+ensure-upstream, fetch, inject-machinery, overlay, migrate, declare-visibility (DAO-OS L8:
+declares public what `.well-known/` shows the instance already publishes, as its own commit;
+nothing once `dao.json` carries the L8 generator's mark),
+generate-schemas, re-assess, receipt — aborting on the first failure so an instance is never
+left half-migrated.
+The `overlay` stage copies the framework-owned paths over the instance's; it replaces the
 framework's own `scripts/sync-upstream.mjs` (a git rebase) for instances that cannot run it.
 
 The `--dir` hub mode is the point. The code comments give the reason: an instance cannot
@@ -207,6 +210,9 @@ file-structure spec, and the module engine itself.
 `npm run validate:structure`. Today `scripts/modules.mjs` validates a manifest and does
 nothing else (see the note at the top); `tests/scripts/modules.test.mjs` and
 `tests/scripts/module-manifests.test.mjs` cover it and `modules/README.md` describes the state.
+In an instance, `validate:schemas` checks for leaks but not the standards schemas (no ajv
+there), so `--strict` cannot pass; run the framework's `scripts/validate-identity.mjs <instance>
+--strict` for the strict check.
 
 **Status.** `in-dev` — manifest validation and the schema ship today; registry loading, `add`,
 `adopt`, drift and health checks are not built (v5 Phase 1–3).

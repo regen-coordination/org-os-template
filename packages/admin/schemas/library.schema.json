@@ -1,0 +1,80 @@
+{
+  "$id": "orgos://registry/library",
+  "type": "object",
+  "required": ["id", "entry", "version", "shelf", "created", "status", "by", "at", "decision"],
+  "additionalProperties": false,
+  "x-order": ["id", "entry", "version", "shelf", "created", "status", "by", "at", "decision", "removed"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "The entry id with ':' turned into '-', then -2, -3… when that is taken." },
+    "entry": { "type": "string", "pattern": "^[a-z]+:[a-z0-9][a-z0-9-]*$", "description": "The library entry that was added: <kind>:<slug>." },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "description": "The entry's version when it was added." },
+    "shelf": { "type": "string", "minLength": 1, "description": "The shelf it came from: the entry's `source`, which equals its shelf's name (framework, dao…)." },
+    "created": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/recordBase" },
+      "description": "Every record the add created, with its hash as created: how a removal tells a record edited since the add."
+    },
+    "status": { "enum": ["installed", "removed"] },
+    "by": { "type": ["string", "null"], "minLength": 1, "description": "Sealed: the member who applied or proposed the add. Null only while staged." },
+    "at": { "type": ["string", "null"], "format": "date", "description": "Sealed: the day it was applied or proposed (the decision row dates a ratify). Null only while staged." },
+    "decision": { "$ref": "#/$defs/decision" },
+    "removed": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["by", "at", "decision"],
+          "additionalProperties": false,
+          "properties": {
+            "by": { "type": ["string", "null"], "minLength": 1 },
+            "at": { "type": ["string", "null"], "format": "date" },
+            "decision": { "$ref": "#/$defs/decision" }
+          }
+        }
+      ],
+      "description": "Null while installed. On removal, { by, at, decision }, sealed the same way."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "removed" } }, "required": ["status"] },
+      "then": { "required": ["removed"], "properties": { "removed": { "type": "object" } } }
+    }
+  ],
+  "$defs": {
+    "recordBase": {
+      "type": "object",
+      "required": ["record", "base"],
+      "additionalProperties": false,
+      "properties": {
+        "record": { "type": "string", "pattern": "^[a-z][a-z0-9-]*:.+$", "description": "<registry>:<id>." },
+        "base": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the record's canonical YAML as created. Null only while staged." }
+      }
+    },
+    "decision": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["rule", "change"],
+          "additionalProperties": false,
+          "properties": {
+            "rule": { "type": "string", "minLength": 1, "description": "The Org-Rule value of the commit." },
+            "change": { "type": "string", "minLength": 1, "description": "The Org-Change id." }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["proposal"],
+          "additionalProperties": false,
+          "properties": {
+            "proposal": { "type": "string", "pattern": "^p-\\d{4}-\\d{2}-\\d{2}-\\d{3}(-[0-9a-f]{4})?$", "description": "The proposal that ratified it; its decision row is found by its `proposal` field." }
+          }
+        }
+      ],
+      "description": "Sealed: a change applied directly, or a proposal ratified. Null only while staged."
+    }
+  },
+  "$comment": "data/library.yaml (DAO-OS L1, ruling L1-R1): the library's receipts. Written only through the library's Add and Remove; lib/receipts.mjs checkReceipts reports a committed receipt with a null seal. `modified` (an array of the same recordBase) is reserved for L7's entries that change existing records."
+}

@@ -1,0 +1,48 @@
+{
+  "registryCommunity": {
+    "id": "0x6a4de0000000000000000000000000000000c0de",
+    "communityName": "Synthetic Commons",
+    "chainId": "42220",
+    "councilSafe": "0x5afe00000000000000000000000000000000c0de",
+    "pendingNewCouncilSafe": null,
+    "membersCount": "9",
+    "registerStakeAmount": "1000000000000000000",
+    "registerToken": "0x00000000000000000000000000000000000006c0",
+    "archived": false,
+    "garden": {
+      "id": "0x00000000000000000000000000000000000006c0",
+      "symbol": "USDGLO",
+      "decimals": "18"
+    },
+    "strategies": [
+      {
+        "id": "0x0000000000000000000000000000000000000001",
+        "poolId": "48",
+        "token": "0x00000000000000000000000000000000000006c0",
+        "isEnabled": true,
+        "archived": false,
+        "metadata": {
+          "title": "Fund one"
+        },
+        "config": {
+          "proposalType": "1",
+          "pointSystem": "0"
+        }
+      },
+      {
+        "id": "0x0000000000000000000000000000000000000002",
+        "poolId": "49",
+        "token": "0x00000000000000000000000000000000000006c0",
+        "isEnabled": true,
+        "archived": false,
+        "metadata": {
+          "title": "Fund two"
+        },
+        "config": {
+          "proposalType": "1",
+          "pointSystem": "0"
+        }
+      }
+    ]
+  }
+}

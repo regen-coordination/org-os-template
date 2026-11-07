@@ -1,0 +1,386 @@
+/* The frame (spec §5), ported from the approved gallery's frame with every raw value a token. A10 draws the
+   grid, the sidebar, the rail and the top bar here; A11 the phone bars and the More sheet; A9 brought the view-as
+   control and band (§5.9, C-23). The frame reads its own width (§3.8): Shell sets data-mode for the grid's
+   columns, and the phone's forms are the frame's container query (`frame`, under 760px) at the end. */
+
+/* A theme switch holds every transition for one frame (theme.ts setTheme), so the house changes colour at once. */
+:root[data-theme-switching] *, :root[data-theme-switching] *::before, :root[data-theme-switching] *::after { transition: none; }
+
+/* The skip link (§13): off screen until it has focus. The door draws the same one. */
+/* Off at the inline start, so a right-to-left page does not scroll to it (§13: logical properties). */
+.skip { position: absolute; inset-inline-start: -9999px; }
+.skip:focus { inset-inline-start: var(--sp-7); inset-block-start: var(--sp-7); z-index: 50; background: var(--raised); border: var(--rule-w) solid var(--edge); padding: var(--sp-4) var(--sp-7); }
+
+/* The grid (§5.1): sidebar + main; main is top, band, scroll, tray. The page scrolls in its own area. */
+.frame { position: relative; display: grid; grid-template-columns: var(--w-nav) minmax(0, 1fr); block-size: 100dvh;
+  container: frame / inline-size; background: var(--paper); }
+.frame[data-mode="rail"] { grid-template-columns: var(--w-rail) minmax(0, 1fr); }
+.frame[data-mode="phone"] { grid-template-columns: minmax(0, 1fr); }
+.frame-side { display: flex; min-width: 0; min-height: 0; }
+.frame-main { grid-column: -2 / -1; grid-row: 1; display: grid; grid-template-rows: var(--h-topbar) auto minmax(0, 1fr) auto;
+  min-width: 0; min-height: 0; position: relative; }
+.frame-top { min-width: 0; }
+.frame-band { min-width: 0; }
+.frame-scroll { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-top: var(--h-topbar); }
+.frame-row { display: flex; min-block-size: 100%; }
+.main { flex: 1; min-width: 0; padding: var(--sp-10) var(--sp-14) var(--sp-15); outline: none; }
+.frame-tray { min-width: 0; }
+.frame-bbar { display: none; }
+
+/* Expanded from the rail (760–1099): the sidebar laid over the page, a scrim under it. Esc, the scrim or a
+   followed link closes it (Shell). */
+.frame[data-overlay] > .frame-side { display: flex; position: absolute; inset-block: 0; inset-inline-start: 0; z-index: 41;
+  inline-size: var(--w-nav); box-shadow: var(--shadow-pop); }
+.frame-scrim { position: absolute; inset: 0; z-index: 40; background: var(--scrim); }
+
+/* The sidebar (§5.2) */
+.side { flex: 1; display: flex; flex-direction: column; gap: var(--sp-6); min-width: 0; padding: var(--sp-7) var(--sp-7) var(--sp-8);
+  background: var(--paper); border-inline-end: var(--rule-w) solid var(--rule); overflow-y: auto; overscroll-behavior: contain; }
+.side .menu-wrap { display: flex; }
+.side .menu-wrap > button { flex: 1; min-width: 0; }
+.side .menu-wrap > .menu { inset-inline-start: 0; inset-inline-end: auto; }
+.side-foot .menu-wrap > .menu { inset-block-start: auto; inset-block-end: calc(100% + var(--sp-4)); }
+
+/* the org switcher: the seal on --solid, the name in Sans 600 (truncated), an up-down chevron */
+.side-org { display: flex; align-items: center; gap: var(--sp-6); min-block-size: var(--h-org); padding: 0 var(--sp-5); border: 0;
+  border-radius: var(--radius-ctl); background: transparent; color: var(--ink); font: var(--fw-strong) var(--fs-body)/var(--lh-ui) var(--sans);
+  text-align: start; cursor: pointer; transition: background-color var(--dur-1) var(--ease); }
+.side-org > .i-xs { margin-inline-start: auto; inline-size: var(--ic-sm); block-size: var(--ic-sm); color: var(--faint); }
+.side-org-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: var(--lh-body); }
+.side-seal { display: var(--brand-dot-display); align-items: center; justify-content: center; flex: none; overflow: hidden;
+  inline-size: var(--h-seal); block-size: var(--h-seal); border-radius: var(--radius-sm); background: var(--solid); color: var(--on-solid); }
+.side-seal img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+
+/* Search or jump: a field-shaped button with its key */
+.side-search { display: flex; align-items: center; gap: var(--sp-6); min-block-size: var(--h-ctl); padding-block: 0; padding-inline: var(--sp-7) var(--sp-6);
+  border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius-ctl); background: var(--raised); box-shadow: var(--shadow-card);
+  color: var(--faint); font: var(--fs-ui)/var(--lh-ui) var(--sans); text-align: start; cursor: pointer; transition: background-color var(--dur-1) var(--ease); }
+.side-search kbd { margin-inline-start: auto; }
+
+/* the sections: 32px rows, icon + label + trailing count; Workspace's collections 28px, indented. Rows are at least
+   that tall and grow with the text (200 %, §13); a label's line has room for its descenders. */
+.side-nav { display: grid; gap: var(--sp-1); }
+.side-a { display: flex; align-items: center; gap: var(--sp-7); min-block-size: var(--h-ctl); min-width: 0; padding: var(--nav-pad);
+  border-radius: var(--radius-ctl); color: var(--nav-ink); font-size: var(--fs-body); text-decoration: none;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.side-a > .i { color: var(--faint); }
+.side-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: var(--lh-body); }
+.side-a .n { margin-inline-start: auto; font-size: var(--fs-tiny); font-style: normal; font-variant-numeric: tabular-nums; color: var(--faint); }
+.side-a .n.attn { color: var(--attn); font-weight: var(--fw-medium); }
+.side-a .n.accent { color: var(--accent); font-weight: var(--fw-medium); }
+/* an empty collection's dashed dot, where a count would be (design pass 2026-11-04): a shape, its word in the name */
+.side-dot { flex: none; margin-inline-start: auto; inline-size: var(--mark); block-size: var(--mark); border: var(--stroke-w) dashed var(--faint); border-radius: var(--radius-chip); }
+.side-a.on { background: var(--nav-on-bg); color: var(--ink); font-weight: var(--nav-on-weight); }
+.side-a.on > .i { color: var(--ink); }
+.side-sub { min-block-size: var(--h-side-sub); padding-inline-start: var(--pad-side-sub); font-size: var(--fs-ui); }
+.side-foot .side-a > .i-xs { margin-inline-start: auto; }
+.side-group { display: grid; gap: var(--sp-1); }
+.side-group-in { display: grid; gap: var(--sp-1); }
+.side-h { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-10) var(--sp-6) var(--sp-5); border: 0; background: none;
+  color: var(--faint); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); text-align: start; }
+button.side-h { cursor: pointer; border-radius: var(--radius-ctl); }
+
+/* the foot: Public door ↗, then the signed-in identity */
+.side-foot { margin-top: auto; display: grid; gap: var(--sp-1); padding-top: var(--sp-6); border-top: var(--rule-w) solid var(--rule); }
+.who { display: flex; align-items: center; gap: var(--sp-6); min-width: 0; padding: var(--sp-6) var(--sp-6) 0; border: 0; border-radius: var(--radius-ctl);
+  background: none; color: var(--ink); font: inherit; text-align: start; }
+button.who { cursor: pointer; }
+.who-w { display: grid; min-width: 0; }
+.who-t { font-size: var(--fs-ui); font-weight: var(--fw-medium); line-height: var(--lh-title); }
+.who-s { font: var(--fs-micro)/var(--lh-title) var(--mono); color: var(--faint); }
+.who-t, .who-s { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hatmark { display: inline-grid; place-items: center; flex: none; inline-size: var(--h-hatmark); block-size: var(--h-hatmark);
+  border-radius: var(--radius-chip); background: var(--wash); color: var(--mute); }
+
+.side-a:focus-visible, .side-org:focus-visible, .side-search:focus-visible, button.side-h:focus-visible, button.who:focus-visible {
+  outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+@media (hover: hover) {
+  .side-a:hover, .side-org:hover, button.who:hover { background: var(--wash); color: var(--ink); }
+  .side-search:hover { background: var(--wash); }
+  button.side-h:hover { color: var(--ink); }
+}
+
+/* The rail (§5.3): 56px, icons alone in 40px targets, counts as 10px superscripts, labels as tooltips beside them.
+   Nothing in it scrolls, so a tooltip or a menu may stand out over the page. */
+.side-rail { align-items: center; padding-inline: var(--sp-4); overflow: visible; }
+.side-rail .side-a, .side-rail .side-search, .side-rail .side-org { inline-size: var(--h-rail-a); block-size: var(--h-rail-a); padding: 0;
+  justify-content: center; position: relative; }
+.side-rail .side-a .n { position: absolute; inset-block-start: var(--sp-3); inset-inline-end: var(--sp-3); margin: 0; font-size: var(--fs-rail-count); }
+.side-rail .side-nav { justify-items: center; }
+.side-rail .side-foot { justify-items: center; }
+.side-rail .who { padding: var(--sp-6) 0 0; justify-content: center; }
+.side-rail .side-a:focus-visible, .side-rail .side-org:focus-visible, .side-rail .side-search:focus-visible, .side-rail button.who:focus-visible {
+  outline-offset: var(--focus-w); }
+.side-rail .tip-wrap > .tip { inset-block-end: auto; inset-block-start: 50%; inset-inline-start: calc(100% + var(--sp-5)); translate: 0 -50%; }
+
+/* The top bar (§5.5): the rail toggle, the path, then View as and notifications */
+.tb { display: flex; align-items: center; gap: var(--sp-8); block-size: 100%; min-width: 0; padding-block: 0; padding-inline: var(--sp-12) var(--sp-10);
+  border-block-end: var(--rule-w) solid var(--rule); }
+.tb > .btn:first-child { color: var(--faint); }
+.crumbs { min-width: 0; font-size: var(--fs-ui); color: var(--mute); }
+.crumbs ol { display: flex; align-items: center; gap: var(--sp-5); min-width: 0; margin: 0; padding: 0; list-style: none; }
+.crumbs li { display: flex; align-items: center; gap: var(--sp-5); min-width: 0; flex-shrink: 3; }
+.crumbs li:not(:first-child):not(:last-child) { flex-shrink: 9; } /* the middle ancestors give way first */
+.crumbs li:last-child { flex-shrink: 1; }
+.crumbs li + li::before { content: "/" / ""; color: var(--rule-strong); }
+.crumbs a, .crumbs [aria-current] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crumbs a { color: var(--mute); text-decoration: none; border-radius: var(--radius-xs); }
+.crumbs a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.crumbs [aria-current] { color: var(--ink); font-weight: var(--fw-medium); }
+@media (hover: hover) { .crumbs a:hover { color: var(--ink); text-decoration: underline; } }
+.tb-tools { display: flex; align-items: center; gap: var(--sp-6); flex: none; margin-inline-start: auto; }
+.tb-bell { position: relative; }
+.tb-dot { position: absolute; inset-block-start: var(--sp-5); inset-inline-end: var(--sp-5); inline-size: var(--h-dot); block-size: var(--h-dot);
+  border-radius: var(--radius-chip); background: var(--accent); box-shadow: 0 0 0 var(--rule-w-heavy) var(--paper); }
+
+/* Coarse pointers (§13, the accessibility floor): every frame target is 44px. The sidebar's rows grow to it; the
+   rail keeps its 40×40 look and gets a 44px hit area beyond it; the path's links take a 44px line, which the 52px
+   top bar holds. The top bar's buttons are .btn (controls.css) and the view-as pill has its own (above). */
+@media (pointer: coarse) {
+  .side-a, .side-sub, .side-org, .side-search { block-size: var(--h-ctl-touch); }
+  button.side-h, button.who { min-block-size: var(--h-ctl-touch); }
+  .side-rail .side-a::after, .side-rail .side-search::after, .side-rail .side-org::after {
+    content: ""; position: absolute; inset: calc((var(--h-rail-a) - var(--h-ctl-touch)) / 2); }
+  .side-rail button.who { min-inline-size: var(--h-ctl-touch); }
+  .crumbs a { line-height: var(--h-ctl-touch); }
+  .pal-o { block-size: var(--h-ctl-touch); } /* the palette's rows: on a phone it is a touch sheet (§5.7) */
+}
+
+/* View-as control (§5.9): eye + "View as: you" + chevron, 28px, 12/500 mute, outlined on --raised. */
+.viewas-wrap { display: contents; }
+.viewas { position: relative; display: inline-flex; align-items: center; gap: var(--sp-5); block-size: var(--h-viewas); padding-block: 0;
+  padding-inline: var(--sp-7) var(--sp-6); border: var(--rule-w) solid var(--rule-strong); border-radius: var(--radius-ctl); background: var(--raised);
+  color: var(--mute); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease); }
+.viewas:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { .viewas:hover { background: var(--wash); } }
+@media (pointer: coarse) { .viewas::after { content: ""; position: absolute; inset-inline: 0; inset-block: calc((var(--h-viewas) - var(--h-ctl-touch)) / 2); } }
+
+/* The band (§5.9): across the main column while previewing — ink fill (--solid / --on-solid), a 15px eye, the
+   sentence with its lead in 600, and an outlined Exit preview at the end, 26px, in the band's own ink. */
+.band { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); min-width: 0; padding: var(--sp-6) var(--sp-12);
+  background: var(--solid); color: var(--on-solid); font-size: var(--fs-ui); line-height: var(--lh-body); }
+.band > .i { inline-size: var(--ic-band); block-size: var(--ic-band); }
+.band-t { min-width: 0; }
+.band b { font-weight: var(--fw-strong); }
+/* the read-only band's way out (§14.1): a link in the band's own ink, underlined; focus in that ink too */
+.band-a { color: var(--on-solid); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: var(--sp-2); white-space: nowrap; }
+.band-a:focus-visible { outline: var(--focus-w) solid var(--on-solid); outline-offset: var(--focus-w); border-radius: var(--radius-xs); }
+.band .btn { margin-inline-start: auto; background: transparent; color: var(--on-solid); border-color: currentColor; box-shadow: none; }
+.band .btn:focus-visible { outline-color: var(--on-solid); }
+@media (hover: hover) { .band .btn:not(:disabled):not([aria-disabled="true"]):hover { background: var(--on-solid); color: var(--solid); } }
+/* The phone bar (§5.4): 48px — the org's seal, the page's title (Sans 600 14), then View as (the eye) and Search,
+   each a 44px target on any pointer. */
+.ptop { display: flex; align-items: center; gap: var(--sp-6); block-size: 100%; min-width: 0; padding-block: 0; padding-inline: var(--sp-10) var(--sp-6);
+  border-block-end: var(--rule-w) solid var(--rule); }
+.ptop-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink);
+  font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); }
+.ptop-tools { display: flex; align-items: center; gap: var(--sp-2); flex: none; margin-inline-start: auto; }
+.ptop-tools .btn.icon { inline-size: var(--h-ctl-touch); block-size: var(--h-ctl-touch); }
+
+/* The bottom bar (§5.4, C-7): five equal items, a 20px icon over an 11px label, on --raised over a hairline; it
+   stands clear of the home indicator by the safe area (the viewport meta has viewport-fit=cover). The current item
+   is ink, the others mute; Needs you's count is a clay badge in --on-accent, ringed in the bar's colour. */
+.bbar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); block-size: calc(var(--h-bottombar) + env(safe-area-inset-bottom));
+  padding-block-end: env(safe-area-inset-bottom); background: var(--raised); border-block-start: var(--rule-w) solid var(--rule); }
+.bbar-a { position: relative; display: grid; justify-items: center; align-content: start; gap: var(--sp-3); min-width: 0;
+  padding: var(--sp-6) var(--sp-2) 0; border: 0; background: none; color: var(--mute); font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--sans);
+  text-decoration: none; cursor: pointer; transition: color var(--dur-1) var(--ease); }
+.bbar-a[aria-current], .bbar-a[aria-expanded="true"] { color: var(--ink); }
+.bbar-l { max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bbar-n { position: absolute; inset-block-start: var(--sp-4); inset-inline-start: calc(50% + var(--sp-5)); min-inline-size: var(--h-badge);
+  block-size: var(--h-badge); padding: 0 var(--sp-4); border-radius: var(--radius-badge); background: var(--attn); color: var(--on-accent);
+  font: var(--fw-strong) var(--fs-badge)/var(--h-badge) var(--sans); font-variant-numeric: tabular-nums; text-align: center;
+  box-shadow: 0 0 0 var(--rule-w-heavy) var(--raised); }
+.bbar-a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+@media (hover: hover) { .bbar-a:hover { color: var(--ink); } }
+
+/* The More sheet (§5.4): a modal <dialog> on --pop with 16px top corners and a grab handle, standing on the bottom
+   bar over the scrim (the bar stays in sight, under the scrim, as the gallery draws it); 44px rows of 16px labels,
+   then the identity, whole. It scrolls in itself when the screen is short. A /parts specimen draws it in place. */
+.sheet { position: fixed; inset-inline: 0; inset-block: auto calc(var(--h-bottombar) + env(safe-area-inset-bottom)); inline-size: auto;
+  max-inline-size: none; max-block-size: calc(100% - var(--h-bottombar) - env(safe-area-inset-bottom) - var(--h-phonebar)); margin: 0;
+  padding: 0; overflow-y: auto; overscroll-behavior: contain; border: 0; border-start-start-radius: var(--radius-lg); border-start-end-radius: var(--radius-lg);
+  background: var(--pop); color: var(--ink); box-shadow: var(--shadow-pop); }
+.sheet::backdrop { background: var(--scrim); }
+.sheet-inline { position: absolute; z-index: 41; }
+.sheet-scrim { position: absolute; inset: 0; z-index: 40; background: var(--scrim); }
+.sheet-in { display: grid; gap: var(--sp-1); padding: 0 var(--sp-6) var(--sp-10); }
+.sheet-grab { display: grid; place-items: center; padding: var(--sp-8) 0 var(--sp-8); touch-action: none; cursor: grab; }
+.sheet-grab::before { content: ""; inline-size: var(--w-grab); block-size: var(--h-grab); border-radius: var(--radius-grab); background: var(--rule-strong); }
+.sheet-nav { display: grid; gap: var(--sp-1); }
+.sheet-a { display: flex; align-items: center; gap: var(--sp-7); block-size: var(--h-ctl-touch); min-width: 0; padding: var(--nav-pad); border: 0;
+  border-radius: var(--radius-ctl); background: none; color: var(--nav-ink); font: inherit; font-size: var(--fs-sub); text-align: start;
+  text-decoration: none; cursor: pointer; transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.sheet-a > .i { color: var(--faint); }
+.sheet-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-a .n { margin-inline-start: auto; font-size: var(--fs-tiny); font-variant-numeric: tabular-nums; color: var(--faint); }
+.sheet-a .n.accent { color: var(--accent); font-weight: var(--fw-medium); }
+.sheet-a > .i-xs { margin-inline-start: auto; }
+.sheet-a[aria-current] { background: var(--nav-on-bg); color: var(--ink); font-weight: var(--nav-on-weight); }
+.sheet-a[aria-current] > .i { color: var(--ink); }
+.sheet-a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.sheet-who { padding-block-start: var(--sp-10); }
+.sheet-who .menu-wrap { display: flex; }
+.sheet-who .menu-wrap > button { flex: 1; min-width: 0; min-block-size: var(--h-ctl-touch); }
+.sheet-who .menu-wrap > .menu { inset-inline: 0 auto; inset-block: auto calc(100% + var(--sp-4)); }
+@media (hover: hover) { .sheet-a:hover, .sheet-who button.who:hover { background: var(--wash); color: var(--ink); } }
+
+/* ⌘K (§5.7): a modal <dialog> over the scrim, laid over the whole viewport so a press around the panel is a press
+   on the scrim; the panel is the pop surface, --w-palette wide at --h-palette-top from the top. Input 52px with a
+   18px search glyph and the scope chip; the results' groups, 40px rows, --wash on the active one, the matched letters
+   600 ink; the foot's keys. A focused input draws its row's rule in --focus. Both are drawn inside the frame (App.tsx),
+   so on a phone — the frame's own width under 760 (below) — the palette is a full-height sheet from the top. The key map (§5.8) is the same surface, its table two columns of what a key does and its keys. */
+.pal-dialog[open] { position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-start; inline-size: 100%;
+  block-size: 100%; max-inline-size: none; max-block-size: none; margin: 0; padding: var(--h-palette-top) var(--sp-10) var(--sp-10);
+  border: 0; background: transparent; color: var(--ink); }
+.pal-dialog::backdrop { background: var(--scrim); }
+.pal { display: flex; flex-direction: column; inline-size: min(var(--w-palette), 100%); max-block-size: 100%; min-width: 0; overflow: hidden;
+  background: var(--pop); color: var(--ink); border: var(--rule-w) solid transparent; border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); }
+.pal-dialog > .pal { transition: opacity var(--dur-2) var(--ease), translate var(--dur-2) var(--ease); }
+@starting-style { .pal-dialog[open] > .pal { opacity: 0; translate: 0 calc(-1 * var(--sp-4)); } }
+@media (prefers-reduced-motion: reduce) { .pal-dialog > .pal { transition: opacity var(--dur-1) var(--ease); } }
+.pal-in { display: flex; align-items: center; gap: var(--sp-8); flex: none; block-size: var(--h-pal-in); padding: 0 var(--sp-10);
+  border-bottom: var(--rule-w) solid var(--rule); }
+.pal-in:has(input:focus-visible) { border-bottom: var(--focus-w) solid var(--focus); }
+.pal-in > .i { flex: none; inline-size: var(--ic-pal); block-size: var(--ic-pal); color: var(--faint); }
+.pal-in input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: var(--ink); font: var(--fs-sub)/var(--lh-ui) var(--sans); outline: none; }
+.pal-in input::placeholder { color: var(--faint); }
+.pal-scope { flex: none; padding: var(--sp-4) var(--sp-6); border-radius: var(--radius-xs); background: var(--wash); color: var(--mute);
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); white-space: nowrap; }
+.pal-list { flex: 0 1 auto; min-block-size: 0; max-block-size: var(--h-pal-list); overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--sp-4) var(--sp-4) var(--sp-6); }
+.pal-g { padding: var(--sp-8) var(--sp-7) var(--sp-5); color: var(--faint); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); }
+.pal-o { display: flex; align-items: center; gap: var(--sp-8); block-size: var(--h-row-1); min-width: 0; padding: 0 var(--sp-7);
+  border-radius: calc(var(--radius-pop) - var(--sp-4)); color: var(--ink); font-size: var(--fs-body); cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease); }
+.pal-o > .i { flex: none; color: var(--mute); }
+.pal-l, .pal-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-l { flex: 0 1 auto; }
+.pal-sub { flex: 0 10 auto; color: var(--faint); font-size: var(--fs-meta); }
+.pal-end { display: flex; align-items: center; gap: var(--sp-2); flex: none; margin-inline-start: auto; color: var(--faint); font-size: var(--fs-tiny); }
+.pal-o[aria-selected="true"] { background: var(--wash); }
+.pal-o mark { background: none; color: var(--ink); font-weight: var(--fw-strong); }
+@media (hover: hover) { .pal-o:hover { background: var(--wash); } }
+.pal-list .note { margin: 0; padding: var(--sp-10) var(--sp-7); }
+.pal-foot { display: flex; flex-wrap: wrap; gap: var(--sp-11); flex: none; padding: var(--sp-6) var(--sp-10); border-top: var(--rule-w) solid var(--rule);
+  color: var(--faint); font-size: var(--fs-tiny); }
+.pal-foot span { display: inline-flex; align-items: center; gap: var(--sp-4); }
+.keymap-pop { overflow-y: auto; overscroll-behavior: contain; }
+.keymap-h { display: flex; align-items: center; gap: var(--sp-8); flex: none; min-block-size: var(--h-pal-in); padding: var(--sp-4) var(--sp-11);
+  border-bottom: var(--rule-w) solid var(--rule); }
+.keymap-t { margin: 0; color: var(--mute); font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; }
+.keymap-hint { display: inline-flex; align-items: center; gap: var(--sp-4); margin-inline-start: auto; color: var(--faint); font-size: var(--fs-tiny); }
+.keymap { display: block; inline-size: 100%; border-collapse: collapse; }
+.keymap tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--w-keymap-col)), 1fr)); gap: var(--sp-4) var(--sp-12);
+  padding: var(--sp-10) var(--sp-11) var(--sp-11); }
+.keymap tr { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); min-width: 0; min-block-size: var(--h-keymap-row);
+  border-bottom: var(--rule-w) solid var(--rule); }
+.keymap th { min-width: 0; padding: 0; color: var(--mute); font-size: var(--fs-ui); font-weight: var(--fw-regular); text-align: start; }
+.keymap td { display: inline-flex; align-items: center; gap: var(--sp-3); flex: none; padding: 0; }
+.keymap-or { color: var(--faint); font-size: var(--fs-tiny); }
+
+/* The Changes tray (§5.6, C-6), docked in the frame's tray area under the page, never over it. Collapsed: the bar,
+   56px on --raised under a hairline — the moss count square (22px, radius 6, --on-accent 600 12; clay with "!" when
+   an op is stale), "N staged changes" (500 13) over the last op and its rule (12 mute, one line, truncated), then
+   Review and the primary. Expanded: the panel opens upward from the dock over the page and a scrim, at most 60% of
+   the frame's height, a modal dialog, entering with opacity and a 4px rise (§3.7). */
+.tray { min-width: 0; background: var(--raised); border-block-start: var(--rule-w) solid var(--rule); }
+.tray-bar { display: flex; align-items: center; gap: var(--sp-8); min-block-size: var(--h-tray); min-width: 0;
+  padding-block: var(--sp-6); padding-inline: var(--sp-12) var(--sp-10); }
+.tray-cnt { display: grid; place-items: center; flex: none; min-inline-size: var(--h-chip); block-size: var(--h-chip); padding: 0 var(--sp-5);
+  border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent);
+  font: var(--fw-strong) var(--fs-tiny)/var(--lh-ui) var(--sans); font-variant-numeric: tabular-nums; }
+.tray-cnt.attn { background: var(--attn); }
+.tray-bar > .spin { margin-inline: var(--sp-4); color: var(--mute); }
+.tray-what { display: grid; min-width: 0; color: var(--ink); text-decoration: none; }
+.tray-what b { font-size: var(--fs-ui); font-weight: var(--fw-medium); line-height: var(--lh-label); }
+.tray-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mute); font-size: var(--fs-tiny);
+  line-height: var(--lh-label); }
+.tray-acts { display: flex; align-items: center; gap: var(--sp-6); flex: none; margin-inline-start: auto; }
+.tray-why { padding: var(--sp-5) var(--sp-12) 0; }
+.tray-why > p, p.tray-why { margin: 0; }
+.tray-bar:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+/* A right-slot panel that holds a form (Propose): wide enough that its field rows keep two columns (E-55), and never
+   wider than the column it stands in, so on the phone, where the slot goes under the page, nothing scrolls sideways */
+.panel-right { border-left: var(--rule-w) solid var(--divider); padding: var(--sp-9) var(--sp-11); min-width: var(--w-panel); }
+.panel-form { flex: none; box-sizing: border-box; inline-size: var(--w-panel-form); max-inline-size: 100%; }
+
+/* The expanded panel: a modal <dialog> over the scrim (its backdrop), standing on the foot of the main column — past
+   the sidebar or the rail — and at most 60% of the frame's height (the frame is the viewport's height). */
+.tray-pop[open] { position: fixed; inset-block: auto 0; inset-inline: 0; display: flex; flex-direction: column; inline-size: auto;
+  max-inline-size: none; max-block-size: 60%; margin: 0; padding: 0; overflow: hidden; border: 0;
+  border-start-start-radius: var(--radius-pop); border-start-end-radius: var(--radius-pop); background: var(--raised); color: var(--ink);
+  box-shadow: var(--shadow-pop); transition: opacity var(--dur-2) var(--ease), translate var(--dur-2) var(--ease); }
+.frame[data-mode="sidebar"] .tray-pop[open] { inset-inline-start: var(--w-nav); }
+.frame[data-mode="rail"] .tray-pop[open] { inset-inline-start: var(--w-rail); }
+.tray-pop::backdrop { background: var(--scrim); }
+@starting-style { .tray-pop[open] { opacity: 0; translate: 0 var(--sp-4); } }
+@media (prefers-reduced-motion: reduce) { .tray-pop[open] { transition: opacity var(--dur-1) var(--ease); } }
+.tray-pop > .trayx { flex: 1 1 auto; min-block-size: 0; }
+
+/* The expanded change (§5.6): the head, one block per op, the foot on --sunken. Also /changes, as a page. */
+.trayx { display: flex; flex-direction: column; min-width: 0; background: var(--raised); }
+.trayx-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-4) var(--sp-6); flex: none; padding: var(--sp-10) var(--sp-10) var(--sp-8); }
+.trayx-h h2 { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); outline: none; }
+.trayx-n { color: var(--mute); font-size: var(--fs-meta); }
+.trayx-h > .btn { margin-inline-start: auto; }
+.trayx > .tray-why { padding: 0 var(--sp-10) var(--sp-6); }
+.trayx-why { margin: 0; padding: 0 var(--sp-10) var(--sp-6); color: var(--attn); font-size: var(--fs-meta); }
+.trayx-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
+.trayx-ops { margin: 0; padding: 0; list-style: none; }
+.trayop { display: grid; grid-template-columns: var(--h-ktile) minmax(0, 1fr) auto; gap: var(--sp-8); align-items: start; padding: var(--sp-8) var(--sp-10);
+  border-block-start: var(--rule-w) solid var(--rule); }
+.trayop.stale { background: var(--attn-soft); }
+.trayop-b { min-width: 0; }
+.trayop-t { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-5); font: var(--fw-medium) var(--fs-ui)/var(--lh-label) var(--sans); }
+.trayop-t a { min-width: 0; color: var(--ink); text-decoration: none; border-radius: var(--radius-xs); }
+.trayop-t a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+@media (hover: hover) { .trayop-t a:hover { text-decoration: underline; } }
+.trayop-chg { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3) var(--sp-6); min-width: 0; margin-block-start: var(--sp-3);
+  font-size: var(--fs-meta); }
+.trayop-chg > .i { align-self: center; color: var(--faint); }
+.trayop-k { color: var(--mute); }
+.trayop-was { min-width: 0; color: var(--faint); font: var(--fs-code) var(--mono); }
+.trayop-new { min-width: 0; color: var(--ink); font: var(--fs-code) var(--mono); }
+.trayop-trunk { color: var(--faint); font-size: var(--fs-tiny); }
+.trayop-chg > .err { flex-basis: 100%; margin: 0; }
+.trayop-acts { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-block-start: var(--sp-6); }
+.trayx-diff { padding: var(--sp-6) var(--sp-10) var(--sp-8); border-block-start: var(--rule-w) solid var(--rule); }
+.trayx-diff td { font: var(--fs-code) var(--mono); overflow-wrap: anywhere; }
+.trayx-diff s { color: var(--faint); }
+.trayx-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); flex: none; padding: var(--sp-9) var(--sp-10);
+  border-block-start: var(--rule-w) solid var(--rule); background: var(--sunken); }
+.trayx-rule { min-width: 0; color: var(--mute); font-size: var(--fs-meta); }
+.trayx-end { display: flex; gap: var(--sp-6); margin-inline-start: auto; }
+/* /changes: the change as a page, on a card */
+.tray-page { margin-block-start: var(--sp-10); background: none; border: 0; }
+.tray-page > .tray-in > .trayx { overflow: hidden; border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+
+/* The phone (§5.4): under 760px of the frame's own width the sidebar is not drawn, the top is the 48px phone bar
+   and the bottom bar is drawn under the tray. The page, the notice and the band keep the phone's gutters. */
+@container frame (max-width: 759px) {
+  .frame-side { display: none; }
+  .frame-main { grid-template-rows: var(--h-phonebar) auto minmax(0, 1fr) auto auto; }
+  .frame-bbar { display: block; }
+  .main { padding: var(--sp-9) var(--sp-11) var(--sp-13); }
+  .frame-row { flex-direction: column; }
+  .band { padding: var(--sp-6) var(--sp-10); }
+  /* the tray (§5.6): a card 8px above the bottom bar, radius 12, raised to pop — the count, "N staged" (a link to
+     /changes over the whole card) and the primary, which stands above the link */
+  .tray:not(.tray-page) { margin: 0 var(--sp-6) var(--sp-6); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-pop);
+    box-shadow: var(--shadow-pop); }
+  .tray:not(.tray-page) > .tray-bar { position: relative; min-block-size: 0; padding-block: var(--sp-5); padding-inline: var(--sp-8) var(--sp-5); }
+  .tray-go::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+  .tray-go:focus-visible { outline: none; }
+  .tray-go:focus-visible::after { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); border-radius: var(--radius-pop); }
+  .tray-acts { position: relative; }
+  .tray-why { padding-inline: var(--sp-8); }
+}
+
+/* The palette on a phone (§5.7): a full-height sheet from the top. */
+@container frame (max-width: 759px) {
+  .pal-dialog[open] { padding: 0; }
+  .pal-dialog > .pal { inline-size: 100%; block-size: 100%; max-block-size: none; border-radius: 0; padding-block-start: env(safe-area-inset-top); }
+  .pal-dialog .pal-list { flex: 1 1 auto; max-block-size: none; }
+}

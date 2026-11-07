@@ -132,12 +132,12 @@ test('[merge] maturity never downgrades and review fields survive untouched', ()
   const t = fresh();
   a().store(t, [entry({
     ...rich(), maturity: 'reviewed', ai_assisted: false,
-    reviewed_by: 'luiz', last_reviewed: '2026-07-25',
+    reviewed_by: 'steward-a', last_reviewed: '2026-07-25',
   })], { onCollision: 'merge' });
   a().store(t, [entry(thin())], { onCollision: 'merge' });                       // thin is maturity: raw, ai_assisted: true
   const m = only(t);
   assert.equal(m.maturity, 'reviewed');
-  assert.equal(m.reviewed_by, 'luiz');
+  assert.equal(m.reviewed_by, 'steward-a');
   assert.equal(m.last_reviewed, '2026-07-25');
   assert.equal(m.ai_assisted, false);
 });

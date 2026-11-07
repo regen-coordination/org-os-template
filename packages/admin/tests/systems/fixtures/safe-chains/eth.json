@@ -1,0 +1,141 @@
+{
+  "info": {
+    "address": "0x5aFE00000000000000000000000000000000C0De",
+    "nonce": "14",
+    "threshold": 4,
+    "owners": [
+      "0x00000000000000000000000000000000000000A1",
+      "0x00000000000000000000000000000000000000A2",
+      "0x00000000000000000000000000000000000000A3",
+      "0x00000000000000000000000000000000000000a4",
+      "0x00000000000000000000000000000000000000A5",
+      "0x00000000000000000000000000000000000000a6",
+      "0x00000000000000000000000000000000000000A7",
+      "0x00000000000000000000000000000000000000a8"
+    ],
+    "masterCopy": "0x00000000000000000000000000000000000000a0",
+    "modules": [],
+    "fallbackHandler": "0x00000000000000000000000000000000000000f0",
+    "guard": "0x0000000000000000000000000000000000000000",
+    "moduleGuard": "0x0000000000000000000000000000000000000000",
+    "version": "1.3.0+L2"
+  },
+  "balances": {
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "tokenAddress": null,
+        "token": null,
+        "balance": "1400000000000000000"
+      },
+      {
+        "tokenAddress": "0x00000000000000000000000000000000000000C1",
+        "token": {
+          "name": "Test Dollar",
+          "symbol": "tUSD",
+          "decimals": 6,
+          "logoUri": "https://safe-transaction-assets.safe.global/tokens/logos/test.png"
+        },
+        "balance": "2500000"
+      }
+    ]
+  },
+  "transactions": {
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "safe": "0x5aFE00000000000000000000000000000000C0De",
+        "to": "0x00000000000000000000000000000000000000D3",
+        "value": "0",
+        "data": "0xa9059cbb",
+        "operation": 0,
+        "nonce": 13,
+        "executionDate": "2026-10-27T09:00:00Z",
+        "submissionDate": "2026-10-27T08:00:00Z",
+        "transactionHash": "0x6571657165716571657165716571657165716571657165716571657165716571",
+        "safeTxHash": "0x650d650d650d650d650d650d650d650d650d650d650d650d650d650d650d650d",
+        "proposer": "0x00000000000000000000000000000000000000A1",
+        "executor": "0x00000000000000000000000000000000000000A1",
+        "isExecuted": true,
+        "isSuccessful": true,
+        "confirmationsRequired": 4,
+        "trusted": true,
+        "dataDecoded": {
+          "method": "transfer",
+          "parameters": []
+        },
+        "confirmations": [
+          {
+            "owner": "0x00000000000000000000000000000000000000A1",
+            "submissionDate": "2026-10-27T08:30:00Z",
+            "signatureType": "EOA"
+          },
+          {
+            "owner": "0x00000000000000000000000000000000000000A2",
+            "submissionDate": "2026-10-27T08:30:00Z",
+            "signatureType": "EOA"
+          },
+          {
+            "owner": "0x00000000000000000000000000000000000000A3",
+            "submissionDate": "2026-10-27T08:30:00Z",
+            "signatureType": "EOA"
+          },
+          {
+            "owner": "0x00000000000000000000000000000000000000a4",
+            "submissionDate": "2026-10-27T08:30:00Z",
+            "signatureType": "EOA"
+          }
+        ]
+      },
+      {
+        "safe": "0x5aFE00000000000000000000000000000000C0De",
+        "to": "0x00000000000000000000000000000000000000D2",
+        "value": "0",
+        "data": "0x8d80ff0a",
+        "operation": 1,
+        "nonce": 12,
+        "executionDate": "2026-10-10T09:00:00Z",
+        "submissionDate": "2026-10-10T08:00:00Z",
+        "transactionHash": "0x6570657065706570657065706570657065706570657065706570657065706570",
+        "safeTxHash": "0x650c650c650c650c650c650c650c650c650c650c650c650c650c650c650c650c",
+        "proposer": "0x00000000000000000000000000000000000000A1",
+        "executor": "0x00000000000000000000000000000000000000A1",
+        "isExecuted": true,
+        "isSuccessful": true,
+        "confirmationsRequired": 4,
+        "trusted": true,
+        "dataDecoded": {
+          "method": "multiSend",
+          "parameters": []
+        },
+        "confirmations": [
+          {
+            "owner": "0x00000000000000000000000000000000000000A1",
+            "submissionDate": "2026-10-10T08:30:00Z",
+            "signatureType": "EOA"
+          },
+          {
+            "owner": "0x00000000000000000000000000000000000000A2",
+            "submissionDate": "2026-10-10T08:30:00Z",
+            "signatureType": "EOA"
+          },
+          {
+            "owner": "0x00000000000000000000000000000000000000A3",
+            "submissionDate": "2026-10-10T08:30:00Z",
+            "signatureType": "EOA"
+          },
+          {
+            "owner": "0x00000000000000000000000000000000000000a4",
+            "submissionDate": "2026-10-10T08:30:00Z",
+            "signatureType": "EOA"
+          }
+        ]
+      }
+    ],
+    "countUniqueNonce": 2
+  }
+}

@@ -9,13 +9,16 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30, not 20: with the house's tests (selftest's test:admin, the site build and its tests) a green
+    # run takes 18-19 minutes (19m03s on #21, 18m36s on main at 3e12c24f), too close to 20.
+    timeout-minutes: 30
     steps:
       # Full history: the site's verify-build looks up each doc's `verified`
       # commit (site/src/data/docs-manifest.mjs). A shallow clone has one
       # commit and would fail every page.
       - uses: actions/checkout@v4
         with:
+          # validate:governance reads the history; a shallow clone has none to judge.
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -59,6 +62,17 @@ jobs:
       # failure here is a real failure and must not be swallowed.
       - name: Validate schemas
         run: npm run validate:schemas
+
+      # Every data/*.yaml against the admin schemas (needs the admin deps above).
+      # Errors fail the run; warnings are printed and do not.
+      - name: Validate data
+        run: npm run validate:data
+
+      # The rules are well-formed and the history agrees with them (0.6 F2). CI=true makes
+      # a commit that went around the loop an error; locally it is a warning.
+      # The checkout above is full-depth so that it has history to read.
+      - name: Validate governance
+        run: npm run validate:governance
 
       - name: Analyze instances
         run: npm run analyze:instances

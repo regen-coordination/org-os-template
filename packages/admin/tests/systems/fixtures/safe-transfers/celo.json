@@ -1,0 +1,135 @@
+{
+  "count": 10,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "type": "ERC20_TRANSFER",
+      "executionDate": "2026-10-12T14:03:11Z",
+      "transactionHash": "0x7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e7a1e",
+      "from": "0x00000000000000000000000000000000000000B1",
+      "to": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "value": "2500000000000000000000",
+      "tokenAddress": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "tokenInfo": {
+        "symbol": "cUSD",
+        "decimals": 18,
+        "trusted": true
+      }
+    },
+    {
+      "type": "ERC721_TRANSFER",
+      "executionDate": "2026-10-03T08:20:45Z",
+      "transactionHash": "0x7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e7a2e",
+      "from": "0x00000000000000000000000000000000000000C7",
+      "to": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "value": null,
+      "tokenAddress": "0x00000000000000000000000000000000000000C7",
+      "tokenInfo": {
+        "symbol": "BADGE",
+        "decimals": 0,
+        "trusted": false
+      }
+    },
+    {
+      "type": "ETHER_TRANSFER",
+      "executionDate": "2026-09-30T10:12:09Z",
+      "transactionHash": "0x7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e",
+      "from": "0x00000000000000000000000000000000000000b2",
+      "to": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "value": "10000000000000000000",
+      "tokenAddress": null,
+      "tokenInfo": null
+    },
+    {
+      "type": "ERC20_TRANSFER",
+      "executionDate": "2026-09-30T10:12:09Z",
+      "transactionHash": "0x7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e7a3e",
+      "from": "0x00000000000000000000000000000000000000b2",
+      "to": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "value": "10000000000000000000",
+      "tokenAddress": "0x471EcE3750Da237f93B8E339c536989b8978a438",
+      "tokenInfo": {
+        "symbol": "CELO",
+        "decimals": 18,
+        "trusted": true
+      }
+    },
+    {
+      "type": "ERC20_TRANSFER",
+      "executionDate": "2026-09-20T03:00:00Z",
+      "transactionHash": "0x7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e7a6e",
+      "from": "0x00000000000000000000000000000000000000c8",
+      "to": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "value": "5000000000",
+      "tokenAddress": "0x00000000000000000000000000000000000000C9",
+      "tokenInfo": {
+        "symbol": "USDC",
+        "decimals": 6,
+        "trusted": false
+      }
+    },
+    {
+      "type": "ERC20_TRANSFER",
+      "executionDate": "2026-09-15T14:09:40Z",
+      "transactionHash": "0x7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e7a5e",
+      "from": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "to": "0x0000000000000000ffffffffffffff00000000b3",
+      "value": "0",
+      "tokenAddress": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "tokenInfo": {
+        "symbol": "cUSD",
+        "decimals": 18,
+        "trusted": true
+      }
+    },
+    {
+      "type": "ERC20_TRANSFER",
+      "executionDate": "2026-09-15T14:01:17Z",
+      "transactionHash": "0x337a578e281306764c2d818188a24a000fbaa9ca32d035f9363bac1c45f1711f",
+      "from": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "to": "0x00000000000000000000000000000000000000b3",
+      "value": "600000000000000000000",
+      "tokenAddress": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "tokenInfo": {
+        "symbol": "cUSD",
+        "decimals": 18,
+        "trusted": true
+      }
+    },
+    {
+      "type": "ERC20_TRANSFER",
+      "executionDate": "2026-09-15T14:01:17Z",
+      "transactionHash": "0x337a578e281306764c2d818188a24a000fbaa9ca32d035f9363bac1c45f1711f",
+      "from": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "to": "0x00000000000000000000000000000000000000B4",
+      "value": "412500000000000000000",
+      "tokenAddress": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "tokenInfo": {
+        "symbol": "cUSD",
+        "decimals": 18,
+        "trusted": true
+      }
+    },
+    {
+      "type": "ERC20_TRANSFER",
+      "executionDate": "2026-08-21T19:44:02Z",
+      "transactionHash": "0x7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e7a4e",
+      "from": "0x00000000000000000000000000000000000000b2",
+      "to": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "value": "1000000",
+      "tokenAddress": "0x00000000000000000000000000000000000000C7",
+      "tokenInfo": null
+    },
+    {
+      "type": "ETHER_TRANSFER",
+      "executionDate": "2026-07-01T00:00:00Z",
+      "transactionHash": "0x7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e7a7e",
+      "from": "0x00000000000000000000000000000000000000b2",
+      "to": "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60",
+      "value": "99000000000000000000",
+      "tokenAddress": null,
+      "tokenInfo": null
+    }
+  ]
+}

@@ -38,7 +38,7 @@ test('isPublishable is keyed on schema, not object.type', () => {
 });
 
 test('publicView strips editorial internals, keeps everything else, does not mutate', () => {
-  const src = { title: 'A', notes: 'internal', work_order: 'wo-1', reviewed_by: 'Luiz', high_risk: false, provenance: { origin: 'o', surfaced_by: 'batch 2' }, url: 'u' };
+  const src = { title: 'A', notes: 'internal', work_order: 'wo-1', reviewed_by: 'Steward A', high_risk: false, provenance: { origin: 'o', surfaced_by: 'batch 2' }, url: 'u' };
   const out = publicView(src);
   assert.deepEqual(out, { title: 'A', provenance: { origin: 'o' }, url: 'u' });
   assert.equal(src.notes, 'internal');

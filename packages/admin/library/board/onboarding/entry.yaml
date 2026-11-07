@@ -1,0 +1,42 @@
+id: board:onboarding
+shelf: board
+title: Onboarding
+summary: A page for someone new. Who is here, what is being worked on, what needs a person.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [coordination]
+  domain: [people]
+  audience: [member]
+  maturity: raw
+related: [board:people, board:projects]
+installs:
+  - op: create
+    record: boards:onboarding
+    value:
+      id: onboarding
+      name: Onboarding
+      audience: members
+      layout: flow
+      blocks:
+        - id: welcome
+          type: note
+          title: Welcome
+          text: "This page gathers who is here, what is being worked on, and what needs a person. Open anything to read more."
+        - id: people
+          type: list
+          title: People
+          source: { section: people }
+          view: { select: false }
+        - id: projects
+          type: list
+          title: Projects
+          source: { kind: project, sort: "-changed", limit: 8 }
+          view: { select: false, empty: No projects yet. }
+        - id: needs
+          type: list
+          title: Needs you
+          source: { where: { needs: { not: 2 } }, sort: "needs, changed" }
+          view: { select: false, empty: Nothing needs you. }

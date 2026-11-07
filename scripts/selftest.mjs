@@ -23,6 +23,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { failDetail } from "./lib/test-failures.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -103,15 +104,12 @@ function run(name, cmd, args, { optional = false, skipKey = null } = {}) {
   if (result.status === 0) {
     results.push({ name, status: "PASS", detail: "" });
   } else {
-    const tail = (result.stderr || result.stdout || "")
-      .trim()
-      .split("\n")
-      .slice(-3)
-      .join(" | ");
+    // The failing tests' names when the output has them (vitest, node --test),
+    // else the output's last lines: scripts/lib/test-failures.mjs.
     results.push({
       name,
       status: "FAIL",
-      detail: `exit ${result.status}: ${tail}`,
+      detail: failDetail(result.status, result.stdout, result.stderr),
     });
   }
 }
@@ -123,6 +121,34 @@ run("validate:structure", "node", ["scripts/validate-structure.mjs"]);
 run("validate:schemas", "node", ["scripts/validate-identity.mjs"], {
   optional: true,
 });
+// validate:data needs packages/admin's schemas and ajv. A checkout whose admin
+// deps are not installed SKIPs it with the command to run, as test:admin does
+// below; an instance has no copy of the script and SKIPs it as optional.
+if (
+  existsSync(path.join(rootDir, "scripts", "validate-data.mjs")) &&
+  !existsSync(path.join(rootDir, "packages", "admin", "node_modules"))
+) {
+  results.push({
+    name: "validate:data",
+    status: "SKIP",
+    detail: "deps not installed — npm ci --prefix packages/admin",
+  });
+} else {
+  run("validate:data", "node", ["scripts/validate-data.mjs"], { optional: true });
+}
+// validate:governance reads the same admin modules (0.6 F2): same skip, same reason.
+if (
+  existsSync(path.join(rootDir, "scripts", "validate-governance.mjs")) &&
+  !existsSync(path.join(rootDir, "packages", "admin", "node_modules"))
+) {
+  results.push({
+    name: "validate:governance",
+    status: "SKIP",
+    detail: "deps not installed — npm ci --prefix packages/admin",
+  });
+} else {
+  run("validate:governance", "node", ["scripts/validate-governance.mjs"], { optional: true });
+}
 frameworkOnly("analyze:instances", "data/instances.yaml", () =>
   run("analyze:instances", "node", ["scripts/analyze-instances.mjs"]),
 );

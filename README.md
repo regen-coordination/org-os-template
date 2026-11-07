@@ -89,6 +89,12 @@ npm run install:hooks    # pre-commit + advisory hooks
 npm run selftest         # full reliability check
 ```
 
+One admin test, the *no-names* guard (`packages/admin/app/src/test/no-names.test.ts`), keeps real
+people's names out of fixtures and screens. The repository is public, so the names it looks for are
+never committed: list them in `.org-os/names.local` at the repository root, one per line (`#` starts
+a comment, blank lines are skipped; matched as whole words, any case). The file is git-ignored.
+Without it the guard is skipped and says so.
+
 ### You're an **agent** opening a session
 
 Read `MASTERPLAN.md`, `SOUL.md`, `IDENTITY.md`, then run `/initialize`. `AGENTS.md` has the

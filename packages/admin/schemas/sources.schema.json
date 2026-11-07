@@ -12,19 +12,49 @@
     "status",
     "last_synced"
   ],
+  "x-groups": [
+    {
+      "label": "What it is",
+      "fields": [
+        "name",
+        "type",
+        "url"
+      ]
+    },
+    {
+      "label": "How it is read",
+      "fields": [
+        "sync_method",
+        "feed_url",
+        "status"
+      ]
+    }
+  ],
   "properties": {
     "id": {
+      "title": "Id",
+      "description": "A short name, unique in this file.",
       "type": "string",
       "minLength": 1
     },
     "name": {
+      "title": "Name",
+      "description": "What the source is called.",
       "type": [
         "string",
         "null"
       ]
     },
     "type": {
-      "enum": [
+      "title": "Kind",
+      "description": "What sort of source it is.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "$comment": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "blog",
         "podcast",
         "newsletter",
@@ -34,25 +64,39 @@
       ]
     },
     "url": {
+      "title": "Link",
+      "description": "Where it is.",
       "type": [
         "string",
         "null"
       ]
     },
     "feed_url": {
+      "title": "Feed",
+      "description": "The address of its feed, when it has one.",
       "type": [
         "string",
         "null"
       ]
     },
     "status": {
-      "enum": [
+      "title": "Status",
+      "description": "Whether it is followed now.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "$comment": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "active",
         "paused",
         "archived"
       ]
     },
     "last_synced": {
+      "title": "Last read",
+      "description": "When it was last read.",
       "type": [
         "string",
         "null"
@@ -60,6 +104,8 @@
       "format": "date"
     },
     "sync_method": {
+      "title": "Read by",
+      "description": "How it is read: RSS, an API, by hand, or scraped.",
       "enum": [
         "rss",
         "api",
@@ -68,12 +114,16 @@
       ]
     },
     "content_count": {
+      "title": "Items",
+      "description": "How many items have been read from it.",
       "type": [
         "number",
         "null"
       ]
     },
     "tags": {
+      "title": "Tags",
+      "description": "Words to find it by.",
       "type": [
         "array",
         "null"

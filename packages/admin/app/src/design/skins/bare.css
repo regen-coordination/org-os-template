@@ -1,0 +1,431 @@
+/* The skin "bare": the Index register of P1 (spec section 4), unchanged. Ruled rows, mono labels, square
+   corners, no shadow, no motion, one accent for what needs a person. A skin is only this file: every value
+   the client draws with is a token here, and the sheets (base.css, design/css/*) hold none. Light first; dark under the
+   system preference unless the browser chose light in the palette, and dark whenever it chose dark.
+   Bare is kept as a test skin (it anchors css.test.ts's P1 assertions); house owns the plain :root and is
+   what draws before any script has set data-skin. Every token house adds is set here to what bare draws. */
+:root[data-skin="bare"] {
+  /* colour, light */
+  --paper: #ffffff;
+  --ink: #111111;
+  --mute: #666666;
+  --faint: #888888;
+  --rule: #dddddd;
+  --wash: #f2f2f2;
+  --attn: #b3261e;
+  --raised: #ffffff;
+  --edge: #111111;
+  --solid: #111111;
+  --on-solid: #ffffff;
+  --focus: #111111;
+  --pop: var(--raised);
+  --sunken: var(--wash);
+  --wash-strong: var(--wash);
+  --rule-strong: var(--rule);
+  --on-accent: var(--on-solid);
+  --attn-soft: var(--wash);
+  --map-dot: var(--rule);
+  /* roles a skin may draw apart from the ones above; bare leaves each equal to the colour it was drawn in */
+  --accent: var(--ink); /* selection, a staged change, the open tab */
+  --accent-soft: var(--wash); /* the fill of a selected row or a chosen palette entry */
+  --row-hover: transparent; /* the fill of a table row under the pointer */
+  --nav-ink: var(--ink);
+  --nav-on-bg: transparent; /* the current page's entry in the menu */
+  --input-fill: var(--wash);
+  --input-edge: var(--edge);
+  --block-bg: transparent; /* a block's surface against the page */
+  color-scheme: light;
+
+  /* type */
+  --display: var(--sans);
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, Menlo, monospace;
+  --fs-micro: 9px;
+  --fs-av: var(--fs-micro);
+  --fs-tiny: 9.5px;
+  --fs-label: 10px;
+  --fs-meta: 11px;
+  --fs-code: 11.5px;
+  --fs-ui: 12px;
+  --fs-body: 13px;
+  --fs-sub: 15px;
+  --fs-title: 18px;
+  --fs-greet: var(--fs-title);
+  --fs-page: var(--fs-title);
+  --fs-amount: var(--fs-title);
+  --fs-d-hero: var(--fs-title);
+  --fs-d-sec: var(--fs-title);
+  --fs-d-card: var(--fs-title);
+  --fs-d-lead: var(--fs-sub);
+  --fs-d-body: var(--fs-sub);
+  --fs-d-fig: var(--fs-title);
+  --fs-d-fact: var(--fs-title);
+  --lh-body: 1.45;
+  --lh-code: 1.5;
+  --lh-title: var(--lh-body);
+  --lh-row: var(--lh-body);
+  --lh-prose: var(--lh-body);
+  --lh-d-hero: var(--lh-title);
+  --lh-d-sec: var(--lh-title);
+  --lh-d-lead: var(--lh-body);
+  --lh-greet: var(--lh-title);
+  --lh-ui: var(--lh-body);
+  --lh-label: var(--lh-body);
+  --lh-tiny: var(--lh-body);
+  --lh-addr-full: var(--lh-body);
+  --ws-unit: 0; /* bare keeps the space whole */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-strong: 600;
+  --fw-display: var(--fw-strong); /* bare draws a title strong */
+  --ls-label: .08em;
+  --ls-node: .06em;
+  --ls-name: .02em;
+  --ls-title: -.01em;
+  --ls-eyebrow: var(--ls-label);
+  --ls-display: var(--ls-title);
+  --ls-d-sec: var(--ls-title);
+  --ls-amount: var(--ls-title);
+  --ls-av: var(--ls-name);
+  --soft: 0; /* bare has no Fraunces: nothing to soften */
+  --soft-hero: var(--soft);
+  --soft-sec: var(--soft);
+
+  /* space */
+  --sp-1: 1px;
+  --sp-2: 2px;
+  --sp-3: 3px;
+  --sp-4: 4px;
+  --sp-5: 5px;
+  --sp-6: 6px;
+  --sp-7: 8px;
+  --sp-8: 10px;
+  --sp-9: 12px;
+  --sp-10: 14px;
+  --sp-11: 16px;
+  --sp-12: 18px;
+  --sp-13: 20px;
+  --sp-14: 22px;
+  --sp-15: 24px;
+  --sp-16: var(--sp-15);
+  --sp-17: var(--sp-15);
+  --sp-18: var(--sp-15);
+
+  /* rules, marks, corners, depth, motion */
+  --rule-w: 1px;
+  --rule-w-heavy: 2px;
+  --rule-w-mark: 3px;
+  --stroke-w: var(--rule-w);
+  --mark: 6px;
+  --mark-bar: 2px;
+  --w-mark-bar: var(--mark);
+  --radius-mark: var(--radius);
+  --radius-mark-bar: var(--radius);
+  --mark-check: 10px;
+  --mark-tick-w: 4px;
+  --mark-tick-h: 7px;
+  --mark-tick-x: 3px;
+  --grip: 12px;
+  --radius: 0;
+  --radius-ctl: 0;
+  --radius-xs: var(--radius);
+  --radius-sm: var(--radius);
+  --radius-pop: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-plate: var(--radius);
+  --shadow-card: none;
+  --shadow-raise: none;
+  --shadow-pop: none;
+  --scrim: transparent;
+  --o-disabled: .45;
+  --o-dim: var(--o-disabled);
+  --o-inert: .6;
+  --o-hover: 1;
+  --o-breathe: .55;
+  --o-proposed: .5;
+  --dash: 3 3;
+  --dur: 0s;
+  --dur-1: 0s;
+  --dur-press: 0s;
+  --dur-2: 0s;
+  --dur-3: 0s;
+  --dur-flow: 0s;
+  --dur-out: var(--dur);
+  --dur-spin: 800ms;
+  --dur-breathe: var(--dur); /* bare does not move */
+  --ease: linear;
+  --press-scale: 1; /* no press: bare does not move */
+  --dur-copy: var(--dur);
+  --scale-copy: 1; /* bare does not move: the glyphs swap */
+  --blur-copy: 0;
+
+  /* structure: widths and heights of the shell and its parts */
+  --w-nav: 180px;
+  --w-kind: 80px;
+  --w-label: 120px;
+  --w-dt: 72px;
+  --w-field-label-min: var(--w-label); /* bare keeps 0.6's one label width */
+  --w-field-label-max: var(--w-label);
+  --w-inspector: 240px;
+  --w-aside: 280px;
+  --w-palette: 560px;
+  --w-panel: 300px;
+  --w-panel-form: 464px; /* a right-slot panel holding a form (Propose): a field row's two columns (420) and its padding (E-55) */
+  --w-node: 150px;
+  --w-tile: 180px;
+  --w-kcol: 180px;
+  --w-kcol-min: 160px;
+  --radius-kcard: var(--radius);
+  --h-kdrop: 44px;
+  --lift-rotate: 0deg;
+  --h-cal-day: 96px;
+  --h-cal-date: 22px;
+  --h-ev: 20px;
+  --radius-ev: var(--radius);
+  --h-ed-bar: 40px;
+  --w-ed-min: 480px;
+  --fs-page-narrow: var(--fs-title);
+  --fs-h2: var(--fs-sub);
+  --ls-page: 0;
+  --h-erow: 36px;
+  --h-selbar-b: var(--h-ctl-sm);
+  --w-slash: 240px;
+  --w-mpop: 260px;
+  --w-thread: 300px;
+  --h-av-lg: var(--h-av);
+  --pad-reply: 48px;
+  --h-composer: 40px;
+  --w-menu: 220px;
+  --w-tip: 32ch;
+  --w-chip: 24ch;
+  --w-filter: 14em;
+  --w-token-input: 10em;
+  --h-log: 260px;
+  --h-embed: 480px;
+  --h-canvas-chrome: 140px;
+  --h-canvas-min: 360px;
+  --h-canvas-small: 260px;
+  --h-cell: 120px;
+  --h-kcol: 80px;
+  --h-textarea: 4em;
+  --h-palette-top: 12vh;
+  --h-pal-in: var(--h-input);
+  --h-pal-list: 50vh;
+  --w-keymap-col: 190px;
+  --h-keymap-row: var(--h-ctl);
+  /* the house frame's lengths: bare has none of its own, so it takes the house's; a node's floor is its width */
+  --w-rail: 56px;
+  --w-content: 1040px;
+  --w-prose: 68ch;
+  --w-door: 1120px;
+  --w-parts: 1272px;
+  --w-spec-two: 520px;
+  --w-node-min: var(--w-node);
+  --w-node-big: 236px;
+  --h-node: 56px;
+  --h-node-big: 84px;
+  --h-node-tag: 18px;
+  --h-attn-dot: 10px;
+  --ring-attn-dot: 2.5px;
+  --w-attn-ring: 1.25px;
+  --ic-node-f: 11px;
+  --stroke-edge: 1.25;
+  --stroke-edge-on: 1.75;
+  --stroke-flow: 3;
+  --dash-flow-dot: .1;
+  --dash-flow-gap: 11;
+  --dash-flow: var(--dash-flow-dot) var(--dash-flow-gap);
+  --dash-bad: 4 4;
+  --o-edge-dim: .3;
+  --o-ring: .9;
+  --dur-ring: 0s;
+  --map-grid: 18px;
+  --map-dot-r: 1px;
+  --map-dot-fade: 1.3px;
+  --fs-node-k: var(--fs-micro);
+  --fs-node-big: var(--fs-sub);
+  --fs-node-big-narrow: var(--fs-body);
+  --fs-node-narrow: var(--fs-micro);
+  --fs-node-tag: var(--fs-micro);
+  --lh-node: 1.25;
+  --lh-node-f: 1.3;
+  --lh-node-big: 1.2;
+  --ls-node-big: 0;
+  --pad-elabel: 3px 5px;
+  --radius-group: 0;
+  --h-mini: 188px; /* the small map in the inspector (§8.6) */
+  --h-mini-page: 220px; /* and on a record page */
+  --map-grid-mini: 14px; /* its dot grid */
+  --ic-mini: 12px; /* a small-map pill's glyph */
+  --h-mini-dot: 8px; /* a small-map neighbour's attention dot */
+  --ring-mini-dot: 2px; /* the canvas-coloured ring that parts it from the pill */
+  --w-shelf: 200px; /* the compose canvas's Place shelf (§8.7) */
+  --w-shelf-item-min: 140px; /* a shelf item, at its narrowest, in the row the shelf becomes under 820px */
+  --h-shelf-item: 34px; /* a shelf item */
+  --radius-cmp: var(--radius); /* a shelf item's corners, and the invalid connection's note */
+  --w-cmp-insp: 280px; /* the compose canvas's inspector column */
+  --h-cmp-canvas: 440px; /* the compose canvas, at least */
+  --w-cmp-node: 190px; /* a node on it; elements/compose/compose.ts COMPOSE.nodeW */
+  --h-handle: 9px; /* a connection handle at the selected node's sides */
+  --w-cmp-note: 210px; /* the invalid connection's note, at its widest */
+  --h-sheet-max: 88dvh; /* the inspector's bottom sheet on the phone, at its tallest (§5.10) */
+  --h-topbar: 52px;
+  --h-row: 56px;
+  --h-row-1: 40px;
+  --h-thead: var(--h-input);
+  --h-trow-grp: var(--h-ctl);
+  --h-need: 72px;
+  --h-call-n: 22px;
+  --h-tl-mark: 22px;
+  --h-tl-dot: 10px;
+  --w-tl-join: 14px;
+  --h-rt-row: 44px;
+  --h-rt-tg: 18px;
+  --h-rt-hat: 26px;
+  --pad-rt-indent: 22px;
+  --w-rt-elbow: 9px;
+  --w-ff: 980px;
+  --h-tray: 56px;
+  --h-bottombar: 60px;
+  --h-ctl: 32px;
+  --h-ctl-touch: 44px;
+  --h-input: 36px;
+  --h-chip: 22px;
+  --h-addr: 24px;
+  --h-ctl-sm: var(--h-ctl);
+  --h-viewas: var(--h-ctl);
+  --h-org: 36px;
+  --h-seal: 22px;
+  --h-side-sub: 28px;
+  --pad-side-sub: 34px;
+  --h-rail-a: 40px;
+  --fs-rail-count: .625rem;
+  --h-hatmark: var(--h-addr);
+  --h-dot: 6px;
+  --h-phonebar: 48px;
+  --h-badge: 16px;
+  --radius-badge: var(--radius);
+  --fs-badge: .625rem;
+  --w-grab: 36px;
+  --h-grab: 4px;
+  --radius-grab: var(--radius);
+  --w-specimen-phone: 390px;
+  --h-specimen: 860px;
+  --h-specimen-short: 640px;
+  --h-tab: var(--h-input);
+  --h-kbd: 18px;
+  --h-check: 16px;
+  --radio-dot: 5px;
+  --h-ktile: 28px;
+  --h-ktile-needs: 32px;
+  --h-ktile-header: 40px;
+  --radius-ktile-needs: var(--radius);
+  --radius-well: var(--radius);
+  --w-meter-seg: 12px;
+  --h-meter: 4px;
+  --w-meter-bar: 96px;
+  --radius-meter: var(--radius);
+  --w-chain-glyph: 7px;
+  --w-chain-bar: 3px;
+  --h-chain-bars: 6px;
+  --h-spin-age: 11px;
+  --h-av: var(--h-addr);
+  --h-av-sm: var(--h-av);
+  --ring-av: var(--rule-w-heavy);
+  --h-av-pen: 12px;
+  --h-skel: 10px;
+  --h-skel-sub: 8px;
+  --radius-skel: var(--radius);
+  --w-skel-end: 52px;
+  --w-skel-end-1: 40px;
+  --w-row-age: 84px;
+  --w-signin: 420px;
+  --h-signin-go: var(--h-ctl);
+  --h-door-top: 76px;
+  --w-door-seal: 26px;
+  --h-lib-card: 172px;
+  --w-lib-card: 260px;
+  --fs-lib-t: var(--fs-body);
+  --w-wiz-rail: 220px;
+  --h-wiz-dot: 20px;
+  --fs-wiz-n: var(--fs-micro);
+  --fs-wiz-h: var(--fs-sub);
+  --radius-door-seal: var(--radius);
+  --fs-d-mark: var(--fs-sub);
+  --w-door-label: 240px;
+  --w-door-lead: 34em;
+  --w-door-desc: 42ch;
+  --lh-d-body: var(--lh-body);
+  --fs-d-row: var(--fs-sub);
+  --fs-d-hat: var(--fs-sub);
+  --lh-d-row: var(--lh-body);
+  --radius-door-card: var(--radius);
+  --w-door-dot: 20px;
+  --w-door-dot-ring: var(--rule-w);
+  --w-door-id: 120px;
+
+  /* icons (bare shows no menu icon; an icon drawn elsewhere takes the house sizes) */
+  --ic-xs: 13px;
+  --ic-sm: 14px;
+  --ic: 16px;
+  --ic-lg: 20px;
+  --ic-menu: var(--ic);
+  --ic-pen: 8px;
+  --ic-band: var(--ic);
+  --ic-chev: var(--ic-xs);
+  --ic-pal: var(--ic);
+  --stroke-pen: var(--icon-stroke);
+  --icon-stroke: 1.5;
+
+  /* the parts of a look that are not a colour or a length */
+  --focus-w: 2px;
+  --label-case: uppercase;
+  --label-font: var(--mono);
+  --font-btn: var(--mono);
+  --nav-on-weight: var(--fw-strong);
+  --input-bw: 0 0 1px 0;
+  --radius-chip: 0;
+  --radius-input: 0;
+  --radius-step: 0; /* the shape of a wizard step marker */
+  /* pieces of a look that markup carries and a skin shows: bare shows none, and draws every line as it did */
+  --block-pad: 0; /* the padding inside a block's surface */
+  --divider: var(--edge); /* the structural lines of the page (not the edge of a control) */
+  --nav-pad: var(--sp-2) 0; /* one menu entry */
+  --brand-dot-display: none; /* the org's seal beside its name */
+  --input-pad: var(--sp-1) var(--sp-2); /* the padding inside a field */
+  --input-w: 92%; /* a field's width in its cell */
+  --font-data: var(--mono); /* the family of what carries data: status, dates, chips, segments, tabs, the menu's counts */
+  --data-nums: normal; /* the figures of that data: tabular-nums lines columns of numbers up */
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="bare"]:not([data-theme="light"]) {
+    --paper: #111111;
+    --ink: #ededed;
+    --mute: #a0a0a0;
+    --faint: #7a7a7a;
+    --rule: #2e2e2e;
+    --wash: #1c1c1c;
+    --attn: #ff6b5e;
+    --raised: #111111;
+    --edge: #ededed;
+    --solid: #ededed;
+    --on-solid: #111111;
+    --focus: #ededed;
+    color-scheme: dark;
+  }
+}
+:root[data-skin="bare"][data-theme="dark"] {
+  --paper: #111111;
+  --ink: #ededed;
+  --mute: #a0a0a0;
+  --faint: #7a7a7a;
+  --rule: #2e2e2e;
+  --wash: #1c1c1c;
+  --attn: #ff6b5e;
+  --raised: #111111;
+  --edge: #ededed;
+  --solid: #ededed;
+  --on-solid: #111111;
+  --focus: #ededed;
+  color-scheme: dark;
+}

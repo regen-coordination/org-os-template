@@ -1,0 +1,23 @@
+# What the library serves in this release: Q6 (library v1 scope), answered as the design recommends
+# (docs/superpowers/specs/2026-10-18-platform-skins-library-dao-os-design.md, section 4.9). The operator has not
+# answered Q6. To change the answer, edit this list: an entry whose folder is not named here is not served, and a
+# name with no folder is refused in words. Nothing else reads the folders.
+#
+# built_in_boards: the framework's own boards (packages/admin/boards/), listed as Built in: previewable, never
+# installable. Meetings is not offered as a template because the built-in covers it.
+built_in_boards: true
+entries:
+  - board:treasury-council
+  - board:funding-pipeline
+  - board:onboarding
+  - rules:solo
+  - rules:approve-one-maintainer
+  - rules:consent-7d
+  - rules:vote-quorum
+  - rules:treasury-safe
+  - system:link
+  - system:safe
+  - system:docs
+  - system:repo
+  - system:database
+  - system:snapshot-space

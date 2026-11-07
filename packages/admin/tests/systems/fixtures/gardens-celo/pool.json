@@ -1,0 +1,81 @@
+{
+  "cvstrategy": {
+    "id": "0x0000000000000000000000000000000000000001",
+    "poolId": "48",
+    "token": "0x00000000000000000000000000000000000006c0",
+    "isEnabled": true,
+    "archived": false,
+    "metadata": {
+      "title": "Fund one"
+    },
+    "registryCommunity": {
+      "id": "0x6a4de0000000000000000000000000000000c0de",
+      "communityName": "Synthetic Commons",
+      "chainId": "42220",
+      "councilSafe": "0x5afe00000000000000000000000000000000c0de"
+    },
+    "config": {
+      "proposalType": "1",
+      "pointSystem": "0",
+      "maxAmount": "0",
+      "allowlist": [
+        "0x00000000000000000000000000000000000000a1",
+        "0x00000000000000000000000000000000000000a2",
+        "0x00000000000000000000000000000000000000a3",
+        "0x00000000000000000000000000000000000000a4",
+        "0x00000000000000000000000000000000000000a5",
+        "0x00000000000000000000000000000000000000a6",
+        "0x00000000000000000000000000000000000000a7",
+        "0x00000000000000000000000000000000000000a8",
+        "0x5afe00000000000000000000000000000000c0de"
+      ]
+    }
+  },
+  "cvproposals": [
+    {
+      "id": "0x0000000000000000000000000000000000000001-3",
+      "proposalNumber": "3",
+      "proposalStatus": "1",
+      "requestedAmount": "100000000000000000000",
+      "requestedToken": "0x00000000000000000000000000000000000006c0",
+      "beneficiary": "0x00000000000000000000000000000000000000b3",
+      "convictionLast": "480",
+      "stakedAmount": "3000000000000000000000",
+      "createdAt": "1792922400",
+      "executedAt": null,
+      "metadata": {
+        "title": "Seed library"
+      }
+    },
+    {
+      "id": "0x0000000000000000000000000000000000000001-2",
+      "proposalNumber": "2",
+      "proposalStatus": "1",
+      "requestedAmount": "200000000000000000000",
+      "requestedToken": "0x00000000000000000000000000000000000006c0",
+      "beneficiary": "0x00000000000000000000000000000000000000b2",
+      "convictionLast": "1010",
+      "stakedAmount": "5000000000000000000000",
+      "createdAt": "1792490400",
+      "executedAt": null,
+      "metadata": {
+        "title": "Water tanks"
+      }
+    },
+    {
+      "id": "0x0000000000000000000000000000000000000001-1",
+      "proposalNumber": "1",
+      "proposalStatus": "4",
+      "requestedAmount": "1500000000000000000000",
+      "requestedToken": "0x00000000000000000000000000000000000006c0",
+      "beneficiary": "0x00000000000000000000000000000000000000b1",
+      "convictionLast": "2100",
+      "stakedAmount": "7000000000000000000000",
+      "createdAt": "1788256800",
+      "executedAt": "1789466400",
+      "metadata": {
+        "title": "Shared tools"
+      }
+    }
+  ]
+}

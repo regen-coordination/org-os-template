@@ -1,0 +1,1068 @@
+{
+  "projects": {
+    "$id": "orgos://registry/projects",
+    "type": "object",
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "type": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "lead": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "contributors": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "started": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "target_completion": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "description": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "milestones": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "object"
+        }
+      },
+      "related_ideas": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "funding_source": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "tags": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": [
+            "string",
+            "number"
+          ]
+        }
+      }
+    }
+  },
+  "members": {
+    "$id": "orgos://registry/members",
+    "type": "object",
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "person",
+          "agent",
+          "organization",
+          "role",
+          null
+        ]
+      },
+      "role": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "layer": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "status": {
+        "enum": [
+          "active",
+          "inactive",
+          "alumni"
+        ]
+      },
+      "joined": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "left": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "skills": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "email": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "handles": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "git": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            ]
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}:[-.%a-zA-Z0-9]{1,128}$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}:[-.%a-zA-Z0-9]{1,128}$"
+                }
+              }
+            ]
+          }
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "affiliations": {
+        "type": [
+          "array",
+          "null"
+        ]
+      }
+    }
+  },
+  "funding-opportunities": {
+    "$id": "orgos://registry/funding-opportunities",
+    "type": "object",
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "type": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "platform": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "deadline": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "amount_available": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "currency": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "relevance": {
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      "url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "notes": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "applied": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "application_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  },
+  "relationships": {
+    "$id": "orgos://registry/relationships",
+    "type": "object",
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "partner": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "type": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "since": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "contact": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "description": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "touchpoints": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "ideas": {
+    "$id": "orgos://registry/ideas",
+    "type": "object",
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "enum": [
+          "surfaced",
+          "proposed",
+          "approved",
+          "developing",
+          "hatched",
+          "archived"
+        ]
+      },
+      "source": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "submitted_by": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "champions": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "ecosystem_gap": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "description": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "hatched_repo": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "skills_needed": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "resources": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "compensation": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "created": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "updated": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "votes": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "comments": {
+        "type": [
+          "array",
+          "null"
+        ]
+      }
+    }
+  },
+  "meetings": {
+    "$id": "orgos://registry/meetings",
+    "type": "object",
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "date": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "anyOf": [
+          {
+            "format": "date"
+          },
+          {
+            "format": "date-time"
+          }
+        ]
+      },
+      "type": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "participants": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "duration_minutes": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "recording_url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "transcript_path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "summary": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "decisions": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "action_items": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "tags": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "systems": {
+    "$id": "orgos://registry/systems",
+    "type": "object",
+    "required": [
+      "id",
+      "kind",
+      "name"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "kind": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "chain": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$"
+      },
+      "chains": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$"
+        }
+      },
+      "address": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "url": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "uri"
+      },
+      "space": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "driver": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "section": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "embeddable": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "description": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "grant_pool": {
+        "oneOf": [
+          {
+            "const": false
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mechanism"
+            ],
+            "properties": {
+              "mechanism": {
+                "enum": [
+                  "Direct Grants",
+                  "Quadratic Funding",
+                  "Streaming Quadratic Funding",
+                  "Retro Funding",
+                  "Conviction Voting",
+                  "Self-Curated Registries",
+                  "Gift Circles",
+                  "Social Media-Based Capital Allocation",
+                  "Futarchy",
+                  "Assurance Contracts",
+                  "Cookie Jar",
+                  "Impact Attestations",
+                  "Stokvel",
+                  "Request for Proposal",
+                  "Delegated Domain Allocation",
+                  "Evolutionary Grants Games",
+                  "Direct to Contract Incentives",
+                  "Angel Investment",
+                  "Dominant Assurance Contracts",
+                  "Community Currencies",
+                  "Universal Basic Income",
+                  "Bounties",
+                  "Gnosis Safe",
+                  "Waqf",
+                  "Ranked Choice Voting",
+                  "Honour",
+                  "Mutual Aid Networks",
+                  "Bonding Curves",
+                  "Zakat",
+                  "Decentralized Validators",
+                  "Revnets"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "is_open": {
+                "type": "boolean"
+              },
+              "close_date": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "size": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "amount",
+                    "denomination"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "amount": {
+                      "type": [
+                        "number",
+                        "string"
+                      ]
+                    },
+                    "denomination": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "usd": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "as_of"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "as_of": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              "email": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "relates": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "to",
+            "label"
+          ],
+          "properties": {
+            "to": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "enum": [
+                "elects",
+                "appoints",
+                "includes",
+                "holds",
+                "signs",
+                "admin",
+                "pool"
+              ]
+            }
+          }
+        }
+      },
+      "roles": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "propertyNames": {
+          "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}:0x[0-9a-fA-F]{64}$"
+        },
+        "additionalProperties": {
+          "enum": [
+            "decides",
+            "acts"
+          ]
+        }
+      },
+      "notes": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "not": {
+                "const": "hats-tree"
+              }
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "properties": {
+            "roles": {
+              "type": "null"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "enum": [
+                "safe",
+                "gardens-community",
+                "gardens-pool",
+                "hats-tree",
+                "daouri-registration"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "required": [
+            "chain",
+            "address"
+          ],
+          "properties": {
+            "chain": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "enum": [
+                "safe",
+                "gardens-community",
+                "gardens-pool"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "properties": {
+            "address": {
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "hats-tree"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "properties": {
+            "address": {
+              "pattern": "^(0x[0-9a-fA-F]{1,8}|[1-9][0-9]{0,9})$"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "enum": [
+                "snapshot-space",
+                "docs",
+                "database",
+                "repo",
+                "kms-connector",
+                "link"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "required": [
+            "url"
+          ],
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "sources": {
+    "$id": "orgos://registry/sources",
+    "type": "object",
+    "required": [
+      "id"
+    ],
+    "additionalProperties": true,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "type": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "feed_url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "last_synced": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date"
+      },
+      "sync_method": {
+        "enum": [
+          "rss",
+          "api",
+          "manual",
+          "scrape"
+        ]
+      },
+      "content_count": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "tags": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

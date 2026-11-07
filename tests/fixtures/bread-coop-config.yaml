@@ -12,8 +12,8 @@ org:
   license: "MIT"
 
 operator:
-  name: "Luiz Fernando"
-  email: "luizfernandolfsg@gmail.com"
+  name: "Ops lead"
+  email: "ops-lead@example.org"
 
 network:
   name: "regen-coordination"

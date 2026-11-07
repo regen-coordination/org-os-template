@@ -1,0 +1,24 @@
+id: rules:consent-7d
+shelf: rules
+title: Consent among maintainers
+summary: Maintainers decide by consent after a 7-day window to object; anyone may propose records.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [governance]
+  domain: [decisions]
+  audience: [steward]
+  maturity: raw
+related: [rules:approve-one-maintainer, rules:vote-quorum]
+installs:
+  - op: update
+    record: governance:governance
+    set:
+      roles:
+        member: { all: true }
+      rules:
+        - { id: records, applies_to: [records], propose: member, decide: { by: maintainer, method: approve, count: 1 } }
+        - { id: governance, applies_to: [governance, members, identity, systems, publication], propose: maintainer, decide: { by: maintainer, method: consent, window: P7D } }
+        - { id: other, applies_to: [treasury, operations], propose: maintainer, decide: { by: maintainer, method: consent, window: P7D } }

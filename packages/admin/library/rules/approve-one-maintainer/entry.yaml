@@ -1,0 +1,22 @@
+id: rules:approve-one-maintainer
+shelf: rules
+title: Approval by one maintainer
+summary: Anyone proposes; one maintainer approves. The author does not decide their own change.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [governance]
+  domain: [decisions]
+  audience: [steward]
+  maturity: raw
+related: [rules:solo, rules:consent-7d]
+installs:
+  - op: update
+    record: governance:governance
+    set:
+      roles:
+        member: { all: true }
+      rules:
+        - { id: approve, applies_to: [all], propose: member, decide: { by: maintainer, method: approve, count: 1 } }

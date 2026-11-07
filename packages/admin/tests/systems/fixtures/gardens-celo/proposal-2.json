@@ -1,0 +1,12 @@
+{
+  "cvproposal": {
+    "id": "0x0000000000000000000000000000000000000001-2",
+    "proposalNumber": "2",
+    "proposalStatus": "1",
+    "createdAt": "1792490400",
+    "executedAt": null,
+    "strategy": {
+      "id": "0x0000000000000000000000000000000000000001"
+    }
+  }
+}

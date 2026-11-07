@@ -8,7 +8,7 @@ import { validateObject, loadSchema, validateKernel } from '../src/index.mjs';
 
 test('person: a minimal person entry validates', () => {
   const ok = validateObject('person', {
-    title: 'Ashley Cooper', type: 'person', full_name: 'Ashley Cooper',
+    title: 'Example Person', type: 'person', full_name: 'Example Person',
     affiliation: 'Gitcoin', consent_status: 'consented-public',
     maturity: 'raw', ai_assisted: true, provenance: { origin: 'x' },
   });

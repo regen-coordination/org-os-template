@@ -1,0 +1,26 @@
+id: rules:treasury-safe
+shelf: rules
+title: Treasury decided by a Safe
+summary: A treasury change passes when the org's Safe has the signatures it needs; the platform never signs.
+version: 1.0.0
+source: framework
+standing: stated
+as_of: 2026-10-18
+tags:
+  function: [treasury, governance]
+  domain: [operations]
+  audience: [steward]
+  maturity: raw
+requires:
+  - system-kind:safe
+related: [system:safe, board:treasury-council]
+config:
+  properties:
+    system: { type: string, default: treasury-safe, description: The id, in data/systems.yaml, of the Safe that decides. }
+  required: [system]
+installs:
+  - op: update
+    record: governance:governance
+    set:
+      rules:
+        - { id: treasury, applies_to: [treasury], propose: maintainer, decide: { by: system, system: treasury-safe } }

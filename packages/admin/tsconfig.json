@@ -10,7 +10,9 @@
     "types": ["node"],
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowJs": true
   },
-  "include": ["server", "app/src", "tests", "schemas"]
+  "include": ["server", "app/src", "tests", "schemas", "lib", "scripts"],
+  "exclude": ["tests/server/git.vocabulary.fixtures"]
 }

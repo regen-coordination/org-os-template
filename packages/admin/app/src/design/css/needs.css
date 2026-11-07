@@ -1,0 +1,43 @@
+/* Needs you (§9.4; the gallery's "needs" section): one row per thing waiting on this member, in a raised list. Every
+   length is a token; the list reads its own container, never the viewport's width (CC-15). */
+
+.needs { container: needs / inline-size; min-width: 0; background: var(--raised); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.needs-ul { list-style: none; margin: 0; padding: 0; }
+.need-li { min-width: 0; }
+
+/* A row: 72px at least, the 32px tile · the title and the meta line · the trailing words; the whole row one link */
+.need { display: grid; grid-template-columns: var(--h-ktile-needs) minmax(0, 1fr) auto; align-items: center; gap: var(--sp-10);
+  min-block-size: var(--h-need); padding: var(--sp-9) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule);
+  color: var(--ink); text-decoration: none; transition: background-color var(--dur-1) var(--ease); }
+.need-li:first-child > .need { border-block-start: 0; border-start-start-radius: var(--radius); border-start-end-radius: var(--radius); }
+.need-li:last-child > .need { border-end-start-radius: var(--radius); border-end-end-radius: var(--radius); }
+.need-main { display: grid; min-width: 0; }
+/* the title, 14/500, two lines at most */
+.need-t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+  font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); letter-spacing: var(--ls-name); }
+/* the meta line, 13 mute: the id in Mono, the route or the chains, the meter and its words, the context */
+.need-s { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-8); min-width: 0; margin-block-start: var(--sp-3);
+  font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); }
+.need-s .mono { font-variant-numeric: tabular-nums slashed-zero; }
+.need-s .meter-w { display: inline-flex; align-items: center; gap: var(--sp-6); }
+.need-failed { color: var(--attn); }
+/* the trailing words: the deadline (clay once past), the link-out or Look, with their arrow */
+.need-end { display: inline-flex; align-items: center; gap: var(--sp-6); font-size: var(--fs-meta); color: var(--mute); white-space: nowrap; }
+.need-end > .i { color: var(--faint); }
+.need-late { color: var(--attn); }
+@media (hover: hover) { .need:hover { background: var(--row-hover); } }
+.need:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); border-radius: var(--radius-sm); }
+@container needs (max-width: 519px) {
+  .need { grid-template-columns: var(--h-ktile-needs) minmax(0, 1fr); }
+  .need-end { grid-column: 2; white-space: normal; }
+}
+
+/* The first load: two rows of the row's own shape and height (Skeleton's 'needs') */
+.skel-row-needs { grid-template-columns: var(--h-ktile-needs) minmax(0, 1fr) auto; gap: var(--sp-10); min-block-size: var(--h-need);
+  padding: var(--sp-9) var(--sp-10); border-block-start: var(--rule-w) solid var(--rule); }
+.skel-row-needs:first-child { border-block-start: 0; }
+
+/* Nothing waits on you: the check, the line and the Systems line centred in the dashed block */
+.needs-empty > .note-block { justify-items: center; text-align: center; padding: var(--sp-14) var(--sp-11); }
+.needs-empty-g { order: -1; display: inline-flex; color: var(--faint); }

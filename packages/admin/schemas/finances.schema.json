@@ -6,6 +6,7 @@
     "treasury": {
       "type": [
         "object",
+        "array",
         "null"
       ]
     },

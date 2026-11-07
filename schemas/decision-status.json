@@ -1,0 +1,10 @@
+{
+  "$comment": "How the decision status words instances write group, for display and for F2's rules (F1 spec §3.3). Covers the fleet's governance.yaml words and DECISIONS.md's own (active, superseded, proposed, withdrawn). governance.yaml keeps each instance's own word; a word not listed here shows as written (statusGroup returns null). Matching ignores case. A word belongs to one group only.",
+  "groups": {
+    "ratified": ["ratified", "approved", "adopted", "executed", "passed", "accepted", "enacted", "closed", "active", "superseded"],
+    "open": ["open", "proposed", "draft", "voting", "pending", "in-review", "discussion"],
+    "rejected": ["rejected", "declined", "failed", "vetoed", "preference-not-ratified"],
+    "expired": ["expired", "lapsed"],
+    "withdrawn": ["withdrawn", "cancelled", "canceled", "retracted"]
+  }
+}

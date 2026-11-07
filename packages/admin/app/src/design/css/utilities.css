@@ -1,0 +1,27 @@
+/* Utilities (C10): the text helpers every group uses. This sheet is imported last, so a helper wins over a group's
+   rule of the same weight, as it did when these lived in design.css. Colours and type come only from tokens. */
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.clip { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+.brk { overflow-wrap: anywhere; }
+.mono { font: var(--fs-meta)/var(--lh-body) var(--mono); }
+.faint { color: var(--faint); }
+.att { color: var(--attn); }
+code { font: var(--fs-meta) var(--mono); }
+
+/* Everything the app marks as a function of now (`data-volatile`: a deadline's count, a read age, "12 d") keeps every
+   digit the same width, so a day passing cannot re-wrap the line beside it while the count keeps its digit count (9 d →
+   10 d, 59 min → 1 h still add or drop a glyph, and can still re-wrap) — the route shots mask these, but a mask covers
+   the words, not the space they take. `:where()` keeps the rule at no specificity, so a skin's own --data-nums decides
+   the figures wherever a marked label is also one of its data faces (bare sets them proportional, on purpose). */
+:where([data-volatile]) { font-variant-numeric: tabular-nums; }
+
+/* A meta line (the skin's data face: bare's mono, the house's Sans) and an error line under a field or a form */
+.meta { font: var(--fs-meta) var(--font-data); font-variant-numeric: var(--data-nums); color: var(--mute); }
+.err { font: var(--fs-meta) var(--font-data); font-variant-numeric: var(--data-nums); color: var(--attn); margin: var(--sp-2) 0; }
+
+/* A page's opening paragraph under its head (Governance, the library), and a line of what is wrong with the data
+   (a section's unaddressable entries, Governance's problems, generated files behind the data) */
+.lede { margin: var(--sp-7) 0 0; }
+.problem { margin: var(--sp-7) 0 0; }

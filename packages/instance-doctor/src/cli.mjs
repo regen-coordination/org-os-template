@@ -133,9 +133,15 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
     log(`doctor sync — ${snapshot.name} (dry run: nothing will be written)`);
     log(`  ${snapshot.dir}`);
     log('');
+    const plan0 = runSync(snapshot, { dryRun: true }, realIo);
     for (const [i, stage] of planSync(snapshot).entries()) {
       log(`  ${String(i + 1).padStart(2)}. ${stage.title}`);
       log(`      ${stage.detail}`);
+    }
+    if (plan0.declarationText) {
+      log('');
+      log('  declare-visibility would write data/visibility.yaml:');
+      for (const l of plan0.declarationText.trimEnd().split('\n')) log(`    ${l}`);
     }
     log('');
     log('  Re-run without --dry-run to execute this plan.');

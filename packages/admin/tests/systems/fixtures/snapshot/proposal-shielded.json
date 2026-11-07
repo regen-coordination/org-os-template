@@ -1,0 +1,28 @@
+{
+  "data": {
+    "proposal": {
+      "id": "0x4444444444444444444444444444444444444444444444444444444444444444",
+      "state": "active",
+      "type": "single-choice",
+      "choices": [
+        "For",
+        "Against",
+        "Abstain"
+      ],
+      "scores": [
+        0,
+        0,
+        0
+      ],
+      "scores_total": 0,
+      "scores_state": "pending",
+      "quorum": 0,
+      "created": 1791900000,
+      "end": 1793000000,
+      "privacy": "shutter",
+      "space": {
+        "id": "example-dao.eth"
+      }
+    }
+  }
+}

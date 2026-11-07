@@ -1,0 +1,28 @@
+{
+  "data": {
+    "proposal": {
+      "id": "0x4444444444444444444444444444444444444444444444444444444444444444",
+      "state": "closed",
+      "type": "quadratic",
+      "choices": [
+        "Steward A",
+        "Steward B",
+        "Steward C"
+      ],
+      "scores": [
+        12.5,
+        20.1,
+        3
+      ],
+      "scores_total": 35.6,
+      "scores_state": "final",
+      "quorum": 0,
+      "created": 1791900000,
+      "end": 1793000000,
+      "privacy": "",
+      "space": {
+        "id": "example-dao.eth"
+      }
+    }
+  }
+}

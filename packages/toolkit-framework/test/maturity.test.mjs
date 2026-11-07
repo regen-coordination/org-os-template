@@ -4,7 +4,7 @@ import { loadSchema, isValid } from '../src/index.mjs';
 import { isAwaitingReview } from '../src/util.mjs';
 
 // K1 / R1: the canonical state model is orthogonal axes (not one ladder). Started as
-// THREE (maturity/public_use/lifecycle_state); T4 adds Matty's 3 missing status
+// THREE (maturity/public_use/lifecycle_state); T4 adds the master doc's 3 missing status
 // dimensions (currentness/confidence/maintenance) as further orthogonal axes.
 test('review-maturity defines the canonical orthogonal axes', () => {
   const s = loadSchema('review-maturity');
@@ -12,7 +12,7 @@ test('review-maturity defines the canonical orthogonal axes', () => {
     ['confidence', 'currentness', 'lifecycle_state', 'maintenance', 'maturity', 'public_use']);
 });
 
-// T4 — Matty's 3 missing status dimensions (framework<->Database_Spec crosswalk).
+// T4 — the master doc's 3 missing status dimensions (framework<->Database_Spec crosswalk).
 test('currentness/confidence/maintenance axes accept their canonical values', () => {
   assert.equal(isValid('currentness', 'stale'), true);
   assert.equal(isValid('confidence', 'low'), true);

@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeFixtureRepo, removeFixtureRepo } from './fixtures.ts'
-import { watchData } from '../server/watcher.ts'
+import { watchData, watchPaths } from '../server/watcher.ts'
+import { testTimeoutMs } from './time-limit.ts'
 
 let repo: string
 let close: (() => Promise<void>) | undefined
@@ -36,9 +37,28 @@ describe('watchData', () => {
     write()
     const rewrite = setInterval(write, 50)
     try {
-      await expect.poll(() => seen, { interval: 25, timeout: 5000 }).toContain('projects')
+      // Half the suite's limit, so that a missing event fails here, as an assertion that says what was awaited.
+      await expect.poll(() => seen, { interval: 25, timeout: testTimeoutMs() / 2 }).toContain('projects')
     } finally {
       clearInterval(rewrite)
     }
-  }, 10000)
+  })
+})
+
+describe('watchPaths', () => {
+  it('reports the changed path relative to the repository, with forward slashes', async () => {
+    repo = makeFixtureRepo()
+    mkdirSync(join(repo, 'modules', 'm'), { recursive: true })
+    const seen: string[] = []
+    const watcher = watchPaths(repo, ['modules'], rel => seen.push(rel), { usePolling: true, interval: 40 })
+    close = () => watcher.close()
+    await new Promise<void>(resolve => watcher.on('ready', () => resolve()))
+    // Re-written until seen, for the same reason as the test above: chokidar's polling baseline.
+    const target = join(repo, 'modules', 'm', 'module.yaml')
+    let n = 0
+    const rewrite = setInterval(() => writeFileSync(target, `id: m\n# ${n++}\n`), 50)
+    try {
+      await expect.poll(() => seen, { interval: 25, timeout: testTimeoutMs() / 2 }).toContain('modules/m/module.yaml')
+    } finally { clearInterval(rewrite) }
+  })
 })

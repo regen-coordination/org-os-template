@@ -1,0 +1,11 @@
+# A map board (P4 spec §5.2, P4c ruling R-3): one map block, full width. /b/systems is also where the
+# old platform board's /b/<id> links land.
+id: systems
+name: "Systems map"
+audience: members
+layout: flow
+blocks:
+  - id: map
+    type: map
+    source: { map: systems }
+    view: { empty: "Nothing on this map yet: its records come from data/*.yaml and the instance's adapters." }

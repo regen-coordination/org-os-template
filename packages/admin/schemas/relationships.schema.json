@@ -12,19 +12,55 @@
     "status",
     "since"
   ],
+  "x-groups": [
+    {
+      "label": "Who",
+      "fields": [
+        "partner",
+        "type",
+        "contact"
+      ]
+    },
+    {
+      "label": "Where it stands",
+      "fields": [
+        "status",
+        "since"
+      ]
+    },
+    {
+      "label": "About",
+      "fields": [
+        "description"
+      ],
+      "optional": true
+    }
+  ],
   "properties": {
     "id": {
+      "title": "Id",
+      "description": "A short name, unique in this file.",
       "type": "string",
       "minLength": 1
     },
     "partner": {
+      "title": "Partner",
+      "description": "The organisation or person on the other side.",
       "type": [
         "string",
         "null"
       ]
     },
     "type": {
-      "enum": [
+      "title": "Kind",
+      "description": "What the relationship is.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "$comment": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "alliance",
         "collaboration",
         "funding",
@@ -33,7 +69,15 @@
       ]
     },
     "status": {
-      "enum": [
+      "title": "Status",
+      "description": "Where it stands now.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "$comment": "Instance-defined vocabulary: real instances use their own words. The examples are the framework's defaults.",
+      "examples": [
         "active",
         "dormant",
         "completed",
@@ -41,6 +85,8 @@
       ]
     },
     "since": {
+      "title": "Since",
+      "description": "When it began.",
       "type": [
         "string",
         "null"
@@ -48,23 +94,30 @@
       "format": "date"
     },
     "contact": {
+      "title": "Contact",
+      "description": "Who to talk to there, or how.",
       "type": [
         "string",
         "null"
       ]
     },
     "description": {
+      "title": "Description",
+      "description": "What it is about, in a sentence or two.",
+      "x-format": "textarea",
       "type": [
         "string",
         "null"
       ]
     },
     "touchpoints": {
+      "title": "Touchpoints",
+      "description": "Where the relationship shows: files, pages, records.",
       "type": [
         "array",
         "null"
       ],
-      "description": "Where this relationship is visible. Real data uses file paths as strings; objects are accepted for richer records.",
+      "$comment": "Where this relationship is visible. Real data uses file paths as strings; objects are accepted for richer records.",
       "items": {
         "anyOf": [
           {

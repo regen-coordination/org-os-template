@@ -2,47 +2,74 @@
   "$id": "orgos://registry/governance",
   "type": "object",
   "additionalProperties": true,
+  "x-order": ["model", "description", "current_phase", "trunk", "membership", "roles", "rules", "decisions", "elections", "infrastructure"],
   "properties": {
     "model": {
-      "enum": [
-        "steward-council",
-        "multisig",
-        "assembly",
-        "conviction"
-      ]
+      "enum": ["solo-maintainer", "consensus", "steward-council", "multisig", "assembly", "conviction", "other"]
     },
-    "current_phase": {
-      "enum": [
-        "bootstrap",
-        "transition",
-        "active",
-        "sunset"
-      ]
+    "description": {
+      "type": ["string", "null"],
+      "description": "Prose. Required when model is other."
     },
-    "infrastructure": {
-      "type": [
-        "object",
-        "null"
-      ]
+    "current_phase": { "enum": ["bootstrap", "transition", "active", "sunset"] },
+    "membership": {
+      "type": ["object", "null"],
+      "description": "DAO-OS L5: { tree: <the id of a hats-tree System in data/systems.yaml> }, the Hats tree whose wearers are the members. Absent, and exactly one hats-tree System exists, that one is the tree. Checked by lib/rules.mjs checkGovernance.",
+      "properties": { "tree": { "type": "string", "minLength": 1 } }
+    },
+    "roles": {
+      "type": ["object", "array", "null"],
+      "description": "A map from a role id to exactly one of { members: [member ids] }, { all: true } (every person) or { hat: <hat ref> } (whoever wears that hat of the membership tree, exactly; DAO-OS L5). An empty list or null means no roles; validate:data reads the rest (lib/rules.mjs checkGovernance) because it needs data/members.yaml and data/systems.yaml.",
+      "additionalProperties": { "type": "object" }
+    },
+    "rules": {
+      "type": ["array", "null"],
+      "description": "Per change class: who may propose and how it is decided (architecture 4.5, F2 spec 3.2). Each rule: id, applies_to, propose, decide { by, method, count | window | quorum, threshold | system, passes? } (passes: { choice: <label> }, the Snapshot choice that must win; DAO-OS L2). Cross-file checks are in lib/rules.mjs checkGovernance.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "expires": { "type": "string", "description": "An ISO 8601 duration (P14D, PT36H): the proposal expires that long after it was opened or last revised. Default P30D." },
+          "self_approve": { "type": "boolean", "description": "true: the author's own approval counts under this rule. Default false, which is four eyes." }
+        }
+      }
     },
     "decisions": {
-      "type": [
-        "array",
-        "null"
-      ],
+      "type": ["array", "null"],
       "items": {
-        "type": "object"
+        "type": "object",
+        "required": ["id", "title", "date", "status"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "date": { "type": "string", "format": "date" },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free word. schemas/decision-status.json groups the words instances use into ratified | open | rejected | expired | withdrawn; an unknown word shows as written."
+          },
+          "proposal": { "type": "string", "description": "The proposal this decision settled (P2 writes it)." },
+          "rule": { "type": "string", "description": "The id of the rule it was decided under." },
+          "method": { "enum": ["direct", "approve", "consent", "vote", "system"] },
+          "outcome": { "enum": ["ratified", "rejected", "expired"] },
+          "by": { "type": "array", "items": { "type": "string" }, "description": "Member ids who carried it." },
+          "summary": { "type": "string" }
+        }
       }
     },
-    "elections": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "object"
-      }
+    "trunk": { "type": ["string", "null"], "description": "The branch decisions land on (P2-R17). Default: the branch the repository is on when the server starts. Checked by lib/rules.mjs validTrunkName." },
+    "elections": { "type": ["array", "null"], "items": { "type": "object" } },
+    "infrastructure": {
+      "type": ["object", "null"],
+      "deprecated": true,
+      "description": "Deprecated in 0.6: outside systems live in data/systems.yaml. Still read; validate:data warns when it holds a value."
     }
   },
-  "$comment": "Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`, and refusing it made real entries unsavable."
+  "allOf": [
+    {
+      "if": { "properties": { "model": { "const": "other" } }, "required": ["model"] },
+      "then": { "required": ["description"], "properties": { "description": { "type": "string", "minLength": 1 } } }
+    }
+  ],
+  "$comment": "The canonical shape (F1 spec §3.3) is this block under a top-level `governance:` key. lib/governance-read.mjs also reads a flat file and `decision_model`; a file with several YAML documents is not read. Optional fields accept null."
 }

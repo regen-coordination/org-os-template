@@ -1,0 +1,13 @@
+{
+  "classes": ["records", "members", "governance", "identity", "systems", "treasury", "operations", "publication"],
+  "map": [
+    { "registry": "members", "class": "members" },
+    { "registry": "governance", "class": "governance" },
+    { "registry": "systems", "class": "systems" },
+    { "path": "IDENTITY.md", "class": "identity" },
+    { "path": "federation.yaml", "class": "identity" },
+    { "path": ".well-known/**", "class": "identity" },
+    { "registry": "visibility", "class": "publication" },
+    { "registry": "*", "class": "records" }
+  ]
+}

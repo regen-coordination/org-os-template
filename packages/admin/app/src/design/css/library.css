@@ -1,0 +1,189 @@
+/* Library, wizards, sign-in (§11; the gallery's "lib" and "tray" sections). Every length is a token; these elements
+   read their own container, never the viewport's width (CC-15). */
+
+/* /sign-in (L5 §11.1): the frame's blank layout — the card alone, centred on the page's ground, the full height. */
+.signin-page { display: grid; place-items: center; min-height: 100dvh; padding: var(--sp-8); background: var(--paper); }
+.signin-page .signin { inline-size: 100%; }
+
+/* Sign-in (§11.4): a raised card at most 420 wide — the eyebrow, the title in Fraunces 24, then the state's body.
+   Its actions take the card's width at 40px. */
+.signin { display: grid; gap: var(--sp-10); align-content: start; min-width: 0; max-inline-size: var(--w-signin); padding: var(--sp-12);
+  background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.signin-k { margin: 0; font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--faint); overflow-wrap: anywhere; }
+.signin-t { margin: 0; font-weight: var(--fw-regular); font-size: var(--fs-title); line-height: var(--lh-title); letter-spacing: var(--ls-title);
+  color: var(--ink); text-wrap: balance; }
+.signin-body { display: grid; gap: var(--sp-10); min-width: 0; border-radius: var(--radius-sm); }
+.signin-body:focus:not(:focus-visible) { outline: none; }
+.signin-body:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.signin-p { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); text-wrap: pretty; }
+.signin .note { margin: 0; }
+.signin-go .btn { inline-size: 100%; height: var(--h-signin-go); font-size: var(--fs-body); }
+.signin-hint { margin: 0; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+/* signed in: the identity's face, flush, its two lines free to wrap */
+.signin-who { padding: 0; }
+.signin-who .who-t, .signin-who .who-s { white-space: normal; overflow-wrap: anywhere; }
+/* 44px on a coarse pointer (§13), after the rule it enlarges */
+@media (pointer: coarse) { .signin-go .btn { height: var(--h-ctl-touch); } }
+
+/* The library page (§14.1): the preview of the entry in view above the shelf; the shelf's tools — the segmented
+   control and the search field — then the grid of cards. */
+.lib { display: grid; gap: var(--sp-12); margin-top: var(--sp-9); min-width: 0; }
+.lib-list { display: grid; gap: var(--sp-10); align-content: start; min-width: 0; }
+.lib-tools { display: flex; flex-wrap: wrap; gap: var(--sp-8); align-items: center; min-width: 0; }
+.lib-search { inline-size: auto; flex: 1 1 var(--w-filter); max-inline-size: var(--w-aside); }
+
+/* Entry card (§11.1): raised, radius 10, at least 172 tall — the kind as an eyebrow, the title (Sans 600 15), the
+   summary clamped to two lines (13 mute), and the foot: shelf · version (Mono) · the state mark at the end. Hover
+   outline --rule-strong; the open one wears the moss outline and ring. The grid is auto-fill minmax(260px, 1fr). */
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--w-lib-card), 100%), 1fr)); gap: var(--sp-8); min-width: 0; }
+.lib-item { display: grid; min-width: 0; }
+.lib-card { position: relative; display: grid; gap: var(--sp-6); align-content: start; min-height: var(--h-lib-card); min-width: 0; padding: var(--sp-10);
+  background: var(--raised); color: var(--ink); text-decoration: none; border: var(--rule-w) solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
+@media (hover: hover) { .lib-card:hover { border-color: var(--rule-strong); } }
+/* the link is the title, stretched over the card (::after): a click anywhere on the card follows it, and its focus ring
+   is drawn around the card */
+.lib-card-a { color: inherit; text-decoration: none; }
+.lib-card-a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.lib-card-a:focus-visible { outline: none; }
+.lib-card-a:focus-visible::after { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.lib-card.sel { border-color: var(--accent); box-shadow: 0 0 0 var(--sp-3) var(--accent-soft); }
+.lib-card-k, .lib-prev-k, .wiz-k, .wiz-writes-k { font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--faint); }
+.lib-card-t { font: var(--fw-strong) var(--fs-lib-t)/var(--lh-title) var(--sans); letter-spacing: var(--ls-name); overflow-wrap: anywhere; }
+.lib-card-d { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: var(--fs-meta);
+  line-height: var(--lh-body); color: var(--mute); overflow-wrap: anywhere; }
+.lib-card-f { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5) var(--sp-8); margin-top: auto; padding-top: var(--sp-6);
+  font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); min-width: 0; }
+.lib-card-f .mono { font-size: var(--fs-tiny); line-height: var(--lh-tiny); }
+.lib-card-f .smark { margin-inline-start: auto; }
+
+/* Preview (§11.2): two columns — the main one, and the side on --sunken at --w-panel — that become one under 680px
+   of the preview's own width. */
+.lib-prev { container: prev / inline-size; min-width: 0; }
+.lib-prev-in { display: grid; grid-template-columns: minmax(0, 1fr) var(--w-panel); overflow: hidden; background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.lib-prev-in.lib-prev-one { grid-template-columns: minmax(0, 1fr); }
+.lib-prev-m { display: grid; gap: var(--sp-12); align-content: start; padding: var(--sp-12); min-width: 0; }
+.lib-prev-s { display: grid; gap: var(--sp-11); align-content: start; padding: var(--sp-12) var(--sp-11); min-width: 0;
+  background: var(--sunken); border-inline-start: var(--rule-w) solid var(--rule); }
+@container prev (max-width: 679px) {
+  .lib-prev-in { grid-template-columns: minmax(0, 1fr); }
+  .lib-prev-s { border-inline-start: 0; border-top: var(--rule-w) solid var(--rule); }
+}
+.lib-prev-head { display: grid; gap: var(--sp-4); min-width: 0; }
+.lib-prev-top { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-6); min-width: 0; }
+.lib-prev-id { color: var(--mute); overflow-wrap: anywhere; }
+.lib-prev-t { margin: 0; font: var(--fw-strong) var(--fs-wiz-h)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); color: var(--ink); }
+.lib-prev-t:focus:not(:focus-visible) { outline: none; }
+.lib-prev-t:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.lib-p { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); max-width: var(--w-prose); overflow-wrap: anywhere; }
+.lib-sum { color: var(--ink); }
+.lib-lede { display: grid; gap: var(--sp-5); min-width: 0; }
+.lib-state { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); }
+.lib-sec { display: grid; gap: var(--sp-6); align-content: start; min-width: 0; }
+.lib-h { margin: 0; font: var(--fw-strong) var(--fs-ui)/var(--lh-label) var(--sans); color: var(--ink); }
+.lib-ul { margin: 0; padding-inline-start: var(--sp-10); font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); }
+/* It would create N records: a bordered list, a row each — glyph, name, registry:id, the class and who decides */
+.lib-rows { list-style: none; margin: 0; padding: 0; border: var(--rule-w) solid var(--rule); border-radius: var(--radius-well); background: var(--raised); }
+.lib-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-8); padding: var(--sp-6) var(--sp-8);
+  border-top: var(--rule-w) solid var(--rule); font-size: var(--fs-meta); line-height: var(--lh-row); min-width: 0; }
+.lib-row:first-child { border-top: 0; }
+.lib-row > .i { color: var(--mute); flex: none; }
+.lib-row .mono { color: var(--mute); overflow-wrap: anywhere; }
+.lib-row-c { margin-inline-start: auto; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+.lib-row-clay { background: var(--attn-soft); }
+.lib-row-clay > .i, .lib-row-clay .lib-row-c { color: var(--attn); }
+/* the side: a check list, missing in clay; hosts in Mono */
+.lib-check { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-5); font-size: var(--fs-meta); line-height: var(--lh-body); }
+.lib-check li { display: flex; gap: var(--sp-5); align-items: flex-start; min-width: 0; }
+.lib-check li > .i { flex: none; margin-top: var(--sp-1); color: var(--mute); }
+.lib-check li.miss, .lib-check li.miss > .i { color: var(--attn); }
+.lib-hosts { display: grid; gap: var(--sp-4); color: var(--mute); }
+.lib-hosts .mono { overflow-wrap: anywhere; }
+/* the receipt line, and the actions: Add — stage a change (primary), Close */
+.lib-rcpts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-4); }
+.lib-rcpt { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); font-size: var(--fs-meta); color: var(--mute); }
+.lib-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+.lib-form { display: grid; gap: var(--sp-10); min-width: 0; }
+.lib-hint { display: block; margin-top: var(--sp-2); font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+.lib-prev .note { margin: 0; }
+/* what removing would do, in the same frame */
+.lib-rm { display: grid; gap: var(--sp-10); min-width: 0; }
+.lib-rm-t:focus:not(:focus-visible) { outline: none; }
+.lib-rm-t:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.lib-held { color: var(--attn); }
+
+/* Wizard steps (§11.3): the rail (--w-wiz-rail on --sunken, numbered circles: done an ink disc with a check, current
+   an ink ring and its label in 500 ink, ahead a --rule-strong ring); the body — eyebrow, the question (Sans 600 20),
+   one sentence of why, choices or fields, the This screen writes well in Mono — and the foot: Save and leave (ghost)
+   · Back · Continue (primary). Under 560px of its own width the rail is a top line and the foot's buttons share it. */
+.wiz-c { container: wiz / inline-size; min-width: 0; }
+.wiz { display: grid; grid-template-columns: var(--w-wiz-rail) minmax(0, 1fr); overflow: hidden; background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.wiz-steps { list-style: none; margin: 0; padding: var(--sp-12) var(--sp-10); display: grid; gap: var(--sp-4); align-content: start;
+  background: var(--sunken); border-inline-end: var(--rule-w) solid var(--rule); }
+.wiz-step { display: flex; align-items: center; gap: var(--sp-6); min-height: var(--h-ctl); font-size: var(--fs-ui); color: var(--mute); min-width: 0; }
+.wiz-step-t { min-width: 0; overflow-wrap: anywhere; }
+.wiz-dot { display: grid; place-items: center; flex: none; inline-size: var(--h-wiz-dot); block-size: var(--h-wiz-dot); box-sizing: border-box;
+  border: var(--stroke-w) solid var(--rule-strong); border-radius: var(--radius-step); font: var(--fw-medium) var(--fs-wiz-n)/var(--lh-ui) var(--mono); }
+.wiz-step.done .wiz-dot { background: var(--solid); border-color: var(--solid); color: var(--on-solid); }
+.wiz-step.current { color: var(--ink); font-weight: var(--fw-medium); }
+.wiz-step.current .wiz-dot { border-color: var(--ink); color: var(--ink); }
+.wiz-main { min-width: 0; }
+.wiz-top { display: none; }
+.wiz-body { display: grid; gap: var(--sp-11); align-content: start; padding: var(--sp-13) var(--sp-13) var(--sp-12); min-width: 0; }
+.wiz-k { margin: 0; }
+.wiz-h { margin: 0; font: var(--fw-strong) var(--fs-wiz-h)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); color: var(--ink); }
+.wiz-h:focus:not(:focus-visible) { outline: none; }
+.wiz-h:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.wiz-ask { margin: 0; color: var(--mute); max-width: var(--w-prose); text-wrap: pretty; }
+.wiz-body .note { margin: 0; }
+/* choices and fields */
+.wiz-doors { display: grid; gap: var(--sp-6); margin: 0; padding: 0; border: 0; min-width: 0; }
+.wiz-doors legend { padding: 0; }
+.wiz-legend { margin-bottom: var(--sp-4); font: var(--fw-medium) var(--fs-label)/var(--lh-label) var(--sans); color: var(--mute); }
+.wiz-help { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); max-width: var(--w-prose); }
+.wiz-field { display: grid; gap: var(--sp-4); min-width: 0; max-inline-size: var(--w-palette); }
+.wiz-field label { font: var(--fw-medium) var(--fs-label)/var(--lh-label) var(--sans); color: var(--mute); }
+.wiz-note { margin: 0; color: var(--mute); max-width: var(--w-prose); }
+.wiz-label { margin: 0; font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.wiz-log { margin: 0; padding: var(--sp-8) var(--sp-9); background: var(--sunken); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-well);
+  font: var(--fs-code)/var(--lh-code) var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.wiz-log b { font-weight: var(--fw-strong); }
+.wiz-cmd { font-size: var(--fs-meta); color: var(--mute); }
+.wiz-cmd summary { cursor: pointer; }
+.wiz-cmd .wiz-log { margin-top: var(--sp-6); }
+.wiz-files { display: grid; gap: var(--sp-2); }
+.wiz-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); }
+/* running: lines of progress, a spinner or a check */
+.wiz-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-6); font-size: var(--fs-meta); color: var(--mute); }
+.wiz-lines li { display: flex; align-items: center; gap: var(--sp-6); min-width: 0; }
+.wiz-lines li > .i { flex: none; color: var(--ink); }
+/* done and failed: the outcome's tile beside what happened, its actions under it */
+.wiz-out { display: flex; align-items: flex-start; gap: var(--sp-8); min-width: 0; }
+.wiz-out-b { display: grid; gap: var(--sp-6); align-content: start; flex: 1; min-width: 0; }
+.wiz-out .wiz-h { font-size: var(--fs-sub); font-weight: var(--fw-medium); letter-spacing: var(--ls-name); }
+.wiz-out .wiz-ask { font-size: var(--fs-meta); }
+.wiz-out .wiz-foot { padding-top: 0; border-top: 0; }
+/* This screen writes: a well in Mono */
+.wiz-writes { display: grid; gap: var(--sp-4); padding: var(--sp-8) var(--sp-9); background: var(--sunken); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius-well); min-width: 0; }
+.wiz-writes-k { margin-bottom: var(--sp-3); }
+.wiz-writes-v { display: grid; gap: var(--sp-4); font: var(--fs-code)/var(--lh-code) var(--mono); color: var(--mute); overflow-wrap: anywhere; }
+.wiz-writes-v .mono { font: inherit; }
+/* the foot */
+.wiz-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); padding-top: var(--sp-10); border-top: var(--rule-w) solid var(--rule); }
+.wiz-end { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-inline-start: auto; }
+@container wiz (max-width: 559px) {
+  .wiz { grid-template-columns: minmax(0, 1fr); }
+  .wiz-steps { display: none; }
+  .wiz-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); margin: 0; padding: var(--sp-8) var(--sp-10);
+    background: var(--sunken); border-bottom: var(--rule-w) solid var(--rule); font-size: var(--fs-tiny); color: var(--mute); }
+  .wiz-top b { font-weight: var(--fw-medium); color: var(--ink); }
+  .wiz-body { padding: var(--sp-11) var(--sp-10); }
+  .wiz-foot > .btn { flex: 1 1 100%; }
+  .wiz-end { inline-size: 100%; }
+  .wiz-end .btn { flex: 1; }
+}

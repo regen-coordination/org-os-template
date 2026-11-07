@@ -1,0 +1,12 @@
+# A section board (P4 spec §5.2): the section's list, as P4b's ResourceList drew it. Its title, empty
+# sentence, absent adapter and map come from the section (blockCfg, ruling R-7). An instance replaces it
+# with a board of id "funding" in data/boards.yaml.
+id: funding
+name: Funding
+audience: members
+layout: flow
+blocks:
+  - id: list
+    type: list
+    source: { section: funding }
+    view: { switch: true, filter: true, new: true }

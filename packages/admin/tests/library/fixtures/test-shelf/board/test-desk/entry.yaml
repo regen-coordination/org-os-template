@@ -1,0 +1,23 @@
+id: board:test-desk
+shelf: board
+title: Test desk
+summary: A one-note board, here to prove a second shelf is read.
+version: 1.0.0
+source: test-shelf
+standing: stated
+as_of: 2026-10-29
+tags:
+  maturity: field-informed
+installs:
+  - op: create
+    record: boards:test-desk
+    value:
+      id: test-desk
+      name: Test desk
+      audience: members
+      layout: flow
+      blocks:
+        - id: hello
+          type: note
+          title: Hello
+          text: "A note on the test desk."

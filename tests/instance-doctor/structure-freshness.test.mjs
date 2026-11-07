@@ -69,6 +69,91 @@ test('a validator that could not run is reported rather than assumed green', () 
   assert.match(f.message, /structure/);
 });
 
+const GREEN = { ran: true, exitCode: 0, failed: 0, warnings: 0 };
+
+test('a failing data validator is a BLOCKER that carries the repair from its output', () => {
+  const r = checkStructure({
+    validators: {
+      structure: GREEN,
+      schemas: GREEN,
+      data: {
+        ran: true,
+        exitCode: 1,
+        failed: 1,
+        warnings: 222,
+        tail: '✗ data/governance.yaml: holds 11 YAML documents, separated by `---`, where a registry is one. Merge them into one document under `governance:` by hand: only the people who wrote them know where each part belongs. Nothing in the file is read until then. | Results: 37 passed, 1 failed, 222 warnings',
+      },
+    },
+  });
+  assert.equal(r.status, 'BLOCKER');
+  const f = r.findings.find((x) => x.code === 'data-invalid');
+  assert.ok(f, JSON.stringify(r.findings.map((x) => x.code)));
+  assert.match(f.message, /data validation failed with 1 failing check/);
+  assert.match(f.hint, /Merge them into one document under `governance:`/);
+});
+
+test('data warnings alone are a WARN', () => {
+  const r = checkStructure({ validators: { structure: GREEN, schemas: GREEN, data: { ...GREEN, warnings: 47 } } });
+  assert.equal(r.status, 'WARN');
+  assert.deepEqual(r.findings.map((x) => x.code), ['data-warnings']);
+});
+
+test('a data validator that could not run is reported; a snapshot without one says nothing', () => {
+  const r = checkStructure({ validators: { structure: GREEN, schemas: GREEN, data: { ran: false, reason: 'scripts/validate-data.mjs not present in the framework checkout' } } });
+  assert.equal(r.status, 'WARN');
+  assert.match(r.findings[0].message, /the data validator could not be run/);
+  assert.equal(checkStructure({ validators: { structure: GREEN, schemas: GREEN } }).status, 'OK');
+});
+
+test('a data validator that exits 2 (cannot run) is a WARN, never a BLOCKER', () => {
+  const r = checkStructure({
+    validators: { structure: GREEN, schemas: GREEN, data: { ran: true, exitCode: 2, failed: null, warnings: 0, tail: '✗ validate:data cannot load the admin schemas (x) | run: npm ci --prefix packages/admin' } },
+  });
+  assert.equal(r.status, 'WARN');
+  assert.deepEqual(r.findings.map((x) => x.code), ['validator-did-not-run']);
+  assert.match(r.findings[0].hint, /npm ci --prefix packages\/admin/);
+});
+
+
+// 0.6 F2: validate:governance is the fourth validator (rules well-formed; history agrees).
+const WITH = (governance) => ({ validators: { structure: GREEN, schemas: GREEN, data: GREEN, governance } });
+
+test('a governance validator that passes is OK', () => {
+  assert.equal(checkStructure(WITH(GREEN)).status, 'OK');
+});
+
+test('rules that cannot work are a BLOCKER, and the hint is the last error line', () => {
+  const r = checkStructure(WITH({
+    ran: true, exitCode: 1, passed: 1, failed: 1, warnings: 0,
+    tail: '✗ data/governance.yaml rules.records.propose: rule "records": propose names the role "steward", and roles defines none by that name | Results: 1 passed, 1 failed, 0 warnings',
+  }));
+  assert.equal(r.status, 'BLOCKER');
+  const f = r.findings.find((x) => x.code === 'governance-invalid');
+  assert.ok(f, JSON.stringify(r.findings.map((x) => x.code)));
+  assert.match(f.message, /governance validation failed with 1 failing check/);
+  assert.match(f.hint, /propose names the role "steward"/);
+});
+
+test('history that disagrees with the rules (warnings, as the doctor runs it without --strict) is a WARN', () => {
+  const r = checkStructure(WITH({ ...GREEN, warnings: 3 }));
+  assert.equal(r.status, 'WARN');
+  assert.deepEqual(r.findings.map((x) => x.code), ['governance-warnings']);
+  assert.match(r.findings[0].hint, /validate-governance\.mjs/);
+});
+
+test('a governance validator that exits 2 (cannot run) is a WARN, never a BLOCKER; one that was not found is reported', () => {
+  const cannot = checkStructure(WITH({ ran: true, exitCode: 2, failed: null, warnings: 0, tail: '✗ validate:governance cannot load the admin schemas (x) | run: npm ci --prefix packages/admin' }));
+  assert.equal(cannot.status, 'WARN');
+  assert.deepEqual(cannot.findings.map((x) => x.code), ['validator-did-not-run']);
+  const missing = checkStructure(WITH({ ran: false, reason: 'scripts/validate-governance.mjs not present in the framework checkout' }));
+  assert.match(missing.findings[0].message, /the governance validator could not be run/);
+});
+
+test('a snapshot taken before the governance validator existed says nothing about it', () => {
+  assert.equal(checkStructure({ validators: { structure: GREEN, schemas: GREEN, data: GREEN } }).status, 'OK');
+});
+
+
 // --- B6 ------------------------------------------------------------------
 
 const FRESH = {

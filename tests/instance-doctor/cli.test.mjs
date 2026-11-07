@@ -6,7 +6,7 @@
 // instances cannot self-update using machinery they do not have.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,8 @@ import { makeInstance, refiMedShape, breadCoopShape, healthyShape } from '../hel
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const shim = path.join(rootDir, 'scripts', 'doctor.mjs');
+// The doctor migrates to the framework's own version (package.json), so the plan names whatever that is.
+const frameworkMinor = JSON.parse(readFileSync(path.join(rootDir, 'package.json'), 'utf8')).version.match(/^\d+\.\d+/)[0];
 
 const run = (args, cwd = rootDir) =>
   spawnSync('node', [shim, ...args], { cwd, encoding: 'utf-8', timeout: 120_000 });
@@ -74,7 +76,7 @@ test('sync --dry-run prints the plan, mutates nothing, and exits 0', () => {
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /dry run/i);
     assert.match(r.stdout, /rewrite `upstream`/);
-    assert.match(r.stdout, /re-stamp the version surfaces 3\.0 → 0\.5/);
+    assert.match(r.stdout, new RegExp(`re-stamp the version surfaces 3\\.0 → ${frameworkMinor.replace('.', '\\.')}\\b`));
     const after = run(['assess', '--dir', dir, '--json', '--no-validators']).stdout;
     assert.equal(before, after, 'a dry run must not change the instance');
   });
