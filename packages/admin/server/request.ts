@@ -3,6 +3,8 @@
 // The actor comes with the request (L5 spec §6.2, §6.5): one middleware, mounted by createApp before every route under
 // /api/, sets `c.var.actor` and `c.var.viewer` once per request; routes ask `actorOf(c)`, `knownActorOf(c)` and
 // `viewerOf(c)`, never `resolveActor(repo)`. In order:
+//   0. a valid emailed-link session (the I5 cookie, Lane 3 Task 9) → the person, with their Roles read from the Roles
+//      table now; with no Role, the public's view (their own Profile, `GET /api/actor`, is theirs) and no act;
 //   1. a valid session (its cookie read here, from the private store: app.ts's own routes come before mountSession's
 //      middleware, R-L5-6.3) → the signed-in member, as `actorIdOf` names them (§6.3);
 //   2. no session, local → git's identity, exactly as `resolveActor` (its address read again only when the config file
@@ -10,20 +12,25 @@
 //   3. no session, hosted → nobody: the viewer is public, and every write is 401 "Sign in to change anything here."
 // A read never waits on the network: it uses the last good reading (`Membership.forRead`). An act (a write) reads now
 // (`Membership.forAct`): a signed-in member who wears no hat of the tree now, or whose hats cannot be read, is refused
-// before any route runs, so nothing is written (§5.2, Review Focus 2).
+// before any route runs, so nothing is written (§5.2, Review Focus 2). A signed-in session reads as the public past the
+// grace, with no reading and older than the grace (after a restart), or with a reading that shows no hat (L9 §5.8).
 
 import type { Context, MiddlewareHandler } from 'hono'
-import { existsSync, statSync } from 'node:fs'
+import { statSync } from 'node:fs'
 import { join } from 'node:path'
-import { isKnown, actorForEmail, actorTrailer, lowestHat, walletOf, withWallet, type Actor, type KnownActor, type SiweActor } from './actor.ts'
+import { isKnown, actorForEmail, actorTrailer, lowestHat, walletOf, withWallet, type Actor, type KnownActor, type PersonActor, type SiweActor } from './actor.ts'
 import { configuredEmail } from './git.ts'
 import { Refusal } from './changes/apply.ts'
 import { effectiveRule, readRuleContext } from './governance/effective.ts'
-import { readRegistry, registryPath } from './registry.ts'
+import { readRegistryOrEmptyCached } from './registry.ts'
 import { shortAddress } from './systems/safe.ts'
-import { accountOn, actUnreadable, TREE_UNREADABLE, type Membership } from './session/membership.ts'
+import { accountOn, actUnreadable, readsAsPublic, TREE_UNREADABLE, type Membership } from './session/membership.ts'
 import { sessionFromCookie, type Session } from './session/sessions.ts'
+import { endPersonSession, needsReissue, personActor, readPersonCookie, reissue, viewerRoles, type PersonCookie } from './session/person.ts'
+import type { SignInConfig } from './session/config.ts'
+import type { RolesPerson } from './private/store.ts'
 import type { PrivateStore } from './private/store.ts'
+import type { HostedConfig } from './hosted/config.ts'
 import { actorIdOf, walletsOf, type HatAct } from '../lib/hat-readings.mjs'
 import { parseCaip10 } from '../lib/caip.mjs'
 import { resolveRoles, rolesOf } from '../lib/rules.mjs'
@@ -40,6 +47,8 @@ declare module 'hono' {
 
 /** §3, §13: a write with no actor in hosted mode. */
 export const SIGN_IN = 'Sign in to change anything here.'
+/** An act by a person signed in with an emailed link who holds no Role (Review Focus 2: their Profile only). */
+export const NO_ROLE = 'You hold no Role here, so your sign-in shows your Profile only and you cannot change anything. Nothing was written.'
 /** An act by a signed-in member whose fresh reading shows no hat of the membership tree (§5.2: acts are refused at once). */
 export const notWorn = (block: number) =>
   `You no longer wear a hat of this organisation's Hats tree (read at block ${block}), so you cannot change anything here. Nothing was written.`
@@ -52,6 +61,10 @@ export interface RequestDeps {
   membership: Membership | null
   /** Where sessions are kept; null or absent: no request carries one. */
   store?: PrivateStore | null
+  /** The hosted binding (L9 §5.1), when hosted: the session is read from the `__Host-` cookie alone (§5.8). */
+  config?: HostedConfig
+  /** The emailed-link sign-in (Lane 3): its cookie is read first. Absent or null: no request carries one. */
+  signIn?: SignInConfig | null
   now?: () => Date
 }
 
@@ -62,6 +75,8 @@ interface Reading { account: string; hats: string[]; block: number; readAt: stri
 const repos = new WeakMap<Context, string>()
 /** The Membership each request's middleware read hats with (null: none, no hats are read). */
 const memberships = new WeakMap<Context, Membership | null>()
+/** The I5 cookie each request carried, as read (null: none, or one that does not verify). */
+const persons = new WeakMap<Context, PersonCookie | null>()
 const READS = new Set(['GET', 'HEAD', 'OPTIONS'])
 /** Sign-in, its nonce and sign-out: writes that need no actor and no hats. */
 const isSessionPath = (path: string) => path === '/api/session' || path.startsWith('/api/session/')
@@ -70,16 +85,28 @@ const isSessionPath = (path: string) => path === '/api/session' || path.startsWi
 export function withRequest(d: RequestDeps): MiddlewareHandler {
   const now = d.now ?? (() => new Date())
   const email = emailReader(d.repo)
+  const hostCookie = d.hosted && d.config !== undefined
   return async (c, next) => {
     const act = !READS.has(c.req.method) && !isSessionPath(c.req.path)
+    // A session route's write (sign-in, sign-out, a link) sets its own cookies: nothing is re-issued or cleared after it.
+    const sessionWrite = !READS.has(c.req.method) && isSessionPath(c.req.path)
+    let person: PersonCookie | null = null
+    try { person = d.store && d.signIn ? readPersonCookie(d.store, d.signIn, c.req.header('cookie'), now) : null } catch (err) {
+      console.error(`org-os admin: a sign-in could not be read from the private store: ${err instanceof Error ? err.message : String(err)}`)
+    }
     let session: Session | null = null
-    try { session = d.store && d.membership ? sessionFromCookie(d.store, c.req.header('cookie'), now) : null } catch (err) {
-      // A store that fails to answer is no session, never a 500 for every route (as mountSession's middleware).
-      console.error(`org-os admin: a session could not be read from the private store: ${err instanceof Error ? err.message : String(err)}`)
+    if (person?.kind !== 'person') {
+      try { session = d.store && d.membership ? sessionFromCookie(d.store, c.req.header('cookie'), now, hostCookie) : null } catch (err) {
+        // A store that fails to answer is no session, never a 500 for every route (as mountSession's middleware).
+        console.error(`org-os admin: a session could not be read from the private store: ${err instanceof Error ? err.message : String(err)}`)
+      }
     }
     let who: { actor: Actor | null; viewer: Viewer }
-    if (session && d.membership) {
-      const signed = await signedIn(d.repo, d.membership, session, act)
+    if (person?.kind === 'person') {
+      if (act && person.person.roles.length === 0) return c.json({ error: NO_ROLE, reason: NO_ROLE, code: 'NO_ROLE' }, 403)
+      who = personWho(d.repo, person.person)
+    } else if (session && d.membership) {
+      const signed = await signedIn(d.repo, d.membership, session, act, now())
       if ('refusal' in signed) return c.json(signed.refusal.body, signed.refusal.status)
       who = signed
     } else if (d.hosted) {
@@ -90,10 +117,28 @@ export function withRequest(d: RequestDeps): MiddlewareHandler {
     }
     repos.set(c, d.repo)
     memberships.set(c, d.membership)
+    persons.set(c, person)
     c.set('actor', who.actor)
     c.set('viewer', who.viewer)
     await next()
+    // I5's re-issue: under 12 h left, a fresh cookie with the Roles as they are now. A person no longer on the records,
+    // or a session the house ended: the row goes and the cookie is cleared.
+    if (person && d.store && d.signIn && !sessionWrite) {
+      try {
+        const cookie = person.kind === 'person'
+          ? (needsReissue(person.claims, now()) ? await reissue(d.store, d.signIn, person.person, person.claims, now()) : null)
+          : await endPersonSession(d.store, d.signIn, person.claims)
+        if (cookie) c.res.headers.append('set-cookie', cookie)
+      } catch (err) {
+        console.error(`org-os admin: a sign-in could not be renewed: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
   }
+}
+
+/** The I5 cookie the request carried, as the request middleware read it (null: none, or one that does not verify). */
+export function personOf(c: Context): PersonCookie | null {
+  return persons.get(c) ?? null
 }
 
 /** The repository the middleware ran for; it throws when it did not run, so a route mounted before it is found at once. */
@@ -186,7 +231,7 @@ export async function hatActOf(c: Context, hats: readonly string[], permitted: W
 
 // ── the signed-in member (§6.3) ─────────────────────────────────────────────────────────────────────
 
-async function signedIn(repo: string, m: Membership, session: Session, act: boolean): Promise<{ actor: SiweActor; viewer: Viewer } | { refusal: Refusal }> {
+async function signedIn(repo: string, m: Membership, session: Session, act: boolean, at: Date): Promise<{ actor: SiweActor; viewer: Viewer } | { refusal: Refusal }> {
   const members = membersOf(repo)
   const account = session.account
   const id = actorIdOf(account, members)
@@ -213,9 +258,20 @@ async function signedIn(repo: string, m: Membership, session: Session, act: bool
     id, name, kind: 'person', via: 'siwe', account, hats,
     reading: { block: read?.block ?? 0, readAt: read?.readAt ?? '' }, // no reading yet: after a restart, until the first lands
   }
-  // Past the grace (§5.2) the session reads as public until a reading succeeds.
-  const viewer: Viewer = read?.stale ? { kind: 'public' } : { kind: 'member', id, hats, roles: rolesFor(repo, actor, read) }
+  // Past the grace (§5.2), with no reading and older than the grace (after a restart, carry 3), or wearing no hat (a
+  // member whose hats were taken off, L9 §5.8): the session reads as public until a reading with a hat lands.
+  const viewer: Viewer = readsAsPublic(read, session.created, at) ? { kind: 'public' } : { kind: 'member', id, hats, roles: rolesFor(repo, actor, read) }
   return { actor, viewer }
+}
+
+// ── the person signed in with an emailed link (Lane 3 Task 9) ───────────────────────────────────────
+
+/** The person's actor and viewer: with no Role, the public's view (Review Focus 2); otherwise a member whose roles are
+ *  their Roles and the governance roles the members list gives their id (a steward listed in a role's `members` holds it). */
+function personWho(repo: string, p: RolesPerson): { actor: PersonActor; viewer: Viewer } {
+  const actor = personActor(p)
+  if (p.roles.length === 0) return { actor, viewer: { kind: 'public' } }
+  return { actor, viewer: { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, actor, null)) } }
 }
 
 /** A CAIP-10 actor's name (§6.3): the name of the lowest hat worn and the short address ("Council · 0x0000…00A1"). The
@@ -289,8 +345,8 @@ function nameOf(member: Record<string, unknown>, id: string): string {
   return typeof member.name === 'string' && member.name.trim() !== '' ? member.name : id
 }
 
+/** The members registry, through the repository's read cache (L9 §7.6): parsed again only when the file changes. A missing
+ *  file, or one that cannot be read, is no members. Frozen: every request shares it. */
 function membersOf(repo: string): Record<string, unknown>[] {
-  try {
-    return existsSync(registryPath(repo, 'members')) ? (readRegistry(repo, 'members').entries ?? []) as Record<string, unknown>[] : []
-  } catch { return [] }
+  try { return (readRegistryOrEmptyCached(repo, 'members').entries ?? []) as Record<string, unknown>[] } catch { return [] }
 }

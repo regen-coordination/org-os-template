@@ -30,6 +30,22 @@ export const actUnreadable = (hat: string) => `The Hats tree could not be read, 
 type System = Record<string, unknown>
 export interface MembershipTree { system: System; chain: string; ref: string }
 export interface ReadForRead { hats: string[]; block: number; readAt: string; stale: boolean }
+
+/** Whether a session has no reading it may be read by (§5.2; L9 spec §5.8, carry 3): its reading is past the grace, or it
+ *  has none and was made `HATS_GRACE_MS` or more ago (after a restart with the tree down). A `created` that is no date
+ *  counts as past the grace. */
+export function pastGrace(read: ReadForRead | null, created: string, now: Date): boolean {
+  if (read) return read.stale
+  const made = Date.parse(created)
+  return Number.isNaN(made) || now.getTime() - made >= HATS_GRACE_MS
+}
+
+/** Whether a signed-in session reads as the public (L9 spec §5.8): past the grace, or its reading shows no hat (rule 1: a
+ *  member wears a hat; a member whose hats were taken off is narrowed to the public). With no reading yet and a session
+ *  younger than the grace, it reads as a member until the first reading lands. */
+export function readsAsPublic(read: ReadForRead | null, created: string, now: Date): boolean {
+  return pastGrace(read, created, now) || (read !== null && read.hats.length === 0)
+}
 export type Refused = { ok: false; error: string }
 /** Why an act under a hat was refused (`actFor`): the tree could not be read (a 502), the hat is not worn now, there is
  *  no tree, the hat is no hat ref, or the account is not on the tree's chain (403s). */
@@ -72,7 +88,9 @@ export class Membership {
   /** The account's last good reading, for a read; never awaits the network. Null before a first reading (one is
    *  started) or for an account that is not on the tree's chain. Older than `HATS_FRESH_MS`, a reading is refreshed
    *  in the background and still answered; older than `HATS_GRACE_MS`, it answers no hats and `stale: true`, so the
-   *  session reads as public until a reading succeeds. */
+   *  session reads as public until a reading succeeds. A reading this starts is kept even when it shows no hat (a
+   *  negative reading, L9 spec §5.8): only a live session, or a member's own wallet, is read for reads, and its account
+   *  is then asked at most once per `HATS_FRESH_MS`, not at every request. */
   forRead(account: string): ReadForRead | null {
     const tree = this.tree()
     const id = tree ? accountOn(tree.chain, account) : null
@@ -140,14 +158,15 @@ export class Membership {
     return prettyHatId(parsed.hatId)
   }
 
-  /** Keeps a good reading for reads, only for an account that wears a hat or already has a kept reading (a member
-   *  whose hats were taken off is narrowed, not forgotten): a sign-in by anyone else leaves nothing behind. Readings
-   *  older than `KEPT_MAX_MS` are dropped at each keep, so the map holds the members seen within a session's life. */
-  private keep(id: string, r: { hats: string[]; block: number; readAt: string }): void {
+  /** Keeps a good reading for reads, only for an account that wears a hat, already has a kept reading (a member whose
+   *  hats were taken off is narrowed, not forgotten), or was read for a read (`negative`: a live session's account,
+   *  L9 spec §5.8): a sign-in by anyone else leaves nothing behind. Readings older than `KEPT_MAX_MS` are dropped at
+   *  each keep, so the map holds the members seen within a session's life. */
+  private keep(id: string, r: { hats: string[]; block: number; readAt: string }, negative = false): void {
     const now = this.now().getTime()
     for (const [k, v] of this.kept) if (now - v.at >= KEPT_MAX_MS) this.kept.delete(k)
     for (const [k, at] of this.failedAt) if (now - at >= FAILED_READ_TTL_MS) this.failedAt.delete(k)
-    if (r.hats.length === 0 && !this.kept.has(id)) return
+    if (r.hats.length === 0 && !negative && !this.kept.has(id)) return
     const read = Date.parse(r.readAt)
     this.kept.set(id, { hats: r.hats, block: r.block, readAt: r.readAt, at: Number.isNaN(read) ? now : read })
   }
@@ -160,7 +179,7 @@ export class Membership {
     this.inflight.add(id)
     void this.reader.wearer(tree.system, id).then(
       r => {
-        if (r.ok) { this.failedAt.delete(id); this.keep(id, r) } else this.failedAt.set(id, this.now().getTime())
+        if (r.ok) { this.failedAt.delete(id); this.keep(id, r, true) } else this.failedAt.set(id, this.now().getTime())
       },
       () => { this.failedAt.set(id, this.now().getTime()) /* the reader never rejects */ },
     ).finally(() => this.inflight.delete(id))

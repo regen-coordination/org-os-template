@@ -5,9 +5,14 @@ import { actorIdOf } from '../../lib/hat-readings.mjs'
 import { orgName } from '../resources/util.ts'
 import { readRegistry } from '../registry.ts'
 import type { PrivateStore } from '../private/store.ts'
-import { GRACE_BAND, TREE_UNREADABLE, type Membership } from './membership.ts'
+import type { HostedConfig } from '../hosted/config.ts'
+import { GRACE_BAND, pastGrace, TREE_UNREADABLE, type Membership } from './membership.ts'
 import { Nonces, TOO_MANY } from './nonces.ts'
 import { clearedCookie, createSession, endSession, sessionCookie, sessionFromCookie, sessionToken, type Session } from './sessions.ts'
+import { personOf, viewerOf } from '../request.ts'
+import { endPersonSession } from './person.ts'
+import { clearedSessionCookie } from '../../lib/session-token.mjs'
+import type { SignInConfig } from './config.ts'
 
 /** §4.3 step 3's refusal: the signature recovers to another address than the message's. */
 export const OTHER_ADDRESS = 'The wallet signed with another address than the one it gave. Choose one address in the wallet and sign again.'
@@ -35,6 +40,14 @@ export interface SessionDeps {
   store: PrivateStore | null
   membership: Membership
   hosted: boolean
+  /** The hosted binding (L9 §5.1), when hosted: the SIWE domain and URI come from it, never from the request (behind
+   *  the TLS proxy the request says `http:`), the cookie is `__Host-`, and `GET /api/session` names the door. */
+  config?: HostedConfig
+  /** The emailed-link sign-in (Lane 3 Task 9), as `readSignInConfig` read it: null when it is not offered. Given (even
+   *  null), `GET /api/session` also says which methods are offered and whether the instance is written to. */
+  signIn?: SignInConfig | null
+  /** `HOUSE_INSTANCE_WRITES` (Lane 3 Task 11), for `GET /api/session`; 'on' until that switch is wired. */
+  instanceWrites?: 'on' | 'off'
   now?: () => Date
 }
 
@@ -45,40 +58,64 @@ export function mountSession(app: Hono, d: SessionDeps): void {
   const now = d.now ?? (() => new Date())
   const nonces = new Nonces(now)
   const mode = d.hosted ? 'hosted' : 'local'
+  const config = d.hosted ? d.config : undefined
+  /** The `__Host-` cookie: only with the hosted binding (L5's hosted mode alone keeps the plain name, Secure). */
+  const hostCookie = config !== undefined
+  /** `door` in `GET /api/session` (§5.2): the door's origin, or null; answered only with the hosted binding. */
+  const door = config ? { door: config.doorOrigin } : {}
 
   // Only the API carries sessions (the WebSocket upgrade reads its own, in serve.ts). A store that fails to answer is
   // no session, never a 500 for every route after it.
   app.use('/api/*', async (c, next) => {
     let s: Session | null = null
-    try { s = d.store ? sessionFromCookie(d.store, c.req.header('cookie'), now) : null } catch (err) {
+    try { s = d.store ? sessionFromCookie(d.store, c.req.header('cookie'), now, hostCookie) : null } catch (err) {
       console.error(`org-os admin: a session could not be read from the private store: ${err instanceof Error ? err.message : String(err)}`)
     }
     current.set(c, s)
     await next()
   })
 
-  const hostOf = (c: Context) => c.req.header('host') ?? new URL(c.req.url).host
-  const originOf = (c: Context) => `${new URL(c.req.url).protocol}//${hostOf(c)}`
+  // Hosted, the configured host and origin (§5.2): the guard has made the request's Host the configured one, and the
+  // scheme the request URL shows is the proxy's, never read. Locally, the request's own.
+  const hostOf = (c: Context) => config ? config.host : c.req.header('host') ?? new URL(c.req.url).host
+  const originOf = (c: Context) => config ? config.origin : `${new URL(c.req.url).protocol}//${hostOf(c)}`
 
-  /** The answer for a live session (§13): its hats are the last good reading, never awaited; past the grace, none
-   *  (`stale`). With no reading kept yet (after a restart, until the first lands; for as long as the tree cannot be
-   *  read) the hats are not known: `unread`, with the band, so `hats: []` is never told as "wears no hat" (final review
-   *  I1, Review Focus 3). */
+  /** The answer for a live session (§13): its hats are the last good reading, never awaited; past the grace (a reading
+   *  that old, or none and a session that old, L9 §5.8), none (`stale`), with the band. With no reading kept yet and a
+   *  session younger than the grace (after a restart, until the first lands) the hats are not known: `unread`, with the
+   *  band, so `hats: []` is never told as "wears no hat" (final review I1, Review Focus 3). */
   const signedIn = (s: Session) => {
     const read = d.membership.forRead(s.account)
     return {
       mode, signedIn: true, actor: actorIdOf(s.account, members(d.repo)), account: s.account,
       hats: (read?.hats ?? []).map(hat => ({ hat, name: d.membership.hatName(hat) })),
       expiresAt: s.expires,
-      ...(read === null ? { unread: true, band: GRACE_BAND } : read.stale ? { stale: true, band: GRACE_BAND } : {}),
+      ...(pastGrace(read, s.created, now()) ? { stale: true, band: GRACE_BAND } : read === null ? { unread: true, band: GRACE_BAND } : {}),
     }
   }
 
+  /** With the email method wired (`signIn` given): the methods offered — `email` when it is configured and the store is
+   *  open, `wallet` when a tree is named too — and whether the instance is written to. Without it, L5's answer as it was. */
+  const offered = (tree: unknown) => 'signIn' in d ? {
+    methods: [...(d.signIn && d.store ? ['email'] : []), ...(tree ? ['wallet'] : [])],
+    instanceWrites: d.instanceWrites ?? 'on',
+  } : {}
+
   app.get('/api/session', c => {
-    const s = sessionOf(c)
-    if (s) return c.json(signedIn(s))
     const tree = d.store ? d.membership.tree() : null
-    return c.json({ mode, signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, signedIn: false })
+    const p = personOf(c)
+    if (p?.kind === 'person') {
+      const { person, claims } = p
+      return c.json({
+        mode, signedIn: true, via: 'email', actor: person.id,
+        person: { id: person.id, name: person.name, roles: person.roles, nodes: person.nodes },
+        viewer: viewerOf(c).kind, expiresAt: new Date(claims.exp * 1000).toISOString(),
+        signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...door,
+      })
+    }
+    const s = sessionOf(c)
+    if (s) return c.json({ ...signedIn(s), ...offered(tree), ...door })
+    return c.json({ mode, signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, signedIn: false, ...offered(tree), ...door })
   })
 
   app.post('/api/session/nonce', async c => {
@@ -137,13 +174,20 @@ export function mountSession(app: Hono, d: SessionDeps): void {
     if (read.hats.length === 0) return c.json({ signedIn: false, notMember: true })
     // Step 6.
     const { token, session } = await createSession(d.store, account, now)
-    c.header('set-cookie', sessionCookie(token, d.hosted))
+    c.header('set-cookie', sessionCookie(token, hostCookie, d.hosted))
     return c.json(signedIn(session))
   })
 
   app.delete('/api/session', async c => {
-    if (d.store) await endSession(d.store, sessionToken(c.req.header('cookie')))
-    c.header('set-cookie', clearedCookie(d.hosted))
+    if (d.store) await endSession(d.store, sessionToken(c.req.header('cookie'), hostCookie))
+    c.header('set-cookie', clearedCookie(hostCookie, d.hosted))
+    // The emailed-link session too: its row goes (so the same cookie, replayed, is the public's), and its cookie is
+    // cleared, whether or not this request carried one.
+    if (d.signIn) {
+      const p = personOf(c)
+      const cleared = p && d.store ? await endPersonSession(d.store, d.signIn, p.claims) : clearedSessionCookie(d.signIn.cookie)
+      c.header('set-cookie', cleared, { append: true })
+    }
     return c.body(null, 204)
   })
 }

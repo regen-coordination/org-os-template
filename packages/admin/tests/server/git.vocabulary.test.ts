@@ -19,15 +19,17 @@ const EXPECTED_ALLOWED = {
   '--version': [],
   'check-ignore': ['-q'],
   'check-ref-format': ['--branch'],
+  clone: [],
   commit: ['-F', '--allow-empty'],
   diff: ['--name-only', '--cached', '--no-renames'],
   'diff-tree': ['-r', '--name-only'],
   fetch: [],
-  log: ['-1', '--format=%B'],
+  log: ['-1', '--format=%B', '--format=%ae'],
   'ls-files': ['-v', '--error-unmatch'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
   'merge-tree': ['--write-tree', '--name-only'],
+  push: [],
   'rev-list': ['--first-parent', '--reverse', '--count'],
   'rev-parse': ['--git-path', '--verify', '-q'],
   show: [],
@@ -43,17 +45,18 @@ const EXPECTED_UNSAFE = [
 ]
 const EXPECTED_ENV = ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']
 const EXPECTED_EXPORTS = [
-  'FETCH_FRESH_MS', 'GitExit', '__internal', 'addWorktree', 'assertTracked', 'commitDataPaths', 'commitMerge', 'configuredEmail', 'countBetween', 'diffNames',
+  'FETCH_FRESH_MS', 'GitExit', '__internal', 'addWorktree', 'assertTracked', 'authorEmail', 'cloneInstance', 'commitDataPaths', 'commitMerge', 'configuredEmail', 'countBetween', 'diffNames',
   'diffText', 'fetchRemote', 'gitPath', 'gitVersion', 'hiddenDataPaths', 'hiddenMergePaths', 'isAncestor', 'isIgnored', 'lastFetch', 'mergeAbort', 'mergeBase',
   'mergeFfOnly', 'mergeInProgress', 'mergeNoFf', 'mergeTree', 'messageOf',
-  'moveProposalBranch', 'parseGitVersion', 'recordRemoteTrunkAbsent', 'remoteUrl', 'removeWorktree', 'repoStatus', 'resolveRev', 'restageDataPaths', 'showFile',
+  'moveProposalBranch', 'onCommit', 'parseGitVersion', 'pushTrunk', 'recordRemoteTrunkAbsent', 'remoteUrl', 'removeWorktree', 'repoStatus', 'resolveRev', 'restageDataPaths', 'showFile',
   'stageMergeFiles', 'stagedNames', 'trackedChanges', 'treeDiffNames', 'trunkLine', 'uncommittedDataPaths', 'unmergedPaths', 'validBranchName',
 ]
 const RULES: ScanRules = {
   allowed: EXPECTED_ALLOWED,
   clientMethods: EXPECTED_CLIENT_METHODS,
   // ./state.ts runs no git: it names the admin state directory, the only place removeWorktree removes from (final review M5).
-  imports: ['node:path', 'node:fs', 'simple-git', '../lib/trailers.mjs', './state.ts'],
+  // ../lib/rules.mjs runs no git: its validTrunkName is the trunk name a push may carry (L9 §5.6).
+  imports: ['node:path', 'node:fs', 'simple-git', '../lib/trailers.mjs', '../lib/rules.mjs', './state.ts'],
   unsafe: EXPECTED_UNSAFE,
   env: EXPECTED_ENV,
 }
@@ -128,6 +131,15 @@ describe('the scan of server/git.ts', () => {
     const changed = real.replace("run('ls-files', ['-v'", "run('clean', ['-fd'")
     expect(changed).not.toBe(real)
     expect(scanVocabulary(programWith(program, planted, changed), planted, RULES).join('|')).toMatch(/"clean" is not a subcommand on the list/)
+  })
+
+  it('allows simpleGit\'s timeout as { block } only (the push\'s limit, L9 §5.6): another key in it is caught', () => {
+    const real = program.getSourceFile(GIT_TS)!.text
+    const planted = join(FIXTURES, 'fail', '.planted-copy.ts')
+    // stdErr: false would let a process that writes only to stderr run on without a limit.
+    const changed = real.replace('timeout: { block: blockMs ?? 0 } })', 'timeout: { block: blockMs ?? 0, stdErr: false } })')
+    expect(changed).not.toBe(real)
+    expect(scanVocabulary(programWith(program, planted, changed), planted, RULES).join('|')).toMatch(/simpleGit option "timeout" takes \{ block \} only/)
   })
 })
 
@@ -235,6 +247,42 @@ describe('run() refuses, before any process starts, what the scan cannot see', (
     ['an empty subcommand', ['', 'x']],
     ['--version with an argument', ['--version', 'x']],
     ['--exec-path', ['--exec-path']],
+    // L9 §5.6: push is exactly `<remote> refs/heads/<b>:refs/heads/<b>`, the same valid trunk on both sides, no flag, no +.
+    ['push --force with the shape', ['push', '--force', 'origin', 'refs/heads/main:refs/heads/main']],
+    ['push --force after the shape', ['push', 'origin', 'refs/heads/main:refs/heads/main', '--force']],
+    ['push -f', ['push', '-f', 'origin', 'refs/heads/main:refs/heads/main']],
+    ['push --mirror', ['push', '--mirror', 'origin']],
+    ['push --delete', ['push', 'origin', '--delete', 'refs/heads/main']],
+    ['push a forcing refspec', ['push', 'origin', '+refs/heads/main:refs/heads/main']],
+    ['push a plus refspec, short', ['push', 'origin', '+main']],
+    ['push a: b with a and b different', ['push', 'origin', 'refs/heads/main:refs/heads/other']],
+    ['push a short refspec', ['push', 'origin', 'main:main']],
+    ['push a source with no destination', ['push', 'origin', 'refs/heads/main']],
+    ['push an empty source (deletes the remote branch)', ['push', 'origin', ':refs/heads/main']],
+    ['push a tag', ['push', 'origin', 'refs/tags/v1:refs/tags/v1']],
+    ['push a proposal branch', ['push', 'origin', 'refs/heads/proposal/p-2026-10-18-001-a3f9:refs/heads/proposal/p-2026-10-18-001-a3f9']],
+    ['push a bad ref name (two dots)', ['push', 'origin', 'refs/heads/a..b:refs/heads/a..b']],
+    ['push a bad ref name (begins with a dash)', ['push', 'origin', 'refs/heads/-x:refs/heads/-x']],
+    ['push a bad ref name (a wildcard)', ['push', 'origin', 'refs/heads/*:refs/heads/*']],
+    ['push a bad ref name (reserved)', ['push', 'origin', 'refs/heads/HEAD:refs/heads/HEAD']],
+    ['push to an https URL', ['push', 'https://example.org/x.git', 'refs/heads/main:refs/heads/main']],
+    // L9 Task 17 (ruling P8): clone is exactly `-- <url> <absolute dir>`, no flag, no other transport.
+    ['clone with no --', ['clone', '/srv/remote.git', '/srv/instance']],
+    ['clone --mirror', ['clone', '--mirror', '--', '/srv/remote.git', '/srv/instance']],
+    ['clone with an option after --', ['clone', '--', '--upload-pack=touch /tmp/x', '/srv/instance']],
+    ['clone an ext:: transport', ['clone', '--', 'ext::sh -c touch% /tmp/x', '/srv/instance']],
+    ['clone a file:// url', ['clone', '--', 'file:///srv/remote.git', '/srv/instance']],
+    ['clone an http url', ['clone', '--', 'http://example.org/x.git', '/srv/instance']],
+    ['clone into a relative folder', ['clone', '--', '/srv/remote.git', 'instance']],
+    ['clone with a third operand', ['clone', '--', '/srv/remote.git', '/srv/instance', 'more']],
+    ['push to an scp-like address', ['push', 'git@example.org:x/y.git', 'refs/heads/main:refs/heads/main']],
+    ['push to a path', ['push', '/tmp/remote.git', 'refs/heads/main:refs/heads/main']],
+    ['push to a remote starting with a dash', ['push', '-origin', 'refs/heads/main:refs/heads/main']],
+    ['push with an extra refspec', ['push', 'origin', 'refs/heads/main:refs/heads/main', 'refs/heads/main:refs/heads/main']],
+    ['push with -- and a refspec', ['push', 'origin', '--', 'refs/heads/main:refs/heads/main']],
+    ['push with -- before a forcing refspec', ['push', '--', '+refs/heads/main:refs/heads/main']],
+    ['push with no refspec', ['push', 'origin']],
+    ['push with nothing', ['push']],
   ]
   // What the module itself builds, form by form.
   const ACCEPTED: [string, string[]][] = [
@@ -242,6 +290,7 @@ describe('run() refuses, before any process starts, what the scan cannot see', (
     ['ls-files -v', ['ls-files', '-v', '--', 'data/members.yaml']],
     ['ls-files --error-unmatch', ['ls-files', '--error-unmatch', '--', 'data/a.yaml', 'DECISIONS.md']],
     ['log -1', ['log', '-1', '--format=%B', H40]],
+    ['log -1 author', ['log', '-1', '--format=%ae', H40]],
     ['rev-parse --verify', ['rev-parse', '--verify', 'HEAD']],
     ['rev-parse --verify -q', ['rev-parse', '--verify', '-q', 'refs/remotes/origin/main']],
     ['rev-parse of a parent', ['rev-parse', '--verify', '-q', `${H40}^`]],
@@ -259,6 +308,8 @@ describe('run() refuses, before any process starts, what the scan cannot see', (
     ['merge-tree --write-tree', ['merge-tree', '--write-tree', H40, H40]],
     ['merge-tree --write-tree --name-only', ['merge-tree', '--write-tree', '--name-only', 'main', 'origin/main']],
     ['fetch', ['fetch', 'origin']],
+    ['push the trunk', ['push', 'origin', 'refs/heads/main:refs/heads/main']],
+    ['push a trunk with a slash', ['push', 'origin', 'refs/heads/release/1.0:refs/heads/release/1.0']],
     ['commit -F', ['commit', '-F', '/x/.git/COMMIT_EDITMSG']],
     ['commit --allow-empty -F', ['commit', '--allow-empty', '-F', '/x/.git/COMMIT_EDITMSG']],
     ['rev-list --first-parent', ['rev-list', '--first-parent', '--reverse', `${H40}..${H40}`]],

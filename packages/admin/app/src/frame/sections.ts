@@ -51,7 +51,9 @@ export function countText(n: number): string | null {
 export interface OrgMark { name: string; mark: string | null }
 
 /** Who is signed in, as the sidebar's foot draws them (L5 replaces where it comes from). */
-export interface Identity { hatName: string; address: string | null; hatId: string | null; hats: string[] }
+/** Who is signed in. A wallet session names its hat, address and hats; an email session (Lane 3) names the person in
+ *  `hatName`, has no address and no hats, and gives its Roles as words in `roles`. */
+export interface Identity { hatName: string; address: string | null; hatId: string | null; hats: string[]; roles?: string[] }
 
 /** What the counts are read from: the lists as the server gives them, filtered here by `visible` (the viewer's
  *  eyes, §6.3) — so a preview as Public counts only what the door would show. Needs you's count is its items

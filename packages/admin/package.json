@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": { "node": ">=22.13.0" },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
@@ -19,7 +20,10 @@
     "e2e:keys": "npm run build && tsx tests/e2e/keys.mts",
     "house:backup": "tsx scripts/house-backup.ts backup",
     "house:backup:key": "tsx scripts/house-backup.ts key",
-    "house:restore": "tsx scripts/house-backup.ts restore"
+    "house:backup:keypair": "tsx scripts/house-backup.ts keypair",
+    "house:restore": "tsx scripts/house-backup.ts restore",
+    "house:roles": "tsx scripts/house-roles.ts",
+    "house:session-key": "tsx scripts/house-session-key.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

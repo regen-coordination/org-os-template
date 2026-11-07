@@ -19,6 +19,8 @@
 .signin-p { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); text-wrap: pretty; }
 .signin .note { margin: 0; }
 .signin-go .btn { inline-size: 100%; height: var(--h-signin-go); font-size: var(--fs-body); }
+.signin-form { display: grid; gap: var(--sp-6); min-width: 0; }
+.signin-label { font: var(--fw-medium) var(--fs-meta)/var(--lh-label) var(--sans); }
 .signin-hint { margin: 0; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
 /* signed in: the identity's face, flush, its two lines free to wrap */
 .signin-who { padding: 0; }

@@ -1,0 +1,49 @@
+{
+  "$id": "orgos://house/roles-doc",
+  "title": "Roles document (I4)",
+  "description": "The Roles an org compiles from its records system's dated dump, loaded whole into the private store by `npm run house:roles -- load` (on stdin, never a file). It holds email keys (HMAC-SHA256 of an address under the deployment's pepper), never addresses.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["roles_version", "people"],
+  "properties": {
+    "roles_version": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "The date of the dump the Roles were compiled from (YYYY-MM-DD)."
+    },
+    "people": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "email_keys", "roles", "nodes"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*:person:[a-z0-9][a-z0-9-]*$",
+            "description": "The person's id (I1): <org>:person:<slug>."
+          },
+          "name": { "type": "string", "description": "The name the Hub shows for the person." },
+          "email_keys": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "description": "I3 keys of the addresses on record: lowercase hex HMAC-SHA256."
+          },
+          "roles": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "enum": ["steward", "node-lead", "network-member"] },
+            "description": "I2 Role names. Empty: the person signs in to their Profile only."
+          },
+          "nodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "The slugs of the nodes the person belongs to or leads."
+          }
+        }
+      }
+    }
+  }
+}

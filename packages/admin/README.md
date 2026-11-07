@@ -635,6 +635,117 @@ already drawn in it; `main.tsx` then checks it against the skins the client ship
 setting: build with `VITE_ORG_OS_SKIN=calm npm run build`; an unknown id falls back to `house`. The instance's own data
 has no field for it yet, so the default is per build.
 
+## Sign-in by email, Roles and the read-only switch
+
+A person signs in with a link sent to their email address. No wallet and no Hats tree is needed; when the org names
+a tree, "Sign in with a wallet" is offered beside it.
+
+| Call | Answer |
+|---|---|
+| `POST /api/session/email` `{ email, return? }` | 202 and the same sentence for every address, known or not, limited or not. The answer is made before anyone is looked up; a known person within the limits then gets a link. |
+| `POST /api/session/link` `{ token }` | spends the link once and sets the session cookie: `{ signedIn: true, return }`. An unknown, used or expired link, or a person removed since, is one 401. |
+| `GET /api/session` | adds `methods` (`email`, and `wallet` when a tree exists), the signed-in `person` (id, name, Roles, nodes) and `instanceWrites` |
+| `DELETE /api/session` | ends the session at the house and clears both cookies |
+
+- **The link** is `<hub>/sign-in/link?token=…`. It works once, for 15 minutes. The page asks for one click before it
+  posts the token, so a mail scanner that opens the link leaves it working. Afterwards it goes to `return`: a path in
+  the Hub, or an https address on the cookie's domain. Anything else goes to the Hub's root.
+- **Limits:** 3 asks per address and 10 per client in any 15 minutes. A limited ask gets the same answer as any other.
+- **No addresses are kept.** The house stores a keyed hash of each address (HMAC-SHA-256 with
+  `HOUSE_EMAIL_PEPPER`, after trimming and lower-casing it), never the address itself, and logs neither.
+- **The cookie** is a compact JWS (EdDSA, Ed25519) holding `{ iss, sub, roles, nodes, iat, exp, jti }`, for 24 hours:
+  `Domain` from `SESSION_COOKIE_DOMAIN`, `Path=/; Secure; HttpOnly; SameSite=Lax`. The org's other sites verify it with
+  the public key alone. The house reads the Roles from its store on every request, so a Role removed at a reload
+  stops at the house at once. Under 12 hours left, the cookie is re-issued with the current Roles.
+- **No Role:** a person on the records who holds no Role is signed in, but reads what the public reads. They see only
+  their own Profile (`GET /api/actor`) and can act on nothing.
+
+| Variable | Hosted | Locally |
+|---|---|---|
+| `HOUSE_EMAIL_PEPPER` | required: 32 bytes or more, as hex (`openssl rand -hex 32`) | a fixed, public pepper |
+| `HOUSE_SESSION_PRIVATE_JWK` | required: `npm run -s house:session-key -- new` | a key made for the run |
+| `SESSION_COOKIE_NAME` | required; not `__Host-`, not the wallet session's | `house_person_dev` |
+| `SESSION_COOKIE_DOMAIN` | the Hub's host or a domain it is inside; unset keeps the cookie on the Hub's host | none |
+| `RESEND_API_KEY`, `MAIL_FROM` | required (the sender: an address, or `Name <address>`) | both or neither; with neither, the link is printed to the log |
+| `HOUSE_INSTANCE_WRITES` | `off` by default | `on` by default |
+
+Hosted with none of the sign-in variables set, the email method is not offered and the server still starts. Setting
+only some of them stops the start, and the refusal names the missing variables, never a value.
+
+### Roles: `npm run -s house:roles -- load`
+
+The Roles come from a JSON document read on **stdin only**: `{ roles_version, people: [{ id, name, email_keys, roles,
+nodes }] }`, as `schemas/roles-doc.schema.json` describes. The Roles are `steward`, `node-lead` and
+`network-member`. Loading replaces the whole table. The command prints counts only: no name, id or key. A document
+containing an address (anything with `@`) is refused. The org builds the document from its own records.
+
+### The session key: `npm run -s house:session-key`
+
+- `-- new` prints a private Ed25519 JWK on one line and nothing else. Put it in `HOUSE_SESSION_PRIVATE_JWK`.
+- `<private JWK> | … -- public` reads the private key on stdin and prints its public JWK, without `d`. The org's
+  sites read it as `HOUSE_SESSION_PUBLIC_JWK`.
+
+### The read-only switch: `HOUSE_INSTANCE_WRITES`
+
+While it is `off`, the house writes nothing to its instance:
+
+- Every route that commits, stages or ratifies answers 403 `INSTANCE_READ_ONLY`, "This Hub is read-only until
+  writes are turned on. Nothing was written." That covers records, the tray, the library, proposals, the narrowing,
+  sync, the push's retry, the claim and commands. A write route the table (`server/hosted/instance-writes.ts`) does
+  not name is refused too.
+- Sign-in, sign-out, wizard drafts and board layouts still work. They are kept outside the instance.
+- A proposal's page builds no branch and records no reading. The private store is not reconciled at start. No push
+  runs, whatever `ORG_OS_PUSH` says.
+- `GET /api/status` says `instanceWrites: "off"`, and the app hides the tray and every other write control.
+
+Only `on` and `off` are accepted; any other value stops the start. A hosted house will not start with `on` while
+`BEFORE_PILOT_OPEN` lists known write defects. Each release that fixes one removes it from the list.
+
+## The private store's backup
+
+The server opens one private store at start (`house.db`, L5 spec §10): in `ORG_OS_PRIVATE_DIR`, else
+`<instance>/.org-os/private/`, which `.gitignore` must name. A store that cannot be opened leaves the git side
+serving and says why on Home ("Needs you"). Git keeps no history of this file, so it is backed up on its own,
+encrypted (AES-256-GCM) under a key that a maintainer holds:
+
+    npm run house:backup:key -- ~/keys/house.key     # once: 32 random bytes, mode 600
+    export ORG_OS_BACKUP_KEY_FILE=~/keys/house.key
+    npm run house:backup                             # a backup now
+    npm run house:backup -- --verify <file>          # everything a restore does but the move
+    npm run house:restore -- <file>                  # with this instance's server stopped
+
+- **The key** stays outside the repository and outside the store's folder (both are refused): "Keep a copy of
+  this key away from this machine. Without it no backup can be read." A lost key is a lost backup.
+- **Sealed to a public key (hosted, L9 §7.1).** A hosted Hub must not hold what opens its own backups, so it seals
+  them to a maintainer's X25519 public key (`ORGOSPK1`) and uses no symmetric key:
+
+      npm run house:backup:keypair -- ~/keys/backup.key ~/keys/backup.pub   # on a maintainer's machine, once
+      export ORG_OS_BACKUP_PUBLIC_KEY_FILE=~/keys/backup.pub                # the only key the server holds
+      ORG_OS_BACKUP_PRIVATE_KEY_FILE=~/keys/backup.key npm run house:backup -- --verify <file>   # for that run only
+
+  Locally the public key is optional; when it is set it is used instead of `ORG_OS_BACKUP_KEY_FILE`. L5's `ORGOSPS1`
+  files still open with their key file. Hosted with no public key, Home says "The private store was not backed up:
+  no public key is set. …".
+- **A backup** is a consistent copy of the store (`VACUUM INTO` on the store's read connection, a snapshot that
+  holds no write lock and waits for none), sealed and written as
+  `house-<UTC time>.db.enc` (`ORGOSPS1`, a 12-byte IV, the ciphertext, the 16-byte tag) to `ORG_OS_BACKUP_DIR`
+  (default `<private dir>/backups/`), with a line in `manifest.jsonl` there: its SHA-256, schema version and row
+  counts. Nothing in clear is written outside the store's own folder. `ORG_OS_BACKUP_DIR` inside the repository is
+  refused when hosted, and locally unless git ignores it. A copy or a restore cut short leaves a `.backup-*` folder or
+  a `house.db.restoring-*` file in the store's folder; the next server to start (with no other running) removes it
+  and says so in its log.
+- **The server** takes one every `ORG_OS_BACKUP_EVERY` (default 24 h; `ms`, `s`, `m`, `h` or `d`, as `12h`), at
+  start too when the newest is older than that, and keeps the newest `ORG_OS_BACKUP_KEEP` (default 14). With no key
+  set it takes none; in hosted mode that, like any failed backup, is on Home: "The private store was not backed up:
+  <why>."
+- **A restore** refuses while the server for this repository runs (its pid file), opens the backup into the store's
+  folder, runs `PRAGMA integrity_check` and checks the schema version, keeps the current file as
+  `house.db.before-restore-<time>`, and moves the restored one in. A wrong key is "This backup cannot be read with
+  that key."; a changed or damaged file "This backup has been changed or is damaged; it was not restored."
+- **Off the machine.** Copying the backup folder elsewhere (another disk, object storage, a second host) is set up
+  per deployment (L9). The files are sealed, so the copy may go where the key does not; keep the key's own copy apart
+  from them.
+
 ## Test
 
     npm test                          # vitest: server services, API, the elements and pages

@@ -3,7 +3,7 @@
   "type": "object",
   "required": ["id", "title", "author", "classes", "rules", "state", "opened", "rev", "ops", "events"],
   "additionalProperties": false,
-  "x-order": ["id", "title", "rationale", "author", "classes", "rules", "state", "opened", "opened_as", "rev", "base", "branch", "ops", "statement", "events", "closed"],
+  "x-order": ["id", "title", "rationale", "author", "classes", "rules", "state", "opened", "opened_as", "rev", "base", "branch", "ops", "touched", "statement", "events", "closed"],
   "properties": {
     "id": { "type": "string", "pattern": "^p-\\d{4}-\\d{2}-\\d{2}-\\d{3}(-[0-9a-f]{4})?$", "description": "p-<date>-<NNN>-<xxxx>; NNN counts that day's proposals, xxxx is 4 lowercase hex drawn at random so two clones proposing on one day do not collide. The shape before the suffix, p-<date>-<NNN>, is still accepted." },
     "title": { "type": "string", "minLength": 1 },
@@ -23,6 +23,7 @@
     "base": { "type": ["string", "null"], "description": "The trunk sha the branch was last replayed onto." },
     "branch": { "type": ["string", "null"], "pattern": "^proposal/p-\\d{4}-\\d{2}-\\d{2}-\\d{3}(-[0-9a-f]{4})?$" },
     "ops": { "type": "array", "items": { "$ref": "#/$defs/op" }, "description": "The content; the branch is derived from it (ruling P2-R6)." },
+    "touched": { "enum": ["public", "members"], "description": "The strictest level its ops ever touched: members when any record they touched, before or after, was not public, or held private data. Set when it is opened, raised by a revision, never lowered (DAO-OS L9 Ruling T12-1). An entry revised with none is read as members." },
     "statement": {
       "type": ["object", "null"],
       "additionalProperties": false,

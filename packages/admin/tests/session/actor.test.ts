@@ -272,6 +272,11 @@ describe('the house\'s commits (L5 spec §6.4)', () => {
     expect(off.status).toBe(403)
     const sentence = 'You no longer wear a hat of this organisation\'s Hats tree (read at block 150), so you cannot change anything here. Nothing was written.'
     expect(await off.json()).toEqual({ reason: sentence, error: sentence, code: 'NOT_WORN' })
+    // Wearing no hat, the session now reads as the public (L9 spec §5.8): the members' side, its change included, is
+    // closed to it. Once the hat is back on (an act reads now), the change it staged is there as it was.
+    expect(await (await call(app, 'GET', '/api/changes', { cookie })).json()).toEqual({ error: 'Sign in to see this: it is for members only.', code: 'SIGN_IN' })
+    state.answer = wears([COUNCIL], 151)
+    expect((await call(app, 'POST', '/api/probe', { cookie })).status).toBe(200)
     await untouched()
   })
 

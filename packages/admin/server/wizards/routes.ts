@@ -1,39 +1,50 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Hono } from 'hono'
+import type { Context, Hono } from 'hono'
 import { HttpError } from '../errors.ts'
 import { stateDir } from '../state.ts'
+import { knownActorOf } from '../request.ts'
+import { actorTrailer } from '../actor.ts'
+import { actorKey } from '../hosted/writes.ts'
 import { loadWizards, type WizardDef } from '../../lib/wizards.mjs'
 
-export interface WizardDeps { repo: string; dir?: string }
+export interface WizardDeps {
+  repo: string; dir?: string
+  /** Hosted mode: each member keeps their own draft (L9 §5.4, Q-L9-4). Absent or false: one draft, as before. */
+  hosted?: boolean
+}
 
 /** A draft is a few answers, never a document. */
 export const DRAFT_MAX_BYTES = 16_384
 
 /** Wizards are data (wizards/*.yaml); a draft is the answers so far and the step, kept beside the
  *  Changes tray's own state and outside any repository. Discarding deletes only that file. The
- *  draft number is reserved (`<id>-<n>.json`); one is kept for now. */
-export function mountWizards(app: Hono, { repo, dir }: WizardDeps): void {
+ *  draft number is reserved (`<id>-<n>.json`); one is kept for now. Hosted, a draft is the member's own
+ *  (`<id>-<actor key>.json`): one member never reads or discards another's. */
+export function mountWizards(app: Hono, { repo, dir, hosted = false }: WizardDeps): void {
   const read = () => loadWizards(dir)
   const named = (id: string): WizardDef => {
     const w = read().wizards.find(x => x.id === id)
     if (!w) throw new HttpError(404, `No wizard "${id}". GET /api/wizards lists them.`)
     return w
   }
-  const file = (id: string) => join(stateDir(repo), 'wizards', `${named(id).id}-1.json`)
+  const file = (c: Context) => {
+    const id = named(c.req.param('id')!).id
+    return join(stateDir(repo), 'wizards', `${id}-${hosted ? actorKey(actorTrailer(knownActorOf(c))) : '1'}.json`)
+  }
 
   app.get('/api/wizards', c => c.json(read().wizards.map(({ id, title, summary }) => ({ id, title, summary }))))
   app.get('/api/wizards/:id', c => c.json(named(c.req.param('id'))))
 
   // No saved draft is the ordinary first visit: an empty answer (null), not a 404 the console would show red.
   app.get('/api/wizards/:id/draft', c => {
-    const path = file(c.req.param('id'))
+    const path = file(c)
     if (!existsSync(path)) return c.json(null)
     try { return c.json(JSON.parse(readFileSync(path, 'utf8'))) } catch { return c.json(null) }
   })
 
   app.put('/api/wizards/:id/draft', async c => {
-    const path = file(c.req.param('id'))
+    const path = file(c)
     let body: unknown
     try { body = await c.req.json() } catch { body = undefined }
     const o = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : null
@@ -52,7 +63,7 @@ export function mountWizards(app: Hono, { repo, dir }: WizardDeps): void {
   })
 
   app.delete('/api/wizards/:id/draft', c => {
-    rmSync(file(c.req.param('id')), { force: true })
+    rmSync(file(c), { force: true })
     return c.json({ discarded: true })
   })
 }

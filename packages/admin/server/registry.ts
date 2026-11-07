@@ -6,6 +6,7 @@ import { STRINGIFY, spliceUpdate, spliceCreate, spliceDelete } from './splice.ts
 import { whyNot, type Edit, type Unintended } from './verify.ts'
 import { HttpError } from './errors.ts'
 import { readGovernance } from '../lib/governance-read.mjs'
+import { deepFreeze, readCacheFor } from './hosted/readCache.ts'
 
 export type Entity = Record<string, unknown>
 
@@ -103,13 +104,17 @@ function readSource(repo: string, name: string): { path: string; src: string } {
   return { path, src: readFileSync(path, 'utf8') }
 }
 
+/** A collection's count as GET /api/registries lists it: the items of its top key. */
+function countOf(doc: ReturnType<typeof parseDocument>, def: ReturnType<typeof registryDef>): number {
+  const node = doc.get(resolveTopKey(k => doc.has(k), def))
+  return isSeq(node) ? node.items.length : 0
+}
+
 export function listRegistries(repo: string) {
   return REGISTRIES.filter(def => existsSync(join(repo, 'data', `${def.name}.yaml`)))
     .map(def => {
       if (def.kind === 'document') return { name: def.name, kind: def.kind, count: null }
-      const { doc } = loadDoc(repo, def.name)
-      const node = doc.get(resolveTopKey(k => doc.has(k), def))
-      return { name: def.name, kind: def.kind, count: isSeq(node) ? node.items.length : 0 }
+      return { name: def.name, kind: def.kind, count: countOf(loadDoc(repo, def.name).doc, def) }
     })
 }
 
@@ -121,8 +126,12 @@ function plain(node: Node, doc: ReturnType<typeof parseDocument>): unknown {
 }
 
 export function readRegistry(repo: string, name: string): RegistryRead {
+  return readLoaded(name, loadDoc(repo, name))
+}
+
+/** A registry as `readRegistry` answers it, from its parsed text. */
+function readLoaded(name: string, loaded: Parsed): RegistryRead {
   const def = registryDef(name)
-  const loaded = loadDoc(repo, name)
   const { doc } = loaded
   const dangling = danglingAlias(loaded)
   if (dangling) throw new HttpError(409, `data/${name}.yaml cannot be read: ${dangling.fault} ${dangling.repair}`)
@@ -153,6 +162,47 @@ export function readRegistryOrEmpty(repo: string, name: string): RegistryRead {
   return def.kind === 'document'
     ? { name, kind: def.kind, schemaVersion: null, document: {} }
     : { name, kind: def.kind, schemaVersion: null, entries: [] }
+}
+
+// ── through the read cache (L9 §7.6) ───────────────────────────────────────────────────────────────
+
+/** What one reading of a registry's text holds: its count as `listRegistries` gives it, and what `readRegistry` answers
+ *  (or the error it throws: a text that cannot be read fails the same way every time until it changes). */
+type Held = { count: number; read: RegistryRead } | { count: number; read?: undefined; error: unknown }
+
+/** One parser per registry, defined once, so the read cache can tell it apart (`ReadCache.get`). */
+const holders = new Map<string, (src: string) => Held>()
+function holderOf(name: string): (src: string) => Held {
+  let holder = holders.get(name)
+  if (!holder) {
+    const def = registryDef(name)
+    holder = (src: string): Held => {
+      const loaded = parseText(src, false)
+      const count = def.kind === 'collection' ? countOf(loaded.doc, def) : 0
+      try { return { count, read: deepFreeze(readLoaded(name, loaded)) } } catch (error) { return { count, error } }
+    }
+    holders.set(name, holder)
+  }
+  return holder
+}
+
+const heldOf = (repo: string, name: string): Held => readCacheFor(repo).get(registryPath(repo, name), holderOf(name))
+
+/** `readRegistryOrEmpty` through the repository's read cache (L9 §7.6): a file that has not changed is not parsed again.
+ *  What it answers is frozen, as every request shares it. The gate reads registries through it. */
+export function readRegistryOrEmptyCached(repo: string, name: string): RegistryRead {
+  if (!existsSync(registryPath(repo, name))) return readRegistryOrEmpty(repo, name)
+  const held = heldOf(repo, name)
+  if (held.read === undefined) throw held.error
+  return held.read
+}
+
+/** `listRegistries` through the repository's read cache. */
+export function listRegistriesCached(repo: string): ReturnType<typeof listRegistries> {
+  return REGISTRIES.filter(def => existsSync(join(repo, 'data', `${def.name}.yaml`)))
+    .map(def => (def.kind === 'document'
+      ? { name: def.name, kind: def.kind, count: null }
+      : { name: def.name, kind: def.kind, count: heldOf(repo, def.name).count }))
 }
 
 /** A collection's entries from a text that is not (yet) the file: what the change engine

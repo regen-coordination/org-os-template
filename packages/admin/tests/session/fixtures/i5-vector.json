@@ -1,0 +1,35 @@
+{
+  "note": "Synthetic test vector for I3 (emailKey) and I5 (the session JWS). The key pair was generated once for this file and is used nowhere else; its private half was not kept.",
+  "i3": {
+    "email": "steward@example.org",
+    "pepper": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "emailKey": "71a49c1b7d79243d5fbb8fd2c86d59487365173daf6cbb03c141e5e11e8b13ed",
+    "alsoMatches": [
+      " Steward@Example.org "
+    ]
+  },
+  "i5": {
+    "publicJwk": {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "w3C8UbS7dwSQQYXHNjNWEu4lXKNUsUSqSCaIORV4C8k"
+    },
+    "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2h1Yi5leGFtcGxlLm9yZyIsInN1YiI6InJlZmlkYW86cGVyc29uOmV4YW1wbGUtc3Rld2FyZCIsInJvbGVzIjpbIm5ldHdvcmstbWVtYmVyIiwic3Rld2FyZCJdLCJub2RlcyI6WyJleGFtcGxlLW5vZGUiXSwiaWF0IjoxNzk0OTkyNDAwLCJleHAiOjE3OTUwNzg4MDAsImp0aSI6IjM4N2ViMGU0YmNjNjRkYTk4YTQ2MTkzNDRhODZmOWIyIn0.n63_VxkqrbzFoXaMhRKi33kTnW6n6XWNTrDTELCji6wXIgCv3SU5J94TsUIOro0mUdnNrDhEaqRn5km9hRZDBA",
+    "claims": {
+      "iss": "https://hub.example.org",
+      "sub": "refidao:person:example-steward",
+      "roles": [
+        "network-member",
+        "steward"
+      ],
+      "nodes": [
+        "example-node"
+      ],
+      "iat": 1794992400,
+      "exp": 1795078800,
+      "jti": "387eb0e4bcc64da98a4619344a86f9b2"
+    },
+    "now": "2026-11-18T10:00:00.000Z",
+    "expiredAt": "2026-11-19T09:00:00.000Z"
+  }
+}

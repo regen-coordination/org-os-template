@@ -324,7 +324,7 @@ describe('the gate itself', () => {
     const account = 'eip155:42220:0x00000000000000000000000000000000000000a1'
     const reading = { hat: 'eip155:42220:0x0000000d00010000000000000000000000000000000000000000000000000000', account, block: 1, readAt: '2026-10-29T12:00:00Z' }
     const entry = {
-      id: 'p-2', title: 'Fund it', rev: 'r2',
+      id: 'p-2', title: 'Fund it', rev: 'r2', touched: 'public',
       closed: { by: 'steward-b', as: reading, checked: [{ ...reading, wears: true }] },
       events: [
         { kind: 'revise', by: 'steward-a', rev: 'r2', ops: [{ op: 'update', record: 'projects:p', set: { title: 'Fund it', budget: 'SECRET-MEMBERS-ONLY' }, before: { id: 'p', title: 'Plan', budget: 'SECRET-BEFORE' } }] },
@@ -334,7 +334,7 @@ describe('the gate itself', () => {
     }
     const shown = gateRecord(PUBLIC_VIEWER, 'proposals', entry, config, PUBLIC)
     expect(shown).toEqual({
-      id: 'p-2', title: 'Fund it', rev: 'r2', closed: { by: 'steward-b' },
+      id: 'p-2', title: 'Fund it', rev: 'r2', touched: 'public', closed: { by: 'steward-b' },
       events: [
         { kind: 'revise', by: 'steward-a', rev: 'r2', ops: [{ op: 'update', record: 'projects:p', set: { title: 'Fund it' }, before: { id: 'p', title: 'Plan' } }] },
         { kind: 'approve', by: 'steward-b', rev: 'r2' },
@@ -349,6 +349,9 @@ describe('the gate itself', () => {
     // The proposal's level judges what its revisions wrote, not only its current ops.
     const levels = new Levels(repo, config)
     expect(levels.proposal(entry)).toEqual(PUBLIC)
+    // Revised, with no `touched` (written before L9 Ruling T12-1): what it was opened on is unknown, so it is members'.
+    const { touched: _touched, ...legacy } = entry
+    expect(levels.proposal(legacy)).toEqual(MEMBERS)
     const touched = {
       ...entry,
       events: [{ kind: 'revise', by: 'steward-a', rev: 'r1', ops: [{ op: 'update', record: 'ideas:i-1', set: { title: 'SECRET-IDEA' } }] }, ...entry.events],

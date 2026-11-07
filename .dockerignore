@@ -1,0 +1,14 @@
+# The Hub's image (deploy/hub/Dockerfile) is built from the framework's root with an allow-list: nothing goes in that
+# is not named here. No instance data, no keys, no .env, no tests.
+*
+!package.json
+!schemas
+!scripts
+!packages/admin
+packages/admin/node_modules
+packages/admin/tests
+packages/admin/app/e2e
+packages/admin/app/dist*
+packages/admin/.env*
+**/*.key
+**/.env*

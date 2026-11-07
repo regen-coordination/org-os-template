@@ -22,6 +22,7 @@ import { updateEntry, resolveTrunk, type LedgerOptions, type LedgerWho } from '.
 import { revOf, type Proposal, type LedgerEvent } from '../../lib/proposals.mjs'
 import { gitOpsOf, isPlaceholder } from '../../lib/ops.mjs'
 import { RESTRICTED_SUBJECT } from '../private/ops.ts'
+import { Levels, raisedTouched } from '../visibility/gate.ts'
 import type { Op, StageOp } from '../changes/types.ts'
 
 /** What a build needs of a proposal: its id, its author (the commit's `Org-Actor`) and its ops as the ledger stores them,
@@ -298,6 +299,9 @@ export async function replayBranch(repo: string, proposal: Proposal, fromRev: st
   if (!reopened && !built.moved) return { ...built, event: null, rev }
   const fields: Record<string, unknown> = { base }
   if (reopened) { fields.ops = ops; fields.rev = rev }
+  // A choice that changes the content is a revision: `touched` is raised as Revise raises it (L9 Ruling T12-1), so Take
+  // theirs dropping an op on a record narrowed since does not make the proposal public.
+  if (kind === 'revise') fields.touched = raisedTouched(proposal as unknown as Record<string, unknown>, ops, new Levels(repo))
   const { event } = await updateEntry(repo, proposal.id, { fields, event: kind === 'revise' ? { kind, rev, ops } : { kind, base } }, who, opts)
   return { ...built, event, rev }
 }

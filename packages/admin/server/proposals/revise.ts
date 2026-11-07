@@ -30,6 +30,7 @@ import { aroundGit, noStore, privateClasses as privateClassesOf, reach, resolveP
 import { admittedTo, pendingOps, pendingPart, placeholdersOf, type LedgerPlaceholder } from '../private/proposals.ts'
 import type { PendingRow, PrivateStore } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
+import { Levels, raisedTouched } from '../visibility/gate.ts'
 import { refuseOthersLink } from '../visibility/widen.ts'
 import { refuseNarrowed } from '../private/guard.ts'
 import { rulesForClasses, validTrunkName } from '../../lib/rules.mjs'
@@ -163,7 +164,9 @@ export async function revise(repo: string, actor: KnownActor, id: string, ops: O
   const from = await resolveRev(repo, 'HEAD')
   if (from === null) throw new HttpError(409, 'This repository has no commit yet, so there is no trunk to revise on.')
   const who: LedgerWho = { actor: actor.id, rule: ruleTrailer(entry), ident: commitIdent(actor) }
-  const write = () => updateEntry(repo, id, { fields: { ops: ledgerOps, rev, base: from }, event: { kind: 'revise', rev, ops: ledgerOps } }, who, { ...deps, now: () => now })
+  // `touched` is only ever raised (L9 Ruling T12-1).
+  const touched = raisedTouched(entry as unknown as Record<string, unknown>, [...ops, ...placeholders], new Levels(repo))
+  const write = () => updateEntry(repo, id, { fields: { ops: ledgerOps, rev, base: from, touched }, event: { kind: 'revise', rev, ops: ledgerOps } }, who, { ...deps, now: () => now })
   const { commit } = priv && rows
     ? await aroundGit(priv.store, {
       before: w => { w.deletePending(id); for (const row of rows!) w.putPending(row) },

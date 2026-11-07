@@ -141,7 +141,15 @@ export function scanVocabulary(program: ts.Program, file: string, rules: ScanRul
           else for (const p of opts.properties) {
             const name = p.name && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) ? p.name.text : null
             if (!ts.isSpreadAssignment(p) && name === 'unsafe' && ts.isPropertyAssignment(p)) { checkUnsafe(p.initializer); continue }
-            if (ts.isSpreadAssignment(p) || name !== 'errors') at(p, `simpleGit option "${name ?? 'spread'}" is not allowed (errors, and unsafe for the environment's own categories, only)`)
+            // A block time (L9 §5.6, the push's limit): `timeout: { block: <expr> }` and nothing else; it only ends a process.
+            if (!ts.isSpreadAssignment(p) && name === 'timeout' && ts.isPropertyAssignment(p)) {
+              const t = p.initializer
+              const only = ts.isObjectLiteralExpression(t) && t.properties.length === 1 && ts.isPropertyAssignment(t.properties[0]!) &&
+                ts.isIdentifier(t.properties[0]!.name) && t.properties[0]!.name.text === 'block'
+              if (!only) at(p, 'simpleGit option "timeout" takes { block } only')
+              continue
+            }
+            if (ts.isSpreadAssignment(p) || name !== 'errors') at(p, `simpleGit option "${name ?? 'spread'}" is not allowed (errors, unsafe for the environment's own categories, and timeout's block, only)`)
           }
         }
       }

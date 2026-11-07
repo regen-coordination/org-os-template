@@ -3,7 +3,7 @@ import { registryDef } from './registries.ts'
 import { readRegistry, type Entity } from './registry.ts'
 import { loadSchema } from './schema.ts'
 import { repoStatus } from './git.ts'
-import { refusal } from './guard.ts'
+import { refusal, type GuardScope } from './guard.ts'
 import { HttpError } from './errors.ts'
 import { orgName } from './resources/util.ts'
 import { mountChanges, applyAs } from './changes/routes.ts'
@@ -11,6 +11,8 @@ import { knownActorOf, viewerOf, withRequest } from './request.ts'
 import { gateRecord, gateRegistry, gateRegistryList, Levels, publicReads, publicStatus, withoutEcho } from './visibility/gate.ts'
 import { noStore, splitOps, type PrivateAccess } from './private/ops.ts'
 import { privateReads } from './private/reads.ts'
+import { hostedWrites } from './hosted/writes.ts'
+import { instanceWrites, type InstanceWrites } from './hosted/instance-writes.ts'
 import { readConfig } from './visibility/config.ts'
 import { mountGovernance } from './governance/routes.ts'
 import { mountBoards } from './boards/routes.ts'
@@ -53,6 +55,17 @@ export interface AppOptions {
   /** The one private store (L5 spec §10), or why it is not open: private records and restricted fields are read from it
    *  and written only to it. Absent: none (the git side serves; a private write is refused with `NO_STORE`). */
   privateStore?: PrivateAccess
+  /** Where the guard stands (guard.ts): hosted at the configured host and origin (L9 §5.2), or, absent, this machine. */
+  guard?: GuardScope
+  /** Hosted mode (L5 spec §3): every write route is then classified (hosted/writes.ts, L9 §5.4); one the table does not
+   *  name is refused. Absent or false: local, every route as before. */
+  hosted?: boolean
+  /** Middleware mounted on every path before the guard, in this order (L9 §5.9, §5.10, §7.4: hosted with its
+   *  configuration, the access log, the security headers and the rate limits). Absent: none, as locally. */
+  edge?: MiddlewareHandler[]
+  /** The writes-off switch (Lane 3 Task 11, C1): `off` refuses every write to the instance, 403 INSTANCE_READ_ONLY, after
+   *  the hosted table. Absent: `on`, as before. */
+  instanceWrites?: InstanceWrites
 }
 
 /** What `extend` is given besides the app: the repository's one write lock, for a route whose write
@@ -81,6 +94,9 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
     return c.json(code ? { error: err.message, code } : { error: err.message }, status(err) as 404)
   })
 
+  // Hosted, first of all: the access line, the headers on every answer, the rate limits (L9 Task 8).
+  for (const m of opts.edge ?? []) app.use('*', m)
+
   // Before any route: is this caller one the server answers? (see guard.ts)
   app.use('*', async (c, next) => {
     const refused = refusal({
@@ -88,7 +104,8 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
       host: c.req.header('host') ?? new URL(c.req.url).host,
       origin: c.req.header('origin'),
       contentType: c.req.header('content-type'),
-    })
+      path: c.req.path,
+    }, opts.guard)
     if (refused) return c.json({ error: refused.error }, refused.status)
     await next()
   })
@@ -98,11 +115,18 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
   // And who may ask what (L5 spec §9.5): the public is refused the members' side here, before any route; every route the
   // public may ask answers its items through the gate (visibility/gate.ts).
   app.use('/api/*', publicReads)
+  // Hosted, every write is one the table names (L9 §5.4): commands, sync and the claim are off; the rest go on to their
+  // route, which asks for its actor or keeps the member's files apart.
+  if (opts.hosted) app.use('/api/*', hostedWrites())
+  // While writes are off (C1), nothing reaches the instance: every write route that commits, stages or ratifies is
+  // refused here, before it runs (hosted/instance-writes.ts).
+  if (opts.instanceWrites === 'off') app.use('/api/*', instanceWrites('off'))
 
   app.get('/api/status', async c => {
     if (viewerOf(c).kind === 'public') return c.json(publicStatus(repo))
     const s = await repoStatus(repo)
-    return c.json({ org: orgName(repo), ...s })
+    // While writes are off (Lane 3 Task 11) the client hides every write control; on, the answer is as before.
+    return c.json({ org: orgName(repo), ...s, ...(opts.instanceWrites === 'off' ? { instanceWrites: 'off' as const } : {}) })
   })
 
   app.get('/api/registries', c => c.json(gateRegistryList(viewerOf(c), repo, levels())))

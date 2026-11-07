@@ -471,6 +471,8 @@ function mergeEntry(id, base, ours, theirs) {
     let value
     if (key === 'events') value = [...events.values()].sort(byOrder)
     else if (key === 'state' || key === 'closed') value = closing[key]
+    // What its ops touched is only ever raised (DAO-OS L9 Ruling T12-1): the stricter side's stands.
+    else if (key === 'touched') value = ours[key] === undefined ? theirs[key] : theirs[key] === undefined ? ours[key] : (ours[key] === 'public' && theirs[key] === 'public' ? 'public' : 'members')
     else {
       const [o, t, b] = [ours[key], theirs[key], base?.[key]]
       const decided = Object.hasOwn(decidedBy, key) ? winner(key, /** @type {number[]} */ (decidedBy[/** @type {'rev'} */ (key)])) : null
@@ -492,7 +494,7 @@ function mergeEntry(id, base, ours, theirs) {
 /**
  * Two copies of the ledger, merged by id (spec §3.12). Entries are unioned; an entry's events are unioned by
  * id and ordered; for a field both sides changed, the final state wins (`ratified` over `open`), the side with
- * the later `revise` event wins `ops` and `rev`, the later `revise` or `replay` wins `base`; anything else it
+ * the later `revise` event wins `ops` and `rev`, the later `revise` or `replay` wins `base`, the stricter `touched` stands; anything else it
  * cannot decide is refused, naming the proposal. `base` is the copy both sides started from (an absent or empty
  * ledger is `[]`). The result is sorted by id, so the merge is the same whichever side is "ours", and merging it
  * with either side again changes nothing. Pure: it copies, it never touches what it was given.

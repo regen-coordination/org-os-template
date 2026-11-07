@@ -14,6 +14,9 @@ export interface OperationDeps {
   catalogue?: Operation[]
   /** The branch the server started on, for routes that write the proposal ledger (`LedgerOptions.startBranch`). */
   startBranch?: string
+  /** Hosted mode: no operation is offered, since a hosted Hub runs no command for anyone (L9 §5.4, Q-L9-4); the routes
+   *  that would run one are refused before they are reached (hosted/writes.ts). */
+  hosted?: boolean
 }
 
 const ajv = new Ajv({ allErrors: true, strict: false })
@@ -62,6 +65,7 @@ export function mountOperations(app: Hono, deps: OperationDeps): void {
   }
 
   app.get('/api/operations', async c => {
+    if (deps.hosted) return c.json([])
     const id = c.req.query('resource')
     if (id !== undefined) {
       const r = await resourceNamed(id)
