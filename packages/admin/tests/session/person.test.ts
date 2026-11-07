@@ -30,7 +30,7 @@ const PEPPER = '0f'.repeat(32)
 const T0 = new Date('2026-11-18T10:00:00.000Z')
 const H = 3_600_000
 const CELO = 'eip155:42220'
-const ID = { steward: 'refidao:person:example-steward', both: 'refidao:person:example-both', contributor: 'refidao:person:example-contributor' }
+const ID = { steward: 'example-org:person:example-steward', both: 'example-org:person:example-both', contributor: 'example-org:person:example-contributor' }
 const MAIL = { steward: 'steward@example.org', both: 'both@example.org', contributor: 'contributor@example.org' }
 const DOC: RolesDoc = {
   roles_version: '2026-11-18',

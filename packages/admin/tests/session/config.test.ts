@@ -44,8 +44,8 @@ describe('readSignInConfig, hosted', () => {
     expect(c.mail).toEqual({ apiKey: 're_test_synthetic', from: 'Example Hub <hub@example.org>' })
     expect(c.publicJwk.d).toBeUndefined()
     // the pair signs and verifies
-    const token = signSession(newSessionClaims({ iss: c.issuer, sub: 'refidao:person:example-steward', roles: [], nodes: [] }, new Date()), c.privateJwk)
-    expect(verifySession(token, c.publicJwk, new Date(), { iss: HUB })?.sub).toBe('refidao:person:example-steward')
+    const token = signSession(newSessionClaims({ iss: c.issuer, sub: 'example-org:person:example-steward', roles: [], nodes: [] }, new Date()), c.privateJwk)
+    expect(verifySession(token, c.publicJwk, new Date(), { iss: HUB })?.sub).toBe('example-org:person:example-steward')
   })
 
   it('hosted with none of them: email sign-in not offered, the server starts', () => {

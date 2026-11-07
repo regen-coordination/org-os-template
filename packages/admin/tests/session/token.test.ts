@@ -23,7 +23,7 @@ function keyPair(): { privateJwk: JsonWebKey; publicJwk: JsonWebKey } {
 }
 
 const NOW = new Date('2026-11-18T09:00:00Z')
-const claimsAt = (now = NOW) => newSessionClaims({ iss: ISS, sub: 'refidao:person:example-steward', roles: ['steward'], nodes: [] }, now)
+const claimsAt = (now = NOW) => newSessionClaims({ iss: ISS, sub: 'example-org:person:example-steward', roles: ['steward'], nodes: [] }, now)
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
 

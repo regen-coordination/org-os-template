@@ -45,7 +45,7 @@ async function house(o: { mailer?: Mailer; hosted?: Pick<HostedConfig, 'origin' 
   await store.replaceRoles({
     roles_version: '2026-11-18',
     people: [
-      { id: 'refidao:person:example-steward', name: 'Example Steward', email_keys: [emailKey(ADDRESS, PEPPER)], roles: ['network-member', 'steward'], nodes: [] },
+      { id: 'example-org:person:example-steward', name: 'Example Steward', email_keys: [emailKey(ADDRESS, PEPPER)], roles: ['network-member', 'steward'], nodes: [] },
     ],
   })
   const state = { clock: T0 }
@@ -95,7 +95,7 @@ describe('POST /api/session/email (Lane 3 Task 7)', () => {
     // A second link, taken a moment before its 15 minutes are up, works.
     await ask(h, { email: ADDRESS })
     const second = tokenOf(h.mailer.sent[1]!.link)
-    expect(await h.store.takeLink(sha256(second), new Date(T0.getTime() + LINK_TTL_MS - 1000))).toMatchObject({ personId: 'refidao:person:example-steward' })
+    expect(await h.store.takeLink(sha256(second), new Date(T0.getTime() + LINK_TTL_MS - 1000))).toMatchObject({ personId: 'example-org:person:example-steward' })
   })
 
   it('" Steward@Example.org " finds steward@example.org', async () => {

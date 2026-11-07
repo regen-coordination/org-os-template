@@ -84,7 +84,10 @@ describe('deploy/hub/RAILWAY.md', () => {
     expect(text).toContain('NODE_BASE_DIGEST')
     expect(text).not.toMatch(/0x[0-9a-fA-F]{40}/)
     expect(text).not.toMatch(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/) // no project or service ids
-    expect(text).not.toMatch(/refidao|steward\./i) // the framework is public: the org's hosts stay in its instance
+    // The framework is public: the org's hosts stay in its instance. Every host named is a placeholder or the container
+    // service's own.
+    const hosts = text.match(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:org|com|net|io|app|dev)\b/gi) ?? []
+    expect(hosts.filter(h => !/(?:^|\.)example\.(?:org|com)$|\.railway\.app$/i.test(h))).toEqual([])
   })
 })
 

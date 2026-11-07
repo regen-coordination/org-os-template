@@ -18,7 +18,7 @@ import { main as keyMain, newPrivateJwk, publicJwkOf } from '../../scripts/house
 
 const HUB = 'https://hub.example.org'
 const PEPPER = '0f'.repeat(32)
-const STEWARD = { id: 'refidao:person:example-steward', mail: 'steward@example.org' }
+const STEWARD = { id: 'example-org:person:example-steward', mail: 'steward@example.org' }
 
 const cleanup: (() => void | Promise<void>)[] = []
 const savedEnv = { ...process.env }

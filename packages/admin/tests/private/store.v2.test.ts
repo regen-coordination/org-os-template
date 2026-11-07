@@ -28,8 +28,8 @@ const KEY_A = 'a'.repeat(64), KEY_B = 'b'.repeat(64), KEY_C = 'c'.repeat(64)
 const DOC: RolesDoc = {
   roles_version: '2026-11-18',
   people: [
-    { id: 'refidao:person:example-steward', name: 'Example Steward', email_keys: [KEY_A], roles: ['network-member', 'steward'], nodes: [] },
-    { id: 'refidao:person:example-lead', name: 'Example Lead', email_keys: [KEY_B, KEY_C], roles: ['node-lead'], nodes: ['node-one', 'node-two'] },
+    { id: 'example-org:person:example-steward', name: 'Example Steward', email_keys: [KEY_A], roles: ['network-member', 'steward'], nodes: [] },
+    { id: 'example-org:person:example-lead', name: 'Example Lead', email_keys: [KEY_B, KEY_C], roles: ['node-lead'], nodes: ['node-one', 'node-two'] },
   ],
 }
 const NOW = new Date('2026-11-18T09:00:00.000Z')
@@ -37,7 +37,7 @@ const NOW = new Date('2026-11-18T09:00:00.000Z')
 const ADDRESS = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/
 const later = (ms: number) => new Date(NOW.getTime() + ms)
 const link = (tokenHash: string, expires = later(15 * 60_000)): Omit<RolesLink, 'usedAt'> => ({
-  tokenHash, personId: 'refidao:person:example-steward', returnTo: 'https://hub.example.org/', created: NOW.toISOString(), expires: expires.toISOString(),
+  tokenHash, personId: 'example-org:person:example-steward', returnTo: 'https://hub.example.org/', created: NOW.toISOString(), expires: expires.toISOString(),
 })
 
 /** Schema 1 as org-os 0.6 wrote it (L5 §10.2), so a store made before this lane can be opened by it. */
@@ -75,7 +75,7 @@ describe('schema 2 (Lane 3 Task 2)', () => {
     expect(s.history()).toHaveLength(1)
     expect(s.session('h1')?.account).toBe('eip155:42220:0x00000000000000000000000000000000000000a1')
     expect(s.rolesVersion()).toBeNull()
-    expect(s.person('refidao:person:example-steward')).toBeNull()
+    expect(s.person('example-org:person:example-steward')).toBeNull()
     await s.replaceRoles(DOC)
     expect(s.rolesVersion()).toBe('2026-11-18')
     s.close()
@@ -103,13 +103,13 @@ describe('the Roles (I4) and the email keys (I3)', () => {
   it('reads a person by id and by any of their email keys', async () => {
     const s = await opened()
     await s.replaceRoles(DOC)
-    const lead = { id: 'refidao:person:example-lead', name: 'Example Lead', roles: ['node-lead'], nodes: ['node-one', 'node-two'] }
-    expect(s.person('refidao:person:example-lead')).toEqual(lead)
+    const lead = { id: 'example-org:person:example-lead', name: 'Example Lead', roles: ['node-lead'], nodes: ['node-one', 'node-two'] }
+    expect(s.person('example-org:person:example-lead')).toEqual(lead)
     expect(s.personByEmailKey(KEY_B)).toEqual(lead)
     expect(s.personByEmailKey(KEY_C)).toEqual(lead)
-    expect(s.personByEmailKey(KEY_A)?.id).toBe('refidao:person:example-steward')
+    expect(s.personByEmailKey(KEY_A)?.id).toBe('example-org:person:example-steward')
     expect(s.personByEmailKey('d'.repeat(64))).toBeNull()
-    expect(s.person('refidao:person:nobody')).toBeNull()
+    expect(s.person('example-org:person:nobody')).toBeNull()
   })
 
   it('replaceRoles replaces, never merges', async () => {
@@ -117,10 +117,10 @@ describe('the Roles (I4) and the email keys (I3)', () => {
     await s.replaceRoles(DOC)
     await s.replaceRoles({ roles_version: '2026-11-25', people: [{ ...DOC.people[0]!, roles: ['network-member'], email_keys: [KEY_C] }] })
     expect(s.rolesVersion()).toBe('2026-11-25')
-    expect(s.person('refidao:person:example-lead')).toBeNull()
+    expect(s.person('example-org:person:example-lead')).toBeNull()
     expect(s.personByEmailKey(KEY_B)).toBeNull()
     expect(s.personByEmailKey(KEY_A)).toBeNull() // the steward's old key went with the old doc
-    expect(s.personByEmailKey(KEY_C)).toEqual({ id: 'refidao:person:example-steward', name: 'Example Steward', roles: ['network-member'], nodes: [] })
+    expect(s.personByEmailKey(KEY_C)).toEqual({ id: 'example-org:person:example-steward', name: 'Example Steward', roles: ['network-member'], nodes: [] })
     expect(s.history()).toEqual([]) // the dump is the source: no history row
   })
 
@@ -134,7 +134,7 @@ describe('the Roles (I4) and the email keys (I3)', () => {
     await expect(s.replaceRoles(twice)).rejects.toThrow('An email key is held by two people in this Roles document; nothing was loaded.')
     // nothing written: the old doc stands whole
     expect(s.rolesVersion()).toBe('2026-11-18')
-    expect(s.personByEmailKey(KEY_B)?.id).toBe('refidao:person:example-lead')
+    expect(s.personByEmailKey(KEY_B)?.id).toBe('example-org:person:example-lead')
   })
 
   it('refuses a doc it must not hold, in words that name no value', async () => {
@@ -219,7 +219,7 @@ describe('what the file holds', () => {
     const all = s.allStrings()
     expect(all.has(KEY_A)).toBe(true)
     expect(all.has('Example Steward')).toBe(false)
-    expect(all.has('refidao:person:example-steward')).toBe(false)
+    expect(all.has('example-org:person:example-steward')).toBe(false)
   })
 
   it('a backup restores the roles tables', async () => {
@@ -234,7 +234,7 @@ describe('what the file holds', () => {
     await restore(r, made.file, key, { dir: to, now: NOW })
     const back = await opened(r, to)
     expect(back.rolesVersion()).toBe('2026-11-18')
-    expect(back.personByEmailKey(KEY_C)?.id).toBe('refidao:person:example-lead')
-    expect(await back.takeLink('5'.repeat(64), later(1000))).toMatchObject({ personId: 'refidao:person:example-steward' })
+    expect(back.personByEmailKey(KEY_C)?.id).toBe('example-org:person:example-lead')
+    expect(await back.takeLink('5'.repeat(64), later(1000))).toMatchObject({ personId: 'example-org:person:example-steward' })
   })
 })

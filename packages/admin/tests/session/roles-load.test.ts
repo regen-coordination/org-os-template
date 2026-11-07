@@ -16,9 +16,9 @@ const KEY_A = 'a'.repeat(64), KEY_B = 'b'.repeat(64)
 const DOC = {
   roles_version: '2026-11-18',
   people: [
-    { id: 'refidao:person:example-steward', name: 'Example Steward', email_keys: [KEY_A], roles: ['network-member', 'steward'], nodes: [] },
-    { id: 'refidao:person:example-lead', name: 'Example Lead', email_keys: [KEY_B], roles: ['network-member', 'node-lead'], nodes: ['node-one', 'node-two'] },
-    { id: 'refidao:person:example-contributor', name: 'Example Contributor', email_keys: [], roles: [], nodes: [] },
+    { id: 'example-org:person:example-steward', name: 'Example Steward', email_keys: [KEY_A], roles: ['network-member', 'steward'], nodes: [] },
+    { id: 'example-org:person:example-lead', name: 'Example Lead', email_keys: [KEY_B], roles: ['network-member', 'node-lead'], nodes: ['node-one', 'node-two'] },
+    { id: 'example-org:person:example-contributor', name: 'Example Contributor', email_keys: [], roles: [], nodes: [] },
   ],
 }
 
@@ -36,7 +36,7 @@ async function run(args: string[], stdin: string, at: ReturnType<typeof setup>) 
 
 async function storeOf(at: ReturnType<typeof setup>) {
   const s = await openPrivateStore(at.repo, { dir: at.dir })
-  try { return { version: s.rolesVersion(), steward: s.person('refidao:person:example-steward'), byKey: s.personByEmailKey(KEY_B) } } finally { s.close() }
+  try { return { version: s.rolesVersion(), steward: s.person('example-org:person:example-steward'), byKey: s.personByEmailKey(KEY_B) } } finally { s.close() }
 }
 
 describe('house:roles load (Lane 3 Task 3)', () => {
@@ -48,7 +48,7 @@ describe('house:roles load (Lane 3 Task 3)', () => {
     expect(r.out).not.toContain(KEY_A)
     const s = await storeOf(at)
     expect(s.version).toBe('2026-11-18')
-    expect(s.byKey?.id).toBe('refidao:person:example-lead')
+    expect(s.byKey?.id).toBe('example-org:person:example-lead')
   })
 
   it('a second load replaces the first', async () => {

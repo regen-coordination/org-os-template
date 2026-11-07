@@ -25,7 +25,7 @@ const HUB = 'https://hub.example.org'
 const PEPPER = '0f'.repeat(32)
 const T0 = new Date('2026-11-18T10:00:00.000Z')
 const STEWARD = 'steward@example.org', LEAD = 'lead@example.org', BOTH = 'both@example.org', CONTRIBUTOR = 'contributor@example.org'
-const ID = { steward: 'refidao:person:example-steward', lead: 'refidao:person:example-lead', both: 'refidao:person:example-both', contributor: 'refidao:person:example-contributor' }
+const ID = { steward: 'example-org:person:example-steward', lead: 'example-org:person:example-lead', both: 'example-org:person:example-both', contributor: 'example-org:person:example-contributor' }
 const DOC: RolesDoc = {
   roles_version: '2026-11-18',
   people: [

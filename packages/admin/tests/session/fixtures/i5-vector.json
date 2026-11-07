@@ -12,12 +12,12 @@
     "publicJwk": {
       "kty": "OKP",
       "crv": "Ed25519",
-      "x": "w3C8UbS7dwSQQYXHNjNWEu4lXKNUsUSqSCaIORV4C8k"
+      "x": "1Z8SZ0-vagTgqeHiiwe_cAgR4ZK5kduR8ti4CxcFYug"
     },
-    "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2h1Yi5leGFtcGxlLm9yZyIsInN1YiI6InJlZmlkYW86cGVyc29uOmV4YW1wbGUtc3Rld2FyZCIsInJvbGVzIjpbIm5ldHdvcmstbWVtYmVyIiwic3Rld2FyZCJdLCJub2RlcyI6WyJleGFtcGxlLW5vZGUiXSwiaWF0IjoxNzk0OTkyNDAwLCJleHAiOjE3OTUwNzg4MDAsImp0aSI6IjM4N2ViMGU0YmNjNjRkYTk4YTQ2MTkzNDRhODZmOWIyIn0.n63_VxkqrbzFoXaMhRKi33kTnW6n6XWNTrDTELCji6wXIgCv3SU5J94TsUIOro0mUdnNrDhEaqRn5km9hRZDBA",
+    "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2h1Yi5leGFtcGxlLm9yZyIsInN1YiI6ImV4YW1wbGUtb3JnOnBlcnNvbjpleGFtcGxlLXN0ZXdhcmQiLCJyb2xlcyI6WyJuZXR3b3JrLW1lbWJlciIsInN0ZXdhcmQiXSwibm9kZXMiOlsiZXhhbXBsZS1ub2RlIl0sImlhdCI6MTc5NDk5MjQwMCwiZXhwIjoxNzk1MDc4ODAwLCJqdGkiOiIzODdlYjBlNGJjYzY0ZGE5OGE0NjE5MzQ0YTg2ZjliMiJ9.fcMrKQhmY94Oshlz1arhg2m7N9a5SzbtDhAufvtvfurvYb8-W6Hfl0h2yHfwtshm0EYAfq3GPQnsLKcIt1xLDw",
     "claims": {
       "iss": "https://hub.example.org",
-      "sub": "refidao:person:example-steward",
+      "sub": "example-org:person:example-steward",
       "roles": [
         "network-member",
         "steward"
