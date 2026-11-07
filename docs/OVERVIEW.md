@@ -47,17 +47,17 @@ Plans: the framework repository keeps its own in the `agent-plans` directory und
 
 ### Data registries: `data/`
 
-YAML files are the source of truth for structured facts: members, projects, finances, governance, meetings, ideas, funding opportunities, relationships, sources, events, channels, assets and more. Each file has a top-level key matching its name and an `id` on every entry. The framework repository's own `data/` has 18 files. A new instance does not get `instances.yaml`, `skills-matrix.yaml` or `packages-matrix.yaml` (framework-only), starts with `members`, `projects`, `ideas`, `relationships`, `ecosystems` and `governance` reset to empty scaffolds, and has the framework's `data/federation/frontier` cache removed. After editing:
+YAML files are the source of truth for structured facts: members, projects, finances, governance, meetings, ideas, funding opportunities, relationships, sources, events, channels, assets and more. Each file has a top-level key matching its name and an `id` on every entry. The framework repository's own `data/` has 18 files. A new instance does not get `instances.yaml`, `skills-matrix.yaml` or `packages-matrix.yaml` (framework-only), starts with `members`, `projects`, `ideas`, `relationships`, `ecosystems` and `governance` reset to empty scaffolds, and has the framework's `data/federation/frontier` cache removed. Since 0.6, `data/governance.yaml` can also hold the org's rules (who may propose and who decides each class of change; with none, the maintainer decides alone), and an instance may add `systems`, `boards`, `proposals`, `library` and `visibility` registries, which the [admin app](ADMIN-APP.md) reads and writes. After editing:
 
 ```bash
 npm run generate:schemas && npm run validate:schemas
 ```
 
-Documented in [Data model](DATA-MODEL.md).
+Documented in [Data model](DATA-MODEL.md). `npm run validate:data` and `npm run validate:governance` check the registries and the rules; they need `packages/admin`, so they run from the framework checkout with the instance's path.
 
 ### Generated descriptors: `.well-known/` and `schemas/`
 
-`npm run generate:schemas` writes JSON from the registries into `.well-known/` (members, projects, finances, meetings, ideas, knowledge, proposals, activities, contracts, skills, and `dao.json` once `daoURI` is set in `IDENTITY.md`). A new instance ships only the `.json.template` files and generates the rest. They follow EIP-4824 and are never edited by hand. `schemas/` holds the JSON-LD and JSON Schema definitions the generators and validators use. Documented in [EIP-4824 guide](EIP4824-GUIDE.md) and [Data model](DATA-MODEL.md).
+`npm run generate:schemas` writes from the registries into `.well-known/`: `dao.json`, members, proposals, activities, contracts and a `governance.md` (EIP-4824), grant pools, applications and attestation issuers when there are any (DAOIP-5, DAOIP-3), and meetings, projects, finances, ideas and knowledge. It writes only what `data/visibility.yaml` makes public, and nothing until `identity.daoURI` is set in `federation.yaml`. `skills.json` comes from `npm run generate:skills`. A new instance ships the `.json.template` files, a `dao.json` the clone renders from its config, and a copy of the generator in `scripts/lib/standards/`. The files are never edited by hand. `schemas/` holds the JSON-LD and JSON Schema definitions the generators and validators use, and the change classes the rules are written against (`schemas/change-classes.json`). Documented in [EIP-4824 guide](EIP4824-GUIDE.md) and [Data model](DATA-MODEL.md).
 
 ### Federation: `federation.yaml`
 
@@ -87,6 +87,7 @@ npm run generate:schemas    # registries -> .well-known/
 npm run validate:schemas    # schema and identity checks
 npm run validate:structure  # file and folder structure
 npm run doctor -- --dir ../my-instance   # read-only assessment, from the framework checkout (an instance does not carry the doctor)
+npm run admin -- --repo ../my-instance   # the admin app on http://localhost:4680, from the framework checkout
 npm run vault:snapshot -- "reason"   # permanent ref for tracked files before a risky git operation (not untracked files)
 ```
 

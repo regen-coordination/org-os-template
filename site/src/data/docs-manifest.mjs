@@ -30,8 +30,8 @@ export const ALLOW_UNVERIFIED = false;
 export const PAGES = [
   { source: "docs/OVERVIEW.md", slug: "overview", title: "Overview", section: "start", order: 10,
     summary: "What org-os is, what an instance contains, and which page documents each part",
-    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
-    covers: ["IDENTITY.md", "federation.yaml", "data", "skills", ".well-known", "schemas", "templates", "package.json"] },
+    verified: "21ab8aa37bdc44e7e3d5ed5800044e27303e535b",
+    covers: ["IDENTITY.md", "federation.yaml", "data", "skills", ".well-known", "schemas", "templates", "package.json", "scripts/generate-all-schemas.mjs", "scripts/validate-data.mjs", "scripts/validate-governance.mjs", "scripts/clone-framework.mjs", "packages/admin/lib/registries.mjs"] },
   { source: "docs/SETUP.md", slug: "setup", title: "Setup", section: "start", order: 20,
     summary: "Create an instance: clone the framework, generate from a config, check with the doctor, publish its schemas.",
     verified: "214e2e4d06eed1f646c26ae938cb0d0c858af99f",
@@ -131,9 +131,9 @@ export const PAGES = [
     verified: "33668237a177ae86438a353cff75b0987ceb8e25",
     covers: ["modules/", "scripts/modules.mjs", "packages/", "skills/"] },
   { source: "docs/ADMIN-APP.md", slug: "admin-app", title: "Admin app", section: "modules", order: 20,
-    summary: "A local web page to edit an instance's data registries with forms; one git commit per save.",
-    verified: "33668237a177ae86438a353cff75b0987ceb8e25",
-    covers: ["packages/admin/"] },
+    summary: "The local platform for an instance: records staged as changes, applied or proposed under the org's rules, boards, outside systems and sign-in.",
+    verified: "21ab8aa37bdc44e7e3d5ed5800044e27303e535b",
+    covers: ["packages/admin/", "scripts/clone-framework.mjs", "package.json"] },
   { source: "docs/RAD-ORG-OS.md", slug: "rad-org-os", title: "rad-org-os", section: "modules", order: 30,
     summary: "The planned org-os distribution on Radicle: what is designed, what exists, what is not built.",
     verified: "33668237a177ae86438a353cff75b0987ceb8e25",
@@ -198,8 +198,8 @@ export const PAGES = [
 
   { source: "docs/ARCHITECTURE.md", slug: "architecture", title: "Architecture", section: "concepts", order: 10,
     summary: "The six layers of the framework, what is in each, and why it is built from files",
-    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
-    covers: ["AGENTS.md", "federation.yaml", "data/", ".well-known/", "skills/", "scripts/", "packages/", "modules/", ".claude/settings.json", ".github/workflows/generate-schemas.yml", ".github/workflows/drift.yml"] },
+    verified: "21ab8aa37bdc44e7e3d5ed5800044e27303e535b",
+    covers: ["AGENTS.md", "federation.yaml", "data/", ".well-known/", "skills/", "scripts/", "packages/", "modules/", ".claude/settings.json", ".github/workflows/generate-schemas.yml", ".github/workflows/drift.yml", "schemas/", ".github/workflows/validate.yml"] },
   { source: "docs/AGENTIC-ARCHITECTURE.md", slug: "agentic-architecture", title: "Agentic architecture", section: "concepts", order: 20,
     summary: "The ten-step startup sequence, what an agent may edit, skills, personas and hosts",
     verified: "48cf5dd07515bbaa6cb2e2ed00f4d5db936f69d2",
@@ -214,7 +214,7 @@ export const PAGES = [
     covers: ["skills/workspace-improver", "MASTERPLAN.md", "data/skills-matrix.yaml"] },
   { source: "docs/ECOSYSTEM.md", slug: "ecosystem", title: "Ecosystem", section: "concepts", order: 50,
     summary: "Org-os instances, related projects and external systems, as recorded in this repository",
-    verified: "7a804431d106cc045db4a2066a9f727a46f4da4e",
+    verified: "21ab8aa37bdc44e7e3d5ed5800044e27303e535b",
     covers: ["federation.yaml", "data/instances.yaml", "data/ecosystems.yaml", "repos.manifest.json"] },
 ];
 

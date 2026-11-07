@@ -1,93 +1,106 @@
 # Admin app
 
-The admin app is a local web page for editing an instance's `data/*.yaml` registries through forms. It runs on your machine, reads and writes the files in the instance's working tree, and makes one git commit for every save, create or delete.
+The admin app is a local web server and page for running an instance: its `data/*.yaml` records, the rules that decide changes to them, the proposals those rules call for, its boards, and the outside systems it uses (a Safe, a Hats tree, a Gardens pool). It runs on your machine, reads and writes the files in the instance's working tree, and every change it makes lands as a git commit carrying `Org-*` trailers. In 0.6 it is the platform of the [0.6 architecture](superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md): a new client on the server that milestone M1 of the [admin design](superpowers/specs/2026-07-23-admin-app-design.md) built.
 
-**Status:** `in-dev` (the vocabulary of [Modules](MODULES.md)). Milestone M1 of the [design](superpowers/specs/2026-07-23-admin-app-design.md) is built and is in `packages/admin/`. The design's proposals workflow, the canvas view, the markdown and system-file editing, and authentication are not built. The package has 47 test cases (vitest). They were not run for this page, because the package's dependencies are not installed in the checkout it was written from and installing them needs the network. Everything below is read from the source.
+**Status:** `in-dev` (the vocabulary of [Modules](MODULES.md)), in `packages/admin/`. Not built: an edit path for `data/governance.yaml`, `data/finances.yaml`, `data/knowledge-manifest.yaml`, `data/visibility.yaml`, `IDENTITY.md` and `federation.yaml` (the app shows them read only); serving on any address but `127.0.0.1`; regenerating `.well-known/` after a change. The package's vitest suite and its browser checks were not run for this page. Everything below is read from the source.
 
 ## Start it
 
-Run it from the **framework checkout**. An instance does not receive `packages/admin` (the clone leaves it out), so the app cannot be started from inside an instance; you point it at one with `--repo`.
+Run it from the **framework checkout**. An instance does not receive `packages/admin` (`scripts/clone-framework.mjs` removes every package the config does not enable and vendors only the standards generator into `scripts/lib/`), so the app cannot be started from inside an instance; you point it at one with `--repo`.
 
 ```bash
-npm install --prefix packages/admin     # once: the package has its own dependencies
-npm run admin -- -- --repo ../my-instance    # build the UI, serve on http://localhost:4680
+npm install --prefix packages/admin          # once: the package has its own dependencies
+npm run admin -- --repo ../my-instance        # build the UI, serve on http://localhost:4680
 ```
 
-`npm run admin` is `npm --prefix packages/admin run start`: it builds the single-page app with Vite (`app/dist/`), then starts the server with `tsx`. With no options it edits the directory npm was run from (`INIT_CWD`), which here is the framework itself. The server refuses to start unless the target directory has both `data/` and `federation.yaml`.
+`npm run admin` is `npm --prefix packages/admin run start --`: it builds the single-page app with Vite (`app/dist/`), then starts `server/index.ts` with `tsx`. Because the root script ends in `--`, one `--` on your command line is enough. With no options it serves the directory npm was run from (`INIT_CWD`), which here is the framework itself. The server refuses to start unless the target directory has both `data/` and `federation.yaml`.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--repo <path>` | the directory you ran npm from | the instance to edit |
+| `--repo <path>` | the directory you ran npm from | the instance to serve |
 | `--port <n>` | `4680` | the port |
+| `--hosted` (or `ORG_OS_HOSTED=1`) | off | hosted mode: with no session the caller is the public (below) |
 
-Because the root script calls npm a second time, the options need two `--` separators, as in `npm run admin -- -- --repo ../my-instance --port 4700`. With one, npm swallows the flag names and passes only the values (checked with a stand-in script under npm 11). The server binds `127.0.0.1` only; the address is fixed in `server/index.ts` and has no option.
+The server binds `127.0.0.1` only, in either mode; the address is fixed in `server/serve.ts` and has no option. `npm run admin:dev` runs the server alone with `tsx watch` (no UI build); pair it with `npm run dev:app` inside `packages/admin/`. If `app/dist/` is missing the server still starts and says so; only the API is served.
 
-`npm run admin:dev` runs the server alone with `tsx watch` (no UI build). Pair it with `npm run dev:app` inside `packages/admin/` for hot reload; the Vite dev server proxies `/api` to port 4680. If `app/dist/` is missing the server still starts and says so; only the API is served.
+## Who is acting
+
+Every request is read for an actor (`server/request.ts`, `server/actor.ts`):
+
+- **Locally, with no session,** the actor is the member whose `handles.git` (or `email`) in `data/members.yaml` holds `git config user.email`. An address no member holds can read but not write; the *claim your handle* wizard (`wizards/claim-handle.yaml`, `lib/claim.mjs`) adds it to a member, and only while the org has written no rules.
+- **Signed in,** the actor is the member whose `handles.wallet` lists the address, else the address itself. Sign-in is Sign-in with Ethereum (`lib/siwe.mjs`, `server/session/`): the server writes the message and the browser's wallet signs it; the server holds no key. It is offered when `data/systems.yaml` holds a `hats-tree` system (`governance.membership.tree` picks one when there are several, `membershipTree` in `lib/rules.mjs`). The hats an address wears are read from that tree when signing in and again before every act. Commits a session makes are authored by `house@org-os.invalid`, with the member in `Org-Actor`.
+- **Hosted, with no session,** the caller is the public: reading anything not public, and every write, answers `401`. A hosted server refuses to start while `origin` is public, or while it cannot read whether it is, unless `ORG_OS_REMOTE_PRIVATE=confirmed` (`server/visibility/remote.ts`); a local one says so on Home.
+
+What the public may read is set in `data/visibility.yaml` (`lib/visibility.mjs`). A record or field kept stricter than *members* lives outside git in a SQLite file, `house.db` (`server/private/`), in `ORG_OS_PRIVATE_DIR` or else `<instance>/.org-os/private/`, which `.gitignore` must name; `npm run house:backup` writes an encrypted copy of it, and the server takes one every 24 hours by default once `ORG_OS_BACKUP_KEY_FILE` names a key (`server/private/backup.ts`).
 
 ## What it can edit
 
-It knows 14 registries, the files in `data/`:
+The registries are listed once, in `lib/registries.mjs`: 19 files in `data/`.
 
-- **Eleven collections, editable:** `members`, `projects`, `meetings`, `ideas`, `funding-opportunities`, `relationships`, `sources`, `events`, `channels`, `assets`, `knowledge-gaps`. Each is a list of entries with an `id`. You can create, change and delete entries.
-- **Three documents, read-only:** `finances`, `governance`, `knowledge-manifest`. The page shows them as YAML and the API answers `403` to a write.
+- **Twelve collections, edited as records:** `members`, `projects`, `meetings`, `ideas`, `funding-opportunities`, `relationships`, `sources`, `events`, `channels`, `assets`, `knowledge-gaps`, `systems`. Each is a list of entries with an `id`: field rows on the record page, and a source editor for the whole entry.
+- **Three collections with their own routes:** `boards` (arranged on the board itself), `proposals` (the ledger, written only by the proposal routes) and `library` (receipts, written only by the library's Add and Remove).
+- **Four documents, read only:** `finances`, `governance`, `knowledge-manifest`, `visibility`. A write through the registry routes answers `403`.
 
-A registry file that is missing from `data/` is not listed. `funding-opportunities` accepts either the top-level key `opportunities` or `funding_opportunities`, whichever the file already uses, so the app does not split the data in two.
+`app/src/editors.ts` holds this table, and `app/src/editors.test.ts` fails when a governed file has no line in it. `funding-opportunities` accepts either the top-level key `opportunities` or `funding_opportunities`, whichever the file already uses. A registry file that is missing from `data/` is not listed.
 
-Each form is generated from a JSON Schema in `packages/admin/schemas/` (one per registry, `_generic.schema.json` for any without its own). Simple fields get inputs; nested structures (arrays of objects, maps) are edited as YAML text in a textarea.
+Each entry is checked with Ajv against a JSON Schema in `packages/admin/schemas/` (one per registry, `_generic.schema.json` for any without its own), and its cross-references must resolve (`REFS` in `lib/data-validate.mjs`: a project's `lead`, `contributors`, `related_ideas` and `funding_source`, a meeting's `participants`, an event's `related_project`). An entry's `id` cannot change. Deleting an entry that another entry names is refused, listing what refers to it.
 
-Each write is checked before it is saved:
+## How a change is decided
 
-- the entry is validated against the registry's schema (Ajv); a failure answers `422` with the field errors;
-- cross-references must resolve: `projects.lead` and `projects.contributors` to `members`, `projects.related_ideas` to `ideas`, `projects.funding_source` to `funding-opportunities`, `meetings.participants` to `members`, `events.related_project` to `projects`. If the target registry file is absent, the check is skipped;
-- an update cannot change an entry's `id`.
+Saving a record stages it in your **change**, one per actor, kept outside the repository (`~/.org-os/admin/<instance>-<hash>/changes/`; `ORG_OS_ADMIN_HOME` moves it). Each staged op carries a base, the SHA-256 of the entry's canonical YAML (`server/changes/canonical.ts`), so an entry someone else changed since is marked stale.
 
-Deleting an entry is not checked for references to it.
+The records a change touches fall into classes (`schemas/change-classes.json`), and the rules in `data/governance.yaml` say, per class, how such a change is decided (`lib/rules.mjs`): `direct`, `approve`, `consent` (an objection window), `vote`, or `system` (an outside system such as a Safe). With no rules the solo default applies: the maintainer decides alone.
+
+- **Apply**, when the rule lets you decide alone, makes one commit of the whole change, with the trailers `Org-Actor`, `Org-Change` and `Org-Rule` (`server/changes/`).
+- **Propose**, otherwise, turns the change into an entry of `data/proposals.yaml` and builds a local branch `proposal/<id>` from it, never pushed. Members approve, object, vote or comment. **Ratify**, once the rule is met, is one merge commit carrying `Org-Proposal` and `Org-Decision` that also writes the decision row into `data/governance.yaml`, and an entry in `DECISIONS.md` when the proposal has a statement (`server/proposals/ratify.ts`). Nothing closes a proposal on its own when a window ends. Proposal writes refuse while the repository is off the trunk (`governance.trunk`, else the branch the server started on). See the [proposals design](superpowers/specs/2026-10-18-org-os-0.6-p2-proposals-design.md).
+- **Sync and Share** reach other members' proposals through `origin`: Sync fetches and fast-forwards the trunk (merging when the histories diverged and only the ledger conflicts); Share pushes the trunk by an explicit refspec, never forced. Both ask for a confirmation first.
+
+The older routes (`PUT`/`POST`/`DELETE /api/registries/...`) still work: each is a one-op change applied at once under Apply's checks, with the message `admin(<registry>): update|create|delete <id>`.
 
 ## How it writes
 
-For a change, the server:
+For each file a change touches, the server parses it with the `yaml` package's document model, changes only the lines of the fields that differ (comments, quoting and layout elsewhere survive), parses the result back, and refuses with `409` if any other entry or field would read differently. Then it writes the files and makes one commit of exactly those paths to the **currently checked-out branch**. If git refuses the commit, every file is put back and the answer is `503`.
 
-1. parses the registry file with the `yaml` package's document model, so comments and formatting survive;
-2. changes only the keys that differ. A scalar edited in place keeps its quote style. Replacing a whole nested object or array drops comments inside that value; the rest of the file is untouched;
-3. writes the file in `data/` of the working tree;
-4. commits that one file to the **currently checked-out branch**, with the message `admin(<registry>): update <id>`, `admin(<registry>): create <id>` or `admin(<registry>): delete <id>`.
+Writes to the repository are serialised by one in-memory lock. A WebSocket (`/api/events`) watches `data/` and refreshes the page when a file changes from outside, for example from an editor or an agent. The server does not run `npm run generate:schemas`: `GET /api/generated` says when a ratify has left `.well-known/` behind, and you run it yourself (see [Data model](DATA-MODEL.md)).
 
-Writes to the same registry are serialised in memory, so two saves cannot interleave. A WebSocket (`/api/events`) watches `data/` and refreshes the page when a file changes from outside, for example from an editor or an agent.
+## Beyond records
 
-It does not run `npm run generate:schemas`, so `.well-known/` is not regenerated after an edit; run it yourself before you push (see [Data model](DATA-MODEL.md)).
+- **Boards** (`/b/<id>`): the 15 built-in boards in `packages/admin/boards/` and an instance's own in `data/boards.yaml`, each a layout of blocks (lists, kanban, maps, metrics, proposals, systems and the others in `app/src/blocks/`).
+- **Systems** (`/systems`): each entry of `data/systems.yaml` is read by a driver (`server/systems/drivers.ts`: link, Safe, Hats tree, Snapshot space, Gardens community and pool, DAO URI registration) every five minutes, reaching only the hosts it declares and sending only reads. An action on a system (adding a Safe owner, giving a hat), on a proposal, is prepared as a Safe transaction for the Safe's signers (`server/proposals/prepare.ts`); the server signs, sends and writes nothing.
+- **Operations and jobs**: what a resource offers (a module's check, a fetch, a share) runs as a job with no shell, and anything that writes or reaches the network needs a single-use plan first. The server never commits for a job.
+- **Library** (`/library`): entries a shelf offers (boards, rule sets, systems), previewed, then added through your change like any other edit.
 
 ## Safety properties
 
 What the code enforces:
 
-- **Git vocabulary is three verbs.** `server/git.ts` can ask for status, `add` and `commit`. There is no stash, clean, reset or force, by design.
-- **Commits stay inside `data/`.** A path outside `data/` makes the commit function throw before anything is staged.
-- **Only the registry file is committed.** The commit names the one path, so other staged or modified files are left alone.
-- **Local only.** It listens on `127.0.0.1`.
+- **Git vocabulary is a list.** `server/git.ts` runs a git command only if it and each of its flags are on `ALLOWED`; stash, clean, reset and any force flag are not, and `tests/server/git.vocabulary.test.ts` holds the list. Push exists only as the Share operation, whose command `server/operations/catalogue.ts` builds.
+- **Commits stay inside `data/`.** A data commit throws on a path outside `data/` before anything is staged; a ratify merge may stage `DECISIONS.md` as well, and nothing else.
+- **It does not commit work it did not make.** A registry file with uncommitted changes, or one git was told not to look at, refuses the write with `409 DIRTY`.
+- **Nothing stricter than members enters git.** The texts about to be committed are checked against `data/visibility.yaml` first.
+- **Who may call.** Before any route, `server/guard.ts` refuses a request addressed to a host other than localhost, a browser request whose `Origin` is not the app's own page, and a write that is not `application/json`.
 
-What it does not do, and what to know before using it:
+What to know before using it:
 
-- **It commits the whole file, not just your edit.** If the registry file already had uncommitted changes of yours, they go into the app's commit.
-- **The write comes before the commit.** If the commit fails, for example a git hook rejects it, the file stays changed in the working tree and nothing is committed.
-- **No authentication.** Anything on the machine that can reach `localhost:4680` can write. The API has no origin or CORS check and reads the body as JSON whatever its content type. The risk from a web page open in your browser was not tested.
-- **It never pushes.** Commits stay local until you push.
-- **Not a gate.** It does not use the proposals queue; every save goes straight to the current branch. Commit or copy aside anything you cannot lose, then take a snapshot (tracked files only), as in [Vault safety](VAULT-SAFETY.md).
+- **Apply commits to the branch you are on.** Only the proposal routes check for the trunk.
+- **It never pushes on its own.** Commits stay local until you Share or push.
 
 ## The files
 
 | Path | What it is |
 |---|---|
-| `packages/admin/server/` | the Hono API: `index.ts` (start-up), `app.ts` (routes), `registries.ts` (the 14 registries), `registry.ts` (YAML read and write), `schema.ts` (validation), `git.ts`, `watcher.ts` |
-| `packages/admin/app/` | the React single-page app (Vite, TanStack Query, wouter) |
-| `packages/admin/schemas/` | the JSON Schemas that drive the forms |
-| `packages/admin/tests/`, `app/src/components/EntityForm.test.tsx` | the tests; `tests/real-data.test.ts` checks the schemas against this repository's own `data/` |
+| `packages/admin/server/` | the Hono API: `index.ts` (start-up), `serve.ts` (the server), `app.ts` (the registry routes), `git.ts`, `registry.ts`, and a folder per area: `changes/`, `proposals/`, `governance/`, `session/`, `private/`, `visibility/`, `boards/`, `systems/`, `operations/`, `resources/`, `library/`, `wizards/` |
+| `packages/admin/lib/` | plain JavaScript shared with the root scripts: the registry list, rules, proposals, change classes, and `standards/`, the builder `npm run generate:schemas` uses |
+| `packages/admin/app/` | the React single-page app (Vite, TanStack Query, wouter, React Flow for maps) |
+| `packages/admin/schemas/`, `boards/`, `wizards/`, `library/` | the JSON Schemas, the built-in boards, the wizards, the framework's library shelf |
+| `packages/admin/tests/`, `app/src/**/*.test.ts(x)` | the tests |
 
-The API: `GET /api/status`, `GET /api/registries`, `GET /api/registries/:name`, `GET /api/schemas/:name`, `PUT /api/registries/:name/:id`, `POST /api/registries/:name`, `DELETE /api/registries/:name/:id`.
+`packages/admin/README.md` lists every API route and its answers.
 
 ## Test it
 
 ```bash
-npm run test:admin     # vitest: the server services, the API and the form component
+npm run test:admin     # vitest: the server, the API and the app's components
 ```
 
-It needs the install above. `npm test` inside `packages/admin/` is the same suite.
+It needs the install above. `npm test` inside `packages/admin/` is the same suite; `npm run e2e` there runs the browser paths in the installed Chrome.
