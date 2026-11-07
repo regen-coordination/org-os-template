@@ -2,7 +2,7 @@
 
 The instance doctor answers one question: is this instance healthy, and can it be updated from the framework safely? It has two verbs. `assess` is read-only: it runs six checks and prints a scorecard. `sync` repairs the machinery an instance needs to update itself, copies the framework's own files over, re-assesses, and writes a receipt. It stops at the first failure.
 
-**Status:** pilot. `assess` has been run against the instances the maintainer operates, and the file-level overlay sync was accepted end to end against one of them (the acceptance report is not in this repository). The package's 167 tests pass offline. Every instance today is run by the maintainer, so nobody else has yet run `sync` against an instance they did not generate.
+**Status:** pilot. `assess` has been run against the instances the maintainer operates, and the file-level overlay sync was accepted end to end against one of them, with the nine stages it had then (`memory/reports/overlay-acceptance-2026-08-29.md`); `declare-visibility` came after. Its suite, `tests/instance-doctor/`, has 207 test cases (not run for this page); every side effect is injected, so it needs no network. Every instance today is run by the maintainer, so nobody else has yet run `sync` against an instance they did not generate.
 
 ```bash
 npm run doctor                                    # assess the current directory
@@ -27,7 +27,7 @@ Flags: `--json` (machine-readable, for CI), `--strict` (warnings fail too; asses
 
 Exit codes: `0` no blockers · `1` blockers found (or, with `--strict`, any warning) · `2` bad usage.
 
-This is real output (trimmed) against this framework repository itself (the framework is a running instance, so it assesses itself and says so; the lineage and `upstream` warnings are expected here and mean nothing for the framework):
+This is real output (trimmed), captured at 0.5.0, against this framework repository itself (the framework is a running instance, so it assesses itself and says so; the lineage and `upstream` warnings are expected here and mean nothing for the framework):
 
 ```text
 org-os instance doctor — org-os
@@ -67,10 +67,10 @@ Read them in this order: who am I, where did I come from, what version, does my 
 | Lineage | Do `federation.yaml` `metadata.genesis_commit` and `last_sync_commit` hold real commits, and how far has the framework moved since the last sync? |
 | Version surfaces | Do `federation.yaml`, `VERSION.md` and `CHANGELOG.md` claim the same framework version, and is it behind the framework? |
 | Machinery integrity | Do the scripts that `package.json` names exist, and are the git remotes right? |
-| Structure + schemas | Do the framework's `validate-structure.mjs` and `validate-identity.mjs` pass against the instance? |
+| Structure + schemas | Do the framework's `validate-structure.mjs`, `validate-identity.mjs`, `validate-data.mjs` and `validate-governance.mjs` pass against the instance? The last two (0.6) need the framework's `packages/admin` dependencies; when they cannot run, that is a `validator-did-not-run` warning, not a failure. |
 | Freshness | Is anyone working in it, and is it safe to sync now? |
 
-Versions are compared by milestone, not by semver. org-os renumbered `3.5` to `0.5` once, on purpose (see [VERSIONING.md](VERSIONING.md)); an instance stamped `3.0` is behind a framework on `0.5`, not ahead.
+Versions are compared by milestone, not by semver. org-os renumbered `3.5` to `0.5` once, on purpose (see [VERSIONING.md](VERSIONING.md)); an instance stamped `3.0` is behind a framework on `0.6`, not ahead.
 
 ### Common findings and what to do
 
@@ -87,7 +87,7 @@ Level and cause are from the check source in `packages/instance-doctor/src/check
 | `framework-version-missing`, `version-surfaces-contradict` | BLOCKER | No `metadata.framework_version`, or surfaces claim different milestones. | `doctor sync` re-stamps them in its migrate stage. |
 | `genesis-commit-malformed`, `last-sync-commit-malformed` | BLOCKER | The stamp is not a 40-hex commit. | Replace `genesis_commit` with `git rev-list --max-parents=0 HEAD`; set `last_sync_commit` to `null` and let sync record it. |
 | `federation-missing` | BLOCKER | No `federation.yaml`. | Not an org-os instance, or never scaffolded; sync cannot run. |
-| `structure-invalid`, `schemas-invalid` | BLOCKER | A framework validator failed. | Run the named script by hand (`node scripts/validate-structure.mjs <dir>`) and fix what it lists. On a new instance, run `npm run generate:schemas` first. |
+| `structure-invalid`, `schemas-invalid`, `data-invalid`, `governance-invalid` | BLOCKER | A framework validator failed. | Run the named script from the framework checkout (`node scripts/validate-structure.mjs <dir>`, and likewise `validate-identity`, `validate-data`, `validate-governance`) and fix what it lists. The finding's hint is the validator's last output line. |
 | `never-synced`, `sync-stale`, `unstamped-fork`, `lineage-absent` | WARN | The instance has no lineage stamp, never synced, or the framework has moved on since the stamped commit. | `doctor sync`. |
 | `framework-version-stale` | WARN | The instance claims an older milestone than the framework. | `doctor sync`. |
 | `upstream-remote-missing`, `upstream-declared-wrong-url` | WARN | No `upstream` remote, or `federation.yaml` declares a wrong upstream. | `doctor sync` adds the remote and corrects the declaration. |
@@ -99,36 +99,37 @@ Level and cause are from the check source in `packages/instance-doctor/src/check
 | `package-json-missing` | BLOCKER | No `package.json`. | This directory is not an org-os instance; sync cannot fix it. |
 | `not-a-git-repo` | BLOCKER | The directory is not a git repository. | `git init`, or point `--dir` at the right directory. |
 | `version-scheme-unknown` | WARN | A version surface is on neither the legacy (1.x to 3.5) nor the 0.x line. | See the `[0.5.0]` re-baseline paragraph in `CHANGELOG.md`. |
-| `structure-warnings`, `schemas-warnings` | WARN | The validator passed with warnings. | Run `node scripts/validate-structure.mjs <dir>` or `node scripts/validate-identity.mjs <dir>` to read them. |
+| `structure-warnings`, `schemas-warnings`, `data-warnings`, `governance-warnings` | WARN | The validator passed with warnings. | Run the named validator from the framework checkout against `<dir>` to read them. |
 | `migrations-dir-missing` | WARN | No `migrations/` at the instance root. | See the note below: this one does not clear. |
 
 ## Sync
 
-Run the dry run first. It is read-only, so it is safe against a dirty production tree, and it prints exactly the nine stages with what each will do to this instance.
+Run the dry run first. It is read-only, so it is safe against a dirty production tree, and it prints exactly the ten stages with what each will do to this instance, and the `data/visibility.yaml` that `declare-visibility` would write, if any.
 
 ```bash
 npm run doctor -- sync --dir ../my-instance --dry-run
 npm run doctor -- sync --dir ../my-instance
 ```
 
-### The nine stages, in order
+### The ten stages, in order
 
 If a stage fails, every later stage is skipped, nothing is re-stamped, and the receipt names the stage that stopped it. The exit code is 1.
 
 1. **snapshot.** Writes `refs/snapshots/<timestamp>-doctor-sync`, a commit of the tracked and staged files made with `git stash create` (the `-u` it passes has no effect, so untracked files are not in it; see [Workspace safety](VAULT-SAFETY.md)). It does not touch the tree, the index or the stash list. Always first. Then the dirty-tree gate: if uncommitted changes collide with a file the overlay would write, it fails here and names them.
 2. **ensure-upstream.** Adds the `upstream` remote, or rewrites it, to `https://github.com/regen-coordination/org-os-template.git`. Also corrects `federation.yaml` `upstream[0].url`, and commits that change on its own.
 3. **fetch.** `git fetch upstream`. Needs network access to the framework repository.
-4. **inject-machinery.** Copies `scripts/sync-upstream.mjs`, `scripts/validate-identity.mjs`, `scripts/validate-structure.mjs` and `scripts/doctor.mjs` from the framework, and commits them (explicit paths, never `git add -A`). This is the step that breaks the deadlock.
+4. **inject-machinery.** Copies `scripts/sync-upstream.mjs`, `scripts/validate-identity.mjs`, `scripts/validate-structure.mjs` and `scripts/doctor.mjs` from the framework, and vendors the standards generator into `scripts/lib/` (the set `clone:framework` copies, computed by `scripts/lib/standards-vendor.mjs`; see the [EIP-4824 guide](EIP4824-GUIDE.md)). It commits them (explicit paths, never `git add -A`). This is the step that breaks the deadlock.
 5. **overlay.** Copies the framework-owned paths, `scripts/` and `templates/`, over the instance's, and commits them. It only adds and updates; it never deletes. It refuses to write `data/`, `memory/`, `.well-known/`, `knowledge/`, `repos/`, `federation.yaml`, `package.json` or the identity files (`IDENTITY.md`, `SOUL.md`, `MASTERPLAN.md` and the rest).
-6. **migrate.** `npm run migrate --if-present` in the instance, then re-stamps the version surfaces that claim a framework version (`federation.yaml`, `VERSION.md`, and `package.json` only if it is still named after the template).
-7. **generate-schemas.** `npm run generate:schemas --if-present`, republishing `.well-known/`.
-8. **re-assess.** The six checks again. Any blocker fails the sync.
-9. **receipt.** Writes `memory/reports/sync-receipt-<date>.md` and stamps `federation.yaml`: `last_sync_commit` to the framework's HEAD, `genesis_commit` (only if absent) to the instance's root commit, and `last_updated`.
+6. **migrate.** The framework's runner against the instance, `node <framework>/scripts/migrate.mjs <instance> --target <framework version>` (not the instance's own `npm run migrate`, whose default target is the instance's `package.json` version), then re-stamps the version surfaces that claim a framework version (`federation.yaml`, `VERSION.md`, and `package.json` only if it is still named after the template).
+7. **declare-visibility.** From 0.6 `generate:schemas` publishes only what `data/visibility.yaml` declares public, and a collection it does not list is `members`. When the instance has no such file and its `.well-known/` holds files an earlier generator wrote, this stage writes one that declares public only what those files already publish (`members.json` → members, ids only; `proposals.json` → governance decisions; `contracts.json` → systems; the extras → their collections), each only when the instance has the registry. It is its own commit, `chore(visibility): declare what this instance already publishes`: a publication decision for the organisation to confirm, edit or revert. It does nothing when the file exists, when it has any git history (so a revert stays reverted), when there is no earlier output, or when `.well-known/dao.json` carries the current generator's mark (`x-org-os`). Source: `packages/instance-doctor/src/run-sync.mjs`, `visibility-declaration.mjs`.
+8. **generate-schemas.** `npm run generate:schemas --if-present`, republishing `.well-known/`.
+9. **re-assess.** The six checks again. Any blocker fails the sync.
+10. **receipt.** Writes `memory/reports/sync-receipt-<date>.md` and stamps `federation.yaml`: `last_sync_commit` to the framework's HEAD, `genesis_commit` (only if absent) to the instance's root commit, and `last_updated`.
 
 ### What it will not touch, and what it leaves behind
 
 - **Uncommitted work is safe unless it collides.** Only dirty files that the overlay would overwrite stop the run. Uncommitted `data/`, `memory/`, drafts and your own scripts do not. The doctor's own earlier output (injected machinery, an old receipt) does not count as dirt either, so it can retry after its own abort.
-- **Stages 6 to 9 are not committed.** After a run, `git status` in the instance shows the re-stamp, the regenerated `.well-known/`, the stamped `federation.yaml` and the receipt as uncommitted. Review and commit them yourself. Stages 2, 4 and 5 are committed, each separately, so each can be reverted alone.
+- **Migrate, generate-schemas and receipt are not committed.** After a run, `git status` in the instance shows what the migrations wrote, the re-stamp, the regenerated `.well-known/`, the stamped `federation.yaml` and the receipt as uncommitted. Review and commit them yourself. Stages 2, 4, 5 and 7 (when it writes) are committed, each separately, so each can be reverted alone. The receipt repeats a visibility declaration under "Publication decision for the org".
 - **Undo.** The snapshot ref from stage 1 is a local commit of the tracked files as they were before the run. Untracked files are not in it. List them with `git for-each-ref refs/snapshots`.
 - **It does not edit your `package.json`.** The overlay copies every file under `scripts/` and `templates/`, including scripts the clone had left out, but it does not add `package.json` entries for them. Those scripts exist but have no `npm run` name.
 - **Receipts are one per day.** A second run on the same date overwrites the first receipt, including an aborted run overwriting a successful one. Read the receipt before you re-run.
@@ -142,17 +143,16 @@ npm run doctor -- --dir ../my-instance
 cat ../my-instance/memory/reports/sync-receipt-*.md
 ```
 
-Real run, against a scratch instance generated with `npm run clone:framework` (see [Setup](SETUP.md)): before sync, 2 blockers and 5 warnings (`git-remote-absent`, `structure-invalid` because schemas were not yet generated, and the lineage and freshness warnings). After sync, 0 blockers and 4 warnings: lineage and the receipt warning cleared, and the `upstream` remote counted as the missing remote. The overlay added 29 files.
+Real run at 0.5, against a scratch instance generated with `npm run clone:framework` (see [Setup](SETUP.md)): before sync, 2 blockers and 5 warnings (`git-remote-absent`, `structure-invalid` because schemas were not yet generated, and the lineage and freshness warnings). After sync, 0 blockers and 4 warnings: lineage and the receipt warning cleared, and the `upstream` remote counted as the missing remote. The overlay added 29 files.
 
 ## Known problems
 
 Found while writing this page; they are code issues, not documentation issues.
 
 - `migrations-dir-missing` never clears after a sync. The check looks for `migrations/` at the instance root, but the migrate script reads `scripts/migrations/`, and no stage creates the root directory, although the hint says sync does. Treat this warning as noise until the check is fixed.
-- The `structure-invalid` blocker on a freshly generated instance is cleared by `npm run generate:schemas`, not by sync alone.
 
 ## Files it reads and writes
 
-Reads: `federation.yaml`, `IDENTITY.md`, `.well-known/dao.json`, `package.json`, `VERSION.md`, `CHANGELOG.md`, the sync scripts, git remotes and log, `memory/`. Assess writes nothing. Sync writes the files above and the receipt.
+Reads: `federation.yaml`, `IDENTITY.md`, `.well-known/dao.json`, `package.json`, `VERSION.md`, `CHANGELOG.md`, the sync scripts, git remotes and log, `memory/`; sync's `declare-visibility` also reads `.well-known/`, `data/visibility.yaml` and the registries it would declare. Assess writes nothing. Sync writes the files above, `data/visibility.yaml` when it declares one, and the receipt.
 
 For how the package is built (pure checks over one snapshot, every side effect injected) see its [README](../packages/instance-doctor/README.md). The step-by-step operator skill is [skills/instance-doctor/SKILL.md](../skills/instance-doctor/SKILL.md). Related: [Adopt with an AI agent](ADOPT-WITH-AN-AGENT.md), [Versioning](VERSIONING.md).

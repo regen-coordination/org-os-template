@@ -1,78 +1,84 @@
 # EIP-4824
 
-EIP-4824 (Common Interfaces for DAOs) defines a `daoURI`: a URL that resolves to a JSON-LD document describing an organisation and linking to registries of its members, proposals, activity and contracts. org-os generates that document, and the registries it links to, from the instance's YAML data. This page covers what is generated, from what, how to check it, and how to publish it. Status: off-chain generation and validation are built; on-chain registration is not (see [On-chain](#on-chain)).
+EIP-4824 (Common Interfaces for DAOs) defines a `daoURI`: a URL that resolves to a JSON-LD document describing an organisation and linking to registries of its members, proposals, activity and contracts. org-os generates that document, the registries it links to, and the DAOIP-5 and DAOIP-3 files, from the public part of the instance's records. This page covers what is generated, from what, how to check it, and how to publish it. Status: off-chain generation and validation are built; on-chain registration is not (see [On-chain](#on-chain)).
 
 ## What gets generated
 
 ```bash
-npm run generate:schemas    # data/*.yaml, content/ → .well-known/*.json
-npm run validate:schemas    # structural checks, see below
+npm run generate:schemas    # federation.yaml, data/*.yaml, content/ → .well-known/; public records only
+npm run validate:schemas    # parse checks, schema check and leak scan, see below
 ```
 
-`generate:schemas` runs [`scripts/generate-all-schemas.mjs`](../scripts/generate-all-schemas.mjs). It writes ten files into `.well-known/`:
+`generate:schemas` runs [`scripts/generate-all-schemas.mjs`](../scripts/generate-all-schemas.mjs), which loads the builder in `packages/admin/lib/standards/`. Three rules come first:
 
-| File | `type` | Built from |
+- **Nothing without a `daoURI`.** Every id in the files is built from `identity.daoURI` in `federation.yaml`, so with no `daoURI` the command writes nothing, names each file an earlier generator left in `.well-known/` ("not refreshed … not removed") and exits 0. This repository leaves `daoURI` empty, so here it writes nothing; its committed `.well-known/*.json` predate this builder (its `dao.json` was written by hand, with URLs on `organizational-os.github.io`) and are no longer refreshed. A `daoURI` that is not an `https` URL stops every write (exit 1).
+- **Public only.** The builder reads the records through one projection (`projectPublic` in `project.mjs`), which keeps only what `data/visibility.yaml` makes public. A collection that file does not list is visible to members only (`DEFAULT_LEVEL` in `lib/visibility.mjs`), so an instance with no `visibility.yaml` publishes no records. What is withheld is counted on the console (`withheld: …`), never written. Members' `email` and `handles` are never public. See [Data model](DATA-MODEL.md), `visibility.yaml`.
+- **The leak scan.** Before writing, `checkNoLeak` looks through every built file for any withheld value of six characters or more. One hit, and nothing is written (exit 1).
+
+The framework runs the builder with its schema check (`index.mjs`, which needs `ajv`: `npm ci --prefix packages/admin`). An instance does not receive `packages/admin`; `clone:framework` and the instance doctor's sync copy the builder's pure core (every module of `lib/standards/` except `index.mjs` and `validate.mjs`, plus the modules those import) into the instance's `scripts/lib/` ([`scripts/lib/standards-vendor.mjs`](../scripts/lib/standards-vendor.mjs)). The instance's `generate:schemas` then writes the same files, without the schema check. Neither copy found: exit 2.
+
+The files, in the order the builder writes them (`STANDARD_FILES` in `build.mjs`):
+
+| File | Standard | Built from (public records only) |
 |---|---|---|
-| `dao.json` | `identity.type` (e.g. `Project`, `DAO`) | `.well-known/dao.json.template` filled from `federation.yaml` `identity`; written only when `identity.daoURI` is set |
-| `members.json` | `DAO` | `data/members.yaml`; only each member's `id` is published |
-| `proposals.json` | `ProposalRegistry` | `data/governance.yaml` → `governance.decisions` (id, title, type, status, date, summary) |
-| `activities.json` | `ActivityLog` | the last 20 entries of `data/meetings.yaml` |
-| `contracts.json` | none | `identity.safe` and `identity.gardens` of `federation.yaml`, with `identity.chain`; empty otherwise |
-| `meetings.json` | `MeetingRegistry` | `data/meetings.yaml` plus `content/meetings/*.md` that have an `id` in their front matter; checklist items become action items |
-| `projects.json` | `ProjectRegistry` | `data/projects.yaml` plus `content/projects/*.md` that have an `id` |
-| `finances.json` | `FinancialRegistry` | `data/finances.yaml` (`budgets`, `expenses`, `revenues`) |
-| `ideas.json` | `IdeaRegistry` | `data/ideas.yaml` |
-| `knowledge.json` | `KnowledgeManifest` | `data/knowledge-manifest.yaml` (`knowledge_manifest.domains`, `.exchange`) and `data/sources.yaml` |
+| `dao.json` | EIP-4824 | `federation.yaml` `identity` (see below) |
+| `members.json` | EIP-4824 | `data/members.yaml`: active `person` and `organization` members, each as `{ id }` only; an id without a scheme becomes `https://<host>/members/<id>` |
+| `proposals.json` | EIP-4824 | the proposals ledger `data/proposals.yaml`, plus the `decisions` of `data/governance.yaml` not already folded into a proposal; a restricted one is published as "A change to a restricted collection". A decision's `by` and `summary` are never published |
+| `activities.json` | EIP-4824 | the events of each published proposal (opened, approve, object, vote, ratify and the rest; not comments) |
+| `contracts.json` | EIP-4824 | each public on-chain System in `data/systems.yaml` (`safe`, `hats-tree`, `gardens-community`, `gardens-pool`, `daouri-registration`) with a chain and an address, as a CAIP-10 id. With none, it falls back, with a warning, to `identity.safe` / `identity.gardens`, else `governance.yaml` `infrastructure`; and to `identity.onchain_registration` for the registration contract |
+| `governance.md` | EIP-4824 `governanceURI` | `data/governance.yaml`: its `description` and one line per rule; "How … decides is not public." when the document is not public |
+| `grant-pools.json` | DAOIP-5 | each public `gardens-pool` System, and any public System with a `grant_pool` block (`grant_pool: false` opts out); absent when there is none |
+| `applications.json` | DAOIP-5 | a Gardens pool's proposals, from a live read. Only the admin's live copy has reads, so `generate:schemas` never writes it (and removes one it finds) |
+| `attestation-issuers.json` | DAOIP-3 | `identity.attestation_issuers` (`name`, `issuer`); absent when there is none |
+| `meetings.json`, `projects.json` | org-os | `data/meetings.yaml`, `data/projects.yaml`, plus `content/meetings/*.md` and `content/projects/*.md` with an `id` in their front matter; people appear only as public member ids |
+| `finances.json`, `ideas.json`, `knowledge.json` | org-os | `data/finances.yaml` (`budgets`, `expenses`, `revenues`); `data/ideas.yaml`; `data/knowledge-manifest.yaml` and `data/sources.yaml` |
 
-A generator whose source file is absent skips its output and leaves any existing file alone (`meetings.json`, `projects.json`, `proposals.json`, `activities.json` and `contracts.json` are always written). A separate command, `npm run generate:skills`, writes `.well-known/skills.json`; it is not part of EIP-4824. Each registry file declares `"@context": "https://www.daostar.org/schemas"`; `dao.json` declares `http://www.daostar.org/schemas` (from its template).
+The command writes the files built and removes any of these fourteen it did not build (a pool that is gone, for example). It touches nothing else in `.well-known/`. A separate command, `npm run generate:skills`, writes `.well-known/skills.json`; it is not part of the standards.
 
-`*.json.template` files in the same directory are what `clone:framework` and `setup` render. A new instance gets its own `dao.json` at clone time; the other generated files are stripped from the clone and come back on its first `npm run generate:schemas`.
+`*.json.template` files sit in the same directory. Only `clone:framework` (and the older `setup` script) read one, `dao.json.template`, to render a new instance's first `dao.json` from its config; the builder does not use them. The clone strips the framework's generated `.json` files, so a new instance publishes nothing more until it sets a `daoURI` (see [Setup](SETUP.md)).
 
 ## dao.json
 
-The template renders these fields, and these are all of them:
+Built by `daoDoc` in `dao.mjs`, not from the template. The fields, all of them:
 
-```json
-{
-  "@context": "http://www.daostar.org/schemas",
-  "type": "Organization",
-  "name": "{{ORGANIZATION_NAME}}",
-  "description": "{{ORGANIZATION_DESCRIPTION}}",
-  "membersURI": "https://{{BASE_URL}}/.well-known/members.json",
-  "proposalsURI": "https://{{BASE_URL}}/.well-known/proposals.json",
-  "activityLogURI": "https://{{BASE_URL}}/.well-known/activities.json",
-  "governanceURI": "https://{{BASE_URL}}/governance",
-  "contractsURI": "https://{{BASE_URL}}/.well-known/contracts.json",
-  "meetingsURI": "https://{{BASE_URL}}/.well-known/meetings.json",
-  "projectsURI": "https://{{BASE_URL}}/.well-known/projects.json",
-  "financesURI": "https://{{BASE_URL}}/.well-known/finances.json"
-}
-```
+| Field | Value |
+|---|---|
+| `@context` | `http://www.daostar.org/schemas` (the other EIP-4824 files use `https://`) |
+| `type` | from `identity.type`: `DAO` and `Foundation` stay, `PersonalNode` is `Person`, `Other` is `Entity`, anything else `Organization` |
+| `name`, `description` | `identity.name`; `identity.short_description`, else `identity.description` (left out if neither) |
+| `membersURI`, `proposalsURI`, `activityLogURI`, `governanceURI`, `contractsURI` | `https://<host>/.well-known/<file>`, where `<host>` is the origin of `identity.daoURI`; `governanceURI` points to `governance.md` |
+| `grantPoolsURI`, `attestationIssuersURI` | only when that file was built |
+| `meetingsURI`, `financesURI` | org-os extensions |
+| `x-org-os` | `{ "generator": "org-os standards (L8)" }`: the mark the instance doctor reads to tell this builder's output from an earlier generator's |
 
-The first five URIs are the ones EIP-4824 names; `meetingsURI`, `projectsURI` and `financesURI` are org-os extensions. There is no `ideasURI` or `knowledgeURI`; those two files are published but not linked from `dao.json`. The generator replaces `type` with `identity.type`, the name with `identity.name`, the description with `identity.short_description` (or `identity.description`, or a generic sentence), and `BASE_URL` with the host of `identity.daoURI`. So the `daoURI` you set in `federation.yaml` decides every URL in the file, and `governanceURI` points to a page (`/governance`) that nothing in this repository generates.
-
-If `identity.daoURI` is empty, `generate:schemas` prints a skip message and keeps the existing `dao.json`. This repository does exactly that: its `dao.json` is hand-written, with URLs on `organizational-os.github.io`.
+There is no `projectsURI`, `ideasURI` or `knowledgeURI`; those files are published but not linked from `dao.json`.
 
 ## Validation
 
-`npm run validate:schemas` runs [`scripts/validate-identity.mjs`](../scripts/validate-identity.mjs). For `.well-known/` it checks that `dao.json`, `members.json`, `projects.json`, `finances.json`, `activities.json`, `proposals.json` and `contracts.json` exist (a missing one is a warning) and parse as JSON, and that `dao.json` has `@context` and `name`. That is all it checks of the registries: it does not check the other required EIP-4824 URI fields, does not fetch any URI to see whether it is reachable, does not validate the JSON-LD context, and does not look at `meetings.json`, `ideas.json` or `knowledge.json`. `npm run validate:structure` additionally requires `.well-known/dao.json`, `members.json` and `projects.json` and parses every `.well-known/*.json`. The same command also checks `IDENTITY.md` against `federation.yaml` and the lineage stamp (see [Federation](FEDERATION.md)).
+`npm run validate:schemas` runs [`scripts/validate-identity.mjs`](../scripts/validate-identity.mjs). For `.well-known/` it checks that `dao.json`, `members.json`, `projects.json`, `finances.json`, `activities.json`, `proposals.json` and `contracts.json` exist (a missing one is a warning) and parse, and that `dao.json` has `@context` and `name`. When `identity.daoURI` is set it then:
+
+- checks the published files against their JSON Schemas (`validate.mjs`, schemas in `packages/admin/schemas/standards/`: the five EIP-4824 JSON files, the two DAOIP-5 files and the DAOIP-3 file; `governance.md` and the org-os extras have none). A problem is a warning, an error under `--strict`;
+- reads the instance's records and scans every `.well-known/*.json` and `*.md` for a value they withhold. A leak always fails.
+
+In an instance the vendored copy has no `ajv`, so only the leak scan runs, and `--strict` cannot pass there. Run the framework's validator against the instance instead: `node scripts/validate-identity.mjs <instance dir> --strict` from the framework checkout. Nothing fetches a URI to see whether it is reachable or resolves the JSON-LD context. `npm run validate:structure` requires `.well-known/dao.json`, `members.json` and `projects.json` only when a `daoURI` is set, and parses every `.well-known/*.json`. The same `validate:schemas` run also checks `IDENTITY.md` against `federation.yaml` and the lineage stamp (see [Federation](FEDERATION.md)).
 
 ## Publishing (off-chain)
 
 The files only need to be served over HTTPS at the URLs in `dao.json`. The steps:
 
-1. Set `identity.daoURI` in `federation.yaml` to where `dao.json` will be served (for example `https://example.org/.well-known/dao.json`).
-2. `npm run generate:schemas`, then `npm run validate:schemas`.
-3. Commit `.well-known/` and push, so the host serves it.
+1. Set `identity.daoURI` in `federation.yaml` to the `https` URL where `dao.json` will be served (for example `https://example.org/.well-known/dao.json`).
+2. Say what is public in `data/visibility.yaml`.
+3. `npm run generate:schemas`, then `npm run validate:schemas` (in an instance, run the framework's validator against it for the schema check).
+4. Commit `.well-known/` and push; serving it is yours to arrange.
 
-`.github/workflows/generate-schemas.yml` also runs the generator and commits `.well-known/` on any push touching `data/`, `content/meetings/`, `content/projects/` or `federation.yaml`, and once a day. The public org-os site copies this repository's `.well-known/` into its build.
+`.github/workflows/generate-schemas.yml` also runs the generator and commits `.well-known/` on any push touching `data/`, `content/meetings/`, `content/projects/` or `federation.yaml`, daily, and on manual dispatch. The admin app does not regenerate `.well-known/` after a change; it serves a members' preview of the live copy, with its reads, at `GET /api/standards` (`packages/admin/server/standards/routes.ts`; see [Admin app](ADMIN-APP.md)). The public org-os site copies this repository's `.well-known/` into its build.
 
 ## On-chain
 
-Not built. `federation.yaml` has `identity.onchain_registration` (`enabled`, `chain`, `contract_address`) and the fields `chain`, `safe`, `hats` and `gardens`, but no script reads `onchain_registration` or `hats`, and the repository contains no registration contract, no deployment script and no `packages/web3` directory (an earlier version of this page pointed there). `chain`, `safe` and `gardens` are used only to fill `contracts.json`. To register a `daoURI` on-chain you would use an EIP-4824 registration contract deployed and called outside this repository; nothing here does it or checks it. Likewise, no code in the repository talks to the DAOstar indexer, Snapshot or Tally: whether those tools read your files is a property of the files following the standard, not of any integration.
+Registration is not built. Nothing in the repository signs or sends a transaction, deploys a registration contract or calls one to register a `daoURI`. What exists is reading: a `daouri-registration` System (or, as a fallback, `identity.onchain_registration.contract_address`) is listed in `contracts.json`, and the admin's driver for it (`packages/admin/server/systems/registration.ts`) makes one `eth_call` to `daoURI()`; when that read names another `daoURI` than the identity's, the live copy warns. `identity.hats` is not read; a Hats tree is published from a `hats-tree` System. The admin also reads Snapshot spaces through Snapshot's public GraphQL hub, read-only, and the live copy lists their proposals in `proposals.json`. No code talks to the DAOstar indexer or Tally: whether those tools read your files is a property of the files following the standard, not of any integration.
 
 ## Related
 
 - [Federation](FEDERATION.md): the manifest, the lineage stamp, the other `.well-known` files and who reads them.
-- [Data model](DATA-MODEL.md): the `data/*.yaml` registries the generator reads.
+- [Data model](DATA-MODEL.md): the `data/*.yaml` registries the generator reads, `systems.yaml` and `visibility.yaml`.
 - The standard: https://eips.ethereum.org/EIPS/eip-4824

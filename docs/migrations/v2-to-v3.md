@@ -48,7 +48,7 @@ git diff docs/agent-plans
 git add docs/agent-plans && git commit -m "chore: migrate plans to workstream frontmatter"
 ```
 
-Why step 2 runs the script by hand: `npm run migrate` selects scripts by the numbers at the start of the file name and compares them with the framework's version. `v2-to-v3-…` reads as `2.0 → 3.0`, which is never at or below the current `0.5`, so `npm run migrate` does not select it (`npm run migrate -- --dry` lists nothing on a current checkout). Run it with `node` as shown.
+Why step 2 runs the script by hand: `npm run migrate` (`scripts/migrate.mjs`) reads each script's range from its file name, and the pre-0.5 numbering (`v2-to-v3-…`, read as `2 → 3`) and the 0.x numbering (`v0.5-to-v0.6-…`) never mix. A legacy-numbered script never runs on an instance stamped `0.x` or for a `0.x` target, and an instance still stamped `2.x` migrating to a `0.x` target is read as `0.5`. So neither `sync:upstream` nor the doctor's migrate stage (`--target 0.6`) selects it. Run it with `node` as shown.
 
 ## What the script does
 

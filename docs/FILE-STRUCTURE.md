@@ -19,22 +19,22 @@ The clone copies only what is committed at `HEAD` of the framework repository, a
 |---|---|
 | `.claude/`, `.cursor/`, `.opencode/` | Slash commands, `.claude/settings.json` and `.opencode/opencode.json`. `.opencode/agents/` is not copied. |
 | `.github/` | `hooks/pre-commit.sh` and `workflows/generate-schemas.yml` only. |
-| `.well-known/` | The `*.json.template` files. Published `*.json` files are removed; `dao.json` is rendered for the new organisation; the rest come back on the first `npm run generate:schemas`. |
+| `.well-known/` | The `*.json.template` files. Published `*.json` files are removed; `dao.json` is rendered for the new organisation. Nothing else is published until the instance sets `identity.daoURI` and says what is public in `data/visibility.yaml` (see [EIP4824-GUIDE.md](EIP4824-GUIDE.md)). |
 | `.env.example`, `.gitignore`, `.prettierignore`, `LICENSE`, `BOOTSTRAP.md` | As is (`.gitignore` gains a `docs/temp/` line). |
 | `data/` | The registry files. `members`, `projects`, `ideas`, `relationships`, `ecosystems` and `governance` are reset to empty or to a scaffold. `instances.yaml`, `skills-matrix.yaml`, `packages-matrix.yaml` and `knowledge-gaps.yaml` are not carried over, and `data/federation/frontier/` is removed. |
-| `docs/` | The operator documentation. Framework history is left out: the framework's `agent-plans` directory, `docs/superpowers/`, `docs/sessions/`, `docs/research/`, `docs/QUEUE.md`, and a list of framework-only pages (`POSITIONING.md`, `ECOSYSTEM.md`, `RAD-ORG-OS.md`, `QUILT.md`, `VAULT-SAFETY-CASE-STUDY.md` and others named in `EXCLUDE_FILES`). |
-| `package.json`, `package-lock.json` | `package.json` is renamed for the new organisation, set to version `0.1.0` and `private: true`; npm scripts whose target file is not in the instance are dropped (20 of them in the test run for this page). |
+| `docs/` | The operator documentation. Framework history is left out: the framework's `agent-plans` directory, `docs/superpowers/`, `docs/sessions/`, `docs/research/`, `docs/design/`, `docs/QUEUE.md`, and a list of framework-only pages (`POSITIONING.md`, `ECOSYSTEM.md`, `RAD-ORG-OS.md`, `QUILT.md`, `VAULT-SAFETY-CASE-STUDY.md` and others named in `EXCLUDE_FILES`). |
+| `package.json`, `package-lock.json` | `package.json` is renamed for the new organisation, set to version `0.1.0` and `private: true`; npm scripts whose target file is not in the instance are dropped. |
 | `packages/` | Only the packages set to `true` under `packages:` in the clone config. With no `packages:` block, none. |
 | `skills/` | Only the skills listed under `skills:` in the config; every skill directory when the list is absent or empty. |
 | `repos/`, `repos.manifest.json` | `repos/README.md`; the manifest's `repositories` list is emptied. |
-| `schemas/`, `scripts/`, `templates/` | `scripts/` without `clone-manifest.mjs`, `render-templates.mjs` and `test-federation.sh` (and without `symbient-hatch.mjs` when the `symbient` skill is not selected). `templates/` carries the English set plus the instance's own language. |
+| `schemas/`, `scripts/`, `templates/` | `scripts/` without `clone-manifest.mjs`, `render-templates.mjs` and `test-federation.sh`, and without `validate-data.mjs`, `validate-governance.mjs` and `claim-handle.mjs`, which need `packages/admin` and are run from the framework against the instance (and without `symbient-hatch.mjs` when the `symbient` skill is not selected). `scripts/lib/` gains a copy of the standards generator's core from `packages/admin/lib/standards/` (`scripts/lib/standards-vendor.mjs` computes the set from its imports). `templates/` carries the English set plus the instance's own language. |
 | `tests/` | The suites that make sense in an instance. Framework-only suites (clone, instance-doctor, buzz, paper, module manifests) are left out. |
 
 **Written fresh by the clone:** `IDENTITY.md`, `MASTERPLAN.md`, `MEMORY.md`, `HEARTBEAT.md`, `SOUL.md`, `USER.md`, `TOOLS.md`, `DECISIONS.md`, `federation.yaml` (with a lineage stamp), `README.md`, `GETTING-STARTED.md`, `CLAUDE.md`, `AGENTS.md`, `dashboard.yaml`, `memory/.gitkeep`, `knowledge/INDEX.md`, `docs/plans/QUEUE.md`, and empty `docs/superpowers/{specs,plans,research}/`.
 
 **Not copied, framework only:** `.agents/`, `.hermes/`, `CHANGELOG.md`, `VERSION.md`, `SKILLS.md` (the instance makes its own with `npm run generate:skills`), `SYNC-GUIDE.md`, `PAPERCLIP_DEPLOYMENT_GUIDE.md`, `RESEARCH_INTELLIGENCE_PLAN.md`, `graphify-out/`, `renders/`, `site/`, `integrations/`, `modules/`, and the contents of the framework's own `knowledge/` and `memory/`.
 
-After the clone, the instance still needs `npm install`, `npm run generate:schemas` and `npm run validate:structure`; the clone prints that list when it finishes. A fresh clone passes `validate:structure` once `generate:schemas` has produced `members.json` and `projects.json`, with warnings for the optional pieces it does not have.
+After the clone, the instance still needs `npm install`, `npm run generate:schemas` and `npm run validate:structure`; the clone prints that list when it finishes. On a fresh clone `generate:schemas` writes nothing (there is no `identity.daoURI` yet), and `validate:structure` does not require the generated files until there is one; it passes with warnings for the optional pieces the instance does not have.
 
 ## Root files
 
@@ -78,27 +78,27 @@ After the clone, the instance still needs `npm install`, `npm run generate:schem
 
 YAML files that hold the structured data of the organisation. The validator requires six: `members.yaml`, `projects.yaml`, `finances.yaml`, `governance.yaml`, `meetings.yaml`, `ideas.yaml`. It warns when any of these optional ones is missing: `funding-opportunities.yaml`, `relationships.yaml`, `sources.yaml`, `knowledge-manifest.yaml`, `events.yaml`, `channels.yaml`, `assets.yaml`, `knowledge-gaps.yaml`.
 
-The framework repository also has `ecosystems.yaml`, `instances.yaml`, `skills-matrix.yaml`, `packages-matrix.yaml` and `data/federation/frontier/` (a cache of what the framework knows of its peers). What each file holds is in [DATA-MODEL.md](DATA-MODEL.md).
+The framework repository also has `ecosystems.yaml`, `instances.yaml`, `skills-matrix.yaml`, `packages-matrix.yaml` and `data/federation/frontier/` (a cache of what the framework knows of its peers). The 0.6 registries (`systems.yaml`, `boards.yaml`, `proposals.yaml`, `library.yaml`, `visibility.yaml`) are in neither list; `npm run validate:data` checks them when they exist. What each file holds is in [DATA-MODEL.md](DATA-MODEL.md).
 
 ### `.well-known/`: EIP-4824 files (required)
 
-Generated by `npm run generate:schemas` from `data/` and `federation.yaml`. Edit the sources, not these files. The validator requires `dao.json`, `members.json` and `projects.json`, and checks that every `*.json` in the directory parses.
+Generated by `npm run generate:schemas` from `federation.yaml`, `data/` and `content/meetings/`, `content/projects/`, through the standards builder in `packages/admin/lib/standards/` (an instance runs its vendored copy in `scripts/lib/standards/`). Edit the sources, not these files. The directory is required. Once `identity.daoURI` is set the validator also requires `dao.json`, `members.json` and `projects.json`; it checks that every `*.json` in the directory parses.
+
+Without a `daoURI` the generator writes nothing, and it writes only what `data/visibility.yaml` makes public. The files it may write:
 
 | File | Built from |
 |---|---|
-| `dao.json` | `dao.json.template` plus `identity` in `federation.yaml`; only written when `identity.daoURI` is set |
-| `members.json` | `data/members.yaml` (member ids only) |
-| `projects.json` | `data/projects.yaml`, plus `content/projects/*.md` front matter when that directory exists |
-| `finances.json` | `data/finances.yaml` (`budgets`, `expenses`, `revenues`) |
-| `meetings.json` | `data/meetings.yaml`, plus `content/meetings/*.md` when that directory exists |
-| `proposals.json` | `governance.decisions` in `data/governance.yaml` |
-| `activities.json` | the last 20 entries of `data/meetings.yaml` |
-| `contracts.json` | `identity.safe` and `identity.gardens` in `federation.yaml` |
-| `ideas.json` | `data/ideas.yaml` |
-| `knowledge.json` | `data/knowledge-manifest.yaml` and `data/sources.yaml` |
+| `dao.json` | `identity` in `federation.yaml` |
+| `members.json` | `data/members.yaml` (active members' ids only) |
+| `proposals.json`, `activities.json` | `data/proposals.yaml` (the ledger and its events) and `decisions` in `data/governance.yaml` |
+| `contracts.json` | the on-chain Systems in `data/systems.yaml` (falling back to `identity.safe` and `identity.gardens`) |
+| `governance.md` | `data/governance.yaml` (its description and rules) |
+| `grant-pools.json`, `attestation-issuers.json` | Gardens pools and `grant_pool` blocks in `data/systems.yaml`; `identity.attestation_issuers`. Each only when there is one |
+| `projects.json`, `meetings.json` | `data/projects.yaml`, `data/meetings.yaml`, plus `content/projects/*.md` and `content/meetings/*.md` front matter when those directories exist |
+| `finances.json`, `ideas.json`, `knowledge.json` | `data/finances.yaml`; `data/ideas.yaml`; `data/knowledge-manifest.yaml` and `data/sources.yaml` |
 | `skills.json` | written by `npm run generate:skills`, not by `generate:schemas` |
 
-Each `*.json` except `skills.json` has a `*.json.template` beside it.
+`dao.json`, `members.json`, `proposals.json`, `activities.json`, `contracts.json` and the five org-os extras each have a `*.json.template` beside them, left from the earlier generator; only `dao.json.template` is read, by the clone. The full account is in [EIP4824-GUIDE.md](EIP4824-GUIDE.md).
 
 ### `memory/`: daily logs (required)
 
@@ -161,7 +161,7 @@ These exist in the framework repository and are not copied: `modules/` (module m
 1. The twelve required root files exist (listed under "Agent files" and "Configuration files").
 2. The six required directories exist: `data`, `.well-known`, `memory`, `skills`, `packages`, `scripts`. A missing `knowledge`, `ideas`, `docs`, `repos`, `.claude` or `graphify-out` is a warning.
 3. The six required `data/` files exist; missing optional registries are warnings.
-4. `.well-known/dao.json`, `members.json` and `projects.json` exist, and every `.well-known/*.json` parses.
+4. When `federation.yaml` sets `identity.daoURI`, `.well-known/dao.json`, `members.json` and `projects.json` exist; every `.well-known/*.json` parses.
 5. `skills/` has at least one skill directory, and each has a `SKILL.md`.
 6. `federation.yaml` parses and has `identity` (with `name` and `type`), an `agent` section, and some federation participation (`network`, `peers`, `upstream` or `downstream`, or a legacy `federation:` section).
 7. `package.json` has `generate:schemas` and `validate:schemas`; missing `clone:repos`, `setup` or `sync:upstream` is a warning.

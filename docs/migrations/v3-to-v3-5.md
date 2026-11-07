@@ -1,6 +1,6 @@
 # Migration: v3.0 → v3.5
 
-> **Version numbering: this page speaks in the legacy line (`1.x → 2.x → 3.x → 3.5`).** In 2026-06 the framework renumbered itself `3.5 → 0.5` (see [VERSIONING.md](../VERSIONING.md) and `VERSION.md`); `0.5` is the current framework and is *later* than `3.5`. "v3.5" below means the fourth milestone of the old line.
+> **Version numbering: this page speaks in the legacy line (`1.x → 2.x → 3.x → 3.5`).** In 2026-06 the framework renumbered itself `3.5 → 0.5` (see [VERSIONING.md](../VERSIONING.md) and `VERSION.md`); the `0.x` line (now at `0.6`) is *later* than `3.5`. "v3.5" below means the fourth milestone of the old line.
 >
 > **Does an operator still need this page?** Rarely. The current framework already contains everything v3.5 introduced. What may still apply is the migration script: an older instance that lacks `genesis_commit` or `last_sync_commit` in `federation.yaml.metadata`, or has `data/packages-matrix.yaml` entries without `lifecycle_status`, can have them seeded by running `scripts/migrations/v3-to-v3-5-consolidation.mjs` (see below). For moving an instance onto the current framework, use `npm run doctor -- sync --dry-run` and then `npm run doctor -- sync` (see [VERSIONING.md](../VERSIONING.md)). The step list below is kept as the historical procedure, with the commands that no longer work as written corrected.
 
@@ -43,7 +43,7 @@ git add federation.yaml data/packages-matrix.yaml memory/migrations-*.md   # dro
 git commit -m "chore: apply the v3.5 lineage and lifecycle migration"
 ```
 
-Two corrections to the old procedure. `git pull upstream main` is replaced by `npm run sync:upstream`, the supported route; that script also refuses to run on a dirty tree. And `npm run migrate -- --target v3.5` does not exist: `migrate.mjs` only knows `--dry`, ignores other arguments, and does not select `v3-to-v3-5-consolidation.mjs` when the framework is on `0.5` (it reads the file name as `3.0 → 3.0`). Run the script with `node`.
+Two corrections to the old procedure. `git pull upstream main` is replaced by `npm run sync:upstream`, the supported route; that script also refuses to run on a dirty tree. And the old `npm run migrate -- --target v3.5` step is replaced by running the script with `node`, which works whatever the instance is stamped. `migrate.mjs` has a `--target` flag again since 0.6, but it selects this script (read as `3 → 3`) only when the instance's `framework_version` is still on the legacy numbering and the target is too; with a `0.x` stamp or a `0.x` target, as in `sync:upstream` and the doctor's migrate stage, it selects nothing (read from `scripts/migrate.mjs`, not run).
 
 ## What the migration does (mechanically)
 

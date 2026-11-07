@@ -11,20 +11,20 @@ Every instance today is run by the maintainer; the federation graph is real file
 The manifest lives at the repository root. This repository's own is the working example. Its first lines:
 
 ```yaml
-version: "0.5"
+version: "0.6"
 spec: "organizational-os/0.5"
 identity:
   name: "org-os"
   type: "Project"
 ```
 
-`version` and `spec` carry the framework's major.minor (`npm run clone:framework` writes both from `package.json`, and `scripts/update-version.mjs` rewrites them on a version bump; the framework is `0.5.0`). Older text, including `schemas/federation.yaml`, still says `3.0`; that is the number from before the 2026-06-17 re-baseline and is not what the code writes. No script reads `spec`.
+`version` and `spec` carry the framework's major.minor when `npm run clone:framework` writes them (both from `package.json`; the framework is `0.6.0`). On a version bump `scripts/update-version.mjs` rewrites `version` and `metadata.framework_version` but not `spec`, which is why this repository's `spec` still says `0.5`. Older text, including `schemas/federation.yaml`, still says `3.0`; that is the number from before the 2026-06-17 re-baseline and is not what the code writes. No script reads `spec`.
 
 ### What the validators require
 
-`npm run validate:structure` also requires `.well-known/dao.json`, `members.json` and `projects.json`, parses every `.well-known/*.json`, and requires `metadata.framework_version`. Its federation check (section 6) fails an instance unless `federation.yaml` has: `identity`, `identity.name`, `identity.type`, at least one of `network` / `peers` / `upstream` / `downstream` (or a legacy `federation:` wrapper key), and an `agent` section. A missing `knowledge-commons` section is a warning only.
+`npm run validate:structure` also requires `.well-known/dao.json`, `members.json` and `projects.json` once `identity.daoURI` is set (not before: without it nothing is generated), parses every `.well-known/*.json`, and requires `metadata.framework_version`. Its federation check (section 6) fails an instance unless `federation.yaml` has: `identity`, `identity.name`, `identity.type`, at least one of `network` / `peers` / `upstream` / `downstream` (or a legacy `federation:` wrapper key), and an `agent` section. A missing `knowledge-commons` section is a warning only.
 
-`npm run validate:schemas` ([`scripts/validate-identity.mjs`](../scripts/validate-identity.mjs)) checks: `identity.name` and `identity.type` equal the `Name` and `Type` lines of `IDENTITY.md`; `metadata.framework_version` is exactly major.minor (`"0.5"`, not `"0.5.0"`); `metadata.genesis_commit` is a 40-hex SHA (missing is a warning, so a first sync can seed it); `metadata.last_sync_commit` is a 40-hex SHA or null. `--strict` turns warnings into failures; a directory argument validates another instance.
+`npm run validate:schemas` ([`scripts/validate-identity.mjs`](../scripts/validate-identity.mjs)) checks: `identity.name` and `identity.type` equal the `Name` and `Type` lines of `IDENTITY.md`; `metadata.framework_version` is exactly major.minor (`"0.6"`, not `"0.6.0"`); `metadata.genesis_commit` is a 40-hex SHA (missing is a warning, so a first sync can seed it); `metadata.last_sync_commit` is a 40-hex SHA or null. With `identity.daoURI` set it also checks the published `.well-known/` files against their schemas and scans them for withheld values (see the [EIP-4824 guide](EIP4824-GUIDE.md)). `--strict` turns warnings into failures; a directory argument validates another instance.
 
 Neither validator checks the `type` enum, trust values or any other field value. [`schemas/federation.yaml`](../schemas/federation.yaml) lists enums, but it is a description, not something code loads; and its `agent.runtime` and `upstream.type` lists no longer match the files in use.
 
@@ -37,15 +37,16 @@ Neither validator checks the `type` enum, trust values or any other field value.
 | Field | Meaning | Read by |
 |---|---|---|
 | `name` | Organisation name (required) | validators; schema generator; map |
-| `type` | One of `DAO`, `Cooperative`, `Foundation`, `Project`, `LocalNode`, `PersonalNode`, `RegionalNode`, `Hub`, `Network`, `Other` (required; list from `schemas/federation.yaml`, not enforced) | validators; schema generator (becomes `dao.json` `type`); map |
+| `type` | One of `DAO`, `Cooperative`, `Foundation`, `Project`, `LocalNode`, `PersonalNode`, `RegionalNode`, `Hub`, `Network`, `Other` (required; list from `schemas/federation.yaml`, not enforced) | validators; schema generator (decides the `type` of `dao.json` and `members.json`: `DAO`, `Foundation`, `Person`, `Entity` or `Organization`); map |
 | `scope`, `role` | Free-form qualifier of the node within its type (`role` is used by this repo: `framework-upstream + orchestration-hub`) | nothing |
 | `emoji` | Display glyph | map |
 | `language` | BCP-47 working language; stamped at clone time | agents |
 | `short_description` | One-line description | schema generator (`dao.json` description) |
-| `daoURI` | URL of the instance's `dao.json` | schema generator: its host becomes the base URL of every URI in `dao.json`; if empty, `dao.json` is not regenerated |
-| `chain`, `safe`, `gardens` | Chain id (CAIP-2), Safe address, Gardens address | schema generator: `safe` and `gardens` become entries of `contracts.json` |
-| `hats` | Hats Protocol tree id | nothing |
-| `onchain_registration` | `enabled`, `chain`, `contract_address` | nothing (no registration code exists) |
+| `daoURI` | `https` URL of the instance's `dao.json` | schema generator: every id and URI in `.well-known/` is built from it; if empty, `generate:schemas` writes nothing, and `validate:structure` does not require the `.well-known/` files |
+| `attestation_issuers[]` | `name`, `issuer` | schema generator: `attestation-issuers.json` (DAOIP-3) |
+| `chain`, `safe`, `gardens` | Chain id (CAIP-2), Safe address, Gardens address | schema generator, as a 0.5 fallback only: when `data/systems.yaml` has no on-chain System, `safe` and `gardens` become entries of `contracts.json`, with a warning to move them there |
+| `hats` | Hats Protocol tree id | nothing (a `hats-tree` System in `data/systems.yaml` is what gets published) |
+| `onchain_registration` | `enabled`, `chain`, `contract_address` | schema generator, as a fallback: the address is listed in `contracts.json` when `data/systems.yaml` has no `daouri-registration` System. Nothing registers anything |
 
 **Network and relations**
 
@@ -103,17 +104,9 @@ The framework repository keeps `data/instances.yaml`, a registry of every instan
 
 ## `.well-known/`
 
-Each instance publishes JSON files under `.well-known/` that other tools can fetch over HTTPS. The EIP-4824 files are covered in the [EIP-4824 guide](EIP4824-GUIDE.md); the files that exist and what produces them:
+Each instance publishes files under `.well-known/` that other tools can fetch over HTTPS. `npm run generate:schemas` writes them from `federation.yaml` `identity`, the `data/*.yaml` registries and the Markdown records in `content/meetings/` and `content/projects/`, through the standards builder in `packages/admin/lib/standards/`. It writes nothing without `identity.daoURI`, and only what `data/visibility.yaml` makes public. The files: `dao.json`, `members.json`, `proposals.json`, `activities.json`, `contracts.json` and `governance.md` (EIP-4824); `grant-pools.json` and `applications.json` (DAOIP-5, when there is a public pool; `applications.json` only in the admin's live copy); `attestation-issuers.json` (DAOIP-3, when `identity.attestation_issuers` names one); and the org-os extras `meetings.json`, `projects.json`, `finances.json`, `ideas.json` and `knowledge.json`. Which file comes from which record, and how they are checked, is in the [EIP-4824 guide](EIP4824-GUIDE.md). `skills.json` is separate: `npm run generate:skills` writes it from `skills/`.
 
-| File | Produced by | From |
-|---|---|---|
-| `dao.json` | `npm run generate:schemas` | `.well-known/dao.json.template` + `identity` (only if `identity.daoURI` is set) |
-| `members.json`, `finances.json`, `contracts.json`, `proposals.json`, `activities.json` | `generate:schemas` | `data/members.yaml`, `data/finances.yaml`, `identity.safe`/`gardens`, `data/governance.yaml`, `data/meetings.yaml` |
-| `meetings.json`, `projects.json` | `generate:schemas` | `data/*.yaml` plus front-matter of `content/meetings/*.md`, `content/projects/*.md` |
-| `ideas.json`, `knowledge.json` | `generate:schemas` | `data/ideas.yaml`; `data/knowledge-manifest.yaml` and `data/sources.yaml` |
-| `skills.json` | `npm run generate:skills` | `skills/` |
-
-`*.json.template` files sit beside them; `clone:framework` strips the generated `.json` files from a new instance (rendering its own `dao.json`) and the operator regenerates the rest. `validate:schemas` parses `dao.json`, `members.json`, `projects.json`, `finances.json`, `activities.json`, `proposals.json` and `contracts.json` (not `meetings.json`, `ideas.json` or `knowledge.json`) and checks `dao.json` has `@context` and `name`. A workflow, `.github/workflows/generate-schemas.yml`, regenerates and commits `.well-known/` on pushes that touch `data/`, `content/meetings/`, `content/projects/` or `federation.yaml`, and daily.
+An instance does not receive `packages/admin`; `clone:framework` and the instance doctor's sync copy the builder's core into its `scripts/lib/` ([`scripts/lib/standards-vendor.mjs`](../scripts/lib/standards-vendor.mjs)), so it writes the same files. `*.json.template` files sit beside them; `clone:framework` strips the generated files from a new instance and renders its own `dao.json` from the template. A workflow, `.github/workflows/generate-schemas.yml`, regenerates and commits `.well-known/` on pushes that touch `data/`, `content/meetings/`, `content/projects/` or `federation.yaml`, and daily.
 
 Discovery works as follows: a tool that knows an instance's `daoURI` fetches `dao.json`, which links to the other files by URL. The federation map reads `members.json` and `projects.json` from sibling checkouts (counts), not from the network; the public site's build (`site/scripts/aggregate-federation.mjs`) copies this repository's `.well-known/` into the site and reads sibling instances' the same way.
 
@@ -140,8 +133,8 @@ An idea in `data/ideas.yaml` moves through `surfaced → proposed → approved �
 This is the federation.yaml part of what `clone:framework` produces (the clone also writes `metadata.bootstrap_date` and `bootstrap_operator`, and a real `genesis_commit`; both are optional). It satisfies the federation checks of both validators; `validate:structure` also needs the rest of the instance tree:
 
 ```yaml
-version: "0.5"
-spec: "organizational-os/0.5"
+version: "0.6"
+spec: "organizational-os/0.6"
 identity:
   name: "My Organization"
   type: "Project"
@@ -158,7 +151,7 @@ agent:
 packages:
   knowledge_base: true
 metadata:
-  framework_version: "0.5"
+  framework_version: "0.6"
   genesis_commit: null
   last_sync_commit: null
 ```

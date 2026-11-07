@@ -4,7 +4,7 @@ This page lists what can go wrong in an org-os instance and which check, if any,
 
 ## Failure modes
 
-1. **Data integrity** — missing or malformed required files, `federation.yaml` sections, `.well-known/*.json`, and identity files that disagree with `federation.yaml`. `data/*.yaml` is checked for presence of the required registries, not field by field, and nothing validates `dashboard.yaml`.
+1. **Data integrity** — missing or malformed required files, `federation.yaml` sections, `.well-known/*.json`, and identity files that disagree with `federation.yaml`. Since 0.6, `validate:data` checks each `data/*.yaml` registry the admin knows against its JSON Schema, and `validate:governance` checks the rules and the git history against them (see [Data model](DATA-MODEL.md)); both need `packages/admin`'s dependencies and run from the framework. Nothing validates `dashboard.yaml`.
 2. **Agent runtime correctness** — `/initialize`, `/close` and the scripts they call produce broken or stub output. Only the unit tests under `tests/` cover this; there is no runtime monitor.
 3. **Federation drift** — an instance falls out of line with the framework (skills, packages, data registries, `framework_version`).
 4. **Script divergence** — instance scripts drift silently from the framework's.
@@ -15,9 +15,9 @@ This page lists what can go wrong in an org-os instance and which check, if any,
 | Layer | When | Checks |
 |---|---|---|
 | **Manual** | Operator on demand | `npm run selftest` (see below) |
-| **Pre-commit** | Local commit, after `npm run install:hooks` | `validate:structure` always; `validate:schemas` if a `data/*.yaml` file is staged. `vault:audit` is not part of it. |
+| **Pre-commit** | Local commit, after `npm run install:hooks` | `validate:structure` always; `validate:schemas` if a `data/*.yaml` file is staged, and then `validate:data` and `validate:governance` as warnings only (never blocking), where their scripts exist. In a linked worktree with no `node_modules` it skips every check and says so. `vault:audit` is not part of it. |
 | **Pre-push** | Local push, same installer | Refuses to push `agent/*` branches |
-| **CI** | Push to `main` or `release/**`; pull request to `main` | `.github/workflows/validate.yml`: `validate:structure`, `validate:schemas`, `analyze:instances`, `npm test`, `selftest` (which includes `check:divergence`), `test:admin`, `version:check`, the site build and tests, and a docs drift report that never blocks and is written to the run summary |
+| **CI** | Push to `main` or `release/**`; pull request to `main` | `.github/workflows/validate.yml` (30-minute limit, full-depth checkout): `validate:structure`, `validate:schemas`, `validate:data`, `validate:governance` (with `CI=true` a commit that went around the rules is an error), `analyze:instances`, `npm test`, `selftest` (which includes `check:divergence`), `test:admin`, the site build and tests, a docs drift report that never blocks and is written to the run summary, and `version:check` |
 | **Scheduled** | Weekly, Sunday 04:00 UTC | `.github/workflows/drift.yml`: `analyze:instances`, then commits any new report in `memory/reports/` |
 | **Pre-destructive** | Before a risky git operation | `vault:snapshot` (tracked files only; protect untracked notes first), run by the operator (see [VAULT-SAFETY.md](VAULT-SAFETY.md)); `vault:audit` afterwards |
 
@@ -43,7 +43,7 @@ The operator resolves divergences by hand. There is no merge tooling.
 
 ### Data corruption
 
-1. `npm run validate:schemas` flags the file
+1. `npm run validate:data` flags a registry that breaks its schema; `npm run validate:schemas` flags `.well-known/` and identity problems
 2. `git log -- data/<file>.yaml` finds last good version
 3. `git checkout <sha> -- data/<file>.yaml`
 4. Re-run validators to confirm
@@ -56,8 +56,8 @@ The operator resolves divergences by hand. There is no merge tooling.
 
 ### Broken migration
 
-- `npm run migrate` runs the scripts in `scripts/migrations/` that apply between the instance's `framework_version` and the framework's version (`--dry` lists them). On the 0.5 line it selects no script (the two that exist carry legacy numbers); see [Versioning](VERSIONING.md). Each is written to be idempotent, so re-running should be safe
-- The v3 to v3.5 migration logs to `memory/migrations-YYYY-MM-DD.md`; the other migration does not
+- `npm run migrate` runs the scripts in `scripts/migrations/` from the instance's `framework_version` up to `package.json`'s version or `--target <version>` (`--dry` lists them). On the 0.x line that means the two `v0.5-to-v0.6-…` migrations; the two with legacy numbers never run on a 0.x instance. See [Versioning](VERSIONING.md). Each is written to be idempotent, so re-running should be safe
+- The v3 to v3.5 migration and both 0.6 migrations log to `memory/migrations-YYYY-MM-DD.md`; the v2 to v3 migration does not
 - Roll back by reverting the commit, then fix the migration
 
 ### Lost untracked content
@@ -74,17 +74,18 @@ The operator resolves divergences by hand. There is no merge tooling.
 `npm run selftest` (`scripts/selftest.mjs`) runs these checks in order:
 
 1. `validate:structure` — must pass.
-2. `validate:schemas` — `.well-known/*.json` structure, `IDENTITY.md` against `federation.yaml`, the version triplet, and the lineage stamp shape. Skipped if its script is missing.
-3. `analyze:instances` — framework repository only (skipped where `data/instances.yaml` is absent). Writes the drift report; it cannot fail on drift.
-4. `check:divergence` — advisory; skippable with `--skip divergence`.
-5. Berd skills mirror in sync (`sync-skills-berd.mjs --check`) — framework repository only.
-6. `clone:framework --dry` against `tests/fixtures/instance-config.yaml`, into a temporary directory — skipped if the script is missing.
-7. `node --test tests/**/*.test.mjs`.
-8. `test:admin` — skipped, with the install command, if `packages/admin` or its dependencies are absent.
+2. `validate:schemas` — `.well-known/*.json` structure (and, with a `daoURI`, the standards schemas and leak scan), `IDENTITY.md` against `federation.yaml`, the `framework_version` and lineage stamp shape. Skipped if its script is missing.
+3. `validate:data` and `validate:governance` — skipped, with the install command, when `packages/admin` has no `node_modules`; skipped as optional where the script is absent (an instance).
+4. `analyze:instances` — framework repository only (skipped where `data/instances.yaml` is absent). Writes the drift report; it cannot fail on drift.
+5. `check:divergence` — advisory; skippable with `--skip divergence`.
+6. Berd skills mirror in sync (`sync-skills-berd.mjs --check`) — framework repository only.
+7. `clone:framework --dry` against `tests/fixtures/instance-config.yaml`, into a temporary directory — skipped if the script is missing.
+8. `node --test tests/**/*.test.mjs`.
+9. `test:admin` — skipped, with the install command, if `packages/admin` or its dependencies are absent.
 
 A check whose script does not exist, or that does not apply to an instance, is reported as skipped rather than failed. `--verbose` shows each check's output; `--skip a,b` skips by key (`divergence`, `berd`, `clone`, `tests`, `admin`).
 
-Exit code 0: all green. 1: at least one failure. 2: warnings only.
+A failed check reports the names of the failing tests when its output has them (vitest and `node --test`; `scripts/lib/test-failures.mjs`), else its last lines. Exit code 0: all green. 1: at least one failure. 2: warnings only.
 
 ## CI failure handling
 
@@ -101,4 +102,4 @@ Exit code 0: all green. 1: at least one failure. 2: warnings only.
 - the `**Framework Version:**` line in `VERSION.md`, if present
 - the `**Version:**` header in `MASTERPLAN.md`, if present
 
-It exits 1 with a diff on a mismatch and changes no file. CI runs it; `validate:schemas` checks the first three as well.
+It exits 1 with a diff on a mismatch and changes no file. CI runs it. `validate:structure` also compares `package.json` with `framework_version` (except on a `0.x` instance version) and warns when `CHANGELOG.md` has no heading for the current version.
