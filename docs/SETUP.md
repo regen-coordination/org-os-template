@@ -21,7 +21,10 @@ An AI agent can run all of this for you: see [Adopt org-os with an AI agent](ADO
 git clone https://github.com/regen-coordination/org-os-template.git
 cd org-os-template
 npm install
+npm install --prefix packages/admin
 ```
+
+The second install is for `packages/admin`, which has its own dependencies. The doctor (Step 5) runs `validate:data` and `validate:governance` from this checkout, and both load the admin's schemas and modules; without that install each is reported as `validator-did-not-run`. It is also what the [Admin app](ADMIN-APP.md) needs.
 
 The clone reads only **committed** files of the framework checkout (it lists `HEAD`), so an uncommitted local change in your checkout never ends up in a new instance.
 
@@ -79,27 +82,23 @@ npm run clone:framework -- --target ../harbor-bakery-os --config my-org.yaml
 | `--no-git` | skip `git init` and the initial commit |
 | `--commit-unverified` | commit even when the framework checkout is not a git repository |
 
-The stages it prints: copy the committed framework files, strip the framework-only registries and generated `.well-known/` files, reset the placeholder identity files from `templates/scaffold/`, materialise the packages and skills you chose, write `federation.yaml` with your identity and the lineage stamp, render `README.md`, `GETTING-STARTED.md`, `CLAUDE.md` and `AGENTS.md`, then `git init` and one initial commit.
+The stages it prints: copy the committed framework files, strip the framework-only registries and generated `.well-known/` files, reset the placeholder identity files from `templates/scaffold/`, materialise the packages and skills you chose, copy the standards generator (the pure core of `packages/admin/lib/standards/`, without its two ajv modules) into the instance's `scripts/lib/`, write `federation.yaml` with your identity and the lineage stamp, render `.well-known/dao.json` from your config, render `README.md`, `GETTING-STARTED.md`, `CLAUDE.md` and `AGENTS.md`, then `git init` and one initial commit.
 
-## Step 4: Publish the instance's schemas and validate
-
-The clone ships `.well-known/` as templates only, so it cannot publish the framework's identity as yours. `generate:schemas` writes *your* files; run it before any validation.
+## Step 4: Install and validate
 
 ```bash
 cd ../harbor-bakery-os
 npm install
-npm run generate:schemas
 npm run validate:schemas
 npm run validate:structure
 ```
 
-`generate:schemas` writes the EIP-4824 files (`dao.json`, `members.json`, `projects.json`, ...) into `.well-known/`; see the [EIP-4824 guide](EIP4824-GUIDE.md). Re-run it after you change `data/*.yaml` or `federation.yaml`.
+The clone ships `.well-known/` as `*.json.template` files plus the `dao.json` it rendered from your config, so it cannot publish the framework's identity as yours. A new instance publishes nothing more until you decide to:
 
-It leaves the new `.well-known/` files untracked, so commit them (the doctor otherwise reports `working-tree-dirty`, and a push would publish only the initial commit):
+- `federation.yaml` has no `identity.daoURI`, and `npm run generate:schemas` builds nothing without one, because every id it writes is built from it. On a fresh instance it says `nothing generated: identity.daoURI is not set` and warns that the rendered `dao.json` is not refreshed; that is expected. `validate:structure` requires `.well-known/dao.json`, `members.json` and `projects.json` only once a `daoURI` is set (`scripts/validate-structure.mjs`).
+- To publish, set `identity.daoURI` to the `https` URL where `dao.json` will be served (see the [EIP-4824 guide](EIP4824-GUIDE.md)), and say what is public in `data/visibility.yaml`: a collection it does not list is `members`, so its records are not written (see [Data model](DATA-MODEL.md)). Then run `npm run generate:schemas` and commit what it wrote (the doctor otherwise reports `working-tree-dirty`). Re-run it after you change `data/*.yaml` or `federation.yaml`.
 
-```bash
-git add -A && git commit -m "chore: generate schemas"
-```
+In an instance, `generate:schemas` runs the copy of the generator in `scripts/lib/standards/`, which has no schema check (no ajv). To check the published files against their schemas, run the framework's validator against the instance: `node scripts/validate-identity.mjs ../harbor-bakery-os` from the framework checkout.
 
 ## Step 5: Check it with the doctor
 
@@ -109,7 +108,7 @@ From the framework directory:
 npm run doctor -- --dir ../harbor-bakery-os
 ```
 
-A fresh instance should report **no blockers except `git-remote-absent`**, which is expected until you give it a repository. Warnings such as `never-synced`, `memory-absent` and `no-sync-receipts` are normal on day one. Any other blocker is a framework bug.
+A fresh instance should report **no blockers except `git-remote-absent`**, which is expected until you give it a repository. Warnings such as `never-synced`, `memory-absent` and `no-sync-receipts` are normal on day one. The doctor runs four validators from the framework checkout against the instance: `validate:structure`, `validate:schemas`, `validate:data` and `validate:governance` (`packages/instance-doctor/src/snapshot.mjs`); the last two report `validator-did-not-run` if you skipped the admin install in Step 1. Any other blocker is a framework bug.
 
 Create a repository for the instance and connect it:
 
@@ -142,7 +141,7 @@ Set `org.language` to a BCP-47 tag and everything the clone writes comes out in 
 
 - **Node version.** `node --version` should be 22 or higher.
 - **`Target not empty`.** The target directory must be empty; use a new directory (or `--force`, knowing what it overwrites).
-- **Validation fails right after the clone.** You skipped `npm run generate:schemas`; run it first.
+- **`validate:structure` fails after you set a `daoURI`.** It now requires `.well-known/dao.json`, `members.json` and `projects.json`; run `npm run generate:schemas`.
 - **Schema errors.** Check the YAML in `data/` is valid, then `npm run validate:schemas`.
 - **Doctor reports a blocker other than `git-remote-absent`.** Run `npm run doctor -- --dir <instance> --json` and report it with the check code.
 
@@ -152,6 +151,6 @@ Set `org.language` to a BCP-47 tag and everything the clone writes comes out in 
 - [Packages](PACKAGES.md): what each package adds
 - [EIP-4824 guide](EIP4824-GUIDE.md): the published identity files
 - [Federation](FEDERATION.md): connecting instances
-- Keeping an instance current: from the framework checkout, `npm run doctor -- sync --dir ../harbor-bakery-os --dry-run` prints the plan; without `--dry-run` it snapshots tracked files (not untracked ones), overlays framework-owned files, migrates, regenerates schemas and writes a receipt under `memory/reports/`.
+- Keeping an instance current: from the framework checkout, `npm run doctor -- sync --dir ../harbor-bakery-os --dry-run` prints the plan; without `--dry-run` it snapshots tracked files (not untracked ones), copies in the sync machinery and the standards generator, overlays framework-owned files, runs the framework's migrations against the instance, regenerates schemas and writes a receipt under `memory/reports/`. When the instance has no `data/visibility.yaml` and its `.well-known/` holds files an earlier generator wrote, it also writes one declaring public what those files already publish, as a commit of its own for the organisation to confirm, edit or revert (`declare-visibility` in `packages/instance-doctor/src/run-sync.mjs`).
 
 Issues and questions: <https://github.com/regen-coordination/org-os-template/issues>

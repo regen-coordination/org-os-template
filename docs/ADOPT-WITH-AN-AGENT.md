@@ -31,6 +31,7 @@ live, not inside it:
 git clone https://github.com/regen-coordination/org-os-template.git
 cd org-os-template
 npm install
+npm install --prefix packages/admin   # the doctor's data and governance checks load it
 ```
 
 **2. Ask the operator, in conversation,** for: org name · org type
@@ -78,21 +79,21 @@ operator wants to inspect the plan):
 npm run clone:framework -- --target ../harbor-bakery-os --config my-org.yaml
 ```
 
-**4. Install and publish the instance's schemas** — inside the new instance.
-Order matters: the clone deliberately ships `.well-known/` as templates (so it
-cannot publish the framework's identity), and `generate:schemas` is what
-publishes *yours* — run it before any validation:
+**4. Install and validate** — inside the new instance:
 
 ```bash
 cd ../harbor-bakery-os
 npm install
-npm run generate:schemas && npm run validate:schemas
-npm run validate:structure
-git add -A && git commit -m "chore: generate schemas"
+npm run validate:schemas && npm run validate:structure
 ```
 
-The commit matters: `generate:schemas` leaves the new `.well-known/` files
-untracked, which the doctor reports as `working-tree-dirty`.
+The clone ships `.well-known/` as templates plus a `dao.json` rendered from
+the config, so it cannot publish the framework's identity. A new instance has
+no `identity.daoURI` in `federation.yaml`, and `npm run generate:schemas`
+builds nothing without one (it says so and warns that `dao.json` is not
+refreshed; that is expected). Publishing is the operator's decision: ask before
+setting `identity.daoURI` and writing `data/visibility.yaml`, then run
+`generate:schemas` and commit what it wrote. See [Setup](SETUP.md), Step 4.
 
 **5. Verify with the doctor** — back in the framework directory, run the
 instance doctor against what you just made:
@@ -105,7 +106,9 @@ npm run doctor -- --dir ../harbor-bakery-os
 **Acceptance:** the scorecard must show **no blockers except
 `git-remote-absent`** (expected until the org gets its own remote repository —
 create one and `git remote add origin <url>` when ready). Any other blocker is
-a bug in the framework; report it upstream.
+a bug in the framework; report it upstream. A `validator-did-not-run` warning
+for `data` or `governance` means the `packages/admin` install in step 1 was
+skipped.
 
 **6. Open the first session.** Read `GETTING-STARTED.md` (rendered for the new
 org) and run the `bootstrap-interviewer` skill to fill in members, projects,
@@ -119,8 +122,9 @@ channels and data sources — that conversational pass is `BOOTSTRAP.md`
 - `IDENTITY.md` and `SOUL.md` say **your** org's name and mission — not
   "org-os". (The clone seeds them from your config; the interviewer pass adds
   depth.)
-- `.well-known/dao.json` — after `generate:schemas`, this is your public
-  machine-readable identity. It should carry your name.
+- `.well-known/dao.json` — the clone renders it from the config; once a
+  `daoURI` is set, `generate:schemas` rewrites it. It is your public
+  machine-readable identity and should carry your name.
 - `federation.yaml` — the lineage stamp: `metadata.genesis_commit` is the
   framework repository's **root commit** (the same for every instance), and
   `metadata.last_sync_commit` stays `null` until the first `doctor sync`
@@ -135,14 +139,18 @@ framework:
 
 ```bash
 npm run doctor -- sync --dir ../your-org --dry-run   # print the plan, change nothing
-npm run doctor -- sync --dir ../your-org             # snapshot (tracked files only), overlay, migrate, regenerate, receipt
+npm run doctor -- sync --dir ../your-org             # snapshot (tracked files only), overlay, migrate, declare visibility, regenerate, receipt
 ```
 
 `sync` is a file-level overlay: it copies framework-owned paths (`scripts/`,
 `templates/`, ...) in, never deletes, leaves what the organisation owns alone,
-and writes a receipt to `memory/reports/`. The overlay landed on `main` after
-the `v0.5.0` tag (see `CHANGELOG.md`, Unreleased), so a checkout of the tag only
-has the `--dry-run` plan. Run the dry run first and read it.
+and writes a receipt to `memory/reports/`. It runs the framework's migrations
+against the instance (`scripts/migrate.mjs <instance> --target <version>`). When
+the instance has no `data/visibility.yaml` and its `.well-known/` holds files an
+earlier generator wrote, it writes one declaring public what they already
+publish, as its own commit: a publication decision for the org to confirm, edit
+or revert. The overlay shipped in `v0.6.0` (see `CHANGELOG.md`); a checkout of
+`v0.5.0` only has the `--dry-run` plan. Run the dry run first and read it.
 
 ---
 
@@ -150,4 +158,6 @@ has the `--dry-run` plan. Run the dry run first and read it.
 above. The clone wrote the instance; before `generate:schemas` the doctor showed
 two blockers (`git-remote-absent`, `structure-invalid`); after it, one
 (`git-remote-absent`). `npm install` inside the instance and a real remote were
-not exercised.*
+not exercised. These steps were not re-run for 0.6: the 0.6 changes above
+(no `.well-known/` requirement without a `daoURI`, the doctor's four
+validators) are read from the code.*
