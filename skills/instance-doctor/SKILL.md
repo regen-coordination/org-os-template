@@ -123,6 +123,11 @@ Then run it:
 npm run doctor -- sync --dir ../refi-med-os
 ```
 
+An instance with a `.sync-freeze` file at its root is refused before stage 1:
+no snapshot, no commit, no receipt, exit 1, and the file's text is printed as
+the reason. `sync-upstream.mjs` refuses the same file. `--dry-run` says the
+instance is frozen. Remove the file to sync it.
+
 The ten stages:
 
 1. **snapshot** — a recoverable ref of the whole working tree, always written
@@ -193,6 +198,8 @@ cat ../refi-med-os/memory/reports/sync-receipt-*.md
 - **It will not overwrite uncommitted work.** It refuses when a dirty file is
   one it would write, and it will never stash, discard, or hard-reset anything
   to clear the way.
+- **It will not sync a frozen instance.** A `.sync-freeze` file at the root
+  is the instance's own pin; the doctor stops before writing anything.
 - **It will not touch an instance's own `package.json` version.** That is the
   instance's version, not a framework claim. The only exception is a
   `package.json` still named after the template, which means the file was

@@ -16,6 +16,10 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
   refusal through `announce()`, which runs in an effect after the note is drawn. The tests checked
   what was said as soon as the note was found, which a loaded machine can do before the effect
   runs. They now wait for it.
+- **`doctor sync` honours `.sync-freeze`.** An instance pinned with `.sync-freeze` was refused by
+  `sync-upstream.mjs` but not by `doctor sync`, which went on to overlay the framework. It now
+  refuses before the snapshot: nothing is written, the file's text is printed, and it exits 1.
+  `--dry-run` says the instance is frozen.
 
 ### Changed
 

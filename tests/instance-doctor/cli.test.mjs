@@ -82,6 +82,32 @@ test('sync --dry-run prints the plan, mutates nothing, and exits 0', () => {
   });
 });
 
+test('sync refuses a frozen instance: exits 1, names the reason, writes nothing', () => {
+  const shape = refiMedShape();
+  shape.files = { ...shape.files, '.sync-freeze': 'pinned until the operator moves it\n' };
+  withInstance(shape, (dir) => {
+    const git = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf-8' }).stdout;
+    const head = git(['rev-parse', 'HEAD']);
+    const r = run(['sync', '--dir', dir, '--no-validators']);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /FROZEN by \.sync-freeze: pinned until the operator moves it/);
+    assert.equal(git(['for-each-ref', 'refs/snapshots']), '', 'no snapshot ref');
+    assert.equal(git(['rev-parse', 'HEAD']), head, 'no commit');
+    assert.equal(git(['status', '--porcelain']), '', 'no receipt, no file written');
+    assert.equal(git(['remote', 'get-url', 'upstream']).trim(), 'https://github.com/regen-coordination/organizational-os-framework.git', 'the remote is left as it was');
+  });
+});
+
+test('sync --dry-run over a frozen instance says so and exits 0', () => {
+  const shape = refiMedShape();
+  shape.files = { ...shape.files, '.sync-freeze': 'release QA\n' };
+  withInstance(shape, (dir) => {
+    const r = run(['sync', '--dir', dir, '--dry-run', '--no-validators']);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /frozen by \.sync-freeze: release QA/);
+  });
+});
+
 test('an unknown verb fails loudly rather than assessing something by accident', () => {
   const r = run(['destroy', '--dir', rootDir]);
   assert.equal(r.status, 2);

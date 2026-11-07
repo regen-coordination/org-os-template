@@ -134,6 +134,11 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
     log(`  ${snapshot.dir}`);
     log('');
     const plan0 = runSync(snapshot, { dryRun: true }, realIo);
+    if (plan0.frozen) {
+      log(`  ✗ ${snapshot.name} is frozen by .sync-freeze: ${plan0.frozen.reason}`);
+      log('    A real run refuses before the snapshot and writes nothing. Remove .sync-freeze to enable syncing.');
+      log('');
+    }
     for (const [i, stage] of planSync(snapshot).entries()) {
       log(`  ${String(i + 1).padStart(2)}. ${stage.title}`);
       log(`      ${stage.detail}`);
@@ -156,6 +161,18 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
   };
 
   const result = runSync(snapshot, {}, io);
+
+  if (result.frozen) {
+    log('');
+    log(`doctor sync — ${snapshot.name}`);
+    log(`  ${snapshot.dir}`);
+    log('');
+    log(`  ✗ Sync is FROZEN by .sync-freeze: ${result.frozen.reason}`);
+    log('    Nothing was written: no snapshot, no commit, no receipt.');
+    log('    Remove .sync-freeze to enable syncing.');
+    log('');
+    return 1;
+  }
 
   log('');
   log(`doctor sync — ${snapshot.name}`);
