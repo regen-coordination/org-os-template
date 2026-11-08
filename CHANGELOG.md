@@ -6,6 +6,16 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
+_(Append changes here as they land.)_
+
+## [0.6.1] — 2026-11-08
+
+**0.6.1 lets an org run the house as its members' Hub.** It runs hosted from one container
+image (DAO-OS L9), people sign in with an emailed link instead of a wallet, and every write to the
+instance is off by default when hosted: the Hub reads its instance and follows the remote,
+fast-forward only. On a member's own machine the house still writes, as in 0.6.0. Nothing here
+migrates an instance's files.
+
 ### Added
 
 - **Sign-in by emailed link** (`packages/admin`). `POST /api/session/email` answers 202 with the
@@ -447,7 +457,8 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/regen-coordination/org-os-template/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/regen-coordination/org-os-template/compare/archive/v3.5.0...v0.5.0
 [3.5.0]: https://github.com/regen-coordination/org-os-template/compare/v3.0.0...v3.5.0
