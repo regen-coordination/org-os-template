@@ -146,8 +146,10 @@ export const EXCLUDE_DIRS = new Set([
   "docs/sessions",
   "docs/research",
   "docs/design", // the framework's own design references (the DAO-OS element gallery); the look ships as code
-  // The framework operator's own OpenCode agents (they describe a personal
-  // notes vault, not an organisation). Commands + opencode.json stay.
+  // OpenCode agents. The framework's were the operator's own (they described a
+  // personal notes vault, not an organisation) and moved out of the repository
+  // in 0.6.1; the exclusion stays so none can travel again. Commands +
+  // opencode.json stay.
   ".opencode/agents",
   // framework-only test suites — need framework env/fixtures, meaningless in an instance
   "tests/buzz-integration",
