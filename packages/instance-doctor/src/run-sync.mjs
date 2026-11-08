@@ -52,6 +52,58 @@ export function frameworkSource(io, frameworkDir) {
 }
 
 /**
+ * Capture the working tree — tracked edits, staged files and untracked files, not gitignored ones — as a commit
+ * object, without touching the working tree, the real index or the stash list: stage everything into a throwaway
+ * index (GIT_INDEX_FILE at `indexFile`), write it as a tree, wrap the tree in a commit on HEAD.
+ *
+ * The index starts from HEAD (read-tree) rather than empty, so a file that is tracked but matches .gitignore stays
+ * in the snapshot; `add -A` then brings in every change and every untracked, non-ignored file.
+ *
+ * Before 2026-11-08 the snapshot stage called `git stash create -u -m …`. `stash create` takes no options: `-u`
+ * and `-m` became part of the message, and no untracked file was ever captured.
+ *
+ * Returns `{ ok: true, target, note }` — `target` is the commit the snapshot ref should name: HEAD itself when the
+ * tree matches HEAD's, a commit with no parent when HEAD is unborn — or `{ ok: false, out }`. Never throws.
+ */
+export function captureWorkingTree(dir, io, indexFile) {
+  const env = { GIT_INDEX_FILE: indexFile };
+
+  // No HEAD yet (a repository with no commits): snapshot anyway, as a commit with no parent.
+  const head = io.git(dir, ['rev-parse', '--verify', '--quiet', 'HEAD']);
+  const parent = head.ok && head.out ? head.out : null;
+
+  // Prove the throwaway index reaches git before anything writes an index. An io bag that dropped `env` would
+  // otherwise read HEAD into, and sweep the whole tree into, the operator's real index.
+  const probe = io.git(dir, ['rev-parse', '--git-path', 'index'], { env });
+  if (!probe.ok || path.resolve(dir, probe.out) !== path.resolve(indexFile)) {
+    return {
+      ok: false,
+      out: `the throwaway index did not reach git (it answered ${probe.out || 'nothing'}); refusing to stage into the real index`,
+    };
+  }
+
+  if (parent) {
+    const read = io.git(dir, ['read-tree', parent], { env });
+    if (!read.ok) return { ok: false, out: `read-tree: ${read.out}` };
+  }
+  const added = io.git(dir, ['-c', 'advice.addEmbeddedRepo=false', 'add', '-A', '--', '.'], { env });
+  if (!added.ok) return { ok: false, out: `add: ${added.out}` };
+  const tree = io.git(dir, ['write-tree'], { env });
+  if (!tree.ok || !tree.out) return { ok: false, out: `write-tree: ${tree.out || 'no tree'}` };
+
+  // Nothing differs from HEAD: point the ref at HEAD rather than mint an identical commit, so "there is always a
+  // recovery point" holds without a new commit per no-op run.
+  if (parent) {
+    const headTree = io.git(dir, ['rev-parse', `${parent}^{tree}`]);
+    if (headTree.ok && headTree.out === tree.out) return { ok: true, target: parent, note: ' (tree matches HEAD)' };
+  }
+
+  const commit = io.git(dir, ['commit-tree', tree.out, ...(parent ? ['-p', parent] : []), '-m', 'doctor sync']);
+  if (!commit.ok || !commit.out) return { ok: false, out: `commit-tree: ${commit.out || 'no commit'}` };
+  return { ok: true, target: commit.out, note: parent ? '' : ' (no commit yet: a snapshot with no parent)' };
+}
+
+/**
  * What the declare-visibility stage would write, read through the io bag (Ruling R31). `{ exists, text, reason }`:
  * `exists` when data/visibility.yaml is already there; `text` null when there is nothing to write, and then `reason`
  * says why. Nothing is written when the file has any git history (declared before, perhaps reverted: a revert
@@ -297,25 +349,24 @@ export function runSync(snapshot, opts = {}, io) {
 
   const handlers = {
     snapshot() {
-      // The safe primitive: this writes a commit object and prints its hash
-      // without touching the working tree, the index, or the stash list. Same
-      // one scripts/vault-snapshot.mjs uses, reimplemented here because the
-      // target instances do not carry that script.
-      const created = io.git(dir, ['stash', 'create', '-u', '-m', 'doctor sync']);
-      if (!created.ok) {
-        return { status: 'failed', detail: `could not snapshot the working tree: ${created.out}` };
+      // The safe primitive: stage the whole working tree into a throwaway index
+      // in a fresh temp dir and commit it (captureWorkingTree), so the working
+      // tree, the real index and the stash list are never touched. The same
+      // route scripts/vault-snapshot.mjs takes, reimplemented here because the
+      // target instances do not carry that script. The temp dir is removed
+      // whatever happens.
+      const tmp = io.tempDir('doctor-snapshot-');
+      if (!tmp.ok) return { status: 'failed', detail: `could not snapshot the working tree: ${tmp.out}` };
+      let captured;
+      try {
+        captured = captureWorkingTree(dir, io, path.join(tmp.out, 'index'));
+      } finally {
+        io.removeDir(tmp.out);
       }
-
-      // An empty result means the tree matches HEAD. Point the ref at HEAD
-      // anyway, so "there is always a recovery point" holds without exception.
-      let target = created.out;
-      let note = '';
-      if (!target) {
-        const head = io.git(dir, ['rev-parse', 'HEAD']);
-        if (!head.ok) return { status: 'failed', detail: `could not resolve HEAD: ${head.out}` };
-        target = head.out;
-        note = ' (tree matches HEAD)';
+      if (!captured.ok) {
+        return { status: 'failed', detail: `could not snapshot the working tree: ${captured.out}` };
       }
+      const { target, note } = captured;
 
       const ref = `refs/snapshots/${io.timestamp()}-doctor-sync`;
       const updated = io.git(dir, ['update-ref', ref, target]);

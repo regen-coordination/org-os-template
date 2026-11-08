@@ -61,7 +61,7 @@ TMPIDX=$(mktemp) && rm "$TMPIDX" && \
 
 This stages the whole working tree into a throwaway index (`GIT_INDEX_FILE`), writes it as a tree and wraps it in a commit on `HEAD`. Your real index, working tree and stash list are never touched. Pinning it with `update-ref` makes it survive `git gc`.
 
-Do **not** use `git stash create --include-untracked` (or `-u`) for this: `stash create` takes no options, so the flag becomes part of the message and no untracked file is captured. Until 2026-11-07 both this pattern and the script did exactly that, so every snapshot ref made before that date holds the tracked tree only.
+Do **not** use `git stash create --include-untracked` (or `-u`) for this: `stash create` takes no options, so the flag becomes part of the message and no untracked file is captured. Until 2026-11-07 both this pattern and the script did exactly that, so every snapshot ref made before that date holds the tracked tree only. `doctor sync`'s own snapshot stage made the same call until 2026-11-08, so its `refs/snapshots/*-doctor-sync` refs from before then hold the tracked tree only too.
 
 ### After the risky op — always verify
 
