@@ -8,6 +8,39 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.6.2] — 2026-11-08
+
+**0.6.2 names the hosted Hub's public site the portal.** The site 0.6.1 called the door is the
+portal. The three settings that point a Hub at it now carry that name, and the old names keep
+working until 0.7. Nothing here migrates an instance's files.
+
+### Changed
+
+- **The portal's settings** (`packages/admin`, hosted): `ORG_OS_PORTAL_ORIGIN`,
+  `ORG_OS_PORTAL_DIR` (default `/srv/portal`) and `ORG_OS_PORTAL_EVERY` replace
+  `ORG_OS_DOOR_ORIGIN`, `ORG_OS_DOOR_DIR` (default `/srv/door`) and `ORG_OS_DOOR_EVERY`.
+  `deploy/hub/env.example` and `RAILWAY.md` use the new names.
+- **`GET /api/session`** answers `portal`, the portal's origin or null, when hosted.
+- **The members' side sends `/portal` to the portal**, as it did `/door`, when a portal origin
+  is set. Both now keep the path under them and the query: `/door/decisions?q=2` lands on
+  `<portal>/decisions?q=2`.
+- The L9 build modules moved from `server/door/` to `server/portal/`
+  (`collectPortalInput`, `scanPortal`, `PortalInput`).
+
+### Deprecated
+
+- **`ORG_OS_DOOR_ORIGIN`, `ORG_OS_DOOR_DIR` and `ORG_OS_DOOR_EVERY`** are still read, until
+  0.7. Each one prints a warning at start that names its replacement, and `hub check` prints it
+  too. If an old name and its new name are both set to different values, the Hub refuses to
+  start. `ORG_OS_DOOR_DIR`'s folder is used as it is set: nothing is moved.
+- **`door` in `GET /api/session`** repeats `portal` until 0.7.
+
+### Notes
+
+- The house's own pages still say "door": the `/door` page, the frame's "Public door" and the
+  sign-in card's "Read the public door". They move to "portal" with the house's rename of the
+  page itself.
+
 ## [0.6.1] — 2026-11-08
 
 **0.6.1 lets an org run the house as its members' Hub.** It runs hosted from one container
@@ -457,7 +490,8 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/regen-coordination/org-os-template/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/regen-coordination/org-os-template/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/regen-coordination/org-os-template/compare/archive/v3.5.0...v0.5.0
