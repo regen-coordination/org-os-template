@@ -6,7 +6,7 @@
 //   hub backup [--verify <file>] a backup now, sealed to the public key; or everything a restore does but the move
 //   hub restore <file>           with the server stopped; the private key named for that run only
 //
-// The instance is --repo <path>, else /srv/instance. `door:build` (§4.1) joins once Task 14's door command exists.
+// The instance is --repo <path>, else /srv/instance. `portal:build` (§4.1) joins once Task 14's portal command exists.
 // Exit codes: 0 done; 1 a verb that failed or was used wrongly; 2 a start check that refused.
 import { accessSync, constants, existsSync, readdirSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -56,6 +56,7 @@ async function check(repo: string, io: HubIo): Promise<HostedConfig | null> {
   const read = readHostedConfig(io.env, repo)
   if ('refuse' in read) { fail(read.refuse); return null }
   const config = read.config
+  for (const w of read.warnings) io.err(`Configuration: ${w}`)
   pass('Configuration: the members\' address and every setting read as they should.')
 
   if (!existsSync(resolve(repo, 'data')) || !existsSync(resolve(repo, 'federation.yaml'))) {
@@ -83,12 +84,12 @@ async function check(repo: string, io: HubIo): Promise<HostedConfig | null> {
   // The folders the Hub writes: each where the Hub's user can write (or make) it. None may be in the repository: the
   // configuration has already refused that.
   const folders: [string, string][] = [
-    ['ORG_OS_PRIVATE_DIR', config.privateDir], ['ORG_OS_BACKUP_DIR', config.backupDir], ['ORG_OS_DOOR_DIR', config.doorDir],
+    ['ORG_OS_PRIVATE_DIR', config.privateDir], ['ORG_OS_BACKUP_DIR', config.backupDir], ['ORG_OS_PORTAL_DIR', config.portalDir],
     ['ORG_OS_ADMIN_HOME', io.env.ORG_OS_ADMIN_HOME?.trim() || STATE_DIR],
   ]
   const unwritable = folders.filter(([, dir]) => !writable(dir))
   for (const [name] of unwritable) fail(`Folders: ${name} cannot be written by the Hub's user. Give that user the folder, then start again.`)
-  if (unwritable.length === 0) pass('Folders: the private store, backup, door and state folders can be written.')
+  if (unwritable.length === 0) pass('Folders: the private store, backup, portal and state folders can be written.')
   if (!writable(repo)) fail('Folders: the instance folder cannot be written by the Hub\'s user. Give that user the folder, then start again.')
 
   // Rule 4 (L5 §12, L9 §5.7): last, as at start.

@@ -1,31 +1,31 @@
-// The door's inputs (DAO-OS L9 spec §3.2, §3.4): public only, and the secrets the scan refuses. The fixture instance
-// (tests/fixtures/door) is a fresh repository under the temp directory with its private store beside it.
+// The portal's inputs (DAO-OS L9 spec §3.2, §3.4): public only, and the secrets the scan refuses. The fixture instance
+// (tests/fixtures/portal) is a fresh repository under the temp directory with its private store beside it.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { stringify } from 'yaml'
-import { collectDoorInput, ledgerAccounts, storeStrings, DOOR_STORE_UNREADABLE, type DoorInput } from '../../server/door/inputs.ts'
+import { collectPortalInput, ledgerAccounts, storeStrings, PORTAL_STORE_UNREADABLE, type PortalInput } from '../../server/portal/inputs.ts'
 import { parseCaip10 } from '../../lib/caip.mjs'
 import {
-  ACTOR, CHECKED, DOOR_ORIGIN, NOW, PROPOSAL, SENTINEL, SHOWN, TREASURY_READ_AT, WEARER, makeDoorInstance, standInReader, type DoorInstance,
-} from '../fixtures/door/instance.ts'
+  ACTOR, CHECKED, PORTAL_ORIGIN, NOW, PROPOSAL, SENTINEL, SHOWN, TREASURY_READ_AT, WEARER, makePortalInstance, standInReader, type PortalInstance,
+} from '../fixtures/portal/instance.ts'
 
 const bare = (account: string) => parseCaip10(account)!.address.toLowerCase()
 const lowered = (secrets: Set<string>) => new Set([...secrets].map(s => s.toLowerCase()))
 
-let inst: DoorInstance
-let input: DoorInput
+let inst: PortalInstance
+let input: PortalInput
 
 beforeAll(async () => {
-  inst = await makeDoorInstance()
-  const got = await collectDoorInput(inst.repo, { reader: standInReader(), store: inst.store, storeConfigured: true, now: NOW, doorOrigin: DOOR_ORIGIN })
+  inst = await makePortalInstance()
+  const got = await collectPortalInput(inst.repo, { reader: standInReader(), store: inst.store, storeConfigured: true, now: NOW, portalOrigin: PORTAL_ORIGIN })
   if ('refuse' in got) throw new Error(got.refuse)
   input = got
 }, 60_000)
 afterAll(() => inst?.remove())
 
-describe('collectDoorInput', () => {
+describe('collectPortalInput', () => {
   it('the secrets hold all three sentinels and the account', () => {
     for (const s of [SENTINEL.store, SENTINEL.field, SENTINEL.members]) expect(input.secrets.has(s), s).toBe(true)
     const secrets = lowered(input.secrets)
@@ -48,7 +48,7 @@ describe('collectDoorInput', () => {
   })
 
   it('an account stays a secret where L5\'s public projection shows it: only what L8 publishes clears an address', () => {
-    // the gate keeps a public proposal's event `by`, a CAIP-10 here; the door never names an actor (§3.4 point 2)
+    // the gate keeps a public proposal's event `by`, a CAIP-10 here; the portal never names an actor (§3.4 point 2)
     expect(JSON.stringify(input.projection.proposals).toLowerCase()).toContain(ACTOR.toLowerCase())
     const secrets = lowered(input.secrets)
     for (const s of [ACTOR.toLowerCase(), bare(ACTOR)]) expect(secrets.has(s), s).toBe(true)
@@ -64,26 +64,26 @@ describe('collectDoorInput', () => {
   })
 
   it('a configured store that cannot be read refuses with the spec\'s sentence', async () => {
-    const unopened = await collectDoorInput(inst.repo, { reader: standInReader(), store: null, storeConfigured: true, now: NOW, doorOrigin: DOOR_ORIGIN })
-    expect(unopened).toEqual({ refuse: 'The public door was not built: the private store could not be read, so the check for what must not be published is incomplete.' })
-    expect(DOOR_STORE_UNREADABLE).toBe(unopened && 'refuse' in unopened ? unopened.refuse : '')
+    const unopened = await collectPortalInput(inst.repo, { reader: standInReader(), store: null, storeConfigured: true, now: NOW, portalOrigin: PORTAL_ORIGIN })
+    expect(unopened).toEqual({ refuse: 'The portal was not built: the private store could not be read, so the check for what must not be published is incomplete.' })
+    expect(PORTAL_STORE_UNREADABLE).toBe(unopened && 'refuse' in unopened ? unopened.refuse : '')
 
-    const other = await makeDoorInstance()
+    const other = await makePortalInstance()
     try {
       other.store.close() // opened, then it fails: its reads throw
-      const closed = await collectDoorInput(other.repo, { reader: standInReader(), store: other.store, storeConfigured: true, now: NOW })
-      expect(closed).toEqual({ refuse: DOOR_STORE_UNREADABLE })
+      const closed = await collectPortalInput(other.repo, { reader: standInReader(), store: other.store, storeConfigured: true, now: NOW })
+      expect(closed).toEqual({ refuse: PORTAL_STORE_UNREADABLE })
     } finally { other.remove() }
   }, 60_000)
 
   it('no store at all scans with store: none, and says so', async () => {
-    const got = await collectDoorInput(inst.repo, { reader: standInReader(), store: null, storeConfigured: false, now: NOW })
+    const got = await collectPortalInput(inst.repo, { reader: standInReader(), store: null, storeConfigured: false, now: NOW })
     if ('refuse' in got) throw new Error(got.refuse)
     expect(got.store).toBe('none')
     expect(got.secrets.has(SENTINEL.members)).toBe(true)
     expect(lowered(got.secrets).has(ACTOR.toLowerCase())).toBe(true)
     expect(got.secrets.has(SENTINEL.store)).toBe(false) // the store's strings are what it cannot know
-    expect(got.doorOrigin).toBeNull()
+    expect(got.portalOrigin).toBeNull()
   }, 60_000)
 
   it('reads: each System read, with the time it was read; a System never read is absent, never zero', () => {
@@ -91,25 +91,25 @@ describe('collectDoorInput', () => {
     expect(input.reads[0]!.read.readAt).toBe(TREASURY_READ_AT)
   })
 
-  it('carries the commit, the time, the door origin, and the standards live and as in git', () => {
+  it('carries the commit, the time, the portal origin, and the standards live and as in git', () => {
     expect(input.commit).toMatch(/^[0-9a-f]{40}$/)
     expect(input.now).toBe(NOW)
-    expect(input.doorOrigin).toBe(DOOR_ORIGIN)
+    expect(input.portalOrigin).toBe(PORTAL_ORIGIN)
     expect(Object.keys(input.standards)).toContain('dao.json')
     expect(Object.keys(input.gitStandards)).toContain('dao.json')
     expect(input.problems.filter(p => p.level === 'error')).toEqual([])
-    // urls.proposal is the door's decisions section until per-record pages exist (Q-L9-12)
+    // urls.proposal is the portal's decisions section until per-record pages exist (Q-L9-12)
     const proposals = input.standards['proposals.json'] as { proposals: { contentURI?: string }[] }
-    expect(proposals.proposals.map(p => p.contentURI)).toEqual([`${DOOR_ORIGIN}/#decisions`])
+    expect(proposals.proposals.map(p => p.contentURI)).toEqual([`${PORTAL_ORIGIN}/#decisions`])
     expect(JSON.stringify([input.standards, input.gitStandards, input.pub])).not.toContain('SENTINEL')
   })
 
   it('a repository with no daoURI refuses: nothing public can be built', async () => {
-    const repo = mkdtempSync(join(tmpdir(), 'door-nouri-'))
+    const repo = mkdtempSync(join(tmpdir(), 'portal-nouri-'))
     try {
-      writeFileSync(join(repo, 'federation.yaml'), 'identity:\n  name: "Door Test Org"\n')
-      const got = await collectDoorInput(repo, { reader: standInReader(), store: null, storeConfigured: false, now: NOW })
-      expect(got).toEqual({ refuse: 'The public door was not built: federation.yaml: identity.daoURI is not set — every id is built from it.' })
+      writeFileSync(join(repo, 'federation.yaml'), 'identity:\n  name: "Portal Test Org"\n')
+      const got = await collectPortalInput(repo, { reader: standInReader(), store: null, storeConfigured: false, now: NOW })
+      expect(got).toEqual({ refuse: 'The portal was not built: federation.yaml: identity.daoURI is not set — every id is built from it.' })
     } finally { rmSync(repo, { recursive: true, force: true }) }
   })
 })
@@ -130,7 +130,7 @@ describe('storeStrings', () => {
 
 describe('ledgerAccounts', () => {
   it('by (CAIP-10), as, opened_as and closed.as accounts, wearers and checked accounts; never a member id', () => {
-    const repo = mkdtempSync(join(tmpdir(), 'door-ledger-'))
+    const repo = mkdtempSync(join(tmpdir(), 'portal-ledger-'))
     try {
       mkdirSync(join(repo, 'data'))
       const a = (t: string) => `eip155:42220:0x${t.padStart(40, '0')}`
@@ -158,7 +158,7 @@ describe('ledgerAccounts', () => {
   })
 
   it('no ledger: no accounts', () => {
-    const repo = mkdtempSync(join(tmpdir(), 'door-noledger-'))
+    const repo = mkdtempSync(join(tmpdir(), 'portal-noledger-'))
     try { expect(ledgerAccounts(repo).size).toBe(0) } finally { rmSync(repo, { recursive: true, force: true }) }
   })
 })

@@ -1,6 +1,6 @@
 // The guard when hosted (L9 spec §5.2, §10; Review Focus 1): one configured host and one https origin, writes as JSON,
 // and the container's own health check on loopback. The WebSocket upgrade asks the same question, and the members'
-// side's /door goes to the door's origin. A fresh fixture repository under the temp directory (makeFixtureRepo), no
+// side's /portal (and /door, its old name) goes to the portal's origin. A fresh fixture repository under the temp directory (makeFixtureRepo), no
 // network (ruling S13).
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { request } from 'node:http'
@@ -41,14 +41,14 @@ describe('refusal(caller, hosted scope)', () => {
   })
 
   it('refuses a Host other than the configured one, with the sentence (Review Focus 1)', () => {
-    for (const host of ['203.0.113.5', '203.0.113.5:4680', 'hub.example.org:4680', 'example.org', 'localhost:4680', 'door.example.test', 'evil.example.org']) {
+    for (const host of ['203.0.113.5', '203.0.113.5:4680', 'hub.example.org:4680', 'example.org', 'localhost:4680', 'portal.example.test', 'evil.example.org']) {
       expect(refusal(caller({ host }), HOSTED)).toEqual({ status: 403, error: WRONG_HOST(host) })
     }
     expect(refusal(caller({ host: undefined }), HOSTED)).toEqual({ status: 403, error: WRONG_HOST('') })
   })
 
   it('refuses Origin http://hub.example.org, and any other page, with the wrong-origin sentence', () => {
-    for (const origin of ['http://hub.example.org', 'https://example.org', 'https://door.example.test', 'https://hub.example.org:8443', 'null']) {
+    for (const origin of ['http://hub.example.org', 'https://example.org', 'https://portal.example.test', 'https://hub.example.org:8443', 'null']) {
       expect(refusal(caller({ origin }), HOSTED)).toEqual({ status: 403, error: WRONG_ORIGIN(origin) })
     }
   })
@@ -164,23 +164,35 @@ describe('a hosted server (a real listener on localhost)', () => {
     expect(await upgrade({ host: 'hub.example.org', origin: ORIGIN })).toBe('opened')
   })
 
-  it('hosted /door answers 302 to the door origin', async () => {
-    await start(config({ ORG_OS_DOOR_ORIGIN: 'https://door.example.test' }))
-    const res = await call('/door', { host: 'hub.example.org' })
-    expect(res.status).toBe(302)
-    expect(res.location).toBe('https://door.example.test')
+  it('hosted /portal and /door answer 302 to the portal origin, with what is under them and the query', async () => {
+    await start(config({ ORG_OS_PORTAL_ORIGIN: 'https://portal.example.test' }))
+    for (const [path, to] of [
+      ['/portal', 'https://portal.example.test'], ['/door', 'https://portal.example.test'],
+      ['/portal/', 'https://portal.example.test/'], ['/door/decisions?q=2', 'https://portal.example.test/decisions?q=2'],
+      ['/portal/a/b?x=1', 'https://portal.example.test/a/b?x=1'],
+    ] as const) {
+      const res = await call(path, { host: 'hub.example.org' })
+      expect(res.status, path).toBe(302)
+      expect(res.location, path).toBe(to)
+    }
+    // a path that only begins with the word is the SPA's
+    expect((await call('/doorway', { host: 'hub.example.org' })).status).toBe(200)
+    expect((await call('/portals', { host: 'hub.example.org' })).status).toBe(200)
   })
 
-  it('with no door origin, /door answers the SPA as now', async () => {
+  it('with no portal origin, /portal and /door answer the SPA as now', async () => {
     await start(config())
-    const res = await call('/door', { host: 'hub.example.org' })
-    expect(res.status).toBe(200)
-    expect(res.body).toContain('<title>admin</title>')
+    for (const path of ['/portal', '/door']) {
+      const res = await call(path, { host: 'hub.example.org' })
+      expect(res.status, path).toBe(200)
+      expect(res.body).toContain('<title>admin</title>')
+    }
   })
 
   it('the guard runs before the SPA: a wrong Host is refused there too', async () => {
-    await start(config({ ORG_OS_DOOR_ORIGIN: 'https://door.example.test' }))
+    await start(config({ ORG_OS_PORTAL_ORIGIN: 'https://portal.example.test' }))
+    expect((await call('/portal', { host: `127.0.0.1:${server!.port}` })).status).toBe(403)
     expect((await call('/door', { host: `127.0.0.1:${server!.port}` })).status).toBe(403)
-    expect((await call('/', { host: 'door.example.test' })).status).toBe(403)
+    expect((await call('/', { host: 'portal.example.test' })).status).toBe(403)
   })
 })

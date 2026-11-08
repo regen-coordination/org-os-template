@@ -486,7 +486,7 @@ export interface PublicProjection {
   /** GET /api/resources for the public. */
   resources: Gated<Resource>[]
   /** The graph's edges the public may see (L9 spec §3.2), as `gateGraph` gives them: between two of `resources` only,
-   *  and only where one end's public record names the other. Additive (L9): the door's map draws them. */
+   *  and only where one end's public record names the other. Additive (L9): the portal's map draws them. */
   edges: Edge[]
   /** GET /api/proposals for the public. */
   proposals: Gated<ProposalView>[]

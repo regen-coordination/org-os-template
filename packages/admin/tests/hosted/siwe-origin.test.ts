@@ -69,7 +69,7 @@ function treeRepo(): string {
 }
 
 /** A hosted house with its binding: the hosted guard, the session routes with the configuration, a fake Hats reader. */
-async function house(cfg: HostedConfig = config({ ORG_OS_DOOR_ORIGIN: 'https://door.example.test' })) {
+async function house(cfg: HostedConfig = config({ ORG_OS_PORTAL_ORIGIN: 'https://portal.example.test' })) {
   const repo = treeRepo()
   const dir = mkdtempSync(join(tmpdir(), 'hosted-session-store-')); cleanup.push(dir)
   const store = await openPrivateStore(repo, { dir }); stores.push(store)
@@ -151,14 +151,15 @@ describe('SIWE from configuration (the app)', () => {
     expect(await res.json()).toMatchObject({ mode: 'hosted', signedIn: true, account: `${CELO}:${addressOfKey(sk)}` })
   })
 
-  it('GET /api/session answers the door origin, or null when there is none', async () => {
-    const withDoor = await house()
-    expect(await (await call(withDoor.app, 'GET', '/api/session')).json()).toMatchObject({ mode: 'hosted', signedIn: false, door: 'https://door.example.test' })
-    const token = hostTokenOf(await signIn(withDoor.app, key()))
-    expect(await (await call(withDoor.app, 'GET', '/api/session', { cookie: `__Host-house_session=${token}` })).json())
-      .toMatchObject({ signedIn: true, door: 'https://door.example.test' })
-    const noDoor = await house(config())
-    expect(await (await call(noDoor.app, 'GET', '/api/session')).json()).toMatchObject({ signedIn: false, door: null })
+  it('GET /api/session answers the portal origin, or null when there is none (and as door, its name until 0.6.2)', async () => {
+    const P = 'https://portal.example.test'
+    const withPortal = await house()
+    expect(await (await call(withPortal.app, 'GET', '/api/session')).json()).toMatchObject({ mode: 'hosted', signedIn: false, portal: P, door: P })
+    const token = hostTokenOf(await signIn(withPortal.app, key()))
+    expect(await (await call(withPortal.app, 'GET', '/api/session', { cookie: `__Host-house_session=${token}` })).json())
+      .toMatchObject({ signedIn: true, portal: P, door: P })
+    const noPortal = await house(config())
+    expect(await (await call(noPortal.app, 'GET', '/api/session')).json()).toMatchObject({ signedIn: false, portal: null, door: null })
   })
 })
 

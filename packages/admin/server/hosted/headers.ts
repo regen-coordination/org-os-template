@@ -1,4 +1,4 @@
-// Security headers when hosted (L9 spec §5.10). HSTS belongs to the proxy (§5.3); the door's headers are the proxy's.
+// Security headers when hosted (L9 spec §5.10). HSTS belongs to the proxy (§5.3); the portal's headers are the proxy's.
 import { createHash } from 'node:crypto'
 import type { MiddlewareHandler } from 'hono'
 

@@ -222,7 +222,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   // Membership from the DAO's Hats tree (§5), read through the one reader; sessions live in the one private store.
   const membership = new Membership({ repo, reader: systemReader, now: () => new Date() })
   // The hosted binding (L9 §5.1), only when hosted and given (`config`, above): one host and one origin for the guard,
-  // SIWE and the WebSocket upgrade; the `__Host-` cookie; the door's origin. Without it, hosted is L5's, on this machine.
+  // SIWE and the WebSocket upgrade; the `__Host-` cookie; the portal's origin. Without it, hosted is L5's, on this machine.
   const guard: GuardScope = config ? { kind: 'hosted', host: config.host, origin: config.origin } : { kind: 'local' }
   // The one writer's push (L9 §5.6): made once the server listens, beside the RemoteWatch it reads rule 4 through; its
   // retry route reads it when asked, and answers PUSH_OFF while there is none (local, or ORG_OS_PUSH=off).
@@ -270,9 +270,13 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   // A connection's viewer is read as a request's is, from the same session cookie.
   const viewerOfCookie = connectionViewer({ repo, hosted, membership, store: privateStore, config, signIn })
   const events = new EventLevels(repo, attentionLevel(hosted))
-  // The members' side's /door goes to the door (§5.2); with no door origin it is the SPA's, as before.
-  const doorOrigin = config?.doorOrigin
-  if (doorOrigin) app.get('/door', c => c.redirect(doorOrigin, 302))
+  // The members' side's /portal, and /door (its name until 0.6.2), go to the portal (§5.2), with anything under them and
+  // the query kept; with no portal origin they are the SPA's, as before.
+  const portalOrigin = config?.portalOrigin
+  if (portalOrigin) app.on('GET', ['/portal', '/portal/*', '/door', '/door/*'], c => {
+    const u = new URL(c.req.url)
+    return c.redirect(`${portalOrigin}${u.pathname.replace(/^\/(?:portal|door)/, '')}${u.search}`, 302)
+  })
   if (appDist && existsSync(appDist)) {
     app.use('/*', serveStatic({ root: appDist }))
     app.get('*', serveStatic({ path: 'index.html', root: appDist })) // SPA fallback

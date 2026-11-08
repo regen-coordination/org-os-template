@@ -752,10 +752,10 @@ export class PrivateStore {
     for (const s of rows('SELECT op FROM staged')) take(parsed(s.op))
     for (const h of rows('SELECT "by", "before", "after" FROM history')) { take(h.by); take(parsed(h.before)); take(parsed(h.after)) }
     // A wallet session's account (CAIP-10) is private; an emailed-link session's is the person's id (I1), which is in git
-    // and which a door page may name (Lane 3 ruling S8-2), so it is left out.
+    // and which a portal page may name (Lane 3 ruling S8-2), so it is left out.
     for (const s of rows('SELECT account FROM sessions')) if (!PERSON_ID.test(String(s.account))) take(s.account)
     // The email keys are private; the Roles' ids and names are not added: the ids are in git, and the stewards' names
-    // are public, so the door must stay free to print them (Lane 3 ruling S2-1).
+    // are public, so the portal must stay free to print them (Lane 3 ruling S2-1).
     for (const k of rows('SELECT email_key FROM email_keys')) take(k.email_key)
     return out
   }

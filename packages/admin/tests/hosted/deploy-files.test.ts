@@ -42,8 +42,8 @@ describe('deploy/hub/Dockerfile', () => {
     expect(lines.some(l => /apt-get install .*--no-install-recommends.*\bgit\b.*\bopenssh-client\b/.test(l))).toBe(true)
     expect(lines).toContain('ENTRYPOINT ["node", "node_modules/.bin/tsx", "scripts/hub.ts"]')
     expect(lines).toContain('CMD ["serve"]')
-    // the door bundles are later work (Task 14): no door build here yet
-    expect(dockerfile()).not.toMatch(/door:build/)
+    // the portal bundles are later work (Task 14): no portal build here yet
+    expect(dockerfile()).not.toMatch(/(door|portal):build/)
   })
 })
 
@@ -69,7 +69,7 @@ describe('deploy/hub/env.example', () => {
     // placeholders only (L9 spec §15)
     expect(text).not.toMatch(/0x[0-9a-fA-F]{40}/)
     expect(text).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/)
-    for (const host of text.match(/https:\/\/[^\s"']+/g) ?? []) expect(host).toMatch(/^https:\/\/(hub\.example\.org|example\.org|door\.example\.test)\/?$/)
+    for (const host of text.match(/https:\/\/[^\s"']+/g) ?? []) expect(host).toMatch(/^https:\/\/(hub\.example\.org|example\.org|portal\.example\.test)\/?$/)
   })
 })
 

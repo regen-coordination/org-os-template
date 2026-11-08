@@ -7,12 +7,12 @@
 # node:sqlite) and pass its digest; the server checks the version again at start (carry 4).
 #
 # No VOLUME line: the platform mounts the data volume (some refuse a VOLUME instruction). The folders the Hub writes
-# are set by ORG_OS_PRIVATE_DIR, ORG_OS_BACKUP_DIR, ORG_OS_DOOR_DIR and ORG_OS_ADMIN_HOME (defaults under /srv), and
+# are set by ORG_OS_PRIVATE_DIR, ORG_OS_BACKUP_DIR, ORG_OS_PORTAL_DIR and ORG_OS_ADMIN_HOME (defaults under /srv), and
 # the instance by `hub ... --repo` (default /srv/instance). See env.example and RAILWAY.md.
 ARG NODE_BASE_DIGEST
 
-# Build stage: the admin package's dependencies, exactly as locked, and the members' app. (The door's bundles join
-# here once the door command exists: Task 14.)
+# Build stage: the admin package's dependencies, exactly as locked, and the members' app. (The portal's bundles join
+# here once the portal command exists: Task 14.)
 FROM node:22-bookworm-slim@sha256:${NODE_BASE_DIGEST} AS build
 WORKDIR /build
 COPY package.json ./

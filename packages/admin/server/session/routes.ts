@@ -41,7 +41,7 @@ export interface SessionDeps {
   membership: Membership
   hosted: boolean
   /** The hosted binding (L9 §5.1), when hosted: the SIWE domain and URI come from it, never from the request (behind
-   *  the TLS proxy the request says `http:`), the cookie is `__Host-`, and `GET /api/session` names the door. */
+   *  the TLS proxy the request says `http:`), the cookie is `__Host-`, and `GET /api/session` names the portal. */
   config?: HostedConfig
   /** The emailed-link sign-in (Lane 3 Task 9), as `readSignInConfig` read it: null when it is not offered. Given (even
    *  null), `GET /api/session` also says which methods are offered and whether the instance is written to. */
@@ -61,8 +61,9 @@ export function mountSession(app: Hono, d: SessionDeps): void {
   const config = d.hosted ? d.config : undefined
   /** The `__Host-` cookie: only with the hosted binding (L5's hosted mode alone keeps the plain name, Secure). */
   const hostCookie = config !== undefined
-  /** `door` in `GET /api/session` (§5.2): the door's origin, or null; answered only with the hosted binding. */
-  const door = config ? { door: config.doorOrigin } : {}
+  /** `portal` in `GET /api/session` (§5.2): the portal's origin, or null; answered only with the hosted binding. `door`,
+   *  its name until 0.6.2, says the same until org-os 0.7. */
+  const portalField = config ? { portal: config.portalOrigin, door: config.portalOrigin } : {}
 
   // Only the API carries sessions (the WebSocket upgrade reads its own, in serve.ts). A store that fails to answer is
   // no session, never a 500 for every route after it.
@@ -110,12 +111,12 @@ export function mountSession(app: Hono, d: SessionDeps): void {
         mode, signedIn: true, via: 'email', actor: person.id,
         person: { id: person.id, name: person.name, roles: person.roles, nodes: person.nodes },
         viewer: viewerOf(c).kind, expiresAt: new Date(claims.exp * 1000).toISOString(),
-        signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...door,
+        signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
       })
     }
     const s = sessionOf(c)
-    if (s) return c.json({ ...signedIn(s), ...offered(tree), ...door })
-    return c.json({ mode, signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, signedIn: false, ...offered(tree), ...door })
+    if (s) return c.json({ ...signedIn(s), ...offered(tree), ...portalField })
+    return c.json({ mode, signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, signedIn: false, ...offered(tree), ...portalField })
   })
 
   app.post('/api/session/nonce', async c => {
