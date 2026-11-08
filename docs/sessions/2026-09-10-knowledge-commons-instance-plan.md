@@ -48,7 +48,7 @@ org:
   emoji: "📚"
   license: "MIT"
 operator:
-  name: "Luiz Fernando"
+  name: "The operator"  # the operator's own name
   email: "operator@example.org"  # the operator's own account
 network:
   name: "regen-coordination"
