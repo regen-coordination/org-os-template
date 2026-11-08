@@ -556,15 +556,16 @@ export async function mergeTree(repo: string, a: string, b: string): Promise<Mer
   return { tree, conflicts }
 }
 
-/** `git fetch <remote>`: the one network read. Called only by the `fetch` operation's job. The remote is `origin`, the one
+/** `git fetch <remote>`: the one network read. Called by the `fetch` operation's job and by a read-only Hub's refresh
+ *  (`hosted/refresh.ts`, which ends a fetch that says nothing for `blockMs`). The remote is `origin`, the one
  *  `lastFetch` reads and Share pushes to, and it must be configured (`remote.origin.url`): git reads a bare word that names
  *  no remote as a path, and fetches from the repository it finds there. */
-export async function fetchRemote(repo: string, remote = 'origin'): Promise<void> {
+export async function fetchRemote(repo: string, remote = 'origin', opts: { blockMs?: number } = {}): Promise<void> {
   checkArgv(['fetch', remote]) // a URL or a refspec is refused for what it is, before anything runs
   if (remote !== 'origin') throw new Error(`"${remote}" is not a remote this platform fetches: it fetches origin only, so nothing was fetched.`)
   const url = (await simpleGit(repo).getConfig('remote.origin.url')).value
   if (url === null || url.trim() === '') throw new Error('"origin" is not a remote of this repository (it has no remote.origin.url), so nothing was fetched.')
-  await run('fetch', [remote], repo)
+  await run('fetch', [remote], repo, undefined, opts.blockMs)
 }
 
 /** `git push <remote> refs/heads/<trunk>:refs/heads/<trunk>`: the one network write (L9 §5.6), the hosted Hub's Pusher's

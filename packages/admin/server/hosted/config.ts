@@ -11,7 +11,7 @@ export const NODE_FLOOR = '22.13.0'
  *  `env.example` is checked against this list. */
 export const HOSTED_ENV = [
   'ORG_OS_HOSTED', 'ORG_OS_PUBLIC_ORIGIN', 'ORG_OS_DOOR_ORIGIN', 'ORG_OS_BIND', 'PORT', 'ORG_OS_TRUST_PROXY',
-  'ORG_OS_DOOR_DIR', 'ORG_OS_DOOR_EVERY', 'ORG_OS_PUSH', 'ORG_OS_PRIVATE_DIR', 'ORG_OS_BACKUP_DIR',
+  'ORG_OS_DOOR_DIR', 'ORG_OS_DOOR_EVERY', 'ORG_OS_PUSH', 'ORG_OS_REFRESH_EVERY', 'ORG_OS_PRIVATE_DIR', 'ORG_OS_BACKUP_DIR',
   'ORG_OS_BACKUP_EVERY', 'ORG_OS_BACKUP_KEEP', 'ORG_OS_BACKUP_PUBLIC_KEY_FILE', 'ORG_OS_ADMIN_HOME',
   'ORG_OS_REMOTE_PRIVATE', 'ORG_OS_RPC', 'GIT_SSH_COMMAND',
   // The writes-off switch (Lane 3 Task 11): read by startServer (hosted/instance-writes.ts), named here for the deploy example.
@@ -31,6 +31,8 @@ export interface HostedConfig {
   /** null: no timer (the door is refreshed by hand). */
   doorEveryMs: number | null
   push: boolean
+  /** How often a Hub whose writes are off takes new commits from its remote (convergence C1, C2: 15 min); null: never. */
+  refreshEveryMs: number | null
   privateDir: string
   backupDir: string
   backupEveryMs: number
@@ -90,6 +92,13 @@ export function readHostedConfig(env: Record<string, string | undefined>, repo: 
     if (doorEveryMs === null || doorEveryMs > MAX_EVERY_MS) return { refuse: `ORG_OS_DOOR_EVERY is "${doorEveryText}", not a time such as 1h (or off).` }
   }
 
+  const refreshEveryText = get('ORG_OS_REFRESH_EVERY') ?? '15m'
+  let refreshEveryMs: number | null = null
+  if (!/^(off|0)$/i.test(refreshEveryText)) {
+    refreshEveryMs = parseEvery(refreshEveryText)
+    if (refreshEveryMs === null || refreshEveryMs > MAX_EVERY_MS) return { refuse: `ORG_OS_REFRESH_EVERY is "${refreshEveryText}", not a time such as 15m (or off).` }
+  }
+
   const backupEveryText = get('ORG_OS_BACKUP_EVERY') ?? '6h'
   const backupEveryMs = parseEvery(backupEveryText)
   if (backupEveryMs === null || backupEveryMs > MAX_EVERY_MS) return { refuse: `ORG_OS_BACKUP_EVERY is "${backupEveryText}", not a time such as 6h.` }
@@ -122,6 +131,7 @@ export function readHostedConfig(env: Record<string, string | undefined>, repo: 
       trustProxy,
       doorDir, doorEveryMs,
       push,
+      refreshEveryMs,
       privateDir, backupDir, backupEveryMs, backupKeep,
       backupPublicKeyFile: get('ORG_OS_BACKUP_PUBLIC_KEY_FILE') ?? '/run/secrets/backup.pub',
       deployKeyFile,

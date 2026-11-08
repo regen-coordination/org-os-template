@@ -77,6 +77,14 @@ describe('readHostedConfig', () => {
       expect(refused({ ...base, ORG_OS_TRUST_PROXY: v })).toBe(`ORG_OS_TRUST_PROXY is "${v}", not on or off.`)
     }
   })
+  it('ORG_OS_REFRESH_EVERY: 15 min by default; a time, or off / 0 for none; anything else refuses to start (C1, C2)', () => {
+    expect(ok(base).refreshEveryMs).toBe(900_000)
+    expect(ok({ ...base, ORG_OS_REFRESH_EVERY: '1h' }).refreshEveryMs).toBe(3_600_000)
+    for (const v of ['off', 'OFF', '0']) expect(ok({ ...base, ORG_OS_REFRESH_EVERY: v }).refreshEveryMs).toBeNull()
+    for (const v of ['soon', '15 minutes', '-5m']) {
+      expect(refused({ ...base, ORG_OS_REFRESH_EVERY: v })).toBe(`ORG_OS_REFRESH_EVERY is "${v}", not a time such as 15m (or off).`)
+    }
+  })
   it('door every "off" means no timer', () => {
     expect(ok({ ...base, ORG_OS_DOOR_EVERY: 'off' }).doorEveryMs).toBeNull()
   })
@@ -126,11 +134,11 @@ describe('nodeRefusal', () => {
 })
 
 describe('HOSTED_ENV', () => {
-  it('lists the spec table, the sign-in variables (Lane 3 Task 4) and the writes-off switch (Task 11), each name once', () => {
+  it('lists the spec table, the sign-in variables (Lane 3 Task 4), the writes-off switch (Task 11) and the refresh (C1, C2), each name once', () => {
     expect([...HOSTED_ENV].sort()).toEqual([
       'GIT_SSH_COMMAND', 'ORG_OS_ADMIN_HOME', 'ORG_OS_BACKUP_DIR', 'ORG_OS_BACKUP_EVERY', 'ORG_OS_BACKUP_KEEP', 'ORG_OS_BACKUP_PUBLIC_KEY_FILE',
       'ORG_OS_BIND', 'ORG_OS_DOOR_DIR', 'ORG_OS_DOOR_EVERY', 'ORG_OS_DOOR_ORIGIN', 'ORG_OS_HOSTED', 'ORG_OS_PRIVATE_DIR', 'ORG_OS_PUBLIC_ORIGIN',
-      'ORG_OS_PUSH', 'ORG_OS_REMOTE_PRIVATE', 'ORG_OS_RPC', 'ORG_OS_TRUST_PROXY', 'PORT', 'HOUSE_INSTANCE_WRITES',
+      'ORG_OS_PUSH', 'ORG_OS_REFRESH_EVERY', 'ORG_OS_REMOTE_PRIVATE', 'ORG_OS_RPC', 'ORG_OS_TRUST_PROXY', 'PORT', 'HOUSE_INSTANCE_WRITES',
       'HOUSE_EMAIL_PEPPER', 'HOUSE_SESSION_PRIVATE_JWK', 'SESSION_COOKIE_NAME', 'SESSION_COOKIE_DOMAIN', 'RESEND_API_KEY', 'MAIL_FROM',
     ].sort())
     expect(new Set(HOSTED_ENV).size).toBe(HOSTED_ENV.length)

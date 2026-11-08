@@ -46,6 +46,7 @@ import type { Viewer } from '../lib/visibility.mjs'
 import type { HostedConfig } from './hosted/config.ts'
 import { useHubIdent } from './hosted/ident.ts'
 import { mountPush, Pusher } from './hosted/push.ts'
+import { Refresher } from './hosted/refresh.ts'
 import { readInstanceWrites, INSTANCE_WRITES_ENV, type InstanceWrites } from './hosted/instance-writes.ts'
 import { rateLimits, RATE, upgradeAddress, WS_PER_ADDRESS } from './hosted/limits.ts'
 import { prepaintHashes, securityHeaders } from './hosted/headers.ts'
@@ -174,6 +175,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     repo, now: () => new Date(), run: runCommand, lastOk: (op, id) => jobs.lastOk(op, id),
     // The only reader given the network: drivers reach their declared hosts and nothing else.
     systems: systemReader,
+    // The Sources page's row for a read-only Hub's refresh (C1, C2); none while there is no Refresher.
+    refresh: () => refresher?.state() ?? null,
   }, [...ADAPTERS, serverAttentionAdapter(attention)])
   attention.onChange = () => store.invalidateAdapter('server')
   // The one private store. One that cannot be opened (not ignored by git, unreadable, newer) leaves the git side
@@ -224,10 +227,15 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   // The one writer's push (L9 §5.6): made once the server listens, beside the RemoteWatch it reads rule 4 through; its
   // retry route reads it when asked, and answers PUSH_OFF while there is none (local, or ORG_OS_PUSH=off).
   let pusher: Pusher | null = null
+  // The reader's refresh (C1, C2): made once the server listens, when hosted with writes off; it moves the trunk under
+  // the write lock, which the app hands over here.
+  let refresher: Refresher | null = null
+  let writeLock: (<T>(fn: () => Promise<T>) => Promise<T>) | null = null
   // The emailed-link sign-in's work done after its answers (S10-0): waited for at stop, before the store closes.
   let emailSignIn: EmailSignIn | null = null
   const app = createApp(repo, (a, ctx) => {
     // First, so its middleware reads the session for every route mounted after it.
+    writeLock = ctx.withLock
     mountSession(a, { repo, store: privateStore, membership, hosted, config, signIn, instanceWrites })
     emailSignIn = mountEmailSignIn(a, { repo, store: privateStore, config: signIn, mailer: signInMailer, ...(config ? { hosted: config } : {}) })
     mountResources(a, store, repo, { hosted })
@@ -416,6 +424,17 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         pusher = new Pusher({ repo, trunk: () => resolveTrunk(repo, startBranch), watch: remoteWatch, attention })
         pusher.start()
       }
+      // Hosted with writes off: the Hub reads its instance, whose commits are made elsewhere, so it takes them from the
+      // remote, fast-forward only, at start and every ORG_OS_REFRESH_EVERY (15 min). Never beside a Pusher.
+      if (config && config.refreshEveryMs !== null && instanceWrites === 'off') {
+        refresher = new Refresher({
+          repo, trunk: () => resolveTrunk(repo, startBranch), everyMs: config.refreshEveryMs, attention,
+          ...(writeLock ? { withLock: writeLock } : {}),
+          onAdvance: () => { for (const a of ADAPTERS) store.invalidateAdapter(a.name) },
+          onState: () => { store.invalidateAdapter('sources'); scheduleRefresh() },
+        })
+        refresher.start()
+      }
       // Hosted with its configuration, the backups' folder, interval, count and public key are the configuration's (§5.1,
       // ruling P7: 6 h, `/srv/backups`, `/run/secrets/backup.pub` by default); otherwise the environment's, as L5.
       const backupEnv = config ? {
@@ -434,6 +453,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
           await executor.stopAll()
           // Then the push: no new one starts, its timer goes, and one under way is waited for.
           await pusher?.stop()
+          // And the refresh: its timer goes, and one under way (a fetch, a fast-forward) is waited for.
+          await refresher?.stop()
           clearInterval(crewPoll)
           clearInterval(clockTick)
           clearInterval(systemsTick)

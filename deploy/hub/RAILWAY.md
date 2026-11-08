@@ -63,6 +63,10 @@ Then set:
 `hub init git@forge.example.org:org/instance.git`, then start with `hub serve`. A key on the volume is in every copy of
 the volume. A read-only key limits what a lost copy can do, and it can be revoked at the forge.
 
+The same key keeps the clone current. While writes are off, the Hub fetches the instance at start and every 15 minutes
+(`ORG_OS_REFRESH_EVERY`) and moves its trunk forward, fast-forward only. If the clone and the remote diverge, the
+refresh stops and the Sources page says so; once they agree again, restart the service.
+
 ## The proxy
 
 - Railway terminates TLS and forwards the request with the `Host` the visitor used. Set `ORG_OS_PUBLIC_ORIGIN` to

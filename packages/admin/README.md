@@ -701,6 +701,21 @@ While it is `off`, the house writes nothing to its instance:
 Only `on` and `off` are accepted; any other value stops the start. A hosted house will not start with `on` while
 `BEFORE_PILOT_OPEN` lists known write defects. Each release that fixes one removes it from the list.
 
+### Following the remote: `ORG_OS_REFRESH_EVERY`
+
+While writes are off, the instance's commits are made elsewhere (the org's own sessions) and reach the remote. A hosted
+house then takes them from the remote, once at start and every `ORG_OS_REFRESH_EVERY` (`15m` by default; `off` for
+never): `git fetch origin`, then `git merge --ff-only` of `origin/<trunk>`, under the write lock. A page shows a commit
+once it is on the remote and the next refresh has run.
+
+- It never merges and never writes over a commit. A copy holding commits the remote does not (a diverged history), a
+  copy that is not on its trunk, or a fast-forward git refuses stops the refresh until the house starts again.
+- A remote it cannot read is a warning, and it asks again at the next refresh. git's words are not shown: they can name
+  the remote's address.
+- The Sources page has a row, "This Hub's copy of the instance", for members: the trunk, the last refresh and the copy's
+  commit, with the warning or the stop. Home's "Needs you" shows the same sentence.
+- While writes are on there is no refresh: the house is then the one writer, and the push sends its commits.
+
 ## The private store's backup
 
 The server opens one private store at start (`house.db`, L5 spec §10): in `ORG_OS_PRIVATE_DIR`, else

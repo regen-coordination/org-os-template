@@ -29,6 +29,11 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
   branch, the start-up reconcile is skipped, no push runs whatever `ORG_OS_PUSH` says, and the app
   hides its write controls. A hosted house refuses `on` while `BEFORE_PILOT_OPEN` lists known
   write defects.
+- **A read-only house follows its remote** (`ORG_OS_REFRESH_EVERY`, `15m` by default, `off`
+  for never). While writes are off, the hosted house fetches `origin` at start and on that
+  interval, and moves its trunk forward, fast-forward only. A diverged history, a copy off its
+  trunk or a refused fast-forward stops it until the next start. The Sources page shows the
+  refresh as a row for members, and Home's "Needs you" shows a stop or a warning.
 - **The house runs hosted** (`packages/admin`, DAO-OS L9). One container image
   (`deploy/hub/Dockerfile`, base pinned by digest) starts `hub serve`, which runs every start check
   first (`hub check`; Node 22.13 or later). Hosted, the house answers one configured host and
