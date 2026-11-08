@@ -32,7 +32,8 @@ export type { Problem } from '../../lib/data-validate.mjs'
 export type ChangeView = ServerChangeView
 
 export interface RegistrySummary { name: string; kind: 'collection' | 'document'; count: number | null }
-export interface Status { org: string; branch: string; dirty: boolean }
+/** `instanceWrites` is said only while the Hub's writes are off (Lane 3 Task 11). */
+export interface Status { org: string; branch: string; dirty: boolean; instanceWrites?: 'off' }
 export type Entity = Record<string, unknown> & { id: string }
 export interface RegistryRead {
   name: string; kind: 'collection' | 'document'; schemaVersion: string | null

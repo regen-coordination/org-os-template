@@ -21,6 +21,7 @@ import { readLedger, resolveTrunk } from './ledger.ts'
 import { canWrite, cannotWrite, mayCheck, currentAttach, judgedBy, proposalContext, readOutcome, recordOutcome, type OutcomeSource } from './events.ts'
 import type { ProposeDeps } from './propose.ts'
 import { actHats, decidersOf, liveEvents, methodOf, type Proposal } from '../../lib/proposals.mjs'
+import { HOUSE_IDENT } from '../../lib/trailers.mjs'
 import { gitOpsOf } from '../../lib/ops.mjs'
 import type { ShownPrivate } from '../private/proposals.ts'
 import { hatRef, parseHatRef } from '../../lib/hats.mjs'
@@ -212,7 +213,14 @@ export interface DetailDeps extends Pick<ProposeDeps, 'build' | 'startBranch'> {
   /** The last build a visit tried that failed, per proposal: the rev and the trunk tip it was tried at, and the note. A
    *  visit does not try again at the same rev and tip, which would fail the same way (and run the hooks again). */
   failedBuilds: Map<string, { rev: string; tip: string; note: string }>
+  /** Hosted (L9 §5.5): the branch a visit builds is authored by the Hub. */
+  hosted?: boolean
+  /** Writes are off (Lane 3 Task 11, C1): a visit builds no branch and records no system reading. */
+  readOnly?: boolean
 }
+
+/** The note a visit answers while writes are off and the proposal's branch is missing or outdated. */
+export const READ_ONLY_NO_DIFF = (id: string) => `There is no diff to show: this Hub is read-only, so it builds no branch for proposal ${id}.`
 
 const firstLine = (err: unknown): string => (err instanceof Error ? err.message : String(err)).trim().split('\n')[0] ?? ''
 
@@ -225,7 +233,8 @@ const firstLine = (err: unknown): string => (err instanceof Error ? err.message 
  */
 async function visitRead(repo: string, actor: Actor, entry: Proposal, deps: DetailDeps): Promise<ProposalView['attention']> {
   const attach = currentAttach(entry)
-  if (!isKnown(actor) || entry.state !== 'open' || !attach) return undefined
+  // Recording a reading appends to the ledger (ledger 149's path): not while writes are off.
+  if (deps.readOnly || !isKnown(actor) || entry.state !== 'open' || !attach) return undefined
   const key = `${entry.id}\0${attach.id}`
   const last = deps.visits.get(key)
   if (last && deps.now.getTime() - last.at < OUTCOME_TTL_MS) return last.attention
@@ -255,6 +264,7 @@ async function diffOf(repo: string, id: string, deps: DetailDeps): Promise<{ dif
   const outdated = async (entry: Proposal) => entry.state === 'open' && (await branchStateOf(repo, entry)) === 'missing'
   const read = () => entriesOf(repo).find(e => String(e.id) === id) ?? null
   const first = read()
+  if (first && deps.readOnly && (await outdated(first))) return { diff: null, note: READ_ONLY_NO_DIFF(id) }
   if (first && (await outdated(first))) {
     // Built only under the lock, and only if, read again there, it still needs it: another request may have built it,
     // or revised the proposal, since the first look.
@@ -267,7 +277,7 @@ async function diffOf(repo: string, id: string, deps: DetailDeps): Promise<{ dif
       const tried = deps.failedBuilds.get(id)
       if (tried && tried.rev === entry.rev && tried.tip === tip) return tried.note
       try {
-        await (deps.build ?? buildBranch)(repo, { id, author: entry.author, ops: entry.ops as BranchProposal['ops'] }, tip, {})
+        await (deps.build ?? buildBranch)(repo, { id, author: entry.author, ops: entry.ops as BranchProposal['ops'] }, tip, deps.hosted ? { ident: HOUSE_IDENT } : {})
         deps.failedBuilds.delete(id)
         return undefined
       } catch (err) {

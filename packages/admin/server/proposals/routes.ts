@@ -55,6 +55,9 @@ export interface ProposalRoutesDeps extends ProposeDeps, Pick<RatifyDeps, 'ratif
   /** The one private store (L5 §10): a proposal's private part waits in it until it is decided, and is shown from it to
    *  those admitted. Absent: none (a proposal with a private part cannot be opened, ratified, or shown in full). */
   privateStore?: PrivateAccess
+  /** Writes are off (Lane 3 Task 11, C1): a page visit builds no branch and records no reading. The write routes
+   *  themselves are refused before they run (hosted/instance-writes.ts). */
+  readOnly?: boolean
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -241,7 +244,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
       return Response.json({ ...view, diff: null, note: PUBLIC_NO_DIFF, current })
     }
     const { build, startBranch } = deps
-    const detail = await detailView(repo, id, readerOf(c), { withLock, now: clock(), build, startBranch, systems, visits, failedBuilds })
+    const detail = await detailView(repo, id, readerOf(c), { withLock, now: clock(), build, startBranch, systems, visits, failedBuilds, hosted: deps.hosted, readOnly: deps.readOnly })
     return Response.json({ ...shownTo(detail, viewer, privateStore, readConfig(repo)), visibility: formatLevel(level ?? MEMBERS) })
   }))
   app.post('/api/proposals/:id/revise', async c => {

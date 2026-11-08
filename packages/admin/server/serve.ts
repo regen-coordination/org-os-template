@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { serve } from '@hono/node-server'
@@ -14,11 +14,11 @@ import { watchData, watchPaths } from './watcher.ts'
 import { ADAPTERS, ResourceStore } from './resources/index.ts'
 import { mountResources } from './resources/routes.ts'
 import { runCommand } from './resources/run.ts'
-import { refusal } from './guard.ts'
+import { refusal, type GuardScope } from './guard.ts'
 import { JobStore, otherLive, serverPidFile, stateDir } from './state.ts'
 import { ServerAttention, serverAttentionAdapter } from './attention.ts'
-import { openPrivateStore, type PrivateStore } from './private/store.ts'
-import { scheduleBackups } from './private/backup.ts'
+import { classifyOpenError, openPrivateStore, STORE_STUCK, type PrivateStore } from './private/store.ts'
+import { cleanLeftovers, scheduleBackups } from './private/backup.ts'
 import { LocalExecutor } from './operations/executor.ts'
 import { Plans } from './operations/plans.ts'
 import { mountOperations } from './operations/routes.ts'
@@ -35,11 +35,24 @@ import { FAILED_READ_TTL_MS, type FetchLike } from './systems/driver.ts'
 import { failedReadRetry } from './systems/retry.ts'
 import { Membership } from './session/membership.ts'
 import { mountSession } from './session/routes.ts'
+import { readSignInConfig, type SignInConfig } from './session/config.ts'
+import { mountEmailSignIn, type EmailSignIn } from './session/email.ts'
+import { logMailer, resendMailer, type Mailer } from './session/mail.ts'
 import { withRequest } from './request.ts'
-import { checkRemote } from './visibility/remote.ts'
+import { checkRemote, RemoteWatch } from './visibility/remote.ts'
 import { attentionLevel, EventLevels, gateEvent, PUBLIC_VIEWER } from './visibility/gate.ts'
 import { connectionViewer, mountVisibility } from './visibility/routes.ts'
 import type { Viewer } from '../lib/visibility.mjs'
+import type { HostedConfig } from './hosted/config.ts'
+import { useHubIdent } from './hosted/ident.ts'
+import { mountPush, Pusher } from './hosted/push.ts'
+import { Refresher } from './hosted/refresh.ts'
+import { readInstanceWrites, INSTANCE_WRITES_ENV, type InstanceWrites } from './hosted/instance-writes.ts'
+import { rateLimits, RATE, upgradeAddress, WS_PER_ADDRESS } from './hosted/limits.ts'
+import { prepaintHashes, securityHeaders } from './hosted/headers.ts'
+import { mountHealth } from './hosted/health.ts'
+import { accessLog } from './hosted/access.ts'
+import { resolveTrunk } from './proposals/ledger.ts'
 
 export interface ServeOptions {
   repo: string
@@ -53,11 +66,21 @@ export interface ServeOptions {
   /** Hosted mode (L5 spec §3): `readHosted` reads `--hosted` / `ORG_OS_HOSTED`. The session cookie is then Secure, and
    *  no backup key is attention. */
   hosted?: boolean
+  /** The hosted configuration (L9 spec §5.1), read by `readHostedConfig`. Hosted behaviours beyond L5's apply only when
+   *  it is passed; its `bind` replaces the loopback address. */
+  hostedConfig?: HostedConfig
   /** How often the private store is backed up; tests make it small. Default `ORG_OS_BACKUP_EVERY`, else 24 h. */
   backupEveryMs?: number
   /** How long a WebSocket connection's viewer is kept before it is asked again; tests make it small. Default
    *  `CONNECTION_VIEWER_MS`. */
   connectionViewerMs?: number
+  /** The sign-in mailer (Lane 3 Task 7). Tests pass a recording one; the default sends through the provider the
+   *  configuration names (`RESEND_API_KEY`, `MAIL_FROM`), or, locally with none, prints the link to the log. */
+  mailer?: Mailer
+  /** The writes-off switch (Lane 3 Task 11, C1), for tests that exercise the write routes of a hosted Hub. Absent (the
+   *  CLI never passes it): `HOUSE_INSTANCE_WRITES`, hosted default off, and a hosted on refused while
+   *  BEFORE_PILOT_OPEN is not empty. */
+  instanceWrites?: InstanceWrites
 }
 
 /** How often crew is asked again while an agent is seated: herdr's working, idle and blocked
@@ -71,9 +94,17 @@ export const CLOCK_REFRESH_MS = 3_600_000
 /** Outside systems are read again on this tick, which is also the reader's cache age, so "read N
  *  min ago" stays under five minutes while the server runs. */
 export const SYSTEMS_REFRESH_MS = READ_TTL_MS
+/** A hosted Hub asks again whether its remote is still private (L9 spec §5.7). */
+export const REMOTE_RECHECK_MS = 60 * 60 * 1000
 
 /** The one real network call. Under a test run (vitest sets VITEST) it refuses, so a test that
  *  forgot to inject a fake fetch fails loudly instead of reaching out (ruling S13). */
+/** The hashes of the built UI's inline scripts, for the hosted CSP (L9 §5.10); none when there is no built UI. */
+function builtPrepaint(appDist: string | undefined): string[] {
+  if (!appDist) return []
+  try { return prepaintHashes(readFileSync(join(appDist, 'index.html'), 'utf8')) } catch { return [] }
+}
+
 export const networkFetch: FetchLike = async (url, init) => {
   if (process.env.VITEST) throw new Error(`no network in tests: ${url} (inject a fake fetch)`)
   return globalThis.fetch(url, init)
@@ -111,9 +142,11 @@ export interface Running {
 /** The API plus the built UI on one port, bound to 127.0.0.1 only. Kept apart
  *  from index.ts (which reads the command line) so tests can start a real
  *  server on a free port and call it over HTTP. */
-export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_REFRESH_MS, fetch = networkFetch, hosted = false, backupEveryMs, connectionViewerMs = CONNECTION_VIEWER_MS }: ServeOptions): Promise<Running> {
+export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_REFRESH_MS, fetch = networkFetch, hosted = false, hostedConfig, backupEveryMs, connectionViewerMs = CONNECTION_VIEWER_MS, mailer, instanceWrites: givenWrites }: ServeOptions): Promise<Running> {
   // Read once, before anything listens: the trunk must not follow a later checkout.
   // (A directory that is not a git repository has none; the server still serves what it can.)
+  // Hosted, every commit is the Hub's (L9 §5.5): set before any git process starts, which all inherit it.
+  if (hosted) useHubIdent(process.env)
   const startBranch = await repoStatus(repo).then(s => s.branch, () => undefined)
   const jobs = new JobStore(repo)
   const systemReader = new SystemReader({ repo, fetch, rpc: parseRpcConfig(process.env.ORG_OS_RPC), safeApiKey: process.env.ORG_OS_SAFE_API_KEY?.trim() || undefined })
@@ -123,27 +156,53 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   const remote = await checkRemote(repo, { hosted, fetch, env: process.env })
   if (remote.refuse) throw new Error(remote.refuse)
   if (remote.attention) attention.raise('public-remote', 'Public repository', { level: 'alert', text: remote.attention })
+  // The emailed-link sign-in (Lane 3 Task 4): its variables are checked before anything listens. Hosted with none of
+  // them, it is not offered and the server starts; a refusal names a variable, never a value. The issuer is the Hub's
+  // origin: the configured one when hosted, this machine's otherwise.
+  const signInRead = readSignInConfig(process.env, {
+    hosted, origin: hosted && hostedConfig ? hostedConfig.origin : `http://localhost${port ? `:${port}` : ''}`,
+  })
+  if ('refuse' in signInRead) throw new Error(signInRead.refuse)
+  // The writes-off switch (Lane 3 Task 11, C1): read before anything listens; a value that is not on or off, or a hosted
+  // on while a before-pilot defect is open, stops the start.
+  const writesRead = givenWrites ?? readInstanceWrites(process.env, hosted)
+  if (typeof writesRead !== 'string') throw new Error(writesRead.refuse)
+  const instanceWrites: InstanceWrites = writesRead
+  if (instanceWrites === 'off') console.log(`org-os admin: ${INSTANCE_WRITES_ENV} is off: this Hub writes nothing to the instance (no commits, no push, no reconcile at start).`)
+  const signIn: SignInConfig | null = signInRead.config
+  const signInMailer: Mailer = mailer ?? (signIn?.mail ? resendMailer({ ...signIn.mail, fetch }) : logMailer())
   const store = new ResourceStore({
     repo, now: () => new Date(), run: runCommand, lastOk: (op, id) => jobs.lastOk(op, id),
     // The only reader given the network: drivers reach their declared hosts and nothing else.
     systems: systemReader,
+    // The Sources page's row for a read-only Hub's refresh (C1, C2); none while there is no Refresher.
+    refresh: () => refresher?.state() ?? null,
   }, [...ADAPTERS, serverAttentionAdapter(attention)])
   attention.onChange = () => store.invalidateAdapter('server')
   // The one private store. One that cannot be opened (not ignored by git, unreadable, newer) leaves the git side
   // serving and says why on Home (§10.1); every private read and write is then refused with that sentence.
+  // L9 §7.4 (carry 8): the error's own text (SQLite's, the OS's, the file's path) goes to the log; Home and every refused
+  // private read or write say the class's fixed sentence.
   let privateStore: PrivateStore | null = null
-  let storeWhy = ''
-  try { privateStore = await openPrivateStore(repo) } catch (err) {
-    const text = err instanceof Error ? err.message : String(err)
-    storeWhy = text
-    console.error(`org-os admin: ${text}`)
-    attention.raise('private-store', 'Private store', { level: 'alert', text })
+  let storeFailure: { sentence: string } | null = null
+  // Hosted with its configuration, the store is where it says (L9 §5.1, ruling P7); otherwise `privateDir(repo)`.
+  const config = hosted ? hostedConfig : undefined
+  try { privateStore = await openPrivateStore(repo, config ? { dir: config.privateDir } : {}) } catch (err) {
+    console.error(`org-os admin: ${err instanceof Error ? err.message : String(err)}`)
+    storeFailure = classifyOpenError(err)
+    attention.raise('private-store', 'Private store', { level: 'alert', text: storeFailure.sentence })
   }
   // A failure after it opened (a damaged file, a full disk) is said on Home the same way (§10.1); its words go to the log.
   if (privateStore) privateStore.onFailure = text => attention.raise('private-store', 'Private store', { level: 'alert', text })
+  // A write that holds the store's lock past its wait (§7.5): said on Home while it holds, cleared when it lets go.
+  if (privateStore) {
+    privateStore.onStuck = ms => attention.raise('private-store-stuck', 'Private store', { level: 'warn', text: STORE_STUCK(ms) })
+    privateStore.onUnstuck = () => attention.clear('private-store-stuck')
+  }
   // §10.3: a ratified proposal whose private part was never committed to the store is applied now, before anything is
   // served; a closed proposal's leftover pending rows go. A failure is logged and the server still starts.
-  if (privateStore) {
+  // While writes are off it does not run (ledger 232 M8 sits on this path); the start says so once, above.
+  if (privateStore && instanceWrites === 'on') {
     try {
       const applied = await reconcilePrivate(repo, privateStore)
       if (applied.length > 0) console.log(`org-os admin: applied the restricted part of ${applied.join(', ')}, ratified before the last stop.`)
@@ -162,28 +221,58 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   const plans = new Plans()
   // Membership from the DAO's Hats tree (§5), read through the one reader; sessions live in the one private store.
   const membership = new Membership({ repo, reader: systemReader, now: () => new Date() })
+  // The hosted binding (L9 §5.1), only when hosted and given (`config`, above): one host and one origin for the guard,
+  // SIWE and the WebSocket upgrade; the `__Host-` cookie; the door's origin. Without it, hosted is L5's, on this machine.
+  const guard: GuardScope = config ? { kind: 'hosted', host: config.host, origin: config.origin } : { kind: 'local' }
+  // The one writer's push (L9 §5.6): made once the server listens, beside the RemoteWatch it reads rule 4 through; its
+  // retry route reads it when asked, and answers PUSH_OFF while there is none (local, or ORG_OS_PUSH=off).
+  let pusher: Pusher | null = null
+  // The reader's refresh (C1, C2): made once the server listens, when hosted with writes off; it moves the trunk under
+  // the write lock, which the app hands over here.
+  let refresher: Refresher | null = null
+  let writeLock: (<T>(fn: () => Promise<T>) => Promise<T>) | null = null
+  // The emailed-link sign-in's work done after its answers (S10-0): waited for at stop, before the store closes.
+  let emailSignIn: EmailSignIn | null = null
   const app = createApp(repo, (a, ctx) => {
     // First, so its middleware reads the session for every route mounted after it.
-    mountSession(a, { repo, store: privateStore, membership, hosted })
+    writeLock = ctx.withLock
+    mountSession(a, { repo, store: privateStore, membership, hosted, config, signIn, instanceWrites })
+    emailSignIn = mountEmailSignIn(a, { repo, store: privateStore, config: signIn, mailer: signInMailer, ...(config ? { hosted: config } : {}) })
     mountResources(a, store, repo, { hosted })
-    mountOperations(a, { repo, store, jobs, executor, plans, startBranch })
-    mountProposals(a, { repo, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, systems: systemReader, hosted, privateStore: ctx.privateStore })
+    mountOperations(a, { repo, store, jobs, executor, plans, startBranch, hosted })
+    mountProposals(a, { repo, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, systems: systemReader, hosted, privateStore: ctx.privateStore, readOnly: instanceWrites === 'off' })
     mountSync(a, { repo, withLock: ctx.withLock, store, jobs, executor, plans, startBranch, notify: msg => emit(msg) })
     mountGenerated(a, { repo })
     mountStandards(a, { repo, systems: systemReader }) // seam S4: L5's members gate wraps this route
     mountBootstrap(a, { repo, jobs, executor, withLock: ctx.withLock })
-    mountWizards(a, { repo })
+    mountWizards(a, { repo, hosted })
     mountVisibility(a, { repo, membership, systems: systemReader, withLock: ctx.withLock, privateStore: ctx.privateStore, notify: msg => emit(msg) })
+    mountPush(a, { pusher: () => pusher })
+    // Every mode (ruling P1): public, `{ ok }` and nothing more (L9 §5.11).
+    mountHealth(a, { store: () => privateStore !== null })
   }, {
     notify: msg => emit(msg),
     // Who asks (L5 spec §6.2): the session's member, git's identity locally, nobody hosted; every route reads it.
-    request: withRequest({ repo, hosted, membership, store: privateStore }),
+    request: withRequest({ repo, hosted, membership, store: privateStore, config, signIn }),
     // Private records and restricted fields are read from it and written only to it (L5 §10); down, said with why.
-    privateStore: storeAccess(privateStore, storeWhy),
+    privateStore: storeAccess(privateStore, storeFailure),
+    guard,
+    // Hosted, every write route is classified (L9 §5.4): commands, sync and the claim are off, whatever the configuration.
+    hosted,
+    instanceWrites,
+    // Hosted with its configuration (L9 Task 8): the access line to stdout, the headers, the rate limits; before the guard.
+    ...(config ? { edge: [
+      accessLog(line => console.log(line)),
+      securityHeaders({ host: config.host, prepaintHashes: builtPrepaint(appDist) }),
+      rateLimits({ trustProxy: config.trustProxy }),
+    ] } : {}),
   })
   // A connection's viewer is read as a request's is, from the same session cookie.
-  const viewerOfCookie = connectionViewer({ repo, hosted, membership, store: privateStore })
+  const viewerOfCookie = connectionViewer({ repo, hosted, membership, store: privateStore, config, signIn })
   const events = new EventLevels(repo, attentionLevel(hosted))
+  // The members' side's /door goes to the door (§5.2); with no door origin it is the SPA's, as before.
+  const doorOrigin = config?.doorOrigin
+  if (doorOrigin) app.get('/door', c => c.redirect(doorOrigin, 302))
   if (appDist && existsSync(appDist)) {
     app.use('/*', serveStatic({ root: appDist }))
     app.get('*', serveStatic({ path: 'index.html', root: appDist })) // SPA fallback
@@ -208,26 +297,45 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   })) as typeof createServer
 
   return new Promise(resolve => {
-    const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port, createServer: withReadableHost }, () => {
+    const server = serve({ fetch: app.fetch, hostname: hosted && hostedConfig ? hostedConfig.bind : '127.0.0.1', port, createServer: withReadableHost }, () => {
       // Only a server that is listening may touch job records; and a record that a live server
       // of this repository is running is not an orphan.
       const pidFile = serverPidFile(repo)
       let other = NaN
       try { other = Number(readFileSync(pidFile, 'utf8').trim()) } catch { /* none recorded */ }
       if (otherLive(other)) console.error(`org-os admin: another server (pid ${other}) is running for this repository; its jobs were left as they are.`)
-      else jobs.markInterrupted()
+      else {
+        jobs.markInterrupted()
+        // What a backup or a restore cut short left in the store's folder (L9 §7.1, carry 6): only with no other server.
+        if (privateStore) cleanLeftovers(dirname(privateStore.file), line => console.log(`org-os admin: ${line}`))
+      }
       try { mkdirSync(stateDir(repo), { recursive: true }); writeFileSync(pidFile, String(process.pid)) } catch (err) {
         console.error(`org-os admin: could not record this server's pid: ${err instanceof Error ? err.message : String(err)}`)
       }
       // Who each socket is: kept from its upgrade until it is open, then by the socket.
       const upgrades = new WeakMap<IncomingMessage, Listener>()
+      // Hosted with its configuration, open connections per client address (L9 §5.9): a place is taken when the upgrade
+      // is let through, and given back when the socket closes.
+      const openFrom = new Map<string, number>()
+      const addressOf = new WeakMap<IncomingMessage, string>()
+      const giveBack = (address: string) => {
+        const n = (openFrom.get(address) ?? 1) - 1
+        if (n <= 0) openFrom.delete(address); else openFrom.set(address, n)
+      }
       const listeners = new WeakMap<WebSocket, Listener>()
       const wss = new WebSocketServer({
         server: server as Server, path: '/api/events',
         // The upgrade does not pass through the Hono app, so it asks the same question itself.
         verifyClient: (info, done) => {
-          const refused = refusal({ method: 'GET', host: info.req.headers.host, origin: info.req.headers.origin, contentType: undefined })
+          const refused = refusal({ method: 'GET', host: info.req.headers.host, origin: info.req.headers.origin, contentType: undefined, path: '/api/events' }, guard)
           if (refused) { done(false, refused.status, refused.error); return }
+          if (config) {
+            const address = upgradeAddress(info.req, config.trustProxy)
+            const n = openFrom.get(address) ?? 0
+            if (n >= WS_PER_ADDRESS) { done(false, 429, RATE(60)); return }
+            openFrom.set(address, n + 1)
+            addressOf.set(info.req, address)
+          }
           const cookie = info.req.headers.cookie
           const asked = Date.now()
           void viewerOfCookie(cookie).then(viewer => {
@@ -238,6 +346,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
       })
       wss.on('connection', (ws, req) => {
         listeners.set(ws, upgrades.get(req) ?? { cookie: undefined, viewer: PUBLIC_VIEWER, at: 0, sending: Promise.resolve() })
+        const address = addressOf.get(req)
+        if (address !== undefined) ws.once('close', () => giveBack(address))
       })
       /** The connection's viewer now: the one kept while it is younger than `connectionViewerMs`, else asked again first
        *  (a session that ended reads as the public; an ask that fails does too, `connectionViewer`). */
@@ -305,7 +415,33 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
       // The baseline the first resources-changed is measured from, and each resource's level then.
       store.refresh().then(async () => events.noteGraph(await store.graph())).catch(reportRefreshFailure).then(() => systemsRetry.afterRefresh())
       attention.onChange = () => { store.invalidateAdapter('server'); scheduleRefresh() }
-      const backups = privateStore ? scheduleBackups({ store: privateStore, repo, hosted, attention, everyMs: backupEveryMs }) : null
+      const remoteWatch = hosted ? new RemoteWatch({ repo, fetch, everyMs: REMOTE_RECHECK_MS, attention }) : null
+      remoteWatch?.start()
+      // Hosted and `ORG_OS_PUSH` on: the trunk goes to the remote after the server's commits, and once now. Rule 4 is
+      // read through this RemoteWatch; anything but "not public" holds the push.
+      // While writes are off there is no Pusher at all, whatever ORG_OS_PUSH says (C1).
+      if (remoteWatch && config?.push && instanceWrites === 'on') {
+        pusher = new Pusher({ repo, trunk: () => resolveTrunk(repo, startBranch), watch: remoteWatch, attention })
+        pusher.start()
+      }
+      // Hosted with writes off: the Hub reads its instance, whose commits are made elsewhere, so it takes them from the
+      // remote, fast-forward only, at start and every ORG_OS_REFRESH_EVERY (15 min). Never beside a Pusher.
+      if (config && config.refreshEveryMs !== null && instanceWrites === 'off') {
+        refresher = new Refresher({
+          repo, trunk: () => resolveTrunk(repo, startBranch), everyMs: config.refreshEveryMs, attention,
+          ...(writeLock ? { withLock: writeLock } : {}),
+          onAdvance: () => { for (const a of ADAPTERS) store.invalidateAdapter(a.name) },
+          onState: () => { store.invalidateAdapter('sources'); scheduleRefresh() },
+        })
+        refresher.start()
+      }
+      // Hosted with its configuration, the backups' folder, interval, count and public key are the configuration's (§5.1,
+      // ruling P7: 6 h, `/srv/backups`, `/run/secrets/backup.pub` by default); otherwise the environment's, as L5.
+      const backupEnv = config ? {
+        ...process.env, ORG_OS_BACKUP_DIR: config.backupDir, ORG_OS_BACKUP_EVERY: String(config.backupEveryMs),
+        ORG_OS_BACKUP_KEEP: String(config.backupKeep), ORG_OS_BACKUP_PUBLIC_KEY_FILE: config.backupPublicKeyFile ?? '',
+      } : undefined
+      const backups = privateStore ? scheduleBackups({ store: privateStore, repo, hosted, attention, everyMs: backupEveryMs, ...(backupEnv ? { env: backupEnv } : {}) }) : null
 
       resolve({
         port: (server.address() as AddressInfo).port,
@@ -315,9 +451,14 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         close: async () => {
           // Jobs first: a child left running would outlive the server that promised to supervise it.
           await executor.stopAll()
+          // Then the push: no new one starts, its timer goes, and one under way is waited for.
+          await pusher?.stop()
+          // And the refresh: its timer goes, and one under way (a fetch, a fast-forward) is waited for.
+          await refresher?.stop()
           clearInterval(crewPoll)
           clearInterval(clockTick)
           clearInterval(systemsTick)
+          remoteWatch?.stop()
           systemsRetry.stop()
           try { if (readFileSync(pidFile, 'utf8').trim() === String(process.pid)) rmSync(pidFile, { force: true }) } catch { /* already gone */ }
           if (pending) clearTimeout(pending)
@@ -329,6 +470,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
           await new Promise<void>(done => server.close(() => done()))
           // Last: a backup under way finishes first, and no request is left to read the store.
           await backups?.stop()
+          await emailSignIn?.settled()
           privateStore?.close()
         },
       })

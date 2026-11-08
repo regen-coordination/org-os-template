@@ -29,7 +29,7 @@ import { parseRecord } from '../changes/records.ts'
 import { entriesFromText } from '../registry.ts'
 import { REGISTRIES } from '../registries.ts'
 import {
-  commitMerge, isAncestor, mergeAbort, mergeInProgress, mergeNoFf, resolveRev, showFile,
+  authorEmail, commitMerge, isAncestor, moveProposalBranch, mergeAbort, mergeInProgress, mergeNoFf, resolveRev, showFile,
   stageMergeFiles, stagedNames, trackedChanges, unmergedPaths, type CommitOptions, type GitIdent, type MergeStart,
 } from '../git.ts'
 import { buildBranch, buildFailureWords, type BranchProposal, type BuildResult } from './branch.ts'
@@ -49,7 +49,7 @@ import { decisionRowFor } from '../../lib/decision-row.mjs'
 import { validateRepo } from '../../lib/data-validate.mjs'
 import { transition } from '../../lib/machines/run.mjs'
 import { proposal as machine, proposalGuards } from '../../lib/machines/proposal.mjs'
-import type { TrailerValues } from '../../lib/trailers.mjs'
+import { HOUSE_IDENT, type TrailerValues } from '../../lib/trailers.mjs'
 import { gitOpsOf } from '../../lib/ops.mjs'
 import { applyPrivate, aroundGit, clearsOf, noStore, reach, STORE_FAILED, unavailable, type PrivateAccess, type StagedPrivateOp } from '../private/ops.ts'
 import { decidedWrites, pendingOps, placeholdersOf } from '../private/proposals.ts'
@@ -550,10 +550,15 @@ export async function ratify(repo: string, actor: KnownActor, id: string, deps: 
   if (trunk === null) throw new HttpError(409, 'This repository has no commit yet, so there is no trunk to ratify on.')
   const ref = `refs/heads/proposal/${id}`
   const tip = await resolveRev(repo, ref)
-  if (tip === null || (await resolveRev(repo, `${tip}^`)) !== trunk) {
+  // Hosted, a branch whose tip the Hub did not author (built before the instance moved to hosting, L9 §5.5) is built again.
+  const foreign = deps.hosted === true && tip !== null && (await authorEmail(repo, tip)) !== HOUSE_IDENT.email
+  if (tip === null || foreign || (await resolveRev(repo, `${tip}^`)) !== trunk) {
     try {
-      // Rebuilt by the ratifier's act: committed as they commit (L5 §6.4, the house for a signed-in actor).
-      const build = deps.build ?? ((r: string, p: BranchProposal, f: string) => buildBranch(r, p, f, { ident: commitIdent(actor) }))
+      // buildBranch leaves a branch alone whose parent and tree are the new commit's; the foreign tip is therefore first set
+      // back onto the trunk tip (compare-and-swap, a cache), so the build moves it to a commit the Hub authors.
+      if (foreign && tip !== null && (await resolveRev(repo, `${tip}^`)) === trunk) await moveProposalBranch(repo, id, trunk, tip)
+      // Rebuilt by the ratifier's act: committed as they commit (L5 §6.4, the house for a signed-in actor); hosted, always the Hub.
+      const build = deps.build ?? ((r: string, p: BranchProposal, f: string) => buildBranch(r, p, f, { ident: deps.hosted ? HOUSE_IDENT : commitIdent(actor) }))
       await build(repo, { id, author: entry.author, ops: entry.ops as BranchProposal['ops'] }, trunk)
     } catch (err) {
       // A refusal of the build's own (stale ops, a branch moved meanwhile) is its answer. Anything else (a hook that

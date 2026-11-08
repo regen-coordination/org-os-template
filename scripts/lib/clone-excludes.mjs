@@ -96,6 +96,8 @@ export const TOP_LEVEL_DENY = new Map([
   ["integrations", "framework-side integration workspace (no instance script reads it)"],
   ["modules", "framework-side module registry (scripts/modules.mjs calls it framework source)"],
   ["instances", "private per-instance configs of other organisations"],
+  [".dockerignore", "the framework's container build excludes — an instance runs the published Hub image, it does not build it"],
+  ["deploy", "the framework's Hub image and deploy examples — an instance runs the published image, it does not build it"],
 ]);
 
 /**

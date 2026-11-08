@@ -10,7 +10,7 @@ process.env.ORG_OS_ADMIN_HOME ??= mkdtempSync(join(tmpdir(), 'admin-state-'))
 // inside a fixture (where git does not ignore it, and Home would say so), this worktree or the operator's real store,
 // whatever the caller's shell sets. A test about the place sets it itself. The backup variables are the caller's machine's: no test backs up into its folders or under its key.
 process.env.ORG_OS_PRIVATE_DIR = mkdtempSync(join(tmpdir(), 'admin-private-')) // assigned: never the caller's own store
-for (const key of ['ORG_OS_BACKUP_KEY_FILE', 'ORG_OS_BACKUP_DIR', 'ORG_OS_BACKUP_EVERY', 'ORG_OS_BACKUP_KEEP', 'ORG_OS_HOSTED']) delete process.env[key]
+for (const key of ['ORG_OS_BACKUP_KEY_FILE', 'ORG_OS_BACKUP_PUBLIC_KEY_FILE', 'ORG_OS_BACKUP_PRIVATE_KEY_FILE', 'ORG_OS_BACKUP_DIR', 'ORG_OS_BACKUP_EVERY', 'ORG_OS_BACKUP_KEEP', 'ORG_OS_HOSTED']) delete process.env[key]
 
 // Every git command a test runs (its own, and the server's under test) reads the repository its `cwd` names and nothing
 // else: a variable inherited from the caller (a hook exports GIT_DIR and GIT_INDEX_FILE) outranks the cwd and would point

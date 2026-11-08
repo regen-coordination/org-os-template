@@ -1,6 +1,6 @@
 # MASTERPLAN.md — Organizational OS Framework
 
-**Version:** 0.6.0
+**Version:** 0.6.1
 **Date:** 2026-08-28
 **Workspace:** org-os (organizational-os-template)
 **Agent Identity:** Organizational OS Framework Development Agent

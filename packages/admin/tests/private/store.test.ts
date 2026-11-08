@@ -5,9 +5,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { makeFixtureRepo } from '../fixtures.ts'
+import { makeChangeRepo, git } from '../changes/fixtures.ts'
 import { isIgnored } from '../../server/git.ts'
 import { privateDir } from '../../server/private/paths.ts'
-import { openPrivateStore, StoreUnavailable, type PrivateStore, type PrivateRecord } from '../../server/private/store.ts'
+import {
+  openPrivateStore, StoreUnavailable, type PrivateStore, type PrivateRecord,
+  classifyOpenError, LOCK_WAIT_MIN_MS, LOCK_WAIT_MAX_MS, STORE_CANNOT_OPEN, STORE_NEWER, STORE_STUCK, lockWaited, lockWaitRefusal,
+} from '../../server/private/store.ts'
+import { storeAccess, reach, unavailable, NO_STORE } from '../../server/private/ops.ts'
+import { startServer, type Running } from '../../server/serve.ts'
 
 // Every test runs in a fresh temporary repository (makeFixtureRepo) and keeps its store in a folder of its own
 // under the temp directory, or under the fixture's `.org-os/private/` once that repository ignores it: no store is
@@ -125,7 +131,7 @@ describe('where the store may be (spec §10.1)', () => {
 })
 
 describe('the file (spec §10.1, §10.2)', () => {
-  it('holds the tables and columns of §10.2, in WAL, at schema 1', async () => {
+  it('holds the tables and columns of §10.2 and schema 2, in WAL, at schema 2', async () => {
     const s = await opened()
     s.close()
     const db = new DatabaseSync(s.file, { readOnly: true })
@@ -139,8 +145,12 @@ describe('the file (spec §10.1, §10.2)', () => {
       expect(columns('pending')).toEqual(['ref', 'proposal', 'salt', 'ops', 'digest'])
       expect(columns('applied')).toEqual(['proposal', 'commit', 'at'])
       expect(columns('sessions')).toEqual(['token_hash', 'account', 'created', 'expires'])
+      expect(columns('roles')).toEqual(['person_id', 'name', 'roles', 'nodes'])
+      expect(columns('email_keys')).toEqual(['email_key', 'person_id'])
+      expect(columns('roles_meta')).toEqual(['k', 'v'])
+      expect(columns('sign_in_links')).toEqual(['token_hash', 'person_id', 'return_to', 'created', 'expires', 'used_at'])
       expect(db.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'wal' })
-      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 1 })
+      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 })
     } finally { db.close() }
   })
 
@@ -156,11 +166,11 @@ describe('the file (spec §10.1, §10.2)', () => {
   it('a newer user_version is refused in words', async () => {
     const r = repo(); const dir = storeDir()
     const db = new DatabaseSync(join(dir, 'house.db'))
-    db.exec('PRAGMA user_version = 2')
+    db.exec('PRAGMA user_version = 3')
     db.close()
     const err = await refusal(openPrivateStore(r, { dir }))
     expect(err).toBeInstanceOf(StoreUnavailable)
-    expect(err.message).toBe('This private store was written by a newer org-os (schema 2); update first.')
+    expect(err.message).toBe('This private store was written by a newer org-os (schema 3); update first.')
   })
 
   it('a corrupt file throws StoreUnavailable with the file named, not the contents', async () => {
@@ -369,18 +379,8 @@ describe('transactions (spec §10.3; ruling P7)', () => {
     expect(s.records('grievances').map(x => x.id)).toEqual(['g-2'])
   })
 
-  it('a transaction left open makes the next write fail in words after the bound, not wait forever', async () => {
-    const r = repo(); const dir = storeDir()
-    const s = await openPrivateStore(r, { dir, lockWaitMs: 50 }); open.push(s)
-    const t = await s.begin()
-    t.putRecord(RECORD, 'steward-a', 'c-1')
-    const err = await refusal(s.putRecord({ ...RECORD, id: 'g-2' }, 'steward-a', null)) // the holder's own put, too
-    expect(err).toBeInstanceOf(StoreUnavailable)
-    expect(err.message).toMatch(/a transaction was left open/)
-    t.commit()
-    await s.putRecord({ ...RECORD, id: 'g-3' }, 'steward-a', null) // the queue moves on past the one that gave up
-    expect(s.records('grievances').map(x => x.id)).toEqual(['g-1', 'g-3'])
-  })
+  // "a transaction left open makes the next write fail in words after the bound" (50 ms) is replaced by L9 Task 9's
+  // lock-refusal test below, at 1 s with fake timers (ruling P4): 1 s is now the floor.
 
   it('a writer waiting behind a rolled-back one still runs', async () => {
     const s = await opened()
@@ -389,5 +389,194 @@ describe('transactions (spec §10.3; ruling P7)', () => {
     t.rollback()
     await put
     expect(s.record('grievances', 'g-1')).toEqual(RECORD)
+  })
+})
+
+// ── L9 Task 9: the single writer and error hygiene (L9 spec §7.4, §7.5; carries 5 and 8) ─────────────────────────
+// Stores in folders of their own under the temp directory, fresh temporary repositories, and the one server started is
+// local with a fetch that refuses: nothing is made in this worktree and nothing touches the network.
+
+const running: Running[] = []
+afterEach(async () => {
+  vi.useRealTimers()
+  for (const s of running.splice(0)) await s.close()
+  vi.restoreAllMocks()
+})
+const temp = (prefix: string) => { const d = mkdtempSync(join(tmpdir(), prefix)); cleanup.push(d); return d }
+const changeRepo = () => { const r = makeChangeRepo(); cleanup.push(r); return r }
+async function openedWaiting(lockWaitMs = 1_000): Promise<PrivateStore> {
+  const s = await openPrivateStore(repo(), { dir: storeDir(), lockWaitMs }); open.push(s); return s
+}
+
+describe('a stuck write (§7.5, carry 5)', () => {
+  it('a transaction held past lockWaitMs raises onStuck once and clears on release; the next stuck holder raises again', async () => {
+    const s = await openedWaiting(1_000)
+    vi.useFakeTimers()
+    const stuck = vi.fn(), unstuck = vi.fn()
+    s.onStuck = stuck; s.onUnstuck = unstuck
+    const t = await s.begin()
+    await vi.advanceTimersByTimeAsync(999)
+    expect(stuck).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(2)
+    expect(stuck).toHaveBeenCalledTimes(1)
+    expect(stuck.mock.calls[0]![0]).toBeGreaterThanOrEqual(1_000)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(stuck).toHaveBeenCalledTimes(1) // once per stuck holder
+    expect(unstuck).not.toHaveBeenCalled()
+    t.commit()
+    expect(unstuck).toHaveBeenCalledTimes(1)
+
+    // A holder that finishes in time raises nothing and clears nothing.
+    const quick = await s.begin(); quick.rollback()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect([stuck.mock.calls.length, unstuck.mock.calls.length]).toEqual([1, 1])
+
+    const again = await s.begin()
+    await vi.advanceTimersByTimeAsync(1_001)
+    expect(stuck).toHaveBeenCalledTimes(2)
+    again.rollback()
+    expect(unstuck).toHaveBeenCalledTimes(2)
+  })
+
+  it('the stuck sentence names the seconds held', () => {
+    expect(STORE_STUCK(31_400)).toBe('A write to the private store has been open for 31 s; writes after it wait.')
+  })
+
+  // Replaces store.test.ts "a transaction left open makes the next write fail in words after the bound" (ruling P4):
+  // 50 ms there; 1 s with fake timers here, since 1 s is the floor.
+  it('the lock refusal says the one before has not finished, slow or left open, and that nothing was written', async () => {
+    const s = await openedWaiting(1_000)
+    vi.useFakeTimers()
+    const t = await s.begin()
+    t.putRecord(RECORD, 'steward-a', 'c-1')
+    const waiting = refusal(s.putRecord({ ...RECORD, id: 'g-2' }, 'steward-a', null))
+    await vi.advanceTimersByTimeAsync(1_000)
+    const err = await waiting
+    expect(err).toBeInstanceOf(StoreUnavailable)
+    expect(err.message).toBe('A write to the private store waited 1000 ms for the one before it, which has not finished (it is slow, or was left open). Nothing was written.')
+    expect(err.message).toBe(lockWaited(1_000))
+    t.commit()
+    vi.useRealTimers()
+    await s.putRecord({ ...RECORD, id: 'g-3' }, 'steward-a', null) // the queue moves on past the one that gave up
+    expect(s.records('grievances').map(x => x.id)).toEqual(['g-1', 'g-3'])
+  })
+})
+
+describe('lockWaitMs is validated (§7.5)', () => {
+  it('0, 500, 300_001, 1.5 and NaN refuse to open, with the sentence, and nothing is made', async () => {
+    expect([LOCK_WAIT_MIN_MS, LOCK_WAIT_MAX_MS]).toEqual([1_000, 300_000])
+    for (const v of [0, 500, 300_001, 1.5, Number.NaN]) {
+      const dir = join(temp('robust-lock-'), 'store')
+      const err = await refusal(openPrivateStore(repo(), { dir, lockWaitMs: v }))
+      expect(err).toBeInstanceOf(StoreUnavailable)
+      expect(err.message).toBe(lockWaitRefusal(v))
+      expect(existsSync(dir)).toBe(false)
+    }
+    expect(lockWaitRefusal(500)).toBe('The private store\'s write wait (lockWaitMs) is 500, not a whole number of milliseconds from 1000 to 300000, so the store was not opened.')
+    for (const v of [1_000, 300_000]) await expect(openPrivateStore(repo(), { dir: temp('robust-lock-'), lockWaitMs: v }).then(s => { open.push(s); return true })).resolves.toBe(true)
+  })
+})
+
+describe('atomic() (§7.5)', () => {
+  it('when the write throws and RELEASE also throws, the write\'s error is the one rethrown; the second is logged', async () => {
+    const s = await openedWaiting()
+    const db = (s as unknown as { db: DatabaseSync }).db
+    const exec = db.exec.bind(db)
+    vi.spyOn(db, 'exec').mockImplementation((sql: string) => {
+      if (sql === 'RELEASE write_and_history') throw new Error('SENTINEL-release-1')
+      return exec(sql)
+    })
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const err = await refusal(s.putRecord(RECORD, '', null)) // no "who wrote": the write's own error
+    expect(err.message).toBe('the private store needs who wrote as a non-empty string')
+    expect(said.mock.calls.map(c => String(c[0])).some(l => l.includes('SENTINEL-release-1'))).toBe(true)
+    vi.mocked(db.exec).mockRestore()
+    await s.putRecord(RECORD, 'steward-a', null) // the transaction was rolled back and the lock released
+    expect(s.record('grievances', 'g-1')).toEqual(RECORD)
+  })
+})
+
+describe('what a store that cannot be opened answers (§7.4, carry 8)', () => {
+  /** A store folder whose house.db is not a database: SQLite's own words, and the file's path, in the error. */
+  function garbageDir(): string {
+    const dir = temp('robust-garbage-')
+    writeFileSync(join(dir, 'house.db'), 'SENTINEL-not-a-database-1 '.repeat(200))
+    return dir
+  }
+
+  it('classifyOpenError: three kinds, three fixed sentences; the raw text is never the sentence', async () => {
+    const sqlite = await refusal(openPrivateStore(repo(), { dir: garbageDir() }))
+    expect(classifyOpenError(sqlite)).toEqual({ kind: 'cannot-open', sentence: STORE_CANNOT_OPEN })
+    expect(STORE_CANNOT_OPEN).toBe('The private store could not be opened. A maintainer can read why in the server\'s log.')
+
+    const r = repo()
+    const notIgnored = await refusal(openPrivateStore(r, { dir: join(r, '.org-os', 'private') }))
+    expect(classifyOpenError(notIgnored)).toEqual({ kind: 'not-ignored', sentence: notIgnored.message }) // §10.1's copy
+    expect(notIgnored.message).toMatch(/^The private store would be at \.org-os\/private\/house\.db, which git does not ignore\./)
+
+    expect(classifyOpenError(new StoreUnavailable('This private store was written by a newer org-os (schema 9); update first.', 'newer')))
+      .toEqual({ kind: 'newer', sentence: STORE_NEWER })
+    expect(STORE_NEWER).toBe('The private store was written by a newer org-os. Update this Hub first.')
+    expect(classifyOpenError(new Error('EACCES: permission denied, open \'/srv/private/house.db\''))).toEqual({ kind: 'cannot-open', sentence: STORE_CANNOT_OPEN })
+    expect(classifyOpenError('a string')).toEqual({ kind: 'cannot-open', sentence: STORE_CANNOT_OPEN })
+  })
+
+  it('a newer store is classed newer from the store itself', async () => {
+    const dir = temp('robust-newer-')
+    const first = await openPrivateStore(repo(), { dir }); first.close()
+    const raw = new DatabaseSync(join(dir, 'house.db')); raw.exec('PRAGMA user_version = 9'); raw.close()
+    expect(classifyOpenError(await refusal(openPrivateStore(repo(), { dir })))).toEqual({ kind: 'newer', sentence: STORE_NEWER })
+  })
+
+  it('storeAccess throws the failure\'s sentence, or NO_STORE with none', () => {
+    expect(() => storeAccess(null, { sentence: STORE_CANNOT_OPEN })()).toThrow(STORE_CANNOT_OPEN)
+    expect(() => storeAccess(null, null)()).toThrow(NO_STORE)
+    const { why } = reach(storeAccess(null, { sentence: STORE_CANNOT_OPEN }))
+    expect(unavailable(why).body).toEqual({ error: STORE_CANNOT_OPEN, code: 'PRIVATE_STORE' })
+  })
+
+  it('a server whose store fails to open with SQLite\'s own text answers 503 with the fixed sentence; the log has the original', async () => {
+    const r = changeRepo()
+    vi.stubEnv('ORG_OS_PRIVATE_DIR', garbageDir())
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const server = await startServer({ repo: r, port: 0, fetch: async () => { throw new Error('no network in this test') } })
+    running.push(server)
+    expect(server.privateStore).toBeNull()
+    const logged = said.mock.calls.map(c => String(c[0]))
+    expect(logged.some(l => /could not be opened: .*file is not a database/i.test(l))).toBe(true) // the original, to the log
+
+    // A change with a private part needs the store: its answer is the 503.
+    // steward-a (git's identity here) holds the role ops by name, so the write is admitted and only the store is missing.
+    writeFileSync(join(r, 'data', 'governance.yaml'), 'schema_version: "2.0"\ngovernance:\n  model: "solo-maintainer"\n  roles:\n    ops: { members: [steward-a] }\n  decisions: []\n')
+    writeFileSync(join(r, 'data', 'visibility.yaml'), 'visibility:\n  collections:\n    members: { default: members, fields: { email: "role:ops" } }\n')
+    git(r, 'add -A'); git(r, 'commit -qm "fixture: email is restricted to the role ops"')
+    const res = await fetch(`http://localhost:${server.port}/api/changes/ops`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ops: [{ op: 'update', record: 'members:steward-a', set: { email: 'steward-a@example.invalid' } }] }),
+    })
+    const text = await res.text()
+    expect(res.status).toBe(503)
+    expect(JSON.parse(text)).toEqual({ error: STORE_CANNOT_OPEN, code: 'PRIVATE_STORE' })
+    expect(text).not.toMatch(/SQLITE/i)
+    expect(text).not.toMatch(/errno/i)
+    expect(text).not.toContain('/')
+    expect(text).not.toContain('not a database')
+
+    // Home's attention is the class's sentence, not SQLite's words.
+    const home = await (await fetch(`http://localhost:${server.port}/api/resources`)).json() as { id: string; attention?: { text: string } }[]
+    expect(home.find(n => n.id === 'absent:server:private-store')?.attention?.text).toBe(STORE_CANNOT_OPEN)
+  })
+
+  it('a server raises the stuck store as attention and clears it on release', async () => {
+    const r = changeRepo()
+    vi.stubEnv('ORG_OS_PRIVATE_DIR', temp('robust-ok-'))
+    const server = await startServer({ repo: r, port: 0, fetch: async () => { throw new Error('no network in this test') } })
+    running.push(server)
+    const attention = async () => ((await (await fetch(`http://localhost:${server.port}/api/resources`)).json()) as { id: string; attention?: { text: string } }[])
+      .find(n => n.id === 'absent:server:private-store-stuck')?.attention?.text ?? null
+    server.privateStore!.onStuck!(31_000)
+    expect(await attention()).toBe(STORE_STUCK(31_000))
+    server.privateStore!.onUnstuck!()
+    expect(await attention()).toBeNull()
   })
 })

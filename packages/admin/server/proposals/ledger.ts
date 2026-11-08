@@ -234,7 +234,7 @@ export function closedLedgerText(src: string, id: string, fields: Record<string,
 // ── the one write ─────────────────────────────────────────────────────────────────────────────────
 
 /** The fields an update may change. `id`, `author`, `opened`, `rules` (the snapshot) and `events` are not among them. */
-const CHANGEABLE = ['state', 'closed', 'base', 'branch', 'ops', 'rev', 'title', 'rationale', 'statement', 'classes']
+const CHANGEABLE = ['state', 'closed', 'base', 'branch', 'ops', 'rev', 'touched', 'title', 'rationale', 'statement', 'classes']
 const FINAL_STATES = PROPOSAL_STATES.filter(s => s !== 'open')
 
 /** Problems of the proposal `id` in `text`, as a 422 with its fields; or nothing. */

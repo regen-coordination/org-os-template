@@ -6,7 +6,7 @@ This document tracks the semantic version of the organizational OS framework and
 
 ## Current Version
 
-**Framework Version:** `0.6.0`  
+**Framework Version:** `0.6.1`  
 **Released:** 2026-06-17 (re-baseline) · v0.5 beta in progress  
 **Status:** Pre-beta (`0.x` line)
 

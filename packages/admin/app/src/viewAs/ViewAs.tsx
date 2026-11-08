@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { QueryClientContext } from '@tanstack/react-query'
 import { Button } from '../design/Button.tsx'
 import { Icon, type IconName } from '../design/Icon.tsx'
 import { Menu, type MenuEntry } from '../design/Menu.tsx'
@@ -60,9 +61,21 @@ export function useViewer(): { viewer: Viewer; previewing: boolean; setViewer(v:
 }
 
 /** False while previewing: write actions (buttons, inline edit, the tray, the composer) are not rendered —
- *  hidden, not disabled (C-23). */
+ *  hidden, not disabled (C-23). False too while the Hub's writes are off (Lane 3 Task 11, C1): the server refuses them
+ *  all, so none is offered. */
 export function useCanWrite(): boolean {
-  return useContext(ViewAsContext).viewer.as === 'you'
+  const off = useWritesOff() // a hook, so called on every draw
+  return useContext(ViewAsContext).viewer.as === 'you' && !off
+}
+
+/** Whether `GET /api/status`, as the client last read it, says the Hub's writes are off. It reads the cache only, so it
+ *  asks the server nothing itself, and draws as on with no query client (/parts, element tests). */
+function useWritesOff(): boolean {
+  const client = useContext(QueryClientContext)
+  return useSyncExternalStore(
+    useCallback((changed: () => void) => (client ? client.getQueryCache().subscribe(changed) : () => {}), [client]),
+    () => client?.getQueryData<{ instanceWrites?: string }>(['status'])?.instanceWrites === 'off',
+  )
 }
 
 /** The control (§5.9): eye + "View as: you" + chevron, 28px outlined, in the top bar; `compact` is the phone's

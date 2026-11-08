@@ -1,4 +1,5 @@
 import type { SystemReader } from '../systems/reader.ts'
+import type { RefreshState } from '../hosted/refresh.ts'
 
 /** The two canvases. A resource lives on exactly one. */
 export type Board = 'organization' | 'systems'
@@ -64,6 +65,8 @@ export interface AdapterContext {
   lastOk: (op: string, resource: string) => string | null
   /** Reads outside systems through their drivers. Absent: an offline reader (no network). */
   systems?: SystemReader
+  /** A read-only hosted Hub's refresh from its remote (C1, C2), shown on the Sources page. Absent: no refresh runs. */
+  refresh?: () => RefreshState | null
 }
 
 export interface Adapter {

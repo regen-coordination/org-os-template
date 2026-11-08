@@ -5,6 +5,7 @@ import { findMemberByEmail, memberKind } from '../lib/members.mjs'
 import { HOUSE_IDENT } from '../lib/trailers.mjs'
 import { hatLevel, parseHatRef } from '../lib/hats.mjs'
 import type { HatObservation } from '../lib/hat-readings.mjs'
+import type { Role } from './private/store.ts'
 
 /** A member resolved from git's identity here (0.6). `via` is absent for 0.6 readers, and means `git`. */
 export type GitActor = { id: string; name: string; kind: string; via?: 'git' }
@@ -15,11 +16,15 @@ export type SiweActor = {
   id: string; name: string; kind: 'person'; via: 'siwe'; account: string
   hats: string[]; reading: { block: number; readAt: string }
 }
-/** Who a request is made by (architecture §4.2, L5 spec §6.1): a member by git's identity, a signed-in member, or the
- *  address git commits with here when no member holds it (read-only). */
-export type Actor = GitActor | SiweActor | { unknown: string }
+/** A person signed in with an emailed link (Lane 3 Task 9): `id` is their person id (I1), `roles` and `nodes` are the
+ *  Roles table's now (never the token's claims), so a Role removed at a reload stops at the house at once. No wallet,
+ *  no hats. */
+export type PersonActor = { id: string; name: string; kind: 'person'; via: 'email'; roles: Role[]; nodes: string[] }
+/** Who a request is made by (architecture §4.2, L5 spec §6.1): a member by git's identity, a signed-in member (by
+ *  wallet or by emailed link), or the address git commits with here when no member holds it (read-only). */
+export type Actor = GitActor | SiweActor | PersonActor | { unknown: string }
 /** An actor who may act. */
-export type KnownActor = GitActor | SiweActor
+export type KnownActor = GitActor | SiweActor | PersonActor
 
 export const isKnown = (a: Actor): a is KnownActor => 'id' in a
 
@@ -69,10 +74,10 @@ export function unreadAccount(actor: Actor): string | null {
   return wallet && !wallet.read ? wallet.account : null
 }
 
-/** Who a commit made for `actor` is authored by (L5 spec §6.4): the house for a signed-in actor; for a git actor,
- *  nobody given, so git's own identity, as 0.6. */
+/** Who a commit made for `actor` is authored by (L5 spec §6.4): the house for a signed-in actor (wallet or emailed
+ *  link); for a git actor, nobody given, so git's own identity, as 0.6. */
 export function commitIdent(actor: Actor): GitIdent | undefined {
-  return 'via' in actor && actor.via === 'siwe' ? { name: HOUSE_IDENT.name, email: HOUSE_IDENT.email } : undefined
+  return 'via' in actor && (actor.via === 'siwe' || actor.via === 'email') ? { name: HOUSE_IDENT.name, email: HOUSE_IDENT.email } : undefined
 }
 
 /** The member whose `handles.git` (or email) holds this repository's

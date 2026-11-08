@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createHash, randomBytes } from 'node:crypto'
@@ -9,11 +9,15 @@ import { transition, type MachineEvent } from '../lib/machines/run.mjs'
 import { job as jobMachine, jobGuards } from '../lib/machines/job.mjs'
 
 /** Where this instance's job records and layouts live: outside the repository, so that running
- *  the board never leaves a file for git to see and no instance needs a new ignore rule. */
+ *  the board never leaves a file for git to see and no instance needs a new ignore rule. Keyed by the repository's real
+ *  path (L9 §7.1, carry 6), so a server started through a link and a restore given the real path find one pid file; a
+ *  path that does not exist is keyed by its string, as before. */
 export function stateDir(repo: string): string {
   const home = process.env.ORG_OS_ADMIN_HOME ?? join(homedir(), '.org-os', 'admin')
-  const tag = createHash('sha1').update(repo).digest('hex').slice(0, 6)
-  return join(home, `${instanceSlug(repo)}-${tag}`)
+  let real = repo
+  try { real = realpathSync(repo) } catch { /* not there: its string */ }
+  const tag = createHash('sha1').update(real).digest('hex').slice(0, 6)
+  return join(home, `${instanceSlug(real)}-${tag}`)
 }
 
 /** Where a listening server of `repo` records its pid; it removes the file when it closes. */
@@ -126,16 +130,19 @@ export class JobStore {
 }
 
 export type Positions = Record<string, { x: number; y: number }>
-const layoutFile = (repo: string, board: Board) => join(stateDir(repo), `layout-${board}.json`)
+/** A board's layout file: the shared one, or, given a member's key (hosted/writes.ts `actorKey`), that member's own
+ *  (L9 §5.4: hosted, each member keeps their own positions). */
+export const layoutFile = (repo: string, board: Board, key?: string): string =>
+  join(stateDir(repo), key === undefined ? `layout-${board}.json` : `layout-${board}-${key}.json`)
 
-export function readLayout(repo: string, board: Board): Positions {
-  try { return JSON.parse(readFileSync(layoutFile(repo, board), 'utf8')) as Positions } catch { return {} }
+export function readLayout(repo: string, board: Board, key?: string): Positions {
+  try { return JSON.parse(readFileSync(layoutFile(repo, board, key), 'utf8')) as Positions } catch { return {} }
 }
-export function writeLayout(repo: string, board: Board, positions: Positions): void {
+export function writeLayout(repo: string, board: Board, positions: Positions, key?: string): void {
   mkdirSync(stateDir(repo), { recursive: true })
-  writeFileSync(layoutFile(repo, board), JSON.stringify(positions))
+  writeFileSync(layoutFile(repo, board, key), JSON.stringify(positions))
 }
-export function clearLayout(repo: string, board: Board): void { rmSync(layoutFile(repo, board), { force: true }) }
+export function clearLayout(repo: string, board: Board, key?: string): void { rmSync(layoutFile(repo, board, key), { force: true }) }
 
 /** The positions, or the sentence saying what is wrong with them. */
 export function validPositions(v: unknown): Positions | string {

@@ -2,13 +2,14 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { isAbsolute, join, resolve, sep } from 'node:path'
 import { simpleGit, type SimpleGit, type SimpleGitOptions } from 'simple-git'
 import { withTrailers, parseTrailers, type TrailerValues } from '../lib/trailers.mjs'
+import { validTrunkName } from '../lib/rules.mjs'
 import { stateDir } from './state.ts'
 
 export interface RepoStatus { branch: string; dirty: boolean }
 
 /** The whole vocabulary of this service is the list below (`ALLOWED`, `CLIENT_METHODS`) and nothing else:
- *  status (of the repo or of paths), add(paths), commit(paths), config reads, and the reads and the one
- *  ref move that `run` lets through. stash/clean/reset/force are deliberately absent — vault safety is
+ *  status (of the repo or of paths), add(paths), commit(paths), config reads, and the reads, the one
+ *  ref move and the one push (the trunk, fast-forward only) that `run` lets through. stash/clean/reset/force are deliberately absent — vault safety is
  *  enforced here, not by convention. Do not add pass-through git access. The list is held by
  *  tests/server/git.vocabulary.test.ts, which scans this file: adding a command is an edit of both. */
 export async function repoStatus(repo: string): Promise<RepoStatus> {
@@ -23,21 +24,24 @@ export async function repoStatus(repo: string): Promise<RepoStatus> {
 // this file to see that nothing else is called.
 
 /** Subcommand → the exact flags it may carry. A flag nobody listed is refused whatever it does;
- *  `--` ends the flags, and what follows is a path. `worktree` and `update-ref` have a shape of
- *  their own (below). The vocabulary test holds a copy of this map in its own text. */
+ *  `--` ends the flags, and what follows is a path. `worktree`, `update-ref` and `push` have a shape of
+ *  their own (below), and so has `clone` (`hub init`, ruling P8). The vocabulary test holds a copy of this map in its own
+ *  text. */
 const ALLOWED: Record<string, readonly string[]> = {
   '--version': [],
   'check-ignore': ['-q'],
   'check-ref-format': ['--branch'],
+  clone: [],
   fetch: [],
   commit: ['-F', '--allow-empty'],
   diff: ['--name-only', '--cached', '--no-renames'],
   'diff-tree': ['-r', '--name-only'],
-  log: ['-1', '--format=%B'],
+  log: ['-1', '--format=%B', '--format=%ae'],
   'ls-files': ['-v', '--error-unmatch'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
   'merge-tree': ['--write-tree', '--name-only'],
+  push: [],
   'rev-list': ['--first-parent', '--reverse', '--count'],
   'rev-parse': ['--git-path', '--verify', '-q'],
   show: [],
@@ -65,10 +69,14 @@ type OnExit = NonNullable<Partial<SimpleGitOptions>['errors']>
  *  a pager, a config path and the like (GIT_EDITOR, GIT_CONFIG_GLOBAL), which this process's environment may hold: those
  *  categories are allowed here, because every value in them is the environment every other call already runs under.
  *  The argv is still the vocabulary's. */
-function client(repo: string, errors: OnExit, ident?: GitIdent): SimpleGit {
-  if (!ident) return simpleGit(repo, { errors })
+function client(repo: string, errors: OnExit, ident?: GitIdent, blockMs?: number): SimpleGit {
+  // A block time ends a process that has said nothing for that long (simple-git kills it): the push's, so a remote that
+  // takes the connection and never answers cannot hold the Pusher, or the server's close, for ever.
+  // A block of 0 adds no limit (simple-git's own rule), so every other command runs as before.
+  if (!ident) return simpleGit(repo, { errors, timeout: { block: blockMs ?? 0 } })
   return simpleGit(repo, {
     errors,
+    timeout: { block: blockMs ?? 0 },
     unsafe: {
       allowUnsafeAskPass: true, allowUnsafeConfigEnvCount: true, allowUnsafeConfigPaths: true, allowUnsafeDiffExternal: true,
       allowUnsafeEditor: true, allowUnsafeGitProxy: true, allowUnsafePager: true, allowUnsafeSshCommand: true, allowUnsafeTemplateDir: true,
@@ -79,6 +87,8 @@ function client(repo: string, errors: OnExit, ident?: GitIdent): SimpleGit {
 const HEX40 = /^[0-9a-f]{40}$/
 const ZEROS = '0'.repeat(40)
 const REMOTE_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/
+/** What `hub init` may clone from: `ssh://…`, `https://…`, `git@host:path` (scp-like ssh), or an absolute path. */
+const CLONE_URL = /^(?:ssh:\/\/[^\s]+|https:\/\/[^\s]+|[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+|\/[^\s]*)$/
 /** The proposal id the server mints, `p-<date>-<NNN>-<4 hex>` (final review I5), and its branch's ref: nothing else. */
 const PROPOSAL_ID = /^p-\d{4}-\d{2}-\d{2}-\d{3}-[0-9a-f]{4}$/
 const PROPOSAL_REF = /^refs\/heads\/proposal\/p-\d{4}-\d{2}-\d{2}-\d{3}-[0-9a-f]{4}$/
@@ -124,6 +134,25 @@ function checkArgv(argv: readonly string[]): void {
     const [remote] = args
     if (args.length !== 1 || !REMOTE_NAME.test(remote!)) refuse('fetch takes the name of one remote (not a URL, not a refspec).')
   }
+  if (sub === 'clone') {
+    // L9 Task 17 (ruling P8): exactly `clone -- <url> <dir>`, for `hub init`. No flag; the url an ssh or https remote or
+    // an absolute path (a local bare repository), never one that git would read as an option or as another transport.
+    const [dashes, url, dir] = args
+    if (args.length !== 3 || dashes !== '--' || !CLONE_URL.test(url!) || dir!.startsWith('-') || !isAbsolute(dir!)) {
+      refuse('clone takes -- <ssh, https or absolute-path url> <absolute folder>, nothing else.')
+    }
+  }
+  if (sub === 'push') {
+    // L9 §5.6: exactly `<remote> refs/heads/<b>:refs/heads/<b>`. No flag and no `+` (the loop above refuses both), so
+    // never a force push; one remote by name, never a URL; the same valid trunk name on both sides, so nothing else is
+    // pushed, renamed or deleted (an empty source would delete the remote's branch).
+    const [remote, spec] = args
+    if (args.length !== 2 || !REMOTE_NAME.test(remote!)) refuse('push takes the name of one remote (not a URL) and one refspec, nothing else.')
+    const m = /^refs\/heads\/([^:]+):refs\/heads\/([^:]+)$/.exec(spec!)
+    if (!m || m[1] !== m[2]) refuse('push takes refs/heads/<trunk>:refs/heads/<trunk>, the same branch on both sides.')
+    const named = validTrunkName(m![1])
+    if (named !== true) refuse(`push takes a trunk name the platform accepts: ${named}`)
+  }
   if (sub === 'commit') {
     const file = args[0] === '--allow-empty' ? args.slice(1) : args
     if (file.length !== 2 || file[0] !== '-F' || file[1]!.startsWith('-') || operands(file).length !== 2) refuse('commit takes [--allow-empty] -F <message file>, nothing else.')
@@ -142,6 +171,29 @@ export class GitExit extends Error {
   constructor(public code: number, message: string) { super(message); this.name = 'GitExit' }
 }
 
+// ── onCommit: one in-process event after every commit this module makes (L9 §5.6) ──────────────────
+
+/** A commit this module made: the repository (or the build's worktree) it was made in, and its full sha. */
+export interface CommitEvent { repo: string; commit: string }
+const commitListeners = new Set<(e: CommitEvent) => void>()
+
+/** Hears every commit `commitDataPaths` and `commitMerge` make once it has landed, the build commits among them (a build
+ *  commits through `commitDataPaths` in its worktree, so its `repo` is that worktree). The Pusher and the DoorPublisher
+ *  listen. Answers the unsubscribe. A listener that throws is not the commit's failure, and the others still hear it. */
+export function onCommit(listener: (e: CommitEvent) => void): () => void {
+  commitListeners.add(listener)
+  return () => { commitListeners.delete(listener) }
+}
+
+/** Tells every listener; never throws. No sha (git printed none and HEAD could not be read): nothing is told. */
+function committed(repo: string, commit: string): string {
+  if (commit === '') return commit
+  for (const listener of [...commitListeners]) {
+    try { listener({ repo, commit }) } catch { /* a listener's failure is not the commit's */ }
+  }
+  return commit
+}
+
 /** Every git process this server starts runs with git's optional locks off. A read such as `git status` refreshes the
  *  index and, with them on, holds `index.lock` while it does; the server's reads run outside its write lock, so a write
  *  that met one mid-way was refused ("Unable to create …/index.lock: File exists"). It is git's own switch, set in the
@@ -156,7 +208,7 @@ process.env.GIT_TERMINAL_PROMPT = '0'
 
 /** The one place a git command is run: checked first, then run with every non-zero exit a failure
  *  (simple-git reads a silent non-zero exit as success), the exit status kept in `GitExit`. */
-async function run(sub: string, args: string[], repo: string, ident?: GitIdent): Promise<string> {
+async function run(sub: string, args: string[], repo: string, ident?: GitIdent, blockMs?: number): Promise<string> {
   const argv = [sub, ...args]
   checkArgv(argv)
   let code = -1
@@ -166,7 +218,7 @@ async function run(sub: string, args: string[], repo: string, ident?: GitIdent):
     if (result.exitCode === 0) return undefined
     const said = Buffer.concat([...result.stdOut, ...result.stdErr]).toString('utf8').trim()
     return Buffer.from(said || `git exited with code ${result.exitCode} and gave no reason`)
-  }, ident)
+  }, ident, blockMs)
   try { return await git.raw(argv) } catch (err) {
     throw new GitExit(code, err instanceof Error ? err.message : String(err))
   }
@@ -239,6 +291,11 @@ function writer(repo: string, ident?: GitIdent): SimpleGit {
  *  sha. Throws only when no commit was made: once it has landed, a failure to read its sha, or git exiting non-zero
  *  after the ref update, is not a failure of the commit. */
 export async function commitDataPaths(repo: string, paths: string[], message: string, trailers?: TrailerValues, opts: CommitOptions = {}): Promise<string> {
+  return committed(repo, await commitPaths(repo, paths, message, trailers, opts))
+}
+
+/** `commitDataPaths` before the event. */
+async function commitPaths(repo: string, paths: string[], message: string, trailers: TrailerValues | undefined, opts: CommitOptions): Promise<string> {
   if (paths.length === 0) {
     if (!opts.allowEmpty) throw new Error('no paths to commit')
     return commitEmpty(repo, message, trailers, opts.ident)
@@ -387,6 +444,11 @@ export async function mergeBase(repo: string, a: string, b: string): Promise<str
   }
 }
 
+/** The author's address of the commit `rev` names (`log -1 --format=%ae`). Throws when `rev` names no commit. */
+export async function authorEmail(repo: string, rev: string): Promise<string> {
+  return (await run('log', ['-1', '--format=%ae', rev], repo)).trim()
+}
+
 /** A commit's whole message (`log -1 --format=%B`, the form the landed-commit check uses). Throws when `rev` names
  *  nothing. */
 export async function messageOf(repo: string, rev: string): Promise<string> {
@@ -494,21 +556,50 @@ export async function mergeTree(repo: string, a: string, b: string): Promise<Mer
   return { tree, conflicts }
 }
 
-/** `git fetch <remote>`: the one network read. Called only by the `fetch` operation's job. The remote is `origin`, the one
+/** `git fetch <remote>`: the one network read. Called by the `fetch` operation's job and by a read-only Hub's refresh
+ *  (`hosted/refresh.ts`, which ends a fetch that says nothing for `blockMs`). The remote is `origin`, the one
  *  `lastFetch` reads and Share pushes to, and it must be configured (`remote.origin.url`): git reads a bare word that names
  *  no remote as a path, and fetches from the repository it finds there. */
-export async function fetchRemote(repo: string, remote = 'origin'): Promise<void> {
+export async function fetchRemote(repo: string, remote = 'origin', opts: { blockMs?: number } = {}): Promise<void> {
   checkArgv(['fetch', remote]) // a URL or a refspec is refused for what it is, before anything runs
   if (remote !== 'origin') throw new Error(`"${remote}" is not a remote this platform fetches: it fetches origin only, so nothing was fetched.`)
   const url = (await simpleGit(repo).getConfig('remote.origin.url')).value
   if (url === null || url.trim() === '') throw new Error('"origin" is not a remote of this repository (it has no remote.origin.url), so nothing was fetched.')
-  await run('fetch', [remote], repo)
+  await run('fetch', [remote], repo, undefined, opts.blockMs)
+}
+
+/** `git push <remote> refs/heads/<trunk>:refs/heads/<trunk>`: the one network write (L9 §5.6), the hosted Hub's Pusher's
+ *  only. Fast-forward only: no flag and no `+`, so a remote that has commits the trunk lacks refuses it, and the `GitExit`
+ *  carries git's words (`[rejected]`). The remote is `origin`, the one rule 4 is read for (`RemoteWatch`), and it must be
+ *  configured: git reads a bare word that names no remote as a path. Reads refs only; runs outside the write lock. */
+export async function pushTrunk(repo: string, remote: string, trunk: string, opts: { blockMs?: number } = {}): Promise<void> {
+  const args = [remote, `refs/heads/${trunk}:refs/heads/${trunk}`]
+  checkArgv(['push', ...args]) // a URL, a flag, a `+` or another branch is refused for what it is, before anything runs
+  if (remote !== 'origin') throw new Error(`"${remote}" is not a remote this platform pushes to: it pushes to origin only, whose privacy it checks, so nothing was sent.`)
+  if ((await remoteUrl(repo)) === null) throw new Error('"origin" is not a remote of this repository (it has no remote.origin.url), so nothing was sent.')
+  // A push that says nothing for two minutes is ended, a GitExit without `[rejected]`: the Pusher tries again later.
+  await run('push', args, repo, undefined, opts.blockMs ?? 120_000)
+}
+
+/** Clones `url` into `dir`, which must be absent or an empty folder (`hub init`, L9 §6, ruling P8): the only command that
+ *  runs outside a repository, from `dir`'s parent. The deploy key reaches git through `GIT_SSH_COMMAND`, which every git
+ *  process inherits. Answers nothing; throws git's words as a `GitExit`. */
+export async function cloneInstance(url: string, dir: string): Promise<void> {
+  const target = resolve(dir)
+  const parent = resolve(target, '..')
+  mkdirSync(parent, { recursive: true })
+  await run('clone', ['--', url, target], parent)
 }
 
 /** Commit the pending merge: what is staged, with `message` and, after a blank line, the Org-* trailers; authored and
  *  committed by `opts.ident` when given. Takes no paths; it refuses unless a merge is pending and every staged path is
  *  in `allowedPaths`. A hook that refuses leaves the merge pending (the caller aborts). Answers the new commit's full sha. */
 export async function commitMerge(repo: string, message: string, allowedPaths: string[], trailers?: TrailerValues, opts: CommitOptions = {}): Promise<string> {
+  return committed(repo, await commitPendingMerge(repo, message, allowedPaths, trailers, opts))
+}
+
+/** `commitMerge` before the event. */
+async function commitPendingMerge(repo: string, message: string, allowedPaths: string[], trailers: TrailerValues | undefined, opts: CommitOptions): Promise<string> {
   if (!(await mergeInProgress(repo))) throw new Error('there is no merge waiting to be committed.')
   const staged = await stagedNames(repo)
   const outside = staged.filter(p => !allowedPaths.includes(p))

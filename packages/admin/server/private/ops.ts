@@ -68,9 +68,10 @@ export const noCollection = (collection: string) => `"${collection}" names no co
 /** One answer for a private record that is not there and one the actor may not read (§9.2, §9.5): the same words. */
 export const noRecord = (collection: string, id: string) => `There is no record ${id} in ${collection} to change. Nothing was written.`
 
-/** The access to `store`, or, when it could not be opened, a throw of why (the attention sentence). */
-export function storeAccess(store: PrivateStore | null, why: string): PrivateAccess {
-  return () => { if (store) return store; throw new StoreUnavailable(why) }
+/** The access to `store`, or, when it could not be opened, a throw of the failure's fixed sentence (L9 §7.4,
+ *  `classifyOpenError`): never the store's own words, which went to the log. No failure named: `NO_STORE`. */
+export function storeAccess(store: PrivateStore | null, failure: { sentence: string } | null): PrivateAccess {
+  return () => { if (store) return store; throw new StoreUnavailable(failure?.sentence ?? NO_STORE) }
 }
 
 /** The store when it can be reached; else null, with why. */

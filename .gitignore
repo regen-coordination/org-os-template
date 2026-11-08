@@ -84,3 +84,6 @@ site/test-results/
 # The private store (dao-os L5 spec §10.1): private records, restricted fields, sessions, their backups. Never in git;
 # the admin server refuses to open a store inside the repository that git does not ignore.
 .org-os/private/
+
+# The public door's releases when built beside the repository (dao-os L9 spec §5.1).
+.org-os/door/

@@ -6,6 +6,56 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
+_(Append changes here as they land.)_
+
+## [0.6.1] — 2026-11-08
+
+**0.6.1 lets an org run the house as its members' Hub.** It runs hosted from one container
+image (DAO-OS L9), people sign in with an emailed link instead of a wallet, and every write to the
+instance is off by default when hosted: the Hub reads its instance and follows the remote,
+fast-forward only. On a member's own machine the house still writes, as in 0.6.0. Nothing here
+migrates an instance's files.
+
+### Added
+
+- **Sign-in by emailed link** (`packages/admin`). `POST /api/session/email` answers 202 with the
+  same sentence for every address. The lookup, the link and the mail happen after the answer, so
+  the response time does not show whether an address is known. `POST /api/session/link` spends
+  a single-use, 15-minute link and sets a signed session cookie (EdDSA JWS, 24 h, re-issued with
+  less than 12 h left). Its name and domain come from `SESSION_COOKIE_NAME` and
+  `SESSION_COOKIE_DOMAIN`. The org's other sites verify the cookie with the public key alone.
+  No wallet and no Hats tree is needed; with a tree, the wallet stays on offer.
+- **The house keeps keyed hashes of addresses** (`HOUSE_EMAIL_PEPPER`), never the addresses.
+  Rate limits: 3 asks per address and 10 per client in 15 minutes, each answered alike.
+- **Roles** (`steward`, `node-lead`, `network-member`) are loaded with
+  `npm run -s house:roles -- load` from a JSON document on stdin. The house reads them on every
+  request, so a removed Role takes effect at once. A person with no Role reads what the public reads.
+- **`npm run -s house:session-key -- new | public`** makes the private Ed25519 JWK
+  (`HOUSE_SESSION_PRIVATE_JWK`) and derives its public half (`HOUSE_SESSION_PUBLIC_JWK`).
+- **The app:** the email form on the sign-in card, `/sign-in/link` (one click posts the token,
+  and the token is removed from the address bar), and the identity menu naming a person's Roles.
+- **`HOUSE_INSTANCE_WRITES`**: `off` by default when hosted, `on` locally. While off, every
+  route that writes to the instance answers 403 `INSTANCE_READ_ONLY`. Proposal pages build no
+  branch, the start-up reconcile is skipped, no push runs whatever `ORG_OS_PUSH` says, and the app
+  hides its write controls. A hosted house refuses `on` while `BEFORE_PILOT_OPEN` lists known
+  write defects.
+- **A read-only house follows its remote** (`ORG_OS_REFRESH_EVERY`, `15m` by default, `off`
+  for never). While writes are off, the hosted house fetches `origin` at start and on that
+  interval, and moves its trunk forward, fast-forward only. A diverged history, a copy off its
+  trunk or a refused fast-forward stops it until the next start. The Sources page shows the
+  refresh as a row for members, and Home's "Needs you" shows a stop or a warning.
+- **The house runs hosted** (`packages/admin`, DAO-OS L9). One container image
+  (`deploy/hub/Dockerfile`, base pinned by digest) starts `hub serve`, which runs every start check
+  first (`hub check`; Node 22.13 or later). Hosted, the house answers one configured host and
+  origin, sets the session cookie as `__Host-`, adds security headers and an access log, limits
+  request rates, and answers `GET /api/health` with `{ ok }` only. `deploy/hub/RAILWAY.md` and
+  `env.example` say how to run it on a container service with one volume.
+- **One writer, and its push** (L9). Every hosted commit is the Hub's own. The trunk is pushed
+  fast-forward only and the push stops on a diverged remote; `ORG_OS_PUSH=off` runs no push, and
+  any value but `on` or `off` stops the start. Every write route is classified when hosted.
+- **Backups sealed to a maintainer's public key** (`npm run house:backup`, `house:backup:keypair`,
+  `house:restore`), taken without the write lock.
+
 ### Fixed
 
 - **`selftest` names the test that failed.** A failed check now reports the failing tests' names
@@ -24,12 +74,16 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 ### Changed
 
 - **CI `Validate` may run 30 minutes, up from 20.** A green run takes 18–19 minutes since 0.6.
+- `GET /api/session` now reports `methods`, the signed-in `person` and `instanceWrites`. With no
+  Hats tree, sign-in is still offered by email.
+- `deploy/hub/env.example` names the sign-in variables and `HOUSE_INSTANCE_WRITES=off`.
 
 ### Notes
 
-- The record-weight check (`packages/admin/tests/e2e/shoot.test.ts`) skips while
-  `docs/design/house-record/` is empty. Make it required again when the re-shot record is
-  committed (PR B); the test's comment says how.
+- **The house record is back:** `docs/design/house-record/` holds the 17 shots
+  `tests/e2e/shoot.mts` names, re-shot from the example fixtures (light, WebP, at most 150 KiB
+  each). The record-weight check in `packages/admin/tests/e2e/shoot.test.ts` is required again,
+  and it also fails when a named shot is missing.
 
 ## [0.6.0] — 2026-11-05
 
@@ -403,7 +457,8 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/regen-coordination/org-os-template/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/regen-coordination/org-os-template/compare/archive/v3.5.0...v0.5.0
 [3.5.0]: https://github.com/regen-coordination/org-os-template/compare/v3.0.0...v3.5.0

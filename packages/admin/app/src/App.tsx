@@ -52,6 +52,7 @@ import { shownName } from './record/restricted.ts'
 import { useRouteFocus } from './frame/useRouteFocus.ts'
 import { useBoards } from './boards/queries.ts'
 import { DoorPage } from './door/DoorPage.tsx'
+import SignInLinkPage from './pages/SignInLinkPage.tsx'
 import { DOOR_PUBLIC } from './test/fixtures/house/door.ts'
 import { FIXED_NOW } from './test/fixtures/parts.ts'
 
@@ -125,10 +126,18 @@ function DoorRoute() {
   </>
 }
 
-/** /door is the public door, drawn alone; every other route is the Hub, in its frame. */
+/** /sign-in/link (Lane 3 Task 10): the emailed link's page, drawn alone like the door — before sign-in nothing of the
+ *  frame would read. */
+function SignInLinkRoute() {
+  const org = useStatus().data?.org ?? 'org-os'
+  useEffect(() => { document.title = `Sign in · ${org}` }, [org])
+  return <SignInLinkPage org={org} />
+}
+
+/** /door is the public door, drawn alone, and so is /sign-in/link; every other route is the Hub, in its frame. */
 export default function App() {
   const [location] = useLocation()
-  return location === '/door' ? <DoorRoute /> : <HubApp />
+  return location === '/door' ? <DoorRoute /> : location === '/sign-in/link' ? <SignInLinkRoute /> : <HubApp />
 }
 
 function HubApp() {

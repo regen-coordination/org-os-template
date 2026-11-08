@@ -10,6 +10,7 @@ import { commitIdent, type Actor } from '../actor.ts'
 import { Refusal, StageRefusal } from '../changes/apply.ts'
 import { refuseOthersLink } from '../visibility/widen.ts'
 import { readConfig } from '../visibility/config.ts'
+import { Levels } from '../visibility/gate.ts'
 import { refuseNarrowed } from '../private/guard.ts'
 import { changeClasses, staleOps, validateChange } from '../changes/stage.ts'
 import type { Change, Op } from '../changes/types.ts'
@@ -175,6 +176,9 @@ export async function propose(repo: string, actor: Extract<Actor, { id: string }
     base: from,
     branch: `proposal/${id}`,
     ops: ledgerOps,
+    // What its ops touch, kept for good: a revision records only the ops it writes (L9 Ruling T12-1). Judged on the ops as
+    // staged (the record each saw), the placeholders included.
+    touched: new Levels(repo).touched([...ops, ...(part?.placeholders ?? [])]),
     ...(input.statement !== undefined ? { statement: input.statement } : {}),
     events: [],
     closed: null,

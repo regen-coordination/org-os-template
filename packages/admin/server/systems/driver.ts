@@ -157,7 +157,7 @@ export interface Driver {
 }
 
 /** The one network call a driver can cause. `globalThis.fetch` is one; tests pass fakes. */
-export type FetchLike = (url: string, init: { method: 'GET' | 'POST'; headers: Record<string, string>; body?: string; redirect: 'error'; signal: AbortSignal }) =>
+export type FetchLike = (url: string, init: { method: 'GET' | 'POST'; headers: Record<string, string>; body?: string; redirect: 'error' | 'manual'; signal: AbortSignal }) =>
   Promise<{ ok: boolean; status: number; headers?: { get(name: string): string | null }; json(): Promise<unknown> }>
 
 /** The URL checks both doors share: https, no other port, no login in the address, and a host the driver declared

@@ -59,15 +59,13 @@ describe('the screen harness', () => {
     await expect(fitRecord(async q => Buffer.alloc(Math.round(409_600 * q)))).rejects.toThrow('160.0 KiB at quality 0.4, over the 150 KiB a record may weigh')
   })
 
-  // The committed record is re-shot from the example fixtures and comes back after 0.6.0
-  // (docs/superpowers/history/org-os-0.6.md); until then there is none to weigh.
-  // When PR B commits the re-shot record, require it again: make this a plain `it` whose first line is
-  // `expect(committed.length).toBeGreaterThan(0)`, so a record that goes missing fails here instead of skipping.
+  // The committed record, re-shot from the example fixtures in 0.6.1 (docs/superpowers/history/org-os-0.6.md). It is
+  // required: a record that goes missing fails here instead of skipping.
   const RECORD_DIR = fileURLToPath(new URL('../../../../docs/design/house-record/', import.meta.url))
   const committed = existsSync(RECORD_DIR) ? readdirSync(RECORD_DIR).filter(f => f.endsWith('.webp')) : []
-  it.skipIf(committed.length === 0)('keeps every committed record within 150 KiB', () => {
-    const dir = RECORD_DIR
-    const files = committed
-    for (const f of files) expect(statSync(dir + f).size, f).toBeLessThanOrEqual(RECORD_MAX_BYTES)
+  it('keeps every committed record within 150 KiB, and every name in RECORD is there', () => {
+    expect(committed.length).toBeGreaterThan(0)
+    expect([...committed].sort()).toEqual(RECORD.map(r => `${r}-light.webp`).sort())
+    for (const f of committed) expect(statSync(RECORD_DIR + f).size, f).toBeLessThanOrEqual(RECORD_MAX_BYTES)
   })
 })

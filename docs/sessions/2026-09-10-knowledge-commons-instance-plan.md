@@ -48,8 +48,8 @@ org:
   emoji: "📚"
   license: "MIT"
 operator:
-  name: "Luiz Fernando"
-  email: "luizfernandolfsg@gmail.com"
+  name: "The operator"  # the operator's own name
+  email: "operator@example.org"  # the operator's own account
 network:
   name: "regen-coordination"
   upstream_url: "https://github.com/regen-coordination/org-os-template.git"

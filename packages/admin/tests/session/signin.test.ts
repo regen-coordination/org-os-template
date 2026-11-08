@@ -395,7 +395,11 @@ describe('startServer mounts the session routes on its one store (Task 5)', () =
       try {
         expect(server.privateStore).not.toBeNull()
         const res = await fetch(`http://localhost:${server.port}/api/session`)
-        expect(await res.json()).toEqual({ mode: hosted ? 'hosted' : 'local', signIn: null, signedIn: false })
+        // Lane 3 Task 9: the server also says which methods are offered (locally the email method always is; hosted with
+        // none of its variables, it is not) and whether the instance is written to (Task 11: off by default when hosted).
+        expect(await res.json()).toEqual({
+          mode: hosted ? 'hosted' : 'local', signIn: null, signedIn: false, methods: hosted ? [] : ['email'], instanceWrites: hosted ? 'off' : 'on',
+        })
       } finally { await server.close() }
     }
   })

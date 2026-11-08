@@ -5,12 +5,25 @@ import type { PrivateStore, SessionRow } from '../private/store.ts'
 export const SESSION_TTL_MS = 86_400_000
 /** The cookie that carries the session token. */
 export const SESSION_COOKIE = 'house_session'
+/** Its name on a hosted Hub (L9 §5.8): `__Host-` makes the browser keep it to the members' host alone (Secure, `Path=/`,
+ *  no `Domain`), so it never reaches the door host or another subdomain. */
+export const HOSTED_SESSION_COOKIE = '__Host-house_session'
+
+/** The session cookie's name: `hosted` is the hosted binding (a `HostedConfig` was given), not L5's hosted flag alone. */
+export function sessionCookieName(hosted: boolean): 'house_session' | '__Host-house_session' {
+  return hosted ? HOSTED_SESSION_COOKIE : SESSION_COOKIE
+}
 
 /** A session as the private store keeps it: the SHA-256 of the token, never the token (§4.4). */
 export type Session = SessionRow
 
 /** The hex SHA-256 of a token: what the store keeps in its place. */
 export const tokenHash = (token: string): string => createHash('sha256').update(token, 'utf8').digest('hex')
+
+/** The key an emailed-link session (I5) is kept under in the same table: the SHA-256 of `person:` and its id (`jti`).
+ *  Apart from a wallet session's key (the SHA-256 of the token alone), so an I5 session id, which its holder can read
+ *  in the token, never opens a wallet session when sent as `house_session` (Lane 3 ruling S8-1). */
+export const personSessionHash = (jti: string): string => tokenHash(`person:${jti}`)
 
 /** Starts a session for `account` (CAIP-10): 32 random bytes as the token (base64url), its hash in the store. Sessions
  *  expired by now are removed first. The token is answered once, for the cookie, and kept nowhere. */
@@ -41,27 +54,30 @@ export async function endSession(store: PrivateStore, token: string): Promise<vo
   if (token !== '') await store.deleteSession(tokenHash(token))
 }
 
-/** The `house_session` value of a Cookie header, or ''. */
-export function sessionToken(header: string | undefined): string {
+/** The session cookie's value in a Cookie header, or '': `house_session`, or hosted `__Host-house_session` only (a
+ *  `house_session` cookie is then not read, Review Focus 5). */
+export function sessionToken(header: string | undefined, hosted = false): string {
+  const name = sessionCookieName(hosted)
   for (const part of (header ?? '').split(';')) {
     const eq = part.indexOf('=')
-    if (eq > 0 && part.slice(0, eq).trim() === SESSION_COOKIE) return part.slice(eq + 1).trim()
+    if (eq > 0 && part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim()
   }
   return ''
 }
 
 /** The session a Cookie header carries: the HTTP routes and the WebSocket upgrade read it the same way (§4.4). */
-export function sessionFromCookie(store: PrivateStore, header: string | undefined, now: () => Date): Session | null {
-  return findSession(store, sessionToken(header), now)
+export function sessionFromCookie(store: PrivateStore, header: string | undefined, now: () => Date, hosted = false): Session | null {
+  return findSession(store, sessionToken(header, hosted), now)
 }
 
-/** The Set-Cookie value for a session: `HttpOnly; SameSite=Strict; Path=/`, plus `Secure` whenever hosted (§3,
- *  controller ruling P14); never Secure locally. A browser session cookie: the server holds the 24 h itself. */
-export function sessionCookie(token: string, hosted: boolean): string {
-  return `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/${hosted ? '; Secure' : ''}`
+/** The Set-Cookie value for a session: `HttpOnly; SameSite=Strict; Path=/`, with no `Domain`. `hosted` (the hosted
+ *  binding, L9 §5.8): the `__Host-` name, and Secure. `secure`: Secure under the plain name, for L5's hosted mode with no
+ *  binding (§3, controller ruling P14); never Secure locally. A browser session cookie: the server holds the 24 h itself. */
+export function sessionCookie(token: string, hosted: boolean, secure = hosted): string {
+  return `${sessionCookieName(hosted)}=${token}; HttpOnly; SameSite=Strict; Path=/${hosted || secure ? '; Secure' : ''}`
 }
 
-/** The Set-Cookie value that clears it. */
-export function clearedCookie(hosted: boolean): string {
-  return `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${hosted ? '; Secure' : ''}`
+/** The Set-Cookie value that clears it (the same name and attributes). */
+export function clearedCookie(hosted: boolean, secure = hosted): string {
+  return `${sessionCookieName(hosted)}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${hosted || secure ? '; Secure' : ''}`
 }

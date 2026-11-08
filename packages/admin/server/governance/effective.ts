@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readGovernance, NO_MODEL } from '../../lib/governance-read.mjs'
 import { isKnown, lowestHat, readingObservations, walletOf, type Actor } from '../actor.ts'
-import { readRegistry } from '../registry.ts'
+import { readRegistryOrEmptyCached } from '../registry.ts'
 import { effectiveRules, resolveRoles, rulesForClasses, mayDecideAlone, mayPropose, type RoleBook } from '../../lib/rules.mjs'
 import { orgName, str } from '../resources/util.ts'
 import type { RuleSummary } from '../changes/types.ts'
@@ -45,7 +45,8 @@ export function readRuleContext(repo: string, actor: Actor): RuleContext {
   let text: string | null = null
   try { text = existsSync(path) ? readFileSync(path, 'utf8') : null } catch { text = null }
   let members: Record<string, unknown>[] = []
-  try { members = existsSync(join(repo, 'data', 'members.yaml')) ? (readRegistry(repo, 'members').entries ?? []) : [] } catch { members = [] }
+  // Through the read cache (L9 §7.6): every signed-in request reads it. A missing file is no members; frozen, as shared.
+  try { members = readRegistryOrEmptyCached(repo, 'members').entries ?? [] } catch { members = [] }
   const read = readGovernance(text) as {
     governance: Record<string, unknown> | null; shape: string; problems: string[]; modelImplied: boolean
   }
