@@ -33,6 +33,6 @@ deploy (L7), door hosting (L9), and empty boards and new records (2026-11-04).
 ## Screenshots
 
 The house's committed visual record (`docs/design/house-record/`) and the gallery comparison shots
-(`docs/design/gallery-shots/`) are re-shot from the example fixtures and come back in a later release.
-Until then the record-weight check in `packages/admin/tests/e2e/shoot.test.ts` skips. The release that
-brings the record back makes it required again: that test says how.
+(`docs/design/gallery-shots/`) were left out of 0.6.0, to be re-shot from the example fixtures. The
+record came back in 0.6.1, and the record-weight check in `packages/admin/tests/e2e/shoot.test.ts` is
+required again. The gallery shots come back in a later release.

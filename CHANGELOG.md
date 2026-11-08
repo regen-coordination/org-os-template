@@ -70,9 +70,10 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ### Notes
 
-- The record-weight check (`packages/admin/tests/e2e/shoot.test.ts`) skips while
-  `docs/design/house-record/` is empty. Make it required again when the re-shot record is
-  committed (PR B); the test's comment says how.
+- **The house record is back:** `docs/design/house-record/` holds the 17 shots
+  `tests/e2e/shoot.mts` names, re-shot from the example fixtures (light, WebP, at most 150 KiB
+  each). The record-weight check in `packages/admin/tests/e2e/shoot.test.ts` is required again,
+  and it also fails when a named shot is missing.
 
 ## [0.6.0] — 2026-11-05
 
