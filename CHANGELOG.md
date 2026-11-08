@@ -6,7 +6,17 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
-_(Append changes here as they land.)_
+### Fixed
+
+- **`org-os-kms publish` runs the canon gate in a canon-shaped instance with no plane role.**
+  Such an instance published on the framework floor alone, so an entry with `maturity: draft` and
+  `public_use: ok-with-caveat` was minted an id and written to `public/`. When its knowledge base
+  holds canon control data (a source card that claims or holds corpus paths, or a public-use
+  boundary), the selection (`selectPublic`, which `publish`, the steward's preview and kms-admin
+  share) now also runs the gate `export` runs (`packages/org-os-kms/src/planes/canon-gate.mjs`),
+  in every mode and before any id is minted, and `publish` reports `canonGate`. Malformed control
+  data refuses the publish (`refused: 'canon-control-data'`). Canons and public planes are
+  unchanged.
 
 ## [0.7.5] — 2026-11-25
 

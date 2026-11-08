@@ -6,6 +6,8 @@ import * as fw from './framework.mjs';
 import { packPublishRules } from './pack-publish.mjs';
 import { visibilityFloor } from './visibility.mjs';
 import { claimFloor } from './claims.mjs';
+import { planeRole } from './planes/role.mjs';
+import { canonControl, applyCanonGate, CanonControlError } from './planes/canon-gate.mjs';
 
 export async function loadInstanceGate(dir, config) {
   const rel = config.publish?.gate;
@@ -39,7 +41,10 @@ export function applyGate(gate, items, ctx) {
  * instance gate, which can only narrow. The one place both `publish` and the steward's preview decide it.
  * A type of a visibility-gated pack that declares no publish_requires / public_fields is withheld here (counted in
  * `withheld.undeclared`), and one whose object misses a declared `publish_requires` value (`withheld.visibility`), and a claim that misses its floor (`withheld.claims`), so one undeclared type never fails the whole plan; planPublish refuses it independently.
- * → { candidates, rejected, gated, withheld } (gated: an instance gate ran; candidates are what passed)
+ * In an instance with no plane role whose knowledge base is canon-shaped, the canon publication gate (src/planes/canon-gate.mjs, the
+ * gate `export` runs) narrows the floors before the instance gate, and is reported as `canonGate`; malformed canon control data throws a
+ * CanonControlError (code 'CANON_CONTROL_DATA'), so nothing is called public. A canon or a public plane gets no `canonGate`.
+ * → { candidates, rejected, gated, withheld, canonGate? } (gated: an instance gate ran; candidates are what passed)
  */
 export async function selectPublic({ dir, config, all }) {
   const types = fw.publishableTypes(config);
@@ -49,10 +54,23 @@ export async function selectPublic({ dir, config, all }) {
   // The visibility floor sits right after the framework floor and BEFORE the instance gate, which can only narrow it.
   const visible = declaredOnly.filter(({ schema, object }) => visibilityFloor(object, schema).ok);
   // The claims floor (src/claims.mjs) sits beside it: a claim about a node is published only with the node's consent date and publish.claims on.
-  const floor = visible.filter(({ schema, object }) => claimFloor(object, config, schema).ok);
+  let floor = visible.filter(({ schema, object }) => claimFloor(object, config, schema).ok);
   const withheld = { undeclared: eligible.length - declaredOnly.length, visibility: declaredOnly.length - visible.length, claims: visible.length - floor.length };
+  // No role, but a canon-shaped knowledge base: the canon gate narrows too, so a draft cannot leave on the floors alone.
+  let canonGate;
+  if (planeRole(config) === null) {
+    const canon = canonControl(all);
+    if (canon.status === 'malformed') throw new CanonControlError(canon.errors);
+    if (canon.status === 'applied') {
+      const { passed, rejected } = applyCanonGate(floor, canon.kb);
+      floor = passed;
+      const by_reason = {}; for (const r of rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
+      canonGate = { status: 'applied', passed: passed.length, rejected: rejected.length, by_reason };
+    } else canonGate = canon;
+  }
+  const extra = canonGate ? { canonGate } : {};
   const gate = await loadInstanceGate(dir, config);
-  if (!gate) return { candidates: floor, rejected: [], gated: false, withheld };
+  if (!gate) return { candidates: floor, rejected: [], gated: false, withheld, ...extra };
   const { passed, rejected } = applyGate(gate, floor, buildGateContext(all));
-  return { candidates: passed, rejected, gated: true, withheld };
+  return { candidates: passed, rejected, gated: true, withheld, ...extra };
 }

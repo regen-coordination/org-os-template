@@ -40,3 +40,16 @@ Every page kms writes for people speaks the house element set (tokens generated 
 ## Checking the pages
 
 `scripts/shoot.mjs` is a dev-only page checker: `node scripts/shoot.mjs --html <file.html> --out <dir> --name <surface> [--widths 1440,390] [--themes light,dark] [--reflow 390,320] [--axe] [--full-page]`. It writes one JPEG per width and theme plus `<name>-report.json` (horizontal overflow at the reflow widths, every request that is not `file:` or `data:`, console errors, and with `--axe` the WCAG 2.x A/AA violations), and exits 1 on any finding. It needs `playwright-core` (and `axe-core` for `--axe`) and the installed Chrome; none are dependencies of this package. Set `KMS_SHOOT_MODULES` to a directory containing `node_modules/` with them, otherwise `packages/admin` and then this package are tried; exit code 2 means they were not found.
+
+## Publishing
+
+`org-os-kms publish` (`src/ops.mjs`) selects what passes the framework floor (with the visibility
+and claims floors), then narrows it with any instance gate (`publish.gate`). That selection is
+`selectPublic` (`src/gate.mjs`), which the steward's preview and kms-admin read too. A canon never
+publishes, and a public plane re-gates itself against its canon first. An instance with no plane
+role whose knowledge base is canon-shaped (a source card that claims or holds corpus paths, or a
+public-use boundary) also runs the canon publication gate, the one `export` runs
+(`src/planes/canon-gate.mjs`), in plan mode, `--dry` and `--apply`: a draft entry is neither minted
+an id nor written. Malformed cards or boundaries refuse the publish before anything is minted or
+written, and the preview and kms-admin call nothing public until they are fixed. Without such data,
+publish behaves as it always did. Details: [`docs/CONNECTORS.md`, *Two planes*](docs/CONNECTORS.md#two-planes-a-private-canon-and-a-public-plane-export-validate).
