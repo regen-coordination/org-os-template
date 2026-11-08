@@ -2,8 +2,8 @@
 
 - **Date:** 2026-11-06
 - **Status:** accepted by the operator 2026-11-06 ("good, let's proceed"), with the recommended answers to
-  §11.4 (this copy lives on org-os `feat/network`, cut from `feat/platform-full-l7` at `4cc9dc30`). §11.1–3 stay
-  open; none of them blocks N0. Written without a question round, at the operator's request. Every choice not
+  §11.4 (this copy lives on org-os `feat/network`, cut from `feat/platform-full-l7` at `4cc9dc30`). §11.1–3 were
+  answered on 2026-11-08 (see §11). Written without a question round, at the operator's request. Every choice not
   taken from the operator's own words is marked *my call* and gathered in §10.
 - **Project:** org-os framework stewardship (lf-work-os).
 - **Verified against:** org-os `feat/platform-full-l7` at `edd9b861`, the most complete platform tree. Nothing
@@ -272,16 +272,19 @@ existing pilot gate rather than replacing it.
 - The launcher keeps a local list of recent instances: paths only.
 - The order N0–N5 and the release test.
 
-## 11. Open for the operator
+## 11. Operator decisions
 
-These only you can answer, and each one changes what gets built:
+All four are answered. The operator answered 1–3 on 2026-11-08, relayed by the lf-work-os orchestrator, taking
+the recommended option each time:
 
-1. **First pilot pair.** Is ReFi BCN → ReFi DAO the right first real request, given the settlement and
-   ReFi DAO's cut-over? The alternative is a Regen Coordination member or a Brazil node.
-2. **Default join policy for the networks you steward.** For ReFi DAO, Regen Coordination and the RKC, is
-   it `invite` or `open-with-approval`? Each network's council may need to decide this, not you.
-3. **Node-lead hats on acceptance (§6.7).** In scope for N4, or left out? It touches the chain.
-4. ~~Where this spec lives once it's accepted.~~ Answered: org-os `feat/network`.
+1. **First pilot pair: ReFi BCN → ReFi DAO.** Both instances are the operator's, they already list each other,
+   and the pair tests the whole flow end to end. A Regen Coordination member or a Brazil node comes later.
+2. **Default join policy for ReFi DAO, Regen Coordination and the RKC: `open-with-approval`.** Anyone can ask
+   and the hub's stewards decide. Each network's council confirms the policy in its own `federation.yaml`,
+   through its own rules. The framework does not set a hub's policy for it.
+3. **Node-lead hats on acceptance: left out of N4.** They come later as a step of their own. N4 stays off the
+   chain, and §6.7's prepared hats are out of scope until that step is planned.
+4. **Where this spec lives:** org-os `feat/network`.
 
 ## 12. Revisions after reading the code (2026-11-06, for the N0 plan)
 
@@ -306,3 +309,32 @@ These bind over the sections above where they differ.
   the other side's `.well-known/federation.json` over the network also arrives in N2.
 - **R5. `federation.json` comes from the existing standards builder,** so it follows the builder's rules: it
   is written only when `identity.daoURI` is set, and it is leak-scanned and counted like every other file.
+
+## 13. Revisions after reading the code (2026-11-08, for the N1 plan)
+
+These bind over the sections above where they differ.
+
+- **R6. The launcher is its own small process.** The admin server fixes one repository per process: every store,
+  watcher and the pid file is built around it. So the launcher is a separate local server (`npm run open`, port
+  4679, `127.0.0.1` only). It serves the same app at `/launch` and starts one admin server per instance it opens,
+  as a child process. Its git writes go through their own small, locked vocabulary. The instance server's
+  `git.ts` vocabulary is unchanged.
+- **R7. The write path, exactly.** The launcher writes in five places only:
+  - a folder that is new or empty (create, clone);
+  - a new branch `org-os/adopt` of a clean repo that isn't org-os, adding files that don't exist there yet;
+  - a scratch folder under the system temp directory, which it removes afterwards;
+  - `~/.org-os/instances.json` (paths only);
+  - the doctor's result for an opened instance, in that instance's admin state folder.
+
+  §5.2's "empty or new folder only" holds for create and clone. Adopt is the one write into an existing repo, on
+  those terms.
+- **R8. Adopt scaffolds, then copies what is missing.** The doctor's overlay syncs an instance that already
+  exists. It overwrites framework files and commits on the current branch, so it can't adopt. Adopt instead
+  runs `clone:framework` into a scratch folder with the same answers as "Create new". It copies only the files
+  the repo doesn't already have, onto `org-os/adopt`. Every file the repo already has is kept, and the list of
+  kept files is shown before anything is written.
+- **R9. "Join a network" arrives with N2.** It needs the request record and the invite format. N1's launcher
+  shows the fourth door as "comes with federation", as the wizard's `later` doors do today.
+- **R10. Cloning a mounted repo is a per-row operation on the Systems page.** It is offered once the System,
+  with its `mount`, is in `data/systems.yaml`, and only for a mount under `repos/`, which the canonical
+  `.gitignore` ignores. "Map the rest" stages `mount`. It clones nothing.
