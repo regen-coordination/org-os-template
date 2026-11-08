@@ -25,6 +25,15 @@ jobs:
       
       - name: Install dependencies
         run: npm install
+
+      # In the framework the generator's builder is packages/admin's, which checks each file with ajv.
+      # packages/admin is not an npm workspace, so the root install does not reach it; without this the
+      # generator exits 2 as soon as identity.daoURI is set. An instance has no packages/admin (it runs
+      # its vendored copy in scripts/lib/standards/), so the step is skipped there.
+      - name: Install admin package dependencies
+        if: hashFiles('packages/admin/package-lock.json') != ''
+        working-directory: packages/admin
+        run: npm ci
       
       - name: Generate schemas
         run: npm run generate:schemas

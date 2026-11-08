@@ -9,7 +9,8 @@ import { PAGES, SECTIONS, ALLOW_UNVERIFIED } from "../src/data/docs-manifest.mjs
 import { REDIRECTS } from "../src/data/redirects.mjs";
 import { validateManifest } from "../src/lib/manifest.mjs";
 import { REPO_ROOT, commitExists, listRepoFiles } from "../src/lib/repo.mjs";
-import { parseRegistry, registryView, listedProblems, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
+import { parseRegistry, registryView, listedProblems, isListed, PUBLIC_FIELDS, OPERATIONAL_DEFINITION } from "./federation-aggregate.mjs";
+import { mapProblems } from "./map-addresses.mjs";
 import { registryGuard, findLeaks, longestSharedRun, visibleText, instanceLine, unlistedPrinted, countProblems, RUN_LENGTH } from "./registry-leaks.mjs";
 import { tablesOutsideRegion } from "../src/lib/table-scroll.mjs";
 import { idsIn, fragmentOf, fragmentVerdict, stripCode, fragmentCoverage } from "../src/lib/fragments.mjs";
@@ -51,8 +52,6 @@ const REQUIRED = [
   "llms.txt",
   "federation.json",
   "map.json",
-  ".well-known/dao.json",
-  ".well-known/members.json",   // surfaced EIP-4824 schema (copied by the aggregate step)
   "pagefind/pagefind.js",
   "pagefind/pagefind-ui.js",
   "pagefind/pagefind-ui.css",
@@ -63,6 +62,10 @@ for (const p of new Set(REQUIRED)) {
   else fail(`MISSING: ${join(DIST, p)}`);
 }
 console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
+// The repository's .well-known files are the hand-written 0.5 ones, under addresses nobody holds; the site does
+// not publish them (operator decision 3, 2026-11-07) until the generator can write them for this address.
+if (existsSync(join(DIST, ".well-known"))) fail(`WELL-KNOWN: ${join(DIST, ".well-known")} exists. The site does not publish the repository's .well-known files; scripts/aggregate-federation.mjs removes public/.well-known, so something else put it there.`);
+else console.log("well-known: none published");
 
 // ── 3. The instance registry: only the agreed fields are published ────────
 // data/instances.yaml holds the maintainer's notes beside each instance's name.
@@ -130,6 +133,12 @@ console.log(`required: ${present}/${new Set(REQUIRED).size} files present`);
     const flagged = (map.nodes ?? []).filter((n) => n.live === false);
     if (flagged.length > 0) fail(`REGISTRY: map.json marks ${flagged.length} node(s) live: false (first: ${flagged[0].id}); the map would show them as unreached. scripts/aggregate-federation.mjs must write quietMap(map).`);
     else console.log(`map.json: ${(map.nodes ?? []).length} nodes, none marked as not live`);
+    // 3c'. The map follows the list (operator decisions 3c, 7 and 8, 2026-11-07): no entry marked listed: false,
+    // nothing reached only through one, and no private, workspace, non-https or unowned address.
+    const unlistedIds = registry.filter((raw) => !isListed(raw)).map((raw) => raw.id);
+    const mapBad = mapProblems(map, unlistedIds);
+    for (const problem of mapBad) fail(`REGISTRY: ${problem}. scripts/aggregate-federation.mjs must write publicMap(map) (scripts/map-addresses.mjs).`);
+    if (mapBad.length === 0) console.log(`map.json: no node marked listed: false or reached only through one (${unlistedIds.length} left out), and every url and repo an https address that is public and owned`);
   } catch (e) { fail(`map.json: unreadable — ${e.message}`); }
 
   // 3d. The home page's counts are the registry's, operational and registered,

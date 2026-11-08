@@ -108,7 +108,7 @@ Each instance publishes files under `.well-known/` that other tools can fetch ov
 
 An instance does not receive `packages/admin`; `clone:framework` and the instance doctor's sync copy the builder's core into its `scripts/lib/` ([`scripts/lib/standards-vendor.mjs`](../scripts/lib/standards-vendor.mjs)), so it writes the same files. `*.json.template` files sit beside them; `clone:framework` strips the generated files from a new instance and renders its own `dao.json` from the template. A workflow, `.github/workflows/generate-schemas.yml`, regenerates and commits `.well-known/` on pushes that touch `data/`, `content/meetings/`, `content/projects/` or `federation.yaml`, and daily.
 
-Discovery works as follows: a tool that knows an instance's `daoURI` fetches `dao.json`, which links to the other files by URL. The federation map reads `members.json` and `projects.json` from sibling checkouts (counts), not from the network; the public site's build (`site/scripts/aggregate-federation.mjs`) copies this repository's `.well-known/` into the site and reads sibling instances' the same way.
+Discovery works as follows: a tool that knows an instance's `daoURI` fetches `dao.json`, which links to the other files by URL. The federation map reads `members.json` and `projects.json` from sibling checkouts (counts), not from the network; the public site's build (`site/scripts/aggregate-federation.mjs`) reads sibling instances' the same way, and does not publish this repository's own `.well-known/` (see [Federation map](FEDERATION-MAP.md#how-the-project-site-uses-it)).
 
 ## The federation map
 

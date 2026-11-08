@@ -27,7 +27,7 @@ export const GET: APIRoute = ({ site }) => {
     ...docs,
     "## Machine-readable",
     `- [Federation data](${url("/federation.json")}): name, type and repository of each registered instance`,
-    `- [dao.json](${url("/.well-known/dao.json")}): the EIP-4824 entry point; its sibling schemas sit beside it`,
+    `- [Map data](${url("/map.json")}): the nodes and edges the federation map draws`,
     "",
   ];
   return new Response(lines.join("\n"), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
