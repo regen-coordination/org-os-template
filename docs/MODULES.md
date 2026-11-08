@@ -337,7 +337,8 @@ shipped is the seam both sides build to.
 
 **How it works.** The Astro site in `site/` publishes the docs listed in
 `site/src/data/docs-manifest.mjs` (the allowlist) and, at build time, `site/scripts/aggregate-federation.mjs`
-reads `data/instances.yaml` and each reachable instance's `.well-known/`. The org-os site is
+reads `data/instances.yaml` and each reachable instance's `.well-known/`; the map it draws follows the registry's
+`listed` rule and carries only public `https` addresses. The org-os site is
 the only output; there is no command that points the generator at another instance's data.
 
 **Status.** `in-dev`.
@@ -462,6 +463,14 @@ surfaces and the module as a unit are not built.
 | **org-os-koi**        | KOI-net bridges and the OPAL integration                                     |
 | **org-os-egregore**   | `packages/egregore-core`                                                     |
 | **org-os-web3**       | Safe, Hats, and Gardens integrations (the admin app's `server/systems/` drivers already read them) |
+
+**Not built: KOI and Egregore.** The repository holds first drafts toward both, and neither has anything an
+operator can run or configure, so their integration pages (`docs/integrations/koi.md` and
+`docs/integrations/egregore.md`) stay in the repository and are not published here.
+`packages/koi-bridge/` and `packages/koi-opal-bridge/` have no tests, their command-line tools mostly print
+messages, and nothing has been run against a KOI network. `packages/egregore-core/`'s adapter has no tests,
+and its `Show activity` command passes an empty limit, so it runs `git log --oneline -` and git rejects it.
+Each page goes on the site once its package has something to run.
 
 ---
 
