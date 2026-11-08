@@ -7,6 +7,7 @@
 // `load`, the server the `yaml` package's `parse`), so an instance's vendored copy runs without admin's dependencies.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { readFederation } from '../federation/read.mjs'
 import { isComposed } from '../compose.mjs'
 import { REGISTRIES, resolveTopKey } from '../registries.mjs'
 import { readPolicy, effectiveLevel } from '../visibility.mjs'
@@ -193,7 +194,7 @@ export function loadStandardsInput(root, { parseYaml }) {
   records.systems = systems
 
   return {
-    input: { identity, policy, records: /** @type {StandardsInput['records']} */ (records), reads: null },
+    input: { identity, policy, records: /** @type {StandardsInput['records']} */ (records), reads: null, federation: readFederation(federation) },
     problems,
   }
 }

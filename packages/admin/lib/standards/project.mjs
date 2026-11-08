@@ -12,6 +12,8 @@ import { isComposed } from '../compose.mjs'
 import { originOf, memberUri, systemChains, snapshotProposalUri, applicationId, contractIdsOf } from './ids.mjs'
 import { MECHANISMS, APPLICATION_STATUSES } from './daoip5.mjs'
 import { GENERATOR_MARK_KEY, GENERATOR_MARK } from './dao.mjs'
+import { isPublishedPeer } from './federation.mjs'
+import { publicHref } from '../federation/peers.mjs'
 
 /** @typedef {import('../visibility.mjs').VisibilityPolicy} VisibilityPolicy */
 /** @typedef {{ level: 'error' | 'warn', file: string, text: string }} Problem */
@@ -29,7 +31,9 @@ import { GENERATOR_MARK_KEY, GENERATOR_MARK } from './dao.mjs'
  *   sources: Record<string, unknown>[] }} records raw, as in git, by registry name
  * @property {Record<string, DriverRead> | null} reads by system id; null: the git copy
  * @property {{ proposal?: (id: string) => string }} [urls]
+ * @property {ReturnType<typeof readFederation>} [federation] federation.yaml as `readFederation` reads it (absent: none read)
  */
+/** @typedef {import('../federation/read.mjs').readFederation} readFederation */
 /** @typedef {{ id: string, kind: string, at: string, actor: string | null }} PublicEvent */
 /** @typedef {{ id: string, title: string | null, author: string | null, state: string, opened: string, closed: string | null, rules: string[], restricted: boolean, attached: string[], events: PublicEvent[] }} PublicProposal */
 /** @typedef {{ id: string, proposal: string | null, title: string | null, status: string, date: string, rule: string | null, method: string | null, restricted: boolean }} PublicDecision */
@@ -45,6 +49,10 @@ import { GENERATOR_MARK_KEY, GENERATOR_MARK } from './dao.mjs'
  * @property {PublicProposal[]} proposals
  * @property {PublicDecision[]} decisions
  * @property {{ description: string | null, rules: Record<string, unknown>[] } | null} governance null: not public
+ * @property {{ scope: string | null, networks: { name: string, hub: string | null, role: string | null }[],
+ *   peers: { name: string, url: string, type: string | null, trust: string | null }[],
+ *   join: { policy: string, types: string[], asks: string[], where: string | null } | null } | null} federation exactly what may be
+ *   published (null: none read)
  * @property {{ meetings: Record<string, unknown>[], projects: Record<string, unknown>[], finances: Record<string, unknown>,
  *   ideas: Record<string, unknown>[], knowledge: Record<string, unknown> | null, sources: Record<string, unknown>[] }} extras
  */
@@ -119,7 +127,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|
 const notSecret = s => ISO_DATE.test(s) || VOCABULARY_LOWER.has(s.toLowerCase())
 
 /** The collections of `input.records`, in the order `withheld` lists them. */
-const COLLECTIONS = /** @type {const} */ (['members', 'systems', 'proposals', 'governance', 'meetings', 'projects', 'finances', 'ideas', 'knowledge-manifest', 'sources'])
+const COLLECTIONS = /** @type {const} */ (['members', 'systems', 'proposals', 'governance', 'meetings', 'projects', 'finances', 'ideas', 'knowledge-manifest', 'sources', 'peers'])
 const DOCUMENTS = new Set(['governance', 'finances', 'knowledge-manifest'])
 
 /** The kinds that close a proposal: their actor may be recorded on `closed.as` (L5 spec §7.2). */
@@ -185,7 +193,7 @@ export function projectPublic(input) {
   if (origin === null) {
     problems.push({ level: 'error', file: 'federation.yaml', text: `identity.daoURI ${JSON.stringify(identity?.daoURI ?? null)} is not an https URL: every published id is built from it, so nothing is published` })
     const pub = emptyPublic(identity)
-    for (const c of COLLECTIONS) withhold(records[c])
+    for (const c of COLLECTIONS) if (c !== 'peers') withhold(records[c])   // peers never lives in records
     withhold(rawReads)
     return { pub, withheld: [], secrets: subtract(candidates, pub), problems }
   }
@@ -528,8 +536,34 @@ export function projectPublic(input) {
     sources: viewsOf('sources'),
   }
 
+  // ── federation: the public projection only; every other string of the read is a candidate secret ──
+  const fed = isObj(input?.federation) ? input.federation : null
+  /** @type {PublicInput['federation']} */
+  let federation = null
+  if (fed) {
+    const scope = isObj(fed.identity) && typeof fed.identity.scope === 'string' && fed.identity.scope !== '' ? fed.identity.scope : null
+    const networks = (Array.isArray(fed.networks) ? fed.networks : []).map(n => {
+      const hub = publicHref(n.hub)
+      if (hub === null) withhold(n.hub)
+      return { name: n.name, hub, role: n.role }
+    })
+    /** @type {{ name: string, url: string, type: string | null, trust: string | null }[]} */
+    const published = []
+    for (const peer of Array.isArray(fed.peers) ? fed.peers : []) {
+      withhold([peer.ref, peer.relationship, peer.since, peer.decision])
+      if (isPublishedPeer(peer)) published.push({ name: peer.name, url: /** @type {string} */ (peer.url), type: peer.type, trust: peer.trust })
+      else { withhold([peer.name, peer.url]); count('peers', 'records') }
+    }
+    const j = fed.join
+    const where = j ? publicHref(j.where) : null
+    if (j && where === null) withhold(j.where)
+    federation = { scope, networks, peers: published, join: j ? { policy: j.policy, types: j.types, asks: j.asks, where } : null }
+    // identity (other than what is published) and the read's warnings may name withheld values: never shown
+    withhold(fed.problems)
+  }
+
   /** @type {PublicInput} */
-  const pub = { identity, origin, members, systems, reads, proposals, decisions, governance, extras }
+  const pub = { identity, origin, members, systems, reads, proposals, decisions, governance, federation, extras }
   const withheld = COLLECTIONS.flatMap(c => (counts.has(c) ? [/** @type {Withheld} */ (counts.get(c))] : []))
   return { pub, withheld, secrets: subtract(candidates, pub, sectionCandidates), problems }
 }
@@ -537,7 +571,7 @@ export function projectPublic(input) {
 /** @param {StandardsInput['identity']} identity @returns {PublicInput} */
 function emptyPublic(identity) {
   return {
-    identity, origin: '', members: [], systems: [], reads: {}, proposals: [], decisions: [], governance: null,
+    identity, origin: '', members: [], systems: [], reads: {}, proposals: [], decisions: [], governance: null, federation: null,
     extras: { meetings: [], projects: [], finances: {}, ideas: [], knowledge: null, sources: [] },
   }
 }

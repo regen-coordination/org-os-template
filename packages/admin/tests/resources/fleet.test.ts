@@ -52,11 +52,51 @@ describe('fleet adapter', () => {
     const g = (await fleet.read(ctx())) as Graph
     expect(g.nodes.find(n => n.id === 'instance:fixture-org')).toMatchObject({ name: 'Fixture Org', status: 'this instance',
       facts: expect.objectContaining({ self: true, localPath: repo }) })
-    expect(g.nodes.find(n => n.id === `instance:${basename(sibling)}`)).toMatchObject({ name: 'Sibling', status: 'host-cooperative',
-      changed: expect.objectContaining({ by: 'Peer' }), facts: expect.objectContaining({ localPath: sibling }) })
-    expect(g.nodes.find(n => n.id === 'instance:far-away')).toMatchObject({ status: 'read', changed: null,
-      facts: expect.objectContaining({ localPath: null }) })
+    expect(g.nodes.find(n => n.id === `instance:${basename(sibling)}`)).toMatchObject({ name: 'Sibling', status: 'a repo, not an instance',
+      changed: expect.objectContaining({ by: 'Peer' }), facts: expect.objectContaining({ localPath: sibling, link: 'not-an-instance', relationship: 'host-cooperative', trust: 'read' }) })
+    expect(g.nodes.find(n => n.id === 'instance:far-away')).toMatchObject({ status: 'not checked', attention: null, changed: null,
+      facts: expect.objectContaining({ localPath: null, link: 'unknown' }) })
     expect(g.edges).toContainEqual({ from: 'instance:far-away', to: 'instance:fixture-org', kind: 'federation' })
+  })
+
+  const linked = (siblingPeers: string) => {
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', '  slug: fixture-org', 'peers:',
+      '  - name: Sibling', `    repo: ../${basename(sibling)}`, ''].join('\n'))
+    writeFileSync(join(sibling, 'federation.yaml'), siblingPeers)
+  }
+
+  it('a sibling that lists this instance back is mutual', async () => {
+    linked(`peers:\n  - name: Fixture Org\n    repo: ../${basename(repo)}\n`)
+    const g = (await fleet.read(ctx())) as Graph
+    expect(g.nodes.find(n => n.id === `instance:${basename(sibling)}`)).toMatchObject({ status: 'mutual', attention: null, facts: expect.objectContaining({ link: 'mutual' }) })
+  })
+
+  it('a sibling instance that does not list this one is claimed, with the ask', async () => {
+    linked('peers: []\n')
+    const g = (await fleet.read(ctx())) as Graph
+    expect(g.nodes.find(n => n.id === `instance:${basename(sibling)}`)).toMatchObject({ status: 'claimed',
+      attention: { level: 'warn', text: 'Only this side lists the link. Ask them to add this instance.' }, facts: expect.objectContaining({ link: 'claimed' }) })
+  })
+
+  // Final review M1: a folder was looked at, so the card says what was found there, not "not checked".
+  it('a missing folder or a broken federation.yaml reads "can\'t read their side", with the reason', async () => {
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', '  slug: fixture-org', 'peers:',
+      '  - name: Gone', '    repo: ../gone-peer-folder', '  - name: Sibling', `    repo: ../${basename(sibling)}`, ''].join('\n'))
+    writeFileSync(join(sibling, 'federation.yaml'), 'peers: [\n  bad: : :\n')
+    const g = (await fleet.read(ctx())) as Graph
+    expect(g.nodes.find(n => n.id === 'instance:gone-peer-folder')).toMatchObject({ status: "can't read their side",
+      attention: { level: 'warn', text: `No folder at ${join(dirname(repo), 'gone-peer-folder')}.` }, facts: expect.objectContaining({ link: 'unknown' }) })
+    const broken = g.nodes.find(n => n.id === `instance:${basename(sibling)}`)!
+    expect(broken).toMatchObject({ status: "can't read their side", facts: expect.objectContaining({ link: 'unknown' }) })
+    expect(broken.attention).toMatchObject({ level: 'warn', text: expect.stringMatching(/^Their federation\.yaml can't be read: .+\.$/) })
+  })
+
+  it('reads peers nested under federation: when there are none at the top level (final review C1)', async () => {
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', '  slug: fixture-org', 'federation:', '  peers:',
+      '    - name: Far Away', '      repo: someone/far-away', ''].join('\n'))
+    const g = (await fleet.read(ctx())) as Graph
+    expect(g.nodes.map(n => n.id)).toEqual(['instance:fixture-org', 'instance:far-away'])
+    expect(g.nodes[1]).toMatchObject({ status: 'not checked', attention: null })
   })
 
   it('prefers data/instances.yaml, skips its own entry, and warns on drift', async () => {

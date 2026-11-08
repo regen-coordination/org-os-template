@@ -68,13 +68,54 @@ Declares this instance's position in the network topology.
 
 ```yaml
 network: "regen-coordination"
-hub: "github.com/regen-coordination/hub"
+hub: "https://github.com/regen-coordination/hub"
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `network` | string | recommended | Name of the federation network this instance belongs to |
-| `hub` | URL | recommended | URL of the hub repository that aggregates network data |
+| `network` | string | recommended | Name of the federation network this instance belongs to. Read as one item of `networks` |
+| `hub` | URL | recommended | URL of the hub repository that aggregates network data. Read as one item of `networks` |
+
+An instance in more than one network lists them under `networks` instead. When `networks` is set, `network` and `hub` are ignored.
+
+An older file may keep `network`, `hub`, `networks` or `peers` inside a `federation:` block. They are still read from there when the top level has none of them, and `validate:schemas` asks you to move them to the top level.
+
+```yaml
+networks:
+  - name: "regen-coordination"
+    hub: "https://github.com/regen-coordination/hub"
+    role: "node"
+  - name: "refi-dao"
+    hub: "https://github.com/refi-dao/hub"
+    role: "node"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Name of the network |
+| `hub` | URL | recommended | The network's hub repository. `url` is read the same way when there is no `hub` |
+| `role` | string | no | What this instance is in that network, for example `node` or `hub` |
+
+### join
+
+Says how others can join this instance's network. It is published in `.well-known/federation.json`.
+
+```yaml
+join:
+  policy: "open-with-approval"
+  types: ["LocalNode", "PersonalNode"]
+  asks: ["who you are", "why you want to join"]
+  where: "https://github.com/org/hub/issues"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `policy` | enum | yes | One of: `closed`, `invite`, `open-with-approval`, `open` |
+| `types` | list | no | Instance types that may join |
+| `asks` | list | no | What a newcomer is asked to say or show |
+| `where` | string | no | Where to ask, as a public `https://` address (an issue tracker, a form). Anything else is not published |
+
+A `join` with an unknown `policy` is ignored, and `validate:schemas` says so.
 
 ---
 
@@ -93,15 +134,32 @@ peers:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Human-readable peer name |
-| `repo` | string | yes | Path or slug to the peer repository (relative to workspace or GitHub) |
+| `repo` | string | yes | Where the peer lives: a path relative to this instance or to a folder above it (such as `03 Libraries/…` in a vault), a GitHub `owner/repo`, or a URL |
 | `url` | URL | yes | Public URL of the peer |
-| `trust` | enum | yes | One of: `full`, `read`, `none` |
+| `trust` | enum | yes | One of: `full`, `read`, `read-write`, `none` |
+| `since` | date | no | When the link started |
+| `decision` | string | no | Where the choice to link was recorded (a decision id or a date) |
+| `visibility` | enum | no | `public` (default) or `private`. A `private` peer is never published |
 
 **Trust levels:**
 
 - `full` — Bidirectional sync. This node can push knowledge to the peer, and the peer can push back. Used between tightly coupled organizations.
 - `read` — This node can read the peer's published data but does not push to it. The default for most federations.
+- `read-write` — This node reads the peer's published data and may also send changes to it, but nothing flows back automatically.
 - `none` — Peer is listed for reference but no automated exchange occurs.
+
+#### Link state
+
+Whether a link is real depends on both sides, so it is worked out each time from both `federation.yaml` files and never stored. In N0 a peer is in one of four states:
+
+| State | Meaning |
+|-------|---------|
+| `mutual` | You list them and they list you back |
+| `claimed` | You list them, but they do not list you |
+| `not-an-instance` | The folder exists but has no `federation.yaml`: it is a repo, not an org-os instance. Map it as a System in `data/systems.yaml` |
+| `unknown` | Their side can't be read from here: the folder is missing, the file is broken, or the peer is only a URL |
+
+`npm run validate:schemas` turns `claimed`, `not-an-instance` and `unknown` into warnings, except an `unknown` peer known only by a URL or a GitHub `owner/repo`, which there is no folder to check for. It never fails because of them, except under `--strict`. Nothing in a `peers` list is ever moved or removed for you.
 
 ---
 
@@ -463,7 +521,7 @@ Responsibilities:
 - Publishes a unified `.well-known/` surface covering the entire network
 - Coordinates cross-org initiatives
 
-A federation has exactly one hub. The hub URL is declared in every peer's `federation.yaml` under the `hub` field.
+Each network has one hub node; an instance can be in several networks. The hub URL is declared in every peer's `federation.yaml` under the `hub` field (or in `networks`).
 
 ### Peer / Node
 
@@ -673,6 +731,10 @@ Every org-os instance publishes machine-readable JSON schemas in `.well-known/` 
 3. The `dao.json` links to other schemas. The peer can then fetch `members.json`, `projects.json`, etc.
 4. For federation specifically, a peer reads `knowledge.json` to discover what knowledge domains are available and how many pages exist.
 
+### federation.json
+
+`.well-known/federation.json` publishes this instance's own public claims: its networks, its join terms and the peers it is willing to name. A peer is listed only when its `url` is a public `https:` address and it is not `visibility: private`. Notes, contacts, relationships and local paths are never published, and peers held back are only counted. A network's `hub` and the `join.where` are published the same way: only as a public `https:` address (`github.com/<owner>/<repo>` written without `https://` counts as one). Anything else, such as a local path or a name with no dot like `https://nas/`, is left out, and `validate:schemas` warns about it.
+
 ### Generating schemas
 
 ```bash
@@ -793,7 +855,7 @@ identity:
   type: "Project"
 
 network: "regen-coordination"
-hub: "github.com/regen-coordination/hub"
+hub: "https://github.com/regen-coordination/hub"
 
 peers:
   - name: "Hub"

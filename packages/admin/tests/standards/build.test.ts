@@ -20,9 +20,9 @@ const liveCopy = () => buildStandards(complete(fixtureInput({ reads: fixtureRead
 const serialised = (files: Record<string, unknown>) => Object.keys(files).map(f => serializeFile(f, files[f])).join('\n')
 
 describe('STANDARD_FILES', () => {
-  it('names the fourteen files, in order', () => {
+  it('names the fifteen files, in order', () => {
     expect(STANDARD_FILES).toEqual(['dao.json', 'members.json', 'proposals.json', 'activities.json', 'contracts.json', 'governance.md',
-      'grant-pools.json', 'applications.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json', 'ideas.json', 'knowledge.json'])
+      'grant-pools.json', 'applications.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json', 'ideas.json', 'knowledge.json', 'federation.json'])
   })
 })
 
@@ -30,7 +30,7 @@ describe('buildStandards: the two copies', () => {
   it('the git copy: every file but applications.json, grant pools with their sizes warned, no reads', () => {
     const out = gitCopy()
     expect(Object.keys(out.files)).toEqual(['dao.json', 'members.json', 'proposals.json', 'activities.json', 'contracts.json', 'governance.md',
-      'grant-pools.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json', 'ideas.json', 'knowledge.json'])
+      'grant-pools.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json', 'ideas.json', 'knowledge.json', 'federation.json'])
     expect(out.problems.filter(p => p.file === 'grant-pools.json' && p.level === 'warn').map(p => p.text).join('\n')).toMatch(/totalGrantPoolSize is absent/)
     expect(out.reads).toEqual([])
     const dao = out.files['dao.json'] as Record<string, unknown>

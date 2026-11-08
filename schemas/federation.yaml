@@ -9,6 +9,7 @@ description: "Repository relationship manifest for agent-native federated organi
 # CHANGELOG from v2.0:
 # - Added identity.emoji, identity.chain, identity.safe, identity.hats, identity.gardens
 # - Added federation.network, federation.hub, federation.peers (replaces simple upstream/downstream)
+#   (network N0: these are now written at the top level; a nested federation: block is still read, with a warning)
 # - Added agent section (runtime, skills, channels, proactive, heartbeat_interval)
 # - Added knowledge-commons section
 # - Version bump: "2.0" → "3.0", spec: "organizational-os/2.0" → "organizational-os/3.0"
@@ -91,13 +92,54 @@ identity:
 # ── Network Membership (NEW in v3.0) ─────────────────────────────────────────
 network:
   type: string
-  description: "Federation network identifier (e.g., 'regen-coordination')"
+  description: "Federation network identifier (e.g., 'regen-coordination'). Read as one item of networks."
   required: false
 
 hub:
   type: string
-  description: "Hub repository path (e.g., 'github.com/regen-coordination/hub')"
+  description: "Hub repository URL (e.g., 'https://github.com/regen-coordination/hub'). Read as one item of networks. Published only as a public https address."
   required: false
+
+networks:
+  type: array
+  description: "The networks this instance is in. Each network has one hub node; an instance can be in several networks. When set, network and hub are ignored."
+  items:
+    type: object
+    properties:
+      name:
+        type: string
+        description: "Network name (e.g., 'regen-coordination')"
+      hub:
+        type: string
+        description: "Hub repository URL. Published only as a public https address (github.com/<owner>/<repo> without a scheme counts as one)"
+      url:
+        type: string
+        description: "Read as hub when hub is not set"
+      role:
+        type: string
+        description: "What this instance is in the network (e.g., 'node', 'hub')"
+
+join:
+  type: object
+  description: "How others can join this instance's network. Published in .well-known/federation.json."
+  properties:
+    policy:
+      type: string
+      enum: ["closed", "invite", "open-with-approval", "open"]
+      description: "Who may join"
+    types:
+      type: array
+      description: "Instance types that may join"
+      items:
+        type: string
+    asks:
+      type: array
+      description: "What a newcomer is asked to say or show when joining"
+      items:
+        type: string
+    where:
+      type: string
+      description: "Where to ask, as a public https address (an issue tracker, a form). Anything else is not published"
 
 peers:
   type: array
@@ -117,9 +159,21 @@ peers:
         description: "Full repository URL"
       trust:
         type: string
-        enum: ["full", "read", "none"]
+        enum: ["full", "read", "read-write", "none"]
         description: "Trust level for this peer"
         default: "read"
+      since:
+        type: string
+        format: date
+        description: "When the link started"
+      decision:
+        type: string
+        description: "Where the choice to link was recorded (a decision id or a date)"
+      visibility:
+        type: string
+        enum: ["public", "private"]
+        description: "private keeps this peer out of .well-known/federation.json"
+        default: "public"
 
 # ── Upstream/Downstream Relationships ────────────────────────────────────────
 upstream:
@@ -458,7 +512,7 @@ example: |
       chain: "eip155:100"
 
   network: "regen-coordination"
-  hub: "github.com/regen-coordination/hub"
+  hub: "https://github.com/regen-coordination/hub"
 
   peers:
     - name: "NYC Node"

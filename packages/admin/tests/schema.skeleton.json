@@ -643,6 +643,13 @@
         "type": "string",
         "minLength": 1
       },
+      "mount": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[^\\0]+$"
+      },
       "name": {
         "type": "string",
         "minLength": 1
@@ -840,6 +847,19 @@
           "type": "string",
           "pattern": "^(?!/)(?!.*(^|/)\\.{1,2}(/|$))(?!.*//)[^\\s]+$"
         }
+      },
+      "purpose": {
+        "enum": [
+          "website",
+          "knowledge",
+          "app",
+          "contracts",
+          "data",
+          "fork",
+          "archive",
+          "other",
+          null
+        ]
       },
       "relates": {
         "type": [

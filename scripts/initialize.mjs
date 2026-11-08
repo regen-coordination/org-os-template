@@ -17,7 +17,7 @@ import fs from "fs";
 import path from "path";
 import yaml from "js-yaml";
 import matter from "gray-matter";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { execSync } from "child_process";
 import { readGraphStatus, renderStatusMarkdown } from "./graph-status.mjs";
 
@@ -580,7 +580,25 @@ function loadRecentMemory() {
 
 // ── Federation ───────────────────────────────────────────────────────────────
 
-function loadFederation(federation) {
+/**
+ * The federation reader validate:schemas uses: the framework's (packages/admin/lib/federation/) or an instance's
+ * vendored copy (scripts/lib/federation/). Null when neither is here, and loadFederation falls back to its own reading.
+ */
+export async function loadFederationReader(dir = __dirname) {
+  for (const rel of ["../packages/admin/lib/federation/read.mjs", "./lib/federation/read.mjs"]) {
+    const file = path.join(dir, rel);
+    if (!fs.existsSync(file)) continue;
+    try {
+      const mod = await import(pathToFileURL(file).href);
+      if (typeof mod.readFederation === "function") return mod.readFederation;
+    } catch {
+      // try the next one
+    }
+  }
+  return null;
+}
+
+export function loadFederation(federation, readFederation = null) {
   if (!federation) return null;
 
   // Support both v3 (federation.peers) and v1 (peers at root) structures
@@ -603,11 +621,14 @@ function loadFederation(federation) {
   const knowledgeCommons = federation["knowledge-commons"] || {};
   const agentSection = federation.agent || {};
 
-  const networks = (fedSection.networks || []).map((n) => ({
-    name: n.name,
-    role: n.role || null,
-    url: n.url || null,
-  }));
+  // Top-level networks (or network + hub) and the nested federation: block, read as validate:schemas reads them.
+  const networks = readFederation
+    ? readFederation(federation).networks.map((n) => ({ name: n.name, role: n.role, url: n.hub }))
+    : (fedSection.networks || []).map((n) => ({
+        name: n.name,
+        role: n.role || null,
+        url: n.url || null,
+      }));
 
   const repos = (federation.repos || []).map((r) => ({
     name: r.name,
@@ -1187,7 +1208,7 @@ async function main() {
   const skillCandidates = loadSkillCandidates();
   const funding = loadFunding(fundingData);
   const recentMemory = loadRecentMemory();
-  const federation = loadFederation(federationData);
+  const federation = loadFederation(federationData, await loadFederationReader());
   const apps = loadApps(federationData);
   const git = loadGitStatus();
   const pipelines = loadPipelines(fundingData);
@@ -1894,7 +1915,17 @@ function generateSuggestions(state, count) {
   return suggestions.slice(0, count);
 }
 
-main().catch((err) => {
-  console.error("Error during initialization:", err.message);
-  process.exit(1);
-});
+// Run as a script; imported (by a test), it only lends its readers.
+const invokedAs = (() => {
+  try {
+    return process.argv[1] ? fs.realpathSync(process.argv[1]) : null;
+  } catch {
+    return null;
+  }
+})();
+if (invokedAs === fs.realpathSync(__filename)) {
+  main().catch((err) => {
+    console.error("Error during initialization:", err.message);
+    process.exit(1);
+  });
+}

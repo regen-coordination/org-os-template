@@ -37,6 +37,13 @@ const load = (root: string) => loadStandardsInput(root, { parseYaml: parse })
 const systemsOf = (r: ReturnType<typeof load>) => r.input!.records.systems as Record<string, unknown>[]
 const warns = (r: ReturnType<typeof load>) => r.problems.filter(p => p.level === 'warn').map(p => `${p.file}: ${p.text}`)
 
+describe('loadStandardsInput: federation', () => {
+  it('puts the federation.yaml read on the input', () => {
+    const r = load(instance({ 'federation.yaml': FEDERATION('peers:\n  - name: P\n    url: https://example.org/p\n') }))
+    expect(r.input!.federation!.peers.map((p: { name: string }) => p.name)).toEqual(['P'])
+  })
+})
+
 describe('loadStandardsInput: identity', () => {
   it('no daoURI: no input, and a problem says why', () => {
     for (const fed of ['identity:\n  name: "Test DAO"\n  type: "DAO"\n', 'identity:\n  name: "Test DAO"\n  daoURI: ""\n']) {

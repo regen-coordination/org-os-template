@@ -45,7 +45,7 @@ const NOTHING = '· nothing generated: identity.daoURI is not set — every id i
  *  daoURI the builder is not loaded. */
 const STANDARD_FILES = ['dao.json', 'members.json', 'proposals.json', 'activities.json', 'contracts.json', 'governance.md',
   'grant-pools.json', 'applications.json', 'attestation-issuers.json', 'meetings.json', 'projects.json', 'finances.json',
-  'ideas.json', 'knowledge.json'];
+  'ideas.json', 'knowledge.json', 'federation.json'];
 
 /** Nothing to build (R32): say so, and name each standard file still in .well-known/ — written by an earlier
  *  generator (0.6), never refreshed now. Nothing is removed: they are the organisation's to keep or delete. */

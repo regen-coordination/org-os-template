@@ -4,6 +4,9 @@ import { lastCommit } from '../changed.ts'
 import { displayNames } from '../../session/names.ts'
 import { instanceAttention } from '../attention.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
+import { readFederation } from '../../../lib/federation/read.mjs'
+import { selfAddresses, linkState } from '../../../lib/federation/peers.mjs'
+import { nodePeerIO } from '../../federation-io.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
 
 /** A clone on this machine, or null: only a folder holding a git repository counts. */
@@ -11,6 +14,36 @@ const clone = (repo: string, ref: string | null): string | null => {
   if (!ref) return null
   const path = resolve(repo, ref)
   return existsSync(join(path, '.git')) ? path : null
+}
+
+const LINK_STATUS: Record<string, { status: string; attention: Resource['attention'] }> = {
+  mutual: { status: 'mutual', attention: null },
+  claimed: { status: 'claimed', attention: { level: 'warn', text: 'Only this side lists the link. Ask them to add this instance.' } },
+  'not-an-instance': { status: 'a repo, not an instance', attention: { level: 'warn', text: 'This is a repo, not an org-os instance. Map it as a System.' } },
+  unknown: { status: 'not checked', attention: null },
+}
+
+/** How a link reads on its card. An `unknown` with a path means a folder was looked at: what was found there is said. */
+const shownLink = (link: { state: string; path: string | null; reason: string | null }) => {
+  if (link.state !== 'unknown' || !link.path || !link.reason) return LINK_STATUS[link.state]
+  const text = `${link.reason.charAt(0).toUpperCase()}${link.reason.slice(1)}`.replace(/\.?$/, '.')
+  return { status: "can't read their side", attention: { level: 'warn' as const, text } }
+}
+
+/** The peers list readFederation reads: the top-level one, else one nested under `federation:` (the v3 shape). */
+const peersOf = (fed: Record<string, unknown>): unknown => {
+  if (fed.peers !== undefined) return fed.peers
+  const nested = fed.federation
+  return nested && typeof nested === 'object' && !Array.isArray(nested) ? (nested as Record<string, unknown>).peers : undefined
+}
+
+/** The URL column of `git remote -v`, de-duplicated; none when git fails. */
+const remoteUrls = async (ctx: Parameters<Adapter['read']>[0]): Promise<string[]> => {
+  try {
+    const r = await ctx.run('git', ['remote', '-v'], { cwd: ctx.repo, timeoutMs: 5000 })
+    if (r.code !== 0) return []
+    return [...new Set(r.stdout.split('\n').map(l => l.split(/\s+/)[1]).filter(Boolean))]
+  } catch { return [] }
 }
 
 export const fleet: Adapter = {
@@ -45,17 +78,23 @@ export const fleet: Adapter = {
         })
         edges.push({ from: `instance:${id}`, to: self.id, kind: 'federation' })
       }
-    } else if (Array.isArray(fed.peers)) {
-      for (const raw of fed.peers as Record<string, unknown>[]) {
+    } else if (Array.isArray(peersOf(fed))) {
+      const self_ = selfAddresses(ctx.repo, await remoteUrls(ctx), nodePeerIO)
+      const parsed = readFederation(fed).peers
+      for (const [i, raw] of (peersOf(fed) as Record<string, unknown>[]).entries()) {
         const ref = str(raw?.repo)
         const id = (ref ? basename(ref).replace(/\.git$/, '') : '') || slug(str(raw?.name) ?? '')
         if (!id || id === selfId) continue // a federation that lists this instance among its peers: its card is the self one
         const local = ref && ref.startsWith('.') ? clone(ctx.repo, ref) : null
+        const peer = parsed.find(p => p.index === i)
+        const link = peer ? linkState(peer, self_, ctx.repo, nodePeerIO) : { state: 'unknown' as const, path: null, reason: "can't read their side from here" }
+        const shown = shownLink(link)
         nodes.push({
           id: `instance:${id}`, kind: 'instance', board: 'systems', name: str(raw.name) ?? id,
-          status: str(raw.relationship) ?? str(raw.trust), attention: null,
+          status: shown.status, attention: shown.attention,
           changed: local ? await lastCommit(local, '.') : null,
-          facts: { type: raw.type ?? null, repo: ref, url: raw.url ?? null, trust: raw.trust ?? null, relationship: raw.relationship ?? null, localPath: local },
+          facts: { type: raw.type ?? null, repo: ref, url: raw.url ?? null, trust: raw.trust ?? null, relationship: raw.relationship ?? null, localPath: local,
+            link: link.state, linkReason: link.reason },
           source: { path: 'federation.yaml', editable: false },
         })
         edges.push({ from: `instance:${id}`, to: self.id, kind: 'federation' })
