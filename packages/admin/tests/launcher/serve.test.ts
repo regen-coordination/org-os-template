@@ -18,7 +18,7 @@ let base: string
 
 beforeEach(async () => {
   repo = makeFixtureRepo()
-  fakeStartAdmin = vi.fn(async () => ({ url: 'http://localhost:4999', stop: async () => {} }))
+  fakeStartAdmin = vi.fn(async () => ({ url: 'http://localhost:4999', stop: async () => {}, exited: new Promise<void>(() => {}) }))
   fakeAssess = vi.fn(async () => clean)
   launcher = await startLauncher({ port: 0, frameworkDir: REAL_REPO, startAdmin: fakeStartAdmin, assess: fakeAssess })
   base = `http://127.0.0.1:${launcher.port}`
@@ -26,7 +26,7 @@ beforeEach(async () => {
 afterEach(async () => { await launcher.close(); removeFixtureRepo(repo) })
 
 const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
-  launcher.app.request(`${base}${path}`, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', host: `localhost:${launcher.port}`, ...headers } })
+  launcher.app.request(`${base}${path}`, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', host: `localhost:${launcher.port}`, origin: `http://localhost:${launcher.port}`, ...headers } })
 
 describe('the launcher', () => {
   it('refuses a foreign Origin or Host', async () => {
@@ -35,8 +35,40 @@ describe('the launcher', () => {
     expect(fakeStartAdmin).not.toHaveBeenCalled()
   })
 
+  it('refuses a write with no Origin, and a DELETE that is not JSON', async () => {
+    const h = { 'content-type': 'application/json', host: `localhost:${launcher.port}` }
+    expect((await launcher.app.request(`${base}/api/launcher/open`, { method: 'POST', body: JSON.stringify({ path: repo }), headers: h })).status).toBe(403)
+    const own = { host: h.host, origin: `http://localhost:${launcher.port}` }
+    expect((await launcher.app.request(`${base}/api/launcher/recent`, { method: 'DELETE', body: '{}', headers: { ...own, 'content-type': 'text/plain' } })).status).toBe(415)
+    expect(fakeStartAdmin).not.toHaveBeenCalled()
+  })
+
+  it('opens one canonical path: a trailing slash and a symlink are the same instance', async () => {
+    const { symlinkSync } = await import('node:fs')
+    const link = `${repo}-link`
+    symlinkSync(repo, link)
+    try {
+      await post('/api/launcher/open', { path: `${repo}/` })
+      await post('/api/launcher/open', { path: link })
+      await post('/api/launcher/open', { path: `${repo}/data/..` })
+      expect(fakeStartAdmin).toHaveBeenCalledTimes(1)
+      expect(fakeStartAdmin).toHaveBeenCalledWith(realpathSync(repo))
+      expect(JSON.parse(readFileSync(join(stateDir(realpathSync(repo)), 'doctor.json'), 'utf8')).blockers).toBe(0)
+    } finally { rmSync(link, { force: true }) }
+  })
+
+  it('drops an admin that has ended: the next open starts a new one', async () => {
+    let end!: () => void
+    fakeStartAdmin.mockImplementationOnce(async () => ({ url: 'http://localhost:4999', stop: async () => {}, exited: new Promise<void>(r => { end = r }) }))
+    await post('/api/launcher/open', { path: repo })
+    end()
+    await new Promise(r => setTimeout(r, 10))
+    await post('/api/launcher/open', { path: repo })
+    expect(fakeStartAdmin).toHaveBeenCalledTimes(2)
+  })
+
   it('refuses a write that is not JSON', async () => {
-    const r = await launcher.app.request(`${base}/api/launcher/open`, { method: 'POST', body: '{}', headers: { 'content-type': 'text/plain', host: `localhost:${launcher.port}` } })
+    const r = await launcher.app.request(`${base}/api/launcher/open`, { method: 'POST', body: '{}', headers: { 'content-type': 'text/plain', host: `localhost:${launcher.port}`, origin: `http://localhost:${launcher.port}` } })
     expect(r.status).toBe(415)
   })
 
@@ -51,7 +83,7 @@ describe('the launcher', () => {
   it('opens an instance: doctor result saved, remembered, admin started, sent to map the rest', async () => {
     const r = await post('/api/launcher/open', { path: repo })
     expect(await r.json()).toEqual({ url: 'http://localhost:4999/systems/map?first=1' })
-    expect(JSON.parse(readFileSync(join(stateDir(repo), 'doctor.json'), 'utf8')).blockers).toBe(0)
+    expect(JSON.parse(readFileSync(join(stateDir(realpathSync(repo)), 'doctor.json'), 'utf8')).blockers).toBe(0)
     expect(readRecent()[0]).toBe(realpathSync(repo))
     await post('/api/launcher/open', { path: repo })
     expect(fakeStartAdmin).toHaveBeenCalledTimes(1) // the child is reused
@@ -62,7 +94,7 @@ describe('the launcher', () => {
     try {
       const r = await post('/api/launcher/open', { path: plain })
       expect(r.status).toBe(409)
-      expect(await r.json()).toMatchObject({ adoptable: true, path: plain })
+      expect(await r.json()).toMatchObject({ adoptable: true, path: realpathSync(plain) })
     } finally { rmSync(plain, { recursive: true, force: true }) }
   })
 
@@ -73,8 +105,8 @@ describe('the launcher', () => {
   it('names the process of an admin it did not start', async () => {
     const { serverPidFile } = await import('../../server/state.ts')
     const { mkdirSync, writeFileSync } = await import('node:fs')
-    mkdirSync(stateDir(repo), { recursive: true })
-    writeFileSync(serverPidFile(repo), String(process.ppid))
+    mkdirSync(stateDir(realpathSync(repo)), { recursive: true })
+    writeFileSync(serverPidFile(realpathSync(repo)), String(process.ppid))
     const r = await post('/api/launcher/open', { path: repo })
     expect(r.status).toBe(409)
     expect((await r.json() as { error: string }).error).toBe(`This instance is already open in another window (process ${process.ppid}). Use that window, or stop it first.`)
@@ -87,7 +119,7 @@ describe('the launcher', () => {
     const state = await (await launcher.app.request(`${base}/api/launcher/state`, { headers: { host: `localhost:${launcher.port}` } })).json() as any
     expect(state.recent[0]).toEqual({ path: '/nope', found: false, name: null, instance: false })
     expect(state.recent[1]).toEqual({ path: realpathSync(repo), found: true, name: 'Fixture Org', instance: true })
-    const r = await launcher.app.request(`${base}/api/launcher/recent`, { method: 'DELETE', body: JSON.stringify({ path: '/nope' }), headers: { 'content-type': 'application/json', host: `localhost:${launcher.port}` } })
+    const r = await launcher.app.request(`${base}/api/launcher/recent`, { method: 'DELETE', body: JSON.stringify({ path: '/nope' }), headers: { 'content-type': 'application/json', host: `localhost:${launcher.port}`, origin: `http://localhost:${launcher.port}` } })
     const left = (await r.json() as any).recent as string[]
     expect(left).not.toContain('/nope')
     expect(left).toContain(realpathSync(repo))

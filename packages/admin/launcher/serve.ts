@@ -1,8 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { createServer } from 'node:http'
-import type { AddressInfo } from 'node:net'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
@@ -12,16 +10,18 @@ import { refusal } from '../server/guard.ts'
 import { runningServer, stateDir } from '../server/state.ts'
 import { readFederation } from '../lib/federation/read.mjs'
 import { forget, readRecent, remember } from './home.ts'
-import { isInstance } from './folders.ts'
+import { isInstance, resolveFolder } from './folders.ts'
 import { defaultAssess, defaultStartAdmin } from './children.ts'
 
+import { readableHost } from '../server/serve.ts'
 export { readHosted } from '../server/serve.ts'
 
 export interface DoctorSummary {
   status: string; blockers: number; warnings: number
   findings: { level: 'WARN' | 'BLOCKER'; code: string; message: string; hint?: string }[]
 }
-export type StartAdmin = (repo: string) => Promise<{ url: string; stop: () => Promise<void> }>
+export interface AdminChild { url: string; stop: () => Promise<void>; /** Settles when the admin has ended. */ exited: Promise<void> }
+export type StartAdmin = (repo: string) => Promise<AdminChild>
 export type Assess = (repo: string) => Promise<DoctorSummary>
 
 export interface LauncherOptions {
@@ -50,8 +50,8 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
   const startAdmin: StartAdmin = opts.startAdmin ?? defaultStart!
   const assess: Assess = opts.assess ?? defaultAssess(opts.frameworkDir)
 
-  const children = new Map<string, { url: string; stop: () => Promise<void> }>()
-  const starting = new Map<string, Promise<{ url: string; stop: () => Promise<void> }>>()
+  const children = new Map<string, AdminChild>()
+  const starting = new Map<string, Promise<AdminChild>>()
 
   /** Tasks 4–6 reuse this: the doctor looks, its findings are saved, the instance is remembered, its admin is started. */
   async function openFlow(repo: string): Promise<{ url: string }> {
@@ -69,6 +69,8 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       }
       child = await pending
       children.set(repo, child)
+      const started = child
+      void child.exited.then(() => { if (children.get(repo) === started) children.delete(repo) })
     }
     return { url: `${child.url}/systems/map?first=1` }
   }
@@ -78,8 +80,26 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
   app.use('/api/*', async (c, next) => {
     const refused = refusal({ method: c.req.method, host: c.req.header('host'), origin: c.req.header('origin'), contentType: c.req.header('content-type') })
     if (refused) return c.json({ error: refused.error }, refused.status)
+    // A write must also come from the launcher's own page: an Origin is required, and DELETE must be JSON too.
+    if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+      const host = c.req.header('host')
+      const origin = c.req.header('origin')
+      if (origin === undefined || origin !== `http://${host}`) {
+        return c.json({ error: `Refused: a write must come from the launcher's own page (http://${host ?? ''}), and the request ${origin === undefined ? 'named no page' : `came from ${origin}`}.` }, 403)
+      }
+      const type = (c.req.header('content-type') ?? '').split(';')[0]!.trim().toLowerCase()
+      if (type !== 'application/json') {
+        return c.json({ error: `Refused: a write must be sent as JSON. Set the header "content-type: application/json" (the request had ${c.req.header('content-type') ? `"${c.req.header('content-type')}"` : 'no content type'}).` }, 415)
+      }
+    }
     await next()
   })
+
+  const base = (): string => {
+    if (opts.base) return opts.base
+    const last = readRecent().find(p => existsSync(p) && isInstance(p))
+    return last ? dirname(last) : homedir()
+  }
 
   app.get('/api/launcher/state', c => {
     const recent = readRecent().map(path => {
@@ -87,9 +107,8 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       const instance = found && isInstance(path)
       return { path, name: instance ? liveName(path) : null, found, instance }
     })
-    const lastFound = recent.find(r => r.instance)
     return c.json({
-      base: opts.base ?? (lastFound ? dirname(lastFound.path) : homedir()),
+      base: base(),
       recent,
       doors: [
         { id: 'open', available: true }, { id: 'create', available: true }, { id: 'adopt', available: true },
@@ -106,9 +125,11 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
   }
 
   app.post('/api/launcher/open', async c => {
-    const path = await bodyPath(c)
-    if (!path) return c.json({ error: 'Say which folder.' }, 400)
-    if (!existsSync(path)) return c.json({ error: `There is no folder at ${path}.` }, 404)
+    const given = await bodyPath(c)
+    if (!given) return c.json({ error: 'Say which folder.' }, 400)
+    const typed = resolveFolder(given, base())
+    if (!existsSync(typed)) return c.json({ error: `There is no folder at ${typed}.` }, 404)
+    const path = realpathSync(typed)
     if (!isInstance(path)) return c.json({ error: `${path} is not an org-os instance yet.`, adoptable: true, path }, 409)
     if (!children.has(path)) {
       const pid = runningServer(path)
@@ -132,19 +153,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     app.get('*', serveStatic({ path: 'index.html', root: opts.appDist })) // SPA fallback
   }
 
-  // Same wrapper as the admin server: a Host header that is not an address gets a sentence, not a bare 400.
-  const withReadableHost = ((options, listener) => createServer(options, (req, res) => {
-    const { host } = req.headers
-    let name: string | null = null
-    try { if (host !== undefined) name = new URL(`http://${host}`).hostname } catch { /* not an address */ }
-    if (host !== undefined && name !== host && name !== host.replace(/:\d+$/, '')) {
-      const { port: bound } = req.socket.address() as AddressInfo
-      res.writeHead(400, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ error: `Refused: the Host header "${host}" is not an address this server can read. Use http://localhost:${bound}.` }))
-      return
-    }
-    listener!(req, res)
-  })) as typeof createServer
+  const withReadableHost = readableHost(bound => `Use http://localhost:${bound}.`)
 
   return new Promise((resolve, reject) => {
     const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: opts.port, createServer: withReadableHost }, info => {

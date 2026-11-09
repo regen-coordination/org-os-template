@@ -123,6 +123,23 @@ export const networkFetch: FetchLike = async (url, init) => {
   return globalThis.fetch(url, init)
 }
 
+/** The HTTP adapter turns away a Host header it cannot make an address of (a user part, upper case) with a bare 400
+ *  before the app's guard runs. Ask its question first, so the refusal comes with a sentence. `advice` ends it. */
+export function readableHost(advice: (boundPort: number) => string): typeof createServer {
+  return ((options, listener) => createServer(options, (req, res) => {
+    const { host } = req.headers
+    let name: string | null = null
+    try { if (host !== undefined) name = new URL(`http://${host}`).hostname } catch { /* not an address */ }
+    if (host !== undefined && name !== host && name !== host.replace(/:\d+$/, '')) {
+      const { port: bound } = req.socket.address() as AddressInfo
+      res.writeHead(400, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: `Refused: the Host header "${host}" is not an address this server can read. ${advice(bound)}` }))
+      return
+    }
+    listener!(req, res)
+  })) as typeof createServer
+}
+
 /** Hosted mode (L5 spec §3): the `--hosted` flag, or `ORG_OS_HOSTED` set to `1` or `true`. */
 export function readHosted(argv: readonly string[], env: Record<string, string | undefined>): boolean {
   return argv.includes('--hosted') || /^(1|true)$/i.test(env.ORG_OS_HOSTED ?? '')
@@ -345,23 +362,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     app.get('*', serveStatic({ path: 'index.html', root: appDist })) // SPA fallback
   }
 
-  // The HTTP adapter turns away a Host header it cannot make an address of
-  // (a user part, upper case) with a bare 400 before the app's guard runs.
-  // Ask its question first, so the refusal comes with a sentence.
-  const withReadableHost = ((options, listener) => createServer(options, (req, res) => {
-    const { host } = req.headers
-    let name: string | null = null
-    try { if (host !== undefined) name = new URL(`http://${host}`).hostname } catch { /* not an address */ }
-    if (host !== undefined && name !== host && name !== host.replace(/:\d+$/, '')) {
-      const { port: bound } = req.socket.address() as AddressInfo
-      res.writeHead(400, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ error:
-        `Refused: the Host header "${host}" is not an address this server can read. ` +
-        `Use the server's own address, in lower case and with nothing before the name: http://localhost:${bound}.` }))
-      return
-    }
-    listener!(req, res)
-  })) as typeof createServer
+  const withReadableHost = readableHost(bound =>
+    `Use the server's own address, in lower case and with nothing before the name: http://localhost:${bound}.`)
 
   return new Promise(resolve => {
     const server = serve({ fetch: app.fetch, hostname: hosted && hostedConfig ? hostedConfig.bind : '127.0.0.1', port, createServer: withReadableHost }, () => {

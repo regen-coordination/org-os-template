@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
-import type { Assess, DoctorSummary, StartAdmin } from './serve.ts'
+import type { AdminChild, Assess, DoctorSummary, StartAdmin } from './serve.ts'
 
 const unavailable = (message: string): DoctorSummary =>
   ({ status: 'unknown', blockers: 0, warnings: 1, findings: [{ level: 'WARN', code: 'doctor-unavailable', message }] })
@@ -60,21 +60,21 @@ export function defaultStartAdmin(frameworkDir: string): StartAdmin & { closeAll
     const port = await firstFreePort(4680)
     const child = spawn(process.execPath, ['--import', 'tsx', join(frameworkDir, 'packages', 'admin', 'server', 'index.ts'), '--repo', repo, '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
     children.add(child)
-    child.on('exit', () => children.delete(child))
+    const exited = new Promise<void>(res => child.on('exit', () => { children.delete(child); res() }))
     const stop = () => new Promise<void>(resolve => {
       if (child.exitCode !== null || child.signalCode !== null) { resolve(); return }
       child.once('exit', () => resolve())
       child.kill('SIGTERM')
       setTimeout(() => child.kill('SIGKILL'), 5000).unref()
     })
-    return new Promise<{ url: string; stop: () => Promise<void> }>((resolve, reject) => {
+    return new Promise<AdminChild>((resolve, reject) => {
       let out = ''
       const lastErr: string[] = []
       const timer = setTimeout(() => { void stop(); reject(new Error(`The admin did not start in 30 seconds.${lastErr.length ? ` ${lastErr.join(' ')}` : ''}`)) }, 30_000)
       child.stdout!.on('data', d => {
         out += d
         const m = out.match(/org-os admin → (http:\/\/localhost:\d+)/)
-        if (m) { clearTimeout(timer); resolve({ url: m[1]!, stop }) }
+        if (m) { clearTimeout(timer); resolve({ url: m[1]!, stop, exited }) }
       })
       child.stderr!.on('data', d => { lastErr.push(...String(d).trim().split('\n')); lastErr.splice(0, Math.max(0, lastErr.length - 5)) })
       child.on('error', e => { clearTimeout(timer); reject(e) })
