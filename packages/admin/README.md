@@ -23,6 +23,13 @@ Flags: `--repo <path>` (default: the directory you ran the command from),
 Binds 127.0.0.1 only. Who may read and change what is decided by the mode, sign-in and the org's levels
 (below).
 
+## Launcher
+
+`npm run open` (from the repo root) builds the admin and starts the launcher on http://localhost:4679/launch
+(`--port` changes it). From there you open an instance by folder or git address, create a new one, or adopt a repo
+that isn't org-os; each opened instance gets its own admin on the next free port from 4680. It writes only in the
+places spec §13 R7 lists, never pushes, and refuses to start in hosted mode. See `docs/OPENING.md`.
+
 ## Modes
 
 The same server runs in one of two modes, chosen at start (DAO-OS L5 spec §3):
