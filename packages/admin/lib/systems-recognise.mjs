@@ -21,6 +21,21 @@ const sameRepo = (a, b) => a !== null && b !== null && sameAddress(a, b)
 const short = a => `${a.slice(0, 6)}…${a.slice(-4)}`
 const safe = (prefix, address) => ({ kind: 'safe', name: `Safe ${short(address)}`, chain: CHAINS[prefix], address })
 
+const NO_SECRET = 'Paste the address without a token or password in it.'
+// Words that sit where a GitHub owner would, but are GitHub's own pages.
+const RESERVED = new Set(['settings', 'orgs', 'marketplace', 'sponsors', 'features', 'topics', 'collections', 'explore', 'notifications', 'login', 'about'])
+
+/** True when the line carries a credential: userinfo on a web address, a user other than `git` on ssh, or any `:password`. */
+function hasSecret(line) {
+  if (/^[^\s@/:]+:[^\s@/]+@[^\s/:]+:/.test(line)) return true // scp form with a password
+  if (!/^(?:https?|ssh):\/\//i.test(line)) return false
+  let u
+  try { u = new URL(line) } catch { return false }
+  if (u.password) return true
+  if (!u.username) return false
+  return !(u.protocol === 'ssh:' && u.username === 'git')
+}
+
 const decodeSeg = x => { try { return decodeURIComponent(x) } catch { return x } }
 
 function pageKind(u, line) {
@@ -44,12 +59,20 @@ export function recogniseLink(input) {
   if (!line || line.startsWith('#')) return null
   const bad = error => ({ ok: false, line, error })
 
-  const repo = /^https:\/\/(?:www\.)?github\.com\/([^/?#\s]+)\/([^/?#\s]+?)(?:\.git)?(?:[/?#].*)?$/i.exec(line)
+  if (hasSecret(line)) return bad(NO_SECRET)
+
+  // `orgs/<x>` is the organization page of owner <x>; a few other first segments are GitHub's own pages, not owners.
+  const org = /^https:\/\/(?:www\.)?github\.com\/orgs\/([^/?#\s]+)\/?(?:[?#].*)?$/i.exec(line)
+  if (org) return { ok: true, githubOwner: org[1] }
+  const first = /^https:\/\/(?:www\.)?github\.com\/([^/?#\s]+)/i.exec(line)
+  const reserved = first !== null && RESERVED.has(first[1].toLowerCase())
+
+  const repo = reserved ? null : /^https:\/\/(?:www\.)?github\.com\/([^/?#\s]+)\/([^/?#\s]+?)(?:\.git)?(?:[/?#].*)?$/i.exec(line)
   if (repo) return { ok: true, system: { kind: 'repo', name: repo[2], url: `https://github.com/${repo[1]}/${repo[2]}` } }
   // The ssh forms of a repo (git clone addresses) name the same repo; the system's url is the https one.
   const ssh = /^(?:ssh:\/\/)?git@github\.com[:/]([^/?#\s]+)\/([^/?#\s]+?)(?:\.git)?\/?$/i.exec(line)
   if (ssh) return { ok: true, system: { kind: 'repo', name: ssh[2], url: `https://github.com/${ssh[1]}/${ssh[2]}` } }
-  const owner = /^https:\/\/(?:www\.)?github\.com\/([^/?#\s]+)\/?$/i.exec(line)
+  const owner = reserved ? null : /^https:\/\/(?:www\.)?github\.com\/([^/?#\s]+)\/?(?:[?#].*)?$/i.exec(line)
   if (owner) return { ok: true, githubOwner: owner[1] }
 
   const snap = /^https:\/\/snapshot\.box\/#\/s:([^/?#\s]+)/.exec(line) ?? /^https:\/\/snapshot\.org\/#\/([^/?#\s]+)/.exec(line)

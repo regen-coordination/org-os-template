@@ -13,6 +13,19 @@ import { kmsSrc } from '../knowledge/kms.ts'
 import { validTrunkName } from '../../lib/rules.mjs'
 import type { Kind, Resource } from '../resources/types.ts'
 
+/** True when the instance's own .gitignore names the mount (or repos/ above it): read from the file, since an adopted repo keeps its own. */
+function mountIgnored(repo: string, mount: string): boolean {
+  let text: string
+  try { text = readFileSync(join(repo, '.gitignore'), 'utf8') } catch { return false }
+  const parts = mount.split('/')
+  const names = new Set<string>()
+  for (let n = 1; n <= parts.length; n++) {
+    const dir = parts.slice(0, n).join('/')
+    for (const f of [dir, `${dir}/`, `${dir}/*`, `${dir}/**`]) { names.add(f); names.add(`/${f}`) }
+  }
+  return text.split(/\r?\n/).some(l => names.has(l.trim()))
+}
+
 /** A command the executor spawns (never through a shell), and the repository paths it may change. */
 export interface Planned { cmd: string; args: string[]; writes: string[] }
 /** Work done inside the server process: it changes no file, and answers the text for the job's log. `summary` is what a
@@ -225,6 +238,7 @@ export const CATALOGUE: Operation[] = [
       const norm = normalize(mount)
       if (!/^repos\/[^/]/.test(norm) || norm.split(/[\\/]/).includes('..')) return 'Clone works for mounts under repos/, which the instance ignores in git.'
       if (leadsOutside(repo, norm)) return `${norm} leads outside this instance.`
+      if (!mountIgnored(repo, norm)) return "Add repos/ to this instance's .gitignore first, so the clone stays out of its history."
       try { if (readdirSync(join(repo, norm)).length > 0) return `${norm} is already there, with files in it.` } catch { /* not there: fine */ }
       // The address comes from the registry here, never from the resource's facts (which every client reads).
       const url = entryOf(repo, r)?.url
@@ -234,9 +248,10 @@ export const CATALOGUE: Operation[] = [
     plan: async (r, _p, repo) => {
       const mount = normalize(mountPath(r) ?? '')
       const entry = entryOf(repo, r)
-      const branch = str(entry?.branch) ?? 'main'
-      if (!(await validBranchName(repo, branch))) throw new HttpError(409, `Not cloned: "${branch}" is not a branch name git accepts. Nothing was changed.`)
-      return { cmd: 'git', args: ['-c', 'protocol.ext.allow=never', 'clone', '--branch', branch, '--', String(entry?.url), join(repo, mount)], writes: [`${mount}/`] }
+      // An absent branch means the remote's default: git is told no branch, so a repo whose default is master clones too.
+      const branch = str(entry?.branch)
+      if (branch !== null && !(await validBranchName(repo, branch))) throw new HttpError(409, `Not cloned: "${branch}" is not a branch name git accepts. Nothing was changed.`)
+      return { cmd: 'git', args: ['-c', 'protocol.ext.allow=never', 'clone', ...(branch !== null ? ['--branch', branch] : []), '--', String(entry?.url), join(repo, mount)], writes: [`${mount}/`] }
     },
   },
   {

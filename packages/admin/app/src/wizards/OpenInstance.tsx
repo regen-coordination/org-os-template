@@ -131,7 +131,8 @@ export default function OpenInstance({ def: given, run, base: folderBase, onClos
       }
       const adopting = fixedFolder !== undefined
       return (
-        <WizardFrame {...base} status={running ? (adopting ? 'Making the files…' : 'Creating it…') : adopting ? 'Review. Nothing is written to your repo yet.' : 'Review. Nothing is made until you choose Create it.'} refusal={runError} heading={def.review.title} ask={def.review.ask}
+        <WizardFrame {...base} status={running ? (adopting ? 'Making the files…' : 'Creating it…') : adopting ? 'Review. Nothing is written to your repo yet.' : 'Review. Nothing is made until you choose Create it.'} refusal={runError} heading="Check the answers"
+          ask={adopting ? 'Nothing is written to your repo yet. Next you see every file it would add.' : 'Create it makes the folder and its first commit.'}
           writes={adopting ? 'Nothing in your repo yet. The files are made in a scratch folder first, so you can see what would be added.' : 'A new folder with the instance in it, and its first git commit.'}
           actions={{ ...(close ? { cancel: { ...close, disabled: running } } : {}), back: { label: 'Back', onClick: () => m.send('BACK'), disabled: running }, next: { label: adopting ? 'See what it adds' : 'Create it', onClick: () => void create(), disabled: running } }}>
           <p className="wiz-label">{adopting ? 'Repo' : 'Folder'}</p>

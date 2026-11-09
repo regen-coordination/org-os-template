@@ -192,6 +192,28 @@ describe('W1 with a run: the launcher creates it', () => {
     expect(calls.filter(c => c.path.includes('/draft') || c.path === '/api/actor')).toEqual([])
   })
 
+  it('the review says what Create it does, not that the app does not run anything', async () => {
+    fetchRoutes(routes())
+    await toReview(vi.fn(async () => {}))
+    expect(screen.getByRole('heading', { level: 2, name: 'Check the answers' })).toBeTruthy()
+    expect(screen.getByText('Create it makes the folder and its first commit.')).toBeTruthy()
+    expect(screen.queryByText(/does not run it/)).toBeNull()
+    expect(screen.queryByText(/The command, and the file it reads/)).toBeNull()
+  })
+
+  it('the adopt review says nothing is written yet', async () => {
+    fetchRoutes(routes())
+    renderAt(<OpenInstance def={def} run={(async () => {}) as never} base="/w" fixedFolder="/home/me/plain" />)
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    fillOrg(); click('Continue')
+    await screen.findByLabelText('Your name')
+    type('Your name', 'Steward A'); type('Git email', 'a@alder.example'); click('Continue')
+    await screen.findByRole('button', { name: 'See what it adds' })
+    expect(screen.getByRole('heading', { level: 2, name: 'Check the answers' })).toBeTruthy()
+    expect(screen.getByText('Nothing is written to your repo yet. Next you see every file it would add.')).toBeTruthy()
+    expect(screen.queryByText(/does not run it/)).toBeNull()
+  })
+
   it('shows what run returns as an error', async () => {
     fetchRoutes(routes())
     await toReview(vi.fn(async () => ({ error: 'That folder already holds files.' })))
@@ -206,6 +228,8 @@ describe('W1 with a run: the launcher creates it', () => {
     await screen.findByLabelText('Your name'); type('Your name', 'Steward A'); click('Continue')
     expect(await screen.findByRole('button', { name: 'Copy the command' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Create it' })).toBeNull()
+    expect(screen.getByText(/This app does not run it/)).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 2, name: 'The command, and the file it reads' })).toBeTruthy()
   })
 
   it('opens at the questions with no intro, and Close calls onClose', async () => {

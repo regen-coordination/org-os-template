@@ -300,3 +300,11 @@ describe('SystemRow: a System in a list (§9.2)', () => {
     expect(screen.queryByText(SAFE)).toBeNull()
   })
 })
+
+describe('SystemRow: a clone that could not be read', () => {
+  it('says so instead of showing a detached head', () => {
+    list(<SystemRow resource={{ ...GARDEN, facts: { ...GARDEN.facts, mount: { path: 'repos/g', cloned: true, error: true } } }} now={NOW} />)
+    expect(screen.getByText(/Couldn't read this clone\./)).toBeTruthy()
+    expect(screen.queryByText(/detached/)).toBeNull()
+  })
+})

@@ -33,8 +33,9 @@ function RowAge({ read, now }: { read: DriverRead | null; now: Date }) {
 export function mountLine(facts: Record<string, unknown>): string | null {
   const m = facts.mount
   if (typeof m !== 'object' || m === null) return null
-  const f = m as { cloned?: unknown; branch?: unknown; ahead?: unknown; behind?: unknown; dirty?: unknown }
+  const f = m as { cloned?: unknown; error?: unknown; branch?: unknown; ahead?: unknown; behind?: unknown; dirty?: unknown }
   if (f.cloned !== true) return 'Not cloned yet.'
+  if (f.error === true) return "Couldn't read this clone."
   const parts = [typeof f.branch === 'string' ? `On ${f.branch}` : 'On a detached head']
   if (typeof f.ahead === 'number' && f.ahead > 0) parts.push(`${f.ahead} ahead`)
   if (typeof f.behind === 'number' && f.behind > 0) parts.push(`${f.behind} behind`)

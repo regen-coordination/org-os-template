@@ -43,4 +43,19 @@ describe('systems adapter: mounts', () => {
     expect(g2.nodes.find(n => n.id === 'system:linked')!.facts).not.toHaveProperty('branch')
     expect(by('escape').facts.mount).toEqual({ path: '../outside', cloned: false })
   })
+  it('reads a clone without taking its index lock', async () => {
+    const seen: string[][] = []
+    await systems.read({ ...ctx(), run: (cmd, args, o) => { seen.push(args); return runCommand(cmd, args, o) } })
+    const status = seen.filter(a => a.includes('status'))
+    expect(status.length).toBeGreaterThan(0)
+    for (const a of status) expect(a.slice(0, 3)).toEqual(['--no-optional-locks', '-C', expect.stringContaining('repos')])
+  })
+  it('says the clone could not be read, rather than drawing a clean detached state', async () => {
+    const failing = { ...ctx(), run: async () => ({ code: 128, stdout: '', stderr: 'boom', timedOut: false }) }
+    const g = (await systems.read(failing)) as Graph
+    expect(g.nodes.find(n => n.id === 'system:site')!.facts.mount).toEqual({ path: 'repos/site', cloned: true, error: true })
+    const throwing = { ...ctx(), run: async () => { throw new Error('x') } }
+    const g2 = (await systems.read(throwing as never)) as Graph
+    expect(g2.nodes.find(n => n.id === 'system:site')!.facts.mount).toEqual({ path: 'repos/site', cloned: true, error: true })
+  })
 })

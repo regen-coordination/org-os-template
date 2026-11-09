@@ -40,19 +40,19 @@ const membershipOf = (repo: string, entries: Entity[]): string | null => {
   } catch { return null }
 }
 
-/** The org's node: its member of kind organization, else this instance's fleet node. */
 /** A repo System's `mount`, read from its clone (a read: it never fetches), or `cloned: false`. A mount that leaves the repo is never looked at. */
 const mountFacts = async (ctx: Parameters<Adapter['read']>[0], mount: string) => {
   const abs = resolve(ctx.repo, mount)
   const rel = relative(ctx.repo, abs)
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel) || leadsOutside(ctx.repo, mount) || !existsSync(join(abs, '.git'))) return { path: mount, cloned: false as const }
   try {
-    const r = await ctx.run('git', ['-C', abs, 'status', '--porcelain=v2', '--branch'], { cwd: ctx.repo, timeoutMs: 5000 })
-    if (r.code !== 0) return { path: mount, cloned: true as const, branch: null, ahead: null, behind: null, dirty: false }
+    const r = await ctx.run('git', ['--no-optional-locks', '-C', abs, 'status', '--porcelain=v2', '--branch'], { cwd: ctx.repo, timeoutMs: 5000 })
+    if (r.code !== 0) return { path: mount, cloned: true as const, error: true as const }
     return { path: mount, cloned: true as const, ...parseStatusV2(r.stdout) }
-  } catch { return { path: mount, cloned: true as const, branch: null, ahead: null, behind: null, dirty: false } }
+  } catch { return { path: mount, cloned: true as const, error: true as const } }
 }
 
+/** The org's node: its member of kind organization, else this instance's fleet node. */
 const holderOf = (members: Entity[], repo: string): string => {
   const org = members.find(m => memberKind(m) === 'organization' && str(m.id))
   return org ? `person:${String(org.id)}` : `instance:${instanceSlug(repo)}`

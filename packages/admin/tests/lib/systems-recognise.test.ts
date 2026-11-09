@@ -21,6 +21,29 @@ describe('recogniseLink', () => {
     expect(recogniseLink('https://github.com/o')).toEqual({ ok: true, githubOwner: 'o' })
     expect(recogniseLink('https://github.com/o/')).toEqual({ ok: true, githubOwner: 'o' })
   })
+  it('refuses a line with a token or password in it', () => {
+    const msg = 'Paste the address without a token or password in it.'
+    for (const l of ['https://ghp_abc123@github.com/o/r.git', 'https://user:pw@notion.so/x', 'https://tok@github.com/o', 'http://u:p@example.org', 'ssh://tok@github.com/o/r', 'ssh://git:pw@github.com/o/r', 'git:pw@github.com:o/r'])
+      expect(recogniseLink(l)).toEqual({ ok: false, line: l, error: msg })
+  })
+  it('still takes the ssh forms with the plain git user', () => {
+    const want = { ok: true, system: { kind: 'repo', name: 'r', url: 'https://github.com/o/r' } }
+    expect(recogniseLink('git@github.com:o/r')).toEqual(want)
+    expect(recogniseLink('ssh://git@github.com/o/r')).toEqual(want)
+  })
+  it('reads orgs/<x> as owner x, and leaves GitHub pages as plain links', () => {
+    expect(recogniseLink('https://github.com/orgs/acme')).toEqual({ ok: true, githubOwner: 'acme' })
+    expect(recogniseLink('https://github.com/orgs/acme/repositories')).toMatchObject({ ok: true, system: { kind: 'link' } })
+    for (const w of ['settings', 'marketplace', 'sponsors', 'features', 'topics', 'collections', 'explore', 'notifications', 'login', 'about'])
+      expect(recogniseLink(`https://github.com/${w}/x`)).toEqual({ ok: true, system: { kind: 'link', name: 'github.com', url: `https://github.com/${w}/x` } })
+    expect(recogniseLink('https://github.com/orgs')).toMatchObject({ ok: true, system: { kind: 'link' } })
+    expect(recogniseLink('https://github.com/settings')).toMatchObject({ ok: true, system: { kind: 'link' } })
+  })
+  it('lets ?… and #… follow an owner url', () => {
+    expect(recogniseLink('https://github.com/o?tab=repositories')).toEqual({ ok: true, githubOwner: 'o' })
+    expect(recogniseLink('https://github.com/o/#x')).toEqual({ ok: true, githubOwner: 'o' })
+    expect(recogniseLink('https://github.com/orgs/acme?x=1')).toEqual({ ok: true, githubOwner: 'acme' })
+  })
   it('recognises Snapshot spaces', () => {
     expect(sys('https://snapshot.box/#/s:refi.eth')).toEqual({ kind: 'snapshot-space', name: 'refi.eth', space: 'refi.eth' })
     expect(sys('https://snapshot.org/#/refi.eth')).toEqual({ kind: 'snapshot-space', name: 'refi.eth', space: 'refi.eth' })
