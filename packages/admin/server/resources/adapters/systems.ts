@@ -11,6 +11,7 @@ import { absentCard, lostRegistryCard } from '../graph.ts'
 import { instanceSlug, str } from '../util.ts'
 import { SystemReader, systemAttention } from '../../systems/reader.ts'
 import { httpAddress } from '../../systems/link.ts'
+import { leadsOutside } from '../mount.ts'
 import { parseStatusV2 } from '../../../lib/git-status-v2.mjs'
 import type { Adapter, Board, Edge, Resource } from '../types.ts'
 import type { PrivateAccess } from '../../private/ops.ts'
@@ -44,7 +45,7 @@ const membershipOf = (repo: string, entries: Entity[]): string | null => {
 const mountFacts = async (ctx: Parameters<Adapter['read']>[0], mount: string) => {
   const abs = resolve(ctx.repo, mount)
   const rel = relative(ctx.repo, abs)
-  if (rel === '' || rel.startsWith('..') || isAbsolute(rel) || !existsSync(join(abs, '.git'))) return { path: mount, cloned: false as const }
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel) || leadsOutside(ctx.repo, mount) || !existsSync(join(abs, '.git'))) return { path: mount, cloned: false as const }
   try {
     const r = await ctx.run('git', ['-C', abs, 'status', '--porcelain=v2', '--branch'], { cwd: ctx.repo, timeoutMs: 5000 })
     if (r.code !== 0) return { path: mount, cloned: true as const, branch: null, ahead: null, behind: null, dirty: false }
@@ -128,7 +129,7 @@ export const systems: Adapter = {
           kind: e.kind ?? null, chain: e.chain ?? null, address: read[i]!.address ?? null, ...(url ? { url } : {}),
           section: e.section ?? null, embeddable: e.embeddable === true, notes: e.notes ?? null, driver,
           ...(id === membership ? { membership: true } : {}),
-          ...(mounts[i] ? { mount: mounts[i], cloneUrl: str(e.url), branch: str(e.branch) } : {}),
+          ...(mounts[i] ? { mount: mounts[i] } : {}),
         },
         source: { path: rel, editable: true, registry: 'systems', entityId: id },
       })

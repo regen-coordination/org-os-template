@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, normalize } from 'node:path'
+import { leadsOutside } from '../resources/mount.ts'
+import { readRegistry } from '../registry.ts'
 import { gitUrlProblem } from '../../launcher/git-write.ts'
 import { HttpError } from '../errors.ts'
 import { failingFileChecks } from '../resources/adapters/modules.ts'
@@ -48,6 +50,11 @@ export const needsConfirm = (op: Pick<Operation, 'effect' | 'network'>): boolean
 const mountPath = (r: Resource): string | null => {
   const m = r.facts.mount
   return m && typeof m === 'object' && typeof (m as { path?: unknown }).path === 'string' ? (m as { path: string }).path : null
+}
+
+/** The System's entry in data/systems.yaml, read server-side. */
+const entryOf = (repo: string, r: Resource): Record<string, unknown> | null => {
+  try { return (readRegistry(repo, 'systems').entries ?? []).find(e => `system:${String(e.id)}` === r.id) ?? null } catch { return null }
 }
 
 const NO_PARAMS: ParamsSchema = { type: 'object', additionalProperties: false }
@@ -216,15 +223,20 @@ export const CATALOGUE: Operation[] = [
       const mount = mountPath(r)
       if (mount === null) return 'This System has no mount to clone into.'
       const norm = normalize(mount)
-      if (!norm.startsWith('repos/') || norm.split(/[\\/]/).includes('..')) return 'Clone works for mounts under repos/, which the instance ignores in git.'
+      if (!/^repos\/[^/]/.test(norm) || norm.split(/[\\/]/).includes('..')) return 'Clone works for mounts under repos/, which the instance ignores in git.'
+      if (leadsOutside(repo, norm)) return `${norm} leads outside this instance.`
       try { if (readdirSync(join(repo, norm)).length > 0) return `${norm} is already there, with files in it.` } catch { /* not there: fine */ }
-      const url = str(r.facts.cloneUrl)
-      if (url === null) return 'This System has no address to clone from.'
+      // The address comes from the registry here, never from the resource's facts (which every client reads).
+      const url = entryOf(repo, r)?.url
+      if (typeof url !== 'string' || url === '') return 'This System has no address to clone from.'
       return gitUrlProblem(url)
     },
-    plan: (r, _p, repo) => {
+    plan: async (r, _p, repo) => {
       const mount = normalize(mountPath(r) ?? '')
-      return { cmd: 'git', args: ['-c', 'protocol.ext.allow=never', 'clone', '--branch', str(r.facts.branch) ?? 'main', '--', String(r.facts.cloneUrl), join(repo, mount)], writes: [mount] }
+      const entry = entryOf(repo, r)
+      const branch = str(entry?.branch) ?? 'main'
+      if (!(await validBranchName(repo, branch))) throw new HttpError(409, `Not cloned: "${branch}" is not a branch name git accepts. Nothing was changed.`)
+      return { cmd: 'git', args: ['-c', 'protocol.ext.allow=never', 'clone', '--branch', branch, '--', String(entry?.url), join(repo, mount)], writes: [`${mount}/`] }
     },
   },
   {
