@@ -18,7 +18,8 @@ export default function Launcher() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [recent, setRecent] = useState<RecentEntry[]>([])
   const [folder, setFolder] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [opening, setOpening] = useState(false)
+  const [cloning, setCloning] = useState(false)
   const [refusal, setRefusal] = useState<Refusal | null>(null)
   const [gitUrl, setGitUrl] = useState('')
   const [cloneFolder, setCloneFolder] = useState('')
@@ -41,14 +42,14 @@ export default function Launcher() {
 
   const open = async (e: FormEvent) => {
     e.preventDefault()
-    setBusy(true); setRefusal(null)
+    setOpening(true); setRefusal(null)
     try {
       const { url } = await openInstance(folder.trim())
       window.location.assign(url)
     } catch (err) {
       const x = err as Error & { adoptable?: boolean; path?: string }
       setRefusal({ message: x.message, adoptable: x.adoptable === true, path: x.path })
-    } finally { setBusy(false) }
+    } finally { setOpening(false) }
   }
 
   const onGitUrl = (v: string) => {
@@ -58,14 +59,14 @@ export default function Launcher() {
 
   const cloneIt = async (e: FormEvent) => {
     e.preventDefault()
-    setBusy(true); setRefusal(null)
+    setCloning(true); setRefusal(null)
     try {
       const { url } = await cloneInstance(gitUrl.trim(), cloneFolder.trim())
       window.location.assign(url)
     } catch (err) {
       const x = err as Error & { adoptable?: boolean; path?: string }
       setRefusal({ message: x.message, adoptable: x.adoptable === true, path: x.path })
-    } finally { setBusy(false) }
+    } finally { setCloning(false) }
   }
 
   const startCreate = async () => {
@@ -125,7 +126,7 @@ export default function Launcher() {
             <input id="launch-folder" className="input" type="text" value={folder} placeholder={state?.base ?? ''}
               onChange={e => setFolder(e.target.value)} autoComplete="off" spellCheck={false} />
             <div className="wiz-acts">
-              <Button type="submit" primary busy={busy ? 'Opening…' : undefined}>Open</Button>
+              <Button type="submit" primary busy={opening ? 'Opening…' : undefined}>Open</Button>
             </div>
           </form>
           <form onSubmit={e => void cloneIt(e)} className="wiz-field">
@@ -136,7 +137,7 @@ export default function Launcher() {
             <input id="launch-clone-folder" className="input" type="text" value={cloneFolder}
               onChange={e => { setCloneFolder(e.target.value); setCloneEdited(true) }} autoComplete="off" spellCheck={false} />
             <div className="wiz-acts">
-              <Button type="submit" busy={busy ? 'Cloning…' : undefined} disabled={gitUrl.trim() === '' || cloneFolder.trim() === ''}>Clone and open</Button>
+              <Button type="submit" busy={cloning ? 'Cloning…' : undefined} disabled={gitUrl.trim() === '' || cloneFolder.trim() === ''}>Clone and open</Button>
             </div>
           </form>
           {refusal && (

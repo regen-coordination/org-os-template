@@ -18,7 +18,7 @@ own machine: a hosted Hub is one instance and refuses to start it.
   folder, which gives the instance its genesis commit.
 - **Adopt a repo.** For a repo you already have that is not an org-os instance. See "Adopt" below.
 - **Join a network.** Shown as "Comes with federation." It needs the request record and the invite format, which
-  arrive with federation (spec §13 R9). Until then it does nothing.
+  arrive with federation (spec §13 R9). Until then it is shown but not available yet.
 
 ## What the launcher writes
 
@@ -46,10 +46,11 @@ least one commit, and no `org-os/adopt` branch yet. Otherwise it refuses and wri
 
 1. You answer the same questions as "Create a new one" (the folder is the repo).
 2. The launcher scaffolds the framework into a scratch folder and works out which files your repo lacks.
-3. It shows you two lists before anything is written: the files it would add, and the files your repo already has,
-   which are kept as they are. Paths your `.gitignore` ignores are left out and listed.
-4. On "Apply", it creates the branch `org-os/adopt`, copies only the missing files (never overwriting one), and makes
-   one commit there. Your default branch does not move. Merge the branch when you are ready.
+3. It shows you three lists before anything is written: the files it would add, the files your repo already has,
+   which are kept as they are, and the paths your `.gitignore` ignores, which are left out.
+4. On "Add them on org-os/adopt", it creates the branch `org-os/adopt`, copies only the missing files (never
+   overwriting one), and makes one commit there. Your repo's own git hooks run on that commit. Your default branch
+   does not move. Merge the branch when you are ready.
 5. The plan expires after 30 minutes and its scratch folder is removed.
 
 ## Map the rest

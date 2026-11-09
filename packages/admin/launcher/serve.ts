@@ -140,7 +140,8 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     if (!existsSync(typed)) return c.json({ error: `There is no folder at ${typed}.` }, 404)
     const path = realpathSync(typed)
     if (!isInstance(path)) return c.json({ error: `${path} is not an org-os instance yet.`, adoptable: true, path }, 409)
-    if (!children.has(path)) {
+    // Not while this launcher is starting, or already holds, an admin for the path: its pid file is that child's own.
+    if (!children.has(path) && !starting.has(path)) {
       const pid = runningServer(path)
       if (pid !== null) return c.json({ error: `This instance is already open in another window (process ${pid}). Use that window, or stop it first.` }, 409)
     }

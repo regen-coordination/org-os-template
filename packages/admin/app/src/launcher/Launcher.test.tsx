@@ -61,6 +61,23 @@ describe('the launcher page', () => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith('http://127.0.0.1:4680/'))
   })
 
+  it('submitting Open does not say Cloning, and Clone does not say Opening', async () => {
+    let finish!: (v: unknown) => void
+    m.openInstance.mockReturnValue(new Promise(r => { finish = r }) as never)
+    m.cloneInstance.mockReturnValue(new Promise(() => {}) as never)
+    renderAt(<Launcher />, '/launch')
+    fireEvent.change(await screen.findByLabelText("The folder it's in"), { target: { value: '~/orgs/alder' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    await screen.findByText('Opening…')
+    expect(screen.queryByText('Cloning…')).toBeNull()
+    finish({ url: 'http://127.0.0.1:4680/' })
+    await waitFor(() => expect(assign).toHaveBeenCalled())
+    fireEvent.change(screen.getByLabelText('Or paste a git address'), { target: { value: 'https://github.com/o/alder.git' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Clone and open' }))
+    await screen.findByText('Cloning…')
+    expect(screen.queryByText('Opening…')).toBeNull()
+  })
+
   it('a folder that is not an instance offers to adopt it', async () => {
     m.openInstance.mockRejectedValue(Object.assign(new Error('/x/y is not an org-os instance yet.'), { adoptable: true, path: '/x/y' }))
     renderAt(<Launcher />, '/launch')

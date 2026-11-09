@@ -8,6 +8,12 @@ import { startLauncher, type DoctorSummary } from '../../launcher/serve.ts'
 import { doctorSummaryOf } from '../../launcher/children.ts'
 import { readRecent, remember } from '../../launcher/home.ts'
 import { stateDir } from '../../server/state.ts'
+import { scaffold } from '../../launcher/scaffold.ts'
+import { launcherGit } from '../../launcher/git-write.ts'
+import { existsSync } from 'node:fs'
+
+vi.mock('../../launcher/scaffold.ts', async orig => { const m = await orig<typeof import('../../launcher/scaffold.ts')>(); return { ...m, scaffold: vi.fn(m.scaffold) } })
+vi.mock('../../launcher/git-write.ts', async orig => { const m = await orig<typeof import('../../launcher/git-write.ts')>(); return { ...m, launcherGit: vi.fn(m.launcherGit) } })
 
 const clean: DoctorSummary = { status: 'ok', blockers: 0, warnings: 0, findings: [] }
 let repo: string
@@ -33,6 +39,40 @@ describe('the launcher', () => {
     expect((await post('/api/launcher/open', { path: repo }, { origin: 'https://evil.example' })).status).toBe(403)
     expect((await post('/api/launcher/open', { path: repo }, { host: 'evil.example:4679' })).status).toBe(403)
     expect(fakeStartAdmin).not.toHaveBeenCalled()
+  })
+
+  it('refuses a foreign Origin on create and clone, before anything runs', async () => {
+    const target = join(mkdtempSync(join(tmpdir(), 'launcher-foreign-')), 'x')
+    vi.mocked(scaffold).mockClear(); vi.mocked(launcherGit).mockClear()
+    const answers = { name: 'Alder Commons', type: 'LocalNode', description: 'A cooperative.', folder: target, operatorName: 'S', email: 's@x.example' }
+    for (const [path, body] of [['/api/launcher/create', { answers }], ['/api/launcher/clone', { url: 'https://github.com/x/y', folder: target }]] as const) {
+      expect((await post(path, body, { origin: 'https://evil.example' })).status).toBe(403)
+      expect((await post(path, body, { host: 'evil.example:4679' })).status).toBe(403)
+    }
+    expect(scaffold).not.toHaveBeenCalled()
+    expect(launcherGit).not.toHaveBeenCalled()
+    expect(fakeAssess).not.toHaveBeenCalled()
+    expect(fakeStartAdmin).not.toHaveBeenCalled()
+    expect(existsSync(target)).toBe(false)
+    expect(existsSync(join(stateDir(realpathSync(repo)), 'doctor.json'))).toBe(false)
+  })
+
+  it('a second open while the first is still starting joins it, and is not told the window is taken', async () => {
+    const { serverPidFile } = await import('../../server/state.ts')
+    const { mkdirSync, writeFileSync } = await import('node:fs')
+    const real = realpathSync(repo)
+    fakeStartAdmin.mockImplementationOnce(async () => {
+      mkdirSync(stateDir(real), { recursive: true })
+      writeFileSync(serverPidFile(real), String(process.ppid)) // the child's own pid file, written before it resolves
+      await new Promise(r => setTimeout(r, 50))
+      return { url: 'http://localhost:4999', stop: async () => {}, exited: new Promise<void>(() => {}) }
+    })
+    const first = post('/api/launcher/open', { path: repo })
+    await new Promise(r => setTimeout(r, 20)) // the start is pending and the pid file is there
+    const second = post('/api/launcher/open', { path: repo })
+    const [a, b] = await Promise.all([first, second])
+    expect([a.status, b.status]).toEqual([200, 200])
+    expect(fakeStartAdmin).toHaveBeenCalledTimes(1)
   })
 
   it('refuses a write with no Origin, and a DELETE that is not JSON', async () => {
