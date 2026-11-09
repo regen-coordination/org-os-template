@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { REAL_REPO } from '../fixtures.ts'
 import { startLauncher, type DoctorSummary } from '../../launcher/serve.ts'
-import { ADOPT_BRANCH, adoptProblem, applyAdopt, planAdopt } from '../../launcher/adopt.ts'
+import { ADOPT_BRANCH, NOTHING_TO_ADD, adoptProblem, applyAdopt, planAdopt } from '../../launcher/adopt.ts'
 import { isInstance } from '../../launcher/folders.ts'
 import * as scaffoldMod from '../../launcher/scaffold.ts'
 
@@ -24,7 +24,7 @@ const headOf = async (dir: string, ref: string) => git(dir, 'rev-parse', `refs/h
 
 let roots: string[] = []
 /** A fresh temp repo on `main` with one commit holding README.md, package.json and .gitignore, and its own identity. */
-function repo(opts: { commit?: boolean } = {}): string {
+function repo(opts: { commit?: boolean; gitignore?: string } = {}): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'adopt-repo-')))
   roots.push(dir)
   git(dir, 'init', '-b', 'main')
@@ -33,7 +33,7 @@ function repo(opts: { commit?: boolean } = {}): string {
   git(dir, 'config', 'commit.gpgsign', 'false')
   writeFileSync(join(dir, 'README.md'), '# My project\n\nMine.\n')
   writeFileSync(join(dir, 'package.json'), '{ "name": "mine", "private": true }\n')
-  writeFileSync(join(dir, '.gitignore'), 'node_modules/\n*.log\nfederation.yaml.local\n')
+  writeFileSync(join(dir, '.gitignore'), opts.gitignore ?? 'node_modules/\n*.log\nfederation.yaml.local\n')
   if (opts.commit !== false) {
     git(dir, 'add', '.')
     git(dir, 'commit', '-m', 'first')
@@ -121,6 +121,42 @@ describe('adopting a repo', () => {
     await applyAdopt(plan)
     expect(readdirSync(outside)).toEqual([])
     expect(readFileSync(join(dir, 'memory'), 'utf8')).toBe('a file, not a folder\n')
+  }, 120_000)
+
+  it('leaves out the paths the repo\'s .gitignore ignores, lists them, and commits cleanly', async () => {
+    const dir = repo({ gitignore: 'node_modules/\n.claude/\n*.json\n' })
+    const main = await headOf(dir, 'main')
+    const plan = await planAdopt(dir, answers, REAL_REPO)
+    const scaffolded = (readdirSync(join(plan.scratch, 'scaffold'), { recursive: true, withFileTypes: true }) as import('node:fs').Dirent[])
+      .filter(e => e.isFile()).map(e => join(e.parentPath, e.name).slice(join(plan.scratch, 'scaffold').length + 1))
+    const matching = scaffolded.filter(p => p.startsWith('.claude/') || (p.endsWith('.json') && p !== 'package.json')).sort()
+    expect(matching.length, 'the scaffold makes .claude/ and .json files').toBeGreaterThan(2)
+    expect(plan.ignored).toEqual(matching)
+    expect(plan.ignored).toEqual(expect.arrayContaining(['.claude/settings.json', 'package-lock.json']))
+    expect(plan.add.filter(p => plan.ignored.includes(p))).toEqual([])
+    expect(plan.add).toContain('federation.yaml')
+    expect(plan.kept).toContain('package.json') // tracked, so kept rather than ignored
+    expect(status(dir)).toBe('') // the dry run wrote nothing
+    const r = await applyAdopt(plan)
+    expect(r.added).toBe(plan.add.length)
+    expect(await headOf(dir, 'main')).toBe(main)
+    const changed = git(dir, 'diff', '--name-only', '--no-renames', `${main}..HEAD`).trim().split('\n').sort()
+    expect(changed).toEqual(plan.add)
+    for (const p of plan.ignored) expect(existsSync(join(dir, p)), p).toBe(false)
+    expect(status(dir)).toBe('')
+  }, 120_000)
+
+  it('refuses a repo that ignores everything the scaffold would add, and makes no branch', async () => {
+    const dir = repo({ gitignore: '*\n!.gitignore\n' })
+    const before = { status: status(dir), branches: branches(dir), tree: tree(dir) }
+    await expect(planAdopt(dir, answers, REAL_REPO)).rejects.toThrow(NOTHING_TO_ADD)
+    const r = await post('plan', { path: dir, answers })
+    expect(r.status).toBe(409)
+    expect((await r.json()).error).toBe('There is nothing to add: the repo already has every file, or ignores it.')
+    expect({ status: status(dir), branches: branches(dir), tree: tree(dir) }).toEqual(before)
+    const scratches = vi.mocked(scaffoldMod.scaffold).mock.calls.map(c => c[1].replace(/\/scaffold$/, ''))
+    expect(scratches.length).toBe(2)
+    for (const s of scratches) expect(existsSync(s)).toBe(false)
   }, 120_000)
 
   it('refuses every unsafe repo state and writes nothing', async () => {
@@ -225,6 +261,7 @@ describe('the adopt routes', () => {
     expect(plan.add).toContain('federation.yaml')
     expect(plan.kept).toEqual(expect.arrayContaining(['README.md', 'package.json', '.gitignore']))
     expect(plan.scratch).toBeUndefined() // where the scratch is stays on the server
+    expect(plan.ignored).toEqual([])
     expect(vi.mocked(scaffoldMod.scaffold).mock.calls[0]![2]).toEqual({ git: false })
     const r2 = await post('apply', { planId: plan.planId })
     const body = await r2.json()

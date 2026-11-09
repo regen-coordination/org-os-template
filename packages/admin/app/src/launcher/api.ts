@@ -38,9 +38,10 @@ export const launcherWizard = () => call<import('../../../lib/wizards.mjs').Wiza
 /** Creates the instance the answers describe and answers where it opened; throws Error(body.error), with the command's log on `log`. */
 export const createInstance = (answers: Answers) => call<{ url: string }>('POST', '/api/launcher/create', { answers })
 
-/** What adopting would do: the org-os files the repo lacks (`add`) and the ones it already has (`kept`). Writes nothing
+/** What adopting would do: the org-os files the repo lacks (`add`), the ones it already has (`kept`) and the ones its
+ *  .gitignore leaves out (`ignored`). Writes nothing
  *  to the repo; throws Error(body.error) when the repo cannot be adopted now. */
-export type AdoptPlanAnswer = { planId: string; add: string[]; kept: string[] }
+export type AdoptPlanAnswer = { planId: string; add: string[]; kept: string[]; ignored: string[] }
 export const adoptPlan = (path: string, answers: Answers) => call<AdoptPlanAnswer>('POST', '/api/launcher/adopt/plan', { path, answers })
 /** Adds the plan's files on the branch org-os/adopt and answers where the instance opened. */
 export const adoptApply = (planId: string) => call<{ url: string; branch: string }>('POST', '/api/launcher/adopt/apply', { planId })

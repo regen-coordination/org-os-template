@@ -256,7 +256,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     const timer = setTimeout(() => { const gone = dropPlan(plan.id); if (gone) removeScratch(gone.scratch) }, PLAN_TTL_MS)
     timer.unref?.()
     plans.set(plan.id, { plan, timer })
-    return c.json({ planId: plan.id, add: plan.add, kept: plan.kept })
+    return c.json({ planId: plan.id, add: plan.add, kept: plan.kept, ignored: plan.ignored })
   })
 
   app.post('/api/launcher/adopt/apply', async c => {

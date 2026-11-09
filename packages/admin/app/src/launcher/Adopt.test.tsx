@@ -54,7 +54,7 @@ describe('the Adopt door', () => {
   })
 
   it('lists both groups under the exact headings, with the button and the line under it', async () => {
-    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['data/members.yaml', 'federation.yaml'], kept: ['.gitignore', 'README.md', 'package.json'] } as never)
+    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['data/members.yaml', 'federation.yaml'], kept: ['.gitignore', 'README.md', 'package.json'], ignored: [] } as never)
     await toReview()
     const added = await screen.findByRole('list', { name: ADD_HEADING })
     expect(screen.getByText(ADD_HEADING)).toBeTruthy()
@@ -68,8 +68,24 @@ describe('the Adopt door', () => {
     expect(m.adoptApply).not.toHaveBeenCalled()
   })
 
+  it('lists what the repo\'s .gitignore leaves out as a third group', async () => {
+    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['federation.yaml'], kept: ['README.md'], ignored: ['.claude/settings.json', 'package-lock.json'] } as never)
+    await toReview()
+    const heading = 'Your .gitignore leaves these out, so they aren\'t added:'
+    const ignored = await screen.findByRole('list', { name: heading })
+    expect(screen.getByText(heading)).toBeTruthy()
+    expect(within(ignored).getAllByRole('listitem').map(li => li.textContent)).toEqual(['.claude/settings.json', 'package-lock.json'])
+  })
+
+  it('draws no ignored group when nothing is ignored', async () => {
+    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['federation.yaml'], kept: [], ignored: [] } as never)
+    await toReview()
+    await screen.findByRole('button', { name: 'Add them on org-os/adopt' })
+    expect(screen.queryByText(/leaves these out/)).toBeNull()
+  })
+
   it('applies the plan and goes to the instance', async () => {
-    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['federation.yaml'], kept: [] } as never)
+    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['federation.yaml'], kept: [], ignored: [] } as never)
     m.adoptApply.mockResolvedValue({ url: 'http://localhost:4999/systems/map?first=1', branch: 'org-os/adopt' } as never)
     await toReview()
     fireEvent.click(await screen.findByRole('button', { name: 'Add them on org-os/adopt' }))
@@ -85,7 +101,7 @@ describe('the Adopt door', () => {
   })
 
   it('a failed apply is said as it came, and nothing navigates', async () => {
-    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['federation.yaml'], kept: [] } as never)
+    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['federation.yaml'], kept: [], ignored: [] } as never)
     m.adoptApply.mockRejectedValue(new Error('No email was given and auto-detection is disabled. The 1 file already copied stays on org-os/adopt, not committed.'))
     await toReview()
     fireEvent.click(await screen.findByRole('button', { name: 'Add them on org-os/adopt' }))

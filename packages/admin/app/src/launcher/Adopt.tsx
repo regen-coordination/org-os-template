@@ -18,6 +18,7 @@ export default function Adopt({ base, initialFolder = '', onClose }: { base?: st
   const [tried, setTried] = useState(false)
   const addId = useId()
   const keptId = useId()
+  const ignoredId = useId()
   const fieldId = useId()
 
   const start = async (e: FormEvent) => {
@@ -58,6 +59,12 @@ export default function Adopt({ base, initialFolder = '', onClose }: { base?: st
           <p className="wiz-label" id={keptId}>Your repo already has these. They stay exactly as they are:</p>
           <ul className="wiz-lines" aria-labelledby={keptId}>
             {plan.kept.map(p => <li key={p} className="wiz-cmd">{p}</li>)}
+          </ul>
+        </>}
+        {(plan.ignored ?? []).length > 0 && <>
+          <p className="wiz-label" id={ignoredId}>Your .gitignore leaves these out, so they aren't added:</p>
+          <ul className="wiz-lines" aria-labelledby={ignoredId}>
+            {plan.ignored.map(p => <li key={p} className="wiz-cmd">{p}</li>)}
           </ul>
         </>}
         {error !== null && <Note state="error">{error}</Note>}

@@ -15,7 +15,13 @@ import { scaffold } from './scaffold.ts'
 export const ADOPT_BRANCH = 'org-os/adopt'
 const SCRATCH_PREFIX = 'org-os-adopt-'
 
-export interface AdoptPlan { id: string; dir: string; add: string[]; kept: string[]; scratch: string }
+/** `add`: missing in the repo, will be copied. `kept`: something is already there. `ignored`: missing, but the repo's
+ *  .gitignore leaves it out, so it is never copied. All POSIX paths relative to the repo, sorted. */
+export interface AdoptPlan { id: string; dir: string; add: string[]; kept: string[]; ignored: string[]; scratch: string }
+
+/** The sentence when adopting would add nothing. */
+export const NOTHING_TO_ADD = 'There is nothing to add: the repo already has every file, or ignores it.'
+const IGNORE_CHUNK = 200
 
 /** A refusal or a stop, with the HTTP status the launcher answers it with and, for a scaffold failure, its log. */
 export class AdoptError extends Error {
@@ -123,12 +129,32 @@ export async function planAdopt(dir: string, answers: Answers, frameworkDir: str
       if (!plainPath(rel)) continue
       ;(nothingAt(dir, rel) ? add : kept).push(rel)
     }
-    add.sort(); kept.sort()
-    return { id: randomUUID(), dir, add, kept, scratch }
+    const ignored = await ignoredBy(dir, add)
+    const adding = add.filter(p => !ignored.has(p)).sort()
+    if (adding.length === 0) throw new AdoptError(NOTHING_TO_ADD, 409)
+    kept.sort()
+    return { id: randomUUID(), dir, add: adding, kept, ignored: [...ignored].sort(), scratch }
   } catch (err) {
     removeScratch(scratch)
     throw err
   }
+}
+
+/** Which of `paths` (not in the repo yet) its ignore rules leave out, asked of git without writing anything:
+ *  `add --dry-run --ignore-missing` names each ignored path on its own line and exits 1. Only lines that are exactly
+ *  one of `paths` count, so git's wording and hints do not matter; a failure that names none of them is git's error. */
+async function ignoredBy(dir: string, paths: string[]): Promise<Set<string>> {
+  const ignored = new Set<string>()
+  for (let i = 0; i < paths.length; i += IGNORE_CHUNK) {
+    const chunk = paths.slice(i, i + IGNORE_CHUNK)
+    const asked = new Set(chunk)
+    const r = await launcherGit(dir, 'add', ['--dry-run', '--ignore-missing', '--', ...chunk.map(p => `:(literal)${p}`)])
+    if (r.code === 0) continue
+    const named = `${r.stderr}\n${r.stdout}`.split('\n').filter(l => asked.has(l))
+    if (named.length === 0) throw new AdoptError(`${gitSentence(r.stderr, 'git could not check the ignore rules.')} Nothing was written to your repo.`, 500)
+    for (const p of named) ignored.add(p)
+  }
+  return ignored
 }
 
 /** What to say about the branch after a stop that came after the switch. */
