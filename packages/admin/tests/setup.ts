@@ -6,6 +6,9 @@ import { join } from 'node:path'
 // The server keeps job records and layouts under ~/.org-os/admin. No test may write there.
 process.env.ORG_OS_ADMIN_HOME ??= mkdtempSync(join(tmpdir(), 'admin-state-'))
 
+// The launcher keeps its recent-instances list in ~/.org-os (N1). No test may read or write there.
+process.env.ORG_OS_LAUNCHER_HOME = mkdtempSync(join(tmpdir(), 'launcher-home-'))
+
 // Every server a test starts opens the private store (L5 Task 5): in a folder of its own under the temp directory, never
 // inside a fixture (where git does not ignore it, and Home would say so), this worktree or the operator's real store,
 // whatever the caller's shell sets. A test about the place sets it itself. The backup variables are the caller's machine's: no test backs up into its folders or under its key.
