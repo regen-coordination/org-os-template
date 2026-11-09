@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { folderState, isInstance, resolveFolder, writableFolderProblem } from '../../launcher/folders.ts'
@@ -35,6 +35,25 @@ describe('folder guards', () => {
     expect(folderState(lone)).toBe('not-a-folder')
     expect(writableFolderProblem(lone)).toBe(`${lone} is a file, not a folder.`)
     expect(writableFolderProblem(base)).toBe(`${base} already has files in it. Choose a new or empty folder.`)
+  })
+  it('refuses a dangling symlink and a path under a regular file instead of calling them new', () => {
+    const base = tmp()
+    const dangling = join(base, 'dangling'); symlinkSync(join(base, 'nowhere'), dangling)
+    expect(folderState(dangling)).toBe('not-a-folder')
+    expect(writableFolderProblem(dangling)).not.toBeNull()
+    const file = join(base, 'f'); writeFileSync(file, 'x')
+    const under = join(file, 'sub')
+    expect(folderState(under)).toBe('not-a-folder')
+    expect(writableFolderProblem(under)).toBe(`${under} cannot be read. Choose a new or empty folder.`)
+  })
+  it.skipIf(process.getuid?.() === 0)('refuses an unreadable folder with a sentence instead of throwing', () => {
+    const dir = tmp()
+    chmodSync(dir, 0o000)
+    try {
+      expect(folderState(dir)).toBe('not-a-folder')
+      expect(writableFolderProblem(dir)).toBe(`${dir} cannot be read. Choose a new or empty folder.`)
+      expect(writableFolderProblem(join(dir, 'child'))).toMatch(/cannot be read/)
+    } finally { chmodSync(dir, 0o700) }
   })
   it('knows an instance by data/ and federation.yaml', () => {
     const base = tmp()

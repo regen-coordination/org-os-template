@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from 'node:fs'
+import { lstatSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -13,17 +13,31 @@ export function resolveFolder(input: string, base: string): string {
   return resolve(base, text)
 }
 
-/** What is at `abs`, following symlinks. A path that is not there is `new`, whether or not its parents are. */
-export function folderState(abs: string): FolderState {
+/** What is at `abs`, with `unreadable` for a path that cannot be looked at (a parent that is a file, a loop, no permission). */
+function probe(abs: string): FolderState | 'unreadable' {
   let stat
-  try { stat = statSync(abs) } catch { return 'new' }
+  try {
+    stat = statSync(abs)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return 'unreadable'
+    try { lstatSync(abs) } catch { return 'new' } // nothing there at all
+    return 'not-a-folder' // a symlink that points nowhere
+  }
   if (!stat.isDirectory()) return 'not-a-folder'
-  return readdirSync(abs).length === 0 ? 'empty' : 'not-empty'
+  try { return readdirSync(abs).length === 0 ? 'empty' : 'not-empty' } catch { return 'unreadable' }
+}
+
+/** What is at `abs`, following symlinks. Only a path that is not there is `new`, whether or not its parents are; a path
+ *  that cannot be looked at is `not-a-folder`, so nothing is ever made on it. */
+export function folderState(abs: string): FolderState {
+  const state = probe(abs)
+  return state === 'unreadable' ? 'not-a-folder' : state
 }
 
 /** Why a new instance cannot be made at `abs`, in a sentence, or null when it can. */
 export function writableFolderProblem(abs: string): string | null {
-  const state = folderState(abs)
+  const state = probe(abs)
+  if (state === 'unreadable') return `${abs} cannot be read. Choose a new or empty folder.`
   if (state === 'not-empty') return `${abs} already has files in it. Choose a new or empty folder.`
   if (state === 'not-a-folder') return `${abs} is a file, not a folder.`
   return null
