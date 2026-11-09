@@ -107,3 +107,22 @@ describe('manifestImports', () => {
     expect(out[0]).toMatchObject({ name: 'x', branch: 'dev', mount: 'r/x' })
   })
 })
+
+describe('fix round 1', () => {
+  it('a bad escape is a row, the rest still recognise', () => {
+    const out = recogniseLines('https://notion.so/%E0%A4%A\nhttps://example.org/x', [])
+    expect(out.rows).toHaveLength(2)
+    expect(out.rows[0].system.kind).toBe('docs')
+  })
+  it('manifestImports validates', () => {
+    const e = (name: string, url = 'https://github.com/o/x.git') => ({ name, url, branch: 'main' })
+    expect(manifestImports({ repositories: [e('../../x'), e('a/b'), e('.'), e('..'), e('ok')] }, []).map((x: any) => x.name)).toEqual(['ok'])
+    for (const baseDirectory of ['/abs', '../up', 'a/../b']) expect(manifestImports({ baseDirectory, repositories: [e('ok')] }, [])).toEqual([])
+    const out = manifestImports({ repositories: [e('a', 'http://h/x.git'), e('b', 'ext::sh -c x'), e('c', 'git@github.com:o/c.git'), e('d', 'https://example.org/d.git'), e('f', 'git@other.com:o/f.git')] }, []) as any[]
+    expect(out.map(x => [x.name, x.url])).toEqual([['c', 'https://github.com/o/c'], ['d', 'https://example.org/d']])
+  })
+  it('a mixed-case repo is a duplicate', () => {
+    const out = recogniseLines('https://github.com/Foo/Bar', [{ id: 'bar', kind: 'repo', name: 'bar', url: 'git@github.com:foo/bar.git' }])
+    expect(out.rows[0].duplicateOf).toBe('bar')
+  })
+})

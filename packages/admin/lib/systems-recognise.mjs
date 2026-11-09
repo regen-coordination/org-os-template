@@ -1,7 +1,8 @@
 // "Map the rest" (network N1): pasted lines become Systems, a GitHub owner's repos become repo Systems, and the old
-// repos.manifest.json is offered as repo Systems. Pure: the page runs it in the browser, so no node: imports. It does
-// not import federation/peers.mjs (that pulls in node readers); `repoAddress`/`sameRepo` below apply the same github
-// and url rules as peers.mjs's addressOf/sameAddress, for the forms a repo System's url takes.
+// repos.manifest.json is offered as repo Systems. Pure: the page runs it in the browser; peers.mjs and read.mjs are
+// pure too (no node:*), and give the one address rule (N0, ruling P5).
+
+import { addressOf, sameAddress } from './federation/peers.mjs'
 
 const CHAINS = { eth: 'eip155:1', oeth: 'eip155:10', gno: 'eip155:100', matic: 'eip155:137', arb1: 'eip155:42161', base: 'eip155:8453', celo: 'eip155:42220', sep: 'eip155:11155111' }
 const HEX = '0x[0-9a-fA-F]{40}'
@@ -9,35 +10,23 @@ const SAFE_RE = new RegExp(`^(${Object.keys(CHAINS).join('|')}):(${HEX})$`)
 
 const NOT_KNOWN = 'Not a link this page knows. Paste a web address, a GitHub repo or organization, or a Safe as chain:0x….'
 
-/** The address a repo url names, as peers.mjs reads it: { kind: 'github', owner, repo } or { kind: 'url', href }. */
-function repoAddress(ref) {
-  const r = String(ref ?? '').trim()
-  if (!r) return null
-  const ssh = /^(?:ssh:\/\/)?git@github\.com[:/]([^/]+)\/([^/]+?)\/?$/i.exec(r)
-  if (ssh) return { kind: 'github', owner: ssh[1], repo: ssh[2].replace(/\.git$/i, '') }
-  const web = /^(?:https?:\/\/(?:[^/?#@]*@)?)?(?:www\.)?github\.com\/([^/?#]+)\/([^/?#]+)\/?([^?#]*)$/i.exec(r)
-  if (web) return { kind: 'github', owner: web[1], repo: web[2].replace(/\.git$/i, '') }
-  if (/^https?:\/\//i.test(r)) {
-    try {
-      const u = new URL(r)
-      return { kind: 'url', href: `${u.protocol}//${u.host}${u.pathname}`.replace(/\/+$/, '').replace(/\.git$/i, '') }
-    } catch { return null }
-  }
-  return null
+const NO_IO = { resolve: (_b, r) => r, isDir: () => false, readFederationAt: () => ({ found: false }) }
+/** A repo url's address by N0's rules (ruling P5): github (ssh, https, any case) or url; anything else is null. */
+const repoAddress = ref => {
+  const a = addressOf(String(ref ?? ''), '/', NO_IO)
+  return a && (a.kind === 'github' || a.kind === 'url') ? a : null
 }
-function sameRepo(a, b) {
-  if (!a || !b || a.kind !== b.kind) return false
-  if (a.kind === 'github') return a.owner.toLowerCase() === b.owner.toLowerCase() && a.repo.toLowerCase() === b.repo.toLowerCase()
-  return a.href === b.href
-}
+const sameRepo = (a, b) => a !== null && b !== null && sameAddress(a, b)
 
 const short = a => `${a.slice(0, 6)}…${a.slice(-4)}`
 const safe = (prefix, address) => ({ kind: 'safe', name: `Safe ${short(address)}`, chain: CHAINS[prefix], address })
 
+const decodeSeg = x => { try { return decodeURIComponent(x) } catch { return x } }
+
 function pageKind(u, line) {
   const host = u.hostname.replace(/^www\./, '')
   const seg = u.pathname.split('/').filter(Boolean)[0] ?? ''
-  const named = product => ({ name: seg ? `${product} ${decodeURIComponent(seg)}` : product, url: line })
+  const named = product => ({ name: seg ? `${product} ${decodeSeg(seg)}` : product, url: line })
   if (host === 'notion.so' || host.endsWith('.notion.so')) return { kind: 'docs', ...named('Notion') }
   if (host === 'notion.site' || host.endsWith('.notion.site')) return { kind: 'docs', ...named('Notion') }
   if (host === 'docs.google.com') {
@@ -143,17 +132,25 @@ export function githubRepoSystems(list, existing) {
 export function manifestImports(manifest, systems) {
   const entries = manifest && Array.isArray(manifest.repositories) ? manifest.repositories : []
   const base = manifest?.baseDirectory ?? 'repos'
+  if (typeof base !== 'string' || !base || base.startsWith('/') || base.split('/').includes('..')) return []
   const repos = systems.filter(s => s.kind === 'repo')
   const taken = new Set(systems.map(s => s.id))
   const out = []
   for (const e of entries) {
-    if (!e || !e.name || !e.url) continue
-    const mount = `${base}/${e.name}`
+    if (!e || typeof e.name !== 'string' || typeof e.url !== 'string') continue
+    if (!/^[A-Za-z0-9._-]+$/.test(e.name) || e.name === '.' || e.name === '..') continue
+    // Only https, or a github ssh form: addressOf would read `git@other.com:o/f` as owner/repo shorthand.
+    if (!/^(https:\/\/|(ssh:\/\/)?git@github\.com[:/])/i.test(e.url.trim())) continue
     const addr = repoAddress(e.url)
+    let url
+    if (addr?.kind === 'github') url = `https://github.com/${addr.owner}/${addr.repo}`
+    else if (addr?.kind === 'url' && addr.href.startsWith('https://')) url = addr.href.replace(/\.git$/i, '')
+    else continue
+    const mount = `${base}/${e.name}`
     if (repos.some(s => s.mount === mount || (s.url && sameRepo(repoAddress(s.url), addr)))) continue
     const id = systemIdFor(e.name, taken)
     taken.add(id)
-    const imp = { id, kind: 'repo', name: e.name, url: String(e.url).replace(/\.git$/i, ''), mount }
+    const imp = { id, kind: 'repo', name: e.name, url, mount }
     if (e.branch && e.branch !== 'main') imp.branch = e.branch
     out.push(imp)
   }
