@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import Launcher from './Launcher.tsx'
+import App from '../App.tsx'
 import { renderAt } from '../test/render.tsx'
 import * as api from './api.ts'
 
@@ -58,7 +59,7 @@ describe('the launcher page', () => {
   })
 
   it('a folder that is not an instance offers to adopt it', async () => {
-    m.openInstance.mockRejectedValue(Object.assign(new Error("This folder isn't an org-os instance yet."), { adoptable: true, path: '/x/y' }))
+    m.openInstance.mockRejectedValue(Object.assign(new Error('/x/y is not an org-os instance yet.'), { adoptable: true, path: '/x/y' }))
     renderAt(<Launcher />, '/launch')
     fireEvent.change(await screen.findByLabelText("The folder it's in"), { target: { value: '/x/y' } })
     fireEvent.click(screen.getByRole('button', { name: 'Open' }))
@@ -81,5 +82,18 @@ describe('the launcher page', () => {
     expect(await screen.findByText('Comes with federation.')).toBeTruthy()
     const join = screen.getByRole('button', { name: 'Join a network' }) as HTMLButtonElement
     expect(join.disabled).toBe(true)
+  })
+
+  it('/launch is drawn alone: no request goes outside /api/launcher/', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 200 }))
+    // the api module is mocked above; here the real one runs, so the requests are real fetches
+    m.launcherState.mockImplementation((await vi.importActual<typeof api>('./api.ts')).launcherState)
+    renderAt(<App />, '/launch')
+    await screen.findByRole('heading', { name: 'Open an instance' })
+    await new Promise(r => setTimeout(r, 50))
+    const urls = spy.mock.calls.map(c => String(c[0] instanceof Request ? c[0].url : c[0]))
+    spy.mockRestore()
+    expect(urls).toContain('/api/launcher/state')
+    expect(urls.filter(u => !u.includes('/api/launcher/'))).toEqual([])
   })
 })

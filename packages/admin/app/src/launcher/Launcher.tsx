@@ -83,7 +83,7 @@ export default function Launcher() {
           </form>
           {refusal && (
             <Note state="error" action={refusal.adoptable ? <Button small onClick={() => { setAdoptFolder(refusal.path ?? folder.trim()); setRefusal(null) }}>Adopt it</Button> : undefined}>
-              {refusal.message}
+              {refusal.adoptable ? "This folder isn't an org-os instance yet." : refusal.message}
             </Note>
           )}
         </section>
