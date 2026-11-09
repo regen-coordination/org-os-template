@@ -27,3 +27,11 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
 export const launcherState = () => call<LauncherState>('GET', '/api/launcher/state')
 export const openInstance = (path: string) => call<{ url: string }>('POST', '/api/launcher/open', { path })
 export const forgetRecent = (path: string) => call<{ recent: RecentEntry[] }>('DELETE', '/api/launcher/recent', { path })
+export const cloneInstance = (url: string, folder: string) => call<{ url: string }>('POST', '/api/launcher/clone', { url, folder })
+
+/** Mirrors launcher/folders.ts defaultCloneFolder (the page cannot import node:path): the repo's name, inside `base`. */
+export function defaultCloneFolder(url: string, base: string): string {
+  const last = url.trim().replace(/\/+$/, '').split(/[/:]/).pop() ?? ''
+  const name = last.replace(/\.git$/, '').replace(/[^A-Za-z0-9._-]/g, '')
+  return `${base.replace(/\/+$/, '')}/${name === '' || name === '.' || name === '..' ? 'instance' : name}`
+}

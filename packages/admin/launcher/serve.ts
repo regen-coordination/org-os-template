@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { serve } from '@hono/node-server'
@@ -10,7 +10,8 @@ import { refusal } from '../server/guard.ts'
 import { runningServer, stateDir } from '../server/state.ts'
 import { readFederation } from '../lib/federation/read.mjs'
 import { forget, readRecent, remember } from './home.ts'
-import { isInstance, resolveFolder } from './folders.ts'
+import { folderState, isInstance, resolveFolder, writableFolderProblem } from './folders.ts'
+import { gitUrlProblem, launcherGit } from './git-write.ts'
 import { defaultAssess, defaultStartAdmin } from './children.ts'
 
 import { readableHost } from '../server/serve.ts'
@@ -44,7 +45,7 @@ function liveName(path: string): string | null {
   } catch { return null }
 }
 
-export async function startLauncher(opts: LauncherOptions): Promise<{ port: number; app: Hono; close: () => Promise<void> }> {
+export async function startLauncher(opts: LauncherOptions): Promise<{ port: number; app: Hono; openFlow: (repo: string) => Promise<{ url: string }>; close: () => Promise<void> }> {
   if (opts.hosted) throw new Error(HOSTED_SENTENCE)
   const defaultStart = opts.startAdmin ? null : defaultStartAdmin(opts.frameworkDir)
   const startAdmin: StartAdmin = opts.startAdmin ?? defaultStart!
@@ -55,6 +56,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
 
   /** Tasks 4–6 reuse this: the doctor looks, its findings are saved, the instance is remembered, its admin is started. */
   async function openFlow(repo: string): Promise<{ url: string }> {
+    if (!isInstance(repo)) throw new Error(`${repo} is not an org-os instance, so it cannot be opened.`)
     const summary = await assess(repo)
     const dir = stateDir(repo)
     mkdirSync(dir, { recursive: true })
@@ -140,6 +142,39 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     }
   })
 
+  app.post('/api/launcher/clone', async c => {
+    let url = '', given = ''
+    try {
+      const b = await c.req.json() as { url?: unknown; folder?: unknown }
+      url = typeof b?.url === 'string' ? b.url.trim() : ''
+      given = typeof b?.folder === 'string' ? b.folder : ''
+    } catch { /* answered below */ }
+    const bad = gitUrlProblem(url)
+    if (bad) return c.json({ error: bad }, 400)
+    if (!given.trim()) return c.json({ error: 'Say which folder to clone into.' }, 400)
+    const abs = resolveFolder(given, base())
+    const problem = writableFolderProblem(abs)
+    if (problem) return c.json({ error: problem }, 409)
+    const wasNew = folderState(abs) === 'new'
+    try { mkdirSync(dirname(abs), { recursive: true }) } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 409)
+    }
+    let result
+    try { result = await launcherGit(dirname(abs), 'clone', ['--', url, abs]) } catch (err) {
+      result = { code: 1, stdout: '', stderr: err instanceof Error ? err.message : String(err) }
+    }
+    if (result.code !== 0) {
+      if (wasNew) rmSync(abs, { recursive: true, force: true }) // the launcher made it; a folder that was already there stays
+      const last = result.stderr.trim().split('\n').filter(Boolean).pop() ?? 'git could not clone it.'
+      return c.json({ error: last }, 502)
+    }
+    const path = realpathSync(abs)
+    if (!isInstance(path)) return c.json({ error: `${path} is not an org-os instance yet.`, adoptable: true, path }, 409)
+    try { return c.json(await openFlow(path)) } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+  })
+
   app.delete('/api/launcher/recent', async c => {
     const path = await bodyPath(c)
     if (!path) return c.json({ error: 'Say which folder.' }, 400)
@@ -158,7 +193,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
   return new Promise((resolve, reject) => {
     const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: opts.port, createServer: withReadableHost }, info => {
       resolve({
-        port: info.port, app,
+        port: info.port, app, openFlow,
         close: async () => {
           await Promise.all([...children.values()].map(ch => ch.stop().catch(() => {})))
           children.clear()

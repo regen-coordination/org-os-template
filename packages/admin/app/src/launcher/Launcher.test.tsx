@@ -6,7 +6,10 @@ import App from '../App.tsx'
 import { renderAt } from '../test/render.tsx'
 import * as api from './api.ts'
 
-vi.mock('./api.ts', () => ({ launcherState: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn() }))
+vi.mock('./api.ts', async orig => ({
+  ...(await orig<typeof import('./api.ts')>()),
+  launcherState: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn(), cloneInstance: vi.fn(),
+}))
 const m = vi.mocked(api)
 
 const state = (over: Record<string, unknown> = {}) => ({
@@ -75,6 +78,28 @@ describe('the launcher page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open' }))
     expect(await screen.findByText('That instance is already open at http://127.0.0.1:4680/.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Adopt it' })).toBeNull()
+  })
+
+  it('a pasted git address pre-fills an editable folder and clones it', async () => {
+    m.cloneInstance.mockResolvedValue({ url: 'http://127.0.0.1:4681/' } as never)
+    renderAt(<Launcher />, '/launch')
+    await screen.findByText('Alder Commons')
+    fireEvent.change(screen.getByLabelText('Or paste a git address'), { target: { value: 'https://github.com/o/alder.git' } })
+    const folder = screen.getByLabelText('The folder to clone it into') as HTMLInputElement
+    expect(folder.value).toBe('/home/me/orgs/alder')
+    fireEvent.change(folder, { target: { value: '~/mine' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Clone and open' }))
+    await waitFor(() => expect(m.cloneInstance).toHaveBeenCalledWith('https://github.com/o/alder.git', '~/mine'))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('http://127.0.0.1:4681/'))
+  })
+
+  it('a clone that is not an instance offers to adopt it', async () => {
+    m.cloneInstance.mockRejectedValue(Object.assign(new Error('x'), { adoptable: true, path: '/home/me/orgs/plain' }))
+    renderAt(<Launcher />, '/launch')
+    fireEvent.change(await screen.findByLabelText('Or paste a git address'), { target: { value: 'https://github.com/o/plain' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Clone and open' }))
+    expect(await screen.findByText("This folder isn't an org-os instance yet.")).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Adopt it' })).toBeTruthy()
   })
 
   it('Join is disabled and says why', async () => {

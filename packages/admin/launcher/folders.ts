@@ -50,3 +50,10 @@ const isFile = (p: string) => { try { return statSync(p).isFile() } catch { retu
 export function isInstance(abs: string): boolean {
   return isDir(join(abs, 'data')) && isFile(join(abs, 'federation.yaml'))
 }
+
+/** Where a clone of `url` goes by default: the repo's name, inside `base`. */
+export function defaultCloneFolder(url: string, base: string): string {
+  const last = url.trim().replace(/\/+$/, '').split(/[/:]/).pop() ?? ''
+  const name = last.replace(/\.git$/, '').replace(/[^A-Za-z0-9._-]/g, '') || 'instance'
+  return join(base, name === '.' || name === '..' ? 'instance' : name)
+}

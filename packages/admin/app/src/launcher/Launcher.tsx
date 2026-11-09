@@ -3,7 +3,7 @@ import { Button } from '../design/Button.tsx'
 import { Note } from '../design/Note.tsx'
 import { applySkin, chosenSkin } from '../skin.ts'
 import { applyTheme, storedTheme } from '../theme.ts'
-import { forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
+import { cloneInstance, defaultCloneFolder, forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
 
 type Refusal = { message: string; adoptable: boolean; path?: string }
 
@@ -17,12 +17,15 @@ export default function Launcher() {
   const [folder, setFolder] = useState('')
   const [busy, setBusy] = useState(false)
   const [refusal, setRefusal] = useState<Refusal | null>(null)
+  const [gitUrl, setGitUrl] = useState('')
+  const [cloneFolder, setCloneFolder] = useState('')
+  const [cloneEdited, setCloneEdited] = useState(false)
   const [adoptFolder, setAdoptFolder] = useState('')
 
   useEffect(() => { applyTheme(storedTheme()); applySkin(chosenSkin()); document.title = 'Instances' }, [])
   useEffect(() => {
     let live = true
-    launcherState().then(s => { if (live) { setState(s); setRecent(s.recent) } }, e => { if (live) setLoadError((e as Error).message) })
+    launcherState().then(s => { if (live) { setState(s); setRecent(s.recent ?? []) } }, e => { if (live) setLoadError((e as Error).message) })
     return () => { live = false }
   }, [])
 
@@ -38,11 +41,28 @@ export default function Launcher() {
     } finally { setBusy(false) }
   }
 
+  const onGitUrl = (v: string) => {
+    setGitUrl(v)
+    if (!cloneEdited) setCloneFolder(v.trim() ? defaultCloneFolder(v, state?.base ?? '') : '')
+  }
+
+  const cloneIt = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true); setRefusal(null)
+    try {
+      const { url } = await cloneInstance(gitUrl.trim(), cloneFolder.trim())
+      window.location.assign(url)
+    } catch (err) {
+      const x = err as Error & { adoptable?: boolean; path?: string }
+      setRefusal({ message: x.message, adoptable: x.adoptable === true, path: x.path })
+    } finally { setBusy(false) }
+  }
+
   const forget = async (path: string) => {
     try { setRecent((await forgetRecent(path)).recent) } catch (err) { setRefusal({ message: (err as Error).message, adoptable: false }) }
   }
 
-  const door = (id: string) => state?.doors.find(d => d.id === id)
+  const door = (id: string) => state?.doors?.find(d => d.id === id)
 
   return (
     <main className="wiz-body" id="launcher-main">
@@ -79,6 +99,17 @@ export default function Launcher() {
               onChange={e => setFolder(e.target.value)} autoComplete="off" spellCheck={false} />
             <div className="wiz-acts">
               <Button type="submit" primary busy={busy ? 'Opening…' : undefined}>Open</Button>
+            </div>
+          </form>
+          <form onSubmit={e => void cloneIt(e)} className="wiz-field">
+            <label htmlFor="launch-git">Or paste a git address</label>
+            <input id="launch-git" className="input" type="text" value={gitUrl} placeholder="https://github.com/owner/name"
+              onChange={e => onGitUrl(e.target.value)} autoComplete="off" spellCheck={false} />
+            <label htmlFor="launch-clone-folder">The folder to clone it into</label>
+            <input id="launch-clone-folder" className="input" type="text" value={cloneFolder}
+              onChange={e => { setCloneFolder(e.target.value); setCloneEdited(true) }} autoComplete="off" spellCheck={false} />
+            <div className="wiz-acts">
+              <Button type="submit" busy={busy ? 'Cloning…' : undefined} disabled={gitUrl.trim() === '' || cloneFolder.trim() === ''}>Clone and open</Button>
             </div>
           </form>
           {refusal && (
