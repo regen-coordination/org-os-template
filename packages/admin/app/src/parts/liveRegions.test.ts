@@ -16,6 +16,7 @@ const ALLOWED: Record<string, { count: number; why: string }> = {
   'changes/ProposePanel.tsx': { count: 2, why: 'the "Opened p-…" news that takes focus once the form is gone, and a refused Propose, the alert §13 names' },
   'elements/compose/ComposeCanvas.tsx': { count: 1, why: "the refused connection, the canvas's one role=alert §13 names" },
   'pages/Proposal.tsx': { count: 3, why: "the rule's overall state beside its path, what an act just did (it takes focus), and the read-back check's line: each a status that changes in place while the person is on it" },
+  'pages/MapTheRest.tsx': { count: 1, why: 'the "Staged. Review them in Changes." line beside the Stage button, a status that appears in place once the additions are staged' },
   'pages/syncShare.tsx': { count: 1, why: "what Sync or Share did, where the person pressed it (a refusal is a quiet error note said by announce())" },
   'wizards/OpenInstance.tsx': { count: 1, why: '"Copied." beside the command just copied' },
   'wizards/WizardFrame.tsx': { count: 1, why: "the wizard's screen-reader status line (C4b: which step, what it writes), kept beside the polite region; e2e:a11y finds it in the tree. Not drawn where the page says the step through the one region (the stepped new-record form)" },

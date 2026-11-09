@@ -76,15 +76,10 @@ or listener left from this run.
 ## 9. Full suites (one at a time, through the lock)
 
 - Root `npm test`: 1007 tests, 1007 passed, 0 failed (the clone manifest needed no change).
-- Admin `npm --prefix packages/admin test`: 7520 passed, 2 skipped, 3 failed (500 files, 3 failed). The three fail
-  again when run alone, so they are not load flakes. They are design and accessibility guard tests that the N1 pages
-  do not yet satisfy:
-  - `app/src/design/legacy.test.ts`: classes `sysrow-mount` (SystemRow.tsx) and `mapr-label` (MapTheRest.tsx) are
-    drawn by no stylesheet.
-  - `app/src/parts/liveRegions.test.ts`: `pages/MapTheRest.tsx` holds one live region that is not on the allowed list.
-  - `app/src/design/skins/skins.test.ts`: `launcher/Launcher.tsx` has six look-bearing style props (`color`,
-    `opacity`, `fontSize: 'inherit'`).
-  No test or expectation was changed to hide them; they are left for the author of those pages.
+- Admin `npm --prefix packages/admin test`: first run 7520 passed, 2 skipped, 3 failed: design and accessibility
+  guards (`legacy.test.ts`, `liveRegions.test.ts`, `skins.test.ts`) that the launcher and map pages did not satisfy.
+  Fixed in the next commit (two classes drawn in the stylesheets, the Launcher's inline styles moved into classes,
+  the map page's "Staged" status listed as a live region). Re-run: 500 files passed, 7523 passed, 2 skipped, 0 failed.
 - `npm --prefix packages/admin run typecheck`: 0 errors.
 
-Status: root and typecheck green; admin has 3 real failures, open.
+Status: green.

@@ -101,9 +101,9 @@ export default function Launcher() {
         <p className="wiz-label">Recent instances</p>
         {recent.length === 0
           ? <p className="wiz-note">{state ? 'Nothing opened yet.' : ''}</p>
-          : <ul className="wiz-lines" style={{ color: 'inherit' }}>
+          : <ul className="wiz-lines launcher-lines">
               {recent.map(r => (
-                <li key={r.path} className="wiz-out" style={r.found ? undefined : { opacity: 0.6 }}>
+                <li key={r.path} className={r.found ? 'wiz-out' : 'wiz-out launcher-missing'}>
                   <div className="wiz-out-b">
                     <strong>{r.name ?? r.path.split('/').filter(Boolean).pop() ?? r.path}</strong>
                     <span className="wiz-cmd">{r.path}</span>
@@ -119,7 +119,7 @@ export default function Launcher() {
 
       <div className="wiz-doors" role="group" aria-label="The four doors">
         <section className="wiz-writes" aria-labelledby="door-open">
-          <h2 className="wiz-h" id="door-open" style={{ fontSize: 'inherit' }}>Open an instance</h2>
+          <h2 className="wiz-h launcher-door-h" id="door-open">Open an instance</h2>
           <form onSubmit={e => void open(e)} className="wiz-field">
             <label htmlFor="launch-folder">The folder it's in</label>
             <input id="launch-folder" className="input" type="text" value={folder} placeholder={state?.base ?? ''}
@@ -147,7 +147,7 @@ export default function Launcher() {
         </section>
 
         <section className="wiz-writes" aria-labelledby="door-create">
-          <h2 className="wiz-h" id="door-create" style={{ fontSize: 'inherit' }}>Create a new one</h2>
+          <h2 className="wiz-h launcher-door-h" id="door-create">Create a new one</h2>
           {creating
             ? <>
                 <OpenInstance def={creating} run={runCreate} base={state?.base} onClose={() => { setCreating(null); setCreateLog(null) }} />
@@ -157,14 +157,14 @@ export default function Launcher() {
         </section>
 
         <section className="wiz-writes" aria-labelledby="door-adopt" ref={adoptCard} tabIndex={-1}>
-          <h2 className="wiz-h" id="door-adopt" style={{ fontSize: 'inherit' }}>Adopt a repo</h2>
+          <h2 className="wiz-h launcher-door-h" id="door-adopt">Adopt a repo</h2>
           {adopting
             ? <Adopt key={adoptFolder} base={state?.base} initialFolder={adoptFolder} onClose={() => { setAdopting(false); setAdoptFolder('') }} />
             : <div className="wiz-acts"><Button onClick={() => setAdopting(true)}>Adopt a repo</Button></div>}
         </section>
 
         <section className="wiz-writes" aria-labelledby="door-join">
-          <h2 className="wiz-h" id="door-join" style={{ fontSize: 'inherit' }}>Join a network</h2>
+          <h2 className="wiz-h launcher-door-h" id="door-join">Join a network</h2>
           <p className="wiz-note">{door('join')?.note ?? 'Comes with federation.'}</p>
           <div className="wiz-acts"><Button disabled={true}>Join a network</Button></div>
         </section>
