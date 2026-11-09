@@ -13,6 +13,7 @@ import { forget, readRecent, remember } from './home.ts'
 import { isInstance, resolveFolder, writableFolderProblem } from './folders.ts'
 import { gitUrlProblem, launcherGit } from './git-write.ts'
 import { scaffold } from './scaffold.ts'
+import { AdoptError, adoptProblem, applyAdopt, planAdopt, removeScratch, type AdoptPlan } from './adopt.ts'
 import { loadWizards } from '../lib/wizards.mjs'
 import { orgProblem, youProblem, type Answers } from '../lib/open-instance.mjs'
 import { defaultAssess, defaultStartAdmin } from './children.ts'
@@ -37,6 +38,9 @@ export interface LauncherOptions {
   startAdmin?: StartAdmin
   assess?: Assess
 }
+
+/** How long an adopt plan is held before it expires and its scratch folder is removed. */
+export const PLAN_TTL_MS = 30 * 60_000
 
 export const HOSTED_SENTENCE = 'A hosted Hub is one instance. The launcher is for your own machine.'
 
@@ -216,6 +220,60 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     }
   })
 
+  // Adopt (Task 6): plans are held here by an unguessable id, never sent to the page with their scratch path. Each one
+  // expires after PLAN_TTL_MS; its scratch is removed then, after an apply, and on close().
+  const plans = new Map<string, { plan: AdoptPlan; timer: ReturnType<typeof setTimeout> }>()
+  const dropPlan = (id: string): AdoptPlan | undefined => {
+    const held = plans.get(id)
+    if (!held) return undefined
+    plans.delete(id)
+    clearTimeout(held.timer)
+    return held.plan
+  }
+
+  app.post('/api/launcher/adopt/plan', async c => {
+    let given = '', answers: Record<string, unknown> = {}
+    try {
+      const b = await c.req.json() as { path?: unknown; answers?: unknown }
+      given = typeof b?.path === 'string' ? b.path : ''
+      if (b?.answers && typeof b.answers === 'object') answers = b.answers as Record<string, unknown>
+    } catch { /* answered below */ }
+    if (!given.trim()) return c.json({ error: 'Say which folder.' }, 400)
+    // The same canonical path as the open route: resolved, there, then its real path once.
+    const typed = resolveFolder(given, base())
+    if (!existsSync(typed)) return c.json({ error: `There is no folder at ${typed}.` }, 404)
+    const path = realpathSync(typed)
+    const problem = await adoptProblem(path)
+    if (problem) return c.json({ error: problem }, 409)
+    const withFolder = { ...answers, folder: path } as Answers
+    const bad = orgProblem(withFolder) ?? youProblem(withFolder)
+    if (bad) return c.json({ error: bad }, 400)
+    let plan: AdoptPlan
+    try { plan = await planAdopt(path, withFolder, opts.frameworkDir) } catch (err) {
+      if (err instanceof AdoptError) return c.json({ error: err.message, ...(err.log !== undefined ? { log: err.log } : {}) }, err.status)
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+    const timer = setTimeout(() => { const gone = dropPlan(plan.id); if (gone) removeScratch(gone.scratch) }, PLAN_TTL_MS)
+    timer.unref?.()
+    plans.set(plan.id, { plan, timer })
+    return c.json({ planId: plan.id, add: plan.add, kept: plan.kept })
+  })
+
+  app.post('/api/launcher/adopt/apply', async c => {
+    let id = ''
+    try { const b = await c.req.json() as { planId?: unknown }; id = typeof b?.planId === 'string' ? b.planId : '' } catch { /* answered below */ }
+    // Taken out before any await: a plan is applied at most once.
+    const plan = id ? dropPlan(id) : undefined
+    if (!plan) return c.json({ error: 'This plan has expired or was already used. Start the adoption again.' }, 410)
+    let applied
+    try { applied = await applyAdopt(plan) } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, err instanceof AdoptError ? err.status : 500)
+    }
+    try { return c.json({ ...(await openFlow(plan.dir)), branch: applied.branch }) } catch (err) {
+      return c.json({ error: `The files were added on ${applied.branch}, but the instance could not be opened: ${err instanceof Error ? err.message : String(err)}` }, 500)
+    }
+  })
+
   app.delete('/api/launcher/recent', async c => {
     const path = await bodyPath(c)
     if (!path) return c.json({ error: 'Say which folder.' }, 400)
@@ -236,6 +294,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       resolve({
         port: info.port, app, openFlow,
         close: async () => {
+          for (const id of [...plans.keys()]) { const gone = dropPlan(id); if (gone) removeScratch(gone.scratch) }
           await Promise.all([...children.values()].map(ch => ch.stop().catch(() => {})))
           children.clear()
           await defaultStart?.closeAll()

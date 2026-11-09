@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import OpenInstance from './OpenInstance.tsx'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
@@ -215,6 +216,31 @@ describe('W1 with a run: the launcher creates it', () => {
     expect(screen.queryByText(/kept as a draft/)).toBeNull()
     click('Close')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('in StrictMode (the double effect of dev) opens at the questions with no stray refusal', async () => {
+    fetchRoutes(routes())
+    // StrictMode at the root (renderAt's providers sit above it, where React does not double the effects)
+    render(<QueryClientProvider client={new QueryClient()}><OpenInstance def={def} run={(async () => {}) as never} /></QueryClientProvider>, { reactStrictMode: true })
+    expect(await screen.findByRole('heading', { level: 2, name: 'About the organization' })).toBeTruthy()
+    expect(document.querySelector('.note-error')).toBeNull()
+  })
+
+  it('with fixedFolder, the folder is preset and its field hidden', async () => {
+    fetchRoutes(routes())
+    const run = vi.fn(async (_a: unknown) => {})
+    renderAt(<OpenInstance def={def} run={run as never} base="/w" fixedFolder="/home/me/plain" />)
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    expect(screen.queryByLabelText('Folder to create')).toBeNull()
+    fillOrg()
+    click('Continue')
+    await screen.findByLabelText('Your name')
+    type('Your name', 'Steward A'); type('Git email', 'a@alder.example'); click('Continue')
+    const next = await screen.findByRole('button', { name: 'See what it adds' })
+    expect(screen.queryByRole('button', { name: 'Create it' })).toBeNull()
+    fireEvent.click(next)
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    expect(run.mock.calls[0]![0]).toMatchObject({ name: 'Alder Commons', folder: '/home/me/plain' })
   })
 
   it('without run, opens at the intro as before', async () => {

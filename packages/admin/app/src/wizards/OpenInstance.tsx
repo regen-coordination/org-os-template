@@ -19,18 +19,21 @@ const CHOOSE = 'Choose one.'
  *  Inside an instance (no `run`) it shows that command at the review, with the config it takes: it runs nothing and
  *  writes nothing but its draft, which sits outside any repository. In the launcher (`run` given; no instance behind it)
  *  there is no intro, start step or draft: it opens at the questions, the review's action is "Create it", which calls
- *  `run`, and Close (or Back from the first question) calls `onClose`. */
-export default function OpenInstance({ def: given, run, base: folderBase, onClose }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string; onClose?: () => void }) {
+ *  `run`, and Close (or Back from the first question) calls `onClose`. With `fixedFolder` (adopting a repo) the folder is
+ *  that repo: the answer is preset, its field is not drawn, and the review's action asks to see what would be added. */
+export default function OpenInstance({ def: given, run, base: folderBase, onClose, fixedFolder }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string; onClose?: () => void; fixedFolder?: string }) {
   // With `run` (the launcher: no instance behind it) the start step is skipped, no draft is read or kept, and the review
   // creates the instance instead of showing the command.
-  const def = run ? { ...given, steps: given.steps.filter(s => s.id !== 'start') } : given
+  const steps = run ? given.steps.filter(s => s.id !== 'start') : given.steps
+  const def = fixedFolder === undefined ? (run ? { ...given, steps } : given)
+    : { ...given, steps: steps.map(s => (s.fields ? { ...s, ...(s.id === 'org' ? { ask: 'What it is called and what kind it is.' } : {}), fields: s.fields.filter(f => f.id !== 'folder') } : s)) }
   const draft = useQuery({ queryKey: ['draft', def.id], queryFn: () => api.wizardDraft(def.id), retry: false, refetchOnWindowFocus: false, enabled: !run })
   const actor = useQuery({ queryKey: ['actor'], queryFn: api.actor, staleTime: 60_000, retry: false, enabled: !run })
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT', ...(run ? { start: 'open' } : {}) })
-  const [folderTouched, setFolderTouched] = useState(false)
+  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT', ...(run ? { start: 'open' } : {}), ...(fixedFolder !== undefined ? { folder: fixedFolder } : {}) })
+  const [folderTouched, setFolderTouched] = useState(fixedFolder !== undefined)
   const [copied, setCopied] = useState(false)
   const canWrite = useCanWrite()
 
@@ -81,8 +84,9 @@ export default function OpenInstance({ def: given, run, base: folderBase, onClos
     api.saveWizardDraft(def.id, body).catch(() => { /* a draft is a convenience */ })
   }, [m.state, index, answers, def.id, canWrite, run])
 
-  // In the launcher the intro is skipped: the run starts at the first question.
-  useEffect(() => { if (run) m.send('START') }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // In the launcher the intro is skipped: the run starts at the first question. Once: StrictMode runs this effect twice in dev.
+  const started = useRef(false)
+  useEffect(() => { if (run && !started.current) { started.current = true; m.send('START') } }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const view = m.state as WizardView
   const base = { title: def.title, steps: def.steps.map(s => s.title), view, index, status: m.shows.text,
@@ -125,14 +129,16 @@ export default function OpenInstance({ def: given, run, base: folderBase, onClos
           if (r && 'error' in r) setRunError(r.error)
         } catch (err) { setRunError(err instanceof Error ? err.message : String(err)) } finally { setRunning(false) }
       }
+      const adopting = fixedFolder !== undefined
       return (
-        <WizardFrame {...base} status={running ? 'Creating it…' : 'Review. Nothing is made until you choose Create it.'} refusal={runError} heading={def.review.title} ask={def.review.ask} writes="A new folder with the instance in it, and its first git commit."
-          actions={{ ...(close ? { cancel: { ...close, disabled: running } } : {}), back: { label: 'Back', onClick: () => m.send('BACK'), disabled: running }, next: { label: 'Create it', onClick: () => void create(), disabled: running } }}>
-          <p className="wiz-label">Folder</p>
+        <WizardFrame {...base} status={running ? (adopting ? 'Making the files…' : 'Creating it…') : adopting ? 'Review. Nothing is written to your repo yet.' : 'Review. Nothing is made until you choose Create it.'} refusal={runError} heading={def.review.title} ask={def.review.ask}
+          writes={adopting ? 'Nothing in your repo yet. The files are made in a scratch folder first, so you can see what would be added.' : 'A new folder with the instance in it, and its first git commit.'}
+          actions={{ ...(close ? { cancel: { ...close, disabled: running } } : {}), back: { label: 'Back', onClick: () => m.send('BACK'), disabled: running }, next: { label: adopting ? 'See what it adds' : 'Create it', onClick: () => void create(), disabled: running } }}>
+          <p className="wiz-label">{adopting ? 'Repo' : 'Folder'}</p>
           <pre className="wiz-log">{answers.folder}</pre>
           <p className="wiz-label">Config</p>
           <pre className="wiz-log">{cloneConfigText(answers)}</pre>
-          <p className="wiz-note">The framework makes the folder and refuses one that already holds files. It never deletes.</p>
+          {!adopting && <p className="wiz-note">The framework makes the folder and refuses one that already holds files. It never deletes.</p>}
         </WizardFrame>
       )
     }

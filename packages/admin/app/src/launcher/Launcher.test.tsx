@@ -8,7 +8,7 @@ import * as api from './api.ts'
 
 vi.mock('./api.ts', async orig => ({
   ...(await orig<typeof import('./api.ts')>()),
-  launcherState: vi.fn(), launcherWizard: vi.fn(), createInstance: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn(), cloneInstance: vi.fn(),
+  launcherState: vi.fn(), launcherWizard: vi.fn(), createInstance: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn(), cloneInstance: vi.fn(), adoptPlan: vi.fn(), adoptApply: vi.fn(),
 }))
 const m = vi.mocked(api)
 
@@ -187,5 +187,33 @@ describe('the Create door', () => {
     await screen.findByRole('heading', { level: 2, name: 'About the organization' })
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(await screen.findByRole('button', { name: 'Create a new one' })).toBeTruthy()
+  })
+})
+
+describe('the Adopt door', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    m.launcherState.mockResolvedValue(state() as never)
+  })
+
+  it('opens from its own button with a folder field', async () => {
+    renderAt(<Launcher />, '/launch')
+    await screen.findByText('Alder Commons')
+    const door = screen.getByRole('button', { name: 'Adopt a repo' }) as HTMLButtonElement
+    expect(door.disabled).toBe(false)
+    fireEvent.click(door)
+    expect((await screen.findByLabelText("The repo's folder") as HTMLInputElement).value).toBe('')
+  })
+
+  it('Adopt it hands the path over and moves focus to the Adopt card', async () => {
+    m.openInstance.mockRejectedValue(Object.assign(new Error('/x/plain is not an org-os instance yet.'), { adoptable: true, path: '/x/plain' }))
+    renderAt(<Launcher />, '/launch')
+    fireEvent.change(await screen.findByLabelText("The folder it's in"), { target: { value: '/x/plain' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Adopt it' }))
+    const field = await screen.findByLabelText("The repo's folder") as HTMLInputElement
+    expect(field.value).toBe('/x/plain')
+    const card = screen.getByRole('region', { name: 'Adopt a repo' })
+    await waitFor(() => expect(card.contains(document.activeElement)).toBe(true))
   })
 })

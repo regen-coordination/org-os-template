@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from '../design/Button.tsx'
 import { Note } from '../design/Note.tsx'
 import { applySkin, chosenSkin } from '../skin.ts'
 import { applyTheme, storedTheme } from '../theme.ts'
 import OpenInstance from '../wizards/OpenInstance.tsx'
+import Adopt from './Adopt.tsx'
 import type { WizardDef } from '../api.ts'
 import { cloneInstance, createInstance, launcherWizard, defaultCloneFolder, forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
 
@@ -11,7 +12,7 @@ type Refusal = { message: string; adoptable: boolean; path?: string }
 
 /** The launcher at /launch, drawn alone outside the Hub's frame: it has no instance behind it, so none of the
  *  instance's APIs are called. The recent instances, then the four ways in. Create runs the open-instance wizard
- *  with the framework's command actually run; Adopt is wired by a later task and cannot be used yet. */
+ *  with the framework's command actually run; Adopt adds the missing org-os files to a repo on the branch org-os/adopt. */
 export default function Launcher() {
   const [state, setState] = useState<LauncherState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -25,6 +26,11 @@ export default function Launcher() {
   const [createLog, setCreateLog] = useState<string | null>(null)
   const [creating, setCreating] = useState<WizardDef | null>(null)
   const [adoptFolder, setAdoptFolder] = useState('')
+  const [adopting, setAdopting] = useState(false)
+  const adoptCard = useRef<HTMLElement>(null)
+  const [adoptFocus, setAdoptFocus] = useState(0)
+  // "Adopt it" hands a path over: keyboard focus follows it to the Adopt card.
+  useEffect(() => { if (adoptFocus > 0) adoptCard.current?.focus() }, [adoptFocus])
 
   useEffect(() => { applyTheme(storedTheme()); applySkin(chosenSkin()); document.title = 'Instances' }, [])
   useEffect(() => {
@@ -134,7 +140,7 @@ export default function Launcher() {
             </div>
           </form>
           {refusal && (
-            <Note state="error" action={refusal.adoptable ? <Button small onClick={() => { setAdoptFolder(refusal.path ?? folder.trim()); setRefusal(null) }}>Adopt it</Button> : undefined}>
+            <Note state="error" action={refusal.adoptable ? <Button small onClick={() => { setAdoptFolder(refusal.path ?? folder.trim()); setAdopting(true); setRefusal(null); setAdoptFocus(n => n + 1) }}>Adopt it</Button> : undefined}>
               {refusal.adoptable ? "This folder isn't an org-os instance yet." : refusal.message}
             </Note>
           )}
@@ -150,10 +156,11 @@ export default function Launcher() {
             : <div className="wiz-acts"><Button onClick={() => void startCreate()}>Create a new one</Button></div>}
         </section>
 
-        <section className="wiz-writes" aria-labelledby="door-adopt">
+        <section className="wiz-writes" aria-labelledby="door-adopt" ref={adoptCard} tabIndex={-1}>
           <h2 className="wiz-h" id="door-adopt" style={{ fontSize: 'inherit' }}>Adopt a repo</h2>
-          {adoptFolder !== '' && <p className="wiz-cmd">{adoptFolder}</p>}
-          <div className="wiz-acts"><Button disabled={true}>Adopt a repo</Button></div>
+          {adopting
+            ? <Adopt key={adoptFolder} base={state?.base} initialFolder={adoptFolder} onClose={() => { setAdopting(false); setAdoptFolder('') }} />
+            : <div className="wiz-acts"><Button onClick={() => setAdopting(true)}>Adopt a repo</Button></div>}
         </section>
 
         <section className="wiz-writes" aria-labelledby="door-join">
