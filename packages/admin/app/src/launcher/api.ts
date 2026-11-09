@@ -11,6 +11,7 @@ export type LauncherState = { base: string; recent: RecentEntry[]; doors: Door[]
 export class LauncherError extends Error {
   adoptable?: boolean
   path?: string
+  log?: string
 }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -21,6 +22,7 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok) {
     const err = new LauncherError(typeof json.error === 'string' ? json.error : `The launcher answered ${res.status}.`)
+    if (typeof json.log === 'string') err.log = json.log
     if (json.adoptable === true) { err.adoptable = true; err.path = typeof json.path === 'string' ? json.path : undefined }
     throw err
   }

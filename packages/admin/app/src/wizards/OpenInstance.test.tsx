@@ -170,7 +170,6 @@ describe('W1, first screens: open an organization', () => {
 describe('W1 with a run: the launcher creates it', () => {
   async function toReview(run: (a: unknown) => Promise<{ error: string } | void>) {
     renderAt(<OpenInstance def={def} run={run as never} base="/w" />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Start' }))
     await screen.findByRole('heading', { level: 2, name: 'About the organization' }) // the start step is skipped
     fillOrg()
     type('Name', 'Alder Commons')
@@ -206,5 +205,22 @@ describe('W1 with a run: the launcher creates it', () => {
     await screen.findByLabelText('Your name'); type('Your name', 'Steward A'); click('Continue')
     expect(await screen.findByRole('button', { name: 'Copy the command' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Create it' })).toBeNull()
+  })
+
+  it('opens at the questions with no intro, and Close calls onClose', async () => {
+    fetchRoutes(routes())
+    const onClose = vi.fn()
+    renderAt(<OpenInstance def={def} run={(async () => {}) as never} onClose={onClose} />)
+    expect(await screen.findByRole('heading', { level: 2, name: 'About the organization' })).toBeTruthy()
+    expect(screen.queryByText(/kept as a draft/)).toBeNull()
+    click('Close')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('without run, opens at the intro as before', async () => {
+    fetchRoutes(routes())
+    renderAt(<OpenInstance def={def} />)
+    expect(await screen.findByRole('heading', { level: 2, name: 'Open an organization' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy()
   })
 })

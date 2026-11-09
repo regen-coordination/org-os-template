@@ -22,6 +22,7 @@ export default function Launcher() {
   const [gitUrl, setGitUrl] = useState('')
   const [cloneFolder, setCloneFolder] = useState('')
   const [cloneEdited, setCloneEdited] = useState(false)
+  const [createLog, setCreateLog] = useState<string | null>(null)
   const [creating, setCreating] = useState<WizardDef | null>(null)
   const [adoptFolder, setAdoptFolder] = useState('')
 
@@ -67,11 +68,13 @@ export default function Launcher() {
   }
 
   const runCreate = async (answers: Parameters<typeof createInstance>[0]): Promise<{ error: string } | void> => {
+    setCreateLog(null)
     try {
       const { url } = await createInstance(answers)
       window.location.assign(url)
     } catch (err) {
       const x = err as Error & { log?: string }
+      setCreateLog(x.log ?? null)
       return { error: x.message }
     }
   }
@@ -140,7 +143,10 @@ export default function Launcher() {
         <section className="wiz-writes" aria-labelledby="door-create">
           <h2 className="wiz-h" id="door-create" style={{ fontSize: 'inherit' }}>Create a new one</h2>
           {creating
-            ? <OpenInstance def={creating} run={runCreate} base={state?.base} />
+            ? <>
+                <OpenInstance def={creating} run={runCreate} base={state?.base} onClose={() => { setCreating(null); setCreateLog(null) }} />
+                {createLog && <pre className="wiz-log" aria-label="What the command printed">{createLog}</pre>}
+              </>
             : <div className="wiz-acts"><Button onClick={() => void startCreate()}>Create a new one</Button></div>}
         </section>
 

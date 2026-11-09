@@ -140,6 +140,52 @@ describe('the Create door', () => {
     renderAt(<Launcher />, '/launch')
     await screen.findByText('Alder Commons')
     fireEvent.click(screen.getByRole('button', { name: 'Create a new one' }))
-    expect(await screen.findByRole('button', { name: 'Start' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 2, name: 'About the organization' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Start' })).toBeNull()
+  })
+
+  async function toReview() {
+    const { parse } = await import('yaml')
+    const source = (await import('../../../wizards/open-instance.yaml?raw')).default
+    m.launcherWizard.mockResolvedValue(parse(source) as never)
+    renderAt(<Launcher />, '/launch')
+    await screen.findByText('Alder Commons')
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new one' }))
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Alder Commons' } })
+    fireEvent.click(screen.getByRole('radio', { name: /Local node/ }))
+    fireEvent.change(screen.getByLabelText('One line'), { target: { value: 'Seed keepers.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByLabelText('Your name')
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Steward A' } })
+    fireEvent.change(screen.getByLabelText('Git email'), { target: { value: 'a@alder.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Create it' }))
+  }
+
+  it('goes to the URL when the create works', async () => {
+    m.createInstance.mockResolvedValue({ url: 'http://127.0.0.1:4682/' } as never)
+    await toReview()
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('http://127.0.0.1:4682/'))
+  })
+
+  it('shows the command log when the create fails', async () => {
+    m.createInstance.mockRejectedValue(Object.assign(new Error('The framework could not create the instance.'), { log: 'git: no identity\nboom' }))
+    await toReview()
+    expect(await screen.findByText('The framework could not create the instance.')).toBeTruthy()
+    expect(screen.getByLabelText('What the command printed').textContent).toBe('git: no identity\nboom')
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it('closes back to the four doors', async () => {
+    const { parse } = await import('yaml')
+    const source = (await import('../../../wizards/open-instance.yaml?raw')).default
+    m.launcherWizard.mockResolvedValue(parse(source) as never)
+    renderAt(<Launcher />, '/launch')
+    await screen.findByText('Alder Commons')
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new one' }))
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(await screen.findByRole('button', { name: 'Create a new one' })).toBeTruthy()
   })
 })

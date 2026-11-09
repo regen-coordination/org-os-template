@@ -15,11 +15,12 @@ type Draft = Answers & { start?: string }
 const CONFIG_FILE = 'draft.yaml'
 const CHOOSE = 'Choose one.'
 
-/** W1's first screens (wizards spec §5.4). It collects what the framework's own `clone:framework` reads
- *  and shows that command at the review, with the config it takes. It runs nothing and writes nothing but
- *  its draft, which sits outside any repository: creating a folder is a write path this app does not have
- *  yet, so the wizard stops at the review and says so. */
-export default function OpenInstance({ def: given, run, base: folderBase }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string }) {
+/** W1's first screens (wizards spec §5.4). It collects what the framework's own `clone:framework` reads, in two modes.
+ *  Inside an instance (no `run`) it shows that command at the review, with the config it takes: it runs nothing and
+ *  writes nothing but its draft, which sits outside any repository. In the launcher (`run` given; no instance behind it)
+ *  there is no intro, start step or draft: it opens at the questions, the review's action is "Create it", which calls
+ *  `run`, and Close (or Back from the first question) calls `onClose`. */
+export default function OpenInstance({ def: given, run, base: folderBase, onClose }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string; onClose?: () => void }) {
   // With `run` (the launcher: no instance behind it) the start step is skipped, no draft is read or kept, and the review
   // creates the instance instead of showing the command.
   const def = run ? { ...given, steps: given.steps.filter(s => s.id !== 'start') } : given
@@ -80,6 +81,9 @@ export default function OpenInstance({ def: given, run, base: folderBase }: { de
     api.saveWizardDraft(def.id, body).catch(() => { /* a draft is a convenience */ })
   }, [m.state, index, answers, def.id, canWrite, run])
 
+  // In the launcher the intro is skipped: the run starts at the first question.
+  useEffect(() => { if (run) m.send('START') }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const view = m.state as WizardView
   const base = { title: def.title, steps: def.steps.map(s => s.title), view, index, status: m.shows.text,
     refusal: view === 'step' && invalid === null ? null : m.refusal }
@@ -89,6 +93,8 @@ export default function OpenInstance({ def: given, run, base: folderBase }: { de
   // control (C6, C-23), and keeping a draft is a write to the server: neither the control nor the write is made (the
   // effect above stops at `canWrite`). Start, Continue, Back and Copy write nothing.
   const leave = { label: 'Save and leave', onClick: () => m.send('CANCEL') }
+  const close = onClose ? { label: 'Close', onClick: onClose } : undefined
+  if (run && view === 'intro') return null
 
   if (view === 'intro') {
     return (
@@ -104,7 +110,7 @@ export default function OpenInstance({ def: given, run, base: folderBase }: { de
   if (view === 'step') {
     return (
       <WizardFrame {...base} heading={step.title} ask={step.ask} writes={step.writes}
-        actions={{ ...(canWrite ? { cancel: leave } : {}), back: { label: 'Back', onClick: () => m.send('BACK') }, next: { label: 'Continue', onClick: () => m.send('NEXT') } }}>
+        actions={{ ...(close ? { cancel: close } : canWrite ? { cancel: leave } : {}), back: { label: 'Back', onClick: () => (close && index === 0 ? close.onClick() : m.send('BACK')) }, next: { label: 'Continue', onClick: () => m.send('NEXT') } }}>
         <StepBody step={step} values={answers as Record<string, string | undefined>} onChange={set} />
       </WizardFrame>
     )
@@ -121,7 +127,7 @@ export default function OpenInstance({ def: given, run, base: folderBase }: { de
       }
       return (
         <WizardFrame {...base} status={running ? 'Creating it…' : 'Review. Nothing is made until you choose Create it.'} refusal={runError} heading={def.review.title} ask={def.review.ask} writes="A new folder with the instance in it, and its first git commit."
-          actions={{ back: { label: 'Back', onClick: () => m.send('BACK'), disabled: running }, next: { label: 'Create it', onClick: () => void create(), disabled: running } }}>
+          actions={{ ...(close ? { cancel: { ...close, disabled: running } } : {}), back: { label: 'Back', onClick: () => m.send('BACK'), disabled: running }, next: { label: 'Create it', onClick: () => void create(), disabled: running } }}>
           <p className="wiz-label">Folder</p>
           <pre className="wiz-log">{answers.folder}</pre>
           <p className="wiz-label">Config</p>
