@@ -166,3 +166,45 @@ describe('W1, first screens: open an organization', () => {
     expect(within(stop.closest('.wiz-body')!).getByText(/how it decides|starting set/i)).toBeTruthy()
   })
 })
+
+describe('W1 with a run: the launcher creates it', () => {
+  async function toReview(run: (a: unknown) => Promise<{ error: string } | void>) {
+    renderAt(<OpenInstance def={def} run={run as never} base="/w" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }))
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' }) // the start step is skipped
+    fillOrg()
+    type('Name', 'Alder Commons')
+    expect((screen.getByLabelText('Folder to create') as HTMLInputElement).value).toBe('/w/alder-commons')
+    click('Continue')
+    await screen.findByLabelText('Your name')
+    type('Your name', 'Steward A'); type('Git email', 'a@alder.example'); click('Continue')
+    await screen.findByRole('button', { name: 'Create it' })
+  }
+
+  it('shows Create it, calls run with the answers, and writes no draft', async () => {
+    const { calls } = fetchRoutes(routes())
+    const run = vi.fn(async (_a: unknown) => {})
+    await toReview(run)
+    expect(screen.queryByRole('button', { name: 'Copy the command' })).toBeNull()
+    click('Create it')
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    expect(run.mock.calls[0]![0]).toMatchObject({ name: 'Alder Commons', type: 'LocalNode', folder: '/w/alder-commons', operatorName: 'Steward A', email: 'a@alder.example' })
+    expect(calls.filter(c => c.path.includes('/draft') || c.path === '/api/actor')).toEqual([])
+  })
+
+  it('shows what run returns as an error', async () => {
+    fetchRoutes(routes())
+    await toReview(vi.fn(async () => ({ error: 'That folder already holds files.' })))
+    click('Create it')
+    expect(await screen.findByText('That folder already holds files.')).toBeTruthy()
+  })
+
+  it('without run, still shows Copy the command', async () => {
+    fetchRoutes(routes())
+    renderAt(<OpenInstance def={def} />)
+    await toOrg(); fillOrg(); click('Continue')
+    await screen.findByLabelText('Your name'); type('Your name', 'Steward A'); click('Continue')
+    expect(await screen.findByRole('button', { name: 'Copy the command' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Create it' })).toBeNull()
+  })
+})

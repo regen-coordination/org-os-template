@@ -8,7 +8,7 @@ import * as api from './api.ts'
 
 vi.mock('./api.ts', async orig => ({
   ...(await orig<typeof import('./api.ts')>()),
-  launcherState: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn(), cloneInstance: vi.fn(),
+  launcherState: vi.fn(), launcherWizard: vi.fn(), createInstance: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn(), cloneInstance: vi.fn(),
 }))
 const m = vi.mocked(api)
 
@@ -120,5 +120,26 @@ describe('the launcher page', () => {
     spy.mockRestore()
     expect(urls).toContain('/api/launcher/state')
     expect(urls.filter(u => !u.includes('/api/launcher/'))).toEqual([])
+  })
+})
+
+describe('the Create door', () => {
+  const assign = vi.fn()
+  const real = window.location
+  beforeEach(() => {
+    vi.clearAllMocks()
+    m.launcherState.mockResolvedValue(state() as never)
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...real, assign } })
+  })
+  afterEach(() => { Object.defineProperty(window, 'location', { configurable: true, value: real }) })
+
+  it('opens the wizard and shows the review with Create it', async () => {
+    const { parse } = await import('yaml')
+    const source = (await import('../../../wizards/open-instance.yaml?raw')).default
+    m.launcherWizard.mockResolvedValue(parse(source) as never)
+    renderAt(<Launcher />, '/launch')
+    await screen.findByText('Alder Commons')
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new one' }))
+    expect(await screen.findByRole('button', { name: 'Start' })).toBeTruthy()
   })
 })

@@ -12,6 +12,9 @@ import { readFederation } from '../lib/federation/read.mjs'
 import { forget, readRecent, remember } from './home.ts'
 import { isInstance, resolveFolder, writableFolderProblem } from './folders.ts'
 import { gitUrlProblem, launcherGit } from './git-write.ts'
+import { scaffold } from './scaffold.ts'
+import { loadWizards } from '../lib/wizards.mjs'
+import { orgProblem, youProblem, type Answers } from '../lib/open-instance.mjs'
 import { defaultAssess, defaultStartAdmin } from './children.ts'
 
 import { readableHost } from '../server/serve.ts'
@@ -185,6 +188,30 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     const path = realpathSync(abs)
     if (!isInstance(path)) return c.json({ error: `${path} is not an org-os instance yet.`, adoptable: true, path }, 409)
     try { return c.json(await openFlow(path)) } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
+    }
+  })
+
+  app.get('/api/launcher/wizard', c => {
+    const def = loadWizards().wizards.find(w => w.id === 'open-instance')
+    return def ? c.json(def) : c.json({ error: 'The open-instance wizard is missing.' }, 500)
+  })
+
+  app.post('/api/launcher/create', async c => {
+    let answers: Record<string, unknown> = {}
+    try { const b = await c.req.json() as { answers?: unknown }; if (b?.answers && typeof b.answers === 'object') answers = b.answers as Record<string, unknown> } catch { /* answered below */ }
+    const bad = orgProblem(answers as Answers) ?? youProblem(answers as Answers)
+    if (bad) return c.json({ error: bad }, 400)
+    const abs = resolveFolder(String(answers.folder), base())
+    const problem = writableFolderProblem(abs)
+    if (problem) return c.json({ error: problem }, 409)
+    // clone:framework makes the folder itself and refuses one that holds files; nothing is removed here if it fails.
+    let result
+    try { result = await scaffold(answers as Answers, abs, { git: true }, opts.frameworkDir) } catch (err) {
+      result = { code: 1, log: err instanceof Error ? err.message : String(err) }
+    }
+    if (result.code !== 0) return c.json({ error: 'The framework could not create the instance. Whatever it made is left in the folder.', log: result.log }, 500)
+    try { return c.json(await openFlow(realpathSync(abs))) } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
     }
   })

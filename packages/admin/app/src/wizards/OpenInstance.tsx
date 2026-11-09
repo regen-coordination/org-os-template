@@ -19,11 +19,16 @@ const CHOOSE = 'Choose one.'
  *  and shows that command at the review, with the config it takes. It runs nothing and writes nothing but
  *  its draft, which sits outside any repository: creating a folder is a write path this app does not have
  *  yet, so the wizard stops at the review and says so. */
-export default function OpenInstance({ def }: { def: WizardDef }) {
-  const draft = useQuery({ queryKey: ['draft', def.id], queryFn: () => api.wizardDraft(def.id), retry: false, refetchOnWindowFocus: false })
-  const actor = useQuery({ queryKey: ['actor'], queryFn: api.actor, staleTime: 60_000, retry: false })
+export default function OpenInstance({ def: given, run, base: folderBase }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string }) {
+  // With `run` (the launcher: no instance behind it) the start step is skipped, no draft is read or kept, and the review
+  // creates the instance instead of showing the command.
+  const def = run ? { ...given, steps: given.steps.filter(s => s.id !== 'start') } : given
+  const draft = useQuery({ queryKey: ['draft', def.id], queryFn: () => api.wizardDraft(def.id), retry: false, refetchOnWindowFocus: false, enabled: !run })
+  const actor = useQuery({ queryKey: ['actor'], queryFn: api.actor, staleTime: 60_000, retry: false, enabled: !run })
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT' })
+  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT', ...(run ? { start: 'open' } : {}) })
   const [folderTouched, setFolderTouched] = useState(false)
   const [copied, setCopied] = useState(false)
   const canWrite = useCanWrite()
@@ -36,7 +41,7 @@ export default function OpenInstance({ def }: { def: WizardDef }) {
     if (id === 'folder') setFolderTouched(true)
     setAnswers(a => {
       const next = { ...a, [id]: value }
-      if (id === 'name' && !folderTouched) next.folder = defaultFolder(value)
+      if (id === 'name' && !folderTouched) next.folder = defaultFolder(value, run ? folderBase : undefined)
       return next
     })
   }
@@ -66,20 +71,20 @@ export default function OpenInstance({ def }: { def: WizardDef }) {
   // (C6, C-23), so a preview leaves no draft behind as the person types.
   const kept = useRef('')
   useEffect(() => {
-    if (!canWrite) return
+    if (!canWrite || run) return
     if (m.state !== 'step' && m.state !== 'review') return
     const body = { index, answers }
     const text = JSON.stringify(body)
     if (text === kept.current) return
     kept.current = text
     api.saveWizardDraft(def.id, body).catch(() => { /* a draft is a convenience */ })
-  }, [m.state, index, answers, def.id, canWrite])
+  }, [m.state, index, answers, def.id, canWrite, run])
 
   const view = m.state as WizardView
   const base = { title: def.title, steps: def.steps.map(s => s.title), view, index, status: m.shows.text,
     refusal: view === 'step' && invalid === null ? null : m.refusal }
 
-  if (draft.isPending) return <Skeleton rows={4} shape="row-1" label={def.title} />
+  if (draft.isPending && !run) return <Skeleton rows={4} shape="row-1" label={def.title} />
   // Save and leave: the answers are kept as a draft (the machine's closed state says so). Previewing draws no write
   // control (C6, C-23), and keeping a draft is a write to the server: neither the control nor the write is made (the
   // effect above stops at `canWrite`). Start, Continue, Back and Copy write nothing.
@@ -106,6 +111,25 @@ export default function OpenInstance({ def }: { def: WizardDef }) {
   }
 
   if (view === 'review') {
+    if (run) {
+      const create = async () => {
+        setRunning(true); setRunError(null)
+        try {
+          const r = await run(answers)
+          if (r && 'error' in r) setRunError(r.error)
+        } catch (err) { setRunError(err instanceof Error ? err.message : String(err)) } finally { setRunning(false) }
+      }
+      return (
+        <WizardFrame {...base} status={running ? 'Creating it…' : 'Review. Nothing is made until you choose Create it.'} refusal={runError} heading={def.review.title} ask={def.review.ask} writes="A new folder with the instance in it, and its first git commit."
+          actions={{ back: { label: 'Back', onClick: () => m.send('BACK'), disabled: running }, next: { label: 'Create it', onClick: () => void create(), disabled: running } }}>
+          <p className="wiz-label">Folder</p>
+          <pre className="wiz-log">{answers.folder}</pre>
+          <p className="wiz-label">Config</p>
+          <pre className="wiz-log">{cloneConfigText(answers)}</pre>
+          <p className="wiz-note">The framework makes the folder and refuses one that already holds files. It never deletes.</p>
+        </WizardFrame>
+      )
+    }
     const command = cloneCommand(answers, CONFIG_FILE)
     const copy = () => {
       void Promise.resolve(navigator.clipboard?.writeText(command)).then(() => setCopied(true), () => setCopied(false))

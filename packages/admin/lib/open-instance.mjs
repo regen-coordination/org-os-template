@@ -3,7 +3,8 @@
 // W1's first screens (wizards spec §5.4, "Open an instance"). What a person answers becomes the config
 // file the framework's own `clone:framework` takes, and the command to run with it. Nothing here runs
 // anything: the platform has no way to create a folder yet (that is a new write path, spec §5.2), so
-// the wizard shows the command and stops at the review.
+// the wizard inside an instance shows the command and stops at the review. The launcher (no instance behind it)
+// runs it, through launcher/scaffold.ts.
 //
 // The config is only what the command reads: `org` (name, type, short_description, license, language)
 // and `operator` (name, email). tests/lib/open-instance.test.ts asks the command itself, with --dry,
@@ -28,11 +29,12 @@ export const LANGUAGES = Object.freeze([{ value: 'en', label: 'English' }, { val
 
 const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v.trim() : '')
 
-/** The folder suggested from a name, beside where the person works: ../alder-commons.
- *  @param {string} name */
-export function defaultFolder(name) {
+/** The folder suggested from a name, beside where the person works: ../alder-commons; inside `base` when there is one.
+ *  @param {string} name @param {string} [base] */
+export function defaultFolder(name, base) {
   const slug = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return `../${slug || 'new-organization'}`
+  const leaf = slug || 'new-organization'
+  return base ? `${base.replace(/\/+$/, '')}/${leaf}` : `../${leaf}`
 }
 
 /** Why the organization step cannot be left yet, in a sentence; null when it can.

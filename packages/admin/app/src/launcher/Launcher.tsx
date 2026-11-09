@@ -3,13 +3,15 @@ import { Button } from '../design/Button.tsx'
 import { Note } from '../design/Note.tsx'
 import { applySkin, chosenSkin } from '../skin.ts'
 import { applyTheme, storedTheme } from '../theme.ts'
-import { cloneInstance, defaultCloneFolder, forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
+import OpenInstance from '../wizards/OpenInstance.tsx'
+import type { WizardDef } from '../api.ts'
+import { cloneInstance, createInstance, launcherWizard, defaultCloneFolder, forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
 
 type Refusal = { message: string; adoptable: boolean; path?: string }
 
 /** The launcher at /launch, drawn alone outside the Hub's frame: it has no instance behind it, so none of the
- *  instance's APIs are called. The recent instances, then the four ways in. Create and Adopt are wired by later
- *  tasks; until then they are drawn and cannot be used. */
+ *  instance's APIs are called. The recent instances, then the four ways in. Create runs the open-instance wizard
+ *  with the framework's command actually run; Adopt is wired by a later task and cannot be used yet. */
 export default function Launcher() {
   const [state, setState] = useState<LauncherState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -20,6 +22,7 @@ export default function Launcher() {
   const [gitUrl, setGitUrl] = useState('')
   const [cloneFolder, setCloneFolder] = useState('')
   const [cloneEdited, setCloneEdited] = useState(false)
+  const [creating, setCreating] = useState<WizardDef | null>(null)
   const [adoptFolder, setAdoptFolder] = useState('')
 
   useEffect(() => { applyTheme(storedTheme()); applySkin(chosenSkin()); document.title = 'Instances' }, [])
@@ -56,6 +59,21 @@ export default function Launcher() {
       const x = err as Error & { adoptable?: boolean; path?: string }
       setRefusal({ message: x.message, adoptable: x.adoptable === true, path: x.path })
     } finally { setBusy(false) }
+  }
+
+  const startCreate = async () => {
+    setRefusal(null)
+    try { setCreating(await launcherWizard()) } catch (err) { setRefusal({ message: (err as Error).message, adoptable: false }) }
+  }
+
+  const runCreate = async (answers: Parameters<typeof createInstance>[0]): Promise<{ error: string } | void> => {
+    try {
+      const { url } = await createInstance(answers)
+      window.location.assign(url)
+    } catch (err) {
+      const x = err as Error & { log?: string }
+      return { error: x.message }
+    }
   }
 
   const forget = async (path: string) => {
@@ -121,7 +139,9 @@ export default function Launcher() {
 
         <section className="wiz-writes" aria-labelledby="door-create">
           <h2 className="wiz-h" id="door-create" style={{ fontSize: 'inherit' }}>Create a new one</h2>
-          <div className="wiz-acts"><Button disabled={true}>Create a new one</Button></div>
+          {creating
+            ? <OpenInstance def={creating} run={runCreate} base={state?.base} />
+            : <div className="wiz-acts"><Button onClick={() => void startCreate()}>Create a new one</Button></div>}
         </section>
 
         <section className="wiz-writes" aria-labelledby="door-adopt">
