@@ -18,7 +18,13 @@ export function gitUrlProblem(url: string): string | null {
     if (authority.includes('@')) return 'Paste the address without a token or password in it, such as https://github.com/owner/name.'
     return null
   }
-  if (url.startsWith('ssh://')) return url.length > 'ssh://'.length ? null : 'Paste the full ssh address, such as ssh://git@github.com/owner/name.'
+  if (url.startsWith('ssh://')) {
+    const authority = url.slice('ssh://'.length).split('/')[0] ?? ''
+    if (!authority) return 'Paste the full ssh address, such as ssh://git@github.com/owner/name.'
+    const userinfo = authority.includes('@') ? authority.slice(0, authority.lastIndexOf('@')) : ''
+    if (userinfo.includes(':')) return 'Paste the address without a token or password in it, such as ssh://git@github.com/owner/name.'
+    return null
+  }
   if (url.startsWith('file:///')) return null
   if (/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^-]/.test(url)) return null
   return 'Paste an https:// address, such as https://github.com/owner/name.'

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { REAL_REPO } from '../fixtures.ts'
 import { startLauncher, type DoctorSummary } from '../../launcher/serve.ts'
 import { defaultCloneFolder } from '../../launcher/folders.ts'
+import { cloneName } from '../../lib/clone-name.mjs'
 import * as gitWrite from '../../launcher/git-write.ts'
 
 vi.mock('../../launcher/git-write.ts', async orig => {
@@ -92,7 +93,7 @@ describe('opening from a git address', () => {
   })
 
   it('refuses ext:: and option addresses before git runs', async () => {
-    for (const bad of ['ext::sh -c touch% /tmp/x', 'ext::sh', '--upload-pack=x', 'https://user:tok@github.com/o/n']) {
+    for (const bad of ['ext::sh -c touch% /tmp/x', 'ext::sh', 'fd::3', '--upload-pack=x', 'https://user:tok@github.com/o/n']) {
       expect((await clone(bad, join(root, 'into', 'x'))).status).toBe(400)
     }
     expect(gitWrite.launcherGit).not.toHaveBeenCalled()
@@ -113,10 +114,41 @@ describe('opening from a git address', () => {
     expect(readdirSync(target)).toEqual([])
   })
 
+  it('a failed clone does not delete a folder that appeared meanwhile', async () => {
+    const target = join(root, 'into', 'raced')
+    const real = (await vi.importActual<typeof import('../../launcher/git-write.ts')>('../../launcher/git-write.ts')).launcherGit
+    vi.mocked(gitWrite.launcherGit).mockImplementationOnce(async (cwd, verb, args) => {
+      writeFileSync(join(target, 'theirs.md'), 'keep')
+      return real(cwd, verb, args)
+    })
+    const r = await clone(`file://${join(root, 'missing.git')}`, target)
+    expect(r.status).toBe(502)
+    expect(readdirSync(target)).toEqual(['theirs.md'])
+  })
+
+  it('the launcher removes what it made when git itself throws', async () => {
+    const target = join(root, 'into', 'deep', 'er', 'x')
+    vi.mocked(gitWrite.launcherGit).mockImplementationOnce(async () => { throw new Error('no git here') })
+    const r = await clone('https://github.com/o/n', target)
+    expect(r.status).toBe(502)
+    expect(existsSync(join(root, 'into', 'deep'))).toBe(false)
+    expect(existsSync(join(root, 'into'))).toBe(true)
+  })
+
   it('openFlow refuses a folder that is not an instance', async () => {
     const plain = join(root, 'into', 'plain2'); mkdirSync(plain)
     await expect(launcher.openFlow(plain)).rejects.toThrow(/not an org-os instance/)
     expect(fakeStartAdmin).not.toHaveBeenCalled()
+  })
+})
+
+describe('cloneName', () => {
+  it('is the last segment without .git', () => {
+    expect(cloneName('https://github.com/o/name.git')).toBe('name')
+    expect(cloneName('git@github.com:o/name.git')).toBe('name')
+    expect(cloneName('https://github.com/')).toBe('github.com')
+    expect(cloneName('')).toBe('instance')
+    expect(cloneName('x/..')).toBe('instance')
   })
 })
 

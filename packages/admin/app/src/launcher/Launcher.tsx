@@ -43,7 +43,7 @@ export default function Launcher() {
 
   const onGitUrl = (v: string) => {
     setGitUrl(v)
-    if (!cloneEdited) setCloneFolder(v.trim() ? defaultCloneFolder(v, state?.base ?? '') : '')
+    if (!cloneEdited && state) setCloneFolder(v.trim() ? defaultCloneFolder(v, state.base) : '')
   }
 
   const cloneIt = async (e: FormEvent) => {

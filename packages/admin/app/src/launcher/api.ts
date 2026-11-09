@@ -1,3 +1,4 @@
+import { cloneName } from '../../../lib/clone-name.mjs'
 /** The launcher's own API (launcher/serve.ts). Each call returns the parsed JSON, or throws Error(body.error);
  *  a 409 that carries `adoptable` keeps it, with the path, on the error. Tasks 4-6 add their calls here. */
 
@@ -29,9 +30,7 @@ export const openInstance = (path: string) => call<{ url: string }>('POST', '/ap
 export const forgetRecent = (path: string) => call<{ recent: RecentEntry[] }>('DELETE', '/api/launcher/recent', { path })
 export const cloneInstance = (url: string, folder: string) => call<{ url: string }>('POST', '/api/launcher/clone', { url, folder })
 
-/** Mirrors launcher/folders.ts defaultCloneFolder (the page cannot import node:path): the repo's name, inside `base`. */
+/** The default folder for a clone: the repo's name, inside `base`. */
 export function defaultCloneFolder(url: string, base: string): string {
-  const last = url.trim().replace(/\/+$/, '').split(/[/:]/).pop() ?? ''
-  const name = last.replace(/\.git$/, '').replace(/[^A-Za-z0-9._-]/g, '')
-  return `${base.replace(/\/+$/, '')}/${name === '' || name === '.' || name === '..' ? 'instance' : name}`
+  return `${base.replace(/\/+$/, '')}/${cloneName(url)}`
 }

@@ -14,7 +14,7 @@ const fresh = () => {
 
 describe('gitUrlProblem', () => {
   it('refuses option, transport and credential tricks', () => {
-    for (const bad of ['-uhttps://x', 'ext::sh -c id', 'fd::3', 'https://tok@github.com/a/b', 'https://github.com/a b', 'http://github.com/a/b'])
+    for (const bad of ['-uhttps://x', 'ext::sh -c id', 'fd::3', 'https://tok@github.com/a/b', 'ssh://git:tok@github.com/a/b', 'ssh://:tok@host/a', 'ssh:///a', 'https://github.com/a b', 'http://github.com/a/b'])
       expect(gitUrlProblem(bad)).not.toBeNull()
     for (const ok of ['https://github.com/a/b', 'https://github.com/a/b.git', 'ssh://git@github.com/a/b', 'git@github.com:a/b.git', 'file:///tmp/x.git'])
       expect(gitUrlProblem(ok)).toBeNull()

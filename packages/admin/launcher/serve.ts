@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, rmdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { serve } from '@hono/node-server'
@@ -10,7 +10,7 @@ import { refusal } from '../server/guard.ts'
 import { runningServer, stateDir } from '../server/state.ts'
 import { readFederation } from '../lib/federation/read.mjs'
 import { forget, readRecent, remember } from './home.ts'
-import { folderState, isInstance, resolveFolder, writableFolderProblem } from './folders.ts'
+import { isInstance, resolveFolder, writableFolderProblem } from './folders.ts'
 import { gitUrlProblem, launcherGit } from './git-write.ts'
 import { defaultAssess, defaultStartAdmin } from './children.ts'
 
@@ -155,8 +155,17 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     const abs = resolveFolder(given, base())
     const problem = writableFolderProblem(abs)
     if (problem) return c.json({ error: problem }, 409)
-    const wasNew = folderState(abs) === 'new'
-    try { mkdirSync(dirname(abs), { recursive: true }) } catch (err) {
+    // Claim the folder before cloning: only what this request made is removed if the clone fails.
+    let firstMade: string | undefined
+    let made = false
+    try {
+      firstMade = mkdirSync(dirname(abs), { recursive: true })
+      try { mkdirSync(abs); made = true } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+        const now = writableFolderProblem(abs)
+        if (now) return c.json({ error: now }, 409)
+      }
+    } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 409)
     }
     let result
@@ -164,7 +173,12 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       result = { code: 1, stdout: '', stderr: err instanceof Error ? err.message : String(err) }
     }
     if (result.code !== 0) {
-      if (wasNew) rmSync(abs, { recursive: true, force: true }) // the launcher made it; a folder that was already there stays
+      // Only folders this request made, and only while empty: anything someone put in them meanwhile stays.
+      if (made) { try { rmdirSync(abs) } catch { /* not empty, or already gone */ } }
+      if (firstMade) {
+        // the parents it made, from the innermost up to the first one
+        try { for (let d = dirname(abs); d.startsWith(firstMade); d = dirname(d)) { rmdirSync(d); if (d === firstMade) break } } catch { /* not empty, or already gone */ }
+      }
       const last = result.stderr.trim().split('\n').filter(Boolean).pop() ?? 'git could not clone it.'
       return c.json({ error: last }, 502)
     }

@@ -1,6 +1,7 @@
 import { lstatSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { cloneName } from '../lib/clone-name.mjs'
 
 export type FolderState = 'new' | 'empty' | 'not-empty' | 'not-a-folder'
 
@@ -53,7 +54,5 @@ export function isInstance(abs: string): boolean {
 
 /** Where a clone of `url` goes by default: the repo's name, inside `base`. */
 export function defaultCloneFolder(url: string, base: string): string {
-  const last = url.trim().replace(/\/+$/, '').split(/[/:]/).pop() ?? ''
-  const name = last.replace(/\.git$/, '').replace(/[^A-Za-z0-9._-]/g, '') || 'instance'
-  return join(base, name === '.' || name === '..' ? 'instance' : name)
+  return join(base, cloneName(url))
 }
