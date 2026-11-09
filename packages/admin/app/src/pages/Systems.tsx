@@ -4,6 +4,7 @@ import { Note } from '../design/Note.tsx'
 import { SystemsView, useSystems } from '../blocks/systems.tsx'
 import { useBlockCtx } from '../blocks/context.ts'
 import { Skeleton } from '../design/Skeleton.tsx'
+import { ButtonLink } from '../design/Button.tsx'
 
 /** Systems (section `/systems`, `g s`): every System — the outside systems, the sources' connectors, the treasury —
  *  as Systems rows under their column head, List · Map, the map the DAO map with the main Safe big (§8.2). A row
@@ -16,7 +17,9 @@ export default function Systems() {
   const readAt = resources.dataUpdatedAt > 0 ? new Date(resources.dataUpdatedAt).toISOString() : null
   return (
     <>
-      <PageHead title="Systems" from={org ? { repo: org, readAt } : undefined} now={ctx.now} />
+      <PageHead title="Systems" from={org ? { repo: org, readAt } : undefined} now={ctx.now}>
+        <ButtonLink href="/systems/map">Map the rest</ButtonLink>
+      </PageHead>
       {error !== undefined ? <Note state="error">{error}</Note>
         : systems === null ? <Skeleton rows={4} shape="row" label="Systems" />
         : <SystemsView systems={systems} now={ctx.now} marks={ctx.marks} />}

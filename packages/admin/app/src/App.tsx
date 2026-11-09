@@ -30,6 +30,7 @@ import { SessionProvider } from './session/session.ts'
 import { useHouseSource } from './session/houseSource.ts'
 import Needs from './pages/Needs.tsx'
 import Systems from './pages/Systems.tsx'
+import MapTheRest from './pages/MapTheRest.tsx'
 import Roles from './pages/Roles.tsx'
 import Workspace from './pages/Workspace.tsx'
 import PagePage from './workspace/PagePage.tsx' // DAO-OS L6 Task 16: /p/:id
@@ -232,6 +233,7 @@ function HubApp() {
           <Route path="/wizards/:id">{p => <WizardPage key={p.id} id={safeDecode(p.id)} />}</Route>
           {/* The Hub's own sections (L4-R22, E-33): before /:section, which would send /systems to a board */}
           <Route path="/needs" component={Needs} />
+          <Route path="/systems/map" component={MapTheRest} />{/* network N1: before /systems */}
           <Route path="/systems" component={Systems} />
           <Route path="/compose" component={Compose} />{/* DAO-OS L7 Task 17 */}
           <Route path="/deploy" component={Deploy} />{/* DAO-OS L7 Task 18 */}

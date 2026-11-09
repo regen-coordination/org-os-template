@@ -348,6 +348,9 @@ export const api = {
   stage: (ops: StageOp[]) => fetchJSON<ChangeView>('/api/changes/ops', json('POST', { ops })),
   /** The rule your change would fall under with these ops added; nothing is staged (the new-record form's line). */
   wouldRule: (ops: StageOp[]) => fetchJSON<RuleSummary>('/api/changes/rule', json('POST', { ops })),
+  /** "Map the rest" (network N1): the old repos.manifest.json as repo Systems to offer, and one GitHub owner's repos. Read-only. */
+  mapManifest: () => fetchJSON<{ imports: Record<string, unknown>[] }>('/api/systems/map/manifest'),
+  mapGithub: (owner: string) => fetchJSON<{ repos: { name: string; url: string; description?: string; archived: boolean; fork: boolean }[]; more: boolean }>(`/api/systems/map/github/${enc(owner)}`),
   unstage: (n: number) => fetchJSON<ChangeView>(`/api/changes/ops/${n}`, { method: 'DELETE' }),
   rebase: (n: number, keep: 'mine' | 'theirs') => fetchJSON<ChangeView>(`/api/changes/ops/${n}/rebase`, json('POST', { keep })),
   discard: () => fetchJSON<void>('/api/changes', { method: 'DELETE' }),
