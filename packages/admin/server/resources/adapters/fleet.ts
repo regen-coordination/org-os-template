@@ -3,6 +3,8 @@ import { join, resolve, basename } from 'node:path'
 import { lastCommit } from '../changed.ts'
 import { displayNames } from '../../session/names.ts'
 import { instanceAttention } from '../attention.ts'
+import { readFileSync } from 'node:fs'
+import { stateDir } from '../../state.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import { readFederation } from '../../../lib/federation/read.mjs'
 import { selfAddresses, linkState } from '../../../lib/federation/peers.mjs'
@@ -46,6 +48,20 @@ const remoteUrls = async (ctx: Parameters<Adapter['read']>[0]): Promise<string[]
   } catch { return [] }
 }
 
+/** What the doctor found when the launcher opened this instance (`doctor.json` in its state folder), as attention; null when it found nothing or was never run. */
+const doctorAttention = (repo: string): Resource['attention'] => {
+  try {
+    const d = JSON.parse(readFileSync(join(stateDir(repo), 'doctor.json'), 'utf8')) as { blockers?: number; warnings?: number; findings?: { level: string; message: string }[] }
+    const blockers = Number(d.blockers) || 0
+    const warnings = Number(d.warnings) || 0
+    if (blockers === 0 && warnings === 0) return null
+    const level = blockers > 0 ? 'BLOCKER' : 'WARN'
+    const first = d.findings?.find(f => f.level === level)?.message ?? ''
+    const what = blockers > 0 ? `${blockers} blocker(s)` : `${warnings} warning(s)`
+    return { level: blockers > 0 ? 'alert' : 'warn', text: `The doctor found ${what} when this instance was opened${first ? `: ${first}` : '.'}` }
+  } catch { return null }
+}
+
 export const fleet: Adapter = {
   name: 'fleet', board: 'systems', title: 'Fleet',
   watch: ['data/instances.yaml', 'federation.yaml'],
@@ -55,7 +71,7 @@ export const fleet: Adapter = {
     const selfId = instanceSlug(ctx.repo)
     const self: Resource = {
       id: `instance:${selfId}`, kind: 'instance', board: 'systems', name: str(identity.name) ?? selfId,
-      status: 'this instance', attention: null, changed: await lastCommit(ctx.repo, '.', displayNames(ctx.repo, ctx.membership ?? null)),
+      status: 'this instance', attention: doctorAttention(ctx.repo), changed: await lastCommit(ctx.repo, '.', displayNames(ctx.repo, ctx.membership ?? null)),
       facts: { self: true, type: identity.type ?? null, localPath: ctx.repo }, source: { path: 'federation.yaml', editable: false },
     }
     const nodes: Resource[] = [self]

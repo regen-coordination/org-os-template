@@ -70,6 +70,7 @@
     "build:site": "cd repos/refi-bcn-knowledge && npx quartz build",
     "serve:site": "cd repos/refi-bcn-knowledge && npx quartz build --serve",
     "admin": "npm --prefix packages/admin run start --",
+    "open": "npm --prefix packages/admin run open --",
     "admin:dev": "npm --prefix packages/admin run dev --",
     "house:backup": "npm --prefix packages/admin run house:backup --",
     "house:backup:key": "npm --prefix packages/admin run house:backup:key --",
