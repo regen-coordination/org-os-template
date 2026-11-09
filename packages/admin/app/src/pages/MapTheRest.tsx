@@ -83,13 +83,22 @@ export default function MapTheRest() {
     return { manifestOut, pastedOut, githubOut }
   }, [offered, pasted, owners, existing, ownerNames.join('\n')]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Row state follows the thing, not its id (an id can pass to another line when Recognise runs again).
+  const sk = (r: Row) => `${r.source}:${String(r.system.url ?? r.system.address ?? r.system.space ?? r.system.id)}`
+  // The folder a repo would be cloned into: from the repo itself (the last segment of its address), never the editable name.
+  const repoDir = (r: Row) => {
+    const tail = String(r.system.url ?? '').replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop() ?? ''
+    for (const c of [tail.replace(/\.git$/i, ''), r.system.id]) if (/^[A-Za-z0-9._-]+$/.test(c) && c !== '.' && c !== '..') return c
+    return 'repo'
+  }
+  const emptyName = (r: Row) => (names[sk(r)] ?? r.system.name).trim() === ''
   const allRows = [...manifestOut, ...pastedOut, ...githubOut.flatMap(g => g.rows)]
-  const isTicked = (r: Row) => r.duplicateOf === null && (ticked[r.system.id] ?? r.source !== 'github')
+  const isTicked = (r: Row) => r.duplicateOf === null && !emptyName(r) && (ticked[sk(r)] ?? r.source !== 'github')
   const valueOf = (r: Row): Sys => {
-    const s: Sys = { ...r.system, name: names[r.system.id] ?? r.system.name }
-    const purpose = purposes[r.system.id]
+    const s: Sys = { ...r.system, name: (names[sk(r)] ?? r.system.name).trim() }
+    const purpose = purposes[sk(r)]
     if (purpose) s.purpose = purpose
-    if (clone[r.system.id]) s.mount = `repos/${s.name}`
+    if (clone[sk(r)]) s.mount = `repos/${repoDir(r)}`
     return s
   }
   const chosen = allRows.filter(isTicked)
@@ -100,7 +109,7 @@ export default function MapTheRest() {
     try {
       await api.stage(chosen.map(valueOf).map(s => ({ op: 'create' as const, record: `systems:${s.id}`, value: s })))
       setStaged(true)
-      setTicked(t => { const n = { ...t }; for (const r of chosen) n[r.system.id] = false; return n })
+      setTicked(t => { const n = { ...t }; for (const r of chosen) n[sk(r)] = false; return n })
     } catch (e) {
       setFailure(e instanceof Error ? e.message : 'The additions could not be staged.')
     } finally { setBusy(false) }
@@ -108,20 +117,21 @@ export default function MapTheRest() {
 
   const row = (r: Row) => {
     const s = valueOf(r)
+    const shown = names[sk(r)] ?? r.system.name
     const dup = r.duplicateOf !== null
     const repo = s.kind === 'repo' && r.source !== 'manifest'
     return (
       <tr key={r.key}>
-        <td><input type="checkbox" aria-label={`Add ${s.name}`} checked={isTicked(r)} disabled={dup} onChange={e => { touched(); setTicked(t => ({ ...t, [r.system.id]: e.target.checked })) }} /></td>
+        <td><input type="checkbox" aria-label={`Add ${s.name || r.system.name}`} checked={isTicked(r)} disabled={dup || emptyName(r)} onChange={e => { touched(); setTicked(t => ({ ...t, [sk(r)]: e.target.checked })) }} /></td>
         <td>{s.kind}</td>
-        <td><input className="input" aria-label={`Name of ${r.system.name}`} value={s.name} disabled={dup} onChange={e => { touched(); setNames(n => ({ ...n, [r.system.id]: e.target.value })) }} /></td>
+        <td><input className="input" aria-label={`Name of ${r.system.name}`} value={shown} disabled={dup} onChange={e => { touched(); setNames(n => ({ ...n, [sk(r)]: e.target.value })) }} /></td>
         <td className="mapr-link">
           {s.url ?? (typeof s.address === 'string' ? s.address : typeof s.space === 'string' ? s.space : '')}
           {repo && !dup && (
             <div className="mapr-extra">
-              <label><input type="checkbox" checked={clone[r.system.id] === true} onChange={e => { touched(); setClone(c => ({ ...c, [r.system.id]: e.target.checked })) }} /> Clone into repos/{s.name} later</label>
+              <label><input type="checkbox" checked={clone[sk(r)] === true} onChange={e => { touched(); setClone(c => ({ ...c, [sk(r)]: e.target.checked })) }} /> Clone into repos/{repoDir(r)} later</label>
               <label>Purpose{' '}
-                <select aria-label="Purpose" value={purposes[r.system.id] ?? s.purpose ?? ''} onChange={e => { touched(); setPurposes(p => ({ ...p, [r.system.id]: e.target.value })) }}>
+                <select aria-label="Purpose" value={purposes[sk(r)] ?? s.purpose ?? ''} onChange={e => { touched(); setPurposes(p => ({ ...p, [sk(r)]: e.target.value })) }}>
                   <option value="">None</option>
                   {PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
