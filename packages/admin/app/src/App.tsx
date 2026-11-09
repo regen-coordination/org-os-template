@@ -68,6 +68,7 @@ import { useRouteFocus } from './frame/useRouteFocus.ts'
 import { useBoards } from './boards/queries.ts'
 import { PortalPage } from './portal/PortalPage.tsx'
 import SignInLinkPage from './pages/SignInLinkPage.tsx'
+import Launcher from './launcher/Launcher.tsx'
 import { PORTAL_PUBLIC } from './test/fixtures/house/portal.ts'
 import { FIXED_NOW } from './test/fixtures/parts.ts'
 
@@ -182,6 +183,8 @@ export default function App() {
   const [location] = useLocation()
   const search = useSearch()
   if (OLD_PORTAL.test(location)) return <Redirect to={location.replace(OLD_PORTAL, '/portal') + (search ? `?${search}` : '')} replace />
+  // /launch is the launcher, drawn alone too: it has no instance behind it, so HubApp (which calls the instance's APIs) never mounts.
+  if (location === '/launch') return <Launcher />
   return location === '/portal' ? <PortalRoute /> : location === '/sign-in/link' ? <SignInLinkRoute /> : <HubApp />
 }
 
