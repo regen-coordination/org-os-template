@@ -85,5 +85,6 @@ site/test-results/
 # the admin server refuses to open a store inside the repository that git does not ignore.
 .org-os/private/
 
-# The public door's releases when built beside the repository (dao-os L9 spec §5.1).
+# The portal's releases when built beside the repository (dao-os L9 spec §5.1; .org-os/door/ until 0.6.2).
+.org-os/portal/
 .org-os/door/

@@ -1,13 +1,13 @@
-// The door's fixture instance (DAO-OS L9, Tasks 13–16): a fresh git repository under the temp directory and a private
+// The portal's fixture instance (DAO-OS L9, Tasks 13–16): a fresh git repository under the temp directory and a private
 // store beside it (outside the repository), in the style of tests/fixtures.ts. It holds public, members and `hat:`
-// things, and four sentinels that must never reach the door:
+// things, and four sentinels that must never reach the portal:
 // - SENTINEL-store-1, in a private record kept at the Council hat (a `hat:` record lives only in the store);
 // - SENTINEL-field-2, in a restricted field of a public member (kept in the store);
 // - SENTINEL-members-3, the title of a members-level project (in git);
 // - SENTINEL-budget-4, a members-level field of a public project (in git);
-// and the ledger records acts by ACTOR (0x…a1) under the Council hat, which the door never names.
+// and the ledger records acts by ACTOR (0x…a1) under the Council hat, which the portal never names.
 // Placeholders only (L9 spec §15): steward-a, steward-b, ops-lead; 0x…a1–a4; tree eip155:42220:13; example.org and
-// door.example.test. Nothing here touches the network: the System reader is a stand-in.
+// portal.example.test. Nothing here touches the network: the System reader is a stand-in.
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -21,20 +21,20 @@ import { caip10 } from '../../../lib/caip.mjs'
 export const CELO = 'eip155:42220'
 /** `0x…<tail>`, lower case as a record writes it. */
 export const addr = (tail: string) => `0x${tail.padStart(40, '0')}`
-/** The member who acts in the ledger: the door names the hat, never this account. */
+/** The member who acts in the ledger: the portal names the hat, never this account. */
 export const ACTOR = `${CELO}:${addr('a1')}`
 /** Another wearer of the Council hat, recorded only in `wearers`. */
 export const WEARER = `${CELO}:${addr('a2')}`
 /** A third account, recorded only in a ratify's `closed.checked`. */
 export const CHECKED = `${CELO}:${addr('a3')}`
-/** The treasury Safe: a public System's contract, which the door may show. */
+/** The treasury Safe: a public System's contract, which the portal may show. */
 export const SAFE = addr('a4')
 /** The Safe as the standards publish it (CAIP-10, checksummed). */
 export const SAFE_ID = caip10(CELO, SAFE)
 /** Tree 13 on Celo; the Council is its hat 13.1. */
 export const COUNCIL_HAT = `${CELO}:0x0000000d0001${'0'.repeat(52)}`
 export const DAO_URI = 'https://example.org/.well-known/dao.json'
-export const DOOR_ORIGIN = 'https://door.example.test'
+export const PORTAL_ORIGIN = 'https://portal.example.test'
 export const NOW = new Date('2026-10-30T12:00:00Z')
 export const TREASURY_READ_AT = '2026-10-30T09:00:00Z'
 
@@ -46,13 +46,13 @@ export const SENTINEL = {
   pending: 'SENTINEL-pending-5',
 } as const
 
-/** Strings the door may show: none of them is ever a secret. */
+/** Strings the portal may show: none of them is ever a secret. */
 export const SHOWN = { project: 'Public Project One', member: 'Steward A' } as const
 
 export const PROPOSAL = 'p-2026-10-29-001-ab12'
 
 const FEDERATION_YAML = `identity:
-  name: "Door Test Org"
+  name: "Portal Test Org"
   type: "DAO"
   daoURI: "${DAO_URI}"
   chain: "${CELO}"
@@ -140,7 +140,7 @@ export function standInReader(reads: Record<string, DriverRead> = fixtureReads()
   return { read: async (system: Record<string, unknown>) => reads[String(system.id)] ?? never } as unknown as SystemReader
 }
 
-export interface DoorInstance {
+export interface PortalInstance {
   repo: string
   /** The private store's folder, outside the repository. */
   storeDir: string
@@ -149,8 +149,8 @@ export interface DoorInstance {
 }
 
 /** The fixture instance: a committed repository and an open private store holding the store's sentinels. */
-export async function makeDoorInstance(): Promise<DoorInstance> {
-  const repo = mkdtempSync(join(tmpdir(), 'door-fixture-'))
+export async function makePortalInstance(): Promise<PortalInstance> {
+  const repo = mkdtempSync(join(tmpdir(), 'portal-fixture-'))
   mkdirSync(join(repo, 'data'))
   writeFileSync(join(repo, 'federation.yaml'), FEDERATION_YAML)
   writeFileSync(join(repo, 'data', 'visibility.yaml'), VISIBILITY_YAML)
@@ -164,9 +164,9 @@ export async function makeDoorInstance(): Promise<DoorInstance> {
   git('config user.email steward-a@example.org')
   git('config user.name steward-a')
   git('add -A')
-  git('commit -qm "fixture: the door\'s instance"')
+  git('commit -qm "fixture: the portal\'s instance"')
 
-  const storeDir = mkdtempSync(join(tmpdir(), 'door-store-'))
+  const storeDir = mkdtempSync(join(tmpdir(), 'portal-store-'))
   const store = await openPrivateStore(repo, { dir: storeDir })
   await store.putRecord({
     collection: 'projects', id: 'proj-hat', visibility: `hat:${COUNCIL_HAT}`, rev: 'r1',

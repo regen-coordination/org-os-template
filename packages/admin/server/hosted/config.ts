@@ -10,8 +10,8 @@ export const NODE_FLOOR = '22.13.0'
 /** Every variable hosted mode reads (§5.1's table, and the emailed-link sign-in's, Lane 3 Task 4). The deploy
  *  `env.example` is checked against this list. */
 export const HOSTED_ENV = [
-  'ORG_OS_HOSTED', 'ORG_OS_PUBLIC_ORIGIN', 'ORG_OS_DOOR_ORIGIN', 'ORG_OS_BIND', 'PORT', 'ORG_OS_TRUST_PROXY',
-  'ORG_OS_DOOR_DIR', 'ORG_OS_DOOR_EVERY', 'ORG_OS_PUSH', 'ORG_OS_REFRESH_EVERY', 'ORG_OS_PRIVATE_DIR', 'ORG_OS_BACKUP_DIR',
+  'ORG_OS_HOSTED', 'ORG_OS_PUBLIC_ORIGIN', 'ORG_OS_PORTAL_ORIGIN', 'ORG_OS_BIND', 'PORT', 'ORG_OS_TRUST_PROXY',
+  'ORG_OS_PORTAL_DIR', 'ORG_OS_PORTAL_EVERY', 'ORG_OS_PUSH', 'ORG_OS_REFRESH_EVERY', 'ORG_OS_PRIVATE_DIR', 'ORG_OS_BACKUP_DIR',
   'ORG_OS_BACKUP_EVERY', 'ORG_OS_BACKUP_KEEP', 'ORG_OS_BACKUP_PUBLIC_KEY_FILE', 'ORG_OS_ADMIN_HOME',
   'ORG_OS_REMOTE_PRIVATE', 'ORG_OS_RPC', 'GIT_SSH_COMMAND',
   // The writes-off switch (Lane 3 Task 11): read by startServer (hosted/instance-writes.ts), named here for the deploy example.
@@ -19,17 +19,26 @@ export const HOSTED_ENV = [
   ...SIGN_IN_ENV,
 ] as const
 
+/** The public site's settings were named for the door until 0.6.2, when the door became the portal. A Hub still reads
+ *  each old name, with a warning at start, until 0.7; set beside its new name with another value, it stops the start. */
+export const RENAMED_ENV = {
+  ORG_OS_DOOR_ORIGIN: 'ORG_OS_PORTAL_ORIGIN',
+  ORG_OS_DOOR_DIR: 'ORG_OS_PORTAL_DIR',
+  ORG_OS_DOOR_EVERY: 'ORG_OS_PORTAL_EVERY',
+} as const
+
 export interface HostedConfig {
   /** `ORG_OS_PUBLIC_ORIGIN`, without a trailing slash, and its host. */
   origin: string
   host: string
-  doorOrigin: string | null
+  /** `ORG_OS_PORTAL_ORIGIN`: the portal's own host, or null when the portal is built but not served. */
+  portalOrigin: string | null
   bind: string
   port: number
   trustProxy: boolean
-  doorDir: string
-  /** null: no timer (the door is refreshed by hand). */
-  doorEveryMs: number | null
+  portalDir: string
+  /** null: no timer (the portal is refreshed by hand). */
+  portalEveryMs: number | null
   push: boolean
   /** How often a Hub whose writes are off takes new commits from its remote (convergence C1, C2: 15 min); null: never. */
   refreshEveryMs: number | null
@@ -43,7 +52,9 @@ export interface HostedConfig {
 }
 
 const ADDRESS = 'A hosted Hub needs its address: set ORG_OS_PUBLIC_ORIGIN to https:// and the members\' host, then start again.'
-const SAME_HOST = 'The door and the members\' side need two hosts: ORG_OS_DOOR_ORIGIN and ORG_OS_PUBLIC_ORIGIN are the same.'
+const SAME_HOST = (name: string) => `The portal and the members' side need two hosts: ${name} and ORG_OS_PUBLIC_ORIGIN are the same.`
+const OLD_NAME = (old: string, now: string) => `${old} is the old name of ${now}. This Hub reads it until org-os 0.7: rename it to ${now}.`
+const TWO_NAMES = (old: string, now: string) => `${old} and ${now} are both set, to different values. ${now} is the name now: remove ${old}, then start again.`
 
 /** An `https://<host>` origin with no path, query, fragment or credentials; its normal form, or null. */
 function httpsOrigin(text: string): { origin: string; host: string } | null {
@@ -66,30 +77,44 @@ const inside = (name: string) => `${name} is inside the repository. Put it on it
 const onOff = (text: string): boolean | null =>
   /^(on|1|true|yes)$/i.test(text) ? true : /^(off|0|false|no)$/i.test(text) ? false : null
 
-/** The configuration, or the sentence that stops the start. */
-export function readHostedConfig(env: Record<string, string | undefined>, repo: string): { config: HostedConfig } | { refuse: string } {
+/** The configuration and its warnings (an old setting name read), or the sentence that stops the start. */
+export function readHostedConfig(env: Record<string, string | undefined>, repo: string): { config: HostedConfig; warnings: string[] } | { refuse: string } {
   const get = (k: string): string | undefined => env[k]?.trim() ? env[k]!.trim() : undefined
+
+  // The renamed settings: the new name, else the old one with a warning; both with different values stop the start.
+  const warnings: string[] = []
+  const renamed: Partial<Record<string, { name: string; value: string }>> = {}
+  for (const [old, now] of Object.entries(RENAMED_ENV)) {
+    const o = get(old), n = get(now)
+    if (o !== undefined && n !== undefined && o !== n) return { refuse: TWO_NAMES(old, now) }
+    if (o !== undefined) warnings.push(OLD_NAME(old, now))
+    if (n !== undefined) renamed[now] = { name: now, value: n }
+    else if (o !== undefined) renamed[now] = { name: old, value: o }
+  }
+  const setting = (now: (typeof RENAMED_ENV)[keyof typeof RENAMED_ENV]) => renamed[now]
 
   const pub = get('ORG_OS_PUBLIC_ORIGIN') ? httpsOrigin(get('ORG_OS_PUBLIC_ORIGIN')!) : null
   if (!pub) return { refuse: ADDRESS }
 
-  let doorOrigin: string | null = null
-  if (get('ORG_OS_DOOR_ORIGIN')) {
-    const door = httpsOrigin(get('ORG_OS_DOOR_ORIGIN')!)
-    if (!door) return { refuse: 'ORG_OS_DOOR_ORIGIN must be https:// and the door\'s host, with no path, then start again.' }
-    if (door.host === pub.host) return { refuse: SAME_HOST }
-    doorOrigin = door.origin
+  let portalOrigin: string | null = null
+  const portalSet = setting('ORG_OS_PORTAL_ORIGIN')
+  if (portalSet) {
+    const portal = httpsOrigin(portalSet.value)
+    if (!portal) return { refuse: `${portalSet.name} must be https:// and the portal's host, with no path, then start again.` }
+    if (portal.host === pub.host) return { refuse: SAME_HOST(portalSet.name) }
+    portalOrigin = portal.origin
   }
 
   const portText = get('PORT') ?? '4680'
   const port = Number(portText)
   if (!Number.isInteger(port) || port < 0 || port > 65535) return { refuse: `PORT is "${portText}", not a port number.` }
 
-  const doorEveryText = get('ORG_OS_DOOR_EVERY') ?? '1h'
-  let doorEveryMs: number | null = null
-  if (!/^(off|0)$/i.test(doorEveryText)) {
-    doorEveryMs = parseEvery(doorEveryText)
-    if (doorEveryMs === null || doorEveryMs > MAX_EVERY_MS) return { refuse: `ORG_OS_DOOR_EVERY is "${doorEveryText}", not a time such as 1h (or off).` }
+  const everySet = setting('ORG_OS_PORTAL_EVERY')
+  const portalEveryText = everySet?.value ?? '1h'
+  let portalEveryMs: number | null = null
+  if (!/^(off|0)$/i.test(portalEveryText)) {
+    portalEveryMs = parseEvery(portalEveryText)
+    if (portalEveryMs === null || portalEveryMs > MAX_EVERY_MS) return { refuse: `${everySet?.name ?? 'ORG_OS_PORTAL_EVERY'} is "${portalEveryText}", not a time such as 1h (or off).` }
   }
 
   const refreshEveryText = get('ORG_OS_REFRESH_EVERY') ?? '15m'
@@ -107,10 +132,11 @@ export function readHostedConfig(env: Record<string, string | undefined>, repo: 
   const backupKeep = Number(keepText)
   if (!Number.isInteger(backupKeep) || backupKeep < 1) return { refuse: `ORG_OS_BACKUP_KEEP is "${keepText}", not a whole number of backups to keep.` }
 
-  const doorDir = resolve(repo, get('ORG_OS_DOOR_DIR') ?? '/srv/door')
+  const dirSet = setting('ORG_OS_PORTAL_DIR')
+  const portalDir = resolve(repo, dirSet?.value ?? '/srv/portal')
   const privateDir = resolve(repo, get('ORG_OS_PRIVATE_DIR') ?? '/srv/private')
   const backupDir = resolve(repo, get('ORG_OS_BACKUP_DIR') ?? '/srv/backups')
-  for (const [name, dir] of [['ORG_OS_DOOR_DIR', doorDir], ['ORG_OS_PRIVATE_DIR', privateDir], ['ORG_OS_BACKUP_DIR', backupDir]] as const) {
+  for (const [name, dir] of [[dirSet?.name ?? 'ORG_OS_PORTAL_DIR', portalDir], ['ORG_OS_PRIVATE_DIR', privateDir], ['ORG_OS_BACKUP_DIR', backupDir]] as const) {
     if (folderInsideRepo(dir, repo)) return { refuse: inside(name) }
   }
 
@@ -126,16 +152,17 @@ export function readHostedConfig(env: Record<string, string | undefined>, repo: 
 
   return {
     config: {
-      origin: pub.origin, host: pub.host, doorOrigin,
+      origin: pub.origin, host: pub.host, portalOrigin,
       bind: get('ORG_OS_BIND') ?? '0.0.0.0', port,
       trustProxy,
-      doorDir, doorEveryMs,
+      portalDir, portalEveryMs,
       push,
       refreshEveryMs,
       privateDir, backupDir, backupEveryMs, backupKeep,
       backupPublicKeyFile: get('ORG_OS_BACKUP_PUBLIC_KEY_FILE') ?? '/run/secrets/backup.pub',
       deployKeyFile,
     },
+    warnings,
   }
 }
 

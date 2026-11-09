@@ -14,9 +14,9 @@ import { personSessionHash, sessionFromCookie, tokenHash } from '../../server/se
 import type { HostedConfig } from '../../server/hosted/config.ts'
 import { emailKey, verifySession } from '../../lib/session-token.mjs'
 import { main as houseRoles } from '../../scripts/house-roles.ts'
-import { collectDoorInput } from '../../server/door/inputs.ts'
-import { scanDoor } from '../../server/door/scan.ts'
-import { CELO, DOOR_ORIGIN, NOW, addr, makeDoorInstance, standInReader } from '../fixtures/door/instance.ts'
+import { collectPortalInput } from '../../server/portal/inputs.ts'
+import { scanPortal } from '../../server/portal/scan.ts'
+import { CELO, PORTAL_ORIGIN, NOW, addr, makePortalInstance, standInReader } from '../fixtures/portal/instance.ts'
 
 // Lane 3 Task 8: POST /api/session/link spends an emailed link once and answers the I5 cookie. Synthetic values only:
 // keys are made per test, the mailer records, the addresses are example.org's.
@@ -195,27 +195,27 @@ describe('POST /api/session/link (Lane 3 Task 8)', () => {
   })
 })
 
-describe("the door and a signed-in person (Lane I's batch 2 note, point 2)", () => {
+describe("the portal and a signed-in person (Lane I's batch 2 note, point 2)", () => {
   const page = (body: string) =>
-    `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n\n<link rel="stylesheet" href="/assets/door-1a2b.css">\n</head>\n<body>\n${body}\n<script type="module" src="/assets/door-1a2b.js"></script>\n</body>\n</html>\n`
+    `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n\n<link rel="stylesheet" href="/assets/portal-1a2b.css">\n</head>\n<body>\n${body}\n<script type="module" src="/assets/portal-1a2b.js"></script>\n</body>\n</html>\n`
 
-  it('a door page that names a signed-in person still renders; a wallet account stays withheld', async () => {
-    const inst = await makeDoorInstance(); cleanup.push(() => inst.remove())
+  it('a portal page that names a signed-in person still renders; a wallet account stays withheld', async () => {
+    const inst = await makePortalInstance(); cleanup.push(() => inst.remove())
     const h = await house({ repo: inst.repo, store: inst.store })
     expect((await post(h, '/api/session/link', { token: await linkFor(h, STEWARD) })).status).toBe(200)
     const wallet = `${CELO}:${addr('b7')}`
     await inst.store.putSession({ tokenHash: 'f'.repeat(64), account: wallet, created: T0.toISOString(), expires: new Date(T0.getTime() + 86_400_000).toISOString() })
     expect(inst.store.allStrings().has(ID.steward)).toBe(false)
     expect(inst.store.allStrings().has(wallet)).toBe(true)
-    const input = await collectDoorInput(inst.repo, { reader: standInReader(), store: inst.store, storeConfigured: true, now: NOW, doorOrigin: DOOR_ORIGIN })
+    const input = await collectPortalInput(inst.repo, { reader: standInReader(), store: inst.store, storeConfigured: true, now: NOW, portalOrigin: PORTAL_ORIGIN })
     if ('refuse' in input) throw new Error(input.refuse)
     const files = {
-      'index.html': page(`<main><h1>Door Test Org</h1><p>Steward: ${ID.steward}</p></main>`),
+      'index.html': page(`<main><h1>Portal Test Org</h1><p>Steward: ${ID.steward}</p></main>`),
       'robots.txt': 'User-agent: *\nAllow: /\n',
     }
-    expect(scanDoor(files, input)).toEqual([])
+    expect(scanPortal(files, input)).toEqual([])
     // The wallet account is still refused where a page prints it.
-    const leaked = scanDoor({ ...files, 'index.html': page(`<main><p>${wallet}</p></main>`) }, input)
+    const leaked = scanPortal({ ...files, 'index.html': page(`<main><p>${wallet}</p></main>`) }, input)
     expect(leaked.map(p => p.file)).toEqual(['index.html'])
   }, 60_000)
 })

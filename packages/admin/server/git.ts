@@ -178,7 +178,7 @@ export interface CommitEvent { repo: string; commit: string }
 const commitListeners = new Set<(e: CommitEvent) => void>()
 
 /** Hears every commit `commitDataPaths` and `commitMerge` make once it has landed, the build commits among them (a build
- *  commits through `commitDataPaths` in its worktree, so its `repo` is that worktree). The Pusher and the DoorPublisher
+ *  commits through `commitDataPaths` in its worktree, so its `repo` is that worktree). The Pusher and the PortalPublisher
  *  listen. Answers the unsubscribe. A listener that throws is not the commit's failure, and the others still hear it. */
 export function onCommit(listener: (e: CommitEvent) => void): () => void {
   commitListeners.add(listener)

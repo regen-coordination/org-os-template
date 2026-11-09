@@ -1,10 +1,10 @@
-// packages/admin/server/door/inputs.ts
+// packages/admin/server/portal/inputs.ts
 //
-// What the public door is built from (DAO-OS L9 spec §3.2), and the secrets its scan refuses (§3.4). Three things are
+// What the portal is built from (DAO-OS L9 spec §3.2), and the secrets its scan refuses (§3.4). Three things are
 // read for content and nothing else: L8's public projection with the live standards, L5's public projection with the
 // graph's public edges, and the renderer's own assets (Task 16). Beside them, for the scan only: L8's withheld strings,
 // every string the private store holds, and every actor account the ledger records, the public strings taken out.
-// Tasks 14 (releases, the publisher) and 15 (`doorModel`) consume `DoorInput` as it is: its fields are plain data.
+// Tasks 14 (releases, the publisher) and 15 (`portalModel`) consume `PortalInput` as it is: its fields are plain data.
 import type { SystemReader } from '../systems/reader.ts'
 import type { DriverRead } from '../systems/driver.ts'
 import type { Graph } from '../resources/types.ts'
@@ -20,17 +20,17 @@ import { projectPublic, RESTRICTED_TITLE, VOCABULARY, type PublicInput, type Pro
 import { contractIdsOf } from '../../lib/standards/ids.mjs'
 import { parseCaip10 } from '../../lib/caip.mjs'
 
-/** L9 spec §10, "door, store unreadable" (§3.4 point 4): a configured store that cannot be read stops the build. */
-export const DOOR_STORE_UNREADABLE =
-  'The public door was not built: the private store could not be read, so the check for what must not be published is incomplete.'
+/** L9 spec §10, "portal, store unreadable" (§3.4 point 4): a configured store that cannot be read stops the build. */
+export const PORTAL_STORE_UNREADABLE =
+  'The portal was not built: the private store could not be read, so the check for what must not be published is incomplete.'
 
 /** The leak scan's floor (L8-C15): shorter strings are not secrets. */
 const MIN_SECRET = 6
 
-/** One System's last good read, as the door shows it (L9 spec §3.2): `ok` false is a failed read that kept an earlier
+/** One System's last good read, as the portal shows it (L9 spec §3.2): `ok` false is a failed read that kept an earlier
  *  good one, whose facts and `readAt` it carries ("balances read 3 h ago"). A System never read successfully has no
  *  entry: its section is left out, never shown as "0". */
-export interface DoorRead {
+export interface PortalRead {
   /** The System's id. */
   system: string
   /** When the facts were read (ISO 8601). */
@@ -41,19 +41,19 @@ export interface DoorRead {
   read: DriverRead
 }
 
-/** Everything the door is built and scanned from. Plain data: nothing here reads anything again. */
-export interface DoorInput {
+/** Everything the portal is built and scanned from. Plain data: nothing here reads anything again. */
+export interface PortalInput {
   /** L8's public projection of the live input (identity, members, Systems, their public reads, proposals, decisions,
    *  governance, extras). */
   pub: PublicInput
-  /** The live copy of the standards (`buildStandards(...).files`, with the reads): the door's `.well-known`. Empty
+  /** The live copy of the standards (`buildStandards(...).files`, with the reads): the portal's `.well-known`. Empty
    *  when L8 refused (then `problems` holds an error). */
   standards: Record<string, unknown>
   /** The git copy of the standards (no reads), as `generate:schemas` would write them: Task 14's `publicDigest` reads
-   *  it, so a System's new read alone does not rebuild the door. */
+   *  it, so a System's new read alone does not rebuild the portal. */
   gitStandards: Record<string, unknown>
   /** The Systems read, each with the time it was read, sorted by System id; a System never read is absent. */
-  reads: DoorRead[]
+  reads: PortalRead[]
   /** The loader's and the live build's problems. Any `level: 'error'` refuses the release (§3.4 point 1). */
   problems: Problem[]
   /** L5's public projection, with the graph's public edges (§3.2). */
@@ -63,15 +63,15 @@ export interface DoorInput {
   secrets: Set<string>
   /** Whether the private store's strings are in `secrets` ('read') or there is no store ('none'); the manifest says so. */
   store: 'read' | 'none'
-  /** The commit the door is built from. */
+  /** The commit the portal is built from. */
   commit: string
   now: Date
-  /** The door's own origin (`https://<door host>`); null when none is configured (the door is built, not served). The
-   *  standards' `urls.proposal` is `<doorOrigin>/#decisions` until per-record pages exist (Q-L9-12). */
-  doorOrigin: string | null
+  /** The portal's own origin (`https://<portal host>`); null when none is configured (the portal is built, not served). The
+   *  standards' `urls.proposal` is `<portalOrigin>/#decisions` until per-record pages exist (Q-L9-12). */
+  portalOrigin: string | null
 }
 
-export interface DoorDeps {
+export interface PortalDeps {
   /** The System reader (its cache, its pacing): the live copy's reads. */
   reader: SystemReader
   /** The open private store; null when none is open. */
@@ -79,8 +79,8 @@ export interface DoorDeps {
   /** Whether a private store is configured: a configured store that is null or cannot be read refuses (§3.4 point 4). */
   storeConfigured: boolean
   now?: Date
-  /** The door's origin (HostedConfig's door origin, or none). */
-  doorOrigin?: string | null
+  /** The portal's origin (HostedConfig's portal origin, or none). */
+  portalOrigin?: string | null
   /** The resources graph (the server's, when it asks); the default reads the repository's own. */
   graph?: () => Promise<Graph>
 }
@@ -164,7 +164,7 @@ const l8Shown = (pub: PublicInput) => shownText([
 ])
 
 /** An address, alone or in an account: only what L8 publishes clears it (a public System's contract, a public
- *  member's own record). L5's public projection does not: its proposals' events keep a CAIP-10 `by`, and the door
+ *  member's own record). L5's public projection does not: its proposals' events keep a CAIP-10 `by`, and the portal
  *  never names an actor (§3.4 point 2). */
 const ADDRESS = /0x[0-9a-f]{40}/i
 
@@ -192,40 +192,40 @@ function originOf(o: string | null | undefined): string | null {
 }
 
 /**
- * The door's inputs (L9 spec §3.2, §3.4). Refuses, with the sentence to show, when the private store is configured but
+ * The portal's inputs (L9 spec §3.2, §3.4). Refuses, with the sentence to show, when the private store is configured but
  * cannot be read (§3.4 point 4), when nothing public can be built (no daoURI), or when the repository has no commit.
  * Standards errors are not refused here: they are in `problems`, and the release refuses on them (Task 14).
  */
-export async function collectDoorInput(repo: string, deps: DoorDeps): Promise<DoorInput | { refuse: string }> {
+export async function collectPortalInput(repo: string, deps: PortalDeps): Promise<PortalInput | { refuse: string }> {
   const now = deps.now ?? new Date()
-  const doorOrigin = originOf(deps.doorOrigin)
+  const portalOrigin = originOf(deps.portalOrigin)
 
   // The store first: a scan that cannot be complete is not begun.
   let fromStore: Set<string> = new Set()
-  let store: DoorInput['store'] = 'none'
+  let store: PortalInput['store'] = 'none'
   if (deps.store) {
-    try { fromStore = storeStrings(deps.store) } catch { return { refuse: DOOR_STORE_UNREADABLE } }
+    try { fromStore = storeStrings(deps.store) } catch { return { refuse: PORTAL_STORE_UNREADABLE } }
     store = 'read'
   } else if (deps.storeConfigured) {
-    return { refuse: DOOR_STORE_UNREADABLE }
+    return { refuse: PORTAL_STORE_UNREADABLE }
   }
 
   const { input: loaded, problems: loadProblems } = loadStandardsInput(repo, { parseYaml: serverYaml })
   if (!loaded) {
     const why = loadProblems.map(p => `${p.file}: ${p.text}`).join('; ') || 'identity.daoURI is not set'
-    return { refuse: `The public door was not built: ${why}.` }
+    return { refuse: `The portal was not built: ${why}.` }
   }
   const commit = await resolveRev(repo, 'HEAD')
-  if (!commit) return { refuse: 'The public door was not built: the repository has no commit to build it from.' }
+  if (!commit) return { refuse: 'The portal was not built: the repository has no commit to build it from.' }
 
-  const urls: StandardsInput['urls'] = doorOrigin ? { proposal: () => `${doorOrigin}/#decisions` } : undefined
+  const urls: StandardsInput['urls'] = portalOrigin ? { proposal: () => `${portalOrigin}/#decisions` } : undefined
   const live: StandardsInput = { ...loaded, reads: await readsFor(deps.reader, loaded), ...(urls ? { urls } : {}) }
   const built = buildStandards(live)
   const gitBuilt = buildStandards({ ...loaded, reads: null, ...(urls ? { urls } : {}) })
   const { pub, secrets: withheld } = projectPublic(live)
   const projection = await publicProjection(repo, { now, ...(deps.graph ? { graph: deps.graph } : {}) })
 
-  const reads: DoorRead[] = Object.entries(pub.reads)
+  const reads: PortalRead[] = Object.entries(pub.reads)
     .filter((e): e is [string, DriverRead] => typeof e[1]?.readAt === 'string' && e[1].readAt !== '')
     .map(([system, read]) => ({ system, readAt: read.readAt as string, ok: read.ok === true, read }))
     .sort((a, b) => (a.system < b.system ? -1 : a.system > b.system ? 1 : 0))
@@ -239,6 +239,6 @@ export async function collectDoorInput(repo: string, deps: DoorDeps): Promise<Do
   return {
     pub, standards: built.files, gitStandards: gitBuilt.files, reads,
     problems: [...loadProblems, ...built.problems],
-    projection, secrets, store, commit, now, doorOrigin,
+    projection, secrets, store, commit, now, portalOrigin,
   }
 }

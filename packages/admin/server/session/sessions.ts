@@ -6,7 +6,7 @@ export const SESSION_TTL_MS = 86_400_000
 /** The cookie that carries the session token. */
 export const SESSION_COOKIE = 'house_session'
 /** Its name on a hosted Hub (L9 §5.8): `__Host-` makes the browser keep it to the members' host alone (Secure, `Path=/`,
- *  no `Domain`), so it never reaches the door host or another subdomain. */
+ *  no `Domain`), so it never reaches the portal host or another subdomain. */
 export const HOSTED_SESSION_COOKIE = '__Host-house_session'
 
 /** The session cookie's name: `hosted` is the hosted binding (a `HostedConfig` was given), not L5's hosted flag alone. */

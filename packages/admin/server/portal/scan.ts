@@ -1,17 +1,17 @@
-// packages/admin/server/door/scan.ts
+// packages/admin/server/portal/scan.ts
 //
-// The door's scan (DAO-OS L9 spec §3.4 points 2 and 3): the release's refusal, and the only path to a release. Every
-// text file of the output is searched for every secret of `DoorInput.secrets` (L8's `checkNoLeak` for JSON, with its
+// The portal's scan (DAO-OS L9 spec §3.4 points 2 and 3): the release's refusal, and the only path to a release. Every
+// text file of the output is searched for every secret of `PortalInput.secrets` (L8's `checkNoLeak` for JSON, with its
 // paths; a line search for the rest, as written and as HTML decodes it). Then the structure: the model embedded in the
 // HTML holds no `restricted` key, no `visibility` other than public and no account that is not a public System's
-// contract; the HTML holds no form, no button that writes, and asks no host but the door's own. An HTML file is also read
+// contract; the HTML holds no form, no button that writes, and asks no host but the portal's own. An HTML file is also read
 // as a reader sees it (tags out, references decoded, whitespace collapsed), so markup or a line break inside a secret
 // hides nothing. A problem names the file and the path or line, never the value (problems are printed).
 import { checkNoLeak, type Problem } from '../../lib/standards/project.mjs'
 import { contractIdsOf } from '../../lib/standards/ids.mjs'
-import type { DoorInput } from './inputs.ts'
+import type { PortalInput } from './inputs.ts'
 
-/** `<script type="application/json" id="…">…</script>`: JSON a page embeds (the door model, L9 spec §3.7). */
+/** `<script type="application/json" id="…">…</script>`: JSON a page embeds (the portal model, L9 spec §3.7). */
 const JSON_SCRIPT = /<script\b((?:[^"'>]|"[^"]*"|'[^']*')*?\btype\s*=\s*["']?application\/(?:ld\+)?json["']?(?:[^"'>]|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>/gi
 /** An eip155 account (CAIP-10 with a 20-byte address); a hat ref (32 bytes) or a tree ref is none. */
 const ACCOUNT = /eip155:\d+:0x[0-9a-f]{40}(?![0-9a-f])/gi
@@ -152,27 +152,27 @@ function jsonScripts(html: string): { scripts: { label: string; value: unknown; 
   return { scripts, rest }
 }
 
-/** Whether `url` (an attribute's value or a CSS url) asks a host other than the door's own. */
-function otherHost(url: string, door: string | null): boolean {
+/** Whether `url` (an attribute's value or a CSS url) asks a host other than the portal's own. */
+function otherHost(url: string, portal: string | null): boolean {
   if (!ABSOLUTE.test(url)) return false
   try {
     const u = new URL(url.trim().startsWith('//') ? `https:${url.trim()}` : url.trim())
     if (u.protocol === 'data:') return false
-    return door === null || u.host !== new URL(door).host
+    return portal === null || u.host !== new URL(portal).host
   } catch { return true }
 }
 
 /** The structure of an HTML file (§3.4 point 3), outside its JSON scripts. */
-function htmlStructure(file: string, html: string, door: string | null): Problem[] {
+function htmlStructure(file: string, html: string, portal: string | null): Problem[] {
   const out: Problem[] = []
-  for (const m of html.matchAll(/<form\b/gi)) out.push(err(file, `the HTML holds a form at line ${lineAt(html, m.index!)}; the door writes nothing`))
+  for (const m of html.matchAll(/<form\b/gi)) out.push(err(file, `the HTML holds a form at line ${lineAt(html, m.index!)}; the portal writes nothing`))
   for (const m of html.matchAll(/<button\b((?:[^"'>]|"[^"]*"|'[^']*')*)>/gi)) {
     if (/\bform(?:action|method)\s*=|\btype\s*=\s*["']?submit\b/i.test(m[1]!)) {
-      out.push(err(file, `the HTML holds a button that submits at line ${lineAt(html, m.index!)}; the door writes nothing`))
+      out.push(err(file, `the HTML holds a button that submits at line ${lineAt(html, m.index!)}; the portal writes nothing`))
     }
   }
   const ask = (at: number, what: string) =>
-    out.push(err(file, `the HTML asks another host than the door's own (${what}) at line ${lineAt(html, at)}; the door makes no third-party request`))
+    out.push(err(file, `the HTML asks another host than the portal's own (${what}) at line ${lineAt(html, at)}; the portal makes no third-party request`))
   for (const m of html.matchAll(/<([a-z][a-z0-9-]*)\b((?:[^"'>]|"[^"]*"|'[^']*')*)>/gi)) {
     const tag = m[1]!.toLowerCase()
     for (const a of m[2]!.matchAll(/([a-z][a-z0-9:_-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi)) {
@@ -186,11 +186,11 @@ function htmlStructure(file: string, html: string, door: string | null): Problem
         : name === 'style' ? cssUrls(value)
         : name === 'content' && /http-equiv\s*=\s*["']?refresh/i.test(m[2]!) ? [value.replace(/^[^;]*;\s*url\s*=\s*/i, '')]
         : []
-      if (urls.some(u => otherHost(u, door))) ask(m.index!, `<${tag} ${name}>`)
+      if (urls.some(u => otherHost(u, portal))) ask(m.index!, `<${tag} ${name}>`)
     }
   }
   for (const m of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
-    if (cssUrls(m[1]!).some(u => otherHost(u, door))) ask(m.index!, '<style>')
+    if (cssUrls(m[1]!).some(u => otherHost(u, portal))) ask(m.index!, '<style>')
   }
   return out
 }
@@ -210,12 +210,12 @@ function modelStructure(file: string, model: unknown, contracts: Set<string>): P
   const walk = (v: unknown, path: string): void => {
     if (typeof v === 'string') {
       if ([...v.matchAll(ACCOUNT)].some(m => !contracts.has(m[0].toLowerCase()))) {
-        out.push(err(file, `an account that is not a public System's contract is published at ${path}; the door shows the hat, never who wears it`))
+        out.push(err(file, `an account that is not a public System's contract is published at ${path}; the portal shows the hat, never who wears it`))
       }
     } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`))
     else if (isObj(v)) {
       for (const [k, x] of Object.entries(v)) {
-        if (k === 'restricted') out.push(err(file, `the model holds a "restricted" key at ${path}; a restricted thing is never on the door`))
+        if (k === 'restricted') out.push(err(file, `the model holds a "restricted" key at ${path}; a restricted thing is never on the portal`))
         if (k === 'visibility' && x !== 'public') out.push(err(file, `the model holds a visibility other than public at ${path}.visibility`))
         walk(x, `${path}.${k}`)
       }
@@ -227,11 +227,11 @@ function modelStructure(file: string, model: unknown, contracts: Set<string>): P
 
 /**
  * The scan (L9 spec §3.4 points 2 and 3) over a release's text files, by path (`index.html`, `.well-known/dao.json`,
- * `robots.txt`, `door-manifest.json`…). An empty answer is the only way to a release. A JSON file is scanned as JSON
+ * `robots.txt`, `portal-manifest.json`…). An empty answer is the only way to a release. A JSON file is scanned as JSON
  * (`checkNoLeak`, with its paths); an HTML file's JSON scripts as JSON (the file named `<page>#<script id>`), the rest of
  * it by line, as written and decoded; any other file by line.
  */
-export function scanDoor(files: Record<string, string>, input: DoorInput): Problem[] {
+export function scanPortal(files: Record<string, string>, input: PortalInput): Problem[] {
   const secrets = [...input.secrets].filter(s => typeof s === 'string' && s.length >= 6).map(s => ({ s, lower: s.toLowerCase() }))
   const contracts = new Set(input.pub.systems.flatMap(s => contractIdsOf(s).map(c => c.id.toLowerCase())))
   const out: Problem[] = []
@@ -253,7 +253,7 @@ export function scanDoor(files: Record<string, string>, input: DoorInput): Probl
         out.push(...checkNoLeak({ [name]: s.value }, input.secrets), ...modelStructure(name, s.value, contracts))
       }
       const found = new Set<string>()
-      out.push(...textLeaks(file, rest, secrets, true, found), ...renderedLeaks(file, rest, secrets, found), ...htmlStructure(file, rest, input.doorOrigin))
+      out.push(...textLeaks(file, rest, secrets, true, found), ...renderedLeaks(file, rest, secrets, found), ...htmlStructure(file, rest, input.portalOrigin))
     } else {
       out.push(...textLeaks(file, text, secrets, false))
     }

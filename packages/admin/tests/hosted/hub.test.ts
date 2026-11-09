@@ -34,7 +34,7 @@ function goodEnv(root: string): NodeJS.ProcessEnv {
   return {
     ORG_OS_PUBLIC_ORIGIN: 'https://sentinel-origin-1.example.org',
     ORG_OS_PRIVATE_DIR: join(root, 'SENTINEL-private-1'), ORG_OS_BACKUP_DIR: join(root, 'SENTINEL-backups-1'),
-    ORG_OS_DOOR_DIR: join(root, 'SENTINEL-door-1'), ORG_OS_ADMIN_HOME: join(root, 'SENTINEL-state-1'),
+    ORG_OS_PORTAL_DIR: join(root, 'SENTINEL-portal-1'), ORG_OS_ADMIN_HOME: join(root, 'SENTINEL-state-1'),
     ORG_OS_BACKUP_PUBLIC_KEY_FILE: pub, ORG_OS_PUSH: 'off', ORG_OS_TRUST_PROXY: 'on', PORT: '4681',
     GIT_SSH_COMMAND: `ssh -i ${deployKey} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes`,
   }
@@ -46,7 +46,7 @@ const PASSED = [
   'Instance: the instance folder holds an org-os instance.',
   'Keys: the deploy key can be read by the Hub\'s user only.',
   'Keys: the backup public key is an X25519 public key.',
-  'Folders: the private store, backup, door and state folders can be written.',
+  'Folders: the private store, backup, portal and state folders can be written.',
   'Rule 4: the repository\'s remote is not public.',
 ]
 
@@ -159,7 +159,7 @@ describe('hub backup and restore', () => {
   })
 
   it('an unknown verb names the verbs', async () => {
-    const res = await run(['door:build'], {})
+    const res = await run(['portal:build'], {})
     expect(res.code).toBe(1)
     expect(res.err[0]).toMatch(/^Use one of: hub serve, hub check, hub init <remote url>, hub backup \[--verify <file>\], hub restore <file>/)
   })
