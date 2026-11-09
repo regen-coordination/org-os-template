@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve, relative, isAbsolute } from 'node:path'
 import { readRegistry, type Entity } from '../../registry.ts'
 import { addressability } from '../../../lib/data-validate.mjs'
 import { memberKind } from '../../../lib/members.mjs'
@@ -11,6 +11,7 @@ import { absentCard, lostRegistryCard } from '../graph.ts'
 import { instanceSlug, str } from '../util.ts'
 import { SystemReader, systemAttention } from '../../systems/reader.ts'
 import { httpAddress } from '../../systems/link.ts'
+import { parseStatusV2 } from '../../../lib/git-status-v2.mjs'
 import type { Adapter, Board, Edge, Resource } from '../types.ts'
 import type { PrivateAccess } from '../../private/ops.ts'
 import { strictPrivateReads } from '../../private/reads.ts'
@@ -39,6 +40,18 @@ const membershipOf = (repo: string, entries: Entity[]): string | null => {
 }
 
 /** The org's node: its member of kind organization, else this instance's fleet node. */
+/** A repo System's `mount`, read from its clone (a read: it never fetches), or `cloned: false`. A mount that leaves the repo is never looked at. */
+const mountFacts = async (ctx: Parameters<Adapter['read']>[0], mount: string) => {
+  const abs = resolve(ctx.repo, mount)
+  const rel = relative(ctx.repo, abs)
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel) || !existsSync(join(abs, '.git'))) return { path: mount, cloned: false as const }
+  try {
+    const r = await ctx.run('git', ['-C', abs, 'status', '--porcelain=v2', '--branch'], { cwd: ctx.repo, timeoutMs: 5000 })
+    if (r.code !== 0) return { path: mount, cloned: true as const, branch: null, ahead: null, behind: null, dirty: false }
+    return { path: mount, cloned: true as const, ...parseStatusV2(r.stdout) }
+  } catch { return { path: mount, cloned: true as const, branch: null, ahead: null, behind: null, dirty: false } }
+}
+
 const holderOf = (members: Entity[], repo: string): string => {
   const org = members.find(m => memberKind(m) === 'organization' && str(m.id))
   return org ? `person:${String(org.id)}` : `instance:${instanceSlug(repo)}`
@@ -100,6 +113,7 @@ export const systems: Adapter = {
     // Side by side: one slow system holds the others back no longer than its own time limit. Systems
     // on one paced host (several Safes) take turns, and each read's limit starts with its own turn.
     const reads = await Promise.all(read.map(e => reader!.read(e, members)))
+    const mounts = await Promise.all(entries.map(e => (e.kind === 'repo' && str(e.mount) ? mountFacts(ctx, str(e.mount)!) : null)))
     const nodes: Resource[] = []
     const edges: Edge[] = []
     entries.forEach((e, i) => {
@@ -114,6 +128,7 @@ export const systems: Adapter = {
           kind: e.kind ?? null, chain: e.chain ?? null, address: read[i]!.address ?? null, ...(url ? { url } : {}),
           section: e.section ?? null, embeddable: e.embeddable === true, notes: e.notes ?? null, driver,
           ...(id === membership ? { membership: true } : {}),
+          ...(mounts[i] ? { mount: mounts[i], cloneUrl: str(e.url), branch: str(e.branch) } : {}),
         },
         source: { path: rel, editable: true, registry: 'systems', entityId: id },
       })

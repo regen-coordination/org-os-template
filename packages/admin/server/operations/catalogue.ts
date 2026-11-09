@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join, normalize } from 'node:path'
+import { gitUrlProblem } from '../../launcher/git-write.ts'
 import { HttpError } from '../errors.ts'
 import { failingFileChecks } from '../resources/adapters/modules.ts'
 import { idOf, list, str } from '../resources/util.ts'
@@ -43,6 +44,11 @@ export interface Operation {
 /** The server asks for a confirmation (a planned nonce) before anything that changes a file or
  *  a running agent, and before anything that reaches the network. */
 export const needsConfirm = (op: Pick<Operation, 'effect' | 'network'>): boolean => op.effect === 'changes' || op.network
+
+const mountPath = (r: Resource): string | null => {
+  const m = r.facts.mount
+  return m && typeof m === 'object' && typeof (m as { path?: unknown }).path === 'string' ? (m as { path: string }).path : null
+}
 
 const NO_PARAMS: ParamsSchema = { type: 'object', additionalProperties: false }
 const SEC = 1000
@@ -198,6 +204,27 @@ export const CATALOGUE: Operation[] = [
           ...(p.task ? ['--task', String(p.task)] : []), ...(p.base ? ['--base', String(p.base)] : []), '--', String(p.brief)],
         writes: ['memory/crew/'],
       }
+    },
+  },
+  {
+    // Clone a repo System into its mount (network N1, R10): only under repos/, which the instance ignores in git. The url is
+    // checked by the launcher's rule and follows `--`; `ext::` transports are off. git refuses a non-empty folder itself.
+    id: 'system.clone', kinds: ['system'], label: () => 'Clone', effect: 'changes', network: true,
+    timeoutMs: 300 * SEC, params: NO_PARAMS, refreshes: 'records',
+    unavailable: (r, repo) => {
+      if (r.facts.kind !== 'repo') return 'Only a repo System can be cloned.'
+      const mount = mountPath(r)
+      if (mount === null) return 'This System has no mount to clone into.'
+      const norm = normalize(mount)
+      if (!norm.startsWith('repos/') || norm.split(/[\\/]/).includes('..')) return 'Clone works for mounts under repos/, which the instance ignores in git.'
+      try { if (readdirSync(join(repo, norm)).length > 0) return `${norm} is already there, with files in it.` } catch { /* not there: fine */ }
+      const url = str(r.facts.cloneUrl)
+      if (url === null) return 'This System has no address to clone from.'
+      return gitUrlProblem(url)
+    },
+    plan: (r, _p, repo) => {
+      const mount = normalize(mountPath(r) ?? '')
+      return { cmd: 'git', args: ['-c', 'protocol.ext.allow=never', 'clone', '--branch', str(r.facts.branch) ?? 'main', '--', String(r.facts.cloneUrl), join(repo, mount)], writes: [mount] }
     },
   },
   {
