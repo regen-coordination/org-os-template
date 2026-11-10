@@ -120,8 +120,10 @@ export const records: Adapter = {
       }
     }
 
-    // Meetings that happened: what each was, and what came of it. A recording's link is carried only when the record
-    // says it may be shared (`recording_shared: true`); otherwise the Hub says only that there is one. Transcripts, raw
+    // Meetings that happened: what each was, and what came of it. `recorded` says there is a recording, whichever
+    // field names it (`recording`, `recording_url`, or `recording_shared`, which some instances write as the link the
+    // recording was shared at). A link is carried only when `recording_shared` is exactly `true` and `recording_url`
+    // is https; a shared-at link is never carried, since who it was shared with is not in the record. Transcripts, raw
     // archives and private notes stay where they are: none of their paths becomes a fact.
     const meetings = entries('meetings')
     if (meetings) {
@@ -131,7 +133,7 @@ export const records: Adapter = {
         const link = str(e.recording_url)
         nodes.push(node('meeting', 'meetings', e, str(e.title) ?? String(e.id), changes, {
           date: e.date == null ? null : String(e.date), type: str(e.type) ?? str(e.kind), session: e.session_number ?? null,
-          recorded: Boolean(e.recording || link), recording: shared && link && /^https:\/\//.test(link) ? link : null,
+          recorded: Boolean(e.recording || link || e.recording_shared), recording: shared && link && /^https:\/\//.test(link) ? link : null,
           agenda: str(e.agenda_ref), summary: str(e.summary),
           decisions: count(e.decisions ?? e.keyDecisions), actions: count(e.action_items ?? e.actionItems),
           project: str(e.project_id) ?? str(e.related_project),
