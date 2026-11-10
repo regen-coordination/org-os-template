@@ -34,6 +34,10 @@ describe('records adapter: meetings, events and organizations', () => {
       '    title: Subject call',
       '    date: "2026-11-06"',
       '    recording_url: https://example.org/rec/private',
+      '  - id: m-short',
+      '    title: Council Session 12 - a long sentence of what the room did',
+      '    short_title: Council Session 12',
+      '    date: "2026-11-11"',
       '  - id: m-shared-at',
       '    title: Session 10',
       '    date: "2026-10-14"',
@@ -47,6 +51,8 @@ describe('records adapter: meetings, events and organizations', () => {
       source: { path: 'data/meetings.yaml', editable: true, registry: 'meetings', entityId: 'm-shared' } })
     expect(JSON.stringify(shared)).not.toContain('private/transcripts')
     expect(g.nodes.find(n => n.id === 'meeting:m-private')?.facts).toMatchObject({ recorded: true, recording: null })
+    expect(g.nodes.find(n => n.id === 'meeting:m-short')).toMatchObject({ name: 'Council Session 12',
+      facts: { summary: 'Council Session 12 - a long sentence of what the room did' } })
     const sharedAt = g.nodes.find(n => n.id === 'meeting:m-shared-at')
     expect(sharedAt?.facts).toMatchObject({ recorded: true, recording: null })
     expect(JSON.stringify(sharedAt)).not.toContain('example.org/shared')

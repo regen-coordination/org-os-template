@@ -131,10 +131,11 @@ export const records: Adapter = {
       for (const e of meetings) {
         const shared = e.recording_shared === true
         const link = str(e.recording_url)
-        nodes.push(node('meeting', 'meetings', e, str(e.title) ?? String(e.id), changes, {
+        // A meeting's `short_title`, when it has one, names it in lists; `title` is often a whole summary sentence.
+        nodes.push(node('meeting', 'meetings', e, str(e.short_title) ?? str(e.title) ?? String(e.id), changes, {
           date: e.date == null ? null : String(e.date), type: str(e.type) ?? str(e.kind), session: e.session_number ?? null,
           recorded: Boolean(e.recording || link || e.recording_shared), recording: shared && link && /^https:\/\//.test(link) ? link : null,
-          agenda: str(e.agenda_ref), summary: str(e.summary),
+          agenda: str(e.agenda_ref), summary: str(e.summary) ?? (str(e.short_title) ? str(e.title) : null),
           decisions: count(e.decisions ?? e.keyDecisions), actions: count(e.action_items ?? e.actionItems),
           project: str(e.project_id) ?? str(e.related_project),
         }))
