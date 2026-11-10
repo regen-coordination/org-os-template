@@ -36,3 +36,13 @@ export function applyStoredAppearance(root: HTMLElement = document.documentEleme
   applyTheme(o ? o.scheme : storedTheme(), root)
   applyOrgTheme(o, root)
 }
+
+/** The appearance that shows, read from <html>: `data-theme` and `data-org-theme` change wherever the choice is made
+ *  (the org menu, the sites bar, ⌘K), so whoever draws a choice watches the attributes, not the storage. */
+export function watchAppearance(onChange: () => void): () => void {
+  const watch = new MutationObserver(onChange)
+  watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-org-theme'] })
+  return () => watch.disconnect()
+}
+export const shownTheme = (): Theme | null => { const t = document.documentElement.dataset.theme; return t === 'light' || t === 'dark' ? t : null }
+export const shownOrgTheme = (): string | null => document.documentElement.dataset.orgTheme ?? null

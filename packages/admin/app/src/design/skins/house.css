@@ -255,6 +255,7 @@
   --pad-reply: 54px; /* a reply's indent: under its comment's body (§10.3) */
   --h-composer: 40px; /* the composer's text, at least */
   --w-menu: 220px; /* a menu's narrowest */
+  --w-sites: 272px; /* the sites bar's list of sites (frame/SitesBar.tsx) */
   --w-tip: 32ch; /* a tooltip's widest (§7.3) */
   --w-chip: 24ch;
   --w-filter: 14em;

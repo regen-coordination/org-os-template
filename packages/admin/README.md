@@ -923,7 +923,10 @@ Two skins ship:
 
 **The instance's own.** An instance may carry `house/skin.css`: token values that re-tint the house, served at
 `/instance-skin.css` and linked in the head. It may also carry `house/bar.yaml`, its sites bar: the sites an
-organisation keeps side by side, drawn as one slim row over every page, the one this house is marked `current`.
+organisation keeps side by side, drawn as one row over every page: a lockup (the label, a way home, then the site
+this house is, marked `current`, which opens the list of sites with each one's note) and, at the far end, the theme
+control (the instance's themes under Auto; with none, a light or dark switch). The mark beside the label is an empty
+box (`.sites-mark`) for the instance's skin to fill; beside the open sidebar the label is not said twice.
 
 ```yaml
 label: Example Org              # optional: whose sites these are
