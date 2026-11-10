@@ -16,6 +16,8 @@
         if (/^[a-z0-9-]+$/.test(v)) document.documentElement.dataset.skin = v;
       })();
     </script>
+    <!-- The instance's own skin (server/instanceSkin.ts): empty unless the instance carries house/skin.css. -->
+    <link rel="stylesheet" href="/instance-skin.css" />
   </head>
   <body>
     <div id="root"></div>

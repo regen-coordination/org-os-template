@@ -963,6 +963,15 @@ Tokens come in groups (each skin's file is written in this order):
   before a menu entry), `--brand-dot-display` (the org's seal beside its name) and `--product-display` (the product's
   name in the menu foot). Bare sets each to what it drew before the token existed (padding 0, the edge colour, `none`).
 
+**An instance's own look.** An instance may carry `house/skin.css` at its root: token values that re-tint the
+`house` skin, light and dark, so an org can wear its own colours and type with nothing of it written here. The server
+answers `GET /instance-skin.css` with that file (read on each request, at most 64 KB; empty when there is none), and
+`index.html` links it in the head, so the first frame is drawn in it. Write its blocks with `html:root[...]`
+selectors (`html:root[data-skin="house"]`, the same under `prefers-color-scheme: dark` with
+`:not([data-theme="light"])`, and `html:root[data-skin="house"][data-theme="dark"]`), one element more specific
+than `house.css`, so they win in a build and in dev alike. The tests do not see it: check its contrast yourself
+(text against paper, raised and sunken, 4.5:1 or more). `bare` and any other skin a viewer picks are left alone.
+
 To add a skin `calm`:
 
 1. Copy `skins/bare.css` to `skins/calm.css` and replace `bare` with `calm` in its three selectors
