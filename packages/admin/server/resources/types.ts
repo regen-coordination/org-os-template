@@ -7,7 +7,7 @@ import type { PrivateAccess } from '../private/ops.ts'
 export type Board = 'organization' | 'systems'
 
 export type Kind =
-  | 'project' | 'person' | 'funding' | 'partner' | 'idea' | 'knowledge-gaps'
+  | 'project' | 'person' | 'funding' | 'partner' | 'idea' | 'meeting' | 'event' | 'organization' | 'task' | 'knowledge-gaps'
   | 'module' | 'role' | 'seat' | 'instance' | 'source' | 'channel' | 'connector' | 'system'
   | 'proposal'
   | 'knowledge'   // the commons: only what waits on a person (adapter `knowledge`)
@@ -47,7 +47,7 @@ export interface BoardView { board: Board; nodes: Resource[]; edges: Edge[]; por
 
 export const BOARD_OF: Record<Exclude<Kind, 'absent'>, Board> = {
   project: 'organization', person: 'organization', funding: 'organization', partner: 'organization',
-  idea: 'organization', 'knowledge-gaps': 'organization',
+  idea: 'organization', meeting: 'organization', event: 'organization', organization: 'organization', task: 'organization', 'knowledge-gaps': 'organization',
   module: 'systems', role: 'systems', seat: 'systems', instance: 'systems',
   source: 'systems', channel: 'systems', connector: 'systems',
   system: 'systems', // the default: the systems adapter places each entry by its section

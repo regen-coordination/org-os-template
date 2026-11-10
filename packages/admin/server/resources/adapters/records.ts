@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { parse as parseYaml } from 'yaml'
 import { join } from 'node:path'
 import { readRegistry, type Entity } from '../../registry.ts'
 import { addressability } from '../../../lib/data-validate.mjs'
@@ -8,6 +9,9 @@ import { fundingAttention } from '../attention.ts'
 import { absentCard, lostRegistryCard } from '../graph.ts'
 import { str, list } from '../util.ts'
 import type { Adapter, Changed, Edge, Kind, Resource } from '../types.ts'
+
+/** How many items a list field holds, whatever they are (decisions and actions are often objects). */
+const count = (v: unknown): number => (Array.isArray(v) ? v.length : 0)
 
 const ME = { name: 'records', board: 'organization' as const, title: 'Records' }
 
@@ -113,6 +117,91 @@ export const records: Adapter = {
         const by = str(e.submitted_by)
         if (by) edges.push({ from: r.id, to: `person:${by}`, kind: 'submitted' })
         for (const c of list(e.champions)) edges.push({ from: r.id, to: `person:${c}`, kind: 'champion' })
+      }
+    }
+
+    // Meetings that happened: what each was, and what came of it. A recording's link is carried only when the record
+    // says it may be shared (`recording_shared: true`); otherwise the Hub says only that there is one. Transcripts, raw
+    // archives and private notes stay where they are: none of their paths becomes a fact.
+    const meetings = entries('meetings')
+    if (meetings) {
+      const changes = await entityChanges(ctx.repo, 'meetings')
+      for (const e of meetings) {
+        const shared = e.recording_shared === true
+        const link = str(e.recording_url)
+        nodes.push(node('meeting', 'meetings', e, str(e.title) ?? String(e.id), changes, {
+          date: e.date == null ? null : String(e.date), type: str(e.type) ?? str(e.kind), session: e.session_number ?? null,
+          recorded: Boolean(e.recording || link), recording: shared && link && /^https:\/\//.test(link) ? link : null,
+          agenda: str(e.agenda_ref), summary: str(e.summary),
+          decisions: count(e.decisions ?? e.keyDecisions), actions: count(e.action_items ?? e.actionItems),
+          project: str(e.project_id) ?? str(e.related_project),
+        }))
+      }
+    }
+
+    // Events to come (and past ones the calendar keeps): sessions, calls, gatherings. `start` is the date with its time
+    // when one is given, so a board can sort them and ask for what comes after now.
+    const events = entries('events')
+    if (events) {
+      const changes = await entityChanges(ctx.repo, 'events')
+      for (const e of events) {
+        const date = e.date == null ? null : String(e.date)
+        const time = str(e.time)
+        nodes.push(node('event', 'events', e, str(e.title) ?? String(e.id), changes, {
+          date, start: date && time && /^\d\d:\d\d/.test(time) && /^\d{4}-\d\d-\d\d$/.test(date) ? `${date}T${time.slice(0, 5)}` : date,
+          end: e.end_date == null ? null : String(e.end_date), type: str(e.type), session: e.session_number ?? null,
+          location: str(e.location), agenda: str(e.agenda_ref) ?? str(e.agenda_doc), recurrence: str(e.recurrence),
+          project: str(e.related_project),
+        }))
+      }
+    }
+
+    // An instance's own task list (DATA-MODEL "Extension Pattern": `tasks.yaml` is the first example), when it keeps
+    // one: what is to be done, by whom and by when. `audience: stewards` marks an ask of the Council. Read-only, and
+    // its notes stay in the file: only the fields a list needs become facts.
+    const tasksPath = join(ctx.repo, 'data', 'tasks.yaml')
+    if (existsSync(tasksPath)) {
+      try {
+        const doc = parseYaml(readFileSync(tasksPath, 'utf8')) as { tasks?: unknown } | unknown[] | null
+        const all = Array.isArray(doc) ? doc : Array.isArray((doc as { tasks?: unknown } | null)?.tasks) ? (doc as { tasks: unknown[] }).tasks : []
+        for (const t of all) {
+          if (!t || typeof t !== 'object') continue
+          const e = t as Record<string, unknown>
+          const id = str(e.id)
+          if (!id) continue
+          nodes.push({
+            id: `task:${id}`, kind: 'task', board: 'organization', name: str(e.title) ?? id, status: str(e.status),
+            attention: null, changed: null,
+            facts: { owner: str(e.owner), due: e.due == null ? null : String(e.due), priority: str(e.priority), audience: str(e.audience),
+              meeting: str(e.meeting_ref), project: str(e.related_project) },
+            source: { path: 'data/tasks.yaml', editable: false, entityId: id },
+          })
+        }
+      } catch (err) {
+        nodes.push(absentCard({ ...ME, title: 'data/tasks.yaml' },
+          `cannot be read: ${err instanceof Error ? err.message : String(err)}`, 'records:tasks'))
+      }
+    }
+
+    // The organizations the knowledge store knows (data/kb/organization.yaml, org-os-kms): Local Nodes and the like,
+    // with their stage, place and where they belong. Read-only here: the knowledge store has its own pipeline.
+    const kbPath = join(ctx.repo, 'data', 'kb', 'organization.yaml')
+    if (existsSync(kbPath)) {
+      try {
+        const doc = parseYaml(readFileSync(kbPath, 'utf8')) as { entries?: Record<string, Record<string, unknown>> } | null
+        for (const [slug, e] of Object.entries(doc?.entries ?? {})) {
+          if (!e || typeof e !== 'object') continue
+          const coords = Array.isArray(e.coords) && e.coords.length === 2 && e.coords.every(n => typeof n === 'number') ? e.coords : null
+          nodes.push({
+            id: `organization:${slug}`, kind: 'organization', board: 'organization', name: str(e.title) ?? slug,
+            status: str(e.status), attention: null, changed: null,
+            facts: { org_type: str(e.org_type), stage: str(e.stage), place: str(e.place), url: str(e.url), part_of: str(e.part_of), scale: str(e.scale), coords },
+            source: { path: 'data/kb/organization.yaml', editable: false, entityId: slug },
+          })
+        }
+      } catch (err) {
+        nodes.push(absentCard({ ...ME, title: 'data/kb/organization.yaml' },
+          `cannot be read: ${err instanceof Error ? err.message : String(err)}`, 'records:kb-organization'))
       }
     }
 
