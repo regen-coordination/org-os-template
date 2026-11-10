@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ORG_THEME_KEY, setOrgTheme, storedOrgTheme } from './orgTheme.ts'
+import { ORG_THEME_KEY, applyStoredAppearance, setOrgTheme, storedOrgTheme } from './orgTheme.ts'
 
 const root = document.documentElement
 afterEach(() => {
@@ -26,6 +26,19 @@ describe('instance themes in the browser', () => {
     setOrgTheme(null)
     expect(root.dataset.orgTheme).toBeUndefined()
     expect(storedOrgTheme()).toBeNull()
+  })
+
+  it('keeps a stored theme and its scheme at start-up, even with no light or dark choice stored', () => {
+    const store = memory()
+    store.set(ORG_THEME_KEY, 'dawn:light')
+    root.dataset.orgTheme = 'dawn'; root.dataset.theme = 'light' // as the inline script drew it
+    applyStoredAppearance()
+    expect(root.dataset.theme).toBe('light')
+    expect(root.dataset.orgTheme).toBe('dawn')
+    store.delete(ORG_THEME_KEY); store.set('org-os-admin.theme', 'dark')
+    applyStoredAppearance()
+    expect(root.dataset.orgTheme).toBeUndefined()
+    expect(root.dataset.theme).toBe('dark')
   })
 
   it('reads nothing from a made-up stored value', () => {

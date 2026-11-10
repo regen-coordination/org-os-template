@@ -1,5 +1,5 @@
 import { recall, remember } from './storage.ts'
-import { setTheme, type Theme } from './theme.ts'
+import { applyTheme, setTheme, storedTheme, type Theme } from './theme.ts'
 
 /** The key index.html's inline script reads too, so a chosen theme is drawn from the first frame. Kept as
  *  `<id>:<scheme>`, so the script can set both attributes without asking the server. */
@@ -27,4 +27,12 @@ export function setOrgTheme(choice: OrgThemeChoice | null, root: HTMLElement = d
   remember(ORG_THEME_KEY, choice ? `${choice.id}:${choice.scheme}` : null)
   applyOrgTheme(choice, root)
   if (choice) setTheme(choice.scheme, root)
+}
+
+/** The appearance at start-up: an instance theme chosen here carries its scheme and wins over the light or dark
+ *  choice, as the inline script in index.html already drew it; else the light or dark choice, or the system. */
+export function applyStoredAppearance(root: HTMLElement = document.documentElement): void {
+  const o = storedOrgTheme()
+  applyTheme(o ? o.scheme : storedTheme(), root)
+  applyOrgTheme(o, root)
 }
