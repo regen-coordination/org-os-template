@@ -2,7 +2,7 @@
 // packages/admin/app/src/blocks/markdown.test.tsx
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
-import { renderMarkdown, safeHref } from './markdown.tsx'
+import { internalHref, renderMarkdown, safeHref } from './markdown.tsx'
 
 const html = (md: string) => render(<div>{renderMarkdown(md)}</div>).container.innerHTML
 
@@ -32,7 +32,7 @@ describe('renderMarkdown', () => {
   it.each(['http://example.org', 'https://example.org/a?b=1', 'HTTPS://EXAMPLE.ORG', 'mailto:a@b.org', 'MAILTO:a@b.org'])('safeHref allows %j', url => {
     expect(safeHref(url)).toBe(url)
   })
-  it.each(refused.filter(u => u !== '' && !/\s/.test(u)))('draws a link to %j as its text, with no anchor and no href', url => {
+  it.each(refused.filter(u => u !== '' && u !== '/relative' && !/\s/.test(u)))('draws a link to %j as its text, with no anchor and no href', url => {
     const { container } = render(<div>{renderMarkdown(`[label](${url})`)}</div>)
     expect(container.querySelector('a')).toBeNull()
     expect(container.innerHTML).not.toContain('href')
@@ -59,4 +59,17 @@ describe('renderMarkdown', () => {
     expect(container.querySelector('a')).toBeNull()
     expect(container.textContent).toBe(text)
   })
+
+  it('draws a link to a rooted path as a link inside the house: no new tab, no rel', () => {
+    const { container } = render(<div>{renderMarkdown('See [Needs you](/needs) and [the map](/b/projects?view=map#top).')}</div>)
+    const [a, b] = [...container.querySelectorAll('a')]
+    expect(a!.getAttribute('href')).toBe('/needs')
+    expect(a!.hasAttribute('target')).toBe(false)
+    expect(a!.hasAttribute('rel')).toBe(false)
+    expect(a!.textContent).toBe('Needs you')
+    expect(b!.getAttribute('href')).toBe('/b/projects?view=map#top')
+  })
+  it.each(['/', '/needs', '/b/projects', '/r/project/a%20b?x=1#y'])('internalHref allows %j', url => { expect(internalHref(url)).toBe(url) })
+  it.each(['//evil.example/x', '/\\evil.example', 'needs', './needs', '../x', '', ' /needs', '/a b', '/a\tb', 'https://example.org', 'javascript:alert(1)'])(
+    'internalHref refuses %j', url => { expect(internalHref(url)).toBeNull() })
 })

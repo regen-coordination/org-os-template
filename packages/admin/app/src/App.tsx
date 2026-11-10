@@ -60,6 +60,7 @@ import { applySkin, chosenSkin } from './skin.ts'
 import { ViewAsBand, ViewAsProvider, useCanWrite, useViewer, useVisibilitySource } from './viewAs/ViewAs.tsx'
 import { TopBar } from './frame/TopBar.tsx'
 import { PhoneBar } from './frame/PhoneBar.tsx'
+import { SitesBar } from './frame/SitesBar.tsx'
 import { namedIn, pathOf } from './frame/path.ts'
 import { useEntryOfResources } from './blocks/entries.ts'
 import { shownName } from './record/restricted.ts'
@@ -197,7 +198,7 @@ function HubApp() {
   // phone sheet reads the frame's width (frame.css).
   return (
     <ViewAsProvider source={source}><PanelProvider><InspectorProvider><SessionProvider>
-      {location === '/sign-in' ? <SignInPage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: null }} nav={<Nav />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
+      {location === '/sign-in' ? <SignInPage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: null }} nav={<Nav />} sites={<SitesBar />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
         band={<><ViewAsBand /><ReadOnlyNotice /></>} aside={<RightSlot />} foot={<Dock />} bottom={<HouseBottom />}>
         <Switch>
           <Route path="/"><ToBoard id="home" /></Route>

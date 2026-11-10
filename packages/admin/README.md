@@ -921,6 +921,22 @@ Two skins ship:
 
 `sleek` and `sample` are gone.
 
+**The instance's own.** An instance may carry `house/skin.css`: token values that re-tint the house, served at
+`/instance-skin.css` and linked in the head. It may also carry `house/bar.yaml`, its sites bar: the sites an
+organisation keeps side by side, drawn as one slim row over every page, the one this house is marked `current`.
+
+```yaml
+label: Example Org              # optional: whose sites these are
+sites:
+  - { label: Knowledge, href: "https://knowledge.example.org", note: "What we know" }
+  - { label: House, href: /, current: true }
+```
+
+A site's `href` is an http(s) address (it opens in its own tab) or a rooted path (a place in the house); a site
+without a label, or with any other address, is left out, and at most eight are kept. `GET /api/house/bar` answers
+it to members; with no file there are no sites and no bar. A note block's Markdown follows the same rule for its
+links: `[Needs you](/needs)` stays in the house, `[site](https://example.org)` opens in a new tab.
+
 **Fonts.** The house sets type in three self-hosted variable fonts: Fraunces (`--display`: the greeting, the portal),
 Geist (`--sans`: everything else) and Geist Mono (`--mono`: ids, addresses, wells). The WOFF2 files sit in
 `app/src/design/fonts/` with their OFL licences, latin and latin-ext. They are copied from the

@@ -19,6 +19,9 @@
 .frame-side { display: flex; min-width: 0; min-height: 0; }
 .frame-main { grid-column: -2 / -1; grid-row: 1; display: grid; grid-template-rows: var(--h-topbar) auto minmax(0, 1fr) auto;
   min-width: 0; min-height: 0; position: relative; }
+/* The instance's sites bar (frame/SitesBar.tsx), when the frame is given one: a row of its own over the top bar. */
+.frame-main:has(> .frame-sites) { grid-template-rows: auto var(--h-topbar) auto minmax(0, 1fr) auto; }
+.frame-sites { min-width: 0; }
 .frame-top { min-width: 0; }
 .frame-band { min-width: 0; }
 .frame-scroll { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-top: var(--h-topbar); }
@@ -112,6 +115,21 @@ button.who { cursor: pointer; }
 .side-rail .side-a:focus-visible, .side-rail .side-org:focus-visible, .side-rail .side-search:focus-visible, .side-rail button.who:focus-visible {
   outline-offset: var(--focus-w); }
 .side-rail .tip-wrap > .tip { inset-block-end: auto; inset-block-start: 50%; inset-inline-start: calc(100% + var(--sp-5)); translate: 0 -50%; }
+
+/* The sites bar: whose sites these are, then the sites, trailing; the one this house is in ink over a rule in
+   --accent. One row: narrower than its sites, it scrolls sideways in itself, so the page never does. */
+.sites { display: flex; align-items: center; gap: var(--sp-8); min-block-size: var(--h-ctl); min-width: 0; padding-inline: var(--sp-12) var(--sp-10);
+  border-block-end: var(--rule-w) solid var(--rule); font-size: var(--fs-ui); color: var(--mute); overflow-x: auto; scrollbar-width: none; }
+.sites::-webkit-scrollbar { display: none; }
+.sites-org { flex: none; color: var(--ink); font-weight: var(--fw-medium); white-space: nowrap; }
+.sites-l { display: flex; align-items: stretch; gap: var(--sp-8); flex: none; margin: 0; margin-inline-start: auto; padding: 0; list-style: none; }
+.sites-l > li { display: flex; }
+.sites-a { display: inline-flex; align-items: center; gap: var(--sp-3); min-block-size: var(--h-ctl); color: var(--mute); text-decoration: none; white-space: nowrap;
+  border-block: var(--rule-w-heavy) solid transparent; transition: color var(--dur-1) var(--ease); }
+.sites-a[aria-current] { color: var(--ink); font-weight: var(--fw-medium); border-block-end-color: var(--accent); }
+.sites-out { color: var(--faint); }
+.sites-a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+@media (hover: hover) { .sites-a:hover { color: var(--ink); } }
 
 /* The top bar (§5.5): the rail toggle, the path, then View as and notifications */
 .tb { display: flex; align-items: center; gap: var(--sp-8); block-size: 100%; min-width: 0; padding-block: 0; padding-inline: var(--sp-12) var(--sp-10);
@@ -362,6 +380,8 @@ button.who { cursor: pointer; }
 @container frame (max-width: 759px) {
   .frame-side { display: none; }
   .frame-main { grid-template-rows: var(--h-phonebar) auto minmax(0, 1fr) auto auto; }
+  .frame-main:has(> .frame-sites) { grid-template-rows: auto var(--h-phonebar) auto minmax(0, 1fr) auto auto; }
+  .sites { padding-inline: var(--sp-11); }
   .frame-bbar { display: block; }
   .main { padding: var(--sp-9) var(--sp-11) var(--sp-13); }
   .frame-row { flex-direction: column; }

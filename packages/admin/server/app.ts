@@ -23,6 +23,7 @@ import { mountLibrary } from './library/routes.ts'
 import { mountWorkspace } from './workspace/routes.ts'
 import { cachedReads, withFromMarks, type SourceReader } from './workspace/sources.ts'
 import { chainKept } from './deploy/private-flip.ts'
+import { INSTANCE_BAR_PATH, readInstanceBar } from './instanceBar.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
 import { LEDGER_SENTENCE } from './changes/stage.ts'
@@ -140,6 +141,9 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
     // While writes are off (Lane 3 Task 11) the client hides every write control; on, the answer is as before.
     return c.json({ org: orgName(repo), ...s, ...(opts.instanceWrites === 'off' ? { instanceWrites: 'off' as const } : {}) })
   })
+
+  // The instance's sites bar (instanceBar.ts): read per request; no sites when the instance carries none.
+  app.get(INSTANCE_BAR_PATH, c => c.json(readInstanceBar(repo)))
 
   app.get('/api/registries', c => c.json(gateRegistryList(viewerOf(c), repo, levels())))
   app.get('/api/registries/:name', async c => {

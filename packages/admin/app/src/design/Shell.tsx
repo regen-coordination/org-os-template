@@ -59,9 +59,10 @@ const viewport = () => (typeof window !== 'undefined' && window.innerWidth > 0 ?
  *  thing focusable and targets `main`. The frame measures its own width (ResizeObserver), or takes `width` (a
  *  /parts specimen), and sets `data-mode`. `folded` given overrides the stored fold, so a specimen draws the same
  *  in every browser; a `specimen` is not the page's main landmark and has no skip link. `title` names a
- *  specimen; `org` is the frame's org, for whoever draws it. */
-export function Shell({ title, org, nav, top, band, notice, aside, foot, bottom, width, folded: given, specimen = false, children }: {
-  title: string; org?: OrgMark; nav: ReactNode; top?: ReactNode; band?: ReactNode; notice?: ReactNode; aside?: ReactNode
+ *  specimen; `org` is the frame's org, for whoever draws it. `sites`, when given, is a row over the top bar: the
+ *  instance's sites bar (frame/SitesBar.tsx), at every width. */
+export function Shell({ title, org, nav, sites, top, band, notice, aside, foot, bottom, width, folded: given, specimen = false, children }: {
+  title: string; org?: OrgMark; nav: ReactNode; sites?: ReactNode; top?: ReactNode; band?: ReactNode; notice?: ReactNode; aside?: ReactNode
   foot?: ReactNode; bottom?: ReactNode; width?: number; folded?: boolean; specimen?: boolean; children: ReactNode
 }) {
   const root = useRef<HTMLDivElement>(null)
@@ -138,6 +139,7 @@ export function Shell({ title, org, nav, top, band, notice, aside, foot, bottom,
         <div ref={side} className="frame-side" id={sideId} onClick={followed}>{nav}</div>
         {shown && <div className="frame-scrim" aria-hidden="true" onClick={() => close(false)} />}
         <div className="frame-main">
+          {sites !== undefined && <div className="frame-sites">{sites}</div>}
           <Top className="frame-top">{top}</Top>
           <div className="frame-band" inert={under}>{band}{notice}</div>
           <div className="frame-scroll" inert={under}>

@@ -6,6 +6,7 @@ import type { OutcomeReading } from '../../server/systems/driver.ts'
 import type { EventInput } from '../../server/proposals/events.ts'
 import type { Actor } from '../../server/actor.ts'
 import type { BoardRead } from '../../server/boards/types.ts'
+import type { InstanceBar } from '../../server/instanceBar.ts'
 import type { LibraryList, LibraryPreview, Receipt, RemovalPreview } from '../../server/library/types.ts'
 import type { DeployPlan } from '../../server/deploy/prepare.ts'
 import type { ReadBackAnswer, Ran } from '../../server/deploy/readback.ts'
@@ -48,6 +49,7 @@ export type { EventInput as ProposalEventInput, EventKindHere as ProposalEventKi
 export type { DriverRead, DriverSection, Driver, DriverContext } from '../../server/systems/driver.ts'
 export type { Actor } from '../../server/actor.ts'
 export type { Shelf, Maturity, Standing, Fits, ListedEntry, ShelfProblem, LibraryList, LibraryPreview, Receipt, ReceiptDecision, RemovalPreview } from '../../server/library/types.ts'
+export type { InstanceBar, BarSite } from '../../server/instanceBar.ts'
 export type { Layout, GridPlace, CanvasPlace, Place, BlockEntry, BoardDef, BoardRead } from '../../server/boards/types.ts'
 export type { Kind as ResourceKind, EdgeKind } from '../../server/resources/types.ts'
 export type { MemberKind } from '../../lib/members.mjs'
@@ -349,6 +351,8 @@ export const api = {
   actor: () => fetchJSON<Actor>('/api/actor'),
   // P4c: boards (contract "P4c produces"). Written only through stage().
   boards: () => fetchJSON<BoardRead[]>('/api/boards'),
+  /** The instance's sites bar (server/instanceBar.ts): no sites when the instance carries none. */
+  houseBar: () => fetchJSON<InstanceBar>('/api/house/bar'),
   board: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}`),
   builtinBoard: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}/builtin`),
   // The library: its list, a preview that writes nothing, and Add and Remove, which stage into your change (the tray's).
