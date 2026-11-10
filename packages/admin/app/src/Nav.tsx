@@ -101,7 +101,7 @@ function useHouseNav() {
     : 'id' in actor ? { hatName: actor.name, address: null, hatId: null, hats: [] }
     : { hatName: 'Read-only', address: null, hatId: null, hats: [] }
 
-  return { org: { name: status.data?.org ?? 'org-os', mark: null }, counts, identity, collections, instance }
+  return { org: { name: status.data?.org ?? 'org-os', mark: status.data?.mark ?? null }, counts, identity, collections, instance }
 }
 
 /** The house sidebar (§5.2). */

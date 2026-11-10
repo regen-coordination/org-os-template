@@ -25,6 +25,7 @@ import { cachedReads, withFromMarks, type SourceReader } from './workspace/sourc
 import { chainKept } from './deploy/private-flip.ts'
 import { INSTANCE_BAR_PATH, readInstanceBar } from './instanceBar.ts'
 import { INSTANCE_THEMES_PATH, readInstanceThemes } from './instanceThemes.ts'
+import { instanceMark } from './instanceAssets.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
 import { LEDGER_SENTENCE } from './changes/stage.ts'
@@ -140,7 +141,8 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
     if (viewerOf(c).kind === 'public') return c.json(publicStatus(repo))
     const s = await repoStatus(repo)
     // While writes are off (Lane 3 Task 11) the client hides every write control; on, the answer is as before.
-    return c.json({ org: orgName(repo), ...s, ...(opts.instanceWrites === 'off' ? { instanceWrites: 'off' as const } : {}) })
+    const mark = instanceMark(repo) // named only when the instance carries one, so the status reads as before otherwise
+    return c.json({ org: orgName(repo), ...(mark ? { mark } : {}), ...s, ...(opts.instanceWrites === 'off' ? { instanceWrites: 'off' as const } : {}) })
   })
 
   // The instance's sites bar (instanceBar.ts): read per request; no sites when the instance carries none.

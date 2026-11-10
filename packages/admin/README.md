@@ -991,6 +991,13 @@ selectors (`html:root[data-skin="house"]`, the same under `prefers-color-scheme:
 than `house.css`, so they win in a build and in dev alike. The tests do not see it: check its contrast yourself
 (text against paper, raised and sunken, 4.5:1 or more). `bare` and any other skin a viewer picks are left alone.
 
+**An instance's images and mark.** Images the skin draws (a wordmark, a texture) live as files in `house/`, not as
+base64 in the CSS: the server answers `GET /instance-assets/<name>` for a plain name (`a-z0-9-`, one of `.svg .png
+.webp .jpg`, at most 256 KB) directly in `house/`, so the skin writes `url(/instance-assets/wordmark.svg)`. An SVG is
+served with a locked-down `Content-Security-Policy` (no script, no fetches). The instance's mark is `house/mark.svg`,
+`.png` or `.webp` (the first there is): `/api/status` names it as `mark`, and the org seal draws it (`org.mark`)
+instead of the neutral seal.
+
 **An instance's themes.** Beside its own look, an instance may offer up to 8 themes a viewer picks in Appearance
 (the org menu). `house/themes.yaml` names them, `themes: [{ id, label, scheme: light | dark, note? }]` (`id` is
 `a-z0-9-`, at most 24 characters), and `house/themes.css` draws them; the server answers `GET /api/house/themes`, and

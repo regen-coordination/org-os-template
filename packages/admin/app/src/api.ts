@@ -70,7 +70,8 @@ export type ChangeView = ServerChangeView
 
 export interface RegistrySummary { name: string; kind: 'collection' | 'document'; count: number | null }
 /** `instanceWrites` is said only while the Hub's writes are off (Lane 3 Task 11). */
-export interface Status { org: string; branch: string; dirty: boolean; instanceWrites?: 'off' }
+/** `mark`: the instance's mark for the org seal (server/instanceAssets.ts), absent when it carries none. */
+export interface Status { org: string; mark?: string | null; branch: string; dirty: boolean; instanceWrites?: 'off' }
 export type Entity = Record<string, unknown> & { id: string }
 export interface RegistryRead {
   name: string; kind: 'collection' | 'document'; schemaVersion: string | null

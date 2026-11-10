@@ -200,7 +200,7 @@ function HubApp() {
   // phone sheet reads the frame's width (frame.css).
   return (
     <ViewAsProvider source={source}><PanelProvider><InspectorProvider><SessionProvider>
-      {location === '/sign-in' ? <SignInPage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: null }} nav={<Nav />} sites={<SitesBar />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
+      {location === '/sign-in' ? <SignInPage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: status.data?.mark ?? null }} nav={<Nav />} sites={<SitesBar />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
         band={<><ViewAsBand /><ReadOnlyNotice /></>} aside={<RightSlot />} foot={<Dock />} bottom={<HouseBottom />}>
         <Switch>
           <Route path="/"><ToBoard id="home" /></Route>
