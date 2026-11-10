@@ -6,6 +6,7 @@
 // styles). Absent, the answer is an empty stylesheet: the house looks as it ships.
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { INSTANCE_THEMES_CSS } from './instanceThemes.ts'
 
 export const INSTANCE_SKIN_PATH = '/instance-skin.css'
 /** Where an instance keeps its skin, from its root. */
@@ -13,12 +14,20 @@ export const INSTANCE_SKIN_FILE = join('house', 'skin.css')
 /** Larger than any token file needs; a bigger file is a mistake, not a skin. */
 export const INSTANCE_SKIN_MAX_BYTES = 64 * 1024
 
-/** The instance skin's CSS, or '' when the instance carries none (or one too large to be a skin). Read on every
- *  call, so an edit shows on the next load without a restart. */
-export function readInstanceSkin(repo: string): string {
-  const file = join(repo, INSTANCE_SKIN_FILE)
+/** A CSS file of the instance's, or '' when it is absent, not a file, or too large. */
+function readCss(repo: string, rel: string): string {
+  const file = join(repo, rel)
   if (!existsSync(file)) return ''
   const st = statSync(file)
   if (!st.isFile() || st.size > INSTANCE_SKIN_MAX_BYTES) return ''
   return readFileSync(file, 'utf8')
+}
+
+/** The instance skin's CSS, then its themes' (house/themes.css, instanceThemes.ts) when it offers any: '' when it
+ *  carries neither. Each file is held to the same cap on its own. Read on every call, so an edit shows on the next
+ *  load without a restart. */
+export function readInstanceSkin(repo: string): string {
+  const skin = readCss(repo, INSTANCE_SKIN_FILE)
+  const themes = readCss(repo, INSTANCE_THEMES_CSS)
+  return themes === '' ? skin : `${skin}\n/* house/themes.css */\n${themes}`
 }

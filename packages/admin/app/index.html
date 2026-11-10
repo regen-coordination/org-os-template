@@ -14,6 +14,11 @@
         try { v = localStorage.getItem('org-os-admin.skin'); } catch (e) {}
         if (!/^[a-z0-9-]+$/.test(v || '')) v = '%VITE_ORG_OS_SKIN%';
         if (/^[a-z0-9-]+$/.test(v)) document.documentElement.dataset.skin = v;
+        /* An instance theme chosen here (orgTheme.ts ORG_THEME_KEY, "<id>:<scheme>"): drawn from the first frame too. */
+        var t = null;
+        try { t = localStorage.getItem('org-os-admin.org-theme'); } catch (e) {}
+        var m = /^([a-z0-9-]{1,24}):(light|dark)$/.exec(t || '');
+        if (m) { document.documentElement.dataset.orgTheme = m[1]; document.documentElement.dataset.theme = m[2]; }
       })();
     </script>
     <!-- The instance's own skin (server/instanceSkin.ts): empty unless the instance carries house/skin.css. -->

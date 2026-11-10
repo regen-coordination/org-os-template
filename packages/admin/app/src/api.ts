@@ -50,6 +50,8 @@ export type { DriverRead, DriverSection, Driver, DriverContext } from '../../ser
 export type { Actor } from '../../server/actor.ts'
 export type { Shelf, Maturity, Standing, Fits, ListedEntry, ShelfProblem, LibraryList, LibraryPreview, Receipt, ReceiptDecision, RemovalPreview } from '../../server/library/types.ts'
 export type { InstanceBar, BarSite } from '../../server/instanceBar.ts'
+import type { InstanceThemes } from '../../server/instanceThemes.ts'
+export type { InstanceThemes, InstanceTheme } from '../../server/instanceThemes.ts'
 export type { Layout, GridPlace, CanvasPlace, Place, BlockEntry, BoardDef, BoardRead } from '../../server/boards/types.ts'
 export type { Kind as ResourceKind, EdgeKind } from '../../server/resources/types.ts'
 export type { MemberKind } from '../../lib/members.mjs'
@@ -353,6 +355,8 @@ export const api = {
   boards: () => fetchJSON<BoardRead[]>('/api/boards'),
   /** The instance's sites bar (server/instanceBar.ts): no sites when the instance carries none. */
   houseBar: () => fetchJSON<InstanceBar>('/api/house/bar'),
+  /** The instance's themes (server/instanceThemes.ts): none when it offers none. */
+  houseThemes: () => fetchJSON<InstanceThemes>('/api/house/themes'),
   board: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}`),
   builtinBoard: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}/builtin`),
   // The library: its list, a preview that writes nothing, and Add and Remove, which stage into your change (the tray's).

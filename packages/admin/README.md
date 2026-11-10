@@ -988,6 +988,15 @@ selectors (`html:root[data-skin="house"]`, the same under `prefers-color-scheme:
 than `house.css`, so they win in a build and in dev alike. The tests do not see it: check its contrast yourself
 (text against paper, raised and sunken, 4.5:1 or more). `bare` and any other skin a viewer picks are left alone.
 
+**An instance's themes.** Beside its own look, an instance may offer up to 8 themes a viewer picks in Appearance
+(the org menu). `house/themes.yaml` names them, `themes: [{ id, label, scheme: light | dark, note? }]` (`id` is
+`a-z0-9-`, at most 24 characters), and `house/themes.css` draws them; the server answers `GET /api/house/themes`, and
+`/instance-skin.css` serves the themes' CSS after the skin's (each file held to 64 KB). Picking one sets
+`data-org-theme="<id>"` on `<html>` and `data-theme` to its scheme, kept for this browser and applied by the inline
+script before the first paint, so write each theme as `html:root[data-skin][data-theme][data-org-theme="<id>"] { … }`,
+more specific than the skin's blocks. System, Light or Dark hands back to the instance's own look. Check contrast
+yourself, as for the skin.
+
 To add a skin `calm`:
 
 1. Copy `skins/bare.css` to `skins/calm.css` and replace `bare` with `calm` in its three selectors

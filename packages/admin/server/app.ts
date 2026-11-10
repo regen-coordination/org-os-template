@@ -24,6 +24,7 @@ import { mountWorkspace } from './workspace/routes.ts'
 import { cachedReads, withFromMarks, type SourceReader } from './workspace/sources.ts'
 import { chainKept } from './deploy/private-flip.ts'
 import { INSTANCE_BAR_PATH, readInstanceBar } from './instanceBar.ts'
+import { INSTANCE_THEMES_PATH, readInstanceThemes } from './instanceThemes.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
 import { LEDGER_SENTENCE } from './changes/stage.ts'
@@ -144,6 +145,8 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
 
   // The instance's sites bar (instanceBar.ts): read per request; no sites when the instance carries none.
   app.get(INSTANCE_BAR_PATH, c => c.json(readInstanceBar(repo)))
+  // The instance's themes (instanceThemes.ts), offered in Appearance; none when it names none.
+  app.get(INSTANCE_THEMES_PATH, c => c.json(readInstanceThemes(repo)))
 
   app.get('/api/registries', c => c.json(gateRegistryList(viewerOf(c), repo, levels())))
   app.get('/api/registries/:name', async c => {
