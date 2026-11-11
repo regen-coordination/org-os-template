@@ -759,6 +759,24 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBeNull()
   })
 
+  // T2c (closing review, minor 3): a reply goes with the comment it is under whatever its time, and so do the notifications
+  // of every comment purged; a later comment that is not under a purged one keeps its own.
+  it('a reply purged with its comment takes its notifications too, whatever their time', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    const target = 'page:scratch-0001'
+    const later = '2026-10-31T13:00:00.000Z'
+    const row = (id: string, parent: string | null, created: string): CommentRow => ({ id, target, parent, anchor: null, by: 'steward-b', body: 'Talk.', created,
+      edited: null, resolvedBy: null, resolvedAt: null, deleted: null })
+    const told = (id: string, source: string, created: string) => ({ id, member: 'steward-c', kind: 'mention' as const, target, source, by: 'steward-b', created, readAt: null })
+    await w.store.writeConversation({
+      comments: [row('c-old', null, NOW.toISOString()), row('c-reply', 'c-old', later), row('c-new', null, later)],
+      notifications: [told('n-old', 'comment:c-old', NOW.toISOString()), told('n-reply', 'comment:c-reply', later), told('n-new', 'comment:c-new', later)],
+    })
+    expect(await w.store.purgeConversation([{ target, at: '2026-10-31T12:30:00.000Z' }])).toEqual([target])
+    expect(w.store.comments(target).map(c => c.id)).toEqual(['c-new'])
+    expect(w.store.notifications('steward-c').map(n => n.id)).toEqual(['n-new'])
+  })
+
   // R2b (review I-3): a purge cursor in the admin state directory (the last trunk commit fully purged). Every move, and the
   // start, read from it to the trunk; it advances only once the targets are purged or buried.
   const recreatePublic = (repo: string, id = 'scratch-0001') => {

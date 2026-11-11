@@ -842,9 +842,10 @@ export class PrivateStore {
     if (purge) this.purgeIn(collection === 'pages' ? `page:${id}` : `record:${collection}:${id}`)
   }
 
-  /** `target`'s comments made at or before `at` (every one without it), the replies under them, and their mentions; the
-   *  target's own (a page's) mentions, which hold no time; its notifications and read marks made at or before `at`: gone.
-   *  Inside an open transaction. */
+  /** `target`'s comments made at or before `at` (every one without it), the replies under them, and their mentions and
+   *  notifications, whatever their time (T2c minor 3: a reply that goes takes what it told); the target's own (a page's)
+   *  mentions, which hold no time; its other notifications and read marks made at or before `at`: gone. Inside an open
+   *  transaction. */
   private purgeIn(target: string, at: string = UNBOUNDED): void {
     const rows = this.w.goneComments.all(target) as { id: string; parent: string | null; created: string }[]
     const gone = new Set(rows.filter(r => r.created <= at).map(r => r.id))
@@ -855,6 +856,7 @@ export class PrivateStore {
     }
     for (const id of gone) {
       this.w.goneMentions.run(`comment:${id}`)
+      this.w.notificationsDrop.run(`comment:${id}`)
       this.w.goneComment.run(id)
     }
     this.w.goneMentions.run(target)
