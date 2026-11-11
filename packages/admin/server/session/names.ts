@@ -81,18 +81,14 @@ export function memberLabels(repo: string, level: ParsedLevel): (id: string) => 
   }
 }
 
-/** R4c 1 (half b): a member mention's label as stored text is handed to `viewer` from a text at `level` now: the name when
- *  both the loosest reader of that level and the viewer may read it, else the id. A page widened since it was written, or
- *  one written outside the Hub, is read so. A members file that cannot be read says the id (fail closed). */
-export function readLabels(repo: string, level: ParsedLevel, viewer: Viewer): (id: string) => string {
+/** R4c 1 (half b), R4c2 (PR7-R79): a member mention's label as stored text is handed to `viewer`: the name the viewer may
+ *  read now (Rule 4 is about the reader), else the id. Labels are written at the text's level (`memberLabels`), so stored
+ *  text holds no stricter name; this read only says to each reader what they may read, a page widened since, or one
+ *  written outside the Hub, included. An id the members file does not hold is its id; a members file that cannot be read
+ *  says the id (fail closed). */
+export function readLabels(repo: string, viewer: Viewer): (id: string) => string {
   const read = membersRead(repo)
-  if (read === null) return id => id
-  const atLevel = labelsFrom(repo, read, loosestReader(level))
-  const toViewer = displayNames(repo, null, { viewer })
-  return id => {
-    const name = atLevel(id)
-    return name !== id && toViewer(id) === name ? name : id
-  }
+  return read === null ? id => id : labelsFrom(repo, read, viewer)
 }
 
 function labelsFrom(repo: string, read: readonly Record<string, unknown>[], viewer: Viewer): (id: string) => string {

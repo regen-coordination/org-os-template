@@ -1175,8 +1175,8 @@ describe('T2e M2: housekeeping keeps what it cannot read', () => {
   })
 })
 
-// T2f 1 (Rule 4): a member's name written into text. The picker labels a person as any member may read them (else their
-// id), and every write of a comment's body, a page's body (git and store) and a task's title rewrites each `hub:member/<id>`
+// T2f 1 (Rule 4): a member's name written into text. The picker labels a person as the author may read them (else their
+// id; R4c2, PR7-R79: it was any member's read before), and every write of a comment's body, a page's body (git and store) and a task's title rewrites each `hub:member/<id>`
 // label to that name, typed and stale labels too. steward-a wears the council's hat here, and the members file keeps names
 // to the council: no reader below it (steward-b wears Ops, steward-c nothing) and nothing in git sees one.
 describe('T2f 1: a name kept to the council is never written into text by a mention', () => {
@@ -1197,13 +1197,19 @@ describe('T2f 1: a name kept to the council is never written into text by a ment
   const history = (repo: string) => git(repo, `log -p ${fixture.get(repo)}..HEAD`)
   afterEach(() => { WEARS.a1 = [OPS] })
 
-  it('the picker (a comment\'s and the page editor\'s) offers people by the name any member may read, else the id', async () => {
+  it('the picker (a comment\'s and the page editor\'s) offers people by the name the author may read, else the id', async () => {
     const w = await council()
+    // R4c2 (PR7-R79): the council's wearer is offered the names; any write still says the id (the tests below).
     const offered = await call(w.app, `/api/mentionables?target=${PAGE}&q=`)
     expect(offered.status).toBe(200)
     const persons = (offered.body as { kind: string; id: string; label: string }[]).filter(m => m.kind === 'person')
-    expect(persons.map(m => [m.id, m.label])).toEqual(expect.arrayContaining([['steward-b', 'steward-b'], ['steward-c', 'steward-c']]))
-    expect(JSON.stringify(offered.body)).not.toMatch(NAMES)
+    expect(persons.map(m => [m.id, m.label])).toEqual(expect.arrayContaining([['steward-b', 'Steward B'], ['steward-c', 'Steward C']]))
+    asC(w.repo)
+    const below = await call(w.app, `/api/mentionables?target=${PAGE}&q=`)
+    expect(below.status).toBe(200)
+    const theirs = (below.body as { kind: string; id: string; label: string }[]).filter(m => m.kind === 'person')
+    expect(theirs.map(m => [m.id, m.label])).toEqual(expect.arrayContaining([['steward-b', 'steward-b'], ['steward-c', 'steward-c']]))
+    expect(JSON.stringify(below.body)).not.toMatch(NAMES)
   })
 
   it('a comment: typed labels, and one in a fence the thread still draws, are written as the id', async () => {
@@ -1211,7 +1217,8 @@ describe('T2f 1: a name kept to the council is never written into text by a ment
     const body = 'Ask [@Steward B](hub:member/steward-b) and [Steward C](<hub:member/steward-c>).\n```\n[@Steward B](hub:member/steward-b)\n```'
     const r = await call(w.app, '/api/comments', json('POST', { target: PAGE, body }))
     expect(r.status).toBe(201)
-    expect(r.body.comment.body).not.toMatch(NAMES) // its author is named to them as they may read it (T2f 4); its text is not
+    // R4c2 (PR7-R79): the answer reads the labels back as its author (the council's wearer) may read them; the store says ids.
+    expect(r.body.comment.body).toContain('[@Steward B](hub:member/steward-b)')
     const kept = w.store.comment(r.body.comment.id)!.body
     expect(kept).toContain('[@steward-b](hub:member/steward-b)')
     expect(kept).toContain('[steward-c](<hub:member/steward-c>)')
@@ -1431,5 +1438,28 @@ describe('R4c: what a comment shows of its task and its mentions', () => {
     const read = await call(w.app, `/api/comments?target=${PAGE}`)
     expect(read.status).toBe(200)
     expect(read.body[0].body).toBe('[@steward-b](hub:member/steward-b) to file the report')
+  })
+})
+
+// R4c2 (PR7-R79): a comment's member mention reads as the name each viewer may read now, else the id. Written at the
+// target's level as R4c 1 has it (any member's names here), so the store holds the id of a name kept to Ops.
+describe('R4c2: a comment\'s mention reads as each viewer may read the name (PR7-R79)', () => {
+  const PAGE = 'page:handbook-3f2a'
+
+  it('a name kept to Ops: written as the id, read as the name by an Ops wearer and as the id by a member below it', async () => {
+    const w = await world()
+    writeFileSync(join(w.repo, 'data', 'visibility.yaml'), `${VISIBILITY}    members: { fields: { name: "hat:${OPS}" } }\n`)
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "fixture: member names are Ops\'"')
+    await w.prime(A1, A2)
+    asA(w.repo)
+    const posted = await call(w.app, '/api/comments', json('POST', { target: PAGE, body: 'Ask [@Steward B](hub:member/steward-b).' }))
+    expect(posted.status).toBe(201)
+    expect(w.store.comment(posted.body.comment.id)!.body).toBe('Ask [@steward-b](hub:member/steward-b).')
+    expect(posted.body.comment.body).toBe('Ask [@Steward B](hub:member/steward-b).')
+    expect((await call(w.app, `/api/comments?target=${PAGE}`)).body[0].body).toBe('Ask [@Steward B](hub:member/steward-b).')
+    asC(w.repo)
+    const below = await call(w.app, `/api/comments?target=${PAGE}`)
+    expect(below.body[0].body).toBe('Ask [@steward-b](hub:member/steward-b).')
+    expect(JSON.stringify(below.body)).not.toContain('Steward B')
   })
 })

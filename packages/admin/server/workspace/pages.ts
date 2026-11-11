@@ -38,7 +38,7 @@ import { lastCommit } from '../resources/changed.ts'
 import { fileBase, gitPages, pendingText, registerFileCheck } from './files.ts'
 import { gitDefinitions } from './collections.ts'
 import { fromOf } from './sources.ts'
-import { gateItems, Levels, MAINTAINERS, NOBODY, PUBLIC as PUBLIC_LEVEL, PUBLIC_VIEWER } from '../visibility/gate.ts'
+import { gateItems, Levels, MAINTAINERS, NOBODY, PUBLIC_VIEWER } from '../visibility/gate.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gitNames, heldMove, MOVE_PROPOSED, reach, storeAccess, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { narrow } from '../visibility/narrow.ts'
@@ -175,18 +175,19 @@ export function publicPagesOf(repo: string): { front: PageFront; body: string }[
   return [...tree.byId.values()]
     .filter(e => e.where === 'git' && levelIn(tree, e.id).level === 'public')
     .flatMap(e => {
-      const body = textFor(repo, e.markdown, PUBLIC_LEVEL, PUBLIC_VIEWER)
+      const body = textFor(repo, e.markdown, PUBLIC_VIEWER)
       return body === null ? [] : [{ front: e.front!, body }]
     })
 }
 
-/** R4c 1 (half b): a stored text (a page's body, a comment's) as `viewer` is handed it from a text at `level` now: each member
- *  mention's label the name the loosest reader of that level and the viewer may both read, else the id (`readLabels`), so a
- *  page widened since it was written, or one written outside the Hub, never hands out a name its readers may not read. Null
- *  when a member link cannot be relabelled (a reference-style link, written outside the Hub). */
-export function textFor(repo: string, text: string, level: ParsedLevel, viewer: Viewer): string | null {
+/** R4c 1 (half b), R4c2 (PR7-R79): a stored text (a page's body, a comment's) as `viewer` is handed it: each member
+ *  mention's label the name the viewer may read now, else the id (`readLabels`), so a page widened since it was written, or
+ *  one written outside the Hub, never hands out a name its reader may not read. Null when a member link cannot be
+ *  relabelled (a reference-style link, written outside the Hub). An answer to an unknown or anonymous reader passes the
+ *  public viewer. */
+export function textFor(repo: string, text: string, viewer: Viewer): string | null {
   if (!text.includes('hub:member/')) return text
-  const out = relabelMembers(text, readLabels(repo, level, viewer))
+  const out = relabelMembers(text, readLabels(repo, viewer))
   return out.refused === null ? out.body : null
 }
 
@@ -777,9 +778,9 @@ export function mountPages(app: Hono, deps: PagesDeps): void {
     // The walk's I4 (G5): a git page reads, for the member who staged an edit of it, as their change holds it (its title and
     // body; the op keeps its base); anyone else, and a preview (`?as`), reads the trunk.
     const mine = e.where === 'git' && c.req.query('as') === undefined ? stagedPage(repo, actorOf(c), pagePath(id)) : null
-    // R4c 1 (half b): the body as this viewer may read it from the page's level now (a page widened since, or written outside
-    // the Hub, included); a member link that cannot be relabelled is MEMBER_TEXT_UNSHOWN's sentence, never the text.
-    const shownText = (text: string) => textFor(repo, text, levelIn(tree, id), viewer) ?? MEMBER_TEXT_UNSHOWN
+    // R4c 1 (half b), R4c2 (PR7-R79): each member mention as this viewer may read the name now (the public's viewer for a
+    // reader with no session or `?as=public`); a member link that cannot be relabelled is MEMBER_TEXT_UNSHOWN's sentence.
+    const shownText = (text: string) => textFor(repo, text, viewer) ?? MEMBER_TEXT_UNSHOWN
     return c.json({
       page: {
         id, title: mine?.title ?? e.title, parent: stale ? null : e.parent, path: e.where === 'git' ? pagePath(id) : null, visibility: formatLevel(levelIn(tree, id)),

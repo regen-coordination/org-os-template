@@ -383,9 +383,9 @@ export function commentView(row: CommentRow, names: (id: string) => { handle: st
 }
 
 /**
- * R4c 1, 2: what `viewer` is shown of the comments on a target: each body relabelled as they may read it at members (a
- * comment is read by members alone, §8.2: `visibleTarget`), so a label written before T2f 1, or one naming someone they may
- * not read, says the id; a body whose member link cannot be relabelled is MEMBER_TEXT_UNSHOWN. A task is named to them only
+ * R4c 1, 2, R4c2 (PR7-R79): what `viewer` is shown of the comments on a target: each body's member mentions as they may read
+ * the names now (a comment is read by members alone, §8.2: `visibleTarget`), so a label written before T2f 1, or one naming
+ * someone they may not read, says the id; a body whose member link cannot be relabelled is MEMBER_TEXT_UNSHOWN. A task is named to them only
  * when they may read it now: a git task whose record admits them, a store task whose level does, or one their own change
  * stages; one kept from them (narrowed since, or made where the talk was narrower) is absent, and a second Turn into a task
  * is refused without naming it (TASK_ALREADY_UNNAMED).
@@ -394,7 +394,7 @@ export function shownTo(repo: string, store: PrivateStore, viewer: Viewer): Show
   let levels: Levels | null = null
   const memo = new Map<string, boolean>()
   return {
-    body: text => textFor(repo, text, MEMBERS_LEVEL, viewer) ?? MEMBER_TEXT_UNSHOWN,
+    body: text => textFor(repo, text, viewer) ?? MEMBER_TEXT_UNSHOWN,
     task: id => {
       let hit = memo.get(id)
       if (hit === undefined) {
@@ -472,9 +472,9 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const people = new People(deps.repo, deps.membership)
   // `tell`'s test (T2e M4): the target's level now and, for a reply, every level of the comments above it (`floors`).
   const told = (v: Viewer) => admits(level, v) && floors.every(f => mayRead(v, level, f))
-  // T2f 1 (Rule 4): a member is offered by the name any member may read (the gate), else their id; R4c: and the author may
-  // (a members file that cannot be read offers ids). Every write rewrites the label at the text's level (`relabelMembers`).
-  const display = readLabels(deps.repo, MEMBERS_LEVEL, viewer)
+  // T2f 1, R4c2 (PR7-R79; Rule 4): a member is offered by the name the author may read (the gate), else their id (a members
+  // file that cannot be read offers ids). Every write rewrites the label at the text's level (`relabelMembers`).
+  const display = readLabels(deps.repo, viewer)
 
   const persons: Mentionable[] = []
   for (const m of people.members) {

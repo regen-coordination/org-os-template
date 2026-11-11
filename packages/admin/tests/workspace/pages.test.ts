@@ -664,3 +664,51 @@ members:
     expect(read.body.page.markdown).toBe('Ask [@steward-b](hub:member/steward-b) and [@steward-a](hub:member/steward-a).\n')
   })
 })
+
+// R4c2 (PR7-R79, amending PR7-R71's read half; Rule 4 is about the reader): a stored member mention reads as the name the
+// viewer may read now, else the id. Labels are still written at the text's level (R4c 1), so git holds no stricter name;
+// only what each reader is handed changes. The public's reads (GET as the public, `?as=public`, the portal's input) say the
+// id wherever the name is the members'.
+describe('R4c2: a member mention reads as the name the viewer may read (PR7-R79)', () => {
+  const MD = 'Ask [@Steward B](hub:member/steward-b).\n'
+  const AS_ID = 'Ask [@steward-b](hub:member/steward-b).\n'
+  // Names kept to a role steward-a holds by the members file (no hats read here): `?as=members` reads as a plain member.
+  const STEWARDS = GOVERNANCE.replace('  decisions: []', '    stewards: { members: [steward-a] }\n  decisions: []')
+  const STEWARD_NAMES = `${VISIBILITY}    members: { fields: { name: "role:stewards" } }\n`
+
+  it('a public page naming a member whose name is at members: a member reads the name, the public the id', async () => {
+    const w = await world({ pages: { 'open-0001': page('open-0001', 'Open', { visibility: 'public', body: MD }) } })
+    expect((await call(w.app, '/api/pages/open-0001')).body.page.markdown).toBe(MD)
+    expect((await call(w.app, '/api/pages/open-0001?as=members')).body.page.markdown).toBe(MD)
+    expect((await call(w.app, '/api/pages/open-0001?as=public')).body.page.markdown).toBe(AS_ID)
+    const pub = await call(w.pub, '/api/pages/open-0001')
+    expect(pub.status).toBe(200)
+    expect(pub.body.page.markdown).toBe(AS_ID)
+    expect(JSON.stringify(pub.body)).not.toContain('Steward B')
+    expect(publicPagesOf(w.repo).find(p => p.front.id === 'open-0001')!.body).toBe(AS_ID)
+  })
+
+  it('a name kept to role:stewards: a steward reads it on a public page and a members page; a plain member and the public read the id', async () => {
+    const w = await world({ governance: STEWARDS, visibility: STEWARD_NAMES, pages: {
+      'open-0001': page('open-0001', 'Open', { visibility: 'public', body: AS_ID }), 'inner-0001': page('inner-0001', 'Inner', { body: AS_ID }),
+    } })
+    for (const id of ['open-0001', 'inner-0001']) {
+      expect((await call(w.app, `/api/pages/${id}`)).body.page.markdown).toBe(MD)
+      expect((await call(w.app, `/api/pages/${id}?as=members`)).body.page.markdown).toBe(AS_ID)
+    }
+    const pub = await call(w.pub, '/api/pages/open-0001')
+    expect(pub.body.page.markdown).toBe(AS_ID)
+    expect(JSON.stringify(pub.body)).not.toContain('Steward B')
+    expect(publicPagesOf(w.repo).find(p => p.front.id === 'open-0001')!.body).toBe(AS_ID)
+  })
+
+  it('the write half is R4c 1\'s: a member saving a public page with a members-level name writes the id, and reads the name back', async () => {
+    const w = await world()
+    const pub = await call(w.app, '/api/pages', json('POST', { title: 'Open', visibility: 'public', markdown: MD }))
+    expect(pub.status).toBe(201)
+    expect(fileAt(w.repo, `pages/${pub.body.id}.md`)).toContain(AS_ID)
+    expect(fileAt(w.repo, `pages/${pub.body.id}.md`)).not.toContain('Steward B')
+    expect((await call(w.app, `/api/pages/${pub.body.id}`)).body.page.markdown).toBe(MD)
+    expect((await call(w.pub, `/api/pages/${pub.body.id}`)).body.page.markdown).toBe(AS_ID)
+  })
+})
