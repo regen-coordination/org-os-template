@@ -26,7 +26,7 @@ const MEMBERS = `schema_version: "2.0"
 members:
   - { id: steward-a, name: Steward A, kind: person, handles: { git: ["steward-a@example.test"] } }
   - { id: steward-b, name: Steward B, kind: person, handles: { git: ["steward-b@example.test"] } }
-  - { id: ana, name: Ana Silva, kind: person }
+  - { id: ana, name: Ana Example, kind: person }
 `
 const GOV = `schema_version: "2.0"
 governance:

@@ -48,7 +48,7 @@ members:
     handles:
       git: ["admin-test@local"]
   - id: "ana"
-    name: "Ana Silva"
+    name: "Ana Example"
     kind: "person"
 `
 
