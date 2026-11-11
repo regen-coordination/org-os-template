@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fakeAddress, ORG, ROLES, SAFE, SAFE_CHAINS } from './org.ts'
@@ -55,7 +55,33 @@ describe('the house fixtures: the org, its roles, its Safe (spec §17)', () => {
     const found = files.filter(f => keptOutIn(readFileSync(f, 'utf8')).length > 0).map(f => relative(FIXTURES, f))
     expect(found).toEqual([])
   })
+  // R3 scan 6: the same guard over every fixture folder 0.7 adds outside the app, in every text form they hold (Markdown,
+  // YAML, scripts, CSV, HTML as well as .ts and .json): the server's, the import's, the deploy's, the shelf's, kms's and the
+  // federation map's, and the root's.
+  it('name no real org in the fixture folders 0.7 adds outside the app either (by digest)', () => {
+    const ADMIN = join(HERE, '..', '..', '..', '..', '..')
+    const ROOT = join(ADMIN, '..', '..')
+    const roots = [
+      join(ADMIN, 'tests', 'fixtures'), join(ADMIN, 'tests', 'deploy', 'fixtures'), join(ADMIN, 'tests', 'library', 'fixtures'),
+      join(ADMIN, 'tests', 'lib', 'compose.fixtures.ts'), join(ADMIN, 'tests', 'server', 'knowledge', 'fixture.ts'),
+      join(ROOT, 'packages', 'org-os-kms', 'test', 'fixtures'), join(ROOT, 'packages', 'org-os-federation-map', 'test', 'fixtures'),
+      join(ROOT, 'tests', 'scripts', 'fixtures'),
+    ]
+    const files = roots.flatMap(r => (statSync(r).isDirectory() ? textFilesUnder(r) : [r]))
+    expect(files.length).toBeGreaterThan(50)
+    const found = files.filter(f => keptOutIn(readFileSync(f, 'utf8')).length > 0).map(f => relative(ROOT, f))
+    expect(found).toEqual([])
+  })
 })
+
+/** Every text file under `dir` a fixture is written in, its subfolders too. */
+function textFilesUnder(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+    const path = join(dir, e.name)
+    if (e.isDirectory()) return textFilesUnder(path)
+    return /\.(tsx?|mts|mjs|js|json|md|ya?ml|csv|html|txt)$/.test(e.name) ? [path] : []
+  })
+}
 
 /** The fixture sources under `dir`, its subfolders too: .ts, .tsx and .json, the tests themselves left out. */
 function filesUnder(dir: string): string[] {
