@@ -77,8 +77,9 @@ export interface CommentThreadProps {
   onDelete?(id: string): void
   /** The passage the next comment will be on (the page's selection), drawn over the composer with a way to drop it. */
   quote?: { text: string; onDrop(): void }
-  /** The composers' mention picker (Composer's `mention`). */
-  mention?: (q: string, pick: (label: string, markdown: string) => void) => ReactNode
+  /** The composers' mention picker (Composer's `mention`); in a reply's composer, with the comment it answers (`replyTo`,
+   *  T2e M4: who may be told is judged with the talk above it). */
+  mention?: (q: string, pick: (label: string, markdown: string) => void, replyTo?: string) => ReactNode
   // --- end L6 Task 18
 }
 
@@ -203,7 +204,8 @@ export function CommentThread(p: CommentThreadProps) {
       {c.replies.map(r => <CommentItem key={r.id} c={r} reply me={p.me} now={now} acts={actsFor(r, true)} show={show} body={p.renderBody} />)}
       {canWrite && replying === c.id && (
         <div className="cmt-reply cmt-reply-box">
-          <Composer me={p.me ?? ''} name={p.meName} label={`Reply to ${c.handle === p.me ? 'yourself' : c.role}`} autoFocus mention={p.mention}
+          <Composer me={p.me ?? ''} name={p.meName} label={`Reply to ${c.handle === p.me ? 'yourself' : c.role}`} autoFocus
+            mention={p.mention ? (q, pick) => p.mention!(q, pick, c.id) : undefined}
             onSend={body => { p.onSend(body, c.id); setReplying(null) }} />
         </div>
       )}

@@ -449,7 +449,9 @@ export const api = {
   suggestSession: (sid: string, body: { markdown: string; title?: string; proposal: { title: string; rationale?: string } }) =>
     fetchJSON<ProposalWrite>(`/api/sessions/${enc(sid)}/suggest`, json('POST', body)),
   presence: (targets: string[]) => fetchJSON<Record<string, Present[]>>(`/api/presence?targets=${targets.map(enc).join(',')}`),
-  mentionables: (target: string, q: string) => fetchJSON<ServedMentionable[]>(`/api/mentionables?target=${enc(target)}&q=${enc(q)}`),
+  /** T2e M4: in a reply, `parent` (the comment it answers), so who may be told is judged with the talk above it. */
+  mentionables: (target: string, q: string, parent?: string) =>
+    fetchJSON<ServedMentionable[]>(`/api/mentionables?target=${enc(target)}&q=${enc(q)}${parent ? `&parent=${enc(parent)}` : ''}`),
   collections: () => fetchJSON<{ collections: CollectionView[] }>('/api/collections'),
   // --- end L6 Task 16
   // --- DAO-OS L6 Task 17: collections, saved views, view state, batched record writes, Record a meeting (spec §16)

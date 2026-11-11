@@ -15,10 +15,11 @@ import { useConversation, useMarkRead, type Conversation } from './useConversati
 import type { ThreadSlot } from './PagePage.tsx'
 
 /** The picker's choices for what is typed after `@`, as the server offers them on `target` (never what the author may
- *  not see; a member who may not see it, disabled). The last answer stays drawn while the next is read. */
-function MentionChoices({ target, q, pick }: { target: string; q: string; pick(label: string, markdown: string): void }) {
+ *  not see; a member who may not see it, disabled; in a reply, `parent`, judged with the talk above it: T2e M4). The last
+ *  answer stays drawn while the next is read. */
+function MentionChoices({ target, q, pick, parent }: { target: string; q: string; pick(label: string, markdown: string): void; parent?: string }) {
   const served = useQuery({
-    queryKey: ['mentionables', target, q], queryFn: () => api.mentionables(target, q), retry: false, staleTime: 10_000,
+    queryKey: ['mentionables', target, q, parent ?? null], queryFn: () => api.mentionables(target, q, parent), retry: false, staleTime: 10_000,
     placeholderData: keepPreviousData,
   }).data ?? []
   return (
@@ -51,7 +52,7 @@ export function ConversationThread({ conversation: c, target, visibility, me, me
       renderBody={(x: Comment) => commentBody(x.body, me)}
       onShowPassage={onShowPassage}
       quote={quote && onDropQuote ? { text: quote.exact, onDrop: onDropQuote } : undefined}
-      mention={(q, pick) => <MentionChoices target={target} q={q} pick={pick} />} />
+      mention={(q, pick, replyTo) => <MentionChoices target={target} q={q} pick={pick} parent={replyTo} />} />
   )
 }
 

@@ -212,6 +212,21 @@ describe('the conversation on a page (§8.2, Task 18)', () => {
     expect(posts(calls)[0]!.body).toEqual({ target: TARGET, body: 'Over to [@Steward B](hub:member/steward-b)' })
   })
 
+  // T2e M4: a reply's picker asks with the comment it answers, so `canSee` is judged with the floor above it.
+  it('the picker in a reply asks GET /api/mentionables with the comment it answers', async () => {
+    const { calls } = routes({
+      'GET /api/comments': [served({ id: 'cmt_1' })],
+      'GET /api/mentionables': [{ kind: 'person', id: 'steward-c', label: 'Steward C', canSee: false, href: 'hub:member/steward-c' }],
+    })
+    draw()
+    await editorView()
+    const thread = await openThread(1)
+    fireEvent.click(within(thread).getByRole('button', { name: 'Reply' }))
+    write(thread, 'Over to @ste', 'Reply to Steward B')
+    await within(thread).findByRole('listbox', { name: 'Mention' })
+    expect(calls.some(c => c.path === `/api/mentionables?target=${encodeURIComponent(TARGET)}&q=ste&parent=cmt_1`)).toBe(true)
+  })
+
   it('Comment on a selected passage sends its quote as the anchor; Show the passage rings it in the editor', async () => {
     const into = vi.fn()
     Element.prototype.scrollIntoView = into

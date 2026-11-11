@@ -410,12 +410,14 @@ const wordsOf = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(B
 
 /**
  * What an `@` may name on `target` (§8.3, L4 §10.4), for `query` (as L4c's `mentionables` matches it): members (their name,
- * the lowest hat they wear) and roles (how many hold them), each with `canSee` by the same test as `tell`; pages and records
+ * the lowest hat they wear) and roles (how many hold them), each with `canSee` by the same test as `tell` (for a reply,
+ * `floors`: the written levels of the comments above it, T2e M4); pages and records
  * only when the author may see them. A member who may not see the target is kept, after the rest, to be drawn disabled; a
  * role none of whose holders may see it is not offered. A record of a private collection is offered only on a target no
  * looser than that collection (§4.5); one the author may not see never. Nothing for a target the author may not see.
  */
-export function mentionablesFor(target: Target, query: string, viewer: Viewer, deps: Omit<ConversationDeps, 'store'> & { store: PrivateStore | null }): Mentionable[] {
+export function mentionablesFor(target: Target, query: string, viewer: Viewer, deps: Omit<ConversationDeps, 'store'> & { store: PrivateStore | null },
+  floors: readonly (string | null)[] = []): Mentionable[] {
   if (viewer.kind !== 'member') return []
   const info = targetInfo(deps.repo, target, deps.store)
   if (!info || !admits(info.level, viewer)) return []
@@ -423,6 +425,8 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const q = query.trim().replace(/^@/, '').trim().toLowerCase()
   const matches = (id: string, label: string) => q === '' || id.toLowerCase().startsWith(q) || label.toLowerCase().startsWith(q) || wordsOf(label).some(w => w.startsWith(q))
   const people = new People(deps.repo, deps.membership)
+  // `tell`'s test (T2e M4): the target's level now and, for a reply, every level of the comments above it (`floors`).
+  const told = (v: Viewer) => admits(level, v) && floors.every(f => mayRead(v, level, f))
   // T2e I1 (Rule 4): a member is offered by the name the author may read (the gate), else their id.
   const display = displayNames(deps.repo, deps.membership, { viewer })
 
@@ -433,12 +437,12 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
     const label = display(id)
     if (!matches(id, label)) continue
     const hat = people.hat(id)
-    persons.push({ kind: 'person', id, label, ...(hat ? { hat } : {}), canSee: admits(level, people.viewer(id)), href: `hub:member/${id}` })
+    persons.push({ kind: 'person', id, label, ...(hat ? { hat } : {}), canSee: told(people.viewer(id)), href: `hub:member/${id}` })
   }
   const roles: Mentionable[] = []
   for (const r of people.roles().values()) {
     if (!r.defined || !matches(r.id, r.id)) continue
-    if (!r.members.some(h => admits(level, people.viewer(h)))) continue
+    if (!r.members.some(h => told(people.viewer(h)))) continue
     roles.push({ kind: 'role', id: r.id, label: r.id, count: r.members.length, canSee: true, href: `hub:role/${r.id}` })
   }
 
@@ -879,10 +883,20 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     })
   })
 
-  app.get('/api/mentionables', c => {
+  app.get('/api/mentionables', async c => {
     const target = parseTarget(c.req.query('target') ?? '')
     if (!target) throw new HttpError(400, TARGET_QUERY)
     const viewer = viewerOf(c)
+    const parent = c.req.query('parent')
+    // T2e M4: a reply's picker (`parent`, the comment it answers) judges `canSee` with the floor above it, as the reply tells;
+    // that needs the store, and a parent the asker may not read, or on another target, is one that is not there.
+    if (parent !== undefined && parent !== '') {
+      const store = await needStore()
+      visibleTarget(repo, target, store, null, viewer)
+      const { row, rows } = visibleComment(store, parent, viewer)
+      if (row.target !== target) throw new HttpError(404, NO_COMMENT(parent))
+      return c.json(mentionablesFor(target, c.req.query('q') ?? '', viewer, { repo, store, membership, now }, floorsAbove(rows, row.id)))
+    }
     const { store, why } = reach(deps.privateStore)
     visibleTarget(repo, target, store, why, viewer)
     return c.json(mentionablesFor(target, c.req.query('q') ?? '', viewer, { repo, store, membership, now }))

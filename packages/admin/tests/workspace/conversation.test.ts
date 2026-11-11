@@ -907,6 +907,23 @@ describe('PR7-R45: the conversation floor (a row is read at its target\'s level 
     expect(w.store.comment(sent.body.comment.id)?.task ?? null).toBeNull()
   })
 
+  // T2e M4: the picker judges `canSee` with the reply's floor, so it agrees with who a reply under earlier talk tells.
+  it('the picker for a reply under Ops talk on a page widened since: steward-c cannot see it, as the reply will not tell them', async () => {
+    const { w, top } = await opsTalk()
+    await hubLevel(w, 'members')
+    const canSee = (body: { kind: string; id: string; canSee: boolean }[]) =>
+      Object.fromEntries(body.filter(m => m.kind === 'person').map(m => [m.id, m.canSee]))
+    const plainPick = await call(w.app, `/api/mentionables?target=${T}&q=steward`)
+    expect(canSee(plainPick.body)).toMatchObject({ 'steward-b': true, 'steward-c': true })
+    const replyPick = await call(w.app, `/api/mentionables?target=${T}&q=steward&parent=${top}`)
+    expect(replyPick.status).toBe(200)
+    expect(canSee(replyPick.body)).toMatchObject({ 'steward-b': true, 'steward-c': false })
+    // A parent the asker may not read answers as one that is not there.
+    asC(w.repo)
+    expect(await call(w.app, `/api/mentionables?target=${T}&q=&parent=${top}`)).toEqual({ status: 404, body: { error: `There is no comment ${top}.` } })
+    asA(w.repo)
+  })
+
   it('a conversation event names the floor of what changed: it reaches only those admitted to it, and the floor is not sent', async () => {
     const { w, top } = await opsTalk()
     await hubLevel(w, 'members')
