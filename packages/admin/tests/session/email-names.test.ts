@@ -36,13 +36,20 @@ const T0 = new Date('2026-11-18T10:00:00.000Z')
 const ID = 'example-org:person:example-steward'
 const MAIL = 'steward@example.org'
 /** The Roles table's name for them: not the members file's, so the test can tell which one is said. */
+/** A person with no Role (T2c minor 2): their viewer is the public's, which may not read the members file. */
+const VISITOR = 'example-org:person:example-visitor'
+const VISITOR_MAIL = 'visitor@example.org'
 const DOC: RolesDoc = {
   roles_version: '2026-11-18',
-  people: [{ id: ID, name: 'E. Steward (roles)', email_keys: [emailKey(MAIL, PEPPER)], roles: ['network-member', 'steward'], nodes: [] }],
+  people: [
+    { id: ID, name: 'E. Steward (roles)', email_keys: [emailKey(MAIL, PEPPER)], roles: ['network-member', 'steward'], nodes: [] },
+    { id: VISITOR, name: 'V. Visitor (roles)', email_keys: [emailKey(VISITOR_MAIL, PEPPER)], roles: [], nodes: [] },
+  ],
 }
 const MEMBERS = `schema_version: "2.0"
 members:
   - { id: "${ID}", name: "Example Steward", kind: person }
+  - { id: "${VISITOR}", name: "Example Visitor", kind: person }
 `
 const GOVERNANCE = `schema_version: "2.0"
 governance:
@@ -100,10 +107,10 @@ async function house() {
     if (o.body !== undefined) headers['content-type'] = 'application/json'
     return app.request(`http://${HOST}${path}`, { method, headers, body: o.body === undefined ? undefined : JSON.stringify(o.body) })
   }
-  const signedIn = async (): Promise<string> => {
-    await call('POST', '/api/session/email', { body: { email: MAIL } })
+  const signedIn = async (mail = MAIL): Promise<string> => {
+    await call('POST', '/api/session/email', { body: { email: mail } })
     await email!.settled()
-    const token = new URL(mailer.sent[0]!.link).searchParams.get('token')!
+    const token = new URL(mailer.sent[mailer.sent.length - 1]!.link).searchParams.get('token')!
     const res = await call('POST', '/api/session/link', { body: { token } })
     expect(res.status).toBe(200)
     const jws = res.headers.getSetCookie().map(l => /^org_session_dev=([^;]*)/.exec(l)?.[1]).find(v => v !== undefined)!
@@ -154,5 +161,17 @@ describe('a member signed in by an emailed link, in the one display name (PF-R25
     expect(git('log', '-1', '--format=%an <%ae>|%cn <%ce>').trim())
       .toBe(`${HOUSE_IDENT.name} <${HOUSE_IDENT.email}>|${HOUSE_IDENT.name} <${HOUSE_IDENT.email}>`)
     expect((await entityChanges(h.repo, 'ideas', displayNames(h.repo, h.membership))).get('idea-1')).toMatchObject({ by: 'Example Steward' })
+  })
+
+  // T2c (closing review, minor 2), Rule 4: the members file's name is read as the session's viewer may read it. A person
+  // with no Role reads as the public, who may not read the members file (members by default): they are named as the Roles
+  // table names them.
+  it('a person with no Role is named as the public may read: the Roles table\'s name, never the members file\'s', async () => {
+    const h = await house()
+    const cookie = await h.signedIn(VISITOR_MAIL)
+    const session = await (await h.call('GET', '/api/session', { cookie })).json()
+    expect(session).toMatchObject({ signedIn: true, via: 'email', actor: VISITOR, viewer: 'public', person: { id: VISITOR, name: 'V. Visitor (roles)' } })
+    const actor = await (await h.call('GET', '/api/actor', { cookie })).json()
+    expect(actor).toMatchObject({ id: VISITOR, name: 'V. Visitor (roles)' })
   })
 })

@@ -25,9 +25,10 @@ const nameOf = (record: Record<string, unknown> | null, id: string): string =>
 
 /** The name a person signed in by an emailed link is shown by (R2, PF-R258): their member name when the members file
  *  holds their person id (as `displayNames` says it everywhere else, so the composer's monogram, the identity and their
- *  comments agree), else the Roles table's. */
-export function personName(repo: string, person: { id: string; name: string }): string {
-  const said = displayNames(repo, null)(person.id)
+ *  comments agree), else the Roles table's. Rule 4 (T2c minor 2): the members file is read as `viewer`, the session's
+ *  own viewer, may read it: a person with no Role reads as the public, and a name the public may not read is not said. */
+export function personName(repo: string, person: { id: string; name: string }, viewer: Viewer): string {
+  const said = displayNames(repo, null, { viewer })(person.id)
   if (said !== person.id) return said
   return person.name.trim() !== '' ? person.name : person.id
 }

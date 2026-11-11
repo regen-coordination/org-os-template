@@ -9,7 +9,7 @@ import type { HostedConfig } from '../hosted/config.ts'
 import { GRACE_BAND, pastGrace, TREE_UNREADABLE, type Membership } from './membership.ts'
 import { Nonces, TOO_MANY } from './nonces.ts'
 import { clearedCookie, createSession, endSession, sessionCookie, sessionFromCookie, sessionToken, type Session } from './sessions.ts'
-import { personOf, viewerOf } from '../request.ts'
+import { actorOf, personOf, viewerOf } from '../request.ts'
 import { endPersonSession } from './person.ts'
 import { personName } from './names.ts'
 import { clearedSessionCookie } from '../../lib/session-token.mjs'
@@ -103,6 +103,13 @@ export function mountSession(app: Hono, d: SessionDeps): void {
     instanceWrites: d.instanceWrites ?? 'on',
   } : {}
 
+  /** The person's name as the request named them (request.ts `personWho`, read as their own viewer may read the members
+   *  file: Rule 4, T2c minor 2); never wider than the request's viewer. */
+  const nameOfPerson = (c: Context, person: { id: string; name: string }): string => {
+    const who = actorOf(c)
+    return who && 'via' in who && who.via === 'email' && who.id === person.id ? who.name : personName(d.repo, person, viewerOf(c))
+  }
+
   app.get('/api/session', c => {
     const tree = d.store ? d.membership.tree() : null
     const p = personOf(c)
@@ -110,7 +117,7 @@ export function mountSession(app: Hono, d: SessionDeps): void {
       const { person, claims } = p
       return c.json({
         mode, signedIn: true, via: 'email', actor: person.id,
-        person: { id: person.id, name: personName(d.repo, person), roles: person.roles, nodes: person.nodes },
+        person: { id: person.id, name: nameOfPerson(c, person), roles: person.roles, nodes: person.nodes },
         viewer: viewerOf(c).kind, expiresAt: new Date(claims.exp * 1000).toISOString(),
         signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
       })
