@@ -34,17 +34,17 @@ describe('the house fixtures: the org, its roles, its Safe (spec §17)', () => {
   it('the guard can fail: a listed token is found inside a word, a joined pair, a host, an address, calldata and a topic', () => {
     // Synthetic stand-ins, never the real values: a 7-letter name, a host's joined labels, a placeholder address.
     const ADDR = `${'0'.repeat(36)}0b1d`
-    const listed = listedOf(['zedcorp', 'zedhostcom', ADDR])
+    const listed = listedOf(['zedcorp', 'zedhosttest', ADDR])
     expect(keptOutIn('By ZedCorp.', listed)).toEqual(['zedcorp'])
     expect(keptOutIn('"Zed Corp" and zed-corp.eth', listed)).toEqual(['zedcorp'])
     expect(keptOutIn('const zedCorpSafe = 1', listed)).toEqual(['zedcorp'])
     expect(keptOutIn('round: zedcorp2025', listed)).toEqual(['zedcorp'])
-    expect(keptOutIn('https://grants.zedhost.com/x', listed)).toEqual(['zedhostcom'])
+    expect(keptOutIn('https://grants.zedhost.test/x', listed)).toEqual(['zedhosttest'])
     expect(keptOutIn(`safe: '0x${ADDR.toUpperCase()}'`, listed)).toEqual([ADDR])
     const calldata = `0xa9059cbb${'0'.repeat(24)}${ADDR}${'0'.repeat(63)}1`
     expect(keptOutIn(`data: "${calldata}"`, listed)).toEqual([ADDR])
     expect(keptOutIn(`topics: ['0x${'0'.repeat(24)}${ADDR}']`, listed)).toEqual([ADDR])
-    expect(keptOutIn(`A zed company at zedcorx.test, zed-host.co, 0x${'0'.repeat(36)}0b1e`, listed)).toEqual([])
+    expect(keptOutIn(`A zed company at zedcorx.test, zed-host.example, 0x${'0'.repeat(36)}0b1e`, listed)).toEqual([])
   })
   it('name no real org: no real org name, ENS name, outside link or public address (by digest)', () => {
     const FIXTURES = join(HERE, '..')

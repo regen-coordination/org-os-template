@@ -307,8 +307,8 @@ describe('the import after its review (Task 12 review)', () => {
       `A paren row: [Bonus (Q4)](${href(`${PAYROLL}/Bonus (Q4) ${P.bonus}.md`)})`,
       `A bracket row: [Review [draft]](${href(`${PAYROLL}/Review [draft] ${P.review}.md`)})`,
       `A paren page: [Salary bands (2026)](${href(`${PAYROLL}/Plain row ${P.plain}/Salary bands (2026) ${P.salary}.md`)})`,
-      `On Notion: [Bonus (Q4)](https://www.notion.so/acme/Bonus-Q4-${P.bonus}) and [the bands](https://www.notion.so/${dashed(P.salary)}?pvs=4)`,
-      `A label only: [Payroll](https://example.org/elsewhere) and <https://www.notion.so/Payroll-${P.payroll}>`,
+      `On Notion: [Bonus (Q4)](https://notion.example.test/acme/Bonus-Q4-${P.bonus}) and [the bands](https://notion.example.test/${dashed(P.salary)}?pvs=4)`,
+      `A label only: [Payroll](https://example.org/elsewhere) and <https://notion.example.test/Payroll-${P.payroll}>`,
       '',
     ].join('\n')
     const w = await world(payroll({ pages: [{ title: 'Index', id: P.index, body }] }))
