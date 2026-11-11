@@ -10,9 +10,7 @@ import { removeFixtureRepo } from '../fixtures.ts'
 import { createApp } from '../../server/app.ts'
 import { mountProposals } from '../../server/proposals/routes.ts'
 import { mountSync } from '../../server/proposals/sync.ts'
-import { goneSettled, onTargetsGone, purgeCursor, trunkAtStart, trunkTip } from '../../server/workspace/gone.ts'
-import { resolveTrunk } from '../../server/proposals/ledger.ts'
-import { withFailingSubcommand } from '../git-shim.ts'
+import { goneSettled, onHousekeeping } from '../../server/workspace/gone.ts'
 import { mountOperations } from '../../server/operations/routes.ts'
 import { opById, needsConfirm, type InProcess } from '../../server/operations/catalogue.ts'
 import { LocalExecutor } from '../../server/operations/executor.ts'
@@ -195,85 +193,27 @@ describe('the fetch operation', () => {
 })
 
 describe('POST /api/sync and GET /api/sync', () => {
-  // R2 review (Rule 4): Sync moves the trunk without applyOps; a page its commits delete, even one made again after, is
-  // told to the conversation's purger, commit by commit, on a fast-forward and on a merge.
-  it('a page deleted and made again on the remote is told gone after the fast-forward and after a merge', async () => {
+  // PR7-R45: Sync moves the trunk without applyOps; after a fast-forward and after a merge the conversation's housekeeping
+  // runs (workspace/gone.ts: the talk of targets that are not there now goes). Nothing is read of the history.
+  it('the conversation\'s housekeeping runs after the fast-forward and after a merge, and not when there is nothing to bring', async () => {
     const { a, b } = world()
-    mkdirSync(join(a, 'pages'), { recursive: true })
-    const page = (body: string, extra = '') => `---\nid: notes-0001\ntitle: Notes\nparent: null\norder: 1000\n${extra}---\n${body}`
-    commitFile(a, 'pages/notes-0001.md', page('Members only.\n')); sh(a, 'git push -q origin main')
     const served = serve(b)
-    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
-    const told: string[][] = []
-    onTargetsGone(b, async targets => { told.push(targets) })
-    sh(a, 'git rm -q pages/notes-0001.md && git commit -qm "page: deleted"')
-    mkdirSync(join(a, 'pages'), { recursive: true }) // git took the folder with its last file
-    commitFile(a, 'pages/notes-0001.md', page('Public now.\n', 'visibility: public\n')); sh(a, 'git push -q origin main')
+    let ran = 0
+    onHousekeeping(b, async () => { ran++ })
+    expect((await sync(served.app)).body).toMatchObject({ state: 'up-to-date' })
+    await goneSettled(b)
+    expect(ran).toBe(0)
+    commitFile(a, 'new.txt', 'n\n'); sh(a, 'git push -q origin main')
     tick()
     expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
     await goneSettled(b)
-    expect(told).toEqual([['page:notes-0001']])
-    // Again, with a commit of b's own first: the merge's side of a counts too.
-    sh(a, 'git rm -q pages/notes-0001.md && git commit -qm "page: deleted again"'); sh(a, 'git push -q origin main')
+    expect(ran).toBe(1)
+    commitFile(a, 'two.txt', 't\n'); sh(a, 'git push -q origin main')
     commitFile(b, 'mine.txt', 'm\n')
     tick()
     expect((await sync(served.app)).body).toMatchObject({ state: 'merged' })
     await goneSettled(b)
-    expect(told).toEqual([['page:notes-0001'], ['page:notes-0001']])
-  })
-
-  // T2c (closing review I-a): Sync's merge commit is a commit the Hub makes, but what it brings is outside. The Hub's own
-  // commits move the purge cursor (onCommit); the merge must not, or a read that fails after it leaves the cursor past
-  // what the merge brought, and nothing reads it again.
-  it('a read that fails after a Sync merge leaves the cursor before the merge, and the next run purges what it brought', async () => {
-    const { a, b } = world()
-    mkdirSync(join(a, 'pages'), { recursive: true })
-    const page = (id: string, body: string) => `---\nid: ${id}\ntitle: Notes\nparent: null\norder: 1000\n---\n${body}`
-    commitFile(a, 'pages/notes-0001.md', page('notes-0001', 'Members only.\n')); sh(a, 'git push -q origin main')
-    const served = serve(b)
-    const told: string[][] = []
-    onTargetsGone(b, async targets => { told.push(targets) })
-    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
-    await goneSettled(b)
-    // A commit of the Hub's own: the cursor follows it.
-    writeFileSync(join(b, 'pages', 'mine-0002.md'), page('mine-0002', 'Mine.\n'))
-    await gitModule.commitPaths(b, ['pages/mine-0002.md'], 'page: mine (the Hub)')
-    await goneSettled(b)
-    const before = sha(b)
-    expect(purgeCursor(b)).toBe(before)
-    sh(a, 'git rm -q pages/notes-0001.md && git commit -qm "page: deleted"'); sh(a, 'git push -q origin main')
-    tick()
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-    await withFailingSubcommand('log', async () => {
-      expect((await sync(served.app)).body).toMatchObject({ state: 'merged' })
-      await goneSettled(b)
-    })
-    expect(errors).toHaveBeenCalled()
-    expect(told).toEqual([])
-    expect(purgeCursor(b)).toBe(before)
-    await trunkAtStart(b, await trunkTip(b, () => resolveTrunk(b)), new Date()); await goneSettled(b)
-    expect(told).toEqual([['page:notes-0001']])
-    expect(purgeCursor(b)).toBe(sha(b))
-  })
-
-  // T2c (closing review, minor 4): Sync takes the purge's time just before it moves the trunk, under the lock: what was
-  // written while it worked (here: a minute spent on its checks) was written at the old level, and goes.
-  it('Sync takes the purge\'s time just before it moves the trunk', async () => {
-    const { a, b } = world()
-    mkdirSync(join(a, 'pages'), { recursive: true })
-    commitFile(a, 'pages/notes-0001.md', '---\nid: notes-0001\ntitle: Notes\nparent: null\norder: 1000\n---\nMembers only.\n'); sh(a, 'git push -q origin main')
-    const served = serve(b)
-    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
-    await goneSettled(b)
-    const told: { targets: string[]; at: string }[] = []
-    onTargetsGone(b, async (targets, at) => { told.push({ targets, at }) })
-    sh(a, 'git rm -q pages/notes-0001.md && git commit -qm "page: deleted"'); sh(a, 'git push -q origin main')
-    tick()
-    const real = gitModule.trackedChanges
-    vi.spyOn(gitModule, 'trackedChanges').mockImplementation(async (...args: Parameters<typeof real>) => { tick(60); return real(...args) })
-    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
-    await goneSettled(b)
-    expect(told).toEqual([{ targets: ['page:notes-0001'], at: clock.toISOString() }])
+    expect(ran).toBe(2)
   })
 
   it('behind and clean: a fast-forward', async () => {

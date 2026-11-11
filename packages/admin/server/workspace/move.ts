@@ -32,8 +32,9 @@ import {
   gitNames, isMove, MOVE_ALONE, MOVE_CHANGED, moveDigest, MOVES, moveSplit, noRecord, PRIVATE_COLLECTION_STAYS, registerMoveCheck, resolvePrivate, unavailable,
   type MovedPart, type MoveToGit, type StagedPrivateOp,
 } from '../private/ops.ts'
-import type { PrivateRecord, PrivateStore } from '../private/store.ts'
+import type { CommentRow, PrivateRecord, PrivateStore } from '../private/store.ts'
 import { guardPageRefs, pagePath, treeOf } from './pages.ts'
+import { readableRows } from './written.ts'
 
 export { isMove, MOVE_ALONE, MOVES, PRIVATE_COLLECTION_STAYS, type MoveToGit }
 
@@ -76,9 +77,13 @@ export function planMove(repo: string, store: PrivateStore, move: MoveToGit, pol
   if (move.digest !== moveDigest(kept)) throw new Refusal(409, { code: 'PRIVATE_CONFLICT', error: MOVE_CHANGED(record) })
   const level: ParsedLevel = parseLevel(move.level) ?? { level: 'members' }
   const label = moveLabel(collection, id, kept.body)
-  let comments: { deleted: string | null }[]
+  let comments: CommentRow[]
   try { comments = store.comments(collection === 'pages' ? `page:${id}` : `record:${collection}:${id}`) } catch (err) { throw unavailable(err, store) }
-  if (comments.some(c => c.deleted === null)) throw new StageError('', HAS_CONVERSATION(label))
+  // PR7-R45: only talk the mover may read holds the move (they may resolve it, or ask for it to go); talk they may not read
+  // is not named to them, and keeps the level it was written at wherever the record goes. A decided proposal's (no viewer)
+  // counts every comment, and is PRIVATE_STALE, which names nothing.
+  const holding = viewer === null ? comments : readableRows(comments, viewer, levelOfToken(kept.visibility))
+  if (holding.some(c => c.deleted === null)) throw new StageError('', HAS_CONVERSATION(label))
   const base = { move, label, collection, id, visibility: kept.visibility, body: kept.body }
 
   if (collection === 'pages') {

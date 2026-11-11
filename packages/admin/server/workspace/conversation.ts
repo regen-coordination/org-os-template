@@ -2,9 +2,11 @@
 //
 // Conversation (DAO-OS L6 spec §8): comments on a page or a record, mentions told only to those who may see what they are
 // on, notifications as rows of Needs you, and read state. All of it lives in the private store (schema 2, §8.1), never in
-// git (rule 4): a comment has no level of its own, it follows its target's level as it is now (§8.2), so a comment, a
-// mention or a notification on something the viewer may not see is absent, and counts drop with it (rule 7). Every read
-// is judged here through `Levels` and `gateItems`; while the store is down, conversation refuses in L5's words (§16).
+// git (rule 4). A comment, a mention and a notification keep the level their target had when they were written, and are
+// read only by a viewer admitted to that level and to the target's level now (PR7-R45, written.ts): a widening never takes
+// earlier talk to anyone it did not admit then, and a narrowing hides it from those it no longer admits. One the viewer may
+// not read is absent, and counts drop with it (rule 7). Every read is judged here through `Levels`, `readableRows` and
+// `gateItems`; while the store is down, conversation refuses in L5's words (§16).
 //
 // What the routes answer is a superset of L4c's shapes (controller ruling P-11): L4c's `Comment` with the author's id, the
 // anchor as stored, a deleted state and the reply's parent; L4c's `Mentionable` with `recordKind` and the `href` a mention
@@ -12,6 +14,9 @@
 // `NotificationRow[]` (preflight row 46; both in the L6 rulings log).
 
 import { randomBytes } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { parse as parseYaml } from 'yaml'
 import type { Context, Hono } from 'hono'
 import { HttpError } from '../errors.ts'
 import { lowestHat, type KnownActor } from '../actor.ts'
@@ -32,7 +37,9 @@ import type { CommentRow, MentionRow, PrivateStore, StoredNotification } from '.
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, NOBODY } from '../visibility/gate.ts'
 import { commitOrStage, guardPageRefs, mayWritePrivate } from './pages.ts'
-import { bury, onTargetsGone, tombstones, unbury } from './gone.ts'
+import { bury, onHousekeeping, onTargetsGone, tombstones, unbury } from './gone.ts'
+import { floorsAbove, mayRead, NOBODY_WRITTEN, readableRows } from './written.ts'
+import { readRegistryOrEmpty } from '../registry.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, type ParsedLevel, type Viewer } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
 import { NO_PAGE, slugOf, splitPage } from '../../lib/workspace/pages.mjs'
@@ -238,11 +245,15 @@ const storeRead = <T>(store: PrivateStore, fn: () => T): T => { try { return fn(
 
 interface Judged { told: string[]; notTold: string[]; mentions: MentionRow[]; notifications: StoredNotification[] }
 
-/** §8.3's test for each mention, nothing written: a member is told when the target's level admits them (`viewerFor`); a role
- *  tells each holder who passes the same test; the author is never told of their own mention; a page or a record mentioned
- *  tells nobody. A mention `source` already recorded is not told again. One notification per member told. */
-function judge(mentions: { kind: string; ref: string }[], target: Target, by: string, deps: ConversationDeps, source: string): Judged {
+/** §8.3's test for each mention, nothing written: a member is told when the target's level admits them (`viewerFor`), and
+ *  every level in `floors` (a reply's: the written levels of the comments above it, PR7-R45); a role tells each holder who
+ *  passes the same test; the author is never told of their own mention; a page or a record mentioned tells nobody. A
+ *  mention `source` already recorded is not told again. One notification per member told. Each row keeps the target's level
+ *  now as the level it was written at. */
+function judge(mentions: { kind: string; ref: string }[], target: Target, by: string, deps: ConversationDeps, source: string,
+  floors: readonly (string | null)[] = []): Judged {
   const level = targetLevel(deps.repo, target, deps.store)
+  const writtenLevel = level ? formatLevel(level) : NOBODY_WRITTEN
   const people = new People(deps.repo, deps.membership)
   const recorded = new Set(storeRead(deps.store, () => deps.store.mentionsOf(source)).map(m => `${m.kind} ${m.ref}`))
   const author = parseCaip10(by) ? String(actorIdOf(by, people.members)) : by
@@ -252,7 +263,8 @@ function judge(mentions: { kind: string; ref: string }[], target: Target, by: st
   const seen = new Set<string>()
   const judgeMember = (id: string): boolean => {
     if (id === author || !people.member(id)) return false
-    if (level && admits(level, people.viewer(id))) { told.add(id); return true }
+    const viewer = people.viewer(id)
+    if (level && admits(level, viewer) && floors.every(f => mayRead(viewer, level, f))) { told.add(id); return true }
     notTold.add(id)
     return false
   }
@@ -268,12 +280,12 @@ function judge(mentions: { kind: string; ref: string }[], target: Target, by: st
       const role = people.roles().get(m.ref)
       if (role?.defined) for (const holder of role.members) any = judgeMember(holder) || any
     }
-    rows.push({ source, kind, ref: m.ref, told: any })
+    rows.push({ source, kind, ref: m.ref, told: any, writtenLevel })
   }
   for (const id of told) notTold.delete(id)
   const created = (deps.now ?? (() => new Date()))().toISOString()
   const notifications = [...told].sort().map((member): StoredNotification =>
-    ({ id: newId('ntf'), member, kind: 'mention', target, source, by, created, readAt: null }))
+    ({ id: newId('ntf'), member, kind: 'mention', target, source, by, created, readAt: null, writtenLevel }))
   return { told: [...told].sort(), notTold: [...notTold].sort(), mentions: rows, notifications }
 }
 
@@ -461,8 +473,9 @@ export interface NotificationRow {
   text: string; source: string; visibility: string
 }
 
-/** `viewer`'s notifications, each re-judged against its target's level now (§8.3): one on something they may no longer see,
- *  or that is gone, is absent, and is not counted. */
+/** `viewer`'s notifications, each re-judged against its target's level now and the level it was told at (§8.3, PR7-R45),
+ *  and one that names a comment only with that comment readable: one on something they may no longer see, or that is gone,
+ *  is absent, and is not counted. */
 export function notificationsFor(viewer: Viewer, deps: Omit<ConversationDeps, 'now'>): NotificationRow[] {
   if (viewer.kind !== 'member') return []
   const rows = storeRead(deps.store, () => deps.store.notifications(viewer.id))
@@ -471,15 +484,85 @@ export function notificationsFor(viewer: Viewer, deps: Omit<ConversationDeps, 'n
     if (!infos.has(t)) infos.set(t, parseTarget(t) ? targetInfo(deps.repo, t as Target, deps.store) : null)
     return infos.get(t) ?? null
   }
+  const readable = new Map<string, Set<string>>()
+  const readableOn = (t: string, info: TargetInfo) => {
+    let ids = readable.get(t)
+    if (!ids) {
+      ids = new Set(readableRows(storeRead(deps.store, () => deps.store.comments(t)), viewer, info.level).map(r => r.id))
+      readable.set(t, ids)
+    }
+    return ids
+  }
   const names = namesFor(deps.repo, deps.membership, viewer)
   const views = rows.flatMap(n => {
     const info = infoOf(n.target)
-    if (!info) return []
+    if (!info || !mayRead(viewer, info.level, n.writtenLevel)) return []
+    const comment = /^comment:(.+)$/.exec(n.source)
+    if (comment && !readableOn(n.target, info).has(comment[1]!)) return []
     const by = names(n.by)
     return [{ id: n.id, kind: n.kind, target: n.target as Target, title: info.title, by, at: n.created, read: n.readAt !== null,
       text: `${by.role} mentioned you on ${info.title}`, source: n.source }]
   })
   return gateItems(viewer, views, v => infoOf(v.target)?.level ?? NOBODY)
+}
+
+// ── the floor's migration and the housekeeping (PR7-R45) ─────────────────────────────────────────────
+
+/** Once after schema 3's migration: the rows written before `written_level` existed take their target's level now (the
+ *  safe reading for a store of today), or a level nobody is admitted to when the target is not there to read. */
+export async function fillWrittenLevels(repo: string, store: PrivateStore): Promise<void> {
+  const targets = store.unfilledTargets()
+  if (targets.length === 0) return
+  const levels = levelsOf(repo, store)
+  const known = new Map<string, string>()
+  for (const t of targets) {
+    const level = levels.target(t)
+    if (level) known.set(t, formatLevel(level))
+  }
+  await store.fillWrittenLevels(known, NOBODY_WRITTEN)
+}
+
+/** Whether data/collections.yaml can be read (absent counts): with it unreadable the custom collections are not known, so
+ *  nothing is said of a record whose collection is not found. */
+function collectionsReadable(repo: string): boolean {
+  const path = join(repo, 'data', 'collections.yaml')
+  if (!existsSync(path)) return true
+  try { parseYaml(readFileSync(path, 'utf8')); return true } catch { return false }
+}
+
+/** The conversation's targets that are not there now (PR7-R45's housekeeping): a page no page holds (git's or the store's),
+ *  a record neither its collection's file nor the store holds, or of a collection that is defined nowhere. A file that
+ *  cannot be read says nothing: its targets are kept (no purge on a guess). No history is read. */
+export function absentTargets(repo: string, store: PrivateStore): string[] {
+  const defs = new Map(registriesOf(repo).filter(d => d.kind === 'collection').map(d => [d.name, d]))
+  const kept = new Set(store.collections().map(c => c.id))
+  const pages = levelsOf(repo, store).pages()
+  const known = collectionsReadable(repo)
+  const files = new Map<string, Set<string> | null>()
+  const idsOf = (registry: string): Set<string> | null => {
+    if (!files.has(registry)) {
+      let ids: Set<string> | null
+      try { ids = new Set((readRegistryOrEmpty(repo, registry).entries ?? []).map(e => String((e as { id?: unknown }).id))) } catch { ids = null }
+      files.set(registry, ids)
+    }
+    return files.get(registry) ?? null
+  }
+  const out: string[] = []
+  for (const t of store.conversationTargets()) {
+    const page = /^page:(.+)$/.exec(t)
+    if (page) { if (!pages.has(page[1]!)) out.push(t); continue }
+    const rec = /^record:([^:]+):(.+)$/.exec(t)
+    if (!rec) continue
+    const [, registry, id] = rec as unknown as [string, string, string]
+    if (store.record(registry, id)) continue
+    if (defs.has(registry)) {
+      const ids = idsOf(registry)
+      if (ids !== null && !ids.has(id)) out.push(t)
+      continue
+    }
+    if (kept.has(registry) || known) out.push(t)
+  }
+  return out
 }
 
 // ── Turn into a task (§8.2) ──────────────────────────────────────────────────────────────────────────
@@ -549,8 +632,9 @@ export interface ConversationRoutesDeps {
   privateStore: PrivateAccess
   /** The repository's one write lock (Turn into a task writes git). */
   withLock: <T>(fn: () => Promise<T>) => Promise<T>
-  /** Sent after a write: `conversation` for the target (gated per connection, §8.5), `changes` after a staged task. */
-  notify?: (msg: { type: 'conversation'; target: Target } | { type: 'changes' }) => void
+  /** Sent after a write: `conversation` for the target (gated per connection, §8.5) with the floor of what changed (`written`:
+   *  its written level and those of the comments above it, PR7-R45), `changes` after a staged task. */
+  notify?: (msg: { type: 'conversation'; target: Target; written: string[] } | { type: 'changes' }) => void
   now?: () => Date
 }
 
@@ -563,7 +647,16 @@ const chars = (s: string) => [...s].length
 export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void {
   const { repo, membership } = deps
   const now = () => (deps.now ?? (() => new Date()))()
-  const notify = (target: Target) => { try { deps.notify?.({ type: 'conversation', target }) } catch { /* the write stands */ } }
+  const notify = (target: Target, written: readonly (string | null)[]) => {
+    try { deps.notify?.({ type: 'conversation', target, written: written.map(w => w ?? NOBODY_WRITTEN) }) } catch { /* the write stands */ }
+  }
+  /** PR7-R45: the rows written before the column existed are filled before any conversation is read (once per store). */
+  const filled = new WeakSet<PrivateStore>()
+  const fill = async (store: PrivateStore) => {
+    if (filled.has(store)) return
+    try { await fillWrittenLevels(repo, store) } catch (err) { throw unavailable(err, store) }
+    filled.add(store)
+  }
   /** R-9a: the tombstones of git targets deleted while the store was down, applied before any conversation is read. */
   const applyTombstones = async (store: PrivateStore) => {
     const list = tombstones(repo)
@@ -575,6 +668,7 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
   const needStore = async (): Promise<PrivateStore> => {
     const { store, why } = reach(deps.privateStore)
     if (!store) throw unavailable(why)
+    await fill(store)
     await applyTombstones(store)
     return store
   }
@@ -586,30 +680,50 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
       await applyTombstones(store)
       await store.purgeConversation(targets.map(target => ({ target, at })))
     } catch (err) {
-      // Buried, they are taken the moment the store is reached again: the purge is done as far as its callers go (the
-      // purge cursor moves on, R2b I-3). A tombstone that cannot be written throws.
+      // Buried, they are taken the moment the store is reached again: the purge is done as far as its callers go. A
+      // tombstone that cannot be written throws.
       bury(repo, targets, at)
       console.error(`org-os admin: the private store could not take the conversation of ${targets.join(', ')} now (${err instanceof Error ? err.message : String(err)}); it goes when the store is reached again.`)
     }
   })
+  // PR7-R45: after each trunk move by the Refresher or Sync, and at the start, the talk of targets that are not there now
+  // goes. Housekeeping, not a privacy guard (the floor is): a mistake can only leave rows behind, or take those of a target
+  // that is gone. `at` is taken before the targets are read, so talk written on a target made meanwhile stays.
+  onHousekeeping(repo, async () => {
+    const { store } = reach(deps.privateStore)
+    if (!store) return // the next move or start
+    await fill(store)
+    await applyTombstones(store)
+    const at = now().toISOString()
+    const gone = absentTargets(repo, store)
+    if (gone.length > 0) await store.purgeConversation(gone.map(target => ({ target, at })))
+  })
   const write = async (store: PrivateStore, w: Parameters<PrivateStore['writeConversation']>[0]) => {
     try { await store.writeConversation(w) } catch (err) { throw unavailable(err, store) }
   }
-  /** A comment the viewer may see, with its target; else the 404 of one that is not there. */
-  const visibleComment = (store: PrivateStore, id: string, viewer: Viewer): { row: CommentRow; info: TargetInfo } => {
+  /** A comment the viewer may read (its target's level now, the level it was written at, and every comment above it:
+   *  PR7-R45), with its target and the target's comments; else the 404 of one that is not there. */
+  const visibleComment = (store: PrivateStore, id: string, viewer: Viewer): { row: CommentRow; info: TargetInfo; rows: CommentRow[] } => {
     const row = storeRead(store, () => store.comment(id))
     const t = row ? parseTarget(row.target) : null
     if (!row || !t) throw new HttpError(404, NO_COMMENT(id))
-    try { return { row, info: visibleTarget(repo, t, store, null, viewer) } } catch (err) {
+    let info: TargetInfo
+    try { info = visibleTarget(repo, t, store, null, viewer) } catch (err) {
       if (err instanceof HttpError && err.status === 404) throw new HttpError(404, NO_COMMENT(id))
       throw err
     }
+    const rows = storeRead(store, () => store.comments(row.target))
+    if (!readableRows(rows, viewer, info.level).some(r => r.id === id)) throw new HttpError(404, NO_COMMENT(id))
+    return { row, info, rows }
   }
-  const view = (store: PrivateStore, row: CommentRow, info: TargetInfo) => {
+  /** The floor of a change to `row`: its written level and those of the comments above it (PR7-R45). */
+  const floorOf = (row: CommentRow, rows: readonly CommentRow[]) => [row.writtenLevel, ...floorsAbove(rows, row.parent)]
+  const view = (store: PrivateStore, row: CommentRow, info: TargetInfo, viewer: Viewer) => {
     const names = namesFor(repo, membership)
     const out = commentView(row, names, info.text)
     if (row.parent === null) {
-      out.replies = storeRead(store, () => store.comments(row.target)).filter(r => r.parent === row.id).map(r => commentView(r, names, info.text))
+      const rows = readableRows(storeRead(store, () => store.comments(row.target)), viewer, info.level)
+      out.replies = rows.filter(r => r.parent === row.id).map(r => commentView(r, names, info.text))
     }
     return out
   }
@@ -618,8 +732,10 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     const target = parseTarget(c.req.query('target') ?? '')
     if (!target) throw new HttpError(400, TARGET_QUERY)
     const store = await needStore()
-    const info = visibleTarget(repo, target, store, null, viewerOf(c))
-    return c.json(threadOf(storeRead(store, () => store.comments(target)), namesFor(repo, membership, viewerOf(c)), info.text))
+    const viewer = viewerOf(c)
+    const info = visibleTarget(repo, target, store, null, viewer)
+    const rows = readableRows(storeRead(store, () => store.comments(target)), viewer, info.level)
+    return c.json(threadOf(rows, namesFor(repo, membership, viewer), info.text))
   })
 
   app.post('/api/comments', async c => {
@@ -640,10 +756,12 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     const store = await needStore()
     const info = visibleTarget(repo, target, store, null, viewer)
     let parent: string | null = null
+    let floors: (string | null)[] = []
     if (typeof raw.parent === 'string') {
-      const p = visibleComment(store, raw.parent, viewer).row
+      const { row: p, rows } = visibleComment(store, raw.parent, viewer)
       if (p.target !== target) throw new HttpError(422, NOT_ON_TARGET(p.id, target), 'NOT_ON_TARGET')
       parent = p.id
+      floors = floorsAbove(rows, p.id)
     }
     // §4.5 holds in a comment as in a page: a stricter page's title never shows here; a private collection's record cannot
     // be named from a looser target.
@@ -651,23 +769,24 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     if (guarded.refused !== null) throw new Refusal(422, { code: 'CANNOT_LINK', error: guarded.refused })
     const row: CommentRow = {
       id: newId('cmt'), target, parent, anchor, by: actor.id, body: guarded.body, created: now().toISOString(),
-      edited: null, resolvedBy: null, resolvedAt: null, deleted: null,
+      edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: formatLevel(info.level),
     }
     const cdeps: ConversationDeps = { repo, store, membership, now }
-    const j = judge(refsOf(guarded.body).mentions, target, actor.id, cdeps, `comment:${row.id}`)
+    const j = judge(refsOf(guarded.body).mentions, target, actor.id, cdeps, `comment:${row.id}`, floors)
     await write(store, { comments: [row], mentions: j.mentions, notifications: j.notifications })
-    notify(target)
+    notify(target, [row.writtenLevel, ...floors])
     return c.json({ comment: commentView(row, namesFor(repo, membership), info.text), notTold: j.notTold.map(NOT_TOLD) }, 201)
   })
 
   const resolve = (resolved: boolean) => async (c: Context) => {
     const actor = knownActorOf(c)
     const store = await needStore()
-    const { row, info } = visibleComment(store, c.req.param('id')!, viewerOf(c))
+    const viewer = viewerOf(c)
+    const { row, info, rows } = visibleComment(store, c.req.param('id')!, viewer)
     const next: CommentRow = resolved ? { ...row, resolvedBy: actor.id, resolvedAt: now().toISOString() } : { ...row, resolvedBy: null, resolvedAt: null }
     await write(store, { comments: [next] })
-    notify(row.target as Target)
-    return c.json({ comment: view(store, next, info) })
+    notify(row.target as Target, floorOf(row, rows))
+    return c.json({ comment: view(store, next, info, viewer) })
   }
   app.post('/api/comments/:id/resolve', resolve(true))
   app.post('/api/comments/:id/reopen', resolve(false))
@@ -675,12 +794,13 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
   app.delete('/api/comments/:id', async c => {
     const actor = knownActorOf(c)
     const store = await needStore()
-    const { row, info } = visibleComment(store, c.req.param('id'), viewerOf(c))
+    const viewer = viewerOf(c)
+    const { row, info, rows } = visibleComment(store, c.req.param('id'), viewer)
     if (row.by !== actor.id) throw new HttpError(403, NOT_YOUR_COMMENT, 'NOT_YOURS')
     const next: CommentRow = { ...row, body: '', anchor: null, deleted: row.deleted ?? now().toISOString() }
     await write(store, { comments: [next], dropSources: [`comment:${row.id}`] })
-    notify(row.target as Target)
-    return c.json({ comment: view(store, next, info) })
+    notify(row.target as Target, floorOf(row, rows))
+    return c.json({ comment: view(store, next, info, viewer) })
   })
 
   app.post('/api/comments/:id/task', async c => {
@@ -688,11 +808,11 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     const viewer = viewerOf(c)
     return deps.withLock(async () => {
       const store = await needStore()
-      const { row, info } = visibleComment(store, c.req.param('id'), viewer)
+      const { row, info, rows } = visibleComment(store, c.req.param('id'), viewer)
       const out = await turnIntoTask(row, info, actor, { repo, store, membership, now, notify: msg => deps.notify?.(msg) })
       // Task 18 fix round 1: the comment keeps the task it became, so everyone admitted sees it and it is not made twice.
       await write(store, { comments: [{ ...row, task: out.task }] })
-      notify(row.target as Target)
+      notify(row.target as Target, floorOf(row, rows))
       return c.json(out, 201)
     })
   })
@@ -732,11 +852,12 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     visibleTarget(repo, target, store, null, viewer)
     if (viewer.kind !== 'member') throw new HttpError(404, NO_TARGET(target))
     const at = now().toISOString()
-    let read: number
+    // §8.3: opening the target marks its rows read, those the viewer may read only (PR7-R45): the others are not counted.
+    const ids = notificationsFor(viewer, { repo, store, membership }).filter(n => n.target === target && !n.read).map(n => n.id)
+    let read = 0
     try {
       await store.putRead(viewer.id, target, at)
-      // §8.3: opening the target marks its rows read.
-      read = await store.markNotificationsRead(viewer.id, at, { target })
+      if (ids.length > 0) read = await store.markNotificationsRead(viewer.id, at, { ids })
     } catch (err) { throw unavailable(err, store) }
     return c.json({ target, at, read })
   })

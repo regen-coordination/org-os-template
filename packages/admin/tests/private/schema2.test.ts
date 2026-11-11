@@ -64,7 +64,7 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     const r = repo(), dir = temp('schema2-task-')
     const s = await opened(r, dir)
     await s.writeConversation({ comments: [{ id: 'cmt_1', target: 'page:p-1', parent: null, anchor: null, by: 'steward-a', body: 'b',
-      created: '2026-10-31T12:00:00.000Z', edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
+      created: '2026-10-31T12:00:00.000Z', edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: 'members' }] })
     const file = s.file
     s.close(); open.splice(0)
     const db = new DatabaseSync(file)
@@ -75,6 +75,42 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     expect(again.comment('cmt_1')!.task).toBe('check-the-season')
   })
 
+  // PR7-R45 (schema 3 is not released, so its migration carries the column): each conversation row keeps the level its
+  // target had when it was written. A store made before the column gains it with every row marked unfilled, which admits
+  // nobody until the server's start fills it; a write must name it, and it never changes once written.
+  it('the conversation floor: a store made before written_level gains it, every row unfilled; a write names it, and keeps the first', async () => {
+    const r = repo(), dir = temp('schema3-written-')
+    const s = await opened(r, dir)
+    const row = { id: 'cmt_1', target: 'page:p-1', parent: null, anchor: null, by: 'steward-a', body: 'b', created: '2026-10-31T12:00:00.000Z',
+      edited: null, resolvedBy: null, resolvedAt: null, deleted: null }
+    await expect(s.writeConversation({ comments: [row as never] })).rejects.toThrow(/written level/)
+    await expect(s.writeConversation({ notifications: [{ id: 'n-1', member: 'steward-b', kind: 'mention', target: 'page:p-1', source: 'comment:cmt_1', by: 'steward-a',
+      created: row.created, readAt: null } as never] })).rejects.toThrow(/written level/)
+    await expect(s.writeConversation({ mentions: [{ source: 'comment:cmt_1', kind: 'member', ref: 'steward-b', told: true } as never] })).rejects.toThrow(/written level/)
+    await s.writeConversation({
+      comments: [{ ...row, writtenLevel: 'hat:Ops' }],
+      mentions: [{ source: 'comment:cmt_1', kind: 'member', ref: 'steward-b', told: true, writtenLevel: 'hat:Ops' }],
+      notifications: [{ id: 'n-1', member: 'steward-b', kind: 'mention', target: 'page:p-1', source: 'comment:cmt_1', by: 'steward-a', created: row.created, readAt: null, writtenLevel: 'hat:Ops' }],
+    })
+    // A resolve puts the row whole again: what it says of the level is not taken.
+    await s.writeConversation({ comments: [{ ...row, resolvedBy: 'steward-a', resolvedAt: row.created, writtenLevel: 'public' }] })
+    expect(s.comment('cmt_1')).toMatchObject({ resolvedBy: 'steward-a', writtenLevel: 'hat:Ops' })
+    const file = s.file
+    s.close(); open.splice(0)
+    const db = new DatabaseSync(file)
+    try { for (const t of ['comments', 'mentions', 'notifications']) db.exec(`ALTER TABLE ${t} DROP COLUMN written_level`) } finally { db.close() }
+    const again = await opened(r, dir)
+    expect(again.comment('cmt_1')?.writtenLevel).toBe('unfilled')
+    expect(again.mentionsOf('comment:cmt_1').map(m => m.writtenLevel)).toEqual(['unfilled'])
+    expect(again.notifications('steward-b').map(n => n.writtenLevel)).toEqual(['unfilled'])
+    expect(again.unfilledTargets()).toEqual(['page:p-1'])
+    await again.fillWrittenLevels(new Map([['page:p-1', 'members']]), 'nobody')
+    expect(again.comment('cmt_1')?.writtenLevel).toBe('members')
+    expect(again.mentionsOf('comment:cmt_1').map(m => m.writtenLevel)).toEqual(['members'])
+    expect(again.notifications('steward-b').map(n => n.writtenLevel)).toEqual(['members'])
+    expect(again.unfilledTargets()).toEqual([])
+  })
+
   it('SCHEMA_VERSION is 2, and a new store has the six new tables, STRICT, column for column', async () => {
     expect(SCHEMA_VERSION).toBe(3) // schema 3 holds these tables and the Roles'
     const s = await opened(repo(), temp('schema2-'))
@@ -82,9 +118,9 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     const db = new DatabaseSync(s.file, { readOnly: true })
     try {
       const columns = (t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map(c => c.name)
-      expect(columns('comments')).toEqual(['id', 'target', 'parent', 'anchor', 'by', 'body', 'created', 'edited', 'resolved_by', 'resolved_at', 'deleted', 'task'])
-      expect(columns('mentions')).toEqual(['source', 'kind', 'ref', 'told'])
-      expect(columns('notifications')).toEqual(['id', 'member', 'kind', 'target', 'source', 'by', 'created', 'read_at'])
+      expect(columns('comments')).toEqual(['id', 'target', 'parent', 'anchor', 'by', 'body', 'created', 'edited', 'resolved_by', 'resolved_at', 'deleted', 'task', 'written_level'])
+      expect(columns('mentions')).toEqual(['source', 'kind', 'ref', 'told', 'written_level'])
+      expect(columns('notifications')).toEqual(['id', 'member', 'kind', 'target', 'source', 'by', 'created', 'read_at', 'written_level'])
       expect(columns('reads')).toEqual(['member', 'target', 'at'])
       expect(columns('view_state')).toEqual(['member', 'collection', 'state'])
       expect(columns('drafts')).toEqual(['session', 'target', 'actor', 'base', 'body', 'opened', 'updated'])

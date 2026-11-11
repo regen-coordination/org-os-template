@@ -379,10 +379,14 @@ the viewer reads "<hat> only"; a record kept from them is absent.
 
 ### Conversation and presence
 
-Comments on a page or a record, mentions and notifications live in the private store, never in git. A comment follows its
-target's level as it is now: narrow the page and the comment, its mention and its notification are gone for whoever it no
-longer admits. A mention tells only those who may see what it is on; the rest are named back as not told. Presence is in
-the server's memory only (a beat every 20 s, gone 45 s after the last), shown only to those who may see the thing.
+Comments on a page or a record, mentions and notifications live in the private store, never in git. Each keeps the level
+its target had when it was written, and is read only by someone admitted to that level and to the target's level now (a
+reply only with the comments above it). Narrow the page and the talk is gone for whoever it no longer admits; widen it, in
+the Hub or outside, and the earlier talk stays with those who could read it before, while what is written after is read at
+the new level. A page deleted and made again under its id shows its old talk only to those who could read it then. After
+the trunk moves (Refresher, Sync) and at the start, the talk of pages and records that are no longer there is removed. A
+mention tells only those who may see what it is on; the rest are named back as not told. Presence is in the server's
+memory only (a beat every 20 s, gone 45 s after the last), shown only to those who may see the thing.
 
 | Route | Does |
 |---|---|

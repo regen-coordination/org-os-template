@@ -50,7 +50,7 @@ import { workspaceOf } from './workspace/routes.ts'
 import { actorNames, mountConversation, targetLevel, tellAtCommit, type Target } from './workspace/conversation.ts'
 import { mountPresence, Presence, PRESENCE_BEAT_MS } from './workspace/presence.ts'
 import { privateReads } from './private/reads.ts'
-import { goneSettled, trunkAtStart, trunkTip } from './workspace/gone.ts'
+import { goneSettled, housekeepAtStart } from './workspace/gone.ts'
 import type { Viewer } from '../lib/visibility.mjs'
 import type { HostedConfig } from './hosted/config.ts'
 import { useHubIdent } from './hosted/ident.ts'
@@ -295,10 +295,9 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     systems: systemReader,
     membership,
   })
-  // R2b I-3: what the trunk's commits since the purge cursor deleted (a move made while the server was down) takes its
-  // conversation; with no cursor yet, it is set to the trunk. Queued: it reads history after the start goes on. The tip is
-  // read now, before the drafts below are committed (T2c minor 1): their commits are the Hub's, never read as outside.
-  void trunkAtStart(repo, await trunkTip(repo, () => resolveTrunk(repo, startBranch)), new Date())
+  // PR7-R45: the conversation's housekeeping at the start (the rows written before written_level existed are filled, and the
+  // talk of a target deleted while the server was down goes). Queued: the start goes on.
+  void housekeepAtStart(repo)
   // DAO-OS L6 §6 (Task 8): the editing sessions' drafts and the record batches a crash left are committed now, before
   // anything is served; a draft that conflicts stays, for Compare. A failure is logged and the server still starts.
   // While writes are off nothing is committed at start (as the private store's reconcile, above): the drafts wait.
@@ -419,7 +418,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
       // only what they may see. The levels of the message's keys are worked out once, for every connection; each
       // connection's messages go one after another, each judged on the viewer as it is when it is sent (R-L5-13.6).
       const broadcast = (raw: unknown) => {
-        const msg = raw as { type: string; registry?: string; ids?: string[]; target?: string }
+        const msg = raw as { type: string; registry?: string; ids?: string[]; target?: string; written?: string[] }
         const levelOf = events.levelsFor(msg)
         for (const client of wss.clients) {
           if (client.readyState !== client.OPEN) continue

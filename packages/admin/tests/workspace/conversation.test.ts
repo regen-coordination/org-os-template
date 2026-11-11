@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { parse as parseYaml } from 'yaml'
 import type { Hono } from 'hono'
 import { makeChangeRepo, git } from '../changes/fixtures.ts'
@@ -14,9 +15,10 @@ import { openPrivateStore, StoreUnavailable, type PrivateStore } from '../../ser
 import { storeAccess } from '../../server/private/ops.ts'
 import { mountVisibility } from '../../server/visibility/routes.ts'
 import { EditSessions } from '../../server/workspace/sessions.ts'
-import { goneBetween, goneSettled, purgeCursor, tombstones, trunkAtStart, trunkTip } from '../../server/workspace/gone.ts'
+import { goneSettled, housekeepAtStart, tombstones } from '../../server/workspace/gone.ts'
+import { UNFILLED } from '../../server/workspace/written.ts'
+import { gateEvent } from '../../server/visibility/gate.ts'
 import { commitPaths } from '../../server/git.ts'
-import { withFailingSubcommand, withGitTrace } from '../git-shim.ts'
 import { Refresher } from '../../server/hosted/refresh.ts'
 import { ServerAttention } from '../../server/attention.ts'
 import { resolveTrunk } from '../../server/proposals/ledger.ts'
@@ -268,8 +270,8 @@ describe('mentions are told only to those who may see the target (§8.3)', () =>
     expect(w.store.notifications('steward-c')).toEqual([])
     expect(w.store.notifications('steward-b')).toMatchObject([{ member: 'steward-b', kind: 'mention', target: `page:${OPS_PAGE}`, source: `comment:${sent.body.comment.id}`, by: 'steward-a' }])
     expect(w.store.mentionsOf(`comment:${sent.body.comment.id}`)).toEqual([
-      { source: `comment:${sent.body.comment.id}`, kind: 'member', ref: 'steward-b', told: true },
-      { source: `comment:${sent.body.comment.id}`, kind: 'member', ref: 'steward-c', told: false },
+      { source: `comment:${sent.body.comment.id}`, kind: 'member', ref: 'steward-b', told: true, writtenLevel: `hat:${OPS}` },
+      { source: `comment:${sent.body.comment.id}`, kind: 'member', ref: 'steward-c', told: false, writtenLevel: `hat:${OPS}` },
     ])
   })
 
@@ -450,7 +452,7 @@ describe('the comment\'s acts and limits (§8.2)', () => {
     expect(long.status).toBe(422)
     // commentView alone: the anchor is judged on the text given.
     const row: CommentRow = { id: 'cmt_1', target: 'page:handbook-3f2a', parent: null, anchor: { exact: 'gone', prefix: '', suffix: '' }, by: 'steward-a', body: 'b',
-      created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null }
+      created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: 'members' }
     expect(commentView(row, id => ({ handle: id, role: id }), 'nothing here').unanchored).toEqual({ text: 'gone', note: ANCHOR_CHANGED })
   })
 
@@ -681,520 +683,260 @@ describe('§8.5: a private page written in the store is heard', () => {
   })
 })
 
-// R2 review (Rule 4): the Refresher (a read-only hosted Hub taking its remote's commits) and Sync move the trunk without
-// applyOps or a ratify. A page or record those commits delete takes its conversation too, read commit by commit, so a
-// delete and a re-make between two refreshes still counts. Every repository here is fresh under the temp directory.
-describe('R2 review: a trunk moved from outside takes a deleted target\'s conversation', () => {
+// PR7-R45, the conversation floor: every comment, reply, mention and notification keeps the level its target had when it was
+// written, and is read only by a viewer admitted to both that level and the target's level now. A widening, made in the Hub
+// or outside it, a delete and re-make, never shows earlier talk to anyone it did not admit then. Every repository and store
+// here is fresh under the temp directory; a remote is a bare repository beside it.
+describe('PR7-R45: the conversation floor (a row is read at its target\'s level now and the level it was written at)', () => {
+  const T = 'page:scratch-0001'
+  const OPS_LEVEL = `hat:${OPS}`
   const tmp = (prefix: string) => { const d = mkdtempSync(join(tmpdir(), prefix)); cleanup.push(d); return d }
-  /** A bare remote for `repo`, and a clone of it where commits are made elsewhere (as steward-b). */
-  const remoteOf = (repo: string) => {
-    const bare = join(tmp('gone-remote-'), 'remote.git')
-    git(tmp('gone-init-'), `init -q --bare -b main ${bare}`)
-    git(repo, `remote add origin ${bare}`)
-    git(repo, 'push -q origin HEAD:refs/heads/main')
-    const elsewhere = join(tmp('gone-elsewhere-'), 'clone')
-    git(tmp('gone-clone-'), `clone -q ${bare} ${elsewhere}`)
-    git(elsewhere, 'config user.email steward-b@example.test')
-    git(elsewhere, 'config user.name "Steward B"')
-    return elsewhere
-  }
-
-  it('a git page deleted and made again at public on the remote: after the refresh its members\' comments are gone', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    const sent = await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} members-only talk` }))
-    expect(sent.status).toBe(201)
-    await call(w.app, '/api/reads', json('POST', { target: 'page:scratch-0001' }))
-    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
-    expect(w.store.notifications('steward-c')).toHaveLength(1)
-    const elsewhere = remoteOf(w.repo)
-    git(elsewhere, 'rm -q pages/scratch-0001.md')
-    git(elsewhere, 'commit -qm "page: deleted"')
-    mkdirSync(join(elsewhere, 'pages'), { recursive: true }) // git took the folder with its last file
-    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
-    git(elsewhere, 'add pages/scratch-0001.md')
-    git(elsewhere, 'commit -qm "page: made again, public"')
-    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-
-    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000 })
-    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
-    await goneSettled(w.repo)
-    expect(targetLevel(w.repo, 'page:scratch-0001', w.store)).toEqual({ level: 'public' })
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-    expect(w.store.notifications('steward-c')).toEqual([])
-    expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBeNull()
-    for (const who of [asA, asC]) {
-      who(w.repo)
-      expect((await call(w.app, '/api/comments?target=page:scratch-0001')).body).toEqual([])
-    }
-  })
-
-  // R2b (review I-2): the purge is bounded by the time the trunk moved (taken before the fast-forward): a comment, a read
-  // mark or a notification made on the page after that is the new page's, and stays.
-  it('the Refresher takes the time before the fast-forward: what was written on the page after it survives the purge', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    expect((await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} members-only talk` }))).status).toBe(201)
-    await call(w.app, '/api/reads', json('POST', { target: 'page:scratch-0001' }))
-    expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBe(NOW.toISOString())
-    const elsewhere = remoteOf(w.repo)
-    git(elsewhere, 'rm -q pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: deleted"')
-    mkdirSync(join(elsewhere, 'pages'), { recursive: true })
-    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
-    git(elsewhere, 'add pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: made again, public"')
-    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-    // Written on the new page after the move (13:00), the move at 12:30, the old comment at the fixed clock (12:00).
-    const later = '2026-10-31T13:00:00.000Z'
-    await w.store.writeConversation({
-      comments: [{ id: 'c-after', target: 'page:scratch-0001', parent: null, anchor: null, by: 'steward-b', body: 'On the public page.', created: later,
-        edited: null, resolvedBy: null, resolvedAt: null, deleted: null }],
-      notifications: [{ id: 'n-after', member: 'steward-c', kind: 'mention', target: 'page:scratch-0001', source: 'comment:c-after', by: 'steward-b', created: later, readAt: null }],
-    })
-    await w.store.putRead('steward-b', 'page:scratch-0001', later)
-    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000,
-      now: () => new Date('2026-10-31T12:30:00Z') })
-    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
-    await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001').map(c => c.id)).toEqual(['c-after'])
-    expect(w.store.notifications('steward-c').map(n => n.id)).toEqual(['n-after'])
-    expect(w.store.readOf('steward-b', 'page:scratch-0001')).toBe(later)
-    expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBeNull()
-  })
-
-  // T2c (closing review, minor 4): the time is taken under the write lock, just before the fast-forward: what was written
-  // on the members' page while the Refresher waited its turn on the lock is written at the old level, and goes.
-  it('the Refresher takes the time under the lock: what was written while it waited for the lock goes', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    const elsewhere = remoteOf(w.repo)
-    git(elsewhere, 'rm -q pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: deleted"')
-    mkdirSync(join(elsewhere, 'pages'), { recursive: true })
-    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
-    git(elsewhere, 'add pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: made again, public"')
-    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-    let clock = new Date('2026-10-31T12:30:00Z')
-    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000, now: () => clock,
-      withLock: async fn => {
-        // Written at 12:40, while the Refresher waited its turn; the lock is its at 12:45.
-        await w.store.writeConversation({ comments: [{ id: 'c-waiting', target: 'page:scratch-0001', parent: null, anchor: null, by: 'steward-b',
-          body: 'Still the members\' page.', created: '2026-10-31T12:40:00.000Z', edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
-        clock = new Date('2026-10-31T12:45:00Z')
-        return fn()
-      } })
-    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
-    await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-  })
-
-  // T2c (closing review, minor 3): a reply goes with the comment it is under whatever its time, and so do the notifications
-  // of every comment purged; a later comment that is not under a purged one keeps its own.
-  it('a reply purged with its comment takes its notifications too, whatever their time', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    const target = 'page:scratch-0001'
-    const later = '2026-10-31T13:00:00.000Z'
-    const row = (id: string, parent: string | null, created: string): CommentRow => ({ id, target, parent, anchor: null, by: 'steward-b', body: 'Talk.', created,
-      edited: null, resolvedBy: null, resolvedAt: null, deleted: null })
-    const told = (id: string, source: string, created: string) => ({ id, member: 'steward-c', kind: 'mention' as const, target, source, by: 'steward-b', created, readAt: null })
-    await w.store.writeConversation({
-      comments: [row('c-old', null, NOW.toISOString()), row('c-reply', 'c-old', later), row('c-new', null, later)],
-      notifications: [told('n-old', 'comment:c-old', NOW.toISOString()), told('n-reply', 'comment:c-reply', later), told('n-new', 'comment:c-new', later)],
-    })
-    expect(await w.store.purgeConversation([{ target, at: '2026-10-31T12:30:00.000Z' }])).toEqual([target])
-    expect(w.store.comments(target).map(c => c.id)).toEqual(['c-new'])
-    expect(w.store.notifications('steward-c').map(n => n.id)).toEqual(['n-new'])
-  })
-
-  // R2b (review I-3): a purge cursor in the admin state directory (the last trunk commit fully purged). Every move, and the
-  // start, read from it to the trunk; it advances only once the targets are purged or buried.
-  const recreatePublic = (repo: string, id = 'scratch-0001') => {
-    git(repo, `rm -q pages/${id}.md`); git(repo, `commit -qm "page ${id}: deleted"`)
-    mkdirSync(join(repo, 'pages'), { recursive: true })
-    writeFileSync(join(repo, 'pages', `${id}.md`), joinPage({ id, title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
-    git(repo, `add pages/${id}.md`); git(repo, `commit -qm "page ${id}: made again, public"`)
-  }
-  const talk = async (w: World) => {
-    expect((await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} members-only talk` }))).status).toBe(201)
-  }
-  const atStart = async (w: World) => trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date())
-
-  it('with no cursor yet, the start sets it to the trunk and purges nothing that came before', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    await talk(w)
-    recreatePublic(w.repo)
-    expect(purgeCursor(w.repo)).toBeNull()
-    await atStart(w); await goneSettled(w.repo)
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
-  })
-
-  it('a trunk moved while the server was down is read at the next start', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    await atStart(w); await goneSettled(w.repo)
-    const was = tip(w.repo)
-    expect(purgeCursor(w.repo)).toBe(was)
-    await talk(w)
-    recreatePublic(w.repo) // a pull made by hand while the Hub was stopped
-    await atStart(w); await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-  })
-
-  it('a git read that fails is an error: the cursor stays, and the next run purges', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    await atStart(w); await goneSettled(w.repo)
-    const was = tip(w.repo)
-    await talk(w)
-    const elsewhere = remoteOf(w.repo)
-    recreatePublic(elsewhere); git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000 })
-    await withFailingSubcommand('show', async () => {
-      try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
-      await goneSettled(w.repo)
-    })
-    expect(tip(w.repo)).not.toBe(was) // the copy moved
-    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
-    expect(purgeCursor(w.repo)).toBe(was)
-    expect(errors).toHaveBeenCalled()
-    await atStart(w); await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-  })
-
-  it('the Hub\'s own commits move the cursor: a page it deleted and made again keeps the new page\'s talk at the next start', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    await atStart(w); await goneSettled(w.repo)
-    rmSync(join(w.repo, 'pages', 'scratch-0001.md'))
-    await commitPaths(w.repo, ['pages/scratch-0001.md'], 'page: deleted (the Hub)')
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
-    await commitPaths(w.repo, ['pages/scratch-0001.md'], 'page: made again, public (the Hub)')
-    await goneSettled(w.repo)
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-    await talk(w)
-    await atStart(w); await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
-  })
-
-  // T2c (closing review I-b): at the start, a cursor that is not an ancestor of the trunk (the trunk rewound, or moved to
-  // another line, while the server was down). Every path the cursor's line changed past the trunk's is compared at the
-  // cursor and at the trunk (absent or wider at the trunk: purged), and the trunk's line is read from the merge-base.
-  const written = async (w: World, target: string, id: string) => {
-    await w.store.writeConversation({ comments: [{ id, target, parent: null, anchor: null, by: 'steward-a', body: 'Said at its level.', created: NOW.toISOString(),
-      edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
-  }
-  const atOps = (id: string, title = 'Scratch') => joinPage({ id, title, parent: null, order: 1000, visibility: `hat:${OPS}` as 'members' }, BODY)
-  const moveTrunk = (repo: string, to: string) => {
-    const trunk = trunkOf(repo)
-    git(repo, 'checkout -q --detach'); git(repo, `branch -f ${trunk} ${to}`); git(repo, `checkout -q ${trunk}`)
-  }
-
-  it('a cursor ahead of the trunk (the trunk rewound): a page it narrowed is back at its wider level, and the talk goes', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
-    await atStart(w); await goneSettled(w.repo)
-    const base = tip(w.repo)
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atOps('scratch-0001'))
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "page: narrowed to Ops, by hand"')
-    await atStart(w); await goneSettled(w.repo) // a narrowing keeps the talk; the cursor moves on
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-    await written(w, 'page:scratch-0001', 'c-ops')
-    await written(w, 'page:keep-0002', 'c-keep')
-    moveTrunk(w.repo, base) // rewound by hand while the Hub was stopped
-    await atStart(w); await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-    expect(w.store.comments('page:keep-0002').map(c => c.id)).toEqual(['c-keep'])
-    expect(purgeCursor(w.repo)).toBe(base)
-  })
-
-  it('a cursor on an abandoned line: a page it narrowed, and one it added, take their talk; the trunk\'s own line is read from the merge-base', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
-    await atStart(w); await goneSettled(w.repo)
-    const base = tip(w.repo)
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atOps('scratch-0001'))
-    writeFileSync(join(w.repo, 'pages', 'new-0003.md'), atOps('new-0003', 'New'))
-    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', `{ id: proj-1, visibility: "hat:${OPS}", title: Seed Fund,`))
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "abandoned: scratch and seed fund narrowed, a page added"')
-    await atStart(w); await goneSettled(w.repo)
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-    await written(w, 'page:scratch-0001', 'c-ops')
-    await written(w, 'page:new-0003', 'c-new')
-    await written(w, 'page:keep-0002', 'c-keep')
-    await written(w, 'record:projects:proj-1', 'c-seed')
-    await written(w, 'record:projects:budget', 'c-budget')
-    // The trunk goes another way from the base: keep-0002 edited at its level.
-    git(w.repo, `checkout -q --detach ${base}`)
-    writeFileSync(join(w.repo, 'pages', 'keep-0002.md'), page('keep-0002', 'Keep', 'Edited on the other line.\n'))
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "other line: keep edited"')
-    const other = tip(w.repo)
-    git(w.repo, 'checkout -q -'); moveTrunk(w.repo, other)
-    await atStart(w); await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-    expect(w.store.comments('page:new-0003')).toEqual([])
-    expect(w.store.comments('record:projects:proj-1')).toEqual([])
-    expect(w.store.comments('page:keep-0002').map(c => c.id)).toEqual(['c-keep'])
-    expect(w.store.comments('record:projects:budget').map(c => c.id)).toEqual(['c-budget'])
-    expect(purgeCursor(w.repo)).toBe(other)
-  })
-
-  // R2b (review I-1): only the first-parent line is read, each merge against its first parent, and a target is purged only
-  // when it is absent at the end, or there at a level looser than it had before (at the start, or just before a delete).
-  const tip = (repo: string) => git(repo, 'rev-parse HEAD').trim()
-  const trunkOf = (repo: string) => git(repo, 'rev-parse --abbrev-ref HEAD').trim()
-  // R2b (review I-4): the line is read by one `git log --first-parent -m --name-status` process, not a process per commit;
-  // a file is shown only where a level is compared.
-  // PR7-R32: a page edited on the line is now compared too (its level at both ends), each file shown once per revision.
-  it('goneBetween reads the line in one git log process, and shows files only to compare levels', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
-    const from = tip(w.repo)
-    for (let i = 0; i < 5; i++) {
-      writeFileSync(join(w.repo, 'pages', 'keep-0002.md'), page('keep-0002', 'Keep', `Edit ${i}.\n`))
-      git(w.repo, 'add -A'); git(w.repo, `commit -qm "edit ${i}"`)
-    }
-    git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "page deleted"')
-    const to = tip(w.repo)
-    await withGitTrace(async started => {
-      expect(await goneBetween(w.repo, from, to)).toEqual(['page:scratch-0001'])
-      const subs = started().map(l => l.split(' ').find(a => !a.startsWith('-')))
-      expect(subs.filter(x => x === 'log')).toHaveLength(1)
-      expect(subs.filter(x => x !== 'log' && x !== 'show' && x !== 'rev-parse')).toEqual([])
-      const shown = started().filter(l => l.split(' ').find(a => !a.startsWith('-')) === 'show')
-      expect(new Set(shown).size).toBe(shown.length)
-      expect(shown.some(l => l.includes('keep-0002'))).toBe(true)
-      expect(started()[0]).toContain('--first-parent -m --no-renames --name-status --format=%H')
-    })
-    // Made again at its level: its level is read where it is compared, and nothing else is.
-    mkdirSync(join(w.repo, 'pages'), { recursive: true })
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), page('scratch-0001', 'Scratch'))
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "made again"')
-    await withGitTrace(async started => {
-      expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
-      const subs = started().map(l => l.split(' ').find(a => !a.startsWith('-')))
-      expect(subs.filter(x => x === 'log')).toHaveLength(1)
-      expect(subs.filter(x => x !== 'log' && x !== 'show' && x !== 'rev-parse')).toEqual([])
-    })
-  })
-
-  it('goneBetween: a record removed then put back at its level is kept, put back public is gone, an edit does not count', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
-    const from = tip(w.repo)
-    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
-    const without = (id: string) => projects.split('\n').filter(l => !l.includes(`id: ${id}`)).join('\n')
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), without('budget'))
-    writeFileSync(join(w.repo, 'pages', 'keep-0002.md'), page('keep-0002', 'Keep', 'Edited.\n'))
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: budget out, keep edited"')
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects)
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: budget back"')
-    const back = tip(w.repo)
-    expect(await goneBetween(w.repo, from, back)).toEqual([])
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), without('proj-1'))
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: seed fund out"')
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', '{ id: proj-1, visibility: public, title: Seed Fund,'))
-    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: seed fund back, public"')
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['record:projects:proj-1'])
-    expect(await goneBetween(w.repo, back, back)).toEqual([])
-  })
-
-  it('goneBetween: a deleting branch merged with -s ours keeps the page\'s conversation', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    const trunk = trunkOf(w.repo), from = tip(w.repo)
-    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page deleted"')
-    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'merge -q -s ours side -m "merge side, ours"')
-    expect(existsSync(join(w.repo, 'pages', 'scratch-0001.md'))).toBe(true)
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
-  })
-
-  it('goneBetween: a page deleted and restored at the same level on a branch, merged without squash, is kept', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    const trunk = trunkOf(w.repo), from = tip(w.repo)
-    const text = readFileSync(join(w.repo, 'pages', 'scratch-0001.md'), 'utf8')
-    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page deleted"')
-    mkdirSync(join(w.repo, 'pages'), { recursive: true })
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), text.replace(BODY, 'Restored.\n'))
-    git(w.repo, 'add pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page restored"')
-    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on"')
-    git(w.repo, 'merge -q --no-ff side -m "merge side"')
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
-    // On the trunk's own line too: deleted, then made again at the same level.
-    const mid = tip(w.repo)
-    git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "page deleted"')
-    mkdirSync(join(w.repo, 'pages'), { recursive: true })
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), text)
-    git(w.repo, 'add pages/scratch-0001.md'); git(w.repo, 'commit -qm "page made again, members"')
-    expect(await goneBetween(w.repo, mid, tip(w.repo))).toEqual([])
-  })
-
-  it('goneBetween: a page deleted and made again at public is gone, and so is one a merge deletes', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
-    const trunk = trunkOf(w.repo), from = tip(w.repo)
-    git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "page deleted"')
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
-    git(w.repo, 'add pages/scratch-0001.md'); git(w.repo, 'commit -qm "made again, public"')
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['page:scratch-0001'])
-    // A merge whose side deleted keep-0002: the merge, read against its first parent, deletes it.
-    const mid = tip(w.repo)
-    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/keep-0002.md'); git(w.repo, 'commit -qm "side: keep deleted"')
-    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on"')
-    git(w.repo, 'merge -q --no-ff side -m "merge side"')
-    expect(await goneBetween(w.repo, mid, tip(w.repo))).toEqual(['page:keep-0002'])
-  })
-})
-
-// Rule 4, as amended (PR7-R32, amends PR7-R24): an outside move (the purge cursor's path, never the Hub's own commits) that
-// leaves a target present at its end at a looser level than it had at the start purges its conversation, as a delete does.
-// A widening made in the Hub asks first (the widen dialog and its count) and keeps the talk; one made outside asked nobody.
-// Every repository here is fresh under the temp directory.
-describe('Rule 4 (PR7-R32): a widening that comes from outside clears the conversation', () => {
-  const tmp = (prefix: string) => { const d = mkdtempSync(join(tmpdir(), prefix)); cleanup.push(d); return d }
-  const tip = (repo: string) => git(repo, 'rev-parse HEAD').trim()
-  const trunkOf = (repo: string) => git(repo, 'rev-parse --abbrev-ref HEAD').trim()
-  const atLevel = (id: string, visibility?: string, parent: string | null = null, body = BODY) =>
+  const atLevel = (id: string, visibility?: string, body = BODY) =>
     // A hat level is written as git holds it (the front's type names members and public only).
-    joinPage({ id, title: 'Scratch', parent, order: 1000, ...(visibility !== undefined ? { visibility: visibility as 'members' } : {}) }, body)
+    joinPage({ id, title: 'Scratch', parent: null, order: 1000, ...(visibility !== undefined ? { visibility: visibility as 'members' } : {}) }, body)
   const remoteOf = (repo: string) => {
-    const bare = join(tmp('widen-remote-'), 'remote.git')
-    git(tmp('widen-init-'), `init -q --bare -b main ${bare}`)
+    const bare = join(tmp('floor-remote-'), 'remote.git')
+    git(tmp('floor-init-'), `init -q --bare -b main ${bare}`)
     git(repo, `remote add origin ${bare}`)
     git(repo, 'push -q origin HEAD:refs/heads/main')
-    const elsewhere = join(tmp('widen-elsewhere-'), 'clone')
-    git(tmp('widen-clone-'), `clone -q ${bare} ${elsewhere}`)
+    const elsewhere = join(tmp('floor-elsewhere-'), 'clone')
+    git(tmp('floor-clone-'), `clone -q ${bare} ${elsewhere}`)
     git(elsewhere, 'config user.email steward-b@example.test')
     git(elsewhere, 'config user.name "Steward B"')
     return elsewhere
   }
-  const talk = async (w: World, target = 'page:scratch-0001') => {
-    expect((await call(w.app, '/api/comments', json('POST', { target, body: `${mention('steward-c')} members-only talk` }))).status).toBe(201)
-  }
+  const commitAll = (repo: string, message: string) => { git(repo, 'add -A'); git(repo, `commit -qm "${message}"`) }
   const refresh = async (w: World) => {
     const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000 })
     try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
     await goneSettled(w.repo)
   }
-  const commitAll = (repo: string, message: string) => { git(repo, 'add -A'); git(repo, `commit -qm "${message}"`) }
-
-  it('a page deleted and made again at public on a side branch, then merged: purged', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    const trunk = trunkOf(w.repo), from = tip(w.repo)
-    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page deleted"')
-    mkdirSync(join(w.repo, 'pages'), { recursive: true })
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public', null, 'Public now.\n'))
-    commitAll(w.repo, 'side: page made again, public')
-    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on"')
-    git(w.repo, 'merge -q --no-ff side -m "merge side"')
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['page:scratch-0001'])
-    // A record the side branch removed and put back public, merged the same way: purged too.
-    const mid = tip(w.repo)
-    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
-    git(w.repo, 'checkout -qb side2')
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.split('\n').filter(l => !l.includes('id: proj-1')).join('\n'))
-    commitAll(w.repo, 'side2: seed fund out')
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', '{ id: proj-1, visibility: public, title: Seed Fund,'))
-    commitAll(w.repo, 'side2: seed fund back, public')
-    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on again"')
-    git(w.repo, 'merge -q --no-ff side2 -m "merge side2"')
-    expect(await goneBetween(w.repo, mid, tip(w.repo))).toEqual(['record:projects:proj-1'])
-  })
-
-  it('a plain outside edit of a page\'s level to public: after the refresh its members\' comments are gone', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    await talk(w)
-    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
-    const elsewhere = remoteOf(w.repo)
-    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
-    commitAll(elsewhere, 'page: public')
-    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-    await refresh(w)
-    expect(targetLevel(w.repo, 'page:scratch-0001', w.store)).toEqual({ level: 'public' })
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-    expect(w.store.notifications('steward-c')).toEqual([])
-  })
-
-  it('goneBetween: an outside widening of a record, of a parent page, or of the policy purges what it widened', async () => {
-    const w = await world({ pages: {
-      'scratch-0001': page('scratch-0001', 'Scratch'),
-      'child-0002': atLevel('child-0002', undefined, 'scratch-0001'),
-      'own-0003': atLevel('own-0003', 'members', 'scratch-0001'),
-    } })
-    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
-    // A record's own level, edited in git.
-    let from = tip(w.repo)
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', '{ id: proj-1, visibility: public, title: Seed Fund,'))
-    commitAll(w.repo, 'elsewhere: seed fund public')
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['record:projects:proj-1'])
-    // A parent page made public: the page and the subpage that inherits its level; the one with its own level stays.
-    from = tip(w.repo)
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
-    commitAll(w.repo, 'elsewhere: scratch public')
-    expect((await goneBetween(w.repo, from, tip(w.repo))).sort()).toEqual(['page:child-0002', 'page:scratch-0001'])
-    // The policy: projects' default loosened to public takes budget (proj-1 is public already).
-    from = tip(w.repo)
-    writeFileSync(join(w.repo, 'data', 'visibility.yaml'), VISIBILITY.replace('projects: { default: members }', 'projects: { default: public }'))
-    commitAll(w.repo, 'elsewhere: projects public by default')
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['record:projects:budget'])
-  })
-
-  // T2c (closing review I-c): a lagging cursor (a read that failed) must not miss a narrowing the Hub served in between.
-  // Public → Ops (the purge's read failed, so the cursor stayed) → public again: the Ops talk would be public. A target the
-  // line changed is compared at the end against the strictest level it held at any revision of the line.
-  it('a lagging cursor: public, then Ops (its read failed), then public again takes the talk written at Ops', async () => {
-    const w = await world({ pages: {
-      'scratch-0001': atLevel('scratch-0001', 'public'),
-      'child-0002': atLevel('child-0002', undefined, 'scratch-0001'),
-      'keep-0002': page('keep-0002', 'Keep'),
-    } })
-    await trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date()); await goneSettled(w.repo)
-    const start = tip(w.repo)
-    const elsewhere = remoteOf(w.repo)
-    const projects = readFileSync(join(elsewhere, 'data', 'projects.yaml'), 'utf8')
-    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', `hat:${OPS}`))
-    writeFileSync(join(elsewhere, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', `{ id: proj-1, visibility: "hat:${OPS}", title: Seed Fund,`))
-    commitAll(elsewhere, 'elsewhere: scratch and seed fund narrowed to Ops')
-    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-    await withFailingSubcommand('show', () => refresh(w))
-    expect(errors).toHaveBeenCalled()
-    expect(purgeCursor(w.repo)).toBe(start) // the read failed: the cursor stayed
-    for (const target of ['page:scratch-0001', 'page:child-0002', 'record:projects:proj-1', 'page:keep-0002', 'record:projects:budget']) {
-      await w.store.writeConversation({ comments: [{ id: `c-${target}`, target, parent: null, anchor: null, by: 'steward-a', body: 'Said at Ops.', created: NOW.toISOString(),
-        edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
-    }
-    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
-    writeFileSync(join(elsewhere, 'data', 'projects.yaml'), projects)
-    commitAll(elsewhere, 'elsewhere: public again, seed fund members again')
-    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-    await refresh(w)
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-    expect(w.store.comments('page:scratch-0001')).toEqual([])
-    expect(w.store.comments('page:child-0002')).toEqual([])
-    expect(w.store.comments('record:projects:proj-1')).toEqual([])
-    expect(w.store.comments('page:keep-0002')).toHaveLength(1)
-    expect(w.store.comments('record:projects:budget')).toHaveLength(1)
-  })
-
-  it('an outside edit that narrows the level, or keeps it, keeps the conversation', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
-    await talk(w)
-    const elsewhere = remoteOf(w.repo)
-    const from = tip(w.repo)
-    const projects = readFileSync(join(elsewhere, 'data', 'projects.yaml'), 'utf8')
-    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', `hat:${OPS}`)) // narrowed
-    writeFileSync(join(elsewhere, 'pages', 'keep-0002.md'), atLevel('keep-0002', 'members', null, 'Edited.\n')) // the same level, said
-    writeFileSync(join(elsewhere, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', `{ id: proj-1, visibility: "hat:${OPS}", title: Seed Fund,`)
-      .replace('{ id: budget, title: Budget,', '{ id: budget, title: Budget two,'))
-    commitAll(elsewhere, 'elsewhere: narrowed and edited')
-    writeFileSync(join(elsewhere, 'data', 'visibility.yaml'), VISIBILITY.replace('projects: { default: members }', `projects: { default: "hat:${OPS}" }`))
-    commitAll(elsewhere, 'elsewhere: projects narrowed by default')
-    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
-    await refresh(w)
-    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
-    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
-  })
-
-  it('a widening made through the Hub keeps the conversation (it asked first)', async () => {
-    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    await trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date()); await goneSettled(w.repo)
-    await talk(w)
-    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
-    await commitPaths(w.repo, ['pages/scratch-0001.md'], 'page: public (the Hub, after the widen dialog)')
+  /** The Hub's own commit of the page at `level` (what the apply of a decided widening or a narrowing commits). */
+  const hubLevel = async (w: World, level: string) => {
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', level))
+    await commitPaths(w.repo, ['pages/scratch-0001.md'], `page: ${level} (the Hub)`)
     await goneSettled(w.repo)
-    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-    await trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date()); await goneSettled(w.repo)
-    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
+  }
+  /** The thread `who` reads: each comment's body, a reply after the comment it is under. */
+  const thread = async (w: World, who: (repo: string) => void, query = '') => {
+    who(w.repo)
+    const got = await call(w.app, `/api/comments?target=${T}${query}`)
+    asA(w.repo)
+    if (got.status !== 200) return got.status
+    return (got.body as { body: string; replies: { body: string }[] }[]).flatMap(c => [c.body, ...c.replies.map(r => r.body)])
+  }
+  /** Rows written at the fixed clock are ordered by their random ids: several are compared as a set. */
+  const sorted = (got: unknown) => (got as string[]).slice().sort()
+  const sources = async (w: World, who: (repo: string) => void) => {
+    who(w.repo)
+    const got = await call(w.app, '/api/notifications')
+    asA(w.repo)
+    return (got.body as { source: string }[]).map(n => n.source)
+  }
+  /** `scratch-0001`, a git page at hat:Ops, and its talk: steward-a's comment telling steward-b (who wears Ops), and a reply. */
+  const opsTalk = async () => {
+    const w = await world({ pages: { 'scratch-0001': atLevel('scratch-0001', OPS_LEVEL) } })
+    await w.prime(A1, A2)
+    const top = await call(w.app, '/api/comments', json('POST', { target: T, body: `${mention('steward-b')} Ops talk` }))
+    expect(top.status).toBe(201)
+    expect(top.body.notTold).toEqual([])
+    const reply = await call(w.app, '/api/comments', json('POST', { target: T, body: 'Ops reply', parent: top.body.comment.id }))
+    expect(reply.status).toBe(201)
+    expect(w.store.comment(top.body.comment.id)?.writtenLevel).toBe(OPS_LEVEL)
+    expect(w.store.notifications('steward-b').map(n => n.writtenLevel)).toEqual([OPS_LEVEL])
+    return { w, top: top.body.comment.id as string, reply: reply.body.comment.id as string }
+  }
+  const OPS_TALK = [`${mention('steward-b')} Ops talk`, 'Ops reply']
+
+  it('a widening in the Hub: steward-c reads none of the earlier talk, steward-b all of it; a comment written after it is read at the new level', async () => {
+    const { w, top } = await opsTalk()
+    await hubLevel(w, 'members')
+    expect(targetLevel(w.repo, T, w.store)).toEqual({ level: 'members' })
+    // The rows stay: nothing is purged, they are read at both levels.
+    expect(w.store.comments(T)).toHaveLength(2)
+    expect(await thread(w, asC)).toEqual([])
+    expect(await sources(w, asC)).toEqual([])
+    expect(await thread(w, asB)).toEqual(OPS_TALK)
+    expect(await sources(w, asB)).toEqual([`comment:${top}`])
+    // A preview as a member with no hat reads what steward-c reads; the public reads no conversation at all (sign in).
+    expect(await thread(w, asA, '&as=members')).toEqual([])
+    expect(await thread(w, asA, '&as=public')).toBe(401)
+    // Written after the widening: read at members, and steward-c is told.
+    const after = await call(w.app, '/api/comments', json('POST', { target: T, body: `${mention('steward-c')} members talk` }))
+    expect(after.body.notTold).toEqual([])
+    expect(w.store.comment(after.body.comment.id)?.writtenLevel).toBe('members')
+    expect(await thread(w, asC)).toEqual([`${mention('steward-c')} members talk`])
+    expect(await sources(w, asC)).toEqual([`comment:${after.body.comment.id}`])
+    expect(sorted(await thread(w, asB))).toEqual(sorted([...OPS_TALK, `${mention('steward-c')} members talk`]))
+  })
+
+  it('a reply written after the widening under earlier talk is read only with it, and tells nobody the talk above it does not admit', async () => {
+    const { w, top } = await opsTalk()
+    await hubLevel(w, 'members')
+    const reply = await call(w.app, '/api/comments', json('POST', { target: T, body: `${mention('steward-c')} a late reply`, parent: top }))
+    expect(reply.status).toBe(201)
+    expect(reply.body.notTold).toEqual([NOT_TOLD('steward-c')])
+    expect(w.store.notifications('steward-c')).toEqual([])
+    expect(await thread(w, asC)).toEqual([])
+    expect(sorted(await thread(w, asB))).toEqual(sorted([...OPS_TALK, `${mention('steward-c')} a late reply`]))
+  })
+
+  it('an outside widening (the Refresher takes it): the same', async () => {
+    const { w, top } = await opsTalk()
+    const elsewhere = remoteOf(w.repo)
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'members'))
+    commitAll(elsewhere, 'page: members')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    await refresh(w)
+    expect(targetLevel(w.repo, T, w.store)).toEqual({ level: 'members' })
+    expect(w.store.comments(T)).toHaveLength(2)
+    expect(await thread(w, asC)).toEqual([])
+    expect(await thread(w, asB)).toEqual(OPS_TALK)
+    expect(await sources(w, asB)).toEqual([`comment:${top}`])
+  })
+
+  it('an outside delete and re-make at public: the old talk is read only by those who could read it then', async () => {
+    const { w } = await opsTalk()
+    const elsewhere = remoteOf(w.repo)
+    git(elsewhere, 'rm -q pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: deleted"')
+    mkdirSync(join(elsewhere, 'pages'), { recursive: true })
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public', 'Public now.\n'))
+    commitAll(elsewhere, 'page: made again, public')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    await refresh(w)
+    expect(targetLevel(w.repo, T, w.store)).toEqual({ level: 'public' })
+    expect(await thread(w, asC)).toEqual([])
+    expect(await thread(w, asA, '&as=members')).toEqual([])
+    expect(await thread(w, asB)).toEqual(OPS_TALK)
+  })
+
+  it('a narrowing: the stricter level now hides the talk from those it no longer admits', async () => {
+    const w = await world({ pages: { 'scratch-0001': atLevel('scratch-0001') } })
+    await w.prime(A1, A2)
+    expect((await call(w.app, '/api/comments', json('POST', { target: T, body: 'members talk' }))).status).toBe(201)
+    expect(await thread(w, asC)).toEqual(['members talk'])
+    await hubLevel(w, OPS_LEVEL)
+    expect(await thread(w, asC)).toBe(404)
+    expect(await thread(w, asB)).toEqual(['members talk'])
+  })
+
+  it('a page narrowed and widened back keeps all its talk, each row read as it was written', async () => {
+    const w = await world({ pages: { 'scratch-0001': atLevel('scratch-0001') } })
+    await w.prime(A1, A2)
+    expect((await call(w.app, '/api/comments', json('POST', { target: T, body: 'members talk' }))).status).toBe(201)
+    await hubLevel(w, OPS_LEVEL)
+    asB(w.repo)
+    expect((await call(w.app, '/api/comments', json('POST', { target: T, body: 'Ops talk' }))).status).toBe(201)
+    asA(w.repo)
+    await hubLevel(w, 'members')
+    expect(await thread(w, asC)).toEqual(['members talk'])
+    // Both written at the fixed clock: the thread orders them by id, so they are compared as a set.
+    expect(sorted(await thread(w, asB))).toEqual(['Ops talk', 'members talk'])
+  })
+
+  it('every reader of a hidden comment answers as for one that is not there: its acts, a reply to it, its notification, a read\'s count', async () => {
+    const { w, top, reply } = await opsTalk()
+    await hubLevel(w, 'members')
+    // A notification steward-c could only have had while wearing Ops (written at Ops), and one on the page now: one is read.
+    const told = (id: string, source: string, written: string) => ({ id, member: 'steward-c', kind: 'mention' as const, target: T, source, by: 'steward-a',
+      created: NOW.toISOString(), readAt: null, writtenLevel: written })
+    await w.store.writeConversation({ notifications: [told('n-hidden', `comment:${top}`, OPS_LEVEL), told('n-page', T, 'members')] })
+    asC(w.repo)
+    expect((await call(w.app, '/api/notifications')).body.map((n: { id: string }) => n.id)).toEqual(['n-page'])
+    for (const id of [top, reply]) {
+      for (const act of ['resolve', 'reopen', 'task']) expect(await call(w.app, `/api/comments/${id}/${act}`, json('POST')), `${act} ${id}`).toEqual({ status: 404, body: { error: `There is no comment ${id}.` } })
+      expect(await call(w.app, `/api/comments/${id}`, json('DELETE'))).toEqual({ status: 404, body: { error: `There is no comment ${id}.` } })
+      expect(await call(w.app, '/api/comments', json('POST', { target: T, body: 'An answer.', parent: id }))).toEqual({ status: 404, body: { error: `There is no comment ${id}.` } })
+    }
+    expect(await call(w.app, '/api/notifications/read', json('POST', { ids: ['n-hidden'] }))).toEqual({ status: 200, body: { read: 0 } })
+    // Opening the page marks and counts only what steward-c may read; the hidden row is left as it was.
+    expect((await call(w.app, '/api/reads', json('POST', { target: T }))).body).toMatchObject({ read: 1 })
+    expect(w.store.notifications('steward-c').map(n => [n.id, n.readAt !== null])).toEqual([['n-page', true], ['n-hidden', false]])
+    asA(w.repo)
+  })
+
+  it('a conversation event names the floor of what changed: it reaches only those admitted to it, and the floor is not sent', async () => {
+    const { w, top } = await opsTalk()
+    await hubLevel(w, 'members')
+    const heard: unknown[] = []
+    const app = createApp(w.repo, (a, ctx) => {
+      mountConversation(a, { repo: w.repo, membership: w.membership, privateStore: ctx.privateStore, withLock: ctx.withLock, now: () => NOW, notify: m => { heard.push(m) } })
+    }, { request: withRequest({ repo: w.repo, hosted: false, membership: w.membership, store: w.store, now: () => NOW }), privateStore: () => w.store })
+    expect((await call(app, `/api/comments/${top}/resolve`, json('POST'))).status).toBe(200)
+    expect(heard).toEqual([{ type: 'conversation', target: T, written: [OPS_LEVEL] }])
+    const levelOf = () => ({ level: 'members' }) as const
+    const c = viewerFor('steward-c', { repo: w.repo, membership: w.membership })
+    const b = viewerFor('steward-b', { repo: w.repo, membership: w.membership })
+    expect(gateEvent(c, heard[0] as { type: string; target: string; written: string[] }, levelOf)).toBeNull()
+    expect(gateEvent(b, heard[0] as { type: string; target: string; written: string[] }, levelOf)).toEqual({ type: 'conversation', target: T })
+  })
+})
+
+// PR7-R45, housekeeping: after each trunk move by the Refresher or Sync, and at the start, the conversation of targets that do
+// not exist now goes. No history is read; a target that is there keeps its talk, and one whose file cannot be read too.
+describe('PR7-R45: the housekeeping purge (targets that are not there now)', () => {
+  const tmp = (prefix: string) => { const d = mkdtempSync(join(tmpdir(), prefix)); cleanup.push(d); return d }
+  const T = 'page:scratch-0001'
+
+  it('the Refresher\'s move: the talk of a page deleted outside goes, its notifications and read marks too', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0001': page('keep-0001', 'Keep') } })
+    expect((await call(w.app, '/api/comments', json('POST', { target: T, body: `${mention('steward-c')} old talk` }))).status).toBe(201)
+    expect((await call(w.app, '/api/comments', json('POST', { target: 'page:keep-0001', body: 'kept talk' }))).status).toBe(201)
+    await call(w.app, '/api/reads', json('POST', { target: T }))
+    const bare = join(tmp('keep-remote-'), 'remote.git')
+    git(tmp('keep-init-'), `init -q --bare -b main ${bare}`)
+    git(w.repo, `remote add origin ${bare}`); git(w.repo, 'push -q origin HEAD:refs/heads/main')
+    const elsewhere = join(tmp('keep-elsewhere-'), 'clone')
+    git(tmp('keep-clone-'), `clone -q ${bare} ${elsewhere}`)
+    git(elsewhere, 'config user.email steward-b@example.test'); git(elsewhere, 'config user.name "Steward B"')
+    git(elsewhere, 'rm -q pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: deleted"')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000 })
+    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
+    await goneSettled(w.repo)
+    expect(w.store.comments(T)).toEqual([])
+    expect(w.store.notifications('steward-c')).toEqual([])
+    expect(w.store.readOf('steward-a', T)).toBeNull()
+    expect(w.store.comments('page:keep-0001').map(c => c.body)).toEqual(['kept talk'])
+  })
+
+  it('at the start: a page deleted while the server was down takes its talk; a record whose file cannot be read keeps its own', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    expect((await call(w.app, '/api/comments', json('POST', { target: T, body: 'old talk' }))).status).toBe(201)
+    expect((await call(w.app, '/api/comments', json('POST', { target: 'record:projects:proj-1', body: 'on the seed fund' }))).status).toBe(201)
+    expect((await call(w.app, '/api/comments', json('POST', { target: `page:${OPS_PAGE}`, body: 'on the runbook' }))).status).toBe(201)
+    git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "page: deleted by hand"')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), 'projects: [ {id: proj-1\n') // not YAML: unreadable, not absent
+    git(w.repo, 'add data/projects.yaml'); git(w.repo, 'commit -qm "projects: broken by hand"')
+    await housekeepAtStart(w.repo)
+    await goneSettled(w.repo)
+    expect(w.store.comments(T)).toEqual([])
+    expect(w.store.comments('record:projects:proj-1').map(c => c.body)).toEqual(['on the seed fund'])
+    expect(w.store.comments(`page:${OPS_PAGE}`).map(c => c.body)).toEqual(['on the runbook'])
+  })
+
+  it('rows written before the column existed are filled once with their target\'s level then; one on a target not there admits nobody', async () => {
+    const w = await world({ pages: { 'scratch-0001': joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: `hat:${OPS}` as 'members' }, BODY) } })
+    await w.prime(A1, A2)
+    expect((await call(w.app, '/api/comments', json('POST', { target: T, body: `${mention('steward-b')} before the column` }))).status).toBe(201)
+    await w.store.writeConversation({ comments: [{ id: 'c-orphan', target: 'page:gone-0001', parent: null, anchor: null, by: 'steward-a', body: 'orphan',
+      created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: 'members' }] })
+    // The store as schema 3 left it before PR7-R45: no written_level anywhere.
+    const file = w.store.file
+    w.store.close(); stores.splice(stores.indexOf(w.store), 1)
+    const db = new DatabaseSync(file)
+    try { for (const t of ['comments', 'mentions', 'notifications']) db.exec(`ALTER TABLE ${t} DROP COLUMN written_level`) } finally { db.close() }
+    const again = await openPrivateStore(w.repo, { dir: dirname(file) }); stores.push(again)
+    expect(again.comments(T).map(c => c.writtenLevel)).toEqual([UNFILLED])
+    // The page is widened before the start fills them: they take the level of the moment the migration runs.
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000 }, BODY))
+    const app = w.appWith(() => again)
+    await housekeepAtStart(w.repo); await goneSettled(w.repo)
+    expect(again.comments(T).map(c => c.writtenLevel)).toEqual(['members'])
+    expect(again.notifications('steward-b').map(n => n.writtenLevel)).toEqual(['members'])
+    expect(again.comment('c-orphan')).toBeNull() // its target is not there: housekeeping took it
+    asC(w.repo)
+    expect((await call(app, `/api/comments?target=${T}`)).body.map((c: { body: string }) => c.body)).toEqual([`${mention('steward-b')} before the column`])
+    asA(w.repo)
   })
 })

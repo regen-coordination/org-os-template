@@ -92,10 +92,17 @@ export function gateRecord(viewer: Viewer, registry: string, record: unknown, co
  *  events naming public items). `levelOf` answers a registry name or a resource id.
  *  DAO-OS L6 §8.5 (Task 9): a message naming a `target` (`page:<id>`, `record:<registry>:<id>`: presence, conversation) is
  *  heard by a member admitted to it, never by the public, whatever the target's level (§8.4: presence is never public;
- *  conversation is the members' side). */
-export function gateEvent<M extends { type: string; registry?: string; ids?: string[]; target?: string }>(viewer: Viewer, msg: M,
+ *  conversation is the members' side). PR7-R45: a conversation message's `written` (the floor of what changed: its written
+ *  level and those of the comments above it) admits them too, each; it is not sent. */
+export function gateEvent<M extends { type: string; registry?: string; ids?: string[]; target?: string; written?: string[] }>(viewer: Viewer, msg: M,
   levelOf: (key: string) => ParsedLevel): M | null {
-  if (typeof msg.target === 'string') return viewer.kind === 'member' && admits(levelOf(msg.target), viewer) ? msg : null
+  if (typeof msg.target === 'string') {
+    if (viewer.kind !== 'member' || !admits(levelOf(msg.target), viewer)) return null
+    if (msg.written === undefined) return msg
+    if (!Array.isArray(msg.written) || !msg.written.every(w => typeof w === 'string' && admits(levelOfToken(w), viewer))) return null
+    const { written: _floor, ...heard } = msg
+    return heard as M
+  }
   if (Array.isArray(msg.ids)) {
     const ids = msg.ids.filter(id => admits(levelOf(id), viewer))
     return ids.length > 0 ? { ...msg, ids } : null

@@ -19,6 +19,7 @@ import { Refusal, StageRefusal } from '../changes/apply.ts'
 import { readConfig } from '../visibility/config.ts'
 import type { Change, PrivatePlaceholder, RecordError, RecordOp, StageOp } from '../changes/types.ts'
 import { StoreUnavailable, type PrivateField, type PrivateRecord, type PrivateStore, type PrivateWriter } from './store.ts'
+import { readableRows } from '../workspace/written.ts'
 
 /** One write to private data, as `applyPrivate` makes it: a whole record (a private collection's, or a git
  *  collection's record kept private) or one restricted field of a git record. Resolved at apply time from the staged ops
@@ -610,14 +611,17 @@ export const MOVE_CHANGED = (record: string) =>
   `${record} changed since this move was staged; stage the move again. Nothing was written.`
 
 /** The store's writes of planned moves (§12), inside the caller's transaction: each record still as it was planned, and
- *  still with no comment written while private (R-L6-T11-3, checked again here: Task 11 review M-3), else 409
- *  `PRIVATE_CONFLICT`; its restricted fields put as `fields` rows, then the record deleted. */
-export function movedWrites(store: PrivateStore, moved: readonly MovedPart[]): PrivateOp[] {
+ *  still with no comment written while private (R-L6-T11-3, checked again here: Task 11 review M-3) that `viewer` may read
+ *  (PR7-R45, as `planMove`; null, a decided proposal's: every comment), else 409 `PRIVATE_CONFLICT`; its restricted fields
+ *  put as `fields` rows, then the record deleted. */
+export function movedWrites(store: PrivateStore, moved: readonly MovedPart[], viewer: Viewer | null = null): PrivateOp[] {
   const out: PrivateOp[] = []
   for (const m of moved) {
     const kept = storeRead(store, () => store.record(m.collection, m.id))
     const target = m.collection === 'pages' ? `page:${m.id}` : `record:${m.collection}:${m.id}`
-    const talked = storeRead(store, () => store.comments(target)).some(c => c.deleted === null)
+    const comments = storeRead(store, () => store.comments(target))
+    const holding = viewer === null || !kept ? comments : readableRows(comments, viewer, levelOf(kept.visibility))
+    const talked = holding.some(c => c.deleted === null)
     if (!kept || kept.visibility !== m.visibility || !sameValue(kept.body, m.body) || talked) {
       throw new Refusal(409, { code: 'PRIVATE_CONFLICT', error: MOVE_CHANGED(`${m.collection}:${m.id}`) })
     }
@@ -665,7 +669,7 @@ export async function withPrivate<T extends { commit: string | null }>(store: Pr
     before: w => {
       applyPrivate(w, resolvePrivate(store, ops, viewer, known), by, change, store)
       // DAO-OS L6 §12: the records the commit moves into git leave the store in the same transaction.
-      applyPrivate(w, movedWrites(store, moved), by, change, store)
+      applyPrivate(w, movedWrites(store, moved, viewer), by, change, store)
       if (staged) { try { w.deleteStaged(change) } catch (err) { throw unavailable(err, store) } }
     },
     git,

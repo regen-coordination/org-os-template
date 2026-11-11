@@ -30,7 +30,7 @@ import {
 import { guardTrunk, resolveTrunk } from './ledger.ts'
 import { mergeLedgers } from '../../lib/proposals.mjs'
 import { validTrunkName } from '../../lib/rules.mjs'
-import { outsideMove, trunkMoved } from '../workspace/gone.ts'
+import { trunkMoved } from '../workspace/gone.ts'
 
 export interface SyncDeps {
   repo: string
@@ -176,7 +176,7 @@ async function mergeCommit(repo: string, trunk: string, head: string, tip: strin
 type LocalResult = { state: SyncState; moved: boolean } & Record<string, unknown>
 
 /** The local part of Sync, on what the fetch just brought: callers hold the write lock. */
-async function localPart(repo: string, trunk: string, startBranch: string | undefined, now: Date, clock: () => Date): Promise<LocalResult> {
+async function localPart(repo: string, trunk: string, startBranch: string | undefined, now: Date): Promise<LocalResult> {
   await guardTrunk(repo, startBranch)
   if (await mergeInProgress(repo)) {
     throw refuse('MERGE_IN_PROGRESS', `Not synced: a merge is already in progress in this repository. Finish it or undo it with git yourself (\`git status\` says which), then Sync again. ${NOTHING}`)
@@ -210,13 +210,10 @@ async function localPart(repo: string, trunk: string, startBranch: string | unde
   if (head === null || tip === null) throw refuse('FETCH', `Not synced: ${head === null ? 'the trunk has no commit' : `${remoteRef} is not there`}. ${NOTHING}`)
 
   if (f.ahead === 0) {
-    // R2 review (Rule 4): what the commits brought in deleted takes its conversation, written until `at`, taken just before
-    // the move (T2c minor 4).
-    const at = clock()
-    try { await outsideMove(repo, () => mergeFfOnly(repo, tip)) } catch (err) {
+    try { await mergeFfOnly(repo, tip) } catch (err) {
       throw refuse('FF_FAILED', `Not synced: git would not fast-forward ${trunk} (${firstLine(err)}). ${NOTHING}`)
     }
-    trunkMoved(repo, head, tip, at)
+    trunkMoved(repo) // PR7-R45: the conversation's housekeeping, queued
     const after = await lastFetch(repo, trunk)
     return { state: 'fast-forwarded', moved: true, commit: tip, ...counts(after), sentence: `Fast-forwarded ${trunk} by ${plural(f.behind, 'commit')} from ${REMOTE}.` }
   }
@@ -235,11 +232,8 @@ async function localPart(repo: string, trunk: string, startBranch: string | unde
       { conflicts })
   }
   const ledger = conflicts.includes(LEDGER) ? await ledgerMerge(repo, head, tip) : null
-  // Its merge commit is the Hub's, but what it brings is not: the cursor leaves it to `trunkMoved` (T2c I-a). The time is
-  // taken just before the merge starts (T2c minor 4).
-  const at = clock()
-  const commit = await outsideMove(repo, () => mergeCommit(repo, trunk, head, tip, computed.tree, ledger))
-  trunkMoved(repo, head, commit, at)
+  const commit = await mergeCommit(repo, trunk, head, tip, computed.tree, ledger)
+  trunkMoved(repo) // PR7-R45: the conversation's housekeeping, queued
   const after = await lastFetch(repo, trunk)
   return {
     state: 'merged', moved: true, commit, ledger: ledger !== null ? 'merged by id' : null, ...counts(after),
@@ -283,7 +277,7 @@ export function mountSync(app: Hono, { repo, withLock, store, jobs, executor, pl
 
     return withLock(async () => {
       let result: LocalResult
-      try { result = await localPart(repo, trunk, startBranch, now(), now) } catch (err) {
+      try { result = await localPart(repo, trunk, startBranch, now()) } catch (err) {
         // the trunk's own guards speak without a state; Sync's answer always has one
         if (err instanceof Refusal && err.body.state === undefined) throw new Refusal(err.status, { state: 'refused', ...err.body })
         throw err

@@ -5,12 +5,12 @@
 // history that diverged from the remote's (the copy holds commits the remote does not), or a fast-forward git refuses
 // stops it with an alert until the Hub starts again; a remote it cannot read is a warning, and it asks again at the next
 // refresh. While writes are on there is no Refresher: the Hub is then the one writer, and the Pusher sends its commits.
-// What it last did is a row on the Sources page (`state()`, read by the sources adapter) and server attention. A page or
-// record the commits it took delete takes its conversation with it (workspace/gone.ts `trunkMoved`, R2 review Rule 4).
+// What it last did is a row on the Sources page (`state()`, read by the sources adapter) and server attention. After it
+// moves the trunk, the conversation's housekeeping runs (workspace/gone.ts `trunkMoved`, PR7-R45).
 
 import { fetchRemote, isAncestor, mergeFfOnly, remoteUrl, repoStatus, resolveRev } from '../git.ts'
 import type { ServerAttention } from '../attention.ts'
-import { outsideMove, trunkMoved } from '../workspace/gone.ts'
+import { trunkMoved } from '../workspace/gone.ts'
 
 /** The refresh runs this often unless `ORG_OS_REFRESH_EVERY` says otherwise. */
 export const REFRESH_EVERY_MS = 15 * 60_000
@@ -132,22 +132,17 @@ export class Refresher {
     // remote does not: that is a non-fast-forward, and it stops the refresh.
     if (ours === null || !(await isAncestor(repo, ours, theirs))) return { kind: 'stop', trunk, sentence: REFRESH_DIVERGED }
     if (this.closed) return { kind: 'closed' }
-    // When the trunk moved, taken under the lock just before it does (T2c minor 4): the purge takes what was written on a
-    // deleted target until then, what was written while the Refresher waited its turn among it.
-    let at = (this.o.now ?? (() => new Date()))()
     try {
       await this.lock(async () => {
         // Under the lock the trunk is read again: the copy is moved only from the commit that was checked.
         if ((await resolveRev(repo, `refs/heads/${trunk}`)) !== ours) throw new Error('moved')
-        at = (this.o.now ?? (() => new Date()))()
-        await outsideMove(repo, () => mergeFfOnly(repo, remoteRef))
+        await mergeFfOnly(repo, remoteRef)
       })
     } catch {
       return { kind: 'stop', trunk, sentence: REFRESH_REFUSED }
     }
-    const commit = (await resolveRev(repo, `refs/heads/${trunk}`)) ?? theirs
-    trunkMoved(repo, ours, commit, at) // queued: read after this refresh ends
-    return { kind: 'advanced', trunk, commit }
+    trunkMoved(repo) // PR7-R45: the housekeeping, queued: it runs after this refresh ends
+    return { kind: 'advanced', trunk, commit: (await resolveRev(repo, `refs/heads/${trunk}`)) ?? theirs }
   }
 
   /** What an outcome leaves: the state, the attention and the next refresh, if any. */

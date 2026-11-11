@@ -230,7 +230,7 @@ describe('A record with comments written while private (R-L6-T11-3)', () => {
     const w = await world()
     await privateTask(w)
     const comment = { id: 'c-1', target: 'record:tasks:t-secret', parent: null, anchor: null, by: 'steward-a', body: `${SENTINEL}comment`,
-      created: T0.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null }
+      created: T0.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: AT_OPS }
     await w.store.writeConversation({ comments: [comment] })
     const [status, body] = await refused(await call(w.app, 'POST', '/api/changes/ops', { body: { ops: moveOf('tasks:t-secret') } }))
     expect([status, body.errors[0].message]).toEqual([422, HAS_CONVERSATION('Review the grant')])
@@ -241,6 +241,20 @@ describe('A record with comments written while private (R-L6-T11-3)', () => {
     expect(w.store.record('tasks', 't-secret')).toBeNull()
     expect(w.store.comments('record:tasks:t-secret').map(c => c.id)).toEqual(['c-1'])
     expect(scan(w.repo, [`${SENTINEL}comment`])).toEqual([])
+  })
+
+  // PR7-R45: talk the mover may not read does not hold the move (it is not theirs to see, nor to delete): it keeps the level
+  // it was written at wherever the record goes, so nobody that level did not admit reads it after the move either.
+  it('a comment the mover may not read (written at Council) does not hold the move, and keeps its level after it', async () => {
+    const w = await world()
+    await privateTask(w)
+    await w.store.writeConversation({ comments: [{ id: 'c-council', target: 'record:tasks:t-secret', parent: null, anchor: null, by: 'steward-b',
+      body: `${SENTINEL}council`, created: T0.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: `hat:${COUNCIL}` }] })
+    await stage(w, moveOf('tasks:t-secret'))
+    await apply(w)
+    expect(w.store.record('tasks', 't-secret')).toBeNull()
+    expect(w.store.comment('c-council')).toMatchObject({ writtenLevel: `hat:${COUNCIL}`, deleted: null })
+    expect(scan(w.repo, [`${SENTINEL}council`])).toEqual([])
   })
 })
 
@@ -583,7 +597,7 @@ describe('Task 11 review: the store\'s side of a move checks its conversation in
     // Written after applyAs planned the move, before its transaction begins (the one await between them).
     store.within = (async (fn: (t: PrivateTransaction) => Promise<unknown>) => {
       await store.writeConversation({ comments: [{ id: 'c-late', target: 'record:tasks:t-secret', parent: null, anchor: null, by: 'steward-b',
-        body: `${SENTINEL}late-comment`, created: T0.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
+        body: `${SENTINEL}late-comment`, created: T0.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: AT_OPS }] })
       return within(fn as never)
     }) as never
     const before = head(w.repo)

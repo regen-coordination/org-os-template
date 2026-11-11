@@ -97,11 +97,18 @@ export interface CommentRow {
   created: string; edited: string | null; resolvedBy: string | null; resolvedAt: string | null; deleted: string | null
   /** DAO-OS L6 Task 18 fix round 1: the task the comment was turned into (its id), so it is turned into one only once. */
   task?: string | null
+  /** PR7-R45: the level its target had when it was written (a level token). Read only by a viewer admitted to it and to the
+   *  target's level now. Set once: a later put of the row keeps the first. */
+  writtenLevel: string
 }
-/** One mention (L6 §8.1, `mentions`): `source` is `comment:<id>` or `page:<id>`; `told` whether anyone was told by it. */
-export interface MentionRow { source: string; kind: 'member' | 'role' | 'page' | 'record'; ref: string; told: boolean }
-/** One member told (L6 §8.1, `notifications`): a row of their Needs you. `readAt` null until read. */
-export interface StoredNotification { id: string; member: string; kind: 'mention'; target: string; source: string; by: string; created: string; readAt: string | null }
+/** One mention (L6 §8.1, `mentions`): `source` is `comment:<id>` or `page:<id>`; `told` whether anyone was told by it;
+ *  `writtenLevel` its target's level when it was made (PR7-R45). */
+export interface MentionRow { source: string; kind: 'member' | 'role' | 'page' | 'record'; ref: string; told: boolean; writtenLevel: string }
+/** One member told (L6 §8.1, `notifications`): a row of their Needs you. `readAt` null until read; `writtenLevel` its target's
+ *  level when it was told (PR7-R45). */
+export interface StoredNotification {
+  id: string; member: string; kind: 'mention'; target: string; source: string; by: string; created: string; readAt: string | null; writtenLevel: string
+}
 /** What one conversation write holds, written in one transaction: comments put whole, mentions put (one per source, kind
  *  and ref), notifications added, and the notifications of `dropSources` (a deleted comment's) removed. */
 export interface ConversationWrite {
@@ -167,21 +174,27 @@ CREATE TABLE IF NOT EXISTS sign_in_links (token_hash TEXT PRIMARY KEY, person_id
 
 // Schema 2 (DAO-OS L6 §8.1), table for table and column for column; times ISO 8601. `target` is `page:<id>` or
 // `record:<registry>:<id>`; a comment's `anchor` a W3C TextQuoteSelector as JSON, or null; `deleted` and the other times
-// null until they happen; a mention's `told` 0 or 1.
+// null until they happen; a mention's `told` 0 or 1. Schema 3 (unreleased when PR7-R45 was ruled) adds `written_level` to
+// comments, mentions and notifications: the level their target had when they were written. A store made before it gains
+// the column with every row `unfilled` (WRITTEN_UNFILLED), which admits nobody until the server's start fills it.
 const SCHEMA_2 = `
 CREATE TABLE IF NOT EXISTS comments (id TEXT NOT NULL PRIMARY KEY, target TEXT NOT NULL, parent TEXT, anchor TEXT, "by" TEXT NOT NULL,
-  body TEXT NOT NULL, created TEXT NOT NULL, edited TEXT, resolved_by TEXT, resolved_at TEXT, deleted TEXT, task TEXT) STRICT;
+  body TEXT NOT NULL, created TEXT NOT NULL, edited TEXT, resolved_by TEXT, resolved_at TEXT, deleted TEXT, task TEXT,
+  written_level TEXT NOT NULL DEFAULT 'unfilled') STRICT;
 CREATE INDEX IF NOT EXISTS comments_target ON comments (target);
 CREATE TABLE IF NOT EXISTS mentions (source TEXT NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL, told INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (source, kind, ref)) STRICT;
+  written_level TEXT NOT NULL DEFAULT 'unfilled', PRIMARY KEY (source, kind, ref)) STRICT;
 CREATE TABLE IF NOT EXISTS notifications (id TEXT NOT NULL PRIMARY KEY, member TEXT NOT NULL, kind TEXT NOT NULL, target TEXT NOT NULL,
-  source TEXT NOT NULL, "by" TEXT NOT NULL, created TEXT NOT NULL, read_at TEXT) STRICT;
+  source TEXT NOT NULL, "by" TEXT NOT NULL, created TEXT NOT NULL, read_at TEXT, written_level TEXT NOT NULL DEFAULT 'unfilled') STRICT;
 CREATE INDEX IF NOT EXISTS notifications_member ON notifications (member);
 CREATE TABLE IF NOT EXISTS reads (member TEXT NOT NULL, target TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (member, target)) STRICT;
 CREATE TABLE IF NOT EXISTS view_state (member TEXT NOT NULL, collection TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY (member, collection)) STRICT;
 CREATE TABLE IF NOT EXISTS drafts (session TEXT NOT NULL PRIMARY KEY, target TEXT NOT NULL, actor TEXT NOT NULL, base TEXT, body TEXT NOT NULL,
   opened TEXT NOT NULL, updated TEXT NOT NULL) STRICT;
 `
+
+/** What a conversation row written before `written_level` existed holds until the server's start fills it (PR7-R45). */
+export const WRITTEN_UNFILLED = 'unfilled'
 
 /** §10.1's sentence for a place inside the repository that git does not ignore. */
 function notIgnored(place: string): string {
@@ -240,8 +253,18 @@ export async function openPrivateStore(repo: string, opts: { dir?: string; git?:
       try { db.exec(`${SCHEMA}\n${SCHEMA_2}\nPRAGMA user_version = ${SCHEMA_VERSION};`); db.exec('COMMIT') } catch (err) { db.exec('ROLLBACK'); throw err }
     }
     // DAO-OS L6 Task 18 fix round 1: a schema-2 store made before a comment kept the task it became gains the column.
-    const commentColumns = (db.prepare('PRAGMA table_info(comments)').all() as { name: string }[]).map(c => c.name)
-    if (!commentColumns.includes('task')) db.exec('ALTER TABLE comments ADD COLUMN task TEXT')
+    const columnsOf = (t: string) => (db!.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map(c => c.name)
+    if (!columnsOf('comments').includes('task')) db.exec('ALTER TABLE comments ADD COLUMN task TEXT')
+    // PR7-R45, in schema 3's migration: the conversation's rows gain the level they were written at, every row kept as
+    // `unfilled` (admitting nobody) until the start fills it with its target's level then (`fillWrittenLevels`).
+    const lacking = ['comments', 'mentions', 'notifications'].filter(t => !columnsOf(t).includes('written_level'))
+    if (lacking.length > 0) {
+      db.exec('BEGIN IMMEDIATE')
+      try {
+        for (const t of lacking) db.exec(`ALTER TABLE ${t} ADD COLUMN written_level TEXT NOT NULL DEFAULT '${WRITTEN_UNFILLED}'`)
+        db.exec('COMMIT')
+      } catch (err) { db.exec('ROLLBACK'); throw err }
+    }
     reader = new DatabaseSync(file, { readOnly: true })
     reader.exec('PRAGMA busy_timeout = 5000')
     return new PrivateStore(file, db, reader, lockWaitMs)
@@ -358,15 +381,22 @@ export function rolesDocRefusal(doc: unknown): string | null {
   return null
 }
 
-const COMMENT_COLUMNS = 'id, target, parent, anchor, "by", body, created, edited, resolved_by, resolved_at, deleted, task'
+const COMMENT_COLUMNS = 'id, target, parent, anchor, "by", body, created, edited, resolved_by, resolved_at, deleted, task, written_level'
 interface CommentRaw {
   id: string; target: string; parent: string | null; anchor: string | null; by: string; body: string
   created: string; edited: string | null; resolved_by: string | null; resolved_at: string | null; deleted: string | null; task: string | null
+  written_level: string
 }
 const asComment = (c: CommentRaw): CommentRow => ({
   id: c.id, target: c.target, parent: c.parent, anchor: c.anchor === null ? null : JSON.parse(c.anchor) as Anchor, by: c.by, body: c.body,
   created: c.created, edited: c.edited, resolvedBy: c.resolved_by, resolvedAt: c.resolved_at, deleted: c.deleted, task: c.task,
+  writtenLevel: c.written_level,
 })
+interface NotificationRaw { id: string; member: string; kind: 'mention'; target: string; source: string; by: string; created: string; read_at: string | null; written_level: string }
+const asNotification = (n: NotificationRaw): StoredNotification =>
+  ({ id: n.id, member: n.member, kind: n.kind, target: n.target, source: n.source, by: n.by, created: n.created, readAt: n.read_at, writtenLevel: n.written_level })
+/** A written level as a write must name it (PR7-R45): a non-empty token. */
+const writtenOf = (what: string, v: unknown): string => nonEmpty(`${what}'s written level`, v)
 const MENTION_KINDS = new Set(['member', 'role', 'page', 'record'])
 const orNull = (name: string, v: unknown): string | null => (v === null ? null : nonEmpty(name, v))
 function checkComment(r: CommentRow): CommentRow {
@@ -375,6 +405,7 @@ function checkComment(r: CommentRow): CommentRow {
   orNull('a comment\'s parent, or null,', r.parent); orNull('an edit time, or null,', r.edited)
   orNull('who resolved it, or null,', r.resolvedBy); orNull('a resolve time, or null,', r.resolvedAt); orNull('a delete time, or null,', r.deleted)
   if (r.task !== undefined) orNull('the task it became, or null,', r.task)
+  writtenOf('a comment', r.writtenLevel)
   if (r.anchor !== null && (typeof r.anchor !== 'object' || typeof r.anchor.exact !== 'string' || typeof r.anchor.prefix !== 'string' || typeof r.anchor.suffix !== 'string')) {
     throw new Error('the private store needs a comment\'s anchor as { exact, prefix, suffix }, or null')
   }
@@ -472,13 +503,14 @@ export class PrivateStore {
         ON CONFLICT (session) DO UPDATE SET target = excluded.target, actor = excluded.actor, base = excluded.base, body = excluded.body,
         opened = excluded.opened, updated = excluded.updated`),
       draftDelete: db.prepare('DELETE FROM drafts WHERE session = ?'),
-      commentPut: db.prepare(`INSERT INTO comments (id, target, parent, anchor, "by", body, created, edited, resolved_by, resolved_at, deleted, task)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET target = excluded.target, parent = excluded.parent,
+      // PR7-R45: a row's written level is set once; a later put of it (a resolve, a delete, the task it became) keeps the first.
+      commentPut: db.prepare(`INSERT INTO comments (id, target, parent, anchor, "by", body, created, edited, resolved_by, resolved_at, deleted, task, written_level)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET target = excluded.target, parent = excluded.parent,
         anchor = excluded.anchor, "by" = excluded."by", body = excluded.body, created = excluded.created, edited = excluded.edited,
         resolved_by = excluded.resolved_by, resolved_at = excluded.resolved_at, deleted = excluded.deleted, task = excluded.task`),
-      mentionPut: db.prepare(`INSERT INTO mentions (source, kind, ref, told) VALUES (?, ?, ?, ?)
+      mentionPut: db.prepare(`INSERT INTO mentions (source, kind, ref, told, written_level) VALUES (?, ?, ?, ?, ?)
         ON CONFLICT (source, kind, ref) DO UPDATE SET told = excluded.told`),
-      notificationPut: db.prepare('INSERT INTO notifications (id, member, kind, target, source, "by", created, read_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
+      notificationPut: db.prepare('INSERT INTO notifications (id, member, kind, target, source, "by", created, read_at, written_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'),
       notificationsDrop: db.prepare('DELETE FROM notifications WHERE source = ?'),
       notificationRead: db.prepare('UPDATE notifications SET read_at = ? WHERE member = ? AND id = ? AND read_at IS NULL'),
       notificationsReadOf: db.prepare('UPDATE notifications SET read_at = ? WHERE member = ? AND target = ? AND read_at IS NULL'),
@@ -513,8 +545,8 @@ export class PrivateStore {
       drafts: reader.prepare('SELECT session, target, actor, base, body, opened, updated FROM drafts ORDER BY opened, session'),
       comment: reader.prepare(`SELECT ${COMMENT_COLUMNS} FROM comments WHERE id = ?`),
       comments: reader.prepare(`SELECT ${COMMENT_COLUMNS} FROM comments WHERE target = ? ORDER BY created, id`),
-      mentions: reader.prepare('SELECT source, kind, ref, told FROM mentions WHERE source = ? ORDER BY kind, ref'),
-      notifications: reader.prepare('SELECT id, member, kind, target, source, "by", created, read_at FROM notifications WHERE member = ? ORDER BY created DESC, id DESC'),
+      mentions: reader.prepare('SELECT source, kind, ref, told, written_level FROM mentions WHERE source = ? ORDER BY kind, ref'),
+      notifications: reader.prepare('SELECT id, member, kind, target, source, "by", created, read_at, written_level FROM notifications WHERE member = ? ORDER BY created DESC, id DESC'),
       read: reader.prepare('SELECT at FROM reads WHERE member = ? AND target = ?'),
     }
   }
@@ -717,19 +749,22 @@ export class PrivateStore {
     await this.locked(() => { this.w.draftDelete.run(nonEmpty('a session id', session)) })
   }
 
-  // Conversation (DAO-OS L6 §8.1–8.3): comments, mentions, notifications and read state. Not private data's history (a
-  // comment has no level of its own: it follows its target's, §8.2). Each write is one transaction under the write lock.
+  // Conversation (DAO-OS L6 §8.1–8.3): comments, mentions, notifications and read state. Not private data's history. A
+  // comment, a mention and a notification keep the level their target had when written (PR7-R45); a viewer reads one only
+  // when admitted to that and to the target's level now (workspace/written.ts). Each write is one transaction under the
+  // write lock.
 
   /** Comments, mentions and notifications written together, or none of them (a comment and whom it told are one act). */
   async writeConversation(c: ConversationWrite): Promise<void> {
     const comments = (c.comments ?? []).map(checkComment)
     for (const m of c.mentions ?? []) {
-      nonEmpty('a mention\'s source', m.source); nonEmpty('a mention\'s ref', m.ref)
+      nonEmpty('a mention\'s source', m.source); nonEmpty('a mention\'s ref', m.ref); writtenOf('a mention', m.writtenLevel)
       if (!MENTION_KINDS.has(m.kind)) throw new Error(`the private store needs a mention's kind as member, role, page or record, not ${String(m.kind)}`)
     }
     for (const n of c.notifications ?? []) {
       for (const name of ['id', 'member', 'target', 'source', 'by', 'created'] as const) nonEmpty(`a notification's ${name}`, n[name])
       if (n.kind !== 'mention') throw new Error('the private store needs a notification\'s kind as mention')
+      writtenOf('a notification', n.writtenLevel)
     }
     for (const s of c.dropSources ?? []) nonEmpty('a source', s)
     await this.locked(() => {
@@ -737,17 +772,55 @@ export class PrivateStore {
       try {
         for (const r of comments) {
           this.w.commentPut.run(r.id, r.target, r.parent, r.anchor === null ? null : JSON.stringify(r.anchor), r.by, r.body, r.created, r.edited,
-            r.resolvedBy, r.resolvedAt, r.deleted, r.task ?? null)
+            r.resolvedBy, r.resolvedAt, r.deleted, r.task ?? null, r.writtenLevel)
         }
-        for (const m of c.mentions ?? []) this.w.mentionPut.run(m.source, m.kind, m.ref, m.told ? 1 : 0)
+        for (const m of c.mentions ?? []) this.w.mentionPut.run(m.source, m.kind, m.ref, m.told ? 1 : 0, m.writtenLevel)
         for (const s of c.dropSources ?? []) this.w.notificationsDrop.run(s)
-        for (const n of c.notifications ?? []) this.w.notificationPut.run(n.id, n.member, n.kind, n.target, n.source, n.by, n.created, n.readAt)
+        for (const n of c.notifications ?? []) this.w.notificationPut.run(n.id, n.member, n.kind, n.target, n.source, n.by, n.created, n.readAt, n.writtenLevel)
         this.db.exec('COMMIT')
       } catch (err) {
         try { this.db.exec('ROLLBACK') } catch { /* the error to tell is the write's */ }
         throw err
       }
     })
+  }
+
+  /** PR7-R45: the targets that hold conversation rows written before `written_level` existed (still `unfilled`). */
+  unfilledTargets(): string[] {
+    return (this.reader.prepare(`SELECT target FROM comments WHERE written_level = ?1 UNION SELECT target FROM notifications WHERE written_level = ?1
+      UNION SELECT source AS target FROM mentions WHERE written_level = ?1 AND source NOT LIKE 'comment:%' ORDER BY target`).all(WRITTEN_UNFILLED) as { target: string }[])
+      .map(r => r.target)
+  }
+
+  /** PR7-R45, once, at the start after schema 3's migration: every `unfilled` row takes its target's level then (`levels`,
+   *  target → level token), `nobody` where `levels` has none (the target was not there to read); a comment's mentions take
+   *  the comment's. One transaction. */
+  async fillWrittenLevels(levels: ReadonlyMap<string, string>, nobody: string): Promise<void> {
+    nonEmpty('the level that admits nobody', nobody)
+    for (const [t, l] of levels) { nonEmpty('a target', t); nonEmpty('a level', l) }
+    await this.locked(() => {
+      this.db.exec('BEGIN IMMEDIATE')
+      try {
+        const targets = new Set(this.unfilledTargetsIn())
+        for (const target of targets) {
+          const level = levels.get(target) ?? nobody
+          this.db.prepare('UPDATE comments SET written_level = ? WHERE target = ? AND written_level = ?').run(level, target, WRITTEN_UNFILLED)
+          this.db.prepare('UPDATE notifications SET written_level = ? WHERE target = ? AND written_level = ?').run(level, target, WRITTEN_UNFILLED)
+          this.db.prepare('UPDATE mentions SET written_level = ? WHERE source = ? AND written_level = ?').run(level, target, WRITTEN_UNFILLED)
+        }
+        this.db.prepare(`UPDATE mentions SET written_level = COALESCE((SELECT c.written_level FROM comments c WHERE 'comment:' || c.id = mentions.source), ?1)
+          WHERE written_level = ?2 AND source LIKE 'comment:%'`).run(nobody, WRITTEN_UNFILLED)
+        this.db.exec('COMMIT')
+      } catch (err) {
+        try { this.db.exec('ROLLBACK') } catch { /* the error to tell is the write's */ }
+        throw err
+      }
+    })
+  }
+
+  private unfilledTargetsIn(): string[] {
+    return (this.db.prepare(`SELECT target FROM comments WHERE written_level = ?1 UNION SELECT target FROM notifications WHERE written_level = ?1
+      UNION SELECT source AS target FROM mentions WHERE written_level = ?1 AND source NOT LIKE 'comment:%'`).all(WRITTEN_UNFILLED) as { target: string }[]).map(r => r.target)
   }
 
   /** `member`'s notifications marked read at `at`: those of `ids`, and every one on `target`; answers how many were unread. */
@@ -1021,14 +1094,21 @@ export class PrivateStore {
 
   /** The mentions `source` (`comment:<id>` or `page:<id>`) has made. */
   mentionsOf(source: string): MentionRow[] {
-    return (this.r.mentions.all(source) as unknown as { source: string; kind: MentionRow['kind']; ref: string; told: number }[])
-      .map(m => ({ source: m.source, kind: m.kind, ref: m.ref, told: m.told === 1 }))
+    return (this.r.mentions.all(source) as unknown as { source: string; kind: MentionRow['kind']; ref: string; told: number; written_level: string }[])
+      .map(m => ({ source: m.source, kind: m.kind, ref: m.ref, told: m.told === 1, writtenLevel: m.written_level }))
   }
 
-  /** `member`'s notifications, newest first, as stored: the caller judges each against its target's level now (§8.3). */
+  /** `member`'s notifications, newest first, as stored: the caller judges each against its target's level now and the level
+   *  it was written at (§8.3, PR7-R45). */
   notifications(member: string): StoredNotification[] {
-    return (this.r.notifications.all(member) as unknown as { id: string; member: string; kind: 'mention'; target: string; source: string; by: string; created: string; read_at: string | null }[])
-      .map(n => ({ id: n.id, member: n.member, kind: n.kind, target: n.target, source: n.source, by: n.by, created: n.created, readAt: n.read_at }))
+    return (this.r.notifications.all(member) as unknown as NotificationRaw[]).map(asNotification)
+  }
+
+  /** PR7-R45, the housekeeping: every target the conversation holds rows on (comments, notifications, read marks, a page's
+   *  own mentions), each once, sorted. */
+  conversationTargets(): string[] {
+    return (this.reader.prepare(`SELECT target FROM comments UNION SELECT target FROM notifications UNION SELECT target FROM reads
+      UNION SELECT source AS target FROM mentions WHERE source NOT LIKE 'comment:%' ORDER BY target`).all() as { target: string }[]).map(r => r.target)
   }
 
   /** When `member` last opened `target`, or null. */
