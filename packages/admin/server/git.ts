@@ -36,9 +36,8 @@ const ALLOWED: Record<string, readonly string[]> = {
   commit: ['-F', '--allow-empty'],
   diff: ['--name-only', '--cached', '--no-renames'],
   'diff-tree': ['-r', '--name-only'],
-  log: ['-1', '--format=%B', '--format=%ae', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H'],
+  log: ['-1', '--format=%B', '--format=%ae'],
   'ls-files': ['-v', '--error-unmatch'],
-  'ls-tree': ['--name-only'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
   'merge-file': ['-p'],
@@ -130,24 +129,6 @@ function checkArgv(argv: readonly string[]): void {
     const rest = args.slice(named ? 2 : 1)
     if (args[0] !== '--write-tree' || rest.length !== 2 || rest.some(a => a.startsWith('-') || a.startsWith('+'))) {
       refuse('merge-tree takes --write-tree [--name-only] <a> <b>, nothing else.')
-    }
-  }
-  if (sub === 'log') {
-    // Two shapes only: one commit's message or author (`-1 --format=%B|%ae <rev>`), or the conversation purge's first-parent
-    // line (R2b I-4: `--first-parent -m --no-renames --name-status --format=%H <a>..<b> -- <paths>`). A flag of one shape
-    // is never taken in the other, and a revision is never read as a flag.
-    const LINE = ['--first-parent', '-m', '--no-renames', '--name-status', '--format=%H']
-    const one = args.length === 3 && args[0] === '-1' && (args[1] === '--format=%B' || args[1] === '--format=%ae')
-    const line = args.length >= 8 && LINE.every((f, i) => args[i] === f) && args[6] === '--' && !args.slice(7).some(a => a === '' || a.startsWith('-'))
-    const rev = one ? args[2]! : line ? args[5]! : null
-    if (rev === null || rev.startsWith('-') || rev.startsWith('+')) {
-      refuse(`"${rev ?? args.join(' ')}" is not a flag log may carry here: log takes -1 --format=%B|%ae <rev>, or --first-parent -m --no-renames --name-status --format=%H <a>..<b> -- <paths>.`)
-    }
-  }
-  if (sub === 'ls-tree') {
-    // PR7-R32: the names in one folder of one commit (the pages a widening may reach): `--name-only <40 hex> -- <folder>/`.
-    if (args.length !== 4 || args[0] !== '--name-only' || !HEX40.test(args[1]!) || args[2] !== '--' || !/^[a-z0-9][a-z0-9_-]*\/$/.test(args[3]!)) {
-      refuse('ls-tree takes --name-only <full commit id> -- <folder>/, nothing else.')
     }
   }
   if (sub === 'merge-file') {
@@ -536,34 +517,6 @@ export async function resolveRev(repo: string, rev: string): Promise<string | nu
  *  commits beneath a merge's second parent are not in it. */
 export async function trunkLine(repo: string, a: string, b: string): Promise<string[]> {
   return lines(await run('rev-list', ['--first-parent', '--reverse', `${a}..${b}`], repo))
-}
-
-/** One commit of a first-parent line and the paths it changed against its first parent: `A` added, `M` modified, `D`
- *  deleted, `T` changed in type (a rename is a delete and an add). */
-export interface LineStep { commit: string; changes: { status: string; path: string }[] }
-
-/** The first-parent line `a..b`, oldest first, in one process (`git log --first-parent -m --no-renames --name-status`):
- *  each commit, a merge too, read against its first parent, with the paths under `paths` it changed. A commit that changed
- *  none of them is not listed. `a` and `b` are full commit ids. */
-export async function firstParentChanges(repo: string, a: string, b: string, paths: readonly string[]): Promise<LineStep[]> {
-  if (!HEX40.test(a) || !HEX40.test(b)) throw new Error('firstParentChanges takes two full commit ids.')
-  if (paths.length === 0 || paths.some(p => p === '' || p.startsWith('-'))) throw new Error('firstParentChanges takes the paths to read, none read as a flag.')
-  const text = await run('log', ['--first-parent', '-m', '--no-renames', '--name-status', '--format=%H', `${a}..${b}`, '--', ...paths], repo)
-  const steps: LineStep[] = []
-  for (const line of lines(text)) {
-    if (HEX40.test(line)) { steps.push({ commit: line, changes: [] }); continue }
-    const tab = line.indexOf('\t')
-    const step = steps[steps.length - 1]
-    if (tab > 0 && step) step.changes.push({ status: line.slice(0, 1), path: line.slice(tab + 1) })
-  }
-  return steps.reverse()
-}
-
-/** The names of the files in one folder (`pages/`) of the commit `rev` (a full id): the folder's own entries, not deeper
- *  ones, as paths from the root (`pages/<id>.md`). None when the commit has no such folder. */
-export async function namesAt(repo: string, rev: string, folder: string): Promise<string[]> {
-  if (!HEX40.test(rev)) throw new Error('namesAt takes a full commit id.')
-  return lines(await run('ls-tree', ['--name-only', rev, '--', folder], repo))
 }
 
 /** The paths that differ between two revisions (names only). */
