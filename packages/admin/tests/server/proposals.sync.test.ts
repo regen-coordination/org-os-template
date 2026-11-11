@@ -10,7 +10,7 @@ import { removeFixtureRepo } from '../fixtures.ts'
 import { createApp } from '../../server/app.ts'
 import { mountProposals } from '../../server/proposals/routes.ts'
 import { mountSync } from '../../server/proposals/sync.ts'
-import { goneSettled, onTargetsGone, purgeCursor, trunkAtStart } from '../../server/workspace/gone.ts'
+import { goneSettled, onTargetsGone, purgeCursor, trunkAtStart, trunkTip } from '../../server/workspace/gone.ts'
 import { resolveTrunk } from '../../server/proposals/ledger.ts'
 import { withFailingSubcommand } from '../git-shim.ts'
 import { mountOperations } from '../../server/operations/routes.ts'
@@ -251,7 +251,7 @@ describe('POST /api/sync and GET /api/sync', () => {
     expect(errors).toHaveBeenCalled()
     expect(told).toEqual([])
     expect(purgeCursor(b)).toBe(before)
-    await trunkAtStart(b, () => resolveTrunk(b), new Date()); await goneSettled(b)
+    await trunkAtStart(b, await trunkTip(b, () => resolveTrunk(b)), new Date()); await goneSettled(b)
     expect(told).toEqual([['page:notes-0001']])
     expect(purgeCursor(b)).toBe(sha(b))
   })

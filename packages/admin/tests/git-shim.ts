@@ -41,13 +41,15 @@ exit 128
 /** Runs `fn` with a `git` first on PATH that writes its arguments to a marker file, one line per
  *  start, and then passes them to the real git. `started()` reads that file: it is how a test sees
  *  that a process began (simple-git does not go through any property of `child_process` a spy could
- *  watch). Only this process (one test file) sees the changed PATH. */
-export async function withGitTrace<T>(fn: (started: () => string[]) => Promise<T>): Promise<T> {
+ *  watch). `slow`: a command whose argument line holds it waits a second before git runs (how a test
+ *  makes a read land after a write). Only this process (one test file) sees the changed PATH. */
+export async function withGitTrace<T>(fn: (started: () => string[]) => Promise<T>, slow?: string): Promise<T> {
   const real = execSync('command -v git', { shell: '/bin/sh' }).toString().trim()
   const dir = mkdtempSync(join(tmpdir(), 'git-trace-'))
   const marker = join(dir, 'started')
   writeFileSync(join(dir, 'git'), `#!/bin/sh
 echo "$*" >> "${marker}"
+${slow === undefined ? '' : `case "$*" in *'${slow.replace(/'/g, '')}'*) sleep 1 ;; esac`}
 exec "${real}" "$@"
 `, { mode: 0o755 })
   const path = process.env.PATH

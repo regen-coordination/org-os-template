@@ -519,13 +519,21 @@ export function trunkMoved(repo: string, from: string | null, to: string | null,
 }
 
 /** At the server's start: queue the purge of what the trunk's commits since the cursor deleted (a move made while the
- *  server was down), of what was written before `at`; with no cursor, set it to the trunk. Resolves when the job ends. */
-export function trunkAtStart(repo: string, trunk: () => Promise<string>, at: Date): Promise<void> {
-  return queue(repo, 'the commits made while the server was stopped', async () => {
-    const name = await trunk()
-    const to = await resolveRev(repo, `refs/heads/${name}`)
-    if (to !== null) await catchUp(repo, null, to, at)
-  })
+ *  server was down), up to `tip`, the trunk as the start read it before committing anything of its own (T2c minor 1: a
+ *  crash's draft committed at start is the Hub's, followed by the cursor, never read as outside), of what was written
+ *  before `at`; with no cursor, set it to `tip`. A null tip (no trunk commit to read) queues nothing. Resolves when the
+ *  job ends. */
+export function trunkAtStart(repo: string, tip: string | null, at: Date): Promise<void> {
+  if (tip === null || !HEX40.test(tip)) return Promise.resolve()
+  return queue(repo, 'the commits made while the server was stopped', () => catchUp(repo, null, tip, at))
+}
+
+/** The trunk's tip, read at the start before anything is committed (`trunkAtStart`); null when it cannot be read. */
+export async function trunkTip(repo: string, trunk: () => Promise<string>): Promise<string | null> {
+  try { return await resolveRev(repo, `refs/heads/${await trunk()}`) } catch (err) {
+    console.error(`org-os admin: the trunk could not be read at start, so the conversation of what changed while the server was stopped is purged at the next move or start: ${err instanceof Error ? err.message : String(err)}`)
+    return null
+  }
 }
 
 // ── tombstones, while the store is down ──────────────────────────────────────────────────────────────

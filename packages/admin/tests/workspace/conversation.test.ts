@@ -14,7 +14,7 @@ import { openPrivateStore, StoreUnavailable, type PrivateStore } from '../../ser
 import { storeAccess } from '../../server/private/ops.ts'
 import { mountVisibility } from '../../server/visibility/routes.ts'
 import { EditSessions } from '../../server/workspace/sessions.ts'
-import { goneBetween, goneSettled, purgeCursor, tombstones, trunkAtStart } from '../../server/workspace/gone.ts'
+import { goneBetween, goneSettled, purgeCursor, tombstones, trunkAtStart, trunkTip } from '../../server/workspace/gone.ts'
 import { commitPaths } from '../../server/git.ts'
 import { withFailingSubcommand, withGitTrace } from '../git-shim.ts'
 import { Refresher } from '../../server/hosted/refresh.ts'
@@ -770,7 +770,7 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
   const talk = async (w: World) => {
     expect((await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} members-only talk` }))).status).toBe(201)
   }
-  const atStart = (w: World) => trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date())
+  const atStart = async (w: World) => trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date())
 
   it('with no cursor yet, the start sets it to the trunk and purges nothing that came before', async () => {
     const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
@@ -1096,7 +1096,7 @@ describe('Rule 4 (PR7-R32): a widening that comes from outside clears the conver
       'child-0002': atLevel('child-0002', undefined, 'scratch-0001'),
       'keep-0002': page('keep-0002', 'Keep'),
     } })
-    await trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date()); await goneSettled(w.repo)
+    await trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date()); await goneSettled(w.repo)
     const start = tip(w.repo)
     const elsewhere = remoteOf(w.repo)
     const projects = readFileSync(join(elsewhere, 'data', 'projects.yaml'), 'utf8')
@@ -1146,13 +1146,13 @@ describe('Rule 4 (PR7-R32): a widening that comes from outside clears the conver
 
   it('a widening made through the Hub keeps the conversation (it asked first)', async () => {
     const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
-    await trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date()); await goneSettled(w.repo)
+    await trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date()); await goneSettled(w.repo)
     await talk(w)
     writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
     await commitPaths(w.repo, ['pages/scratch-0001.md'], 'page: public (the Hub, after the widen dialog)')
     await goneSettled(w.repo)
     expect(purgeCursor(w.repo)).toBe(tip(w.repo))
-    await trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date()); await goneSettled(w.repo)
+    await trunkAtStart(w.repo, await trunkTip(w.repo, () => resolveTrunk(w.repo)), new Date()); await goneSettled(w.repo)
     expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
   })
 })

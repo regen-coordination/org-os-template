@@ -14,6 +14,8 @@ import { stateDir } from '../../server/state.ts'
 import { ChangeStore } from '../../server/changes/store.ts'
 import { MOVE_PROPOSED } from '../../server/private/ops.ts'
 import { mergeThree } from '../../server/git.ts'
+import { goneSettled, purgeCursor } from '../../server/workspace/gone.ts'
+import { withGitTrace } from '../git-shim.ts'
 import { joinPage, splitPage } from '../../lib/workspace/pages.mjs'
 import { workspaceOf } from '../../server/workspace/routes.ts'
 import {
@@ -767,5 +769,27 @@ describe('the server\'s stop and start (serve.ts)', () => {
       expect(bodyOf(repo, 'guide-0001')).toContain('Crashed')
     } finally { await server.close() }
     expect(commits(repo)).toBe(before + 1)
+  })
+
+  // T2c (closing review, minor 1): the start reads the trunk's tip before it commits a crash's draft, and the purge runs
+  // from the cursor to that tip; the draft's commit is the Hub's own, followed by the cursor, never read as outside. The
+  // trunk's read is made slow, so a read made inside the queued job would land after the draft's commit.
+  it('the start reads the trunk before it commits a crash\'s draft: the purge never reads that commit as outside', async () => {
+    const repo = plainRepo()
+    const tip = git(repo, 'rev-parse HEAD').trim()
+    mkdirSync(stateDir(repo), { recursive: true })
+    writeFileSync(join(stateDir(repo), 'conversation-cursor.json'), `${JSON.stringify({ commit: tip })}\n`)
+    const crashed = new EditSessions(repo, { store: null })
+    live.push(crashed)
+    const { session } = await crashed.open(STEWARD_A, member, 'guide-0001')
+    await crashed.save(session, STEWARD_A, { markdown: BODY.replace('First', 'Crashed') })
+    crashed.dispose()
+    await withGitTrace(async started => {
+      const server = await startServer({ repo, port: 0 })
+      try { await goneSettled(repo) } finally { await server.close() }
+      expect(lastMessage(repo)).toContain(`Org-Change: ${session}`)
+      expect(started().filter(l => l.includes('--first-parent'))).toEqual([])
+    }, 'rev-parse --verify -q refs/heads/')
+    expect(purgeCursor(repo)).toBe(git(repo, 'rev-parse HEAD').trim())
   })
 })
