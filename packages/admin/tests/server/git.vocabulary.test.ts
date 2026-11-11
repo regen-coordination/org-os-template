@@ -46,7 +46,7 @@ const EXPECTED_UNSAFE = [
 ]
 const EXPECTED_ENV = ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']
 const EXPECTED_EXPORTS = [
-  'FETCH_FRESH_MS', 'GitExit', '__internal', 'addWorktree', 'assertTracked', 'assertWritablePath', 'authorEmail', 'blobText', 'cloneInstance', 'commitDataPaths', 'commitMerge', 'commitPaths', 'configuredEmail', 'countBetween', 'diffNames',
+  'FETCH_FRESH_MS', 'GitExit', '__internal', 'addWorktree', 'assertTracked', 'assertWritablePath', 'authorEmail', 'blobText', 'cloneInstance', 'commitDataPaths', 'commitsBetween', 'commitMerge', 'commitPaths', 'configuredEmail', 'countBetween', 'diffNames',
   'diffText', 'fetchRemote', 'gitPath', 'gitVersion', 'hiddenDataPaths', 'hiddenMergePaths', 'isAncestor', 'isIgnored', 'lastFetch', 'mergeAbort', 'mergeBase',
   'mergeFfOnly', 'mergeInProgress', 'mergeNoFf', 'mergeThree', 'mergeTree', 'messageOf',
   'moveProposalBranch', 'onCommit', 'parseGitVersion', 'pushTrunk', 'recordRemoteTrunkAbsent', 'remoteUrl', 'removeWorktree', 'repoStatus', 'resolveRev', 'restageDataPaths', 'showFile',

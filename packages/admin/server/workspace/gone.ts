@@ -8,6 +8,9 @@
 // - a git page or record: once the commit that deletes it is made (`applyOps`, a ratify's merge), through the purger the
 //   conversation routes register here. The purge waits its turn on the store's write lock, so it is never awaited inside
 //   a transaction the caller holds. A thing the store keeps under that id by then (it moved there) keeps its rows.
+// - a git page or record deleted by commits the Hub did not make (the Refresher's fast-forward of a read-only hosted Hub,
+//   Sync's fast-forward or merge): once the trunk has moved, read commit by commit (`goneBetween`), so a page deleted and
+//   made again between two moves still takes its old conversation (R2 review, Rule 4);
 // - the store down at that moment: a tombstone (the target and when it went) is kept in the server's state directory, and
 //   applied the moment the store is reached again, before any conversation is read or written: every row on the target
 //   goes (none can be newer: nothing is written to a store that is down, and the tombstone goes first when it is back).
@@ -19,6 +22,7 @@ import { dirname, join, resolve } from 'node:path'
 import { registriesOf, registryFileOf } from '../registries.ts'
 import { entriesFromText } from '../registry.ts'
 import { stateDir } from '../state.ts'
+import { commitsBetween, resolveRev, showFile, treeDiffNames } from '../git.ts'
 import type { StageOp } from '../changes/types.ts'
 
 /** What hears that git targets are gone, per repository: the conversation routes' purger (`mountConversation`). */
@@ -83,6 +87,37 @@ export function goneOfOps(repo: string, ops: readonly StageOp[]): string[] {
     }
   }
   return [...out, ...goneOfFiles(repo, files)]
+}
+
+/** The targets the commits in `from..to` delete, each commit read against its first parent: a page file removed, or a
+ *  collection's entry left out. One deleted on the way counts even when a later commit makes it again under the same id
+ *  (its old conversation would otherwise follow the new one's level). The collections are the ones the tree defines now.
+ *  A commit or file git cannot read says nothing. */
+export async function goneBetween(repo: string, from: string, to: string): Promise<string[]> {
+  if (from === to) return []
+  const collections = new Set(registriesOf(repo).filter(d => d.kind === 'collection').map(d => registryFileOf(d)))
+  const textAt = async (rev: string, rel: string): Promise<string | null> => {
+    try { return await showFile(repo, rev, rel) } catch { return null }
+  }
+  const out = new Set<string>()
+  for (const commit of await commitsBetween(repo, from, to)) {
+    const parent = await resolveRev(repo, `${commit}^`)
+    if (parent === null) continue
+    const changed = (await treeDiffNames(repo, parent, commit)).filter(rel => PAGE_FILE.test(rel) || collections.has(rel))
+    const files: { rel: string; before: string | null; text: string | null }[] = []
+    for (const rel of changed) files.push({ rel, before: await textAt(parent, rel), text: await textAt(commit, rel) })
+    for (const t of goneOfFiles(repo, files)) out.add(t)
+  }
+  return [...out]
+}
+
+/** After the trunk moved from `from` to `to` by commits the Hub did not make: queue the purge of what they deleted.
+ *  Never throws (the move stands, and a failure is said on the console). */
+export async function trunkMoved(repo: string, from: string | null, to: string | null): Promise<void> {
+  if (from === null || to === null || from === to) return
+  try { targetsGone(repo, await goneBetween(repo, from, to)) } catch (err) {
+    console.error(`org-os admin: what the commits ${from.slice(0, 7)}..${to.slice(0, 7)} deleted could not be read: ${err instanceof Error ? err.message : String(err)}`)
+  }
 }
 
 // ── tombstones, while the store is down ──────────────────────────────────────────────────────────────

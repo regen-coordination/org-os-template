@@ -14,7 +14,10 @@ import { openPrivateStore, StoreUnavailable, type PrivateStore } from '../../ser
 import { storeAccess } from '../../server/private/ops.ts'
 import { mountVisibility } from '../../server/visibility/routes.ts'
 import { EditSessions } from '../../server/workspace/sessions.ts'
-import { goneSettled, tombstones } from '../../server/workspace/gone.ts'
+import { goneBetween, goneSettled, tombstones } from '../../server/workspace/gone.ts'
+import { Refresher } from '../../server/hosted/refresh.ts'
+import { ServerAttention } from '../../server/attention.ts'
+import { resolveTrunk } from '../../server/proposals/ledger.ts'
 import { stateDir } from '../../server/state.ts'
 import {
   ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, commentView, mentionablesFor, mountConversation,
@@ -673,5 +676,67 @@ describe('§8.5: a private page written in the store is heard', () => {
     await w.store.deleteRecord('pages', 'p-00000000000b', 'steward-a', null)
     await w.store.putViewState('steward-a', 'tasks', { view: 'all' })
     expect(heard).toEqual([['pages'], ['pages']])
+  })
+})
+
+// R2 review (Rule 4): the Refresher (a read-only hosted Hub taking its remote's commits) and Sync move the trunk without
+// applyOps or a ratify. A page or record those commits delete takes its conversation too, read commit by commit, so a
+// delete and a re-make between two refreshes still counts. Every repository here is fresh under the temp directory.
+describe('R2 review: a trunk moved from outside takes a deleted target\'s conversation', () => {
+  const tmp = (prefix: string) => { const d = mkdtempSync(join(tmpdir(), prefix)); cleanup.push(d); return d }
+  /** A bare remote for `repo`, and a clone of it where commits are made elsewhere (as steward-b). */
+  const remoteOf = (repo: string) => {
+    const bare = join(tmp('gone-remote-'), 'remote.git')
+    git(tmp('gone-init-'), `init -q --bare -b main ${bare}`)
+    git(repo, `remote add origin ${bare}`)
+    git(repo, 'push -q origin HEAD:refs/heads/main')
+    const elsewhere = join(tmp('gone-elsewhere-'), 'clone')
+    git(tmp('gone-clone-'), `clone -q ${bare} ${elsewhere}`)
+    git(elsewhere, 'config user.email steward-b@example.test')
+    git(elsewhere, 'config user.name "Steward B"')
+    return elsewhere
+  }
+
+  it('a git page deleted and made again at public on the remote: after the refresh its members\' comments are gone', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    const sent = await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} members-only talk` }))
+    expect(sent.status).toBe(201)
+    await call(w.app, '/api/reads', json('POST', { target: 'page:scratch-0001' }))
+    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
+    expect(w.store.notifications('steward-c')).toHaveLength(1)
+    const elsewhere = remoteOf(w.repo)
+    git(elsewhere, 'rm -q pages/scratch-0001.md')
+    git(elsewhere, 'commit -qm "page: deleted"')
+    mkdirSync(join(elsewhere, 'pages'), { recursive: true }) // git took the folder with its last file
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
+    git(elsewhere, 'add pages/scratch-0001.md')
+    git(elsewhere, 'commit -qm "page: made again, public"')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+
+    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000 })
+    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
+    await goneSettled(w.repo)
+    expect(targetLevel(w.repo, 'page:scratch-0001', w.store)).toEqual({ level: 'public' })
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+    expect(w.store.notifications('steward-c')).toEqual([])
+    expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBeNull()
+    for (const who of [asA, asC]) {
+      who(w.repo)
+      expect((await call(w.app, '/api/comments?target=page:scratch-0001')).body).toEqual([])
+    }
+  })
+
+  it('goneBetween reads each commit against its parent: a record removed then put back counts, an edit does not', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
+    const from = git(w.repo, 'rev-parse HEAD').trim()
+    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.split('\n').filter(l => !l.includes('id: budget')).join('\n'))
+    writeFileSync(join(w.repo, 'pages', 'keep-0002.md'), page('keep-0002', 'Keep', 'Edited.\n'))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: budget out, keep edited"')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects)
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: budget back"')
+    const to = git(w.repo, 'rev-parse HEAD').trim()
+    expect(await goneBetween(w.repo, from, to)).toEqual(['record:projects:budget'])
+    expect(await goneBetween(w.repo, to, to)).toEqual([])
   })
 })

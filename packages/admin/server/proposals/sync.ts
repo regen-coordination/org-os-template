@@ -30,6 +30,7 @@ import {
 import { guardTrunk, resolveTrunk } from './ledger.ts'
 import { mergeLedgers } from '../../lib/proposals.mjs'
 import { validTrunkName } from '../../lib/rules.mjs'
+import { trunkMoved } from '../workspace/gone.ts'
 
 export interface SyncDeps {
   repo: string
@@ -212,6 +213,7 @@ async function localPart(repo: string, trunk: string, startBranch: string | unde
     try { await mergeFfOnly(repo, tip) } catch (err) {
       throw refuse('FF_FAILED', `Not synced: git would not fast-forward ${trunk} (${firstLine(err)}). ${NOTHING}`)
     }
+    await trunkMoved(repo, head, tip) // R2 review (Rule 4): what the commits brought in deleted takes its conversation
     const after = await lastFetch(repo, trunk)
     return { state: 'fast-forwarded', moved: true, commit: tip, ...counts(after), sentence: `Fast-forwarded ${trunk} by ${plural(f.behind, 'commit')} from ${REMOTE}.` }
   }
@@ -231,6 +233,7 @@ async function localPart(repo: string, trunk: string, startBranch: string | unde
   }
   const ledger = conflicts.includes(LEDGER) ? await ledgerMerge(repo, head, tip) : null
   const commit = await mergeCommit(repo, trunk, head, tip, computed.tree, ledger)
+  await trunkMoved(repo, head, commit)
   const after = await lastFetch(repo, trunk)
   return {
     state: 'merged', moved: true, commit, ledger: ledger !== null ? 'merged by id' : null, ...counts(after),

@@ -539,6 +539,11 @@ export async function diffText(repo: string, a: string, b: string): Promise<stri
   return run('diff', [`${a}...${b}`], repo)
 }
 
+/** Every commit `b` has that `a` lacks, oldest first (merges and the commits beneath a merge's second parent too). */
+export async function commitsBetween(repo: string, a: string, b: string): Promise<string[]> {
+  return lines(await run('rev-list', ['--reverse', `${a}..${b}`], repo))
+}
+
 /** How many commits `b` has that `a` lacks. */
 export async function countBetween(repo: string, a: string, b: string): Promise<number> {
   return Number((await run('rev-list', ['--count', `${a}..${b}`], repo)).trim())

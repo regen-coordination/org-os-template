@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
@@ -10,6 +10,7 @@ import { removeFixtureRepo } from '../fixtures.ts'
 import { createApp } from '../../server/app.ts'
 import { mountProposals } from '../../server/proposals/routes.ts'
 import { mountSync } from '../../server/proposals/sync.ts'
+import { goneSettled, onTargetsGone } from '../../server/workspace/gone.ts'
 import { mountOperations } from '../../server/operations/routes.ts'
 import { opById, needsConfirm, type InProcess } from '../../server/operations/catalogue.ts'
 import { LocalExecutor } from '../../server/operations/executor.ts'
@@ -192,6 +193,33 @@ describe('the fetch operation', () => {
 })
 
 describe('POST /api/sync and GET /api/sync', () => {
+  // R2 review (Rule 4): Sync moves the trunk without applyOps; a page its commits delete, even one made again after, is
+  // told to the conversation's purger, commit by commit, on a fast-forward and on a merge.
+  it('a page deleted and made again on the remote is told gone after the fast-forward and after a merge', async () => {
+    const { a, b } = world()
+    mkdirSync(join(a, 'pages'), { recursive: true })
+    const page = (body: string, extra = '') => `---\nid: notes-0001\ntitle: Notes\nparent: null\norder: 1000\n${extra}---\n${body}`
+    commitFile(a, 'pages/notes-0001.md', page('Members only.\n')); sh(a, 'git push -q origin main')
+    const served = serve(b)
+    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
+    const told: string[][] = []
+    onTargetsGone(b, async targets => { told.push(targets) })
+    sh(a, 'git rm -q pages/notes-0001.md && git commit -qm "page: deleted"')
+    mkdirSync(join(a, 'pages'), { recursive: true }) // git took the folder with its last file
+    commitFile(a, 'pages/notes-0001.md', page('Public now.\n', 'visibility: public\n')); sh(a, 'git push -q origin main')
+    tick()
+    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
+    await goneSettled(b)
+    expect(told).toEqual([['page:notes-0001']])
+    // Again, with a commit of b's own first: the merge's side of a counts too.
+    sh(a, 'git rm -q pages/notes-0001.md && git commit -qm "page: deleted again"'); sh(a, 'git push -q origin main')
+    commitFile(b, 'mine.txt', 'm\n')
+    tick()
+    expect((await sync(served.app)).body).toMatchObject({ state: 'merged' })
+    await goneSettled(b)
+    expect(told).toEqual([['page:notes-0001'], ['page:notes-0001']])
+  })
+
   it('behind and clean: a fast-forward', async () => {
     const { a, b } = world()
     commitFile(a, 'new.txt', 'n\n'); sh(a, 'git push -q origin main')
