@@ -115,13 +115,17 @@ const EMPTY_POLICY = Object.freeze({ collections: {}, defaults: {} }) as unknown
 /** What the trunk's first-parent line `from..to` deleted, each commit (a merge too) read against its first parent: a page
  *  file removed, or a collection's entry left out. A side branch's own commits are not read: what its merge brought is the
  *  merge's diff, so a branch merged with `-s ours`, or a delete its own later commit undid, deletes nothing.
- *  A target deleted on the line is purged only when it is absent at `to`, or there at a level looser than one it had before:
- *  at `from`, or just before each delete (rule R-9a's risk is a conversation inheriting a wider level; one kept at the same
- *  level, or a narrower one, keeps its conversation). A level that cannot be read is no reason to keep it.
- *  And a target the line did not delete, there at `from` and at `to`, is purged when its level at `to` is looser than at
- *  `from` (Rule 4 as amended, PR7-R32): a page or an entry edited on the line; every subpage when a page it may inherit from
- *  moved to a looser level (or went, leaving its subpages the pages' default); every page and entry when the policy file
- *  moved. Here a level that cannot be read (a proposal's) keeps it: nothing was deleted, so no purge on a guess.
+ *  A target deleted on the line is purged only when it is absent at `to`, or there at a level looser than one it had on the
+ *  line: at `from`, after each change, or just before each delete (rule R-9a's risk is a conversation inheriting a wider
+ *  level; one kept at the same level, or a narrower one, keeps its conversation). A level that cannot be read is no reason
+ *  to keep it.
+ *  And a target the line did not delete, there at `to`, is purged when its level at `to` is looser than one it held on the
+ *  line (Rule 4 as amended, PR7-R32; T2c I-c: the strictest of `from`'s and each revision's where it changed, so a cursor
+ *  that lagged past a narrowing the Hub served, public → stewards → public, misses none): a page or an entry changed on the
+ *  line; every subpage when a page it may inherit from went looser (or went, leaving its subpages the pages' default), read
+ *  at `from` and at each commit that changed such a page or the policy; every page and entry when the policy file moved,
+ *  entries read too as each policy change found them. Here a level that cannot be read (a proposal's) keeps it: nothing
+ *  was deleted, so no purge on a guess.
  *  The collections are the ones the tree defines now. */
 async function goneOnLine(repo: string, from: string, to: string, steps: readonly LineStep[], textAt: TextAt, pagesAt: PagesAt): Promise<string[]> {
   const defs = registriesOf(repo).filter(d => d.kind === 'collection' && d.filesGlob === undefined)
@@ -137,41 +141,46 @@ async function goneOnLine(repo: string, from: string, to: string, steps: readonl
       into.set(key, [...(into.get(key) ?? []), { commit: step.commit, status: ch.status }])
     }
   }
-  const policyMoved = steps.some(step => step.changes.some(ch => ch.path === POLICY_FILE))
+  const policyCommits = steps.filter(step => step.changes.some(ch => ch.path === POLICY_FILE)).map(step => step.commit)
+  const policyMoved = policyCommits.length > 0
   const levels = new LevelsAt(textAt)
   /** Whether the level `now` admits nobody that every level of `before` did not. */
   const keeps = (now: ParsedLevel | null, before: readonly (ParsedLevel | null)[]) =>
     now !== null && before.every(b => b !== null && narrowerOrEqual(now, b))
-  /** Whether a target there at both ends is looser at the end (PR7-R32); a level not read says no. */
-  const widened = (before: ParsedLevel | null, now: ParsedLevel | null) => before !== null && now !== null && !narrowerOrEqual(now, before)
+  /** Whether a target there at `to` at `now` is looser than a level it held (`held`); a level not read says no. */
+  const widened = (held: readonly (ParsedLevel | null)[], now: ParsedLevel | null) => now !== null && held.some(b => b !== null && !narrowerOrEqual(now, b))
   const out: string[] = []
   // Whether a subpage that inherits may have moved with a page it inherits from: its level is that page's, or the pages'
-  // default under a parent that is not there, so only a page read looser at `to` than at `from` (or the policy) moves it.
+  // default under a parent that is not there, so only a page read looser at `to` than at a revision it held (or the
+  // policy) moves it; such a subpage is read at `from` and at each commit that changed such a page or the policy.
   let reach = policyMoved
+  const reachRevs = new Set(policyCommits)
   for (const [id, events] of pages) {
     const deletes = events.filter(e => e.status === 'D')
     const target = `page:${id}`
     const atFrom = events[0]!.status !== 'A'
     const atTo = events[events.length - 1]!.status !== 'D'
-    if (!reach) {
-      const was = atFrom ? await levels.page(from, id) : await levels.pagesDefault(from)
-      const now = atTo ? await levels.page(to, id) : await levels.pagesDefault(to)
-      if (!keeps(now, [was])) reach = true
+    // Each revision of the line at which the page was there: `from`, after each change that left it, before each delete.
+    const revs = [...(atFrom ? [from] : []), ...events.filter(e => e.status !== 'D').map(e => e.commit), ...deletes.map(d => `${d.commit}^`)]
+    const held: (ParsedLevel | null)[] = []
+    for (const rev of revs) held.push(await levels.page(rev, id))
+    const now = atTo ? await levels.page(to, id) : null
+    const was = atFrom ? held : [await levels.pagesDefault(from), ...held]
+    if (!keeps(atTo ? now : await levels.pagesDefault(to), was)) {
+      reach = true
+      for (const e of events) reachRevs.add(e.commit)
     }
-    if (deletes.length === 0) {
-      if (atFrom && widened(await levels.page(from, id), await levels.page(to, id))) out.push(target)
-      continue
-    }
-    if (events[events.length - 1]!.status === 'D') { out.push(target); continue }
-    const revs = [...(events[0]!.status !== 'A' ? [from] : []), ...deletes.map(d => `${d.commit}^`)]
-    const before: (ParsedLevel | null)[] = []
-    for (const rev of revs) before.push(await levels.page(rev, id))
-    if (!keeps(await levels.page(to, id), before)) out.push(target)
+    if (deletes.length === 0) { if (widened(held, now)) out.push(target); continue }
+    if (!atTo) { out.push(target); continue }
+    if (!keeps(now, held)) out.push(target)
   }
   if (reach) {
+    const revs = [from, ...reachRevs]
     for (const id of await pagesAt(to)) {
       if (pages.has(id)) continue // read above
-      if (widened(await levels.page(from, id), await levels.page(to, id))) out.push(`page:${id}`)
+      const held: (ParsedLevel | null)[] = []
+      for (const rev of revs) held.push(await levels.page(rev, id))
+      if (widened(held, await levels.page(to, id))) out.push(`page:${id}`)
     }
   }
   const recordFiles = policyMoved ? [...byFile.keys()] : [...files.keys()]
@@ -182,8 +191,19 @@ async function goneOnLine(repo: string, from: string, to: string, steps: readonl
       if (text === null) return new Map()
       try { return new Map(entriesFromText(text, def).map(e => [String(e.id), e as Record<string, unknown>])) } catch { return null }
     }
+    /** Each version of each entry the line held, with the revision it was read at (T2c I-c). */
+    const held = new Map<string, { rev: string; entry: Record<string, unknown> }[]>()
+    const hold = (rev: string, versions: Map<string, Record<string, unknown>>, always: boolean) => {
+      for (const [eid, entry] of versions) {
+        const list = held.get(eid) ?? []
+        const prior = list[list.length - 1]
+        if (always || prior === undefined || JSON.stringify(prior.entry) !== JSON.stringify(entry)) list.push({ rev, entry })
+        held.set(eid, list)
+      }
+    }
     // A version that cannot be read is passed over: its neighbours are compared (no purge on a guess, no delete missed).
     const atFrom = events[0]?.status === 'A' ? new Map<string, Record<string, unknown>>() : read(await textAt(from, rel))
+    if (atFrom !== null) hold(from, atFrom, true)
     let last = events.length === 0 ? read(await textAt(to, rel)) : atFrom
     const removed = new Map<string, { rev: string; entry: Record<string, unknown> }[]>()
     for (const e of events) {
@@ -192,23 +212,31 @@ async function goneOnLine(repo: string, from: string, to: string, steps: readonl
       if (last !== null) {
         for (const [eid, entry] of last) if (!next.has(eid)) removed.set(eid, [...(removed.get(eid) ?? []), { rev: `${e.commit}^`, entry }])
       }
+      hold(e.commit, next, false)
       last = next
+    }
+    // Each move of the policy: the entries as the file held them then, under it.
+    for (const commit of policyCommits) {
+      const then = read(await textAt(commit, rel))
+      if (then !== null) hold(commit, then, true)
+    }
+    const levelsOf = async (versions: readonly { rev: string; entry: Record<string, unknown> }[]) => {
+      const out: (ParsedLevel | null)[] = []
+      for (const v of versions) out.push(await levels.record(v.rev, def.name, v.entry))
+      return out
     }
     for (const [eid, gone] of removed) {
       const target = `record:${def.name}:${eid}`
       const now = last?.get(eid)
       if (!now) { out.push(target); continue }
-      const was = [...(atFrom?.has(eid) ? [{ rev: from, entry: atFrom.get(eid)! }] : []), ...gone]
-      const before: (ParsedLevel | null)[] = []
-      for (const w of was) before.push(await levels.record(w.rev, def.name, w.entry))
-      if (!keeps(await levels.record(to, def.name, now), before)) out.push(target)
+      if (!keeps(await levels.record(to, def.name, now), await levelsOf([...(held.get(eid) ?? []), ...gone]))) out.push(target)
     }
-    if (atFrom === null || last === null) continue
+    if (last === null) continue
     for (const [eid, now] of last) {
-      const was = atFrom.get(eid)
-      if (was === undefined || removed.has(eid)) continue
-      if (!policyMoved && JSON.stringify(was) === JSON.stringify(now)) continue
-      if (widened(await levels.record(from, def.name, was), await levels.record(to, def.name, now))) out.push(`record:${def.name}:${eid}`)
+      if (removed.has(eid)) continue
+      const versions = held.get(eid) ?? []
+      if (versions.length === 0) continue
+      if (widened(await levelsOf(versions), await levels.record(to, def.name, now))) out.push(`record:${def.name}:${eid}`)
     }
   }
   return out

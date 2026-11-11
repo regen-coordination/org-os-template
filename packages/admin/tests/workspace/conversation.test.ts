@@ -1087,6 +1087,44 @@ describe('Rule 4 (PR7-R32): a widening that comes from outside clears the conver
     expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['record:projects:budget'])
   })
 
+  // T2c (closing review I-c): a lagging cursor (a read that failed) must not miss a narrowing the Hub served in between.
+  // Public → Ops (the purge's read failed, so the cursor stayed) → public again: the Ops talk would be public. A target the
+  // line changed is compared at the end against the strictest level it held at any revision of the line.
+  it('a lagging cursor: public, then Ops (its read failed), then public again takes the talk written at Ops', async () => {
+    const w = await world({ pages: {
+      'scratch-0001': atLevel('scratch-0001', 'public'),
+      'child-0002': atLevel('child-0002', undefined, 'scratch-0001'),
+      'keep-0002': page('keep-0002', 'Keep'),
+    } })
+    await trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date()); await goneSettled(w.repo)
+    const start = tip(w.repo)
+    const elsewhere = remoteOf(w.repo)
+    const projects = readFileSync(join(elsewhere, 'data', 'projects.yaml'), 'utf8')
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', `hat:${OPS}`))
+    writeFileSync(join(elsewhere, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', `{ id: proj-1, visibility: "hat:${OPS}", title: Seed Fund,`))
+    commitAll(elsewhere, 'elsewhere: scratch and seed fund narrowed to Ops')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await withFailingSubcommand('show', () => refresh(w))
+    expect(errors).toHaveBeenCalled()
+    expect(purgeCursor(w.repo)).toBe(start) // the read failed: the cursor stayed
+    for (const target of ['page:scratch-0001', 'page:child-0002', 'record:projects:proj-1', 'page:keep-0002', 'record:projects:budget']) {
+      await w.store.writeConversation({ comments: [{ id: `c-${target}`, target, parent: null, anchor: null, by: 'steward-a', body: 'Said at Ops.', created: NOW.toISOString(),
+        edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
+    }
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
+    writeFileSync(join(elsewhere, 'data', 'projects.yaml'), projects)
+    commitAll(elsewhere, 'elsewhere: public again, seed fund members again')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    await refresh(w)
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+    expect(w.store.comments('page:child-0002')).toEqual([])
+    expect(w.store.comments('record:projects:proj-1')).toEqual([])
+    expect(w.store.comments('page:keep-0002')).toHaveLength(1)
+    expect(w.store.comments('record:projects:budget')).toHaveLength(1)
+  })
+
   it('an outside edit that narrows the level, or keeps it, keeps the conversation', async () => {
     const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
     await talk(w)
