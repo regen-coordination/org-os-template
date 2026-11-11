@@ -1,4 +1,4 @@
-/** The knowledge fixtures: the repo's own "Riverbend Commons" world, as the server answers it (server/knowledge/types.ts).
+/** The knowledge fixtures: the repo's own "Example DAO Commons" world, as the server answers it (server/knowledge/types.ts).
  *  Same counts the gallery draws, so a page test and the review look at one canon. */
 import type { CanonRow, EntryView, KnowledgeView } from '../../api.ts'
 
@@ -21,8 +21,8 @@ export function knowledgeView(over: Partial<KnowledgeView> = {}): KnowledgeView 
   const awaiting = [row('awaiting', 'Seed swap notes', { type: 'claim-evidence', id: 'claim-evidence/seed-swap-notes' })]
   const internal = [row('internal', 'Staff handbook')]
   return {
-    configured: true, reason: null, instance: 'Riverbend Commons', did: 'did:plc:riverbendown',
-    sentence: 'Field notes and practice from the Riverbend growers.',
+    configured: true, reason: null, instance: 'Example DAO Commons', did: 'did:plc:exampledao',
+    sentence: 'Field notes and practice from the Example DAO growers.',
     counts: { entries: 5, kinds: 3, sources: 1, peers: 1, published: 3, awaiting: 1, internal: 1, draft: 0 },
     lanes: [
       { id: 'draft', word: 'Draft', movesOn: 'Moves on: a field it still needs.', count: 0, rows: [] },
@@ -60,7 +60,7 @@ export function entryView(over: Partial<EntryView> = {}): EntryView {
       { field: 'references', mark: { shape: 'needs', word: '3 of 4 resolve' }, value: '3 of 4 resolve', note: '1 points at nothing' },
       { field: 'public use', mark: { shape: 'done', word: 'Its public use is published' }, value: 'reviewed-for-guidance', note: 'its public use is one that is published' },
       { field: 'your rule', mark: { shape: 'done', word: 'Selected' }, value: 'Selected', note: 'no rule of its own here: its public use decides' },
-      { field: 'record', mark: { shape: 'done', word: 'Published' }, value: 'encyclopedia-entry/living-mulch', note: 'at://did:plc:riverbendown/org.riverbend.encyclopedia-entry/id-living-mulch' },
+      { field: 'record', mark: { shape: 'done', word: 'Published' }, value: 'encyclopedia-entry/living-mulch', note: 'at://did:plc:exampledao/org.exampledao.encyclopedia-entry/id-living-mulch' },
     ],
     fields: [
       { field: 'title', label: 'Title', value: 'Living mulch', kind: 'text' },
@@ -78,21 +78,21 @@ export function entryView(over: Partial<EntryView> = {}): EntryView {
       { slug: 'no-such-note', title: 'no-such-note', kind: 'No entry', glyph: 'link', href: null, peer: null, mark: null, internal: false, broken: true },
     ],
     provenance: [
-      { field: 'source_system', value: 'Riverbend Seed Library', published: true },
+      { field: 'source_system', value: 'Example DAO Seed Library', published: true },
       { field: 'notes', value: 'ask about the neighbour’s field', published: false },
     ],
     goes: [
       { label: 'page', value: 'public/k/encyclopedia-entry/id-living-mulch.html' },
       { label: 'API', value: 'public/api/encyclopedia-entry/id-living-mulch.json' },
-      { label: 'AT Proto', value: 'at://did:plc:riverbendown/org.riverbend.encyclopedia-entry/id-living-mulch' },
+      { label: 'AT Proto', value: 'at://did:plc:exampledao/org.exampledao.encyclopedia-entry/id-living-mulch' },
     ],
     publicFace: {
       published: true, title: 'Living mulch', lead: 'A cover crop kept growing between rows to hold soil and feed the next planting.',
       body: [{ field: 'known_tensions', label: 'Known tensions', text: 'Competes with young seedlings for water.' }],
       related: [{ slug: 'cover-cropping', title: 'Cover cropping', kind: 'Concept lineage', glyph: 'branch', href: 'k/concept-lineage/id-cover-cropping.html', peer: null, mark: { shape: 'done', word: 'Field-informed' }, internal: false, broken: false }],
-      about: [['Kind', 'Encyclopedia entry'], ['Maturity', 'Reviewed'], ['Record', 'at://did:plc:riverbendown/org.riverbend.encyclopedia-entry/id-living-mulch']],
-      atUri: 'at://did:plc:riverbendown/org.riverbend.encyclopedia-entry/id-living-mulch',
-      cite: 'Credit the Riverbend Seed Library, CC BY.', reason: null,
+      about: [['Kind', 'Encyclopedia entry'], ['Maturity', 'Reviewed'], ['Record', 'at://did:plc:exampledao/org.exampledao.encyclopedia-entry/id-living-mulch']],
+      atUri: 'at://did:plc:exampledao/org.exampledao.encyclopedia-entry/id-living-mulch',
+      cite: 'Credit the Example DAO Seed Library, CC BY.', reason: null,
     },
     file: 'data/kb/encyclopedia-entry.yaml', base: 'a'.repeat(64),
     ...over,

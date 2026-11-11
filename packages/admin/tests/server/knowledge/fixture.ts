@@ -43,8 +43,8 @@ export const FIXTURE_OBJECTS: { schema: string; slug: string; object: Record<str
     superseded_by: 'cover-cropping', use_cases: 'Small beds with a trellis.', not_for: 'Wide rows.', updated: '2026-03-01',
   } },
   { schema: 'source-system', slug: 'seed-library', object: {
-    title: 'Riverbend Seed Library', type: 'source-system', id: 'id-seed-library', maturity: 'reviewed', public_use: 'reviewed-for-guidance',
-    what_it_curates: 'Seed records and field notes.', how_to_credit: 'Credit the Riverbend Seed Library, CC BY.', updated: '2026-07-01',
+    title: 'Example DAO Seed Library', type: 'source-system', id: 'id-seed-library', maturity: 'reviewed', public_use: 'reviewed-for-guidance',
+    what_it_curates: 'Seed records and field notes.', how_to_credit: 'Credit the Example DAO Seed Library, CC BY.', updated: '2026-07-01',
   } },
   { schema: 'resource', slug: 'seed-saving', object: {
     title: 'Seed saving for small farms', type: 'resource', id: 'id-peer-seed-saving', maturity: 'source-linked',
@@ -63,7 +63,7 @@ export const FIXTURE_OBJECTS: { schema: string; slug: string; object: Record<str
 ]
 
 const KMS_YAML = `# A test canon, from the repo's own fixture.
-instance: Riverbend Commons
+instance: Example DAO Commons
 adapter: repo-data
 target: "."
 publish:
@@ -74,15 +74,15 @@ connectors:
     config:
       peers: [did:plc:hillsidepeer]
 atproto:
-  did: did:plc:riverbendown
+  did: did:plc:exampledao
   pds: https://pds.example
-  nsid_authority: org.riverbend
+  nsid_authority: org.exampledao
 `
 
 const KNOWLEDGE_JSON = {
-  did: 'did:plc:riverbendown',
-  description: 'Field notes and practice from the Riverbend growers.',
-  sources: [{ title: 'Riverbend Seed Library' }],
+  did: 'did:plc:exampledao',
+  description: 'Field notes and practice from the Example DAO growers.',
+  sources: [{ title: 'Example DAO Seed Library' }],
 }
 
 /** The reads sidecar with the last read failed, nine days before the clock the tests pass: the gallery's clay row. */
@@ -113,7 +113,7 @@ export function makeKmsInstance(): FixtureInstance {
   const objects: Record<string, unknown> = {}
   for (const { schema, slug, object } of FIXTURE_OBJECTS) {
     if (slug === 'seed-saving') continue // a peer's entry is a row, never a page (KI R-34)
-    objects[String(object.id)] = { slug, atUri: `at://did:plc:riverbendown/org.riverbend.${schema}/${String(object.id)}` }
+    objects[String(object.id)] = { slug, atUri: `at://did:plc:exampledao/org.exampledao.${schema}/${String(object.id)}` }
   }
   write('data/kms-published.json', JSON.stringify({ version: 1, objects }, null, 2))
   return {

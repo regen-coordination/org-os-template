@@ -41,7 +41,7 @@ test('vendored alone: verbs that do not draw run as before (render map json, a s
   const root = vendor();
   const { dispatch } = await load(root, 'src/cli.mjs');
   const inst = mkdtempSync(join(tmpdir(), 'kms-vendored-inst-'));
-  writeFileSync(join(inst, 'federation.yaml'), 'identity:\n  name: riverbend-os\n  type: Project\ndownstream:\n  - id: hillside\n    name: Hillside Coop\n');
+  writeFileSync(join(inst, 'federation.yaml'), 'identity:\n  name: example-dao-os\n  type: Project\ndownstream:\n  - id: hillside\n    name: Hillside Coop\n');
   const m = await dispatch(['render', 'map', '--dir', inst, '--out', 'out/map.json']);
   assert.equal(m.ok, true);
   assert.equal(JSON.parse(readFileSync(join(inst, 'out', 'map.json'), 'utf8')).nodes.length, 1);

@@ -1,6 +1,6 @@
-// Fixture for the page model: an invented commons, "Riverbend Commons". Invented entries and roles only.
+// Fixture for the page model: an invented commons, "Example DAO Commons". Invented entries and roles only.
 export const NOW = '2026-10-29T12:00:00Z';
-const OWN = 'did:plc:riverbendown';
+const OWN = 'did:plc:exampledao';
 const PEER = 'did:plc:hillsidepeer';
 export const PEER_URI = `at://${PEER}/org.hillside.resource/seedsaving1`;
 const day = (n) => new Date(Date.parse(NOW) - n * 86400000).toISOString();
@@ -32,8 +32,8 @@ export const sisters = item('option-entry', 'three-sisters-guild', {
   use_cases: 'Small beds with a trellis.', not_for: 'Wide rows.', updated: '2026-03-01',
 });
 export const card = item('source-system', 'seed-library', {
-  title: 'Riverbend Seed Library', maturity: 'reviewed', public_use: 'reviewed-for-guidance',
-  what_it_curates: 'Seed records and field notes.', how_to_credit: 'Credit the Riverbend Seed Library, CC BY.', updated: '2026-07-01',
+  title: 'Example DAO Seed Library', maturity: 'reviewed', public_use: 'reviewed-for-guidance',
+  what_it_curates: 'Seed records and field notes.', how_to_credit: 'Credit the Example DAO Seed Library, CC BY.', updated: '2026-07-01',
 });
 export const peerEntry = item('resource', 'seed-saving', {
   title: 'Seed saving for small farms', id: 'id-peer-seed-saving', maturity: 'source-linked', public_use: 'source-linked-unreviewed',
@@ -51,15 +51,15 @@ export const swapNotes = item('claim-evidence', 'seed-swap-notes', {
 export const items = [living, cover, grazing, sisters, card, peerEntry];
 export const allItems = [...items, handbook, swapNotes];
 
-const rec = (it) => [it.object.id, { slug: it.ref.split('#')[1], atUri: `at://${OWN}/org.riverbend.${it.schema}/${it.object.id}`, cid: `cid-${it.object.id}` }];
+const rec = (it) => [it.object.id, { slug: it.ref.split('#')[1], atUri: `at://${OWN}/org.exampledao.${it.schema}/${it.object.id}`, cid: `cid-${it.object.id}` }];
 export const manifest = { version: 1, objects: Object.fromEntries(allItems.filter((i) => i !== peerEntry).map(rec)) };
 
 export const config = {
-  instance: 'Riverbend Commons',
-  atproto: { did: OWN, nsid_authority: 'org.riverbend' },
+  instance: 'Example DAO Commons',
+  atproto: { did: OWN, nsid_authority: 'org.exampledao' },
   connectors: [{ name: 'atproto', config: { peers: [PEER] } }],
   peers: {}, render: {}, publish: {}, packs: [],
 };
-export const knowledge = { did: OWN, description: 'Field notes and practice from the Riverbend growers.', sources: [{ title: 'Riverbend Seed Library' }] };
+export const knowledge = { did: OWN, description: 'Field notes and practice from the Example DAO growers.', sources: [{ title: 'Example DAO Seed Library' }] };
 export const reads = { atproto: { ok_at: day(3), attempt_at: day(3), error: null } };
 export const readsFailed = { atproto: { ok_at: day(9), attempt_at: day(0), error: 'timeout' } };

@@ -84,7 +84,7 @@ const BASE: Omit<PortalModel, 'facts'> = {
     { name: 'Karma GAP', href: 'https://impact.example.test' },
     { name: 'Gitcoin', href: 'https://rounds.example.test' },
   ],
-  daoUri: 'https://riverbend.example.test/.well-known/dao.json',
+  daoUri: 'https://door.example.org/.well-known/dao.json',
   membersOrigin: '',
 }
 

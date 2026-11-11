@@ -309,11 +309,11 @@ describe('the id a composition is named from (walk I12) and a steady count (walk
     fireEvent.click(await screen.findByRole('button', { name: 'Start' }))
     await heading('Name'); fill('Name', 'Test DAO')
     expect((field('Id') as HTMLInputElement).value).toBe('test-dao')
-    fill('Name', 'Riverbend Growers’ Co-op')
-    expect((field('Id') as HTMLInputElement).value).toBe('riverbend-growers-co-op')
-    fill('Id', 'riverbend')
-    fill('Name', 'Riverbend')
-    expect((field('Id') as HTMLInputElement).value).toBe('riverbend')
+    fill('Name', 'Example DAO Growers’ Co-op')
+    expect((field('Id') as HTMLInputElement).value).toBe('example-dao-growers-co-op')
+    fill('Id', 'example-co')
+    fill('Name', 'Example DAO')
+    expect((field('Id') as HTMLInputElement).value).toBe('example-co')
   })
 
   it('on a taken id, goes back to the Name step with the next free id in the Id field and the sentence; Continue stages it', async () => {

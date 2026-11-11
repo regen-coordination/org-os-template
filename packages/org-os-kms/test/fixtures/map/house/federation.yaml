@@ -1,5 +1,5 @@
 identity:
-  name: "Riverbend Commons"
+  name: "Example DAO Commons"
   type: "Hub"
 upstream:
   - name: "Watershed Network"

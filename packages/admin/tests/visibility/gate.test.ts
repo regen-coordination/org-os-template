@@ -477,7 +477,7 @@ describe('GET /api/visibility (§11.2, §13)', () => {
     const reader = { wearer: vi.fn(async (_s: Record<string, unknown>, account: string) => reading(account)), wearers: vi.fn() }
     const membership = new Membership({ repo: r, reader: reader as never, now })
     const read = vi.fn(async () => ({ ok: true, readAt: NOW.toISOString(), facts: { hats: [
-      { id: TOP, details: 'Riverbend Growers' }, { id: COUNCIL, details: 'The council' }, { id: STEWARDS, details: 'ipfs://bafy-stewards' },
+      { id: TOP, details: 'Example DAO' }, { id: COUNCIL, details: 'The council' }, { id: STEWARDS, details: 'ipfs://bafy-stewards' },
       { id: OPS, details: 'Operations' },
     ] }, sections: [], open: null }))
     const app = createApp(r, a => {
@@ -493,7 +493,7 @@ describe('GET /api/visibility (§11.2, §13)', () => {
 
   it('names a hat no role is sourced from by the tree read’s details (the top hat by its name, not its id)', async () => {
     expect(await named(`{ id: hats-main, kind: hats-tree, name: Hats, chain: "${CELO}", address: "13", driver: hats-tree }`)).toEqual([
-      [TOP, 'Riverbend Growers'], [COUNCIL, 'council'], [STEWARDS, 'stewards'], [OPS, 'Operations'],
+      [TOP, 'Example DAO'], [COUNCIL, 'council'], [STEWARDS, 'stewards'], [OPS, 'Operations'],
     ])
   })
 

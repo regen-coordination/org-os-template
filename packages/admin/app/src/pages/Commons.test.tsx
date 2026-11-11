@@ -19,7 +19,7 @@ describe('the commons', () => {
   it('draws the four lanes in pipeline order, with their counts and what moves a row on', async () => {
     fetchRoutes(routes())
     renderAt(<Commons />, '/c/knowledge')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Riverbend Commons' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Example DAO Commons' })).toBeTruthy()
     const lanes = ['Draft', 'Awaiting review', 'Published', 'Internal only']
     for (const name of lanes) expect(screen.getAllByText(name).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Moves on: a person.').length).toBeGreaterThan(0)
@@ -217,7 +217,7 @@ describe('review fixes: the house’s rows, and View as Public (2026-11-04)', ()
   it('previewing as Public: the selection only — no awaiting or internal entry, no plate, no publishing, no setup', async () => {
     fetchRoutes(routes({ 'GET /api/knowledge/plan': PLAN }))
     atAs({ as: 'public' })
-    await screen.findByRole('heading', { level: 1, name: 'Riverbend Commons' })
+    await screen.findByRole('heading', { level: 1, name: 'Example DAO Commons' })
     expect(screen.getAllByText('Living mulch').length).toBeGreaterThan(0)
     expect(screen.queryAllByText('Seed swap notes')).toHaveLength(0)
     expect(screen.queryAllByText('Staff handbook')).toHaveLength(0)

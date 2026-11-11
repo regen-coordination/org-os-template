@@ -25,7 +25,7 @@ test('esc escapes & < > " and \'', () => {
 });
 
 test('page() is one self-contained document', () => {
-  const html = page({ title: 'Riverbend <Commons> & “map”', body: '<main id="main">x</main>', icons: ['seal'] });
+  const html = page({ title: 'Example DAO <Commons> & “map”', body: '<main id="main">x</main>', icons: ['seal'] });
   assert.ok(html.startsWith('<!DOCTYPE html>'));
   assert.equal(count(html, /<style[\s>]/g), 1);
   assert.equal(count(html, /<svg width="0" height="0" aria-hidden="true">/g), 1, 'one sprite');
@@ -36,7 +36,7 @@ test('page() is one self-contained document', () => {
   assert.match(html, /<html lang="en" dir="ltr">/);
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/);
   assert.match(html, /<meta charset="utf-8">/);
-  assert.match(html, /<title>Riverbend &lt;Commons&gt; &amp; “map”<\/title>/);
+  assert.match(html, /<title>Example DAO &lt;Commons&gt; &amp; “map”<\/title>/);
   assert.match(html, /<main id="main">x<\/main>/);
 });
 
@@ -145,10 +145,10 @@ test('icon() references the sprite and is hidden from assistive tech', () => {
 });
 
 test('artBar(): seal on the solid tile, the name escaped, sub as given, tools trailing', () => {
-  const h = artBar({ name: 'Riverbend & Co', sub: 'Federation map · generated <time datetime="2026-10-29T06:10">29 Oct 2026 06:10</time>', tools: '<button>Fit</button>' });
+  const h = artBar({ name: 'Example DAO & Co', sub: 'Federation map · generated <time datetime="2026-10-29T06:10">29 Oct 2026 06:10</time>', tools: '<button>Fit</button>' });
   assert.match(h, /^<header class="art-bar">/);
   assert.match(h, /<span class="seal"><svg class="i" aria-hidden="true"><use href="#i-seal"\/><\/svg><\/span>/);
-  assert.match(h, /<h1 class="art-name">Riverbend &amp; Co<\/h1>/);
+  assert.match(h, /<h1 class="art-name">Example DAO &amp; Co<\/h1>/);
   assert.match(h, /<span class="art-sub">Federation map · generated <time datetime="2026-10-29T06:10">/);
   assert.match(h, /<div class="tools"><button>Fit<\/button><\/div><\/header>$/);
   assert.doesNotMatch(artBar({ name: 'x', sub: '' }), /class="tools"/);

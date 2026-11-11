@@ -75,11 +75,11 @@ describe('publishPlan — what a run would do, and the command that does it', ()
   it('refuses where kms refuses: a canon publishes nothing itself', async () => {
     instance = makeKmsInstance()
     const { appendFileSync } = await import('node:fs')
-    appendFileSync(`${instance.dir}/kms.yaml`, 'planes:\n  public:\n    instance: riverbend-public\n')
+    appendFileSync(`${instance.dir}/kms.yaml`, 'planes:\n  public:\n    instance: example-dao-public\n')
     const plan = await publishPlan(instance.dir, { now: FIXTURE_NOW })
     expect(plan.ok).toBe(false)
     expect(plan.refused).toContain('this instance is a canon')
-    expect(plan.refused).toContain('riverbend-public')
+    expect(plan.refused).toContain('example-dao-public')
   })
 })
 
@@ -91,7 +91,7 @@ describe('previewEntry — the projected object, exactly', () => {
     expect(entry.title).toBe('Living mulch')
     expect(entry.lead).toContain('A cover crop kept growing')
     expect(entry.related.map(r => r.slug)).toEqual(['cover-cropping', 'seed-saving'])
-    expect(entry.cite).toBe('Credit the Riverbend Seed Library, CC BY.')
+    expect(entry.cite).toBe('Credit the Example DAO Seed Library, CC BY.')
     expect(JSON.stringify(entry)).not.toContain('ask about the neighbour')
   })
 

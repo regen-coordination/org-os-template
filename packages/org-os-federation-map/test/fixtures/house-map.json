@@ -2,8 +2,8 @@
   "version": "1",
   "generated_at": "2026-10-29T12:00:00Z",
   "self": {
-    "id": "Riverbend Commons",
-    "name": "Riverbend Commons",
+    "id": "Example DAO Commons",
+    "name": "Example DAO Commons",
     "type": "Hub",
     "emoji": null,
     "url": null,
@@ -206,48 +206,48 @@
   ],
   "edges": [
     {
-      "from": "Riverbend Commons",
+      "from": "Example DAO Commons",
       "to": "hillside-coop",
       "kind": "federation"
     },
     {
-      "from": "Riverbend Commons",
+      "from": "Example DAO Commons",
       "to": "lowland-guild",
       "kind": "federation"
     },
     {
-      "from": "Riverbend Commons",
+      "from": "Example DAO Commons",
       "to": "watershed-network",
       "kind": "upstream"
     },
     {
-      "from": "Riverbend Commons",
+      "from": "Example DAO Commons",
       "to": "youth-circle",
       "kind": "downstream"
     },
     {
-      "from": "Riverbend Commons",
+      "from": "Example DAO Commons",
       "to": "market-garden",
       "kind": "downstream"
     },
     {
-      "from": "Riverbend Commons",
+      "from": "Example DAO Commons",
       "to": "open-seed-library",
       "kind": "knowledge"
     },
     {
       "from": "field-notes-archive",
-      "to": "Riverbend Commons",
+      "to": "Example DAO Commons",
       "kind": "provenance"
     },
     {
       "from": "seed-registry",
-      "to": "Riverbend Commons",
+      "to": "Example DAO Commons",
       "kind": "provenance"
     },
     {
       "from": "open-data-portal",
-      "to": "Riverbend Commons",
+      "to": "Example DAO Commons",
       "kind": "provenance"
     },
     {

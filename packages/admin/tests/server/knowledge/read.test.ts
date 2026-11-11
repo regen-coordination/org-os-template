@@ -16,9 +16,9 @@ describe('readKnowledge — the collection', () => {
     instance = makeKmsInstance()
     const view = await readKnowledge(instance.dir, { now: FIXTURE_NOW })
     expect(view.configured).toBe(true)
-    expect(view.instance).toBe('Riverbend Commons')
-    expect(view.did).toBe('did:plc:riverbendown')
-    expect(view.sentence).toBe('Field notes and practice from the Riverbend growers.')
+    expect(view.instance).toBe('Example DAO Commons')
+    expect(view.did).toBe('did:plc:exampledao')
+    expect(view.sentence).toBe('Field notes and practice from the Example DAO growers.')
     expect(view.counts).toMatchObject({ entries: 8, published: 6, awaiting: 1, internal: 1, draft: 0, kinds: 6, sources: 1 })
     expect(view.lanes.map(l => [l.id, l.count])).toEqual([['draft', 0], ['awaiting', 1], ['published', 6], ['internal', 1]])
   })
@@ -78,19 +78,19 @@ describe('readKnowledge — the collection', () => {
     instance = makeKmsInstance()
     const kmsPath = join(instance.dir, 'kms.yaml')
     const canon = parse(readFileSync(kmsPath, 'utf8'))
-    writeFileSync(kmsPath, stringify({ ...canon, planes: { public: { instance: 'riverbend-public' } } }))
+    writeFileSync(kmsPath, stringify({ ...canon, planes: { public: { instance: 'example-dao-public' } } }))
     const { mkdirSync } = await import('node:fs')
-    const plane = join(instance.dir, 'repos', 'riverbend-public')
+    const plane = join(instance.dir, 'repos', 'example-dao-public')
     mkdirSync(join(plane, 'site', '.well-known'), { recursive: true })
     writeFileSync(join(plane, 'kms.yaml'), stringify({
-      instance: 'riverbend-public', adapter: 'repo-data', target: '.',
+      instance: 'example-dao-public', adapter: 'repo-data', target: '.',
       publish: { static: true, static_dir: 'site', base_url: 'http://127.0.0.1:1', pages: true },
-      planes: { role: 'public', canon: 'Riverbend Commons' },
+      planes: { role: 'public', canon: 'Example DAO Commons' },
     }))
     writeFileSync(join(plane, 'site', '.well-known', 'knowledge.json'), '{}')
     const view = await readKnowledge(instance.dir, { now: FIXTURE_NOW })
-    expect(view.plane).toMatchObject({ dir: 'repos/riverbend-public/site', pages: true, static: true, atproto: false, lastRun: '0 d ago' })
-    expect(view.files.at(-1)).toMatchObject({ path: 'repos/riverbend-public/site/', state: 'written 0 d ago' })
+    expect(view.plane).toMatchObject({ dir: 'repos/example-dao-public/site', pages: true, static: true, atproto: false, lastRun: '0 d ago' })
+    expect(view.files.at(-1)).toMatchObject({ path: 'repos/example-dao-public/site/', state: 'written 0 d ago' })
   })
 
   it('writes nothing: every byte on disk is the byte it was', async () => {
@@ -144,7 +144,7 @@ describe('readEntry — one entry, as the record draws it', () => {
     expect(view.publicFace.published).toBe(true)
     expect(view.publicFace.related.map(r => r.slug)).toEqual(['cover-cropping', 'seed-saving'])
     expect(JSON.stringify(view.publicFace)).not.toContain('ask about the neighbour')
-    expect(view.publicFace.cite).toBe('Credit the Riverbend Seed Library, CC BY.')
+    expect(view.publicFace.cite).toBe('Credit the Example DAO Seed Library, CC BY.')
   })
 
   it('names the paths a publication writes, from the manifest’s own AT URI', async () => {
@@ -153,7 +153,7 @@ describe('readEntry — one entry, as the record draws it', () => {
     const value = (label: string) => view.goes.find(g => g.label.toLowerCase() === label.toLowerCase())?.value
     expect(value('page')).toBe('public/k/encyclopedia-entry/id-living-mulch.html')
     expect(value('API')).toBe('public/api/encyclopedia-entry/id-living-mulch.json')
-    expect(value('AT Proto')).toBe('at://did:plc:riverbendown/org.riverbend.encyclopedia-entry/id-living-mulch')
+    expect(value('AT Proto')).toBe('at://did:plc:exampledao/org.exampledao.encyclopedia-entry/id-living-mulch')
     expect(view.file).toBe('data/kb/encyclopedia-entry.yaml')
   })
 

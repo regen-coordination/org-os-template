@@ -156,7 +156,7 @@ test('preview: the band, broken refs as clay rows with their fix, the lock on in
   // awaiting review: the clay needs mark in the meta line
   const sw = body(render(c, 'id-seed-swap-notes', { preview: true }));
   assert.match(sw.match(/<div class="kp-meta">[\s\S]*?<\/div>/)[0], /<span class="sm needs">[\s\S]*?Awaiting review/);
-  assert.match(html, /<title>Preview · Living mulch · Riverbend Commons<\/title>/);
+  assert.match(html, /<title>Preview · Living mulch · Example DAO Commons<\/title>/);
 });
 
 test('every href is relative to k/<schema>/ or a safe external URL; none starts with /', () => {
@@ -204,7 +204,7 @@ test('related: an embedded record block with its eyebrow head; "Where this comes
   const a = article(render(pub(), 'id-living-mulch'));
   assert.match(a, /<div class="embed"><div class="embed-h"><svg class="i s14" aria-hidden="true"><use href="#i-link"\/><\/svg><span>2 entries<\/span><span class="end">from this commons and one peer<\/span><\/div>/);
   assert.match(a, /<a class="row" href="\.\.\/\.\.\/k\/concept-lineage\/id-cover-cropping\.html">[\s\S]*?<span class="t">Cover cropping<\/span><span class="s">Concept lineage<\/span>[\s\S]*?<span class="sm done">/);
-  assert.match(a, /<h2 class="h-sec" id="h-from">Where this comes from<\/h2><p>From <a class="mention rec" href="\.\.\/\.\.\/k\/source-system\/id-seed-library\.html"><svg class="i" aria-hidden="true"><use href="#i-db"\/><\/svg>Riverbend Seed Library<\/a>\.<\/p><p id="cite">How to cite: Credit the Riverbend Seed Library, CC BY\.<\/p>/);
+  assert.match(a, /<h2 class="h-sec" id="h-from">Where this comes from<\/h2><p>From <a class="mention rec" href="\.\.\/\.\.\/k\/source-system\/id-seed-library\.html"><svg class="i" aria-hidden="true"><use href="#i-db"\/><\/svg>Example DAO Seed Library<\/a>\.<\/p><p id="cite">How to cite: Credit the Example DAO Seed Library, CC BY\.<\/p>/);
 });
 
 test('the aside: About this entry as field rows (mark, record chip), the Neighbourhood small map, Referenced by', () => {
@@ -213,7 +213,7 @@ test('the aside: About this entry as field rows (mark, record chip), the Neighbo
   assert.match(s, /^<aside class="kp-aside" aria-label="About this entry">/);
   assert.match(s, /<dl class="fields"><dt>Kind<\/dt><dd>Encyclopedia entry<\/dd><dt>Page type<\/dt><dd>Concept<\/dd><dt>Maturity<\/dt><dd><span class="sm done">/);
   assert.match(s, /<dt>Steward<\/dt><dd>Field steward<\/dd>/);
-  assert.match(s, /<dt>Record<\/dt><dd><button class="addr" type="button" data-copy="at:\/\/did:plc:riverbendown\/org\.riverbend\.encyclopedia-entry\/id-living-mulch" aria-label="Copy the record’s AT URI"[^>]*>/);
+  assert.match(s, /<dt>Record<\/dt><dd><button class="addr" type="button" data-copy="at:\/\/did:plc:exampledao\/org\.exampledao\.encyclopedia-entry\/id-living-mulch" aria-label="Copy the record’s AT URI"[^>]*>/);
   // the small map: the entry and its one-hop neighbours, each a relative link (peer: out, dashed)
   assert.match(s, /<h2[^>]*>Neighbourhood<\/h2><div class="fm-mini" data-size="page"/);
   assert.match(s, /<a class="mnode" href="\.\.\/\.\.\/k\/concept-lineage\/id-cover-cropping\.html"/);
@@ -224,7 +224,7 @@ test('the aside: About this entry as field rows (mark, record chip), the Neighbo
   assert.match(body(render(pub(), 'id-living-mulch', { mapHref: 'federation-map.html' })), /href="\.\.\/\.\.\/federation-map\.html"[^>]*>[\s\S]*?Federation map/);
   assert.match(s, /<h2[^>]*>Referenced by <span class="faint">1<\/span><\/h2><ul class="rows surf">[\s\S]*?Cover cropping/);
   // the foot: Published by, the AT URI in Mono, JSON, How to cite
-  assert.match(article(html), /<footer class="kp-foot"><span>Published by Riverbend Commons<\/span><code class="uri">at:\/\/did:plc:riverbendown\/org\.riverbend\.encyclopedia-entry\/id-living-mulch<\/code><a href="\.\.\/\.\.\/api\/encyclopedia-entry\/id-living-mulch\.json">JSON<\/a><a href="#cite">How to cite<\/a><\/footer>/);
+  assert.match(article(html), /<footer class="kp-foot"><span>Published by Example DAO Commons<\/span><code class="uri">at:\/\/did:plc:exampledao\/org\.exampledao\.encyclopedia-entry\/id-living-mulch<\/code><a href="\.\.\/\.\.\/api\/encyclopedia-entry\/id-living-mulch\.json">JSON<\/a><a href="#cite">How to cite<\/a><\/footer>/);
 });
 
 test('landmarks: one main, one article, the aside labelled "About this entry", a skip link, <dl> field rows', () => {

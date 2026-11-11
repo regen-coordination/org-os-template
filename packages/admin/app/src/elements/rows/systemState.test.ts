@@ -125,7 +125,7 @@ describe('systemFacts: what a System’s row and header show, from its Resource'
 
   it('a Hats tree’s address is Mono "<chain id> / <tree>"; a Snapshot space’s is its host', () => {
     expect(systemFacts(ROLES)).toMatchObject({ kind: 'hats-tree', chains: ['eip155:42220'], address: { mono: '42220 / 13' }, governs: '13 hats', open: { label: 'Open in Hats' } })
-    expect(systemFacts(VOTES)).toMatchObject({ kind: 'snapshot-space', chains: ['eip155:1'], address: { host: 'votes.example.test' }, governs: null, open: { label: 'Open in Snapshot' } })
+    expect(systemFacts(VOTES)).toMatchObject({ kind: 'snapshot-space', chains: ['eip155:1'], address: { host: 'snapshot.box' }, governs: null, open: { label: 'Open in Snapshot' } })
   })
 
   it('a Gardens community and pool show their address as a chip; a failed read keeps its last good facts', () => {

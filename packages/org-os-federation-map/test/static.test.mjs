@@ -41,7 +41,7 @@ test('both layouts present, one per container width', () => {
   assert.match(html, /<ul class="fm-twin rows" aria-label="6 instances and 3 sources, as a list">/);
   // geometry is inline data: the wide canvas is as wide as its layout, the narrow one 358
   assert.match(slice(html, 'fm-wide', 'fm-narrow'), /class="fm-canvas" style="width:1275px;height:744px"/);
-  assert.match(slice(html, 'fm-narrow', 'fm-cap'), /class="fm-canvas" style="width:358px;height:816px"/);
+  assert.match(slice(html, 'fm-narrow', 'fm-cap'), /class="fm-canvas" style="width:358px;height:834px"/); // the self node's "Example DAO Commons" takes two lines
 });
 
 test('every node of the map appears once per layout, once in the twin', () => {
@@ -65,9 +65,9 @@ test('every node of the map appears once per layout, once in the twin', () => {
 test('self is the only .display, big, with the eyebrow and no glyph', () => {
   const html = vault();
   assert.equal(count(html, /class="nn display"/g), 2); // once per layout
-  const self = html.match(/<button class="node big[^"]*"[^>]*data-id="Riverbend Commons"[\s\S]*?<\/button>/)[0];
+  const self = html.match(/<button class="node big[^"]*"[^>]*data-id="Example DAO Commons"[\s\S]*?<\/button>/)[0];
   assert.match(self, /<span class="nk">This instance<\/span>/);
-  assert.match(self, /<span class="nn display">Riverbend Commons<\/span>/);
+  assert.match(self, /<span class="nn display">Example DAO Commons<\/span>/);
   assert.doesNotMatch(self, /<svg class="i"[^>]*><use href="#i-seal"/);
   assert.match(self, /142 entries · 3 sources/);
   assert.equal(count(html, /class="node big/g), 2);
@@ -81,7 +81,7 @@ test('nodes: button, geometry inline, glyph by href, accessible name and descrip
   assert.match(h, /style="inset-inline-start:278.5px;top:324px;width:192px;min-height:70px"/);
   assert.match(h, /aria-label="Hillside Coop, peer, Coop · 3 members · 2 projects"/);
   const d = h.match(/aria-describedby="([^"]+)"/)[1];
-  assert.match(h, new RegExp(`<span class="sr-only" id="${d}">peers with Riverbend Commons; sees one hop beyond: Valley Commons</span>`));
+  assert.match(h, new RegExp(`<span class="sr-only" id="${d}">peers with Example DAO Commons; sees one hop beyond: Valley Commons</span>`));
   assert.match(h, /<use href="#i-inst"\/>/);
   // ids are unique across the two layouts
   const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
@@ -218,13 +218,13 @@ test('status line and caption', () => {
   const html = vault();
   assert.match(html, /<p class="fm-status"><span class="sm failed" aria-hidden="true"><i><\/i><\/span><span>6 instances · 3 sources · <span class="ink">1 couldn’t be read<\/span><span class="long"> · frontier read 2 h ago<\/span><\/span><\/p>/);
   const cap = slice(html, 'class="fm-cap"', 'class="fm-twin');
-  assert.match(cap, /<b>Riverbend Commons<\/b>/);
+  assert.match(cap, /<b>Example DAO Commons<\/b>/);
   assert.match(cap, /142 entries · 3 sources/);
   assert.match(cap, /This instance — 142 entries from 3 sources\./);
   const sel = renderStaticMap(MAP, { surface: 'vault', now: NOW, selected: 'hillside-coop' });
   const c2 = slice(sel, 'class="fm-cap"', 'class="fm-twin');
   assert.match(c2, /<b>Hillside Coop<\/b> <span class="fm-cap-facts">Coop · peer · read 2 h ago<\/span>/);
-  assert.match(c2, /A peer Riverbend Commons federates with, read from its local clone\./);
+  assert.match(c2, /A peer Example DAO Commons federates with, read from its local clone\./);
   assert.doesNotMatch(c2, /<a /); // its repo is not a URL, so there is nothing to link
   const linked = { ...MAP, nodes: MAP.nodes.map((n) => (n.id === 'hillside-coop' ? { ...n, url: 'https://hillside.example' } : n)) };
   const c3 = slice(renderStaticMap(linked, { surface: 'vault', now: NOW, selected: 'hillside-coop' }), 'class="fm-cap"', 'class="fm-twin');

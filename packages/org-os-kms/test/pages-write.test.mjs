@@ -102,7 +102,7 @@ function instanceDir(extra = {}) {
     'staff-handbook': { title: 'Staff handbook', type: 'encyclopedia-entry', public_use: 'internal-only', summary: 'How the crew works.' },
     'seed-notes': { title: 'Seed notes', type: 'encyclopedia-entry', public_use: 'ok-with-caveat', maturity: 'raw', summary: 'Waiting for a look.' },
   } }));
-  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 'Riverbend Commons', adapter: 'repo-data', target: '.', publish: { base_url: 'https://kc.example', ...extra } }));
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 'Example DAO Commons', adapter: 'repo-data', target: '.', publish: { base_url: 'https://kc.example', ...extra } }));
   return dir;
 }
 const NOW = '2026-10-29T12:00:00Z';
@@ -121,7 +121,7 @@ test('preview: every canon entry has a page, the internal one with the lock; not
   const root = join(dir, 'renders', 'preview');
   assert.equal(entryPages(root).length, 3);
   const internal = pageTitled(root, 'Staff handbook');
-  assert.match(internal, /Internal to Riverbend Commons — not published/);
+  assert.match(internal, /Internal to Example DAO Commons — not published/);
 });
 
 test('preview: the broken ref and the awaiting entry appear, with the fix', async () => {
@@ -163,7 +163,7 @@ test('preview: publish.gate demotes an entry, so the preview shows it as interna
   writeFileSync(join(dir, 'gate.mjs'), 'export function isPublishable(o){ return o.maturity === "reviewed" ? { ok: true } : { ok: false, reason: "not reviewed" }; }');
   const r = await writePreview({ dir, now: NOW });
   assert.equal(r.report.internal, 2, 'handbook (floor) and seed notes (gate)');
-  assert.match(pageTitled(join(dir, 'renders', 'preview'), 'Seed notes'), /Internal to Riverbend Commons — not published/);
+  assert.match(pageTitled(join(dir, 'renders', 'preview'), 'Seed notes'), /Internal to Example DAO Commons — not published/);
   assert.doesNotMatch(pageTitled(join(dir, 'renders', 'preview'), 'Living mulch'), /Internal to/);
 });
 

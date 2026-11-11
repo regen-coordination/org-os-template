@@ -224,7 +224,7 @@ describe('the entry page', () => {
     expect(screen.queryByText('No entry with this name. Fix the reference or publish the entry.')).toBeNull()
     expect(screen.queryByText('internal only — absent from the commons')).toBeNull()
     expect(screen.getAllByText('Cover cropping').length).toBeGreaterThan(0)
-    expect(screen.getByText(/Credit the Riverbend Seed Library/)).toBeTruthy()
+    expect(screen.getByText(/Credit the Example DAO Seed Library/)).toBeTruthy()
   })
 
   it('says why an internal entry has no public face, rather than showing a pretend one', async () => {

@@ -149,7 +149,7 @@ test('accessible names and descriptions', () => {
   assert.equal(V('market-garden').accessibleName, 'Market Garden, downstream, no frontier yet, needs a steward');
   assert.equal(V('Valley Commons').accessibleName, 'Valley Commons, one hop beyond, via Hillside Coop');
   assert.equal(V('field-notes-archive').accessibleName, 'Field notes archive, source, source · field notes');
-  assert.match(V('hillside-coop').description, /peers with Riverbend Commons/);
+  assert.match(V('hillside-coop').description, /peers with Example DAO Commons/);
   assert.match(V('hillside-coop').description, /Valley Commons/);
 });
 
@@ -162,7 +162,7 @@ test('status line', () => {
 
 test('caption sentences', () => {
   const c = captionSentence(node('hillside-coop'), MAP, { surface: 'vault', now: NOW });
-  assert.match(c, /^A peer Riverbend Commons federates with, read from its local clone\./);
+  assert.match(c, /^A peer Example DAO Commons federates with, read from its local clone\./);
   assert.ok(c.includes('one of them, Valley Commons, is not ours yet — one hop beyond.'));
   assert.match(captionSentence(node('market-garden'), MAP, { surface: 'vault', now: NOW }), /org-os-kms federate frontier/);
   assert.match(captionSentence(node('watershed-network'), MAP, { surface: 'vault', now: NOW }), /couldn’t read it; the copy shown is 3 d old/);

@@ -17,8 +17,8 @@ test('public lists only gated items', () => {
   assert.equal(m.counts.entries, 6);
   assert.deepEqual(m.needsReview, []);
   assert.ok(m.entries.every((e) => !e.internal && !e.awaiting && e.broken === undefined));
-  assert.equal(m.instance, 'Riverbend Commons'); assert.equal(m.did, 'did:plc:riverbendown');
-  assert.equal(m.sentence, 'Field notes and practice from the Riverbend growers.');
+  assert.equal(m.instance, 'Example DAO Commons'); assert.equal(m.did, 'did:plc:exampledao');
+  assert.equal(m.sentence, 'Field notes and practice from the Example DAO growers.');
   assert.ok(!JSON.stringify(m).includes('PRIVATE'), 'private fields never reach the model');
 });
 
@@ -184,8 +184,8 @@ test('kinds, counts, about, cite, hrefs', () => {
   assert.deepEqual(m.counts, { entries: 6, kinds: 5, sources: 1, peersRead: 1 });
   const e = by(m, 'living-mulch');
   assert.equal(e.href, 'k/encyclopedia-entry/id-living-mulch.html'); assert.equal(e.apiHref, 'api/encyclopedia-entry/id-living-mulch.json');
-  assert.equal(e.atUri, 'at://did:plc:riverbendown/org.riverbend.encyclopedia-entry/id-living-mulch');
-  assert.equal(e.cite, 'Credit the Riverbend Seed Library, CC BY.'); assert.equal(by(m, 'cover-cropping').cite, null);
+  assert.equal(e.atUri, 'at://did:plc:exampledao/org.exampledao.encyclopedia-entry/id-living-mulch');
+  assert.equal(e.cite, 'Credit the Example DAO Seed Library, CC BY.'); assert.equal(by(m, 'cover-cropping').cite, null);
   assert.equal(e.updated, '2026-10-20');
   assert.deepEqual(e.about.slice(0, 3), [['Kind', 'Encyclopedia entry'], ['Page type', 'Concept'], ['Maturity', 'Reviewed']]);
   assert.ok(e.about.some(([l, v]) => l === 'Steward' && v === 'Field steward'));

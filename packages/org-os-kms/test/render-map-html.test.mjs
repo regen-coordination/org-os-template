@@ -209,7 +209,7 @@ test('house: no torch words — the frontier is "one hop beyond"', () => {
 test('house: the artifact bar — one h1, the generated line with its time in Mono, List · Map and Fit drive the map', () => {
   const { html } = renderHouse();
   assert.equal((html.match(/<h1\b/g) || []).length, 1, 'exactly one h1');
-  assert.match(html, /<h1 class="art-name">Riverbend Commons<\/h1>/);
+  assert.match(html, /<h1 class="art-name">Example DAO Commons<\/h1>/);
   assert.match(html, /Federation map<span class="gen"> · generated <time datetime="2026-10-29T12:00:00Z">29 Oct 2026 12:00 UTC<\/time><\/span>/);
   assert.match(html, /<button type="button" data-fm-view="list" aria-controls="fedmap" aria-pressed="false">/);
   assert.match(html, /<button type="button" data-fm-view="map" aria-controls="fedmap" aria-pressed="true">/);
@@ -243,13 +243,13 @@ test('house: a cloned peer with no frontier snapshot is never fetched too — it
 
 test('house: no peers — this instance alone and the note', () => {
   const { html } = renderHouse((dir) => {
-    writeFileSync(join(dir, 'federation.yaml'), 'identity:\n  name: "Riverbend Commons"\n  type: "Hub"\n');
-    writeFileSync(join(dir, 'kms.yaml'), 'name: riverbend-commons\nadapter: repo-data\ntarget: "."\n');
+    writeFileSync(join(dir, 'federation.yaml'), 'identity:\n  name: "Example DAO Commons"\n  type: "Hub"\n');
+    writeFileSync(join(dir, 'kms.yaml'), 'name: example-dao-commons\nadapter: repo-data\ntarget: "."\n');
     for (const f of ['source-systems.yaml', 'ecosystems.yaml']) rmSync(join(dir, 'data', f), { force: true });
     rmSync(join(dir, 'data', 'federation'), { recursive: true, force: true });
   });
   assert.ok(noScripts(html).includes('No peers yet. Add one with <code>org-os-kms federate add --card &lt;file&gt;</code>.'));
-  assert.ok(noScripts(html).includes('>Riverbend Commons<'));
+  assert.ok(noScripts(html).includes('>Example DAO Commons<'));
   const { html: full } = renderHouse();
   assert.ok(!full.includes('No peers yet'), 'no note when there are peers');
 });

@@ -8,7 +8,7 @@ import {
 import { normalizeMap } from '../src/parse.mjs';
 
 const HOUSE = normalizeMap(JSON.parse(readFileSync(new URL('./fixtures/house-map.json', import.meta.url), 'utf8')));
-const SELF = 'Riverbend Commons';
+const SELF = 'Example DAO Commons';
 
 const byId = (lay, id) => lay.nodes.find((n) => n.id === id);
 const cx = (b) => b.x + b.w / 2;
@@ -52,20 +52,20 @@ function bigMap() {
 const LONG_NAME = 'The Long-Standing Cooperative Federation of Upland Watersheds, Seed Libraries and the Commons';
 const LONG_FACTS = 'knowledge peer · AT Proto · read from a static mirror that has not answered in nine days';
 function longMap() {
-  return mapOf('Riverbend Commons', [
+  return mapOf('Example DAO Commons', [
     inst('long', { name: LONG_NAME }), inst('short', { name: 'Short' }), inst('down', { name: 'Downstream With A Long Name Too' }),
     front('Far Away Network Of Many Words'),
   ], [
-    { from: 'Riverbend Commons', to: 'long', kind: 'federation' },
-    { from: 'Riverbend Commons', to: 'short', kind: 'knowledge' },
-    { from: 'Riverbend Commons', to: 'down', kind: 'downstream' },
+    { from: 'Example DAO Commons', to: 'long', kind: 'federation' },
+    { from: 'Example DAO Commons', to: 'short', kind: 'knowledge' },
+    { from: 'Example DAO Commons', to: 'down', kind: 'downstream' },
     { from: 'long', to: 'Far Away Network Of Many Words', kind: 'frontier' },
   ]);
 }
 const longText = (node) => ({
   name: node.name,
-  facts: node.id === 'Riverbend Commons' ? '142 entries · 9 sources' : LONG_FACTS,
-  eyebrow: node.id === 'Riverbend Commons' ? 'This instance' : null,
+  facts: node.id === 'Example DAO Commons' ? '142 entries · 9 sources' : LONG_FACTS,
+  eyebrow: node.id === 'Example DAO Commons' ? 'This instance' : null,
 });
 
 function shuffled(arr, seed) {
@@ -546,7 +546,7 @@ test('wrapText wraps at spaces, hyphenates a word too long for the line, and nev
 });
 
 test('defaultMeasure: deterministic, by character class, display wider than sans', () => {
-  const s = 'Riverbend Commons';
+  const s = 'Example DAO Commons';
   assert.equal(defaultMeasure(s, { font: 'sans', size: 13 }), defaultMeasure(s, { font: 'sans', size: 13 }));
   assert.ok(defaultMeasure('iiii', { font: 'sans', size: 13 }) < defaultMeasure('mmmm', { font: 'sans', size: 13 }));
   assert.ok(defaultMeasure(s, { font: 'display', size: 13 }) > defaultMeasure(s, { font: 'sans', size: 13 }));

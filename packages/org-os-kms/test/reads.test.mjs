@@ -16,18 +16,18 @@ test('absent file reads as {}', () => {
 
 test('a success sets ok_at and attempt_at', () => {
   const d = tmp();
-  recordRead(d, 'riverbend', { at: '2026-10-29T10:00:00.000Z' });
-  assert.deepEqual(readReads(d), { riverbend: { ok_at: '2026-10-29T10:00:00.000Z', attempt_at: '2026-10-29T10:00:00.000Z', error: null } });
+  recordRead(d, 'exampledao', { at: '2026-10-29T10:00:00.000Z' });
+  assert.deepEqual(readReads(d), { exampledao: { ok_at: '2026-10-29T10:00:00.000Z', attempt_at: '2026-10-29T10:00:00.000Z', error: null } });
 });
 
 test('a failure keeps ok_at and records the error', () => {
   const d = tmp();
-  recordRead(d, 'riverbend', { at: '2026-10-28T10:00:00.000Z' });
-  recordRead(d, 'riverbend', { at: '2026-10-29T10:00:00.000Z', error: 'timeout' });
-  assert.deepEqual(readReads(d).riverbend, { ok_at: '2026-10-28T10:00:00.000Z', attempt_at: '2026-10-29T10:00:00.000Z', error: 'timeout' });
+  recordRead(d, 'exampledao', { at: '2026-10-28T10:00:00.000Z' });
+  recordRead(d, 'exampledao', { at: '2026-10-29T10:00:00.000Z', error: 'timeout' });
+  assert.deepEqual(readReads(d).exampledao, { ok_at: '2026-10-28T10:00:00.000Z', attempt_at: '2026-10-29T10:00:00.000Z', error: 'timeout' });
   recordRead(d, 'hillside', { at: '2026-10-29T11:00:00.000Z', error: 'down' });
   assert.equal(readReads(d).hillside.ok_at, null);
-  assert.ok('riverbend' in readReads(d), 'other connectors survive');
+  assert.ok('exampledao' in readReads(d), 'other connectors survive');
 });
 
 test('malformed file throws naming kms-reads.json', () => {

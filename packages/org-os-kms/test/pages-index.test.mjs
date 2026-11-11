@@ -23,7 +23,7 @@ const groups = (html) => [...body(html).matchAll(/<li class="grp-h"><span>([^<]+
 const rows = (html) => [...body(html).matchAll(/<li data-g="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1].match(/<span class="t">([^<]+)<\/span>/)[1], m[0]]);
 const hrefs = (html) => [...body(html).matchAll(/\s(?:href|src|data-src)="([^"]*)"/g)].map((m) => m[1]).filter((h) => !h.startsWith('#'));
 
-const PUBLIC_TITLES = ['Cover cropping', 'Living mulch', 'Riverbend Seed Library', 'Rotational grazing', 'Seed saving for small farms', 'Three sisters guild'];
+const PUBLIC_TITLES = ['Cover cropping', 'Example DAO Seed Library', 'Living mulch', 'Rotational grazing', 'Seed saving for small farms', 'Three sisters guild'];
 
 test('public index lists exactly the gated entries, grouped by kind with counts', () => {
   const html = renderIndex(pub(), opts);
@@ -36,9 +36,9 @@ test('public index lists exactly the gated entries, grouped by kind with counts'
   }
   // the head: eyebrow, name, facts line, the knowledge.json sentence
   assert.match(body(html), /<span class="eyebrow">Knowledge commons<\/span>/);
-  assert.match(body(html), /<h1 id="h1">Riverbend Commons<\/h1>/);
+  assert.match(body(html), /<h1 id="h1">Example DAO Commons<\/h1>/);
   assert.match(body(html), /6 entries<\/span><span class="dot-sep"><\/span><span>5 kinds<\/span><span class="dot-sep"><\/span><span>1 source<\/span><span class="dot-sep"><\/span><span>1 peer read/);
-  assert.match(body(html), /Field notes and practice from the Riverbend growers\./);
+  assert.match(body(html), /Field notes and practice from the Example DAO growers\./);
   // the foot: JSON API ↗ and the DID in Mono
   assert.match(body(html), /href="api\/index.json"[^>]*>[\s\S]*?JSON API/);
   assert.match(body(html), /<code class="w-s"[^>]*>did:plc:/);
@@ -54,7 +54,7 @@ test('rows: kind tile from the house glyphs, maturity mark with its word, the da
   assert.match(r['Living mulch'], /<span class="sm done"><i aria-hidden="true"><\/i><span class="w">Reviewed<\/span><\/span>/);
   assert.match(r['Living mulch'], /<time datetime="2026-10-20">20 Oct<\/time>/);
   // the house glyph, not labels.mjs's name ('database' is no house glyph)
-  assert.match(r['Riverbend Seed Library'], /<use href="#i-db"\/>/);
+  assert.match(r['Example DAO Seed Library'], /<use href="#i-db"\/>/);
   // a peer entry: dashed tile, "from <peer> ↗ · read 3 d ago", links out to the peer's safe URL only
   assert.match(r['Seed saving for small farms'], /class="ktile dashed"/);
   assert.match(r['Seed saving for small farms'], /from hillside\.example ↗/);
@@ -154,7 +154,7 @@ test('a kind page lists one kind and links back to the commons', () => {
   assert.match(b, /<a class="kh-back" href="\.\.\/\.\.\/index.html">/);
   assert.match(b, /<a href="\.\.\/\.\.\/k\/encyclopedia-entry\/index.html" aria-current="page"/);
   assert.match(b, /href="\.\.\/\.\.\/k\/encyclopedia-entry\/id-living-mulch.html"/);
-  assert.match(html, /<title>Encyclopedia entry · Riverbend Commons<\/title>/);
+  assert.match(html, /<title>Encyclopedia entry · Example DAO Commons<\/title>/);
   assert.throws(() => renderIndex(pub(), { ...opts, kind: 'no-such-kind' }), /unknown kind/);
 });
 
