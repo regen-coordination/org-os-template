@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -24,9 +24,10 @@ import { ServerAttention } from '../../server/attention.ts'
 import { resolveTrunk } from '../../server/proposals/ledger.ts'
 import { stateDir } from '../../server/state.ts'
 import { createSession } from '../../server/session/sessions.ts'
+import { startServer } from '../../server/serve.ts'
 import {
   ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, actorNames, commentView, mentionablesFor, mountConversation,
-  targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, TASK_NO_LEVEL, plainLine,
+  openConversationStore, targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, TASK_NO_LEVEL, plainLine,
 } from '../../server/workspace/conversation.ts'
 import { mountPresence, Presence } from '../../server/workspace/presence.ts'
 import { admits } from '../../lib/visibility.mjs'
@@ -1057,5 +1058,65 @@ describe('T2e I1: a name kept to the council does not reach other members throug
     expect(names({ id: 'example-org:person:guest', name: 'A Guest', kind: 'person', via: 'email' } as KnownActor)).toEqual({ handle: 'example-org:person:guest', role: 'A Guest' })
     writeFileSync(join(w.repo, 'data', 'members.yaml'), 'members: [ {id: steward-a\n') // not YAML
     expect(names({ id: 'steward-a', name: 'Steward A', kind: 'person', via: 'git' })).toEqual({ handle: 'steward-a', role: 'steward-a' })
+  })
+})
+
+// T2e I2: rows written before written_level existed (`unfilled`) are filled as the store is opened, before anything is
+// served; a target whose level cannot be read now stays unfilled (admitting nobody) and is filled when it can be; a target
+// that is not there at all is filled with a level nobody is admitted to.
+describe('T2e I2: the fill of rows written before the floor', () => {
+  const row = (id: string, target: string, body: string): CommentRow => ({ id, target, parent: null, anchor: null, by: 'steward-a', body,
+    created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: UNFILLED })
+
+  it('happens at open: the store comes back from opening with every row it can read a level for filled', async () => {
+    const w = await world({ pages: { 'scratch-0001': joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: `hat:${OPS}` as 'members' }, BODY) } })
+    await w.store.writeConversation({
+      comments: [row('c-ops', 'page:scratch-0001', 'ops'), row('c-rec', 'record:projects:proj-1', 'project')],
+      notifications: [{ id: 'n-1', member: 'steward-b', kind: 'mention', target: 'page:scratch-0001', source: 'comment:c-ops', by: 'steward-a',
+        created: NOW.toISOString(), readAt: null, writtenLevel: UNFILLED }],
+      mentions: [{ source: 'comment:c-ops', kind: 'member', ref: 'steward-b', told: true, writtenLevel: UNFILLED }],
+    })
+    const file = w.store.file
+    w.store.close(); stores.splice(stores.indexOf(w.store), 1)
+    const again = await openConversationStore(w.repo, { dir: dirname(file) }); stores.push(again)
+    expect(again.comment('c-ops')?.writtenLevel).toBe(`hat:${OPS}`)
+    expect(again.comment('c-rec')?.writtenLevel).toBe('members')
+    expect(again.notifications('steward-b').map(n => n.writtenLevel)).toEqual([`hat:${OPS}`])
+    expect(again.mentionsOf('comment:c-ops').map(m => m.writtenLevel)).toEqual([`hat:${OPS}`])
+    expect(again.unfilledTargets()).toEqual([])
+  })
+
+  it('a target that cannot be read now stays unfilled and is filled once it can be; one that is not there admits nobody', async () => {
+    const w = await world()
+    await w.store.writeConversation({ comments: [row('c-rec', 'record:projects:proj-1', 'project'), row('c-gone', 'page:gone-0001', 'gone')] })
+    chmodSync(join(w.repo, 'data', 'projects.yaml'), 0o000) // there, but it cannot be read
+    expect(targetLevel(w.repo, 'record:projects:proj-1', w.store)).toBeNull()
+    const file = w.store.file
+    w.store.close(); stores.splice(stores.indexOf(w.store), 1)
+    const again = await openConversationStore(w.repo, { dir: dirname(file) }); stores.push(again)
+    expect(again.comment('c-rec')?.writtenLevel).toBe(UNFILLED)
+    expect(again.comment('c-gone')?.writtenLevel).toBe('nobody')
+    // Read again once the file can be read: the first conversation read fills it with the record's level then.
+    chmodSync(join(w.repo, 'data', 'projects.yaml'), 0o644)
+    const app = w.appWith(() => again)
+    const listed = await call(app, '/api/comments?target=record:projects:proj-1')
+    expect(listed.status).toBe(200)
+    expect(again.comment('c-rec')?.writtenLevel).toBe('members')
+    expect(listed.body.map((c: { body: string }) => c.body)).toEqual(['project'])
+  })
+
+  it('the server fills them as it opens the store, before it serves', async () => {
+    const repo = makeChangeRepo(GOVERNANCE); cleanup.push(repo)
+    writeFileSync(join(repo, 'data', 'members.yaml'), MEMBERS)
+    mkdirSync(join(repo, 'pages'), { recursive: true })
+    writeFileSync(join(repo, 'pages', 'scratch-0001.md'), page('scratch-0001', 'Scratch'))
+    git(repo, 'add -A'); git(repo, 'commit -qm "fixture: a page"')
+    const first = await openPrivateStore(repo)
+    await first.writeConversation({ comments: [row('c-old', 'page:scratch-0001', 'old')] })
+    first.close()
+    const server = await startServer({ repo, port: 0, fetch: async () => { throw new Error('no network in this test') } })
+    try {
+      expect(server.privateStore!.comment('c-old')?.writtenLevel).toBe('members')
+    } finally { await server.close(); await goneSettled(repo) }
   })
 })

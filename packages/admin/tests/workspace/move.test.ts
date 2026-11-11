@@ -258,6 +258,39 @@ describe('A record with comments written while private (R-L6-T11-3)', () => {
   })
 })
 
+// T2e I2: a row written before written_level existed and not filled yet (`unfilled`) cannot be judged, so it holds the move,
+// at stage (planMove) and in the store's transaction (movedWrites).
+describe('T2e I2: talk not filled yet holds a move', () => {
+  const unfilled = (id: string, body: string) => ({ id, target: 'record:tasks:t-secret', parent: null, anchor: null, by: 'steward-b', body,
+    created: T0.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: 'unfilled' })
+
+  it('at stage: refused with HAS_CONVERSATION while a comment on the record is unfilled', async () => {
+    const w = await world()
+    await privateTask(w)
+    await w.store.writeConversation({ comments: [unfilled('c-old', `${SENTINEL}old`)] })
+    const [status, body] = await refused(await call(w.app, 'POST', '/api/changes/ops', { body: { ops: moveOf('tasks:t-secret') } }))
+    expect([status, body.errors[0].message]).toEqual([422, HAS_CONVERSATION('Review the grant')])
+    expect(w.store.record('tasks', 't-secret')).not.toBeNull()
+  })
+
+  it('in the store\'s transaction: an unfilled comment there refuses the apply; nothing is moved or committed', async () => {
+    const w = await world()
+    await privateTask(w)
+    await stage(w, moveOf('tasks:t-secret'))
+    const store = w.store
+    const within = store.within.bind(store)
+    store.within = (async (fn: (t: PrivateTransaction) => Promise<unknown>) => {
+      await store.writeConversation({ comments: [unfilled('c-late', `${SENTINEL}late`)] })
+      return within(fn as never)
+    }) as never
+    const before = head(w.repo)
+    const [status, body] = await refused(await call(w.app, 'POST', '/api/changes/apply', { body: {} }))
+    expect([status, body.code]).toEqual([409, 'PRIVATE_CONFLICT'])
+    expect(head(w.repo)).toBe(before)
+    expect(w.store.record('tasks', 't-secret')).not.toBeNull()
+  })
+})
+
 describe('A move under a publication rule is a proposal (rule 8 until decided)', () => {
   it('under a publication consent rule it is proposed; the ledger holds a placeholder only; an admitted viewer reads MOVES, another "A change to a restricted collection"', async () => {
     const w = await world(CONSENT)

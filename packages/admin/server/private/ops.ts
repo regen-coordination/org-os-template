@@ -18,7 +18,7 @@ import { currentOf } from '../changes/stage.ts'
 import { Refusal, StageRefusal } from '../changes/apply.ts'
 import { readConfig } from '../visibility/config.ts'
 import type { Change, PrivatePlaceholder, RecordError, RecordOp, StageOp } from '../changes/types.ts'
-import { StoreUnavailable, type PrivateField, type PrivateRecord, type PrivateStore, type PrivateWriter } from './store.ts'
+import { StoreUnavailable, WRITTEN_UNFILLED, type PrivateField, type PrivateRecord, type PrivateStore, type PrivateWriter } from './store.ts'
 import { readableRows } from '../workspace/written.ts'
 
 /** One write to private data, as `applyPrivate` makes it: a whole record (a private collection's, or a git
@@ -620,7 +620,9 @@ export function movedWrites(store: PrivateStore, moved: readonly MovedPart[], vi
     const kept = storeRead(store, () => store.record(m.collection, m.id))
     const target = m.collection === 'pages' ? `page:${m.id}` : `record:${m.collection}:${m.id}`
     const comments = storeRead(store, () => store.comments(target))
-    const holding = viewer === null || !kept ? comments : readableRows(comments, viewer, levelOf(kept.visibility))
+    // T2e I2: a comment not filled yet (written before the floor) holds the move, whoever moves it.
+    const holding = viewer === null || !kept ? comments
+      : [...readableRows(comments, viewer, levelOf(kept.visibility)), ...comments.filter(c => c.writtenLevel === WRITTEN_UNFILLED)]
     const talked = holding.some(c => c.deleted === null)
     if (!kept || kept.visibility !== m.visibility || !sameValue(kept.body, m.body) || talked) {
       throw new Refusal(409, { code: 'PRIVATE_CONFLICT', error: MOVE_CHANGED(`${m.collection}:${m.id}`) })

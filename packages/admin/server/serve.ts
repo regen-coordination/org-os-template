@@ -18,7 +18,7 @@ import { runCommand } from './resources/run.ts'
 import { refusal, type GuardScope } from './guard.ts'
 import { JobStore, otherLive, serverPidFile, stateDir } from './state.ts'
 import { ServerAttention, serverAttentionAdapter } from './attention.ts'
-import { classifyOpenError, openPrivateStore, STORE_STUCK, type PrivateStore } from './private/store.ts'
+import { classifyOpenError, STORE_STUCK, type PrivateStore } from './private/store.ts'
 import { cleanLeftovers, scheduleBackups } from './private/backup.ts'
 import { LocalExecutor } from './operations/executor.ts'
 import { Plans } from './operations/plans.ts'
@@ -47,7 +47,7 @@ import { checkRemote, RemoteWatch } from './visibility/remote.ts'
 import { attentionLevel, EventLevels, gateEvent, PUBLIC_VIEWER } from './visibility/gate.ts'
 import { connectionViewer, mountVisibility } from './visibility/routes.ts'
 import { workspaceOf } from './workspace/routes.ts'
-import { actorNames, mountConversation, targetLevel, tellAtCommit, type Target } from './workspace/conversation.ts'
+import { actorNames, mountConversation, openConversationStore, targetLevel, tellAtCommit, type Target } from './workspace/conversation.ts'
 import { mountPresence, Presence, PRESENCE_BEAT_MS } from './workspace/presence.ts'
 import { privateReads } from './private/reads.ts'
 import { goneSettled, housekeepAtStart } from './workspace/gone.ts'
@@ -201,7 +201,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   let storeFailure: { sentence: string } | null = null
   // Hosted with its configuration, the store is where it says (L9 §5.1, ruling P7); otherwise `privateDir(repo)`.
   const config = hosted ? hostedConfig : undefined
-  try { privateStore = await openPrivateStore(repo, config ? { dir: config.privateDir } : {}) } catch (err) {
+  // T2e I2: opened with its rows written before the conversation floor filled, before anything is served.
+  try { privateStore = await openConversationStore(repo, config ? { dir: config.privateDir } : {}) } catch (err) {
     console.error(`org-os admin: ${err instanceof Error ? err.message : String(err)}`)
     storeFailure = classifyOpenError(err)
     attention.raise('private-store', 'Private store', { level: 'alert', text: storeFailure.sentence })

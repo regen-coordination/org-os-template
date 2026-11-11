@@ -34,7 +34,7 @@ import {
 } from '../private/ops.ts'
 import type { CommentRow, PrivateRecord, PrivateStore } from '../private/store.ts'
 import { guardPageRefs, pagePath, treeOf } from './pages.ts'
-import { readableRows } from './written.ts'
+import { readableRows, UNFILLED } from './written.ts'
 
 export { isMove, MOVE_ALONE, MOVES, PRIVATE_COLLECTION_STAYS, type MoveToGit }
 
@@ -81,8 +81,10 @@ export function planMove(repo: string, store: PrivateStore, move: MoveToGit, pol
   try { comments = store.comments(collection === 'pages' ? `page:${id}` : `record:${collection}:${id}`) } catch (err) { throw unavailable(err, store) }
   // PR7-R45: only talk the mover may read holds the move (they may resolve it, or ask for it to go); talk they may not read
   // is not named to them, and keeps the level it was written at wherever the record goes. A decided proposal's (no viewer)
-  // counts every comment, and is PRIVATE_STALE, which names nothing.
-  const holding = viewer === null ? comments : readableRows(comments, viewer, levelOfToken(kept.visibility))
+  // counts every comment, and is PRIVATE_STALE, which names nothing. T2e I2: a comment not filled yet (written before the
+  // floor) cannot be judged, so it holds the move whoever moves it.
+  const holding = viewer === null ? comments
+    : [...readableRows(comments, viewer, levelOfToken(kept.visibility)), ...comments.filter(c => c.writtenLevel === UNFILLED)]
   if (holding.some(c => c.deleted === null)) throw new StageError('', HAS_CONVERSATION(label))
   const base = { move, label, collection, id, visibility: kept.visibility, body: kept.body }
 

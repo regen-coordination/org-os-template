@@ -792,9 +792,10 @@ export class PrivateStore {
       .map(r => r.target)
   }
 
-  /** PR7-R45, once, at the start after schema 3's migration: every `unfilled` row takes its target's level then (`levels`,
-   *  target → level token), `nobody` where `levels` has none (the target was not there to read); a comment's mentions take
-   *  the comment's. One transaction. */
+  /** PR7-R45, at the store's open after schema 3's migration (and again until none is left): the `unfilled` rows of each
+   *  target in `levels` (target → level token) take that level; a target `levels` does not name stays unfilled, admitting
+   *  nobody, to be filled when its level can be read (T2e I2). A comment's mentions take the comment's level once it has
+   *  one; those of a comment that is gone, `nobody`. One transaction. */
   async fillWrittenLevels(levels: ReadonlyMap<string, string>, nobody: string): Promise<void> {
     nonEmpty('the level that admits nobody', nobody)
     for (const [t, l] of levels) { nonEmpty('a target', t); nonEmpty('a level', l) }
@@ -803,7 +804,8 @@ export class PrivateStore {
       try {
         const targets = new Set(this.unfilledTargetsIn())
         for (const target of targets) {
-          const level = levels.get(target) ?? nobody
+          const level = levels.get(target)
+          if (level === undefined) continue
           this.db.prepare('UPDATE comments SET written_level = ? WHERE target = ? AND written_level = ?').run(level, target, WRITTEN_UNFILLED)
           this.db.prepare('UPDATE notifications SET written_level = ? WHERE target = ? AND written_level = ?').run(level, target, WRITTEN_UNFILLED)
           this.db.prepare('UPDATE mentions SET written_level = ? WHERE source = ? AND written_level = ?').run(level, target, WRITTEN_UNFILLED)

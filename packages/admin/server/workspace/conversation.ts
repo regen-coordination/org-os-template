@@ -33,7 +33,7 @@ import { displayNames, membersHold } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads } from '../private/reads.ts'
-import type { CommentRow, MentionRow, PrivateStore, StoredNotification } from '../private/store.ts'
+import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, NOBODY } from '../visibility/gate.ts'
 import { commitOrStage, guardPageRefs, mayWritePrivate } from './pages.ts'
@@ -517,18 +517,36 @@ export function notificationsFor(viewer: Viewer, deps: Omit<ConversationDeps, 'n
 
 // ── the floor's migration and the housekeeping (PR7-R45) ─────────────────────────────────────────────
 
-/** Once after schema 3's migration: the rows written before `written_level` existed take their target's level now (the
- *  safe reading for a store of today), or a level nobody is admitted to when the target is not there to read. */
-export async function fillWrittenLevels(repo: string, store: PrivateStore): Promise<void> {
+/** PR7-R45, T2e I2: the rows written before `written_level` existed take their target's level now (the safe reading for a
+ *  store of today). A target that is not there at all (`goneNow`, housekeeping's test) takes a level nobody is admitted to,
+ *  so a target made again later never reads its old talk; one there whose level cannot be read now (an unreadable file)
+ *  stays `unfilled`, admitting nobody, and is filled at the next call. Answers whether any row is left unfilled. */
+export async function fillWrittenLevels(repo: string, store: PrivateStore): Promise<boolean> {
   const targets = store.unfilledTargets()
-  if (targets.length === 0) return
+  if (targets.length === 0) return false
   const levels = levelsOf(repo, store)
+  const gone = goneNow(repo, store)
   const known = new Map<string, string>()
   for (const t of targets) {
     const level = levels.target(t)
     if (level) known.set(t, formatLevel(level))
+    else if (gone(t)) known.set(t, NOBODY_WRITTEN)
   }
   await store.fillWrittenLevels(known, NOBODY_WRITTEN)
+  return store.unfilledTargets().length > 0
+}
+
+/**
+ * The private store opened (`openPrivateStore`), its rows written before `written_level` existed filled before it is handed
+ * on (T2e I2), so nothing the server serves meets one it could have filled. A fill that fails is said on the console and
+ * the store is handed on: an unfilled row admits nobody, and the conversation's first read fills it again.
+ */
+export async function openConversationStore(repo: string, opts: Parameters<typeof openPrivateStore>[1] = {}): Promise<PrivateStore> {
+  const store = await openPrivateStore(repo, opts)
+  try { await fillWrittenLevels(repo, store) } catch (err) {
+    console.error(`org-os admin: the conversation's rows written before this version could not be given their level at the store's open (${err instanceof Error ? err.message : String(err)}); they are read by nobody until they are.`)
+  }
+  return store
 }
 
 /** Whether data/collections.yaml can be read (absent counts): with it unreadable the custom collections are not known, so
@@ -539,10 +557,10 @@ function collectionsReadable(repo: string): boolean {
   try { parseYaml(readFileSync(path, 'utf8')); return true } catch { return false }
 }
 
-/** The conversation's targets that are not there now (PR7-R45's housekeeping): a page no page holds (git's or the store's),
- *  a record neither its collection's file nor the store holds, or of a collection that is defined nowhere. A file that
- *  cannot be read says nothing: its targets are kept (no purge on a guess). No history is read. */
-export function absentTargets(repo: string, store: PrivateStore): string[] {
+/** Whether a conversation target is not there now (PR7-R45's housekeeping, T2e I2's fill): a page no page holds (git's or
+ *  the store's), a record neither its collection's file nor the store holds, or of a collection that is defined nowhere. A
+ *  file that cannot be read says nothing: its targets are there (no purge on a guess). No history is read. */
+export function goneNow(repo: string, store: PrivateStore): (t: string) => boolean {
   const defs = new Map(registriesOf(repo).filter(d => d.kind === 'collection').map(d => [d.name, d]))
   const kept = new Set(store.collections().map(c => c.id))
   const pages = levelsOf(repo, store).pages()
@@ -556,22 +574,25 @@ export function absentTargets(repo: string, store: PrivateStore): string[] {
     }
     return files.get(registry) ?? null
   }
-  const out: string[] = []
-  for (const t of store.conversationTargets()) {
+  return t => {
     const page = /^page:(.+)$/.exec(t)
-    if (page) { if (!pages.has(page[1]!)) out.push(t); continue }
+    if (page) return !pages.has(page[1]!)
     const rec = /^record:([^:]+):(.+)$/.exec(t)
-    if (!rec) continue
+    if (!rec) return false
     const [, registry, id] = rec as unknown as [string, string, string]
-    if (store.record(registry, id)) continue
+    if (store.record(registry, id)) return false
     if (defs.has(registry)) {
       const ids = idsOf(registry)
-      if (ids !== null && !ids.has(id)) out.push(t)
-      continue
+      return ids !== null && !ids.has(id)
     }
-    if (kept.has(registry) || known) out.push(t)
+    return kept.has(registry) || known
   }
-  return out
+}
+
+/** The conversation's targets that are not there now (`goneNow`). */
+export function absentTargets(repo: string, store: PrivateStore): string[] {
+  const gone = goneNow(repo, store)
+  return store.conversationTargets().filter(gone)
 }
 
 // ── Turn into a task (§8.2) ──────────────────────────────────────────────────────────────────────────
@@ -665,12 +686,14 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
   const notify = (target: Target, written: readonly (string | null)[]) => {
     try { deps.notify?.({ type: 'conversation', target, written: written.map(w => w ?? NOBODY_WRITTEN) }) } catch { /* the write stands */ }
   }
-  /** PR7-R45: the rows written before the column existed are filled before any conversation is read (once per store). */
+  /** PR7-R45: the rows written before the column existed are filled before any conversation is read: at the store's open
+   *  (`openConversationStore`), and here again until none is left (T2e I2: a target unreadable then is filled once it can be). */
   const filled = new WeakSet<PrivateStore>()
   const fill = async (store: PrivateStore) => {
     if (filled.has(store)) return
-    try { await fillWrittenLevels(repo, store) } catch (err) { throw unavailable(err, store) }
-    filled.add(store)
+    let left: boolean
+    try { left = await fillWrittenLevels(repo, store) } catch (err) { throw unavailable(err, store) }
+    if (!left) filled.add(store)
   }
   /** R-9a: the tombstones of git targets deleted while the store was down, applied before any conversation is read. */
   const applyTombstones = async (store: PrivateStore) => {
