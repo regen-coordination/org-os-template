@@ -1372,3 +1372,23 @@ describe('T2f 4: the write answers name authors as GET names them to the same vi
     expect(deleted.body.comment).toMatchObject({ role: 'Steward A', replies: [expect.objectContaining({ role: 'Steward B' })] })
   })
 })
+
+// T2f 5: a task's title is judged again at the task's own level when it is made: a page the comment linked by its title,
+// narrowed since, is labelled ↗ in the title, so its title never reaches git (or a looser store task).
+describe('T2f 5: a task made from a comment labels a page narrowed since the comment', () => {
+  it('the linked page is kept at Ops now: the git task\'s title says ↗, and git holds no word of its title', async () => {
+    const w = await world()
+    const base = git(w.repo, 'rev-parse HEAD').trim()
+    // Written while plans-0001 was a git page every member read; it has since left git for the store, at Ops.
+    await w.store.writeConversation({ comments: [{ id: 'cmt-plans', target: 'page:handbook-3f2a', parent: null, anchor: null, by: 'steward-a',
+      body: 'Review [Harbour lease terms](./plans-0001.md) before Friday', created: NOW.toISOString(), edited: null, resolvedBy: null,
+      resolvedAt: null, deleted: null, writtenLevel: 'members' }] })
+    await w.store.putRecord({ collection: 'pages', id: 'plans-0001', visibility: `hat:${OPS}`, body: { title: 'Harbour lease terms', parent: null, order: 3000, markdown: BODY }, rev: 'r1' }, 'steward-a', null)
+    asA(w.repo)
+    const made = await call(w.app, '/api/comments/cmt-plans/task', json('POST'))
+    expect(made.status).toBe(201)
+    expect(made.body.commit).toBeTruthy()
+    expect(git(w.repo, 'log -1 --format=%s').trim()).toBe(`tasks: Review ${STRICT_LABEL} before Friday`)
+    expect(git(w.repo, `log -p ${base}..HEAD`)).not.toMatch(/Harbour|lease/)
+  })
+})

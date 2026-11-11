@@ -35,14 +35,14 @@ import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops
 import { levelOfToken, NO_PRIVATE, privateReads, strictPrivateReads } from '../private/reads.ts'
 import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
-import { gateItems, Levels, MAINTAINERS, NOBODY } from '../visibility/gate.ts'
+import { gateItems, Levels, MAINTAINERS, MEMBERS as MEMBERS_LEVEL, NOBODY } from '../visibility/gate.ts'
 import { commitOrStage, guardPageRefs, mayWritePrivate } from './pages.ts'
 import { bury, onHousekeeping, onTargetsGone, tombstones, unbury } from './gone.ts'
 import { floorsAbove, mayRead, NOBODY_WRITTEN, readableRows, writtenLevelOf } from './written.ts'
 import { readRegistryOrEmpty } from '../registry.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, type ParsedLevel, type Viewer } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
-import { NO_PAGE, relabelMembers, slugOf, splitPage } from '../../lib/workspace/pages.mjs'
+import { NO_PAGE, slugOf, splitPage } from '../../lib/workspace/pages.mjs'
 import { resolveRoles, rolesOf } from '../../lib/rules.mjs'
 import { actorIdOf, walletsOf } from '../../lib/hat-readings.mjs'
 import { parseCaip10 } from '../../lib/caip.mjs'
@@ -669,13 +669,16 @@ export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: Kno
   const levels: ParsedLevel[] = [info.level, ...floor.map(w => writtenLevelOf(w ?? ''))]
   const narrowest = levels.find(l => levels.every(o => narrowerOrEqual(l, o)))
   if (!narrowest) throw new HttpError(409, TASK_NO_LEVEL, 'NO_LEVEL')
-  // T2f 1 (Rule 4): a member's label in the line is written as any member may read the name, else the id, whenever the
-  // comment was written.
-  const named = relabelMembers(row.body.split('\n').map(l => l.trim()).find(l => l !== '') ?? '', memberLabels(deps.repo))
-  if (named.refused !== null) throw new Refusal(422, { code: 'MEMBER_LINK', error: named.refused })
-  const title = plainLine(named.body)
+  // T2f 5: the line is judged again at the level the task is kept at (members in git, M-5; else the narrowest), so a page
+  // or record narrowed since the comment was written is ↗ in the title; and (T2f 1, Rule 4) a member's label is written as
+  // any member may read the name, else the id, whenever the comment was written.
+  const inGit = levels.every(l => gitAllows(l))
+  const line = row.body.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
+  const guarded = guardPageRefs(line, inGit ? MEMBERS_LEVEL : narrowest, { repo: deps.repo, store: deps.store })
+  if (guarded.refused !== null) throw new Refusal(422, { code: 'CANNOT_LINK', error: guarded.refused })
+  const title = plainLine(guarded.body)
   const link = linkOf(row.target as Target)
-  if (levels.every(l => gitAllows(l))) {
+  if (inGit) {
     let taken: Set<string>
     try { taken = new Set(currentEntries(deps.repo, 'tasks').map(e => String(e.id))) } catch { taken = new Set() }
     const base = slugOf(title)
