@@ -1211,7 +1211,7 @@ describe('T2f 1: a name kept to the council is never written into text by a ment
     const body = 'Ask [@Steward B](hub:member/steward-b) and [Steward C](<hub:member/steward-c>).\n```\n[@Steward B](hub:member/steward-b)\n```'
     const r = await call(w.app, '/api/comments', json('POST', { target: PAGE, body }))
     expect(r.status).toBe(201)
-    expect(JSON.stringify(r.body)).not.toMatch(NAMES)
+    expect(r.body.comment.body).not.toMatch(NAMES) // its author is named to them as they may read it (T2f 4); its text is not
     const kept = w.store.comment(r.body.comment.id)!.body
     expect(kept).toContain('[@steward-b](hub:member/steward-b)')
     expect(kept).toContain('[steward-c](<hub:member/steward-c>)')
@@ -1341,5 +1341,34 @@ describe('T2f 3: a row that cannot be filled is retried at most once an interval
       await read()
       expect(tries.mock.calls.length).toBe(after)
     } finally { chmodSync(projects, 0o644) }
+  })
+})
+
+// T2f 4: POST, resolve, reopen and delete answer with the author's name as the viewer may read it, as GET does: here a
+// council wearer, who reads the names the members file keeps to the council.
+describe('T2f 4: the write answers name authors as GET names them to the same viewer', () => {
+  const PAGE = 'page:handbook-3f2a'
+  afterEach(() => { WEARS.a1 = [OPS] })
+
+  it('POST, a resolve and a delete say the names the council wearer reads', async () => {
+    const w = await world()
+    writeFileSync(join(w.repo, 'data', 'visibility.yaml'), `${VISIBILITY}    members: { fields: { name: "hat:${COUNCIL}" } }\n`)
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "fixture: member names are the council\'s"')
+    WEARS.a1 = [COUNCIL, OPS]
+    await w.prime(A1, A2)
+    asA(w.repo)
+    const top = await call(w.app, '/api/comments', json('POST', { target: PAGE, body: 'Top' }))
+    expect(top.status).toBe(201)
+    expect(top.body.comment).toMatchObject({ handle: 'steward-a', role: 'Steward A' })
+    asB(w.repo)
+    const reply = await call(w.app, '/api/comments', json('POST', { target: PAGE, body: 'Reply', parent: top.body.comment.id }))
+    expect(reply.body.comment).toMatchObject({ handle: 'steward-b', role: 'steward-b' }) // steward-b reads no council name
+    asA(w.repo)
+    const listed = await call(w.app, `/api/comments?target=${PAGE}`)
+    expect(listed.body[0]).toMatchObject({ role: 'Steward A', replies: [expect.objectContaining({ role: 'Steward B' })] })
+    const resolved = await call(w.app, `/api/comments/${top.body.comment.id}/resolve`, json('POST'))
+    expect(resolved.body.comment).toMatchObject({ role: 'Steward A', replies: [expect.objectContaining({ role: 'Steward B' })] })
+    const deleted = await call(w.app, `/api/comments/${top.body.comment.id}`, json('DELETE'))
+    expect(deleted.body.comment).toMatchObject({ role: 'Steward A', replies: [expect.objectContaining({ role: 'Steward B' })] })
   })
 })

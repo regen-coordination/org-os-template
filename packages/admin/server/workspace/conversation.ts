@@ -801,7 +801,8 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
   /** The floor of a change to `row`: its written level and those of the comments above it (PR7-R45). */
   const floorOf = (row: CommentRow, rows: readonly CommentRow[]) => [row.writtenLevel, ...floorsAbove(rows, row.parent)]
   const view = (store: PrivateStore, row: CommentRow, info: TargetInfo, viewer: Viewer) => {
-    const names = namesFor(repo, membership)
+    // T2f 4: the author's name as this viewer may read it, as GET says it.
+    const names = namesFor(repo, membership, viewer)
     const out = commentView(row, names, info.text)
     if (row.parent === null) {
       const rows = readableRows(storeRead(store, () => store.comments(row.target)), viewer, info.level)
@@ -857,7 +858,7 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     const j = judge(refsOf(guarded.body).mentions, target, actor.id, cdeps, `comment:${row.id}`, floors)
     await write(store, { comments: [row], mentions: j.mentions, notifications: j.notifications })
     notify(target, [row.writtenLevel, ...floors])
-    return c.json({ comment: commentView(row, namesFor(repo, membership), info.text), notTold: j.notTold.map(NOT_TOLD) }, 201)
+    return c.json({ comment: commentView(row, namesFor(repo, membership, viewer), info.text), notTold: j.notTold.map(NOT_TOLD) }, 201)
   })
 
   const resolve = (resolved: boolean) => async (c: Context) => {
