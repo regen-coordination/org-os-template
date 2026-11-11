@@ -1,7 +1,7 @@
 // packages/admin/tests/lib/deployments.test.ts
 //
-// The values are spec §3's table (docs/superpowers/specs/2026-10-30-dao-os-l7-compose-deploy-design.md), read 2026-10-30 from
-// the sources each `sources` entry names.
+// The values are the L7 compose and deploy spec's §3 table (with the process records, see
+// docs/superpowers/history/org-os-0.7.md), read 2026-10-30 from the sources each `sources` entry names.
 import { describe, it, expect } from 'vitest'
 import { DEPLOYMENTS, deploymentsOn } from '../../lib/deployments.mjs'
 import { isAddress } from '../../lib/caip.mjs'

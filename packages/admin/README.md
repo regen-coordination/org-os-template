@@ -1055,6 +1055,11 @@ While it is `off`, the house writes nothing to its instance:
   sync, the push's retry, the claim and commands. A write route the table (`server/hosted/instance-writes.ts`) does
   not name is refused too.
 - Sign-in, sign-out, wizard drafts and board layouts still work. They are kept outside the instance.
+- The workspace's conversation and per-member state still work too: comments (post, resolve, reopen, delete),
+  notifications read, read marks, a collection's view state, and presence (which never says editing while off).
+  They live in the private store or in memory. Everything else the workspace writes is refused, even where its target
+  is the private store: pages and editing sessions, collections and saved views, records, meetings, Council memory,
+  the knowledge commons, the deploy read-back, and a comment's Turn into a task, since that writes a task.
 - A proposal's page builds no branch and records no reading. The private store is not reconciled at start. No push
   runs, whatever `ORG_OS_PUSH` says.
 - `GET /api/status` says `instanceWrites: "off"`, and the app hides the tray and every other write control.

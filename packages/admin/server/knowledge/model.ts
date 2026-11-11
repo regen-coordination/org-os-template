@@ -1,8 +1,8 @@
 /** The knowledge model: pure functions over facts someone else computed. No file is read here, no clock taken, no
  *  kms module imported — so the lanes, the checks and the words can be tested against a table.
  *
- *  Spec: docs/superpowers/specs/2026-10-31-kms-admin-design.md §3 (the lanes and their precedence), §4.2 (checks,
- *  references, provenance), §5-N1–N5. */
+ *  Spec: the kms-admin design (with the process records, see docs/superpowers/history/org-os-0.7.md) §3 (the lanes
+ *  and their precedence), §4.2 (checks, references, provenance), §5-N1–N5. */
 import type { CanonRow, CheckRow, FieldRow, Lane, LaneId, Mark, ProvenanceRow, RefRow } from './types.ts'
 
 /** The four lanes in pipeline order, with what moves a card out of each. The standline draws the gates in the gaps

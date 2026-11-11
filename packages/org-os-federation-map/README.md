@@ -5,7 +5,8 @@ their ecosystems) above it, the instance at the centre with its peers beside it,
 below, and each peer-of-a-peer one hop further out from whoever reported it. The counterpart to the
 internal note graph.
 
-Design spec: `../../docs/superpowers/specs/2026-10-29-kms-house-interface-design.md` (§5.1–5.2).
+Design spec: the kms house interface design (§5.1–5.2), kept with the process records; see
+[`docs/superpowers/history/org-os-0.7.md`](../../docs/superpowers/history/org-os-0.7.md).
 
 ## What is in here
 
