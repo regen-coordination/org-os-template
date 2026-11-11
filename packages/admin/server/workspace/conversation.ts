@@ -217,7 +217,7 @@ export function viewerFor(memberOrAccount: string, deps: { repo: string; members
 
 /** How a member is shown (L4c's `handle` and `role`): their id, and who they are (session/names.ts `displayNames`, the
  *  one display name: their name; a CAIP-10 actor no member holds, the lowest hat they wear and their short address,
- *  "Council · 0x57cB…E9c7"; walk fix wave 4, G9). A CAIP-10 actor's handle is their short address. `viewer`: who it is
+ *  "Council · 0x00C0…0C01"; walk fix wave 4, G9). A CAIP-10 actor's handle is their short address. `viewer`: who it is
  *  said to (a name they may not read is not said). */
 export function namesFor(repo: string, membership: Membership | null, viewer?: Viewer): (id: string) => { handle: string; role: string } {
   const display = displayNames(repo, membership, viewer ? { viewer } : {})

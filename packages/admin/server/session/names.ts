@@ -3,7 +3,7 @@
 // Walk fix wave 4 (G9: W1, W2, W5, M13; PF-R258): who someone is, said one way everywhere a person is shown: history (from
 // a commit's Org-Actor trailer, never git's author name), presence, comments, a proposal's author and its events. A member
 // is their name; a CAIP-10 actor no member holds is the name of the lowest hat they wear and their short address
-// ("Council · 0x57cB…E9c7", as a signed-in actor is named, request.ts); anyone else as the id says. Monograms are drawn
+// ("Council · 0x00C0…0C01", as a signed-in actor is named, request.ts); anyone else as the id says. Monograms are drawn
 // from this name, so a person has the same two letters everywhere.
 //
 // Rule 4: a member's name is read from their record as the viewer may read it (the gate, `gateRecord`): a name the viewer

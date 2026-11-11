@@ -2,7 +2,7 @@ import { Icon } from '../../design/Icon.tsx'
 
 /** Two letters from who someone is, upper case (§7.12): the first letter of the first two words of their one display name
  *  (walk fix wave 4, G9: the server's `displayNames`, so a person has the same letters everywhere), or the first two
- *  letters of a one-word name. Of a hat's name and a short address ("Council · 0x57cB…E9c7"), the hat's ("CO").
+ *  letters of a one-word name. Of a hat's name and a short address ("Council · 0x00C0…0C01"), the hat's ("CO").
  *  Monograms, never pictures or identicons (C-22). */
 export function monogram(name: string): string {
   const named = name.split(' · ')[0] ?? name
