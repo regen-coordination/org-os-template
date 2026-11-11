@@ -191,6 +191,13 @@ describe('api: a refused read said to the session (coordinator ruling L9-O1)', (
     expect((await refusedRead({ ...IN, hats: [] }))!.message).toBe('You are signed in, but you wear no hat in this DAO now.')
   })
 
+  it('an emailed-link person with no Role is told they have no Role here yet (T2c minor 5); one with a Role hears SIGN_IN', async () => {
+    const person = (roles: string[]) => ({ mode: 'hosted', signedIn: true, via: 'email', actor: 'example-org:person:p', viewer: roles.length ? 'member' : 'public',
+      expiresAt: '2026-10-31T10:00:00.000Z', person: { id: 'example-org:person:p', name: 'P', roles, nodes: [] } })
+    expect((await refusedRead(person([])))!.message).toBe('You are signed in, but you have no Role here yet.')
+    expect((await refusedRead(person(['steward'])))!.message).toBe(SIGN_IN)
+  })
+
   it('signed out, the SIGN_IN sentence stands', async () => {
     const err = await refusedRead({ mode: 'hosted', signIn: { chainId: 'eip155:42220', tree: 'eip155:42220:13' }, signedIn: false })
     expect(err!.message).toBe(SIGN_IN)

@@ -124,17 +124,28 @@ const isSessionPath = (path: string) => path === '/api/session' || path.startsWi
 
 /** A signed-in member who wears no hat now (coordinator ruling L9-O1), said in place of a refused read's SIGN_IN sentence. */
 export const NO_HAT = 'You are signed in, but you wear no hat in this DAO now.'
+/** NO_HAT's counterpart for a person signed in by an emailed link who holds no Role (T2c minor 5): they read what the
+ *  public reads, and are told why in the same place. */
+export const NO_ROLE_YET = 'You are signed in, but you have no Role here yet.'
 
 /** The session as last read (`api.session`): a refused read is said from it. */
 let lastSession: SessionView | null = null
 
 /** What a 401 SIGN_IN says to this session (L9-O1): signing in is no answer for one who is signed in. A session whose
- *  reading shows no hat hears `NO_HAT`; one whose hats are not known (past the grace, §5.2, or not read yet: `unread`,
- *  final review I1) hears its band; anyone else the server's sentence. */
+ *  reading shows no hat hears `NO_HAT` (an emailed-link person with no Role, `NO_ROLE_YET`); one whose hats are not known
+ *  (past the grace, §5.2, or not read yet: `unread`, final review I1) hears its band; anyone else the server's sentence. */
 export function signInSentence(message: string, session: SessionView | null): string {
   if (!session?.signedIn) return message
   if (session.stale || session.unread) return session.band ?? message
-  return isWalletSession(session) && session.hats.length === 0 ? NO_HAT : message
+  return noStandingSentence(session) ?? message
+}
+
+/** What a live session that reads as no member is told: a wallet wearing no hat, NO_HAT; a person signed in by an emailed
+ *  link with no Role, NO_ROLE_YET; anyone else nothing. */
+export function noStandingSentence(session: SessionView | null | undefined): string | undefined {
+  if (isWalletSession(session)) return session.hats.length === 0 ? NO_HAT : undefined
+  if (session?.signedIn && session.via === 'email') return session.person.roles.length === 0 ? NO_ROLE_YET : undefined
+  return undefined
 }
 
 // The walk review's G1: View as at the server. While previewing, every read names the viewer it is for (`?as=`); the
