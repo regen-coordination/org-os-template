@@ -256,6 +256,26 @@ describe('POST /api/sync and GET /api/sync', () => {
     expect(purgeCursor(b)).toBe(sha(b))
   })
 
+  // T2c (closing review, minor 4): Sync takes the purge's time just before it moves the trunk, under the lock: what was
+  // written while it worked (here: a minute spent on its checks) was written at the old level, and goes.
+  it('Sync takes the purge\'s time just before it moves the trunk', async () => {
+    const { a, b } = world()
+    mkdirSync(join(a, 'pages'), { recursive: true })
+    commitFile(a, 'pages/notes-0001.md', '---\nid: notes-0001\ntitle: Notes\nparent: null\norder: 1000\n---\nMembers only.\n'); sh(a, 'git push -q origin main')
+    const served = serve(b)
+    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
+    await goneSettled(b)
+    const told: { targets: string[]; at: string }[] = []
+    onTargetsGone(b, async (targets, at) => { told.push({ targets, at }) })
+    sh(a, 'git rm -q pages/notes-0001.md && git commit -qm "page: deleted"'); sh(a, 'git push -q origin main')
+    tick()
+    const real = gitModule.trackedChanges
+    vi.spyOn(gitModule, 'trackedChanges').mockImplementation(async (...args: Parameters<typeof real>) => { tick(60); return real(...args) })
+    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
+    await goneSettled(b)
+    expect(told).toEqual([{ targets: ['page:notes-0001'], at: clock.toISOString() }])
+  })
+
   it('behind and clean: a fast-forward', async () => {
     const { a, b } = world()
     commitFile(a, 'new.txt', 'n\n'); sh(a, 'git push -q origin main')

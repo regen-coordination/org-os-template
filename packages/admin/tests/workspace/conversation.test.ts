@@ -759,6 +759,30 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBeNull()
   })
 
+  // T2c (closing review, minor 4): the time is taken under the write lock, just before the fast-forward: what was written
+  // on the members' page while the Refresher waited its turn on the lock is written at the old level, and goes.
+  it('the Refresher takes the time under the lock: what was written while it waited for the lock goes', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    const elsewhere = remoteOf(w.repo)
+    git(elsewhere, 'rm -q pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: deleted"')
+    mkdirSync(join(elsewhere, 'pages'), { recursive: true })
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
+    git(elsewhere, 'add pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: made again, public"')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    let clock = new Date('2026-10-31T12:30:00Z')
+    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000, now: () => clock,
+      withLock: async fn => {
+        // Written at 12:40, while the Refresher waited its turn; the lock is its at 12:45.
+        await w.store.writeConversation({ comments: [{ id: 'c-waiting', target: 'page:scratch-0001', parent: null, anchor: null, by: 'steward-b',
+          body: 'Still the members\' page.', created: '2026-10-31T12:40:00.000Z', edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
+        clock = new Date('2026-10-31T12:45:00Z')
+        return fn()
+      } })
+    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
+    await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+  })
+
   // T2c (closing review, minor 3): a reply goes with the comment it is under whatever its time, and so do the notifications
   // of every comment purged; a later comment that is not under a purged one keeps its own.
   it('a reply purged with its comment takes its notifications too, whatever their time', async () => {
