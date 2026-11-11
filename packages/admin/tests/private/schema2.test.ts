@@ -31,8 +31,9 @@ INSERT INTO sessions VALUES ('h1', 'eip155:42220:0x00000000000000000000000000000
 PRAGMA user_version = 1;
 `
 const NEW_TABLES = ['comments', 'drafts', 'mentions', 'notifications', 'reads', 'view_state']
-const ALL_TABLES = ['applied', 'collections', 'comments', 'drafts', 'fields', 'history', 'mentions', 'notifications', 'pending', 'reads',
-  'records', 'sessions', 'staged', 'view_state']
+// With the Roles, the email keys and the sign-in links (Lane 3 Task 2), which the same schema holds.
+const ALL_TABLES = ['applied', 'collections', 'comments', 'drafts', 'email_keys', 'fields', 'history', 'mentions', 'notifications', 'pending',
+  'reads', 'records', 'roles', 'roles_meta', 'sessions', 'sign_in_links', 'staged', 'view_state']
 const NOW = new Date('2026-10-30T12:00:00Z')
 
 const cleanup: string[] = []

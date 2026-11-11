@@ -485,7 +485,7 @@ async function moveOutOfGit(repo: string, actor: KnownActor, viewer: Viewer, dep
   const store = needStore(deps)
   mayWritePrivate(repo, actor, lists)
   refuseHeldPages(store, [...orders.keys()].filter(id => id !== e.id))
-  const out = await narrow(repo, actor, { target: { page: e.id }, level: formatLevel(level) }, { viewer, privateStore: storeAccess(store, '') })
+  const out = await narrow(repo, actor, { target: { page: e.id }, level: formatLevel(level) }, { viewer, privateStore: storeAccess(store, null) })
   for (const [id, order] of orders) {
     let kept: PrivateRecord | null
     try { kept = store.record('pages', id) } catch (err) { throw unavailable(err, store) }

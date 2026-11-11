@@ -41,8 +41,8 @@ export const MAP_TREASURY = fromSystem(TREASURY_SYSTEM)
 export const MAP_GARDEN = fromSystem(GARDEN)
 export const MAP_NETWORK = fromSystem(NETWORK_PROJECTS)
 export const MAP_STARTER = fromSystem(LOCAL_STARTER)
-export const MAP_KARMA = link('karma-gap', 'Karma GAP', 'https://gap.karmahq.xyz')
-export const MAP_GITCOIN = link('gitcoin', 'Gitcoin', 'https://explorer.gitcoin.co')
+export const MAP_KARMA = link('karma-gap', 'Karma GAP', 'https://impact.example.test')
+export const MAP_GITCOIN = link('gitcoin', 'Gitcoin', 'https://rounds.example.test')
 
 /** The house's DAO map, as the gallery draws it: who decides, the roles that act, the Treasury, what it feeds, and
  *  two linked Systems. */

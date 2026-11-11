@@ -467,7 +467,7 @@ describe('the store down (Review Focus 5)', () => {
     const kept = await call(w.app, '/api/comments', json('POST', { target: 'page:handbook-3f2a', body: 'Before the store went down.' }))
     const id = kept.body.comment.id as string
     const sentence = 'The private store at /x/house.db could not be opened: test.'
-    const down = w.appWith(storeAccess(null, sentence) as () => PrivateStore)
+    const down = w.appWith(storeAccess(null, { sentence }) as () => PrivateStore)
     const refused = { status: 503, body: { error: sentence, code: 'PRIVATE_STORE' } }
     const head = git(w.repo, 'rev-parse HEAD').trim()
     const state = existsSync(stateDir(w.repo)) ? readdirSync(stateDir(w.repo), { recursive: true }).sort() : []
@@ -596,7 +596,7 @@ describe('R-9a: a target that is gone takes its conversation with it', () => {
   it('with the store down at the delete, a tombstone is kept and applied the moment the store is back', async () => {
     const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
     await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} before` }))
-    const down = w.appWith(storeAccess(null, 'The private store is down for this test.') as () => PrivateStore)
+    const down = w.appWith(storeAccess(null, { sentence: 'The private store is down for this test.' }) as () => PrivateStore)
     expect((await call(down, '/api/pages/scratch-0001', json('DELETE'))).status).toBe(200)
     await goneSettled(w.repo)
     expect(tombstones(w.repo).map(t => t.target)).toEqual(['page:scratch-0001'])

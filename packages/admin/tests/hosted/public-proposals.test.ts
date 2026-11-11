@@ -266,7 +266,7 @@ describe('the public proposal view names no account beyond event by (carry 11a)'
 describe('a proposal that ever touched a non-public record stays members\' (carry 11b, stricter by design)', () => {
   it('is absent for the public, also after a revision removed that op', async () => {
     const entry = readLedger(approving.repo).entries.find(e => e.id === P.touched)!
-    expect(entry.ops.map(op => op.record)).toEqual(['projects:proj-005']) // the revision removed the members' op
+    expect(entry.ops.map(op => (op as { record: string }).record)).toEqual(['projects:proj-005']) // the revision removed the members' op
     expect(entry.events.flatMap(e => (e.ops ?? []) as { record: string }[]).map(op => op.record)).toEqual(['projects:proj-005'])
     expect(entry.touched).toBe('members') // what it was opened on is kept, and the revision did not lower it
     for (const [where, views] of await publicAnswers(approving)) {
@@ -353,7 +353,7 @@ governance:
 
     await ok(call(local, 'POST', `/api/proposals/${id}/replay`, { body: { choose: 'theirs' } }))
     const entry = readLedger(repo).entries[0]!
-    expect(entry.ops.map(op => op.record)).toEqual(['projects:proj-003']) // Take theirs dropped the narrowed record's op
+    expect(entry.ops.map(op => (op as { record: string }).record)).toEqual(['projects:proj-003']) // Take theirs dropped the narrowed record's op
     expect(entry.events.at(-1)).toMatchObject({ kind: 'revise' })
     expect(entry.touched).toBe('members')
     expect((await ok(call(pub, 'GET', '/api/proposals')) as unknown as unknown[])).toEqual([])

@@ -81,8 +81,8 @@ const BASE: Omit<PortalModel, 'facts'> = {
   ],
   also: [
     { name: 'Snapshot', href: 'https://snapshot.box/#/s:exampledao.eth' },
-    { name: 'Karma GAP', href: 'https://gap.karmahq.xyz' },
-    { name: 'Gitcoin', href: 'https://explorer.gitcoin.co' },
+    { name: 'Karma GAP', href: 'https://impact.example.test' },
+    { name: 'Gitcoin', href: 'https://rounds.example.test' },
   ],
   daoUri: 'https://riverbend.example.test/.well-known/dao.json',
   membersOrigin: '',

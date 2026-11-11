@@ -412,17 +412,13 @@ export class PrivateStore {
   onRecordsWritten: ((collections: string[]) => void) | null = null
   private readonly lock: WriteLock
   private readonly w: Record<'recordGet' | 'recordPut' | 'recordDelete' | 'fieldGet' | 'fieldPut' | 'fieldDelete' | 'historyAdd' | 'sessionPut' | 'sessionDelete' | 'sessionRenew' | 'sessionsExpired'
-    | 'collectionGet' | 'collectionPut' | 'stagedPut' | 'stagedDelete' | 'stagedDeleteOne' | 'pendingPut' | 'pendingDelete' | 'appliedPut'
-    | 'rolesClear' | 'rolePut' | 'keysClear' | 'keyPut' | 'metaPut' | 'linkPut' | 'linkGet' | 'linkUse' | 'linksExpired', StatementSync>
-  private readonly r: Record<'record' | 'records' | 'fields' | 'fieldsNamed' | 'collections' | 'history' | 'historyOf' | 'session' | 'staged'
-    | 'stagedAll' | 'pending' | 'pendingAll' | 'applied' | 'person' | 'personByKey' | 'meta', StatementSync>
-  private readonly w: Record<'recordGet' | 'recordPut' | 'recordDelete' | 'fieldGet' | 'fieldPut' | 'fieldDelete' | 'historyAdd' | 'sessionPut' | 'sessionDelete' | 'sessionsExpired'
     | 'collectionGet' | 'collectionPut' | 'collectionDelete' | 'stagedPut' | 'stagedDelete' | 'stagedDeleteOne' | 'pendingPut' | 'pendingDelete' | 'appliedPut'
+    | 'rolesClear' | 'rolePut' | 'keysClear' | 'keyPut' | 'metaPut' | 'linkPut' | 'linkGet' | 'linkUse' | 'linksExpired'
     | 'viewStatePut' | 'viewStateDelete' | 'draftPut' | 'draftDelete'
     | 'commentPut' | 'mentionPut' | 'notificationPut' | 'notificationsDrop' | 'notificationRead' | 'notificationsReadOf' | 'readPut'
     | 'goneComments' | 'goneComment' | 'goneMentions' | 'goneNotifications' | 'goneReads', StatementSync>
   private readonly r: Record<'record' | 'recordUpdated' | 'records' | 'fields' | 'fieldsNamed' | 'collections' | 'history' | 'historyOf' | 'session' | 'staged'
-    | 'stagedAll' | 'pending' | 'pendingAll' | 'applied' | 'viewState' | 'draft' | 'drafts'
+    | 'stagedAll' | 'pending' | 'pendingAll' | 'applied' | 'person' | 'personByKey' | 'meta' | 'viewState' | 'draft' | 'drafts'
     | 'comment' | 'comments' | 'mentions' | 'notifications' | 'read', StatementSync>
 
   /** Use `openPrivateStore`. */
