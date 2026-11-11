@@ -57,3 +57,27 @@ exec "${real}" "$@"
     rmSync(dir, { recursive: true, force: true })
   }
 }
+
+/** Runs `fn` with a `git` first on PATH that fails `sub` (exit 128, in git's own words) and passes every other command to
+ *  the real git: how a test sees a read that git could not make, as opposed to a file a revision does not hold. Only this
+ *  process (one test file) sees the changed PATH. */
+export async function withFailingSubcommand<T>(sub: string, fn: () => Promise<T>): Promise<T> {
+  const real = execSync('command -v git', { shell: '/bin/sh' }).toString().trim()
+  const dir = mkdtempSync(join(tmpdir(), 'git-fail-'))
+  writeFileSync(join(dir, 'git'), `#!/bin/sh
+sub= skip=
+for arg in "$@"; do
+  if [ -n "$skip" ]; then skip=; continue; fi
+  case "$arg" in -c|-C) skip=1 ;; -*) ;; *) sub=$arg; break ;; esac
+done
+[ "$sub" = "${sub}" ] || exec "${real}" "$@"
+echo "fatal: unable to read the object store (test)" >&2
+exit 128
+`, { mode: 0o755 })
+  const path = process.env.PATH
+  process.env.PATH = `${dir}:${path ?? ''}`
+  try { return await fn() } finally {
+    process.env.PATH = path
+    rmSync(dir, { recursive: true, force: true })
+  }
+}

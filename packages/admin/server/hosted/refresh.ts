@@ -144,7 +144,7 @@ export class Refresher {
       return { kind: 'stop', trunk, sentence: REFRESH_REFUSED }
     }
     const commit = (await resolveRev(repo, `refs/heads/${trunk}`)) ?? theirs
-    await trunkMoved(repo, ours, commit, at)
+    trunkMoved(repo, ours, commit, at) // queued: read after this refresh ends
     return { kind: 'advanced', trunk, commit }
   }
 

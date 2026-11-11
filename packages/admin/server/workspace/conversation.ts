@@ -585,7 +585,12 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     try {
       await applyTombstones(store)
       await store.purgeConversation(targets.map(target => ({ target, at })))
-    } catch (err) { bury(repo, targets, at); throw err }
+    } catch (err) {
+      // Buried, they are taken the moment the store is reached again: the purge is done as far as its callers go (the
+      // purge cursor moves on, R2b I-3). A tombstone that cannot be written throws.
+      bury(repo, targets, at)
+      console.error(`org-os admin: the private store could not take the conversation of ${targets.join(', ')} now (${err instanceof Error ? err.message : String(err)}); it goes when the store is reached again.`)
+    }
   })
   const write = async (store: PrivateStore, w: Parameters<PrivateStore['writeConversation']>[0]) => {
     try { await store.writeConversation(w) } catch (err) { throw unavailable(err, store) }

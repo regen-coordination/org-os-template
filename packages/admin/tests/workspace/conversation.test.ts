@@ -14,7 +14,9 @@ import { openPrivateStore, StoreUnavailable, type PrivateStore } from '../../ser
 import { storeAccess } from '../../server/private/ops.ts'
 import { mountVisibility } from '../../server/visibility/routes.ts'
 import { EditSessions } from '../../server/workspace/sessions.ts'
-import { goneBetween, goneSettled, tombstones } from '../../server/workspace/gone.ts'
+import { goneBetween, goneSettled, purgeCursor, tombstones, trunkAtStart } from '../../server/workspace/gone.ts'
+import { commitPaths } from '../../server/git.ts'
+import { withFailingSubcommand } from '../git-shim.ts'
 import { Refresher } from '../../server/hosted/refresh.ts'
 import { ServerAttention } from '../../server/attention.ts'
 import { resolveTrunk } from '../../server/proposals/ledger.ts'
@@ -755,6 +757,77 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     expect(w.store.notifications('steward-c').map(n => n.id)).toEqual(['n-after'])
     expect(w.store.readOf('steward-b', 'page:scratch-0001')).toBe(later)
     expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBeNull()
+  })
+
+  // R2b (review I-3): a purge cursor in the admin state directory (the last trunk commit fully purged). Every move, and the
+  // start, read from it to the trunk; it advances only once the targets are purged or buried.
+  const recreatePublic = (repo: string, id = 'scratch-0001') => {
+    git(repo, `rm -q pages/${id}.md`); git(repo, `commit -qm "page ${id}: deleted"`)
+    mkdirSync(join(repo, 'pages'), { recursive: true })
+    writeFileSync(join(repo, 'pages', `${id}.md`), joinPage({ id, title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
+    git(repo, `add pages/${id}.md`); git(repo, `commit -qm "page ${id}: made again, public"`)
+  }
+  const talk = async (w: World) => {
+    expect((await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} members-only talk` }))).status).toBe(201)
+  }
+  const atStart = (w: World) => trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date())
+
+  it('with no cursor yet, the start sets it to the trunk and purges nothing that came before', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    await talk(w)
+    recreatePublic(w.repo)
+    expect(purgeCursor(w.repo)).toBeNull()
+    await atStart(w); await goneSettled(w.repo)
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
+  })
+
+  it('a trunk moved while the server was down is read at the next start', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    await atStart(w); await goneSettled(w.repo)
+    const was = tip(w.repo)
+    expect(purgeCursor(w.repo)).toBe(was)
+    await talk(w)
+    recreatePublic(w.repo) // a pull made by hand while the Hub was stopped
+    await atStart(w); await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+  })
+
+  it('a git read that fails is an error: the cursor stays, and the next run purges', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    await atStart(w); await goneSettled(w.repo)
+    const was = tip(w.repo)
+    await talk(w)
+    const elsewhere = remoteOf(w.repo)
+    recreatePublic(elsewhere); git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000 })
+    await withFailingSubcommand('show', async () => {
+      try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
+      await goneSettled(w.repo)
+    })
+    expect(tip(w.repo)).not.toBe(was) // the copy moved
+    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
+    expect(purgeCursor(w.repo)).toBe(was)
+    expect(errors).toHaveBeenCalled()
+    await atStart(w); await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+  })
+
+  it('the Hub\'s own commits move the cursor: a page it deleted and made again keeps the new page\'s talk at the next start', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    await atStart(w); await goneSettled(w.repo)
+    rmSync(join(w.repo, 'pages', 'scratch-0001.md'))
+    await commitPaths(w.repo, ['pages/scratch-0001.md'], 'page: deleted (the Hub)')
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
+    await commitPaths(w.repo, ['pages/scratch-0001.md'], 'page: made again, public (the Hub)')
+    await goneSettled(w.repo)
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+    await talk(w)
+    await atStart(w); await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
   })
 
   // R2b (review I-1): only the first-parent line is read, each merge against its first parent, and a target is purged only

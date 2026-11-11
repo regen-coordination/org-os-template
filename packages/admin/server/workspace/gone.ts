@@ -24,7 +24,7 @@ import { registriesOf, registryFileOf } from '../registries.ts'
 import { entriesFromText } from '../registry.ts'
 import { stateDir } from '../state.ts'
 import { parse as parseYaml } from 'yaml'
-import { resolveRev, showFile, treeDiffNames, trunkLine } from '../git.ts'
+import { isAncestor, onCommit, resolveRev, showFile, treeDiffNames, trunkLine } from '../git.ts'
 import { fullLevel, narrowerOrEqual, readFullPolicy, type ParsedLevel } from '../../lib/visibility.mjs'
 import { pageEntries, pageLevel, PRIVATE_PAGE_ID } from '../../lib/workspace/pages.mjs'
 import type { VisibilityPolicy } from '../visibility/config.ts'
@@ -35,7 +35,7 @@ type Purger = (targets: string[], at: string) => Promise<void>
 const purgers = new Map<string, Purger>()
 const pending = new Map<string, Set<Promise<unknown>>>()
 
-export function onTargetsGone(repo: string, fn: Purger): void { purgers.set(resolve(repo), fn) }
+export function onTargetsGone(repo: string, fn: Purger): void { purgers.set(resolve(repo), fn); watched.add(resolve(repo)) }
 
 /** `targets` (`page:<id>`, `record:<registry>:<id>`) are gone from git. Never throws and never waits: the purge is queued. */
 export function targetsGone(repo: string, targets: readonly string[], at: Date = new Date()): void {
@@ -50,10 +50,16 @@ export function targetsGone(repo: string, targets: readonly string[], at: Date =
   set.add(p)
 }
 
-/** Resolves once every purge queued for `repo` has run (tests; the server's stop). */
+/** Resolves once every purge and cursor job queued for `repo` has run (tests; the server's stop). */
 export async function goneSettled(repo: string): Promise<void> {
-  const set = pending.get(resolve(repo))
-  while (set && set.size > 0) await Promise.all([...set])
+  const key = resolve(repo)
+  for (;;) {
+    const job = jobs.get(key)
+    await job
+    const set = pending.get(key)
+    if (set && set.size > 0) { await Promise.all([...set]); continue }
+    if (jobs.get(key) === job) return
+  }
 }
 
 const PAGE_FILE = /^pages\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\.md$/
@@ -209,14 +215,16 @@ class LevelsAt {
   }
 }
 
+/** A file's text at a revision: null when the revision does not hold it (rev-parse says so); a read git cannot make throws
+ *  (R2b I-3: an error is not an absence, so the purge cursor stays and the next run reads again). */
+const textAtOf = (repo: string): TextAt => async (rev, rel) => ((await resolveRev(repo, `${rev}:${rel}`)) === null ? null : showFile(repo, rev, rel))
+
 /** The targets the trunk's first-parent line `from..to` deleted and that must take their conversation (`goneOnLine`). A
- *  commit or file git cannot read says nothing. */
+ *  read git cannot make throws. */
 export async function goneBetween(repo: string, from: string, to: string): Promise<string[]> {
   if (from === to) return []
   const collections = new Set(registriesOf(repo).filter(d => d.kind === 'collection').map(d => registryFileOf(d)))
-  const textAt = async (rev: string, rel: string): Promise<string | null> => {
-    try { return await showFile(repo, rev, rel) } catch { return null }
-  }
+  const textAt = textAtOf(repo)
   const steps: LineStep[] = []
   for (const commit of await trunkLine(repo, from, to)) {
     const parent = await resolveRev(repo, `${commit}^`)
@@ -231,14 +239,118 @@ export async function goneBetween(repo: string, from: string, to: string): Promi
   return goneOnLine(repo, from, to, steps, textAt)
 }
 
-/** After the trunk moved from `from` to `to` by commits the Hub did not make: queue the purge of what they deleted, of
- *  what was written at or before `at`, the time taken before the move (R2b I-2). Never throws (the move stands, and a
- *  failure is said on the console). */
-export async function trunkMoved(repo: string, from: string | null, to: string | null, at: Date): Promise<void> {
-  if (from === null || to === null || from === to) return
-  try { targetsGone(repo, await goneBetween(repo, from, to), at) } catch (err) {
-    console.error(`org-os admin: what the commits ${from.slice(0, 7)}..${to.slice(0, 7)} deleted could not be read: ${err instanceof Error ? err.message : String(err)}`)
+// ── the purge cursor (R2b I-3) ─────────────────────────────────────────────────────────────────────────
+// The last trunk commit whose deletions are fully purged (or buried), kept in the admin state directory beside the
+// tombstones. Every move by commits the Hub did not make (`trunkMoved`), and every start (`trunkAtStart`), reads from it to
+// the trunk, and it advances only once the targets are purged or buried: a read git cannot make leaves it where it is, and
+// the next move or start reads again; a trunk moved while the server was down is read at the start. With no cursor yet, the
+// start sets it to the trunk: a fresh install purges nothing retroactively. The Hub's own commits (`onCommit`) move it on
+// when it stands at their parent: what they delete is purged where they are made (applyOps, a ratify), and read again it
+// would take the talk of a page the Hub made again after. One job at a time per repository, outside the write lock.
+
+const cursorFile = (repo: string) => join(stateDir(repo), 'conversation-cursor.json')
+const HEX40 = /^[0-9a-f]{40}$/
+
+/** The purge cursor, or null when there is none (or it cannot be read). */
+export function purgeCursor(repo: string): string | null {
+  try {
+    const raw = JSON.parse(readFileSync(cursorFile(repo), 'utf8')) as { commit?: unknown }
+    return typeof raw.commit === 'string' && HEX40.test(raw.commit) ? raw.commit : null
+  } catch { return null }
+}
+
+function setCursor(repo: string, commit: string): void {
+  const file = cursorFile(repo)
+  mkdirSync(dirname(file), { recursive: true })
+  const tmp = `${file}.tmp`
+  writeFileSync(tmp, `${JSON.stringify({ commit }, null, 2)}\n`)
+  renameSync(tmp, file)
+}
+
+const jobs = new Map<string, Promise<void>>()
+/** The repositories whose cursor the Hub's own commits move (a purger or a cursor job has named them). */
+const watched = new Set<string>()
+/** The Hub's own commits not yet taken by the cursor, parent → commit, per repository (a few: the cursor is behind). */
+const own = new Map<string, Map<string, string>>()
+const OWN_KEPT = 256
+
+/** `job` after every job queued for `repo` before it; a failure is said on the console and ends only that job. */
+function queue(repo: string, what: string, job: () => Promise<void>): Promise<void> {
+  const key = resolve(repo)
+  watched.add(key)
+  const next = (jobs.get(key) ?? Promise.resolve()).then(job).catch(err => {
+    console.error(`org-os admin: ${what} could not be read, so their conversation is not purged yet (the next move or start reads again): ${err instanceof Error ? err.message : String(err)}`)
+  })
+  jobs.set(key, next)
+  return next
+}
+
+/** The cursor moved on through the Hub's own commits that stand on it. */
+function followOwn(repo: string): void {
+  const edges = own.get(resolve(repo))
+  let at = purgeCursor(repo)
+  if (!edges || at === null) return
+  let moved = false
+  for (let next = edges.get(at); next !== undefined; next = edges.get(at)) { edges.delete(at); at = next; moved = true }
+  if (moved) setCursor(repo, at)
+}
+
+onCommit(({ repo, commit }) => {
+  const key = resolve(repo)
+  if (!watched.has(key) || !HEX40.test(commit)) return
+  void queue(key, `the Hub's commit ${commit.slice(0, 7)}`, async () => {
+    const parent = await resolveRev(key, `${commit}^`)
+    if (parent === null) return
+    const edges = own.get(key) ?? new Map<string, string>()
+    own.set(key, edges)
+    edges.set(parent, commit)
+    if (edges.size > OWN_KEPT) edges.delete(edges.keys().next().value!)
+    followOwn(key)
+  })
+})
+
+/** The targets purged now, or buried (a tombstone) when no purger is there to take them; throws when neither happened. */
+async function purgeNow(repo: string, targets: readonly string[], at: Date): Promise<void> {
+  if (targets.length === 0) return
+  const fn = purgers.get(resolve(repo))
+  if (!fn) { bury(repo, targets, at.toISOString()); return }
+  await fn([...new Set(targets)], at.toISOString())
+}
+
+/** One cursor job: from the cursor (or, with none, from `from`) to `to`; with neither, the cursor is set to `to`. */
+async function catchUp(repo: string, from: string | null, to: string, at: Date): Promise<void> {
+  let cursor = purgeCursor(repo)
+  if (cursor !== null && (await resolveRev(repo, `${cursor}^{commit}`)) === null) {
+    // A cursor git no longer holds (a history rewritten outside, a store restored from elsewhere) can never be read from:
+    // it starts again at the trunk, as a fresh install does, and says so.
+    console.error(`org-os admin: the conversation purge cursor ${cursor.slice(0, 7)} is not a commit of this repository; it starts again at ${to.slice(0, 7)}, and what was deleted between them keeps its conversation.`)
+    setCursor(repo, to)
+    return
   }
+  let start: string | null
+  if (from === null || cursor === null || cursor === from) start = cursor ?? from
+  else start = (await isAncestor(repo, cursor, from)) ? cursor : from
+  if (start !== null && start !== to) await purgeNow(repo, await goneBetween(repo, start, to), at)
+  setCursor(repo, to)
+  followOwn(repo)
+}
+
+/** After the trunk moved from `from` to `to` by commits the Hub did not make: queue the purge of what the line from the
+ *  cursor to `to` deleted, of what was written at or before `at`, the time taken before the move (R2b I-2). Never throws
+ *  and never waits: the history is read after the caller (Sync, under the write lock) goes on. */
+export function trunkMoved(repo: string, from: string | null, to: string | null, at: Date): void {
+  if (to === null || !HEX40.test(to) || (from !== null && !HEX40.test(from))) return
+  void queue(repo, `the commits up to ${to.slice(0, 7)}`, () => catchUp(repo, from, to, at))
+}
+
+/** At the server's start: queue the purge of what the trunk's commits since the cursor deleted (a move made while the
+ *  server was down), of what was written before `at`; with no cursor, set it to the trunk. Resolves when the job ends. */
+export function trunkAtStart(repo: string, trunk: () => Promise<string>, at: Date): Promise<void> {
+  return queue(repo, 'the commits made while the server was stopped', async () => {
+    const name = await trunk()
+    const to = await resolveRev(repo, `refs/heads/${name}`)
+    if (to !== null) await catchUp(repo, null, to, at)
+  })
 }
 
 // ── tombstones, while the store is down ──────────────────────────────────────────────────────────────
