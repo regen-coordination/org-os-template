@@ -64,7 +64,10 @@ export function mountWizards(app: Hono, { repo, dir, hosted = false }: WizardDep
     if (!existsSync(path)) return c.json(null)
     try {
       const saved = JSON.parse(readFileSync(path, 'utf8')) as { by?: unknown }
-      return c.json(saved.by === who ? saved : null) // never another actor's
+      // Never another actor's. Hosted, a draft 0.6.1/0.6.2 wrote has no `by`: its file name is the member's actor key, so it
+      // is theirs (R2 review M-1). A local draft in 0.6's old name (`<id>-1.json`) is not read: it is left where it is.
+      const theirs = saved.by === who || (hosted && saved.by === undefined)
+      return c.json(theirs ? saved : null)
     } catch { return c.json(null) }
   })
 

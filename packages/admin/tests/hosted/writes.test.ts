@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -250,6 +250,20 @@ describe('wizard drafts are per member when hosted (Q-L9-4)', () => {
     expect((await http('GET', DRAFT, { cookie: cookies.a1 })).json).toMatchObject({ answers: { who: 'SENTINEL-draft-1' } })
     expect((await http('DELETE', DRAFT, { cookie: cookies.a1 })).status).toBe(200)
     expect(await http('GET', DRAFT, { cookie: cookies.a1 })).toEqual({ status: 200, json: null })
+  })
+
+  // R2 review M-1: 0.6.1 and 0.6.2 wrote a hosted draft as `<id>-<actor key>.json` with no `by`; its file name is the
+  // member's, so it is offered to them again, and to no one else.
+  it('a draft 0.6.1/0.6.2 wrote (no `by`) is offered again to its member', async () => {
+    const file = join(stateDir(repo), 'wizards', `claim-handle-${actorKey(ids.a1)}.json`)
+    mkdirSync(join(stateDir(repo), 'wizards'), { recursive: true })
+    writeFileSync(file, JSON.stringify({ index: 2, answers: { who: 'SENTINEL-old-draft' }, saved: '2026-11-01T00:00:00.000Z' }))
+    expect((await http('GET', DRAFT, { cookie: cookies.a1 })).json).toMatchObject({ index: 2, answers: { who: 'SENTINEL-old-draft' } })
+    expect(await http('GET', DRAFT, { cookie: cookies.a2 })).toEqual({ status: 200, json: null })
+    // A draft that names someone else is still never offered.
+    writeFileSync(file, JSON.stringify({ index: 2, answers: { who: 'SENTINEL-old-draft' }, saved: '2026-11-01T00:00:00.000Z', by: ids.a2 }))
+    expect(await http('GET', DRAFT, { cookie: cookies.a1 })).toEqual({ status: 200, json: null })
+    expect((await http('DELETE', DRAFT, { cookie: cookies.a1 })).status).toBe(200)
   })
 })
 
