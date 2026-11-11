@@ -726,17 +726,71 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     }
   })
 
-  it('goneBetween reads each commit against its parent: a record removed then put back counts, an edit does not', async () => {
+  // R2b (review I-1): only the first-parent line is read, each merge against its first parent, and a target is purged only
+  // when it is absent at the end, or there at a level looser than it had before (at the start, or just before a delete).
+  const tip = (repo: string) => git(repo, 'rev-parse HEAD').trim()
+  const trunkOf = (repo: string) => git(repo, 'rev-parse --abbrev-ref HEAD').trim()
+  it('goneBetween: a record removed then put back at its level is kept, put back public is gone, an edit does not count', async () => {
     const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
-    const from = git(w.repo, 'rev-parse HEAD').trim()
+    const from = tip(w.repo)
     const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
-    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.split('\n').filter(l => !l.includes('id: budget')).join('\n'))
+    const without = (id: string) => projects.split('\n').filter(l => !l.includes(`id: ${id}`)).join('\n')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), without('budget'))
     writeFileSync(join(w.repo, 'pages', 'keep-0002.md'), page('keep-0002', 'Keep', 'Edited.\n'))
     git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: budget out, keep edited"')
     writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects)
     git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: budget back"')
-    const to = git(w.repo, 'rev-parse HEAD').trim()
-    expect(await goneBetween(w.repo, from, to)).toEqual(['record:projects:budget'])
-    expect(await goneBetween(w.repo, to, to)).toEqual([])
+    const back = tip(w.repo)
+    expect(await goneBetween(w.repo, from, back)).toEqual([])
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), without('proj-1'))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: seed fund out"')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', '{ id: proj-1, visibility: public, title: Seed Fund,'))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "elsewhere: seed fund back, public"')
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['record:projects:proj-1'])
+    expect(await goneBetween(w.repo, back, back)).toEqual([])
+  })
+
+  it('goneBetween: a deleting branch merged with -s ours keeps the page\'s conversation', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    const trunk = trunkOf(w.repo), from = tip(w.repo)
+    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page deleted"')
+    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'merge -q -s ours side -m "merge side, ours"')
+    expect(existsSync(join(w.repo, 'pages', 'scratch-0001.md'))).toBe(true)
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
+  })
+
+  it('goneBetween: a page deleted and restored at the same level on a branch, merged without squash, is kept', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    const trunk = trunkOf(w.repo), from = tip(w.repo)
+    const text = readFileSync(join(w.repo, 'pages', 'scratch-0001.md'), 'utf8')
+    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page deleted"')
+    mkdirSync(join(w.repo, 'pages'), { recursive: true })
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), text.replace(BODY, 'Restored.\n'))
+    git(w.repo, 'add pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page restored"')
+    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on"')
+    git(w.repo, 'merge -q --no-ff side -m "merge side"')
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
+    // On the trunk's own line too: deleted, then made again at the same level.
+    const mid = tip(w.repo)
+    git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "page deleted"')
+    mkdirSync(join(w.repo, 'pages'), { recursive: true })
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), text)
+    git(w.repo, 'add pages/scratch-0001.md'); git(w.repo, 'commit -qm "page made again, members"')
+    expect(await goneBetween(w.repo, mid, tip(w.repo))).toEqual([])
+  })
+
+  it('goneBetween: a page deleted and made again at public is gone, and so is one a merge deletes', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
+    const trunk = trunkOf(w.repo), from = tip(w.repo)
+    git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "page deleted"')
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
+    git(w.repo, 'add pages/scratch-0001.md'); git(w.repo, 'commit -qm "made again, public"')
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['page:scratch-0001'])
+    // A merge whose side deleted keep-0002: the merge, read against its first parent, deletes it.
+    const mid = tip(w.repo)
+    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/keep-0002.md'); git(w.repo, 'commit -qm "side: keep deleted"')
+    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on"')
+    git(w.repo, 'merge -q --no-ff side -m "merge side"')
+    expect(await goneBetween(w.repo, mid, tip(w.repo))).toEqual(['page:keep-0002'])
   })
 })
