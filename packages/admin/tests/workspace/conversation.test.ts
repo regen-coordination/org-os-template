@@ -27,7 +27,7 @@ import { createSession } from '../../server/session/sessions.ts'
 import { startServer } from '../../server/serve.ts'
 import {
   ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, actorNames, commentView, fillWrittenLevels, mentionablesFor, mountConversation,
-  openConversationStore, targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, TASK_NO_LEVEL, plainLine,
+  openConversationStore, targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, TASK_NO_LEVEL, plainLine, FILL_RETRY_MS,
 } from '../../server/workspace/conversation.ts'
 import { mountPresence, Presence } from '../../server/workspace/presence.ts'
 import { admits } from '../../lib/visibility.mjs'
@@ -1287,5 +1287,59 @@ describe('T2f 2: a store read that fails judges nothing gone', () => {
     failing.mockRestore()
     await fillWrittenLevels(w.repo, w.store)
     expect(w.store.comment('c-old')?.writtenLevel).toBe(`hat:${OPS}`)
+  })
+})
+
+// T2f 3: a row that cannot be filled (its target's level cannot be read, and it is not gone) does not rerun the fill's
+// write on every read: the store's fill writes only when something changes, and the conversation retries the fill at most
+// once per FILL_RETRY_MS (housekeeping, at each trunk move and the start, always runs it).
+describe('T2f 3: a row that cannot be filled is retried at most once an interval, and writes nothing', () => {
+  const stuck = (id: string): CommentRow => ({ id, target: 'record:projects:proj-1', parent: null, anchor: null, by: 'steward-a', body: id,
+    created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: UNFILLED })
+
+  it('the store\'s fill opens no write transaction when no row would change', async () => {
+    const w = await world()
+    await w.store.writeConversation({ comments: [stuck('c-stuck')] })
+    const exec = vi.spyOn((w.store as unknown as { db: DatabaseSync }).db, 'exec')
+    await w.store.fillWrittenLevels(new Map(), 'nobody')
+    expect(exec.mock.calls.map(c => c[0])).not.toContain('BEGIN IMMEDIATE')
+    await w.store.fillWrittenLevels(new Map([['record:projects:proj-1', 'members']]), 'nobody')
+    expect(exec.mock.calls.map(c => c[0])).toContain('BEGIN IMMEDIATE')
+    expect(w.store.comment('c-stuck')?.writtenLevel).toBe('members')
+  })
+
+  it('reads within the interval do not retry the fill; one after it does, and housekeeping always does', async () => {
+    const w = await world()
+    await w.store.writeConversation({ comments: [stuck('c-stuck')] })
+    const projects = join(w.repo, 'data', 'projects.yaml')
+    chmodSync(projects, 0o000) // there, but it cannot be read: neither filled nor gone
+    try {
+      let clock = NOW.getTime()
+      const app = createApp(w.repo, (a, ctx) => {
+        mountConversation(a, { repo: w.repo, membership: w.membership, privateStore: ctx.privateStore, withLock: ctx.withLock, now: () => new Date(clock) })
+      }, { request: withRequest({ repo: w.repo, hosted: false, membership: w.membership, store: w.store, now: () => NOW }), privateStore: () => w.store })
+      const tries = vi.spyOn(w.store, 'unfilledTargets')
+      const read = async () => expect((await call(app, '/api/comments?target=page:handbook-3f2a')).status).toBe(200)
+      await read(); await read(); await read()
+      expect(tries).toHaveBeenCalledTimes(2) // one fill: its list, and its check of what is left
+      clock += FILL_RETRY_MS - 1
+      await read()
+      expect(tries).toHaveBeenCalledTimes(2)
+      clock += 1
+      await read()
+      expect(tries).toHaveBeenCalledTimes(4)
+      await housekeepAtStart(w.repo); await goneSettled(w.repo)
+      expect(tries).toHaveBeenCalledTimes(6)
+      expect(w.store.comment('c-stuck')?.writtenLevel).toBe(UNFILLED)
+      // Once it can be read, the next try fills it, and no read tries again.
+      chmodSync(projects, 0o644)
+      clock += FILL_RETRY_MS
+      await read()
+      expect(w.store.comment('c-stuck')?.writtenLevel).toBe('members')
+      const after = tries.mock.calls.length
+      clock += FILL_RETRY_MS
+      await read()
+      expect(tries.mock.calls.length).toBe(after)
+    } finally { chmodSync(projects, 0o644) }
   })
 })

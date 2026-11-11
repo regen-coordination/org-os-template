@@ -801,11 +801,16 @@ export class PrivateStore {
   /** PR7-R45, at the store's open after schema 3's migration (and again until none is left): the `unfilled` rows of each
    *  target in `levels` (target → level token) take that level; a target `levels` does not name stays unfilled, admitting
    *  nobody, to be filled when its level can be read (T2e I2). A comment's mentions take the comment's level once it has
-   *  one; those of a comment that is gone, `nobody`. One transaction. */
+   *  one; those of a comment that is gone, `nobody`. One transaction, and none when no row would change (T2f 3). */
   async fillWrittenLevels(levels: ReadonlyMap<string, string>, nobody: string): Promise<void> {
     nonEmpty('the level that admits nobody', nobody)
     for (const [t, l] of levels) { nonEmpty('a target', t); nonEmpty('a level', l) }
     await this.locked(() => {
+      // T2f 3: no write transaction when no row would change (a target `levels` names, or a comment's mention whose comment
+      // has a level or is gone): a row that cannot be filled yet costs a read, not BEGIN IMMEDIATE.
+      const work = this.unfilledTargetsIn().some(t => levels.has(t)) || this.db.prepare(`SELECT 1 FROM mentions m WHERE m.written_level = ?1
+        AND m.source LIKE 'comment:%' AND NOT EXISTS (SELECT 1 FROM comments c WHERE 'comment:' || c.id = m.source AND c.written_level = ?1) LIMIT 1`).get(WRITTEN_UNFILLED)
+      if (!work) return
       this.db.exec('BEGIN IMMEDIATE')
       try {
         const targets = new Set(this.unfilledTargetsIn())

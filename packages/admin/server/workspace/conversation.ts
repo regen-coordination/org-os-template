@@ -522,6 +522,9 @@ export function notificationsFor(viewer: Viewer, deps: Omit<ConversationDeps, 'n
 
 // ── the floor's migration and the housekeeping (PR7-R45) ─────────────────────────────────────────────
 
+/** T2f 3: how long a read waits before it tries again to fill rows whose level could not be read (housekeeping does not wait). */
+export const FILL_RETRY_MS = 60_000
+
 /** PR7-R45, T2e I2: the rows written before `written_level` existed take their target's level now (the safe reading for a
  *  store of today). A target that is not there at all (`goneNow`, housekeeping's test) takes a level nobody is admitted to,
  *  so a target made again later never reads its old talk; one there whose level cannot be read now (an unreadable file)
@@ -721,10 +724,17 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     try { deps.notify?.({ type: 'conversation', target, written: written.map(w => w ?? NOBODY_WRITTEN) }) } catch { /* the write stands */ }
   }
   /** PR7-R45: the rows written before the column existed are filled before any conversation is read: at the store's open
-   *  (`openConversationStore`), and here again until none is left (T2e I2: a target unreadable then is filled once it can be). */
+   *  (`openConversationStore`), and here again until none is left (T2e I2: a target unreadable then is filled once it can be).
+   *  T2f 3: while some are left, a read retries at most once per FILL_RETRY_MS (an unfilled row admits nobody meanwhile);
+   *  housekeeping (`always`, at each trunk move and the start) retries whenever it runs. */
   const filled = new WeakSet<PrivateStore>()
-  const fill = async (store: PrivateStore) => {
+  const tried = new WeakMap<PrivateStore, number>()
+  const fill = async (store: PrivateStore, always = false) => {
     if (filled.has(store)) return
+    const at = now().getTime()
+    const last = tried.get(store)
+    if (!always && last !== undefined && at - last < FILL_RETRY_MS) return
+    tried.set(store, at)
     let left: boolean
     try { left = await fillWrittenLevels(repo, store) } catch (err) { throw unavailable(err, store) }
     if (!left) filled.add(store)
@@ -764,7 +774,7 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
   onHousekeeping(repo, async () => {
     const { store } = reach(deps.privateStore)
     if (!store) return // the next move or start
-    await fill(store)
+    await fill(store, true)
     await applyTombstones(store)
     const at = now().toISOString()
     const gone = absentTargets(repo, store)
