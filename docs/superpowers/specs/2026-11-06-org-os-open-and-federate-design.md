@@ -338,3 +338,41 @@ These bind over the sections above where they differ.
 - **R10. Cloning a mounted repo is a per-row operation on the Systems page.** It is offered once the System,
   with its `mount`, is in `data/systems.yaml`, and only for a mount under `repos/`, which the canonical
   `.gitignore` ignores. "Map the rest" stages `mount`. It clones nothing.
+
+## 14. Revisions after reading the code (2026-11-10, for the N2 plan)
+
+These bind over the sections above where they differ.
+
+- **R11. Transports are plugins.** A request travels through a transport with one interface: `send`, plus `poll`,
+  `status` and `reply` where the transport can do them. N2 builds two:
+  - `file`: always available. The request is a file the operator sends by any means, and the hub imports it.
+  - `github`: the v1 git-host transport, through the operator's own `gh`.
+
+  `hosted` (the portal's Ask to join, after PR B sign-in and L9) and `p2p` are registered as transports that
+  say what they wait for. Adding one later changes no caller.
+- **R12. The github transport opens an issue on the hub's repo** (`join.where`), with the request in its body.
+  It doesn't push a branch or a fork. The hub polls those issues, and replies by closing the issue with
+  the outcome. *My call*, pending the operator's confirmation in the N2 plan: an issue needs no fork and no
+  write access to the hub. A pull-request transport can be added later as another plugin.
+- **R13. A request record holds org-level facts only:**
+  - the node's name, type and public address;
+  - the network;
+  - the answers to the hub's `asks`;
+  - the invite it used.
+
+  It never holds a person's contact. On a GitHub issue, the person is visible there and nowhere else.
+  The hub builds the change it applies from those validated fields (one `peers` entry). It never applies
+  a change carried inside the file, so a forged or edited request can't change anything else in the hub.
+- **R14. Invites carry a secret token, and the hub stores only its SHA-256.** The link holds the token. An
+  invite can be used once, expires, and is never published. Its authority is the hub's rules: an invite counts
+  only when it is on the hub's trunk, which means its creation passed those rules (the `identity` class).
+- **R15. A proposal can come from outside.** The proposals ledger gains an optional `origin` (`{ kind:
+  'federation-request', request, from }`). Its author is the hub member who imported the request. The
+  proposal list shows these as their own group, "From outside".
+- **R16. Nothing is sent, fetched or replied to over the network without the operator's confirmation.** Each
+  of those is a `network: true` operation. The Join door and the Federation page fill in the request but
+  never send it on their own.
+- **R17. `open` applies under `join.decision`,** a new field naming the hub's standing decision. `open`
+  with no `join.decision` is read as `open-with-approval`. With no `join` block, a hub is `closed`. The
+  operator's choice of `open-with-approval` (§11.2) is offered as the recommended policy. Each hub's
+  council sets its own.
