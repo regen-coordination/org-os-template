@@ -11,6 +11,7 @@ import { baseRoutes, changeView, knownActor } from '../test/data.ts'
 import { entryView } from '../test/fixtures/knowledge.ts'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import type { Viewer } from '../viewAs/visibility.ts'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 /** The member's tray, as the server holds it (G7): a field edit stages the entry's record op (a second field folds into
  *  it), × takes it out, Apply writes it; every answer is the change as it now stands. */
@@ -296,4 +297,28 @@ describe('the entry page', () => {
     expect(screen.getByRole('region', { name: /Checks/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Edit Audience' })).toBeNull()
   })
+})
+
+// R2 (plan D-6): while the Hub's writes are off a knowledge entry is read only: no field's Edit (the prepared edit) and,
+// for an edit already staged, no Apply. With writes on, both are offered.
+describe('the entry page while the Hub\'s writes are off', () => {
+  for (const off of [true, false]) {
+    it(off ? 'off: no Edit on any field, no Apply for a staged edit' : 'on: Edit on each field, and Apply for a staged edit', async () => {
+      const t = tray()
+      const stage = t.routes['POST /api/changes/ops'] as (init: RequestInit) => unknown
+      stage({ body: JSON.stringify({ ops: [{ record: RECORD, set: { audience: 'Volunteer growers' } }] }) })
+      fetchRoutes({ ...routes({}, t), ...statusRoute(off) })
+      renderAt(<Entry type="encyclopedia-entry" slug="living-mulch" />, '/c/knowledge/encyclopedia-entry/living-mulch', { queryClient: clientWith(off) })
+      await screen.findByRole('heading', { level: 1, name: 'Living mulch' })
+      await screen.findByText('Staged')
+      if (off) {
+        await new Promise(r => setTimeout(r, 50))
+        expect(screen.queryAllByRole('button', { name: /^Edit / })).toEqual([])
+        expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull()
+      } else {
+        expect((await screen.findAllByRole('button', { name: /^Edit / })).length).toBeGreaterThan(0)
+        expect(await screen.findByRole('button', { name: 'Apply' })).toBeTruthy()
+      }
+    })
+  }
 })

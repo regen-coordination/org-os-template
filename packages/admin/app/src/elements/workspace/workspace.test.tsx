@@ -18,6 +18,7 @@ import { MentionPicker } from './MentionPicker.tsx'
 import { mentionables } from './mentions.ts'
 import { COMMENTS, ME, MENTIONABLES, PAGE } from '../../test/fixtures/house/workspace.ts'
 import { FIXED_NOW } from '../../test/fixtures/parts.ts'
+import { clientWith } from '../../test/writesOff.ts'
 
 const as = (viewer: Viewer, ui: ReactElement) => renderAt(<ViewAsProvider initial={viewer}>{ui}</ViewAsProvider>)
 const MEMBERS = { level: 'members' } as const
@@ -383,6 +384,25 @@ describe('CommentThread (§10.3, E-15, E-16)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close comments' }))
     expect(onClose).toHaveBeenCalledTimes(2)
   })
+})
+
+// R2 (plan D-6): a read-only Hub still writes its private store's conversation, so with the Hub's writes off the thread
+// keeps its composer, Reply, Resolve and Reopen; only Turn into a task, which writes a task, is not drawn. On, all are.
+describe('CommentThread while the Hub\'s writes are off', () => {
+  const thread = () => (
+    <CommentThread comments={COMMENTS} visibility={HAT_OPS} me={ME} now={FIXED_NOW} form="panel"
+      onSend={noop} onRetry={noop} onDiscard={noop} onResolve={noop} onTask={noop} />
+  )
+  for (const off of [true, false]) {
+    it(off ? 'off: the composer, Reply and Resolve stay; Turn into a task is not drawn' : 'on: Reply, Resolve and Turn into a task, and the composer', () => {
+      renderAt(thread(), '/', { queryClient: clientWith(off) })
+      const first = screen.getByRole('article', { name: 'Steward B, 2 h ago' })
+      const acts = first.querySelector(':scope > .cmt-main > .cmt-f')!
+      expect([...acts.querySelectorAll('button')].map(b => b.textContent)).toEqual(off ? ['Reply', 'Resolve'] : ['Reply', 'Resolve', 'Turn into a task'])
+      expect(screen.queryAllByRole('button', { name: 'Turn into a task' }).length > 0).toBe(!off)
+      expect(screen.getByRole('textbox', { name: /comment/i })).toBeTruthy()
+    })
+  }
 })
 
 describe('Composer (§10.3)', () => {

@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 /** The setup page (spec §4.4, R-36): today it is the dry read — the selection run in memory — and what a run would
  *  write. It says the decisions are kms.yaml's rather than drawing a wizard that cannot write. */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import CommonsSetup from './CommonsSetup.tsx'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
 import { baseRoutes } from '../test/data.ts'
 import { knowledgeView } from '../test/fixtures/knowledge.ts'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
+import { READ_ONLY } from '../viewAs/ViewAs.tsx'
 
 const dryRead = {
   counts: { canon: 8, selected: 6, internal: 1, awaiting: 1, withheld: 0 },
@@ -67,4 +69,25 @@ describe('setting up', () => {
     expect(await screen.findByText('One index, and a page per kind')).toBeTruthy()
     expect(screen.getByText(/this page never runs it/)).toBeTruthy()
   })
+})
+
+// R2 (plan D-6): the dry read is a POST the server refuses while the Hub's writes are off (it serves only publication),
+// so the page does not ask it then and says why in the switch's words; the canon and what decides are still read.
+describe('setting up while the Hub\'s writes are off', () => {
+  for (const off of [true, false]) {
+    it(off ? 'off: no dry read asked; the read-only sentence instead' : 'on: the dry read is run and drawn', async () => {
+      const { calls } = fetchRoutes({ ...routes(), ...statusRoute(off) })
+      renderAt(<CommonsSetup />, '/c/knowledge/setup', { queryClient: clientWith(off) })
+      await screen.findByText('One index, and a page per kind')
+      if (off) {
+        expect(screen.getByText(READ_ONLY)).toBeTruthy()
+        await new Promise(r => setTimeout(r, 50))
+        expect(calls.filter(c => c.path === '/api/knowledge/dry-read')).toEqual([])
+        expect(screen.queryByText('Running the selection…')).toBeNull()
+      } else {
+        await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/api/knowledge/dry-read')).toBe(true))
+        expect(screen.queryByText(READ_ONLY)).toBeNull()
+      }
+    })
+  }
 })

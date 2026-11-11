@@ -12,6 +12,7 @@ import { OPEN_CHANGES } from '../keys/useHouseKeys.ts'
 import { COMPOSED_SYSTEMS } from '../test/fixtures/house/composed.ts'
 import { DEPLOY_PLAN, DEPLOY_SAFE, REPLACES, SPACE_DRAFT, STEP_HATS, STEP_REGISTER, STEP_SPACE, STEP_WEARERS, STEP_WIRE, WIRE_WINDOW } from '../test/fixtures/house/deploy.ts'
 import type { Op } from '../api.ts'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -301,4 +302,20 @@ describe('/deploy (L7 Task 18)', () => {
     await waitFor(() => expect(rows().length).toBe(8))
     expect(screen.queryByRole('button', { name: 'Read back' })).toBeNull()
   })
+})
+
+// R2 (plan D-6): Read back stages what the chain holds into the member's change, so while the Hub's writes are off it is
+// not drawn; the steps are still listed. With writes on, it is the page's primary.
+describe('/deploy while the Hub\'s writes are off', () => {
+  for (const off of [true, false]) {
+    it(off ? 'off: the steps, and no Read back' : 'on: the steps, and Read back', async () => {
+      fetchRoutes(baseRoutes({ ...systems, 'GET /api/deploy': DEPLOY_PLAN, ...statusRoute(off) }))
+      renderAt(<Deploy />, '/deploy', { queryClient: clientWith(off) })
+      await waitFor(() => expect(rows().length).toBe(8))
+      if (off) {
+        await new Promise(r => setTimeout(r, 50))
+        expect(screen.queryByRole('button', { name: 'Read back' })).toBeNull()
+      } else expect(await screen.findByRole('button', { name: 'Read back' })).toBeTruthy()
+    })
+  }
 })

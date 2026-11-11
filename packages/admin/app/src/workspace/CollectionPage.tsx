@@ -32,7 +32,7 @@ import { refusalErrors } from '../record/useEditor.ts'
 import { restrictedHat, restrictedOf } from '../record/restricted.ts'
 import { recallPositions, rememberPositions } from '../storage.ts'
 import { useNow } from '../time.ts'
-import { useCanWrite, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useCanWrite, useVisibilitySource } from '../viewAs/ViewAs.tsx'
 import { RestrictedValue } from '../viewAs/VisibilityMarker.tsx'
 import {
   BUILTIN_NAMES, boardColumns, boardFieldOf, cellText, collectionGraph, columnValue, dateFieldOf, dayOf, fieldsOf, inColumnOrder, NONE,
@@ -83,6 +83,7 @@ export default function CollectionPage({ collection, view }: { collection: strin
   const c = useCollection(collection)
   const [, navigate] = useLocation()
   const canWrite = useCanWrite()
+  const canConverse = useCanConverse()
   const now = useNow(false)
   const label = c.def?.name ?? BUILTIN_NAMES[collection] ?? collection
   const saved: SavedView[] = (c.def?.views ?? []) as SavedView[]
@@ -104,7 +105,8 @@ export default function CollectionPage({ collection, view }: { collection: strin
     if (!ready || work !== null) return
     setWork(c.state && c.state.view === tab ? workOf(c.state) : workOf(current))
   }, [ready])
-  useKeepViewState(collection, work === null ? null : { view: tab, filters: work.filters, sort: work.sort }, canWrite && ready && work !== null, c.state)
+  // View state is the member's own, in the private store: kept while the Hub's writes are off too (plan D-6), never while previewing.
+  useKeepViewState(collection, work === null ? null : { view: tab, filters: work.filters, sort: work.sort }, canConverse && ready && work !== null, c.state)
   // A saved view's tab, however it is reached (a click, or the browser's Back and Forward), brings its own filters and
   // sort; one of the five views keeps the ones on now. The first tab keeps what the view state gave it.
   const was = useRef<string | null>(null)

@@ -86,9 +86,20 @@ export function useCanWrite(): boolean {
   return useContext(ViewAsContext).viewer.as === 'you' && !off
 }
 
+/** False while previewing, true otherwise, whether or not the Hub's writes are off: what a read-only Hub still writes
+ *  (plan D-6) — the private store's conversation and per-member state (comments, their resolve, reopen and delete,
+ *  read marks, view state) — is offered as long as you are you. Turn into a task writes a task: it asks `useCanWrite`. */
+export function useCanConverse(): boolean {
+  return useContext(ViewAsContext).viewer.as === 'you'
+}
+
+/** The sentence a write refused while the Hub's writes are off says (server/hosted/instance-writes.ts READ_ONLY, the
+ *  same words: a test holds them together), for a page that says it without asking. */
+export const READ_ONLY = 'This Hub is read-only until writes are turned on. Nothing was written.'
+
 /** Whether `GET /api/status`, as the client last read it, says the Hub's writes are off. It reads the cache only, so it
  *  asks the server nothing itself, and draws as on with no query client (/parts, element tests). */
-function useWritesOff(): boolean {
+export function useWritesOff(): boolean {
   const client = useContext(QueryClientContext)
   return useSyncExternalStore(
     useCallback((changed: () => void) => (client ? client.getQueryCache().subscribe(changed) : () => {}), [client]),

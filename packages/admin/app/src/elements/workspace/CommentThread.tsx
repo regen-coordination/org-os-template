@@ -4,7 +4,7 @@ import { Button } from '../../design/Button.tsx'
 import { Icon } from '../../design/Icon.tsx'
 import { useFrame } from '../../design/Shell.tsx'
 import { ageText } from '../../time.ts'
-import { useCanWrite } from '../../viewAs/ViewAs.tsx'
+import { useCanConverse, useCanWrite } from '../../viewAs/ViewAs.tsx'
 import { VisibilityMarker } from '../../viewAs/VisibilityMarker.tsx'
 import type { Visibility } from '../../viewAs/visibility.ts'
 import { monogram } from '../atoms/Presence.tsx'
@@ -156,9 +156,13 @@ function ThreadSheet({ inline, onClose, children }: { inline: boolean; onClose?(
  *  into a task; replies indent 54 under it. Sending: the body mute, "Sending…". Not sent: clay "Not sent", Retry and
  *  Discard. Resolved: one line, "Resolved by Ops lead · 3 replies · Show". An anchored comment quotes its passage, and
  *  selecting the quote scrolls the page to it. The composer closes it. While previewing, every write — the actions,
- *  Retry and Discard, the composer — is not drawn (C-23). Conversation shows no save state (§10.6). */
+ *  Retry and Discard, the composer — is not drawn (C-23); while the Hub's writes are off only Turn into a task is not
+ *  (plan D-6). Conversation shows no save state (§10.6). */
 export function CommentThread(p: CommentThreadProps) {
-  const canWrite = useCanWrite()
+  // Conversation is what a read-only Hub still writes (plan D-6): drawn unless previewing. Turn into a task writes a
+  // task, so it is drawn only when writes are on too.
+  const canWrite = useCanConverse()
+  const canTask = useCanWrite()
   const { width } = useFrame()
   const form = p.form ?? threadForm(width)
   const now = p.now ?? new Date()
@@ -186,7 +190,7 @@ export function CommentThread(p: CommentThreadProps) {
       <div className="cmt-f">
         <button type="button" className="cmt-a" aria-expanded={replying === c.id} onClick={() => setReplying(r => (r === c.id ? null : c.id))}>Reply</button>
         {!c.resolved && !c.deleted && <button type="button" className="cmt-a" onClick={() => p.onResolve(c.id)}>Resolve</button>}
-        {!c.deleted && !c.task && <button type="button" className="cmt-a" onClick={() => p.onTask(c.id)}>Turn into a task</button>}
+        {canTask && !c.deleted && !c.task && <button type="button" className="cmt-a" onClick={() => p.onTask(c.id)}>Turn into a task</button>}
         {del}
       </div>
     )

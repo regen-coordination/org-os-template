@@ -14,6 +14,7 @@ import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { FIXTURE_SOURCE } from '../viewAs/visibility.ts'
 import CollectionPage, { MEETING_STAGED, VIEW_STAGED } from './CollectionPage.tsx'
 import { HubCollections } from './HubCollections.tsx'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 const MONTH = TODAY.slice(0, 8)
@@ -497,5 +498,67 @@ describe('/workspace — the Hub’s collections', () => {
     fireEvent.change(within(form).getByRole('textbox', { name: 'Name' }), { target: { value: 'Circles' } })
     fireEvent.submit(form)
     await waitFor(() => expect(loc.history.at(-1)).toBe('/c/circles'))
+  })
+})
+
+// R2 (plan D-6): while the Hub's writes are off a collection is read, never written — no cell edit, no + New in a
+// column, no Record a meeting, no New collection — but the member's own view state, kept in the private store, is
+// still kept. With writes on, each control is offered.
+describe('a collection while the Hub\'s writes are off', () => {
+  const drawWith = (path: string, off: boolean) => {
+    const ui = (
+      <Switch>
+        <Route path="/c/:collection">{p => <CollectionPage key={p.collection} collection={p.collection} />}</Route>
+        <Route path="/c/:collection/:view">{p => <CollectionPage key={p.collection} collection={p.collection} view={p.view} />}</Route>
+      </Switch>
+    )
+    return renderAt(ui, path, { queryClient: clientWith(off) })
+  }
+  const MEETINGS = {
+    'GET /api/collections': { collections: [], problems: [] },
+    'GET /api/registries/meetings': { name: 'meetings', kind: 'collection', schemaVersion: null, entries: [] },
+    'GET /api/view-state/meetings': { collection: 'meetings', state: null },
+  }
+  for (const off of [true, false]) {
+    it(off ? 'off: a cell does not open for editing and the board offers no + New' : 'on: a cell opens for editing and each column offers + New', async () => {
+      routes(statusRoute(off))
+      const first = drawWith('/c/tasks/table', off)
+      const grid = await screen.findByRole('grid', { name: 'Tasks' })
+      const cell = within(grid).getByText('Draft the pool report').closest('tr')!.querySelectorAll('td')[1]!
+      fireEvent.doubleClick(cell)
+      expect(within(cell).queryAllByRole('textbox', { name: 'Status' })).toHaveLength(off ? 0 : 1)
+      first.unmount()
+      drawWith('/c/tasks/board', off)
+      await screen.findByRole('group', { name: 'Tasks' })
+      expect(screen.queryAllByRole('button', { name: /^New in / }).length > 0).toBe(!off)
+    })
+
+    it(off ? 'off: no Record a meeting' : 'on: Record a meeting', async () => {
+      routes({ ...statusRoute(off), ...MEETINGS })
+      drawWith('/c/meetings', off)
+      await screen.findByText('No meetings yet.')
+      expect(screen.queryAllByRole('button', { name: 'Record a meeting' })).toHaveLength(off ? 0 : 1)
+    })
+
+    it(off ? 'off: no New collection; the collections are listed' : 'on: New collection', async () => {
+      routes(statusRoute(off))
+      renderAt(<HubCollections />, '/workspace', { queryClient: clientWith(off) })
+      await screen.findByRole('list', { name: 'Collections in the Hub' })
+      expect(screen.queryAllByRole('button', { name: 'New collection' })).toHaveLength(off ? 0 : 1)
+    })
+  }
+
+  it('off: a filter added is still kept as the member\'s view state (it is theirs, in the private store)', async () => {
+    const { calls } = routes(statusRoute(true))
+    drawWith('/c/tasks/board', true)
+    await screen.findByRole('group', { name: 'Tasks' })
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    const filter = screen.getByRole('form', { name: 'New filter' })
+    fireEvent.change(within(filter).getByLabelText('Field'), { target: { value: 'owner' } })
+    fireEvent.change(within(filter).getByLabelText('Condition'), { target: { value: 'is' } })
+    fireEvent.change(within(filter).getByLabelText('Value'), { target: { value: 'ops-lead' } })
+    fireEvent.submit(filter)
+    await waitFor(() => expect(posts(calls, '/api/view-state/tasks').at(-1)?.body).toEqual({ state: { view: 'board', filters: [{ field: 'owner', op: 'is', value: 'ops-lead' }], sort: null } }))
+    expect(screen.queryByRole('button', { name: 'Save view…' })).toBeNull() // a saved view is the collection's: not while off
   })
 })

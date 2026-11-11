@@ -14,6 +14,7 @@ import Tray from '../changes/Tray.tsx'
 import type { ChangeView, FileView } from '../api.ts'
 import FilePage, { FILE_CHANGED } from './FilePage.tsx'
 import { filesPathOf, READ_HERE, STAGED_WHOLE } from './files.ts'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 const GOV_TEXT = '# who decides what\nmodel: solo-maintainer\nroles:\n  - id: maintainer\n'
 const GOV: FileView = { path: 'data/governance.yaml', text: GOV_TEXT, base: 'b1', class: 'governance', editor: 'rules+source' }
@@ -242,4 +243,27 @@ describe('/files/* — the source editor', () => {
     await waitFor(() => expect(loc.history.at(-1)).toBe('/files/memory/2026-11-05.md'))
     expect((await screen.findByRole('textbox', { name: 'text' }) as HTMLTextAreaElement).value).toBe('# notes\n')
   })
+})
+
+// R2 (plan D-6): the source editor stages into the member's change, so while the Hub's writes are off the file is shown
+// read only and Save to changes is not drawn. With writes on, the well is editable and Save is offered.
+describe('/files/* while the Hub\'s writes are off', () => {
+  for (const off of [true, false]) {
+    it(off ? 'off: the text, read only, and no Save to changes' : 'on: the text in an editable well, and Save to changes', async () => {
+      fetchRoutes({ ...baseRoutes(), ...fileRoute(GOV), ...statusRoute(off) })
+      renderAt(
+        <Switch><Route path="/files/*">{p => <FilePage path={filesPathOf(p['*'])} />}</Route></Switch>,
+        '/files/data/governance.yaml', { queryClient: clientWith(off) })
+      expect(await screen.findByRole('heading', { level: 1, name: 'governance.yaml' })).toBeTruthy()
+      await waitFor(() => expect(document.body.textContent).toContain('model: solo-maintainer'))
+      if (off) {
+        await new Promise(r => setTimeout(r, 50))
+        expect(screen.queryByRole('button', { name: 'Save to changes' })).toBeNull()
+        expect(screen.queryByRole('textbox', { name: 'text' })).toBeNull()
+      } else {
+        expect(await screen.findByRole('button', { name: 'Save to changes' })).toBeTruthy()
+        expect(screen.getByRole('textbox', { name: 'text' })).toBeTruthy()
+      }
+    })
+  }
 })

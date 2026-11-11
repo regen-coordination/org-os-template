@@ -10,6 +10,7 @@ import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { FIXTURE_SOURCE } from '../viewAs/visibility.ts'
 import Workspace from '../pages/Workspace.tsx'
 import { NEW_PAGE_STAGED, PageTree, treeRows } from './PageTree.tsx'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 /** The machine is shared: a first draw may take longer than the default second. */
@@ -109,4 +110,23 @@ describe('the page tree', () => {
     expect(treeRows([...PAGE_NODES], () => true).map(r => [r.node.id, r.depth])).toEqual([
       ['handbook-1a2b', 0], ['treasury-3c4d', 1], ['welcome-5e6f', 0], ['orphan-7a8b', 0]])
   })
+})
+
+// R2 (plan D-6): while the Hub's writes are off, New page and a row's Move to… are not drawn; on, they are.
+describe('the page tree while the Hub\'s writes are off', () => {
+  const writable = PAGE_NODES.map(n => ({ ...n, write: 'direct' }))
+  for (const off of [true, false]) {
+    it(off ? 'off: no New page, no row menu; the pages are still listed' : 'on: New page and each row\'s Move to…', async () => {
+      routes({ ...statusRoute(off), 'GET /api/pages?write': writable })
+      renderAt(<PageTree />, '/workspace', { queryClient: clientWith(off) })
+      expect((await rowsOf()).length).toBe(4)
+      if (off) {
+        expect(screen.queryByRole('button', { name: 'New page' })).toBeNull()
+        expect(screen.queryByRole('button', { name: /^More for/ })).toBeNull()
+      } else {
+        expect(await screen.findByRole('button', { name: 'New page' }, LOAD)).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'More for Handbook' })).toBeTruthy()
+      }
+    })
+  }
 })

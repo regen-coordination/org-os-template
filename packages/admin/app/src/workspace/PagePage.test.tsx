@@ -22,6 +22,8 @@ const NO_STORE = 'This server has no private store open, so nothing private can 
 import { whoCanSee } from './share.ts'
 import { SENDING, SUGGESTED, SUGGEST_TO_GIT } from './SuggestForm.tsx'
 import { errorNote, heard } from '../test/notes.ts'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
+import { pageThread } from './ConversationThread.tsx'
 
 const ID = 'treasury-3c4d'
 const BODY = 'The treasury is one Safe at the same address on seven chains.\n'
@@ -704,4 +706,39 @@ describe('ancestorsOf', () => {
     expect(ancestorsOf('c', 'a', nodes).map(n => n.id)).toEqual(['b', 'a'])
     expect(ancestorsOf(ID, 'handbook-1a2b', [...PAGE_NODES]).map(n => n.id)).toEqual(['handbook-1a2b'])
   })
+})
+
+// R2 (plan D-6): while the Hub's writes are off the page is read, never edited: no editing session is opened (so nothing
+// is saved, suggested or resolved), the editor is read-only, and New subpage and Move to… are not drawn. Presence beats,
+// the read mark and the comments stay. With writes on, the same page opens its session and offers both.
+describe('/p/:id while the Hub\'s writes are off', () => {
+  for (const off of [true, false]) {
+    it(off ? 'off: read only, no session, no New subpage or Move to…; presence, the read mark and Comments stay'
+      : 'on: the session opens, the editor writes, New subpage and Move to… are offered', async () => {
+      const { calls } = routes({
+        ...statusRoute(off),
+        [`POST /api/presence`]: { target: `page:${ID}`, people: [] },
+        'POST /api/reads': { target: `page:${ID}`, at: '2026-11-11T00:00:00Z', read: 0 },
+        'GET /api/notifications': [],
+        [`GET /api/comments?target=page%3A${ID}`]: [],
+      })
+      renderAt(<PagePage id={ID} thread={pageThread} />, `/p/${ID}`, { queryClient: clientWith(off) })
+      const view = await editorView()
+      await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/api/presence')).toBe(true), { timeout: 4000 })
+      await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/api/reads')).toBe(true), { timeout: 4000 })
+      expect(screen.getByRole('button', { name: /^Comments, / })).toBeTruthy()
+      if (off) {
+        await new Promise(r => setTimeout(r, 100))
+        expect(calls.filter(c => c.path.startsWith(`/api/pages/${ID}/sessions`) || c.path.startsWith('/api/sessions/'))).toEqual([])
+        expect(view.dom.getAttribute('contenteditable')).toBe('false')
+        expect(screen.queryByRole('button', { name: 'New subpage' })).toBeNull()
+        expect(screen.queryByRole('button', { name: 'Move to…' })).toBeNull()
+        expect(screen.queryByRole('button', { name: 'Suggest' })).toBeNull()
+      } else {
+        await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === `/api/pages/${ID}/sessions`)).toBe(true), { timeout: 4000 })
+        expect(screen.getByRole('button', { name: 'New subpage' })).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Move to…' })).toBeTruthy()
+      }
+    })
+  }
 })
