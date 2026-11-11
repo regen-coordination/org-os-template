@@ -74,9 +74,10 @@ function signInConfig(): SignInConfig {
   return read.config
 }
 
-async function house() {
+async function house(opts: { visibility?: string } = {}) {
   const repo = makeFixtureRepo(); cleanup.push(() => rmSync(repo, { recursive: true, force: true }))
   writeFileSync(join(repo, 'data', 'members.yaml'), MEMBERS)
+  if (opts.visibility !== undefined) writeFileSync(join(repo, 'data', 'visibility.yaml'), opts.visibility)
   writeFileSync(join(repo, 'data', 'governance.yaml'), GOVERNANCE)
   mkdirSync(join(repo, 'pages'), { recursive: true })
   writeFileSync(join(repo, 'pages', `${PAGE}.md`), joinPage({ id: PAGE, title: 'Notes', parent: null, order: 1000 }, 'Members only.\n'))
@@ -173,5 +174,21 @@ describe('a member signed in by an emailed link, in the one display name (PF-R25
     expect(session).toMatchObject({ signedIn: true, via: 'email', actor: VISITOR, viewer: 'public', person: { id: VISITOR, name: 'V. Visitor (roles)' } })
     const actor = await (await h.call('GET', '/api/actor', { cookie })).json()
     expect(actor).toMatchObject({ id: VISITOR, name: 'V. Visitor (roles)' })
+  })
+
+  // T2d (the T2c review's finding 4), Rule 4: the request's actor is named as any member may read the members file (as the
+  // public may, for a person with no Role), since presence falls back to it for everyone on the page. Only GET /api/session
+  // tells the person their own name as their own viewer reads it.
+  it('a steward whose members-file name only the council may read appears to a plain member in presence by what that member may read', async () => {
+    const h = await house({ visibility: 'visibility:\n  collections:\n    members: { fields: { name: "role:council" } }\n' })
+    const cookie = await h.signedIn()
+    const session = await (await h.call('GET', '/api/session', { cookie })).json()
+    expect(session.person).toMatchObject({ id: ID, name: 'Example Steward' })
+    expect((await h.call('POST', '/api/presence', { cookie, body: { target: `page:${PAGE}` } })).status).toBeLessThan(300)
+    const plain = { kind: 'member' as const, id: 'example-org:person:someone-else', hats: [] as string[], roles: [] as string[] }
+    expect(h.presence.of(`page:${PAGE}`, plain)).toEqual([expect.objectContaining({ handle: ID, role: 'E. Steward (roles)' })])
+    expect(JSON.stringify(h.presence.everyone(`page:${PAGE}`))).not.toContain('Example Steward')
+    const actor = await (await h.call('GET', '/api/actor', { cookie })).json()
+    expect(actor.name).toBe('E. Steward (roles)')
   })
 })

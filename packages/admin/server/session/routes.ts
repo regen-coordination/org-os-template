@@ -9,7 +9,7 @@ import type { HostedConfig } from '../hosted/config.ts'
 import { GRACE_BAND, pastGrace, TREE_UNREADABLE, type Membership } from './membership.ts'
 import { Nonces, TOO_MANY } from './nonces.ts'
 import { clearedCookie, createSession, endSession, sessionCookie, sessionFromCookie, sessionToken, type Session } from './sessions.ts'
-import { actorOf, personOf, viewerOf } from '../request.ts'
+import { personOf, viewerOf } from '../request.ts'
 import { endPersonSession } from './person.ts'
 import { personName } from './names.ts'
 import { clearedSessionCookie } from '../../lib/session-token.mjs'
@@ -103,12 +103,10 @@ export function mountSession(app: Hono, d: SessionDeps): void {
     instanceWrites: d.instanceWrites ?? 'on',
   } : {}
 
-  /** The person's name as the request named them (request.ts `personWho`, read as their own viewer may read the members
-   *  file: Rule 4, T2c minor 2); never wider than the request's viewer. */
-  const nameOfPerson = (c: Context, person: { id: string; name: string }): string => {
-    const who = actorOf(c)
-    return who && 'via' in who && who.via === 'email' && who.id === person.id ? who.name : personName(d.repo, person, viewerOf(c))
-  }
+  /** The person's own name, told to them alone: read as their own viewer may read the members file (Rule 4, T2c minor 2;
+   *  T2d finding 4: the request's actor carries the name any member may read, since others see it). `viewerOf` is the
+   *  session's viewer, narrowed by a `?as=` preview, never wider. */
+  const nameOfPerson = (c: Context, person: { id: string; name: string }): string => personName(d.repo, person, viewerOf(c))
 
   app.get('/api/session', c => {
     const tree = d.store ? d.membership.tree() : null
