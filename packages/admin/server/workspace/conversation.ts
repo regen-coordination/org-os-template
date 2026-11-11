@@ -29,7 +29,7 @@ import { readRuleContext } from '../governance/effective.ts'
 import { registriesOf } from '../registries.ts'
 import { shortAddress } from '../systems/safe.ts'
 import { accountOn, type Membership } from '../session/membership.ts'
-import { displayNames, membersHold } from '../session/names.ts'
+import { displayNames, memberLabels, membersHold } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads } from '../private/reads.ts'
@@ -42,7 +42,7 @@ import { floorsAbove, mayRead, NOBODY_WRITTEN, readableRows, writtenLevelOf } fr
 import { readRegistryOrEmpty } from '../registry.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, type ParsedLevel, type Viewer } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
-import { NO_PAGE, slugOf, splitPage } from '../../lib/workspace/pages.mjs'
+import { NO_PAGE, relabelMembers, slugOf, splitPage } from '../../lib/workspace/pages.mjs'
 import { resolveRoles, rolesOf } from '../../lib/rules.mjs'
 import { actorIdOf, walletsOf } from '../../lib/hat-readings.mjs'
 import { parseCaip10 } from '../../lib/caip.mjs'
@@ -427,8 +427,9 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const people = new People(deps.repo, deps.membership)
   // `tell`'s test (T2e M4): the target's level now and, for a reply, every level of the comments above it (`floors`).
   const told = (v: Viewer) => admits(level, v) && floors.every(f => mayRead(v, level, f))
-  // T2e I1 (Rule 4): a member is offered by the name the author may read (the gate), else their id.
-  const display = displayNames(deps.repo, deps.membership, { viewer })
+  // T2f 1 (Rule 4): a member is offered by the name any member may read (the gate), else their id: the label is written into
+  // the text, which readers other than the author read (and every write rewrites it so, `relabelMembers`).
+  const display = memberLabels(deps.repo)
 
   const persons: Mentionable[] = []
   for (const m of people.members) {
@@ -664,7 +665,11 @@ export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: Kno
   const levels: ParsedLevel[] = [info.level, ...floor.map(w => writtenLevelOf(w ?? ''))]
   const narrowest = levels.find(l => levels.every(o => narrowerOrEqual(l, o)))
   if (!narrowest) throw new HttpError(409, TASK_NO_LEVEL, 'NO_LEVEL')
-  const title = plainLine(row.body.split('\n').map(l => l.trim()).find(l => l !== '') ?? '')
+  // T2f 1 (Rule 4): a member's label in the line is written as any member may read the name, else the id, whenever the
+  // comment was written.
+  const named = relabelMembers(row.body.split('\n').map(l => l.trim()).find(l => l !== '') ?? '', memberLabels(deps.repo))
+  if (named.refused !== null) throw new Refusal(422, { code: 'MEMBER_LINK', error: named.refused })
+  const title = plainLine(named.body)
   const link = linkOf(row.target as Target)
   if (levels.every(l => gitAllows(l))) {
     let taken: Set<string>

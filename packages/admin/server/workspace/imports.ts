@@ -26,6 +26,7 @@ import { classOf } from '../../lib/change-classes.mjs'
 import { registryFileOf } from '../../lib/registries.mjs'
 import { ancestorsOf, pageTargets, recordTargets } from '../../lib/workspace/targets.mjs'
 import { treeReader } from '../private/targets.ts'
+import { memberLabels } from '../session/names.ts'
 import { planImport as plan, withReceipt, type ImportMap, type ImportPlan, type ImportState, type PrivateWrite } from '../../lib/imports/plan.mjs'
 import type { ImportBundle } from '../../lib/imports/bundle.mjs'
 
@@ -71,6 +72,8 @@ export function readImportState(repo: string, store: PrivateStore | null): Impor
     now: new Date().toISOString(),
     by: '',
     random: () => randomBytes(6).toString('hex'),
+    // T2f 1 (Rule 4): a member mention in an imported page is labelled as any member may read the name, else the id.
+    memberLabel: memberLabels(repo),
     registryProps: name => {
       // A registry's own fields, from its schema (packages/admin/schemas/<name>.schema.json): each with the JSON types it takes.
       const file = new URL(`../../schemas/${name}.schema.json`, import.meta.url)

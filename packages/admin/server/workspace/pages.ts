@@ -47,12 +47,12 @@ import type { PrivateRecord, PrivateStore } from '../private/store.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, type ParsedLevel, type Viewer, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
 import { ancestorsOf, pageTargets } from '../../lib/workspace/targets.mjs'
-import { displayNames } from '../session/names.ts'
+import { displayNames, memberLabels } from '../session/names.ts'
 import type { Membership } from '../session/membership.ts'
 import {
   ASSET_MAX_BYTES, CANNOT_LINK, childrenOf, descendantsOf, guardRefs, HAS_SUBPAGES, joinPage, labelledLinks, looserThanParent, LOOSER_THAN_PARENT, NAMED_BY,
   newPageId, NO_PAGE, NO_PRIVATE_ASSETS, orderBetween, ORDER_EPSILON, ORDER_STEP, PAGE_MAX_BYTES, pageEntries, pageLevel, pagesMadePublic, PARENT_MISSING,
-  PRIVATE_PAGE_ID, slugOf, splitPage, staleOf, type PageEntry, type PageFront,
+  PRIVATE_PAGE_ID, relabelMembers, slugOf, splitPage, staleOf, type PageEntry, type PageFront,
 } from '../../lib/workspace/pages.mjs'
 
 export {
@@ -178,8 +178,13 @@ export function publicPagesOf(repo: string): { front: PageFront; body: string }[
 // ── links (§4.5) ─────────────────────────────────────────────────────────────────────────────────────
 
 /** `guardRefs` over the instance: a page's level from the tree, a private collection's from the store. A collection git
- *  does not know, while the store cannot be reached, cannot be judged: the store's 503. */
-export function guardPageRefs(body: string, level: ParsedLevel, deps: { repo: string; store: PrivateStore | null; why?: unknown }): { body: string; refused: string | null } {
+ *  does not know, while the store cannot be reached, cannot be judged: the store's 503. Every write of a page's or a
+ *  comment's body passes it, so it also writes each member mention's label as any member may read the name (T2f 1). */
+export function guardPageRefs(text: string, level: ParsedLevel, deps: { repo: string; store: PrivateStore | null; why?: unknown }): { body: string; refused: string | null } {
+  // T2f 1 (Rule 4): every member mention's label is the name any member may read, else the id, before the links are judged.
+  const named = relabelMembers(text, memberLabels(deps.repo))
+  if (named.refused !== null) return named
+  const body = named.body
   const tree = treeOf(deps.repo, deps.store)
   const names = gitNames(deps.repo)
   return guardRefs(body, level, {

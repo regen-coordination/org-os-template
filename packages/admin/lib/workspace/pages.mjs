@@ -538,6 +538,79 @@ export function guardRefs(body, level, lookups) {
   return badRecord.length > 0 ? { body, refused: STRICT_RECORD_LINK(badRecord[0]) } : { body: out, refused: null }
 }
 
+// ── member mentions (T2f 1, Rule 4) ──────────────────────────────────────────────────────────────────
+
+/** A member mention whose label cannot be rewritten (a reference-style link, a label over several lines, a title in the
+ *  link), so the name it shows could be one fewer people may read. @param {string} id */
+export const MEMBER_LINK = (id) =>
+  `This text names the member ${id} in a way whose label cannot be written as the name every member may read: write the mention as [@${id}](hub:member/${id}).`
+
+const MEMBER_DEST = String.raw`\(\s*(<)?(hub:member\/([^/\s()<>]+))(>)?(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?\s*\)`
+/** A member mention as the dialect reads it (a label with one level of brackets inside). */
+const MEMBER_INLINE = new RegExp(String.raw`(?<![\\!])${LABEL}${MEMBER_DEST}`, 'g')
+/** A member mention as a comment's thread draws it (commentBody.tsx: any `[label](target)` on one line, code or not). */
+const MEMBER_PLAIN = /\[([^\]\n]*)\]\(\s*(<)?(hub:member\/([^/\s()<>]+))(>)?\s*\)/g
+const MEMBER_HREF = /^hub:member\/([^/\s]+)$/
+/** A name as a label holds it: no bracket, backslash, backtick or line break that would end or change the link. @param {string} s */
+const labelText = (s) => s.replace(/[[\]\\`\r\n]/g, '').replace(/\s+/g, ' ').trim()
+/** A label as the check compares it: its marks and spaces gone. @param {string} s */
+const bare = (s) => s.replace(/[[\]\\`*_~\s]/g, '')
+
+/**
+ * T2f 1 (Rule 4): `body` with the label of every member mention (`[label](hub:member/<id>)`) rewritten to `labelOf(id)` (the
+ * name every member may read, else the id; the server's `memberLabels`), an `@` kept where the label had one, and a title
+ * in the link dropped. Every write of a comment, a page (git and store) and a task's title passes it, so a label typed or
+ * picked by someone who may read more, or written before a name was narrowed, never carries a name to the text's readers.
+ * Two passes: the dialect's (outside code, labels with brackets inside) and the thread's (every line, code too, as a
+ * comment is drawn); then the dialect's tokens are read, and a member link whose label is still another is refused with
+ * MEMBER_LINK (a reference-style link, a label over lines).
+ * @param {string} body @param {(id: string) => string} labelOf @returns {{ body: string, refused: string | null }}
+ */
+export function relabelMembers(body, labelOf) {
+  if (!body.includes('hub:member/')) return { body, refused: null }
+  /** @type {Map<string, string>} */
+  const memo = new Map()
+  const nameOf = (/** @type {string} */ id) => {
+    let hit = memo.get(id)
+    if (hit === undefined) { hit = labelText(labelOf(id)) || id; memo.set(id, hit) }
+    return hit
+  }
+  const label = (/** @type {string} */ was, /** @type {string} */ id) => `${was.trimStart().startsWith('@') ? '@' : ''}${nameOf(id)}`
+  const skip = codeLines(body)
+  const first = body.split('\n').map((line, n) => {
+    if (skip.has(n)) return line
+    const masked = maskCode(line)
+    let out = ''
+    let last = 0
+    MEMBER_INLINE.lastIndex = 0
+    for (let m; (m = MEMBER_INLINE.exec(masked)) !== null;) {
+      out += `${line.slice(last, m.index)}[${label(m[1], m[4])}](${m[2] ?? ''}${m[3]}${m[5] ?? ''})`
+      last = m.index + m[0].length
+    }
+    return out + line.slice(last)
+  }).join('\n')
+  const out = first.replace(MEMBER_PLAIN, (_all, was, open, dest, id, close) => `[${label(was, id)}](${open ?? ''}${dest}${close ?? ''})`)
+  /** @type {string | null} */
+  let bad = null
+  /** @param {import('markdown-it').Token[]} tokens */
+  const walk = (tokens) => {
+    for (let i = 0; i < tokens.length && bad === null; i++) {
+      const t = tokens[i]
+      if (t.children) walk(t.children)
+      if (t.type !== 'link_open') continue
+      const href = t.attrGet('href') ?? ''
+      const m = MEMBER_HREF.exec(href)
+      if (!m) continue
+      let text = ''
+      for (let j = i + 1; j < tokens.length && tokens[j].type !== 'link_close'; j++) text += tokens[j].content ?? ''
+      const ok = [href, nameOf(m[1]), `@${nameOf(m[1])}`].map(bare).includes(bare(text))
+      if (!ok || (t.attrGet('title') ?? '') !== '') bad = m[1]
+    }
+  }
+  walk(hubMarkdownIt().parse(out, {}))
+  return bad !== null ? { body, refused: MEMBER_LINK(bad) } : { body: out, refused: null }
+}
+
 /** `line` with the label of each link `re` matches (outside code spans) whose destination `destOf` gives rewritten to ↗.
  * @param {string} line @param {RegExp} re @param {(m: RegExpExecArray) => string | null} destOf */
 function relabel(line, re, destOf) {

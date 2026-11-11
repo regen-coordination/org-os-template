@@ -623,6 +623,18 @@ governance:
     expect(ids.has(String(rows.find(r => r.title === 'Shed')!.notes))).toBe(true)
     expect(scan(w.repo, ['notion-payroll', ...PRIVATE_WORDS])).toEqual([])
   })
+
+  // T2f 1 (Rule 4): an imported page's text is a page write like any other: a member mention's label is the name any member
+  // may read, else the id. The members file here keeps names to the council.
+  it('T2f 1: a member mention in an imported page is labelled as any member may read the name, else by id', async () => {
+    const policy = `${POLICY}    members: { fields: { name: "hat:${COUNCIL}" } }\n`
+    const w = await world({ pages: [{ title: 'Index', id: nid('a', 0x21), body: 'Ask [Steward B](hub:member/steward-b) and [@Ops Lead](hub:member/ops-lead).\n' }] }, { policy })
+    const before = head(w.repo)
+    await applyImport(w.repo, planImport(bundleOf(w), {}, w.repo, w.store), STEWARD_A, w.store)
+    const index = pagesAt(w.repo).map(f => fileAt(w.repo, f)).find(t => t.includes('title: Index'))!
+    expect(index).toContain('Ask [steward-b](hub:member/steward-b) and [@ops-lead](hub:member/ops-lead).')
+    expect(git(w.repo, `log -p ${before}..HEAD`)).not.toMatch(/Steward B|Ops Lead/)
+  })
 })
 
 describe('npm run import (L6 §9.2)', () => {

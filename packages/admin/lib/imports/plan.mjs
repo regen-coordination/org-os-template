@@ -27,7 +27,7 @@ import { canonicalJson } from '../proposals.mjs'
 import { sha256Hex } from '../sha256.mjs'
 import { contactLevel, formatLevel, gitAllows, narrowerOrEqual, parseLevel } from '../visibility.mjs'
 import {
-  ASSET_MAX_BYTES, guardRefs, joinPage, newPageId, ORDER_STEP, PAGE_MAX_BYTES, pageEntries, pageLevel, slugOf, STRICT_LABEL,
+  ASSET_MAX_BYTES, guardRefs, joinPage, relabelMembers, newPageId, ORDER_STEP, PAGE_MAX_BYTES, pageEntries, pageLevel, slugOf, STRICT_LABEL,
 } from '../workspace/pages.mjs'
 import { readCollections } from '../workspace/collections.mjs'
 import { cutTitle, splitName } from './bundle.mjs'
@@ -67,6 +67,7 @@ import { firstIdIn, idsIn, labelText, namesFinder, rewriteLinks, withLabel } fro
  *   fileBlob: (rel: string) => string | null, blobOfFile: (abs: string) => string,
  *   registryProps: (name: string) => Record<string, string[]> | null,
  *   now: string, by: string, random: () => string,
+ *   memberLabel?: (id: string) => string,
  * }} ImportState
  * @typedef {{ writes: { git: FileOp[], private: PrivateWrite[], assets: AssetWrite[] }, needsStore: boolean, report: ImportReport,
  *   receipt: ImportReceipt, subject: string, databases: { sid: string, name: string, into: string, level: string, fields: Record<string, string>, within?: string }[],
@@ -644,6 +645,12 @@ export function planImport(bundle, map, state) {
     const guarded = guardRefs(body, p.level, { pageLevel: levelOfId, collectionLevel: name => privateLevels.get(name) ?? null })
     if (guarded.refused !== null) { say(where, REFUSED_LINK(guarded.refused), about); if (!p.existing) dropped.add(p.sid); continue }
     body = guarded.body
+    // T2f 1 (Rule 4): a member mention's label is the name any member may read, else the id, as every page write writes it.
+    if (state.memberLabel) {
+      const named = relabelMembers(body, state.memberLabel)
+      if (named.refused !== null) { say(where, REFUSED_LINK(named.refused), about); if (!p.existing) dropped.add(p.sid); continue }
+      body = named.body
+    }
     // The backstop (fail closed, C1): in a git page, a link still holding a private item's id, a path into the export or
     // a private item's title as its label is ↗; a private id left anywhere else refuses the import, naming this page.
     if (p.git) {

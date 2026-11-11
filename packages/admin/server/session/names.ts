@@ -48,6 +48,20 @@ export function membersHold(repo: string): (id: string) => boolean {
   return id => ids === null || ids.has(id)
 }
 
+/** T2f 1 (Rule 4): the label a mention of a member is written with, in the picker and into any text (a comment, a page, a
+ *  task's title; `relabelMembers`): their name as any member may read it (the gate, with the generic member viewer that
+ *  `actorNames` uses), else their id. An id the members file does not hold, or one that cannot be read, is its id. */
+export function memberLabels(repo: string): (id: string) => string {
+  const said = displayNames(repo, null)
+  let ids: Set<string>
+  try {
+    ids = existsSync(registryPath(repo, 'members'))
+      ? new Set((readRegistry(repo, 'members').entries ?? []).map(m => String((m as { id?: unknown }).id)))
+      : new Set()
+  } catch { ids = new Set() }
+  return id => (ids.has(id) ? said(id) : id)
+}
+
 /** The Org-Actor value of a git identity no member matches (`actorTrailer`): `unknown <email>`. */
 const UNKNOWN = /^unknown <.*>$/
 

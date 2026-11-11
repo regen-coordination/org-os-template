@@ -148,7 +148,9 @@ const asA = (repo: string) => as(repo, TEST_EMAIL)
 const asB = (repo: string) => as(repo, 'steward-b@example.test')
 const asC = (repo: string) => as(repo, 'steward-c@example.test')
 const commits = (repo: string) => Number(git(repo, 'rev-list --count HEAD').trim())
-const mention = (id: string) => `[@${id}](hub:member/${id})`
+/** A mention as the server writes it (T2f 1): labelled with the name any member may read (here every member reads names). */
+const NAME: Record<string, string> = { 'steward-a': 'Steward A', 'steward-b': 'Steward B', 'steward-c': 'Steward C', 'ops-lead': 'Ops Lead' }
+const mention = (id: string) => `[@${NAME[id] ?? id}](hub:member/${id})`
 const deps = (w: World) => ({ repo: w.repo, store: w.store, membership: w.membership, now: () => NOW })
 
 describe('the constants and the copy (L6 §8)', () => {
@@ -405,7 +407,7 @@ describe('the comment\'s acts and limits (§8.2)', () => {
     expect(made.status).toBe(201)
     // the title, the slug and the commit's subject are the line as plain text: a mention is its label
     expect(made.body.task).toBe('is-the-season-written-down-steward-b-could-you-c') // the slug, clipped as ids are
-    expect(git(w.repo, 'log -1 --format=%s').trim()).toBe('tasks: Is the season written down? @steward-b could you check?')
+    expect(git(w.repo, 'log -1 --format=%s').trim()).toBe('tasks: Is the season written down? @Steward B could you check?')
     expect(readFileSync(join(w.repo, 'data', 'tasks.yaml'), 'utf8')).not.toContain('hub:member')
     const listed = await call(w.app, '/api/comments?target=page:handbook-3f2a')
     expect(listed.body[0].task).toBe(made.body.task)
@@ -868,7 +870,7 @@ describe('PR7-R45: the conversation floor (a row is read at its target\'s level 
     const made = await call(w.app, `/api/comments/${top}/task`, json('POST'))
     expect(made.status).toBe(201)
     expect(made.body).toEqual({ task: expect.stringMatching(/^t-[0-9a-f]{12}$/), visibility: OPS_LEVEL })
-    expect(w.store.record('tasks', made.body.task)).toMatchObject({ visibility: OPS_LEVEL, body: { title: '@steward-b Ops talk', page: 'scratch-0001' } })
+    expect(w.store.record('tasks', made.body.task)).toMatchObject({ visibility: OPS_LEVEL, body: { title: '@Steward B Ops talk', page: 'scratch-0001' } })
     // A reply written at members after the widening, under the Ops talk: its task is kept at Ops too.
     const late = await call(w.app, '/api/comments', json('POST', { target: T, body: 'Late members reply', parent: top }))
     expect(w.store.comment(late.body.comment.id)?.writtenLevel).toBe('members')
@@ -1170,5 +1172,87 @@ describe('T2e M2: housekeeping keeps what it cannot read', () => {
       expect(w.store.comment('c-locked')).not.toBeNull()
       expect(w.store.comment('c-open')).not.toBeNull()
     } finally { chmodSync(folder, 0o755); chmodSync(file, 0o644) }
+  })
+})
+
+// T2f 1 (Rule 4): a member's name written into text. The picker labels a person as any member may read them (else their
+// id), and every write of a comment's body, a page's body (git and store) and a task's title rewrites each `hub:member/<id>`
+// label to that name, typed and stale labels too. steward-a wears the council's hat here, and the members file keeps names
+// to the council: no reader below it (steward-b wears Ops, steward-c nothing) and nothing in git sees one.
+describe('T2f 1: a name kept to the council is never written into text by a mention', () => {
+  const PAGE = 'page:handbook-3f2a'
+  const NAMES = /Steward A|Steward B|Steward C|Ops Lead/
+  const council = async () => {
+    const w = await world()
+    writeFileSync(join(w.repo, 'data', 'visibility.yaml'), `${VISIBILITY}    members: { fields: { name: "hat:${COUNCIL}" } }\n`)
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "fixture: member names are the council\'s"')
+    WEARS.a1 = [COUNCIL, OPS]
+    await w.prime(A1, A2)
+    asA(w.repo)
+    fixture.set(w.repo, git(w.repo, 'rev-parse HEAD').trim())
+    return w
+  }
+  // What the tests' own writes put in git (the fixture's members file holds the names, as the gate's tests keep them).
+  const fixture = new Map<string, string>()
+  const history = (repo: string) => git(repo, `log -p ${fixture.get(repo)}..HEAD`)
+  afterEach(() => { WEARS.a1 = [OPS] })
+
+  it('the picker (a comment\'s and the page editor\'s) offers people by the name any member may read, else the id', async () => {
+    const w = await council()
+    const offered = await call(w.app, `/api/mentionables?target=${PAGE}&q=`)
+    expect(offered.status).toBe(200)
+    const persons = (offered.body as { kind: string; id: string; label: string }[]).filter(m => m.kind === 'person')
+    expect(persons.map(m => [m.id, m.label])).toEqual(expect.arrayContaining([['steward-b', 'steward-b'], ['steward-c', 'steward-c']]))
+    expect(JSON.stringify(offered.body)).not.toMatch(NAMES)
+  })
+
+  it('a comment: typed labels, and one in a fence the thread still draws, are written as the id', async () => {
+    const w = await council()
+    const body = 'Ask [@Steward B](hub:member/steward-b) and [Steward C](<hub:member/steward-c>).\n```\n[@Steward B](hub:member/steward-b)\n```'
+    const r = await call(w.app, '/api/comments', json('POST', { target: PAGE, body }))
+    expect(r.status).toBe(201)
+    expect(JSON.stringify(r.body)).not.toMatch(NAMES)
+    const kept = w.store.comment(r.body.comment.id)!.body
+    expect(kept).toContain('[@steward-b](hub:member/steward-b)')
+    expect(kept).toContain('[steward-c](<hub:member/steward-c>)')
+    expect(kept).not.toMatch(NAMES)
+    asB(w.repo)
+    expect(JSON.stringify((await call(w.app, `/api/comments?target=${PAGE}`)).body)).not.toMatch(NAMES)
+    asC(w.repo)
+    expect(JSON.stringify((await call(w.app, `/api/comments?target=${PAGE}`)).body)).not.toMatch(NAMES)
+  })
+
+  it('a task made from a comment whose label was written before: its title in git says the id', async () => {
+    const w = await council()
+    await w.store.writeConversation({ comments: [{ id: 'cmt-stale', target: PAGE, parent: null, anchor: null, by: 'steward-a',
+      body: '[@Steward B](hub:member/steward-b) to file the report', created: NOW.toISOString(), edited: null, resolvedBy: null,
+      resolvedAt: null, deleted: null, writtenLevel: 'members' }] })
+    const r = await call(w.app, '/api/comments/cmt-stale/task', json('POST'))
+    expect(r.status).toBe(201)
+    expect(r.body.commit).toBeTruthy()
+    expect(readFileSync(join(w.repo, 'data', 'tasks.yaml'), 'utf8')).toContain('@steward-b to file the report')
+    expect(history(w.repo)).not.toMatch(NAMES)
+  })
+
+  it('a page, in git and in the store: every member label is written as the id', async () => {
+    const w = await council()
+    const md = 'Ask [@Steward B](hub:member/steward-b) and [**Steward C**](hub:member/steward-c).\n'
+    const g = await call(w.app, '/api/pages', json('POST', { title: 'Notes', markdown: md }))
+    expect(g.status).toBe(201)
+    const file = readFileSync(join(w.repo, 'pages', `${g.body.id}.md`), 'utf8')
+    expect(file).toContain('[@steward-b](hub:member/steward-b) and [steward-c](hub:member/steward-c)')
+    expect(history(w.repo)).not.toMatch(NAMES)
+    const p = await call(w.app, '/api/pages', json('POST', { title: 'Council page', visibility: `hat:${COUNCIL}`, markdown: md }))
+    expect(p.status).toBe(201)
+    const kept = w.store.records('pages').find(r => r.id === p.body.id)!
+    expect(String(kept.body.markdown)).not.toMatch(NAMES)
+    expect(history(w.repo)).not.toMatch(NAMES)
+  })
+
+  it('a reference-style member link, whose label cannot be rewritten, is refused', async () => {
+    const w = await council()
+    const r = await call(w.app, '/api/pages', json('POST', { title: 'Notes', markdown: 'Ask [Steward B][b].\n\n[b]: hub:member/steward-b\n' }))
+    expect(r.status).toBe(422)
+    expect(history(w.repo)).not.toMatch(NAMES)
   })
 })
