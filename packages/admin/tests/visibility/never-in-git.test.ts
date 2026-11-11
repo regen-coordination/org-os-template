@@ -94,7 +94,9 @@ tasks:
   - { id: t-open, title: Write the agenda, status: todo }
 `
 /** A mention as the dialect writes one (L6 §5). */
-const mention = (id: string) => `[@${id}](hub:member/${id})`
+/** A mention as the server writes it (T2f 1): labelled with the name any member may read (here every member reads names). */
+const NAME: Record<string, string> = { 'steward-a': 'Steward A', 'steward-b': 'Steward B', 'steward-c': 'Steward C' }
+const mention = (id: string) => `[@${NAME[id] ?? id}](hub:member/${id})`
 /** Ratify writes the statement here (a file git tracks). */
 const DECISIONS = `# Decisions
 
