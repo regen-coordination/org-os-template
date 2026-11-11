@@ -20,6 +20,7 @@ import matter from "gray-matter";
 import { fileURLToPath, pathToFileURL } from "url";
 import { execSync } from "child_process";
 import { readGraphStatus, renderStatusMarkdown } from "./graph-status.mjs";
+import { LIFECYCLES, classifyFunding, parseQueue, projectIsHidden, projectIsWorking, projectRank, tally } from "./lib/lifecycles.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -504,37 +505,11 @@ function loadSkillCandidates() {
 // ── Funding ──────────────────────────────────────────────────────────────────
 
 function loadFunding(fundingData) {
-  // Support both v2 key (funding_opportunities) and v1 key (opportunities)
+  // Support both v2 key (funding_opportunities) and v1 key (opportunities). What counts as
+  // upcoming, active or ended is the funding lifecycle's (scripts/lib/lifecycles.mjs).
   const opportunities =
     fundingData?.funding_opportunities || fundingData?.opportunities || [];
-
-  const upcoming = [];
-  const active = [];
-
-  for (const opp of opportunities) {
-    if (!opp.deadline) {
-      if (
-        opp.status === "active" ||
-        opp.status === "applied" ||
-        opp.status === "open"
-      ) {
-        active.push(opp);
-      }
-      continue;
-    }
-
-    const days = daysUntil(opp.deadline);
-    if (days < 0) continue;
-    if (opp.status === "applied" || opp.status === "awarded") {
-      active.push(opp);
-    } else {
-      upcoming.push({ ...opp, daysLeft: days });
-    }
-  }
-
-  upcoming.sort((a, b) => a.daysLeft - b.daysLeft);
-
-  return { upcoming, active };
+  return classifyFunding(opportunities, daysUntil);
 }
 
 // ── Recent Memory ────────────────────────────────────────────────────────────
@@ -863,82 +838,35 @@ function loadSkills() {
 // ── Pipelines ────────────────────────────────────────────────────────────────
 
 function loadPipelines(fundingData) {
+  // Stage lists come from scripts/lib/lifecycles.mjs; tally() accounts for every entry, so values
+  // off the line (aside, ended, or unknown to the lifecycle) are counted and shown, never dropped.
   const pipelines = [];
+  const add = (id, label, values) => {
+    const t = tally(id, values);
+    pipelines.push({ id, label, stages: LIFECYCLES[id].line, counts: t.line, aside: t.aside, terminal: t.terminal, unknown: t.unknown, total: t.total });
+  };
 
-  // Ideas pipeline
   const ideasData = readYamlSafe(path.join(rootDir, "data", "ideas.yaml"));
-  if (ideasData?.ideas) {
-    const counts = {};
-    for (const idea of ideasData.ideas) {
-      const s = idea.status || "surfaced";
-      counts[s] = (counts[s] || 0) + 1;
-    }
-    pipelines.push({
-      id: "ideas",
-      label: "Ideas",
-      stages: ["surfaced", "proposed", "approved", "developing", "hatched"],
-      counts,
-      total: ideasData.ideas.length,
-    });
-  }
+  if (ideasData?.ideas) add("ideas", "Ideas", ideasData.ideas.map((i) => i.status));
 
-  // Funding pipeline
   const opportunities =
     fundingData?.funding_opportunities || fundingData?.opportunities || [];
-  if (opportunities.length > 0) {
-    const counts = {};
-    for (const opp of opportunities) {
-      const s = opp.status || "monitoring";
-      counts[s] = (counts[s] || 0) + 1;
-    }
-    pipelines.push({
-      id: "funding",
-      label: "Funding",
-      stages: ["monitoring", "researching", "applied", "awarded"],
-      counts,
-      total: opportunities.length,
-    });
-  }
+  if (opportunities.length > 0) add("funding", "Funding", opportunities.map((o) => o.status));
 
-  // Knowledge domains pipeline
   const knowledgeData = readYamlSafe(
     path.join(rootDir, "data", "knowledge-manifest.yaml"),
   );
   if (knowledgeData?.knowledge_manifest?.domains) {
-    const counts = {};
-    for (const domain of knowledgeData.knowledge_manifest.domains) {
-      const s = domain.coverage || "stub";
-      counts[s] = (counts[s] || 0) + 1;
-    }
-    pipelines.push({
-      id: "knowledge",
-      label: "Knowledge",
-      stages: ["stub", "partial", "comprehensive"],
-      counts,
-      total: knowledgeData.knowledge_manifest.domains.length,
-    });
+    add("knowledge", "Knowledge", knowledgeData.knowledge_manifest.domains.map((d) => d.coverage));
   }
 
-  // Plans pipeline
   const plansDir = path.join(rootDir, "docs", "plans");
   if (fs.existsSync(plansDir)) {
-    const counts = {};
     const files = fs
       .readdirSync(plansDir)
       .filter((f) => f.endsWith(".md") && f !== "QUEUE.md");
-    for (const file of files) {
-      const parsed = parseMarkdownFrontmatter(path.join(plansDir, file));
-      if (parsed?.data?.status) {
-        counts[parsed.data.status] = (counts[parsed.data.status] || 0) + 1;
-      }
-    }
-    pipelines.push({
-      id: "plans",
-      label: "Plans",
-      stages: ["backlog", "queued", "active", "completed"],
-      counts,
-      total: files.length,
-    });
+    const statuses = files.map((file) => parseMarkdownFrontmatter(path.join(plansDir, file))?.data?.status ?? "(none)");
+    add("plans", "Plans", statuses);
   }
 
   return pipelines;
@@ -950,43 +878,7 @@ function loadPlans() {
   const queueMd = readFileSafe(
     path.join(rootDir, "docs", "plans", "QUEUE.md"),
   );
-  if (!queueMd) return { active: [], queued: [], backlog: [], completed: [] };
-
-  const result = { active: [], queued: [], backlog: [], completed: [] };
-  let currentSection = null;
-
-  for (const line of queueMd.split("\n")) {
-    const sectionMatch = line.match(/^##\s+(Active|Queued|Backlog|Completed)/i);
-    if (sectionMatch) {
-      currentSection = sectionMatch[1].toLowerCase();
-      continue;
-    }
-    if (!currentSection || !result[currentSection]) continue;
-
-    // Match numbered or bulleted list items: "1. [title](file.md) — description"
-    const itemMatch = line.match(
-      /^[-*\d.]+\s+\[([^\]]+)\]\(([^)]+)\)\s*[—–-]\s*(.+)/,
-    );
-    if (itemMatch) {
-      result[currentSection].push({
-        title: itemMatch[1],
-        file: itemMatch[2],
-        description: itemMatch[3].trim(),
-      });
-      continue;
-    }
-    // Match simple bulleted items: "- [title](file.md) — description"
-    const simpleMatch = line.match(/^[-*]\s+\[([^\]]+)\]\(([^)]+)\)\s*[—–-]\s*(.+)/);
-    if (simpleMatch) {
-      result[currentSection].push({
-        title: simpleMatch[1],
-        file: simpleMatch[2],
-        description: simpleMatch[3].trim(),
-      });
-    }
-  }
-
-  return result;
+  return parseQueue(queueMd);
 }
 
 // ── Dashboard Config ────────────────────────────────────────────────────────
@@ -1347,12 +1239,11 @@ function sectionHeader(title) {
 // ── Pipeline Bar Renderer ─────────────────────────────────────────────────
 
 function renderPipelineBar(p) {
-  const barTotal = p.stages.reduce((sum, s) => sum + (p.counts[s] || 0), 0);
   const maxCount = Math.max(...p.stages.map((s) => p.counts[s] || 0), 1);
   const barSlots = 4; // fixed mini-bar width per stage
 
-  // Title line
-  const totalStr = ` ${barTotal} total`;
+  // Title line: the total is every entry, on the line or not
+  const totalStr = ` ${p.total ?? 0} total`;
   const dashes = W - p.label.length - totalStr.length - 5;
   let out = `  ${p.label} ${"─".repeat(Math.max(3, dashes))}${totalStr}\n`;
 
@@ -1364,6 +1255,13 @@ function renderPipelineBar(p) {
     return `${bar} ${s} (${count})`;
   });
   out += `  ${parts.join(" → ")}\n`;
+
+  // What is not on the line: live states beside it, ended ones, and values the lifecycle does not know
+  const list = (o = {}) => Object.entries(o).filter(([, n]) => n > 0).map(([s, n]) => `${s} (${n})`).join(" · ");
+  const also = [list(p.aside), list(p.terminal)].filter(Boolean).join(" · ");
+  if (also) out += `  ${truncate(`also: ${also}`, W - 4)}\n`;
+  const unknown = list(Object.fromEntries(Object.entries(p.unknown ?? {}).sort((a, b) => b[1] - a[1])));
+  if (unknown) out += `  ${truncate(`not in the lifecycle: ${unknown}`, W - 4)}\n`;
 
   return out;
 }
@@ -1508,17 +1406,15 @@ function renderMarkdown(state) {
     const areas = projects.filter((p) => p.type === "area");
     const projs = projects.filter((p) => p.type !== "area");
 
-    const stageOrder = ["active", "integrate", "in-progress", "on-going", "planning", "backlog", "paused", "icebox", "idea"];
-    const sortByStage = (a, b) =>
-      (stageOrder.indexOf(a.stage?.toLowerCase()) ?? 99) -
-      (stageOrder.indexOf(b.stage?.toLowerCase()) ?? 99);
+    // Working stages first, then along the projects lifecycle; unknown stages last.
+    const sortByStage = (a, b) => projectRank(a.stage) - projectRank(b.stage);
 
     out += sectionHeader("Projects & Areas");
 
     if (areas.length > 0) {
       out += pad("  AREAS", 34) + pad("OWNER", 10) + "FOCUS\n";
       for (const a of areas.sort(sortByStage)) {
-        const icon = a.stage === "active" ? "●" : "○";
+        const icon = projectIsWorking(a.stage) ? "●" : "○";
         const name = pad(`  ${icon}  ${truncate(stripMarkdown(a.name), 24)}`, 34);
         const owner = pad(truncate(normalizeOwner(a.owner), 8), 10);
         const desc = truncate(stripMarkdown(a.description || ""), 32);
@@ -1529,19 +1425,13 @@ function renderMarkdown(state) {
 
     if (projs.length > 0) {
       // Filter out archived/done
-      const hiddenStages = ["archived", "done", "canceled"];
-      const visible = projs.filter(
-        (p) => !hiddenStages.includes(p.stage?.toLowerCase()),
-      );
-      const hidden = projs.filter((p) =>
-        hiddenStages.includes(p.stage?.toLowerCase()),
-      );
+      const visible = projs.filter((p) => !projectIsHidden(p.stage));
+      const hidden = projs.filter((p) => projectIsHidden(p.stage));
 
       out += pad("  PROJECTS", 34) + pad("OWNER", 10) + pad("STATUS", 14) + "SUMMARY\n";
       const maxShow = config.projects?.max || 999;
       for (const p of visible.sort(sortByStage).slice(0, maxShow)) {
-        const isActive = ["active", "integrate", "in-progress"].includes(p.stage?.toLowerCase());
-        const icon = isActive ? "●" : "○";
+        const icon = projectIsWorking(p.stage) ? "●" : "○";
         const name = pad(`  ${icon}  ${truncate(stripMarkdown(p.name), 24)}`, 34);
         const owner = pad(truncate(normalizeOwner(p.owner), 8), 10);
         const stage = pad(p.stage || "idea", 14);
@@ -1549,26 +1439,17 @@ function renderMarkdown(state) {
         out += `${name}${owner}${stage}${desc}\n`;
       }
 
-      // Visual pipeline
-      const pipelineStages = ["backlog", "planning", "in-progress", "integrate"];
-      const counts = {};
-      const nonPipelineCounts = {};
-      for (const p of visible) {
-        const s = (p.stage || "idea").toLowerCase();
-        if (pipelineStages.includes(s)) {
-          counts[s] = (counts[s] || 0) + 1;
-        } else {
-          nonPipelineCounts[s] = (nonPipelineCounts[s] || 0) + 1;
-        }
-      }
-      const maxCount = Math.max(1, ...Object.values(counts));
+      // Visual pipeline: the projects lifecycle's line (scripts/lib/lifecycles.mjs), every project counted
+      const t = tally("projects", projs.map((p) => p.stage));
+      const pipelineStages = LIFECYCLES.projects.line;
+      const maxCount = Math.max(1, ...Object.values(t.line));
       const barScale = 4;
 
       out += "\n";
       let pipelineRow = "  ";
       for (let i = 0; i < pipelineStages.length; i++) {
         const s = pipelineStages[i];
-        const c = counts[s] || 0;
+        const c = t.line[s] || 0;
         const barLen = Math.max(0, Math.round((c / maxCount) * barScale));
         const bar = "█".repeat(barLen) + "░".repeat(barScale - barLen);
         const sep = i < pipelineStages.length - 1 ? " → " : "";
@@ -1576,12 +1457,11 @@ function renderMarkdown(state) {
       }
       out += pipelineRow + "\n";
 
-      // Non-pipeline stages + hidden
+      // Off the line: working stages beside it, ended ones (hidden above), and unknown values
       const extras = [];
-      for (const [k, v] of Object.entries(nonPipelineCounts)) {
-        extras.push(`${v} ${k}`);
-      }
-      if (hidden.length > 0) extras.push(`${hidden.length} archived/done`);
+      for (const [k, v] of Object.entries(t.aside)) extras.push(`${v} ${k}`);
+      for (const [k, v] of Object.entries(t.terminal)) extras.push(`${v} ${k} (hidden)`);
+      for (const [k, v] of Object.entries(t.unknown)) extras.push(`${v} ${k} (not in the lifecycle)`);
       if (extras.length > 0) out += `  ${extras.join(" · ")}\n`;
     }
 
@@ -1712,19 +1592,20 @@ function renderMarkdown(state) {
   }
 
   // ── Plans ───────────────────────────────────────────────────────────────
+  const planLine = (p) => truncate([stripMarkdown(p.title), stripMarkdown(p.description)].filter(Boolean).join(" — "), W - 7);
   if (config.plans?.show !== false && plans) {
     out += sectionHeader("Plans");
     if (plans.active.length > 0) {
       out += "  ACTIVE\n";
       for (const p of plans.active) {
-        out += `  ●  ${stripMarkdown(p.title)} — ${stripMarkdown(p.description)}\n`;
+        out += `  ●  ${planLine(p)}\n`;
       }
     }
     const preview = config.plans?.queued_preview || 2;
     if (plans.queued.length > 0) {
       out += "\n  QUEUED" + (plans.queued.length > preview ? ` (next ${preview})` : "") + "\n";
       for (const p of plans.queued.slice(0, preview)) {
-        out += `  ○  ${stripMarkdown(p.title)} — ${stripMarkdown(p.description)}\n`;
+        out += `  ○  ${planLine(p)}\n`;
       }
     }
     const remaining = Math.max(0, plans.queued.length - preview);
