@@ -113,6 +113,42 @@ describe('the sign-in page (L5 spec §11.1)', () => {
   })
 })
 
+// R4a (the hosted walk): the emailed-link sign-in (0.6.1, Lane 3 Task 10) is asked for on this page. GET /api/session's
+// `methods` says what is offered: with `email`, SignIn's email form; with `wallet` too, the wallet beside it.
+describe('the emailed-link sign-in on /sign-in', () => {
+  const SENT = "If this address is on Fixture Org's records, a link is on its way."
+  const EMAIL_OUT = { mode: 'hosted', signIn: null, signedIn: false, methods: ['email'], instanceWrites: 'off' } as unknown as SessionView
+  const both = { ...EMAIL_OUT, signIn: OUT.signedIn ? null : OUT.signIn, methods: ['email', 'wallet'] } as unknown as SessionView
+  const group = () => screen.getByRole('group', { name: 'Sign in' })
+
+  it('a Hub offering email draws the email form; a link is asked for with where to return, and the server’s sentence is said', async () => {
+    const { calls } = routes({ 'GET /api/session': EMAIL_OUT, 'POST /api/session/email': { sent: true, sentence: SENT } })
+    renderAt(<SignInPage />, '/sign-in?next=%2Fworkspace')
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'steward@example.org' } })
+    expect(within(group()).queryByRole('button', { name: /wallet|Ethereum/ })).toBeNull()
+    fireEvent.click(within(group()).getByRole('button', { name: 'Email me a link' }))
+    expect(await within(group()).findByText(SENT)).toBeTruthy()
+    expect(calls.filter(c => c.method === 'POST').map(c => [c.path, c.body])).toEqual([['/api/session/email', { email: 'steward@example.org', return: '/workspace' }]])
+  })
+
+  it('a Hub offering email and a wallet draws both; the wallet still signs in', async () => {
+    const { calls } = routes({ 'GET /api/session': both })
+    wallet()
+    renderAt(<SignInPage />, '/sign-in')
+    await screen.findByLabelText('Email')
+    fireEvent.click(within(group()).getByRole('button', { name: 'Sign in with a wallet' }))
+    await waitFor(() => expect(calls.filter(c => c.method === 'POST').map(c => c.path)).toContain('/api/session/nonce'))
+  })
+
+  it('a refused ask says the server’s sentence under the form', async () => {
+    routes({ 'GET /api/session': EMAIL_OUT, 'POST /api/session/email': refuse(400, { error: 'Send { email }: the address to send the sign-in link to.' }) })
+    renderAt(<SignInPage />, '/sign-in')
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'not-an-address@x' } })
+    fireEvent.click(within(group()).getByRole('button', { name: 'Email me a link' }))
+    expect(await within(group()).findByText('Send { email }: the address to send the sign-in link to.')).toBeTruthy()
+  })
+})
+
 describe('a session past the grace (stale: it reads as public)', () => {
   const STALE: SessionView = { ...IN, hats: [], stale: true, band: 'Your hats could not be read for an hour; you see what anyone sees until they can be.' }
 

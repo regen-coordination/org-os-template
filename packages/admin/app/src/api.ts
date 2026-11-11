@@ -249,7 +249,10 @@ export type SessionMode = 'local' | 'hosted'
 /** `portal` (0.6.2, L9 §5.2): the portal's origin when the Hub is hosted with ORG_OS_PORTAL_ORIGIN, null when hosted
  *  without it, absent on a local Hub. The Portal link is drawn only with it (D-5: `usePortalOrigin`). */
 interface PortalField { portal?: string | null }
-export interface SignedOutView extends PortalField { mode: SessionMode; signIn: { chainId: string; tree: string } | null; signedIn: false }
+/** `methods` (0.6.1, Lane 3): the ways a Hub with the email method wired offers (`email`, `wallet`); absent otherwise. */
+export interface SignedOutView extends PortalField {
+  mode: SessionMode; signIn: { chainId: string; tree: string } | null; signedIn: false; methods?: ('email' | 'wallet')[]
+}
 export interface SignedInView extends PortalField {
   mode: SessionMode; signedIn: true; actor: string; account: string; hats: { hat: string; name: string }[]; expiresAt: string
   /** `stale`: past the grace (§5.2). `unread`: no reading kept yet (after a restart, for as long as the tree cannot be

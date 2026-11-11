@@ -4,6 +4,7 @@ import { SignIn } from '../elements/signin/SignIn.tsx'
 import { useStatus } from '../queries.ts'
 import { isWalletSession } from '../api.ts'
 import { isSignInPath, usePortalOrigin, useSession } from '../session/session.ts'
+import { signInReturn, useEmailSignIn } from '../session/emailSignIn.ts'
 
 /** Where to go once signed in: `next` when it is a path of this Hub (one leading slash, not the sign-in page), else /. */
 export function nextOf(search: string): string {
@@ -18,13 +19,17 @@ const treeName = (ref: string) => `#${ref.slice(ref.lastIndexOf(':') + 1)}`
 const bareAddress = (account: string) => account.slice(account.lastIndexOf(':') + 1)
 
 /** /sign-in (L5 spec §11.1): L4c's SignIn on the Hub frame's blank layout — no sidebar, no bars, no tray; SignIn's
- *  title is the page's only h1. Signed in, it goes on to `next`. */
+ *  title is the page's only h1. Signed in, it goes on to `next`. The ways offered are GET /api/session's `methods`
+ *  (0.6.1, Lane 3): with `email`, SignIn's email form asks for a link, to return to `return` or `next` (the server judges
+ *  it again); with no `methods` (a Hub without the email method), the wallet alone, as before. */
 export default function SignInPage() {
   const { session, state, error, signIn, cancel } = useSession()
   const org = useStatus().data?.org ?? 'org-os'
   const search = useSearch()
   const [, navigate] = useLocation()
   const portal = usePortalOrigin()
+  const email = useEmailSignIn(signInReturn(search))
+  const offered = session && !session.signedIn && session.methods && session.methods.length > 0 ? session.methods : undefined
 
   useEffect(() => { document.title = `Sign in · ${org}` }, [org])
   // Once per sign-in: where `next` pointed when the session began, never again as the location changes after. Not
@@ -47,7 +52,9 @@ export default function SignInPage() {
     <main className="signin-page">
       <SignIn org={org} state={graced ? 'failed' : state} tree={tree} error={graced ? signedIn?.band : error ?? undefined}
         hats={signedIn?.hats.map(h => h.name)} address={signedIn ? bareAddress(signedIn.account) : undefined}
-        onSignIn={() => { void signIn() }} onCancel={cancel} portalHref={portal} />
+        onSignIn={() => { void signIn() }} onCancel={cancel} portalHref={portal}
+        {...(offered ? { methods: offered } : {})} onEmail={email.send} emailBusy={email.state === 'sending'} emailError={email.error}
+        sent={email.state === 'sent' ? email.sentence : null} />
     </main>
   )
 }
