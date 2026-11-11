@@ -264,6 +264,7 @@ function judge(mentions: { kind: string; ref: string }[], target: Target, by: st
   const people = new People(deps.repo, deps.membership)
   const recorded = new Set(storeRead(deps.store, () => deps.store.mentionsOf(source)).map(m => `${m.kind} ${m.ref}`))
   const author = parseCaip10(by) ? String(actorIdOf(by, people.members)) : by
+  const created = (deps.now ?? (() => new Date()))().toISOString()
   const told = new Set<string>()
   const notTold = new Set<string>()
   const rows: MentionRow[] = []
@@ -287,10 +288,9 @@ function judge(mentions: { kind: string; ref: string }[], target: Target, by: st
       const role = people.roles().get(m.ref)
       if (role?.defined) for (const holder of role.members) any = judgeMember(holder) || any
     }
-    rows.push({ source, kind, ref: m.ref, told: any, writtenLevel })
+    rows.push({ source, kind, ref: m.ref, told: any, writtenLevel, created })
   }
   for (const id of told) notTold.delete(id)
-  const created = (deps.now ?? (() => new Date()))().toISOString()
   const notifications = [...told].sort().map((member): StoredNotification =>
     ({ id: newId('ntf'), member, kind: 'mention', target, source, by, created, readAt: null, writtenLevel }))
   return { told: [...told].sort(), notTold: [...notTold].sort(), mentions: rows, notifications }

@@ -102,8 +102,10 @@ export interface CommentRow {
   writtenLevel: string
 }
 /** One mention (L6 §8.1, `mentions`): `source` is `comment:<id>` or `page:<id>`; `told` whether anyone was told by it;
- *  `writtenLevel` its target's level when it was made (PR7-R45). */
-export interface MentionRow { source: string; kind: 'member' | 'role' | 'page' | 'record'; ref: string; told: boolean; writtenLevel: string }
+ *  `writtenLevel` its target's level when it was made (PR7-R45); `created` when it was made (T2e M3: a page's own mentions
+ *  go under the purge's `at` bound as its notifications do; one without goes under any bound). `created` is written, and
+ *  kept from the first put; it is not read back. */
+export interface MentionRow { source: string; kind: 'member' | 'role' | 'page' | 'record'; ref: string; told: boolean; writtenLevel: string; created?: string | null }
 /** One member told (L6 §8.1, `notifications`): a row of their Needs you. `readAt` null until read; `writtenLevel` its target's
  *  level when it was told (PR7-R45). */
 export interface StoredNotification {
@@ -183,7 +185,7 @@ CREATE TABLE IF NOT EXISTS comments (id TEXT NOT NULL PRIMARY KEY, target TEXT N
   written_level TEXT NOT NULL DEFAULT 'unfilled') STRICT;
 CREATE INDEX IF NOT EXISTS comments_target ON comments (target);
 CREATE TABLE IF NOT EXISTS mentions (source TEXT NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL, told INTEGER NOT NULL DEFAULT 0,
-  written_level TEXT NOT NULL DEFAULT 'unfilled', PRIMARY KEY (source, kind, ref)) STRICT;
+  written_level TEXT NOT NULL DEFAULT 'unfilled', created TEXT, PRIMARY KEY (source, kind, ref)) STRICT;
 CREATE TABLE IF NOT EXISTS notifications (id TEXT NOT NULL PRIMARY KEY, member TEXT NOT NULL, kind TEXT NOT NULL, target TEXT NOT NULL,
   source TEXT NOT NULL, "by" TEXT NOT NULL, created TEXT NOT NULL, read_at TEXT, written_level TEXT NOT NULL DEFAULT 'unfilled') STRICT;
 CREATE INDEX IF NOT EXISTS notifications_member ON notifications (member);
@@ -265,6 +267,9 @@ export async function openPrivateStore(repo: string, opts: { dir?: string; git?:
         db.exec('COMMIT')
       } catch (err) { db.exec('ROLLBACK'); throw err }
     }
+    // T2e M3, in schema 3 too: a mention keeps when it was made, so a page's own go under the purge's `at` bound. A row made
+    // before has none, and goes under any bound (as every one did).
+    if (!columnsOf('mentions').includes('created')) db.exec('ALTER TABLE mentions ADD COLUMN created TEXT')
     reader = new DatabaseSync(file, { readOnly: true })
     reader.exec('PRAGMA busy_timeout = 5000')
     return new PrivateStore(file, db, reader, lockWaitMs)
@@ -451,7 +456,7 @@ export class PrivateStore {
     | 'rolesClear' | 'rolePut' | 'keysClear' | 'keyPut' | 'metaPut' | 'linkPut' | 'linkGet' | 'linkUse' | 'linksExpired'
     | 'viewStatePut' | 'viewStateDelete' | 'draftPut' | 'draftDelete'
     | 'commentPut' | 'mentionPut' | 'notificationPut' | 'notificationsDrop' | 'notificationRead' | 'notificationsReadOf' | 'readPut'
-    | 'goneComments' | 'goneComment' | 'goneMentions' | 'goneNotifications' | 'goneReads', StatementSync>
+    | 'goneComments' | 'goneComment' | 'goneMentions' | 'goneOwnMentions' | 'goneNotifications' | 'goneReads', StatementSync>
   private readonly r: Record<'record' | 'recordUpdated' | 'records' | 'fields' | 'fieldsNamed' | 'collections' | 'history' | 'historyOf' | 'session' | 'staged'
     | 'stagedAll' | 'pending' | 'pendingAll' | 'applied' | 'person' | 'personByKey' | 'meta' | 'viewState' | 'draft' | 'drafts'
     | 'comment' | 'comments' | 'mentions' | 'notifications' | 'read', StatementSync>
@@ -508,7 +513,7 @@ export class PrivateStore {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET target = excluded.target, parent = excluded.parent,
         anchor = excluded.anchor, "by" = excluded."by", body = excluded.body, created = excluded.created, edited = excluded.edited,
         resolved_by = excluded.resolved_by, resolved_at = excluded.resolved_at, deleted = excluded.deleted, task = excluded.task`),
-      mentionPut: db.prepare(`INSERT INTO mentions (source, kind, ref, told, written_level) VALUES (?, ?, ?, ?, ?)
+      mentionPut: db.prepare(`INSERT INTO mentions (source, kind, ref, told, written_level, created) VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT (source, kind, ref) DO UPDATE SET told = excluded.told`),
       notificationPut: db.prepare('INSERT INTO notifications (id, member, kind, target, source, "by", created, read_at, written_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'),
       notificationsDrop: db.prepare('DELETE FROM notifications WHERE source = ?'),
@@ -519,6 +524,7 @@ export class PrivateStore {
       goneComments: db.prepare('SELECT id, parent, created FROM comments WHERE target = ?'),
       goneComment: db.prepare('DELETE FROM comments WHERE id = ?'),
       goneMentions: db.prepare('DELETE FROM mentions WHERE source = ?'),
+      goneOwnMentions: db.prepare('DELETE FROM mentions WHERE source = ? AND (created IS NULL OR created <= ?)'),
       goneNotifications: db.prepare('DELETE FROM notifications WHERE target = ? AND created <= ?'),
       goneReads: db.prepare('DELETE FROM reads WHERE target = ? AND at <= ?'),
     }
@@ -774,7 +780,7 @@ export class PrivateStore {
           this.w.commentPut.run(r.id, r.target, r.parent, r.anchor === null ? null : JSON.stringify(r.anchor), r.by, r.body, r.created, r.edited,
             r.resolvedBy, r.resolvedAt, r.deleted, r.task ?? null, r.writtenLevel)
         }
-        for (const m of c.mentions ?? []) this.w.mentionPut.run(m.source, m.kind, m.ref, m.told ? 1 : 0, m.writtenLevel)
+        for (const m of c.mentions ?? []) this.w.mentionPut.run(m.source, m.kind, m.ref, m.told ? 1 : 0, m.writtenLevel, m.created ?? null)
         for (const s of c.dropSources ?? []) this.w.notificationsDrop.run(s)
         for (const n of c.notifications ?? []) this.w.notificationPut.run(n.id, n.member, n.kind, n.target, n.source, n.by, n.created, n.readAt, n.writtenLevel)
         this.db.exec('COMMIT')
@@ -919,8 +925,8 @@ export class PrivateStore {
 
   /** `target`'s comments made at or before `at` (every one without it), the replies under them, and their mentions and
    *  notifications, whatever their time (T2c minor 3: a reply that goes takes what it told); the target's own (a page's)
-   *  mentions, which hold no time; its other notifications and read marks made at or before `at`: gone. Inside an open
-   *  transaction. */
+   *  mentions, its other notifications and its read marks made at or before `at` (T2e M3; a mention with no time, every
+   *  bound): gone. Inside an open transaction. */
   private purgeIn(target: string, at: string = UNBOUNDED): void {
     const rows = this.w.goneComments.all(target) as { id: string; parent: string | null; created: string }[]
     const gone = new Set(rows.filter(r => r.created <= at).map(r => r.id))
@@ -934,7 +940,7 @@ export class PrivateStore {
       this.w.notificationsDrop.run(`comment:${id}`)
       this.w.goneComment.run(id)
     }
-    this.w.goneMentions.run(target)
+    this.w.goneOwnMentions.run(target, at)
     this.w.goneNotifications.run(target, at)
     this.w.goneReads.run(target, at)
   }

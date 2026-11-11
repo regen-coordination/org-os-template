@@ -111,6 +111,27 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     expect(again.unfilledTargets()).toEqual([])
   })
 
+  // T2e M3: a page's own mentions are taken under the same `at` bound as its notifications, so a page made again after it
+  // keeps what its new text told. One with no time (written before the column existed) goes under any bound.
+  it('a page\'s own mentions go under the same `at` bound as its notifications', async () => {
+    const s = await opened(repo(), temp('schema3-m3-'))
+    const at = '2026-10-31T12:00:00.000Z', before = '2026-10-31T11:00:00.000Z', after = '2026-10-31T13:00:00.000Z'
+    const told = (ref: string, created: string) => ({ id: `n-${ref}`, member: ref, kind: 'mention' as const, target: 'page:p-1', source: 'page:p-1',
+      by: 'steward-a', created, readAt: null, writtenLevel: 'members' })
+    await s.writeConversation({
+      mentions: [
+        { source: 'page:p-1', kind: 'member', ref: 'steward-b', told: true, writtenLevel: 'members', created: before },
+        { source: 'page:p-1', kind: 'member', ref: 'steward-c', told: true, writtenLevel: 'members', created: after },
+        { source: 'page:p-1', kind: 'member', ref: 'ops-lead', told: false, writtenLevel: 'members' },
+      ],
+      notifications: [told('steward-b', before), told('steward-c', after)],
+    })
+    await s.purgeConversation([{ target: 'page:p-1', at }])
+    expect(s.mentionsOf('page:p-1').map(m => m.ref)).toEqual(['steward-c'])
+    expect(s.notifications('steward-b')).toEqual([])
+    expect(s.notifications('steward-c').map(n => n.id)).toEqual(['n-steward-c'])
+  })
+
   it('SCHEMA_VERSION is 2, and a new store has the six new tables, STRICT, column for column', async () => {
     expect(SCHEMA_VERSION).toBe(3) // schema 3 holds these tables and the Roles'
     const s = await opened(repo(), temp('schema2-'))
@@ -119,7 +140,7 @@ describe('the private store, schema 2 (L6 §8.1)', () => {
     try {
       const columns = (t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map(c => c.name)
       expect(columns('comments')).toEqual(['id', 'target', 'parent', 'anchor', 'by', 'body', 'created', 'edited', 'resolved_by', 'resolved_at', 'deleted', 'task', 'written_level'])
-      expect(columns('mentions')).toEqual(['source', 'kind', 'ref', 'told', 'written_level'])
+      expect(columns('mentions')).toEqual(['source', 'kind', 'ref', 'told', 'written_level', 'created'])
       expect(columns('notifications')).toEqual(['id', 'member', 'kind', 'target', 'source', 'by', 'created', 'read_at', 'written_level'])
       expect(columns('reads')).toEqual(['member', 'target', 'at'])
       expect(columns('view_state')).toEqual(['member', 'collection', 'state'])
