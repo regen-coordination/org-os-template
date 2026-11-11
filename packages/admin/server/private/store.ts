@@ -14,10 +14,11 @@ import { placeInRepo, privateDir, STORE_FILE } from './paths.ts'
  *  second, read-only connection, so a read made while a transaction is open sees what was last committed and
  *  never a row that may yet be rolled back. */
 
-/** 1: L5 §10.2's tables. 2 (Lane 3 Task 2): the Roles from the records dump, the email keys and the sign-in links; and
- *  (DAO-OS L6 §8.1) the workspace's tables — comments, mentions, notifications, reads, view state, drafts. A version-1
- *  store is migrated when it opens: the new tables are added, every row kept. */
-export const SCHEMA_VERSION = 2
+/** 1: L5 §10.2's tables. 2 was written by two lines, each with tables of its own: 0.6.1's the Roles from the records
+ *  dump, the email keys and the sign-in links (Lane 3 Task 2); the workspace's comments, mentions, notifications, reads,
+ *  view state and drafts (DAO-OS L6 §8.1). 3: both. A store at 1, or at either line's 2, is brought up when it opens:
+ *  the tables it lacks are added, every row kept. */
+export const SCHEMA_VERSION = 3
 
 /** The store cannot be used: its place is not ignored by git, its file cannot be opened, or a newer org-os wrote
  *  it. The git side keeps serving; private reads and writes refuse with this message as attention (§10.1). */
@@ -140,8 +141,9 @@ export interface PrivateTransaction extends PrivateWriter { commit(): void; roll
 export interface Git { isIgnored(repo: string, path: string): Promise<boolean> }
 
 // Spec §10.2, table for table and column for column. JSON is kept as TEXT. History is append only, in the file too.
-// Schema 2 adds four tables (Lane 3 Task 2); every statement is IF NOT EXISTS, so the one script makes a fresh store and
-// brings a schema 1 store up to 2 in one transaction, keeping its rows. `roles` and `nodes` are JSON lists.
+// The Roles' four tables (Lane 3 Task 2) close it, and SCHEMA_2 below adds the workspace's; every statement is IF NOT
+// EXISTS, so the one script makes a fresh store and brings an older one (1, or either line's 2) up to 3 in one transaction,
+// keeping its rows. `roles` and `nodes` are JSON lists.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS records (collection TEXT NOT NULL, id TEXT NOT NULL, visibility TEXT NOT NULL, body TEXT NOT NULL,
   rev TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL, PRIMARY KEY (collection, id)) STRICT;
