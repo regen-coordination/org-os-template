@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
@@ -634,6 +634,19 @@ governance:
     const index = pagesAt(w.repo).map(f => fileAt(w.repo, f)).find(t => t.includes('title: Index'))!
     expect(index).toContain('Ask [steward-b](hub:member/steward-b) and [@ops-lead](hub:member/ops-lead).')
     expect(git(w.repo, `log -p ${before}..HEAD`)).not.toMatch(/Steward B|Ops Lead/)
+  })
+
+  // R4c 3: with the members file unreadable, an import whose pages mention a member is refused 503 (no label is written as
+  // the id for good); one that mentions no member is planned as before.
+  it('R4c 3: the members file unreadable, an import mentioning a member is refused 503, not planned with ids', async () => {
+    const w = await world({ pages: [{ title: 'Index', id: nid('a', 0x21), body: 'Ask [Steward B](hub:member/steward-b).\n' }] })
+    chmodSync(join(w.repo, 'data', 'members.yaml'), 0o000) // there, but it cannot be read
+    let err: unknown = null
+    try { planImport(bundleOf(w), {}, w.repo, w.store) } catch (e) { err = e }
+    expect(err).toMatchObject({ status: 503, code: 'MEMBERS_UNREADABLE' })
+    const plain = await world({ pages: [{ title: 'Index', id: nid('a', 0x22), body: 'No one named.\n' }] })
+    chmodSync(join(plain.repo, 'data', 'members.yaml'), 0o000)
+    expect(() => planImport(bundleOf(plain), {}, plain.repo, plain.store)).not.toThrow()
   })
 })
 

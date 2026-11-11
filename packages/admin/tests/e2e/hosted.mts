@@ -12,7 +12,8 @@
 //
 // The walk:
 //   - the public (no session): every Hub route asks them to sign in (L5 §11.1) and draws nothing restricted; the API
-//     answers them the public page alone; /portal and /door go to the portal origin, the path and query kept;
+//     answers them the public page alone, its mention of a member whose name is the members' read as the id (R4c 1);
+//     /portal and /door go to the portal origin, the path and query kept;
 //   - the steward signs in by an emailed link (the form on /sign-in, the link taken from the mailer, Continue); the
 //     Portal link points at the portal origin; pages, collections, the imports and Sources read; no write control is
 //     drawn on any route the walk opens, and nothing says an edit saves; a write sent straight to the API answers 403
@@ -127,7 +128,11 @@ writeFileSync(join(repo, 'data', 'governance.yaml'), GOVERNANCE)
 writeFileSync(join(repo, 'data', 'visibility.yaml'), VISIBILITY)
 writeFileSync(join(repo, 'data', 'tasks.yaml'), TASKS)
 mkdirSync(join(repo, 'pages'))
-writeFileSync(join(repo, 'pages', `${PUBLIC_PAGE.id}.md`), page(PUBLIC_PAGE.id, PUBLIC_PAGE.title, 'public', 'How Example DAO works, in the open.\n'))
+// R4c 1: the public page names a member whose name is the members' (no policy opens the members collection): written in git
+// as a person writes it, with the name as its label; the public's read must say the id.
+const MENTION = `[@${MEMBER.name}](hub:member/${MEMBER.id})`
+const MENTION_AS_PUBLIC = `[@${MEMBER.id}](hub:member/${MEMBER.id})`
+writeFileSync(join(repo, 'pages', `${PUBLIC_PAGE.id}.md`), page(PUBLIC_PAGE.id, PUBLIC_PAGE.title, 'public', `How Example DAO works, in the open. Ask ${MENTION}.\n`))
 writeFileSync(join(repo, 'pages', `${MEMBERS_PAGE.id}.md`), page(MEMBERS_PAGE.id, MEMBERS_PAGE.title, null, 'Members read this guide.\n'))
 git('add', '-A'); git('commit', '-qm', 'e2e: Example DAO, its pages, tasks and policy')
 
@@ -366,11 +371,15 @@ try {
   const titles = (JSON.parse(publicReads.pages.text) as { title: string }[]).map(x => x.title)
   if (titles.join() !== PUBLIC_PAGE.title) fail(`GET /api/pages answers the public ${titles.join(', ')}`)
   if (publicReads.pub.status !== 200 || !publicReads.pub.text.includes('How Example DAO works, in the open.')) fail(`the public page reads ${publicReads.pub.status} to the public`)
+  // R4c 1: a members-level name never reaches the public through a public page: the mention reads as the member's id.
+  const pubMarkdown = (JSON.parse(publicReads.pub.text) as { page: { markdown: string } }).page.markdown
+  if (publicReads.pub.text.includes(MEMBER.name)) fail(`the public page names ${MEMBER.name} to the public: ${pubMarkdown}`)
+  if (!pubMarkdown.includes(MENTION_AS_PUBLIC)) fail(`the public page's mention reads ${pubMarkdown} to the public`)
   for (const [what, r] of [['the members page', publicReads.mem], ['the private page', publicReads.priv], ['the collections', publicReads.collections], ['Sources', publicReads.sources]] as const) {
     if (r.status === 200 && RESTRICTED.some(w => r.text.includes(w))) fail(`${what} answers the public ${r.text.slice(0, 200)}`)
     if (RESTRICTED.some(w => r.text.includes(w))) fail(`${what}'s refusal names what is restricted: ${r.text.slice(0, 200)}`)
   }
-  log(`the public: every Hub route asks them to sign in, nothing restricted drawn; the API answers the public page alone (members page ${publicReads.mem.status}, private ${publicReads.priv.status}, collections ${publicReads.collections.status}, Sources ${publicReads.sources.status})`)
+  log(`the public: every Hub route asks them to sign in, nothing restricted drawn; the API answers the public page alone (members page ${publicReads.mem.status}, private ${publicReads.priv.status}, collections ${publicReads.collections.status}, Sources ${publicReads.sources.status}), its member mention as the id, no name`)
   // /portal and /door go to the portal origin, anything under them and the query kept.
   for (const [path, location, lands] of [['/portal', PORTAL, `${PORTAL}/`], ['/door', PORTAL, `${PORTAL}/`], ['/door/projects?x=1', `${PORTAL}/projects?x=1`, `${PORTAL}/projects?x=1`]] as const) {
     await pp.goto(`${HUB}${path}`)

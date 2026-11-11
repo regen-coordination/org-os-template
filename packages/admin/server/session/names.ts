@@ -11,14 +11,33 @@
 // role sourced from it, else the tree read's details only when the caller passes them (a viewer who may read the tree),
 // else its pretty id.
 
-import { existsSync } from 'node:fs'
-import { readRegistry, registryPath } from '../registry.ts'
+import { readRegistryOrEmptyCached } from '../registry.ts'
+import { HttpError } from '../errors.ts'
 import { accountOn, type Membership } from './membership.ts'
 import { addressName } from './address-name.ts'
 import { gateRecord, Levels } from '../visibility/gate.ts'
 import { walletsOf } from '../../lib/hat-readings.mjs'
 import { parseCaip10, sameAccount } from '../../lib/caip.mjs'
-import type { Viewer } from '../../lib/visibility.mjs'
+import type { ParsedLevel, Viewer } from '../../lib/visibility.mjs'
+
+/** R4c 4: the members file through the repository's read cache (L9 §7.6), as every request reads it: parsed again only when
+ *  the file changes. A missing file is no members ([]); one that is there but cannot be read is null, so each caller keeps
+ *  its fail-closed reading of it (no name said; held, so no other name stands in). Frozen: requests share it. */
+function membersRead(repo: string): readonly Record<string, unknown>[] | null {
+  try { return (readRegistryOrEmptyCached(repo, 'members').entries ?? []) as Record<string, unknown>[] } catch { return null }
+}
+const idsOf = (entries: readonly Record<string, unknown>[]) => new Set(entries.map(m => String(m.id)))
+
+/** R4c 3: said when a text that mentions a member is written while the members file cannot be read (503, as the house's
+ *  other unavailable answers): its labels would be written as ids for good. */
+export const MEMBERS_UNREADABLE = 'The members file cannot be read now, so the names this text mentions cannot be written as its readers may read them. Nothing was written.'
+
+/** The generic member: no hat, no role (the viewer `actorNames` and a members text's labels are read as). */
+const ANY_MEMBER: Viewer = Object.freeze({ kind: 'member', id: '', hats: [], roles: [] }) as Viewer
+const THE_PUBLIC: Viewer = Object.freeze({ kind: 'public' }) as Viewer
+
+/** R4c 1: the loosest viewer a text at `level` admits: the public for a public text, otherwise the generic member. */
+export const loosestReader = (level: ParsedLevel): Viewer => (level.level === 'public' ? THE_PUBLIC : ANY_MEMBER)
 
 const nameOf = (record: Record<string, unknown> | null, id: string): string =>
   record && typeof record.name === 'string' && record.name.trim() !== '' ? record.name.trim() : id
@@ -39,26 +58,46 @@ export function personName(repo: string, person: { id: string; name: string }, v
 /** T2e I1 (Rule 4): whether the members file holds `id`, read now. A file that is there but cannot be read may hold it, so
  *  it counts as holding: no other name (a session's, the Roles table's) stands in for a name the gate did not say. */
 export function membersHold(repo: string): (id: string) => boolean {
-  let ids: Set<string> | null
-  try {
-    ids = existsSync(registryPath(repo, 'members'))
-      ? new Set((readRegistry(repo, 'members').entries ?? []).map(m => String((m as { id?: unknown }).id)))
-      : new Set()
-  } catch { ids = null }
+  const read = membersRead(repo)
+  const ids = read === null ? null : idsOf(read)
   return id => ids === null || ids.has(id)
 }
 
-/** T2f 1 (Rule 4): the label a mention of a member is written with, in the picker and into any text (a comment, a page, a
- *  task's title; `relabelMembers`): their name as any member may read it (the gate, with the generic member viewer that
- *  `actorNames` uses), else their id. An id the members file does not hold, or one that cannot be read, is its id. */
-export function memberLabels(repo: string): (id: string) => string {
-  const said = displayNames(repo, null)
-  let ids: Set<string>
-  try {
-    ids = existsSync(registryPath(repo, 'members'))
-      ? new Set((readRegistry(repo, 'members').entries ?? []).map(m => String((m as { id?: unknown }).id)))
-      : new Set()
-  } catch { ids = new Set() }
+/** T2f 1, R4c 1 and 3 (Rule 4): the label a mention of a member is written with into a text at `level` (a comment, a page,
+ *  a task's title, an import; `relabelMembers`): their name as the loosest reader of that level may read it (the gate: the
+ *  public for a public text, otherwise the generic member that `actorNames` uses), else their id. An id the members file does
+ *  not hold is its id. The file is read at the first label asked for: one that cannot be read refuses the write (503,
+ *  MEMBERS_UNREADABLE), since its labels would otherwise be written as ids for good; a text with no member mention is
+ *  never refused by it. */
+export function memberLabels(repo: string, level: ParsedLevel): (id: string) => string {
+  let label: ((id: string) => string) | null = null
+  return id => {
+    if (label === null) {
+      const read = membersRead(repo)
+      if (read === null) throw new HttpError(503, MEMBERS_UNREADABLE, 'MEMBERS_UNREADABLE')
+      label = labelsFrom(repo, read, loosestReader(level))
+    }
+    return label(id)
+  }
+}
+
+/** R4c 1 (half b): a member mention's label as stored text is handed to `viewer` from a text at `level` now: the name when
+ *  both the loosest reader of that level and the viewer may read it, else the id. A page widened since it was written, or
+ *  one written outside the Hub, is read so. A members file that cannot be read says the id (fail closed). */
+export function readLabels(repo: string, level: ParsedLevel, viewer: Viewer): (id: string) => string {
+  const read = membersRead(repo)
+  if (read === null) return id => id
+  const atLevel = labelsFrom(repo, read, loosestReader(level))
+  const toViewer = displayNames(repo, null, { viewer })
+  return id => {
+    const name = atLevel(id)
+    return name !== id && toViewer(id) === name ? name : id
+  }
+}
+
+function labelsFrom(repo: string, read: readonly Record<string, unknown>[], viewer: Viewer): (id: string) => string {
+  const ids = idsOf(read)
+  const said = displayNames(repo, null, { viewer })
   return id => (ids.has(id) ? said(id) : id)
 }
 
@@ -71,8 +110,7 @@ const UNKNOWN = /^unknown <.*>$/
  * every member reads). `details`: the tree read's hat names, given only for a viewer who may read the tree (PF-R255).
  */
 export function displayNames(repo: string, membership: Membership | null, o: { viewer?: Viewer; details?: ReadonlyMap<string, string> } = {}): (id: string) => string {
-  let members: Record<string, unknown>[] = []
-  try { members = existsSync(registryPath(repo, 'members')) ? (readRegistry(repo, 'members').entries ?? []) as Record<string, unknown>[] : [] } catch { members = [] }
+  const members = membersRead(repo) ?? []
   const viewer: Viewer = o.viewer ?? { kind: 'member', id: '', hats: [], roles: [] }
   let levels: Levels | null = null
   const shown = (m: Record<string, unknown>): Record<string, unknown> | null => {

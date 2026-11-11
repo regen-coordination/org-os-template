@@ -24,25 +24,26 @@ import { knownActorOf, viewerOf } from '../request.ts'
 import { Refusal } from '../changes/apply.ts'
 import { baseOf } from '../changes/canonical.ts'
 import { currentEntries, targetsOfOps } from '../changes/stage.ts'
+import { ChangeStore } from '../changes/store.ts'
 import type { RecordOp } from '../changes/types.ts'
 import { readRuleContext } from '../governance/effective.ts'
 import { registriesOf } from '../registries.ts'
 import { shortAddress } from '../systems/safe.ts'
 import { accountOn, type Membership } from '../session/membership.ts'
-import { displayNames, memberLabels, membersHold } from '../session/names.ts'
+import { displayNames, membersHold, readLabels } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads, strictPrivateReads } from '../private/reads.ts'
 import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, MEMBERS as MEMBERS_LEVEL, NOBODY } from '../visibility/gate.ts'
-import { commitOrStage, guardPageRefs, mayWritePrivate } from './pages.ts'
+import { commitOrStage, guardPageRefs, mayWritePrivate, textFor } from './pages.ts'
 import { bury, onHousekeeping, onTargetsGone, tombstones, unbury } from './gone.ts'
 import { floorsAbove, mayRead, NOBODY_WRITTEN, readableRows, writtenLevelOf } from './written.ts'
 import { readRegistryOrEmpty } from '../registry.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, type ParsedLevel, type Viewer } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
-import { NO_PAGE, slugOf, splitPage } from '../../lib/workspace/pages.mjs'
+import { MEMBER_TEXT_UNSHOWN, NO_PAGE, slugOf, splitPage } from '../../lib/workspace/pages.mjs'
 import { resolveRoles, rolesOf } from '../../lib/rules.mjs'
 import { actorIdOf, walletsOf } from '../../lib/hat-readings.mjs'
 import { parseCaip10 } from '../../lib/caip.mjs'
@@ -58,8 +59,9 @@ export const COMMENT_MAX_CHARS = 10000
 /** §8.1: each part of an anchor (its quote, the text before, the text after), at most. */
 export const ANCHOR_MAX_CHARS = 500
 
-/** §8.3: said under the comment for each member a mention did not tell. */
-export const NOT_TOLD = (name: string) => `Not told: ${name} can’t see this page.`
+/** §8.3: said under the comment for each member a mention did not tell. R4c 6: true of a comment (the target's level) and of
+ *  a reply alike (the floor of the talk above it, PR7-R45), so it names the conversation, not the page. */
+export const NOT_TOLD = (name: string) => `Not told: ${name} can’t read this conversation.`
 /** §8.2: a comment whose quote is gone from its target stays, unanchored, with this. */
 export const ANCHOR_CHANGED = 'The text it was on has changed.'
 /** §8.2: a deleted comment's body is cleared, and it reads this. */
@@ -80,6 +82,8 @@ export const NOT_ON_TARGET = (id: string, t: Target) => `Comment ${id} is not on
 export const DELETED_NO_TASK = 'A deleted comment cannot be turned into a task. Nothing was written.'
 /** DAO-OS L6 Task 18 fix round 1: a comment becomes one task only. */
 export const TASK_ALREADY = (task: string) => `This comment was turned into the task ${task} already. Nothing was written.`
+/** R4c 2: TASK_ALREADY to a reader who may not read the task: it is not named. */
+export const TASK_ALREADY_UNNAMED = 'This comment was turned into a task already. Nothing was written.'
 /** T2e C1: the levels a comment's talk is kept at (its target's now, its own, those of the comments above it) have no one
  *  level narrower than or equal to all of them, so no task can hold it. Names nothing. */
 export const TASK_NO_LEVEL = 'This comment cannot be turned into a task: no one level holds everyone who may read it and the comments above it. Nothing was written.'
@@ -351,16 +355,22 @@ export interface Comment {
   edited?: string
 }
 
+/** What a viewer is shown of a comment beyond its row (R4c): its body as they are handed it (`body`: each member mention's
+ *  label as they may read it) and whether they may read the task it became (`task`). */
+export interface Shown { body: (text: string) => string; task: (id: string) => boolean }
+
 /** One comment as a viewer admitted to its target is shown it (§8.2). `text`: the target's text now; when given and the
- *  anchor's quote is not in it, the comment is shown unanchored with ANCHOR_CHANGED. A deleted comment shows no body. */
-export function commentView(row: CommentRow, names: (id: string) => { handle: string; role: string }, text?: string): Comment {
+ *  anchor's quote is not in it, the comment is shown unanchored with ANCHOR_CHANGED. A deleted comment shows no body. With
+ *  `shown` (every route passes it: `shownTo`), the body is relabelled for the viewer and the task named only when they may
+ *  read it (R4c 1, 2). */
+export function commentView(row: CommentRow, names: (id: string) => { handle: string; role: string }, text?: string, shown?: Shown): Comment {
   const who = names(row.by)
   const out: Comment = {
-    id: row.id, handle: who.handle, role: who.role, at: row.created, body: row.deleted ? '' : row.body, state: 'sent', replies: [],
+    id: row.id, handle: who.handle, role: who.role, at: row.created, body: row.deleted ? '' : shown ? shown.body(row.body) : row.body, state: 'sent', replies: [],
     by: row.by, target: row.target as Target, parent: row.parent,
   }
   if (row.resolvedBy && row.resolvedAt) { const r = names(row.resolvedBy); out.resolved = { by: r.handle, at: row.resolvedAt, role: r.role } }
-  if (row.task) out.task = row.task
+  if (row.task && (!shown || shown.task(row.task))) out.task = row.task
   if (row.edited) out.edited = row.edited
   if (row.deleted) out.deleted = { at: row.deleted, note: DELETED }
   else if (row.anchor) {
@@ -372,8 +382,43 @@ export function commentView(row: CommentRow, names: (id: string) => { handle: st
   return out
 }
 
+/**
+ * R4c 1, 2: what `viewer` is shown of the comments on a target: each body relabelled as they may read it at members (a
+ * comment is read by members alone, §8.2: `visibleTarget`), so a label written before T2f 1, or one naming someone they may
+ * not read, says the id; a body whose member link cannot be relabelled is MEMBER_TEXT_UNSHOWN. A task is named to them only
+ * when they may read it now: a git task whose record admits them, a store task whose level does, or one their own change
+ * stages; one kept from them (narrowed since, or made where the talk was narrower) is absent, and a second Turn into a task
+ * is refused without naming it (TASK_ALREADY_UNNAMED).
+ */
+export function shownTo(repo: string, store: PrivateStore, viewer: Viewer): Shown {
+  let levels: Levels | null = null
+  const memo = new Map<string, boolean>()
+  return {
+    body: text => textFor(repo, text, MEMBERS_LEVEL, viewer) ?? MEMBER_TEXT_UNSHOWN,
+    task: id => {
+      let hit = memo.get(id)
+      if (hit === undefined) {
+        levels ??= levelsOf(repo, store)
+        const git = levels.records('tasks').find(e => String(e.id) === id)
+        const kept = git ? undefined : storeRead(store, () => store.record('tasks', id))
+        hit = git ? admits(levels.record('tasks', git), viewer)
+          : kept ? admits(levelOfToken(kept.visibility), viewer)
+            : stagedByViewer(repo, viewer, id)
+        memo.set(id, hit)
+      }
+      return hit
+    },
+  }
+}
+
+/** Whether `viewer`'s own change stages the task `id` (a git task made under a raised rule, before it is approved). */
+function stagedByViewer(repo: string, viewer: Viewer, id: string): boolean {
+  if (viewer.kind !== 'member' || viewer.id === '') return false
+  try { return (new ChangeStore(repo).load(viewer.id)?.ops ?? []).some(op => 'record' in op && op.record === `tasks:${id}`) } catch { return false }
+}
+
 /** The thread of a target: its comments, oldest first, each with its replies (a reply to a reply sits under its root). */
-function threadOf(rows: CommentRow[], names: (id: string) => { handle: string; role: string }, text: string): Comment[] {
+function threadOf(rows: CommentRow[], names: (id: string) => { handle: string; role: string }, text: string, shown?: Shown): Comment[] {
   const byId = new Map(rows.map(r => [r.id, r]))
   const rootOf = (r: CommentRow): string => {
     const seen = new Set<string>()
@@ -382,10 +427,10 @@ function threadOf(rows: CommentRow[], names: (id: string) => { handle: string; r
     return at.id
   }
   const tops = new Map<string, Comment>()
-  for (const r of rows) if (rootOf(r) === r.id) tops.set(r.id, commentView(r, names, text))
+  for (const r of rows) if (rootOf(r) === r.id) tops.set(r.id, commentView(r, names, text, shown))
   for (const r of rows) {
     const root = rootOf(r)
-    if (root !== r.id) tops.get(root)?.replies.push(commentView(r, names, text))
+    if (root !== r.id) tops.get(root)?.replies.push(commentView(r, names, text, shown))
   }
   return [...tops.values()]
 }
@@ -427,9 +472,9 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const people = new People(deps.repo, deps.membership)
   // `tell`'s test (T2e M4): the target's level now and, for a reply, every level of the comments above it (`floors`).
   const told = (v: Viewer) => admits(level, v) && floors.every(f => mayRead(v, level, f))
-  // T2f 1 (Rule 4): a member is offered by the name any member may read (the gate), else their id: the label is written into
-  // the text, which readers other than the author read (and every write rewrites it so, `relabelMembers`).
-  const display = memberLabels(deps.repo)
+  // T2f 1 (Rule 4): a member is offered by the name any member may read (the gate), else their id; R4c: and the author may
+  // (a members file that cannot be read offers ids). Every write rewrites the label at the text's level (`relabelMembers`).
+  const display = readLabels(deps.repo, MEMBERS_LEVEL, viewer)
 
   const persons: Mentionable[] = []
   for (const m of people.members) {
@@ -804,12 +849,13 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
   /** The floor of a change to `row`: its written level and those of the comments above it (PR7-R45). */
   const floorOf = (row: CommentRow, rows: readonly CommentRow[]) => [row.writtenLevel, ...floorsAbove(rows, row.parent)]
   const view = (store: PrivateStore, row: CommentRow, info: TargetInfo, viewer: Viewer) => {
-    // T2f 4: the author's name as this viewer may read it, as GET says it.
+    // T2f 4: the author's name as this viewer may read it, as GET says it; R4c: the body and the task as they may read them.
     const names = namesFor(repo, membership, viewer)
-    const out = commentView(row, names, info.text)
+    const shown = shownTo(repo, store, viewer)
+    const out = commentView(row, names, info.text, shown)
     if (row.parent === null) {
       const rows = readableRows(storeRead(store, () => store.comments(row.target)), viewer, info.level)
-      out.replies = rows.filter(r => r.parent === row.id).map(r => commentView(r, names, info.text))
+      out.replies = rows.filter(r => r.parent === row.id).map(r => commentView(r, names, info.text, shown))
     }
     return out
   }
@@ -821,7 +867,7 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     const viewer = viewerOf(c)
     const info = visibleTarget(repo, target, store, null, viewer)
     const rows = readableRows(storeRead(store, () => store.comments(target)), viewer, info.level)
-    return c.json(threadOf(rows, namesFor(repo, membership, viewer), info.text))
+    return c.json(threadOf(rows, namesFor(repo, membership, viewer), info.text, shownTo(repo, store, viewer)))
   })
 
   app.post('/api/comments', async c => {
@@ -861,7 +907,7 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     const j = judge(refsOf(guarded.body).mentions, target, actor.id, cdeps, `comment:${row.id}`, floors)
     await write(store, { comments: [row], mentions: j.mentions, notifications: j.notifications })
     notify(target, [row.writtenLevel, ...floors])
-    return c.json({ comment: commentView(row, namesFor(repo, membership, viewer), info.text), notTold: j.notTold.map(NOT_TOLD) }, 201)
+    return c.json({ comment: commentView(row, namesFor(repo, membership, viewer), info.text, shownTo(repo, store, viewer)), notTold: j.notTold.map(NOT_TOLD) }, 201)
   })
 
   const resolve = (resolved: boolean) => async (c: Context) => {
@@ -895,6 +941,8 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     return deps.withLock(async () => {
       const store = await needStore()
       const { row, info, rows } = visibleComment(store, c.req.param('id'), viewer)
+      // R4c 2: a second conversion is refused as before; a task the viewer may not read is not named by its refusal.
+      if (row.task && !row.deleted && !shownTo(repo, store, viewer).task(row.task)) throw new HttpError(409, TASK_ALREADY_UNNAMED, 'TASKED')
       const out = await turnIntoTask(row, info, actor, { repo, store, membership, now, notify: msg => deps.notify?.(msg) }, floorOf(row, rows))
       // Task 18 fix round 1: the comment keeps the task it became, so everyone admitted sees it and it is not made twice.
       await write(store, { comments: [{ ...row, task: out.task }] })

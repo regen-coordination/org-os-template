@@ -157,7 +157,7 @@ describe('the constants and the copy (L6 §8)', () => {
   it('are the spec\'s, exactly', () => {
     expect(COMMENT_MAX_CHARS).toBe(10000)
     expect(ANCHOR_MAX_CHARS).toBe(500)
-    expect(NOT_TOLD('steward-c')).toBe('Not told: steward-c can’t see this page.')
+    expect(NOT_TOLD('steward-c')).toBe('Not told: steward-c can’t read this conversation.')
     expect(ANCHOR_CHANGED).toBe('The text it was on has changed.')
   })
 })
@@ -1390,5 +1390,46 @@ describe('T2f 5: a task made from a comment labels a page narrowed since the com
     expect(made.body.commit).toBeTruthy()
     expect(git(w.repo, 'log -1 --format=%s').trim()).toBe(`tasks: Review ${STRICT_LABEL} before Friday`)
     expect(git(w.repo, `log -p ${base}..HEAD`)).not.toMatch(/Harbour|lease/)
+  })
+})
+
+// R4c 2: a comment names the task it became only to a viewer who may read that task; a second Turn into a task is refused
+// as before, its sentence naming the task only to them. R4c (T2f's carry): a comment's stored labels are read back as any
+// member may read the names, rows written before T2f 1 included.
+describe('R4c: what a comment shows of its task and its mentions', () => {
+  const PAGE = 'page:handbook-3f2a'
+  const row = (id: string, extra: Partial<CommentRow> = {}): CommentRow => ({ id, target: PAGE, parent: null, anchor: null, by: 'steward-a', body: 'File the report',
+    created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: 'members', ...extra })
+
+  it('a task kept at Ops is named on its comment to an Ops wearer, and absent for a member who may not read it', async () => {
+    const w = await world()
+    await w.prime(A1)
+    await w.store.writeConversation({ comments: [row('cmt-tasked', { task: OPS_TASK })] })
+    asA(w.repo)
+    const wearer = await call(w.app, `/api/comments?target=${PAGE}`)
+    expect(wearer.body[0].task).toBe(OPS_TASK)
+    asC(w.repo)
+    const plainMember = await call(w.app, `/api/comments?target=${PAGE}`)
+    expect(plainMember.status).toBe(200)
+    expect(plainMember.body[0]).not.toHaveProperty('task')
+    expect(JSON.stringify(plainMember.body)).not.toContain(OPS_TASK)
+    const again = await call(w.app, '/api/comments/cmt-tasked/task', json('POST'))
+    expect(again.status).toBe(409)
+    expect(again.body.code).toBe('TASKED')
+    expect(JSON.stringify(again.body)).not.toContain(OPS_TASK)
+    asA(w.repo)
+    const named = await call(w.app, '/api/comments/cmt-tasked/task', json('POST'))
+    expect(named.body).toMatchObject({ code: 'TASKED', error: TASK_ALREADY(OPS_TASK) })
+  })
+
+  it('a comment row whose label names someone kept to the council reads as their id to a member below it', async () => {
+    const w = await world()
+    writeFileSync(join(w.repo, 'data', 'visibility.yaml'), `${VISIBILITY}    members: { fields: { name: "hat:${COUNCIL}" } }\n`)
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "fixture: member names are the council\'s"')
+    await w.store.writeConversation({ comments: [row('cmt-old', { body: '[@Steward B](hub:member/steward-b) to file the report' })] })
+    asC(w.repo)
+    const read = await call(w.app, `/api/comments?target=${PAGE}`)
+    expect(read.status).toBe(200)
+    expect(read.body[0].body).toBe('[@steward-b](hub:member/steward-b) to file the report')
   })
 })

@@ -38,7 +38,7 @@ import { lastCommit } from '../resources/changed.ts'
 import { fileBase, gitPages, pendingText, registerFileCheck } from './files.ts'
 import { gitDefinitions } from './collections.ts'
 import { fromOf } from './sources.ts'
-import { gateItems, Levels, MAINTAINERS, NOBODY } from '../visibility/gate.ts'
+import { gateItems, Levels, MAINTAINERS, NOBODY, PUBLIC as PUBLIC_LEVEL, PUBLIC_VIEWER } from '../visibility/gate.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gitNames, heldMove, MOVE_PROPOSED, reach, storeAccess, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { narrow } from '../visibility/narrow.ts'
@@ -47,12 +47,12 @@ import type { PrivateRecord, PrivateStore } from '../private/store.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, type ParsedLevel, type Viewer, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
 import { ancestorsOf, pageTargets } from '../../lib/workspace/targets.mjs'
-import { displayNames, memberLabels } from '../session/names.ts'
+import { displayNames, memberLabels, readLabels } from '../session/names.ts'
 import type { Membership } from '../session/membership.ts'
 import {
   ASSET_MAX_BYTES, CANNOT_LINK, childrenOf, descendantsOf, guardRefs, HAS_SUBPAGES, joinPage, labelledLinks, looserThanParent, LOOSER_THAN_PARENT, NAMED_BY,
   newPageId, NO_PAGE, NO_PRIVATE_ASSETS, orderBetween, ORDER_EPSILON, ORDER_STEP, PAGE_MAX_BYTES, pageEntries, pageLevel, pagesMadePublic, PARENT_MISSING,
-  PRIVATE_PAGE_ID, relabelMembers, slugOf, splitPage, staleOf, type PageEntry, type PageFront,
+  MEMBER_TEXT_UNSHOWN, PRIVATE_PAGE_ID, relabelMembers, slugOf, splitPage, staleOf, type PageEntry, type PageFront,
 } from '../../lib/workspace/pages.mjs'
 
 export {
@@ -167,12 +167,27 @@ export function backlinks(repo: string, id: string, viewer: Viewer, store: Priva
 }
 
 /** L9's input (§4.7; controller ruling P-15: L9 itself names its own `publishedPages`): the git pages whose level is
- *  public, with their front matter and body. The store is not read: a private page is never public. */
+ *  public, with their front matter and body. The store is not read: a private page is never public. R4c 1: each body as the
+ *  public is handed it (`textFor`): a member mention says the name only where the public may read it, else the id, however
+ *  the page was written or widened; a page whose member links cannot be so relabelled is left out (fail closed). */
 export function publicPagesOf(repo: string): { front: PageFront; body: string }[] {
   const tree = treeOf(repo, null)
   return [...tree.byId.values()]
     .filter(e => e.where === 'git' && levelIn(tree, e.id).level === 'public')
-    .map(e => ({ front: e.front!, body: e.markdown }))
+    .flatMap(e => {
+      const body = textFor(repo, e.markdown, PUBLIC_LEVEL, PUBLIC_VIEWER)
+      return body === null ? [] : [{ front: e.front!, body }]
+    })
+}
+
+/** R4c 1 (half b): a stored text (a page's body, a comment's) as `viewer` is handed it from a text at `level` now: each member
+ *  mention's label the name the loosest reader of that level and the viewer may both read, else the id (`readLabels`), so a
+ *  page widened since it was written, or one written outside the Hub, never hands out a name its readers may not read. Null
+ *  when a member link cannot be relabelled (a reference-style link, written outside the Hub). */
+export function textFor(repo: string, text: string, level: ParsedLevel, viewer: Viewer): string | null {
+  if (!text.includes('hub:member/')) return text
+  const out = relabelMembers(text, readLabels(repo, level, viewer))
+  return out.refused === null ? out.body : null
 }
 
 // ── links (§4.5) ─────────────────────────────────────────────────────────────────────────────────────
@@ -181,8 +196,10 @@ export function publicPagesOf(repo: string): { front: PageFront; body: string }[
  *  does not know, while the store cannot be reached, cannot be judged: the store's 503. Every write of a page's or a
  *  comment's body passes it, so it also writes each member mention's label as any member may read the name (T2f 1). */
 export function guardPageRefs(text: string, level: ParsedLevel, deps: { repo: string; store: PrivateStore | null; why?: unknown }): { body: string; refused: string | null } {
-  // T2f 1 (Rule 4): every member mention's label is the name any member may read, else the id, before the links are judged.
-  const named = relabelMembers(text, memberLabels(deps.repo))
+  // T2f 1, R4c 1 (Rule 4): every member mention's label is the name the loosest reader of `level` may read (the public's in
+  // a public text, any member's otherwise), else the id, before the links are judged. R4c 3: the members file unreadable,
+  // a text that mentions a member is refused 503 (MEMBERS_UNREADABLE), never written with ids for good.
+  const named = relabelMembers(text, memberLabels(deps.repo, level))
   if (named.refused !== null) return named
   const body = named.body
   const tree = treeOf(deps.repo, deps.store)
@@ -629,6 +646,27 @@ export function pageFileErrors(repo: string, op: FileOp): RecordError[] {
   return pageChecks(op.path, id, [...others, { id, text: op.text }], policy).filter(e => !known.has(key(e)))
 }
 
+/** R4c 5: a file op on `pages/<id>.md` (the file editor's, Make public's) with each member mention labelled at the level its
+ *  text gives the page (its own, else its parent's, as `pageFileErrors` reads it), as every other page write is (T2f 1). A
+ *  member link that cannot be relabelled is refused, as a page write refuses it (MEMBER_LINK). Any other op, a deletion,
+ *  and a text whose front matter does not read are answered as they are: the file check judges them. The members file
+ *  unreadable, a text that mentions a member is refused 503 (`memberLabels`). */
+export function labelledPageFile(repo: string, op: FileOp): { op: FileOp; refused: RecordError | null } {
+  const m = PAGE_FILE.exec(op.path)
+  if (!m || typeof op.text !== 'string' || !op.text.includes('hub:member/')) return { op, refused: null }
+  const id = m[1]!
+  let level: ParsedLevel
+  let read: ReturnType<typeof splitPage>
+  try {
+    read = splitPage(op.text)
+    level = pageLevel(id, pageEntries([...gitPages(repo).filter(p => p.id !== id), { id, text: op.text }], []), readConfig(repo))
+  } catch { return { op, refused: null } }
+  const named = relabelMembers(read.body, memberLabels(repo, level))
+  if (named.refused !== null) return { op, refused: { record: op.path, field: 'text', message: `Not staged: ${named.refused} Nothing was staged.` } }
+  if (named.body === read.body) return { op, refused: null }
+  return { op: { ...op, text: joinPage(read.front, named.body, op.text) }, refused: null }
+}
+
 /** §4's checks of page `id` in the git pages `pages` (pageFileErrors reads them before and after the op). */
 function pageChecks(path: string, id: string, pages: { id: string; text: string }[], policy: VisibilityPolicy): RecordError[] {
   const no = (field: string, message: string): RecordError[] => [{ record: path, field, message }]
@@ -739,10 +777,13 @@ export function mountPages(app: Hono, deps: PagesDeps): void {
     // The walk's I4 (G5): a git page reads, for the member who staged an edit of it, as their change holds it (its title and
     // body; the op keeps its base); anyone else, and a preview (`?as`), reads the trunk.
     const mine = e.where === 'git' && c.req.query('as') === undefined ? stagedPage(repo, actorOf(c), pagePath(id)) : null
+    // R4c 1 (half b): the body as this viewer may read it from the page's level now (a page widened since, or written outside
+    // the Hub, included); a member link that cannot be relabelled is MEMBER_TEXT_UNSHOWN's sentence, never the text.
+    const shownText = (text: string) => textFor(repo, text, levelIn(tree, id), viewer) ?? MEMBER_TEXT_UNSHOWN
     return c.json({
       page: {
         id, title: mine?.title ?? e.title, parent: stale ? null : e.parent, path: e.where === 'git' ? pagePath(id) : null, visibility: formatLevel(levelIn(tree, id)),
-        markdown: mine?.markdown ?? e.markdown, edited, ...(e.from !== undefined ? { from: e.from } : {}), ...(fromMark ? { fromMark } : {}),
+        markdown: shownText(mine?.markdown ?? e.markdown), edited, ...(e.from !== undefined ? { from: e.from } : {}), ...(fromMark ? { fromMark } : {}),
         ...(stale ? { stale: 'missing-parent' } : {}), ...(widens !== undefined ? { widens } : {}),
       },
       write: writeMode(repo, c, tree, e),

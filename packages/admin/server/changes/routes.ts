@@ -29,7 +29,8 @@ import { WIDENS } from '../../lib/narrow.mjs'
 import type { PrivateStore } from '../private/store.ts'
 import { transition } from '../../lib/machines/run.mjs'
 import { change as changeMachine, changeGuards, deriveChangeState } from '../../lib/machines/change.mjs'
-import type { Change, Op, RuleSummary, StageOp } from './types.ts'
+import type { Change, FileOp, Op, RuleSummary, StageOp } from './types.ts'
+import { labelledPageFile } from '../workspace/pages.ts'
 
 export interface ChangeRoutesDeps {
   repo: string
@@ -246,9 +247,16 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
           if (held.length > 0) return Response.json({ errors: shownChainHeld(lv, viewerOf(c), held) }, { status: 422 })
         }
       }
-      const git = [...split.git, ...incoming.filter(isFileOp)]
+      // R4c 5: a page's file op is labelled as every page write is: each member mention at the level its text gives the page.
+      const files: FileOp[] = []
+      for (const op of incoming.filter(isFileOp)) {
+        const labelled = labelledPageFile(repo, op)
+        if (labelled.refused) return Response.json({ errors: [labelled.refused] }, { status: 422 })
+        files.push(labelled.op)
+      }
+      const git = [...split.git, ...files]
       // A file op's path, checked whole before it is staged (T19 review I1, PF-R83): git's half of the check is async.
-      const held = await heldFileErrors(repo, incoming.filter(isFileOp))
+      const held = await heldFileErrors(repo, files)
       if (held.length > 0) return Response.json({ errors: held }, { status: 422 })
       // A page the private store keeps is never written back into git by a file op (Task 20 review C1, PF-R95).
       const kept = keptPageErrors(repo, reach(privateStore).store, incoming, 'Nothing was staged.')

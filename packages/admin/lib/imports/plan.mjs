@@ -67,7 +67,7 @@ import { firstIdIn, idsIn, labelText, namesFinder, rewriteLinks, withLabel } fro
  *   fileBlob: (rel: string) => string | null, blobOfFile: (abs: string) => string,
  *   registryProps: (name: string) => Record<string, string[]> | null,
  *   now: string, by: string, random: () => string,
- *   memberLabel?: (id: string) => string,
+ *   memberLabel?: (level: import('../visibility.mjs').ParsedLevel) => (id: string) => string,
  * }} ImportState
  * @typedef {{ writes: { git: FileOp[], private: PrivateWrite[], assets: AssetWrite[] }, needsStore: boolean, report: ImportReport,
  *   receipt: ImportReceipt, subject: string, databases: { sid: string, name: string, into: string, level: string, fields: Record<string, string>, within?: string }[],
@@ -645,9 +645,10 @@ export function planImport(bundle, map, state) {
     const guarded = guardRefs(body, p.level, { pageLevel: levelOfId, collectionLevel: name => privateLevels.get(name) ?? null })
     if (guarded.refused !== null) { say(where, REFUSED_LINK(guarded.refused), about); if (!p.existing) dropped.add(p.sid); continue }
     body = guarded.body
-    // T2f 1 (Rule 4): a member mention's label is the name any member may read, else the id, as every page write writes it.
+    // T2f 1, R4c 1 (Rule 4): a member mention's label is the name the loosest reader of the page's level may read, else the
+    // id, as every page write writes it.
     if (state.memberLabel) {
-      const named = relabelMembers(body, state.memberLabel)
+      const named = relabelMembers(body, state.memberLabel(p.level))
       if (named.refused !== null) { say(where, REFUSED_LINK(named.refused), about); if (!p.existing) dropped.add(p.sid); continue }
       body = named.body
     }

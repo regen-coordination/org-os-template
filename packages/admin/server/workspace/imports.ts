@@ -27,6 +27,7 @@ import { registryFileOf } from '../../lib/registries.mjs'
 import { ancestorsOf, pageTargets, recordTargets } from '../../lib/workspace/targets.mjs'
 import { treeReader } from '../private/targets.ts'
 import { memberLabels } from '../session/names.ts'
+import { HttpError } from '../errors.ts'
 import { planImport as plan, withReceipt, type ImportMap, type ImportPlan, type ImportState, type PrivateWrite } from '../../lib/imports/plan.mjs'
 import type { ImportBundle } from '../../lib/imports/bundle.mjs'
 
@@ -72,8 +73,9 @@ export function readImportState(repo: string, store: PrivateStore | null): Impor
     now: new Date().toISOString(),
     by: '',
     random: () => randomBytes(6).toString('hex'),
-    // T2f 1 (Rule 4): a member mention in an imported page is labelled as any member may read the name, else the id.
-    memberLabel: memberLabels(repo),
+    // T2f 1, R4c 1 (Rule 4): a member mention in an imported page is labelled as the loosest reader of the page's level may
+    // read the name, else the id; R4c 3: with the members file unreadable, a page that mentions one refuses the import (503).
+    memberLabel: level => memberLabels(repo, level),
     registryProps: name => {
       // A registry's own fields, from its schema (packages/admin/schemas/<name>.schema.json): each with the JSON types it takes.
       const file = new URL(`../../schemas/${name}.schema.json`, import.meta.url)
@@ -91,6 +93,8 @@ export function readImportState(repo: string, store: PrivateStore | null): Impor
  */
 export function planImport(bundle: ImportBundle, map: ImportMap, repo: string, store: PrivateStore | null): ImportPlan {
   try { return plan(bundle, map ?? {}, readImportState(repo, store)) } catch (err) {
+    // R4c 3: an unavailable answer (a members file that cannot be read) is the 503 it is, not a map the plan cannot follow.
+    if (err instanceof HttpError && err.status === 503) throw err
     const code = (err as { code?: unknown }).code
     if (typeof code === 'string') throw new Refusal(422, { code, error: (err as Error).message })
     throw err

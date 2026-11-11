@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,9 +12,10 @@ import { openPrivateStore, type PrivateStore } from '../../server/private/store.
 import { validateRepo } from '../../lib/data-validate.mjs'
 import { joinPage, pageEntries, pageLevel, guardRefs, UNREADABLE_FRONT } from '../../lib/workspace/pages.mjs'
 import {
-  CANNOT_LINK, HAS_SUBPAGES, LOOSER_THAN_PARENT, NO_PRIVATE_ASSETS, PARENT_MISSING, ASSET_MAX_BYTES, publicPagesOf, readPages, backlinks,
+  CANNOT_LINK, HAS_SUBPAGES, LOOSER_THAN_PARENT, NO_PRIVATE_ASSETS, PARENT_MISSING, ASSET_MAX_BYTES, publicPagesOf, readPages, backlinks, guardPageRefs,
 } from '../../server/workspace/pages.ts'
 import { MEMBERS as MEMBERS_LEVEL, PUBLIC } from '../../server/visibility/gate.ts'
+import { MEMBERS_UNREADABLE } from '../../server/session/names.ts'
 import type { WearerReading } from '../../server/systems/hats.ts'
 
 // DAO-OS L6 §4, §16, Task 7: pages in git (pages/<id>.md) and in the private store (collection `pages`), their tree, levels,
@@ -587,5 +588,79 @@ describe('moving a page (walk I9)', () => {
     expect(r.body).toEqual({ id: 'loose-0001', staged: true })
     expect(commits(w.repo)).toBe(before)
     expect((await call(w.app, '/api/changes')).body.ops).toEqual([expect.objectContaining({ op: 'file', path: 'pages/loose-0001.md' })])
+  })
+})
+
+// R4c 1 (Rule 4): a member mention's label is written at the text's level (the public's names in a public page, any member's
+// otherwise), and read back at the page's level now, so neither GET /api/pages/:id nor the portal's input (publicPagesOf)
+// hands the public a name the gate keeps from it, a page widened since included. R4c 3: a write with member mentions while
+// the members file cannot be read is refused 503; a read says the id. R4c 5: a page's file op is labelled as its level says.
+// Member names are at members here (no policy for the members collection); steward-a's record is public.
+describe('R4c: a members-level name never reaches the public through a page', () => {
+  const NAMED = `schema_version: "2.0"
+members:
+  - { id: steward-a, name: Steward A, kind: person, visibility: public, handles: { git: ["admin-test@local"], wallet: "${A1}" } }
+  - { id: steward-b, name: Steward B, kind: person, role: Contributor }
+`
+  const MD = 'Ask [@Steward B](hub:member/steward-b) and [@Steward A](hub:member/steward-a).\n'
+  const named = async (pages: Record<string, string> = {}) => {
+    const w = await world({ pages, files: { 'data/members.yaml': NAMED } })
+    return w
+  }
+
+  it('a public page is written with the public\'s names, a members page with any member\'s', async () => {
+    const w = await named()
+    const pub = await call(w.app, '/api/pages', json('POST', { title: 'Open', visibility: 'public', markdown: MD }))
+    expect(pub.status).toBe(201)
+    expect(fileAt(w.repo, `pages/${pub.body.id}.md`)).toContain('Ask [@steward-b](hub:member/steward-b) and [@Steward A](hub:member/steward-a).')
+    const mem = await call(w.app, '/api/pages', json('POST', { title: 'Inner', markdown: MD }))
+    expect(mem.status).toBe(201)
+    expect(fileAt(w.repo, `pages/${mem.body.id}.md`)).toContain('Ask [@Steward B](hub:member/steward-b) and [@Steward A](hub:member/steward-a).')
+  })
+
+  it('a public page written outside the Hub: the public\'s read and the portal\'s input say the id; a member reads a members page\'s name', async () => {
+    const w = await named({ 'open-0001': page('open-0001', 'Open', { visibility: 'public', body: MD }), 'inner-0001': page('inner-0001', 'Inner', { body: MD }) })
+    const read = await call(w.pub, '/api/pages/open-0001')
+    expect(read.status).toBe(200)
+    expect(read.body.page.markdown).toBe('Ask [@steward-b](hub:member/steward-b) and [@Steward A](hub:member/steward-a).\n')
+    expect(JSON.stringify(read.body)).not.toContain('Steward B')
+    expect(publicPagesOf(w.repo).find(p => p.front.id === 'open-0001')!.body).toBe('Ask [@steward-b](hub:member/steward-b) and [@Steward A](hub:member/steward-a).\n')
+    const inner = await call(w.app, '/api/pages/inner-0001')
+    expect(inner.body.page.markdown).toBe(MD)
+  })
+
+  it('a page written at members, widened to public outside the Hub, reads the id to the public', async () => {
+    const w = await named()
+    const mem = await call(w.app, '/api/pages', json('POST', { title: 'Inner', markdown: MD }))
+    const id = mem.body.id as string
+    expect(fileAt(w.repo, `pages/${id}.md`)).toContain('[@Steward B]')
+    writeFileSync(join(w.repo, 'pages', `${id}.md`), fileAt(w.repo, `pages/${id}.md`)!.replace('order: 1000\n', 'order: 1000\nvisibility: public\n'))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "widened by hand"')
+    const read = await call(w.pub, `/api/pages/${id}`)
+    expect(read.status).toBe(200)
+    expect(read.body.page.markdown).toContain('[@steward-b](hub:member/steward-b)')
+    expect(JSON.stringify(read.body)).not.toContain('Steward B')
+  })
+
+  it('a file op widening a page to public is staged with the public\'s names (R4c 5)', async () => {
+    const w = await named({ 'inner-0001': page('inner-0001', 'Inner', { body: MD }) })
+    const text = page('inner-0001', 'Inner', { visibility: 'public', body: MD })
+    const staged = await call(w.app, '/api/changes/ops', json('POST', { ops: [{ op: 'file', path: 'pages/inner-0001.md', text }] }))
+    expect(staged.status).toBe(200)
+    const ops = (await call(w.app, '/api/changes')).body.ops as { path: string; text: string }[]
+    expect(ops[0]!.text).toContain('Ask [@steward-b](hub:member/steward-b) and [@Steward A](hub:member/steward-a).')
+    expect(ops[0]!.text).toContain('visibility: public')
+  })
+
+  it('the members file unreadable: a write naming a member is refused 503, one naming none is written, a read says the id (R4c 3)', async () => {
+    const w = await named({ 'inner-0001': page('inner-0001', 'Inner', { body: MD }) })
+    chmodSync(join(w.repo, 'data', 'members.yaml'), 0o000) // there, but it cannot be read
+    // Every write of a page's or a comment's body passes guardPageRefs (page saves, sessions, comments, a move, a task's title).
+    let refused: unknown = null
+    try { guardPageRefs(MD, PUBLIC, { repo: w.repo, store: w.store }) } catch (err) { refused = err }
+    expect(refused).toMatchObject({ status: 503, message: MEMBERS_UNREADABLE, code: 'MEMBERS_UNREADABLE' })
+    expect(guardPageRefs('No one named.\n', PUBLIC, { repo: w.repo, store: w.store })).toEqual({ body: 'No one named.\n', refused: null })
+    const read = await call(w.app, '/api/pages/inner-0001')
+    expect(read.body.page.markdown).toBe('Ask [@steward-b](hub:member/steward-b) and [@steward-a](hub:member/steward-a).\n')
   })
 })

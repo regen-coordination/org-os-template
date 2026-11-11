@@ -545,6 +545,11 @@ export function guardRefs(body, level, lookups) {
 export const MEMBER_LINK = (id) =>
   `This text names the member ${id} in a way whose label cannot be written as the name every member may read: write the mention as [@${id}](hub:member/${id}).`
 
+/** R4c 1: said in place of a stored text a reader is handed whose member links cannot all be relabelled for them (text
+ *  written outside the Hub: every Hub write refuses such a link, MEMBER_LINK). */
+export const MEMBER_TEXT_UNSHOWN =
+  'This text is not shown here: it names a member in a way whose label cannot be written as the name you may read (a reference-style link, a label over several lines, or a title in the link). Write each member mention as an inline link to show it.'
+
 const MEMBER_DEST = String.raw`\(\s*(<)?(hub:member\/([^/\s()<>]+))(>)?(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?\s*\)`
 /** A member mention as the dialect reads it (a label with one level of brackets inside). */
 const MEMBER_INLINE = new RegExp(String.raw`(?<![\\!])${LABEL}${MEMBER_DEST}`, 'g')
