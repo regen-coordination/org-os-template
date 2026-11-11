@@ -15,7 +15,7 @@ import { mountSession } from '../../server/session/routes.ts'
 import { displayNames } from '../../server/session/names.ts'
 import { withRequest } from '../../server/request.ts'
 import { mountVisibility } from '../../server/visibility/routes.ts'
-import { actorNames, mountConversation, targetLevel } from '../../server/workspace/conversation.ts'
+import { actorNames, mountConversation, namesFor, targetLevel } from '../../server/workspace/conversation.ts'
 import { mountPresence, Presence } from '../../server/workspace/presence.ts'
 import { entityChanges } from '../../server/resources/changed.ts'
 import { HOUSE_IDENT, parseTrailers } from '../../lib/trailers.mjs'
@@ -172,8 +172,9 @@ describe('a member signed in by an emailed link, in the one display name (PF-R25
     const cookie = await h.signedIn(VISITOR_MAIL)
     const session = await (await h.call('GET', '/api/session', { cookie })).json()
     expect(session).toMatchObject({ signedIn: true, via: 'email', actor: VISITOR, viewer: 'public', person: { id: VISITOR, name: 'V. Visitor (roles)' } })
+    // T2e I1: the request's actor carries the name others may be told; the members file holds their id, so it is the id.
     const actor = await (await h.call('GET', '/api/actor', { cookie })).json()
-    expect(actor).toMatchObject({ id: VISITOR, name: 'V. Visitor (roles)' })
+    expect(actor).toMatchObject({ id: VISITOR, name: VISITOR })
   })
 
   // T2d (the T2c review's finding 4), Rule 4: the request's actor is named as any member may read the members file (as the
@@ -186,9 +187,16 @@ describe('a member signed in by an emailed link, in the one display name (PF-R25
     expect(session.person).toMatchObject({ id: ID, name: 'Example Steward' })
     expect((await h.call('POST', '/api/presence', { cookie, body: { target: `page:${PAGE}` } })).status).toBeLessThan(300)
     const plain = { kind: 'member' as const, id: 'example-org:person:someone-else', hats: [] as string[], roles: [] as string[] }
-    expect(h.presence.of(`page:${PAGE}`, plain)).toEqual([expect.objectContaining({ handle: ID, role: 'E. Steward (roles)' })])
-    expect(JSON.stringify(h.presence.everyone(`page:${PAGE}`))).not.toContain('Example Steward')
+    // T2e I1: the members file holds their id, so neither the members row's name nor the Roles table's stands in for the one
+    // a plain member may not read: they are shown by their id.
+    expect(h.presence.of(`page:${PAGE}`, plain)).toEqual([expect.objectContaining({ handle: ID, role: ID })])
+    expect(JSON.stringify(h.presence.everyone(`page:${PAGE}`))).not.toMatch(/Example Steward|E\. Steward/)
+    // Their comment's author, as any member reads it; and the composer's actor carries the name others may be told.
+    expect((await h.call('POST', '/api/comments', { cookie, body: { target: `page:${PAGE}`, body: 'Kept name.' } })).status).toBe(201)
+    const [comment] = await (await h.call('GET', `/api/comments?target=page:${PAGE}`, { cookie })).json()
+    expect(comment).toMatchObject({ handle: ID, role: 'Example Steward' }) // they hold council: they may read it
+    expect(namesFor(h.repo, h.membership, plain)(ID)).toEqual({ handle: ID, role: ID })
     const actor = await (await h.call('GET', '/api/actor', { cookie })).json()
-    expect(actor.name).toBe('E. Steward (roles)')
+    expect(actor.name).toBe(ID)
   })
 })

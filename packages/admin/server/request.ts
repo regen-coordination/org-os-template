@@ -315,7 +315,8 @@ function personWho(repo: string, p: RolesPerson): { actor: PersonActor; viewer: 
   const viewer: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, personActor(p), null)) }
   // Their name is read as anyone who sees the actor may read the members file (Rule 4; T2d, the T2c review's finding 4):
   // presence and the comment it sends fall back to it for everyone on the page. With no Role, as the public may; with one,
-  // as any member may (no hat, no role). Only GET /api/session reads it as their own viewer may, for them alone.
+  // as any member may (no hat, no role); a name that read does not say is their id when the members file holds it, never the
+  // Roles table's (T2e I1). Only GET /api/session reads it as their own viewer may, for them alone.
   const seenBy: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: '', hats: [], roles: [] }
   return { actor: personActor({ ...p, name: personName(repo, p, seenBy) }), viewer }
 }

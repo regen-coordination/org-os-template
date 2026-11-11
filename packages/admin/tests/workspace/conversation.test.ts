@@ -23,8 +23,9 @@ import { Refresher } from '../../server/hosted/refresh.ts'
 import { ServerAttention } from '../../server/attention.ts'
 import { resolveTrunk } from '../../server/proposals/ledger.ts'
 import { stateDir } from '../../server/state.ts'
+import { createSession } from '../../server/session/sessions.ts'
 import {
-  ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, commentView, mentionablesFor, mountConversation,
+  ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, actorNames, commentView, mentionablesFor, mountConversation,
   targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, TASK_NO_LEVEL, plainLine,
 } from '../../server/workspace/conversation.ts'
 import { mountPresence, Presence } from '../../server/workspace/presence.ts'
@@ -988,5 +989,73 @@ describe('PR7-R45: the housekeeping purge (targets that are not there now)', () 
     asC(w.repo)
     expect((await call(app, `/api/comments?target=${T}`)).body.map((c: { body: string }) => c.body)).toEqual([`${mention('steward-b')} before the column`])
     asA(w.repo)
+  })
+})
+
+// T2e I1 (Rule 4): names through presence, comment authors and the composer. A member whose members-file name only the
+// council may read is shown to others as what they may read (the id here), never by the request actor's name, which a
+// wallet session and git's identity read from the members row ungated. Their own session may still tell them their name.
+describe('T2e I1: a name kept to the council does not reach other members through presence, comments or the picker', () => {
+  const PAGE = 'page:handbook-3f2a'
+  const kept = async () => {
+    const w = await world()
+    writeFileSync(join(w.repo, 'data', 'visibility.yaml'), `${VISIBILITY}    members: { fields: { name: "hat:${COUNCIL}" } }\n`)
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "fixture: member names are the council\'s"')
+    await w.prime(A1, A2)
+    const presence = new Presence({ level: t => targetLevel(w.repo, t, w.store), names: actorNames(w.repo, w.membership), now: () => NOW.getTime() })
+    const app = createApp(w.repo, (a, ctx) => {
+      mountVisibility(a, { repo: w.repo, membership: w.membership, withLock: ctx.withLock, privateStore: ctx.privateStore })
+      mountConversation(a, { repo: w.repo, membership: w.membership, privateStore: ctx.privateStore, withLock: ctx.withLock, now: () => NOW })
+      mountPresence(a, { repo: w.repo, membership: w.membership, privateStore: ctx.privateStore, presence })
+    }, { request: withRequest({ repo: w.repo, hosted: false, membership: w.membership, store: w.store, now: () => NOW }), privateStore: () => w.store })
+    const plain = (id: string) => ({ kind: 'member' as const, id, hats: [] as string[], roles: [] as string[] })
+    return { w, app, presence, plain }
+  }
+
+  it('git\'s identity: presence, its comment\'s author and the picker show steward-a to others by id; the composer tells steward-a their own name', async () => {
+    const { w, app, presence, plain } = await kept()
+    asA(w.repo)
+    expect((await call(app, '/api/presence', json('POST', { target: PAGE }))).status).toBeLessThan(300)
+    expect(presence.of(PAGE, plain('steward-b'))).toEqual([{ handle: 'steward-a', role: 'steward-a', editing: false }])
+    expect(JSON.stringify(presence.everyone(PAGE))).not.toContain('Steward A')
+    expect((await call(app, '/api/comments', json('POST', { target: PAGE, body: 'From git' }))).status).toBe(201)
+    asB(w.repo)
+    const listed = await call(app, `/api/comments?target=${PAGE}`)
+    expect(listed.body.map((c: { handle: string; role: string }) => [c.handle, c.role])).toEqual([['steward-a', 'steward-a']])
+    // The picker (the composer's @): steward-b is offered every member by what steward-b may read.
+    const offered = await call(app, `/api/mentionables?target=${PAGE}&q=`)
+    expect(offered.status).toBe(200)
+    const persons = (offered.body as { kind: string; id: string; label: string }[]).filter(m => m.kind === 'person')
+    expect(persons.map(m => [m.id, m.label])).toEqual(expect.arrayContaining([['steward-a', 'steward-a'], ['ops-lead', 'ops-lead']]))
+    expect(JSON.stringify(offered.body)).not.toMatch(/Steward A|Steward C|Ops Lead/)
+    // The composer's own name: steward-a's session tells steward-a.
+    asA(w.repo)
+    expect((await call(app, '/api/actor')).body).toMatchObject({ id: 'steward-a', name: 'Steward A' })
+  })
+
+  it('a wallet session: presence and its comment\'s author show steward-b to others by id, never the members row\'s name', async () => {
+    const { w, app, presence, plain } = await kept()
+    const { token } = await createSession(w.store, A2, () => NOW)
+    const cookie = { cookie: `house_session=${token}` }
+    const as = (init: RequestInit) => ({ ...init, headers: { ...(init.headers as Record<string, string>), ...cookie } })
+    const me = await call(app, '/api/actor', as({}))
+    expect(me.body).toMatchObject({ id: 'steward-b', via: 'siwe', name: 'Steward B' }) // their own session: their own name
+    expect((await call(app, '/api/presence', as(json('POST', { target: PAGE })))).status).toBeLessThan(300)
+    expect(presence.of(PAGE, plain('steward-c'))).toEqual([{ handle: 'steward-b', role: 'steward-b', editing: false }])
+    expect(JSON.stringify(presence.everyone(PAGE))).not.toContain('Steward B')
+    expect((await call(app, '/api/comments', as(json('POST', { target: PAGE, body: 'From a wallet' })))).status).toBe(201)
+    asC(w.repo)
+    const listed = await call(app, `/api/comments?target=${PAGE}`)
+    expect(listed.body.map((c: { handle: string; role: string }) => [c.handle, c.role])).toEqual([['steward-b', 'steward-b']])
+    expect(JSON.stringify((await call(app, `/api/mentionables?target=${PAGE}&q=`)).body)).not.toMatch(/Steward A|Steward B|Ops Lead/)
+    asA(w.repo)
+  })
+
+  it('an id the members file does not hold falls back to the actor\'s name; one an unreadable members file may hold does not', async () => {
+    const { w } = await kept()
+    const names = actorNames(w.repo, w.membership)
+    expect(names({ id: 'example-org:person:guest', name: 'A Guest', kind: 'person', via: 'email' } as KnownActor)).toEqual({ handle: 'example-org:person:guest', role: 'A Guest' })
+    writeFileSync(join(w.repo, 'data', 'members.yaml'), 'members: [ {id: steward-a\n') // not YAML
+    expect(names({ id: 'steward-a', name: 'Steward A', kind: 'person', via: 'git' })).toEqual({ handle: 'steward-a', role: 'steward-a' })
   })
 })

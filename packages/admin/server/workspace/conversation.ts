@@ -29,7 +29,7 @@ import { readRuleContext } from '../governance/effective.ts'
 import { registriesOf } from '../registries.ts'
 import { shortAddress } from '../systems/safe.ts'
 import { accountOn, type Membership } from '../session/membership.ts'
-import { displayNames } from '../session/names.ts'
+import { displayNames, membersHold } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads } from '../private/reads.ts'
@@ -227,7 +227,10 @@ export function namesFor(repo: string, membership: Membership | null, viewer?: V
   }
 }
 
-/** `namesFor` for the actor a request knows: a signed-in CAIP-10 actor is named by the hats their session read. */
+/** `namesFor` for the actor a request knows, as any member may be told it (presence shows it to everyone on the page): a
+ *  signed-in CAIP-10 actor is named by the hats their session read. T2e I1 (Rule 4): the actor's own `name` (a wallet
+ *  session's and git's identity's read from the members row ungated, an emailed link's from the Roles table) stands in only
+ *  for an id the members file does not hold; one it holds (or may, unreadable) is shown as the gate says it, else by id. */
 export function actorNames(repo: string, membership: Membership | null): (actor: KnownActor) => { handle: string; role: string } {
   return actor => {
     if (actor.via === 'siwe' && actor.id === actor.account) {
@@ -235,7 +238,8 @@ export function actorNames(repo: string, membership: Membership | null): (actor:
       return { handle: shortAddress(address), role: addressName(membership, actor.account, actor.hats) }
     }
     const names = namesFor(repo, membership)(actor.id)
-    return names.role === actor.id ? { handle: actor.id, role: actor.name } : names
+    if (names.role !== actor.id || membersHold(repo)(actor.id)) return names
+    return { handle: actor.id, role: actor.name }
   }
 }
 
@@ -419,12 +423,14 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const q = query.trim().replace(/^@/, '').trim().toLowerCase()
   const matches = (id: string, label: string) => q === '' || id.toLowerCase().startsWith(q) || label.toLowerCase().startsWith(q) || wordsOf(label).some(w => w.startsWith(q))
   const people = new People(deps.repo, deps.membership)
+  // T2e I1 (Rule 4): a member is offered by the name the author may read (the gate), else their id.
+  const display = displayNames(deps.repo, deps.membership, { viewer })
 
   const persons: Mentionable[] = []
   for (const m of people.members) {
     const id = String(m.id ?? '')
     if (id === '' || !['person', 'agent'].includes(String(memberKind(m)))) continue
-    const label = typeof m.name === 'string' && m.name.trim() !== '' ? m.name : id
+    const label = display(id)
     if (!matches(id, label)) continue
     const hat = people.hat(id)
     persons.push({ kind: 'person', id, label, ...(hat ? { hat } : {}), canSee: admits(level, people.viewer(id)), href: `hub:member/${id}` })

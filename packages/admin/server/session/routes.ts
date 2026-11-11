@@ -106,7 +106,7 @@ export function mountSession(app: Hono, d: SessionDeps): void {
   /** The person's own name, told to them alone: read as their own viewer may read the members file (Rule 4, T2c minor 2;
    *  T2d finding 4: the request's actor carries the name any member may read, since others see it). `viewerOf` is the
    *  session's viewer, narrowed by a `?as=` preview, never wider. */
-  const nameOfPerson = (c: Context, person: { id: string; name: string }): string => personName(d.repo, person, viewerOf(c))
+  const nameOfPerson = (c: Context, person: { id: string; name: string }): string => personName(d.repo, person, viewerOf(c), true)
 
   app.get('/api/session', c => {
     const tree = d.store ? d.membership.tree() : null

@@ -25,12 +25,27 @@ const nameOf = (record: Record<string, unknown> | null, id: string): string =>
 
 /** The name a person signed in by an emailed link is shown by (R2, PF-R258): their member name when the members file
  *  holds their person id (as `displayNames` says it everywhere else, so the composer's monogram, the identity and their
- *  comments agree), else the Roles table's. Rule 4 (T2c minor 2): the members file is read as `viewer`, the session's
- *  own viewer, may read it: a person with no Role reads as the public, and a name the public may not read is not said. */
-export function personName(repo: string, person: { id: string; name: string }, viewer: Viewer): string {
+ *  comments agree), else the Roles table's. Rule 4 (T2c minor 2): the members file is read as `viewer` may read it: a
+ *  person with no Role reads as the public, and a name the public may not read is not said. T2e I1: when the members file
+ *  holds their id (or cannot be read, so may), the Roles table's name never stands in for one `viewer` may not read: the id
+ *  is said. Only `own` (their own session, telling them) falls back to it. */
+export function personName(repo: string, person: { id: string; name: string }, viewer: Viewer, own = false): string {
   const said = displayNames(repo, null, { viewer })(person.id)
   if (said !== person.id) return said
+  if (!own && membersHold(repo)(person.id)) return person.id
   return person.name.trim() !== '' ? person.name : person.id
+}
+
+/** T2e I1 (Rule 4): whether the members file holds `id`, read now. A file that is there but cannot be read may hold it, so
+ *  it counts as holding: no other name (a session's, the Roles table's) stands in for a name the gate did not say. */
+export function membersHold(repo: string): (id: string) => boolean {
+  let ids: Set<string> | null
+  try {
+    ids = existsSync(registryPath(repo, 'members'))
+      ? new Set((readRegistry(repo, 'members').entries ?? []).map(m => String((m as { id?: unknown }).id)))
+      : new Set()
+  } catch { ids = null }
+  return id => ids === null || ids.has(id)
 }
 
 /** The Org-Actor value of a git identity no member matches (`actorTrailer`): `unknown <email>`. */
