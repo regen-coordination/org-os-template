@@ -1120,3 +1120,38 @@ describe('T2e I2: the fill of rows written before the floor', () => {
     } finally { await server.close(); await goneSettled(repo) }
   })
 })
+
+// T2e M2: housekeeping never deletes on a guess. A collection named in data/collections.yaml keeps its talk though its entry
+// cannot be read as a collection; a page whose file, or whose pages/ folder, cannot be read is there.
+describe('T2e M2: housekeeping keeps what it cannot read', () => {
+  const said = (id: string, target: string): CommentRow => ({ id, target, parent: null, anchor: null, by: 'steward-a', body: id,
+    created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel: 'members' })
+
+  it('a collection named in an entry that is not a valid collection keeps its talk; one named nowhere loses it', async () => {
+    const w = await world()
+    writeFileSync(join(w.repo, 'data', 'collections.yaml'), 'collections:\n  - { id: council_log, name: Council log }\n')
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "fixture: an entry whose id is not a collection id"')
+    await w.store.writeConversation({ comments: [said('c-log', 'record:council_log:r-1'), said('c-nowhere', 'record:nowhere:r-2')] })
+    await housekeepAtStart(w.repo); await goneSettled(w.repo)
+    expect(w.store.comment('c-log')).not.toBeNull()
+    expect(w.store.comment('c-nowhere')).toBeNull()
+  })
+
+  it('a page whose file cannot be read, or whose folder cannot be, keeps its talk; a page that is not there loses it', async () => {
+    const w = await world({ pages: { 'locked-0001': page('locked-0001', 'Locked'), 'open-0001': page('open-0001', 'Open') } })
+    await w.store.writeConversation({ comments: [said('c-locked', 'page:locked-0001'), said('c-open', 'page:open-0001'), said('c-gone', 'page:gone-0001')] })
+    const file = join(w.repo, 'pages', 'locked-0001.md')
+    const folder = join(w.repo, 'pages')
+    try {
+      chmodSync(file, 0o000)
+      await housekeepAtStart(w.repo); await goneSettled(w.repo)
+      expect(w.store.comment('c-locked')).not.toBeNull()
+      expect(w.store.comment('c-gone')).toBeNull()
+      chmodSync(file, 0o644)
+      chmodSync(folder, 0o000)
+      await housekeepAtStart(w.repo); await goneSettled(w.repo)
+      expect(w.store.comment('c-locked')).not.toBeNull()
+      expect(w.store.comment('c-open')).not.toBeNull()
+    } finally { chmodSync(folder, 0o755); chmodSync(file, 0o644) }
+  })
+})

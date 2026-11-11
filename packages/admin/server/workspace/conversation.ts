@@ -14,7 +14,7 @@
 // `NotificationRow[]` (preflight row 46; both in the L6 rulings log).
 
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import type { Context, Hono } from 'hono'
@@ -557,9 +557,31 @@ function collectionsReadable(repo: string): boolean {
   try { parseYaml(readFileSync(path, 'utf8')); return true } catch { return false }
 }
 
+/** T2e M2: whether data/collections.yaml's text names `registry` as a word anywhere, an entry that is not a valid collection
+ *  included: its talk is not taken on a guess. */
+function namedInCollections(repo: string): (registry: string) => boolean {
+  let text = ''
+  try { text = readFileSync(join(repo, 'data', 'collections.yaml'), 'utf8') } catch { text = '' }
+  return registry => {
+    const escaped = registry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return text !== '' && new RegExp(`(^|[^A-Za-z0-9_-])${escaped}([^A-Za-z0-9_-]|$)`).test(text)
+  }
+}
+
+/** T2e M2: whether git's page `id` is there on disk though its file was not read: a file that is there (readable or not),
+ *  or one that cannot be looked for (a pages/ folder that cannot be searched). Only a file that is not there is gone. */
+function pageFileThere(repo: string, id: string): boolean {
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(id)) return false
+  try { statSync(join(repo, 'pages', `${id}.md`)); return true } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    return code !== 'ENOENT' && code !== 'ENOTDIR'
+  }
+}
+
 /** Whether a conversation target is not there now (PR7-R45's housekeeping, T2e I2's fill): a page no page holds (git's or
- *  the store's), a record neither its collection's file nor the store holds, or of a collection that is defined nowhere. A
- *  file that cannot be read says nothing: its targets are there (no purge on a guess). No history is read. */
+ *  the store's) and whose file is not there, a record neither its collection's file nor the store holds, or of a collection
+ *  that is defined nowhere and that data/collections.yaml does not name. A file or folder that cannot be read says nothing:
+ *  its targets are there (no purge on a guess, T2e M2). No history is read. */
 export function goneNow(repo: string, store: PrivateStore): (t: string) => boolean {
   const defs = new Map(registriesOf(repo).filter(d => d.kind === 'collection').map(d => [d.name, d]))
   const kept = new Set(store.collections().map(c => c.id))
@@ -574,9 +596,10 @@ export function goneNow(repo: string, store: PrivateStore): (t: string) => boole
     }
     return files.get(registry) ?? null
   }
+  const named = namedInCollections(repo)
   return t => {
     const page = /^page:(.+)$/.exec(t)
-    if (page) return !pages.has(page[1]!)
+    if (page) return !pages.has(page[1]!) && !pageFileThere(repo, page[1]!)
     const rec = /^record:([^:]+):(.+)$/.exec(t)
     if (!rec) return false
     const [, registry, id] = rec as unknown as [string, string, string]
@@ -585,6 +608,7 @@ export function goneNow(repo: string, store: PrivateStore): (t: string) => boole
       const ids = idsOf(registry)
       return ids !== null && !ids.has(id)
     }
+    if (named(registry)) return false
     return kept.has(registry) || known
   }
 }
