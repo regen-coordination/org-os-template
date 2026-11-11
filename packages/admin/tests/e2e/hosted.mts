@@ -222,7 +222,7 @@ const cookieHeader = async (ctx: BrowserContext) => (await ctx.cookies(HUB)).map
 const loads = new Map<number, number>()
 /** A browser context whose every request goes to this server, from the person `who`'s addresses. The Hub limits reads
  *  per client address (L9 §5.9: 300 a minute, 100 at once), and every page load here is a cold one (the HTML, the
- *  scripts, the fonts and the page's reads, ~25 requests), as a person's first visit is, many times a minute: so each
+ *  scripts, the fonts and the page's reads, about 20 requests), as a person's first visit is, many times a minute: so each
  *  page load comes from the next address of the person's own block (198.18.<who>.<n>), and the limits are not what this
  *  walk measures. */
 async function hubContext(who: number, opts: { width?: number; scheme?: 'light' | 'dark'; storageState?: Awaited<ReturnType<BrowserContext['storageState']>> } = {}): Promise<BrowserContext> {
