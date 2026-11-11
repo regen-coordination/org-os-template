@@ -13,6 +13,7 @@ import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
 import { SYSTEMS_UNREAD, baseRoutes, changeView, entryPlacedSafe, refuse, resource } from '../test/data.ts'
 import { findErrorNote, heard } from '../test/notes.ts'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 afterEach(() => { vi.unstubAllGlobals(); delete document.documentElement.dataset.theme; delete document.documentElement.dataset.skin; localStorage.removeItem('org-os-admin.skin') })
 const buzz = resource({ id: 'module:a', kind: 'module', board: 'systems', name: 'org-os-buzz', source: null })
@@ -474,6 +475,22 @@ describe('Palette before data/systems.yaml answered', () => {
       await open()
       await listed('Projects')
       expect(labels()).not.toContain('Outside systems')
+    })
+  }
+})
+
+// R2b (review M-2): the Deploy page only reads (the plan, the steps), so ⌘K offers it whether the Hub's writes are off or
+// on, to a member who reads a composed System; previewing, it is still not offered (C-23).
+describe('Palette: the Deploy place, the Hub\'s writes off and on', () => {
+  const composed = { 'GET /api/registries/systems': { name: 'systems', kind: 'collection', schemaVersion: '2.0',
+    entries: [{ id: 'gate', kind: 'safe', name: 'Gate', deployment: { status: 'composed' } }] } }
+  for (const off of [true, false]) {
+    it(off ? 'off: Deploy is offered' : 'on: Deploy is offered', async () => {
+      routes({ ...composed, ...statusRoute(off) })
+      renderAt(<Palette />, '/', { queryClient: clientWith(off) })
+      const input = await open()
+      fireEvent.change(input, { target: { value: 'deploy' } })
+      await listed('Deploy')
     })
   }
 })

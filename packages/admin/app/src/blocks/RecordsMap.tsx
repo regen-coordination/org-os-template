@@ -12,7 +12,7 @@ import { EmptyWhen } from '../design/Empty.tsx'
 import { Note } from '../design/Note.tsx'
 import { useSystemEntries } from '../queries.ts'
 import { useEntryOf } from './entries.ts'
-import { useCanWrite, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useVisibilitySource } from '../viewAs/ViewAs.tsx'
 import { restrictedHat, restrictedOf } from '../record/restricted.ts'
 
 /** Some records as a map (§8.1, every collection's Map): them, their direct edges, their neighbours dimmed, drawn
@@ -32,7 +32,7 @@ export function RecordsMap({ label, rows, map, positionsKey, empty, marks, now =
   const latest = useRef(saved)
   const keep = (next: Positions) => { latest.current = next; setSaved(next); rememberPositions(positionsKey, next) }
   const inspector = useInspector()
-  const canWrite = useCanWrite()
+  const canMove = useCanConverse() // this browser's positions: no instance write, so also while the Hub's writes are off (R2b M-2)
   const g = useMemo(() => (view.data ? sectionGraph(rows, view.data) : null), [rows, view.data])
   const positions = useMemo(() => (g ? layoutBoard(g.nodes, g.edges, [], saved) : {}), [g, saved])
   const nodes = useMemo(() => {
@@ -49,7 +49,7 @@ export function RecordsMap({ label, rows, map, positionsKey, empty, marks, now =
     <HouseMap items={nodes} links={links} variant="members" positions={positions} label={label} selected={inspector.id}
       onSelect={(id, act) => inspector.open(id, act)} onInspect={(id, act) => inspector.open(id, act)}
       // moving a node and Auto-layout are writes (of this browser's positions): not while previewing (C-23)
-      onMove={canWrite ? (id, pos) => keep({ ...latest.current, [id]: pos }) : undefined}
-      onReset={canWrite ? () => { latest.current = {}; setSaved({}); rememberPositions(positionsKey, null) } : undefined} />
+      onMove={canMove ? (id, pos) => keep({ ...latest.current, [id]: pos }) : undefined}
+      onReset={canMove ? () => { latest.current = {}; setSaved({}); rememberPositions(positionsKey, null) } : undefined} />
   )
 }

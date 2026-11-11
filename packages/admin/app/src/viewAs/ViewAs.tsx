@@ -88,7 +88,9 @@ export function useCanWrite(): boolean {
 
 /** False while previewing, true otherwise, whether or not the Hub's writes are off: what a read-only Hub still writes
  *  (plan D-6) — the private store's conversation and per-member state (comments, their resolve, reopen and delete,
- *  read marks, view state) — is offered as long as you are you. Turn into a task writes a task: it asks `useCanWrite`. */
+ *  a comment on a selected passage, read marks, view state) — and what is no instance write at all (a map's layout in
+ *  the admin state folder, PUT /api/layout; a collection map's positions in this browser) is offered as long as you are
+ *  you (R2b M-2). Turn into a task writes a task: it asks `useCanWrite`. */
 export function useCanConverse(): boolean {
   return useContext(ViewAsContext).viewer.as === 'you'
 }

@@ -7,7 +7,7 @@ import { Button } from '../design/Button.tsx'
 import { NoteBlock } from '../design/Note.tsx'
 import { announce } from '../parts/live.tsx'
 import { useSlotOpen } from '../parts/panels.tsx'
-import { useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
 import { HouseEdge, edgeGeometry, edgeId, labelAlong, labelFits, labelSize, relationSentence, selectedPath, type Box, type HouseEdgeData } from './HouseEdge.tsx'
 import { HouseNode, statesFor, type MapNodeData, type NodeState } from './HouseNode.tsx'
 import { LAYOUT, layoutMap, type MapLayout, type MapLink, type Placed } from './layers.ts'
@@ -177,8 +177,9 @@ function MapView(p: HouseMapProps) {
   const counted = placed.filter(n => n.layer !== 'linked').length
   const label = p.label ?? `${counted} ${counted === 1 ? 'System' : 'Systems'}, as a map`
   // a node is moved only on a map that keeps its layout, by a viewer who may write it (never while previewing, C-23)
-  const canWrite = useCanWrite()
-  const movable = kept !== undefined && p.onMove !== undefined && members && canWrite
+  // (the positions are a map's layout or this browser's: no instance write, so also while the Hub's writes are off, R2b M-2)
+  const canMove = useCanConverse()
+  const movable = kept !== undefined && p.onMove !== undefined && members && canMove
   // Move mode (C6 fix I-1): a node picked up by `m` or the inspector's Move, carried by the arrows or the nudge
   // buttons a step at a time, put down with Enter or Done (kept through onMove), put back with Escape or Cancel.
   const [moving, setMoving] = useState<{ id: string; from: { x: number; y: number }; at: { x: number; y: number } } | null>(null)

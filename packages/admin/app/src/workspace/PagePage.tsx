@@ -30,7 +30,7 @@ import { DataRow } from '../elements/rows/DataRow.tsx'
 import { useChanges } from '../changes/useChanges.ts'
 import { useResources } from '../queries.ts'
 import { announce } from '../parts/live.tsx'
-import { useCanWrite, useViewer, useVisibilitySource, useWritesKnown } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useCanWrite, useViewer, useVisibilitySource, useWritesKnown } from '../viewAs/ViewAs.tsx'
 import { ageText, useNow } from '../time.ts'
 import NotFound from '../pages/NotFound.tsx'
 import type { HubEditor } from '../editor/view.ts'
@@ -137,6 +137,9 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
   const presence = previewing ? [] : people
   useMarkRead(target, known)
   const talk = Boolean(thread) && known && viewer.as !== 'public'
+  // R2b M-2: a comment on a selected passage writes only the conversation, so a read-only page (the Hub's writes off, or
+  // no write for this viewer) offers the selection toolbar's Comment alone; previewing, it does not.
+  const canConverse = useCanConverse()
   const conversation = useConversation(target, { enabled: talk, me })
   const [quote, setQuote] = useState<Anchor | null>(null)
   const [shownPassage, setShownPassage] = useState<string | null>(null)
@@ -165,6 +168,7 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
   // `live`: a session is open, so the editor writes. An open that failed leaves the page as read, read-only (R-16a's fold).
   const live = opens && session.markdown !== null
   const body = live ? session.markdown : !editable || writes === 'off' || session.openError ? page.markdown : null
+  const commentsOnly = !live && talk && canConverse && body !== null
   useEffect(() => { if (body !== null) markdown.current = body }, [body, session.version])
   // Previewing (or leaving it) closes what only a writer has open.
   useEffect(() => { if (!editable) { setMenu(null); setSelection(null); setComparing(false); setSuggesting(false) } }, [editable])
@@ -213,7 +217,7 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
       if (m.kind === 'insert' && !c.slash) return null
       return m
     })
-    setSelection(c.empty || !live ? null : { marks: marks.current, at: c.at })
+    setSelection(c.empty || !(live || commentsOnly) ? null : { marks: marks.current, at: c.at })
   }
   const caretAt = (): { left: number; top: number } => {
     const v = editor.current?.view
@@ -415,6 +419,14 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
         open: commentsOpen, close: () => setCommentsOpen(false), id: threadId, target,
         visibility: level, conversation, quote, dropQuote: () => setQuote(null), showPassage, me: me?.handle, meName: me?.role,
       })}
+      {commentsOnly && selection && (
+        // R2b M-2: on a read-only page, Comment alone over the selected passage (no format, link or mention: they edit).
+        <div className="pg-floats" onMouseDown={e => e.preventDefault()}>
+          <div className="pg-float pg-float-above" style={{ left: selection.at.left, top: selection.at.top }}>
+            <SelectionToolbar onComment={commentOnSelection} />
+          </div>
+        </div>
+      )}
       {live && !sending && (
         // The floating chrome: kept out of the editor's focus (a press on it never takes the caret away).
         <div ref={floats} className="pg-floats" onMouseDown={e => { if (!(e.target instanceof HTMLInputElement)) e.preventDefault() }}>

@@ -8,6 +8,7 @@ import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
 import { baseRoutes, refuse, resource } from '../test/data.ts'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 // As in HouseMap.test.tsx: watch the map's fitView calls (jsdom has no real geometry).
 const fitView = vi.hoisted(() => vi.fn())
@@ -158,4 +159,24 @@ describe('MapPage', () => {
     expect(await screen.findByText(/Nothing on this map yet/)).toBeTruthy()
     expect(document.querySelector('.hmap')).toBeNull()
   })
+})
+
+// R2b (review M-2): the Organization map's layout is PUT /api/layout, the admin state folder's `state` class, which a
+// read-only Hub still writes: a node is moved and Auto-layout offered whether the Hub's writes are off or on.
+describe('the Organization map\'s layout, the Hub\'s writes off and on', () => {
+  for (const off of [true, false]) {
+    it(off ? 'off: a node moves and the layout is saved; Auto-layout is offered' : 'on: the same', async () => {
+      const { calls } = routes({ 'GET /api/layout/organization': { 'project:p': { x: 100, y: 100 } }, ...statusRoute(off) })
+      renderAt(<BoardPage id="organization" />, '/b/organization', { queryClient: clientWith(off) })
+      const node = await nodeOf('project:p')
+      const flow = node.closest('.react-flow__node') as HTMLElement
+      await waitFor(() => expect(flow.classList.contains('draggable')).toBe(true))
+      expect(screen.getByRole('button', { name: 'Auto-layout' })).toBeTruthy()
+      fireEvent.keyDown(node, { key: 'm' })
+      fireEvent.keyDown(node, { key: 'ArrowRight' })
+      fireEvent.keyDown(node, { key: 'Enter' })
+      await waitFor(() => expect(calls.filter(c => c.method === 'PUT' && c.path === '/api/layout/organization').map(c => c.body))
+        .toEqual([{ 'project:p': { x: 116, y: 100 } }]))
+    })
+  }
 })

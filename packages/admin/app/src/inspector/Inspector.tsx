@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type OperationInfo, type Resource } from '../api.ts'
 import { useInspector, type InspectAt } from './InspectorContext.tsx'
-import { useCanWrite, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useCanWrite, useVisibilitySource } from '../viewAs/ViewAs.tsx'
 import { useCanEdit } from '../editable.ts'
 import { useEntryOfResources, type EntryOf } from '../blocks/entries.ts'
 import { FACT_COLUMNS } from '../kinds.ts'
@@ -103,6 +103,7 @@ function InspectorContent({ resource: r, neighbours, ops, onClose, editable, ent
   entry?: Record<string, unknown>; entryOf?: EntryOf; now: Date; titleId: string; at?: InspectAt
 }) {
   const canWrite = useCanWrite()
+  const canMove = useCanConverse()
   const visibility = useVisibilitySource()
   const kind = kindOf(r)
   // A System's rows are what its driver read (E-63), the read's age told against `now` (§7.9); any other kind's are its columns.
@@ -148,7 +149,8 @@ function InspectorContent({ resource: r, neighbours, ops, onClose, editable, ent
             {/* Edit, the operations and Move are writes: none is drawn while previewing (C-23) */}
             {canWrite && editable && <ButtonLink primary href={`${recordHref(r.id)}?edit=1`}>Edit</ButtonLink>}
             {canWrite && ops.filter(o => o.unavailable === null).map(o => <ButtonLink key={`${o.id}:${o.label}`} href={opHref(r.id, o)}>{o.label}</ButtonLink>)}
-            {canWrite && at.move && <Button onClick={() => { const move = at.move!; onClose(); move() }}>Move on the map</Button>}
+            {/* the map's own move, so wherever the map moves a node (R2b M-2: also while the Hub's writes are off) */}
+            {canMove && at.move && <Button onClick={() => { const move = at.move!; onClose(); move() }}>Move on the map</Button>}
             <ButtonLink href={recordHref(r.id)}>Open record →</ButtonLink>
             {/* a System's own link-out, as on its header (E-63); a record gets none: the outside system it names is never linked */}
             {sys?.open && <ButtonLink href={sys.open.href} variant="ghost" external>{sys.open.label}</ButtonLink>}

@@ -4,7 +4,7 @@ import { useLocation, useSearch } from 'wouter'
 import { api, type Board, type BoardView, type Positions, type Resource } from '../api.ts'
 import { useResources, useSystemsRead } from '../queries.ts'
 import { useInspector } from '../inspector/InspectorContext.tsx'
-import { useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
 import { restrictedHat, restrictedOf } from '../record/restricted.ts'
 import { layoutBoard } from '../map/layout.ts'
 import { HouseMap } from '../map/HouseMap.tsx'
@@ -73,7 +73,8 @@ function FullMapBody({ d, title, ctx, marks, live }: { d: FullMap; title: string
   const [, navigate] = useLocation()
   const select = new URLSearchParams(useSearch()).get('select')
   const inspector = useInspector()
-  const canWrite = useCanWrite()
+  // The layout is PUT /api/layout, the admin state folder (`state`): written also while the Hub's writes are off (R2b M-2)
+  const canMove = useCanConverse()
   const { sees } = useViewer()
   const visibility = useVisibilitySource()
   const needs = useNeeds(ctx.now)
@@ -104,7 +105,7 @@ function FullMapBody({ d, title, ctx, marks, live }: { d: FullMap; title: string
   // the canvas's name counts only what is drawn for this viewer (§6.3): not the records they may not see, nor the links to the other map
   const counted = nodes.filter(n => !others.has(n.item.id) && sees(n.item)).length
   // a move or Auto-layout writes the layout: not while previewing (C-23), and not before the saved layout loaded
-  const writes = kept && live && canWrite
+  const writes = kept && live && canMove
   return (
     <HouseMap items={nodes} links={map.links} variant="members" selected={inspector.id} positions={positions} caption={!kept}
       label={kept ? `${title}, ${counted} ${counted === 1 ? 'record' : 'records'}` : undefined}

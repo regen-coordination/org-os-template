@@ -10,16 +10,20 @@ const TOGGLES: { mark: FormatMark; label: string; icon: IconName }[] = [
 
 /** The floating selection toolbar (§10.1): on --pop, radius 10 — bold, italic, heading (toggles, `aria-pressed`) ·
  *  link, mention, comment. One tab stop (the button last reached): ← → move along it and hold at the ends, Home and
- *  End jump. Where it floats, and what each does to the text, is the editor's (L6). */
+ *  End jump. Where it floats, and what each does to the text, is the editor's (L6). On a page that is read only (R2b
+ *  M-2: the Hub's writes off, or no write for this viewer), only `onComment` is given: Comment alone is drawn. */
 export function SelectionToolbar({ marks, onToggle, onLink, onMention, onComment }: {
-  marks: Record<FormatMark, boolean>; onToggle(m: FormatMark): void; onLink(): void; onMention(): void; onComment(): void
+  marks?: Record<FormatMark, boolean>; onToggle?(m: FormatMark): void; onLink?(): void; onMention?(): void; onComment(): void
 }) {
   const bar = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState(0)
+  const toggles = onToggle ? TOGGLES : []
   const actions: { label: string; icon: IconName; act(): void }[] = [
-    { label: 'Link', icon: 'link', act: onLink }, { label: 'Mention', icon: 'at', act: onMention }, { label: 'Comment', icon: 'comment', act: onComment },
+    ...(onLink ? [{ label: 'Link', icon: 'link' as const, act: onLink }] : []),
+    ...(onMention ? [{ label: 'Mention', icon: 'at' as const, act: onMention }] : []),
+    { label: 'Comment', icon: 'comment', act: onComment },
   ]
-  const count = TOGGLES.length + actions.length
+  const count = toggles.length + actions.length
   const onKey = (e: KeyboardEvent) => {
     const to = e.key === 'ArrowRight' ? Math.min(at + 1, count - 1) : e.key === 'ArrowLeft' ? Math.max(at - 1, 0)
       : e.key === 'Home' ? 0 : e.key === 'End' ? count - 1 : null
@@ -36,9 +40,9 @@ export function SelectionToolbar({ marks, onToggle, onLink, onMention, onComment
   )
   return (
     <div ref={bar} className="selbar" role="toolbar" aria-label="Format" onKeyDown={onKey}>
-      {TOGGLES.map((t, i) => button(i, t.label, t.icon, () => onToggle(t.mark), marks[t.mark]))}
-      <span className="selbar-sep" aria-hidden="true" />
-      {actions.map((a, i) => button(TOGGLES.length + i, a.label, a.icon, a.act))}
+      {toggles.map((t, i) => button(i, t.label, t.icon, () => onToggle?.(t.mark), marks?.[t.mark] ?? false))}
+      {toggles.length > 0 && <span className="selbar-sep" aria-hidden="true" />}
+      {actions.map((a, i) => button(toggles.length + i, a.label, a.icon, a.act))}
     </div>
   )
 }

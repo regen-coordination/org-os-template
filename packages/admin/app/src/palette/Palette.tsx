@@ -20,7 +20,7 @@ import { announce } from '../parts/live.tsx'
 import { Icon } from '../design/Icon.tsx'
 import { Kbd } from '../design/Kbd.tsx'
 import { Note } from '../design/Note.tsx'
-import { useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
 import { useEntryOfResources } from '../blocks/entries.ts'
 import { shownName } from '../record/restricted.ts'
 import { keyStep, pressOf } from '../keys/keys.ts'
@@ -108,6 +108,7 @@ export default function Palette() {
   const { known } = useActor()
   const { viewer, setViewer, visible, sees } = useViewer()
   const canWrite = useCanWrite()
+  const canConverse = useCanConverse()
   const dialog = useRef<HTMLDialogElement>(null)
   const input = useRef<HTMLInputElement>(null)
   // Where focus was when the palette opened: the overlay slot hands it back on every way of closing.
@@ -167,9 +168,10 @@ export default function Palette() {
       .map(d => ({ label: `New ${d.words!.noun}`, go: newRecordHref(d.newRegistry!) })),
     { label: 'New board', go: '/boards?new=1' },
   ] : []
-  // DAO-OS L7 Task 18: Deploy is offered to a member who may write here and reads a composed System (invisible means
-  // absent: previewing, or with nothing composed the viewer may read, it is not offered)
-  const composes = canWrite && known && [...systemsRead.entries.values()].some(e => sees(e) && (e.deployment as { status?: unknown } | undefined)?.status === 'composed')
+  // DAO-OS L7 Task 18: Deploy is offered to a member who reads a composed System (invisible means absent: previewing, or
+  // with nothing composed the viewer may read, it is not offered). The page only reads, so also while the Hub's writes
+  // are off (R2b M-2).
+  const composes = canConverse && known && [...systemsRead.entries.values()].some(e => sees(e) && (e.deployment as { status?: unknown } | undefined)?.status === 'composed')
   const scopeList = scopes(path)
   const scope = scopeList[scopeAt % scopeList.length]!
   const named = new Set(findByAddress(query, all).map(r => `r:${r.id}`))

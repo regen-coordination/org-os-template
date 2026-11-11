@@ -20,6 +20,7 @@ import { editorOf } from './EditorHost.tsx'
 import { OPEN_TASK, TASK_MADE } from './useConversation.ts'
 import { FIXTURE_SOURCE, type Visibility } from '../viewAs/visibility.ts'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 
 const MEMBERS: Visibility = { level: 'members' }
 
@@ -294,4 +295,39 @@ describe('mentions typed in the composer', () => {
       .toBe('[@Steward B](hub:member/steward-b) and [@Steward](hub:role/steward), and [@Steward](x)')
     expect(expandMentions('@Stewardship', picks)).toBe('@Stewardship')
   })
+})
+
+// R2b (review M-2): while the Hub's writes are off the editor is read-only, but a comment on a passage writes only the
+// conversation (an allowed route): the selection toolbar offers Comment alone, without Bold, Link or Mention. With writes
+// on, the editing toolbar is drawn whole, Comment among its buttons.
+describe('a comment on a selected passage, the Hub\'s writes off and on', () => {
+  for (const off of [true, false]) {
+    it(off ? 'off: the read-only page offers Comment alone on a selection, and the comment is sent'
+      : 'on: the editing toolbar is whole, Comment among it', async () => {
+      const { calls } = routes({
+        ...statusRoute(off),
+        'POST /api/comments': (init: RequestInit) => {
+          const b = JSON.parse(String(init.body)) as { body: string }
+          return { comment: served({ id: 'cmt_9', handle: 'steward-a', role: 'Steward A', by: 'steward-a', body: b.body }), notTold: [] }
+        },
+      })
+      renderAt(<PagePage id={ID} thread={pageThread} />, `/p/${ID}`, { queryClient: clientWith(off) })
+      const live = await editorView()
+      expect(live.dom.getAttribute('contenteditable')).toBe(off ? 'false' : 'true')
+      const start = BODY.indexOf('one Safe') + 1
+      act(() => { live.dispatch(live.state.tr.setSelection(TextSelection.create(live.state.doc, start, start + 'one Safe'.length))) })
+      const bar = await screen.findByRole('toolbar', { name: 'Format' })
+      expect(within(bar).getAllByRole('button').map(b => b.getAttribute('aria-label')))
+        .toEqual(off ? ['Comment'] : ['Bold', 'Italic', 'Heading', 'Link', 'Mention', 'Comment'])
+      fireEvent.click(within(bar).getByRole('button', { name: 'Comment' }))
+      const thread = await screen.findByRole('complementary', { name: 'Comments' })
+      expect(within(thread).getByText('On “one Safe”')).toBeTruthy()
+      if (off) {
+        write(thread, 'Which Safe?')
+        fireEvent.click(within(thread).getByRole('button', { name: 'Comment' }))
+        await vi.waitFor(() => expect(posts(calls)).toHaveLength(1))
+        expect(posts(calls)[0]!.body).toMatchObject({ target: TARGET, body: 'Which Safe?', anchor: { exact: 'one Safe' } })
+      }
+    })
+  }
 })
