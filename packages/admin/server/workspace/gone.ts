@@ -27,7 +27,7 @@ import { registriesOf, registryFileOf } from '../registries.ts'
 import { entriesFromText } from '../registry.ts'
 import { stateDir } from '../state.ts'
 import { parse as parseYaml } from 'yaml'
-import { firstParentChanges, isAncestor, namesAt, onCommit, resolveRev, showFile, type LineStep } from '../git.ts'
+import { firstParentChanges, isAncestor, mergeBase, namesAt, onCommit, resolveRev, showFile, type LineStep } from '../git.ts'
 import { fullLevel, narrowerOrEqual, readFullPolicy, type ParsedLevel } from '../../lib/visibility.mjs'
 import { pageEntries, pageLevel, PRIVATE_PAGE_ID } from '../../lib/workspace/pages.mjs'
 import type { VisibilityPolicy } from '../visibility/config.ts'
@@ -290,6 +290,79 @@ export async function goneBetween(repo: string, from: string, to: string): Promi
   return goneOnLine(repo, from, to, steps, textAtOf(repo), pagesAtOf(repo))
 }
 
+/** What the line `steps` (`to..cursor`, a line the trunk at `to` does not hold) changed, compared at `cursor` and at `to`
+ *  (T2c I-b): a page or an entry there at the cursor that is absent at `to`, or there at a looser level, is purged. Every
+ *  page at the cursor is compared when a changed page reads looser at `to` (or went) or the policy moved; every entry of
+ *  every collection when the policy moved. That line's versions were taken away, as a delete takes them: a level that
+ *  cannot be read (a proposal's) purges an entry that differs, and a file at `to` that cannot be read purges what the
+ *  cursor's held. A file the cursor's version cannot be read from says nothing. */
+async function goneOffLine(repo: string, cursor: string, to: string, steps: readonly LineStep[], textAt: TextAt, pagesAt: PagesAt): Promise<string[]> {
+  const defs = registriesOf(repo).filter(d => d.kind === 'collection' && d.filesGlob === undefined)
+  const byFile = new Map(defs.map(d => [registryFileOf(d), d]))
+  const pageIds = new Set<string>()
+  const changedFiles = new Set<string>()
+  let policyMoved = false
+  for (const step of steps) {
+    for (const ch of step.changes) {
+      const page = PAGE_FILE.exec(ch.path)
+      if (page) pageIds.add(page[1]!)
+      else if (byFile.has(ch.path)) changedFiles.add(ch.path)
+      else if (ch.path === POLICY_FILE) policyMoved = true
+    }
+  }
+  const levels = new LevelsAt(textAt)
+  /** Whether a target there at the cursor at `was` is absent at `to` (null) or looser there. */
+  const looser = (was: ParsedLevel, now: ParsedLevel | null) => now === null || !narrowerOrEqual(now, was)
+  const out: string[] = []
+  let reach = policyMoved
+  for (const id of pageIds) {
+    const was = await levels.page(cursor, id)
+    const now = await levels.page(to, id)
+    if (!reach && looser(was ?? await levels.pagesDefault(cursor), now ?? await levels.pagesDefault(to))) reach = true
+    if (was !== null && looser(was, now)) out.push(`page:${id}`)
+  }
+  if (reach) {
+    for (const id of await pagesAt(cursor)) {
+      if (pageIds.has(id)) continue // read above
+      const was = await levels.page(cursor, id)
+      if (was !== null && looser(was, await levels.page(to, id))) out.push(`page:${id}`)
+    }
+  }
+  for (const rel of policyMoved ? [...byFile.keys()] : [...changedFiles]) {
+    const def = byFile.get(rel)!
+    const read = (text: string | null): Map<string, Record<string, unknown>> | null => {
+      if (text === null) return new Map()
+      try { return new Map(entriesFromText(text, def).map(e => [String(e.id), e as Record<string, unknown>])) } catch { return null }
+    }
+    const atCursor = read(await textAt(cursor, rel))
+    if (atCursor === null) continue
+    const atTo = read(await textAt(to, rel))
+    for (const [eid, entry] of atCursor) {
+      const target = `record:${def.name}:${eid}`
+      const now = atTo?.get(eid)
+      if (now === undefined) { out.push(target); continue }
+      if (!policyMoved && JSON.stringify(entry) === JSON.stringify(now)) continue
+      const was = await levels.record(cursor, def.name, entry)
+      if (was === null || looser(was, await levels.record(to, def.name, now))) out.push(target)
+    }
+  }
+  return out
+}
+
+/** At the start, a cursor that is not an ancestor of the trunk `to` (T2c I-b: the trunk rewound, or moved to another line,
+ *  while the server was down). What the cursor's own line changed past the trunk's (`to..cursor`, read as the trunk's line
+ *  is) is compared at the cursor and at `to` (`goneOffLine`), and the trunk's line is read from the merge-base as any move
+ *  is (`goneOnLine`). With no merge-base only the first is read. A read git cannot make throws. */
+export async function goneAcross(repo: string, cursor: string, to: string): Promise<string[]> {
+  const files = registriesOf(repo).filter(d => d.kind === 'collection' && d.filesGlob === undefined).map(d => registryFileOf(d))
+  const paths = ['pages/', POLICY_FILE, ...new Set(files)]
+  const textAt = textAtOf(repo), pagesAt = pagesAtOf(repo)
+  const out = await goneOffLine(repo, cursor, to, await firstParentChanges(repo, to, cursor, paths), textAt, pagesAt)
+  const base = await mergeBase(repo, cursor, to)
+  if (base !== null && base !== to) out.push(...await goneOnLine(repo, base, to, await firstParentChanges(repo, base, to, paths), textAt, pagesAt))
+  return [...new Set(out)]
+}
+
 // ── the purge cursor (R2b I-3) ─────────────────────────────────────────────────────────────────────────
 // The last trunk commit whose deletions are fully purged (or buried), kept in the admin state directory beside the
 // tombstones. Every move by commits the Hub did not make (`trunkMoved`), and every start (`trunkAtStart`), reads from it to
@@ -400,7 +473,11 @@ async function catchUp(repo: string, from: string | null, to: string, at: Date):
   let start: string | null
   if (from === null || cursor === null || cursor === from) start = cursor ?? from
   else start = (await isAncestor(repo, cursor, from)) ? cursor : from
-  if (start !== null && start !== to) await purgeNow(repo, await goneBetween(repo, start, to), at)
+  if (start !== null && start !== to) {
+    // At the start the cursor may stand off the trunk's line (rewound, or moved to another line): read across (T2c I-b).
+    const across = from === null && !(await isAncestor(repo, start, to))
+    await purgeNow(repo, across ? await goneAcross(repo, start, to) : await goneBetween(repo, start, to), at)
+  }
   setCursor(repo, to)
   followOwn(repo)
 }

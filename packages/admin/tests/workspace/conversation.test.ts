@@ -830,6 +830,67 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
   })
 
+  // T2c (closing review I-b): at the start, a cursor that is not an ancestor of the trunk (the trunk rewound, or moved to
+  // another line, while the server was down). Every path the cursor's line changed past the trunk's is compared at the
+  // cursor and at the trunk (absent or wider at the trunk: purged), and the trunk's line is read from the merge-base.
+  const written = async (w: World, target: string, id: string) => {
+    await w.store.writeConversation({ comments: [{ id, target, parent: null, anchor: null, by: 'steward-a', body: 'Said at its level.', created: NOW.toISOString(),
+      edited: null, resolvedBy: null, resolvedAt: null, deleted: null }] })
+  }
+  const atOps = (id: string, title = 'Scratch') => joinPage({ id, title, parent: null, order: 1000, visibility: `hat:${OPS}` as 'members' }, BODY)
+  const moveTrunk = (repo: string, to: string) => {
+    const trunk = trunkOf(repo)
+    git(repo, 'checkout -q --detach'); git(repo, `branch -f ${trunk} ${to}`); git(repo, `checkout -q ${trunk}`)
+  }
+
+  it('a cursor ahead of the trunk (the trunk rewound): a page it narrowed is back at its wider level, and the talk goes', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
+    await atStart(w); await goneSettled(w.repo)
+    const base = tip(w.repo)
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atOps('scratch-0001'))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "page: narrowed to Ops, by hand"')
+    await atStart(w); await goneSettled(w.repo) // a narrowing keeps the talk; the cursor moves on
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+    await written(w, 'page:scratch-0001', 'c-ops')
+    await written(w, 'page:keep-0002', 'c-keep')
+    moveTrunk(w.repo, base) // rewound by hand while the Hub was stopped
+    await atStart(w); await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+    expect(w.store.comments('page:keep-0002').map(c => c.id)).toEqual(['c-keep'])
+    expect(purgeCursor(w.repo)).toBe(base)
+  })
+
+  it('a cursor on an abandoned line: a page it narrowed, and one it added, take their talk; the trunk\'s own line is read from the merge-base', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
+    await atStart(w); await goneSettled(w.repo)
+    const base = tip(w.repo)
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atOps('scratch-0001'))
+    writeFileSync(join(w.repo, 'pages', 'new-0003.md'), atOps('new-0003', 'New'))
+    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', `{ id: proj-1, visibility: "hat:${OPS}", title: Seed Fund,`))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "abandoned: scratch and seed fund narrowed, a page added"')
+    await atStart(w); await goneSettled(w.repo)
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+    await written(w, 'page:scratch-0001', 'c-ops')
+    await written(w, 'page:new-0003', 'c-new')
+    await written(w, 'page:keep-0002', 'c-keep')
+    await written(w, 'record:projects:proj-1', 'c-seed')
+    await written(w, 'record:projects:budget', 'c-budget')
+    // The trunk goes another way from the base: keep-0002 edited at its level.
+    git(w.repo, `checkout -q --detach ${base}`)
+    writeFileSync(join(w.repo, 'pages', 'keep-0002.md'), page('keep-0002', 'Keep', 'Edited on the other line.\n'))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "other line: keep edited"')
+    const other = tip(w.repo)
+    git(w.repo, 'checkout -q -'); moveTrunk(w.repo, other)
+    await atStart(w); await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+    expect(w.store.comments('page:new-0003')).toEqual([])
+    expect(w.store.comments('record:projects:proj-1')).toEqual([])
+    expect(w.store.comments('page:keep-0002').map(c => c.id)).toEqual(['c-keep'])
+    expect(w.store.comments('record:projects:budget').map(c => c.id)).toEqual(['c-budget'])
+    expect(purgeCursor(w.repo)).toBe(other)
+  })
+
   // R2b (review I-1): only the first-parent line is read, each merge against its first parent, and a target is purged only
   // when it is absent at the end, or there at a level looser than it had before (at the start, or just before a delete).
   const tip = (repo: string) => git(repo, 'rev-parse HEAD').trim()
