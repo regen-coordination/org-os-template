@@ -11,6 +11,7 @@ import { Nonces, TOO_MANY } from './nonces.ts'
 import { clearedCookie, createSession, endSession, sessionCookie, sessionFromCookie, sessionToken, type Session } from './sessions.ts'
 import { personOf, viewerOf } from '../request.ts'
 import { endPersonSession } from './person.ts'
+import { personName } from './names.ts'
 import { clearedSessionCookie } from '../../lib/session-token.mjs'
 import type { SignInConfig } from './config.ts'
 
@@ -109,7 +110,7 @@ export function mountSession(app: Hono, d: SessionDeps): void {
       const { person, claims } = p
       return c.json({
         mode, signedIn: true, via: 'email', actor: person.id,
-        person: { id: person.id, name: person.name, roles: person.roles, nodes: person.nodes },
+        person: { id: person.id, name: personName(d.repo, person), roles: person.roles, nodes: person.nodes },
         viewer: viewerOf(c).kind, expiresAt: new Date(claims.exp * 1000).toISOString(),
         signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
       })

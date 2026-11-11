@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import Nav from './Nav.tsx'
+import ReadOnlyNotice from './ReadOnly.tsx'
 import { fetchRoutes } from './test/fetchRoutes.ts'
 import { renderAt } from './test/render.tsx'
 import { baseRoutes, changeView, resource } from './test/data.ts'
@@ -160,6 +161,25 @@ describe('Nav: the house sidebar on 0.6’s queries (§5.2)', () => {
       await waitFor(() => expect(container.querySelector('.who-t')?.textContent).toBe(said))
       unmount()
     }
+  })
+
+  // R2 (plan §5): a member signed in by an emailed link (0.6.1): a person id, no wallet, no hats. The identity is their
+  // name, as the server says it (their member name) and as their comments are signed, with their Roles; no address.
+  it('a member signed in by an emailed link: their name and their Roles, no address, no hat; the read-only band says nothing', async () => {
+    const ID = 'example-org:person:example-steward'
+    routes({
+      'GET /api/actor': { id: ID, name: 'Example Steward', kind: 'person', via: 'email', roles: ['steward'], nodes: [] },
+      'GET /api/session': { mode: 'hosted', signedIn: true, via: 'email', actor: ID, viewer: 'member', expiresAt: '2026-10-31T10:00:00.000Z',
+        person: { id: ID, name: 'Example Steward', roles: ['network-member', 'steward'], nodes: [] }, signIn: null, methods: ['email'], instanceWrites: 'on' },
+    })
+    const { container } = renderAt(<ViewAsProvider><Nav /><ReadOnlyNotice /></ViewAsProvider>)
+    const who = await screen.findByRole('button', { name: /^Example Steward/ })
+    await waitFor(() => expect(container.querySelector('.who-t')!.textContent).toBe('Example Steward'))
+    expect(container.querySelector('.who-s')!.textContent).toBe('Network Member · Steward')
+    expect(container.textContent).not.toMatch(/0x|No hats|Hats not read/)
+    expect(container.querySelector('.band-ro')).toBeNull()
+    fireEvent.click(who)
+    expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual(expect.arrayContaining(['Network Member', 'Steward']))
   })
 
   it('the identity is who git says you are', async () => {

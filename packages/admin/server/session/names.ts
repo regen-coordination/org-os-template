@@ -23,6 +23,15 @@ import type { Viewer } from '../../lib/visibility.mjs'
 const nameOf = (record: Record<string, unknown> | null, id: string): string =>
   record && typeof record.name === 'string' && record.name.trim() !== '' ? record.name.trim() : id
 
+/** The name a person signed in by an emailed link is shown by (R2, PF-R258): their member name when the members file
+ *  holds their person id (as `displayNames` says it everywhere else, so the composer's monogram, the identity and their
+ *  comments agree), else the Roles table's. */
+export function personName(repo: string, person: { id: string; name: string }): string {
+  const said = displayNames(repo, null)(person.id)
+  if (said !== person.id) return said
+  return person.name.trim() !== '' ? person.name : person.id
+}
+
 /** The Org-Actor value of a git identity no member matches (`actorTrailer`): `unknown <email>`. */
 const UNKNOWN = /^unknown <.*>$/
 

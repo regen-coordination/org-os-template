@@ -29,6 +29,7 @@ import { endPersonSession, needsReissue, personActor, readPersonCookie, reissue,
 import type { SignInConfig } from './session/config.ts'
 import type { RolesPerson } from './private/store.ts'
 import { addressName } from './session/address-name.ts'
+import { personName } from './session/names.ts'
 import type { PrivateStore } from './private/store.ts'
 import type { HostedConfig } from './hosted/config.ts'
 import { actorIdOf, walletsOf, type HatAct } from '../lib/hat-readings.mjs'
@@ -311,7 +312,7 @@ async function signedIn(repo: string, m: Membership, session: Session, act: bool
 /** The person's actor and viewer: with no Role, the public's view (Review Focus 2); otherwise a member whose roles are
  *  their Roles and the governance roles the members list gives their id (a steward listed in a role's `members` holds it). */
 function personWho(repo: string, p: RolesPerson): { actor: PersonActor; viewer: Viewer } {
-  const actor = personActor(p)
+  const actor = personActor({ ...p, name: personName(repo, p) })
   if (p.roles.length === 0) return { actor, viewer: { kind: 'public' } }
   return { actor, viewer: { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, actor, null)) } }
 }

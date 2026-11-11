@@ -11,6 +11,7 @@ import { SECTIONS, placeOf, sectionCount, sectionRows, type SectionDef } from '.
 import { useRegistries, useResources, useStatus, useSystemEntries } from './queries.ts'
 import { useCanWrite, useViewer } from './viewAs/ViewAs.tsx'
 import { useSessionView } from './session/session.ts'
+import { personIdentity } from './session/emailSignIn.ts'
 import type { SignedInView } from './api.ts'
 import { hatLevel, parseHatRef, prettyHatId } from '../../lib/hats.mjs'
 import { needsFrom } from './elements/needs/needs.ts'
@@ -93,7 +94,8 @@ function useHouseNav() {
     .map(l => ({ id: l.href, label: l.label, href: l.href }))
 
   const session = useSessionView()
-  const identity: Identity = session?.signedIn ? sessionIdentity(session)
+  // an emailed-link session has no account and no hats: the person's name and Roles (0.6.1's personIdentity)
+  const identity: Identity = session?.signedIn ? (session.via === 'email' ? personIdentity(session.person) : sessionIdentity(session))
     : actor === null
     ? { hatName: '…', address: null, hatId: null, hats: [] }
     : 'id' in actor ? { hatName: actor.name, address: null, hatId: null, hats: [] }

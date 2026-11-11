@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useLocation, useSearch } from 'wouter'
 import { SignIn } from '../elements/signin/SignIn.tsx'
 import { useStatus } from '../queries.ts'
+import { isWalletSession } from '../api.ts'
 import { isSignInPath, usePortalOrigin, useSession } from '../session/session.ts'
 
 /** Where to go once signed in: `next` when it is a path of this Hub (one leading slash, not the sign-in page), else /. */
@@ -37,7 +38,7 @@ export default function SignInPage() {
     navigate(nextOf(search), { replace: true })
   }, [state, stale, search, navigate])
 
-  const signedIn = session?.signedIn ? session : null
+  const signedIn = isWalletSession(session) ? session : null
   const tree = session && !session.signedIn && session.signIn ? treeName(session.signIn.tree) : undefined
   // Past the grace the session lives on but its hats could not be read: the card says the §5.2 band and offers Try again
   // (signing in again reads the hats now), never "signed in" with no hats (R-L5-20.6).

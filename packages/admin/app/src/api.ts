@@ -134,7 +134,7 @@ let lastSession: SessionView | null = null
 export function signInSentence(message: string, session: SessionView | null): string {
   if (!session?.signedIn) return message
   if (session.stale || session.unread) return session.band ?? message
-  return session.hats.length === 0 ? NO_HAT : message
+  return isWalletSession(session) && session.hats.length === 0 ? NO_HAT : message
 }
 
 // The walk review's G1: View as at the server. While previewing, every read names the viewer it is for (`?as=`); the
@@ -244,8 +244,19 @@ export interface SignedInView extends PortalField {
   /** `stale`: past the grace (§5.2). `unread`: no reading kept yet (after a restart, for as long as the tree cannot be
    *  read; final review I1). Either way the hats are not known, and `band` says so; `hats: []` alone is a reading. */
   stale?: true; unread?: true; band?: string
+  via?: 'siwe'
 }
-export type SessionView = SignedOutView | SignedInView
+/** A person signed in by an emailed link (0.6.1, Lane 3): their person id as the actor, the person as the house names
+ *  them (their member name when the members file holds their id), their Roles; no account, no hats. */
+export interface PersonSessionView extends PortalField {
+  mode: SessionMode; signedIn: true; via: 'email'; actor: string
+  person: { id: string; name: string; roles: string[]; nodes: string[] }
+  viewer: 'member' | 'public'; expiresAt: string
+  stale?: undefined; unread?: undefined; band?: undefined
+}
+export type SessionView = SignedOutView | SignedInView | PersonSessionView
+/** A session signed in with a wallet (it has an account and hats); an emailed-link session has neither. */
+export const isWalletSession = (s: SessionView | null | undefined): s is SignedInView => s?.signedIn === true && s.via !== 'email'
 /** POST /api/session: a session, or no hat in the tree (§4.3 step 5). */
 export type SignInAnswer = SignedInView | { signedIn: false; notMember: true }
 /** GET /api/visibility (L5 spec §11.2, §13): the tree's hats with their names and the hats above each, the hats worn, the

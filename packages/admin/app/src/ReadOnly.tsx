@@ -1,7 +1,7 @@
 import { Link } from 'wouter'
 import { readOnlyReason, useActor } from './actor.ts'
 import { Icon } from './design/Icon.tsx'
-import { NO_HAT } from './api.ts'
+import { isWalletSession, NO_HAT } from './api.ts'
 import { useSessionView } from './session/session.ts'
 
 /** Read only, said once at the top of every page when editing is off (§14.1, §6.5 "No actor"): the band (§5.9's
@@ -15,7 +15,7 @@ export default function ReadOnlyNotice() {
   // read yet, I1) its band; a reading that shows no hat, the ruling's sentence (L9-O1). Neither is "the server could
   // not say who you are". Each is said in the same band (C9), as the session gives it: no "Read only:" before it.
   const hatsUnknown = session?.signedIn && (session.stale || session.unread)
-  const said = hatsUnknown ? session.band : session?.signedIn && session.hats.length === 0 ? NO_HAT : undefined
+  const said = hatsUnknown ? session.band : isWalletSession(session) && session.hats.length === 0 ? NO_HAT : undefined
   const unknown = actor !== null && 'unknown' in actor ? actor.unknown : null
   if (!said && !error && unknown === null) return null
   const claim = !said && !error && unknown !== null && unknown !== ''
