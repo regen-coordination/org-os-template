@@ -11,3 +11,5 @@ app/e2e/routes/
 app/e2e/reflow/
 # the workspace walk's shots (tests/e2e/workspace.mts), and a failed walk's page shots and aria snapshots: local only, never committed (Q39)
 app/e2e/workspace/
+# the hosted walk's shots (tests/e2e/hosted.mts), and a failed walk's page shots and aria snapshots: local only, never committed (Q39)
+app/e2e/hosted/
