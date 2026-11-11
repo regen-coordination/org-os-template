@@ -1087,7 +1087,7 @@ code.mono { overflow-wrap: anywhere; }
                data-on="hill>self,valley>hill">
             <svg class="edges" aria-hidden="true"></svg>
             <button class="node beyond" style="grid-area:delta" data-id="delta" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Delta Alliance</span></span><span class="nm">one hop<span class="long"> · via Watershed</span></span></button>
-            <div class="group" style="grid-area:eco" data-id="eco"><span class="eyebrow"><svg class="i"><use href="#i-sprout"/></svg>Regen Commons</span>
+            <div class="group" style="grid-area:eco" data-id="eco"><span class="eyebrow"><svg class="i"><use href="#i-sprout"/></svg>Meadow Network</span>
               <button class="node" type="button" data-id="s1"><span class="nt"><svg class="i"><use href="#i-db"/></svg><span>Field notes archive</span></span><span class="nm">source<span class="long"> · field notes</span></span></button>
               <button class="node" type="button" data-id="s2"><span class="nt"><svg class="i"><use href="#i-db"/></svg><span>Seed registry</span></span><span class="nm">source<span class="long"> · seed records</span></span></button>
             </div>
@@ -1120,7 +1120,7 @@ code.mono { overflow-wrap: anywhere; }
         <div style="display:grid;gap:var(--sp-6)"><span class="cap">frontier couldn’t be read</span><button class="node failed" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Watershed Network</span></span><span class="nm"><svg class="i"><use href="#i-alert"/></svg>couldn’t read · 3 d</span><span class="attn-dot"></span></button></div>
         <div style="display:grid;gap:var(--sp-6)"><span class="cap">frontier read long ago</span><button class="node aged" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Youth Circle</span></span><span class="nm"><svg class="i"><use href="#i-clock"/></svg>LocalNode · 12 d</span></button></div>
         <div style="display:grid;gap:var(--sp-6)"><span class="cap">source</span><button class="node" type="button"><span class="nt"><svg class="i"><use href="#i-db"/></svg><span>Seed registry</span></span><span class="nm">source · seed records</span></button></div>
-        <div style="display:grid;gap:var(--sp-6)"><span class="cap">ecosystem (a group)</span><div class="group" style="align-self:start"><span class="eyebrow"><svg class="i"><use href="#i-sprout"/></svg>Regen Commons</span><span class="faint" style="font-size:var(--fs-tiny)">2 sources</span></div></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">ecosystem (a group)</span><div class="group" style="align-self:start"><span class="eyebrow"><svg class="i"><use href="#i-sprout"/></svg>Meadow Network</span><span class="faint" style="font-size:var(--fs-tiny)">2 sources</span></div></div>
         <div style="display:grid;gap:var(--sp-6)"><span class="cap">edges</span>
           <svg class="edge-key" viewBox="0 0 200 108" style="width:100%;height:auto" aria-hidden="true">
             <path class="edge" d="M10 14 H190"/><text x="10" y="32" style="font:10px var(--mono);fill:var(--mute)">relation · labelled in words</text>
@@ -1142,7 +1142,7 @@ code.mono { overflow-wrap: anywhere; }
           <div class="map kfed" data-edges="delta>up:one hop|up>self:upstream|eco>self:feeds|src>self:feeds|hill>self:peers|valley>hill:one hop|self>seed:reads|self>youth:downstream|self>market:downstream|youth>pantry:one hop" data-on="hill>self,valley>hill">
             <svg class="edges" aria-hidden="true"></svg>
             <button class="node beyond" style="grid-area:delta" data-id="delta"><span class="nt"><span>Delta Alliance</span></span><span class="nm">one hop</span></button>
-            <div class="group" style="grid-area:eco" data-id="eco"><span class="eyebrow">Regen Commons</span>
+            <div class="group" style="grid-area:eco" data-id="eco"><span class="eyebrow">Meadow Network</span>
               <button class="node" data-id="s1"><span class="nt"><span>Field notes archive</span></span></button>
               <button class="node" data-id="s2"><span class="nt"><span>Seed registry</span></span></button></div>
             <button class="node failed" style="grid-area:up" data-id="up"><span class="nt"><span>Watershed Network</span></span><span class="nm">couldn’t read</span><span class="attn-dot"></span></button>
@@ -1512,7 +1512,7 @@ code.mono { overflow-wrap: anywhere; }
     ['Peers', [['i-inst', 'Hillside Coop', 'DAO · peer · 9 members', 'ok', 'Read 4 min ago'], ['i-book', 'Open Seed Library', 'knowledge peer · AT Proto', 'ok', 'Read 3 d ago']]],
     ['Downstream', [['i-inst', 'Youth Circle', 'LocalNode · downstream', 'aged', 'Frontier 12 d'], ['i-inst', 'Market Garden', 'downstream', 'open', 'Not reached']]],
     ['One hop beyond', [['i-inst', 'Valley Commons', 'via Hillside Coop', 'open', ''], ['i-inst', 'Delta Alliance', 'via Watershed Network', 'open', ''], ['i-inst', 'Pantry Network', 'via Youth Circle', 'open', '']]],
-    ['Sources', [['i-db', 'Field notes archive', 'Regen Commons', 'ok', ''], ['i-db', 'Seed registry', 'Regen Commons', 'ok', ''], ['i-db', 'Open data portal', 'source', 'ok', '']]],
+    ['Sources', [['i-db', 'Field notes archive', 'Meadow Network', 'ok', ''], ['i-db', 'Seed registry', 'Meadow Network', 'ok', ''], ['i-db', 'Open data portal', 'source', 'ok', '']]],
   ];
   const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const twinHTML = TWIN.map(([g, items]) => `<li class="grp-h"><span>${g}</span><span class="c">${items.length}</span></li>` + items.map(([ic, t, s, m, w]) =>
