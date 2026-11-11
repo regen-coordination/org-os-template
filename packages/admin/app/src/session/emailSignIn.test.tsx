@@ -18,7 +18,7 @@ afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, '', '
 /** The sign-in card as the sign-in page draws it with the email method: the form, the hook, the server's sentence. */
 function Card({ ret, methods = ['email'] as const }: { ret: string | null; methods?: readonly ('email' | 'wallet')[] }) {
   const email = useEmailSignIn(ret)
-  return <SignIn org="Example Org" state="idle" methods={methods} onSignIn={noop} onCancel={noop} doorHref="/door"
+  return <SignIn org="Example Org" state="idle" methods={methods} onSignIn={noop} onCancel={noop} portalHref={null}
     onEmail={email.send} emailBusy={email.state === 'sending'} emailError={email.error} sent={email.sentence} />
 }
 
@@ -29,7 +29,7 @@ async function submit(address: string) {
 
 describe('the sign-in card with the email method (Lane 3 Task 10)', () => {
   it('no tree: the email form, no wallet button', () => {
-    renderAt(<SignIn org="Example Org" state="idle" methods={['email']} onSignIn={noop} onCancel={noop} doorHref="/door" />, '/sign-in')
+    renderAt(<SignIn org="Example Org" state="idle" methods={['email']} onSignIn={noop} onCancel={noop} portalHref={null} />, '/sign-in')
     const card = screen.getByRole('group', { name: 'Sign in' })
     const field = within(card).getByLabelText('Email')
     expect([field.getAttribute('type'), field.getAttribute('autocomplete')]).toEqual(['email', 'email'])
@@ -41,7 +41,7 @@ describe('the sign-in card with the email method (Lane 3 Task 10)', () => {
 
   it('with a tree too: the email form first, then Sign in with a wallet, which starts the wallet', () => {
     const onSignIn = vi.fn()
-    renderAt(<SignIn org="Example Org" state="idle" methods={['email', 'wallet']} onSignIn={onSignIn} onCancel={noop} doorHref="/door" />, '/sign-in')
+    renderAt(<SignIn org="Example Org" state="idle" methods={['email', 'wallet']} onSignIn={onSignIn} onCancel={noop} portalHref={null} />, '/sign-in')
     const buttons = screen.getAllByRole('button')
     expect(buttons.map(b => b.textContent)).toEqual(['Email me a link', 'Sign in with a wallet'])
     expect(buttons[1]!.className).toBe('btn secondary')

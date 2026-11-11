@@ -977,8 +977,8 @@ sentence "You’ll sign a message to prove you hold an address. Nothing is sent 
 spent. Your role is the hat you wear in tree #13.", a full-width 40px primary **Sign in with Ethereum**,
 hint "EIP-4361 · read-only for anyone without a hat". States: **waiting** (spinner, "Waiting for your
 wallet to sign…", Cancel) · **signed in** (hat disc, hats worn, short address · N hats) · **not a member**
-("This address wears no hat in Example DAO’s tree. You can still read the public door.", Read the public
-door) · **refused / failed** (clay note, Try again). The words "connect wallet" and "login" never appear.
+("This address wears no hat in Example DAO’s tree. You can still read the portal.", Read the portal; both
+only when the Hub has a portal origin) · **refused / failed** (clay note, Try again). The words "connect wallet" and "login" never appear.
 
 ## 12. The portal
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useLocation, useSearch } from 'wouter'
 import { SignIn } from '../elements/signin/SignIn.tsx'
 import { useStatus } from '../queries.ts'
-import { isSignInPath, useSession } from '../session/session.ts'
+import { isSignInPath, usePortalOrigin, useSession } from '../session/session.ts'
 
 /** Where to go once signed in: `next` when it is a path of this Hub (one leading slash, not the sign-in page), else /. */
 export function nextOf(search: string): string {
@@ -23,6 +23,7 @@ export default function SignInPage() {
   const org = useStatus().data?.org ?? 'org-os'
   const search = useSearch()
   const [, navigate] = useLocation()
+  const portal = usePortalOrigin()
 
   useEffect(() => { document.title = `Sign in · ${org}` }, [org])
   // Once per sign-in: where `next` pointed when the session began, never again as the location changes after. Not
@@ -45,7 +46,7 @@ export default function SignInPage() {
     <main className="signin-page">
       <SignIn org={org} state={graced ? 'failed' : state} tree={tree} error={graced ? signedIn?.band : error ?? undefined}
         hats={signedIn?.hats.map(h => h.name)} address={signedIn ? bareAddress(signedIn.account) : undefined}
-        onSignIn={() => { void signIn() }} onCancel={cancel} doorHref="/door" />
+        onSignIn={() => { void signIn() }} onCancel={cancel} portalHref={portal} />
     </main>
   )
 }

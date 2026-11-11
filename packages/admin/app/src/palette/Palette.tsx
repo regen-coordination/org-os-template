@@ -24,6 +24,7 @@ import { useCanConverse, useCanWrite, useViewer, useVisibilitySource } from '../
 import { useEntryOfResources } from '../blocks/entries.ts'
 import { shownName } from '../record/restricted.ts'
 import { keyStep, pressOf } from '../keys/keys.ts'
+import { usePortalOrigin } from '../session/session.ts'
 import {
   GROUPS, filterItems, findByAddress, highlight, inScope, paletteItems, places, recordContext, scopeLabel, scopes, type PaletteItem,
 } from './palette.ts'
@@ -109,6 +110,7 @@ export default function Palette() {
   const { viewer, setViewer, visible, sees } = useViewer()
   const canWrite = useCanWrite()
   const canConverse = useCanConverse()
+  const portal = usePortalOrigin()
   const dialog = useRef<HTMLDialogElement>(null)
   const input = useRef<HTMLInputElement>(null)
   // Where focus was when the palette opened: the overlay slot hands it back on every way of closing.
@@ -178,7 +180,7 @@ export default function Palette() {
   const items = !open ? [] : filterItems(paletteItems(all, places(placed, registries.data ?? [], systemsRead.entries, { sources: sees({}), deploy: composes }), canWrite ? opsSeen : [], {
     hasChanges: staged, canApply: staged && !!view && view.rule.direct && view.stale.length === 0,
     record: canWrite && record && editable ? record : null, // only Edit reads it: offered where the record page offers Edit
-    path, viewing: viewer.as === 'you' ? 'you' : viewer.as === 'public' ? 'public' : 'other', adds,
+    path, viewing: viewer.as === 'you' ? 'you' : viewer.as === 'public' ? 'public' : 'other', adds, portal,
   }).filter(i => inScope(i, scope, path)), query, 30, named)
   const cur = Math.min(at, Math.max(items.length - 1, 0)) // the list may have shrunk under it
   if (!open) return null
@@ -190,6 +192,7 @@ export default function Palette() {
     try {
       if (inspect && item.inspect) { inspector.open(item.inspect); return }
       if (item.go) { navigate(item.go); return }
+      if (item.open) { window.open(item.open, '_blank', 'noopener,noreferrer'); return }
       switch (item.action) {
         case 'theme': toggleTheme(); break
         case 'apply': window.dispatchEvent(new Event('apply-changes')); break

@@ -235,8 +235,11 @@ export interface SyncDone { state: SyncState; remote: string | null; trunk: stri
  *  by name; `stale` (with the `band` sentence) when its last reading is past the grace: the session lives on, no hats,
  *  and it reads as public until a reading succeeds (§5.2). */
 export type SessionMode = 'local' | 'hosted'
-export interface SignedOutView { mode: SessionMode; signIn: { chainId: string; tree: string } | null; signedIn: false }
-export interface SignedInView {
+/** `portal` (0.6.2, L9 §5.2): the portal's origin when the Hub is hosted with ORG_OS_PORTAL_ORIGIN, null when hosted
+ *  without it, absent on a local Hub. The Portal link is drawn only with it (D-5: `usePortalOrigin`). */
+interface PortalField { portal?: string | null }
+export interface SignedOutView extends PortalField { mode: SessionMode; signIn: { chainId: string; tree: string } | null; signedIn: false }
+export interface SignedInView extends PortalField {
   mode: SessionMode; signedIn: true; actor: string; account: string; hats: { hat: string; name: string }[]; expiresAt: string
   /** `stale`: past the grace (§5.2). `unread`: no reading kept yet (after a restart, for as long as the tree cannot be
    *  read; final review I1). Either way the hats are not known, and `band` says so; `hats: []` alone is a reading. */

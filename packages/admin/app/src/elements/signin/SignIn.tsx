@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { Button, ButtonLink } from '../../design/Button.tsx'
+import { Button, buttonClass } from '../../design/Button.tsx'
 import { Icon } from '../../design/Icon.tsx'
 import { Note } from '../../design/Note.tsx'
 import { Spinner } from '../../design/Spinner.tsx'
@@ -18,7 +18,9 @@ export interface SignInProps {
   error?: string | null       // the failed state's sentence, shown as given (the server's, or the no-wallet one); null as none (useSession().error)
   onSignIn(): void            // Sign in with Ethereum, and Try again
   onCancel(): void            // Cancel while the wallet is asked to sign
-  doorHref: string            // where "Read the public door" goes
+  /** Where "Read the portal" goes: the portal's origin (D-5). Null or absent, a Hub with none: no link, and the
+   *  not-a-member sentence does not offer it. */
+  portalHref?: string | null
   /** The ways offered (Lane 3, `GET /api/session`'s `methods`): with `email`, the email form is the primary and the
    *  wallet a second button, drawn only when `wallet` is offered too. Absent, the card is the wallet's alone (L5). */
   methods?: readonly ('email' | 'wallet')[]
@@ -30,7 +32,7 @@ export interface SignInProps {
 
 const WAITING = 'Waiting for your wallet to sign…'
 const FAILED = 'Signing in did not work.'
-const notMember = (org: string) => `This address wears no hat in ${org}’s tree. You can still read the public door.`
+const notMember = (org: string, portal: boolean) => `This address wears no hat in ${org}’s tree.${portal ? ' You can still read the portal.' : ''}`
 const EMAIL_SENTENCE = 'We’ll email you a link that signs you in. It works once, for 15 minutes.'
 const LINK_HINT = 'No mail after a few minutes? Check your spam folder, then ask again.'
 const hatCount = (n: number) => `${n} ${n === 1 ? 'hat' : 'hats'}`
@@ -38,11 +40,11 @@ const hatCount = (n: number) => `${n} ${n === 1 ? 'hat' : 'hats'}`
 /** Sign-in (spec §11.4): a card at most 420 wide, a group named by its title (not a landmark: /parts draws five) —
  *  the eyebrow "<org> · members", the title in the display face, what signing does and does not do, and then the state's body: idle (the one primary, Sign in with Ethereum, and
  *  the EIP-4361 hint), waiting (the reading ring, Cancel), signed in (the hat disc, the hats worn, the short address
- *  and the count), not a member (the sentence, Read the public door) and failed (a clay note, Try again). It draws
+ *  and the count), not a member (the sentence, and Read the portal when there is one) and failed (a clay note, Try again). It draws
  *  only: the wallet and the session are L5's, which pass the state and the two callbacks. When the state changes
  *  after the first draw, focus goes to the new state's action (the body, when it has none) and the new state is said
  *  once through the page's polite region; a failure is said by its own note. */
-export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, onCancel, doorHref, methods = ['wallet'], onEmail, emailBusy = false, emailError = null, sent = null }: SignInProps) {
+export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, onCancel, portalHref = null, methods = ['wallet'], onEmail, emailBusy = false, emailError = null, sent = null }: SignInProps) {
   const byEmail = methods.includes('email')
   const byWallet = methods.includes('wallet')
   const titleId = useId()
@@ -57,9 +59,9 @@ export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, 
     if (before === null || before === shown || !body.current) return
     const target = shown === 'sent' ? body.current : body.current.querySelector<HTMLElement>('a[href], button') ?? body.current
     target.focus()
-    const said = shown === 'sent' ? sent : state === 'waiting' ? WAITING : state === 'not-member' ? notMember(org) : state === 'signed-in' ? `Signed in. ${worn || 'No hats'}.` : null
+    const said = shown === 'sent' ? sent : state === 'waiting' ? WAITING : state === 'not-member' ? notMember(org, portalHref !== null) : state === 'signed-in' ? `Signed in. ${worn || 'No hats'}.` : null
     if (said) announce(said)
-  }, [shown, state, org, worn, sent])
+  }, [shown, state, org, worn, sent, portalHref])
 
   const sentence = 'You’ll sign a message to prove you hold an address. Nothing is sent on chain and nothing is spent.'
     + (tree ? ` Your role is the hat you wear in tree ${tree}.` : '')
@@ -96,8 +98,9 @@ export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, 
           </div>
         )}
         {!sent && state === 'not-member' && <>
-          <p className="note"><Icon name="info" size="sm" /><span className="note-t">{notMember(org)}</span></p>
-          <div className="signin-go"><ButtonLink href={doorHref}>Read the public door</ButtonLink></div>
+          <p className="note"><Icon name="info" size="sm" /><span className="note-t">{notMember(org, portalHref !== null)}</span></p>
+          {/* the portal is its own site (its origin), so a plain link, not the Hub's router */}
+          {portalHref !== null && <div className="signin-go"><a className={buttonClass({})} href={portalHref}>Read the portal</a></div>}
         </>}
         {!sent && state === 'failed' && <>
           <Note state="error">{error ?? FAILED}</Note>

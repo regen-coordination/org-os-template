@@ -21,6 +21,8 @@ export const GROUPS: readonly { id: PaletteGroup; label: string }[] = [
 export interface PaletteItem {
   key: string; group: PaletteGroup; label: string; detail: string; keys?: string; icon?: IconName; hint?: string; where?: string
   go?: string; inspect?: string; action?: ActionId
+  /** An address outside the Hub, opened in a new tab (the portal, D-5). */
+  open?: string
 }
 export interface Place { label: string; href: string; detail: string }
 
@@ -33,6 +35,9 @@ export interface PaletteContext {
   /** What the viewer can make, in order: *New <kind>* for each section they can add to, then *New board* (design
    *  pass 2026-11-04). Writes: the caller passes none while previewing (C-23). */
   adds?: readonly { label: string; go: string }[]
+  /** The portal's origin, when the Hub has one (D-5: `usePortalOrigin`): Jump to lists Portal, opened there in a new
+   *  tab, with its `g d`. Null or absent: no Portal. */
+  portal?: string | null
 }
 
 /** Every page of the menu: Home, Activity, the sections that have records, Governance, the maps, All records. With
@@ -92,6 +97,7 @@ export function paletteItems(resources: Resource[], placeList: Place[], ops: Ope
   const pages = placeList.filter(p => p.detail !== 'map' && !named.has(p.label))
   return [
     ...HOUSE_SECTIONS.map(sectionItem),
+    ...(ctx.portal ? [{ key: 'portal', group: 'jump', label: 'Portal', detail: 'opens in a new tab', keys: 'g d', icon: 'globe', open: ctx.portal } satisfies PaletteItem] : []),
     ...pages.map((p): PaletteItem => ({ key: `p:${p.href}`, group: 'jump', label: p.label, detail: p.detail, icon: placeIcon(p), go: p.href, where: p.href })),
     ...resources.filter(r => r.kind !== 'absent').map((r): PaletteItem => ({
       key: `r:${r.id}`, group: 'records', label: r.name, detail: `${kindLabel(r.kind)} · ${splitId(r.id).id}`, icon: kindIcon(r.kind),

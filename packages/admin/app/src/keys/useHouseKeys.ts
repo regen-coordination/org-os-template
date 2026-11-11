@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'wouter'
 import { useFrame } from '../design/Shell.tsx'
+import { usePortalOrigin } from '../session/session.ts'
 import { keyStep, pressOf, type KeyState } from './keys.ts'
 
 /** Asks the key map to open (KeyMap listens). */
@@ -17,7 +18,7 @@ export const TOGGLE_VIEW = 'house:toggle-view'
 
 /** The house's keys (§5.8), heard on the window after the page has had them (a handled key — an editor's, a
  *  menu's — is left alone). `g` + a key goes to a section, `g c` expands the tray, `g d` opens the portal
- *  in a new tab, `?` the key map, ⌘\ or `[` fold the sidebar (the frame's, so this is drawn inside the Shell),
+ *  in a new tab (only when the Hub has a portal origin, at it: D-5; else it does nothing), `?` the key map, ⌘\ or `[` fold the sidebar (the frame's, so this is drawn inside the Shell),
  *  `v` toggles List · Map on the focused list. ⌘K is the palette's own (it hears it wherever it is mounted) and
  *  j / k / ↓ / ↑ are each list's (useRoving). While a dialog is open — the palette, the key map, the More sheet, a
  *  confirmation, all modal — focus is in it and its keys are its own. That is read from the key's target, not from
@@ -25,8 +26,9 @@ export const TOGGLE_VIEW = 'house:toggle-view'
 export function useHouseKeys(): void {
   const [, navigate] = useLocation()
   const { fold } = useFrame()
-  const latest = useRef({ navigate, fold })
-  latest.current = { navigate, fold }
+  const portal = usePortalOrigin()
+  const latest = useRef({ navigate, fold, portal })
+  latest.current = { navigate, fold, portal }
   useEffect(() => {
     let state: KeyState = { pendingG: null }
     const onKey = (e: KeyboardEvent) => {
@@ -37,7 +39,8 @@ export function useHouseKeys(): void {
       const a = step.action
       if (a === null || 'move' in a || ('open' in a && a.open === 'palette')) return
       if (e.target instanceof Element && e.target.closest('dialog[open]')) return
-      const { navigate, fold } = latest.current
+      const { navigate, fold, portal } = latest.current
+      if ('open' in a && a.open === 'portal' && portal === null) return // no portal origin: the key is not the house's
       e.preventDefault()
       if ('go' in a) navigate(a.go)
       else if ('fold' in a) fold()
@@ -45,7 +48,7 @@ export function useHouseKeys(): void {
       else if (a.open === 'keymap') window.dispatchEvent(new Event(OPEN_KEYMAP))
       else if (a.open === 'changes') window.dispatchEvent(new Event(OPEN_CHANGES))
       else if (a.open === 'new') window.dispatchEvent(new Event(OPEN_NEW_BOARD))
-      else window.open('/portal', '_blank', 'noopener,noreferrer')
+      else if (portal !== null) window.open(portal, '_blank', 'noopener,noreferrer')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

@@ -150,7 +150,9 @@ function Dock() {
 }
 
 /** The portal at /portal, outside the frame: no sidebar, no tray, nothing that needs a member (§12). Here it is
- *  drawn from fixtures and says so; L9 builds the real portal from the org's public records. */
+ *  drawn from fixtures and says so: a Hub with a portal origin (hosted, ORG_OS_PORTAL_ORIGIN) sends /portal and /door to
+ *  the real portal, built from the org's public records (server/portal/), before the app is served, and links to it
+ *  (D-5); one without (a local Hub) has only this sample page, and links to it nowhere. */
 function PortalRoute() {
   useEffect(() => { document.title = PORTAL_PUBLIC.org.name }, [])
   // /portal is outside the Hub's frame (which mounts the page's live region in PanelProvider), so it carries its own:

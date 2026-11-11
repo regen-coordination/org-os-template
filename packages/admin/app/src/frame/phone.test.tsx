@@ -114,7 +114,7 @@ describe('the bottom bar (§5.4, C-7)', () => {
 })
 
 describe('the More sheet (§5.4)', () => {
-  it('is a modal dialog (showModal) listing Systems, Roles, Treasury, Library, Changes, View as… (no Portal until L9), then the identity', () => {
+  it('is a modal dialog (showModal) listing Systems, Roles, Treasury, Library, Changes, View as… (no Portal without a portal origin, D-5), then the identity', () => {
     renderAt(bar())
     expect(more().getAttribute('aria-haspopup')).toBe('dialog')
     openMore()

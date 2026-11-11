@@ -42,10 +42,6 @@ export interface SideLink { id: string; label: string; href: string; empty?: boo
  *  side admits. The source editor (`/files/…`) is Workspace's too, under Sources in the path. */
 export const SOURCES_LINK: SideLink = { id: 'sources', label: 'Sources', href: '/sources' }
 
-/** Walk I16, D2: the portal at /portal is drawn from fixtures until L9 builds it from the org's public records, so the
- *  frame links to it nowhere (the sidebar's foot, the org switcher's menu, the phone's More sheet) until then. /portal and
- *  /door's redirect stay. L9 turns this on. */
-export const PORTAL_LINKED = false
 export const FILES_HREF = '/files'
 
 /** The counts the sidebar shows: each of what the viewer may see (rule 7). */

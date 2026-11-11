@@ -42,7 +42,7 @@ describe('/parts/tray', () => {
     expect(within(state('waiting')).getAllByRole('button').map(b => b.textContent)).toEqual(['Cancel'])
     expect(state('signed in').querySelector('.who-t')!.textContent).toBe('Council steward · Treasury signer')
     expect(state('signed in').querySelector('.who-s')!.textContent).toMatch(/^0x[0-9a-f]{4}…[0-9a-f]{4} · 2 hats$/)
-    expect(within(state('not a member')).getByRole('link', { name: 'Read the public door' }).getAttribute('href')).toBe('/door')
+    expect(within(state('not a member')).getByRole('link', { name: 'Read the portal' }).getAttribute('href')).toBe('https://portal.example.test')
     expect(state('failed').querySelector('.note-error')!.textContent).toBe('Signing in did not work.')
     expect(within(state('failed')).getAllByRole('button').map(b => b.textContent)).toEqual(['Try again'])
   })

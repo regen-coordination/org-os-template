@@ -74,6 +74,8 @@ describe('the routes, in the order App.tsx tries them', () => {
     expect(screen.queryByRole('region', { name: 'Changes' })).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'Hub' })).toBeNull()
     expect(loc.history).toEqual(['/portal'])
+    // D-5: a Hub with no portal origin (a hosted one with it sends /portal there before the app) draws the sample page
+    expect(screen.getByText('Sample values: this portal is drawn from fixtures. The real one is built from the org’s public records.')).toBeTruthy()
   })
 
   it.each([['/door', '/portal'], ['/door?from=card', '/portal?from=card'], ['/door/systems/a', '/portal/systems/a']])('%s, the portal’s old address, lands on %s in place of it', async (path, lands) => {

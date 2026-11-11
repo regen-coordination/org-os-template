@@ -73,14 +73,24 @@ describe('the sign-in page (L5 spec §11.1)', () => {
       await waitFor(() => expect(loc.history.at(-1)).toBe(lands))
     })
 
-  it('a not-member: the sentence, and Read the public door going to /door', async () => {
-    routes({ 'POST /api/session': { signedIn: false, notMember: true } })
+  // D-5: Read the portal goes to the portal's origin (GET /api/session's `portal`), and only when the Hub has one.
+  it('a not-member, the Hub with a portal origin: the sentence, and Read the portal going there', async () => {
+    routes({ 'GET /api/session': { ...OUT, portal: 'https://portal.example.test' }, 'POST /api/session': { signedIn: false, notMember: true } })
     wallet()
     renderAt(<SignInPage />, '/sign-in')
     fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Ethereum' }))
-    const door = await screen.findByRole('link', { name: 'Read the public door' })
-    expect(door.getAttribute('href')).toBe('/door')
-    expect(within(card()).getByText('This address wears no hat in Fixture Org’s tree. You can still read the public door.')).toBeTruthy()
+    const portal = await screen.findByRole('link', { name: 'Read the portal' })
+    expect(portal.getAttribute('href')).toBe('https://portal.example.test')
+    expect(within(card()).getByText('This address wears no hat in Fixture Org’s tree. You can still read the portal.')).toBeTruthy()
+  })
+
+  it('a not-member, the Hub with no portal origin: the sentence alone, no link', async () => {
+    routes({ 'GET /api/session': { ...OUT, portal: null }, 'POST /api/session': { signedIn: false, notMember: true } })
+    wallet()
+    renderAt(<SignInPage />, '/sign-in')
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Ethereum' }))
+    expect(await within(card()).findByText('This address wears no hat in Fixture Org’s tree.')).toBeTruthy()
+    expect(within(card()).queryAllByRole('link')).toEqual([])
   })
 
   it('a 401 from the session post: the server’s sentence, and Try again, which signs again', async () => {

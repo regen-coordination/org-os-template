@@ -115,8 +115,8 @@ describe('the sidebar (§5.2)', () => {
     expect(within(house()).queryByRole('button', { name: 'Instance' })).toBeNull()
   })
 
-  // walk I16, D2: the portal is drawn from fixtures until L9 builds it from the org's public records, so no link leads there
-  it('the foot has no Portal link until L9; the identity opens a menu: hats worn, Copy address, View as…', () => {
+  // D-5: with no portal origin (here no session answers) no link leads to the portal: portalLink.test.tsx draws the three modes
+  it('the foot has no Portal link without a portal origin; the identity opens a menu: hats worn, Copy address, View as…', () => {
     renderAt(side(), '/')
     expect(screen.queryByRole('link', { name: /^Portal/ })).toBeNull()
     expect(document.querySelector('a[href="/portal"]')).toBeNull()

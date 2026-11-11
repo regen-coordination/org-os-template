@@ -107,7 +107,8 @@ try {
   await other.page.goto(`${base}/sign-in`)
   await other.page.getByRole('button', { name: 'Sign in with Ethereum' }).click()
   await other.page.locator('main.signin-page .note').getByText('This address wears no hat in').waitFor({ timeout: 15_000 })
-  await other.page.getByRole('link', { name: 'Read the public door' }).waitFor()
+  // D-5: this Hub has no portal origin, so the card offers no portal link
+  if (await other.page.getByRole('link', { name: 'Read the portal' }).count() > 0) fail('the card offers a portal link with no portal origin')
   await other.ctx.close()
 
   // ── the shots: 1440 and 390, light and dark ──

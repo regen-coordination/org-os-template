@@ -58,7 +58,7 @@ describe('the org switcher (§5.2 item 1)', () => {
     expect(org.querySelector('img')).toBeNull()
   })
 
-  it('its menu holds Appearance: System, Light, Dark, and no Portal until L9 (walk I16, D2)', () => {
+  it('its menu holds Appearance: System, Light, Dark, and no Portal without a portal origin (D-5; portalLink.test.tsx)', () => {
     renderAt(<OrgSwitcher org={{ name: 'Example DAO', mark: null }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Example DAO' }))
     const menu = screen.getByRole('menu', { name: 'Example DAO' })

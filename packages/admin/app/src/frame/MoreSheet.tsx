@@ -4,7 +4,8 @@ import { Icon } from '../design/Icon.tsx'
 import { closeDialog, useSlot } from '../parts/panels.tsx'
 import { openViewAs, useViewer, viewerWord } from '../viewAs/ViewAs.tsx'
 import { Identity } from './Identity.tsx'
-import { HOUSE_SECTIONS, PORTAL_LINKED, countText, type HouseCounts, type Identity as Who, type SectionId } from './sections.ts'
+import { usePortalOrigin } from '../session/session.ts'
+import { HOUSE_SECTIONS, countText, type HouseCounts, type Identity as Who, type SectionId } from './sections.ts'
 
 /** The sections the bottom bar leaves to More (§5.4, C-7), in the house's order. */
 export const UNDER_MORE: readonly SectionId[] = ['systems', 'roles', 'treasury', 'library', 'changes']
@@ -13,7 +14,7 @@ export const UNDER_MORE: readonly SectionId[] = ['systems', 'roles', 'treasury',
 const DRAG_CLOSE = 80
 
 /** The More sheet (§5.4): a bottom sheet over the scrim, with a grab handle, listing Systems, Roles, Treasury,
- *  Library, Changes (with their counts), Portal ↗, View as… (who is viewed trailing it), then the signed-in
+ *  Library, Changes (with their counts), Portal ↗ (only with a portal origin, and to it: D-5), View as… (who is viewed trailing it), then the signed-in
  *  identity, drawn whole. 44px rows, 16px labels. It is a modal `<dialog>` (showModal): focus moves in; Esc, a
  *  tap on the scrim, a followed link or a drag down past 80px closes it, and focus returns to More. It is the
  *  panels' `overlay` slot, so the Escape stack closes it first and hands focus back. `inline` draws it open in
@@ -24,6 +25,7 @@ export function MoreSheet({ id, open, onClose, opener, counts, identity, current
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const { viewer } = useViewer()
+  const portal = usePortalOrigin()
   // The slot shuts the dialog before it hands focus back to More: while the sheet is modal More is inert.
   useSlot('overlay', 'more', open && !inline, onClose, () => opener.current, () => closeDialog(ref.current))
 
@@ -78,7 +80,7 @@ export function MoreSheet({ id, open, onClose, opener, counts, identity, current
                 </Link>
               )
             })}
-            {PORTAL_LINKED && <a className="sheet-a" href="/portal" target="_blank" rel="noopener noreferrer">
+            {portal !== null && <a className="sheet-a" href={portal} target="_blank" rel="noopener noreferrer">
               <Icon name="globe" /><span className="sheet-l">Portal</span><span className="sr-only"> (opens in a new tab)</span>
               <Icon name="external" size="xs" />
             </a>}
