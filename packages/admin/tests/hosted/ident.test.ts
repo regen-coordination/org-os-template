@@ -219,7 +219,8 @@ describe('one identity for every hosted commit (carry 2)', () => {
   }, 60_000)
 
   it('the git vocabulary allows log -1 --format=%ae and nothing new besides', () => {
-    expect(gitModule.__internal.ALLOWED.log).toEqual(['-1', '--format=%B', '--format=%ae'])
+    // R2b I-4 adds the purge's first-parent line, a shape of its own (checkArgv): its flags are not taken with -1.
+    expect(gitModule.__internal.ALLOWED.log).toEqual(['-1', '--format=%B', '--format=%ae', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H'])
     expect(() => gitModule.__internal.checkArgv(['log', '-1', '--format=%ae', 'a'.repeat(40)])).not.toThrow()
     for (const flag of ['--format=%an', '--format=%H', '--all', '-2', '--format=%ae%n']) {
       expect(() => gitModule.__internal.checkArgv(['log', flag, 'a'.repeat(40)]), flag).toThrow()

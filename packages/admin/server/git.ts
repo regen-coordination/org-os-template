@@ -131,6 +131,18 @@ function checkArgv(argv: readonly string[]): void {
       refuse('merge-tree takes --write-tree [--name-only] <a> <b>, nothing else.')
     }
   }
+  if (sub === 'log') {
+    // Two shapes only: one commit's message or author (`-1 --format=%B|%ae <rev>`), or the conversation purge's first-parent
+    // line (R2b I-4: `--first-parent -m --no-renames --name-status --format=%H <a>..<b> -- <paths>`). A flag of one shape
+    // is never taken in the other, and a revision is never read as a flag.
+    const LINE = ['--first-parent', '-m', '--no-renames', '--name-status', '--format=%H']
+    const one = args.length === 3 && args[0] === '-1' && (args[1] === '--format=%B' || args[1] === '--format=%ae')
+    const line = args.length >= 8 && LINE.every((f, i) => args[i] === f) && args[6] === '--' && !args.slice(7).some(a => a === '' || a.startsWith('-'))
+    const rev = one ? args[2]! : line ? args[5]! : null
+    if (rev === null || rev.startsWith('-') || rev.startsWith('+')) {
+      refuse(`"${rev ?? args.join(' ')}" is not a flag log may carry here: log takes -1 --format=%B|%ae <rev>, or --first-parent -m --no-renames --name-status --format=%H <a>..<b> -- <paths>.`)
+    }
+  }
   if (sub === 'merge-file') {
     // DAO-OS L6 §6: the result to stdout (-p), never written over the first file; three files, none read as a flag.
     if (args.length !== 4 || args[0] !== '-p' || args.slice(1).some(a => a.startsWith('-') || a.startsWith('+'))) {
