@@ -11,7 +11,10 @@
 // - a git page or record deleted by commits the Hub did not make (the Refresher's fast-forward of a read-only hosted Hub,
 //   Sync's fast-forward or merge): once the trunk has moved, read along its first-parent line, each merge against its first
 //   parent (`goneBetween`). What the line deleted takes its conversation when it is gone at the end, or there again at a
-//   wider level than it had (R2 review Rule 4; R2b I-1): one deleted and restored at its level keeps it;
+//   wider level than it had (R2 review Rule 4; R2b I-1): one deleted and restored at its level keeps it. And what is there
+//   at the end at a looser level than at the start takes it too, deleted or not (Rule 4 as amended, PR7-R32): a delete and
+//   re-make on a side branch merged in, an edit of a level in git, a parent page or the policy loosened. A widening made in
+//   the Hub asks first and keeps the conversation (its commits move the cursor, below); one made outside asked nobody;
 // - the store down at that moment: a tombstone (the target and when it went) is kept in the server's state directory, and
 //   applied the moment the store is reached again, before any conversation is read or written: every row on the target
 //   goes (none can be newer: nothing is written to a store that is down, and the tombstone goes first when it is back).
@@ -24,7 +27,7 @@ import { registriesOf, registryFileOf } from '../registries.ts'
 import { entriesFromText } from '../registry.ts'
 import { stateDir } from '../state.ts'
 import { parse as parseYaml } from 'yaml'
-import { firstParentChanges, isAncestor, onCommit, resolveRev, showFile, type LineStep } from '../git.ts'
+import { firstParentChanges, isAncestor, namesAt, onCommit, resolveRev, showFile, type LineStep } from '../git.ts'
 import { fullLevel, narrowerOrEqual, readFullPolicy, type ParsedLevel } from '../../lib/visibility.mjs'
 import { pageEntries, pageLevel, PRIVATE_PAGE_ID } from '../../lib/workspace/pages.mjs'
 import type { VisibilityPolicy } from '../visibility/config.ts'
@@ -102,6 +105,10 @@ export function goneOfOps(repo: string, ops: readonly StageOp[]): string[] {
 
 /** A file's text at a revision; null when the revision does not hold it. */
 type TextAt = (rev: string, rel: string) => Promise<string | null>
+/** The page ids a revision holds. */
+type PagesAt = (rev: string) => Promise<string[]>
+
+const POLICY_FILE = 'data/visibility.yaml'
 
 const EMPTY_POLICY = Object.freeze({ collections: {}, defaults: {} }) as unknown as VisibilityPolicy
 
@@ -111,8 +118,12 @@ const EMPTY_POLICY = Object.freeze({ collections: {}, defaults: {} }) as unknown
  *  A target deleted on the line is purged only when it is absent at `to`, or there at a level looser than one it had before:
  *  at `from`, or just before each delete (rule R-9a's risk is a conversation inheriting a wider level; one kept at the same
  *  level, or a narrower one, keeps its conversation). A level that cannot be read is no reason to keep it.
+ *  And a target the line did not delete, there at `from` and at `to`, is purged when its level at `to` is looser than at
+ *  `from` (Rule 4 as amended, PR7-R32): a page or an entry edited on the line; every subpage when a page it may inherit from
+ *  moved to a looser level (or went, leaving its subpages the pages' default); every page and entry when the policy file
+ *  moved. Here a level that cannot be read (a proposal's) keeps it: nothing was deleted, so no purge on a guess.
  *  The collections are the ones the tree defines now. */
-async function goneOnLine(repo: string, from: string, to: string, steps: readonly LineStep[], textAt: TextAt): Promise<string[]> {
+async function goneOnLine(repo: string, from: string, to: string, steps: readonly LineStep[], textAt: TextAt, pagesAt: PagesAt): Promise<string[]> {
   const defs = registriesOf(repo).filter(d => d.kind === 'collection' && d.filesGlob === undefined)
   const byFile = new Map(defs.map(d => [registryFileOf(d), d]))
   const pages = new Map<string, { commit: string; status: string }[]>()
@@ -126,30 +137,54 @@ async function goneOnLine(repo: string, from: string, to: string, steps: readonl
       into.set(key, [...(into.get(key) ?? []), { commit: step.commit, status: ch.status }])
     }
   }
+  const policyMoved = steps.some(step => step.changes.some(ch => ch.path === POLICY_FILE))
   const levels = new LevelsAt(textAt)
   /** Whether the level `now` admits nobody that every level of `before` did not. */
   const keeps = (now: ParsedLevel | null, before: readonly (ParsedLevel | null)[]) =>
     now !== null && before.every(b => b !== null && narrowerOrEqual(now, b))
+  /** Whether a target there at both ends is looser at the end (PR7-R32); a level not read says no. */
+  const widened = (before: ParsedLevel | null, now: ParsedLevel | null) => before !== null && now !== null && !narrowerOrEqual(now, before)
   const out: string[] = []
+  // Whether a subpage that inherits may have moved with a page it inherits from: its level is that page's, or the pages'
+  // default under a parent that is not there, so only a page read looser at `to` than at `from` (or the policy) moves it.
+  let reach = policyMoved
   for (const [id, events] of pages) {
     const deletes = events.filter(e => e.status === 'D')
-    if (deletes.length === 0) continue
     const target = `page:${id}`
+    const atFrom = events[0]!.status !== 'A'
+    const atTo = events[events.length - 1]!.status !== 'D'
+    if (!reach) {
+      const was = atFrom ? await levels.page(from, id) : await levels.pagesDefault(from)
+      const now = atTo ? await levels.page(to, id) : await levels.pagesDefault(to)
+      if (!keeps(now, [was])) reach = true
+    }
+    if (deletes.length === 0) {
+      if (atFrom && widened(await levels.page(from, id), await levels.page(to, id))) out.push(target)
+      continue
+    }
     if (events[events.length - 1]!.status === 'D') { out.push(target); continue }
     const revs = [...(events[0]!.status !== 'A' ? [from] : []), ...deletes.map(d => `${d.commit}^`)]
     const before: (ParsedLevel | null)[] = []
     for (const rev of revs) before.push(await levels.page(rev, id))
     if (!keeps(await levels.page(to, id), before)) out.push(target)
   }
-  for (const [rel, events] of files) {
+  if (reach) {
+    for (const id of await pagesAt(to)) {
+      if (pages.has(id)) continue // read above
+      if (widened(await levels.page(from, id), await levels.page(to, id))) out.push(`page:${id}`)
+    }
+  }
+  const recordFiles = policyMoved ? [...byFile.keys()] : [...files.keys()]
+  for (const rel of recordFiles) {
+    const events = files.get(rel) ?? []
     const def = byFile.get(rel)!
     const read = (text: string | null): Map<string, Record<string, unknown>> | null => {
       if (text === null) return new Map()
       try { return new Map(entriesFromText(text, def).map(e => [String(e.id), e as Record<string, unknown>])) } catch { return null }
     }
     // A version that cannot be read is passed over: its neighbours are compared (no purge on a guess, no delete missed).
-    const atFrom = events[0]!.status === 'A' ? new Map<string, Record<string, unknown>>() : read(await textAt(from, rel))
-    let last = atFrom
+    const atFrom = events[0]?.status === 'A' ? new Map<string, Record<string, unknown>>() : read(await textAt(from, rel))
+    let last = events.length === 0 ? read(await textAt(to, rel)) : atFrom
     const removed = new Map<string, { rev: string; entry: Record<string, unknown> }[]>()
     for (const e of events) {
       const next = e.status === 'D' ? new Map<string, Record<string, unknown>>() : read(await textAt(e.commit, rel))
@@ -168,6 +203,13 @@ async function goneOnLine(repo: string, from: string, to: string, steps: readonl
       for (const w of was) before.push(await levels.record(w.rev, def.name, w.entry))
       if (!keeps(await levels.record(to, def.name, now), before)) out.push(target)
     }
+    if (atFrom === null || last === null) continue
+    for (const [eid, now] of last) {
+      const was = atFrom.get(eid)
+      if (was === undefined || removed.has(eid)) continue
+      if (!policyMoved && JSON.stringify(was) === JSON.stringify(now)) continue
+      if (widened(await levels.record(from, def.name, was), await levels.record(to, def.name, now))) out.push(`record:${def.name}:${eid}`)
+    }
   }
   return out
 }
@@ -176,12 +218,22 @@ async function goneOnLine(repo: string, from: string, to: string, steps: readonl
  *  revision. A private parent page reads as `pageLevel` reads it now. Null: a level this cannot say. */
 class LevelsAt {
   private readonly policies = new Map<string, VisibilityPolicy>()
-  constructor(private readonly textAt: TextAt) {}
+  private readonly texts = new Map<string, Promise<string | null>>()
+  private readonly textAt: TextAt
+  /** Each file read once per revision. */
+  constructor(textAt: TextAt) {
+    this.textAt = (rev, rel) => {
+      const key = `${rev}\0${rel}`
+      let t = this.texts.get(key)
+      if (!t) { t = textAt(rev, rel); this.texts.set(key, t) }
+      return t
+    }
+  }
 
   private async policy(rev: string): Promise<VisibilityPolicy> {
     let p = this.policies.get(rev)
     if (!p) {
-      const text = await this.textAt(rev, 'data/visibility.yaml')
+      const text = await this.textAt(rev, POLICY_FILE)
       try { p = text === null ? EMPTY_POLICY : (readFullPolicy(parseYaml(text)).policy as VisibilityPolicy) } catch { p = EMPTY_POLICY }
       this.policies.set(rev, p)
     }
@@ -205,6 +257,11 @@ class LevelsAt {
     return pageLevel(id, pageEntries(chain, []), await this.policy(rev)) as ParsedLevel
   }
 
+  /** The level a page reads at `rev` under a parent that is not there, or with no level of its own and no parent. */
+  async pagesDefault(rev: string): Promise<ParsedLevel> {
+    return fullLevel(await this.policy(rev), 'pages', null) as ParsedLevel
+  }
+
   /** A git record's level at `rev`. A proposal's depends on what its ops touch, so it is not read here (null). */
   async record(rev: string, registry: string, entry: Record<string, unknown>): Promise<ParsedLevel | null> {
     if (registry === 'proposals') return null
@@ -216,14 +273,21 @@ class LevelsAt {
  *  (R2b I-3: an error is not an absence, so the purge cursor stays and the next run reads again). */
 const textAtOf = (repo: string): TextAt => async (rev, rel) => ((await resolveRev(repo, `${rev}:${rel}`)) === null ? null : showFile(repo, rev, rel))
 
+/** The page ids a commit holds (PR7-R32: the subpages a looser page or policy may reach), in one git process. */
+const pagesAtOf = (repo: string): PagesAt => async rev => {
+  const commit = HEX40.test(rev) ? rev : await resolveRev(repo, `${rev}^{commit}`)
+  if (commit === null) return []
+  return (await namesAt(repo, commit, 'pages/')).flatMap(name => { const m = PAGE_FILE.exec(name); return m ? [m[1]!] : [] })
+}
+
 /** The targets the trunk's first-parent line `from..to` deleted and that must take their conversation (`goneOnLine`),
  *  the line read in one git process (R2b I-4; a rename is a delete and an add, M-3 accepted). A read git cannot make
  *  throws. */
 export async function goneBetween(repo: string, from: string, to: string): Promise<string[]> {
   if (from === to) return []
   const files = registriesOf(repo).filter(d => d.kind === 'collection' && d.filesGlob === undefined).map(d => registryFileOf(d))
-  const steps = await firstParentChanges(repo, from, to, ['pages/', ...new Set(files)])
-  return goneOnLine(repo, from, to, steps, textAtOf(repo))
+  const steps = await firstParentChanges(repo, from, to, ['pages/', POLICY_FILE, ...new Set(files)])
+  return goneOnLine(repo, from, to, steps, textAtOf(repo), pagesAtOf(repo))
 }
 
 // ── the purge cursor (R2b I-3) ─────────────────────────────────────────────────────────────────────────

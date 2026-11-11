@@ -26,6 +26,7 @@ const EXPECTED_ALLOWED = {
   fetch: [],
   log: ['-1', '--format=%B', '--format=%ae', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H'],
   'ls-files': ['-v', '--error-unmatch'],
+  'ls-tree': ['--name-only'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
   'merge-file': ['-p'],
@@ -49,7 +50,7 @@ const EXPECTED_EXPORTS = [
   'FETCH_FRESH_MS', 'GitExit', '__internal', 'addWorktree', 'assertTracked', 'assertWritablePath', 'authorEmail', 'blobText', 'cloneInstance', 'commitDataPaths', 'commitMerge', 'commitPaths', 'configuredEmail', 'countBetween', 'diffNames',
   'diffText', 'fetchRemote', 'firstParentChanges', 'gitPath', 'gitVersion', 'hiddenDataPaths', 'hiddenMergePaths', 'isAncestor', 'isIgnored', 'lastFetch', 'mergeAbort', 'mergeBase',
   'mergeFfOnly', 'mergeInProgress', 'mergeNoFf', 'mergeThree', 'mergeTree', 'messageOf',
-  'moveProposalBranch', 'onCommit', 'parseGitVersion', 'pushTrunk', 'recordRemoteTrunkAbsent', 'remoteUrl', 'removeWorktree', 'repoStatus', 'resolveRev', 'restageDataPaths', 'showFile',
+  'moveProposalBranch', 'namesAt', 'onCommit', 'parseGitVersion', 'pushTrunk', 'recordRemoteTrunkAbsent', 'remoteUrl', 'removeWorktree', 'repoStatus', 'resolveRev', 'restageDataPaths', 'showFile',
   'stageMergeFiles', 'stagedNames', 'trackedChanges', 'treeDiffNames', 'trunkLine', 'uncommittedDataPaths', 'unmergedPaths', 'validBranchName',
 ]
 const RULES: ScanRules = {
@@ -243,6 +244,14 @@ describe('run() refuses, before any process starts, what the scan cannot see', (
     ['log -1 with the line\'s format', ['log', '-1', '--format=%H', 'HEAD']],
     ['log line with no paths', ['log', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H', 'a..b']],
     ['log line with a flag for a revision', ['log', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H', '--all', '--', 'pages/']],
+    // PR7-R32: ls-tree is exactly `--name-only <40 hex> -- <folder>/`.
+    ['ls-tree -r', ['ls-tree', '-r', '--name-only', H40, '--', 'pages/']],
+    ['ls-tree --full-tree', ['ls-tree', '--full-tree', '--name-only', H40, '--', 'pages/']],
+    ['ls-tree of a short revision', ['ls-tree', '--name-only', 'HEAD', '--', 'pages/']],
+    ['ls-tree with no folder', ['ls-tree', '--name-only', H40]],
+    ['ls-tree of two folders', ['ls-tree', '--name-only', H40, '--', 'pages/', 'data/']],
+    ['ls-tree of a file', ['ls-tree', '--name-only', H40, '--', 'data/members.yaml']],
+    ['ls-tree of a deeper path', ['ls-tree', '--name-only', H40, '--', '../']],
     ['a plus ref for rev-list', ['rev-list', '--count', '+main..HEAD']],
     ['status (a client method, not a subcommand to raw)', ['status', '+main']],
     ['ls-files --others', ['ls-files', '--others']],
@@ -310,6 +319,8 @@ describe('run() refuses, before any process starts, what the scan cannot see', (
     ['log -1 author', ['log', '-1', '--format=%ae', H40]],
     // R2b I-4: the purge's first-parent line, one process (workspace/gone.ts via firstParentChanges).
     ['log first-parent name-status', ['log', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H', `${H40}..${H40}`, '--', 'pages/', 'data/projects.yaml']],
+    // PR7-R32: the pages a commit holds (workspace/gone.ts via namesAt).
+    ['ls-tree --name-only', ['ls-tree', '--name-only', H40, '--', 'pages/']],
     ['rev-parse --verify', ['rev-parse', '--verify', 'HEAD']],
     ['rev-parse --verify -q', ['rev-parse', '--verify', '-q', 'refs/remotes/origin/main']],
     ['rev-parse of a parent', ['rev-parse', '--verify', '-q', `${H40}^`]],

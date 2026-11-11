@@ -836,6 +836,7 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
   const trunkOf = (repo: string) => git(repo, 'rev-parse --abbrev-ref HEAD').trim()
   // R2b (review I-4): the line is read by one `git log --first-parent -m --name-status` process, not a process per commit;
   // a file is shown only where a level is compared.
+  // PR7-R32: a page edited on the line is now compared too (its level at both ends), each file shown once per revision.
   it('goneBetween reads the line in one git log process, and shows files only to compare levels', async () => {
     const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
     const from = tip(w.repo)
@@ -848,7 +849,11 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     await withGitTrace(async started => {
       expect(await goneBetween(w.repo, from, to)).toEqual(['page:scratch-0001'])
       const subs = started().map(l => l.split(' ').find(a => !a.startsWith('-')))
-      expect(subs).toEqual(['log'])
+      expect(subs.filter(x => x === 'log')).toHaveLength(1)
+      expect(subs.filter(x => x !== 'log' && x !== 'show' && x !== 'rev-parse')).toEqual([])
+      const shown = started().filter(l => l.split(' ').find(a => !a.startsWith('-')) === 'show')
+      expect(new Set(shown).size).toBe(shown.length)
+      expect(shown.some(l => l.includes('keep-0002'))).toBe(true)
       expect(started()[0]).toContain('--first-parent -m --no-renames --name-status --format=%H')
     })
     // Made again at its level: its level is read where it is compared, and nothing else is.
@@ -925,5 +930,130 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on"')
     git(w.repo, 'merge -q --no-ff side -m "merge side"')
     expect(await goneBetween(w.repo, mid, tip(w.repo))).toEqual(['page:keep-0002'])
+  })
+})
+
+// Rule 4, as amended (PR7-R32, amends PR7-R24): an outside move (the purge cursor's path, never the Hub's own commits) that
+// leaves a target present at its end at a looser level than it had at the start purges its conversation, as a delete does.
+// A widening made in the Hub asks first (the widen dialog and its count) and keeps the talk; one made outside asked nobody.
+// Every repository here is fresh under the temp directory.
+describe('Rule 4 (PR7-R32): a widening that comes from outside clears the conversation', () => {
+  const tmp = (prefix: string) => { const d = mkdtempSync(join(tmpdir(), prefix)); cleanup.push(d); return d }
+  const tip = (repo: string) => git(repo, 'rev-parse HEAD').trim()
+  const trunkOf = (repo: string) => git(repo, 'rev-parse --abbrev-ref HEAD').trim()
+  const atLevel = (id: string, visibility?: string, parent: string | null = null, body = BODY) =>
+    // A hat level is written as git holds it (the front's type names members and public only).
+    joinPage({ id, title: 'Scratch', parent, order: 1000, ...(visibility !== undefined ? { visibility: visibility as 'members' } : {}) }, body)
+  const remoteOf = (repo: string) => {
+    const bare = join(tmp('widen-remote-'), 'remote.git')
+    git(tmp('widen-init-'), `init -q --bare -b main ${bare}`)
+    git(repo, `remote add origin ${bare}`)
+    git(repo, 'push -q origin HEAD:refs/heads/main')
+    const elsewhere = join(tmp('widen-elsewhere-'), 'clone')
+    git(tmp('widen-clone-'), `clone -q ${bare} ${elsewhere}`)
+    git(elsewhere, 'config user.email steward-b@example.test')
+    git(elsewhere, 'config user.name "Steward B"')
+    return elsewhere
+  }
+  const talk = async (w: World, target = 'page:scratch-0001') => {
+    expect((await call(w.app, '/api/comments', json('POST', { target, body: `${mention('steward-c')} members-only talk` }))).status).toBe(201)
+  }
+  const refresh = async (w: World) => {
+    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000 })
+    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
+    await goneSettled(w.repo)
+  }
+  const commitAll = (repo: string, message: string) => { git(repo, 'add -A'); git(repo, `commit -qm "${message}"`) }
+
+  it('a page deleted and made again at public on a side branch, then merged: purged', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    const trunk = trunkOf(w.repo), from = tip(w.repo)
+    git(w.repo, 'checkout -qb side'); git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "side: page deleted"')
+    mkdirSync(join(w.repo, 'pages'), { recursive: true })
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public', null, 'Public now.\n'))
+    commitAll(w.repo, 'side: page made again, public')
+    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on"')
+    git(w.repo, 'merge -q --no-ff side -m "merge side"')
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['page:scratch-0001'])
+    // A record the side branch removed and put back public, merged the same way: purged too.
+    const mid = tip(w.repo)
+    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
+    git(w.repo, 'checkout -qb side2')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.split('\n').filter(l => !l.includes('id: proj-1')).join('\n'))
+    commitAll(w.repo, 'side2: seed fund out')
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', '{ id: proj-1, visibility: public, title: Seed Fund,'))
+    commitAll(w.repo, 'side2: seed fund back, public')
+    git(w.repo, `checkout -q ${trunk}`); git(w.repo, 'commit -q --allow-empty -m "trunk moves on again"')
+    git(w.repo, 'merge -q --no-ff side2 -m "merge side2"')
+    expect(await goneBetween(w.repo, mid, tip(w.repo))).toEqual(['record:projects:proj-1'])
+  })
+
+  it('a plain outside edit of a page\'s level to public: after the refresh its members\' comments are gone', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    await talk(w)
+    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
+    const elsewhere = remoteOf(w.repo)
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
+    commitAll(elsewhere, 'page: public')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    await refresh(w)
+    expect(targetLevel(w.repo, 'page:scratch-0001', w.store)).toEqual({ level: 'public' })
+    expect(w.store.comments('page:scratch-0001')).toEqual([])
+    expect(w.store.notifications('steward-c')).toEqual([])
+  })
+
+  it('goneBetween: an outside widening of a record, of a parent page, or of the policy purges what it widened', async () => {
+    const w = await world({ pages: {
+      'scratch-0001': page('scratch-0001', 'Scratch'),
+      'child-0002': atLevel('child-0002', undefined, 'scratch-0001'),
+      'own-0003': atLevel('own-0003', 'members', 'scratch-0001'),
+    } })
+    const projects = readFileSync(join(w.repo, 'data', 'projects.yaml'), 'utf8')
+    // A record's own level, edited in git.
+    let from = tip(w.repo)
+    writeFileSync(join(w.repo, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', '{ id: proj-1, visibility: public, title: Seed Fund,'))
+    commitAll(w.repo, 'elsewhere: seed fund public')
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['record:projects:proj-1'])
+    // A parent page made public: the page and the subpage that inherits its level; the one with its own level stays.
+    from = tip(w.repo)
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
+    commitAll(w.repo, 'elsewhere: scratch public')
+    expect((await goneBetween(w.repo, from, tip(w.repo))).sort()).toEqual(['page:child-0002', 'page:scratch-0001'])
+    // The policy: projects' default loosened to public takes budget (proj-1 is public already).
+    from = tip(w.repo)
+    writeFileSync(join(w.repo, 'data', 'visibility.yaml'), VISIBILITY.replace('projects: { default: members }', 'projects: { default: public }'))
+    commitAll(w.repo, 'elsewhere: projects public by default')
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual(['record:projects:budget'])
+  })
+
+  it('an outside edit that narrows the level, or keeps it, keeps the conversation', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
+    await talk(w)
+    const elsewhere = remoteOf(w.repo)
+    const from = tip(w.repo)
+    const projects = readFileSync(join(elsewhere, 'data', 'projects.yaml'), 'utf8')
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', `hat:${OPS}`)) // narrowed
+    writeFileSync(join(elsewhere, 'pages', 'keep-0002.md'), atLevel('keep-0002', 'members', null, 'Edited.\n')) // the same level, said
+    writeFileSync(join(elsewhere, 'data', 'projects.yaml'), projects.replace('{ id: proj-1, title: Seed Fund,', `{ id: proj-1, visibility: "hat:${OPS}", title: Seed Fund,`)
+      .replace('{ id: budget, title: Budget,', '{ id: budget, title: Budget two,'))
+    commitAll(elsewhere, 'elsewhere: narrowed and edited')
+    writeFileSync(join(elsewhere, 'data', 'visibility.yaml'), VISIBILITY.replace('projects: { default: members }', `projects: { default: "hat:${OPS}" }`))
+    commitAll(elsewhere, 'elsewhere: projects narrowed by default')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    await refresh(w)
+    expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
+    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
+  })
+
+  it('a widening made through the Hub keeps the conversation (it asked first)', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    await trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date()); await goneSettled(w.repo)
+    await talk(w)
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), atLevel('scratch-0001', 'public'))
+    await commitPaths(w.repo, ['pages/scratch-0001.md'], 'page: public (the Hub, after the widen dialog)')
+    await goneSettled(w.repo)
+    expect(purgeCursor(w.repo)).toBe(tip(w.repo))
+    await trunkAtStart(w.repo, () => resolveTrunk(w.repo), new Date()); await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001')).toHaveLength(1)
   })
 })

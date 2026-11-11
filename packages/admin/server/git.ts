@@ -38,6 +38,7 @@ const ALLOWED: Record<string, readonly string[]> = {
   'diff-tree': ['-r', '--name-only'],
   log: ['-1', '--format=%B', '--format=%ae', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H'],
   'ls-files': ['-v', '--error-unmatch'],
+  'ls-tree': ['--name-only'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
   'merge-file': ['-p'],
@@ -141,6 +142,12 @@ function checkArgv(argv: readonly string[]): void {
     const rev = one ? args[2]! : line ? args[5]! : null
     if (rev === null || rev.startsWith('-') || rev.startsWith('+')) {
       refuse(`"${rev ?? args.join(' ')}" is not a flag log may carry here: log takes -1 --format=%B|%ae <rev>, or --first-parent -m --no-renames --name-status --format=%H <a>..<b> -- <paths>.`)
+    }
+  }
+  if (sub === 'ls-tree') {
+    // PR7-R32: the names in one folder of one commit (the pages a widening may reach): `--name-only <40 hex> -- <folder>/`.
+    if (args.length !== 4 || args[0] !== '--name-only' || !HEX40.test(args[1]!) || args[2] !== '--' || !/^[a-z0-9][a-z0-9_-]*\/$/.test(args[3]!)) {
+      refuse('ls-tree takes --name-only <full commit id> -- <folder>/, nothing else.')
     }
   }
   if (sub === 'merge-file') {
@@ -550,6 +557,13 @@ export async function firstParentChanges(repo: string, a: string, b: string, pat
     if (tab > 0 && step) step.changes.push({ status: line.slice(0, 1), path: line.slice(tab + 1) })
   }
   return steps.reverse()
+}
+
+/** The names of the files in one folder (`pages/`) of the commit `rev` (a full id): the folder's own entries, not deeper
+ *  ones, as paths from the root (`pages/<id>.md`). None when the commit has no such folder. */
+export async function namesAt(repo: string, rev: string, folder: string): Promise<string[]> {
+  if (!HEX40.test(rev)) throw new Error('namesAt takes a full commit id.')
+  return lines(await run('ls-tree', ['--name-only', rev, '--', folder], repo))
 }
 
 /** The paths that differ between two revisions (names only). */
