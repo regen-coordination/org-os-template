@@ -144,7 +144,7 @@ systems:
     kind: "safe"
     name: "Treasury"
     chain: "eip155:42220"
-    address: "0x91889ea97FeD05180fb5A70cB9570630f3C0Be77"
+    address: "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60"
     driver: "quiet"
     section: "organization/treasury"
 `
