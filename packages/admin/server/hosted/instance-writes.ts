@@ -1,8 +1,10 @@
 // The writes-off switch (Lane 3 Task 11, C1): `HOUSE_INSTANCE_WRITES`. While it is off the house writes nothing to the
 // instance: every route that commits to the instance's repository, stages for it or ratifies answers 403
 // `INSTANCE_READ_ONLY`; a proposal's page visit builds no branch and records no reading; the start-up reconcile does not
-// run; and no Pusher is made, whatever `ORG_OS_PUSH` says. Sign-in, sign-out and what is kept per member outside the
-// instance (wizard drafts, board layouts) go on. Hosted, it is off unless the environment says on; locally, on.
+// run; and no Pusher is made, whatever `ORG_OS_PUSH` says. Sign-in, sign-out, what is kept per member outside the
+// instance (wizard drafts, board layouts) and the private store's conversation and per-member state (comments, read
+// marks, notifications read, view state) and presence go on (plan D-6). Hosted, it is off unless the environment says
+// on; locally, on.
 //
 // A hosted house refuses to start with it on while `BEFORE_PILOT_OPEN` names a known defect on a write path. Each entry
 // is a ruling of the L5 review that has to be fixed before a pilot Hub writes; the writes lane removes each as it lands.
@@ -38,8 +40,11 @@ export function readInstanceWrites(env: Record<string, string | undefined>, host
  *  - `instance`: refused while off. It commits to the instance, stages for a commit, ratifies, or (sync, push, the
  *    claim, commands) moves the repository or runs something in it;
  *  - `state`: kept in the admin state folder, per member, never in the instance (drafts, layouts);
- *  - `session`: sign-in and sign-out (the private store's sessions and links, never the instance). */
-export type InstanceClass = 'instance' | 'state' | 'session'
+ *  - `session`: sign-in and sign-out (the private store's sessions and links, never the instance);
+ *  - `conversation`: the private store's conversation and per-member state, and presence (held in memory): comments
+ *    and their resolve, reopen and delete, read marks, notifications read, a collection's view state. Never the
+ *    instance; what a read-only Hub still writes (plan D-6). */
+export type InstanceClass = 'instance' | 'state' | 'session' | 'conversation'
 
 export interface InstanceWrite {
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -51,7 +56,7 @@ export interface InstanceWrite {
 
 const w = (cls: InstanceClass) => (method: InstanceWrite['method'], path: string, pilot?: readonly string[]): InstanceWrite =>
   ({ method, path, class: cls, ...(pilot ? { pilot } : {}) })
-const instance = w('instance'), state = w('state'), session = w('session')
+const instance = w('instance'), state = w('state'), session = w('session'), conversation = w('conversation')
 
 /** Every non-GET route of the app. A test lists the app's routes and fails on one missing here (the HOSTED_WRITES
  *  pattern); a write route not named is refused while off, failing closed. */
@@ -92,6 +97,41 @@ export const INSTANCE_WRITES: readonly InstanceWrite[] = [
   instance('POST', '/api/operations/:op/plan'),
   instance('POST', '/api/jobs'),
   instance('DELETE', '/api/jobs/:id'),
+  // DAO-OS L6, the workspace (plan D-6): everything that writes records, pages, collections, meetings, knowledge, memory,
+  // the deploy's read-back or an editing session is refused while off, even where the target is the private store.
+  instance('POST', '/api/collections'),
+  instance('PUT', '/api/collections/:id'),
+  instance('DELETE', '/api/collections/:id'),
+  instance('PUT', '/api/collections/:id/views/:view'), // a saved view is part of the collection's definition
+  instance('POST', '/api/pages'),
+  instance('POST', '/api/pages/:id/move'),
+  instance('DELETE', '/api/pages/:id'),
+  instance('POST', '/api/pages/:id/assets'),
+  instance('POST', '/api/meetings'),
+  instance('POST', '/api/pages/:id/sessions'),
+  instance('PUT', '/api/sessions/:sid'),
+  instance('POST', '/api/sessions/:sid/close'),
+  instance('POST', '/api/sessions/:sid/resolve'),
+  instance('POST', '/api/sessions/:sid/suggest'),
+  instance('POST', '/api/workspace/records'),
+  instance('POST', '/api/memory'),
+  instance('POST', '/api/deploy/read-back'),
+  // The dry read and a prepared edit write nothing, but they serve only the canon's apply and publication: refused with
+  // them, failing closed (as /api/changes/rule), and the app does not ask them while off.
+  instance('POST', '/api/knowledge/dry-read'),
+  instance('POST', '/api/knowledge/entry/:type/:slug/prepare'),
+  instance('POST', '/api/knowledge/entry/:type/:slug/apply'),
+  // A comment's "Turn into a task" writes a task (D-6).
+  instance('POST', '/api/comments/:id/task'),
+  // The private store's conversation and per-member state, and presence: what a read-only Hub still writes (D-6).
+  conversation('POST', '/api/comments'),
+  conversation('POST', '/api/comments/:id/resolve'),
+  conversation('POST', '/api/comments/:id/reopen'),
+  conversation('DELETE', '/api/comments/:id'),
+  conversation('POST', '/api/notifications/read'),
+  conversation('POST', '/api/reads'),
+  conversation('PUT', '/api/view-state/:collection'),
+  conversation('POST', '/api/presence'),
   // The admin state folder, per member: not the instance.
   state('PUT', '/api/wizards/:id/draft'),
   state('DELETE', '/api/wizards/:id/draft'),

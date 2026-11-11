@@ -11,9 +11,11 @@ import { matchedRoutes, routePath } from 'hono/route'
 /** What a hosted Hub does with a write route:
  *  - `actor`: the route itself calls `knownActorOf` (or `actorOf` and its own refusal) before it writes;
  *  - `off`: refused with the entry's code and sentence, before the route runs;
- *  - `per-member`: kept apart per member by the route (drafts, layouts);
- *  - `session`: sign-in and sign-out, as L5. */
-export type WriteClass = 'actor' | 'off' | 'per-member' | 'session'
+ *  - `per-member`: kept apart per member by the route (drafts, layouts, read marks, view state);
+ *  - `session`: sign-in and sign-out, as L5;
+ *  - `read`: writes nothing (a read sent as a POST); reached only signed in, since a write with no session has been
+ *    answered 401 before this table. */
+export type WriteClass = 'actor' | 'off' | 'per-member' | 'session' | 'read'
 
 export interface HostedWrite {
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -37,7 +39,7 @@ const STATUS = { HOSTED_OFF: 403, ONE_WRITER: 409, CLAIM_HOSTED: 403 } as const
 const off = (method: HostedWrite['method'], path: string, code: NonNullable<HostedWrite['code']>): HostedWrite =>
   ({ method, path, class: 'off', code, sentence: { HOSTED_OFF, ONE_WRITER, CLAIM_HOSTED }[code] })
 const as = (cls: Exclude<WriteClass, 'off'>) => (method: HostedWrite['method'], path: string): HostedWrite => ({ method, path, class: cls })
-const actor = as('actor'), perMember = as('per-member'), session = as('session')
+const actor = as('actor'), perMember = as('per-member'), session = as('session'), read = as('read')
 
 /** Every non-GET route of the app (§5.4's table). A test lists the app's routes and fails on one missing here. */
 export const HOSTED_WRITES: readonly HostedWrite[] = [
@@ -87,6 +89,38 @@ export const HOSTED_WRITES: readonly HostedWrite[] = [
   actor('POST', '/api/proposals/:id/close'),
   // The push's retry (§5.6): the route asks for its actor, then for the role maintainer (C9-22).
   actor('POST', '/api/push/retry'),
+  // DAO-OS L6 and L7: the workspace, the conversation, presence and the deploy's read-back ask for their actor.
+  actor('POST', '/api/collections'),
+  actor('PUT', '/api/collections/:id'),
+  actor('DELETE', '/api/collections/:id'),
+  actor('PUT', '/api/collections/:id/views/:view'),
+  actor('POST', '/api/pages'),
+  actor('POST', '/api/pages/:id/move'),
+  actor('DELETE', '/api/pages/:id'),
+  actor('POST', '/api/pages/:id/assets'),
+  actor('POST', '/api/meetings'),
+  actor('POST', '/api/pages/:id/sessions'),
+  actor('PUT', '/api/sessions/:sid'),
+  actor('POST', '/api/sessions/:sid/close'),
+  actor('POST', '/api/sessions/:sid/resolve'),
+  actor('POST', '/api/sessions/:sid/suggest'),
+  actor('POST', '/api/workspace/records'),
+  actor('POST', '/api/memory'),
+  actor('POST', '/api/deploy/read-back'),
+  actor('POST', '/api/knowledge/entry/:type/:slug/apply'),
+  actor('POST', '/api/comments'),
+  actor('POST', '/api/comments/:id/resolve'),
+  actor('POST', '/api/comments/:id/reopen'),
+  actor('DELETE', '/api/comments/:id'),
+  actor('POST', '/api/comments/:id/task'),
+  actor('POST', '/api/presence'),
+  // Kept per member by the route: the viewer's read marks and a collection's view state.
+  perMember('POST', '/api/reads'),
+  perMember('POST', '/api/notifications/read'),
+  perMember('PUT', '/api/view-state/:collection'),
+  // The canon's dry read and a prepared edit write nothing.
+  read('POST', '/api/knowledge/dry-read'),
+  read('POST', '/api/knowledge/entry/:type/:slug/prepare'),
 ]
 
 const READS = new Set(['GET', 'HEAD', 'OPTIONS'])

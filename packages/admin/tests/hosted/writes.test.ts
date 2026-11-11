@@ -327,6 +327,32 @@ describe('every actor route refuses, or writes as, a member who holds no role (P
       'DELETE /api/changes/ops/:n': { path: '/api/changes/ops/0' },
       'DELETE /api/changes': { path: '/api/changes' },
       'POST /api/push/retry': { path: '/api/push/retry', body: {} },
+      // DAO-OS L6 and L7 (R2): the workspace, the conversation, presence and the deploy's read-back. Paths are written
+      // out (no `:id`), so none is filled with the proposal's id.
+      'POST /api/collections': { path: '/api/collections', body: { id: 'reading-list', name: 'Reading list', fields: [{ id: 'title', type: 'text' }] } },
+      'PUT /api/collections/:id': { path: '/api/collections/reading-list', body: { id: 'reading-list', name: 'Reading list' } },
+      'PUT /api/collections/:id/views/:view': { path: '/api/collections/tasks/views/all', body: { type: 'table' } },
+      'DELETE /api/collections/:id': { path: '/api/collections/reading-list' },
+      'POST /api/pages': { path: '/api/pages', body: { title: 'A page' } },
+      'POST /api/pages/:id/move': { path: '/api/pages/no-such-page/move', body: { parent: null } },
+      'DELETE /api/pages/:id': { path: '/api/pages/no-such-page' },
+      'POST /api/pages/:id/assets': { path: '/api/pages/no-such-page/assets', body: { name: 'a.png', data: '' } },
+      'POST /api/meetings': { path: '/api/meetings', body: { title: 'A meeting', date: '2026-11-11' } },
+      'POST /api/pages/:id/sessions': { path: '/api/pages/no-such-page/sessions', body: {} },
+      'PUT /api/sessions/:sid': { path: '/api/sessions/s-none', body: { markdown: 'Text.' } },
+      'POST /api/sessions/:sid/close': { path: '/api/sessions/s-none/close', body: {} },
+      'POST /api/sessions/:sid/resolve': { path: '/api/sessions/s-none/resolve', body: { keep: 'mine' } },
+      'POST /api/sessions/:sid/suggest': { path: '/api/sessions/s-none/suggest', body: { markdown: 'Text.', proposal: { title: 'A suggestion' } } },
+      'POST /api/workspace/records': { path: '/api/workspace/records', body: { ops: [] } },
+      'POST /api/memory': { path: '/api/memory', body: { title: 'A memory' } },
+      'POST /api/deploy/read-back': { path: '/api/deploy/read-back', body: {} },
+      'POST /api/knowledge/entry/:type/:slug/apply': { path: '/api/knowledge/entry/concept/no-such-entry/apply', body: { fields: {}, base: 'none' } },
+      'POST /api/comments': { path: '/api/comments', body: { target: `record:projects:${PROJECT}`, body: 'A comment.' } },
+      'POST /api/comments/:id/resolve': { path: '/api/comments/c-none/resolve', body: {} },
+      'POST /api/comments/:id/reopen': { path: '/api/comments/c-none/reopen', body: {} },
+      'DELETE /api/comments/:id': { path: '/api/comments/c-none' },
+      'POST /api/comments/:id/task': { path: '/api/comments/c-none/task', body: {} },
+      'POST /api/presence': { path: '/api/presence', body: { target: `record:projects:${PROJECT}` } },
     }
     const actorRoutes = HOSTED_WRITES.filter(w => w.class === 'actor').map(w => `${w.method} ${w.path}`)
     // Every actor route has a body here (a route added later is driven too), and no body is for a route that is gone.
