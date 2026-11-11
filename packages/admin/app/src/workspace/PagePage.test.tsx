@@ -734,7 +734,12 @@ describe('/p/:id while the Hub\'s writes are off', () => {
         expect(screen.queryByRole('button', { name: 'New subpage' })).toBeNull()
         expect(screen.queryByRole('button', { name: 'Move to…' })).toBeNull()
         expect(screen.queryByRole('button', { name: 'Suggest' })).toBeNull()
+        // R4a (the hosted walk, PR7-R67): nothing says an edit saves: no save state, and the meta line reads Read only
+        expect(document.body.textContent).not.toContain('Saved · direct')
+        expect(document.body.textContent).not.toContain('saves directly')
+        expect(document.body.textContent).toContain('Read only')
       } else {
+        expect(document.body.textContent).toContain('saves directly')
         await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === `/api/pages/${ID}/sessions`)).toBe(true), { timeout: 4000 })
         expect(screen.getByRole('button', { name: 'New subpage' })).toBeTruthy()
         expect(screen.getByRole('button', { name: 'Move to…' })).toBeTruthy()

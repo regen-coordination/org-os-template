@@ -11,7 +11,8 @@ import { SaveState, type Save } from './SaveState.tsx'
 export interface EditorBarProps {
   /** The page's ancestors, then the page itself (the last, current). */
   path: { label: string; href: string }[]
-  save: Save
+  /** None on a Hub whose writes are off (plan D-6): nothing there is saved, so no save state is drawn. */
+  save?: Save
   /** L6 (R-16a): why the last save was refused, with the "Not saved" state. */
   saveReason?: string
   /** "Someone saved a newer version": Compare opens 0.6's conflict path. */
@@ -60,7 +61,7 @@ export function EditorBar(p: EditorBarProps) {
         </ol>
       </nav>
       <div className="ed-tools">
-        <SaveState state={p.save} onCompare={p.onCompare} reason={p.saveReason} />
+        {p.save && <SaveState state={p.save} onCompare={p.onCompare} reason={p.saveReason} />}
         <Presence people={p.presence} />
         {canWrite && p.onVisibility
           ? <VisibilityControl value={p.visibility} parent={p.parent} proposed={p.proposed} offers={p.visibilityOffers} more={p.visibilityMore} onChoose={p.onVisibility} />

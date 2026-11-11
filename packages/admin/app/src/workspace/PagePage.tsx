@@ -188,7 +188,8 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
   const shownBacklinks = backlinks.filter(b => sees(levelItem(b.visibility)))
   const meta = [
     page.edited ? `Edited ${ageText(page.edited.at, now)}${page.edited.by ? ` by ${page.edited.by}` : ''}` : null,
-    write.mode === 'direct' ? 'Workspace write · saves directly' : write.mode === 'approval' ? 'Workspace write · needs approval' : 'Read only',
+    // R4a (PR7-R67): on a Hub whose writes are off nothing is saved, whatever the page's write mode
+    writes === 'off' ? 'Read only' : write.mode === 'direct' ? 'Workspace write · saves directly' : write.mode === 'approval' ? 'Workspace write · needs approval' : 'Read only',
     shownBacklinks.length > 0 ? `${shownBacklinks.length} backlink${shownBacklinks.length === 1 ? '' : 's'}` : null,
   ].filter(Boolean).join(' · ')
 
@@ -336,7 +337,7 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
   return (
     <div className="ed-page hub-page">
       <div className="ed">
-        <EditorBar path={path} save={session.state} saveReason={session.state === 'refused' ? session.error ?? undefined : undefined} onCompare={editable ? () => { setComparing(true); void session.openCompare() } : undefined}
+        <EditorBar path={path} {...(writes === 'off' ? {} : { save: session.state })} saveReason={session.state === 'refused' ? session.error ?? undefined : undefined} onCompare={editable ? () => { setComparing(true); void session.openCompare() } : undefined}
           presence={presence} visibility={level} onVisibility={vis.onVisibility} visibilityOffers={vis.visibilityOffers} visibilityMore={vis.visibilityMore}
           proposed={vis.proposed} comments={talk ? conversation.open : 0} onComments={() => setCommentsOpen(o => !o)}
           commentsOpen={talk ? commentsOpen : undefined} commentsId={talk ? threadId : undefined}
