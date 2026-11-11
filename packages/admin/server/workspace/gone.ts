@@ -24,7 +24,7 @@ import { registriesOf, registryFileOf } from '../registries.ts'
 import { entriesFromText } from '../registry.ts'
 import { stateDir } from '../state.ts'
 import { parse as parseYaml } from 'yaml'
-import { isAncestor, onCommit, resolveRev, showFile, treeDiffNames, trunkLine } from '../git.ts'
+import { firstParentChanges, isAncestor, onCommit, resolveRev, showFile, type LineStep } from '../git.ts'
 import { fullLevel, narrowerOrEqual, readFullPolicy, type ParsedLevel } from '../../lib/visibility.mjs'
 import { pageEntries, pageLevel, PRIVATE_PAGE_ID } from '../../lib/workspace/pages.mjs'
 import type { VisibilityPolicy } from '../visibility/config.ts'
@@ -100,9 +100,6 @@ export function goneOfOps(repo: string, ops: readonly StageOp[]): string[] {
   return [...out, ...goneOfFiles(repo, files)]
 }
 
-/** One commit of the trunk's first-parent line, read against its first parent: the paths it added (A), modified (M) or
- *  deleted (D). A rename is a delete and an add (R2b review M-3, accepted). */
-interface LineStep { commit: string; changes: { status: string; path: string }[] }
 /** A file's text at a revision; null when the revision does not hold it. */
 type TextAt = (rev: string, rel: string) => Promise<string | null>
 
@@ -219,24 +216,14 @@ class LevelsAt {
  *  (R2b I-3: an error is not an absence, so the purge cursor stays and the next run reads again). */
 const textAtOf = (repo: string): TextAt => async (rev, rel) => ((await resolveRev(repo, `${rev}:${rel}`)) === null ? null : showFile(repo, rev, rel))
 
-/** The targets the trunk's first-parent line `from..to` deleted and that must take their conversation (`goneOnLine`). A
- *  read git cannot make throws. */
+/** The targets the trunk's first-parent line `from..to` deleted and that must take their conversation (`goneOnLine`),
+ *  the line read in one git process (R2b I-4; a rename is a delete and an add, M-3 accepted). A read git cannot make
+ *  throws. */
 export async function goneBetween(repo: string, from: string, to: string): Promise<string[]> {
   if (from === to) return []
-  const collections = new Set(registriesOf(repo).filter(d => d.kind === 'collection').map(d => registryFileOf(d)))
-  const textAt = textAtOf(repo)
-  const steps: LineStep[] = []
-  for (const commit of await trunkLine(repo, from, to)) {
-    const parent = await resolveRev(repo, `${commit}^`)
-    if (parent === null) continue
-    const changes: LineStep['changes'] = []
-    for (const rel of (await treeDiffNames(repo, parent, commit)).filter(r => PAGE_FILE.test(r) || collections.has(r))) {
-      const [was, now] = [await textAt(parent, rel), await textAt(commit, rel)]
-      changes.push({ status: was === null ? 'A' : now === null ? 'D' : 'M', path: rel })
-    }
-    steps.push({ commit, changes })
-  }
-  return goneOnLine(repo, from, to, steps, textAt)
+  const files = registriesOf(repo).filter(d => d.kind === 'collection' && d.filesGlob === undefined).map(d => registryFileOf(d))
+  const steps = await firstParentChanges(repo, from, to, ['pages/', ...new Set(files)])
+  return goneOnLine(repo, from, to, steps, textAtOf(repo))
 }
 
 // ── the purge cursor (R2b I-3) ─────────────────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ import { mountVisibility } from '../../server/visibility/routes.ts'
 import { EditSessions } from '../../server/workspace/sessions.ts'
 import { goneBetween, goneSettled, purgeCursor, tombstones, trunkAtStart } from '../../server/workspace/gone.ts'
 import { commitPaths } from '../../server/git.ts'
-import { withFailingSubcommand } from '../git-shim.ts'
+import { withFailingSubcommand, withGitTrace } from '../git-shim.ts'
 import { Refresher } from '../../server/hosted/refresh.ts'
 import { ServerAttention } from '../../server/attention.ts'
 import { resolveTrunk } from '../../server/proposals/ledger.ts'
@@ -834,6 +834,35 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
   // when it is absent at the end, or there at a level looser than it had before (at the start, or just before a delete).
   const tip = (repo: string) => git(repo, 'rev-parse HEAD').trim()
   const trunkOf = (repo: string) => git(repo, 'rev-parse --abbrev-ref HEAD').trim()
+  // R2b (review I-4): the line is read by one `git log --first-parent -m --name-status` process, not a process per commit;
+  // a file is shown only where a level is compared.
+  it('goneBetween reads the line in one git log process, and shows files only to compare levels', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
+    const from = tip(w.repo)
+    for (let i = 0; i < 5; i++) {
+      writeFileSync(join(w.repo, 'pages', 'keep-0002.md'), page('keep-0002', 'Keep', `Edit ${i}.\n`))
+      git(w.repo, 'add -A'); git(w.repo, `commit -qm "edit ${i}"`)
+    }
+    git(w.repo, 'rm -q pages/scratch-0001.md'); git(w.repo, 'commit -qm "page deleted"')
+    const to = tip(w.repo)
+    await withGitTrace(async started => {
+      expect(await goneBetween(w.repo, from, to)).toEqual(['page:scratch-0001'])
+      const subs = started().map(l => l.split(' ').find(a => !a.startsWith('-')))
+      expect(subs).toEqual(['log'])
+      expect(started()[0]).toContain('--first-parent -m --no-renames --name-status --format=%H')
+    })
+    // Made again at its level: its level is read where it is compared, and nothing else is.
+    mkdirSync(join(w.repo, 'pages'), { recursive: true })
+    writeFileSync(join(w.repo, 'pages', 'scratch-0001.md'), page('scratch-0001', 'Scratch'))
+    git(w.repo, 'add -A'); git(w.repo, 'commit -qm "made again"')
+    await withGitTrace(async started => {
+      expect(await goneBetween(w.repo, from, tip(w.repo))).toEqual([])
+      const subs = started().map(l => l.split(' ').find(a => !a.startsWith('-')))
+      expect(subs.filter(x => x === 'log')).toHaveLength(1)
+      expect(subs.filter(x => x !== 'log' && x !== 'show' && x !== 'rev-parse')).toEqual([])
+    })
+  })
+
   it('goneBetween: a record removed then put back at its level is kept, put back public is gone, an edit does not count', async () => {
     const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch'), 'keep-0002': page('keep-0002', 'Keep') } })
     const from = tip(w.repo)

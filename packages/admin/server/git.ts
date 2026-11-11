@@ -36,7 +36,7 @@ const ALLOWED: Record<string, readonly string[]> = {
   commit: ['-F', '--allow-empty'],
   diff: ['--name-only', '--cached', '--no-renames'],
   'diff-tree': ['-r', '--name-only'],
-  log: ['-1', '--format=%B', '--format=%ae'],
+  log: ['-1', '--format=%B', '--format=%ae', '--first-parent', '-m', '--no-renames', '--name-status', '--format=%H'],
   'ls-files': ['-v', '--error-unmatch'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
@@ -517,6 +517,27 @@ export async function resolveRev(repo: string, rev: string): Promise<string | nu
  *  commits beneath a merge's second parent are not in it. */
 export async function trunkLine(repo: string, a: string, b: string): Promise<string[]> {
   return lines(await run('rev-list', ['--first-parent', '--reverse', `${a}..${b}`], repo))
+}
+
+/** One commit of a first-parent line and the paths it changed against its first parent: `A` added, `M` modified, `D`
+ *  deleted, `T` changed in type (a rename is a delete and an add). */
+export interface LineStep { commit: string; changes: { status: string; path: string }[] }
+
+/** The first-parent line `a..b`, oldest first, in one process (`git log --first-parent -m --no-renames --name-status`):
+ *  each commit, a merge too, read against its first parent, with the paths under `paths` it changed. A commit that changed
+ *  none of them is not listed. `a` and `b` are full commit ids. */
+export async function firstParentChanges(repo: string, a: string, b: string, paths: readonly string[]): Promise<LineStep[]> {
+  if (!HEX40.test(a) || !HEX40.test(b)) throw new Error('firstParentChanges takes two full commit ids.')
+  if (paths.length === 0 || paths.some(p => p === '' || p.startsWith('-'))) throw new Error('firstParentChanges takes the paths to read, none read as a flag.')
+  const text = await run('log', ['--first-parent', '-m', '--no-renames', '--name-status', '--format=%H', `${a}..${b}`, '--', ...paths], repo)
+  const steps: LineStep[] = []
+  for (const line of lines(text)) {
+    if (HEX40.test(line)) { steps.push({ commit: line, changes: [] }); continue }
+    const tab = line.indexOf('\t')
+    const step = steps[steps.length - 1]
+    if (tab > 0 && step) step.changes.push({ status: line.slice(0, 1), path: line.slice(tab + 1) })
+  }
+  return steps.reverse()
 }
 
 /** The paths that differ between two revisions (names only). */
