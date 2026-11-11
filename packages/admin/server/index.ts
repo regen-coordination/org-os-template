@@ -32,7 +32,6 @@ let hostedConfig
 if (hosted) {
   const read = readHostedConfig(process.env, repo)
   if ('refuse' in read) { console.error(read.refuse); process.exit(2) }
-  for (const w of read.warnings) console.warn(w)
   hostedConfig = read.config
   if (hostedConfig.deployKeyFile && existsSync(hostedConfig.deployKeyFile)) {
     const bad = keyModeRefusal(hostedConfig.deployKeyFile, statSync)

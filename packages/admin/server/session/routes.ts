@@ -62,9 +62,9 @@ export function mountSession(app: Hono, d: SessionDeps): void {
   const config = d.hosted ? d.config : undefined
   /** The `__Host-` cookie: only with the hosted binding (L5's hosted mode alone keeps the plain name, Secure). */
   const hostCookie = config !== undefined
-  /** `portal` in `GET /api/session` (§5.2): the portal's origin, or null; answered only with the hosted binding. `door`,
-   *  its name until 0.6.2, says the same until org-os 0.7. */
-  const portalField = config ? { portal: config.portalOrigin, door: config.portalOrigin } : {}
+  /** `portal` in `GET /api/session` (§5.2): the portal's origin, or null; answered only with the hosted binding. (`door`,
+   *  its name until 0.6.2, is gone in 0.7.) */
+  const portalField = config ? { portal: config.portalOrigin } : {}
 
   // Only the API carries sessions (the WebSocket upgrade reads its own, in serve.ts). A store that fails to answer is
   // no session, never a 500 for every route after it.
