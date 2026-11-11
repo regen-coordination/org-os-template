@@ -32,7 +32,7 @@ import { accountOn, type Membership } from '../session/membership.ts'
 import { displayNames, memberLabels, membersHold } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
-import { levelOfToken, NO_PRIVATE, privateReads } from '../private/reads.ts'
+import { levelOfToken, NO_PRIVATE, privateReads, strictPrivateReads } from '../private/reads.ts'
 import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, NOBODY } from '../visibility/gate.ts'
@@ -584,13 +584,14 @@ function pageFileThere(repo: string, id: string): boolean {
 }
 
 /** Whether a conversation target is not there now (PR7-R45's housekeeping, T2e I2's fill): a page no page holds (git's or
- *  the store's) and whose file is not there, a record neither its collection's file nor the store holds, or of a collection
+ *  the store's, read strictly: a store that fails throws, T2f 2) and whose file is not there, a record neither its collection's file nor the store holds, or of a collection
  *  that is defined nowhere and that data/collections.yaml does not name. A file or folder that cannot be read says nothing:
  *  its targets are there (no purge on a guess, T2e M2). No history is read. */
 export function goneNow(repo: string, store: PrivateStore): (t: string) => boolean {
   const defs = new Map(registriesOf(repo).filter(d => d.kind === 'collection').map(d => [d.name, d]))
   const kept = new Set(store.collections().map(c => c.id))
-  const pages = levelsOf(repo, store).pages()
+  // T2f 2: the store's pages read strictly: a read that fails throws (the fill and housekeeping stop), never reads as none.
+  const pages = new Levels(repo, readConfig(repo), MAINTAINERS, strictPrivateReads(() => store)).pages()
   const known = collectionsReadable(repo)
   const files = new Map<string, Set<string> | null>()
   const idsOf = (registry: string): Set<string> | null => {

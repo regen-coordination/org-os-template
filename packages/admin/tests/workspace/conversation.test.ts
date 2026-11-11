@@ -26,7 +26,7 @@ import { stateDir } from '../../server/state.ts'
 import { createSession } from '../../server/session/sessions.ts'
 import { startServer } from '../../server/serve.ts'
 import {
-  ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, actorNames, commentView, mentionablesFor, mountConversation,
+  ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, actorNames, commentView, fillWrittenLevels, mentionablesFor, mountConversation,
   openConversationStore, targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, TASK_NO_LEVEL, plainLine,
 } from '../../server/workspace/conversation.ts'
 import { mountPresence, Presence } from '../../server/workspace/presence.ts'
@@ -1254,5 +1254,38 @@ describe('T2f 1: a name kept to the council is never written into text by a ment
     const r = await call(w.app, '/api/pages', json('POST', { title: 'Notes', markdown: 'Ask [Steward B][b].\n\n[b]: hub:member/steward-b\n' }))
     expect(r.status).toBe(422)
     expect(history(w.repo)).not.toMatch(NAMES)
+  })
+})
+
+// T2f 2: housekeeping and the fill judge a target gone only on reads that answered. A store read that fails (once) aborts
+// them; nothing is taken, nothing given the level that admits nobody, on a read that said nothing.
+describe('T2f 2: a store read that fails judges nothing gone', () => {
+  const said = (id: string, target: string, writtenLevel: string): CommentRow => ({ id, target, parent: null, anchor: null, by: 'steward-a', body: id,
+    created: NOW.toISOString(), edited: null, resolvedBy: null, resolvedAt: null, deleted: null, writtenLevel })
+
+  it('housekeeping whose read of the store\'s pages fails once keeps a private page\'s talk', async () => {
+    const w = await world()
+    await w.store.writeConversation({ comments: [said('c-ops', `page:${OPS_PAGE}`, `hat:${OPS}`)] })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(w.store, 'records').mockImplementationOnce(() => { throw new Error('disk I/O error') })
+    // (The store's purge also keeps the talk of a page it holds: a guard of the judgment above it, red or not.)
+    await housekeepAtStart(w.repo); await goneSettled(w.repo)
+    expect(w.store.comment('c-ops')).not.toBeNull()
+    // The next run, the store answering, keeps it as well: the page is there.
+    await housekeepAtStart(w.repo); await goneSettled(w.repo)
+    expect(w.store.comment('c-ops')).not.toBeNull()
+  })
+
+  it('the fill, its read of the store\'s pages failing, leaves a private page\'s row unfilled rather than nobody\'s', async () => {
+    const w = await world()
+    await w.store.writeConversation({ comments: [said('c-old', `page:${OPS_PAGE}`, UNFILLED)] })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const real = w.store.records.bind(w.store)
+    const failing = vi.spyOn(w.store, 'records').mockImplementation(c => { if (c === 'pages') throw new Error('disk I/O error'); return real(c) })
+    await expect(fillWrittenLevels(w.repo, w.store)).rejects.toThrow()
+    expect(w.store.comment('c-old')?.writtenLevel).toBe(UNFILLED)
+    failing.mockRestore()
+    await fillWrittenLevels(w.repo, w.store)
+    expect(w.store.comment('c-old')?.writtenLevel).toBe(`hat:${OPS}`)
   })
 })
