@@ -188,6 +188,8 @@ function notIgnored(place: string): string {
   if (place === '') return `The private store would be at ${STORE_FILE}, at the root of the repository, which git does not ignore. Set ORG_OS_PRIVATE_DIR to a folder outside it, or to a folder .gitignore names.`
   return `The private store would be at ${place}/${STORE_FILE}, which git does not ignore. Add \`${place}/\` to .gitignore first.`
 }
+/** Later than any ISO time: a purge with no time bound (a private record's own delete). */
+const UNBOUNDED = '\uffff'
 const reason = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
 /** §10.1's location rule, alone: resolves when the folder `dir` is outside `repo`, or inside it and ignored by git
@@ -482,11 +484,11 @@ export class PrivateStore {
       notificationsReadOf: db.prepare('UPDATE notifications SET read_at = ? WHERE member = ? AND target = ? AND read_at IS NULL'),
       readPut: db.prepare('INSERT INTO reads (member, target, at) VALUES (?, ?, ?) ON CONFLICT (member, target) DO UPDATE SET at = excluded.at'),
       // R-9a: a target's conversation, gone with it.
-      goneComments: db.prepare('SELECT id FROM comments WHERE target = ?'),
+      goneComments: db.prepare('SELECT id, parent, created FROM comments WHERE target = ?'),
       goneComment: db.prepare('DELETE FROM comments WHERE id = ?'),
       goneMentions: db.prepare('DELETE FROM mentions WHERE source = ?'),
-      goneNotifications: db.prepare('DELETE FROM notifications WHERE target = ?'),
-      goneReads: db.prepare('DELETE FROM reads WHERE target = ?'),
+      goneNotifications: db.prepare('DELETE FROM notifications WHERE target = ? AND created <= ?'),
+      goneReads: db.prepare('DELETE FROM reads WHERE target = ? AND at <= ?'),
     }
     this.r = {
       record: reader.prepare('SELECT collection, id, visibility, body, rev FROM records WHERE collection = ? AND id = ?'),
@@ -759,11 +761,12 @@ export class PrivateStore {
     })
   }
 
-  /** R-9a: the conversation of git targets that are gone, in one transaction: every row on each (a tombstone is applied
-   *  before any conversation is read or written once the store is back, so none can be newer than its target's delete). A
-   *  target the store keeps a record for (it moved here under the same id) keeps its rows. Answers the targets purged. */
-  async purgeConversation(gone: readonly { target: string }[]): Promise<string[]> {
-    for (const g of gone) nonEmpty('a target', g.target)
+  /** R-9a: the conversation of git targets that are gone, in one transaction: on each, the comments, read marks and
+   *  notifications made at or before its `at` (when the trunk moved, or the delete was made; R2b I-2), so what was written
+   *  on a page made again after that stays. A target the store keeps a record for (it moved here under the same id) keeps
+   *  its rows. Answers the targets purged. */
+  async purgeConversation(gone: readonly { target: string; at: string }[]): Promise<string[]> {
+    for (const g of gone) { nonEmpty('a target', g.target); nonEmpty('a time', g.at) }
     return this.locked(() => {
       const out: string[] = []
       this.db.exec('BEGIN IMMEDIATE')
@@ -773,7 +776,7 @@ export class PrivateStore {
           const r = m ? null : /^record:([^:]+):(.+)$/.exec(g.target)
           const kept = m ? this.w.recordGet.get('pages', m[1]!) : r ? this.w.recordGet.get(r[1]!, r[2]!) : undefined
           if (kept) continue
-          this.purgeIn(g.target)
+          this.purgeIn(g.target, g.at)
           out.push(g.target)
         }
         this.db.exec('COMMIT')
@@ -839,16 +842,24 @@ export class PrivateStore {
     if (purge) this.purgeIn(collection === 'pages' ? `page:${id}` : `record:${collection}:${id}`)
   }
 
-  /** `target`'s comments and their mentions, the target's own (a page's) mentions, its notifications and its read state:
-   *  gone. Inside an open transaction. */
-  private purgeIn(target: string): void {
-    for (const { id } of this.w.goneComments.all(target) as { id: string }[]) {
+  /** `target`'s comments made at or before `at` (every one without it), the replies under them, and their mentions; the
+   *  target's own (a page's) mentions, which hold no time; its notifications and read marks made at or before `at`: gone.
+   *  Inside an open transaction. */
+  private purgeIn(target: string, at: string = UNBOUNDED): void {
+    const rows = this.w.goneComments.all(target) as { id: string; parent: string | null; created: string }[]
+    const gone = new Set(rows.filter(r => r.created <= at).map(r => r.id))
+    // A reply answers what it is under: it goes with it, whenever it was written.
+    for (let grew = true; grew;) {
+      grew = false
+      for (const r of rows) if (!gone.has(r.id) && r.parent !== null && gone.has(r.parent)) { gone.add(r.id); grew = true }
+    }
+    for (const id of gone) {
       this.w.goneMentions.run(`comment:${id}`)
       this.w.goneComment.run(id)
     }
     this.w.goneMentions.run(target)
-    this.w.goneNotifications.run(target)
-    this.w.goneReads.run(target)
+    this.w.goneNotifications.run(target, at)
+    this.w.goneReads.run(target, at)
   }
 
   private putFieldIn(f: PrivateField, by: string, change: string | null, decision: string | null): void {

@@ -231,11 +231,12 @@ export async function goneBetween(repo: string, from: string, to: string): Promi
   return goneOnLine(repo, from, to, steps, textAt)
 }
 
-/** After the trunk moved from `from` to `to` by commits the Hub did not make: queue the purge of what they deleted.
- *  Never throws (the move stands, and a failure is said on the console). */
-export async function trunkMoved(repo: string, from: string | null, to: string | null): Promise<void> {
+/** After the trunk moved from `from` to `to` by commits the Hub did not make: queue the purge of what they deleted, of
+ *  what was written at or before `at`, the time taken before the move (R2b I-2). Never throws (the move stands, and a
+ *  failure is said on the console). */
+export async function trunkMoved(repo: string, from: string | null, to: string | null, at: Date): Promise<void> {
   if (from === null || to === null || from === to) return
-  try { targetsGone(repo, await goneBetween(repo, from, to)) } catch (err) {
+  try { targetsGone(repo, await goneBetween(repo, from, to), at) } catch (err) {
     console.error(`org-os admin: what the commits ${from.slice(0, 7)}..${to.slice(0, 7)} deleted could not be read: ${err instanceof Error ? err.message : String(err)}`)
   }
 }

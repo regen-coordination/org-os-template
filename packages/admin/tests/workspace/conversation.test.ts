@@ -726,6 +726,37 @@ describe('R2 review: a trunk moved from outside takes a deleted target\'s conver
     }
   })
 
+  // R2b (review I-2): the purge is bounded by the time the trunk moved (taken before the fast-forward): a comment, a read
+  // mark or a notification made on the page after that is the new page's, and stays.
+  it('the Refresher takes the time before the fast-forward: what was written on the page after it survives the purge', async () => {
+    const w = await world({ pages: { 'scratch-0001': page('scratch-0001', 'Scratch') } })
+    expect((await call(w.app, '/api/comments', json('POST', { target: 'page:scratch-0001', body: `${mention('steward-c')} members-only talk` }))).status).toBe(201)
+    await call(w.app, '/api/reads', json('POST', { target: 'page:scratch-0001' }))
+    expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBe(NOW.toISOString())
+    const elsewhere = remoteOf(w.repo)
+    git(elsewhere, 'rm -q pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: deleted"')
+    mkdirSync(join(elsewhere, 'pages'), { recursive: true })
+    writeFileSync(join(elsewhere, 'pages', 'scratch-0001.md'), joinPage({ id: 'scratch-0001', title: 'Scratch', parent: null, order: 1000, visibility: 'public' }, 'Public now.\n'))
+    git(elsewhere, 'add pages/scratch-0001.md'); git(elsewhere, 'commit -qm "page: made again, public"')
+    git(elsewhere, 'push -q origin HEAD:refs/heads/main')
+    // Written on the new page after the move (13:00), the move at 12:30, the old comment at the fixed clock (12:00).
+    const later = '2026-10-31T13:00:00.000Z'
+    await w.store.writeConversation({
+      comments: [{ id: 'c-after', target: 'page:scratch-0001', parent: null, anchor: null, by: 'steward-b', body: 'On the public page.', created: later,
+        edited: null, resolvedBy: null, resolvedAt: null, deleted: null }],
+      notifications: [{ id: 'n-after', member: 'steward-c', kind: 'mention', target: 'page:scratch-0001', source: 'comment:c-after', by: 'steward-b', created: later, readAt: null }],
+    })
+    await w.store.putRead('steward-b', 'page:scratch-0001', later)
+    const r = new Refresher({ repo: w.repo, trunk: () => resolveTrunk(w.repo), attention: new ServerAttention(), fetchBlockMs: 10_000,
+      now: () => new Date('2026-10-31T12:30:00Z') })
+    try { expect((await r.refresh()).state).toBe('following') } finally { await r.stop() }
+    await goneSettled(w.repo)
+    expect(w.store.comments('page:scratch-0001').map(c => c.id)).toEqual(['c-after'])
+    expect(w.store.notifications('steward-c').map(n => n.id)).toEqual(['n-after'])
+    expect(w.store.readOf('steward-b', 'page:scratch-0001')).toBe(later)
+    expect(w.store.readOf('steward-a', 'page:scratch-0001')).toBeNull()
+  })
+
   // R2b (review I-1): only the first-parent line is read, each merge against its first parent, and a target is purged only
   // when it is absent at the end, or there at a level looser than it had before (at the start, or just before a delete).
   const tip = (repo: string) => git(repo, 'rev-parse HEAD').trim()

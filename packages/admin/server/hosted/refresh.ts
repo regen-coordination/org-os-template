@@ -132,6 +132,8 @@ export class Refresher {
     // remote does not: that is a non-fast-forward, and it stops the refresh.
     if (ours === null || !(await isAncestor(repo, ours, theirs))) return { kind: 'stop', trunk, sentence: REFRESH_DIVERGED }
     if (this.closed) return { kind: 'closed' }
+    // When the trunk moved, taken before it does: the purge takes only what was written on a deleted target until then.
+    const at = (this.o.now ?? (() => new Date()))()
     try {
       await this.lock(async () => {
         // Under the lock the trunk is read again: the copy is moved only from the commit that was checked.
@@ -142,7 +144,7 @@ export class Refresher {
       return { kind: 'stop', trunk, sentence: REFRESH_REFUSED }
     }
     const commit = (await resolveRev(repo, `refs/heads/${trunk}`)) ?? theirs
-    await trunkMoved(repo, ours, commit)
+    await trunkMoved(repo, ours, commit, at)
     return { kind: 'advanced', trunk, commit }
   }
 
