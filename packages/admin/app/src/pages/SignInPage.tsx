@@ -19,9 +19,9 @@ const treeName = (ref: string) => `#${ref.slice(ref.lastIndexOf(':') + 1)}`
 const bareAddress = (account: string) => account.slice(account.lastIndexOf(':') + 1)
 
 /** /sign-in (L5 spec §11.1): L4c's SignIn on the Hub frame's blank layout — no sidebar, no bars, no tray; SignIn's
- *  title is the page's only h1. Signed in, it goes on to `next`. The ways offered are GET /api/session's `methods`
- *  (0.6.1, Lane 3): with `email`, SignIn's email form asks for a link, to return to `return` or `next` (the server judges
- *  it again); with no `methods` (a Hub without the email method), the wallet alone, as before. */
+ *  title is the page's only h1. Signed in, it goes on to `next`. Hosted, the ways offered are GET /api/session's
+ *  `methods` (0.6.1, Lane 3): with `email`, SignIn's email form asks for a link, to return to `return` or `next` (the
+ *  server judges it again); with no `methods` (a Hub without the email method), and on a local Hub, the wallet alone. */
 export default function SignInPage() {
   const { session, state, error, signIn, cancel } = useSession()
   const org = useStatus().data?.org ?? 'org-os'
@@ -29,7 +29,9 @@ export default function SignInPage() {
   const [, navigate] = useLocation()
   const portal = usePortalOrigin()
   const email = useEmailSignIn(signInReturn(search))
-  const offered = session && !session.signedIn && session.methods && session.methods.length > 0 ? session.methods : undefined
+  // Hosted only (PR7-R68): a local Hub offers email too (its links go to the server's log), but its sign-in stays the
+  // wallet's, as in 0.6.
+  const offered = session && !session.signedIn && session.mode === 'hosted' && session.methods && session.methods.length > 0 ? session.methods : undefined
 
   useEffect(() => { document.title = `Sign in · ${org}` }, [org])
   // Once per sign-in: where `next` pointed when the session began, never again as the location changes after. Not

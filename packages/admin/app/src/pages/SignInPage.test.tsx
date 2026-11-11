@@ -140,6 +140,16 @@ describe('the emailed-link sign-in on /sign-in', () => {
     await waitFor(() => expect(calls.filter(c => c.method === 'POST').map(c => c.path)).toContain('/api/session/nonce'))
   })
 
+  it('a local Hub keeps the wallet alone, whatever the methods say (its email links go to the log: PR7-R68)', async () => {
+    routes({ 'GET /api/session': { ...both, mode: 'local' } as SessionView })
+    renderAt(<SignInPage />, '/sign-in')
+    // the session read (the tree it names is drawn), then: no email form
+    await waitFor(() => expect(card().querySelector('.signin-p')!.textContent).toContain('Your role is the hat you wear in tree #13.'))
+    expect(screen.getByRole('button', { name: 'Sign in with Ethereum' })).toBeTruthy()
+    expect(screen.queryByLabelText('Email')).toBeNull()
+    expect(screen.getAllByRole('heading', { level: 1 }).map(h => h.textContent)).toEqual(['Sign in with your wallet'])
+  })
+
   it('a refused ask says the server’s sentence under the form', async () => {
     routes({ 'GET /api/session': EMAIL_OUT, 'POST /api/session/email': refuse(400, { error: 'Send { email }: the address to send the sign-in link to.' }) })
     renderAt(<SignInPage />, '/sign-in')
