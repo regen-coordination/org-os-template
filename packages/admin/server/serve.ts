@@ -275,7 +275,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     mountHealth(a, { store: () => privateStore !== null })
     // DAO-OS L6 §8 (Task 9): comments, mentions, notifications, read state, presence.
     mountConversation(a, { repo, membership, privateStore: ctx.privateStore, withLock: ctx.withLock, notify: msg => emit(msg) })
-    mountPresence(a, { repo, membership, privateStore: ctx.privateStore, presence })
+    mountPresence(a, { repo, membership, privateStore: ctx.privateStore, presence, readOnly: instanceWrites === 'off' })
   }, {
     notify: msg => emit(msg),
     // Who asks (L5 spec §6.2): the session's member, git's identity locally, nobody hosted; every route reads it.

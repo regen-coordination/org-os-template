@@ -133,6 +133,25 @@ describe('Presence (in memory, §8.4)', () => {
     const bad = await app.request('/api/presence', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ target: 'nothing' }) })
     expect(bad.status).toBe(400)
   })
+
+  it('R4c 7: on a Hub whose instance writes are off, a beat that says editing is kept as reading', async () => {
+    const repo = makeChangeRepo()
+    cleanup.push(repo)
+    mkdirSync(join(repo, 'pages'), { recursive: true })
+    writeFileSync(join(repo, 'pages', 'guide-0001.md'), joinPage({ id: 'guide-0001', title: 'Guide', parent: null, order: 1000 }, 'Text.\n'))
+    git(repo, 'add -A'); git(repo, 'commit -qm "fixture: a page"')
+    const dir = mkdtempSync(join(tmpdir(), 'presence-')); cleanup.push(dir)
+    const store = await openPrivateStore(repo, { dir }); stores.push(store)
+    const t = Date.parse('2026-10-31T12:00:00Z')
+    const presence = new Presence({ level: x => targetLevel(repo, x, store), now: () => t })
+    const app = createApp(repo, (a, ctx) => mountPresence(a, { repo, membership: null, privateStore: ctx.privateStore, presence, readOnly: true }),
+      { request: withRequest({ repo, hosted: false, membership: null, store }), privateStore: () => store })
+    const post = await app.request('/api/presence', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ target: 'page:guide-0001', editing: true }) })
+    expect(post.status).toBe(200)
+    const seen = presence.of('page:guide-0001', plain('someone-else'))
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.editing).toBe(false)
+  })
 })
 
 describe('events learn targets (§8.5)', () => {

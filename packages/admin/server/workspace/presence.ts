@@ -117,6 +117,8 @@ export interface PresenceRoutesDeps {
   membership?: Membership | null
   privateStore: PrivateAccess
   presence: Presence
+  /** R4c 7: the Hub's instance writes are off (HOUSE_INSTANCE_WRITES): nobody edits, so a beat's `editing` is kept false. */
+  readOnly?: boolean
 }
 
 const PRESENCE_BODY = 'The body must be {"target": "page:<id>" or "record:<collection>:<id>", "editing"?: true or false}.'
@@ -136,7 +138,8 @@ export function mountPresence(app: Hono, deps: PresenceRoutesDeps): void {
     const viewer = viewerOf(c)
     const { store, why } = reach(deps.privateStore)
     visibleTarget(repo, target, store, why, viewer)
-    presence.beat(actor, target, r!.editing === true, viewer)
+    // R4c 7: on a read-only Hub no editing session opens, so no one is shown editing.
+    presence.beat(actor, target, r!.editing === true && deps.readOnly !== true, viewer)
     return c.json({ target, people: presence.of(target, viewer) })
   })
 
