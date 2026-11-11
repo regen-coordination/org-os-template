@@ -14,7 +14,7 @@ import { SelectionToolbar } from './SelectionToolbar.tsx'
 import { SlashMenu } from './SlashMenu.tsx'
 import { CommentThread, type Comment } from './CommentThread.tsx'
 import { Composer } from './Composer.tsx'
-import { MentionPicker } from './MentionPicker.tsx'
+import { CANNOT_READ_TALK, MentionPicker } from './MentionPicker.tsx'
 import { mentionables } from './mentions.ts'
 import { COMMENTS, ME, MENTIONABLES, PAGE } from '../../test/fixtures/house/workspace.ts'
 import { FIXED_NOW } from '../../test/fixtures/parts.ts'
@@ -461,6 +461,13 @@ describe('MentionPicker (§10.4, C-21)', () => {
     expect(onPick).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('option', { name: /Ops lead/ }))
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: 'ops-lead' }))
+  })
+
+  it('R4c 6: a comment\'s picker says the member can’t read this conversation (the target, or a reply\'s talk above it)', () => {
+    renderAt(<MentionPicker items={mentionables(MENTIONABLES, '')} onPick={noop} cannot={CANNOT_READ_TALK} />)
+    const off = screen.getByRole('option', { name: /Treasury steward/ })
+    expect(off.textContent).toContain('can’t read this conversation')
+    expect(off.textContent).not.toContain('can’t see this page')
   })
 
   it('records and pages the author may not see are never offered', () => {

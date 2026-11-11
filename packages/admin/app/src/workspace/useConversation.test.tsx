@@ -29,7 +29,7 @@ const TARGET = `page:${ID}`
 const BODY = 'The treasury is one Safe at the same address on seven chains.\n'
 const AT = '2026-10-31T09:00:00.000Z'
 /** The server's NOT_TOLD (server/workspace/conversation.ts; the server module does not load in jsdom). */
-const NOT_TOLD = (h: string) => `Not told: ${h} can’t see this page.`
+const NOT_TOLD = (h: string) => `Not told: ${h} can’t read this conversation.`
 const NO_STORE = 'This server has no private store open, so nothing private can be read or written here.'
 
 type Served = Record<string, unknown> & { id: string; replies: Served[] }

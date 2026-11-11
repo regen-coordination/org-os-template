@@ -6,7 +6,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api, type ServedMentionable } from '../api.ts'
 import { Note } from '../design/Note.tsx'
 import { CommentThread, type Comment, type ThreadForm } from '../elements/workspace/CommentThread.tsx'
-import { MentionPicker } from '../elements/workspace/MentionPicker.tsx'
+import { CANNOT_READ_TALK, MentionPicker } from '../elements/workspace/MentionPicker.tsx'
 import { mentionMarkdown, mentionables } from '../elements/workspace/mentions.ts'
 import type { Visibility } from '../viewAs/visibility.ts'
 import { commentBody } from './commentBody.tsx'
@@ -23,7 +23,7 @@ function MentionChoices({ target, q, pick, parent }: { target: string; q: string
     placeholderData: keepPreviousData,
   }).data ?? []
   return (
-    <MentionPicker items={mentionables(served as ServedMentionable[], q)}
+    <MentionPicker items={mentionables(served as ServedMentionable[], q)} cannot={CANNOT_READ_TALK}
       onPick={m => pick(m.label, m.href ? mentionMarkdown({ label: m.label, href: m.href }) : `@${m.label}`)} />
   )
 }
