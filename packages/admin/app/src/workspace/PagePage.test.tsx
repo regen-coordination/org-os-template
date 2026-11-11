@@ -22,7 +22,7 @@ const NO_STORE = 'This server has no private store open, so nothing private can 
 import { whoCanSee } from './share.ts'
 import { SENDING, SUGGESTED, SUGGEST_TO_GIT } from './SuggestForm.tsx'
 import { errorNote, heard } from '../test/notes.ts'
-import { clientWith, statusRoute } from '../test/writesOff.ts'
+import { clientWith, statusOf, statusRoute } from '../test/writesOff.ts'
 import { pageThread } from './ConversationThread.tsx'
 
 const ID = 'treasury-3c4d'
@@ -741,4 +741,20 @@ describe('/p/:id while the Hub\'s writes are off', () => {
       }
     })
   }
+})
+
+// R2b (review M-1): until GET /api/status has loaded, the page opens no editing session on arrival (a refused write on a
+// read-only Hub); the page reads meanwhile, and the session opens once the status says the writes are on.
+describe('/p/:id before the status is read', () => {
+  it('opens no session until the status says on, then opens it', async () => {
+    let answer: (v: unknown) => void = () => {}
+    const { calls } = routes({ 'GET /api/status': () => new Promise(r => { answer = r }) })
+    renderAt(<PagePage id={ID} />, `/p/${ID}`)
+    expect(await screen.findByText('Opening the page…', {}, { timeout: 4000 })).toBeTruthy()
+    await new Promise(r => setTimeout(r, 100))
+    expect(calls.filter(c => c.path.startsWith(`/api/pages/${ID}/sessions`))).toEqual([])
+    answer(statusOf(false))
+    await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === `/api/pages/${ID}/sessions`)).toBe(true), { timeout: 4000 })
+    expect((await editorView()).dom.getAttribute('contenteditable')).toBe('true')
+  })
 })

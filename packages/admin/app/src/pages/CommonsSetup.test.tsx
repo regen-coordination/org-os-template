@@ -2,13 +2,13 @@
 /** The setup page (spec §4.4, R-36): today it is the dry read — the selection run in memory — and what a run would
  *  write. It says the decisions are kms.yaml's rather than drawing a wizard that cannot write. */
 import { describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
 import CommonsSetup from './CommonsSetup.tsx'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
-import { baseRoutes } from '../test/data.ts'
+import { baseRoutes, refuse } from '../test/data.ts'
 import { knowledgeView } from '../test/fixtures/knowledge.ts'
-import { clientWith, statusRoute } from '../test/writesOff.ts'
+import { clientWith, statusOf, statusRoute } from '../test/writesOff.ts'
 import { READ_ONLY } from '../viewAs/ViewAs.tsx'
 
 const dryRead = {
@@ -90,4 +90,35 @@ describe('setting up while the Hub\'s writes are off', () => {
       }
     })
   }
+})
+
+// R2b (review M-1): until GET /api/status has loaded, a write that fires on its own waits — the dry read is not asked
+// before the page knows the Hub's writes are on (PR7-R18: refused while off, the hosted image has no kms, PR7-R22). An
+// error a dry read left is not said once the writes are off.
+describe('setting up before the status is read', () => {
+  it('asks no dry read until the status says the writes are on, then asks it', async () => {
+    let answer: (v: unknown) => void = () => {}
+    const { calls } = fetchRoutes({ ...routes(), 'GET /api/status': () => new Promise(r => { answer = r }) })
+    renderAt(<CommonsSetup />, '/c/knowledge/setup')
+    await screen.findByText('One index, and a page per kind')
+    await new Promise(r => setTimeout(r, 50))
+    expect(calls.filter(c => c.path === '/api/knowledge/dry-read')).toEqual([])
+    answer(statusOf(false))
+    await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/api/knowledge/dry-read')).toBe(true))
+  })
+  it('a status that says off asks none', async () => {
+    const { calls } = fetchRoutes({ ...routes(), ...statusRoute(true) })
+    renderAt(<CommonsSetup />, '/c/knowledge/setup')
+    expect(await screen.findByText(READ_ONLY)).toBeTruthy()
+    await new Promise(r => setTimeout(r, 50))
+    expect(calls.filter(c => c.path === '/api/knowledge/dry-read')).toEqual([])
+  })
+  it('hides the error a dry read left once the writes are off', async () => {
+    fetchRoutes({ ...routes(), ...statusRoute(false), 'POST /api/knowledge/dry-read': refuse(500, { error: 'The selection broke.' }) })
+    const { qc } = renderAt(<CommonsSetup />, '/c/knowledge/setup', { queryClient: clientWith(false) })
+    expect(await screen.findByText(/Couldn’t run the dry read: The selection broke/)).toBeTruthy()
+    act(() => { qc.setQueryData(['status'], statusOf(true)) })
+    expect(await screen.findByText(READ_ONLY)).toBeTruthy()
+    expect(screen.queryByText(/Couldn’t run the dry read/)).toBeNull()
+  })
 })

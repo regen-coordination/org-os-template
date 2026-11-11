@@ -8,17 +8,19 @@ import { FieldRow, FieldTable } from '../design/FieldRow.tsx'
 import { DataList } from '../elements/rows/DataList.tsx'
 import { DataRow } from '../elements/rows/DataRow.tsx'
 import { KmsDecides } from '../elements/knowledge/GatePlate.tsx'
-import { READ_ONLY, useWritesOff } from '../viewAs/ViewAs.tsx'
+import { READ_ONLY, useWritesKnownOn, useWritesOff } from '../viewAs/ViewAs.tsx'
 
 /** Setting up the commons (spec §4.4). What this page really is, today: **the dry read** — the selection run in
  *  memory, which writes nothing — and the files a run would write. The six decisions themselves live in `kms.yaml`,
  *  and the wizard that would ask them lands with the wizard machine's live step (R-36); this page says so rather than
  *  drawing a wizard that cannot write. */
 export default function CommonsSetup() {
-  // The dry read is a POST the server refuses while the Hub's writes are off (it serves only publication, plan D-6): not
-  // asked then, and the page says why in the switch's own words.
+  // The dry read is a POST the server refuses while the Hub's writes are off (it serves only publication, plan D-6;
+  // PR7-R18): not asked then, and the page says why in the switch's own words. It fires on its own, so it waits until
+  // GET /api/status has said the writes are on (R2b M-1); an error it left is not said once they are off.
   const off = useWritesOff()
-  const dry = useQuery({ queryKey: ['knowledge', 'dry'], queryFn: api.knowledgeDryRead, enabled: !off })
+  const on = useWritesKnownOn()
+  const dry = useQuery({ queryKey: ['knowledge', 'dry'], queryFn: api.knowledgeDryRead, enabled: on })
   const plan = useQuery({ queryKey: ['knowledge', 'plan'], queryFn: api.knowledgePlan })
   const view = useQuery({ queryKey: ['knowledge'], queryFn: api.knowledge })
 
@@ -35,8 +37,8 @@ export default function CommonsSetup() {
       {view.data?.configured && <Section label="What decides"><KmsDecides view={view.data} command={plan.data?.command} /></Section>}
 
       {off && <Note state="notYet">{READ_ONLY}</Note>}
-      {!off && dry.isPending && <Note state="loading">Running the selection…</Note>}
-      {dry.error && <Note state="error">Couldn’t run the dry read: {(dry.error as Error).message}</Note>}
+      {on && dry.isPending && <Note state="loading">Running the selection…</Note>}
+      {!off && dry.error && <Note state="error">Couldn’t run the dry read: {(dry.error as Error).message}</Note>}
       {dry.data && <DryReadPanel read={dry.data} />}
       {plan.data && <WhatARunWrites plan={plan.data} />}
 

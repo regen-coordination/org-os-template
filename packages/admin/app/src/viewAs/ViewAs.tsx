@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { QueryClientContext } from '@tanstack/react-query'
-import { setPreviewAs } from '../api.ts'
+import { QueryClientContext, useQuery } from '@tanstack/react-query'
+import { api, setPreviewAs } from '../api.ts'
 import { Button } from '../design/Button.tsx'
 import { Icon, type IconName } from '../design/Icon.tsx'
 import { Menu, type MenuEntry } from '../design/Menu.tsx'
@@ -105,6 +105,22 @@ export function useWritesOff(): boolean {
     useCallback((changed: () => void) => (client ? client.getQueryCache().subscribe(changed) : () => {}), [client]),
     () => client?.getQueryData<{ instanceWrites?: string }>(['status'])?.instanceWrites === 'off',
   )
+}
+
+/** Whether `GET /api/status` has been read and does not say the Hub's writes are off: what a write that fires on its own
+ *  asks before it goes (R2b M-1) — the commons' dry read, a page's editing session opened on arrival — so that on a
+ *  read-only Hub it is never sent before the switch is known. It asks the status itself (the frame's query, shared), so a
+ *  page drawn without the frame learns it too; until it answers, or when it cannot, the writes count as off here. */
+export function useWritesKnownOn(): boolean {
+  return useWritesKnown() === 'on'
+}
+
+/** The switch as far as `GET /api/status` has said it: `unknown` until it answers; a status that cannot be read is
+ *  `off` (fails closed). */
+export function useWritesKnown(): 'on' | 'off' | 'unknown' {
+  const status = useQuery({ queryKey: ['status'], queryFn: api.status })
+  if (status.data !== undefined) return (status.data as { instanceWrites?: string }).instanceWrites === 'off' ? 'off' : 'on'
+  return status.isError ? 'off' : 'unknown'
 }
 
 /** The control (§5.9): eye + "View as: you" + chevron, 28px outlined, in the top bar; `compact` is the phone's

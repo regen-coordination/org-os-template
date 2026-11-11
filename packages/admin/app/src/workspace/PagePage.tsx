@@ -30,7 +30,7 @@ import { DataRow } from '../elements/rows/DataRow.tsx'
 import { useChanges } from '../changes/useChanges.ts'
 import { useResources } from '../queries.ts'
 import { announce } from '../parts/live.tsx'
-import { useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanWrite, useViewer, useVisibilitySource, useWritesKnown } from '../viewAs/ViewAs.tsx'
 import { ageText, useNow } from '../time.ts'
 import NotFound from '../pages/NotFound.tsx'
 import type { HubEditor } from '../editor/view.ts'
@@ -117,7 +117,11 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
   // R-L6-SUGGEST-2 (the operator: "Everywhere, maintainers decide"): to one who saves it directly too, beside the save.
   const idle: Save = stagedHere ? 'staged' : write.mode === 'approval' ? 'approval' : 'direct'
   const suggestable = editable && (write.mode === 'approval' || write.mode === 'direct') && page.path !== null
-  const session = useSession(id, editable, idle)
+  // The session opens on arrival, a write that fires on its own: it waits until GET /api/status has said the Hub's writes
+  // are on (R2b M-1): until it answers the page is "Opening…", as while a session opens; off, it reads.
+  const writes = useWritesKnown()
+  const opens = editable && writes === 'on'
+  const session = useSession(id, opens, idle)
 
   const treeRead = useQuery({ queryKey: ['pages'], queryFn: api.pages, retry: false }).data
   const tree = treeRead ?? []
@@ -159,8 +163,8 @@ function PageView({ read, thread }: { read: PageRead; thread?: ThreadSlot }) {
 
   // The body the editor starts from: the session's (which may be a draft this tab kept), or the page as read.
   // `live`: a session is open, so the editor writes. An open that failed leaves the page as read, read-only (R-16a's fold).
-  const live = editable && session.markdown !== null
-  const body = live ? session.markdown : !editable || session.openError ? page.markdown : null
+  const live = opens && session.markdown !== null
+  const body = live ? session.markdown : !editable || writes === 'off' || session.openError ? page.markdown : null
   useEffect(() => { if (body !== null) markdown.current = body }, [body, session.version])
   // Previewing (or leaving it) closes what only a writer has open.
   useEffect(() => { if (!editable) { setMenu(null); setSelection(null); setComparing(false); setSuggesting(false) } }, [editable])
