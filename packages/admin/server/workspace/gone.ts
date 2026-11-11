@@ -297,7 +297,9 @@ export async function goneBetween(repo: string, from: string, to: string): Promi
 // the next move or start reads again; a trunk moved while the server was down is read at the start. With no cursor yet, the
 // start sets it to the trunk: a fresh install purges nothing retroactively. The Hub's own commits (`onCommit`) move it on
 // when it stands at their parent: what they delete is purged where they are made (applyOps, a ratify), and read again it
-// would take the talk of a page the Hub made again after. One job at a time per repository, outside the write lock.
+// would take the talk of a page the Hub made again after. Sync's merge commit is the Hub's but brings what it did not make:
+// it is made inside `outsideMove`, so the cursor leaves it to `trunkMoved` (T2c I-a). One job at a time per repository,
+// outside the write lock.
 
 const cursorFile = (repo: string) => join(stateDir(repo), 'conversation-cursor.json')
 const HEX40 = /^[0-9a-f]{40}$/
@@ -346,9 +348,26 @@ function followOwn(repo: string): void {
   if (moved) setCursor(repo, at)
 }
 
+/** Repositories where a commit the Hub is making now brings commits it did not make (Sync's merge): the cursor does not
+ *  take it, `trunkMoved` reads it (T2c I-a). */
+const outsideNow = new Map<string, number>()
+
+/** `make` (Sync's merge, the Refresher's or Sync's fast-forward) moves the trunk to commits the Hub did not make: a commit
+ *  it lands meanwhile is not the Hub's own for the cursor, so a read of it that fails leaves the cursor before it and the
+ *  next move or start reads it again. The caller then calls `trunkMoved`. */
+export async function outsideMove<T>(repo: string, make: () => Promise<T>): Promise<T> {
+  const key = resolve(repo)
+  outsideNow.set(key, (outsideNow.get(key) ?? 0) + 1)
+  try { return await make() } finally {
+    const left = (outsideNow.get(key) ?? 1) - 1
+    if (left > 0) outsideNow.set(key, left)
+    else outsideNow.delete(key)
+  }
+}
+
 onCommit(({ repo, commit }) => {
   const key = resolve(repo)
-  if (!watched.has(key) || !HEX40.test(commit)) return
+  if (!watched.has(key) || !HEX40.test(commit) || outsideNow.has(key)) return
   void queue(key, `the Hub's commit ${commit.slice(0, 7)}`, async () => {
     const parent = await resolveRev(key, `${commit}^`)
     if (parent === null) return

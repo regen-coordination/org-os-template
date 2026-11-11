@@ -10,7 +10,7 @@
 
 import { fetchRemote, isAncestor, mergeFfOnly, remoteUrl, repoStatus, resolveRev } from '../git.ts'
 import type { ServerAttention } from '../attention.ts'
-import { trunkMoved } from '../workspace/gone.ts'
+import { outsideMove, trunkMoved } from '../workspace/gone.ts'
 
 /** The refresh runs this often unless `ORG_OS_REFRESH_EVERY` says otherwise. */
 export const REFRESH_EVERY_MS = 15 * 60_000
@@ -138,7 +138,7 @@ export class Refresher {
       await this.lock(async () => {
         // Under the lock the trunk is read again: the copy is moved only from the commit that was checked.
         if ((await resolveRev(repo, `refs/heads/${trunk}`)) !== ours) throw new Error('moved')
-        await mergeFfOnly(repo, remoteRef)
+        await outsideMove(repo, () => mergeFfOnly(repo, remoteRef))
       })
     } catch {
       return { kind: 'stop', trunk, sentence: REFRESH_REFUSED }

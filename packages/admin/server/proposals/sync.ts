@@ -30,7 +30,7 @@ import {
 import { guardTrunk, resolveTrunk } from './ledger.ts'
 import { mergeLedgers } from '../../lib/proposals.mjs'
 import { validTrunkName } from '../../lib/rules.mjs'
-import { trunkMoved } from '../workspace/gone.ts'
+import { outsideMove, trunkMoved } from '../workspace/gone.ts'
 
 export interface SyncDeps {
   repo: string
@@ -210,7 +210,7 @@ async function localPart(repo: string, trunk: string, startBranch: string | unde
   if (head === null || tip === null) throw refuse('FETCH', `Not synced: ${head === null ? 'the trunk has no commit' : `${remoteRef} is not there`}. ${NOTHING}`)
 
   if (f.ahead === 0) {
-    try { await mergeFfOnly(repo, tip) } catch (err) {
+    try { await outsideMove(repo, () => mergeFfOnly(repo, tip)) } catch (err) {
       throw refuse('FF_FAILED', `Not synced: git would not fast-forward ${trunk} (${firstLine(err)}). ${NOTHING}`)
     }
     trunkMoved(repo, head, tip, now) // R2 review (Rule 4): what the commits brought in deleted takes its conversation; `now` precedes the move
@@ -232,7 +232,8 @@ async function localPart(repo: string, trunk: string, startBranch: string | unde
       { conflicts })
   }
   const ledger = conflicts.includes(LEDGER) ? await ledgerMerge(repo, head, tip) : null
-  const commit = await mergeCommit(repo, trunk, head, tip, computed.tree, ledger)
+  // Its merge commit is the Hub's, but what it brings is not: the cursor leaves it to `trunkMoved` (T2c I-a).
+  const commit = await outsideMove(repo, () => mergeCommit(repo, trunk, head, tip, computed.tree, ledger))
   trunkMoved(repo, head, commit, now)
   const after = await lastFetch(repo, trunk)
   return {
