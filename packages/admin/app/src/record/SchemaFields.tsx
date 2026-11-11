@@ -14,11 +14,22 @@ import { Note } from '../design/Note.tsx'
 import { Refusal } from '../parts/SyncParts.tsx'
 import { announce } from '../parts/live.tsx'
 import { useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { visibilityWord } from '../viewAs/visibility.ts'
 import { restrictedHat, restrictedOf } from './restricted.ts'
 import { labelOf } from './form.ts'
 
+/** A record's own `visibility` as its level reads (§7.10, "Hat: Ops"), named by the house's visibility source, never the
+ *  raw token (whole-platform walk M18). The names are the server's for this member (GET /api/visibility). */
+function VisibilityValue({ token }: { token: string }) {
+  const source = useVisibilitySource()
+  // the levels the source reads; any other token (a level the house draws no word for) is shown as it is
+  const known = token === 'public' || token === 'members' || /^(hat|role):./.test(token)
+  return <span className="wrap">{known ? visibilityWord(source.visibilityOf({ visibility: token })) : token}</span>
+}
+
 function ReadValue({ registry, field, value, names }: { registry: string; field: string; value: unknown; names: Map<string, string> }) {
   if (value === undefined || value === null || value === '') return <span className="faint">—</span>
+  if (field === 'visibility' && typeof value === 'string') return <VisibilityValue token={value} />
   const ref = refOf(registry, field)
   if (ref) {
     const ids = Array.isArray(value) ? value.map(String) : [String(value)]

@@ -10,6 +10,8 @@ import { loadLibrary } from './read.ts'
 import { listEntries, previewEntry } from './preview.ts'
 import { addOps } from './add.ts'
 import { findReceipt, listReceipts, removalPreview, removeOps } from './remove.ts'
+import { isRecordOp } from '../workspace/files.ts'
+import { changePrivateTargets } from '../private/targets.ts'
 
 export interface LibraryRoutesDeps {
   repo: string
@@ -75,7 +77,7 @@ export function mountLibrary(app: Hono, { repo, withLock, notify, privateStore =
     const next: Change = { ...change, ops, updated: new Date().toISOString() }
     store.save(next)
     notify({ type: 'changes' })
-    return Response.json(changeView(repo, actor, next, stagedView(privateStore, next)))
+    return Response.json(changeView(repo, actor, next, stagedView(privateStore, next), changePrivateTargets(repo, privateStore, next)))
   })
 
   app.get('/api/library', async c => c.json(await listEntries(repo)))
@@ -102,6 +104,6 @@ export function mountLibrary(app: Hono, { repo, withLock, notify, privateStore =
   app.post('/api/library/:id/add', async c => {
     const config = readAddBody(await c.req.text())
     const entry = find(c.req.param('id'))
-    return stageInto(c, staged => addOps(repo, entry, config, staged).ops)
+    return stageInto(c, staged => addOps(repo, entry, config, staged.filter(isRecordOp)).ops)
   })
 }

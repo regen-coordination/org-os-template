@@ -24,6 +24,9 @@ describe('the registry list', () => {
     expect(registryDef('library')).toEqual({ name: 'library', topKey: 'installed', kind: 'collection' })
     expect(registryDef('library').ledger).toBeUndefined()
     expect(REGISTRIES.map(r => r.name).slice(-3)).toEqual(['proposals', 'library', 'visibility'])
+    // DAO-OS L6 (ruling P-7): L6's registries are inserted before proposals, so the three above stay last.
+    expect(REGISTRIES.map(r => r.name).indexOf('tasks')).toBeGreaterThan(-1)
+    expect(REGISTRIES.map(r => r.name).indexOf('tasks')).toBeLessThan(REGISTRIES.map(r => r.name).indexOf('proposals'))
     expect(classOf({ registry: 'library' })).toBe('records')
   })
   it('gives every registry a schema of its own', () => {

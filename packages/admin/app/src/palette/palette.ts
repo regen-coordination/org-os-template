@@ -3,8 +3,8 @@ import { kindLabel, splitId } from '../kinds.ts'
 import { opHref, recordHref, safeDecode } from '../hrefs.ts'
 import { SKINS } from '../design/skins/index.ts'
 import { kindIcon, type IconName } from '../design/Icon.tsx'
-import { HOUSE_SECTIONS, sectionOf, type HouseSection, type SectionId } from '../frame/sections.ts'
-import { SECTIONS, sectionCount, type SystemEntries } from '../sections.ts'
+import { HOUSE_SECTIONS, INSTANCE_LINKS, SOURCES_LINK, sectionOf, type HouseSection, type SectionId } from '../frame/sections.ts'
+import { SECTIONS, placeOf, sectionCount, type SystemEntries } from '../sections.ts'
 
 export type ActionId = 'edit' | 'apply' | 'discard' | 'theme' | 'map' | 'view-public' | 'exit-preview' | `skin:${string}`
 
@@ -35,13 +35,19 @@ export interface PaletteContext {
   adds?: readonly { label: string; go: string }[]
 }
 
-/** Every page of the menu: Home, Activity, the sections that have records, Governance, the maps, All records. */
-export function places(resources: Resource[], registries: RegistrySummary[], systems: SystemEntries): Place[] {
+/** Every page of the menu: Home, Activity, the sections that have records, Governance, the maps, All records. With
+ *  `sources` (a viewer the members' side admits, as the sidebar lists it; L6 carries K11), the Hub's Sources page; a
+ *  0.6 board is named as the sidebar's Instance group names it ("Sources board", PF-R79). With `deploy` (a member, not
+ *  previewing, who reads a composed System: DAO-OS L7 Task 18), the deployment's steps. */
+export function places(resources: Resource[], registries: RegistrySummary[], systems: SystemEntries, opts: { sources?: boolean; deploy?: boolean } = {}): Place[] {
+  const instance = new Map(INSTANCE_LINKS.map(l => [l.href, l.label]))
   return [
     { label: 'Home', href: '/b/home', detail: 'page' },
     { label: 'Activity', href: '/activity', detail: 'page' },
     { label: 'Library', href: '/library', detail: 'page' },
-    ...SECTIONS.filter(d => sectionCount(d, resources, registries, systems) > 0).map(d => ({ label: d.label, href: d.route, detail: 'section' })),
+    ...(opts.sources ? [{ label: SOURCES_LINK.label, href: SOURCES_LINK.href, detail: 'page' }] : []),
+    ...(opts.deploy ? [{ label: 'Deploy', href: '/deploy', detail: 'page' }] : []),
+    ...SECTIONS.filter(d => sectionCount(d, resources, registries, systems) > 0).map(d => ({ label: instance.get(d.route) ?? d.label, href: placeOf(d), detail: 'section' })),
     { label: 'Rules', href: '/governance/rules', detail: 'governance' },
     { label: 'Decisions', href: '/governance/decisions', detail: 'governance' },
     { label: 'Proposals', href: '/governance/proposals', detail: 'governance' },

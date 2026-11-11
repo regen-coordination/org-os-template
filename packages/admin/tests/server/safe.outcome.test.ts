@@ -23,6 +23,8 @@ const NOW = new Date('2026-10-19T10:00:00Z')
 const OPENED = '2026-10-18T12:00:00Z'
 const TX = { to: '0x00000000000000000000000000000000000a11ce', value: '250000000000000000', data: '0x', operation: 0 as const }
 const HASH = '0xb654430c2746c667a0b73282191427a86062e8a20e2e6724371fd853abc52008'
+/** The transaction as the service describes it, carried on a reading once its hash is checked (L7 gap B2). */
+const DESCRIBED = { to: '0x00000000000000000000000000000000000A11CE', operation: 0, data: null }
 const REF: SystemRef = {
   system: 'treasury-safe', id: HASH,
   payload: { to: TX.to, value: TX.value, data_hash: dataHash('0x'), operation: 0, nonce: 8 },
@@ -127,14 +129,14 @@ describe('outcome(ref)', () => {
 
   it('an unexecuted transaction with 1 of 2 confirmations is pending, with that detail', async () => {
     expect(await outcomeOf(service(routes('tx-pending.json')).fetch))
-      .toEqual({ ok: true, outcome: 'pending', confirmations: 1, required: 2, detail: '1 of 2 signatures' })
+      .toEqual({ ok: true, outcome: 'pending', confirmations: 1, required: 2, detail: '1 of 2 signatures', tx: DESCRIBED })
   })
 
   it('executed and successful is executed; executed and failed is failed', async () => {
     expect(await outcomeOf(service(routes('tx-executed.json')).fetch))
-      .toEqual({ ok: true, outcome: 'executed', confirmations: 2, required: 2, detail: 'executed on 2026-10-19T09:12:40Z' })
+      .toEqual({ ok: true, outcome: 'executed', confirmations: 2, required: 2, detail: 'executed on 2026-10-19T09:12:40Z', tx: DESCRIBED })
     expect(await outcomeOf(service(routes('tx-failed.json')).fetch))
-      .toEqual({ ok: true, outcome: 'failed', confirmations: 2, required: 2, detail: 'executed on 2026-10-19T09:12:40Z, and the transaction failed' })
+      .toEqual({ ok: true, outcome: 'failed', confirmations: 2, required: 2, detail: 'executed on 2026-10-19T09:12:40Z, and the transaction failed', tx: DESCRIBED })
   })
 
   it('reads only the declared host, by GET, the Safe after the transaction and a request gap apart', async () => {
@@ -255,7 +257,7 @@ describe('outcome(ref)', () => {
     it('a good reading comes back as the driver gave it', async () => {
       // no pacing between reads here (the driver's own gap between its two requests still runs)
       const reader = new SystemReader({ repo: '/nonexistent', fetch: service(routes('tx-pending.json')).fetch, drivers: [{ ...safe, minGapMs: 0 }], now: () => NOW })
-      expect(await reader.outcome(SYSTEM, REF, OPENED)).toEqual({ ok: true, outcome: 'pending', confirmations: 1, required: 2, detail: '1 of 2 signatures' })
+      expect(await reader.outcome(SYSTEM, REF, OPENED)).toEqual({ ok: true, outcome: 'pending', confirmations: 1, required: 2, detail: '1 of 2 signatures', tx: DESCRIBED })
     })
 
     it('a good reading is kept for the outcome TTL; a failed one is not', async () => {

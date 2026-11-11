@@ -1,11 +1,17 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { makeFixtureRepo } from '../fixtures.ts'
 import { git } from '../changes/fixtures.ts'
+import { makeNotionExport, nid } from '../fixtures/notion-export.ts'
+import { openPrivateStore } from '../../server/private/store.ts'
+import { applyImport, planImport } from '../../server/workspace/imports.ts'
+import { readNotionExport } from '../../lib/imports/notion.mjs'
+import { readFileverse } from '../../lib/imports/fileverse.mjs'
+import { sha256Hex } from '../../lib/sha256.mjs'
 import { addressOfKey, key, sign } from '../session/keys.ts'
 import { startServer, type Running } from '../../server/serve.ts'
 import type { FetchLike } from '../../server/systems/driver.ts'
@@ -18,7 +24,14 @@ import { HATS_SIGNATURES, VIEW_HAT_TYPES, childHatId, hatRef, topHatId } from '.
 // sign-in with test keys (an off-chain SIWE signature; nothing is sent on chain), a private record and a restricted field
 // staged and applied, a person's e-mail (defaults.contact) and wallet link proposed, approved by two Council wearers and
 // ratified, a public record narrowed to Ops (C-14: it carries no sentinel while in git) and then written at its new level,
-// and a restart (reconcile). Nothing is widened (§9.7's move into git is not built). Every restricted value carries
+// and a restart (reconcile). DAO-OS L6 Task 21 extends the session with the workspace (L6 §17 point 1): an imported
+// private item (a Notion database the map keeps at Ops, imported before the server starts, as `npm run import` does), a
+// private page, a comment with a mention (and so a notification) on a members page and a comment on the private page, a
+// Council memory entry, and a private task moved into git by a publication decision whose restricted field stays in the
+// store (and whose title before the move is in the store's history only). The final review's M-2 adds: a private
+// collection defined through POST /api/collections, an imported private database's name and Notion id, a private Notion
+// page, a Fileverse dDoc kept at Ops, a saved view of the private collection, and Turn into a task on the private page's
+// comment. Every restricted value carries
 // `sentinel-7f3a-<n>`; then every object `git rev-list --all --objects` names, and every object in the object store, is
 // read through `git cat-file` and none may hold one. The control: a value at members level carries `visible-sentinel`,
 // and the same scan finds it.
@@ -33,6 +46,9 @@ const OPS = hatRef(CELO, OPS_ID)
 const FRAMEWORK = fileURLToPath(new URL('../../../../', import.meta.url))
 const SENTINEL = 'sentinel-7f3a-'
 const VISIBLE = 'visible-sentinel'
+/** M-2: an imported private database's name, and its Notion id (32 hex, so a needle of its own in the scan). */
+const VAULT = `Vault ${SENTINEL}14`
+const VAULT_ID = '7f3a5e47' + '0'.repeat(20) + 'd014'
 
 /** Records go to the store or git at once, by Ops; members' changes are proposed by Ops and approved by two Council
  *  wearers (one rule per class, so the two paths take two classes: R-L5-18.2). */
@@ -46,6 +62,7 @@ governance:
   rules:
     - { id: records, applies_to: [records], propose: ops, decide: { by: ops, method: direct } }
     - { id: people, applies_to: [members], propose: ops, decide: { by: council, method: approve, count: 2 } }
+    - { id: publish, applies_to: [publication], propose: ops, decide: { by: ops, method: direct } }
   decisions: []
 `
 const SYSTEMS = `schema_version: "2.0"
@@ -70,7 +87,14 @@ const VISIBILITY = `visibility:
   collections:
     projects: { default: members, fields: { budget: "hat:${OPS}" } }
     members: { default: members }
+    tasks: { default: members, fields: { budget: "hat:${OPS}" } }
 `
+const TASKS = `schema_version: "2.0"
+tasks:
+  - { id: t-open, title: Write the agenda, status: todo }
+`
+/** A mention as the dialect writes one (L6 §5). */
+const mention = (id: string) => `[@${id}](hub:member/${id})`
 /** Ratify writes the statement here (a file git tracks). */
 const DECISIONS = `# Decisions
 
@@ -232,9 +256,40 @@ describe('nothing stricter than members enters git (L5 spec §10.5, its third en
     writeFileSync(join(repo, 'data', 'projects.yaml'), PROJECTS)
     writeFileSync(join(repo, 'data', 'visibility.yaml'), VISIBILITY)
     writeFileSync(join(repo, 'DECISIONS.md'), DECISIONS)
-    git(repo, 'add -A'); git(repo, 'commit -qm "fixture: the tree, the rules, three members, two projects, the policy"')
+    writeFileSync(join(repo, 'data', 'tasks.yaml'), TASKS)
+    git(repo, 'add -A'); git(repo, 'commit -qm "fixture: the tree, the rules, three members, two projects, a task, the policy"')
     const privateDir = mkdtempSync(join(tmpdir(), 'never-in-git-')); cleanup.push(privateDir)
     vi.stubEnv('ORG_OS_PRIVATE_DIR', privateDir)
+
+    // 0. An import with a private part (L6 Task 21), while no server runs (the import command's own condition): a
+    //    synthetic Notion export whose one database the map keeps at Ops; its rows, their pages and its id go to the store.
+    //    M-2: the database's name and its Notion id are the Ops's too (a Notion id is hex: its own needle in the scan), and
+    //    a page at the top of the export the map keeps at Ops (`docs:`) beside one that lands members (the control).
+    const exportDir = mkdtempSync(join(tmpdir(), 'never-in-git-export-')); cleanup.push(exportDir)
+    makeNotionExport(exportDir, { pages: [
+      { title: 'Season notes', id: nid('a', 9), body: `Open notes, ${VISIBLE}.\n` },
+      { title: `Pay review ${SENTINEL}15`, id: nid('b', 9), body: `The figures, ${SENTINEL}15.\n` },
+    ], databases: [{
+      name: VAULT, id: VAULT_ID, columns: ['Name', 'Notes'],
+      rows: [{ title: `Ledger ${SENTINEL}7`, id: nid('e', 9), cells: { Notes: `${SENTINEL}7 note` }, body: `The ledger ${SENTINEL}7.\n` }],
+    }] })
+    //    M-2: a Fileverse pull whose one dDoc the map keeps at Ops: its name (the folder), its tab's title and text.
+    const pullDir = mkdtempSync(join(tmpdir(), 'never-in-git-pull-')); cleanup.push(pullDir)
+    const DDOC = `council-${SENTINEL}16`
+    const tabText = `What the council weighs, ${SENTINEL}16.\n`
+    mkdirSync(join(pullDir, DDOC))
+    writeFileSync(join(pullDir, DDOC, 'agenda.md'), `---\ntitle: "Agenda ${SENTINEL}16"\nfileverse_doc: ${DDOC}\nfileverse_tab: "1-agenda"\n` +
+      `pulled_at: 2026-11-02\ncontent_sha256: ${sha256Hex(tabText)}\n---\n\n${tabText}`)
+    {
+      const store = await openPrivateStore(repo, { dir: privateDir })
+      const by = { id: 'steward-a', name: 'Steward A', kind: 'person', via: 'git' } as const
+      const plan = planImport(readNotionExport(exportDir, { exported: '2026-11-01' }),
+        { databases: { [VAULT]: { level: `hat:${OPS}` } }, docs: { [nid('b', 9)]: { level: `hat:${OPS}` } } }, repo, store)
+      await applyImport(repo, plan, by, store)
+      const pulled = planImport(readFileverse(pullDir, { exported: '2026-11-02' }), { docs: { [DDOC]: { level: `hat:${OPS}` } } }, repo, store)
+      await applyImport(repo, pulled, by, store)
+      store.close()
+    }
 
     // Test keys: Ops signs in and does everything but decide; two Council wearers approve. The wallet link's value is the
     // address of a fourth key that never signs: an address must stay an address, so it is its own sentinel (R-L5-18.3).
@@ -249,13 +304,16 @@ describe('nothing stricter than members enters git (L5 spec §10.5, its third en
     const s1 = await startServer({ repo, port: 0, fetch }); servers.push(s1)
     const opsId = `${CELO}:${addressOfKey(opsKey)}`
 
-    // P15: a private collection, seeded through the store (no route defines one yet, R-L5-14.3). Its id is never named
-    // in git (§9.2), so it carries a sentinel too.
-    const GRANTS = `grants-${SENTINEL}1`
-    await s1.privateStore!.putCollection({ id: GRANTS, visibility: `hat:${OPS}`, definition: { title: `Grants ${SENTINEL}1` } }, opsId)
-
     const ops = await signIn(s1, opsKey)
     const council = [await signIn(s1, councilOne), await signIn(s1, councilTwo)]
+
+    // P15: a private collection, defined through POST /api/collections at Ops (M-2). Its id is never named in git
+    // (§9.2), so it carries a sentinel too, as its name does.
+    const GRANTS = `grants-${SENTINEL}1`
+    expect(await ok(s1, 'POST', '/api/collections', { cookie: ops, status: 201, body: { id: GRANTS, name: `Grants ${SENTINEL}1`, visibility: `hat:${OPS}` } }))
+      .toEqual({ id: GRANTS, visibility: `hat:${OPS}` })
+    // M-2: a saved view of it, whose filter's value is the Ops's too.
+    await ok(s1, 'PUT', `/api/collections/${GRANTS}/views/large`, { cookie: ops, body: { name: `Large ${SENTINEL}17`, kind: 'table', filters: [{ field: 'amount', op: 'contains', value: `${SENTINEL}17` }] } })
 
     // 1. Staged and applied at once (records, direct): a private record, and one change to a git record whose title is
     //    members' (the control, `visible-sentinel`) and whose budget is Ops's.
@@ -286,6 +344,27 @@ describe('nothing stricter than members enters git (L5 spec §10.5, its third en
     await ok(s1, 'POST', '/api/changes/ops', { cookie: ops, body: { ops: [{ op: 'update', record: 'projects:p-open', set: { title: `Open project ${SENTINEL}5` } }] } })
     await ok(s1, 'POST', '/api/changes/apply', { cookie: ops })
 
+    // 3b. The workspace (L6 Task 21). A private page at Ops (a store record, no commit); a members page (one commit) with a
+    //     comment mentioning Steward C, who is told (a notification), and a comment on the private page; a Council memory
+    //     entry written by a Council wearer at Council.
+    const privatePage = (await ok(s1, 'POST', '/api/pages', { cookie: ops, status: 201, body: {
+      title: `Ops plan ${SENTINEL}6`, visibility: `hat:${OPS}`, markdown: `Salaries, ${SENTINEL}6.\n` } })).id as string
+    const page = (await ok(s1, 'POST', '/api/pages', { cookie: ops, status: 201, body: { title: 'Open notes', markdown: `Notes every member reads, ${VISIBLE}.\n` } })).id as string
+    await ok(s1, 'POST', '/api/comments', { cookie: ops, status: 201, body: { target: `page:${page}`, body: `${mention('steward-c')} the figure is ${SENTINEL}9` } })
+    const onPlan = (await ok(s1, 'POST', '/api/comments', { cookie: ops, status: 201, body: { target: `page:${privatePage}`, body: `On the plan: ${SENTINEL}10` } })).comment.id as string
+    // M-2: Turn into a task on the private page's comment: a private task at the page's level, its title the comment's.
+    const task = await ok(s1, 'POST', `/api/comments/${onPlan}/task`, { cookie: ops, status: 201 })
+    expect(task).toEqual({ task: expect.stringMatching(/^t-[0-9a-f]{12}$/), visibility: `hat:${OPS}` })
+    await ok(s1, 'POST', '/api/memory', { cookie: council[0], status: 201, body: {
+      level: `hat:${COUNCIL}`, date: '2026-11-05', title: `Council talk ${SENTINEL}11`, body: `What was said, ${SENTINEL}11.\n` } })
+    // 3c. A private task moved into git by a publication decision (the publish rule lets Ops decide alone): its git part goes
+    //     into data/tasks.yaml in one commit; its budget, restricted to Ops, stays in the store as a field row, and its title
+    //     before the move is in the store's history only.
+    await s1.privateStore!.putRecord({ collection: 'tasks', id: 't-move', visibility: `hat:${OPS}`, body: { id: 't-move', title: `Old title ${SENTINEL}13`, status: 'todo' }, rev: '' }, opsId, null)
+    await s1.privateStore!.putRecord({ collection: 'tasks', id: 't-move', visibility: `hat:${OPS}`, body: { id: 't-move', title: 'Review the grant', status: 'todo', budget: `${SENTINEL}12 EUR` }, rev: '' }, opsId, null)
+    await ok(s1, 'POST', '/api/changes/ops', { cookie: ops, body: { ops: [{ op: 'update', record: 'tasks:t-move', set: { visibility: 'members' } }] } })
+    await ok(s1, 'POST', '/api/changes/apply', { cookie: ops })
+
     // 4. The server restarts on the same repository and store (reconcile, §10.3). Every restricted value is there, read
     //    by Ops through the gate: the sentinels exist, and the scan below is not looking for values never written.
     await s1.close(); servers.splice(servers.indexOf(s1), 1)
@@ -300,7 +379,26 @@ describe('nothing stricter than members enters git (L5 spec §10.5, its third en
     expect(members.find((m: { id: string }) => m.id === 'steward-b')).toMatchObject({ role: 'Treasurer', email: `steward-b.${SENTINEL}4@example.invalid`, wallet: LINK })
     expect((await ok(s2, 'GET', `/api/registries/${GRANTS}`, { cookie: again })).entries)
       .toEqual([expect.objectContaining({ id: `g-${SENTINEL}2`, amount: `${SENTINEL}2 EUR` })])
-    // Widen nothing: a private record cannot yet move into git (§9.7's third widening is not built, R-L5-16.8).
+    // The workspace's (L6 Task 21): each kind is held, with its sentinel, where it belongs.
+    const store = s2.privateStore!
+    const vault = store.collections().find(c => c.id.startsWith('notion-vault'))
+    expect(vault?.visibility).toBe(`hat:${OPS}`)
+    expect(vault?.definition).toMatchObject({ name: VAULT, from: { id: VAULT_ID } })
+    expect(store.records(vault!.id).map(r => r.body.title)).toEqual([`Ledger ${SENTINEL}7`])
+    const privatePages = store.records('pages').map(r => ({ title: String(r.body.title), visibility: r.visibility }))
+    expect(privatePages).toEqual(expect.arrayContaining([{ title: `Pay review ${SENTINEL}15`, visibility: `hat:${OPS}` },
+      { title: DDOC, visibility: `hat:${OPS}` }, { title: `Agenda ${SENTINEL}16`, visibility: `hat:${OPS}` }]))
+    expect(store.collections().find(c => c.id === GRANTS)?.definition).toMatchObject({ name: `Grants ${SENTINEL}1`,
+      views: [expect.objectContaining({ id: 'large', filters: [{ field: 'amount', op: 'contains', value: `${SENTINEL}17` }] })] })
+    expect(store.record('tasks', task.task)?.body).toMatchObject({ title: `On the plan: ${SENTINEL}10`, page: privatePage })
+    expect(store.record('pages', privatePage)?.body).toMatchObject({ title: `Ops plan ${SENTINEL}6`, markdown: `Salaries, ${SENTINEL}6.\n` })
+    expect(store.comments(`page:${page}`).map(c => c.body)).toEqual([`${mention('steward-c')} the figure is ${SENTINEL}9`])
+    expect(store.comments(`page:${privatePage}`).map(c => c.body)).toEqual([`On the plan: ${SENTINEL}10`])
+    expect(store.notifications('steward-c')).toHaveLength(1)
+    expect(store.records('council-memory').map(r => r.body.title)).toEqual([`Council talk ${SENTINEL}11`])
+    expect(store.record('tasks', 't-move')).toBeNull()
+    expect(store.fields('tasks', 't-move')).toEqual([expect.objectContaining({ field: 'budget', visibility: `hat:${OPS}`, value: `${SENTINEL}12 EUR` })])
+    expect(gitText(repo, 'show', 'HEAD:data/tasks.yaml')).toContain('Review the grant')
     await s2.close(); servers.splice(servers.indexOf(s2), 1)
 
     // 5. The scan: every object of the history, and every object in the store, read through git cat-file.
@@ -309,9 +407,10 @@ describe('nothing stricter than members enters git (L5 spec §10.5, its third en
     const { reachable, objects } = everyObject(repo)
     expect(reachable).toBeGreaterThan(0)
     expect(new Set(objects.map(o => o.type))).toEqual(new Set(['commit', 'tree', 'blob']))
-    expect(scan(repo, objects, [SENTINEL, linked.slice(2)])).toEqual([])
+    expect(scan(repo, objects, [SENTINEL, linked.slice(2), VAULT_ID])).toEqual([])
     // The control: the members-level value is found by the same scan, in the projects file the apply committed.
-    expect(scan(repo, objects, [VISIBLE])).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'blob', path: 'data/projects.yaml' })]))
+    expect(scan(repo, objects, [VISIBLE])).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'blob', path: 'data/projects.yaml' }),
+      expect.objectContaining({ type: 'blob', path: `pages/${page}.md` })]))
 
     // 6. The validators on the repository: no errors.
     const data = validator('validate-data.mjs', repo)

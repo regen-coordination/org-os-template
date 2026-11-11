@@ -219,6 +219,22 @@ describe('Palette', () => {
     expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull()
   })
 
+  // L6 carries K11 (Task 19, PF-R79): the Hub's Sources page is in Jump to for the members' side, not for a Public preview.
+  it('lists the Sources page in Jump to, going to /sources; not while previewing as Public', async () => {
+    routes()
+    const { unmount } = renderAt(<ViewAsProvider><Palette /></ViewAsProvider>, '/')
+    const input = await open()
+    fireEvent.change(input, { target: { value: 'sources' } })
+    await listed('Sources')
+    unmount()
+    routes()
+    renderAt(<ViewAsProvider initial={{ as: 'public' }}><Palette /></ViewAsProvider>, '/')
+    const again = await open()
+    fireEvent.change(again, { target: { value: 'sources' } })
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Command palette' }).textContent).toContain('Nothing matches'))
+    expect(labels()).not.toContain('Sources')
+  })
+
   it('previewing as Public, records the viewer may not see are not listed and not counted; no "hidden" line', async () => {
     const open1 = resource({ id: 'project:open', name: 'Open garden', facts: { visibility: 'public' } })
     const closed = resource({ id: 'project:closed', name: 'Council garden', facts: {} })

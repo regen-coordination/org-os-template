@@ -152,7 +152,7 @@ describe('PageBody (§10.1, E-14, §18-2)', () => {
     expect(h1.classList.contains('display')).toBe(true)
     expect(h1.classList.contains('ed-title')).toBe(true)
     const meta = document.querySelector('.ed-meta')!
-    expect(meta.textContent).toBe('Edited 4 min ago by Ops lead · Workspace write · saves directly · 3 backlinks · from knowledge/treasury/how-the-treasury-is-run.md · read 4 min ago')
+    expect(meta.textContent).toBe('Edited 4 min ago by Ops lead · Workspace write · saves directly · 3 backlinks · from the repository · read 4 min ago')
     expect(document.querySelector('.ed-prose h2')!.textContent).toBe('What it holds')
     expect(document.querySelector('.ed-prose h3')!.textContent).toBe('On Celo')
   })

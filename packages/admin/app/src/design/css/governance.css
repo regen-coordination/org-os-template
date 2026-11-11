@@ -105,7 +105,7 @@
 .tl-s .meter-l { font-size: inherit; white-space: normal; }
 .tl-s .mono { font: var(--fs-tiny)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
 
-/* The compact form, for rows and the door: 10px dots joined by 14px lines, then one phrase */
+/* The compact form, for rows and the portal: 10px dots joined by 14px lines, then one phrase */
 .tlc { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-6); min-width: 0; }
 .tlc-dots { display: inline-flex; align-items: center; flex: none; }
 .tlc-dots > i { box-sizing: border-box; flex: none; inline-size: var(--h-tl-dot); block-size: var(--h-tl-dot); border-radius: var(--radius-chip);
@@ -276,3 +276,24 @@
   .ff-svg { display: none; }
   .ff-list { display: block; }
 }
+
+/* The deployment's steps (/deploy, DAO-OS L7 Task 18): an ordered list of raised rows, each the call's 22px number,
+   the step's title (14/500) and who signs it (13 mute), its mark at the end; under it what it waits for, a ready
+   step's warnings or a mismatch's findings (clay, the alert glyph), then what to run: the prepared-transaction card,
+   the account-step card (PreparedTx's frame) or the Snapshot space's settings in a Mono well. */
+.dep-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-8); min-width: 0; }
+.dep-step { display: grid; gap: var(--sp-8); min-width: 0; padding: var(--sp-9) var(--sp-10); background: var(--raised); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); }
+.dep-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8); }
+.dep-main { min-width: 0; }
+.dep-t { margin: 0; font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); overflow-wrap: anywhere; }
+.dep-s, .dep-w, .dep-line { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); overflow-wrap: anywhere; }
+.dep-warn, .dep-off { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-4); font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--attn); }
+.dep-warn > li, .dep-off > li { display: flex; align-items: flex-start; gap: var(--sp-5); min-width: 0; overflow-wrap: anywhere; }
+.dep-warn .i, .dep-off .i { flex: none; margin-block-start: var(--sp-2); }
+.dep-draft { display: grid; gap: var(--sp-8); min-width: 0; }
+.dep-json { margin: 0; padding: var(--sp-8) var(--sp-9); background: var(--sunken); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-well);
+  font: var(--fs-tiny)/var(--lh-code) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.dep-links { display: flex; flex-wrap: wrap; gap: var(--sp-6); }
+.dep-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); margin-block: var(--sp-11) var(--sp-8); }
+.dep-foot > .dep-line { flex: 1; min-width: 0; }

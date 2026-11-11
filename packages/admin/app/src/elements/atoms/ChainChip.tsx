@@ -7,7 +7,7 @@ function ChainText({ caip2 }: { caip2: string }) {
   return <>{TEST_CHAINS.has(caip2) ? `${chainName(caip2)} · test` : chainName(caip2)}</>
 }
 
-/** The chains named one by one, as plain chips: what a several-chains chip opens, and the door's treasury list. */
+/** The chains named one by one, as plain chips: what a several-chains chip opens, and the portal's treasury list. */
 export function ChainList({ chains }: { chains: readonly string[] }) {
   return (
     <span className="chain-list" role="list">

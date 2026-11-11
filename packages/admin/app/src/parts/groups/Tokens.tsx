@@ -52,11 +52,11 @@ export default function Tokens() {
       <section className="tk-part" aria-label="Type">
         <h2 className="tk-h">Type <span>Fraunces display · Geist interface · Geist Mono for anything copyable</span></h2>
         <dl className="tk-type">
-          <dt>door hero · Fraunces 350<br />40→76 / 1.02 / −.025em</dt>
+          <dt>portal hero · Fraunces 350<br />40→76 / 1.02 / −.025em</dt>
           <dd><span className="tk-hero">Practised <em>together.</em></span></dd>
-          <dt>door section · Fraunces 350<br />28→36 / 1.1 / −.02em</dt>
+          <dt>portal section · Fraunces 350<br />28→36 / 1.1 / −.02em</dt>
           <dd><span className="tk-dsec">What we fund</span></dd>
-          <dt>door lead · Fraunces 400<br />19→22 / 1.45</dt>
+          <dt>portal lead · Fraunces 400<br />19→22 / 1.45</dt>
           <dd><span className="tk-lead">Two grant pools on Gardens, where members signal with conviction.</span></dd>
           <dt>home line · Fraunces 400<br />28 / 1.15 / −.015em</dt>
           <dd><span className="tk-greet">Three things wait on you.</span></dd>
@@ -83,7 +83,7 @@ export default function Tokens() {
             <ul className="tk-scale">
               {SPACE.map(t => <li key={t}><i style={{ width: `var(--${t})`, height: `var(--${t})` }} />{px(t)}</li>)}
             </ul>
-            <p className="tk-note">--sp-17 {px('sp-17')} and --sp-18 {px('sp-18')}: the door’s rhythm only.</p>
+            <p className="tk-note">--sp-17 {px('sp-17')} and --sp-18 {px('sp-18')}: the portal’s rhythm only.</p>
           </section>
           <section className="tk-card" aria-label="Corners">
             <h3 className="tk-cap">corners</h3>

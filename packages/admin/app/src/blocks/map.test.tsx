@@ -50,13 +50,13 @@ describe('the map block', () => {
     expect(desc.textContent).toMatch(/leads/)
   })
 
-  it('draws a 0.6 portal as a linked node, "on Systems map", that opens the other map at its records', async () => {
+  it('draws a link to the other map as a linked node, "on Systems map", that opens the other map at its records', async () => {
     routes()
     const { loc } = renderAt(<BlockFrame bare def={mapBlock} id="m" cfg={{ title: 'Organization map', source: { map: 'organization' } }} />, '/b/organization')
-    const portal = await nodeOf('portal:systems')
-    expect(portal.className).toContain('is-linked')
-    expect(portal.textContent).toContain('on Systems map')
-    fireEvent.keyDown(portal, { key: 'Enter' })
+    const link = await nodeOf('portal:systems')
+    expect(link.className).toContain('is-linked')
+    expect(link.textContent).toContain('on Systems map')
+    fireEvent.keyDown(link, { key: 'Enter' })
     await waitFor(() => expect(loc.history.at(-1)).toBe('/b/systems?select=module%3Aa'))
   })
 

@@ -9,11 +9,18 @@ import { actorTrailer } from '../actor.ts'
 import { actorKey } from '../hosted/writes.ts'
 import { attentionLevel, gateGraph, Levels } from '../visibility/gate.ts'
 import { readConfig } from '../visibility/config.ts'
+import { noStore, type PrivateAccess } from '../private/ops.ts'
+import { chainKept } from '../deploy/private-flip.ts'
 
-/** `hosted`: the server's mode, which says who its own attention is for (visibility/gate.ts `attentionLevel`). */
-export function mountResources(app: Hono, store: ResourceStore, repo: string, opts: { hosted?: boolean } = {}): void {
+/** `hosted`: the server's mode, which says who its own attention is for (visibility/gate.ts `attentionLevel`).
+ *  `privateStore`: the one private store, whose levels say which of a System's chain fields are kept from whom (walk fix
+ *  wave 4, PF-R256). Absent: none. */
+export function mountResources(app: Hono, store: ResourceStore, repo: string, opts: { hosted?: boolean; privateStore?: PrivateAccess } = {}): void {
   /** The graph as the one who asks may see it (L5 spec §9.5): never a node, a count or an edge for what they may not. */
-  const seen = async (c: Context) => gateGraph(viewerOf(c), await store.graph(), new Levels(repo, readConfig(repo), attentionLevel(opts.hosted)))
+  const seen = async (c: Context) => {
+    const config = readConfig(repo), viewer = viewerOf(c)
+    return gateGraph(viewer, await store.graph(), new Levels(repo, config, attentionLevel(opts.hosted)), chainKept(repo, config, opts.privateStore ?? noStore, viewer))
+  }
 
   app.get('/api/resources', async c => {
     const { board, kind } = c.req.query()

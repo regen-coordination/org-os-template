@@ -9,3 +9,5 @@ app/e2e/signin/
 app/e2e/routes/
 # the reflow walk's text-200 % and forced-colours shots, for the operator: stored locally, never committed
 app/e2e/reflow/
+# the workspace walk's shots (tests/e2e/workspace.mts), and a failed walk's page shots and aria snapshots: local only, never committed (Q39)
+app/e2e/workspace/

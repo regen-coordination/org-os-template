@@ -8,7 +8,7 @@ import { useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.ts
 import { restrictedHat, restrictedOf } from '../record/restricted.ts'
 import { layoutBoard } from '../map/layout.ts'
 import { HouseMap } from '../map/HouseMap.tsx'
-import { daoMapOf, mapItemOf, mapLinksOf, mapNodesOf, portalNode } from '../map/fromRecords.ts'
+import { daoMapOf, mapItemOf, mapLinksOf, mapNodesOf, linkNode } from '../map/fromRecords.ts'
 import { withNeeds } from '../map/valueFlow.ts'
 import { recordHref, selectHref } from '../hrefs.ts'
 import type { Mark } from '../../../lib/machines/run.mjs'
@@ -22,7 +22,7 @@ import type { BlockCfg, BlockCtx, BlockData, FrameView, RecordSource } from './t
 
 type MapSource = { map: Board } | RecordSource
 /** `select: false` keeps the map on its page (/parts): a click selects nothing and goes nowhere, a
- *  portal links nowhere, and a move or auto-layout is not saved. */
+ *  link to the other map goes nowhere, and a move or auto-layout is not saved. */
 type MapView = FrameView & { map?: Board; mapKey?: string; select?: boolean }
 interface FullMap { full: true; board: Board; graph: BoardView; saved: Positions | undefined; layoutReady: boolean; entryOf: EntryOf }
 interface SomeRecords { full: false; rows: Resource[] }
@@ -65,7 +65,7 @@ function useMapData(cfg: BlockCfg): BlockData {
 /** One of the two full maps (P1 spec §6.9), drawn with the house's nodes and edges (E-42, spec §8): the Systems map
  *  laid out by authority (§8.2, the main Safe big), the Organization map in its own graph layout and the saved
  *  positions (§14.2), a node dragged there kept — never before the saved layout has loaded, so a move cannot save a
- *  layout of one node over it. Each 0.6 portal is a linked node, "on <map>", that opens the other map at its
+ *  layout of one node over it. Each link to the other map is a linked node, "on <map>", that opens the other map at its
  *  records. A `?select=` in the address selects into the inspector; a selection is kept there. Attention comes from
  *  Needs you's items the viewer may see (E-35). */
 function FullMapBody({ d, title, ctx, marks, live }: { d: FullMap; title: string; ctx: BlockCtx; marks: (r: Resource) => Mark[]; live: boolean }) {
@@ -88,21 +88,21 @@ function FullMapBody({ d, title, ctx, marks, live }: { d: FullMap; title: string
   const map = useMemo(() => (kept
     ? { items: d.graph.nodes.map(r => mapItemOf(r, entryOf(r), hatOf)), links: mapLinksOf(d.graph.edges, { resources: d.graph.nodes, entryOf }) }
     : daoMapOf(d.graph.nodes, entryOf, d.graph.edges, hatOf)), [d.graph, entryOf, kept, visibility])
-  const portals = useMemo(() => new Map(d.graph.portals.map(p => [p.id, p])), [d.graph.portals])
+  const others = useMemo(() => new Map(d.graph.portals.map(p => [p.id, p])), [d.graph.portals])
   const byId = useMemo(() => new Map(d.graph.nodes.map(r => [r.id, r])), [d.graph.nodes])
   const nodes = useMemo(() => withNeeds([
     ...mapNodesOf(map.items, d.graph.nodes, ctx.now, { staged: id => { const r = byId.get(id); return r !== undefined && marks(r).includes('staged') },
       restricted: r => restrictedOf(entryOf(r)), hatOf }),
-    ...d.graph.portals.map(portalNode),
+    ...d.graph.portals.map(linkNode),
   ], needs.items ?? []), [map, d.graph, ctx.now, marks, needs.items])
   const positions = useMemo(() => (kept ? layoutBoard(d.graph.nodes, d.graph.edges, d.graph.portals, d.saved ?? {}) : undefined), [kept, d.graph, d.saved])
   const go = (id: string): boolean => {
-    const p = portals.get(id)
+    const p = others.get(id)
     if (p && live) navigate(selectHref(p.toBoard, p.targets))
     return p !== undefined
   }
-  // the canvas's name counts only what is drawn for this viewer (§6.3): not the records they may not see, nor portals
-  const counted = nodes.filter(n => !portals.has(n.item.id) && sees(n.item)).length
+  // the canvas's name counts only what is drawn for this viewer (§6.3): not the records they may not see, nor the links to the other map
+  const counted = nodes.filter(n => !others.has(n.item.id) && sees(n.item)).length
   // a move or Auto-layout writes the layout: not while previewing (C-23), and not before the saved layout loaded
   const writes = kept && live && canWrite
   return (

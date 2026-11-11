@@ -7,9 +7,10 @@ import { fleet } from './adapters/fleet.ts'
 import { sources } from './adapters/sources.ts'
 import { systems } from './adapters/systems.ts'
 import { proposals } from './adapters/proposals.ts'
+import { knowledge } from './adapters/knowledge.ts'
 import type { Adapter, AdapterContext, AdapterResult, Graph } from './types.ts'
 
-export const ADAPTERS: Adapter[] = [records, modules, crew, fleet, sources, systems, proposals]
+export const ADAPTERS: Adapter[] = [records, modules, crew, fleet, sources, systems, proposals, knowledge]
 
 /** The graph, kept per adapter: an adapter is read again only after a path it watches changed,
  *  or after `invalidateAdapter` (crew's live state changes without touching a file). */

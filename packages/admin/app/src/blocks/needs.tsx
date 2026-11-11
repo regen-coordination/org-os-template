@@ -4,17 +4,20 @@ import { api, type Resource } from '../api.ts'
 import { useActor } from '../actor.ts'
 import { useResources } from '../queries.ts'
 import { driverOf } from '../systems/DriverView.tsx'
+import { isComposedRead } from '../elements/rows/systemState.ts'
 import { ageText } from '../time.ts'
 import { needsFrom, orderNeeds, type NeedItem } from '../elements/needs/needs.ts'
 import { NeedsList } from '../elements/needs/NeedsList.tsx'
 import { useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useMentionNeeds } from '../workspace/mentionNeeds.ts' // DAO-OS L6 Task 18
 import { defineBlock } from './registry.ts'
 import type { BlockCfg, BlockCtx, BlockData, FrameView } from './types.ts'
 
 /** What the Systems were read as, for a sentence: how many the viewer may see, how many failed, and the newest good
- *  read among them. */
+ *  read among them. A composed System is not read, nor the org's own yet: it is left out (walk I2). */
 export interface SystemsRead { count: number; failing: number; readAt: string | null }
-export function systemsRead(systems: Resource[]): SystemsRead {
+export function systemsRead(given: Resource[]): SystemsRead {
+  const systems = given.filter(r => !isComposedRead(r))
   let failing = 0
   let readAt: string | null = null
   for (const r of systems) {
@@ -45,8 +48,10 @@ export function useNeeds(now: Date): { items: NeedItem[] | null; error?: string;
   const source = useVisibilitySource()
   const id = actor && 'id' in actor ? actor.id : null
   const minute = Math.floor(now.getTime() / 60_000) // the order moves with deadlines, not with every tick
-  const all = useMemo(() => (resources.data && proposals.data ? orderNeeds(needsFrom(resources.data, proposals.data, id, now), now) : null),
-    [resources.data, proposals.data, id, minute])
+  // DAO-OS L6 Task 18: the member's unread mentions join them (§8.3); they never hold the list back while they load.
+  const mentions = useMentionNeeds(now)
+  const all = useMemo(() => (resources.data && proposals.data ? orderNeeds([...needsFrom(resources.data, proposals.data, id, now), ...mentions], now) : null),
+    [resources.data, proposals.data, id, minute, mentions])
   const items = useMemo(() => (all ? visible(all) : null), [all, viewer, source])
   const systems = useMemo(() => visible((resources.data ?? []).filter(r => r.kind === 'system')), [resources.data, viewer, source])
   const error = resources.error?.message ?? proposals.error?.message

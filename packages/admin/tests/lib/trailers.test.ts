@@ -6,9 +6,14 @@ import { TRAILER, HOUSE_IDENT, withTrailers, parseTrailers } from '../../lib/tra
 const gitParse = (message: string) => execSync('git interpret-trailers --parse', { input: message }).toString()
 
 describe('TRAILER', () => {
-  it('names the five trailers of F1 §3.6, and L5 §6.4\'s Org-Hat after Org-Rule', () => {
-    expect(TRAILER).toEqual({ actor: 'Org-Actor', change: 'Org-Change', rule: 'Org-Rule', hat: 'Org-Hat', proposal: 'Org-Proposal', decision: 'Org-Decision' })
-    expect(Object.keys(TRAILER)).toEqual(['actor', 'change', 'rule', 'hat', 'proposal', 'decision'])
+  it('names the five trailers of F1 §3.6, L5 §6.4\'s Org-Hat after Org-Rule, and L6 §12\'s Org-Moved last', () => {
+    expect(TRAILER).toEqual({ actor: 'Org-Actor', change: 'Org-Change', rule: 'Org-Rule', hat: 'Org-Hat', proposal: 'Org-Proposal', decision: 'Org-Decision', moved: 'Org-Moved' })
+    expect(Object.keys(TRAILER)).toEqual(['actor', 'change', 'rule', 'hat', 'proposal', 'decision', 'moved'])
+  })
+  it('writes Org-Moved after Org-Decision, and reads it back (L6 §12, Task 11 review I-3)', () => {
+    const message = withTrailers('m', { moved: 'tasks:t-1, pages:p-0000000000a1', decision: 'gov-1', proposal: 'p-1', actor: 'ana' })
+    expect(message).toBe('m\n\nOrg-Actor: ana\nOrg-Proposal: p-1\nOrg-Decision: gov-1\nOrg-Moved: tasks:t-1, pages:p-0000000000a1')
+    expect(parseTrailers(message).moved).toBe('tasks:t-1, pages:p-0000000000a1')
   })
 })
 

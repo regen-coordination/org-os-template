@@ -28,6 +28,7 @@ const EXPECTED_ALLOWED = {
   'ls-files': ['-v', '--error-unmatch'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
+  'merge-file': ['-p'],
   'merge-tree': ['--write-tree', '--name-only'],
   push: [],
   'rev-list': ['--first-parent', '--reverse', '--count'],
@@ -45,9 +46,9 @@ const EXPECTED_UNSAFE = [
 ]
 const EXPECTED_ENV = ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']
 const EXPECTED_EXPORTS = [
-  'FETCH_FRESH_MS', 'GitExit', '__internal', 'addWorktree', 'assertTracked', 'authorEmail', 'cloneInstance', 'commitDataPaths', 'commitMerge', 'configuredEmail', 'countBetween', 'diffNames',
+  'FETCH_FRESH_MS', 'GitExit', '__internal', 'addWorktree', 'assertTracked', 'assertWritablePath', 'authorEmail', 'blobText', 'cloneInstance', 'commitDataPaths', 'commitMerge', 'commitPaths', 'configuredEmail', 'countBetween', 'diffNames',
   'diffText', 'fetchRemote', 'gitPath', 'gitVersion', 'hiddenDataPaths', 'hiddenMergePaths', 'isAncestor', 'isIgnored', 'lastFetch', 'mergeAbort', 'mergeBase',
-  'mergeFfOnly', 'mergeInProgress', 'mergeNoFf', 'mergeTree', 'messageOf',
+  'mergeFfOnly', 'mergeInProgress', 'mergeNoFf', 'mergeThree', 'mergeTree', 'messageOf',
   'moveProposalBranch', 'onCommit', 'parseGitVersion', 'pushTrunk', 'recordRemoteTrunkAbsent', 'remoteUrl', 'removeWorktree', 'repoStatus', 'resolveRev', 'restageDataPaths', 'showFile',
   'stageMergeFiles', 'stagedNames', 'trackedChanges', 'treeDiffNames', 'trunkLine', 'uncommittedDataPaths', 'unmergedPaths', 'validBranchName',
 ]
@@ -207,6 +208,17 @@ describe('run() refuses, before any process starts, what the scan cannot see', (
     ['merge-tree without --write-tree', ['merge-tree', 'a', 'b']],
     ['merge-tree --write-tree with three revisions', ['merge-tree', '--write-tree', 'a', 'b', 'c']],
     ['merge-tree --messages', ['merge-tree', '--write-tree', '--messages', 'a', 'b']],
+    // DAO-OS L6 §6: merge-file in one shape, -p (the result to stdout, nothing written) and three files.
+    ['merge-file without -p (would write the result over the first file)', ['merge-file', 'a', 'b', 'c']],
+    ['merge-file -p with two files', ['merge-file', '-p', 'a', 'b']],
+    ['merge-file -p with four files', ['merge-file', '-p', 'a', 'b', 'c', 'd']],
+    ['merge-file -p --diff3', ['merge-file', '-p', '--diff3', 'a', 'b', 'c']],
+    ['merge-file -p --ours', ['merge-file', '-p', '--ours', 'a', 'b', 'c']],
+    ['merge-file -p -L', ['merge-file', '-p', '-L', 'x', 'a', 'b', 'c']],
+    ['merge-file -p with a flag-like file', ['merge-file', '-p', '-a', 'b', 'c']],
+    ['merge-file -p with a plus file', ['merge-file', '-p', 'a', '+b', 'c']],
+    ['merge-file -p after the files', ['merge-file', 'a', 'b', 'c', '-p']],
+    ['merge-file -p with --', ['merge-file', '-p', '--', 'a', 'b', 'c']],
     ['fetch --force', ['fetch', '--force', 'origin']],
     ['fetch of a URL', ['fetch', 'https://example.org/x.git']],
     ['fetch of a remote starting with a dash', ['fetch', '-origin']],
@@ -307,6 +319,7 @@ describe('run() refuses, before any process starts, what the scan cannot see', (
     ['merge --abort', ['merge', '--abort']],
     ['merge-tree --write-tree', ['merge-tree', '--write-tree', H40, H40]],
     ['merge-tree --write-tree --name-only', ['merge-tree', '--write-tree', '--name-only', 'main', 'origin/main']],
+    ['merge-file -p', ['merge-file', '-p', '/state/merge/1-mine', '/state/merge/1-base', '/state/merge/1-theirs']],
     ['fetch', ['fetch', 'origin']],
     ['push the trunk', ['push', 'origin', 'refs/heads/main:refs/heads/main']],
     ['push a trunk with a slash', ['push', 'origin', 'refs/heads/release/1.0:refs/heads/release/1.0']],

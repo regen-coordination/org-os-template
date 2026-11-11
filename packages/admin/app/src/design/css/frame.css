@@ -6,7 +6,7 @@
 /* A theme switch holds every transition for one frame (theme.ts setTheme), so the house changes colour at once. */
 :root[data-theme-switching] *, :root[data-theme-switching] *::before, :root[data-theme-switching] *::after { transition: none; }
 
-/* The skip link (§13): off screen until it has focus. The door draws the same one. */
+/* The skip link (§13): off screen until it has focus. The portal draws the same one. */
 /* Off at the inline start, so a right-to-left page does not scroll to it (§13: logical properties). */
 .skip { position: absolute; inset-inline-start: -9999px; }
 .skip:focus { inset-inline-start: var(--sp-7); inset-block-start: var(--sp-7); z-index: 50; background: var(--raised); border: var(--rule-w) solid var(--edge); padding: var(--sp-4) var(--sp-7); }
@@ -80,7 +80,7 @@
   color: var(--faint); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); text-align: start; }
 button.side-h { cursor: pointer; border-radius: var(--radius-ctl); }
 
-/* the foot: Public door ↗, then the signed-in identity */
+/* the foot: Portal ↗, then the signed-in identity */
 .side-foot { margin-top: auto; display: grid; gap: var(--sp-1); padding-top: var(--sp-6); border-top: var(--rule-w) solid var(--rule); }
 .who { display: flex; align-items: center; gap: var(--sp-6); min-width: 0; padding: var(--sp-6) var(--sp-6) 0; border: 0; border-radius: var(--radius-ctl);
   background: none; color: var(--ink); font: inherit; text-align: start; }

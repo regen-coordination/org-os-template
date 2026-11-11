@@ -1,0 +1,71 @@
+{
+  "$id": "orgos://registry/collections",
+  "title": "Collections: definitions and saved views (DAO-OS L6 spec §7.3)",
+  "description": "data/collections.yaml's `collections:` list. An entry naming a registry (tasks, meetings, projects) holds that registry's saved views and notes_parent only; any other entry defines a custom collection, whose records are kept in data/collections/<id>.yaml. validate:data reads it through lib/workspace/collections.mjs `readCollections`, which says more than this schema can.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id"],
+    "additionalProperties": true,
+    "x-order": ["id", "name", "fields", "views", "notes_parent"],
+    "properties": {
+      "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
+      "name": { "type": "string", "minLength": 1 },
+      "notes_parent": { "type": ["string", "null"] },
+      "fields": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "type"],
+          "additionalProperties": true,
+          "properties": {
+            "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,40}$" },
+            "type": { "enum": ["text", "longtext", "number", "select", "multiselect", "date", "daterange", "checkbox", "url", "person", "relation", "page", "email", "phone"] },
+            "name": { "type": "string" },
+            "options": { "type": "array", "items": { "type": "string" } },
+            "to": { "type": "string" },
+            "many": { "type": "boolean" }
+          }
+        }
+      },
+      "views": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "name", "kind"],
+          "additionalProperties": true,
+          "properties": {
+            "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+            "name": { "type": "string", "minLength": 1 },
+            "kind": { "enum": ["table", "board", "calendar", "list", "map"] },
+            "filters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["field", "op", "value"],
+                "properties": {
+                  "field": { "type": "string" },
+                  "op": { "enum": ["is", "is-not", "before", "after", "contains"] },
+                  "value": { "type": "string" }
+                }
+              }
+            },
+            "sort": {
+              "type": "object",
+              "required": ["field", "dir"],
+              "properties": { "field": { "type": "string" }, "dir": { "enum": ["asc", "desc"] } }
+            },
+            "group": { "type": "string" },
+            "columns": { "type": "array", "items": { "type": "string" } },
+            "date": { "type": "string" },
+            "board": {
+              "type": "object",
+              "required": ["field"],
+              "properties": { "field": { "type": "string" }, "order": { "type": "array", "items": { "type": "string" } } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

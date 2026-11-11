@@ -2,7 +2,8 @@
 # sentence, absent adapter and map come from the section (blockCfg, ruling R-7). An instance replaces it
 # with a board of id "meetings" in data/boards.yaml.
 id: meetings
-name: Meetings
+# walk I15, D1: named as a board, as the word Meetings opens another page (the sidebar's).
+name: Meetings board
 audience: members
 layout: flow
 blocks:

@@ -19,7 +19,7 @@ export const GROUPS: readonly GroupEntry[] = [
   { id: 'work', label: 'Workspace', drawn: true },
   { id: 'lib', label: 'Library and wizards', drawn: true },
   { id: 'tray', label: 'Changes and sign-in', drawn: true },
-  { id: 'door', label: 'The public door', drawn: true },
+  { id: 'portal', label: 'The portal', drawn: true },
   { id: 'blocks', label: 'Blocks', drawn: true },
   { id: 'machines', label: 'Machines', drawn: true },
 ]

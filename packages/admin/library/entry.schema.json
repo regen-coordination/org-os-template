@@ -8,8 +8,8 @@
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z]+:[a-z0-9][a-z0-9-]*$", "description": "<shelf>:<slug>. Its folder is library/<shelf>/<slug>." },
     "shelf": {
-      "enum": ["board", "block", "rules", "system", "module", "pattern", "practice", "tool", "case", "resource"],
-      "description": "The kind of thing it is. This release serves board, rules and system; the others are the design's, reserved."
+      "enum": ["board", "block", "rules", "system", "template", "wizard", "module", "pattern", "practice", "tool", "case", "resource"],
+      "description": "The kind of thing it is. This release serves board, rules, system, template (a DAO template: installs that create several records, its governance for after deployment in a composed Safe's deployment.on_deploy) and wizard (it carries `wizard`); the others are the design's, reserved."
     },
     "title": { "type": "string", "minLength": 1 },
     "summary": { "type": "string", "minLength": 1, "description": "One sentence, what it is for." },
@@ -34,14 +34,14 @@
     "related": { "type": "array", "items": { "type": "string", "pattern": "^[a-z]+:[a-z0-9][a-z0-9-]*$" } },
     "installs": {
       "type": "array",
-      "description": "Present and non-empty: something to add. Absent or empty: nothing to add. The ops are the change engine's own (create, update, replace, delete). Any string of a value or set may hold \"${config.<name>}\" (quoted in YAML): exactly that string becomes the supplied value with its type, and a longer one has it put in. Every name must be a property of config.",
+      "description": "Present and non-empty: something to add. Absent or empty: nothing to add. The ops are the change engine's own (create, update, replace, delete). Any string of a value or set may hold \"${config.<name>}\" (quoted in YAML): exactly that string becomes the supplied value with its type, and a longer one has it put in. Every name must be a property of config (camelCase or snake_case). Only ${config.…} is resolved at add: ${hat.<tree>/<key>} and ${system.<id>.address}, written in a composed Safe's deployment.on_deploy, stay text until read-back (L7-D8). No op is on library: (the receipts are the library's own).",
       "items": {
         "type": "object",
         "required": ["op", "record"],
         "additionalProperties": false,
         "properties": {
           "op": { "enum": ["create", "update", "replace", "delete"] },
-          "record": { "type": "string", "pattern": "^[a-z-]+:([a-z0-9][a-z0-9-]*|\\$\\{config\\.[a-z_][a-z0-9_]*\\})$", "description": "<registry>:<id>, as the change engine writes it. The id may be one placeholder, \"${config.<name>}\", which the person's config fills." },
+          "record": { "type": "string", "pattern": "^[a-z][a-z0-9-]*:([a-z0-9-]|\\$\\{config\\.[A-Za-z_][A-Za-z0-9_]*\\})+$", "description": "<registry>:<id>, as the change engine writes it. The id may hold placeholders, \"${config.<name>}\" (\"${config.id}-safe\"), which the person's config fills; the id they make is checked at add: lowercase letters, digits and hyphens." },
           "value": { "type": "object" },
           "set": { "type": "object" }
         }
@@ -53,6 +53,15 @@
       "required": ["properties"],
       "properties": { "properties": { "type": "object" }, "required": { "type": "array", "items": { "type": "string" } } }
     },
-    "replaces": { "type": "string", "description": "Reserved for a template that replaces a built-in board on purpose (design 4.5). Not used in this release." }
-  }
+    "replaces": { "type": "string", "description": "Reserved for a template that replaces a built-in board on purpose (design 4.5). Not used in this release." },
+    "wizard": {
+      "type": "string",
+      "pattern": "\\.ya?ml$",
+      "description": "A wizard entry's wizard (lib/wizards.mjs), a path inside the entry's own folder: wizard.yaml. Served by /api/wizards as <shelf>/<slug>."
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "shelf": { "const": "wizard" } }, "required": ["shelf"] }, "then": { "required": ["wizard"] } },
+    { "if": { "required": ["wizard"] }, "then": { "properties": { "shelf": { "const": "wizard" } } } }
+  ]
 }

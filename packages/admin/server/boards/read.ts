@@ -7,7 +7,7 @@ import type { BoardDef, BoardRead, Layout } from './types.ts'
 
 /** The framework's boards (P4 spec §5.2): one per file, served in this order. */
 export const BUILTIN_DIR = fileURLToPath(new URL('../../boards/', import.meta.url))
-export const BUILTIN_ORDER = ['home', 'projects', 'people', 'funding', 'partners', 'ideas', 'meetings', 'treasury',
+export const BUILTIN_ORDER = ['home', 'projects', 'people', 'funding', 'partners', 'ideas', 'knowledge', 'meetings', 'treasury',
   'crew', 'modules', 'fleet', 'sources', 'outside-systems', 'organization', 'systems']
 
 const LAYOUTS: Layout[] = ['grid', 'canvas', 'flow']

@@ -10,7 +10,7 @@ export function SpecimenHeadings({ level = 3, children }: { level?: 2 | 3; child
   return <Level.Provider value={level}>{children}</Level.Provider>
 }
 
-/** An element's page heading (a page's title, the door's line, the sign-in title): the page's h1, or the level a
+/** An element's page heading (a page's title, the portal's line, the sign-in title): the page's h1, or the level a
  *  gallery holds it at. The class carries its look, so every level draws alike. */
 export function PageHeading({ className, id, children }: { className?: string; id?: string; children: ReactNode }) {
   const level = useContext(Level)

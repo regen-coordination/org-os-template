@@ -10,7 +10,7 @@ tags:
   function: [treasury, governance]
   domain: [operations]
   audience: [steward]
-  maturity: raw
+  maturity: field-informed
 requires:
   - system-kind:safe
 related: [system:safe, board:treasury-council]
@@ -18,9 +18,11 @@ config:
   properties:
     system: { type: string, default: treasury-safe, description: The id, in data/systems.yaml, of the Safe that decides. }
   required: [system]
+# The change engine's one governance edit (L7-D10): the rule is merged into the org's rules by id; a removal gives
+# the rules back as they were before the add (L7-D11).
 installs:
   - op: update
     record: governance:governance
     set:
       rules:
-        - { id: treasury, applies_to: [treasury], propose: maintainer, decide: { by: system, system: treasury-safe } }
+        - { id: treasury, applies_to: [treasury], propose: maintainer, decide: { by: system, system: "${config.system}" } }

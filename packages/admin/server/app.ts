@@ -9,7 +9,10 @@ import { orgName } from './resources/util.ts'
 import { mountChanges, applyAs } from './changes/routes.ts'
 import { knownActorOf, viewerOf, withRequest } from './request.ts'
 import { gateRecord, gateRegistry, gateRegistryList, Levels, publicReads, publicStatus, withoutEcho } from './visibility/gate.ts'
-import { noStore, splitOps, type PrivateAccess } from './private/ops.ts'
+import { entityChanges } from './resources/changed.ts'
+import { displayNames } from './session/names.ts'
+import type { Changed } from './resources/types.ts'
+import { noStore, reach, splitOps, type PrivateAccess } from './private/ops.ts'
 import { privateReads } from './private/reads.ts'
 import { hostedWrites } from './hosted/writes.ts'
 import { instanceWrites, type InstanceWrites } from './hosted/instance-writes.ts'
@@ -17,10 +20,14 @@ import { readConfig } from './visibility/config.ts'
 import { mountGovernance } from './governance/routes.ts'
 import { mountBoards } from './boards/routes.ts'
 import { mountLibrary } from './library/routes.ts'
+import { mountWorkspace } from './workspace/routes.ts'
+import { cachedReads, withFromMarks, type SourceReader } from './workspace/sources.ts'
+import { chainKept } from './deploy/private-flip.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
 import { LEDGER_SENTENCE } from './changes/stage.ts'
-import type { StageOp } from './changes/types.ts'
+import type { RecordOp } from './changes/types.ts'
+import type { Membership } from './session/membership.ts'
 
 /** Map thrown service errors to HTTP statuses. */
 function status(err: unknown): number {
@@ -66,6 +73,11 @@ export interface AppOptions {
   /** The writes-off switch (Lane 3 Task 11, C1): `off` refuses every write to the instance, 403 INSTANCE_READ_ONLY, after
    *  the hosted table. Absent: `on`, as before. */
   instanceWrites?: InstanceWrites
+  /** The System reader (serve.ts), whose cache the Sources page and the from mark read (DAO-OS L6 §10): never a read.
+   *  Absent: no System has a read. */
+  systems?: SourceReader
+  /** Membership from the Hats tree (serve.ts), so a page's editor is named by the hat they wear (walk fix wave 4, G9). */
+  membership?: Membership | null
 }
 
 /** What `extend` is given besides the app: the repository's one write lock, for a route whose write
@@ -130,7 +142,24 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
   })
 
   app.get('/api/registries', c => c.json(gateRegistryList(viewerOf(c), repo, levels())))
-  app.get('/api/registries/:name', c => c.json(gateRegistry(viewerOf(c), repo, c.req.param('name'), levels())))
+  app.get('/api/registries/:name', async c => {
+    const viewer = viewerOf(c), name = c.req.param('name'), lv = levels()
+    const answer = gateRegistry(viewer, repo, name, lv)
+    // DAO-OS L6 §10 (Task 14): asked with ?from, the collection and each record carry their from mark (`fromMark`); the
+    // public is given none.
+    if (c.req.query('from') === undefined || viewer.kind !== 'member') return c.json(answer)
+    return c.json(await withFromMarks(answer, name, { repo, store: reach(privateStore).store, viewer, levels: lv, reads: cachedReads(viewer, lv, opts.systems, chainKept(repo, lv.config, privateStore, viewer)) }))
+  })
+  // Walk M5: the last commit of a record no adapter makes a Resource of (a task, a meeting), named as history names it,
+  // for a record the viewer's gated registry holds; any other id is absent (404). Members only (not a public read).
+  app.get('/api/registries/:name/:id/changed', async c => {
+    const viewer = viewerOf(c), name = c.req.param('name'), id = c.req.param('id')
+    const answer = gateRegistry(viewer, repo, name, levels())
+    if (!(answer.entries ?? []).some(e => String((e as { id?: unknown }).id) === id)) throw new HttpError(404, `No entry "${id}" in ${name}.`)
+    let changed: Changed | null = null
+    try { changed = (await entityChanges(repo, name, displayNames(repo, opts.membership ?? null, { viewer }))).get(id) ?? null } catch { changed = null }
+    return c.json({ changed })
+  })
   app.get('/api/schemas/:name', c => c.json(loadSchema(c.req.param('name'))))
 
   const guardCollection = (name: string) => {
@@ -158,12 +187,12 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
    *  tray's Apply: a known actor (403), the file guards (409), the rule (403), validation (422), one
    *  commit with the three trailers (503, and every file put back, if it fails). Its private part (L5 §10.3) is split
    *  off as staging splits it and written to the private store in the same act. */
-  const writeNow = (c: Context, op: StageOp, message: string) =>
+  const writeNow = (c: Context, op: RecordOp, message: string) =>
     withLock(async () => {
       const actor = knownActorOf(c)
       try {
         const split = splitOps(repo, [op], privateStore, viewerOf(c))
-        const priv = { store: split.store, ops: split.private, staged: false, viewer: viewerOf(c) }
+        const priv = { store: split.store, ops: split.private, staged: false, viewer: viewerOf(c), why: split.why }
         return await applyAs(repo, actor, split.git, { change: newChangeId(), message, private: priv })
       } catch (err) {
         if (err instanceof StageRefusal) {
@@ -213,6 +242,8 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
   mountGovernance(app, repo)
   mountBoards(app, repo)
   mountLibrary(app, { repo, withLock, notify: msg => opts.notify?.(msg), privateStore })
+  // DAO-OS L6: the workspace's routes (server/workspace/routes.ts).
+  mountWorkspace(app, { repo, withLock, notify: msg => opts.notify?.(msg), privateStore, systems: opts.systems ?? null, membership: opts.membership ?? null })
   extend?.(app, { withLock, privateStore })
 
   // An address under /api/ that no route above answers. Without this, the UI's

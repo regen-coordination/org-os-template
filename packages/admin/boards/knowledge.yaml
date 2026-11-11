@@ -1,0 +1,13 @@
+# A section board (P4 spec §5.2): the commons' list, for the board a section is reached by. The section's own page is
+# `/c/knowledge` (the gate plate and the standline); this board is what `/c/knowledge` resolves to in 0.6's board
+# vocabulary, and what an instance's board menu lists. Its title and empty sentence come from the section (blockCfg).
+id: knowledge
+# walk I15, D1: named as a board, as the word Knowledge opens another page (the sidebar's).
+name: Knowledge board
+audience: members
+layout: flow
+blocks:
+  - id: list
+    type: list
+    source: { section: knowledge }
+    view: { switch: true, filter: true, new: true }

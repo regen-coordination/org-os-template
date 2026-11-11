@@ -128,6 +128,13 @@ let evaluateAll, projectOp, decisionRowFor, resolveTopKey, mergeLedgers, insertD
 let OWNER_CLAIM_RULE, lockedOut, oneHandleAdded;
 let NARROW_RULE, narrowCommitProblem, governanceNamesOf, referrersOf;
 let HOUSE_IDENT, observationsOf, walletsOf, knownIds, membershipTree, parseHatRef, hatRef, parseTreeRef, inTree, parseCaip10, isGitSafetyProblem;
+// DAO-OS L6 §3.5: the workspace's class, targets and implied rule.
+let WORKSPACE_SUGGEST, suggestDecidable, maintainerHat, WORKSPACE, WORKSPACE_DIRECT, workspaceRuleFor, isWorkspaceTarget, mayWriteWorkspace, targetsOfPath, targetsOfOp, pageReader, PAGE_FILE_NAME, splitPage;
+let readFullPolicy, fullLevel, narrowerOrEqual, parseLevel;
+// DAO-OS L6 §7.5, §13 (Task 10): the knowledge collection, and what publishes.
+let KNOWLEDGE, fileOfName, publishes, KNOWLEDGE_FILE, canonObjects, knowledgeIdParts;
+// DAO-OS L6 §11: every governed file has an editor, and the file op reaches it.
+let editorFor;
 try {
   const lib = (name) => import(new URL(`../packages/admin/lib/${name}`, import.meta.url).href);
   ({ validateRepo, isGitSafetyProblem, referrersOf } = await lib('data-validate.mjs'));
@@ -148,6 +155,20 @@ try {
   ({ judgedFiles: receiptsRideAlong } = await lib('receipts.mjs'));
   ({ OWNER_CLAIM_RULE, lockedOut, oneHandleAdded } = await lib('claim.mjs'));
   ({ NARROW_RULE, narrowCommitProblem, governanceNamesOf } = await lib('narrow.mjs'));
+  // DAO-OS L6 §3.5
+  ({ WORKSPACE } = await lib('change-classes.mjs'));
+  ({ WORKSPACE_DIRECT, workspaceRuleFor, isWorkspaceTarget, mayWriteWorkspace } = await lib('rules.mjs'));
+  // DAO-OS L6 R-L6-SUGGEST-2
+  ({ WORKSPACE_SUGGEST, suggestDecidable, maintainerHat } = await lib('rules.mjs'));
+  ({ targetsOfPath, targetsOfOp, pageReader } = await lib('workspace/targets.mjs'));
+  ({ PAGE_FILE_NAME, splitPage } = await lib('workspace/pages.mjs'));
+  ({ readFullPolicy, fullLevel, narrowerOrEqual, parseLevel } = await lib('visibility.mjs'));
+  // DAO-OS L6 §11
+  ({ editorFor } = await lib('workspace/editors.mjs'));
+  // DAO-OS L6 §7.5, §13 (Task 10)
+  ({ KNOWLEDGE, fileOfName } = await lib('registries.mjs'));
+  ({ publishes } = await lib('change-classes.mjs'));
+  ({ KNOWLEDGE_FILE, canonObjects, knowledgeIdParts } = await lib('workspace/knowledge.mjs'));
 } catch (err) {
   console.error(`✗ validate:governance cannot load the admin schemas (${String(err?.message ?? err).split('\n')[0]})`);
   console.error('  run: npm ci --prefix packages/admin');
@@ -352,7 +373,9 @@ function judgeLedger(c, { rules, members, governance, systems, tree, was, now })
   const actorId = actor.id;
   const trailer = parseTrailers(c.message).proposal;
   const skew = inWords(CLOCK_SKEW_MS);
-  const shapeCtx = { members, governance, systems, classes: CHANGE_CLASSES, classOf: (registry) => classOf({ registry }) };
+  // A knowledge record (L6 §7.5, Task 10) is read as the server reads it: the collection `knowledge`, class workspace.
+  const shapeCtx = { members, governance, systems, classes: CHANGE_CLASSES, defs: [...REGISTRIES, KNOWLEDGE],
+    classOf: (registry) => (registry === KNOWLEDGE.name ? classOf({ path: KNOWLEDGE.filesGlob }) : classOf({ registry })) };
   const shapeKey = (p) => `${p.path}|${p.message}`;
   const offBy = (time) => offCommit(time, c);
 
@@ -381,22 +404,50 @@ function judgeLedger(c, { rules, members, governance, systems, tree, was, now })
       const classes = listOf(p.classes).map(String);
       const expected = [];
       for (const cls of classes) {
+        if (cls === WORKSPACE) continue; // judged at its ops' targets, below (L6 §3.2)
         const rule = ruleFor(rules, cls);
         if (rule === null) say(`no rule covers the class ${cls}, so nobody can propose it.`);
         else if (!expected.some((r) => r.id === rule.id)) expected.push(rule);
       }
+      // DAO-OS L6 (ruling P-4): a workspace op is decided by the rule that raises its target, read at the parent; one no
+      // written rule names is workspace/direct, which no proposal holds.
+      if (classes.includes(WORKSPACE)) {
+        const readPage = pagesAt(c.parents[0] ?? c.hash);
+        for (const op of opsOf(p)) {
+          const targets = targetsOfOp(op, fileOfRegistry, readPage);
+          if (targets.length === 0 || !isWorkspaceTarget(targets[0])) continue;
+          const rule = workspaceRuleFor(rules, targets);
+          if (rule !== WORKSPACE_DIRECT && !expected.some((r) => r.id === rule.id)) expected.push(rule);
+        }
+      }
+      // DAO-OS L6 R-L6-SUGGEST-2: a suggestion of what only workspace/direct covers is decided under the built-in
+      // workspace/suggest, held as it stands; its author is one who may write the workspace, and a maintainer other
+      // than them decides it.
+      const suggestion = p.suggested === true && expected.length === 0 && classes.length > 0 && classes.every((cls) => cls === WORKSPACE);
+      if (suggestion) expected.push(WORKSPACE_SUGGEST);
       const held = listOf(p.rules);
       if (held.length !== expected.length || !expected.every((r) => held.some((h) => same(h, r)))) {
         say(`its rules are not the ones in force at its parent for ${classes.join(', ') || 'its classes'}: it holds ${rulesInWords(held)}, and data/governance.yaml gave ${rulesInWords(expected)}. A proposal is decided under the rules in force when it was opened.`);
       }
       for (const rule of expected) {
+        if (rule === WORKSPACE_SUGGEST) {
+          const hats = isMap(p.opened_as) && typeof p.opened_as.hat === 'string' ? [p.opened_as.hat] : [];
+          const may = mayWriteWorkspace({ id: String(p.author), hats }, new Set(members.map((m) => String(m.id))), tree?.tree ?? null);
+          if (may !== true) say(may);
+          // A `maintainer` role sourced from a hat is worn by whoever wears it: the server read its wearers to take the
+          // suggestion, and an opening records only its author's reading, so who else wears it is not in the ledger and
+          // is not judged here (fix round 2, review I1). Who approves, and whether that is met, is judged act by act.
+          const decidable = maintainerHat(book) !== undefined ? true : suggestDecidable(book, String(p.author));
+          if (decidable !== true) say(decidable.replace(/ Nothing was proposed\.$/, ''));
+          continue;
+        }
         const may = mayPropose(rule, String(p.author), book);
         if (may !== true) say(may);
       }
       if (typeof p.rev === 'string' && p.rev !== revOf(opsOf(p))) say(`its rev ${p.rev} is not the rev of its ops (${revOf(opsOf(p))}).`);
     } else {
       // An open proposal: what was fixed when it was opened stays.
-      for (const key of ['author', 'opened', 'opened_as', 'rules']) {
+      for (const key of ['author', 'opened', 'opened_as', 'suggested', 'rules']) {
         if (!same(prior[key], p[key])) say(`its \`${key}\` changed; it is fixed when the proposal is opened.`);
       }
     }
@@ -501,11 +552,39 @@ function difference(expected, actual) {
     .map((k) => `${k} is ${json(actual[k])}, where the result is ${json(expected[k])}`).join('; ');
 }
 
+/** A level a moved record or page may carry into git (DAO-OS L6 §12, R-L6-T11-2): members or public, written. */
+const GIT_LEVELS = new Set(['members', 'public']);
+/** The file a moved record of `collection` is created in: a registry's own, else a custom collection's (L6 §7.1). */
+const movedFileOf = (collection) => (REGISTRIES.some((r) => r.name === collection) ? `data/${collection}.yaml` : `data/collections/${collection}.yaml`);
+
+/**
+ * The records and pages a ratify merge's Org-Moved trailer names (DAO-OS L6 §12, Task 11 review I-3): `<collection>:<id>`,
+ * comma-separated, a page as `pages:<id>`. Each is a private record or page the decision moved into git: its create is
+ * not a git op of the proposal (the ledger holds its placeholder only, rule 8), so the trailer is what accepts it.
+ * `bad`: the parts that are not `<collection>:<id>`, or name one twice.
+ */
+function movedOf(value) {
+  const named = [];
+  const bad = [];
+  const seen = new Set();
+  for (const part of String(value ?? '').split(',').map((x) => x.trim()).filter(Boolean)) {
+    const at = part.indexOf(':');
+    const collection = at > 0 ? part.slice(0, at) : '';
+    const id = at > 0 ? part.slice(at + 1) : '';
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(collection) || id === '' || /[\s/]/.test(id) || seen.has(part)) { bad.push(part); continue; }
+    seen.add(part);
+    named.push({ collection, id, name: part });
+  }
+  return { named, bad };
+}
+
 /**
  * A ratify merge's content (§3.10's M4): its second parent stands on its first; it changes no file but the ops' files,
  * the ledger files and DECISIONS.md; each ops file is, as parsed data, the first parent's document with its record list
  * replaced by the ops' result (`projectOp`), so no record and no other top-level key changes but by an op; and
- * DECISIONS.md changes only for a statement, by one inserted entry. Sentences, one per finding.
+ * DECISIONS.md changes only for a statement, by one inserted entry. A record or page the merge's Org-Moved trailer names
+ * (DAO-OS L6 §12) is accepted as exactly one create, at members or public, of a proposal opened for publication with a
+ * restricted op per move; nothing else of its file changes but by an op. Sentences, one per finding.
  */
 function judgeRatifyContent(c, p, govLedgerOnly) {
   const out = [];
@@ -516,21 +595,88 @@ function judgeRatifyContent(c, p, govLedgerOnly) {
       'a ratify merges a branch built on the trunk\'s tip, so that the merge brings the proposal\'s change and nothing else.');
   }
   const ops = opsOf(p);
-  const registryOf = (op) => { try { return parseRecord(String(op.record)).registry; } catch { return null; } };
+  const registryOf = (op) => { try { return parseRecord(String(op.record), [...REGISTRIES, KNOWLEDGE]).registry; } catch { return null; } };
+  const kindOf = (op) => knowledgeIdParts(String(op.record).slice(KNOWLEDGE.name.length + 1));
   const files = new Map();
+  // DAO-OS L6 §7.5 (Task 10): a knowledge op names its kind's canon file, data/kb/<type>.yaml.
+  const canonFiles = new Map();
   for (const op of ops) {
     const registry = registryOf(op);
-    if (registry !== null) files.set(`data/${registry}.yaml`, registry);
+    if (registry === KNOWLEDGE.name) { const parts = kindOf(op); if (parts !== null) canonFiles.set(`data/kb/${parts.type}.yaml`, parts.type); }
+    else if (registry !== null) files.set(`data/${registry}.yaml`, registry);
   }
-  const allowed = new Set([...files.keys(), LEDGER, DECISIONS_MD, ...(govLedgerOnly ? [GOVERNANCE] : [])]);
+  // DAO-OS L6 §12 (Task 11 review I-3): the private records and pages the decision moved into git, named by Org-Moved.
+  const moved = movedOf(parseTrailers(c.message).moved);
+  for (const part of moved.bad) out.push(`its Org-Moved trailer names "${part}", which is not one <collection>:<id> named once.`);
+  if (moved.named.length > 0) {
+    const names = moved.named.map((m) => m.name).join(', ');
+    if (!listOf(p.classes).map(String).includes('publication')) {
+      out.push(`its Org-Moved trailer names ${names}, and proposal ${p.id} was not opened for publication: a move into the repository is a publication.`);
+    }
+    const held = ops.filter((o) => isMap(o) && o.op === 'private').length;
+    if (held < moved.named.length) {
+      out.push(`its Org-Moved trailer names ${moved.named.length === 1 ? 'one record' : `${moved.named.length} records`}, and proposal ${p.id} holds ${held === 0 ? 'no restricted op' : held === 1 ? 'one restricted op' : `${held} restricted ops`}: each move is one.`);
+    }
+  }
+  const movedRecords = moved.named.filter((m) => m.collection !== 'pages');
+  for (const m of movedRecords) if (![...files.values()].includes(m.collection)) files.set(movedFileOf(m.collection), m.collection);
+  const allowed = new Set([...files.keys(), ...canonFiles.keys(), LEDGER, DECISIONS_MD, ...(govLedgerOnly ? [GOVERNANCE] : [])]);
+  // A moved page is its file, created by the merge, at a level git holds.
+  for (const m of moved.named.filter((x) => x.collection === 'pages')) {
+    const rel = `pages/${m.id}.md`;
+    allowed.add(rel);
+    const was = show(first, rel);
+    const now = show(c.hash, rel);
+    if (was !== null) out.push(`its Org-Moved trailer names ${m.name}, and ${rel} is already at the merge's first parent: a move creates its page.`);
+    else if (now === null || !c.files.includes(rel)) out.push(`its Org-Moved trailer names ${m.name}, and the merge does not create ${rel}.`);
+    else {
+      const read = splitPage(now);
+      if (read.front.id !== m.id) out.push(`${rel}, which its Org-Moved trailer names, holds the page ${json(read.front.id)}, not ${m.id}.`);
+      if (!GIT_LEVELS.has(String(read.front.visibility))) out.push(`${rel}, which its Org-Moved trailer names, is ${json(read.front.visibility)}: a page moved into the repository is members or public, written.`);
+    }
+  }
+  // DAO-OS L6 §11.2: a file op names its own file, and the merge holds exactly its text (none, for a delete).
+  for (const op of ops.filter((o) => o.op === 'file' && typeof o.path === 'string')) {
+    allowed.add(op.path);
+    if (c.files.includes(op.path) && show(c.hash, op.path) !== (typeof op.text === 'string' ? op.text : null)) {
+      out.push(`${op.path} in the merge is not its file op's text: a ratify writes a file edited whole exactly as it was proposed.`);
+    }
+  }
   const outside = c.files.filter((f) => !allowed.has(f));
   if (outside.length > 0) {
     out.push(`the merge also changes ${outside.join(', ')}, which no op of the proposal names and which ${outside.length === 1 ? 'is' : 'are'} not a ledger file.`);
   }
   for (const [file, registry] of files) {
-    const def = REGISTRIES.find((r) => r.name === registry);
+    // A custom collection (a moved record's, L6 §7.1) lists its records under its own id.
+    const def = REGISTRIES.find((r) => r.name === registry) ?? { name: registry, topKey: registry };
     const wasDoc = documentOf(show(first, file));
     const nowDoc = documentOf(show(c.hash, file));
+    if (registry === 'governance') {
+      // The one record of the document registry (L7-D10): the roles and rules under `governance:`, as the ops leave them.
+      // Nothing else under it changes but `decisions` (a ratify's own row), and no other top-level key at all.
+      if (wasDoc === null || nowDoc === null) {
+        out.push(`${file} cannot be read ${wasDoc === null ? 'at the merge\'s first parent' : 'in the merge'}, so its roles and rules cannot be compared with the ops' result.`);
+        continue;
+      }
+      const blockOf = (doc) => (isMap(doc.governance) ? doc.governance : doc);
+      const [wasBlock, nowBlock] = [blockOf(wasDoc), blockOf(nowDoc)];
+      const entry = { id: 'governance' };
+      for (const k of ['roles', 'rules']) if (wasBlock[k] !== undefined) entry[k] = structuredClone(wasBlock[k]);
+      const entries = new Map([[registry, [entry]]]);
+      for (const op of ops.filter((o) => registryOf(o) === registry)) projectOp(entries, op);
+      const want = entries.get(registry)[0];
+      for (const k of ['roles', 'rules']) {
+        if (!same(want[k], nowBlock[k])) out.push(`record governance:governance in the merge is not its op's result: ${k} is ${json(nowBlock[k])}, where the result is ${json(want[k])}.`);
+      }
+      const rest = (doc, block) => Object.keys(doc).filter((k) => block === doc || k !== 'governance').map((k) => [k, doc[k]])
+        .concat(block === doc ? [] : Object.keys(block).map((k) => [`governance.${k}`, block[k]]))
+        .filter(([k]) => !['roles', 'rules', 'decisions', 'governance.roles', 'governance.rules', 'governance.decisions'].includes(k));
+      const [rw, rn] = [new Map(rest(wasDoc, wasBlock)), new Map(rest(nowDoc, nowBlock))];
+      for (const k of new Set([...rw.keys(), ...rn.keys()])) {
+        if (!same(rw.get(k), rn.get(k))) out.push(`the merge ${!rw.has(k) ? 'adds' : !rn.has(k) ? 'removes' : 'changes'} the key \`${k}\` of ${file}, which no op touches.`);
+      }
+      continue;
+    }
     // The list the ops write: under the key the first parent uses (the canonical one when it has none).
     const listKey = wasDoc === null ? null : resolveTopKey((k) => Object.hasOwn(wasDoc, k), def);
     const listIn = (doc) => (doc === null ? null : doc[listKey] === undefined || doc[listKey] === null ? [] : Array.isArray(doc[listKey]) ? doc[listKey] : null);
@@ -557,6 +703,15 @@ function judgeRatifyContent(c, p, govLedgerOnly) {
     };
     const expected = byId(entries.get(registry));
     const actual = byId(now);
+    // A record Org-Moved names: one create, absent at the first parent, at members or public; the merge's own is expected.
+    for (const m of movedRecords.filter((x) => x.collection === registry)) {
+      const have = actual.get(m.id) ?? [];
+      if (was.some((e) => keyOf(e) === m.id)) out.push(`its Org-Moved trailer names ${m.name}, which ${file} already holds at the merge's first parent: a move creates its record.`);
+      else if (mine.some((o) => String(o.record) === m.name)) out.push(`its Org-Moved trailer names ${m.name}, which an op of the proposal also names: a move is an op of its own.`);
+      else if (have.length !== 1) out.push(`its Org-Moved trailer names ${m.name}, and the merge ${have.length === 0 ? 'does not create it' : `holds it ${have.length} times`} in ${file}.`);
+      else if (!GIT_LEVELS.has(String(have[0].visibility))) out.push(`record ${m.name}, which its Org-Moved trailer names, is ${json(have[0].visibility)} in the merge: a record moved into the repository is members or public, written.`);
+      else expected.set(m.id, have);
+    }
     for (const id of new Set([...expected.keys(), ...actual.keys()])) {
       const want = expected.get(id) ?? [];
       const have = actual.get(id) ?? [];
@@ -564,6 +719,42 @@ function judgeRatifyContent(c, p, govLedgerOnly) {
       const record = `${registry}:${id ?? '(no id)'}`;
       const detail = difference(want[0], have[0]);
       const op = id === null ? undefined : [...mine].reverse().find((o) => String(o.record) === record);
+      out.push(op
+        ? `record ${record} in the merge is not its ${op.op} op's result: ${detail}.`
+        : `record ${record} changes in the merge, and no op of the proposal names it: ${detail}.`);
+    }
+  }
+  // A canon file holds exactly what its knowledge ops make of it (Task 10): each op a field edit of its entry (null clears the
+  // field), nothing else of the file changed.
+  for (const [file, type] of canonFiles) {
+    const wasText = show(first, file);
+    const nowText = show(c.hash, file);
+    const was = canonObjects(wasText);
+    const now = canonObjects(nowText);
+    if (was === null || now === null) {
+      out.push(`${file} cannot be read as the canon's entries ${was === null ? 'at the merge\'s first parent' : 'in the merge'}, so its entries cannot be compared with the ops' result.`);
+      continue;
+    }
+    const wasDoc = documentOf(wasText);
+    const nowDoc = documentOf(nowText);
+    for (const k of new Set([...Object.keys(wasDoc), ...Object.keys(nowDoc)])) {
+      if (k === 'entries' || same(wasDoc[k], nowDoc[k])) continue;
+      out.push(`the merge ${!Object.hasOwn(wasDoc, k) ? 'adds' : !Object.hasOwn(nowDoc, k) ? 'removes' : 'changes'} the top-level key \`${k}\` of ${file}, which no op touches.`);
+    }
+    const expected = new Map([...was].map(([slug, object]) => [slug, structuredClone(object)]));
+    const mine = ops.filter((op) => registryOf(op) === KNOWLEDGE.name && kindOf(op)?.type === type);
+    for (const op of mine) {
+      const entry = expected.get(kindOf(op).slug);
+      if (op.op !== 'update' || entry === undefined || !isMap(op.set)) continue;
+      for (const [field, value] of Object.entries(op.set)) { if (value === null) delete entry[field]; else entry[field] = value; }
+    }
+    for (const slug of new Set([...expected.keys(), ...now.keys()])) {
+      const want = expected.get(slug);
+      const have = now.get(slug);
+      if (want !== undefined && have !== undefined && canonical(want) === canonical(have)) continue;
+      const record = `${KNOWLEDGE.name}:${type}/${slug}`;
+      const detail = difference(want, have);
+      const op = [...mine].reverse().find((o) => String(o.record) === record);
       out.push(op
         ? `record ${record} in the merge is not its ${op.op} op's result: ${detail}.`
         : `record ${record} changes in the merge, and no op of the proposal names it: ${detail}.`);
@@ -748,14 +939,11 @@ function judgeClosings(c, { governance, members, tree, was, now, wasGov, nowGov,
   return out;
 }
 
-/** The registries an op can name: the collections the change engine stages (`parseRecord` refuses a document
- *  registry), less the ledger. A file outside them (data/governance.yaml, data/finances.yaml, IDENTITY.md, a data
- *  file no registry knows) cannot be carried by a proposal until P2b (P2-R33). */
-const STAGED = new Set(REGISTRIES.filter((r) => {
-  if (r.ledger) return false;
-  try { parseRecord(`${r.name}:x`); return true; } catch { return false; }
-}).map((r) => r.name));
-const reachableByOp = (file) => STAGED.has(/^data\/([^/]+)\.yaml$/.exec(file)?.[1] ?? '');
+/** Whether an op can carry a change of `file` (DAO-OS L6 §11.2): every governed file has a path, a record op or the file
+ *  op, but what is generated from the records (`.well-known/**`), the ledger and DECISIONS.md (written by their own routes).
+ *  The knowledge canon (`data/kb/**`, editor `knowledge`) is reached by a record op only, staged and proposed from its entry
+ *  page in the commons (ruling PF-R1: no file op; Task 10: the canon edit's proposal path), and the finding says so. */
+const reachableByOp = (file) => !['generated', 'ledger', 'ratify', null].includes(editorFor(file));
 
 // ── Merges with no Org-Proposal (P2 spec §3.10 H3, M-e, M-1; §3.12) ──────────
 const FILES = { governance: 'data/governance.yaml', members: 'data/members.yaml', systems: 'data/systems.yaml', proposals: LEDGER };
@@ -903,6 +1091,90 @@ function directClasses(c, at) {
   return [...new Set(receiptsRideAlong(files, governedClassOf).map((f) => governedClassOf(f)).filter(Boolean))];
 }
 
+// ── The workspace (DAO-OS L6 spec §3.2, §3.5) ─────────────────────────────────
+const VISIBILITY_FILE = 'data/visibility.yaml';
+/** A registry's file, as the server's classesOf reads it: a built-in's own, knowledge's (data/kb/, L6 §7.5), any other name a
+ *  custom collection's (lib/registries.mjs `fileOfName`). */
+const fileOfRegistry = (name) => fileOfName(name);
+/** Pages' parents as `rev` holds them (`git show <rev>:pages/<id>.md`, front matter only); a page `rev` lacks is read from
+ *  `also` when given (a page the commit itself creates). */
+const pagesAt = (rev, also = null) => pageReader((rel) => show(rev, rel) ?? (also === null ? null : show(also, rel)));
+
+/**
+ * The rule each workspace file of a commit falls under, and the target it is named at: its targets read at the commit's
+ * parent (a page the commit creates read from the commit) and then at the commit (a page it moves), the first written rule
+ * either names (`workspaceRuleFor`, never `all`); else workspace/direct.
+ */
+function workspaceRulesOf(c, files, rules) {
+  const before = pagesAt(c.parents[0], c.hash);
+  const after = pagesAt(c.hash);
+  return files.map((file) => {
+    for (const read of [before, after]) {
+      const targets = targetsOfPath(file, read) ?? [WORKSPACE];
+      const rule = workspaceRuleFor(rules, targets);
+      if (rule !== WORKSPACE_DIRECT) return { file, rule, target: targets.find((t) => rule.applies_to.includes(t)) ?? targets[0] };
+    }
+    return { file, rule: WORKSPACE_DIRECT, target: WORKSPACE };
+  });
+}
+
+/**
+ * Whether a commit's change to data/visibility.yaml only narrows (ruling P-6): every collection's level and every field's,
+ * and every default, is the same or narrower after it than before. A level that cannot be read, or two that are not ordered,
+ * does not narrow.
+ */
+function visibilityNarrows(c) {
+  const policy = (rev) => { const doc = documentOf(show(rev, VISIBILITY_FILE)); return doc === null ? null : readFullPolicy(doc).policy; };
+  const pa = policy(c.parents[0]);
+  const pb = policy(c.hash);
+  if (pa === null || pb === null) return false;
+  const keys = (a, b) => [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])];
+  for (const name of keys(pa.collections, pb.collections)) {
+    if (!narrowerOrEqual(fullLevel(pb, name, null), fullLevel(pa, name, null))) return false;
+    for (const field of keys(pa.collections[name]?.fields, pb.collections[name]?.fields)) {
+      if (!narrowerOrEqual(fullLevel(pb, name, null, field), fullLevel(pa, name, null, field))) return false;
+    }
+  }
+  for (const key of keys(pa.defaults, pb.defaults)) {
+    if (pa.defaults?.[key] === pb.defaults?.[key]) continue;
+    const was = parseLevel(pa.defaults?.[key]);
+    const now = parseLevel(pb.defaults?.[key]);
+    if (was === null || now === null || !narrowerOrEqual(now, was)) return false;
+  }
+  return true;
+}
+
+/** Why a commit carrying `Org-Rule: workspace/direct` changes more than the workspace (§3.5), or null: every file it changes
+ *  is class workspace, and data/visibility.yaml only when it narrows (ruling P-6). */
+function workspaceCommitProblem(c) {
+  // A library receipt rides along (L1-C5), as the server's `judgedOps` lets it: data/library.yaml is judged only alone.
+  const files = receiptsRideAlong(c.files, governedClassOf);
+  const others = files.filter((f) => governedClassOf(f) !== WORKSPACE && !(f === VISIBILITY_FILE && visibilityNarrows(c)));
+  if (others.length === 0) return null;
+  const named = others.map((f) => { const cls = governedClassOf(f); return cls ? `${f}, which is class ${cls}` : `${f}, which is of no class`; });
+  return `it changes ${named.join(', and ')}: a workspace write changes workspace files only, and data/visibility.yaml only to narrow it`;
+}
+
+/**
+ * The files of a commit that publish (DAO-OS L6 §13, Task 10): a page it makes public, or a git subpage of it (read with the
+ * pages at its parent), and a canon file whose text makes a knowledge object publishable by the commons' floor. Each is
+ * judged by lib's `publishes`, its text at the parent against its text in the commit, under the commit's visibility policy.
+ */
+function publishingFiles(c, files) {
+  const parent = c.parents[0];
+  const doc = documentOf(show(c.hash, VISIBILITY_FILE));
+  const policy = doc === null ? null : readFullPolicy(doc).policy;
+  let pages = null;
+  return files.filter((f) => {
+    const page = /^pages\/[^/]+\.md$/.test(f);
+    if (!page && !KNOWLEDGE_FILE.test(f)) return false;
+    const op = { op: 'file', path: f, text: show(c.hash, f), base: null };
+    if (!page) return publishes(op, show(parent, f), policy);
+    pages ??= gitPagesAt(parent);
+    return publishes(op, show(parent, f), policy, { pages });
+  });
+}
+
 /**
  * Judge one commit: `at` holds the four files at its first parent, `via` the merge that brought it in (null on the trunk's
  * first-parent line). A merge with no Org-Proposal is expanded instead of judged as a change of its own.
@@ -930,6 +1202,10 @@ function judgeCommit(c, at, via = null) {
   const hatted = orgHats(trailers.hat);
   const written = read.governance !== null && !implied && rules.length > 0;
   if (narrowing) findings.push({ unit: 'history', level: strict ? 'error' : 'warn', text: `${who}: its Org-Rule is ${NARROW_RULE}, and ${narrowing}.` });
+  // DAO-OS L6 §3.5: a workspace write changes the workspace alone.
+  const workspaceDirect = trailers.rule === WORKSPACE_DIRECT.id && c.parents.length === 1;
+  const outsideWorkspace = workspaceDirect ? workspaceCommitProblem(c) : null;
+  if (outsideWorkspace) findings.push({ unit: 'history', level: strict ? 'error' : 'warn', text: `${who}: its Org-Rule is ${WORKSPACE_DIRECT.id}, and ${outsideWorkspace}.` });
   if (c.parents.length === 1 && trailers.rule !== OWNER_CLAIM_RULE) {
     // A direct apply under a hat (§6.4, §7.5): its Org-Hat is read, whatever the rules. Under the solo default any hat of the
     // membership tree lets its wearer decide alone (R-L5-8.9), so what is judged there is that it carries one in the tree.
@@ -953,11 +1229,16 @@ function judgeCommit(c, at, via = null) {
   const govNow = c.files.includes(GOVERNANCE) ? show(c.hash, GOVERNANCE) : at.governance;
   const govLedgerOnly = c.files.includes(GOVERNANCE) && ledgerOnly(at.governance, govNow);
   // A library receipt rides along (L1-C5): data/library.yaml is judged only in a commit that writes nothing else governed.
-  const judgedFiles = receiptsRideAlong(c.files.filter((f) => !(f === GOVERNANCE && govLedgerOnly)), governedClassOf);
+  // DAO-OS L6 (ruling P-6): inside a workspace/direct commit, a change to data/visibility.yaml that only narrows is not a publication.
+  const narrowedHere = workspaceDirect && c.files.includes(VISIBILITY_FILE) && visibilityNarrows(c);
+  const judgedFiles = receiptsRideAlong(c.files.filter((f) => !(f === GOVERNANCE && govLedgerOnly) && !(narrowedHere && f === VISIBILITY_FILE)), governedClassOf);
+  // DAO-OS L6 §3.5, §13 (Task 10): a commit whose files make a page public or a knowledge object publishable is judged as
+  // class publication as well, whatever its other classes are (lib's `publishes`, the server's one predicate).
+  const publishing = publishingFiles(c, judgedFiles);
   /** @type {string[]} */
   const reasons = [];
   const governed = [];
-  for (const cls of new Set(judgedFiles.map((f) => governedClassOf(f)).filter(Boolean))) {
+  for (const cls of new Set([...judgedFiles.map((f) => governedClassOf(f)).filter((cls) => cls && cls !== WORKSPACE), ...(publishing.length > 0 ? ['publication'] : [])])) {
     const rule = ruleFor(rules, cls);
     let why;
     if (rule === null) why = `no rule covers the class ${cls}`;
@@ -967,6 +1248,23 @@ function judgeCommit(c, at, via = null) {
       if (may !== true) why = may;
     }
     if (why !== undefined) { reasons.push(`${cls}: ${why.replace(/\.?$/, '.')}`); governed.push(cls); }
+  }
+  // DAO-OS L6 §3.5 (ruling P-1): every workspace file, whatever the trailer, at its targets, never by `all`. Under
+  // workspace/direct its actor must be known (a member id, agents included, or a CAIP-10 id with an Org-Hat in the tree);
+  // under a rule that raises one of its targets, it must decide alone, as a class's rule asks.
+  const workspaceRules = workspaceRulesOf(c, judgedFiles.filter((f) => governedClassOf(f) === WORKSPACE), rules);
+  const knownMembers = new Set(members.map((m) => String(m.id)));
+  for (const target of new Set(workspaceRules.map((w) => w.target))) {
+    const { rule } = workspaceRules.find((w) => w.target === target);
+    let why;
+    if (actor.id === null) why = `${nobodyMade(actor)}, so it is nobody's to apply alone`;
+    else {
+      const may = rule === WORKSPACE_DIRECT
+        ? mayWriteWorkspace({ id: actor.id, hats: hatted.hats }, knownMembers, tree?.tree ?? null)
+        : mayDecideAlone(rule, actor.id, withOrgHat(book, actor.id, hatted.hats)); // L5's withOrgHat (ab9bb01): no rule argument
+      if (may !== true) why = may;
+    }
+    if (why !== undefined) { reasons.push(`${target}: ${why.replace(/\.?$/, '.')}`); if (!governed.includes(WORKSPACE)) governed.push(WORKSPACE); }
   }
   if (reasons.length > 0) {
     const trailer = trailers.proposal;
@@ -978,10 +1276,12 @@ function judgeCommit(c, at, via = null) {
       if (cls && governed.includes(cls) && !reachableByOp(f)) unreachable.set(cls, [...(unreachable.get(cls) ?? []), f]);
     }
     let problem = null;
+    // The canon is reached only from its entry page (ruling PF-R1, Task 10): the finding names where it is proposed.
+    const canon = judgedFiles.some((f) => KNOWLEDGE_FILE.test(f));
     if (!trailer) {
       problem = unreachable.size === 0
-        ? 'it has no Org-Proposal trailer. Propose the change, or ask a maintainer to revert it.'
-        : `it has no Org-Proposal trailer, and no proposal can carry a change of ${[...unreachable].map(([cls, files]) => `class ${cls} (${files.join(', ')})`).join(' or ')} until P2b. ` +
+        ? `it has no Org-Proposal trailer. Propose the change${canon ? ' (a knowledge entry is proposed from its entry page in the commons)' : ''}, or ask a maintainer to revert it.`
+        : `it has no Org-Proposal trailer, and no proposal can carry a change of ${[...unreachable].map(([cls, files]) => `class ${cls} (${files.join(', ')})`).join(' or ')}: .well-known/ is generated from the records (npm run generate:schemas). ` +
           `The finding stays while the commit is among the last ${max}; to clear CI, give the CI command a --range that starts after it (spec §6).`;
     } else if (ledgerNow === null) {
       unchecked = true;
@@ -1006,11 +1306,26 @@ function judgeCommit(c, at, via = null) {
     // Org-Hat names only hats that decide one of those (R-L5-18.4).
     const named = (trailers.rule ?? '').split(',').map((s) => s.trim()).filter((s) => s.endsWith('/direct'))
       .map((s) => rules.find((r) => r.id === s.slice(0, -'/direct'.length))).filter((r) => r?.decide?.method === 'direct');
-    const classes = [...new Set([...judgedFiles.map((f) => governedClassOf(f)).filter(Boolean), ...named.flatMap((r) => r.applies_to)])];
-    const acting = classes.flatMap((cls) => [ruleFor(rules, cls)?.decide?.by, ruleFor(rules, cls)?.propose])
+    // DAO-OS L6 §3.2: workspace files are judged at their targets; a raised target's rule names its hats, and a commit of
+    // workspace/direct writes alone takes any hat of the membership tree (checked above). L5 (ab9bb01): the hats of the
+    // roles that propose or decide, each rule's both.
+    const raised = workspaceRules.filter((w) => w.rule !== WORKSPACE_DIRECT).map((w) => w.rule);
+    const classes = [...new Set([...judgedFiles.map((f) => governedClassOf(f)).filter((cls) => cls && cls !== WORKSPACE), ...named.flatMap((r) => r.applies_to)])];
+    const acting = [...classes.map((cls) => ruleFor(rules, cls)), ...raised].flatMap((r) => [r?.decide?.by, r?.propose])
       .map((id) => book.roles.get(id ?? '')?.hat).filter(Boolean);
-    for (const hat of hatted.hats.filter((h) => !acting.includes(h))) {
+    const directOnly = classes.length === 0 && raised.length === 0 && workspaceRules.length > 0;
+    for (const hat of directOnly ? [] : hatted.hats.filter((h) => !acting.includes(h))) {
       findings.push({ unit: 'history', level: strict ? 'error' : 'warn', text: `${who}: its Org-Hat names the hat ${hat}, which is the hat of no role that proposes or decides ${classes.join(', ') || 'what it changes'}: a direct apply names the hats it acted under.` });
+    }
+  }
+  // PF-R4 (Task 10 review I2): a ratify merge that publishes (a page made public, a knowledge object made publishable) is a
+  // publication decided by a proposal opened for one, under the rule that decides it; a proposal opened for other classes
+  // (one whose ops a trunk moved into the floor's reach, replayed by an older server) did not decide it, whoever ratified.
+  if (c.parents.length > 1 && trailers.proposal && publishing.length > 0 && ledgerNow !== null) {
+    const found = entriesOf(ledgerNow, 'proposals').find((p) => String(p.id) === trailers.proposal);
+    const classes = listOf(found?.classes).map(String);
+    if (found && !classes.includes('publication')) {
+      findings.push({ unit: 'history', level: strict ? 'error' : 'warn', text: `${who}: it publishes (${publishing.join(', ')}), and its Org-Proposal trailer names proposal ${trailers.proposal}, which was opened for ${classes.join(', ') || 'no class'}: a publication is ratified only by a proposal opened for publication, under the rule that decides it.` });
     }
   }
   // A merge here carries Org-Proposal: it is judged as a closing (a ratify), one unit, whatever it touches, once there is
@@ -1051,6 +1366,20 @@ function narrowProblem(c, actor) {
       ...referrersOf(registry, id, (r) => recordsOfDoc(docAt(parent, `data/${r}.yaml`), r)),
       ...governanceNamesOf(readGovernance(show(parent, GOVERNANCE) ?? '').governance, registry, id),
     ],
+    // DAO-OS L6 §4.4 (Task 7): a page is read as a page, and the parent's pages give its tree and its level.
+    text: (f) => ({ was: show(parent, f), now: show(c.hash, f) }),
+    pagesWas: () => gitPagesAt(parent),
+    pagesNow: () => gitPagesAt(c.hash),
+  });
+}
+
+/** DAO-OS L6 §4.4 (Task 7): every git page at `rev` (`pages/<id>.md`, flat), with its text. */
+function gitPagesAt(rev) {
+  const listed = git(['ls-tree', '-z', '--name-only', rev, '--', 'pages/']);
+  if (listed.status !== 0) return [];
+  return listed.stdout.split('\0').filter((rel) => rel.startsWith('pages/') && PAGE_FILE_NAME.test(rel.slice('pages/'.length))).flatMap((rel) => {
+    const text = show(rev, rel);
+    return text === null ? [] : [{ id: rel.slice('pages/'.length, -'.md'.length), text }];
   });
 }
 

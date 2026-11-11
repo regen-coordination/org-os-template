@@ -34,7 +34,7 @@ describe('/parts/views', () => {
     // the list, and the from mark in its four forms
     expect(within(screen.getByRole('list', { name: 'Tasks as a list' })).getAllByRole('listitem')).toHaveLength(5)
     expect([...document.querySelectorAll('.pg-state .from')].map(m => m.textContent)).toEqual([
-      'from data/projects.yaml · read 2 min ago', 'from org-os · data/meetings.yaml · read 1 h ago',
+      'from the repository · read 2 min ago', 'from org-os · read 1 h ago',
       'from Treasury · couldn’t read · last 2 h ago', 'from Notion · exported 12 Aug',
     ])
     await new Promise(r => setTimeout(r, 50))

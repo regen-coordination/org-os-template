@@ -115,7 +115,7 @@ describe('NewRecord, stepped (spec 2026-11-04 §3, Option B)', () => {
     expect([...container.querySelectorAll('.btn.primary')]).toEqual([save])
     // Save follows the governance line in the page's order
     expect(container.querySelector('.form-decide')!.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(document.querySelector('.wiz-writes-v')!.textContent).toBe('data/projects.yaml · a new entry, as a staged change')
+    expect(document.querySelector('.wiz-writes-v')!.textContent).toBe('A new entry, as a staged change')
   })
 
   it('saving stages the same create as Option A and goes to the new record', async () => {

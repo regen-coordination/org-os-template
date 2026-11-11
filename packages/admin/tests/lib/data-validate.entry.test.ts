@@ -147,9 +147,12 @@ describe('loadSchema', () => {
 
 describe('REFS and refMessage', () => {
   it('are the cross-references of docs/DATA-MODEL.md', () => {
-    expect(REFS.map(r => `${r.registry}.${r.field} → ${r.target}`)).toEqual([
+    expect(REFS.map(r => `${r.registry}.${r.field ?? r.path} → ${r.target}`)).toEqual([
       'projects.lead → members', 'projects.contributors → members', 'projects.related_ideas → ideas',
       'projects.funding_source → funding-opportunities', 'meetings.participants → members', 'events.related_project → projects',
+      // DAO-OS L6 §7.2 (Task 2's carry, done in Task 3): a task's project and meeting.
+      'tasks.project → projects', 'tasks.meeting → meetings',
+      'boards.blocks.*.source.system → systems', 'systems.relates.*.to → systems',
     ])
   })
   it('say what the server has always said', () => {

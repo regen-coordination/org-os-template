@@ -50,9 +50,10 @@ describe('Nav: the house sidebar on 0.6’s queries (§5.2)', () => {
     renderAt(<ViewAsProvider><Nav /><PreviewPublic /></ViewAsProvider>)
     await within(house()).findByRole('link', { name: 'Needs you, 1' })
     fireEvent.click(screen.getByRole('button', { name: 'preview' }))
+    // the walk review's G1: a preview reads every answer again, for the previewed viewer, before it counts
+    expect(await within(house()).findByRole('link', { name: 'Systems, 1' })).toBeTruthy()
     expect(within(house()).getByRole('link', { name: 'Needs you' })).toBeTruthy()
     expect(within(house()).getByRole('link', { name: 'Proposals' })).toBeTruthy()
-    expect(within(house()).getByRole('link', { name: 'Systems, 1' })).toBeTruthy()
     expect(within(house()).getByRole('link', { name: 'Changes' })).toBeTruthy()
   })
 
@@ -67,7 +68,34 @@ describe('Nav: the house sidebar on 0.6’s queries (§5.2)', () => {
     expect(within(house()).getByRole('link', { name: 'Meetings, empty' }).querySelector('.side-dot')).not.toBeNull()
     expect(within(house()).queryByRole('link', { name: /^Funding/ })).toBeNull()
     const names = within(house()).getAllByRole('link').map(a => a.getAttribute('aria-label'))
-    expect(names.slice(names.indexOf('Workspace') + 1, names.indexOf('Library'))).toEqual(['Meetings, empty', 'Projects'])
+    // DAO-OS L6 Task 19: then Sources (§15)
+    expect(names.slice(names.indexOf('Workspace') + 1, names.indexOf('Library'))).toEqual(['Meetings, empty', 'Projects', 'Sources'])
+  })
+
+  // walk I15, D1: each word once in the sidebar; Meetings opens the collection, where "Record a meeting" lives
+  it('Meetings opens /c/meetings, the collection, not its board; no label is listed twice', async () => {
+    routes()
+    renderAt(<ViewAsProvider><Nav /></ViewAsProvider>, '/c/meetings')
+    const meetings = await within(house()).findByRole('link', { name: /^Meetings/ })
+    expect(meetings.getAttribute('href')).toBe('/c/meetings')
+    expect(meetings.getAttribute('aria-current')).toBe('page')
+    const labels = within(house()).getAllByRole('link').map(a => a.querySelector('.side-l')?.textContent)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  // DAO-OS L6 Task 19
+  it('lists Sources under Workspace after its collections, current on /sources; absent previewing as Public', async () => {
+    routes()
+    const { unmount } = renderAt(<ViewAsProvider><Nav /></ViewAsProvider>, '/sources')
+    const sources = await within(house()).findByRole('link', { name: 'Sources' })
+    expect(sources.getAttribute('href')).toBe('/sources')
+    expect(sources.getAttribute('aria-current')).toBe('page')
+    expect(within(house()).getByRole('link', { name: 'Workspace' }).classList.contains('on')).toBe(true)
+    unmount()
+    routes()
+    renderAt(<ViewAsProvider initial={{ as: 'public' }}><Nav /></ViewAsProvider>, '/workspace')
+    await within(house()).findByRole('link', { name: 'Systems, 1' })
+    expect(within(house()).queryByRole('link', { name: 'Sources' })).toBeNull()
   })
 
   it('lists no empty collection while previewing as Public', async () => {

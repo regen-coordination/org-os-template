@@ -40,7 +40,7 @@ describe('the key map (§5.8)', () => {
     const rows = within(table).getAllByRole('row').filter(r => r.parentElement?.tagName === 'TBODY')
     expect(rows.length).toBe(19)
     const does = rows.map(r => within(r).getByRole('rowheader').textContent)
-    expect(does.slice(0, 10)).toEqual(['Home', 'Needs you', 'Proposals', 'Systems', 'Roles', 'Treasury', 'Workspace', 'Library', 'Changes', 'Public door, in a new tab'])
+    expect(does.slice(0, 10)).toEqual(['Home', 'Needs you', 'Proposals', 'Systems', 'Roles', 'Treasury', 'Workspace', 'Library', 'Changes', 'Portal, in a new tab'])
     expect(does).toEqual(expect.arrayContaining(['Palette', 'Fold or unfold the sidebar', 'Next or previous row', 'List · Map', 'Open the row', 'Preview in the inspector', 'Close the top panel']))
     const keysOf = (name: string) => [...rows.find(r => within(r).getByRole('rowheader').textContent === name)!.querySelectorAll('kbd')].map(k => k.textContent)
     expect(keysOf('Treasury')).toEqual(['g', 't'])
@@ -89,7 +89,7 @@ describe('the house keys', () => {
     expect(loc.history).toEqual(['/'])
   })
 
-  it('g c asks the tray to open; g d opens the public door in a new tab', () => {
+  it('g c asks the tray to open; g d opens the portal in a new tab', () => {
     house()
     const asked = vi.fn()
     window.addEventListener('house:open-changes', asked)
@@ -98,7 +98,7 @@ describe('the house keys', () => {
     window.removeEventListener('house:open-changes', asked)
     const opened = vi.spyOn(window, 'open').mockImplementation(() => null)
     press('g'); press('d')
-    expect(opened).toHaveBeenCalledWith('/door', '_blank', 'noopener,noreferrer')
+    expect(opened).toHaveBeenCalledWith('/portal', '_blank', 'noopener,noreferrer')
   })
 
   it('n asks the page for its New (Boards listens), and typed in a field it is typing', () => {

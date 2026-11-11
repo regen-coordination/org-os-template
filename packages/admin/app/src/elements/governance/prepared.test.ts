@@ -4,6 +4,7 @@ import type { PreparedStep } from '../../../../server/systems/driver.ts'
 import { SAFE, fakeAddress } from '../../test/fixtures/house/org.ts'
 import { COUNCIL_SAFE, TREASURY_SYSTEM } from '../../test/fixtures/house/systems.ts'
 import { PAY_KIT, PREPARED_RETURN, RETURN_POOLS, TX, daysFrom } from '../../test/fixtures/house/governance.ts'
+import { NOT_SEEN } from '../../../../lib/safe-tx.mjs'
 import { alsoSkipped, payloadJson, preparedFromProposal, preparedFromSteps, sentence, totalsOf } from './prepared.ts'
 
 const CELO = 'eip155:42220'
@@ -83,6 +84,14 @@ describe('preparedFromProposal (CC-9): the ledger attach, one card per chain', (
     expect(preparedFromProposal(kit([], { attention }), TREASURY_SYSTEM)[0]).toMatchObject({ state: 'unsigned', readFailed: true })
     expect(preparedFromProposal(kit([], { attention }), TREASURY_SYSTEM)[0]!.failedAge).toBeUndefined()
     expect(preparedFromProposal(kit([]), TREASURY_SYSTEM)[0]!.readFailed).toBeUndefined()
+  })
+
+  it('an unrecorded mismatch (the view\'s attention names it) is drawn as a mismatch, never Unsigned nor a failed read (fix I-1)', () => {
+    const detail = 'Another hat was created under the admin since this was prepared: prepare it again.'
+    const attention = { level: 'warn' as const, text: `treasury read a different transaction: ${detail} ${NOT_SEEN}`, mismatch: detail }
+    const [tx] = preparedFromProposal(kit([], { attention }), TREASURY_SYSTEM)
+    expect(tx).toMatchObject({ state: 'mismatch', outcome: { differs: [detail, NOT_SEEN] } })
+    expect(tx!.readFailed).toBeUndefined()
   })
 
   it('says a server\'s detail as a sentence', () => {
@@ -172,6 +181,11 @@ describe('preparedFromSteps (CC-9): L2\'s prepare reply, one card per Safe trans
     expect(txs[0]!.calls[0]!.amount).toEqual({ raw: '2500000000000000000', unit: 'CELO', decimals: 18 })
     expect(txs[0]!.of).toBe(0) // given only a name, the threshold is not known
     expect(preparedFromSteps([wearer], { name: 'Treasury' })).toEqual([])
+  })
+
+  // DAO-OS L7 Task 18: a composed Safe has no read yet; /deploy gives its composed threshold
+  it('a composed Safe’s threshold, given in facts, is the count to sign', () => {
+    expect(preparedFromSteps([safeStep], { name: 'Test DAO Safe', facts: { threshold: 2 } })[0]!.of).toBe(2)
   })
 })
 

@@ -26,13 +26,14 @@ import { MiniMap } from '../record/MiniMap.tsx'
 import { RuleStatus } from '../parts/RuleStatus.tsx'
 import { EventLog } from '../parts/EventLog.tsx'
 import { Refusal } from '../parts/SyncParts.tsx'
-import { fmt, trayRows, type TrayRow } from '../changes/rows.ts'
+import { fmt, opRecord, trayRows, type TrayRow } from '../changes/rows.ts'
 import { changeKeyHref, changeKeyOf } from '../hrefs.ts'
 import { useResources } from '../queries.ts'
 import { ago, useNow } from '../time.ts'
 import { useCanWrite, useViewer, useVisibilitySource, viewerWord } from '../viewAs/ViewAs.tsx'
 import { liveEvents, methodOf, type LedgerEvent } from '../../../lib/proposals.mjs'
 import { sentence } from '../../../lib/machines/run.mjs'
+import { NOT_SEEN } from '../../../lib/safe-tx.mjs'
 import { proposal as machine } from '../../../lib/machines/proposal.mjs'
 import { PageLoading } from '../frame/PageLoading.tsx'
 import { Skeleton } from '../design/Skeleton.tsx'
@@ -207,7 +208,7 @@ function Loaded({ view: v, now, resources }: { view: ProposalDetail; now: Date; 
         route={v.rules[0]?.sentence} visibility={source.visibilityOf(own ?? v)} now={now}
         // `opened 3 min ago` is a function of now too (R9): marked, so the route shots mask it instead of depending on
         // the page clock sitting behind the seeded proposal's own time. The phrase stays one meta item, as it was.
-        meta={[<span key="o"><span data-volatile="">{`opened ${ago(String(v.opened), now)}`}</span>{` by ${String(v.author)}`}</span>,
+        meta={[<span key="o"><span data-volatile="">{`opened ${ago(String(v.opened), now)}`}</span>{` by ${v.names?.[String(v.author)] ?? String(v.author)}`}</span>,
           ...(closes_ ? [<span key="c" className={closes_.late ? 'att' : undefined} data-volatile="">{closes_.text}</span>] : []), branch]}
         primary={primary} />
 
@@ -241,7 +242,7 @@ function Loaded({ view: v, now, resources }: { view: ProposalDetail; now: Date; 
           {!restricted && <Changes view={v} busy={busy} onChoose={choose => void run('changes', async () => { await api.replay(id, choose); return null })} failed={failed('changes')} />}
 
           <Section label="Events" note={events.length === 1 ? '1 event' : `${events.length} events`}>
-            <EventLog key={id} events={events} rev={String(v.rev)} now={now} />
+            <EventLog key={id} events={events} rev={String(v.rev)} now={now} names={v.names} />
           </Section>
 
           {canWrite && (
@@ -272,9 +273,6 @@ function Loaded({ view: v, now, resources }: { view: ProposalDetail; now: Date; 
 
 // ── DAO-OS L6 Task 16b (R-L6-SUGGEST) ── a `file` op (L6 §11.2) names a path, not a record; a page's edit is drawn with
 // Compare. Used at four marked lines below: Touches, SmallMap, the Changes heading, and Compare under a page's op.
-// (Ported to L4c by C11, fix round 1, from cfe5986: Touches read `op.record`, which a `file` op has not. L6's `opRecord`
-// lives in its changes/rows.ts with the `file` op type; here it is read off the op as given. L6's PageCompare needs the
-// detail's `compare` and pages.css, which arrive with L6, so it is not ported.)
 
 /** Where an op's key links: a record to its page; a page's path (`pages/<id>.md`) to the page; another file nowhere. */
 const touchHref = (k: string): string | null =>
@@ -291,13 +289,33 @@ function KeyLink({ k }: { k: string }) {
   return href ? <Link href={href} className="brk">{words}</Link> : <span className="brk">{words}</span>
 }
 
-/** An op's key: a record's `<registry>:<id>`, or a `file` op's path (L6's `opRecord`). */
-const opRecord = (op: { op: string; record?: string; path?: string }): string => (op.op === 'file' ? String(op.path) : String(op.record))
+/** What Compare says, and its two wells' captions. */
+export const PAGE_COMPARE = 'The page as it was when this was proposed, next to the text it proposes.'
+export const PAGE_WAS = 'As it was'
+export const PAGE_NOW = 'Proposed'
+/** Task 20 review I2 (PF-R97): a page's widening says what it exposes, as the server counts it. */
+export const PAGE_WIDENS = (n: number): string => n === 0
+  ? 'Once decided, this page is public, for anyone to read.'
+  : `Once decided, this page and its ${n === 1 ? '1 subpage that takes' : `${n} subpages that take`} its level are public, for anyone to read.`
+
+/** Compare for a page's edit (old next to new): the page's body at the proposal's base beside the body its op writes, in
+ *  the wells the page editor's Compare draws (pages.css `.pg-compare-g`, `.pg-well`). */
+function PageCompare({ texts }: { texts: { was: string | null; now: string | null } }) {
+  return (
+    <section className="pp-compare" aria-label="Compare">
+      <p className="meta">{PAGE_COMPARE}</p>
+      <div className="pg-compare-g">
+        <figure className="pg-well"><figcaption>{PAGE_WAS}</figcaption><pre>{texts.was ?? 'Not in the repository yet.'}</pre></figure>
+        <figure className="pg-well"><figcaption>{PAGE_NOW}</figcaption><pre>{texts.now ?? 'Deleted.'}</pre></figure>
+      </div>
+    </section>
+  )
+}
 // ── end DAO-OS L6 Task 16b
 
 /** The records a proposal's ops touch, each linked, in the order the ops name them. */
 function Touches({ view: v }: { view: ProposalDetail }) {
-  const keys = [...new Set(((v.ops as unknown as { op: string; record?: string; path?: string }[]) ?? []).map(opRecord))] // L6 Task 16b: opRecord
+  const keys = [...new Set(((v.ops as unknown as ChangeView['ops']) ?? []).map(opRecord))] // L6 Task 16b: opRecord
   if (keys.length === 0) return <>Nothing</>
   return <>{keys.map((k, i) => <span key={k}>{i > 0 && ', '}<KeyLink k={k} /></span>)}</> // L6 Task 16b: KeyLink
 }
@@ -307,13 +325,19 @@ function Touches({ view: v }: { view: ProposalDetail }) {
  *  admitted to reads "<hat> only". Until those are read the map is not drawn at all, so a restricted name never
  *  flashes raw first. */
 function SmallMap({ view: v, own, resources }: { view: ProposalDetail; own: Resource | undefined; resources: Resource[] }) {
-  const keys = new Set(((v.ops as unknown as { op: string; record?: string; path?: string }[]) ?? []).map(opRecord)) // L6 Task 16b: opRecord
+  const keys = new Set(((v.ops as unknown as ChangeView['ops']) ?? []).map(opRecord)) // L6 Task 16b: opRecord
   const near = resources.filter(r => { const k = changeKeyOf(r); return k !== null && keys.has(k) })
   const centre = own ?? proposalResource(v)
   const entries = useEntryOfResources([centre, ...near])
+  // Walk M12: nothing on the map beside what the Touches line names is no map, not "Touches nothing yet".
+  if (near.length === 0) return null
   if (entries.pending) return <Skeleton rows={3} shape="node" label="the map" />
   return <MiniMap centre={centre} neighbours={near} entryOf={entries.entryOf} />
 }
+
+/** L6 carries K6: why a stale proposal holding a file edited whole offers Take theirs alone (as the tray, PF-R84). */
+export const PROPOSAL_FILE_KEEP_MINE_WHY = 'A file these ops edit whole was changed on the trunk since. Keep mine is not offered until Compare can show ' +
+  'what changed there: take theirs, then revise the proposal over the file as it is now. Approvals clear.'
 
 /** Changes (§14.1): one field change row per changed field (`was` struck → `now`), grouped by the record its op changes,
  *  each record linked; a stale op's rows in clay with what the trunk holds now, and the author's Keep mine / Take
@@ -329,14 +353,17 @@ function Changes({ view: v, busy, onChoose, failed }: { view: ProposalDetail; bu
   const byOp = new Map<number, TrayRow[]>()
   for (const r of rows) byOp.set(r.n, [...(byOp.get(r.n) ?? []), r])
   const chooses = canWrite && open && v.derived === 'stale' && v.can.includes('replay')
+  // L6 carries K6 (PF-R84): a stale file op has no Compare of base, theirs and mine yet, so Keep mine is not offered over it.
+  const fileStale = v.stale.some(n => ops[n]?.op === 'file')
+  const moves = (v.private ?? []).filter((p): p is typeof p & { says: string } => typeof p.says === 'string')
   const emptyDiff = v.state === 'ratified'
     ? `No diff to show: proposal ${id} is ratified, so its changes are on the trunk and its branch adds nothing to it.`
     : `No diff to show: proposal/${id} changes nothing against the trunk.`
   return (
-    <Section label="Changes" note={rows.length === 1 ? '1 field' : `${rows.length} fields`}>
+    <Section label="Changes" note={[rows.length === 1 ? '1 field' : `${rows.length} fields`, ...(moves.length === 0 ? [] : [moves.length === 1 ? '1 move' : `${moves.length} moves`])].join(', ')}>
       {[...byOp.entries()].map(([n, fields]) => (
         <div key={n} className="pp-op">
-          <h3 className="pp-rec"><KeyLink k={opRecord(ops[n]!)} />{/* L6 Task 16b: KeyLink (here the op's key: this branch's trayRows reads op.record) */}
+          <h3 className="pp-rec"><KeyLink k={fields[0]!.record} />{/* L6 Task 16b: KeyLink */}
             <span className="pp-opk">{fields[0]!.op}</span></h3>
           <FieldTable label={`Changes to ${opRecord(ops[n]!)}`}>
             {fields.map(row => (
@@ -347,14 +374,25 @@ function Changes({ view: v, busy, onChoose, failed }: { view: ProposalDetail; bu
               </FieldRow>
             ))}
           </FieldTable>
+          {typeof v.compare?.[n]?.widens === 'number' && <p className="meta">{PAGE_WIDENS(v.compare[n]!.widens!)}</p>}
+          {v.compare?.[n] && <PageCompare texts={v.compare[n]!} />}{/* L6 Task 16b: Compare under a page's op */}
+        </div>
+      ))}
+      {/* DAO-OS L6 Task 20 (§12): a move into the repository, in the server's words to a viewer admitted to it (`says`); the
+          proposal's other private ops are not drawn here. */}
+      {moves.map(p => (
+        <div key={p.ref} className="pp-op">
+          <h3 className="pp-rec"><span>{p.says}</span><span className="pp-opk">move</span></h3>
         </div>
       ))}
       {open && v.stale.length > 0 && (chooses ? (
         <>
-          <p className="att pp-stale" id="prop-stale-why">A record these ops change was changed on the trunk since. Keep mine keeps your values on top of it, and approvals stand;
-            Take theirs drops the fields the trunk changed, and approvals clear. The choice is for every op marked here.</p>
+          {fileStale
+            ? <p className="att pp-stale" id="prop-stale-why">{PROPOSAL_FILE_KEEP_MINE_WHY}</p>
+            : <p className="att pp-stale" id="prop-stale-why">A record these ops change was changed on the trunk since. Keep mine keeps your values on top of it, and approvals stand;
+              Take theirs drops the fields the trunk changed, and approvals clear. The choice is for every op marked here.</p>}
           <p className="pp-btns">
-            <Button disabled={busy} describedby="prop-stale-why" onClick={() => onChoose('mine')}>Keep mine</Button>
+            {!fileStale && <Button disabled={busy} describedby="prop-stale-why" onClick={() => onChoose('mine')}>Keep mine</Button>}
             <Button disabled={busy} describedby="prop-stale-why" onClick={() => onChoose('theirs')}>Take theirs</Button>
           </p>
         </>
@@ -446,10 +484,12 @@ function Actions({ view: v, busy, allowed, why, run, withdraw, me, onLoaded, clo
   const closing = (kind: 'reject' | 'expire', label: string, outcome: 'rejected' | 'expired', ask: string) =>
     act(kind, label, () => { if (confirmed(ask)) void run('actions', async () => { await api.closeProposal(id, outcome); return `Closed as ${outcome}.` }, [], kind).then(closes) })
   const voteOk = allowed('vote')
+  // Walk M12 (PF-R264): the ballot is drawn only where a rule of the proposal is decided by a vote.
+  const votes = v.evaluation.parts.some(p => (p.rule as { decide?: { method?: unknown } }).decide?.method === 'vote')
   return (
     <ul className="pp-acts">
       {form('object', 'Your objection', 'Send objection')}
-      <li key="vote">
+      {votes && <li key="vote">
         <fieldset className="pp-vote" role="radiogroup" aria-labelledby="pa-vote-l" aria-describedby={disabledWhy('vote') ?? (missingFor('vote') ? 'pa-vote-err' : undefined)}>
           <legend id="pa-vote-l" className="pp-vote-l">Vote</legend>
           {['yes', 'no', 'abstain'].map(choice => (
@@ -459,7 +499,7 @@ function Actions({ view: v, busy, allowed, why, run, withdraw, me, onLoaded, clo
         <Button disabled={busy || !voteOk} describedby={disabledWhy('vote')} onClick={sendVote}>Send vote</Button>
         {note('vote')}
         {missingFor('vote') && <span className="err-msg" id="pa-vote-err"><Icon name="alert" size="xs" />{missingFor('vote')}</span>}
-      </li>
+      </li>}
       {form('comment', 'Your comment', 'Send comment')}
       {act('retract', 'Retract', () => { if (mine) void event({ kind: 'retract', of: String(mine.id) }, 'Taken back.') },
         mine ? `Takes back your ${NOUN[mine.kind] ?? mine.kind}, written ${ago(mine.at, new Date())}.` : undefined)}
@@ -521,6 +561,12 @@ function SystemPart({ view: v, now, known, busy, run, allowed, why, failed, card
   const prepareWhy = allowed('attach') ? null : why('attach')
   const outcome = String(last?.outcome ?? '')
   const skipped = alsoSkipped(v)
+  // Fix I-1: a mismatch the Safe service has not seen is answered, never recorded: the visit's attention says it (every
+  // member who visits), and so does Check now's answer, in the words a recorded one has, then that it is not recorded.
+  const unseen = typeof v.attention?.mismatch === 'string' ? v.attention.text : null
+  const checked = check?.reading
+  const checkUnseen = checked?.ok && checked.outcome === 'mismatch' && checked.submitted === false && !check?.appended
+    ? `${system} read a different transaction: ${checked.detail.trim().replace(/[.\s]+$/, '')}. ${NOT_SEEN}` : null
   return (
     <Section label="System" note={system}>
       {cards.length > 0 && <div className="pp-cards">{cards.map(c => <PreparedTx key={`${c.safe.chain}:${c.nonce}`} tx={c} now={now} openPrimary={openPrimary} />)}</div>}
@@ -529,9 +575,11 @@ function SystemPart({ view: v, now, known, busy, run, allowed, why, failed, card
           <span className="note-t">{`${skipped} of this change’s chains could not be read from the ledger and are not shown.`}</span></p>
       )}
       {ref
-        ? <p>Transaction <code className="wrap">{ref.id}</code> on {ref.system}, attached by {attach!.by} {ago(attach!.at, now)}.</p>
+        ? <p>Transaction <code className="wrap">{ref.id}</code> on {ref.system}, attached by {v.names?.[attach!.by] ?? attach!.by} {ago(attach!.at, now)}.</p>
         : <Empty>No transaction is attached yet. Prepare it below, have a signer put it in the Safe, then attach it.</Empty>}
-      {ref && (last
+      {ref && (unseen !== null
+        ? <p className="att">{unseen}</p>
+        : last
         ? <p className={outcome === 'mismatch' ? 'att' : undefined}>{`${system} read ${OUTCOME[outcome] ?? outcome}, ${ago(last.at, now)}${typeof last.text === 'string' && last.text ? `: ${last.text}` : ''}`}</p>
         : <p className="meta">Not read yet: Check now reads it.</p>)}
       {outcome === 'mismatch' && <p>It cannot decide this proposal as it stands: withdraw the proposal and propose again, or revise it and attach a new transaction.</p>}
@@ -543,7 +591,7 @@ function SystemPart({ view: v, now, known, busy, run, allowed, why, failed, card
         </p>
       )}
       {/* Rendered empty first, so a reading is announced when it arrives. */}
-      <p className={check?.attention ? 'att' : 'meta'} role="status">{check ? check.attention?.text ?? (check.reading === null ? NOTHING : check.appended ? 'Read: the new reading is recorded.' : 'Read: nothing changed.') : ''}</p>
+      <p className={check?.attention || checkUnseen ? 'att' : 'meta'} role="status">{check ? check.attention?.text ?? checkUnseen ?? (check.reading === null ? NOTHING : check.appended ? 'Read: the new reading is recorded.' : 'Read: nothing changed.') : ''}</p>
       {canWrite && open && (
         <div className="pp-form">
           <FieldTable label="Prepare transaction">

@@ -1,5 +1,8 @@
 import { addressOf, caip10, isAddress, parseCaip10 } from '../../lib/caip.mjs'
 import { decodeResult } from '../../lib/abi.mjs'
+import { multiSendCallOnlyOn } from '../../lib/deployments.mjs'
+import { assertCallOnlyInner } from '../../lib/deploy/encode.mjs'
+import { encodeMultiSend } from '../../lib/multisend.mjs'
 import { HATS_V1, VIEW_HAT_TYPES, adminOf, childHatId, hatLevel, hatRef, hatsCall, inTree, normalHatId, parseHatRef, prettyHatId, topHatId, treeIdOf, treeRef } from '../../lib/hats.mjs'
 import { TEXT_MAX } from './actions.ts'
 import { CHAINS, chainIdNumber, chainInfo } from './chains.ts'
@@ -96,6 +99,11 @@ const cut = (text: string): string => (text.length > DETAILS_SHOWN ? `${text.sli
 const ADMIN_PARAM = { name: 'admin', label: 'Parent hat', type: 'hat' } as const
 const HAT_PARAM = { name: 'hat', label: 'Hat', type: 'hat' } as const
 const DETAILS_PARAM = { name: 'details', label: 'Details', type: 'text' } as const
+const SUPPLY_PARAM = { name: 'maxSupply', label: 'Most wearers', type: 'uint' } as const
+const ELIGIBILITY_PARAM = { name: 'eligibility', label: 'Eligibility module', type: 'address' } as const
+const TOGGLE_PARAM = { name: 'toggle', label: 'Toggle module', type: 'address' } as const
+const MUTABLE_PARAM = { name: 'mutable', label: 'Can change later ("true" or "false")', type: 'string', optional: true } as const
+const IMAGE_PARAM = { name: 'imageURI', label: 'Image', type: 'string', optional: true } as const
 
 /** What the wearers of a hat's admin can do to the tree, each one call to Hats v1 (spec Q-L2-2 / ruling K1: class governance). */
 export const HATS_ACTIONS: ActionSpec[] = [
@@ -103,10 +111,13 @@ export const HATS_ACTIONS: ActionSpec[] = [
   { id: 'transfer-hat', label: 'Move a hat from one wearer to another', class: 'governance',
     params: [HAT_PARAM, { name: 'from', label: 'From', type: 'address' }, { name: 'to', label: 'To', type: 'address' }] },
   { id: 'create-child', label: 'Create a hat under another', class: 'governance', params: [
-    ADMIN_PARAM, DETAILS_PARAM, { name: 'maxSupply', label: 'Most wearers', type: 'uint' },
-    { name: 'eligibility', label: 'Eligibility module', type: 'address' }, { name: 'toggle', label: 'Toggle module', type: 'address' },
-    { name: 'mutable', label: 'Can change later ("true" or "false")', type: 'string', optional: true }, { name: 'imageURI', label: 'Image', type: 'string', optional: true }] },
+    ADMIN_PARAM, DETAILS_PARAM, SUPPLY_PARAM, ELIGIBILITY_PARAM, TOGGLE_PARAM, MUTABLE_PARAM, IMAGE_PARAM] },
   { id: 'change-details', label: 'Change a hat\'s details', class: 'governance', params: [HAT_PARAM, DETAILS_PARAM] },
+  // DAO-OS L7 §10.1 (Q67, phase 2): a new hat and its first wearers, two calls the admin signs (one Safe transaction
+  // through MultiSendCallOnly when a Safe signs, OQ-1).
+  { id: 'add-role', label: 'Add a role: a new hat and its first wearers', class: 'governance', params: [
+    ADMIN_PARAM, DETAILS_PARAM, SUPPLY_PARAM, { name: 'wearers', label: 'First wearers', type: 'addresses' }, ELIGIBILITY_PARAM, TOGGLE_PARAM,
+    MUTABLE_PARAM, IMAGE_PARAM] },
 ]
 
 /** A refusal: the contract would revert (or the platform would not prepare it), said in a sentence. */
@@ -152,6 +163,34 @@ async function prepareHatsAction(system: Record<string, unknown>, input: ActionI
   const wearerRef = (hatRef_: string, account: string): ForeignRef =>
     ({ system: systemId, id: hatRef_, payload: { kind: 'hats-wearer', wearer: caip10(chain, account) } })
   const adminRefOf = (id: string): string => hatRef(chain, adminOf(id) ?? id)
+  /** A new hat under `p.admin`: create-child's checks with no network (Hats.sol @ cccb71a createHat: ZeroAddress,
+   *  MaxLevelsReached; the platform's text limit and a uint32 supply), then the admin read and the new id predicted as the
+   *  contract builds it, and the createHat call. */
+  const newHat = async () => {
+    const admin = hatIn(chain, treeId, p.admin)
+    const eligibility = who(p.eligibility), toggle = who(p.toggle)
+    if (eligibility.toLowerCase() === ZERO) throw new Refusal('"eligibility" is the zero address; the contract refuses a hat with no eligibility module')
+    if (toggle.toLowerCase() === ZERO) throw new Refusal('"toggle" is the zero address; the contract refuses a hat with no toggle module')
+    const details = String(p.details)
+    if (Buffer.byteLength(details, 'utf8') > TEXT_MAX) throw new Refusal(`"details" is ${Buffer.byteLength(details, 'utf8')} bytes; at most ${TEXT_MAX}`)
+    const supply = BigInt(String(p.maxSupply))
+    if (supply < 1n) throw new Refusal('"maxSupply" must be at least 1: a hat with no room for a wearer reads as not created')
+    if (supply > UINT32_MAX) throw new Refusal(`"maxSupply" is ${supply}; a hat holds at most ${UINT32_MAX}`)
+    const mutable = p.mutable === undefined ? 'true' : String(p.mutable)
+    if (mutable !== 'true' && mutable !== 'false') throw new Refusal(`"mutable" is ${JSON.stringify(mutable)}; it is "true" or "false"`)
+    if (hatLevel(admin.id) >= MAX_HAT_LEVEL) throw new Refusal(`${admin.pretty} is at level ${MAX_HAT_LEVEL} and cannot have children`)
+    const { results } = await ethCalls(ctx, chain, [hatsCall(chain, 'viewHat', [admin.id], `read ${admin.pretty}`)])
+    const fact = existing(chain, admin.id, results[0]!)
+    if (fact.lastHatId >= MAX_CHILD_INDEX) throw new Refusal(`${admin.pretty} has no room for another child (65535 are made)`)
+    // The id Hats v1 gives the new hat (Hats.sol @ cccb71a061cdb9095af7d11dfdb47026993d8c4e, createHat line 167 and
+    // getNextId lines 236–237: buildHatId(_admin, _hats[_admin].lastHatId + 1); HatsIdUtilities.sol buildHatId, line 69:
+    // the index in the first empty 16-bit level under the admin). viewHat's lastHatId is that stored field.
+    const child = childHatId(admin.id, fact.lastHatId + 1)
+    const pretty = prettyHatId(child)
+    const call = hatsCall(chain, 'createHat', [admin.id, details, Number(supply), eligibility, toggle, mutable === 'true', p.imageURI === undefined ? '' : String(p.imageURI)],
+      `create hat ${pretty} under ${admin.pretty}`)
+    return { admin, child, pretty, details, supply, call }
+  }
 
   try {
     switch (input.action) {
@@ -197,29 +236,55 @@ async function prepareHatsAction(system: Record<string, unknown>, input: ActionI
         return done('transfer-hat', hatsCall(chain, 'transferHat', [hat.id, from, to], summary), adminRefOf(hat.id), wearerRef(hat.ref, to))
       }
       case 'create-child': {
-        const admin = hatIn(chain, treeId, p.admin)
-        const eligibility = who(p.eligibility), toggle = who(p.toggle)
-        if (eligibility.toLowerCase() === ZERO) throw new Refusal('"eligibility" is the zero address; the contract refuses a hat with no eligibility module')
-        if (toggle.toLowerCase() === ZERO) throw new Refusal('"toggle" is the zero address; the contract refuses a hat with no toggle module')
-        const details = String(p.details)
-        if (Buffer.byteLength(details, 'utf8') > TEXT_MAX) throw new Refusal(`"details" is ${Buffer.byteLength(details, 'utf8')} bytes; at most ${TEXT_MAX}`)
-        const supply = BigInt(String(p.maxSupply))
-        if (supply < 1n) throw new Refusal('"maxSupply" must be at least 1: a hat with no room for a wearer reads as not created')
-        if (supply > UINT32_MAX) throw new Refusal(`"maxSupply" is ${supply}; a hat holds at most ${UINT32_MAX}`)
-        const mutable = p.mutable === undefined ? 'true' : String(p.mutable)
-        if (mutable !== 'true' && mutable !== 'false') throw new Refusal(`"mutable" is ${JSON.stringify(mutable)}; it is "true" or "false"`)
-        if (hatLevel(admin.id) >= MAX_HAT_LEVEL) throw new Refusal(`${admin.pretty} is at level ${MAX_HAT_LEVEL} and cannot have children`)
-        const { results } = await ethCalls(ctx, chain, [hatsCall(chain, 'viewHat', [admin.id], `read ${admin.pretty}`)])
-        const fact = existing(chain, admin.id, results[0]!)
-        if (fact.lastHatId >= MAX_CHILD_INDEX) throw new Refusal(`${admin.pretty} has no room for another child (65535 are made)`)
-        const child = childHatId(admin.id, fact.lastHatId + 1)
-        const pretty = prettyHatId(child)
+        const made = await newHat()
         if (via) {
-          const second = await ethCalls(ctx, chain, [hatsCall(chain, 'isAdminOfHat', [addressOf(via), child], `is the signer an admin of ${pretty}`)])
-          if (!flag(second.results[0]!, `isAdminOfHat for ${pretty}`)) throw notAdmin(pretty)
+          const second = await ethCalls(ctx, chain, [hatsCall(chain, 'isAdminOfHat', [addressOf(via), made.child], `is the signer an admin of ${made.pretty}`)])
+          if (!flag(second.results[0]!, `isAdminOfHat for ${made.pretty}`)) throw notAdmin(made.pretty)
         }
-        const call = hatsCall(chain, 'createHat', [admin.id, details, Number(supply), eligibility, toggle, mutable === 'true', p.imageURI === undefined ? '' : String(p.imageURI)], `create hat ${pretty} under ${admin.pretty}`)
-        return done('create-child', call, admin.ref, { system: systemId, id: hatRef(chain, child), payload: { kind: 'hats-hat', details } })
+        return done('create-child', made.call, made.admin.ref, { system: systemId, id: hatRef(chain, made.child), payload: { kind: 'hats-hat', details: made.details } })
+      }
+      case 'add-role': {
+        // L7 §10.1 (Q67): createHat, then batchMintHats of the new hat to every first wearer. The refusals are create-child's
+        // and mint-hat's that can be told before the hat exists: more wearers than maxSupply (AllHatsWorn), a wearer listed
+        // twice (AlreadyWearingHat), an ineligible one (NotEligible), a signer that is no admin (NotAdmin).
+        const wearers = (Array.isArray(p.wearers) ? p.wearers : []).map(who)
+        if (wearers.length === 0) throw new Refusal('"wearers" names nobody; a role is added with its first wearers')
+        const twice = wearers.find((w, i) => wearers.findIndex(x => x.toLowerCase() === w.toLowerCase()) !== i)
+        if (twice !== undefined) throw new Refusal(`${short(twice)} is listed twice`)
+        const made = await newHat()
+        if (BigInt(wearers.length) > made.supply) throw new Refusal(`${wearers.length} wearers, and the hat has room for ${made.supply}`)
+        // Before createHat runs, Hats reads the new id's eligibility module as unset, so isEligible answers its bad
+        // standings only (Hats.sol @ cccb71a, _isEligible, line 1098); batchMintHats asks the module itself on chain.
+        const calls: EthCall[] = [
+          ...wearers.map(w => hatsCall(chain, 'isEligible', [w, made.child], `is ${short(w)} eligible for ${made.pretty}`)),
+          ...(via ? [hatsCall(chain, 'isAdminOfHat', [addressOf(via), made.child], `is the signer an admin of ${made.pretty}`)] : []),
+        ]
+        const { results } = await ethCalls(ctx, chain, calls)
+        wearers.forEach((w, i) => { if (!flag(results[i]!, `isEligible for ${made.pretty}`)) throw new Refusal(`${short(w)} is not eligible for ${made.pretty}`) })
+        if (via && !flag(results[wearers.length]!, `isAdminOfHat for ${made.pretty}`)) throw notAdmin(made.pretty)
+        const mint = hatsCall(chain, 'batchMintHats', [wearers.map(() => made.child), wearers], `mint ${made.pretty} to ${wearers.map(short).join(', ')}`)
+        const by = signer(made.admin.ref)
+        // OQ-1 (PF-R192): signed by a Safe, the two calls are one Safe transaction, so that no other hat created under the
+        // admin between two nonces moves the child id the mint names. The Safe delegatecalls MultiSendCallOnly 1.4.1
+        // (operation 1; lib/deployments.mjs cites its canonical address on this driver's chains), whose inner calls are
+        // plain calls to Hats (operation 0, assertCallOnlyInner). Signed by the admin hat's wearers, two calls as before.
+        let steps: PreparedStep[] = [{ call: made.call, signer: by, safe: null }, { call: mint, signer: by, safe: null }]
+        if (via) {
+          const callOnly = multiSendCallOnlyOn(chain)
+          if (!callOnly) throw new Refusal(`MultiSendCallOnly 1.4.1 is not known on ${chain}, so the new hat and its wearers cannot be one Safe transaction`)
+          const inner = [made.call, mint].map(x => ({ operation: 0 as const, to: addressOf(x.to), value: x.value, data: x.data }))
+          assertCallOnlyInner(inner)
+          steps = [{
+            call: { chain, to: caip10(chain, callOnly), value: '0', data: encodeMultiSend(inner), operation: 1,
+              summary: `${made.call.summary}, then ${mint.summary}: one Safe transaction (MultiSendCallOnly ${callOnly})` },
+            signer: by, safe: null,
+          }]
+        }
+        return {
+          ok: true, action: 'add-role', draft: null, link: app(chain, treeId),
+          steps,
+          attach: { system: systemId, id: hatRef(chain, made.child), payload: { kind: 'hats-role', details: made.details, wearers: wearers.map(w => caip10(chain, w)) } },
+        }
       }
       case 'change-details': {
         const hat = hatIn(chain, treeId, p.hat), details = String(p.details)
@@ -256,7 +321,7 @@ function checkHatsRef(system: Record<string, unknown>, raw: unknown): { ok: true
     if (!parsed) return bad(`"id" is not a hat ref (${chain}:0x and 64 hex digits): ${JSON.stringify(r.id)}`)
     const id = hatOf(chain, treeId, r.id)
     const payload = typeof r.payload === 'object' && r.payload !== null && !Array.isArray(r.payload) ? (r.payload as Record<string, unknown>) : null
-    if (payload === null) return bad('a Hats ref has a "payload": {"kind": "hats-wearer", "wearer": <CAIP-10>} or {"kind": "hats-hat", "details": <text>}')
+    if (payload === null) return bad('a Hats ref has a "payload": {"kind": "hats-wearer", "wearer": <CAIP-10>}, {"kind": "hats-hat", "details": <text>} or {"kind": "hats-role", "details": <text>, "wearers": [<CAIP-10>, …]}')
     if (payload.kind === 'hats-wearer') {
       const w = typeof payload.wearer === 'string' ? parseCaip10(payload.wearer) : null
       if (!w) return bad(`the wearer must be a CAIP-10 account (${chain}:0x…): ${JSON.stringify(payload.wearer)}`)
@@ -268,20 +333,63 @@ function checkHatsRef(system: Record<string, unknown>, raw: unknown): { ok: true
       if (payload.existing !== undefined && payload.existing !== true) return bad('"existing" is true or absent')
       return { ok: true, ref: { system: systemId, id, payload: { kind: 'hats-hat', details: payload.details, ...(payload.existing === true ? { existing: true as const } : {}) } } }
     }
-    return bad(`a Hats tree attaches a hats-wearer or hats-hat payload, not ${JSON.stringify(payload.kind)}`)
+    if (payload.kind === 'hats-role') {
+      if (typeof payload.details !== 'string') return bad('the details of a hats-role payload are text')
+      if (!Array.isArray(payload.wearers) || payload.wearers.length === 0) return bad('the wearers of a hats-role payload are a list of CAIP-10 accounts, at least one')
+      const wearers: string[] = []
+      for (const raw of payload.wearers) {
+        const w = typeof raw === 'string' ? parseCaip10(raw) : null
+        if (!w) return bad(`a wearer must be a CAIP-10 account (${chain}:0x…): ${JSON.stringify(raw)}`)
+        if (w.chain !== chain) return bad(`the wearer ${raw} is on ${w.chain}; this tree is on ${chain}`)
+        const account = caip10(chain, w.address)
+        if (wearers.includes(account)) return bad(`the wearer ${account} is listed twice`)
+        wearers.push(account)
+      }
+      return { ok: true, ref: { system: systemId, id, payload: { kind: 'hats-role', details: payload.details, wearers } } }
+    }
+    return bad(`a Hats tree attaches a hats-wearer, hats-hat or hats-role payload, not ${JSON.stringify(payload.kind)}`)
   } catch (err) {
     return bad(err instanceof Error ? err.message : String(err))
   }
 }
 
-/** The outcome of a Hats ref: the wearer now wears the hat, or the hat now exists (or reads the new details). */
+/** The outcome of a Hats ref: the wearer now wears the hat, the hat now exists (or reads the new details), or the new hat
+ *  exists and every one of its first wearers wears it. */
 async function hatsOutcome(system: Record<string, unknown>, ref: OutcomeRef, ctx: DriverContext): Promise<OutcomeReading> {
-  if (!isForeignRef(ref) || (ref.payload.kind !== 'hats-wearer' && ref.payload.kind !== 'hats-hat')) {
-    throw new Error('a Hats tree reads hats-wearer and hats-hat refs, not a Safe transaction or another system\'s ref')
+  if (!isForeignRef(ref) || (ref.payload.kind !== 'hats-wearer' && ref.payload.kind !== 'hats-hat' && ref.payload.kind !== 'hats-role')) {
+    throw new Error('a Hats tree reads hats-wearer, hats-hat and hats-role refs, not a Safe transaction or another system\'s ref')
   }
   const { chain, treeId } = treeOf(system)
   const hat = hatIn(chain, treeId, ref.id)
   const payload = ref.payload
+  if (payload.kind === 'hats-role') {
+    const wearers = payload.wearers.map(w => addressOf(w))
+    // PF-R200 (fix I-3): one Safe transaction closes the gap between createHat and the mint, not the one between prepare
+    // and execution. While the hat is not created, the admin's lastHatId says whether another hat took the predicted
+    // index (Hats.sol @ cccb71a getNextId: lastHatId + 1); moved past it, executing would create another id than the
+    // one the mint names, so the reading is a mismatch the signers can reject on. A hard guarantee needs an on-chain id
+    // check (a guard contract), not built.
+    const admin = adminOf(hat.id)
+    const { results } = await ethCalls(ctx, chain, [
+      hatsCall(chain, 'viewHat', [hat.id], `read ${hat.pretty}`),
+      ...wearers.map(w => hatsCall(chain, 'isWearerOfHat', [w, hat.id], `does ${shortAddress(w)} wear ${hat.pretty}`)),
+      ...(admin ? [hatsCall(chain, 'viewHat', [admin], `read ${prettyHatId(admin)}`)] : []),
+    ])
+    const fact = decodeView(chain, hat.id, results[0]!)
+    const index = admin ? Number((BigInt(hat.id) - BigInt(admin)) >> BigInt(224 - 16 * hatLevel(hat.id))) : 0
+    if (fact.maxSupply === 0) {
+      if (admin && decodeView(chain, admin, results[wearers.length + 1]!).lastHatId >= index) {
+        return { ok: true, outcome: 'mismatch', detail: 'Another hat was created under the admin since this was prepared: prepare it again.', exists: false }
+      }
+      return { ok: true, outcome: 'pending', detail: `${hat.pretty} is not created yet`, exists: false }
+    }
+    if (fact.details !== payload.details) return { ok: true, outcome: 'mismatch', detail: 'another hat took this id; prepare again', exists: true }
+    // M-2: whether the hat is its admin's newest child, as the admin reads now (a hat with no admin is a top hat: newest).
+    const newest = admin ? decodeView(chain, admin, results[wearers.length + 1]!).lastHatId === index : true
+    const missing = wearers.filter((w, i) => !flag(results[i + 1]!, `isWearerOfHat for ${hat.pretty}`))
+    if (missing.length === 0) return { ok: true, outcome: 'executed', detail: `${hat.pretty} exists and its ${wearers.length} wearer${wearers.length === 1 ? '' : 's'} wear${wearers.length === 1 ? 's' : ''} it`, exists: true, newest }
+    return { ok: true, outcome: 'pending', detail: `${missing.map(shortAddress).join(', ')} ${missing.length === 1 ? 'does' : 'do'} not wear ${hat.pretty} yet`, exists: true, newest }
+  }
   if (payload.kind === 'hats-wearer') {
     const wearer = addressOf(payload.wearer)
     const { results } = await ethCalls(ctx, chain, [hatsCall(chain, 'isWearerOfHat', [wearer, hat.id], `does the account wear ${hat.pretty}`)])

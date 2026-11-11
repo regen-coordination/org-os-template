@@ -17,7 +17,7 @@ import { Membership } from '../../server/session/membership.ts'
 import { createSession } from '../../server/session/sessions.ts'
 import { openPrivateStore, type PrivateStore } from '../../server/private/store.ts'
 import { startServer, type Running } from '../../server/serve.ts'
-import { mountVisibility } from '../../server/visibility/routes.ts'
+import { mountVisibility, type VisibilityAnswer } from '../../server/visibility/routes.ts'
 import { readConfig } from '../../server/visibility/config.ts'
 import { readRegistry } from '../../server/registry.ts'
 import { baseOf } from '../../server/changes/canonical.ts'
@@ -461,5 +461,45 @@ describe('GET /api/visibility (§11.2, §13)', () => {
     expect(body.config).toEqual({ collections: {}, defaults: {} })
     const anyone = await app.request('/api/visibility')
     expect([anyone.status, await anyone.json()]).toEqual([401, { error: MEMBERS_ONLY, code: 'SIGN_IN' }])
+  })
+
+  // Whole-platform walk M18 (review G14): a hat no role is sourced from is named from the read's details, never by its id,
+  // and only to a member who may read the tree (Rule 4).
+  const named = async (tree: string) => {
+    const r = makeChangeRepo(`schema_version: "2.0"\ngovernance:\n  model: "solo-maintainer"\n  membership: { tree: hats-main }\n  roles:\n    council: { hat: "${COUNCIL}" }\n    stewards: { hat: "${STEWARDS}" }\n  decisions: []\n`)
+    cleanup.push(r)
+    writeFileSync(join(r, 'data', 'systems.yaml'), `schema_version: "2.0"\nsystems:\n  - ${tree}\n`)
+    git(r, 'add -A'); git(r, 'commit -qm "fixture: the tree"')
+    const dir = mkdtempSync(join(tmpdir(), 'visibility-store-')); cleanup.push(dir)
+    const privateStore = await openPrivateStore(r, { dir }); stores.push(privateStore)
+    const now = () => NOW
+    const reading = (account: string): WearerReading => ({ ok: true, system: 'hats-main', chain: CELO, account, hats: [STEWARDS], block: 100, readAt: NOW.toISOString() })
+    const reader = { wearer: vi.fn(async (_s: Record<string, unknown>, account: string) => reading(account)), wearers: vi.fn() }
+    const membership = new Membership({ repo: r, reader: reader as never, now })
+    const read = vi.fn(async () => ({ ok: true, readAt: NOW.toISOString(), facts: { hats: [
+      { id: TOP, details: 'Riverbend Growers' }, { id: COUNCIL, details: 'The council' }, { id: STEWARDS, details: 'ipfs://bafy-stewards' },
+      { id: OPS, details: 'Operations' },
+    ] }, sections: [], open: null }))
+    const app = createApp(r, a => {
+      mountSession(a, { repo: r, store: privateStore, membership, hosted: true, now })
+      mountVisibility(a, { repo: r, membership, systems: { read } as never, privateStore: () => privateStore })
+    }, { request: withRequest({ repo: r, hosted: true, membership, store: privateStore, now }) })
+    await membership.forAct(A1)
+    const { token } = await createSession(privateStore, A1, now)
+    const res = await app.request('/api/visibility', { headers: { cookie: `house_session=${token}` } })
+    expect(res.status).toBe(200)
+    return ((await res.json()) as VisibilityAnswer).tree.map(h => [h.hat, h.name])
+  }
+
+  it('names a hat no role is sourced from by the tree read’s details (the top hat by its name, not its id)', async () => {
+    expect(await named(`{ id: hats-main, kind: hats-tree, name: Hats, chain: "${CELO}", address: "13", driver: hats-tree }`)).toEqual([
+      [TOP, 'Riverbend Growers'], [COUNCIL, 'council'], [STEWARDS, 'stewards'], [OPS, 'Operations'],
+    ])
+  })
+
+  it('a member the tree is kept from is told no name the tree’s read holds: each such hat is its id', async () => {
+    expect(await named(`{ id: hats-main, kind: hats-tree, name: Hats, chain: "${CELO}", address: "13", driver: hats-tree, visibility: "hat:${COUNCIL}" }`)).toEqual([
+      [TOP, '0x0000000d'], [COUNCIL, 'council'], [STEWARDS, 'stewards'], [OPS, '0x0000000d.0002'],
+    ])
   })
 })

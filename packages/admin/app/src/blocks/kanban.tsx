@@ -1,5 +1,5 @@
 // packages/admin/app/src/blocks/kanban.tsx
-import type { ChangeView, Resource, StageOp } from '../api.ts'
+import type { ChangeView, RecordOp, Resource } from '../api.ts'
 import type { Mark } from '../machines.ts'
 import { useResources, useSystemsRead } from '../queries.ts'
 import { CARD_FIELDS, FACT_COLUMNS, cardFacts, kindLabel } from '../kinds.ts'
@@ -36,7 +36,7 @@ export function groupCards(rows: Resource[], group: string, columns: string[], v
 }
 
 /** A move is the group field set on the record (spec §4.3). A record with no id cannot be addressed (C-6). */
-export function moveOps(card: Resource, group: string, column: string): StageOp[] {
+export function moveOps(card: Resource, group: string, column: string): RecordOp[] {
   const record = changeKeyOf(card)
   return record ? [{ op: 'update', record, set: { [group]: column } }] : []
 }
@@ -44,7 +44,7 @@ export function moveOps(card: Resource, group: string, column: string): StageOp[
 /** The group field as your change will leave it, when the change touches it. */
 export function stagedValue(card: Resource, group: string, change: ChangeView | null): unknown {
   const key = changeKeyOf(card)
-  const op = key ? change?.ops.find(o => o.record === key) : undefined
+  const op = key ? change?.ops.find(o => o.op !== 'file' && o.record === key) : undefined
   if (!op) return undefined
   if (op.op === 'update' && Object.hasOwn(op.set, group)) return op.set[group]
   if ((op.op === 'create' || op.op === 'replace') && Object.hasOwn(op.value, group)) return op.value[group]

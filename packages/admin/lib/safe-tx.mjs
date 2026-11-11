@@ -16,6 +16,9 @@ export const SAFE_MIN_VERSION = '1.3.0'
 /** LOW-6: what a reading says when another transaction took the prepared one's nonce, so it can never execute. The
  *  server's Safe driver writes it; the prepared card reads it as `replaced` (DAO-OS L7 §11.3). */
 export const NONCE_MOVED = "the Safe's nonce changed; revise the proposal to prepare again"
+/** Fix I-1 (L7 Task 18 review): what a mismatch adds when the Safe Transaction Service has not seen the transaction, so
+ *  the reading is answered and never recorded. The server's attention says it; the proposal page draws it. */
+export const NOT_SEEN = 'Not recorded yet: the Safe service has not seen this transaction. Prepare it again and attach what it gives.'
 
 const ascii = s => new TextEncoder().encode(s)
 const toHex = bytes => `0x${Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')}`

@@ -1,6 +1,6 @@
 /** The library (design 2026-10-18, section 4): what an organization builds itself from. It reads the framework's
  *  shelf and the shelves an instance registers, and previews what adding an entry would change. */
-export type Shelf = 'board' | 'block' | 'rules' | 'system' | 'module' | 'pattern' | 'practice' | 'tool' | 'case' | 'resource'
+export type Shelf = 'board' | 'block' | 'rules' | 'system' | 'template' | 'wizard' | 'module' | 'pattern' | 'practice' | 'tool' | 'case' | 'resource'
 export type Standing = 'verified' | 'agent-read' | 'recorded' | 'stated'
 export type Maturity = 'raw' | 'field-informed' | 'reviewed'
 
@@ -23,6 +23,8 @@ export interface LibraryEntry {
   installs?: InstallOp[]
   config?: { properties: Record<string, { type?: string; default?: unknown; description?: string }>; required?: string[] }
   replaces?: string
+  /** A wizard entry (DAO-OS L7 §5.1): its wizard file, a path inside the entry's folder (`wizard.yaml`). */
+  wizard?: string
   builtin?: boolean
 }
 
@@ -73,6 +75,9 @@ export type ReceiptDecision = { rule: string; change: string } | { proposal: str
 export interface Receipt {
   id: string; entry: string; version: string; shelf: string
   created: { record: string; base: string | null }[]
+  /** What the add changed that the org already had (L7-D11): `base` its hash before the add, `after` its hash as the
+   *  add left it (null only while staged). Absent on a receipt that modified nothing. */
+  modified?: { record: string; base: string | null; after: string | null }[]
   status: 'installed' | 'removed'; by: string | null; at: string | null; decision: ReceiptDecision | null
   removed?: { by: string | null; at: string | null; decision: ReceiptDecision | null } | null
 }

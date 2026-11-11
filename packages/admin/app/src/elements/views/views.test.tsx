@@ -141,7 +141,7 @@ describe('ViewHeader', () => {
 
   it('draws where the collection was read from in its meta line (E-2)', () => {
     const { container } = render(<ViewHeader {...header({ from: { file: 'data/tasks.yaml', readAt: '2026-10-17T11:58:00Z' }, now: new Date('2026-10-17T12:00:00Z') })} />)
-    expect(container.querySelector('.vhead-meta')!.textContent).toBe('from data/tasks.yaml · read 2 min ago')
+    expect(container.querySelector('.vhead-meta')!.textContent).toBe('from the repository · read 2 min ago')
   })
 
   it('draws no tabs for a collection seen one way only', () => {

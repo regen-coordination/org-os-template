@@ -71,7 +71,7 @@ export function SystemsView({ systems, now, marks, label = 'Systems', from }: { 
   const box = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useViewToggle('list', box)
   const inspector = useInspector()
-  const empty = { title: 'No Systems here yet.', line: 'Add one from the Library, or give data/systems.yaml an entry.' }
+  const empty = { title: 'No Systems here yet.', line: 'Add one from the Library.' }
   return (
     <div ref={box} className="vlist">
       <ViewHeader label={label} views={LIST_MAP} value={mode} onView={v => setMode(v === 'map' ? 'map' : 'list')} filters={[]} onFilters={() => {}}

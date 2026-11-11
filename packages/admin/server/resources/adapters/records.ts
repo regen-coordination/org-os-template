@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { readRegistry, type Entity } from '../../registry.ts'
 import { addressability } from '../../../lib/data-validate.mjs'
 import { entityChanges } from '../changed.ts'
+import { displayNames } from '../../session/names.ts'
 import { fundingAttention } from '../attention.ts'
 import { absentCard, lostRegistryCard } from '../graph.ts'
 import { str, list } from '../util.ts'
@@ -49,7 +50,7 @@ export const records: Adapter = {
 
     const members = entries('members')
     if (members) {
-      const changes = await entityChanges(ctx.repo, 'members')
+      const changes = await entityChanges(ctx.repo, 'members', displayNames(ctx.repo, ctx.membership ?? null))
       for (const e of members) {
         nodes.push(node('person', 'members', e, str(e.name) ?? String(e.id), changes, { role: e.role ?? null, layer: e.layer ?? null, handles: e.handles ?? null }))
       }
@@ -57,7 +58,7 @@ export const records: Adapter = {
 
     const projects = entries('projects')
     if (projects) {
-      const changes = await entityChanges(ctx.repo, 'projects')
+      const changes = await entityChanges(ctx.repo, 'projects', displayNames(ctx.repo, ctx.membership ?? null))
       for (const e of projects) {
         const id = `project:${String(e.id)}`
         const lead = str(e.lead)
@@ -78,7 +79,7 @@ export const records: Adapter = {
 
     const funding = entries('funding-opportunities')
     if (funding) {
-      const changes = await entityChanges(ctx.repo, 'funding-opportunities')
+      const changes = await entityChanges(ctx.repo, 'funding-opportunities', displayNames(ctx.repo, ctx.membership ?? null))
       for (const e of funding) {
         const r = node('funding', 'funding-opportunities', e, str(e.title) ?? str(e.name) ?? String(e.id), changes, {
           deadline: e.deadline ?? null, fit: e.fit ?? null, next_action: e.next_action ?? null, org: e.org ?? null, url: e.url ?? null,
@@ -92,7 +93,7 @@ export const records: Adapter = {
 
     const partners = entries('relationships')
     if (partners) {
-      const changes = await entityChanges(ctx.repo, 'relationships')
+      const changes = await entityChanges(ctx.repo, 'relationships', displayNames(ctx.repo, ctx.membership ?? null))
       for (const e of partners) {
         const r = node('partner', 'relationships', e, str(e.partner) ?? str(e.name) ?? String(e.id), changes, {
           type: e.type ?? null, since: e.since ?? null, contact: e.contact ?? null, description: e.description ?? null,
@@ -105,7 +106,7 @@ export const records: Adapter = {
 
     const ideas = entries('ideas')
     if (ideas) {
-      const changes = await entityChanges(ctx.repo, 'ideas')
+      const changes = await entityChanges(ctx.repo, 'ideas', displayNames(ctx.repo, ctx.membership ?? null))
       for (const e of ideas) {
         const r = node('idea', 'ideas', e, str(e.title) ?? String(e.id), changes, { votes: e.votes ?? null, updated: e.updated ?? null, description: e.description ?? null })
         nodes.push(r)

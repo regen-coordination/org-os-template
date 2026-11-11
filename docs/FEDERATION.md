@@ -884,6 +884,8 @@ ecosystems (ring 3) — the counterpart of the internal note graph.
 - **View:** `@org-os/federation-map` — `<federation-map>` web component
   (packages/org-os-federation-map). Embedded on the site (`/federation` + home mini).
 - **Vault:** `org-os-kms render map html` → `renders/federation-map.html`
-  (self-contained, offline) + `renders/federation-portals.md` (note-graph doors).
+  (self-contained, offline) + `renders/federation-links.md` (the map's links, one a node, for the note graph).
+  In `map.json` v1 a node's link is its `portal` key, read from `source-systems.yaml`'s `portal_web` /
+  `portal_vault`; the keys stay until map.json v2. ("Portal" names the house's public site.)
 
 Design spec: `docs/superpowers/specs/2026-07-19-federation-map-design.md`.

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { Route, Switch } from 'wouter'
 import App from '../App.tsx'
-import ProposalPage from './Proposal.tsx'
+import ProposalPage, { PAGE_COMPARE, PAGE_NOW, PAGE_WAS, PROPOSAL_FILE_KEEP_MINE_WHY } from './Proposal.tsx'
 import Governance from './Governance.tsx'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
@@ -15,6 +15,7 @@ import { expectNoWriteControls } from '../test/publicPreview.tsx'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { api, type ProposalDetail } from '../api.ts'
 import { ageText } from '../time.ts'
+import { NOT_SEEN } from '../../../lib/safe-tx.mjs'
 
 // The proposal page (0.6 P2 spec §3.14): a head, then Decision rule, Changes, Events, System and Actions. What the
 // page offers is the server's `can`, and a disabled action says the server's `cannot` sentence; the page decides
@@ -173,7 +174,7 @@ describe('the proposal page', () => {
     fireEvent.click((await head()).getByRole('button', { name: 'Ratify' }))
     expect(await screen.findByText('Ratified as commit abcdef1.')).toBeTruthy()
     rerender(<Governance part="rules" />)
-    expect(await screen.findByText('Generated files are behind the data: run npm run generate:schemas and commit .well-known/.')).toBeTruthy()
+    expect(await screen.findByText('Generated files are behind the data: regenerate them from the records and commit them.')).toBeTruthy()
   })
 
   it('no Ratify while the rule is not met, even if a stale `can` held it', async () => {
@@ -184,7 +185,10 @@ describe('the proposal page', () => {
   })
 
   it('the actions are exactly `can`: each enabled one is in it, and each disabled one has the server’s sentence as its accessible description', async () => {
-    serve(proposalDetail({ id: ID, can: ['object', 'comment', 'withdraw', 'revise'], cannot: CANNOT }))
+    // an approve rule and a vote rule, so the ballot is drawn (walk M12: it is drawn only where a rule is decided by a vote)
+    const both = proposalDetail({ id: ID, can: ['object', 'comment', 'withdraw', 'revise'], cannot: CANNOT })
+    const voteRule = { rule: { id: 'r2', applies_to: ['all'], decide: { by: 'member', method: 'vote' } }, evaluation: result({}) }
+    serve({ ...both, evaluation: { ...both.evaluation, parts: [...both.evaluation.parts, voteRule] } } as never)
     page()
     const a = await actions()
     const enabled = (name: string) => (a.getByRole('button', { name }) as HTMLButtonElement).disabled === false
@@ -317,6 +321,38 @@ describe('the proposal page', () => {
     fireEvent.click(rule.getByRole('button', { name: 'Withdraw' }))
     await waitFor(() => expect(body(calls, `/api/proposals/${ID}/events`)).toEqual([{ kind: 'withdraw' }]))
   })
+
+  it('M12: no Vote under rules that take no vote; a vote rule draws it (walk M12)', async () => {
+    serve(proposalDetail({ id: ID, can: ['comment', 'object'], cannot: CANNOT }))
+    page()
+    await section('Actions')
+    expect(screen.queryByRole('radiogroup', { name: 'Vote' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Send vote' })).toBeNull()
+    cleanup()
+    serve(proposalDetail({ id: ID, method: 'vote', can: ['comment', 'vote'], cannot: CANNOT }))
+    page()
+    await section('Actions')
+    expect(screen.getByRole('radiogroup', { name: 'Vote' })).toBeTruthy()
+  })
+
+  it('M12: no "Touches nothing yet" when what it touches is named on the Touches line and not on the map', async () => {
+    serve(proposalDetail({ id: ID, can: ['comment'], cannot: CANNOT,
+      ops: [{ op: 'update', record: 'knowledge:claim-evidence/seed-swap-notes', set: { public_use: 'reviewed-for-guidance' }, base: 'h1' }] } as never),
+    'carla', { 'GET /api/resources': [] })
+    page()
+    await screen.findByRole('complementary', { name: 'About this proposal' })
+    await waitFor(() => expect(screen.getByRole('complementary', { name: 'About this proposal' }).textContent).toContain('Touches'))
+    expect(screen.queryByText('Touches nothing yet.')).toBeNull()
+  })
+
+  it('says who opened it by the name the server gives, not the id (walk W5)', async () => {
+    serve(proposalDetail({ id: ID, author: 'ops-lead', names: { 'ops-lead': 'Ops Lead' }, can: ['comment'], cannot: CANNOT } as never))
+    page()
+    await head()
+    const meta = () => [...document.querySelectorAll('header.rh .rh-m')].map(m => m.textContent)
+    await waitFor(() => expect(meta()[0]).toMatch(/^opened .* by Ops Lead$/))
+    expect(document.querySelector('header.rh')!.textContent).not.toContain('by ops-lead')
+  })
 })
 
 describe('Changes', () => {
@@ -333,6 +369,21 @@ describe('Changes', () => {
     expect(within(value).getByText('ana').closest('s')).toBeNull()
   })
 
+  it('a move into the repository is drawn in the server’s words (`private[].says`, DAO-OS L6 Task 20); no other private op is', async () => {
+    const says = 'Moves Ops notes into the repository, readable by members.'
+    // as shownTo serves it to a viewer admitted to its private part: the placeholders out of `ops`, the part in `private`
+    serve(proposalDetail({ id: ID, ops: [] as never, current: [], diff: '',
+      private: [
+        { ref: 'stg-1', class: 'workspace', op: { op: 'move-to-git', collection: 'pages', id: 'p-0123456789ab', level: 'members' }, says },
+        { ref: 'stg-2', class: 'records', op: { op: 'update-record', collection: 'projects', id: 'p1', set: { budget: 9 } } },
+      ] } as never))
+    page()
+    const ch = within(await section('Changes'))
+    const move = await ch.findByText(says)
+    expect(move.closest('.pp-op')).not.toBeNull()
+    expect(ch.queryByText(/budget/)).toBeNull()
+  })
+
   it('a stale op shows what the trunk holds now, and Keep mine / Take theirs to the author alone', async () => {
     const stale = proposalDetail({ id: ID, stale: [0], derived: 'stale', can: ['comment', 'replay', 'withdraw', 'revise'], cannot: CANNOT,
       current: [{ id: 'garden', title: 'Garden seat', lead: 'bruno' }] })
@@ -346,6 +397,20 @@ describe('Changes', () => {
     expect(ch.getByRole('button', { name: 'Take theirs' })).toBeTruthy()
     // Replay is not offered as a plain action while the proposal is stale: the choice is the author's
     expect((await actions()).queryByRole('button', { name: 'Replay' })).toBeNull()
+  })
+
+  // L6 carries K6, its safe-side part: a stale file op has no Compare yet (base, theirs, mine), so Keep mine is not offered
+  // over it blind, as the tray does not (PF-R84); Take theirs is, with one sentence on why.
+  it('a stale file op offers Take theirs alone, and says why Keep mine is not offered', async () => {
+    const stale = proposalDetail({ id: ID, stale: [0], derived: 'stale', can: ['comment', 'replay', 'withdraw', 'revise'], cannot: CANNOT,
+      ops: [{ op: 'file', path: 'docs/plans/garden.md', text: 'Mine.\n', base: 'b'.repeat(40) }] as never, current: [null] })
+    const { calls } = serve(stale, 'carla', { [`POST /api/proposals/${ID}/replay`]: proposalDetail({ id: ID }) })
+    page()
+    const ch = within(await section('Changes'))
+    expect(ch.queryByRole('button', { name: 'Keep mine' })).toBeNull()
+    expect(ch.getByText(PROPOSAL_FILE_KEEP_MINE_WHY)).toBeTruthy()
+    fireEvent.click(ch.getByRole('button', { name: 'Take theirs' }))
+    await waitFor(() => expect(body(calls, `/api/proposals/${ID}/replay`)).toEqual([{ choose: 'theirs' }]))
   })
 
   it('to anyone but the author a stale op shows its value now, and no choice', async () => {
@@ -443,6 +508,31 @@ describe('System', () => {
     const sys = within(await section('System'))
     expect(sys.getByText(/this transaction is not the one the proposal prepared: its value differs/)).toBeTruthy()
     expect(sys.getByText('It cannot decide this proposal as it stands: withdraw the proposal and propose again, or revise it and attach a new transaction.')).toBeTruthy()
+  })
+
+  // Fix I-1: a mismatch the Safe service has not seen is answered and never recorded; the page still says it.
+  const UNSEEN = 'Another hat was created under the admin since this was prepared: prepare it again.'
+  const UNSEEN_SAID = `treasury-safe read a different transaction: ${UNSEEN} ${NOT_SEEN}`
+
+  it('Check now that reads an unrecorded mismatch says it, with its detail and that it is not recorded yet', async () => {
+    serve(systemDetail([attach]), 'carla', {
+      [`POST /api/proposals/${ID}/check`]: { ...systemDetail([attach]), appended: false, reading: { ok: true, outcome: 'mismatch', submitted: false, detail: UNSEEN } },
+    })
+    page()
+    const sys = within(await section('System'))
+    fireEvent.click(sys.getByRole('button', { name: 'Check now' }))
+    expect(await sys.findByText(UNSEEN_SAID, { selector: '[role="status"]' })).toBeTruthy()
+    expect(sys.queryByText('Read: nothing changed.')).toBeNull()
+  })
+
+  it('a visit whose view carries an unrecorded mismatch draws it on the card and under it, for every visitor', async () => {
+    serve(systemDetail([attach], { attention: { level: 'warn', text: UNSEEN_SAID, mismatch: UNSEEN } as never }), 'bruno')
+    page()
+    const sys = within(await section('System'))
+    const card = sys.getByRole('region', { name: 'Not what was prepared' })
+    expect(card.textContent).toContain(UNSEEN)
+    expect(sys.getByText(UNSEEN_SAID, { selector: 'p.att' })).toBeTruthy()
+    expect(sys.queryByText('Not read yet: Check now reads it.')).toBeNull()
   })
 
   it('nothing attached yet: Prepare transaction reads the hash and the Safe link (read-only), and Attach sends what prepare gave', async () => {
@@ -689,12 +779,13 @@ describe('the proposal page in the house (C7)', () => {
   })
 })
 
-// --- DAO-OS L6 Task 16b (R-L6-SUGGEST), ported by C11 fix round 1: a suggested page edit is a proposal holding one
-// `file` op (L6 §11.2). Before the port the page crashed on it: Touches read `op.record`, which a file op has not.
+// --- DAO-OS L6 Task 16b (R-L6-SUGGEST): a suggested page edit is a proposal holding one `file` op (L6 §11.2). Before L4c's
+// port (C11 fix round 1) the page crashed on it: Touches read `op.record`, which a file op has not.
 describe('a proposal holding a file op (a suggested page edit)', () => {
-  it('draws without failing: Touches links the page by its path, and the diff is there on request', async () => {
+  it('draws: Touches links the page, Changes names the file, Compare shows old next to new, and the diff stays', async () => {
     const diff = '--- a/pages/handbook-1a2b.md\n+++ b/pages/handbook-1a2b.md\n-The handbook starts here.\n+The handbook starts here. Suggested.\n'
     serve(proposalDetail({ id: ID, title: 'Edit to Handbook', diff, current: [null],
+      compare: [{ was: 'The handbook starts here.\n', now: 'The handbook starts here. Suggested.\n' }],
       ops: [{ op: 'file', path: 'pages/handbook-1a2b.md', text: '---\nid: handbook-1a2b\n---\nThe handbook starts here. Suggested.\n', base: 'b0' }] as never }))
     page()
     expect((await screen.findByRole('heading', { level: 1, name: 'Edit to Handbook' })).textContent).toBe('Edit to Handbook')
@@ -702,7 +793,37 @@ describe('a proposal holding a file op (a suggested page edit)', () => {
     expect(within(about).getByRole('link', { name: 'pages/handbook-1a2b.md' }).getAttribute('href')).toBe('/p/handbook-1a2b')
     const changes = within(await section('Changes'))
     expect(changes.queryByText(/undefined/)).toBeNull()
+    expect(changes.getByText('(whole file)')).toBeTruthy()
+    expect(changes.getByRole('link', { name: 'pages/handbook-1a2b.md' }).getAttribute('href')).toBe('/p/handbook-1a2b')
+    // Compare, old next to new, without asking: the page as it was beside the proposed text.
+    const compare = within(changes.getByRole('region', { name: 'Compare' }))
+    expect(compare.getByText(PAGE_COMPARE)).toBeTruthy()
+    const wells = [...changes.getByRole('region', { name: 'Compare' }).querySelectorAll('figure')].map(f => [f.querySelector('figcaption')!.textContent, f.querySelector('pre')!.textContent])
+    expect(wells).toEqual([[PAGE_WAS, 'The handbook starts here.\n'], [PAGE_NOW, 'The handbook starts here. Suggested.\n']])
+    // and the diff, still on request
     fireEvent.click(changes.getByRole('button', { name: 'Show the diff' }))
     expect(changes.getByText(/\+The handbook starts here\. Suggested\./)).toBeTruthy()
+  })
+})
+// --- end L6 Task 16b
+
+// DAO-OS L6 Task 20 review I2 (PF-R97): a page's widening says how many subpages go public with it.
+describe("a proposal that makes a page public", () => {
+  it('says, beside its Compare, how many subpages that take its level become public with it', async () => {
+    serve(proposalDetail({ id: ID, title: 'Publish the handbook', current: [null],
+      compare: [{ was: 'The handbook.\n', now: 'The handbook.\n', widens: 4 }],
+      ops: [{ op: 'file', path: 'pages/handbook-1a2b.md', text: '---\nid: handbook-1a2b\nvisibility: public\n---\nThe handbook.\n', base: 'b0' }] as never }))
+    page()
+    const changes = within(await section('Changes'))
+    expect(changes.getByText('Once decided, this page and its 4 subpages that take its level are public, for anyone to read.')).toBeTruthy()
+  })
+})
+
+describe('a proposal holding no page op (DAO-OS L6 Task 16b)', () => {
+  it('draws no Compare', async () => {
+    serve(proposalDetail({ id: ID }))
+    page()
+    await section('Changes')
+    expect(screen.queryByRole('region', { name: 'Compare' })).toBeNull()
   })
 })

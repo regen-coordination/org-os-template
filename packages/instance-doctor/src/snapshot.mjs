@@ -14,11 +14,13 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import yaml from 'js-yaml';
 
 import { CANONICAL_MACHINERY, localScriptTargets } from './checks/machinery.mjs';
+import { personalMarkers } from './checks/agent-layer.mjs';
 
 const RECEIPT_RE = /^sync-(receipt-)?\d{4}-\d{2}-\d{2}\.md$/;
 const MEMORY_DATE_RE = /^(\d{4}-\d{2}-\d{2})\.md$/;
@@ -119,6 +121,122 @@ function readMemory(dir) {
   };
 }
 
+// ── the agent layer (DAO-OS L6 §14, Q76) ────────────────────────────────────────────────────────────
+
+/** The agent layer's files (L6 §3.1; packages/admin/lib/workspace/targets.mjs keeps the same list). */
+const AGENT_LAYER = /^(?:memory\/|docs\/plans\/|docs\/agent-plans\/|MEMORY\.md$|HEARTBEAT\.md$)/;
+const AGENT_ROOTS = ['memory', 'docs/plans', 'docs/agent-plans', 'MEMORY.md', 'HEARTBEAT.md'];
+/** A file past this is not read whole for markers: it is listed as not read. */
+const AGENT_FILE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Every file under `rel` on disk (links are not followed), as /-separated paths from `root`. */
+function filesUnder(root, rel) {
+  const full = path.join(root, rel);
+  let st;
+  try {
+    st = lstatSync(full);
+  } catch {
+    return [];
+  }
+  if (st.isFile()) return [rel];
+  if (!st.isDirectory()) return [];
+  let entries;
+  try {
+    entries = readdirSync(full);
+  } catch {
+    return [];
+  }
+  return entries.flatMap((name) => filesUnder(root, `${rel}/${name}`));
+}
+
+/** The agent-layer files git holds or would take (tracked, or untracked and not ignored); every one on disk when the
+ *  folder is no repository. A file git ignores is not in git, so it is not at members. */
+function agentLayerPaths(root, isRepo) {
+  if (isRepo) {
+    const out = gitOut(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...AGENT_ROOTS]);
+    if (out !== null) {
+      return [...new Set(out.split('\0').filter((p) => p !== '' && AGENT_LAYER.test(p) && existsSync(path.join(root, p))))].sort();
+    }
+  }
+  return AGENT_ROOTS.flatMap((rel) => filesUnder(root, rel)).filter((p) => AGENT_LAYER.test(p)).sort();
+}
+
+/** The names data/members.yaml lists: what a file's text is searched for (never kept beside its counts). */
+function memberNames(root) {
+  const doc = readYaml(path.join(root, 'data', 'members.yaml'));
+  const list = Array.isArray(doc?.members) ? doc.members : [];
+  return list.map((m) => (m && typeof m.name === 'string' ? m.name : null)).filter(Boolean);
+}
+
+/** Each agent-layer file with its level and its personal-data markers, as counts: the texts are read and let go. */
+function readAgentLayer(root, isRepo) {
+  const names = memberNames(root);
+  return agentLayerPaths(root, isRepo).map((rel) => {
+    let markers = null;
+    try {
+      const full = path.join(root, rel);
+      if (statSync(full).size <= AGENT_FILE_MAX_BYTES) markers = personalMarkers(readFileSync(full, 'utf-8'), names);
+    } catch {
+      markers = null;
+    }
+    return { path: rel, level: 'members', markers };
+  });
+}
+
+/** The private store's file as the Hub finds it (packages/admin/server/private/paths.ts): `ORG_OS_PRIVATE_DIR` (from
+ *  the instance's root when relative), else `<root>/.org-os/private`; `house.db` in it. */
+function storeFile(root, env) {
+  const set = env.ORG_OS_PRIVATE_DIR;
+  const dir = set !== undefined && String(set).trim() !== '' ? path.resolve(root, String(set)) : path.join(root, '.org-os', 'private');
+  return path.join(dir, 'house.db');
+}
+
+/** The real path, where there is one. */
+function real(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+
+/**
+ * The environment the target's store is looked for under (Task 15 review M-4). In hub mode (`--dir` naming an instance
+ * the current directory is not inside), an absolute `ORG_OS_PRIVATE_DIR` is the shell's setting for the instance it was
+ * set up for, never the target's: it is left out, so the target's own place is read (a relative one is read from the
+ * target's root, as that instance's Hub reads it). From inside the instance, the environment stands as it is.
+ */
+export function storeEnvFor(env, dir, cwd) {
+  const set = env.ORG_OS_PRIVATE_DIR;
+  if (set === undefined || String(set).trim() === '' || !path.isAbsolute(String(set))) return env;
+  const rel = path.relative(real(dir), real(cwd));
+  if (rel === '' || (!rel.startsWith(`..${path.sep}`) && rel !== '..' && !path.isAbsolute(rel))) return env;
+  const { ORG_OS_PRIVATE_DIR: _shells, ...rest } = env;
+  return rest;
+}
+
+/** How many Council memory entries the store holds (L6 §14): a count, read read-only; null when there is no store, or
+ *  it cannot be read. Nothing is created, and no title is read. */
+function readCouncilMemory(root, env) {
+  const file = storeFile(root, env);
+  if (!existsSync(file)) return null;
+  let db = null;
+  try {
+    const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
+    db = new DatabaseSync(file, { readOnly: true });
+    const row = db.prepare('SELECT count(*) AS n FROM records WHERE collection = ?').get('council-memory');
+    return Number(row?.n ?? 0);
+  } catch {
+    return null;
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* closing what failed to open */
+    }
+  }
+}
+
 /**
  * Run one of the framework's validators against the target directory and
  * summarise the result. Never throws: a validator that cannot run is reported
@@ -166,8 +284,10 @@ function commitsBehind(frameworkDir, lastSyncCommit) {
  * @param {string} opts.frameworkDir  the org-os framework checkout to assess against
  * @param {boolean} [opts.runValidators=true]
  * @param {number} [opts.now]          injected clock, for deterministic tests
+ * @param {boolean} [opts.beforeWidening=false]  membership is about to widen (Q67): the agent layer's markers block
+ * @param {object} [opts.env]          where the private store is looked for (ORG_OS_PRIVATE_DIR); default process.env
  */
-export function readInstance(dir, { frameworkDir, runValidators = true, now = Date.now() } = {}) {
+export function readInstance(dir, { frameworkDir, runValidators = true, now = Date.now(), beforeWidening = false, env = process.env } = {}) {
   const root = path.resolve(dir);
   const fw = path.resolve(frameworkDir);
 
@@ -212,6 +332,7 @@ export function readInstance(dir, { frameworkDir, runValidators = true, now = Da
   }
 
   const { memoryLatestISO, syncReceipts } = readMemory(root);
+  const git = readGit(root);
   const frameworkPkg = readJson(path.join(fw, 'package.json'));
 
   return {
@@ -232,11 +353,15 @@ export function readInstance(dir, { frameworkDir, runValidators = true, now = Da
     machinery,
     dirs: { migrations: existsSync(path.join(root, 'migrations')) },
 
-    git: readGit(root),
+    git,
     commitsBehindFramework: commitsBehind(fw, federation?.metadata?.last_sync_commit),
 
     memoryLatestISO,
     syncReceipts,
+
+    agentLayer: readAgentLayer(root, git.isRepo),
+    councilMemory: readCouncilMemory(root, env),
+    beforeWidening: Boolean(beforeWidening),
 
     validators: runValidators
       ? {

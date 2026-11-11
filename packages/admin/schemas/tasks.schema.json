@@ -1,0 +1,109 @@
+{
+  "$id": "orgos://registry/tasks",
+  "type": "object",
+  "required": [
+    "id"
+  ],
+  "additionalProperties": true,
+  "x-order": [
+    "id",
+    "title",
+    "status",
+    "owner",
+    "due",
+    "project",
+    "meeting",
+    "proposal",
+    "page",
+    "priority"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Instance-defined vocabulary; a board's columns come from its saved view, else the values in the order first met.",
+      "examples": [
+        "open",
+        "doing",
+        "done"
+      ]
+    },
+    "owner": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "A member id, or a CAIP-10 account id."
+    },
+    "due": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "project": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "A projects id."
+    },
+    "related_project": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The project field of an instance's older tasks; read when `project` is absent (taskProject)."
+    },
+    "meeting": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "A meetings id."
+    },
+    "proposal": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "A proposal id."
+    },
+    "page": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "A page id."
+    },
+    "priority": {
+      "type": [
+        "string",
+        "number",
+        "null"
+      ]
+    },
+    "from": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Where an imported task came from (L6 §9.6): its source, its id there, and when it was exported."
+    }
+  },
+  "$comment": "DAO-OS L6 §7.2. Optional fields accept null: in these YAML registries an explicitly-unset field is written as `null`."
+}

@@ -4,7 +4,7 @@ import { Icon } from '../design/Icon.tsx'
 import { closeDialog, useSlot } from '../parts/panels.tsx'
 import { openViewAs, useViewer, viewerWord } from '../viewAs/ViewAs.tsx'
 import { Identity } from './Identity.tsx'
-import { HOUSE_SECTIONS, countText, type HouseCounts, type Identity as Who, type SectionId } from './sections.ts'
+import { HOUSE_SECTIONS, PORTAL_LINKED, countText, type HouseCounts, type Identity as Who, type SectionId } from './sections.ts'
 
 /** The sections the bottom bar leaves to More (§5.4, C-7), in the house's order. */
 export const UNDER_MORE: readonly SectionId[] = ['systems', 'roles', 'treasury', 'library', 'changes']
@@ -13,7 +13,7 @@ export const UNDER_MORE: readonly SectionId[] = ['systems', 'roles', 'treasury',
 const DRAG_CLOSE = 80
 
 /** The More sheet (§5.4): a bottom sheet over the scrim, with a grab handle, listing Systems, Roles, Treasury,
- *  Library, Changes (with their counts), Public door ↗, View as… (who is viewed trailing it), then the signed-in
+ *  Library, Changes (with their counts), Portal ↗, View as… (who is viewed trailing it), then the signed-in
  *  identity, drawn whole. 44px rows, 16px labels. It is a modal `<dialog>` (showModal): focus moves in; Esc, a
  *  tap on the scrim, a followed link or a drag down past 80px closes it, and focus returns to More. It is the
  *  panels' `overlay` slot, so the Escape stack closes it first and hands focus back. `inline` draws it open in
@@ -78,10 +78,10 @@ export function MoreSheet({ id, open, onClose, opener, counts, identity, current
                 </Link>
               )
             })}
-            <a className="sheet-a" href="/door" target="_blank" rel="noopener noreferrer">
-              <Icon name="globe" /><span className="sheet-l">Public door</span><span className="sr-only"> (opens in a new tab)</span>
+            {PORTAL_LINKED && <a className="sheet-a" href="/portal" target="_blank" rel="noopener noreferrer">
+              <Icon name="globe" /><span className="sheet-l">Portal</span><span className="sr-only"> (opens in a new tab)</span>
               <Icon name="external" size="xs" />
-            </a>
+            </a>}
             <button type="button" className="sheet-a" aria-label={`View as…, ${viewerWord(viewer)}`} onClick={viewAs}>
               <Icon name="eye" /><span className="sheet-l">View as…</span>{' '}<span className="n">{viewerWord(viewer)}</span>
             </button>

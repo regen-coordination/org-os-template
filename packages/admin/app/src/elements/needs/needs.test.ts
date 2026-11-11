@@ -172,6 +172,20 @@ describe('needsFrom: the items, from the Systems’ Resources and the open propo
     expect(ordered.slice(at + 1).some(i => i.youActed)).toBe(true)
   })
 
+  // Walk M11: the knowledge board said "Needs you: last good read 17 d ago" for a peer, and /needs did not list it.
+  it('a commons peer that could not be read → failed-read, opening the commons, with its last good read; an awaiting entry is none here', () => {
+    const peer: Resource = { id: 'knowledge:peer:connector:hillside', kind: 'knowledge', board: 'organization', name: 'hillside couldn’t be read', status: null,
+      attention: { level: 'alert', text: 'last good read 17 d ago' }, changed: null, facts: { peer: 'connector:hillside', relation: 'connector', error: 'timeout' },
+      source: { path: 'data/kb', editable: false } }
+    const commons: Resource = { ...peer, id: 'knowledge:commons', name: 'Commons', attention: null, facts: {} }
+    const awaiting: Resource = { ...peer, id: 'knowledge:encyclopedia-entry/seed-swap', name: 'Seed swap', attention: { level: 'warn', text: 'raw' }, facts: { lane: 'awaiting' } }
+    const items = needsFrom([commons, peer, awaiting], [], ACTOR, FIXED_NOW)
+    expect(items).toEqual([
+      { id: 'failed-read:knowledge:peer:connector:hillside', kind: 'failed-read', title: 'hillside couldn’t be read', href: '/c/knowledge',
+        context: 'last good read 17 d ago', nodes: [], facts: peer.facts },
+    ])
+  })
+
   it('a proposal the actor approved that is still open → youActed, "you approved" in moss', () => {
     const item = one(all(), 'proposal', String(ADD_SIGNER.id))
     expect(item.youActed).toBe(true)

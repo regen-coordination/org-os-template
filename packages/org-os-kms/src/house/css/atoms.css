@@ -1,0 +1,118 @@
+/* kms house CSS — atoms (L4 §6.1, §7; spec §4-6). Ported from the house gallery's controls and data atoms.
+   Tokens only. Hover states live inside @media (hover: hover); transitions name their properties. */
+
+/* button (L4 §7.1) */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-5); height: var(--h-ctl); padding: 0 var(--sp-8);
+  border-radius: var(--radius-ctl); font: var(--fw-medium) var(--fs-ui)/var(--lh-ui) var(--sans); white-space: nowrap;
+  background: var(--raised); color: var(--ink); border: var(--rule-w) solid var(--rule-strong); box-shadow: var(--shadow-card);
+  transition-property: background-color, border-color, scale, opacity; transition-duration: var(--dur-1); transition-timing-function: var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn svg.i { width: var(--ic-sm); height: var(--ic-sm); }
+.btn.has-ico { padding-inline-start: var(--sp-7); }
+.btn:not(:disabled):not([aria-disabled="true"]):active { scale: var(--press-scale); transition-duration: var(--dur-press); }
+.btn.primary { background: var(--solid); color: var(--on-solid); border-color: var(--solid); }
+.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--mute); }
+.btn.icon { width: var(--h-ctl); padding: 0; }
+.btn.sm { height: var(--h-ctl-sm); padding: 0 var(--sp-7); font-size: var(--fs-tiny); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: var(--o-disabled); cursor: not-allowed; }
+@media (hover: hover) {
+  .btn:not(:disabled):hover { background: var(--wash); }
+  .btn.primary:not(:disabled):hover { background: var(--solid); opacity: var(--o-hover); }
+  .btn.ghost:not(:disabled):hover { background: var(--wash); color: var(--ink); }
+}
+@media (pointer: coarse) { .btn { height: var(--h-ctl-touch); padding: 0 var(--sp-10); } .btn.icon { width: var(--h-ctl-touch); } }
+.spin { width: var(--ic-sm); height: var(--ic-sm); flex: none; border-radius: 50%; border: var(--stroke-w) solid currentColor; border-inline-end-color: transparent; }
+@media (prefers-reduced-motion: no-preference) { .spin { animation: kms-spin var(--dur-spin) linear infinite; } }
+@keyframes kms-spin { to { rotate: 1turn; } }
+
+/* segmented control (L4 §7.3): List · Map — a group of toggle buttons with aria-pressed */
+.seg { display: inline-flex; padding: var(--sp-2); gap: var(--sp-2); background: var(--wash); border-radius: calc(var(--radius-ctl) + var(--sp-2)); }
+.seg button { height: var(--h-ctl-sm); padding: 0 var(--sp-7); border-radius: var(--radius-ctl); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute);
+  display: inline-flex; align-items: center; gap: var(--sp-5); transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.seg button[aria-pressed="true"], .seg button[aria-selected="true"] { background: var(--raised); color: var(--ink); box-shadow: var(--shadow-card); }
+.seg svg.i { width: var(--ic-sm); height: var(--ic-sm); }
+@media (hover: hover) { .seg button[aria-pressed="false"]:hover { color: var(--ink); } }
+@media (pointer: coarse) { .seg button { height: var(--h-ctl-touch); } }
+
+/* kbd */
+kbd { display: inline-flex; align-items: center; justify-content: center; min-width: var(--h-kbd); height: var(--h-kbd); padding: 0 var(--sp-4);
+  font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--sans); color: var(--faint); background: var(--raised);
+  border: var(--rule-w) solid var(--rule-strong); border-bottom-width: var(--rule-w-heavy); border-radius: var(--radius-xs); }
+
+/* kind tile (L4 §7.14): kinds by glyph, never hue */
+.ktile { width: var(--h-ktile); height: var(--h-ktile); border-radius: var(--radius-sm); background: var(--wash); color: var(--mute); display: grid; place-items: center; flex: none; }
+.ktile.lg { width: var(--h-ktile-header); height: var(--h-ktile-header); border-radius: var(--radius); } .ktile.lg svg.i { width: var(--ic-lg); height: var(--ic-lg); }
+.ktile.attn { background: var(--attn-soft); color: var(--attn); }
+.ktile.accent { background: var(--accent-soft); color: var(--accent); }
+.ktile.dashed { background: transparent; border: var(--rule-w) dashed var(--rule-strong); }
+
+/* marks (L4 §6.1; spec §4-6): a shape, aria-hidden, and always the word */
+.sm { display: inline-flex; align-items: center; gap: var(--sp-5); font: var(--fw-medium) var(--fs-tiny)/var(--lh-tiny) var(--sans); color: var(--mute); white-space: nowrap; }
+.sm > i { width: var(--mark); height: var(--mark); flex: none; display: inline-block; box-sizing: border-box; }
+.sm.needs { color: var(--attn); } .sm.needs > i { border-radius: 50%; background: var(--attn); }
+.sm.staged { color: var(--accent); } .sm.staged > i { border-radius: var(--radius-mark); background: var(--accent); }
+.sm.stale { color: var(--attn); } .sm.stale > i { border-radius: var(--radius-mark); border: var(--stroke-w) solid var(--attn); }
+.sm.open > i { border-radius: 50%; border: var(--stroke-w) solid var(--mute); }
+.sm.ok > i { border-radius: 50%; background: var(--mute); }
+.sm.done > i { width: var(--mark-check); height: var(--mark-check); background: none; border: 0; }
+.sm.done > i::before { content: ""; display: block; width: var(--mark-tick-w); height: var(--mark-tick-h); margin: 0 0 0 var(--mark-tick-x); border: solid var(--mute); border-width: 0 var(--stroke-w) var(--stroke-w) 0; rotate: 45deg; }
+.sm.failed { color: var(--attn); } .sm.failed > i { height: var(--mark-bar); width: var(--w-mark-bar); background: var(--attn); border-radius: var(--radius-mark-bar); }
+.sm.aged > i { border-radius: 50%; border: var(--stroke-w) dashed var(--faint); }
+.sm.running > i { border-radius: 50%; border: var(--stroke-w) solid var(--mute); border-inline-end-color: transparent; }
+@media (prefers-reduced-motion: no-preference) { .sm.running > i { animation: kms-spin var(--dur-spin) linear infinite; } }
+.sm.closed { color: var(--faint); } .sm.closed > i { height: var(--mark-bar); width: var(--w-mark-bar); background: var(--faint); border-radius: var(--radius-mark-bar); }
+.sm.draft { color: var(--accent); } .sm.draft > i { border-radius: var(--radius-mark); border: var(--stroke-w) dashed var(--accent); }
+
+/* read age (L4 §7.9) */
+.age { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-tiny); color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.age svg.i { width: var(--ic-xs); height: var(--ic-xs); }
+.age.aged { color: var(--mute); }
+.age.failed { color: var(--attn); }
+
+/* visibility marker (L4 §7.10): globe "Public", lock "Internal only" */
+.vis { display: inline-flex; align-items: center; gap: var(--sp-4); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); white-space: nowrap; }
+.vis svg.i { width: var(--ic-sm); height: var(--ic-sm); }
+
+/* address chip (L4 §7.5): a record id, an AT URI's tail — click copies */
+.addr { display: inline-flex; align-items: center; gap: var(--sp-5); height: var(--h-addr); padding: 0 var(--sp-5) 0 var(--sp-6); border-radius: var(--radius-sm);
+  background: var(--wash); color: var(--ink); font: var(--fw-regular) var(--fs-code)/var(--lh-ui) var(--mono); font-variant-numeric: tabular-nums slashed-zero;
+  white-space: nowrap; position: relative; transition: background-color var(--dur-1) var(--ease); }
+.addr svg.i { width: var(--ic-xs); height: var(--ic-xs); color: var(--faint); }
+.addr .ic { position: relative; width: var(--ic-xs); height: var(--ic-xs); display: inline-grid; }
+.addr .ic > * { grid-area: 1 / 1; transition: opacity var(--dur-copy) var(--ease), scale var(--dur-copy) var(--ease), filter var(--dur-copy) var(--ease); }
+.addr .ic .ok { opacity: 0; scale: var(--scale-copy); filter: blur(var(--blur-copy)); color: var(--accent); }
+.addr[data-copied] .ic .cp { opacity: 0; scale: var(--scale-copy); filter: blur(var(--blur-copy)); }
+.addr[data-copied] .ic .ok { opacity: 1; scale: 1; filter: none; }
+@media (prefers-reduced-motion: reduce) { .addr .ic > * { transition-property: opacity; scale: 1 !important; filter: none !important; } }
+@media (hover: hover) { .addr:hover { background: var(--wash-strong); } }
+.addr.full { height: auto; white-space: normal; overflow-wrap: anywhere; line-height: var(--lh-addr-full); padding-block: var(--sp-2); }
+
+/* a link out of the commons (a peer's entry) */
+.ext { display: inline-flex; align-items: center; gap: var(--sp-3); color: var(--mute); }
+.ext svg.i { width: var(--ic-chev); height: var(--ic-chev); }
+
+/* note (L4 §7.4): the one line for empty, loading, error, not-yet */
+.note { display: flex; align-items: flex-start; gap: var(--sp-6); margin: 0; font-size: var(--fs-meta); color: var(--mute); line-height: var(--lh-body); }
+.note svg.i, .note .spin { margin-top: var(--sp-2); }
+.note.empty { color: var(--faint); }
+.note.error { color: var(--attn); }
+.note .act { color: var(--ink); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: var(--sp-3); text-decoration-thickness: from-font; }
+.note-block { padding: var(--sp-12) var(--sp-11); border: var(--rule-w) dashed var(--rule-strong); border-radius: var(--radius); display: grid; justify-items: start; gap: var(--sp-6); }
+.note-block b { font-weight: var(--fw-medium); color: var(--ink); font-size: var(--fs-body); }
+
+/* callout (house §10.1): an entry's caveat */
+.callout { display: flex; gap: var(--sp-8); padding: var(--sp-9) var(--sp-10); background: var(--sunken); border-radius: var(--radius); margin: 0 0 var(--sp-10); font-size: var(--fs-body); line-height: var(--lh-body); }
+.callout svg.i { color: var(--mute); margin-top: var(--sp-3); }
+.callout b { font-weight: var(--fw-medium); }
+
+/* band (house §5.9): preview / view as */
+.band { display: flex; align-items: center; gap: var(--sp-8); padding: var(--sp-6) var(--sp-12); background: var(--solid); color: var(--on-solid); font-size: var(--fs-ui); line-height: var(--lh-body); min-width: 0; flex-wrap: wrap; }
+.band svg.i { width: var(--ic-band); height: var(--ic-band); }
+.band b { font-weight: var(--fw-strong); }
+.band .btn { height: var(--h-ctl-sm); background: transparent; color: var(--on-solid); border-color: currentColor; box-shadow: none; margin-inline-start: auto; font-size: var(--fs-tiny); }
+@media (hover: hover) { .band .btn:not(:disabled):hover { background: transparent; opacity: var(--o-hover); } }
+.band.static { border-radius: var(--radius); align-items: flex-start; }
+.band.static > span { flex: 1 1 220px; min-width: 0; }
+.band.static > svg.i { margin-top: var(--sp-2); }

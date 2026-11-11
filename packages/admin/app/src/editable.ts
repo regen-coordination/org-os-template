@@ -24,7 +24,7 @@ export interface EditTarget {
 export function canEdit(t: EditTarget): boolean {
   if (t.resource && !t.resource.source?.editable) return false
   if (!t.known || !t.registry || !t.id || t.reg?.kind !== 'collection' || !t.reg.entries) return false
-  const mine = t.ops.filter(o => o.record === `${t.registry}:${t.id}`)
+  const mine = t.ops.filter(o => o.op !== 'file' && o.record === `${t.registry}:${t.id}`)
   const created = mine.some(o => o.op === 'create')
   const n = idCounts(t.reg.entries).get(t.id) ?? 0
   if (n !== (created ? 0 : 1)) return false

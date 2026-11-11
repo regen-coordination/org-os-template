@@ -1,9 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readGovernance, NO_MODEL } from '../../lib/governance-read.mjs'
-import { isKnown, lowestHat, readingObservations, walletOf, type Actor } from '../actor.ts'
-import { readRegistryOrEmptyCached } from '../registry.ts'
-import { effectiveRules, resolveRoles, rulesForClasses, mayDecideAlone, mayPropose, type RoleBook } from '../../lib/rules.mjs'
+import { isKnown, lowestHat, readingObservations, walletOf, type Actor, type KnownActor } from '../actor.ts'
+import { readRegistry, readRegistryOrEmptyCached } from '../registry.ts'
+import { effectiveRules, resolveRoles, rolesOf, rulesForClasses, mayDecideAlone, mayPropose, membershipTree, MAINTAINER, type RoleBook } from '../../lib/rules.mjs'
+import { WORKSPACE_DIRECT, isWorkspaceTarget, mayWriteWorkspace, rulesForTargets, workspaceRuleFor } from '../../lib/rules.mjs'
+import { WORKSPACE } from '../../lib/change-classes.mjs'
 import { orgName, str } from '../resources/util.ts'
 import type { RuleSummary } from '../changes/types.ts'
 import type { Rule } from '../../lib/rules.mjs'
@@ -24,11 +26,15 @@ export interface RuleContext {
    *  sourced from a hat holds the actor when they wear it, and not when the reading shows its hat taken off; with no
    *  reading, such a role holds nobody here. */
   observations?: HatObservation[]
+  /** The membership tree's ref (`membershipTree`, L5 spec §5.1), which admits a CAIP-10 actor to the workspace (L6 §3.2);
+   *  null or absent when there is none. */
+  tree?: string | null
 }
 
 /** The seam P2 replaces with the rule evaluator (architecture 4.5): same arguments, same answer.
- *  `classes` are F1 classOf's, one per class the change touches. */
-export type RuleFor = (ctx: RuleContext, classes: string[]) => RuleSummary
+ *  `classes` are F1 classOf's, one per class the change touches. `targets` (L6 §3.2, `targetsOf`): one list per op, most
+ *  specific first; without them each class is its own list, so the class `workspace` is judged at `workspace` alone. */
+export type RuleFor = (ctx: RuleContext, classes: string[], targets?: string[][]) => RuleSummary
 
 export const SOLO_RULE: RuleSummary = Object.freeze({
   direct: true, sentence: 'the maintainer decides alone', source: 'implied by model: solo-maintainer',
@@ -47,13 +53,24 @@ export function readRuleContext(repo: string, actor: Actor): RuleContext {
   let members: Record<string, unknown>[] = []
   // Through the read cache (L9 §7.6): every signed-in request reads it. A missing file is no members; frozen, as shared.
   try { members = readRegistryOrEmptyCached(repo, 'members').entries ?? [] } catch { members = [] }
+  let systems: Record<string, unknown>[] = []
+  try { systems = existsSync(join(repo, 'data', 'systems.yaml')) ? (readRegistry(repo, 'systems').entries ?? []) : [] } catch { systems = [] }
   const read = readGovernance(text) as {
     governance: Record<string, unknown> | null; shape: string; problems: string[]; modelImplied: boolean
   }
   return {
     org: orgName(repo), governance: read.governance, shape: read.shape, problems: read.problems, modelImplied: read.modelImplied, actor, members,
     observations: readingObservations(actor, roleHatsOf(read.governance)),
+    tree: membershipTree(read.governance, systems)?.tree ?? null,
   }
+}
+
+/** Walk I7, D4: whether the actor holds the org's `maintainer` role, as the rules resolve it (a written role, its own hat
+ *  reading counted; with none written, every person, F2-R2). An actor no member holds is none. */
+export function isMaintainer(ctx: RuleContext): boolean {
+  if (!isKnown(ctx.actor)) return false
+  const book = resolveRoles(ctx.governance, ctx.members ?? [{ id: ctx.actor.id, kind: ctx.actor.kind }], ctx.observations ?? [])
+  return rolesOf(book.roles, ctx.actor.id).includes(MAINTAINER)
 }
 
 /** The hats the governance roles are sourced from (L5 spec §7.1), each once. */
@@ -63,6 +80,8 @@ export function roleHatsOf(governance: Record<string, unknown> | null): string[]
 }
 
 const STAYS = 'so this change stays staged.'
+/** Walk W3, D3: a class no written rule covers, in words (no file path): members read it in the tray and on refusals. */
+export const noRuleCovers = (cls: string) => `No rule of this org covers ${cls} changes yet, so nobody can propose one until a rule does.`
 
 /** Written rules (F2): each class the change touches is looked up with `ruleFor`, and the change
  *  is direct only if the actor may apply every one of those classes alone (`mayDecideAlone`).
@@ -74,7 +93,7 @@ function writtenRules(ctx: RuleContext, rules: readonly Rule[], classes: string[
   const SOURCE = 'data/governance.yaml rules'
   if (!isKnown(actor)) return { direct: false, proposable: false, source: 'data/members.yaml', sentence: 'Read-only: no member matches this git identity.' }
   if (classes.length === 0) {
-    return { direct: false, proposable: false, source: SOURCE, sentence: `${org} has written rules in data/governance.yaml, and each change is judged by the rule of its class, ${STAYS}` }
+    return { direct: false, proposable: false, source: SOURCE, sentence: `${org} has written rules, and each change is judged by the rule of its class, ${STAYS}` }
   }
   const members = ctx.members ?? [{ id: actor.id, kind: actor.kind }]
   // Stage and apply have no proposal: the book holds the actor's own reading, read now for an act (L5 spec §7.3).
@@ -82,7 +101,7 @@ function writtenRules(ctx: RuleContext, rules: readonly Rule[], classes: string[
   const used: string[] = []
   let notAlone: { rule: Rule; sentence: string } | null = null
   for (const { class: cls, rule } of rulesForClasses(rules, classes)) {
-    if (rule === null) return { direct: false, proposable: false, source: SOURCE, sentence: `No rule in data/governance.yaml covers the class ${cls}; nobody can propose it until a rule does.` }
+    if (rule === null) return { direct: false, proposable: false, source: SOURCE, sentence: noRuleCovers(cls) }
     const proposed = mayPropose(rule, actor.id, book)
     if (proposed !== true) return { direct: false, proposable: false, source: `${SOURCE}: ${rule.id}`, sentence: proposed }
     const may = mayDecideAlone(rule, actor.id, book)
@@ -98,7 +117,7 @@ function writtenRules(ctx: RuleContext, rules: readonly Rule[], classes: string[
 /** The solo default (architecture 4.5): `model: solo-maintainer` (or no model declared at all) with
  *  no `rules` lets every member resolved as a person decide directly. Written rules go through
  *  `writtenRules`. Everything else is "not direct", with the sentence the tray shows. */
-export const effectiveRule: RuleFor = (ctx, classes) => {
+const classRule = (ctx: RuleContext, classes: string[]): RuleSummary => {
   const { actor, org } = ctx
   if (!isKnown(actor)) {
     return { direct: false, proposable: false, source: 'data/members.yaml', sentence: actor.unknown
@@ -125,23 +144,89 @@ export const effectiveRule: RuleFor = (ctx, classes) => {
     sentence: `${org} decides changes by ${String(model).replace(/-/g, ' ')}, and data/governance.yaml writes no rule for it, so nothing can be proposed until a rule is written.` }
 }
 
+// ---------------------------------------------------------------------------
+// DAO-OS L6 §3.2: workspace targets, judged by their own rule and never by `all`
+// ---------------------------------------------------------------------------
+
+/** The lists judged: `targets` as given, else one per class. */
+const listsOf = (classes: string[], targets?: string[][]): string[][] => targets ?? classes.map(c => [c])
+const rank = (s: RuleSummary): number => (s.direct ? 0 : s.proposable ? 1 : 2)
+const WORKSPACE_WRITE = 'a workspace write applies at once'
+
+/** The workspace targets of a change (L6 §3.2): each list judged by `workspaceRuleFor`. Under `workspace/direct` the actor
+ *  must be admitted (`mayWriteWorkspace`: a member id, agents included, or a CAIP-10 id wearing a hat of the membership
+ *  tree); under a rule that raises a target, as written rules judge a class (`mayPropose`, `mayDecideAlone`). */
+function workspaceRule(ctx: RuleContext, lists: string[][]): RuleSummary {
+  const actor = ctx.actor as KnownActor
+  const SOURCE = 'data/governance.yaml rules'
+  const rules = ctx.governance === null ? [] : effectiveRules(ctx.governance).rules
+  const members = ctx.members ?? [{ id: actor.id, kind: actor.kind }]
+  const book: RoleBook = resolveRoles(ctx.governance, members, ctx.observations ?? [])
+  const known = new Set(members.flatMap(m => (m && typeof m === 'object' && m.id !== undefined && m.id !== null ? [String(m.id)] : [])))
+  const used: string[] = []
+  let notAlone: { rule: Rule; sentence: string } | null = null
+  for (const list of lists) {
+    const rule = workspaceRuleFor(rules, list)
+    if (rule === WORKSPACE_DIRECT) {
+      const may = mayWriteWorkspace({ id: actor.id, hats: walletOf(actor)?.read?.hats ?? [] }, known, ctx.tree ?? null)
+      if (may !== true) return { direct: false, proposable: false, source: WORKSPACE_DIRECT.id, sentence: may }
+    } else {
+      const proposed = mayPropose(rule, actor.id, book)
+      if (proposed !== true) return { direct: false, proposable: false, source: `${SOURCE}: ${rule.id}`, sentence: proposed }
+      const may = mayDecideAlone(rule, actor.id, book)
+      if (may !== true && notAlone === null) notAlone = { rule, sentence: may }
+    }
+    if (!used.includes(rule.id)) used.push(rule.id)
+  }
+  if (notAlone !== null) {
+    return { direct: false, proposable: true, source: `${SOURCE}: ${notAlone.rule.id}`, sentence: `${notAlone.sentence} Propose it instead.` }
+  }
+  const written = used.filter(id => id !== WORKSPACE_DIRECT.id)
+  if (written.length === 0) return { direct: true, source: WORKSPACE_DIRECT.id, sentence: WORKSPACE_WRITE }
+  return { direct: true, source: `${SOURCE}: ${used.join(', ')}`, sentence: 'the maintainer decides alone' }
+}
+
+/** The rule for this actor, over a change's classes or, given, its targets (one list per op, `targetsOf`). Workspace
+ *  targets are judged by `workspaceRule`, the rest by their class as 0.6 judges them; the change is direct only when every
+ *  target is, and the strictest answer is the one given (not proposable, then proposable). */
+export const effectiveRule: RuleFor = (ctx, classes, targets) => {
+  const lists = listsOf(classes, targets)
+  const ws = lists.filter(l => l.length > 0 && isWorkspaceTarget(l[0]))
+  if (ws.length === 0) return classRule(ctx, targets ? [...new Set(lists.flatMap(l => l.slice(0, 1)))] : classes)
+  // The unknown actor and an unreadable governance file are answered before any rule, as 0.6 answers them.
+  if (!isKnown(ctx.actor) || ctx.governance === null) return classRule(ctx, [])
+  const rest = [...new Set(lists.filter(l => l.length > 0 && !isWorkspaceTarget(l[0])).map(l => l[0]))]
+  const own = workspaceRule(ctx, ws)
+  if (rest.length === 0) return own
+  const other = classRule(ctx, rest)
+  // The stricter answer is the one given; on a tie the path rule is named, the more specific (walk M2, PF-R261): a
+  // handbook edit beside a record edit reads "handbook", not "records".
+  if (rank(other) > rank(own)) return other
+  if (!own.direct) return own
+  return { ...other, source: `${other.source}; ${own.source}` }
+}
+
 /** May the context's actor write a thing of `registry` (coordinator Q77)? Yes when the rule for its class lets them apply
  *  a change of it alone, or propose one (`effectiveRule(...).direct || .proposable`). The one predicate for who may narrow
  *  (narrow.ts) and for who is drawn the visibility control (GET /api/visibility `writable`). True, or the rule's sentence
  *  for why not. */
-export function mayWrite(ctx: RuleContext, registry: string): true | string {
-  const rule = effectiveRule(ctx, [String(classOf({ registry }))])
+export function mayWrite(ctx: RuleContext, registry: string, targets?: string[][]): true | string {
+  // DAO-OS L6 §3.2 (merge M1): given, `targets` (a workspace thing's: a page's tree, a collection's split) are judged in
+  // place of the class, as a write to it is (`effectiveRule`'s target lists); absent, the class judges, as above.
+  const rule = effectiveRule(ctx, [String(classOf({ registry }))], targets)
   return rule.direct || rule.proposable === true ? true : rule.sentence
 }
 
-/** The ids of the rules a change is judged by: one per rule that covers a class it touches, in class
- *  order, each once. The solo default is the rule `solo`. A class no rule covers adds none (the
- *  caller has already refused it). This is what `Org-Rule` names, with the method (P2-R14). */
-export function ruleIds(ctx: RuleContext, classes: string[]): string[] {
+/** The ids of the rules a change is judged by: one per rule that covers a class (or, given, a target list) it touches, in
+ *  order, each once. The solo default is the rule `solo`; a workspace target no written rule names is `workspace`, so that
+ *  `Org-Rule` reads `workspace/direct` (L6 §3.4). A class no rule covers adds none (the caller has already refused it).
+ *  This is what `Org-Rule` names, with the method (P2-R14). */
+export function ruleIds(ctx: RuleContext, classes: string[], targets?: string[][]): string[] {
   const governance = ctx.governance ?? { model: 'solo-maintainer' }
   const ids: string[] = []
-  for (const { rule } of rulesForClasses(effectiveRules(governance).rules, classes)) {
-    if (rule !== null && !ids.includes(rule.id)) ids.push(rule.id)
+  for (const { rule } of rulesForTargets(effectiveRules(governance).rules, listsOf(classes, targets))) {
+    const id = rule === WORKSPACE_DIRECT ? WORKSPACE : rule?.id
+    if (id !== undefined && !ids.includes(id)) ids.push(id)
   }
   return ids
 }
@@ -149,13 +234,14 @@ export function ruleIds(ctx: RuleContext, classes: string[]): string[] {
 /** The hats of the roles sourced from a hat (L5 spec §7.1) that the written rules for `classes` name, each once, in rule
  *  order: to decide (`decide.by`) and, unless `deciding` alone is asked, to propose. None under the solo default or an
  *  unreadable governance file. */
-export function ruleHats(ctx: RuleContext, classes: string[], which: 'deciding' | 'both' = 'both'): string[] {
+export function ruleHats(ctx: RuleContext, classes: string[], which: 'deciding' | 'both' = 'both', targets?: string[][]): string[] {
   if (ctx.governance === null) return []
   const written = effectiveRules(ctx.governance)
   if (written.implied) return []
   const book = resolveRoles(ctx.governance, [], [])
   const hats: string[] = []
-  for (const { rule } of rulesForClasses(written.rules, classes)) {
+  // WORKSPACE_DIRECT names no role, so it adds no hat (L6 §3.2).
+  for (const { rule } of rulesForTargets(written.rules, listsOf(classes, targets))) {
     for (const id of rule ? (which === 'deciding' ? [rule.decide?.by] : [rule.decide?.by, rule.propose]) : []) {
       const hat = typeof id === 'string' ? book.roles.get(id)?.hat : undefined
       if (hat && !hats.includes(hat)) hats.push(hat)
@@ -171,12 +257,13 @@ export function ruleHats(ctx: RuleContext, classes: string[], which: 'deciding' 
  *  their CAIP-10 id always carries one: under the solo default, or when no deciding role's hat is one they wear, the
  *  lowest hat they wear (the hat they are named by, R-L5-7.4). Commit trailers are permanent: a direct apply by an
  *  address says which hat let it in. */
-export function hatsActedUnder(ctx: RuleContext, classes: string[]): string[] {
+export function hatsActedUnder(ctx: RuleContext, classes: string[], targets?: string[][]): string[] {
   const { actor } = ctx
   if (!isKnown(actor) || ctx.governance === null) return []
   const worn = new Map((ctx.observations ?? []).filter(o => o.wears).map(o => [o.hat, o.block]))
   const book = resolveRoles(ctx.governance, ctx.members ?? [], ctx.observations ?? [])
-  const used = ruleHats(ctx, classes, 'both')
+  // L5 (Org-Hat carries the proposing hat, ab9bb01) over L6's targets: both hats, judged per target list.
+  const used = ruleHats(ctx, classes, 'both', targets)
     .filter(hat => worn.has(hat) && [...book.roles.values()].some(r => r.hat === hat && r.members.includes(actor.id)))
   if (used.length === 0 && walletOf(actor)?.account === actor.id) {
     const lowest = lowestHat([...worn.keys()])

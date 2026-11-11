@@ -15,7 +15,7 @@ describe('/parts/tray', () => {
     expect(within(panel).getByText('trunk now: 8')).toBeTruthy()
     expect(within(panel).getByText('Council consent decides this · 4 of 8')).toBeTruthy()
     const collapsed = screen.getByRole('group', { name: 'Changes, collapsed' })
-    expect(within(collapsed).getByText('2 staged changes')).toBeTruthy()
+    expect(within(collapsed).getByText('2 staged ops')).toBeTruthy()
     expect(within(collapsed).getAllByRole('button').map(b => b.textContent)).toEqual(['Review', 'Apply'])
     const stale = screen.getByRole('group', { name: 'Changes, stale' })
     expect(stale.querySelector('.tray-cnt.attn')!.textContent).toBe('!')
@@ -50,7 +50,7 @@ describe('/parts/tray', () => {
   it('on a phone, the bars are the phone’s cards: the count and "N staged" lead to /changes, then the primary only', () => {
     renderAt(<Shell title="Parts" nav={null} width={390}><TrayGroup /></Shell>, '/parts/tray')
     const collapsed = screen.getByRole('group', { name: 'Changes, collapsed' })
-    expect(within(collapsed).getByRole('link', { name: 'Review 2 staged changes' }).getAttribute('href')).toBe('/changes')
+    expect(within(collapsed).getByRole('link', { name: 'Review 2 staged ops' }).getAttribute('href')).toBe('/changes')
     expect(within(collapsed).getAllByRole('button').map(b => b.textContent)).toEqual(['Apply'])
   })
 })

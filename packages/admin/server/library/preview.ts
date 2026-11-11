@@ -1,4 +1,9 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { classOf } from '../../lib/change-classes.mjs'
+import { readGovernance } from '../../lib/governance-read.mjs'
+import { MAINTAINER, effectiveRules } from '../../lib/rules.mjs'
+import { StageError, parseRecord } from '../changes/records.ts'
 import { builtinBoards, instanceBoards } from '../boards/read.ts'
 import { currentEntries, project } from '../changes/stage.ts'
 import type { StageOp } from '../changes/types.ts'
@@ -21,7 +26,7 @@ const requirementText = (r: string): string => {
 
 /** The org's registries as the actor's own staged change would leave them: the files, with `staged` applied. A file
  *  that cannot be read is refused in the engine's own sentence (strict). */
-function throughChange(repo: string, staged: StageOp[]): (registry: string) => Entity[] {
+export function throughChange(repo: string, staged: StageOp[]): (registry: string) => Entity[] {
   const projected = staged.length > 0 ? project(r => currentEntries(repo, r, true), staged) : new Map<string, Entity[]>()
   return registry => projected.get(registry) ?? currentEntries(repo, registry, true)
 }
@@ -144,7 +149,56 @@ export const takenRefusal = (repo: string, ops: InstallOp[], staged: StageOp[]):
   firstTaken(ops, throughChange(repo, staged))
 
 const BUILT_IN = 'Built in: every instance has this board.'
-const RULES_NOT_YET = 'Adding a rule set is not available yet: the change engine cannot edit data/governance.yaml yet.'
+const NOT_CREATE_OR_UPDATE = 'Adding is built for entries that create records or update ones the org has; this one replaces or deletes records, which a removal could not give back.'
+
+const NARROWS = 'This org decides alone today. Adding this rule set would narrow that to the maintainer role; define the rules first.'
+
+/** The rules in force when the org has written none (the solo default, `lib/rules.mjs effectiveRules`), as plain
+ *  values to write; [] when its rules are written, or when its model implies none. `now` is the governance record
+ *  through the actor's change; the model is the file's. */
+function impliedRules(repo: string, now: Entity): unknown[] {
+  const path = join(repo, 'data', 'governance.yaml')
+  const block = existsSync(path) ? readGovernance(readFileSync(path, 'utf8')).governance as Record<string, unknown> | null : null
+  const { rules, implied } = effectiveRules({ ...(block ?? {}), rules: now.rules })
+  return implied ? JSON.parse(JSON.stringify(rules)) as unknown[] : []
+}
+
+/** The roles and rules an entry's governance op adds, merged into what the org has (through the actor's change): the
+ *  entry's rules after the org's, its roles beside the org's. An org that has written no rules has the implied ones in
+ *  force, and they are written first, so what was in force stays in force (a removal's `rules: null` returns the org
+ *  to them). A rule id or a role the org already has is refused in the library's sentence (L7 §5.3). Any other op is
+ *  returned as it is. */
+export function mergedGovernance(repo: string, op: InstallOp, entriesOf: (registry: string) => Entity[]): { op: InstallOp; refusal: string | null } {
+  if (op.op !== 'update' || registryOf(op) !== 'governance' || !op.set) return { op, refusal: null }
+  const now = entriesOf('governance')[0] ?? {}
+  const set: Record<string, unknown> = { ...op.set }
+  if (Array.isArray(op.set.rules)) {
+    const written = Array.isArray(now.rules) ? (now.rules as unknown[]) : []
+    const implied = written.length > 0 ? [] : impliedRules(repo, now)
+    const had = written.length > 0 ? written : implied
+    if (implied.length > 0) {
+      // Implied, any person member decides alone and roles are not read; written, `maintainer` resolves through
+      // roles, so a maintainer the org or the entry defines would narrow who decides every class (review NB1).
+      const defines = (roles: unknown) => isMapping(roles) && Object.hasOwn(roles, MAINTAINER)
+      if (defines(now.roles) || defines(op.set.roles)) return { op, refusal: NARROWS }
+    }
+    const ids = new Set(had.filter(isMapping).map(r => String(r.id)))
+    const taken = (op.set.rules as unknown[]).filter(isMapping).find(r => ids.has(String(r.id)))
+    if (taken) {
+      return { op, refusal: implied.length > 0
+        ? `rule ${String(taken.id)} has the id of the rule this org follows without writing it (the solo default), so that id is reserved; the entry's rule needs another.`
+        : `rule ${String(taken.id)} is already written.` }
+    }
+    set.rules = [...had, ...(op.set.rules as unknown[])]
+  }
+  if (isMapping(op.set.roles)) {
+    const had = isMapping(now.roles) ? now.roles : {}
+    const taken = Object.keys(op.set.roles).find(k => Object.hasOwn(had, k))
+    if (taken) return { op, refusal: `role ${taken} is already written.` }
+    set.roles = { ...had, ...op.set.roles }
+  }
+  return { op: { ...op, set }, refusal: null }
+}
 
 /** The first thing that keeps `e` from being added, in the sentence the library says it with (first match wins), or
  *  null when it can be added. Requirements and taken ids are read through `staged`, the actor's own change. A taken id
@@ -153,10 +207,8 @@ export function cannotAdd(repo: string, e: LibraryEntry, staged: StageOp[]): str
   if (e.builtin) return BUILT_IN
   const raw = installsOf(e)
   if (raw.length === 0) return 'It adds nothing.'
-  if (raw.some(op => op.op !== 'create')) {
-    return e.shelf === 'rules' ? RULES_NOT_YET
-      : 'Adding is built for entries that create records; this one changes records the org already has, and removing that is not built yet.'
-  }
+  // An update is a modifying install (L7-D11): its receipt says what it changed, and a removal restores it.
+  if (raw.some(op => op.op !== 'create' && op.op !== 'update')) return NOT_CREATE_OR_UPDATE
   if (e.tags?.maturity === 'raw') return 'This entry is raw: the library shows it and does not add it.'
   const entriesOf = throughChange(repo, staged)
   const reqs = e.requires ?? []
@@ -164,6 +216,19 @@ export function cannotAdd(repo: string, e: LibraryEntry, staged: StageOp[]): str
     const kinds = new Set(entriesOf('systems').map(x => String(x.kind)))
     const lacking = reqs.find(r => !met(r, kinds))
     if (lacking) return `It needs ${requirementText(lacking)}, which this organization does not have yet. Add it first.`
+  }
+  for (const op of resolveInstalls(e, {}, { lenient: true }).ops.filter(o => o.op === 'update')) {
+    if (op.record.includes('${')) continue // its id is the person's to give; the engine says it if there is none
+    let at: { registry: string; id: string }
+    try { at = parseRecord(op.record) } catch (err) { if (err instanceof StageError) continue; throw err } // the engine says it at stage
+    // A modifying add's receipt holds the record's base as the org has it; a change that already edits it would fold
+    // the two into one op, and a removal of either would give back neither (review I2).
+    if (staged.some(s => s.op !== 'file' && s.record === op.record)) return `Your change already edits ${op.record}. Apply or propose it first, then add this.`
+    if (at.registry !== 'governance' && !entriesOf(at.registry).some(x => String(x.id) === at.id)) {
+      return `It changes ${op.record}, which this organization does not have.`
+    }
+    const { refusal } = mergedGovernance(repo, op, entriesOf)
+    if (refusal) return refusal
   }
   if (!Object.hasOwn(e.config?.properties ?? {}, 'id')) {
     const refused = firstTaken(resolveInstalls(e, {}, { lenient: true }).ops, entriesOf)
@@ -197,10 +262,8 @@ export async function previewEntry(repo: string, entry: LibraryEntry, who: Actor
     note = mine
       ? "Built in. This org's own board of the same id is shown in its place; deleting it restores this one."
       : BUILT_IN
-  } else if (entry.shelf === 'rules') {
-    note = ops.length === 0
-      ? 'Adds nothing: this is what an org has until it writes rules.'
-      : RULES_NOT_YET
+  } else if (entry.shelf === 'rules' && ops.length === 0) {
+    note = 'Adds nothing: this is what an org has until it writes rules.'
   } else if (unreadable && needs.length > 0) {
     note = `What this needs could not be checked: ${unreadable}`
   }

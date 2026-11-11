@@ -308,3 +308,21 @@ names a public plane; the public plane carries `planes: { role: public, canon: <
 
 A store whose file name is the type (what `export` writes) carries no `type` on its objects;
 `publish` supplies it on the record without rewriting the file.
+
+## Readable pages (`publish.pages`, `render.fonts`, `render.labels`)
+
+By default `publish` writes only the JSON API under `public/`. Set `publish.pages: true` in `kms.yaml` and it also writes the commons as pages people can read: `index.html` (the commons by kind, with search), `k/<kind>/index.html` (one page per kind), `k/<kind>/<id>.html` (one page per entry), and `_kms/` (the search file and the fonts). Only this instance's own published entries get a page; an entry that came from a peer shows as a row that links out to its source. An entry that is not published has no page and its title appears nowhere under `public/`. The public pages carry no link to the federation map.
+
+kms owns `index.html`, `k/` and `_kms/` in the output folder while this is on: each run removes and rewrites them, so a page for an entry you stopped publishing goes away. A marker file, `_kms/.kms-pages`, records that kms wrote them. Turn `publish.pages` off (or remove it) and the next `publish` removes them, but only if the marker is there; an `index.html` from another tool is never touched. If the output folder already holds one of those three paths and no marker, `publish` refuses to write pages rather than overwrite it.
+
+- `render.fonts`: `house` (default) copies the three house fonts to `_kms/fonts/` and the pages load them from there; `system` writes no fonts and the pages use the reader's own. Pages never ask any other site for a font.
+- `render.labels`: a map of field name to the words shown for it on the pages, for example `render.labels: { steward: "Looked after by" }`. It wins over a pack's labels and the built-in words.
+
+```yaml
+publish:
+  pages: true
+render:
+  fonts: house
+  labels:
+    steward: Looked after by
+```

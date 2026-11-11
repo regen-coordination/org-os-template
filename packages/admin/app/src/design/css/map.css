@@ -200,6 +200,8 @@ a.mini-n:focus-visible, .mini-more:focus-visible { outline: var(--focus-w) solid
 .cmp-bad > .i { flex: none; }
 .cmp-insp { min-width: 0; border-inline-start: var(--rule-w) solid var(--rule); }
 .cmp-hint { margin: 0; padding: var(--sp-10); font-size: var(--fs-meta); color: var(--faint); }
+/* An inspector field's list of addresses (a Safe's owners, a hat's wearers), one a line. */
+.cmp-list { margin: 0; padding: 0; list-style: none; }
 .cmp-foot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); padding: var(--sp-7) var(--sp-10);
   border-block-start: var(--rule-w) solid var(--rule); font-size: var(--fs-meta); color: var(--mute); }
 .cmp-acts { display: inline-flex; flex-wrap: wrap; gap: var(--sp-4); margin-inline-start: auto; }

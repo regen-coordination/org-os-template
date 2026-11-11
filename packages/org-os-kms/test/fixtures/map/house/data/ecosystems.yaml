@@ -1,0 +1,4 @@
+ecosystems:
+  - id: watershed-commons
+    name: "Watershed Commons"
+    sources: [field-notes-archive, seed-registry]

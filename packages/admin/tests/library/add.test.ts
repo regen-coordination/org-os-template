@@ -112,9 +112,13 @@ describe('what an add refuses, staging nothing', () => {
   it('a built-in board', async () => {
     expect(await refused(await add('board:home'), 409)).toEqual({ code: 'NOT_ADDABLE', error: 'Built in: every instance has this board.' })
   })
-  it('a rule set', async () => {
+  // L7 replaced "a rule set" (RULES_NOT_YET): a rule set is added through the engine's governance edit (L7-D10); a raw
+  // one is refused as raw, and one that needs what the org lacks says so.
+  it('a raw rule set, as raw; one whose Safe the org lacks, by what it needs', async () => {
     expect(await refused(await add('rules:consent-7d'), 409))
-      .toEqual({ code: 'NOT_ADDABLE', error: 'Adding a rule set is not available yet: the change engine cannot edit data/governance.yaml yet.' })
+      .toEqual({ code: 'NOT_ADDABLE', error: 'This entry is raw: the library shows it and does not add it.' })
+    expect(await refused(await add('rules:treasury-safe'), 409))
+      .toEqual({ code: 'NOT_ADDABLE', error: 'It needs a system of kind safe, which this organization does not have yet. Add it first.' })
   })
   it('config that leaves out what the entry requires', async () => {
     expect(await refused(await add('system:test-link', { config: { name: 'Desk' } }), 422))
@@ -130,6 +134,15 @@ describe('what an add refuses, staging nothing', () => {
     commitAndWrite('data/systems.yaml', 'schema_version: "1.0"\nsystems:\n  - id: test-link\n    kind: link\n    name: Ours\n    url: https://example.org/ours\n')
     expect(await refused(await add('system:test-link', { config: { name: 'Desk', url: 'https://example.org/desk' } }), 409)).toEqual({
       code: 'TAKEN', error: 'A system with the id `test-link` already exists. Add it under another id.', nextFreeId: 'test-link-2',
+    })
+  })
+  // Walk I12: a template whose records are named from its config id (`<id>-safe`, `<id>-roles`…) is offered the next
+  // config id that frees every record it names, not the taken record's own id plus a number (`test-dao-safe-2`).
+  it('a template whose records are named from its config id: the next config id that frees them all', async () => {
+    const A = `0x${'0'.repeat(38)}a1`
+    commitAndWrite('data/systems.yaml', 'schema_version: "1.0"\nsystems:\n  - id: test-dao-safe\n    kind: link\n    name: Ours\n    url: https://example.org/ours\n  - id: test-dao-2-roles\n    kind: link\n    name: Ours too\n    url: https://example.org/too\n')
+    expect(await refused(await add('template:test-council', { config: { owners: [A], threshold: 1 } }), 409)).toEqual({
+      code: 'TAKEN', error: 'A system with the id `test-dao-safe` already exists. Add it under another id.', nextFreeId: 'test-dao-3',
     })
   })
   it('config the entry accepts but the record does not: the engine\'s own 422, on the record', async () => {

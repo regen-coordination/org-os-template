@@ -1,5 +1,5 @@
 /**
- * assess.mjs — run the whole B1-B6 battery over one snapshot.
+ * assess.mjs — run the whole B1-B6 battery, and B8 (the agent layer), over one snapshot.
  *
  * Pure: every check is a pure function and this composes them, so the entire
  * assessment is testable without a filesystem. All I/O lives in snapshot.mjs.
@@ -11,11 +11,12 @@ import { checkVersions } from './checks/versions.mjs';
 import { checkMachinery } from './checks/machinery.mjs';
 import { checkStructure } from './checks/structure.mjs';
 import { checkFreshness } from './checks/freshness.mjs';
+import { checkAgentLayer } from './checks/agent-layer.mjs';
 import { worst, BLOCKER, WARN } from './lib/finding.mjs';
 
 /** Order is the order an operator should read them in: who am I → where did I
  *  come from → what version → does my machinery work → am I well-formed → am I
- *  alive. */
+ *  alive → what my agents keep where every member reads it (DAO-OS L6 §14). */
 const CHECKS = [
   checkIdentity,
   checkLineage,
@@ -23,6 +24,7 @@ const CHECKS = [
   checkMachinery,
   checkStructure,
   checkFreshness,
+  checkAgentLayer,
 ];
 
 export function assessSnapshot(snapshot) {

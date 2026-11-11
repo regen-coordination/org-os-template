@@ -93,8 +93,8 @@ export const MAP_NODES: MapNodeData[] = withNeeds([
 export const MAP_NODES_ROLES_RESTRICTED: MapNodeData[] = MAP_NODES.map(d => (d.item.kind === 'hat'
   ? { ...d, item: { ...d.item, facts: { ...d.item.facts, visibility: 'hat:treasury' } } } : d))
 
-/** The door's map: what the public reads, each node a link to its public page. */
-export const DOOR_NODES: MapNodeData[] = MAP_NODES.map(d => ({ ...d, href: `/door/systems/${encodeURIComponent(d.item.id)}` }))
+/** The portal's map: what the public reads, each node a link to its public page. */
+export const PORTAL_NODES: MapNodeData[] = MAP_NODES.map(d => ({ ...d, href: `/portal/systems/${encodeURIComponent(d.item.id)}` }))
 
 /** Transaction 18, prepared: the two pools' funds go back to the Treasury, against the admin edges. */
 export const MAP_FLOW: ValueFlow = {
@@ -214,23 +214,25 @@ export const INSPECTOR_OPS: OperationInfo[] = [
   { id: 'system.read', label: 'Read now', effect: 'reads', network: true, confirm: false, params: { type: 'object' }, preset: null, unavailable: null },
 ]
 
-/** The compose canvas: a test DAO on Sepolia — a top hat that appoints the signers, who sign for the Test Treasury
- *  through Hats Signer Gate (transaction 4), a Snapshot space that elects the top hat, and a forum link someone tried
- *  to make sign for the Safe. Five prepared transactions, in order. */
+/** The compose canvas: a test DAO on Sepolia — a Hats tree whose top hat appoints the signers, who sign for the Test
+ *  Treasury through Hats Signer Gate, a Snapshot space that elects the top hat, and a forum link someone tried to make
+ *  sign for the Safe. Four prepared transactions, in order. Placeholder addresses only. */
 export const COMPOSE_CHAIN = 'eip155:11155111'
 export const COMPOSE_SHELF = ['safe', 'hats-tree', 'hat', 'snapshot-space', 'gardens-community', 'link']
+const OWNERS = [1, 2, 3].map(i => `eip155:11155111:0x${'0'.repeat(38)}a${i}`)
 export const COMPOSE_NODES: ComposeNode[] = [
-  { id: 'top-hat', kind: 'hat', name: 'Top hat', x: 170, y: 64, order: 1 },
-  { id: 'signers', kind: 'hat', name: 'Signers', x: 170, y: 200, order: 2 },
-  { id: 'test-treasury', kind: 'safe', name: 'Test Treasury', x: 170, y: 336, order: 3 },
-  { id: 'votes', kind: 'snapshot-space', name: 'Votes', x: 470, y: 150, order: 5 },
+  { id: 'test-roles', kind: 'hats-tree', name: 'Test roles', x: 470, y: 64, order: 1 },
+  { id: 'test-roles/top-hat', kind: 'hat', tree: 'test-roles', name: 'Top hat', x: 170, y: 64, order: 0, wearers: [OWNERS[0]!] },
+  { id: 'test-roles/signers', kind: 'hat', tree: 'test-roles', name: 'Signers', x: 170, y: 200, order: 0, wearers: OWNERS },
+  { id: 'test-treasury', kind: 'safe', name: 'Test Treasury', x: 170, y: 336, order: 2, owners: OWNERS, threshold: 2 },
+  { id: 'votes', kind: 'snapshot-space', name: 'Votes', x: 470, y: 150, order: 3 },
   { id: 'forum', kind: 'link', name: 'Forum', x: 470, y: 280, order: 0 },
 ]
 const refusal = canConnect('link', 'safe')
 export const COMPOSE_EDGES: ComposeEdge[] = [
-  { from: 'votes', to: 'top-hat', label: 'elects' },
-  { from: 'top-hat', to: 'signers', label: 'appoints' },
-  { from: 'signers', to: 'test-treasury', label: 'signs' },
+  { from: 'votes', to: 'test-roles/top-hat', label: 'elects' },
+  { from: 'test-roles/top-hat', to: 'test-roles/signers', label: 'appoints' },
+  { from: 'test-roles/signers', to: 'test-treasury', label: 'signs' },
   { from: 'forum', to: 'test-treasury', label: '', invalid: refusal === true ? undefined : refusal },
 ]
 

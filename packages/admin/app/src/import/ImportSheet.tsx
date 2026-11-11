@@ -56,7 +56,7 @@ export function ImportSheet({ registry, label, onDone, dialogRef }:
 
   const taken = useMemo(() => {
     const ids = new Set((file.data?.entries ?? []).map(e => String(e.id)))
-    for (const op of ch.view?.ops ?? []) { const k = splitChangeKey(op.record); if (k.registry === registry) ids.add(k.id) }
+    for (const op of ch.view?.ops ?? []) { if (op.op === 'file') continue; const k = splitChangeKey(op.record); if (k.registry === registry) ids.add(k.id) }
     return ids
   }, [file.data, ch.view, registry])
   const plan = useMemo(() => (schema.data && text.trim() !== '' ? importPlan(parseSheet(text), schema.data, registry, taken) : null), [schema.data, text, registry, taken])
@@ -101,7 +101,7 @@ export function ImportSheet({ registry, label, onDone, dialogRef }:
   return (
     <ConfirmDialog ref={dialogRef} wide title="Import from a sheet" confirm={`Stage ${plural(ready.length)}`} disabled={ready.length === 0 || reading}
       busy={busy ? 'Staging…' : undefined} onCancel={onDone} onConfirm={() => void stage()}
-      note={<>Saved to <code>data/{registry}.yaml</code> as a staged change</>}
+      note={<>Saved as a staged change</>}
       body={
         <div className={over ? 'imp imp-over' : 'imp'} onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={drop}>
           <p className="imp-l">Paste rows from a sheet, or drop a CSV here, the header row first. Headers are matched to the fields of {label} by name. You’ll see every row before anything is staged.</p>

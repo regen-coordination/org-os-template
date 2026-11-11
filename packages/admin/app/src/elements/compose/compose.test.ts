@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { COMPOSE, canConnect, moveBy, nextOrder, opsForConnect, opsForDelete, opsForMove, opsForPlace, preparedCount, relationOf, type ComposeEdge, type ComposeNode } from './compose.ts'
+import { COMPOSE, CROSS_TREE, DRAG_THRESHOLD_PX, canConnect, treesOf, moveBy, nextOrder, opsForConnect, opsForDelete, opsForMove, opsForPlace, opsForRename, preparedCount, relationOf, type ComposeEdge, type ComposeNode, type ComposedHat } from './compose.ts'
 
 const node = (id: string, kind: string, x = 100, y = 100, order = 1): ComposeNode => ({ id, kind, name: id, x, y, order })
 
@@ -50,36 +50,113 @@ describe('moveBy (§8.7, 2.5.7): arrows move a node 8px, Shift+arrows 40px', () 
 })
 
 describe('the ops each action stages (nothing writes)', () => {
-  const nodes = [node('top', 'hat', 100, 60, 1), node('signers', 'hat', 100, 160, 2), node('vault', 'safe', 100, 260, 3), node('forum', 'link', 300, 160, 0)]
-  const edges: ComposeEdge[] = [{ from: 'top', to: 'signers', label: 'appoints' }]
+  const hat = (key: string, admin = 'top', over: Partial<ComposedHat> = {}): ComposedHat => ({ key, details: key, admin, max_supply: 1, mutable: true, wearers: [], role: 'acts', hat: null, ...over })
+  const CHAIN = 'eip155:11155111'
+  const ctx = { trees: { roles: [hat('council'), hat('stewards', 'council')] } as Record<string, ComposedHat[]>, chain: CHAIN }
+  const nodes = [node('roles', 'hats-tree', 100, 60, 1), node('vault', 'safe', 100, 260, 3), node('forum', 'link', 300, 160, 0)]
+  const edges: ComposeEdge[] = [{ from: 'roles', to: 'vault', label: 'holds' }]
 
-  it('a placed node is a created System with its position and deployment order', () => {
-    expect(opsForPlace(node('safe-2', 'safe', 200, 150, 4))).toEqual([
-      { op: 'create', record: 'systems:safe-2', value: { id: 'safe-2', kind: 'safe', name: 'safe-2', position: { x: 200, y: 150 }, order: 4 } },
+  it('placing a Safe stages a create with its driver, chain and a composed deployment', () => {
+    expect(opsForPlace(node('safe-2', 'safe', 200, 150, 4), ctx)).toEqual([
+      { op: 'create', record: 'systems:safe-2', value: { id: 'safe-2', kind: 'safe', driver: 'safe', name: 'safe-2', chain: CHAIN, position: { x: 200, y: 150 }, order: 4, deployment: { status: 'composed' } } },
     ])
   })
 
-  it('a move updates the position', () => {
-    expect(opsForMove(node('vault', 'safe', 108, 260))).toEqual([{ op: 'update', record: 'systems:vault', set: { position: { x: 108, y: 260 } } }])
+  it('placing a hat with no Hats tree is refused in words', () => {
+    expect(opsForPlace({ ...node('roles/new-hat', 'hat', 0, 0, 0), tree: undefined }, { trees: {}, chain: CHAIN })).toBe('A hat lives in a Hats tree. Place a Hats tree first.')
+    expect(opsForPlace({ ...node('ghost/new-hat', 'hat', 0, 0, 0), tree: 'ghost' }, ctx)).toBe('A hat lives in a Hats tree. Place a Hats tree first.')
   })
 
-  it('a connection sets every relation the source holds, the new one last', () => {
-    expect(opsForConnect('top', [...edges, { from: 'top', to: 'vault', label: 'holds' }])).toEqual([
-      { op: 'update', record: 'systems:top', set: { relates: [{ to: 'signers', label: 'appoints' }, { to: 'vault', label: 'holds' }] } },
+  it('placing a hat in a tree stages the tree’s whole hats list with the new hat last', () => {
+    expect(opsForPlace({ ...node('roles/treasurer', 'hat', 0, 0, 0), name: 'Treasurer', tree: 'roles' }, ctx)).toEqual([
+      { op: 'update', record: 'systems:roles', set: { hats: [hat('council'), hat('stewards', 'council'), hat('treasurer', 'top', { details: 'Treasurer' })] } },
+    ])
+  })
+
+  it('a move updates the position; a hat moves nothing', () => {
+    expect(opsForMove(node('vault', 'safe', 108, 260))).toEqual([{ op: 'update', record: 'systems:vault', set: { position: { x: 108, y: 260 } } }])
+    expect(opsForMove(node('roles/council', 'hat', 108, 260))).toEqual([])
+  })
+
+  it('a System’s connection sets every relation the source holds, the new one last', () => {
+    expect(opsForConnect('roles', [...edges, { from: 'roles', to: 'forum', label: 'holds' }], ctx)).toEqual([
+      { op: 'update', record: 'systems:roles', set: { relates: [{ to: 'vault', label: 'holds' }, { to: 'forum', label: 'holds' }] } },
     ])
   })
 
   it('an invalid edge is never staged as a relation', () => {
-    expect(opsForConnect('forum', [{ from: 'forum', to: 'vault', label: '', invalid: 'A link can’t sign for a Safe.' }])).toEqual([
+    expect(opsForConnect('forum', [{ from: 'forum', to: 'vault', label: '', invalid: 'A link can’t sign for a Safe.' }], ctx)).toEqual([
       { op: 'update', record: 'systems:forum', set: { relates: [] } },
     ])
   })
 
-  it('a removal deletes the System and takes it out of the relations that pointed at it', () => {
-    expect(opsForDelete('signers', edges)).toEqual([
-      { op: 'delete', record: 'systems:signers' },
-      { op: 'update', record: 'systems:top', set: { relates: [] } },
+  it('connecting a hat to a Safe sets the Safe’s signer_gate.hats', () => {
+    const ops = opsForConnect('roles/council', [{ from: 'roles/council', to: 'vault', label: 'signs' }], ctx)
+    expect(ops).toHaveLength(1)
+    expect(ops[0]).toMatchObject({ op: 'update', record: 'systems:vault', set: { signer_gate: { hats: ['roles/council'] } } })
+  })
+
+  it('connecting a hat to a hat sets the child’s admin, in the tree’s whole list', () => {
+    expect(opsForConnect('roles/stewards', [{ from: 'roles/stewards', to: 'roles/council', label: 'appoints' }], ctx)).toEqual([
+      { op: 'update', record: 'systems:roles', set: { hats: [hat('council', 'stewards'), hat('stewards', 'council')] } },
     ])
+  })
+
+  it('deleting a hat drops it and its children from hats, and out of the gate', () => {
+    const ops = opsForDelete('roles/council', [{ from: 'roles/council', to: 'vault', label: 'signs' }, { from: 'roles/stewards', to: 'vault', label: 'signs' }], ctx)
+    expect(ops[0]).toEqual({ op: 'update', record: 'systems:roles', set: { hats: [] } })
+    expect(ops[1]).toMatchObject({ op: 'update', record: 'systems:vault', set: { signer_gate: { hats: [] } } })
+    expect(ops).toHaveLength(2)
+  })
+
+  it('a removal deletes the System and takes it out of the relations that pointed at it', () => {
+    expect(opsForDelete('vault', edges, ctx)).toEqual([
+      { op: 'delete', record: 'systems:vault' },
+      { op: 'update', record: 'systems:roles', set: { relates: [] } },
+    ])
+  })
+
+  it('renaming a hat sets its details in the tree; a System, its name', () => {
+    expect(opsForRename('roles/council', 'Council of stewards', ctx)).toEqual([
+      { op: 'update', record: 'systems:roles', set: { hats: [hat('council', 'top', { details: 'Council of stewards' }), hat('stewards', 'council')] } },
+    ])
+    expect(opsForRename('vault', 'Treasury', ctx)).toEqual([{ op: 'update', record: 'systems:vault', set: { name: 'Treasury' } }])
+  })
+
+  it('a tree rebuilt from canvas nodes keeps every field of a hat it does not change', () => {
+    const kept = hat('stewards', 'council', { role: 'decides', max_supply: 3, image: 'ipfs://x', hat: '0xabc', mutable: false })
+    const ns: ComposeNode[] = [
+      node('roles', 'hats-tree'),
+      { ...node('roles/council', 'hat'), tree: 'roles', hat: hat('council') },
+      { ...node('roles/stewards', 'hat'), tree: 'roles', hat: kept, wearers: [] },
+    ]
+    const trees = treesOf(ns, [])
+    expect(trees.roles!.find(h => h.key === 'stewards')).toEqual({ ...kept, details: 'roles/stewards' })
+    const ops = opsForRename('roles/council', 'Council of stewards', { trees, chain: CHAIN })
+    expect((ops[0] as unknown as { set: { hats: ComposedHat[] } }).set.hats.find(h => h.key === 'stewards')).toMatchObject({ role: 'decides', max_supply: 3, image: 'ipfs://x', hat: '0xabc', mutable: false, admin: 'council' })
+  })
+
+  it('a Safe that holds a Hats tree sets the tree’s deployment.top.worn_by, keeping the rest', () => {
+    const c = { ...ctx, deployments: { roles: { status: 'composed', salt: '1', top: { details: 'd', image: 'i', worn_by: '' } } } }
+    const ops = opsForConnect('vault', [{ from: 'vault', to: 'roles', label: 'holds' }], c)
+    expect(ops).toEqual([
+      { op: 'update', record: 'systems:vault', set: { relates: [] } },
+      { op: 'update', record: 'systems:roles', set: { deployment: { status: 'composed', salt: '1', top: { details: 'd', image: 'i', worn_by: 'vault' } } } },
+    ])
+  })
+
+  it('deleting that Safe clears worn_by', () => {
+    // a tree known to be composed (review I1: worn_by is never written on a tree whose deployment is not known)
+    const ops = opsForDelete('vault', [{ from: 'vault', to: 'roles', label: 'holds' }], { ...ctx, deployments: { roles: { status: 'composed' } } })
+    expect(ops).toEqual([
+      { op: 'delete', record: 'systems:vault' },
+      { op: 'update', record: 'systems:roles', set: { deployment: { status: 'composed', top: { worn_by: '' } } } },
+    ])
+  })
+
+  it('a hat appointing a hat of another tree is refused in words', () => {
+    const two = { ...ctx, trees: { ...ctx.trees, other: [hat('x')] } }
+    expect(opsForConnect('roles/council', [{ from: 'roles/council', to: 'other/x', label: 'appoints' }], two)).toBe(CROSS_TREE)
   })
 
   it('a new node takes the next deployment order; a link is never deployed', () => {
@@ -87,8 +164,8 @@ describe('the ops each action stages (nothing writes)', () => {
     expect(nextOrder([])).toBe(1)
   })
 
-  it('counts a transaction for every deployable node and every signer gate (a hat that signs for a Safe)', () => {
-    expect(preparedCount(nodes, [...edges, { from: 'signers', to: 'vault', label: 'signs' }])).toBe(4)
-    expect(preparedCount(nodes, [{ from: 'forum', to: 'vault', label: '', invalid: 'no' }])).toBe(3)
+  it('counts the planner’s steps, not nodes', () => {
+    expect(preparedCount({ steps: 7 })).toBe(7)
+    expect(DRAG_THRESHOLD_PX).toBe(4)
   })
 })

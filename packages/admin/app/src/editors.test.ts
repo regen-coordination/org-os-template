@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { REGISTRIES } from '../../lib/registries.mjs'
-import { GOVERNED_FILES, READ_ONLY_HERE, editorOf, editorsMarkdown, leftOut } from './editors.ts'
+import { GOVERNED_FILES, editorOf, editorsMarkdown, leftOut } from './editors.ts'
 
 // F-L3-3: every governed file has a stated path through the Hub. The two lists that say what is governed are read as
 // they are on disk: the registry list (lib/registries.mjs) and the change classes (schemas/change-classes.json, at the
@@ -30,18 +30,22 @@ describe('what each governed file is edited with (F-L3-3)', () => {
 
   it('says how each is edited, as the ruling assigns them', () => {
     const by = (path: string) => GOVERNED_FILES.filter(f => f.path === path).map(f => f.target)
-    expect(by('record')).toEqual(['members', 'projects', 'meetings', 'ideas', 'funding-opportunities', 'relationships', 'sources', 'events', 'channels', 'assets', 'knowledge-gaps', 'systems'])
+    expect(by('record')).toEqual(['members', 'projects', 'meetings', 'ideas', 'funding-opportunities', 'relationships', 'sources', 'events', 'channels', 'assets', 'knowledge-gaps', 'systems', 'tasks', 'data/collections/**'])
     expect(by('board')).toEqual(['boards'])
-    expect(by('own-routes')).toEqual(['proposals', 'library'])
+    expect(by('own-routes')).toEqual(['proposals', 'library', 'data/kb/**'])
+    expect(by('page')).toEqual(['pages/**'])
     expect(by('generated')).toEqual(['.well-known/**'])
-    expect(by('none-yet')).toEqual(['finances', 'governance', 'knowledge-manifest', 'visibility', 'data/*.yaml', 'IDENTITY.md', 'federation.yaml'])
-    expect(rowOf('governance')!.how).toMatch(/never staged today \(R-L5-11\.7\).*governance check \(§7\.6\)/)
-    expect(rowOf('visibility')!.how).toMatch(/Narrowing a record has its own route \(L5\); widening one is a publication/)
+    // DAO-OS L6 Task 19: the source editor is built; what had no path yet is edited whole there
+    expect(by('source')).toEqual(['finances', 'governance', 'knowledge-manifest', 'visibility', 'data/*.yaml', 'collections', 'data/imports.yaml',
+      'memory/**', 'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/**', 'docs/agent-plans/**', 'IDENTITY.md', 'federation.yaml'])
+    expect(by('none-yet')).toEqual([])
+    expect(rowOf('governance')!.how).toMatch(/^The source editor \(\/files\/<path>\).*The governance check \(§7\.6\) runs on it/)
+    expect(rowOf('visibility')!.how).toMatch(/Narrowing a record has its own route \(L5\); a text that widens what is public is a publication/)
     expect(rowOf('data/*.yaml')!.what).toMatch(/data\/horizon\.yaml and data\/access-grants\.yaml/)
   })
 
-  it('every document registry has no path yet, and every collection has one', () => {
-    for (const r of REGISTRIES) expect(editorOf({ registry: r.name })!.path === 'none-yet', r.name).toBe(r.kind === 'document')
+  it('every document registry is edited whole in the source editor, and every collection has a path of its own (L6 Task 19)', () => {
+    for (const r of REGISTRIES) expect(editorOf({ registry: r.name })!.path === 'source', r.name).toBe(r.kind === 'document')
   })
 
   it('finds a file’s row by its path', () => {
@@ -52,13 +56,18 @@ describe('what each governed file is edited with (F-L3-3)', () => {
     expect(editorOf({ path: '.well-known/org.json' })!.path).toBe('generated')
     expect(editorOf({ path: 'IDENTITY.md' })!.target).toBe('IDENTITY.md')
     expect(editorOf({ path: 'federation.yaml' })!.target).toBe('federation.yaml')
+    // DAO-OS L6's files: a page, a custom collection's records, the canon, the imports' record, the agent layer
+    expect(editorOf({ path: 'pages/handbook-1a2b.md' })!.path).toBe('page')
+    expect(editorOf({ path: 'data/collections/grants.yaml' })!.path).toBe('record')
+    expect(editorOf({ path: 'data/kb/encyclopedia-entry.yaml' })!.target).toBe('data/kb/**')
+    expect(editorOf({ path: 'data/imports.yaml' })!.target).toBe('data/imports.yaml')
+    expect(editorOf({ path: 'memory/2026-11-04.md' })!.target).toBe('memory/**')
     expect(editorOf({ path: 'scripts/initialize.mjs' })).toBeNull()
     expect(editorOf({ path: 'data/nested/x.yaml' })).toBeNull()
     expect(editorOf({ registry: 'nope' })).toBeNull()
   })
 
-  it('the sentence a document says, in the Hub’s words', () => {
-    expect(READ_ONLY_HERE).toBe('Read only here: a change to this file has no path in the Hub yet.')
+  it('says each in the Hub’s words', () => {
     for (const f of GOVERNED_FILES) expect(`${f.what} ${f.how}`).not.toMatch(/house/i)
   })
 

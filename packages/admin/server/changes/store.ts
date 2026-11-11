@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { stateDir, fileSafe } from '../state.ts'
@@ -38,4 +38,24 @@ export class ChangeStore {
   }
 
   clear(actor: string): void { rmSync(this.file(actor), { force: true }) }
+
+  /** Every member's open change, read only (DAO-OS L6 Task 20 review C1: what a narrowing out of the repository asks of
+   *  every tray), and how many change files could not be read (L6 carries K4: a caller that must know every tray fails
+   *  closed on them). Such a file is left where it is for its own reader; a folder that is not there holds none. */
+  all(): { changes: Change[]; unreadable: number } {
+    let names: string[]
+    try { names = readdirSync(this.dir) } catch (err) {
+      return { changes: [], unreadable: (err as NodeJS.ErrnoException).code === 'ENOENT' ? 0 : 1 }
+    }
+    let unreadable = 0
+    const changes = names.filter(n => n.endsWith('.json')).flatMap(n => {
+      try {
+        const change = JSON.parse(readFileSync(join(this.dir, n), 'utf8')) as Change
+        if (change && Array.isArray(change.ops) && typeof change.actor === 'string') return [change]
+      } catch { /* counted below */ }
+      unreadable++
+      return []
+    })
+    return { changes, unreadable }
+  }
 }

@@ -18,22 +18,50 @@ Render as a `─── Session Summary ───` panel.
 
 ## 2. Write Memory
 
-Append a session entry to `memory/YYYY-MM-DD.md` (today's date). Create the file if it doesn't exist. Format:
+Memory is split by who may read it. Ask of each entry, before writing it: **members or Council?**
 
-```markdown
-## Session — [HH:MM]
+- **members** (org memory) — what every member may read. It goes in git: append a session entry to
+  `memory/YYYY-MM-DD.md` (today's date; create the file if it doesn't exist), by hand or with
+  `npm run memory -- add --level members --date YYYY-MM-DD --title "Session — HH:MM" --file <entry.md>`
+  (nothing is committed; step 8 commits it). Format:
 
-**Focus:** [What was worked on]
+  ```markdown
+  ## Session — [HH:MM]
 
-### Key Decisions
-- [Decision 1]
+  **Focus:** [What was worked on]
 
-### Actions Taken
-- [x] [What was done]
+  ### Key Decisions
+  - [Decision 1]
 
-### Next
-- [ ] [What remains]
-```
+  ### Actions Taken
+  - [x] [What was done]
+
+  ### Next
+  - [ ] [What remains]
+  ```
+
+- **Council** (Council memory) — what only some may read: a person's situation, pay, contact details, money owed, a
+  negotiation, anything Steward-only. It never goes in `memory/`, `MEMORY.md`, `HEARTBEAT.md` or a plan. Write it
+  through the running Hub, at the hat or role it is for (`--level role:<role id>` likewise), with its body on stdin
+  from a heredoc, so it is never a file in the repository:
+
+  ```bash
+  npm run memory -- add --level hat:<steward hat> --date YYYY-MM-DD --title "<title>" - <<'COUNCIL_ENTRY_EOF'
+  <entry text>
+  COUNCIL_ENTRY_EOF
+  ```
+
+  Or write the body to a file made with `mktemp` (outside the repository), pass it as `--file`, then remove it
+  (`rm -f`). It becomes a record of the private collection `council-memory`, which only that level reads. If the Hub
+  is not running the command refuses: start it and run the command again; never write the entry in `memory/` instead.
+  If the Hub answers `LEVEL`, never lower the entry's level (never write it at a wider one) to make it fit: keep it
+  out of `memory/` and ask a steward where it is kept.
+
+The same question holds for what else the close writes: the Session Summary (step 1), the Buzz digest (step 8b) and the
+commit message (step 8) carry members-level matter only, and a Council matter is never in any of them.
+
+When unsure, it is Council. `npm run memory -- list --date YYYY-MM-DD` lists both, the Council part as the Hub answers
+you.
 
 ## 3. Update HEARTBEAT.md
 
@@ -41,7 +69,8 @@ Move completed tasks to "Recently Completed" with today's date. Add any new task
 
 ## 4. Update MEMORY.md
 
-If key decisions were made, append to the Key Decisions section (most recent first).
+If key decisions were made, append to the Key Decisions section (most recent first): members-level lines only. A
+Council decision stays in Council memory; `MEMORY.md` does not name it.
 
 ## 5. Update Plan Queue
 
@@ -86,7 +115,8 @@ git commit -m "session: [concise description of what was done]"
 
 ## 8b. Post session digest to Buzz (optional, fail-open)
 
-After the close commit exists, publish the session digest through the Buzz lane. Write
+After the close commit exists, publish the session digest through the Buzz lane: members-level lines only (step 2),
+never a Council matter. Write
 the digest text (the Session Summary panel from Step 1) to a temp file and post it with
 `--file` — never a bare pipe or an inherited terminal stdin that a producer could leave
 open:

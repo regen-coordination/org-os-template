@@ -1,0 +1,19 @@
+/* kms house CSS — the artifact frame (spec §5.1; gallery §02): a single-file page with no sidebar — one bar
+   (seal, the instance's name, what this page is and when it was generated; trailing tools), then the body.
+   Tokens only. */
+.art { container: art / inline-size; min-height: 100dvh; background: var(--paper); }
+.art-bar { display: flex; align-items: center; gap: var(--sp-8); min-height: var(--h-topbar); padding: var(--sp-5) var(--sp-10) var(--sp-5) var(--sp-11);
+  border-bottom: var(--rule-w) solid var(--rule); flex-wrap: wrap; background: var(--paper); }
+.art-bar .seal { width: var(--h-seal); height: var(--h-seal); border-radius: var(--radius-sm); background: var(--solid); color: var(--on-solid); display: grid; place-items: center; flex: none; }
+.art-bar .seal svg.i { width: var(--ic-xs); height: var(--ic-xs); }
+.art-bar .what { display: grid; gap: var(--sp-2); min-width: 0; flex: 1 1 160px; }
+.art-bar .art-name { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); letter-spacing: var(--ls-name); color: var(--ink); overflow-wrap: break-word; }
+.art-bar .art-sub { font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+.art-bar time { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.art-bar .tools { margin-inline-start: auto; display: flex; align-items: center; gap: var(--sp-6); flex-wrap: wrap; }
+.art-body { padding: var(--sp-12); display: grid; gap: var(--sp-12); min-width: 0; }
+@container art (max-width: 759px) {
+  .art-body { padding: var(--sp-10) var(--sp-6); gap: var(--sp-10); }
+  .art-bar { padding-inline: var(--sp-10); }
+  .art-bar .gen { position: absolute; width: var(--sp-1); height: var(--sp-1); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}

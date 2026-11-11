@@ -6,6 +6,7 @@ import { execSync } from 'node:child_process'
 import { Hono } from 'hono'
 import * as gitModule from '../../server/git.ts'
 import { generatedBehind, mountGenerated, GENERATED_SOURCES } from '../../server/proposals/generated.ts'
+import { isMaintainer, type RuleContext } from '../../server/governance/effective.ts'
 
 // "Generated files are behind the data" (0.6 P2 spec 3.8, P2-R20): a ratify merge (Org-Proposal and Org-Decision) that
 // changed what .well-known/ is generated from, newer than the newest commit that changed .well-known/. Every test builds
@@ -94,10 +95,35 @@ describe('GET /api/generated', () => {
   it('answers { behind, since } and changes nothing', async () => {
     ratify('data/projects.yaml')
     const before = sh(repo, 'git status --porcelain') + head()
-    const app = new Hono(); mountGenerated(app, { repo })
+    const app = new Hono(); mountGenerated(app, { repo, maintainer: () => true })
     const res = await app.request('/api/generated')
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ behind: true, since: head() })
     expect(sh(repo, 'git status --porcelain') + head()).toBe(before)
+  })
+
+  // walk I7, D4: the line is for maintainers; anyone else is told nothing of it
+  it('answers { behind: false } to anyone who is not a maintainer', async () => {
+    ratify('data/projects.yaml')
+    const app = new Hono(); mountGenerated(app, { repo, maintainer: () => false })
+    expect(await (await app.request('/api/generated')).json()).toEqual({ behind: false })
+  })
+})
+
+describe('isMaintainer (walk I7, D4)', () => {
+  const ctx = (governance: Record<string, unknown> | null, actor: RuleContext['actor']): RuleContext => ({
+    org: 'Test', governance, shape: 'map', problems: [], modelImplied: governance === null, actor,
+    members: [{ id: 'steward-a', kind: 'person' }, { id: 'steward-b', kind: 'person' }, { id: 'bot', kind: 'agent' }],
+  })
+  const person = (id: string) => ({ id, name: id, kind: 'person' }) as RuleContext['actor']
+  it('a written maintainer role holds its members only', () => {
+    const gov = { model: 'consensus', roles: { maintainer: { members: ['steward-a'] } } }
+    expect(isMaintainer(ctx(gov, person('steward-a')))).toBe(true)
+    expect(isMaintainer(ctx(gov, person('steward-b')))).toBe(false)
+  })
+  it('with no maintainer role written, every person is one (F2-R2); an agent and an unknown actor are not', () => {
+    expect(isMaintainer(ctx(null, person('steward-b')))).toBe(true)
+    expect(isMaintainer(ctx(null, { id: 'bot', name: 'bot', kind: 'agent' } as RuleContext['actor']))).toBe(false)
+    expect(isMaintainer(ctx(null, { unknown: 'someone@example.test' } as RuleContext['actor']))).toBe(false)
   })
 })

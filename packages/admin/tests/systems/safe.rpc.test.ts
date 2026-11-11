@@ -46,9 +46,10 @@ const SAFE_ANSWERS: Record<string, string> = {
 }
 
 type Rpc = { id: number; method: string; params: unknown[] }
-/** A node: `code` for eth_getCode, `answers` for eth_call by data (a missing one reverts), block 0x6b1a2c. Every
+/** A node: `code` for eth_getCode, `answers` for eth_call by data (a missing one reverts; one in `throttled` is answered
+ *  with a rate-limit error, which is not a revert), block 0x6b1a2c. Every
  *  request is kept, with its method and the RPC methods it carried. */
-function node(over: { code?: string; answers?: Record<string, string>; status?: number } = {}) {
+function node(over: { code?: string; answers?: Record<string, string>; status?: number; throttled?: string[] } = {}) {
   const requests: { url: string; method: string; rpc: string[] }[] = []
   const fetch: FetchLike = async (url, init) => {
     const batch = init.body ? (JSON.parse(init.body) as Rpc[]) : []
@@ -59,6 +60,7 @@ function node(over: { code?: string; answers?: Record<string, string>; status?: 
       if (r.method === 'eth_blockNumber') return { jsonrpc: '2.0', id: r.id, result: '0x6b1a2c' }
       if (r.method === 'eth_getCode') return { jsonrpc: '2.0', id: r.id, result: over.code ?? '0x6080604052' }
       const data = (r.params[0] as { data: string }).data
+      if (over.throttled?.includes(data)) return { jsonrpc: '2.0', id: r.id, error: { code: -32005, message: 'too many requests from https://rpc.example.org/v3/0123456789abcdef' } }
       return data in answers ? { jsonrpc: '2.0', id: r.id, result: answers[data] } : { jsonrpc: '2.0', id: r.id, error: { code: 3, message: 'execution reverted' } }
     }
     return { ok: true, status: 200, json: async () => batch.map(answer) }
@@ -121,6 +123,27 @@ describe('readSafeOnChain: a Safe read by eth_call', () => {
       chain: SEPOLIA, address: ADDR, owners: [A1, A2], threshold: 2, nonce: 3, version: '1.4.1', modules: null, guard: null,
       fallbackHandler: null, singleton: null, block: 0x6b1a2c, unknown: ['modules', 'guard', 'fallbackHandler', 'singleton'],
     })
+  })
+
+  it('a view the node answers with an error that is not a revert (a rate limit inside the batch) throws, naming the host only: never "not known", never "not a Safe" (L7 T10 fix I1, M2)', async () => {
+    const modules = encodeCall('getModulesPaginated(address,uint256)', ['0x0000000000000000000000000000000000000001', 10n])
+    const guard = encodeCall('getStorageAt(uint256,uint256)', [BigInt(GUARD_SLOT), 1n])
+    for (const [data, view] of [[modules, 'getModulesPaginated(address,uint256)'], [guard, 'getStorageAt(guard)'], [encodeCall('getOwners()', []), 'getOwners()']] as const) {
+      const err = await readSafeOnChain(ctxWith(node({ throttled: [data] }).fetch), SEPOLIA, ADDR).then(() => null, (e: Error) => e.message)
+      expect(err).toBe(`${CHAINS[SEPOLIA]!.rpc} answered an error for ${view}`)
+      expect(err).not.toContain('0123456789abcdef')
+    }
+  })
+
+  it('a full page of modules (more beyond it) is not known, never read as the whole list (L7 T10 fix M5)', async () => {
+    const mods = Array.from({ length: 10 }, (_, i) => `0x${'0'.repeat(38)}${(0xb0 + i).toString(16)}`)
+    const page = (next: string) => ({ ...SAFE_ANSWERS, [encodeCall('getModulesPaginated(address,uint256)', ['0x0000000000000000000000000000000000000001', 10n])]: encodeArgs(['address[]', 'address'], [mods, next]) })
+    const more = await readSafeOnChain(ctxWith(node({ answers: page(mods[9]!) }).fetch), SEPOLIA, ADDR)
+    expect(more).toMatchObject({ modules: null, unknown: ['modules'] })
+    // Exactly ten, the list ending at the page's end: the sentinel comes back, and the ten are the whole list.
+    const ten = await readSafeOnChain(ctxWith(node({ answers: page('0x0000000000000000000000000000000000000001') }).fetch), SEPOLIA, ADDR)
+    expect(ten && 'modules' in ten ? ten.modules?.map(m => m.toLowerCase()) : null).toEqual(mods)
+    expect(ten).not.toHaveProperty('unknown')
   })
 
   it('a node that cannot be reached, or a context with no RPC, throws', async () => {

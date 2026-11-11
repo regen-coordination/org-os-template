@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { parse } from 'yaml'
 import { lastCommit } from '../changed.ts'
+import { displayNames } from '../../session/names.ts'
 import { moduleAttention } from '../attention.ts'
 import { absentCard } from '../graph.ts'
 import { str, list } from '../util.ts'
@@ -61,7 +62,7 @@ export const modules: Adapter = {
       const failing = failingFileChecks(ctx.repo, fileChecks)
       nodes.push({
         id: `module:${id}`, kind: 'module', board: 'systems', name: id, status: str(m.version),
-        attention: moduleAttention(failing), changed: await lastCommit(ctx.repo, rel),
+        attention: moduleAttention(failing), changed: await lastCommit(ctx.repo, rel, displayNames(ctx.repo, ctx.membership ?? null)),
         facts: { type: m.type ?? null, description: m.description ?? null, fileChecks, commandChecks, failing },
         source: { path: rel, editable: false },
       })

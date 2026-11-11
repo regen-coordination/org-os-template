@@ -107,7 +107,8 @@ describe('written rules (F2, and Propose of P2): not direct, and whether it can 
   it('a class no rule covers cannot be proposed, in words', () => {
     expect(effectiveRule(withRules(), ['treasury'])).toEqual({
       direct: false, proposable: false, source: 'data/governance.yaml rules',
-      sentence: 'No rule in data/governance.yaml covers the class treasury; nobody can propose it until a rule does.',
+      // walk W3, D3: in words, no file path
+      sentence: 'No rule of this org covers treasury changes yet, so nobody can propose one until a rule does.',
     })
   })
   it('an agent never applies, even if a direct rule lists it', () => {

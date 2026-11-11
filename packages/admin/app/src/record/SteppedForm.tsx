@@ -46,7 +46,7 @@ export function SteppedForm({ registry, schema, entries, ed, title, onSave, onCa
   return (
     <WizardFrame title={title} steps={names} last={CHECK} view={check ? 'review' : 'step'} index={Math.min(index, groups.length - 1)}
       count={{ at: index + 1, of: total }} heading={name} ask={optional ? 'Optional.' : undefined}
-      writes={check ? `data/${registry}.yaml · a new entry, as a staged change` : 'Nothing yet. Check saves it to Changes.'}
+      writes={check ? 'A new entry, as a staged change' : 'Nothing yet. Check saves it to Changes.'}
       actions={{
         cancel: { label: 'Cancel', onClick: onCancel },
         back: index > 0 ? { label: 'Back', onClick: () => go(index - 1) } : undefined,

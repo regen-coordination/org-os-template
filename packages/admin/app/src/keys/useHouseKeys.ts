@@ -7,13 +7,16 @@ import { keyStep, pressOf, type KeyState } from './keys.ts'
 export const OPEN_KEYMAP = 'house:open-keymap'
 /** Asks the Changes tray to expand (`g c`; the tray listens). */
 export const OPEN_CHANGES = 'house:open-changes'
+/** Asks the Changes tray for its Propose panel (the compose canvas's Propose, DAO-OS L7 Task 17); a change that is applied,
+ *  not proposed, opens the tray instead, where its Apply and its rule are said. */
+export const OPEN_PROPOSE = 'house:open-propose'
 /** Asks the page for its New (`n`): the Boards page opens New board; a page without one does nothing. */
 export const OPEN_NEW_BOARD = 'house:new-board'
 /** Dispatched on the focused element, bubbling: the nearest list with List · Map toggles (useViewToggle). */
 export const TOGGLE_VIEW = 'house:toggle-view'
 
 /** The house's keys (§5.8), heard on the window after the page has had them (a handled key — an editor's, a
- *  menu's — is left alone). `g` + a key goes to a section, `g c` expands the tray, `g d` opens the public door
+ *  menu's — is left alone). `g` + a key goes to a section, `g c` expands the tray, `g d` opens the portal
  *  in a new tab, `?` the key map, ⌘\ or `[` fold the sidebar (the frame's, so this is drawn inside the Shell),
  *  `v` toggles List · Map on the focused list. ⌘K is the palette's own (it hears it wherever it is mounted) and
  *  j / k / ↓ / ↑ are each list's (useRoving). While a dialog is open — the palette, the key map, the More sheet, a
@@ -42,7 +45,7 @@ export function useHouseKeys(): void {
       else if (a.open === 'keymap') window.dispatchEvent(new Event(OPEN_KEYMAP))
       else if (a.open === 'changes') window.dispatchEvent(new Event(OPEN_CHANGES))
       else if (a.open === 'new') window.dispatchEvent(new Event(OPEN_NEW_BOARD))
-      else window.open('/door', '_blank', 'noopener,noreferrer')
+      else window.open('/portal', '_blank', 'noopener,noreferrer')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

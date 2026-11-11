@@ -12,6 +12,7 @@ import { reconcilePrivate } from './private/proposals.ts'
 import { repoStatus } from './git.ts'
 import { watchData, watchPaths } from './watcher.ts'
 import { ADAPTERS, ResourceStore } from './resources/index.ts'
+import type { AdapterContext } from './resources/types.ts'
 import { mountResources } from './resources/routes.ts'
 import { runCommand } from './resources/run.ts'
 import { refusal, type GuardScope } from './guard.ts'
@@ -23,11 +24,13 @@ import { LocalExecutor } from './operations/executor.ts'
 import { Plans } from './operations/plans.ts'
 import { mountOperations } from './operations/routes.ts'
 import { mountProposals } from './proposals/routes.ts'
+import { mountDeploy } from './deploy/routes.ts'
 import { mountSync } from './proposals/sync.ts'
 import { mountGenerated } from './proposals/generated.ts'
 import { mountStandards } from './standards/routes.ts'
 import { mountBootstrap } from './bootstrap/routes.ts'
 import { mountWizards } from './wizards/routes.ts'
+import { mountKnowledge } from './knowledge/routes.ts'
 import { opById } from './operations/catalogue.ts'
 import { parseRpcConfig } from './systems/chains.ts'
 import { SystemReader, READ_TTL_MS } from './systems/reader.ts'
@@ -38,10 +41,16 @@ import { mountSession } from './session/routes.ts'
 import { readSignInConfig, type SignInConfig } from './session/config.ts'
 import { mountEmailSignIn, type EmailSignIn } from './session/email.ts'
 import { logMailer, resendMailer, type Mailer } from './session/mail.ts'
-import { withRequest } from './request.ts'
+import { readerOf, withRequest } from './request.ts'
+import { isMaintainer, readRuleContext } from './governance/effective.ts'
 import { checkRemote, RemoteWatch } from './visibility/remote.ts'
 import { attentionLevel, EventLevels, gateEvent, PUBLIC_VIEWER } from './visibility/gate.ts'
 import { connectionViewer, mountVisibility } from './visibility/routes.ts'
+import { workspaceOf } from './workspace/routes.ts'
+import { actorNames, mountConversation, targetLevel, tellAtCommit, type Target } from './workspace/conversation.ts'
+import { mountPresence, Presence, PRESENCE_BEAT_MS } from './workspace/presence.ts'
+import { privateReads } from './private/reads.ts'
+import { goneSettled } from './workspace/gone.ts'
 import type { Viewer } from '../lib/visibility.mjs'
 import type { HostedConfig } from './hosted/config.ts'
 import { useHubIdent } from './hosted/ident.ts'
@@ -171,13 +180,18 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   if (instanceWrites === 'off') console.log(`org-os admin: ${INSTANCE_WRITES_ENV} is off: this Hub writes nothing to the instance (no commits, no push, no reconcile at start).`)
   const signIn: SignInConfig | null = signInRead.config
   const signInMailer: Mailer = mailer ?? (signIn?.mail ? resendMailer({ ...signIn.mail, fetch }) : logMailer())
-  const store = new ResourceStore({
+  // Membership from the DAO's Hats tree (§5), read through the one reader; sessions live in the one private store.
+  const membership = new Membership({ repo, reader: systemReader, now: () => new Date() })
+  const resourceCtx: AdapterContext = {
     repo, now: () => new Date(), run: runCommand, lastOk: (op, id) => jobs.lastOk(op, id),
     // The only reader given the network: drivers reach their declared hosts and nothing else.
     systems: systemReader,
     // The Sources page's row for a read-only Hub's refresh (C1, C2); none while there is no Refresher.
     refresh: () => refresher?.state() ?? null,
-  }, [...ADAPTERS, serverAttentionAdapter(attention)])
+    // history names a CAIP-10 actor by the hat they wear (walk fix wave 4, G9)
+    membership,
+  }
+  const store = new ResourceStore(resourceCtx, [...ADAPTERS, serverAttentionAdapter(attention)])
   attention.onChange = () => store.invalidateAdapter('server')
   // The one private store. One that cannot be opened (not ignored by git, unreadable, newer) leaves the git side
   // serving and says why on Home (§10.1); every private read and write is then refused with that sentence.
@@ -199,6 +213,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     privateStore.onStuck = ms => attention.raise('private-store-stuck', 'Private store', { level: 'warn', text: STORE_STUCK(ms) })
     privateStore.onUnstuck = () => attention.clear('private-store-stuck')
   }
+  // Walk fix wave 5: a System's chain fields the store keeps are laid over git's entry for its read (adapters/systems.ts).
+  resourceCtx.privateStore = storeAccess(privateStore, storeFailure)
   // §10.3: a ratified proposal whose private part was never committed to the store is applied now, before anything is
   // served; a closed proposal's leftover pending rows go. A failure is logged and the server still starts.
   // While writes are off it does not run (ledger 232 M8 sits on this path); the start says so once, above.
@@ -213,14 +229,14 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   // The socket exists only once the server listens; until then events have nowhere to go.
   let emit: (msg: unknown) => void = () => {}
   let afterJob: (op: string) => void = () => {}
+  // DAO-OS L6 §8.5 (Task 9 fix round 1): a private page written in the store is a `pages-changed` too (members only, no id).
+  if (privateStore) privateStore.onRecordsWritten = collections => { if (collections.includes('pages')) emit({ type: 'pages-changed' }) }
   const executor = new LocalExecutor(repo, jobs, {
     started: job => emit({ type: 'job-started', job }),
     output: (job, chunk) => emit({ type: 'job-output', job: job.id, resource: job.resource, chunk }),
     finished: job => { emit({ type: 'job-finished', job }); afterJob(job.op) },
   })
   const plans = new Plans()
-  // Membership from the DAO's Hats tree (§5), read through the one reader; sessions live in the one private store.
-  const membership = new Membership({ repo, reader: systemReader, now: () => new Date() })
   // The hosted binding (L9 §5.1), only when hosted and given (`config`, above): one host and one origin for the guard,
   // SIWE and the WebSocket upgrade; the `__Host-` cookie; the portal's origin. Without it, hosted is L5's, on this machine.
   const guard: GuardScope = config ? { kind: 'hosted', host: config.host, origin: config.origin } : { kind: 'local' }
@@ -233,23 +249,32 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   let writeLock: (<T>(fn: () => Promise<T>) => Promise<T>) | null = null
   // The emailed-link sign-in's work done after its answers (S10-0): waited for at stop, before the store closes.
   let emailSignIn: EmailSignIn | null = null
+  // DAO-OS L6 §8.4 (Task 9): presence, in this process's memory only; each change is an event, gated per connection.
+  const presence = new Presence({ level: t => targetLevel(repo, t, privateStore), names: actorNames(repo, membership) })
+  presence.onChange(target => emit({ type: 'presence', target, people: presence.everyone(target) }))
   const app = createApp(repo, (a, ctx) => {
     // First, so its middleware reads the session for every route mounted after it.
     writeLock = ctx.withLock
     mountSession(a, { repo, store: privateStore, membership, hosted, config, signIn, instanceWrites })
     emailSignIn = mountEmailSignIn(a, { repo, store: privateStore, config: signIn, mailer: signInMailer, ...(config ? { hosted: config } : {}) })
-    mountResources(a, store, repo, { hosted })
+    mountResources(a, store, repo, { hosted, privateStore: ctx.privateStore })
     mountOperations(a, { repo, store, jobs, executor, plans, startBranch, hosted })
-    mountProposals(a, { repo, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, systems: systemReader, hosted, privateStore: ctx.privateStore, readOnly: instanceWrites === 'off' })
+    mountProposals(a, { repo, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, systems: systemReader, hosted, privateStore: ctx.privateStore, readOnly: instanceWrites === 'off', membership })
+    // DAO-OS L7 §8–§9 (Tasks 11, 12): the composition's deployment, prepared; read back and staged as live Systems.
+    mountDeploy(a, { repo, systems: systemReader, withLock: ctx.withLock, notify: msg => emit(msg), privateStore: ctx.privateStore })
     mountSync(a, { repo, withLock: ctx.withLock, store, jobs, executor, plans, startBranch, notify: msg => emit(msg) })
-    mountGenerated(a, { repo })
+    mountGenerated(a, { repo, maintainer: c => isMaintainer(readRuleContext(repo, readerOf(c))) }) // walk I7, D4
     mountStandards(a, { repo, systems: systemReader }) // seam S4: L5's members gate wraps this route
     mountBootstrap(a, { repo, jobs, executor, withLock: ctx.withLock })
     mountWizards(a, { repo, hosted })
+    mountKnowledge(a, { repo, jobs, withLock: ctx.withLock })
     mountVisibility(a, { repo, membership, systems: systemReader, withLock: ctx.withLock, privateStore: ctx.privateStore, notify: msg => emit(msg) })
     mountPush(a, { pusher: () => pusher })
     // Every mode (ruling P1): public, `{ ok }` and nothing more (L9 §5.11).
     mountHealth(a, { store: () => privateStore !== null })
+    // DAO-OS L6 §8 (Task 9): comments, mentions, notifications, read state, presence.
+    mountConversation(a, { repo, membership, privateStore: ctx.privateStore, withLock: ctx.withLock, notify: msg => emit(msg) })
+    mountPresence(a, { repo, membership, privateStore: ctx.privateStore, presence })
   }, {
     notify: msg => emit(msg),
     // Who asks (L5 spec §6.2): the session's member, git's identity locally, nobody hosted; every route reads it.
@@ -266,10 +291,33 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
       securityHeaders({ host: config.host, prepaintHashes: builtPrepaint(appDist) }),
       rateLimits({ trustProxy: config.trustProxy }),
     ] } : {}),
+    // DAO-OS L6 §10 (Task 14): the Sources page and the from mark read this reader's cache, never a read of their own.
+    systems: systemReader,
+    membership,
+  })
+  // DAO-OS L6 §6 (Task 8): the editing sessions' drafts and the record batches a crash left are committed now, before
+  // anything is served; a draft that conflicts stays, for Compare. A failure is logged and the server still starts.
+  // While writes are off nothing is committed at start (as the private store's reconcile, above): the drafts wait.
+  const writers = workspaceOf(app)
+  if (writers && instanceWrites === 'on') {
+    try {
+      const done = [...await writers.sessions.reconcile(), ...await writers.records.reconcile()]
+      if (done.length > 0) console.log(`org-os admin: committed ${done.length} workspace ${done.length === 1 ? 'draft' : 'drafts'} left before the last stop.`)
+    } catch (err) {
+      console.error(`org-os admin: the workspace drafts could not be reconciled at start: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  // DAO-OS L6 §8.3 (Task 9): a page session's new mentions are told at its commit; the store down, they are not (logged).
+  writers?.sessions.onCommit((page, _base, text, more) => {
+    if (!privateStore) return
+    const target: Target = `page:${page}`
+    tellAtCommit(page, text, more, { repo, store: privateStore, membership })
+      .then(out => { if (out.told.length > 0) emit({ type: 'conversation', target }) })
+      .catch(err => console.error(`org-os admin: the mentions of page ${page} could not be told: ${err instanceof Error ? err.message : String(err)}`))
   })
   // A connection's viewer is read as a request's is, from the same session cookie.
   const viewerOfCookie = connectionViewer({ repo, hosted, membership, store: privateStore, config, signIn })
-  const events = new EventLevels(repo, attentionLevel(hosted))
+  const events = new EventLevels(repo, attentionLevel(hosted), privateReads(storeAccess(privateStore, storeFailure)))
   // The members' side's /portal, and /door (its name until 0.6.2), go to the portal (§5.2), with anything under them and
   // the query kept; with no portal origin they are the SPA's, as before.
   const portalOrigin = config?.portalOrigin
@@ -367,7 +415,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
       // only what they may see. The levels of the message's keys are worked out once, for every connection; each
       // connection's messages go one after another, each judged on the viewer as it is when it is sent (R-L5-13.6).
       const broadcast = (raw: unknown) => {
-        const msg = raw as { type: string; registry?: string; ids?: string[] }
+        const msg = raw as { type: string; registry?: string; ids?: string[]; target?: string }
         const levelOf = events.levelsFor(msg)
         for (const client of wss.clients) {
           if (client.readyState !== client.OPEN) continue
@@ -384,6 +432,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
 
       // DECISIONS.md sits at the repository root, outside data/: the Governance page needs to hear of it too.
       const decisionsWatcher = watchPaths(repo, ['DECISIONS.md'], () => broadcast({ type: 'decisions-changed' }))
+      // DAO-OS L6 §4 (Task 7): a git page written, by the Hub or by hand; members' (the gate holds no page level here).
+      const pagesWatcher = watchPaths(repo, ['pages'], () => broadcast({ type: 'pages-changed' }))
 
       // Changes arrive in bursts (a save writes, git writes); one refresh answers a burst.
       let pending: NodeJS.Timeout | null = null
@@ -416,6 +466,9 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         scheduleRefresh()
       }, clockRefreshMs)
       const systemsTick = setInterval(() => { systemReader.expire(); store.invalidateAdapter('systems'); scheduleRefresh() }, SYSTEMS_REFRESH_MS)
+      // DAO-OS L6 §8.4: a lapsed presence is told as it lapses (within a quarter of a beat).
+      const presenceSweep = setInterval(() => presence.sweep(), PRESENCE_BEAT_MS / 4)
+      presenceSweep.unref()
       // The baseline the first resources-changed is measured from, and each resource's level then.
       store.refresh().then(async () => events.noteGraph(await store.graph())).catch(reportRefreshFailure).then(() => systemsRetry.afterRefresh())
       attention.onChange = () => { store.invalidateAdapter('server'); scheduleRefresh() }
@@ -455,6 +508,12 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         close: async () => {
           // Jobs first: a child left running would outlive the server that promised to supervise it.
           await executor.stopAll()
+          // DAO-OS L6 §6: every open editing session and record batch ends now, committed, before the store closes.
+          for (const flush of [() => writers?.sessions.flushAll(), () => writers?.records.flushAll()]) {
+            try { await flush() } catch (err) {
+              console.error(`org-os admin: the workspace drafts could not all be committed at stop: ${err instanceof Error ? err.message : String(err)}`)
+            }
+          }
           // Then the push: no new one starts, its timer goes, and one under way is waited for.
           await pusher?.stop()
           // And the refresh: its timer goes, and one under way (a fetch, a fast-forward) is waited for.
@@ -463,16 +522,19 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
           clearInterval(clockTick)
           clearInterval(systemsTick)
           remoteWatch?.stop()
+          clearInterval(presenceSweep)
           systemsRetry.stop()
           try { if (readFileSync(pidFile, 'utf8').trim() === String(process.pid)) rmSync(pidFile, { force: true }) } catch { /* already gone */ }
           if (pending) clearTimeout(pending)
           await watcher.close()
           await resourceWatcher.close()
           await decisionsWatcher.close()
+          await pagesWatcher.close()
           for (const client of wss.clients) client.terminate()
           wss.close()
           await new Promise<void>(done => server.close(() => done()))
-          // Last: a backup under way finishes first, and no request is left to read the store.
+          // Last: a backup under way finishes first, and no request is left to read the store; a queued purge (R-9a) runs.
+          await goneSettled(repo).catch(() => {})
           await backups?.stop()
           await emailSignIn?.settled()
           privateStore?.close()

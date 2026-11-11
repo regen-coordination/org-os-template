@@ -5,7 +5,7 @@
 // (a commit with both an Org-Proposal and an Org-Decision trailer) that changed something the generator reads is newer
 // than the newest commit that changed `.well-known/`. A read of local history only: no network, no write, no new git form.
 
-import type { Hono } from 'hono'
+import type { Context, Hono } from 'hono'
 import { messageOf, resolveRev, treeDiffNames, trunkLine } from '../git.ts'
 
 /** What scripts/generate-all-schemas.mjs reads: data/*.yaml, federation.yaml, and the Markdown under content/projects and
@@ -59,6 +59,8 @@ async function walk(repo: string): Promise<GeneratedState> {
   return { behind: false }
 }
 
-export function mountGenerated(app: Hono, { repo }: { repo: string }): void {
-  app.get('/api/generated', async c => c.json(await generatedBehind(repo)))
+/** Walk I7, D4: the answer is a maintainer's (they regenerate the files); anyone else is answered `{ behind: false }`.
+ *  `maintainer` judges the request's actor (serve.ts: `isMaintainer` on the actor's rule context). */
+export function mountGenerated(app: Hono, { repo, maintainer }: { repo: string; maintainer: (c: Context) => boolean }): void {
+  app.get('/api/generated', async c => c.json(maintainer(c) ? await generatedBehind(repo) : { behind: false }))
 }

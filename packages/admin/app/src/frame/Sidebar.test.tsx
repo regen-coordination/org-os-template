@@ -115,12 +115,11 @@ describe('the sidebar (§5.2)', () => {
     expect(within(house()).queryByRole('button', { name: 'Instance' })).toBeNull()
   })
 
-  it('the foot has Public door, opening /door in a new tab, and the identity opening a menu: hats worn, Copy address, View as…', () => {
+  // walk I16, D2: the portal is drawn from fixtures until L9 builds it from the org's public records, so no link leads there
+  it('the foot has no Portal link until L9; the identity opens a menu: hats worn, Copy address, View as…', () => {
     renderAt(side(), '/')
-    const door = screen.getByRole('link', { name: /^Public door/ })
-    expect(door.getAttribute('href')).toBe('/door')
-    expect(door.getAttribute('target')).toBe('_blank')
-    expect(door.getAttribute('rel')).toContain('noopener')
+    expect(screen.queryByRole('link', { name: /^Portal/ })).toBeNull()
+    expect(document.querySelector('a[href="/portal"]')).toBeNull()
     const who = screen.getByRole('button', { name: /Council steward/ })
     expect(who.textContent).toContain('0x9c1f…a04e')
     expect(who.textContent).toContain('hat 13.1')

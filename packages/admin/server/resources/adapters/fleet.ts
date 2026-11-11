@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join, resolve, basename } from 'node:path'
 import { lastCommit } from '../changed.ts'
+import { displayNames } from '../../session/names.ts'
 import { instanceAttention } from '../attention.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
@@ -21,7 +22,7 @@ export const fleet: Adapter = {
     const selfId = instanceSlug(ctx.repo)
     const self: Resource = {
       id: `instance:${selfId}`, kind: 'instance', board: 'systems', name: str(identity.name) ?? selfId,
-      status: 'this instance', attention: null, changed: await lastCommit(ctx.repo, '.'),
+      status: 'this instance', attention: null, changed: await lastCommit(ctx.repo, '.', displayNames(ctx.repo, ctx.membership ?? null)),
       facts: { self: true, type: identity.type ?? null, localPath: ctx.repo }, source: { path: 'federation.yaml', editable: false },
     }
     const nodes: Resource[] = [self]

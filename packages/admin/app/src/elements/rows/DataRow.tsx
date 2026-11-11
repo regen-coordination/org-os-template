@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from 'react'
 import { Link } from 'wouter'
 import { KindTile } from '../../design/KindTile.tsx'
+import type { IconName } from '../../design/Icon.tsx'
 import { StatusMark, type Mark } from '../../design/StatusMark.tsx'
 import { useViewer } from '../../viewAs/ViewAs.tsx'
 import { Presence } from '../atoms/Presence.tsx'
@@ -11,6 +12,8 @@ const TREATMENT: ReadonlySet<Mark> = new Set<Mark>(['running', 'selected', 'fain
 
 export interface DataRowProps {
   kind: string
+  /** Another glyph than the kind's, for a kind the house does not draw itself (a canon schema: kms's own glyph). */
+  icon?: IconName
   title: string
   /** The second line: kind, chips, facts (13 mute). */
   second?: ReactNode
@@ -47,7 +50,7 @@ export interface DataRowProps {
 /** The house's list row (§9.2): 56px at least, a hairline between rows inside a DataList's raised surface. The kind
  *  tile (28) · the main (the title 14/500, the second line 13 mute) · the trailing facts and the marks. A list item
  *  of its own, so a row not drawn leaves no gap; `data-row` for the list's roving keys. */
-export function DataRow({ kind, title, second, trailing, marks, href, was, tone, selected = false, onPreview, item, className, presence, lead, action }: DataRowProps) {
+export function DataRow({ kind, icon, title, second, trailing, marks, href, was, tone, selected = false, onPreview, item, className, presence, lead, action }: DataRowProps) {
   const { sees } = useViewer()
   if (item !== undefined && !sees(item)) return null
   const running = marks.includes('running')
@@ -59,7 +62,7 @@ export function DataRow({ kind, title, second, trailing, marks, href, was, tone,
     : undefined
   const body = (
     <>
-      {lead ?? <KindTile kind={kind} tone={tile} />}
+      {lead ?? <KindTile kind={kind} tone={tile} icon={icon} />}
       <span className="drow-main">
         <span className="drow-t">{title}</span>
         {(second !== undefined || was !== undefined) && (

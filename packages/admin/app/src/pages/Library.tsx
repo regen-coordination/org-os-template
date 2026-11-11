@@ -25,7 +25,7 @@ function stagedInChange(change: ChangeView | undefined): { adds: Set<string>; re
   const prefix = `${RECEIPTS}:`
   const adds = new Set<string>(), removals: string[] = []
   for (const op of change?.ops ?? []) {
-    if (!op.record.startsWith(prefix)) continue
+    if (op.op === 'file' || !op.record.startsWith(prefix)) continue // a file op (DAO-OS L6) names no record
     if (op.op === 'create' && typeof op.value.entry === 'string') adds.add(op.value.entry)
     else if (op.op === 'update' && op.set.status === 'removed') removals.push(op.record.slice(prefix.length))
   }

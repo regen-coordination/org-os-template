@@ -49,7 +49,7 @@ governance:
     ops: { hat: "${OPS}" }
     member: { all: true }
   rules:
-    - { id: people, applies_to: [members, records], propose: member, decide: ${decide} }
+    - { id: people, applies_to: [members, records, workspace], propose: member, decide: ${decide} }
   decisions: []
 `
 const SYSTEMS = `schema_version: "2.0"
@@ -428,7 +428,8 @@ describe('Ratify with a private part (§10.3)', () => {
     const w = await world()
     await stage(w, [{ op: 'create', record: 'grants-private:g-1', value: { id: 'g-1', title: SENTINEL } }])
     const id = await propose(w, 'A grant')
-    expect(entryOf(w.repo, id).ops).toEqual([{ ...PLACEHOLDER, class: 'records' }])
+    // A collection only the store holds is class workspace (L6 §3.1, ruling P-5); the rules above raise the workspace.
+    expect(entryOf(w.repo, id).ops).toEqual([{ ...PLACEHOLDER, class: 'workspace' }])
     // Meanwhile the store got a record of that id.
     await w.store.putRecord({ collection: 'grants-private', id: 'g-1', visibility: `hat:${OPS}`, body: { id: 'g-1', title: 'other' }, rev: '' }, 'steward-a', null)
     const council = await w.signIn(A2)

@@ -1,0 +1,11 @@
+- id: field-notes-archive
+  title: "Field notes archive"
+  curates: field notes
+  ecosystem: watershed-commons
+- id: seed-registry
+  title: "Seed registry"
+  curates: seed records
+  ecosystem: watershed-commons
+- id: open-data-portal
+  title: "Open data portal"
+  curates: public datasets

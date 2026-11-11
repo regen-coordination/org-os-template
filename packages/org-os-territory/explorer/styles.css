@@ -1,21 +1,154 @@
-:root{--bg:#fbfaf7;--fg:#1d2420;--mut:#5c6860;--line:#d5d9d2;--card:#fff;--acc:#1f6f54;--acc-bg:#e3f1ea;--warn-bg:#fff4d6;--dim:.38}
-[data-theme=dark]{--bg:#141a17;--fg:#e8ece9;--mut:#9aa69f;--line:#33403a;--card:#1b2320;--acc:#6fd0a8;--acc-bg:#1f3a30;--warn-bg:#3a3117}
-@media (prefers-color-scheme:dark){[data-theme=auto]{--bg:#141a17;--fg:#e8ece9;--mut:#9aa69f;--line:#33403a;--card:#1b2320;--acc:#6fd0a8;--acc-bg:#1f3a30;--warn-bg:#3a3117}}
-*{box-sizing:border-box}body{margin:0;padding:1rem;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;position:relative}
-h1{margin:0;font-size:1.5rem}h2{font-size:1.1rem;margin:.2rem 0 .5rem}h3{font-size:.95rem;margin:1rem 0 .3rem}.sub,.meta,.caption,.step,.none{color:var(--mut);font-size:.9rem;margin:.2rem 0}
-.skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:.5rem;background:var(--card);padding:.3rem .6rem}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-button,input{font:inherit;color:inherit}button{background:var(--card);border:1px solid var(--line);border-radius:.4rem;padding:.3rem .6rem;cursor:pointer}:focus-visible,[tabindex="-1"]:focus{outline:3px solid var(--acc);outline-offset:2px}
-button.link{border:0;background:none;padding:0;color:var(--acc);text-decoration:underline}
-.banner{background:var(--warn-bg);border:1px solid var(--line);border-radius:.4rem;padding:.5rem .7rem;font-size:.9rem}
-.cols{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:1rem;align-items:start}@media (max-width:800px){.cols{grid-template-columns:1fr}}
-.board,.panel,.bar,.drawers,.tour{background:var(--card);border:1px solid var(--line);border-radius:.6rem;padding:.8rem 1rem;margin:0 0 1rem}
-.layer{border-top:1px dashed var(--line);padding:.4rem 0}.tree,.tree ul{list-style:none;margin:0;padding:0}.tree ul{margin-left:1.1rem;border-left:2px solid var(--line);padding-left:.6rem}.tree li{margin:.3rem 0}
-.unit{text-align:left}.unit-level{color:var(--mut);font-size:.8rem}.badge{background:var(--acc);color:var(--bg);border-radius:1rem;padding:0 .45rem;font-size:.8rem}
-.is-selected{border:2px solid var(--acc);background:var(--acc-bg);font-weight:600}.is-ancestor{border-color:var(--acc)}.is-overlapped{border:2px dashed var(--acc)}.is-dimmed{opacity:var(--dim)}.is-tour-target{box-shadow:0 0 0 4px var(--acc-bg),0 0 0 6px var(--acc)}
-.tag{font-size:.75rem;border:1px solid var(--line);border-radius:.3rem;padding:0 .3rem;color:var(--mut);white-space:nowrap}.why{font-size:.75rem;color:var(--mut)}
-.panel ul{padding-left:1.1rem;margin:.2rem 0}.streams li{margin:.5rem 0}.private,.floor{font-size:.9rem;color:var(--mut)}.inside{font-size:.9rem;display:block;margin:.2rem 0}
-.bar fieldset{border:0;padding:0;margin:.3rem 0;display:flex;flex-wrap:wrap;gap:.3rem 1rem}.bar legend{font-weight:600;font-size:.9rem;padding:0}.sentence{margin:.5rem 0}
-.drawer-btn{margin-right:.5rem}.drawer{margin-top:.7rem}.drawer dt{margin-top:.5rem}.drawer dd{margin-left:1rem}
-.tour{border:2px solid var(--acc)}.tour-nav{display:flex;gap:.6rem;align-items:center;margin:.4rem 0 0}code{font-size:.85em;background:var(--acc-bg);padding:0 .2rem;border-radius:.2rem}
-@media (prefers-reduced-motion:no-preference){.unit,.is-dimmed{transition:opacity .15s,background-color .15s}}
-@media print{.top-actions,.bar,.drawers,.tour,.skip{display:none}.cols{grid-template-columns:1fr}body{background:#fff;color:#000}}
+/* explorer/styles.css — the territory explorer's own layout (spec §5.8; gallery §07). kms's house CSS comes first in the page (tokens, base,
+   atoms, rows, the artifact frame); this file lays the explorer out and draws what kms does not ship: the layer trees (house §9.7), the
+   inspector's head, the View as control and its menu (L4 §5.9, §7.3), the meter bar (L4 §7.13) and the tour card. Tokens only: no colour
+   literal, no token of its own, no theme rule — light and dark follow the reader through the house tokens (P-11). Nothing is faded: what a
+   peer would not receive is absent, not dimmed. No horizontal scroll at 390 or 320: every name and id can wrap. */
+
+/* the frame */
+.xp { position: relative; }
+.xp .art-body { width: 100%; max-width: var(--w-parts); margin-inline: auto; align-content: start; }
+.xp p { margin: 0; }
+.xp code { font-size: var(--fs-code); overflow-wrap: anywhere; }
+.xp-band:empty { display: none; }
+.xp-app { display: grid; gap: var(--sp-12); min-width: 0; }
+#banner .callout { margin: 0; }
+
+/* the bar's tools: Take the tour, and View as */
+.xp-tools { display: flex; align-items: center; gap: var(--sp-6); flex-wrap: wrap; }
+.va { position: relative; }
+.viewas { display: inline-flex; align-items: center; gap: var(--sp-5); height: var(--h-viewas); padding: 0 var(--sp-6) 0 var(--sp-7); border-radius: var(--radius-ctl);
+  border: var(--rule-w) solid var(--rule-strong); background: var(--raised); color: var(--mute); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); white-space: nowrap;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.viewas svg.i { width: var(--ic-sm); height: var(--ic-sm); }
+.viewas .chev { display: inline-grid; rotate: 90deg; }
+.viewas .chev svg.i { width: var(--ic-chev); height: var(--ic-chev); }
+.viewas[aria-expanded="true"] { background: var(--wash); color: var(--ink); }
+@media (hover: hover) { .viewas:hover { background: var(--wash); color: var(--ink); } }
+
+/* the View as menu (L4 §7.3): the share group in its header, then the views; the floor below */
+.menu { position: absolute; inset-inline-end: 0; inset-block-start: calc(100% + var(--sp-4)); z-index: 10; width: max-content; min-width: var(--w-menu);
+  max-width: min(var(--w-panel), calc(100vw - 2 * var(--sp-10))); padding: var(--sp-4); background: var(--pop); border: var(--rule-w) solid transparent;
+  border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); overscroll-behavior: contain; }
+.menu .mh { display: block; padding: var(--sp-6) var(--sp-6) var(--sp-4); }
+.menu .mi { display: flex; align-items: center; gap: var(--sp-6); width: 100%; min-height: var(--h-ctl); padding: 0 var(--sp-6); border-radius: var(--radius-sm);
+  font: var(--fw-regular) var(--fs-ui)/var(--lh-ui) var(--sans); color: var(--ink); text-align: start; }
+.menu .mi svg.i { margin-inline-start: auto; width: var(--ic-menu); height: var(--ic-menu); color: var(--accent); visibility: hidden; }
+.menu .mi[aria-checked="true"] svg.i { visibility: visible; }
+.menu .mi:focus-visible { background: var(--wash); outline-offset: calc(-1 * var(--focus-w)); }
+@media (hover: hover) { .menu .mi:hover { background: var(--wash); } }
+.menu .sep { height: var(--rule-w); margin: var(--sp-4) calc(-1 * var(--sp-4)); background: var(--rule); }
+.menu .floor { margin: var(--sp-4) calc(-1 * var(--sp-4)) 0; padding: var(--sp-6) var(--sp-8) var(--sp-4); border-top: var(--rule-w) solid var(--rule);
+  font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--mute); }
+.menu .floor code { font-size: var(--fs-tiny); }
+
+/* the band while previewing as a peer */
+.xp-band .band { margin: 0; }
+
+/* trees beside the inspector; under 860 the inspector stacks under the trees */
+.xp-grid { display: grid; grid-template-columns: minmax(0, 1fr) var(--w-inspector); gap: var(--sp-12); align-items: start; }
+.xp-board { padding: var(--sp-10); display: grid; gap: var(--sp-11); align-content: start; min-width: 0; }
+.xp-layer { min-width: 0; }
+.xp-layer > .eyebrow { display: block; margin: 0 0 var(--sp-5) var(--sp-6); }
+
+/* the layer trees (house §9.7): 44px rows, chevron 18, a 26px pin disc, name + level in faint, the count; 1px connectors with 9px elbows */
+.tree { list-style: none; margin: 0; padding: 0; }
+.tree ul { list-style: none; margin: 0; padding: 0 0 0 calc(var(--sp-11) + var(--sp-2)); position: relative; }
+.tree ul::before { content: ""; position: absolute; inset-inline-start: calc(var(--sp-8) + var(--sp-1)); inset-block: 0 calc(var(--sp-10) + var(--sp-2)); width: var(--rule-w); background: var(--rule-strong); }
+.tree [role="treeitem"] { outline: none; }
+.tnode { position: relative; display: grid; grid-template-columns: calc(var(--sp-10) + var(--sp-2)) var(--h-ctl-sm) minmax(0, 1fr) auto auto; align-items: center; gap: var(--sp-2) var(--sp-5);
+  min-height: var(--h-ctl-touch); padding: var(--sp-4) var(--sp-6); border-radius: var(--radius-ctl); cursor: pointer; transition: background-color var(--dur-1) var(--ease); }
+.tree ul > li > .tnode::before { content: ""; position: absolute; inset-inline-start: calc(-1 * (var(--sp-6) + var(--sp-1))); inset-block-start: 50%; width: calc(var(--sp-6) + var(--sp-1)); height: var(--rule-w); background: var(--rule-strong); }
+.tree [role="treeitem"]:focus-visible > .tnode { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); }
+.tnode .tg { width: calc(var(--sp-10) + var(--sp-2)); height: calc(var(--sp-10) + var(--sp-2)); display: grid; place-items: center; color: var(--faint); border-radius: var(--radius-xs); }
+.tnode .tg svg.i { width: var(--ic-chev); height: var(--ic-chev); transition: rotate var(--dur-1) var(--ease); }
+[aria-expanded="true"] > .tnode .tg svg.i { rotate: 90deg; }
+.tnode .pin { width: var(--h-ctl-sm); height: var(--h-ctl-sm); border-radius: 50%; border: var(--rule-w) solid var(--rule-strong); display: grid; place-items: center; color: var(--mute); background: var(--raised); }
+.tnode .pin svg.i { width: var(--ic-sm); height: var(--ic-sm); }
+.tnode.sel { background: var(--accent-soft); }
+.tnode.sel .pin { border-color: var(--accent); color: var(--accent); }
+.tnode.over .pin { border-style: dashed; }
+.tnode .nmx { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); }
+.tnode .nmx b { font-weight: var(--fw-medium); font-size: var(--fs-body); color: var(--ink); overflow-wrap: anywhere; }
+.tnode .lvl { font-size: var(--fs-tiny); color: var(--faint); }
+.tnode .cntc { grid-column: 5; grid-row: 1; min-width: var(--sp-8); text-align: end; font-size: var(--fs-tiny); color: var(--mute); font-variant-numeric: tabular-nums; }
+.overmark { grid-column: 4; grid-row: 1; margin-inline-end: var(--sp-6); white-space: nowrap; display: inline-flex; align-items: center; gap: var(--sp-3); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--accent); font-variant-numeric: tabular-nums; }
+.overmark svg.i { width: var(--ic-xs); height: var(--ic-xs); }
+@media (hover: hover) { .tnode:hover { background: var(--row-hover); } .tnode.sel:hover { background: var(--accent-soft); } }
+
+/* the inspector (house §5.10) */
+.insp { display: flex; flex-direction: column; min-width: 0; }
+.insp-h { display: flex; align-items: flex-start; gap: var(--sp-8); padding: var(--sp-10) var(--sp-10) var(--sp-8); }
+.insp-name { min-width: 0; }
+.insp .eyebrow { display: block; margin-bottom: var(--sp-3); }
+.insp-h .t { margin: 0; font: var(--fw-strong) var(--fs-sub)/var(--lh-title) var(--sans); letter-spacing: var(--ls-name); color: var(--ink); overflow-wrap: anywhere; }
+.insp-b { padding: 0 var(--sp-10) var(--sp-10); display: grid; gap: var(--sp-11); min-width: 0; }
+.insp-lead { font-size: var(--fs-meta); color: var(--mute); }
+/* R-30: the inspector keeps its field rows side by side, as the gallery draws them — a narrower label column, and kms's under-420 stacking
+   undone for the inspector only (these selectors outrank the house's container rule) */
+.insp .fields { grid-template-columns: minmax(var(--w-kind), max-content) minmax(0, 1fr); }
+.insp .fields > dd:not(:first-of-type) { border-top: var(--rule-w) solid var(--rule); padding-top: var(--sp-6); }
+.fields .restricted { font-size: var(--fs-meta); color: var(--faint); }
+.fields dt svg.i { width: var(--ic-xs); height: var(--ic-xs); }
+.sec-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-4) var(--sp-6); margin: 0 0 var(--sp-5); min-width: 0; }
+.sec-h h3 { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); letter-spacing: var(--ls-name); color: var(--ink); }
+.sec-h .cnt { font-size: var(--fs-meta); color: var(--faint); font-variant-numeric: tabular-nums; }
+.xp-inside { margin-inline-start: auto; display: inline-flex; align-items: center; gap: var(--sp-5); min-height: var(--h-ctl-sm); font-size: var(--fs-meta); color: var(--mute); cursor: pointer; }
+.xp-inside input { width: var(--h-check); height: var(--h-check); margin: 0; accent-color: var(--accent); }
+
+/* rows in the inspector and the tray: the house's data rows, 44px, parts set apart by a dot; a row that selects is a button */
+.xr { min-height: var(--h-ctl-touch); padding-block: var(--sp-6); }
+button.row { width: 100%; text-align: start; }
+@media (hover: hover) { button.row:hover { background: var(--row-hover); } }
+.xr .s { display: block; }
+/* parts run inline, so a line breaks after a dot, never before one */
+.xr .s > span + span::before { content: "\00a0\00a0·\0020\0020"; white-space: pre-wrap; color: var(--faint); }
+.xr .s .inv { font-style: italic; color: var(--faint); }
+.xr .s code { font-size: var(--fs-tiny); }
+.xr.wrap-end { grid-template-columns: var(--h-ktile) minmax(0, 1fr); }
+.xr.wrap-end > .end { grid-column: 2; justify-content: flex-start; gap: var(--sp-8); }
+
+/* the meter bar (L4 §7.13): 96 × 4, an ink fill; always followed by its words */
+.meter.bar { position: relative; display: inline-block; width: var(--w-meter-bar); height: var(--h-meter); border-radius: var(--radius-meter); background: var(--rule-strong); overflow: hidden; }
+.meter.bar > b { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: var(--radius-meter); background: var(--ink); }
+.meter-l { font-size: var(--fs-tiny); color: var(--mute); font-variant-numeric: tabular-nums; }
+
+/* more about the page */
+.xp-more { display: grid; gap: var(--sp-8); justify-items: start; min-width: 0; }
+.xp-more-btns { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+.xp-drawer { display: grid; gap: var(--sp-8); width: 100%; max-width: var(--w-content); padding: var(--sp-10) var(--sp-11); min-width: 0; }
+.xp-drawer .meta { font-size: var(--fs-meta); color: var(--mute); }
+.xp-drawer .sm { vertical-align: middle; }
+
+/* the tour: a pop card (menu depth) under its target; the target carries the focus ring */
+.coach { position: relative; z-index: 5; width: min(var(--w-panel), 100%); display: grid; gap: var(--sp-6); padding: var(--sp-10); background: var(--pop);
+  border: var(--rule-w) solid transparent; border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); }
+.coach.anchored { position: absolute; width: min(var(--w-panel), calc(100% - 2 * var(--sp-10))); }
+.coach .step { font: var(--fw-medium) var(--fs-micro)/1 var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.coach h2 { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); letter-spacing: var(--ls-name); color: var(--ink); }
+.coach p { font-size: var(--fs-meta); color: var(--mute); }
+.coach .acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); margin-top: var(--sp-4); }
+.coach .acts .sp { flex: 1; }
+.is-tour-target:not([role="treeitem"]), [role="treeitem"].is-tour-target > .tnode { outline: var(--focus-w) solid var(--focus); outline-offset: var(--sp-2); }
+
+@media (pointer: coarse) {
+  .viewas, .menu .mi, .xp-inside { min-height: var(--h-ctl-touch); }
+}
+
+@container art (max-width: 860px) {
+  .xp-grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* phones: the View as words are clipped, never display:none (the button keeps its name); a tree row's marks go under its name */
+@container art (max-width: 520px) {
+  .va-l { position: absolute; width: var(--sp-1); height: var(--sp-1); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .xp-board { padding: var(--sp-8) var(--sp-6); }
+  .tnode { grid-template-columns: calc(var(--sp-10) + var(--sp-2)) var(--h-ctl-sm) minmax(0, 1fr) auto; }
+  .tnode .overmark { grid-column: 3; grid-row: 2; }
+  .tnode .cntc { grid-column: 4; }
+  .insp-h { padding-inline: var(--sp-8); }
+  .insp-b { padding-inline: var(--sp-8); }
+}
+
+@media print {
+  .xp-tools, .xp-band, .coach, .skip, .xp-more-btns { display: none; }
+  .xp-grid { grid-template-columns: minmax(0, 1fr); }
+}

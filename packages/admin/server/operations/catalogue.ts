@@ -3,8 +3,10 @@ import { join } from 'node:path'
 import { HttpError } from '../errors.ts'
 import { failingFileChecks } from '../resources/adapters/modules.ts'
 import { idOf, list, str } from '../resources/util.ts'
+import { readYamlObject } from '../resources/util.ts'
 import { fetchRemote, validBranchName } from '../git.ts'
 import { resolveTrunk } from '../proposals/ledger.ts'
+import { kmsSrc } from '../knowledge/kms.ts'
 import { validTrunkName } from '../../lib/rules.mjs'
 import type { Kind, Resource } from '../resources/types.ts'
 
@@ -52,7 +54,9 @@ const npmScripts = (repo: string): Record<string, unknown> => {
   try { return (JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')) as { scripts?: Record<string, unknown> }).scripts ?? {} }
   catch { return {} }
 }
-const kmsCli = (repo: string) => join(repo, 'packages', 'org-os-kms', 'src', 'cli.mjs')
+/** The kms CLI the commons is read from (`kmsSrc`: the repository's own, else the one this server shipped beside). */
+const kmsCli = (repo: string) => join(kmsSrc(repo), 'cli.mjs')
+const noKms = (repo: string) => (existsSync(kmsCli(repo)) ? null : 'the KMS is not here (no org-os-kms cli.mjs beside this repository or this app)')
 
 /** Characters that mean something only to a shell. The platform runs commands without one, so
  *  a check that needs them would not do what its author meant; it is left to a terminal. */
@@ -80,6 +84,19 @@ const idProblem = (r: Resource): string | null => (safeId(idOf(r.id)) === null ?
 const refuse = (problem: string | null): void => { if (problem !== null) throw new HttpError(409, `Not run: ${problem}.`) }
 
 export const CATALOGUE: Operation[] = [
+  {
+    // The commons' one run (spec §4.3, K-1): the app plans it and shows the receipt; the CLI writes. `--apply` is what
+    // makes it a write, and the static plane it writes is declared so a surprise is a surprise.
+    id: 'knowledge.publish', kinds: ['knowledge'], label: () => 'Publish the commons', effect: 'changes', network: true,
+    timeoutMs: 300 * SEC, params: NO_PARAMS, refreshes: 'sources',
+    unavailable: (_r, repo) => noKms(repo),
+    plan: (_r, _p, repo) => {
+      const kms = existsSync(join(repo, 'kms.yaml')) ? readYamlObject(join(repo, 'kms.yaml')) as Record<string, unknown> : {}
+      const publish = (kms.publish ?? {}) as Record<string, unknown>
+      const dir = typeof publish.static_dir === 'string' && publish.static_dir !== '' ? publish.static_dir : 'public'
+      return { cmd: process.execPath, args: [kmsCli(repo), 'publish', '--apply', '--dir', repo], writes: [`${dir}/`, 'data/kms-published.json'] }
+    },
+  },
   {
     id: 'module.checks', kinds: ['module'], label: () => 'Re-run checks', effect: 'reads', network: false,
     timeoutMs: 30 * SEC, params: NO_PARAMS, refreshes: 'modules',
@@ -228,7 +245,7 @@ export const CATALOGUE: Operation[] = [
   {
     id: 'connector.ingest', kinds: ['connector'], label: () => 'Ingest', effect: 'changes', network: true,
     timeoutMs: 600 * SEC, params: NO_PARAMS, refreshes: 'sources',
-    unavailable: (_r, repo) => (existsSync(kmsCli(repo)) ? null : 'the KMS is not here (no packages/org-os-kms/src/cli.mjs)'),
+    unavailable: (_r, repo) => noKms(repo),
     plan: (r, _p, repo) => {
       const target = str(r.facts.target) ?? '.'
       const store = target.replace(/\/+$/, '')

@@ -12,7 +12,13 @@
 //   { event: { kind, text?, vote?, of? }, id, now, email, actor, kind? }   writeEvent, through the machine's guards
 //   { branch: true, id, now, email, actor }           buildBranch on HEAD, as Propose does after the entry
 //   { replay: 'mine' | 'theirs', id, now, email, actor, rule }   replayBranch on HEAD with the author's choice
-//   { ratify: true, id, now, email, actor }           ratify, the route's whole path (preflight, branch, plan, merge)
+//   { ratify: true, id, now, email, actor }           ratify, the route's whole path (preflight, branch, plan, merge),
+//                                                     with the private store when an earlier step opened it
+//   { keep: <PrivateRecord>, now, email, actor }      a record put in the private store (opened under the admin home
+//                                                     on first use, removed with it), as the Hub keeps a private one
+// An `open` step's `private: [<staged private op>]` is its restricted part, as Propose writes it: a placeholder per op
+// appended to the entry's ops (its rev taken again) and its `pending` row in the store; a move's `digest: "@current"` is
+// the digest of the record as the store holds it (DAO-OS L6 §12).
 //   { close: 'rejected' | 'expired' | 'withdrawn', id, now, email, actor }   close, the route's whole path
 //   { merge: { commit, evaluateAt?, drop?, row?, decision?, ledger?, allow? }, id, now, email, actor }   a ratify merge of `commit` (a sha, or
 //                                                     '@branch': buildBranch on HEAD) into HEAD by planRatify and
@@ -22,7 +28,8 @@
 //                                                     as written; `decision` replaces the Org-Decision trailer; `ledger`
 //                                                     ([from, to]) replaces text in the closed ledger; `decisions` ([from,
 //                                                     to]) the same in DECISIONS.md; `allow` adds paths
-//                                                     the merge may stage
+//                                                     the merge may stage; `files` ([{ path, text }]) adds or replaces
+//                                                     texts the merge writes; `moved` sets its Org-Moved trailer
 //   { closing: 'reject' | 'expire' | 'withdraw', id, now, email, actor, evaluateAt? }   a closing commit by the server's
 //                                                     own texts (planClosing, closedLedgerText), skipping its machine
 // `now` is the server's clock and the commit's dates; `email` is the commit's author and committer.
@@ -73,6 +80,14 @@ const { showFile, restageDataPaths, commitDataPaths } = await import('../../../p
 const { evaluateAll } = await import('../../../packages/admin/lib/evaluate.mjs')
 const { eventId, methodOf } = await import('../../../packages/admin/lib/proposals.mjs')
 const { insertDecisionRow } = await import('../../../packages/admin/lib/decision-write.mjs')
+const { openPrivateStore } = await import('../../../packages/admin/server/private/store.ts')
+const { pendingPart } = await import('../../../packages/admin/server/private/proposals.ts')
+const { moveDigest } = await import('../../../packages/admin/server/private/ops.ts')
+const { revOf } = await import('../../../packages/admin/lib/proposals.mjs')
+
+/** The private store, opened under the admin home on first use (DAO-OS L5 §10): never the operator's, removed with it. */
+let store = null
+const privateStore = async () => (store ??= await openPrivateStore(repo, { dir: path.join(adminHome, 'private') }))
 
 const entryOf = id => readLedger(repo).entries.find(e => String(e.id) === id)
 const person = step => ({ id: step.actor, name: step.actor, kind: step.kind ?? 'person' })
@@ -97,13 +112,25 @@ for (const step of steps) {
       return { ...op, base: baseOf(readRegistry(repo, registry).entries.find(e => String(e.id) === id) ?? null) }
     })
     const entry = { ...step.open, ops, base: step.open.base === '@head' ? head : step.open.base }
+    let rows = []
+    if (step.private) {
+      const kept = await privateStore()
+      const staged = step.private.map(op => (op.op === 'move-to-git' && op.digest === '@current' ? { ...op, digest: moveDigest(kept.record(op.collection, op.id)) } : op))
+      const part = pendingPart(entry.id, staged)
+      rows = part.rows
+      entry.ops = [...entry.ops, ...part.placeholders]
+      entry.rev = revOf(entry.ops)
+    }
     await createEntry(repo, entry, { actor: step.actor, rule: step.rule }, { now })
+    if (rows.length > 0) await store.tx(w => { for (const row of rows) w.putPending(row) })
   } else if (step.branch) {
     await buildBranch(repo, entryOf(step.id), head)
   } else if (step.replay) {
     await replayBranch(repo, entryOf(step.id), head, { actor: step.actor, rule: step.rule }, { now, choose: step.replay })
+  } else if (step.keep) {
+    await (await privateStore()).putRecord(step.keep, step.actor, null)
   } else if (step.ratify) {
-    await ratify(repo, person(step), step.id, { now })
+    await ratify(repo, person(step), step.id, { now, ...(store ? { privateStore: () => store } : {}) })
   } else if (step.close) {
     await close(repo, person(step), step.id, step.close, { now })
   } else if (step.merge) {
@@ -135,6 +162,8 @@ for (const step of steps) {
       plan.files = plan.files.map(f => (f.path === 'DECISIONS.md' ? { ...f, text: f.text.replace(from, to) } : f))
     }
     if (step.merge.allow) plan.allowed = [...plan.allowed, ...step.merge.allow]
+    if (step.merge.files) plan.files = [...plan.files.filter(f => !step.merge.files.some(x => x.path === f.path)), ...step.merge.files]
+    if (step.merge.moved) plan.trailers = { ...plan.trailers, moved: step.merge.moved }
     await applyRatifyMerge(repo, { trunk: head, commit, plan })
   } else if (step.closing) {
     const entry = entryOf(step.id)
@@ -162,5 +191,6 @@ for (const step of steps) {
   }
 }
 } finally {
+  try { store?.close() } catch { /* removed below either way */ }
   rmSync(adminHome, { recursive: true, force: true })
 }

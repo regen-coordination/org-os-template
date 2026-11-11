@@ -35,7 +35,7 @@ function world(over: { space?: unknown; proposal?: unknown } = {}) {
 describe('the snapshot-space driver', () => {
   it('is declared and registered', () => {
     expect(snapshotSpace.name).toBe('snapshot-space')
-    expect(snapshotSpace.hosts).toEqual(['hub.snapshot.org'])
+    expect(snapshotSpace.hosts).toEqual(['hub.snapshot.org', 'testnet.hub.snapshot.org']) // the testnet hub since L7 Task 13
     expect(snapshotSpace.minGapMs).toBe(1000)
     expect(DRIVERS).toContain(snapshotSpace)
     expect(SNAPSHOT_ACTIONS.map(a => [a.id, a.class])).toEqual([['draft-proposal', null]])

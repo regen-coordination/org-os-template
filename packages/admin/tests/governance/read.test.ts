@@ -131,3 +131,11 @@ describe('GET /api/governance', () => {
     expect(git(repo, 'status --porcelain')).toBe('')
   })
 })
+
+describe('a decision row a ratified proposal wrote names its proposal (walk M4)', () => {
+  it('GET /api/governance carries `proposal` on such a row, so the proposal is not counted twice', async () => {
+    repo = makeChangeRepo(SOLO_WITH_DECISION.replace('      status: "ratified"\n', '      status: "ratified"\n      proposal: "p-2026-11-07-001-0517"\n'))
+    const view = await governance()
+    expect(view.decisions[0]).toMatchObject({ id: 'gov-001', proposal: 'p-2026-11-07-001-0517' })
+  })
+})

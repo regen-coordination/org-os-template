@@ -144,7 +144,7 @@ describe('SectionPage', () => {
   it("says when the file holds entries it can't address, and links to them", async () => {
     routes({ 'GET /api/registries/projects': { name: 'projects', kind: 'collection', schemaVersion: '2.0', entries: [{ id: 'br' }, { title: 'no id' }, { id: 'site' }] } })
     renderAt(<BoardPage id={sectionBoardId('projects')} />)
-    expect(await screen.findByText(/1 entry in data\/projects\.yaml cannot be addressed/)).toBeTruthy()
+    expect(await screen.findByText(/1 entry in this list cannot be addressed/)).toBeTruthy()
     expect(screen.getByRole('link', { name: "see the file's list →" }).getAttribute('href')).toBe('/all/projects')
   })
 
@@ -179,7 +179,7 @@ describe('SectionPage', () => {
     open.focus()
     fireEvent.click(open)
     const sheet = await screen.findByRole('dialog', { name: 'Import from a sheet' })
-    expect(within(sheet).getByText(/data\/projects\.yaml/)).toBeTruthy()
+    expect(within(sheet).getByText('Saved as a staged change')).toBeTruthy()
     fireEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Import from a sheet' })).toBeNull())
     expect(document.activeElement).toBe(open)

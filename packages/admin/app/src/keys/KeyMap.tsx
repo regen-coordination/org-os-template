@@ -15,7 +15,7 @@ export const KEY_ROWS: readonly { does: string; keys: readonly (readonly string[
   { does: 'Workspace', keys: [['g', 'w']] },
   { does: 'Library', keys: [['g', 'l']] },
   { does: 'Changes', keys: [['g', 'c']] },
-  { does: 'Public door, in a new tab', keys: [['g', 'd']] },
+  { does: 'Portal, in a new tab', keys: [['g', 'd']] },
   { does: 'Palette', keys: [['⌘', 'K'], ['Ctrl', 'K']] },
   { does: 'Fold or unfold the sidebar', keys: [['⌘', '\\'], ['[']] },
   { does: 'Next or previous row', keys: [['j', 'k'], ['↓', '↑']] },

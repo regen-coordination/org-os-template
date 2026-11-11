@@ -94,13 +94,14 @@ describe('preview = prepare: what adding would change, without adding it', () =>
     expect(p.note).toBe("Built in. This org's own board of the same id is shown in its place; deleting it restores this one.")
   })
 
-  it('classes a rule set as governance, decided under the rule in force, and says the engine cannot write it yet', async () => {
+  // L7 replaced "…and says the engine cannot write it yet" (RULES_NOT_YET): the engine writes it now (L7-D10).
+  it('classes a rule set as governance, decided under the rule in force, with no note', async () => {
     const p = await preview('rules:consent-7d')
     expect(p.adds.every(a => a.class === 'governance')).toBe(true)
     expect(p.decided.map(d => d.class)).toEqual(['governance'])
     expect(p.rules.map(r => r.id)).toEqual(['records', 'governance', 'other'])
     expect(p.rules[1]!.sentence).toBe('governance, members, identity, systems, publication: maintainer decides by consent, 7 days to object')
-    expect(p.note).toMatch(/cannot edit data\/governance\.yaml yet/)
+    expect(p.note).toBeNull()
   })
 
   it('a rule set that lists classes by name covers every class, publication too (R-L5-2.6)', async () => {
@@ -108,7 +109,9 @@ describe('preview = prepare: what adding would change, without adding it', () =>
     const { CHANGE_CLASSES } = await import('../../lib/change-classes.mjs')
     const entry = parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'library', 'rules', 'consent-7d', 'entry.yaml'), 'utf8'))
     const covered = entry.installs[0].set.rules.flatMap((r: { applies_to: string[] }) => r.applies_to)
-    expect(CHANGE_CLASSES.filter((c: string) => !covered.includes(c))).toEqual([])
+    // DAO-OS L6 C-1 (Q115): `workspace` is reached only by a rule that names it or its splits, never by a catch-all; a
+    // rule set that leaves it out leaves it to workspace/direct.
+    expect(CHANGE_CLASSES.filter((c: string) => c !== 'workspace' && !covered.includes(c))).toEqual([])
   })
 
   it('says the solo entry adds nothing', async () => {
@@ -164,12 +167,19 @@ describe('what a preview says about adding (DAO-OS L1)', () => {
   it('an entry with nothing to add says so', async () => {
     expect((await look('rules:solo')).cannotAdd).toBe('It adds nothing.')
   })
-  it('a rule set: the rules note', async () => {
-    expect((await look('rules:consent-7d')).cannotAdd).toBe('Adding a rule set is not available yet: the change engine cannot edit data/governance.yaml yet.')
+  // L7 replaced "a rule set: the rules note" (RULES_NOT_YET) and refusal 3, "an entry that changes what the org has, not
+  // on the rules shelf, is not added": an update is a modifying install now (L7-D11); a replace or delete stays refused.
+  it('a rule set: raw, or what it needs', async () => {
+    expect((await look('rules:consent-7d')).cannotAdd).toBe('This entry is raw: the library shows it and does not add it.')
+    expect((await look('rules:treasury-safe')).cannotAdd).toBe('It needs a system of kind safe, which this organization does not have yet. Add it first.')
   })
-  it('an entry that changes what the org has, not on the rules shelf, is not added', () => {
+  it('an entry that updates a record the org does not have is not added', () => {
     const e = { ...served('board:test-desk'), installs: [{ op: 'update' as const, record: 'boards:test-desk', set: { name: 'X' } }] }
-    expect(cannotAdd(org, e, [])).toBe('Adding is built for entries that create records; this one changes records the org already has, and removing that is not built yet.')
+    expect(cannotAdd(org, e, [])).toBe('It changes boards:test-desk, which this organization does not have.')
+  })
+  it('an entry that replaces or deletes a record is not added', () => {
+    const e = { ...served('board:test-desk'), installs: [{ op: 'delete' as const, record: 'boards:test-desk' }] }
+    expect(cannotAdd(org, e, [])).toBe('Adding is built for entries that create records or update ones the org has; this one replaces or deletes records, which a removal could not give back.')
   })
   it('a raw entry: the raw sentence', async () => {
     expect((await look('board:onboarding')).cannotAdd).toBe('This entry is raw: the library shows it and does not add it.')

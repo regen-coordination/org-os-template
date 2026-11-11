@@ -10,6 +10,7 @@ import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { bridge } from './registry-bridge.mjs';
 import { readCursors, writeCursors, cursorKeys } from './cursors.mjs';
+import { recordRead } from './reads.mjs';
 import { renderDashboardSection, renderSiteData } from './render.mjs';
 import { checkPeers } from './federate.mjs';
 import { ensureIds } from './identity.mjs';
@@ -19,7 +20,7 @@ import { createClient as defaultCreateClient } from './atproto/client.mjs';
 import { planStandardSite, applyStandardSite, wellKnownPath } from './atproto/standard-site.mjs';
 import { planeRole, regatePublicPlane } from './planes/role.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
-import { loadInstanceGate, buildGateContext, applyGate } from './gate.mjs';
+import { selectPublic } from './gate.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
 
@@ -90,14 +91,11 @@ export const OPS = {
     const report = { dry, ...(regate ? { regate } : {}), atproto: { status: 'not-configured' }, static: null };
 
     const all = adapter.list(target);
-    const types = fw.publishableTypes(config);
-    let candidates = all.filter(({ schema, object }) => fw.isPublishable(object, { schema, types }));
-    const gate = await loadInstanceGate(dir, config);
-    if (gate) {
-      const { passed, rejected } = applyGate(gate, candidates, buildGateContext(all));
-      candidates = passed;
-      const by_reason = {}; for (const r of rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
-      report.gate = { passed: passed.length, rejected: rejected.length, by_reason };
+    const sel = await selectPublic({ dir, config, all });
+    const candidates = sel.candidates;
+    if (sel.gated) {
+      const by_reason = {}; for (const r of sel.rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
+      report.gate = { passed: candidates.length, rejected: sel.rejected.length, by_reason };
     }
     // Mint ids to disk only when something will consume them (a PDS or the static surface); otherwise
     // an instance with nowhere to publish would get tracked yaml rewritten on every close. The preview
@@ -157,7 +155,7 @@ export const OPS = {
     }
     if (config.publish?.static === false) report.static = 'disabled';
     else if (!dry) {
-      try { report.static = writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items, allItems: all, manifest: next, config }); }
+      try { report.static = await writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items, allItems: all, manifest: next, config }); }
       catch (e) { report.static = { status: 'failed', error: e.message }; }
       // The publication's verification file (standard.site: /.well-known/site.standard.publication returns the record's AT-URI).
       const pubUri = at?.standard_site?.enabled === true && next.standardSite?.publication?.atUri;
@@ -202,6 +200,9 @@ export const OPS = {
     let stored;
     try { stored = readCursors(dir); } catch (e) { return { ok: false, report: { connectors: [], failed: 0, error: e.message } }; }
     const keys = cursorKeys(declared);
+    // ctx.now: ISO timestamp for the reads sidecar (injected by tests); the clock is read only here, at the op edge.
+    const at = ctx.now || new Date().toISOString();
+    const outcomes = []; // [key, error|null], written to the reads sidecar after the loop (status only: it never changes an outcome)
     const normalize = (c) => (c == null || (typeof c === 'object' && !Array.isArray(c) && Object.keys(c).length === 0)) ? null : c;
     const cursorChanges = {}; // sidecar key -> new cursor, merged into a FRESH read of the sidecar after the (slow) network pulls
     for (let i = 0; i < declared.length; i++) {
@@ -212,14 +213,22 @@ export const OPS = {
         const current = keys[i] in stored ? stored[keys[i]] : (decl.cursor ?? null);
         const r = await fw.runConnector(getConnector(decl.name, registry), { config: { ...shared, ...(decl.config || {}) }, cursor: current, adapter: config.adapter, target, dry });
         if (!dry && JSON.stringify(normalize(r.cursor)) !== JSON.stringify(normalize(current))) cursorChanges[keys[i]] = r.cursor ?? null;
+        outcomes.push([keys[i], null]);
         report.connectors.push({ name: decl.name, status: 'ok', dry: r.dry, pulled: r.pulled, candidates: r.candidates, stored: r.stored, updated: r.updated, unchanged: r.unchanged,
           collisions: r.collisions, collided: r.collided ?? [], invalid: r.invalid ?? [], retractions: r.retractions, errors: r.errors });
       } catch (e) {
         if (e.code === 'NOT_IMPLEMENTED') report.connectors.push({ name: decl.name, status: 'not-implemented' });
-        else { report.failed++; report.connectors.push({ name: decl.name, status: 'failed', error: e.message }); }
+        else {
+          report.failed++; report.connectors.push({ name: decl.name, status: 'failed', error: e.message });
+          outcomes.push([keys[i], e.message]);
+        }
       }
     }
     if (!dry && Object.keys(cursorChanges).length) writeCursors(dir, cursorChanges);
+    if (!dry) {
+      try { for (const [key, error] of outcomes) recordRead(dir, key, { at, error }); }
+      catch (e) { report.reads_warning = `data/kms-reads.json not updated: ${e.message}`; } // a malformed sidecar is left as is, never overwritten
+    }
     return { ok: true, report };
   } },
 

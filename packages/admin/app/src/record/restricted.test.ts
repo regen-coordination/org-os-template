@@ -17,10 +17,10 @@ describe('restricted fields (E-60, R-L5-14.5)', () => {
     expect(restrictedOf(null)).toEqual({})
   })
 
-  it('names the hat from the source’s tree, else shows its raw id; a role by the tree, else its id', () => {
+  it('names the hat from the source’s tree, else by its pretty id (walk M18); a role by the tree, else its id', () => {
     expect(restrictedHat('hat:eip155:42220:0x0000000d00010000000000000000000000000000000000000000000000000000', source)).toBe('Steward Council')
     expect(restrictedHat('hat:eip155:42220:0x0000000d00020000000000000000000000000000000000000000000000000000', source))
-      .toBe('eip155:42220:0x0000000d00020000000000000000000000000000000000000000000000000000')
+      .toBe('0x0000000d.0002')
     expect(restrictedHat('role:ops', source)).toBe('Ops')
     expect(restrictedHat('role:treasury', source)).toBe('treasury')
     expect(restrictedHat('members', source)).toBe('Members')

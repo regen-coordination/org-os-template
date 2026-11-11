@@ -3,9 +3,10 @@
 // (spec §3). Local clone first (no network), then raw-GitHub fallback. Snapshots
 // under data/federation/frontier/<id>.json; `render map` reads ONLY this cache, so
 // fetch failures can never break a build. Stale cache beats broken build.
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
+import { atomicWrite } from './atomic-write.mjs';
 
 function normalizePeers(manifest) {
   const out = [];
@@ -18,6 +19,21 @@ function normalizePeers(manifest) {
   return out;
 }
 
+function readPrevious(cachePath) {
+  try {
+    const p = JSON.parse(readFileSync(cachePath, 'utf8'));
+    return p && typeof p === 'object' ? p : null;
+  } catch { return null; }
+}
+
+// Every attempt is recorded: the previous snapshot (or an empty one) keeps its peers and
+// fetched_at, and gains when we last tried and why it failed (null on success).
+function recordAttempt(cachePath, now, error) {
+  const prev = readPrevious(cachePath) || { fetched_at: null, source: null, peers: [] };
+  const snap = { ...prev, last_attempt_at: now, last_error: error };
+  atomicWrite(cachePath, JSON.stringify(snap, null, 2));
+}
+
 export async function fetchFrontier({ dir = '.', fetchFn = globalThis.fetch, now = new Date().toISOString() } = {}) {
   const fed = yaml.load(readFileSync(join(dir, 'federation.yaml'), 'utf8'));
   const entries = [...(fed.peers || []), ...(fed.upstream || []), ...(fed.downstream || [])];
@@ -28,8 +44,10 @@ export async function fetchFrontier({ dir = '.', fetchFn = globalThis.fetch, now
     const id = entry.id || entry.name;
     if (!id) continue;
     const cachePath = join(outDir, `${id}.json`);
+    // an earlier read the map still draws — decided before this attempt is recorded (which writes the file)
+    const cached = Boolean(readPrevious(cachePath)?.fetched_at);
     try {
-      let manifest = null, source = null;
+      let manifest = null, source = null, failure = null;
       const localFed = entry.local_path ? join(dir, entry.local_path, 'federation.yaml') : null;
       if (localFed && existsSync(localFed)) {
         manifest = yaml.load(readFileSync(localFed, 'utf8'));
@@ -43,17 +61,23 @@ export async function fetchFrontier({ dir = '.', fetchFn = globalThis.fetch, now
         try {
           const res = await fetchFn(url, { signal: ctrl.signal });
           if (res.ok) { manifest = yaml.load(await res.text()); source = url; }
+          else failure = `HTTP ${res.status}`;
         } finally { clearTimeout(timer); }
       } else {
         report.push({ id, skipped: 'no local_path or repo' });
         continue;
       }
-      if (!manifest) { report.push({ id, skipped: 'unreached', cached: existsSync(cachePath) }); continue; }
-      const snap = { fetched_at: now, source, peers: normalizePeers(manifest) };
-      writeFileSync(cachePath, JSON.stringify(snap, null, 2));
+      if (!manifest) {
+        recordAttempt(cachePath, now, failure || 'no federation.yaml found');
+        report.push({ id, skipped: 'unreached', cached });
+        continue;
+      }
+      const snap = { fetched_at: now, source, peers: normalizePeers(manifest), last_attempt_at: now, last_error: null };
+      atomicWrite(cachePath, JSON.stringify(snap, null, 2));
       report.push({ id, ok: true, source, count: snap.peers.length });
     } catch (e) {
-      report.push({ id, error: e.message, cached: existsSync(cachePath) });
+      try { recordAttempt(cachePath, now, e.message); } catch { /* the report still carries the error */ }
+      report.push({ id, error: e.message, cached });
     }
   }
   return { ok: true, report };

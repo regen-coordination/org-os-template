@@ -36,6 +36,10 @@ export interface BoardViewProps<T> {
   fixed?(c: T): string | undefined
   /** "+ New" in a column's head. */
   onNew?(column: string): void
+  /** DAO-OS L6 Task 17: a move to a place, the column and the position in it (0 first, counted without the card).
+   *  Given, a card moves within its own column too (the arrows, the pointer, and Move up / Move down in Move to…),
+   *  and every move calls this in place of `onMove`. */
+  onPlace?(c: T, to: string, at: number): Promise<true | string>
 }
 
 /** A board card's body (§10.2): its title (a link when it opens somewhere, or a restricted field's words), two facts
@@ -60,7 +64,7 @@ export function BoardCard({ title, href, facts = [], presence = [], marks = [] }
 /** A lift in progress: the card, where it came from, and where it would land (a position in the column without it). */
 type Lift = { key: string; from: string; fromAt: number; to: string; at: number; by: 'keys' | 'pointer' }
 /** A pointer press on a card, until it travels far enough to be a drag. */
-type Press = { key: string; pointerId: number; x: number; y: number; offX: number; offY: number; w: number; moved: boolean; from: string; fromAt: number; to: string }
+type Press = { key: string; pointerId: number; x: number; y: number; offX: number; offY: number; w: number; moved: boolean; from: string; fromAt: number; to: string; at: number }
 
 /** How far a press travels before it lifts the card. */
 const SLOP = 4
@@ -123,17 +127,23 @@ export function BoardView<T>(p: BoardViewProps<T>) {
     return () => document.removeEventListener('keydown', esc)
   }, [lift?.by])
 
-  const commit = async (c: T, to: string) => {
+  // DAO-OS L6 Task 17: with `onPlace`, a move names its position too (the end of the column when none is chosen).
+  const commit = async (c: T, to: string, at?: number) => {
     if (busy.current) return
     busy.current = true
     const key = p.cardKey(c), name = p.cardName(c)
+    const from = p.columnOf(c)
+    const place = at ?? rest(to, key).length
     setMoving(key)
     setRefused(null)
     let out: true | string
-    try { out = await p.onMove(c, to) } catch (err) { out = err instanceof Error ? err.message : String(err) }
+    try { out = await (p.onPlace ? p.onPlace(c, to, place) : p.onMove(c, to)) } catch (err) { out = err instanceof Error ? err.message : String(err) }
     busy.current = false
     setMoving(null)
-    if (out === true) { announce(`Moved ${name} to ${nameOf(to)}.`); return }
+    if (out === true) {
+      announce(p.onPlace && to === from ? `Moved ${name} to ${place + 1} of ${rest(to, key).length + 1} in ${nameOf(to)}.` : `Moved ${name} to ${nameOf(to)}.`)
+      return
+    }
     setRefused(`Not moved: ${out}`)
     announce(`Not moved: ${out}`)
   }
@@ -173,8 +183,8 @@ export function BoardView<T>(p: BoardViewProps<T>) {
       relocating.current = true
       refocus.current = key
       setLift(null)
-      if (lift.to === lift.from) announce(`${name} stays in ${nameOf(lift.from)}.`)
-      else void commit(c, lift.to)
+      if (lift.to === lift.from && (!p.onPlace || lift.at === lift.fromAt)) announce(`${name} stays in ${nameOf(lift.from)}.`)
+      else void commit(c, lift.to, lift.at)
       return
     }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -198,8 +208,9 @@ export function BoardView<T>(p: BoardViewProps<T>) {
     if ((e.target as HTMLElement).closest('a, button, input, select, textarea')) return
     const r = e.currentTarget.getBoundingClientRect()
     const from = p.columnOf(c)
+    const fromAt = (byCol.get(from) ?? []).indexOf(c)
     press.current = { key: p.cardKey(c), pointerId: e.pointerId, x: e.clientX, y: e.clientY, offX: e.clientX - r.left, offY: e.clientY - r.top,
-      w: r.width, moved: false, from, fromAt: (byCol.get(from) ?? []).indexOf(c), to: from }
+      w: r.width, moved: false, from, fromAt, to: from, at: fromAt }
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
   const onMoveP = (e: PointerEvent<HTMLDivElement>) => {
@@ -211,7 +222,8 @@ export function BoardView<T>(p: BoardViewProps<T>) {
     setRefused(null)
     const over = columnAt(e.clientX, e.clientY)
     d.to = over !== null && targets(d.from).some(t => t.id === over) ? over : d.from
-    setLift({ key: d.key, from: d.from, fromAt: d.fromAt, to: d.to, at: rest(d.to, d.key).length, by: 'pointer' })
+    d.at = p.onPlace ? pointerAt(d.to, d.key, e.clientY) : rest(d.to, d.key).length
+    setLift({ key: d.key, from: d.from, fromAt: d.fromAt, to: d.to, at: d.at, by: 'pointer' })
     const box = root.current?.getBoundingClientRect()
     setFloat({ x: e.clientX - d.offX - (box?.left ?? 0), y: e.clientY - d.offY - (box?.top ?? 0), w: d.w })
   }
@@ -223,7 +235,17 @@ export function BoardView<T>(p: BoardViewProps<T>) {
     const over = columnAt(e.clientX, e.clientY) ?? d.to
     const to = targets(d.from).some(t => t.id === over) ? over : d.from
     const c = cardBy.get(d.key)
-    if (c !== undefined && to !== d.from) void commit(c, to)
+    if (c === undefined) return
+    if (p.onPlace) { if (to !== d.from || d.at !== d.fromAt) void commit(c, to, to === d.to ? d.at : undefined) }
+    else if (to !== d.from) void commit(c, to)
+  }
+  /** DAO-OS L6 Task 17: where a card let go at `y` lands in column `col`, counted without it: before the first card
+   *  whose middle is below the pointer, else at the end. */
+  const pointerAt = (col: string, key: string, y: number): number => {
+    const cards = [...(root.current?.querySelectorAll<HTMLElement>('li[data-card]') ?? [])]
+      .filter(el => el.dataset.card !== key && el.closest<HTMLElement>('[data-column]')?.dataset.column === col)
+    const at = cards.findIndex(el => { const r = el.getBoundingClientRect(); return y < r.top + r.height / 2 })
+    return at < 0 ? cards.length : at
   }
 
   const cardItem = (c: T) => {
@@ -239,6 +261,14 @@ export function BoardView<T>(p: BoardViewProps<T>) {
       unavailable: why ?? (moving !== null ? 'Moving…' : undefined),
       onSelect: () => { if (t.id !== from) void commit(c, t.id) },
     }))
+    // DAO-OS L6 Task 17: within its column, a step up or down (the single-pointer path for a move in place, E-9)
+    if (p.onPlace) {
+      const at = (byCol.get(from) ?? []).indexOf(c), n = byCol.get(from)?.length ?? 0
+      const busyWhy = why ?? (moving !== null ? 'Moving…' : undefined)
+      items.push({ type: 'separator' },
+        { type: 'item', label: 'Move up', unavailable: busyWhy ?? (at <= 0 ? `It is first in ${nameOf(from)}.` : undefined), onSelect: () => void commit(c, from, at - 1) },
+        { type: 'item', label: 'Move down', unavailable: busyWhy ?? (at >= n - 1 ? `It is last in ${nameOf(from)}.` : undefined), onSelect: () => void commit(c, from, at + 1) })
+    }
     return (
       <li key={key} className={cls} data-card={key} tabIndex={canWrite ? 0 : undefined} aria-describedby={canWrite ? hint : undefined}
         aria-busy={moving === key ? true : undefined}
@@ -261,6 +291,14 @@ export function BoardView<T>(p: BoardViewProps<T>) {
     if (!lift || !liftedCard) return cards.map(cardItem)
     if (lift.by === 'pointer') {
       const out = cards.map(cardItem)
+      if (p.onPlace) {
+        // DAO-OS L6 Task 17: the slot where the card would land, in its own column too (the card is still there, a ghost)
+        if (col.id === lift.to && (lift.to !== lift.from || lift.at !== lift.fromAt)) {
+          const i = lift.to === lift.from && lift.at >= lift.fromAt ? lift.at + 1 : lift.at
+          out.splice(i, 0, <li key="@drop" className="kdrop" aria-hidden="true" />)
+        }
+        return out
+      }
       if (col.id === lift.to && lift.to !== lift.from) out.push(<li key="@drop" className="kdrop" aria-hidden="true" />)
       return out
     }

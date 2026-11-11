@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { QueryClientContext } from '@tanstack/react-query'
+import { setPreviewAs } from '../api.ts'
 import { Button } from '../design/Button.tsx'
 import { Icon, type IconName } from '../design/Icon.tsx'
 import { Menu, type MenuEntry } from '../design/Menu.tsx'
@@ -34,15 +35,32 @@ function bandWords(v: Exclude<Viewer, { as: 'you' }>): [string, string] {
   return [`Previewing as ${who}.`, `Only what ${what} can read is shown. Nothing can be changed here.`]
 }
 
+/** The viewer as a read names it to the server (`?as=`, the walk review's G1); null: you. */
+export function asOf(v: Viewer): string | null {
+  return v.as === 'you' ? null : v.as === 'hat' ? `hat:${v.hat}` : v.as
+}
+/** The reads that stay yours whoever is previewed (api.ts sends them without `as`): the session, who you are (the actor is
+ *  never previewed, only the viewer), and the tree's hats the control offers. */
+const READ_AS_YOU = new Set(['session', 'actor', 'visibility'])
+
 /** `initial` starts a provider already previewing (a /parts specimen: the rail as Public); the house starts as you. */
 export function ViewAsProvider({ source = FIXTURE_SOURCE, initial = YOU, children }: { source?: VisibilitySource; initial?: Viewer; children: ReactNode }) {
   const [viewer, set] = useState<Viewer>(initial)
+  const qc = useContext(QueryClientContext)
+  const chose = useRef(false)
+  // A preview chosen here and still on when the provider goes is ended with it, so no later read is previewed.
+  useEffect(() => () => { if (chose.current) setPreviewAs(null) }, [])
   // Entering a preview is said once, through the page's one polite region; leaving it too, as the band goes.
+  // View as at the server (the walk review's G1): every read from now on names the viewer (api.ts), and every answer
+  // already held is dropped and read again, in-flight ones cancelled, so nothing drawn was answered to another viewer.
   const setViewer = useCallback((v: Viewer) => {
     if (sameViewer(v, viewer)) return
+    chose.current = true
+    setPreviewAs(asOf(v))
     set(v)
+    void qc?.resetQueries({ predicate: q => !READ_AS_YOU.has(String(q.queryKey[0])) })
     announce(v.as === 'you' ? 'Preview ended.' : bandWords(v).join(' '))
-  }, [viewer])
+  }, [viewer, qc])
   const value = useMemo(() => ({ viewer, setViewer, source }), [viewer, setViewer, source])
   return <ViewAsContext.Provider value={value}>{children}</ViewAsContext.Provider>
 }

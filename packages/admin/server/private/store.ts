@@ -14,7 +14,9 @@ import { placeInRepo, privateDir, STORE_FILE } from './paths.ts'
  *  second, read-only connection, so a read made while a transaction is open sees what was last committed and
  *  never a row that may yet be rolled back. */
 
-/** 1: L5 §10.2's tables. 2 (Lane 3 Task 2): the Roles from the records dump, the email keys and the sign-in links. */
+/** 1: L5 §10.2's tables. 2 (Lane 3 Task 2): the Roles from the records dump, the email keys and the sign-in links; and
+ *  (DAO-OS L6 §8.1) the workspace's tables — comments, mentions, notifications, reads, view state, drafts. A version-1
+ *  store is migrated when it opens: the new tables are added, every row kept. */
 export const SCHEMA_VERSION = 2
 
 /** The store cannot be used: its place is not ignored by git, its file cannot be opened, or a newer org-os wrote
@@ -80,15 +82,46 @@ export interface RolesDoc { roles_version: string; people: (RolesPerson & { emai
  *  (already judged by the I6 return rule); and when it was used, or null. Times are ISO 8601 UTC. */
 export interface RolesLink { tokenHash: string; personId: string; returnTo: string; created: string; expires: string; usedAt: string | null }
 
+/** A private page's draft (L6 §6, §8.1 `drafts`): one row per editing session, its body the page's Markdown as the session
+ *  last saved it; `base` the page's text the session opened on (null for a page the session creates). Not private data's
+ *  history: a draft is written into the page (and its history) when the session ends. */
+export interface DraftRow { session: string; target: string; actor: string; base: string | null; body: string; opened: string; updated: string }
+
+/** A W3C TextQuoteSelector (L6 §8.1): the quoted text, and the text just before and after it; each at most 500 characters. */
+export interface Anchor { exact: string; prefix: string; suffix: string }
+/** A comment (L6 §8.1, §8.2, `comments` table). `target` is `page:<id>` or `record:<registry>:<id>`; `parent` the comment it
+ *  replies to; `deleted`, `edited`, `resolvedAt` times (ISO 8601) or null. A deleted comment's body is ''. */
+export interface CommentRow {
+  id: string; target: string; parent: string | null; anchor: Anchor | null; by: string; body: string
+  created: string; edited: string | null; resolvedBy: string | null; resolvedAt: string | null; deleted: string | null
+  /** DAO-OS L6 Task 18 fix round 1: the task the comment was turned into (its id), so it is turned into one only once. */
+  task?: string | null
+}
+/** One mention (L6 §8.1, `mentions`): `source` is `comment:<id>` or `page:<id>`; `told` whether anyone was told by it. */
+export interface MentionRow { source: string; kind: 'member' | 'role' | 'page' | 'record'; ref: string; told: boolean }
+/** One member told (L6 §8.1, `notifications`): a row of their Needs you. `readAt` null until read. */
+export interface StoredNotification { id: string; member: string; kind: 'mention'; target: string; source: string; by: string; created: string; readAt: string | null }
+/** What one conversation write holds, written in one transaction: comments put whole, mentions put (one per source, kind
+ *  and ref), notifications added, and the notifications of `dropSources` (a deleted comment's) removed. */
+export interface ConversationWrite {
+  comments?: CommentRow[]
+  mentions?: MentionRow[]
+  notifications?: StoredNotification[]
+  dropSources?: string[]
+}
+
 /** The writes a transaction may make. `decision`, on a write a ratify makes, is the decision row's id (history's
  *  `decision`); null otherwise. */
 export interface PrivateWriter {
   putRecord(r: PrivateRecord, by: string, change: string | null, decision?: string | null): void
-  deleteRecord(collection: string, id: string, by: string, change: string | null, decision?: string | null): void
+  /** `purge` false (DAO-OS L6 §12, a record moved into the repository): its conversation stays with it. */
+  deleteRecord(collection: string, id: string, by: string, change: string | null, decision?: string | null, purge?: boolean): void
   putField(f: PrivateField, by: string, change: string | null, decision?: string | null): void
   deleteField(registry: string, record: string, field: string, by: string, change: string | null, decision?: string | null): void
   /** A private collection's definition, written whole; its history target is the collection's id alone. */
   putCollection(c: PrivateCollection, by: string): void
+  /** A private collection's definition removed (L6 §7.4: the caller has refused one that holds records). */
+  deleteCollection(id: string, by: string): void
   /** One staged op, put at (change, seq): a later put at the same place replaces it. Not private data's history. */
   putStaged(row: StagedRow): void
   /** The staged op of `change` at `seq`, or, with no `seq`, every one (after it is applied, or when it is discarded). */
@@ -128,6 +161,24 @@ CREATE TABLE IF NOT EXISTS email_keys (email_key TEXT PRIMARY KEY, person_id TEX
 CREATE TABLE IF NOT EXISTS roles_meta (k TEXT PRIMARY KEY, v TEXT NOT NULL) STRICT;
 CREATE TABLE IF NOT EXISTS sign_in_links (token_hash TEXT PRIMARY KEY, person_id TEXT NOT NULL, return_to TEXT NOT NULL,
   created TEXT NOT NULL, expires TEXT NOT NULL, used_at TEXT) STRICT;
+`
+
+// Schema 2 (DAO-OS L6 §8.1), table for table and column for column; times ISO 8601. `target` is `page:<id>` or
+// `record:<registry>:<id>`; a comment's `anchor` a W3C TextQuoteSelector as JSON, or null; `deleted` and the other times
+// null until they happen; a mention's `told` 0 or 1.
+const SCHEMA_2 = `
+CREATE TABLE IF NOT EXISTS comments (id TEXT NOT NULL PRIMARY KEY, target TEXT NOT NULL, parent TEXT, anchor TEXT, "by" TEXT NOT NULL,
+  body TEXT NOT NULL, created TEXT NOT NULL, edited TEXT, resolved_by TEXT, resolved_at TEXT, deleted TEXT, task TEXT) STRICT;
+CREATE INDEX IF NOT EXISTS comments_target ON comments (target);
+CREATE TABLE IF NOT EXISTS mentions (source TEXT NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL, told INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (source, kind, ref)) STRICT;
+CREATE TABLE IF NOT EXISTS notifications (id TEXT NOT NULL PRIMARY KEY, member TEXT NOT NULL, kind TEXT NOT NULL, target TEXT NOT NULL,
+  source TEXT NOT NULL, "by" TEXT NOT NULL, created TEXT NOT NULL, read_at TEXT) STRICT;
+CREATE INDEX IF NOT EXISTS notifications_member ON notifications (member);
+CREATE TABLE IF NOT EXISTS reads (member TEXT NOT NULL, target TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (member, target)) STRICT;
+CREATE TABLE IF NOT EXISTS view_state (member TEXT NOT NULL, collection TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY (member, collection)) STRICT;
+CREATE TABLE IF NOT EXISTS drafts (session TEXT NOT NULL PRIMARY KEY, target TEXT NOT NULL, actor TEXT NOT NULL, base TEXT, body TEXT NOT NULL,
+  opened TEXT NOT NULL, updated TEXT NOT NULL) STRICT;
 `
 
 /** §10.1's sentence for a place inside the repository that git does not ignore. */
@@ -182,8 +233,11 @@ export async function openPrivateStore(repo: string, opts: { dir?: string; git?:
     db.exec('PRAGMA busy_timeout = 5000')
     if (version < SCHEMA_VERSION) {
       db.exec('BEGIN IMMEDIATE')
-      try { db.exec(`${SCHEMA}\nPRAGMA user_version = ${SCHEMA_VERSION};`); db.exec('COMMIT') } catch (err) { db.exec('ROLLBACK'); throw err }
+      try { db.exec(`${SCHEMA}\n${SCHEMA_2}\nPRAGMA user_version = ${SCHEMA_VERSION};`); db.exec('COMMIT') } catch (err) { db.exec('ROLLBACK'); throw err }
     }
+    // DAO-OS L6 Task 18 fix round 1: a schema-2 store made before a comment kept the task it became gains the column.
+    const commentColumns = (db.prepare('PRAGMA table_info(comments)').all() as { name: string }[]).map(c => c.name)
+    if (!commentColumns.includes('task')) db.exec('ALTER TABLE comments ADD COLUMN task TEXT')
     reader = new DatabaseSync(file, { readOnly: true })
     reader.exec('PRAGMA busy_timeout = 5000')
     return new PrivateStore(file, db, reader, lockWaitMs)
@@ -300,6 +354,29 @@ export function rolesDocRefusal(doc: unknown): string | null {
   return null
 }
 
+const COMMENT_COLUMNS = 'id, target, parent, anchor, "by", body, created, edited, resolved_by, resolved_at, deleted, task'
+interface CommentRaw {
+  id: string; target: string; parent: string | null; anchor: string | null; by: string; body: string
+  created: string; edited: string | null; resolved_by: string | null; resolved_at: string | null; deleted: string | null; task: string | null
+}
+const asComment = (c: CommentRaw): CommentRow => ({
+  id: c.id, target: c.target, parent: c.parent, anchor: c.anchor === null ? null : JSON.parse(c.anchor) as Anchor, by: c.by, body: c.body,
+  created: c.created, edited: c.edited, resolvedBy: c.resolved_by, resolvedAt: c.resolved_at, deleted: c.deleted, task: c.task,
+})
+const MENTION_KINDS = new Set(['member', 'role', 'page', 'record'])
+const orNull = (name: string, v: unknown): string | null => (v === null ? null : nonEmpty(name, v))
+function checkComment(r: CommentRow): CommentRow {
+  for (const name of ['id', 'target', 'by', 'created'] as const) nonEmpty(`a comment's ${name}`, r[name])
+  if (typeof r.body !== 'string') throw new Error('the private store needs a comment\'s body as a string')
+  orNull('a comment\'s parent, or null,', r.parent); orNull('an edit time, or null,', r.edited)
+  orNull('who resolved it, or null,', r.resolvedBy); orNull('a resolve time, or null,', r.resolvedAt); orNull('a delete time, or null,', r.deleted)
+  if (r.task !== undefined) orNull('the task it became, or null,', r.task)
+  if (r.anchor !== null && (typeof r.anchor !== 'object' || typeof r.anchor.exact !== 'string' || typeof r.anchor.prefix !== 'string' || typeof r.anchor.suffix !== 'string')) {
+    throw new Error('the private store needs a comment\'s anchor as { exact, prefix, suffix }, or null')
+  }
+  return r
+}
+
 const asRecord = (r: RecordRow): PrivateRecord => ({ collection: r.collection, id: r.id, visibility: r.visibility, body: JSON.parse(r.body) as Record<string, unknown>, rev: r.rev })
 const asField = (f: FieldRow): PrivateField => ({ registry: f.registry, record: f.record, field: f.field, visibility: f.visibility, value: JSON.parse(f.value) as unknown })
 const json = (v: unknown): string | null => (v === null ? null : JSON.stringify(v))
@@ -330,12 +407,23 @@ export class PrivateStore {
    *  the server raises and clears attention with them. */
   onStuck: ((heldMs: number) => void) | null = null
   onUnstuck: (() => void) | null = null
+  /** Told, after a transaction that wrote or deleted records is committed, which collections it touched (DAO-OS L6 §8.5: a
+   *  private page's write is a `pages-changed` event). Null: nobody. */
+  onRecordsWritten: ((collections: string[]) => void) | null = null
   private readonly lock: WriteLock
   private readonly w: Record<'recordGet' | 'recordPut' | 'recordDelete' | 'fieldGet' | 'fieldPut' | 'fieldDelete' | 'historyAdd' | 'sessionPut' | 'sessionDelete' | 'sessionRenew' | 'sessionsExpired'
     | 'collectionGet' | 'collectionPut' | 'stagedPut' | 'stagedDelete' | 'stagedDeleteOne' | 'pendingPut' | 'pendingDelete' | 'appliedPut'
     | 'rolesClear' | 'rolePut' | 'keysClear' | 'keyPut' | 'metaPut' | 'linkPut' | 'linkGet' | 'linkUse' | 'linksExpired', StatementSync>
   private readonly r: Record<'record' | 'records' | 'fields' | 'fieldsNamed' | 'collections' | 'history' | 'historyOf' | 'session' | 'staged'
     | 'stagedAll' | 'pending' | 'pendingAll' | 'applied' | 'person' | 'personByKey' | 'meta', StatementSync>
+  private readonly w: Record<'recordGet' | 'recordPut' | 'recordDelete' | 'fieldGet' | 'fieldPut' | 'fieldDelete' | 'historyAdd' | 'sessionPut' | 'sessionDelete' | 'sessionsExpired'
+    | 'collectionGet' | 'collectionPut' | 'collectionDelete' | 'stagedPut' | 'stagedDelete' | 'stagedDeleteOne' | 'pendingPut' | 'pendingDelete' | 'appliedPut'
+    | 'viewStatePut' | 'viewStateDelete' | 'draftPut' | 'draftDelete'
+    | 'commentPut' | 'mentionPut' | 'notificationPut' | 'notificationsDrop' | 'notificationRead' | 'notificationsReadOf' | 'readPut'
+    | 'goneComments' | 'goneComment' | 'goneMentions' | 'goneNotifications' | 'goneReads', StatementSync>
+  private readonly r: Record<'record' | 'recordUpdated' | 'records' | 'fields' | 'fieldsNamed' | 'collections' | 'history' | 'historyOf' | 'session' | 'staged'
+    | 'stagedAll' | 'pending' | 'pendingAll' | 'applied' | 'viewState' | 'draft' | 'drafts'
+    | 'comment' | 'comments' | 'mentions' | 'notifications' | 'read', StatementSync>
 
   /** Use `openPrivateStore`. */
   constructor(file: string, private readonly db: DatabaseSync, private readonly reader: DatabaseSync, lockWaitMs: number = LOCK_WAIT_MS) {
@@ -360,6 +448,7 @@ export class PrivateStore {
       collectionGet: db.prepare('SELECT id, visibility, definition FROM collections WHERE id = ?'),
       collectionPut: db.prepare(`INSERT INTO collections (id, visibility, definition) VALUES (?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET visibility = excluded.visibility, definition = excluded.definition`),
+      collectionDelete: db.prepare('DELETE FROM collections WHERE id = ?'),
       stagedPut: db.prepare(`INSERT INTO staged (change, seq, actor, op) VALUES (?, ?, ?, ?)
         ON CONFLICT (change, seq) DO UPDATE SET actor = excluded.actor, op = excluded.op`),
       stagedDelete: db.prepare('DELETE FROM staged WHERE change = ?'),
@@ -376,9 +465,34 @@ export class PrivateStore {
       linkGet: db.prepare('SELECT token_hash, person_id, return_to, created, expires, used_at FROM sign_in_links WHERE token_hash = ?'),
       linkUse: db.prepare('UPDATE sign_in_links SET used_at = ? WHERE token_hash = ? AND used_at IS NULL'),
       linksExpired: db.prepare('DELETE FROM sign_in_links WHERE expires <= ?'),
+      viewStatePut: db.prepare(`INSERT INTO view_state (member, collection, state) VALUES (?, ?, ?)
+        ON CONFLICT (member, collection) DO UPDATE SET state = excluded.state`),
+      viewStateDelete: db.prepare('DELETE FROM view_state WHERE member = ? AND collection = ?'),
+      draftPut: db.prepare(`INSERT INTO drafts (session, target, actor, base, body, opened, updated) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (session) DO UPDATE SET target = excluded.target, actor = excluded.actor, base = excluded.base, body = excluded.body,
+        opened = excluded.opened, updated = excluded.updated`),
+      draftDelete: db.prepare('DELETE FROM drafts WHERE session = ?'),
+      commentPut: db.prepare(`INSERT INTO comments (id, target, parent, anchor, "by", body, created, edited, resolved_by, resolved_at, deleted, task)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET target = excluded.target, parent = excluded.parent,
+        anchor = excluded.anchor, "by" = excluded."by", body = excluded.body, created = excluded.created, edited = excluded.edited,
+        resolved_by = excluded.resolved_by, resolved_at = excluded.resolved_at, deleted = excluded.deleted, task = excluded.task`),
+      mentionPut: db.prepare(`INSERT INTO mentions (source, kind, ref, told) VALUES (?, ?, ?, ?)
+        ON CONFLICT (source, kind, ref) DO UPDATE SET told = excluded.told`),
+      notificationPut: db.prepare('INSERT INTO notifications (id, member, kind, target, source, "by", created, read_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
+      notificationsDrop: db.prepare('DELETE FROM notifications WHERE source = ?'),
+      notificationRead: db.prepare('UPDATE notifications SET read_at = ? WHERE member = ? AND id = ? AND read_at IS NULL'),
+      notificationsReadOf: db.prepare('UPDATE notifications SET read_at = ? WHERE member = ? AND target = ? AND read_at IS NULL'),
+      readPut: db.prepare('INSERT INTO reads (member, target, at) VALUES (?, ?, ?) ON CONFLICT (member, target) DO UPDATE SET at = excluded.at'),
+      // R-9a: a target's conversation, gone with it.
+      goneComments: db.prepare('SELECT id FROM comments WHERE target = ?'),
+      goneComment: db.prepare('DELETE FROM comments WHERE id = ?'),
+      goneMentions: db.prepare('DELETE FROM mentions WHERE source = ?'),
+      goneNotifications: db.prepare('DELETE FROM notifications WHERE target = ?'),
+      goneReads: db.prepare('DELETE FROM reads WHERE target = ?'),
     }
     this.r = {
       record: reader.prepare('SELECT collection, id, visibility, body, rev FROM records WHERE collection = ? AND id = ?'),
+      recordUpdated: reader.prepare('SELECT updated_at FROM records WHERE collection = ? AND id = ?'),
       records: reader.prepare('SELECT collection, id, visibility, body, rev FROM records WHERE collection = ? ORDER BY id'),
       fields: reader.prepare('SELECT registry, record, field, visibility, value FROM fields WHERE registry = ? AND record = ? ORDER BY field'),
       fieldsNamed: reader.prepare('SELECT registry, record, field, visibility, value FROM fields WHERE registry = ? AND field = ? ORDER BY record'),
@@ -394,6 +508,14 @@ export class PrivateStore {
       person: reader.prepare('SELECT person_id, name, roles, nodes FROM roles WHERE person_id = ?'),
       personByKey: reader.prepare('SELECT r.person_id, r.name, r.roles, r.nodes FROM email_keys k JOIN roles r ON r.person_id = k.person_id WHERE k.email_key = ?'),
       meta: reader.prepare('SELECT v FROM roles_meta WHERE k = ?'),
+      viewState: reader.prepare('SELECT state FROM view_state WHERE member = ? AND collection = ?'),
+      draft: reader.prepare('SELECT session, target, actor, base, body, opened, updated FROM drafts WHERE session = ?'),
+      drafts: reader.prepare('SELECT session, target, actor, base, body, opened, updated FROM drafts ORDER BY opened, session'),
+      comment: reader.prepare(`SELECT ${COMMENT_COLUMNS} FROM comments WHERE id = ?`),
+      comments: reader.prepare(`SELECT ${COMMENT_COLUMNS} FROM comments WHERE target = ? ORDER BY created, id`),
+      mentions: reader.prepare('SELECT source, kind, ref, told FROM mentions WHERE source = ? ORDER BY kind, ref'),
+      notifications: reader.prepare('SELECT id, member, kind, target, source, "by", created, read_at FROM notifications WHERE member = ? ORDER BY created DESC, id DESC'),
+      read: reader.prepare('SELECT at FROM reads WHERE member = ? AND target = ?'),
     }
   }
 
@@ -406,6 +528,7 @@ export class PrivateStore {
     const release = await this.lock.acquire()
     try { this.db.exec('BEGIN IMMEDIATE') } catch (err) { release(); throw err }
     let live = true
+    const touched = new Set<string>()
     const open = () => { if (!live) throw new Error('this private store transaction is finished: it was committed or rolled back') }
     const finish = (sql: 'COMMIT' | 'ROLLBACK') => {
       open()
@@ -414,15 +537,19 @@ export class PrivateStore {
         if (sql === 'COMMIT') { try { this.db.exec('ROLLBACK') } catch { /* nothing left open */ } }
         throw err
       } finally { release() }
+      if (sql === 'COMMIT' && touched.size > 0) { try { this.onRecordsWritten?.([...touched]) } catch { /* a listener never undoes a write */ } }
     }
     return {
-      putRecord: (r, by, change, decision = null) => { open(); this.atomic(() => this.putRecordIn(r, by, change, decision)) },
-      deleteRecord: (collection, id, by, change, decision = null) => { open(); this.atomic(() => this.deleteRecordIn(collection, id, by, change, decision)) },
+      putRecord: (r, by, change, decision = null) => { open(); this.atomic(() => this.putRecordIn(r, by, change, decision)); touched.add(r.collection) },
+      deleteRecord: (collection, id, by, change, decision = null, purge = true) => {
+        open(); this.atomic(() => this.deleteRecordIn(collection, id, by, change, decision, purge)); touched.add(collection)
+      },
       putField: (f, by, change, decision = null) => { open(); this.atomic(() => this.putFieldIn(f, by, change, decision)) },
       deleteField: (registry, record, field, by, change, decision = null) => {
         open(); this.atomic(() => this.deleteFieldIn(registry, record, field, by, change, decision))
       },
       putCollection: (c, by) => { open(); this.atomic(() => this.putCollectionIn(c, by)) },
+      deleteCollection: (id, by) => { open(); this.atomic(() => this.deleteCollectionIn(id, by)) },
       putStaged: row => { open(); this.atomic(() => this.putStagedIn(row)) },
       deleteStaged: (change, seq) => {
         open()
@@ -480,6 +607,7 @@ export class PrivateStore {
 
   putRecord(r: PrivateRecord, by: string, change: string | null): Promise<void> { return this.tx(w => w.putRecord(r, by, change)) }
   putCollection(c: PrivateCollection, by: string): Promise<void> { return this.tx(w => w.putCollection(c, by)) }
+  deleteCollection(id: string, by: string): Promise<void> { return this.tx(w => w.deleteCollection(id, by)) }
   deleteRecord(collection: string, id: string, by: string, change: string | null): Promise<void> { return this.tx(w => w.deleteRecord(collection, id, by, change)) }
   putField(f: PrivateField, by: string, change: string | null): Promise<void> { return this.tx(w => w.putField(f, by, change)) }
   deleteField(registry: string, record: string, field: string, by: string, change: string | null): Promise<void> {
@@ -563,6 +691,108 @@ export class PrivateStore {
     await this.locked(() => { this.w.linksExpired.run(at.toISOString()) })
   }
 
+  // View state and drafts (DAO-OS L6 §7.3, §6, §8.1): a member's own, and an editing session's. One statement each, under
+  // the write lock like any write. Neither is private data's history: view state is nobody's but its member's, and a
+  // draft is written into its page (with its history row) when its session ends.
+
+  /** `member`'s state of `collection`'s view (their current view, unsaved filters, collapsed groups), whole; null removes it. */
+  async putViewState(member: string, collection: string, state: unknown): Promise<void> {
+    nonEmpty('a member', member); nonEmpty('a collection', collection)
+    if (state === null) { await this.locked(() => { this.w.viewStateDelete.run(member, collection) }); return }
+    const text = JSON.stringify(state) as string | undefined
+    if (text === undefined) throw new Error(`the private store needs ${member}'s view state of ${collection} as JSON`)
+    await this.locked(() => { this.w.viewStatePut.run(member, collection, text) })
+  }
+
+  /** One editing session's draft, written whole (a later put for the same session replaces it). */
+  async putDraft(d: DraftRow): Promise<void> {
+    for (const name of ['session', 'target', 'actor', 'opened', 'updated'] as const) nonEmpty(`a draft's ${name}`, d[name])
+    if (typeof d.body !== 'string') throw new Error('the private store needs a draft\'s body as a string')
+    if (d.base !== null && typeof d.base !== 'string') throw new Error('the private store needs a draft\'s base as a string, or null')
+    await this.locked(() => { this.w.draftPut.run(d.session, d.target, d.actor, d.base, d.body, d.opened, d.updated) })
+  }
+
+  /** The draft of `session` gone (its session ended, or was discarded). */
+  async deleteDraft(session: string): Promise<void> {
+    await this.locked(() => { this.w.draftDelete.run(nonEmpty('a session id', session)) })
+  }
+
+  // Conversation (DAO-OS L6 §8.1–8.3): comments, mentions, notifications and read state. Not private data's history (a
+  // comment has no level of its own: it follows its target's, §8.2). Each write is one transaction under the write lock.
+
+  /** Comments, mentions and notifications written together, or none of them (a comment and whom it told are one act). */
+  async writeConversation(c: ConversationWrite): Promise<void> {
+    const comments = (c.comments ?? []).map(checkComment)
+    for (const m of c.mentions ?? []) {
+      nonEmpty('a mention\'s source', m.source); nonEmpty('a mention\'s ref', m.ref)
+      if (!MENTION_KINDS.has(m.kind)) throw new Error(`the private store needs a mention's kind as member, role, page or record, not ${String(m.kind)}`)
+    }
+    for (const n of c.notifications ?? []) {
+      for (const name of ['id', 'member', 'target', 'source', 'by', 'created'] as const) nonEmpty(`a notification's ${name}`, n[name])
+      if (n.kind !== 'mention') throw new Error('the private store needs a notification\'s kind as mention')
+    }
+    for (const s of c.dropSources ?? []) nonEmpty('a source', s)
+    await this.locked(() => {
+      this.db.exec('BEGIN IMMEDIATE')
+      try {
+        for (const r of comments) {
+          this.w.commentPut.run(r.id, r.target, r.parent, r.anchor === null ? null : JSON.stringify(r.anchor), r.by, r.body, r.created, r.edited,
+            r.resolvedBy, r.resolvedAt, r.deleted, r.task ?? null)
+        }
+        for (const m of c.mentions ?? []) this.w.mentionPut.run(m.source, m.kind, m.ref, m.told ? 1 : 0)
+        for (const s of c.dropSources ?? []) this.w.notificationsDrop.run(s)
+        for (const n of c.notifications ?? []) this.w.notificationPut.run(n.id, n.member, n.kind, n.target, n.source, n.by, n.created, n.readAt)
+        this.db.exec('COMMIT')
+      } catch (err) {
+        try { this.db.exec('ROLLBACK') } catch { /* the error to tell is the write's */ }
+        throw err
+      }
+    })
+  }
+
+  /** `member`'s notifications marked read at `at`: those of `ids`, and every one on `target`; answers how many were unread. */
+  async markNotificationsRead(member: string, at: string, which: { ids?: readonly string[]; target?: string }): Promise<number> {
+    nonEmpty('a member', member); nonEmpty('a time', at)
+    return this.locked(() => {
+      let n = 0
+      for (const id of which.ids ?? []) n += Number(this.w.notificationRead.run(at, member, id).changes)
+      if (which.target !== undefined) n += Number(this.w.notificationsReadOf.run(at, member, nonEmpty('a target', which.target)).changes)
+      return n
+    })
+  }
+
+  /** R-9a: the conversation of git targets that are gone, in one transaction: every row on each (a tombstone is applied
+   *  before any conversation is read or written once the store is back, so none can be newer than its target's delete). A
+   *  target the store keeps a record for (it moved here under the same id) keeps its rows. Answers the targets purged. */
+  async purgeConversation(gone: readonly { target: string }[]): Promise<string[]> {
+    for (const g of gone) nonEmpty('a target', g.target)
+    return this.locked(() => {
+      const out: string[] = []
+      this.db.exec('BEGIN IMMEDIATE')
+      try {
+        for (const g of gone) {
+          const m = /^page:(.+)$/.exec(g.target) ?? null
+          const r = m ? null : /^record:([^:]+):(.+)$/.exec(g.target)
+          const kept = m ? this.w.recordGet.get('pages', m[1]!) : r ? this.w.recordGet.get(r[1]!, r[2]!) : undefined
+          if (kept) continue
+          this.purgeIn(g.target)
+          out.push(g.target)
+        }
+        this.db.exec('COMMIT')
+      } catch (err) {
+        try { this.db.exec('ROLLBACK') } catch { /* the error to tell is the write's */ }
+        throw err
+      }
+      return out
+    })
+  }
+
+  /** `member` opened `target` at `at` (read state, §8.3). */
+  async putRead(member: string, target: string, at: string): Promise<void> {
+    nonEmpty('a member', member); nonEmpty('a target', target); nonEmpty('a time', at)
+    await this.locked(() => { this.w.readPut.run(member, target, at) })
+  }
+
   private async locked<T>(fn: () => T): Promise<T> {
     const release = await this.lock.acquire()
     try { return fn() } finally { release() }
@@ -600,12 +830,27 @@ export class PrivateStore {
     this.remember(by, `${collection}/${id}`, old ? asRecord(old) : null, after, change, decision)
   }
 
-  private deleteRecordIn(collection: string, id: string, by: string, change: string | null, decision: string | null): void {
+  private deleteRecordIn(collection: string, id: string, by: string, change: string | null, decision: string | null, purge = true): void {
     nonEmpty('a collection', collection); nonEmpty('a record id', id); nonEmpty('who wrote', by); changeOf(change); decisionOf(decision)
     const old = this.w.recordGet.get(collection, id) as RecordRow | undefined
     if (!old) return
     this.w.recordDelete.run(collection, id)
     this.remember(by, `${collection}/${id}`, asRecord(old), null, change, decision)
+    // R-9a: its conversation goes with it, in this transaction (a page is `page:<id>`, any other record `record:<c>:<id>`);
+    // a record moved into the repository (L6 §12) keeps it.
+    if (purge) this.purgeIn(collection === 'pages' ? `page:${id}` : `record:${collection}:${id}`)
+  }
+
+  /** `target`'s comments and their mentions, the target's own (a page's) mentions, its notifications and its read state:
+   *  gone. Inside an open transaction. */
+  private purgeIn(target: string): void {
+    for (const { id } of this.w.goneComments.all(target) as { id: string }[]) {
+      this.w.goneMentions.run(`comment:${id}`)
+      this.w.goneComment.run(id)
+    }
+    this.w.goneMentions.run(target)
+    this.w.goneNotifications.run(target)
+    this.w.goneReads.run(target)
   }
 
   private putFieldIn(f: PrivateField, by: string, change: string | null, decision: string | null): void {
@@ -629,6 +874,14 @@ export class PrivateStore {
     this.w.collectionPut.run(id, visibility, definition)
     const before = old ? { id: old.id, visibility: old.visibility, definition: JSON.parse(old.definition) as unknown } : null
     this.remember(by, id, before, { id, visibility, definition: c.definition }, null)
+  }
+
+  private deleteCollectionIn(id: string, by: string): void {
+    nonEmpty('a collection id', id); nonEmpty('who wrote', by)
+    const old = this.w.collectionGet.get(id) as { id: string; visibility: string; definition: string } | undefined
+    if (!old) return
+    this.w.collectionDelete.run(id)
+    this.remember(by, id, { id: old.id, visibility: old.visibility, definition: JSON.parse(old.definition) as unknown }, null, null)
   }
 
   private putStagedIn(row: StagedRow): void {
@@ -664,6 +917,13 @@ export class PrivateStore {
   record(collection: string, id: string): PrivateRecord | null {
     const row = this.r.record.get(collection, id) as RecordRow | undefined
     return row ? asRecord(row) : null
+  }
+
+  /** When record `id` of `collection` was last written (its `updated_at`, ISO), or null when the store holds none (DAO-OS L6
+   *  §10, Task 14: a private page's or record's from mark). */
+  updatedAt(collection: string, id: string): string | null {
+    const row = this.r.recordUpdated.get(collection, id) as { updated_at: string } | undefined
+    return row ? row.updated_at : null
   }
 
   records(collection: string): PrivateRecord[] {
@@ -718,6 +978,52 @@ export class PrivateStore {
   /** The `roles_version` (the dump's date) of the Roles last loaded, or null when none has been. */
   rolesVersion(): string | null {
     return (this.r.meta.get('roles_version') as { v: string } | undefined)?.v ?? null
+  }
+
+  /** `member`'s state of `collection`'s view, as they last put it; null when they have none. */
+  viewState(member: string, collection: string): unknown | null {
+    const row = this.r.viewState.get(member, collection) as { state: string } | undefined
+    return row ? JSON.parse(row.state) as unknown : null
+  }
+
+  /** The draft of editing session `session`, or null. */
+  draft(session: string): DraftRow | null {
+    const row = this.r.draft.get(session) as DraftRow | undefined
+    return row ? { ...row } : null
+  }
+
+  /** Every draft the store holds, oldest session first (a server that restarts finds the sessions it left open). */
+  drafts(): DraftRow[] {
+    return (this.r.drafts.all() as unknown as DraftRow[]).map(d => ({ ...d }))
+  }
+
+  /** The comment `id`, or null. */
+  comment(id: string): CommentRow | null {
+    const row = this.r.comment.get(id) as CommentRaw | undefined
+    return row ? asComment(row) : null
+  }
+
+  /** Every comment on `target`, oldest first (replies included: `parent` says where each goes). */
+  comments(target: string): CommentRow[] {
+    return (this.r.comments.all(target) as unknown as CommentRaw[]).map(asComment)
+  }
+
+  /** The mentions `source` (`comment:<id>` or `page:<id>`) has made. */
+  mentionsOf(source: string): MentionRow[] {
+    return (this.r.mentions.all(source) as unknown as { source: string; kind: MentionRow['kind']; ref: string; told: number }[])
+      .map(m => ({ source: m.source, kind: m.kind, ref: m.ref, told: m.told === 1 }))
+  }
+
+  /** `member`'s notifications, newest first, as stored: the caller judges each against its target's level now (§8.3). */
+  notifications(member: string): StoredNotification[] {
+    return (this.r.notifications.all(member) as unknown as { id: string; member: string; kind: 'mention'; target: string; source: string; by: string; created: string; read_at: string | null }[])
+      .map(n => ({ id: n.id, member: n.member, kind: n.kind, target: n.target, source: n.source, by: n.by, created: n.created, readAt: n.read_at }))
+  }
+
+  /** When `member` last opened `target`, or null. */
+  readOf(member: string, target: string): string | null {
+    const row = this.r.read.get(member, target) as { at: string } | undefined
+    return row ? row.at : null
   }
 
   /** Every write, oldest first; with `target`, that target's only. */

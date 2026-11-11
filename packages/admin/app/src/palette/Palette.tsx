@@ -106,7 +106,7 @@ export default function Palette() {
   const inspector = useInspector()
   const changes = useChanges()
   const { known } = useActor()
-  const { viewer, setViewer, visible } = useViewer()
+  const { viewer, setViewer, visible, sees } = useViewer()
   const canWrite = useCanWrite()
   const dialog = useRef<HTMLDialogElement>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -167,10 +167,13 @@ export default function Palette() {
       .map(d => ({ label: `New ${d.words!.noun}`, go: newRecordHref(d.newRegistry!) })),
     { label: 'New board', go: '/boards?new=1' },
   ] : []
+  // DAO-OS L7 Task 18: Deploy is offered to a member who may write here and reads a composed System (invisible means
+  // absent: previewing, or with nothing composed the viewer may read, it is not offered)
+  const composes = canWrite && known && [...systemsRead.entries.values()].some(e => sees(e) && (e.deployment as { status?: unknown } | undefined)?.status === 'composed')
   const scopeList = scopes(path)
   const scope = scopeList[scopeAt % scopeList.length]!
   const named = new Set(findByAddress(query, all).map(r => `r:${r.id}`))
-  const items = !open ? [] : filterItems(paletteItems(all, places(placed, registries.data ?? [], systemsRead.entries), canWrite ? opsSeen : [], {
+  const items = !open ? [] : filterItems(paletteItems(all, places(placed, registries.data ?? [], systemsRead.entries, { sources: sees({}), deploy: composes }), canWrite ? opsSeen : [], {
     hasChanges: staged, canApply: staged && !!view && view.rule.direct && view.stale.length === 0,
     record: canWrite && record && editable ? record : null, // only Edit reads it: offered where the record page offers Edit
     path, viewing: viewer.as === 'you' ? 'you' : viewer.as === 'public' ? 'public' : 'other', adds,

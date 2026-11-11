@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useSearch } from 'wouter'
 import { stringify } from 'yaml'
-import type { Resource } from '../api.ts'
+import { useQuery } from '@tanstack/react-query'
+import { api, type Resource } from '../api.ts'
 import { useActor } from '../actor.ts'
 import { useCanEdit } from '../editable.ts'
 import { useChanges } from '../changes/useChanges.ts'
@@ -16,8 +17,11 @@ import { DriverView } from '../systems/DriverView.tsx'
 import { Links } from '../record/Links.tsx'
 import { MiniMap } from '../record/MiniMap.tsx'
 import Operations from '../record/Operations.tsx'
-import { RecordVisibility, useProposedLevel } from '../record/RecordVisibility.tsx'
-import { useVisibilityView } from '../session/houseSource.ts'
+import { COUNCIL_MEMORY, RecordVisibility, useProposedLevel } from '../record/RecordVisibility.tsx'
+import { inFlightOf, MOVE_PROPOSED } from '../record/levelInFlight.ts'
+
+/** M4: what a record with a staged move says instead of offering Edit. */
+export const RECORD_MOVE_STALE = 'A move of this record into the repository is staged: an edit now would leave the move stale. Apply or discard it first.'
 import OpButtons from '../record/OpButtons.tsx'
 import { factText, kindLabel } from '../kinds.ts'
 import { ageText } from '../time.ts'
@@ -33,8 +37,11 @@ import { ListView } from '../elements/views/ListView.tsx'
 import { DataRow } from '../elements/rows/DataRow.tsx'
 import { Refusal } from '../parts/SyncParts.tsx'
 import { useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useVisibilityView } from '../session/houseSource.ts'
 import NotFound from './NotFound.tsx'
 import { PageLoading } from '../frame/PageLoading.tsx'
+import { RecordThread } from '../workspace/ConversationThread.tsx' // DAO-OS L6 Task 18: a record's comments
+import { useFromMarks } from '../workspace/fromMarks.ts' // DAO-OS L6 Task 19: the server's from marks
 
 const empty = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)
 
@@ -59,8 +66,12 @@ function StateFacts({ resource }: { resource: Resource }) {
 
 /** The record's history as a list of events (§14.1): its last change, by whom and when. The full trail of changes
  *  arrives with Activity. */
-function History({ resource, now }: { resource: Resource | null; now: Date }) {
-  const changed = resource?.changed ? [resource.changed] : []
+function History({ resource, registry, entityId, now }: { resource: Resource | null; registry: string | null; entityId: string | null; now: Date }) {
+  // A record no adapter makes a Resource of (a task, a meeting) reads its last commit from its registry (walk M5).
+  const asked = resource === null && registry !== null && entityId !== null
+  const read = useQuery({ queryKey: ['record-changed', registry, entityId], queryFn: () => api.recordChanged(registry!, entityId!), enabled: asked, retry: false }).data
+  const last = resource?.changed ?? (asked ? read?.changed ?? null : null)
+  const changed = last ? [last] : []
   return (
     <Section label="History">
       <ListView label="History" rows={changed} empty={{ title: 'No commit names this record yet.', line: 'The full trail of changes to a record arrives with Activity.' }}
@@ -87,14 +98,16 @@ export default function RecordPage({ kind, id }: { kind: string; id: string }) {
  *  them as Touches. A record the viewer may not see is not here at all (E-62). */
 function RecordBody({ kind, id }: { kind: string; id: string }) {
   const m = useRecord(kind, id)
+  // DAO-OS L6 Task 19 (§10): the record's from mark, as the server sends it (a System's header reads its own driver read)
+  const marks = useFromMarks(kind === 'system' ? null : m.registry)
   const { actor, error: actorError } = useActor()
   const changes = useChanges()
   const canWrite = useCanWrite()
-  const { sees } = useViewer()
+  const { sees, viewer } = useViewer()
   const source = useVisibilitySource()
   const visibilityView = useVisibilityView() // L5 §9.7: who may change this record's visibility
   // the level in flight, beside the header's marker for a viewer who may not change it (L5 §11.4)
-  const proposedLevel = useProposedLevel(m.changeKey, m.entry, m.staged)
+  const proposedLevel = useProposedLevel(m.changeKey, m.entry, m.staged, changes.view?.private)
   const [path, navigate] = useLocation()
   const search = useSearch()
   const [yaml, setYaml] = useState(false)
@@ -109,7 +122,13 @@ function RecordBody({ kind, id }: { kind: string; id: string }) {
   // address (no id, or an id another entry shares: contract), which can never be staged against.
   // Previewing, nothing is written (C-23): no Edit, no e, no ?edit=1.
   const editable = useCanEdit({ resource: r, registry: m.registry, id: m.entityId })
-  const writable = editable && canWrite
+  // DAO-OS L6 Task 20 review M4, L6 carries K5: while a move of the record into the repository is staged, or held by an
+  // open proposal, an edit would leave the move stale (its digest pins the record): no Edit, and a note says why.
+  const proposals = useQuery({ queryKey: ['proposals'], queryFn: api.proposals, staleTime: 30_000, enabled: m.changeKey !== null }).data ?? []
+  const moveFlight = m.changeKey ? inFlightOf({ record: m.changeKey }, [], changes.view?.private, proposals) : null
+  const moveHeld = moveFlight !== null && moveFlight.move
+  const moveNote = !moveHeld ? null : moveFlight!.proposal ? MOVE_PROPOSED('record', moveFlight!.proposal.id) : RECORD_MOVE_STALE
+  const writable = editable && canWrite && !moveHeld
   const ed = useEditor({ registry: m.registry, entityId: m.entityId, latest: view.value, creating: false, stage: changes.stage })
   // Saving needs the record still writable: an entry that became unaddressable while open is never staged against.
   const save = () => { if (writable) void ed.save() }
@@ -138,7 +157,7 @@ function RecordBody({ kind, id }: { kind: string; id: string }) {
   // Who you are decides the head's buttons, so the page waits for it too: no Edit appearing late. So do the entries
   // the small map's names come from: a restricted name is never drawn raw while they arrive.
   // The first frame is the head as far as the address knows it (the record's id) and field-row skeletons (§6.2).
-  if (m.loading || !actorSettled || mapEntries.pending) return <PageLoading shape="row-1" rows={6} />
+  if (m.loading || !actorSettled || mapEntries.pending || marks.pending) return <PageLoading shape="row-1" rows={6} />
   // What the viewer may not see is absent (§6.3): the not-found page, never its header or a count (E-62).
   const item = r ?? m.entry ?? view.value
   if (item !== null && !sees(item)) return <NotFound />
@@ -186,10 +205,10 @@ function RecordBody({ kind, id }: { kind: string; id: string }) {
   // collection; the header's marker then gives way to it, so the level is drawn once. Anyone else reads the header's
   // marker, with the level in flight beside it.
   const visibilityControl = !ed.editing && canWrite && view.value !== null && m.registry !== null && m.changeKey !== null
-    && (visibilityView?.writable.includes(m.registry) ?? false)
+    && (visibilityView?.writable.includes(m.registry) ?? false) && m.registry !== COUNCIL_MEMORY // its level is never a choice (R-L6-T20-9)
   if (visibilityControl && view.value && m.registry) {
     secondary.unshift(<RecordVisibility key="visibility" registry={m.registry} id={m.entityId} entry={view.value}
-      staged={m.staged} stage={changes.stage} onError={setPageError} />)
+      staged={m.staged} pending={changes.view?.private} stage={changes.stage} onError={setPageError} />)
   }
 
   const state: { mark: Mark; word: string } | null = view.created ? { mark: 'staged', word: 'Staged, new' }
@@ -202,6 +221,14 @@ function RecordBody({ kind, id }: { kind: string; id: string }) {
   // the header's marker, for a viewer the control is not drawn for (a System and a record alike: review I-1)
   const marker = item !== null && !visibilityControl
     ? { visibility: source.visibilityOf(item), visibilityProposed: proposedLevel } : {}
+  // DAO-OS L6 Task 18: a record in a collection holds a conversation once it is written (not while only staged as new).
+  // A preview as the public has no conversation (the members' side, §8.2).
+  const commentTarget = m.registry && m.entityId && !view.created && viewer.as !== 'public' ? `record:${m.registry}:${m.entityId}` : null
+
+  // DAO-OS L6 Task 19 (§10, R-L6-T14-5): a registry's record carries the mark the server sends (its file and that file's
+  // last commit, or the instance for one the store keeps), and none when it sends none; a record no registry holds keeps
+  // the resource's file and when the Hub read it.
+  const fromMark = m.registry !== null ? marks.of(m.entityId) : file ? { file, readAt: m.readAt } : undefined
   const sys = r?.kind === 'system' ? systemFacts(r) : null
   const head = sys && r
     ? (
@@ -216,7 +243,7 @@ function RecordBody({ kind, id }: { kind: string; id: string }) {
     : (
       <RecordHeader variant="record" kind={r?.kind ?? kind} id={id} title={title}
         state={state?.mark} stateWord={state?.word} {...marker}
-        meta={[word]} from={file ? { file, readAt: m.readAt } : undefined} now={now} primary={primary} secondary={secondary} more={more} />
+        meta={[word]} from={fromMark} now={now} primary={primary} secondary={secondary} more={more} />
     )
 
   return (
@@ -230,8 +257,9 @@ function RecordBody({ kind, id }: { kind: string; id: string }) {
           {m.problem && <Warn>{m.problem}</Warn>}
           {/* the attention is the header's state mark, unless a staged state took the mark's place */}
           {r?.attention && !sys && state?.mark !== 'needs' && <Warn>{r.attention.text}</Warn>}
-          {view.created && <Note state="notYet">Staged as a new record: it is not in {file} until the change is applied.</Note>}
-          {view.deleted && <Note state="notYet">Staged for deletion: it leaves {file} when the change is applied.</Note>}
+          {moveNote && canWrite && <Note state="notYet">{moveNote}</Note>}
+          {view.created && <Note state="notYet">Staged as a new record: it is not in the repository until the change is applied.</Note>}
+          {view.deleted && <Note state="notYet">Staged for deletion: it leaves the repository when the change is applied.</Note>}
           {ed.editing && ed.heldProto && (
             <Warn>This entry holds a field named __proto__ in its file. The app does not store a field of that name, so saving this entry removes it.</Warn>
           )}
@@ -251,13 +279,18 @@ function RecordBody({ kind, id }: { kind: string; id: string }) {
           {sys && r && <DriverView resource={r} now={now} />}
           {m.detail && <Links detail={m.detail} />}
           {r && <Operations resource={r} />}
-          <History resource={r} now={now} />
+          <History resource={r} registry={m.registry} entityId={m.entry && m.changeKey ? m.entityId : null} now={now} />
         </div>
-        {m.detail && r && (
+        {((m.detail && r) || commentTarget) && (
           <div className="rp-aside">
-            <Section label="Touches">
-              <MiniMap centre={r} neighbours={m.detail.neighbours} entryOf={mapEntries.entryOf} />
-            </Section>
+            {m.detail && r && (
+              <Section label="Touches">
+                <MiniMap centre={r} neighbours={m.detail.neighbours} entryOf={mapEntries.entryOf} />
+              </Section>
+            )}
+            {/* DAO-OS L6 Task 18: the record's conversation (§8.2), following its level */}
+            {commentTarget && item !== null && <RecordThread key={commentTarget} target={commentTarget} visibility={source.visibilityOf(item)}
+              me={actor && 'id' in actor ? { handle: actor.id, role: actor.name } : null} />}
           </div>
         )}
       </div>

@@ -110,7 +110,7 @@ try {
   const tray = page.getByRole('region', { name: 'Changes' })
   await step(page, 'Enter on Save to changes stages the edit, and focus is on Edit again', async f =>
     f.tag === 'button' && f.name === 'Edit' && (await page.getByRole('group', { name: 'Fields' }).getByText('archive', { exact: true }).count()) > 0
-      && (await tray.getByText(/^\d+ staged changes?$/).count()) > 0)
+      && (await tray.getByText(/^\d+ staged ops?$/).count()) > 0)
   await keys(page, 'g', 'c')
   await step(page, '`g c` opens the change, focus inside it', f => f.inDialog !== '')
   await tabTo(page, f => f.tag === 'button' && f.name === 'Propose', 'Propose')

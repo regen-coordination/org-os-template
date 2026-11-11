@@ -18,11 +18,12 @@ import { parseDocument, Scalar } from 'yaml'
 import { HttpError } from '../errors.ts'
 import { actorTrailer, commitIdent, type KnownActor } from '../actor.ts'
 import { commitDataPaths, restageDataPaths } from '../git.ts'
-import { REGISTRIES } from '../registries.ts'
+import { registriesOf, registryDef, registryFile, registryFileOf } from '../registries.ts'
 import { deletedText, entriesFromText, updatedText } from '../registry.ts'
 import { referrers } from '../schema.ts'
 import { guardFiles, Refusal } from '../changes/apply.ts'
 import { baseOf } from '../changes/canonical.ts'
+import { ChangeStore } from '../changes/store.ts'
 import { currentEntries, named } from '../changes/stage.ts'
 import { assertGitSafe, type GitFile } from '../private/guard.ts'
 import {
@@ -34,9 +35,16 @@ import type { PendingRow, PrivateField, PrivateStore, PrivateWriter, StagedRow }
 import { readConfig } from './config.ts'
 import { mayWrite, readRuleContext } from '../governance/effective.ts'
 import {
-  admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, readFullPolicy, type ParsedLevel, type Viewer, type VisibilityPolicy,
+  admits, DEPLOYED_SYSTEM_REQUIRES, formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, readFullPolicy, requiredInGit,
+  type ParsedLevel, type Viewer, type VisibilityPolicy,
 } from '../../lib/visibility.mjs'
-import { CARRIED_EVENTS, governanceNamesOf, LEAVES_GIT, NARROW_RULE, narrowSubject, referrersInWords, ROSTER, substituteOps, takenOutOfGit, WIDENS, withoutFields } from '../../lib/narrow.mjs'
+import { CARRIED_EVENTS, governanceNamesOf, LEAVES_GIT, NARROW_RULE, narrowSubject, PAGE_LEAVES_GIT, referrersInWords, ROSTER, substituteOps, takenOutOfGit, WIDENS, withoutFields } from '../../lib/narrow.mjs'
+import { descendantsOf, joinPage, labelledLinks, NAMED_BY, NO_PAGE, NO_PRIVATE_ASSETS, pageEntries, pageLevel, splitPage, type PageEntry } from '../../lib/workspace/pages.mjs'
+import { gitPages } from '../workspace/files.ts'
+import { COUNCIL_MEMORY, councilEntriesMoved, judgeCouncilCollectionNarrow, refuseCouncilNarrow } from '../workspace/memory.ts'
+import { privateOpTargets, treeReader } from '../private/targets.ts'
+import { ancestorsOf, pageTargets, targetsOfPath } from '../../lib/workspace/targets.mjs'
+import { customFileOf } from '../../lib/registries.mjs'
 import { readGovernance } from '../../lib/governance-read.mjs'
 import { canonicalJson, revOf, type Proposal } from '../../lib/proposals.mjs'
 
@@ -44,23 +52,27 @@ export { LEAVES_GIT, NARROW_RULE, ROSTER, WIDENS }
 
 /** What a narrowing names (R-L5-16.1). */
 export type NarrowTarget = { registry: string; id: string; field?: string } | { collection: string; field?: string }
+  | { page: string } // DAO-OS L6 §4.4 (Task 7)
 export interface NarrowInput { target: NarrowTarget; level: string }
 /** Who narrows, besides the actor: the viewer the act was judged with (hats read now, §5.2), and the store. */
 export interface NarrowDeps { viewer: Viewer; privateStore: PrivateAccess; now?: () => Date }
 /** §13's answer. `moved`: something left git (the client confirmed it with `LEAVES_GIT` before it asked). */
-export interface NarrowResult { commit: string; moved: boolean }
+export interface NarrowResult { commit: string; moved: boolean; subpages?: number; confirmation?: string }
 
 const VISIBILITY = 'data/visibility.yaml'
 const LEDGER = 'data/proposals.yaml'
-const KNOWN = new Set(REGISTRIES.map(r => r.name))
-const COLLECTIONS = new Set(REGISTRIES.filter(r => r.kind === 'collection' && !r.ledger).map(r => r.name))
+// DAO-OS L6 (ruling R-2b): the names git knows are the instance's, its custom collections among them, each in its own file.
+const knownOf = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).map(r => r.name))
+// Knowledge (L6 §7.5, a file per kind) is not narrowed here: what the commons shows is kms's gate's, decided as a
+// publication (Q69); a narrowing writes one registry file, and the canon has many.
+const collectionsOf = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).filter(r => r.kind === 'collection' && !r.ledger && r.filesGlob === undefined).map(r => r.name))
 const NOTHING = 'Nothing was written.'
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const held = (v: unknown) => v !== undefined && v !== null
 const omit = (v: Record<string, unknown>, key: string) => Object.fromEntries(Object.entries(v).filter(([k]) => k !== key))
 
 const SHAPE = 'The body must be {"target": {"registry": "<registry>", "id": "<id>"} or {"collection": "<collection>"} or ' +
-  '{"collection": "<collection>", "field": "<field>"}, "level": "members", "hat:<hat ref>" or "role:<role id>"}.'
+  '{"collection": "<collection>", "field": "<field>"} or {"page": "<page id>"}, "level": "members", "hat:<hat ref>" or "role:<role id>"}.'
 /** A field has one level for every record of its collection (§9.2). */
 export const fieldOfRecord = (registry: string, field: string) =>
   `${field} has one level for every record of ${registry}, kept in data/visibility.yaml: narrow it for the whole collection instead. ${NOTHING}`
@@ -97,11 +109,13 @@ export function readNarrowBody(body: unknown): NarrowInput {
     if (t.field !== undefined && !str(t.field)) throw bad
     return { target: { collection: String(t.collection), ...(t.field !== undefined ? { field: String(t.field) } : {}) }, level: body.level }
   }
+  if (str(t.page) && Object.keys(t).length === 1) return { target: { page: String(t.page) }, level: body.level } // DAO-OS L6 §4.4
   throw bad
 }
 
-/** One file the narrowing writes: its bytes before (null: none yet) and its text after. */
-interface FileWrite { rel: string; before: Buffer | null; text: string }
+/** One file the narrowing writes: its bytes before (null: none yet) and its text after (null: deleted, a page that leaves
+ *  git, DAO-OS L6 §4.4). */
+interface FileWrite { rel: string; before: Buffer | null; text: string | null }
 
 /** What one narrowing does, worked out before anything is written. */
 interface Plan {
@@ -114,6 +128,8 @@ interface Plan {
   after?: (w: PrivateWriter, commit: string) => void
   /** The policy the files are judged by (data/visibility.yaml as the narrowing leaves it). */
   policy: VisibilityPolicy
+  /** DAO-OS L6 §4.4: the subpages that leave git with a page. */
+  subpages?: number
 }
 
 /** Refuses a move from `cur` to `next` that is not a narrowing (409 `WIDENS`), and one that changes nothing and moves
@@ -136,7 +152,7 @@ const fileOf = (repo: string, rel: string): FileWrite & { src: string } => {
 
 /** data/visibility.yaml with one level set: a collection's (its `level`, or `default` when that is the key it has) or one
  *  of its fields'. Comments and the rest of the file are kept (the yaml Document). */
-function policyText(src: string, collection: string, field: string | undefined, level: string): string {
+export function policyText(src: string, collection: string, field: string | undefined, level: string): string {
   const doc = parseDocument(src === '' ? 'visibility:\n  collections: {}\n' : src)
   const top = isObj(doc.toJS()) && (doc.toJS() as Record<string, unknown>).visibility !== undefined ? ['visibility'] : []
   const at = [...top, 'collections', collection]
@@ -250,6 +266,7 @@ function governanceNames(repo: string, registry: string, id: string): { registry
 function planRecord(repo: string, by: string, registry: string, id: string, next: ParsedLevel, viewer: Viewer,
   store: PrivateStore | null, why: unknown, policy: VisibilityPolicy): Plan {
   const token = formatLevel(next)
+  const KNOWN = knownOf(repo), COLLECTIONS = collectionsOf(repo)
   if (!KNOWN.has(registry)) {
     // A private collection's record: only for those admitted to the collection; anyone else is told it is not there.
     const s = needStore(store, why)
@@ -275,7 +292,7 @@ function planRecord(repo: string, by: string, registry: string, id: string, next
   }
   if (!KNOWN.has(registry)) throw new HttpError(404, noRecord(registry, id), 'NO_RECORD')
 
-  const rel = `data/${registry}.yaml`
+  const rel = registryFile(repo, registry)
   const record = currentEntries(repo, registry, true).find(e => named(e, id))
   if (!record) throw new HttpError(404, noRecord(registry, id), 'NO_RECORD')
   const cur = fullLevel(policy, registry, record)
@@ -287,7 +304,7 @@ function planRecord(repo: string, by: string, registry: string, id: string, next
   if (!leaves) {
     return {
       subject: narrowSubject({ kind: 'record', registry, id, level: token }), moved: false, before: null, policy,
-      files: [{ rel, before: f.before, text: updatedText(f.src, registry, id, { ...record, visibility: token }) }],
+      files: [{ rel, before: f.before, text: updatedText(f.src, registryDef(registry, repo), id, { ...record, visibility: token }) }],
     }
   }
   if (registry === 'members') throw new Refusal(409, { code: 'ROSTER', error: ROSTER })
@@ -301,7 +318,7 @@ function planRecord(repo: string, by: string, registry: string, id: string, next
   const ledger = ledgerPlan(repo, op => (op.record === `${registry}:${id}` ? { keep: null, moved: [recordDelta(op, registry, id, token)] } : null))
   return {
     subject: narrowSubject({ kind: 'record', registry, id, level: token }), moved: true, policy,
-    files: [{ rel, before: f.before, text: deletedText(f.src, registry, id) }, ...(ledger ? [ledger.file] : [])],
+    files: [{ rel, before: f.before, text: deletedText(f.src, registryDef(registry, repo), id) }, ...(ledger ? [ledger.file] : [])],
     before: w => {
       w.putRecord({ collection: registry, id, visibility: token, body, rev: baseOf(body) ?? '' }, by, null)
       relevel(w, fields, next, by)
@@ -325,13 +342,19 @@ function ratifiedApplied(store: PrivateStore, ids: readonly string[]): Plan['aft
 function planCollection(repo: string, by: string, collection: string, next: ParsedLevel, viewer: Viewer,
   store: PrivateStore | null, why: unknown, policy: VisibilityPolicy): Plan {
   const token = formatLevel(next)
+  const KNOWN = knownOf(repo), COLLECTIONS = collectionsOf(repo)
   if (!KNOWN.has(collection)) {
     const s = needStore(store, why)
     const listed = storeRead(s, () => s.collections()).find(c => c.id === collection)
     if (!listed || !admits(levelOfToken(listed.visibility), viewer)) throw new HttpError(404, noCollection(collection), 'NO_COLLECTION')
     judgeMove(levelOfToken(listed.visibility), next, false)
     judgeAdmitted(next, viewer)
-    return { subject: narrowSubject({ kind: 'store' }), files: [], moved: false, policy, before: w => w.putCollection({ ...listed, visibility: token }, by) }
+    // Council memory is one level (PF-R60): its entries move with it, or nothing is narrowed (L6 carries K2).
+    const entries = collection === COUNCIL_MEMORY ? councilEntriesMoved(storeRead(s, () => s.records(collection)), next) : []
+    return { subject: narrowSubject({ kind: 'store' }), files: [], moved: false, policy, before: w => {
+      w.putCollection({ ...listed, visibility: token }, by)
+      for (const r of entries) w.putRecord(r, by, null)
+    } }
   }
   if (!COLLECTIONS.has(collection)) throw new HttpError(404, noCollection(collection), 'NO_COLLECTION')
   if (!gitAllows(next)) throw new Refusal(422, { code: 'COLLECTION_IN_GIT', error: COLLECTION_IN_GIT })
@@ -341,11 +364,11 @@ function planCollection(repo: string, by: string, collection: string, next: Pars
   const text = policyText(v.src, collection, undefined, token)
   const after = readFullPolicy(parseDocument(text).toJS()).policy
   // A record that says it is public itself is narrowed with its collection (R-L5-16.1): nothing in it stays wider.
-  const rel = `data/${collection}.yaml`
+  const rel = registryFile(repo, collection)
   const f = fileOf(repo, rel)
   let records = f.src
   for (const e of currentEntries(repo, collection, true)) {
-    if (e.visibility === 'public' && e.id !== undefined && e.id !== null) records = updatedText(records, collection, String(e.id), omit(e, 'visibility'))
+    if (e.visibility === 'public' && e.id !== undefined && e.id !== null) records = updatedText(records, registryDef(collection, repo), String(e.id), omit(e, 'visibility'))
   }
   return {
     subject: narrowSubject({ kind: 'collection', collection, level: token }), moved: false, before: null, policy: after,
@@ -358,11 +381,15 @@ function planCollection(repo: string, by: string, collection: string, next: Pars
 function planField(repo: string, by: string, collection: string, field: string, next: ParsedLevel, viewer: Viewer,
   store: PrivateStore | null, why: unknown, policy: VisibilityPolicy): Plan {
   const token = formatLevel(next)
-  if (!COLLECTIONS.has(collection)) throw new HttpError(404, noCollection(collection), 'NO_COLLECTION')
+  if (!collectionsOf(repo).has(collection)) throw new HttpError(404, noCollection(collection), 'NO_COLLECTION')
   if (field === 'id' || field === 'visibility') throw new HttpError(400, `${field} is not a field a level can be given to. ${NOTHING}`)
   const leaves = !gitAllows(next)
   if (leaves && collection === 'members' && field === 'handles') throw new Refusal(409, { code: 'ROSTER', error: ROSTER })
-  const rel = `data/${collection}.yaml`
+  // PF-R227: what a deployed System requires stays in git, as checkVisibilityPolicy refuses for a policy written by hand.
+  if (leaves && collection === 'systems' && DEPLOYED_SYSTEM_REQUIRES.includes(field)) {
+    throw new Refusal(422, { code: 'REQUIRED_IN_GIT', error: `${requiredInGit(field)} ${NOTHING}` })
+  }
+  const rel = registryFile(repo, collection)
   const f = fileOf(repo, rel)
   const entries = currentEntries(repo, collection, true)
   const holding = leaves ? entries.flatMap((e, i) => (held(e[field]) ? [{ e, i }] : [])) : []
@@ -395,7 +422,7 @@ function planField(repo: string, by: string, collection: string, field: string, 
   const moves: PrivateField[] = []
   for (const { e, i } of holding) {
     if (e.id === undefined || e.id === null) throw new Refusal(409, { code: 'NO_ID', error: noId(collection, i + 1, field) })
-    records = updatedText(records, collection, String(e.id), takenOutOfGit(collection, field, e))
+    records = updatedText(records, registryDef(collection, repo), String(e.id), takenOutOfGit(collection, field, e))
     moves.push({ registry: collection, record: String(e.id), field, visibility: token, value: e[field] })
   }
   if (records !== f.src) files.push({ rel, before: f.before, text: records })
@@ -416,6 +443,143 @@ function planField(repo: string, by: string, collection: string, field: string, 
   }
 }
 
+// ── DAO-OS L6 §4.4 (Task 7): a page ─────────────────────────────────────────────────────────────────────────────
+
+/** A narrowing of a page that a proposal still edits whole would leave its text in the ledger (this task's copy). */
+const pageProposed = (path: string, proposal: string) =>
+  `Proposal ${proposal} edits ${path}, so it cannot leave the repository while that proposal holds its text: decide or withdraw it first. ${NOTHING}`
+const pageConflict = (id: string) => `The private store already keeps a page ${id}, so this one cannot be moved there. ${NOTHING}`
+/** DAO-OS L6 Task 20 review C1 (PF-R95): a narrowing out of the repository while a tray stages an edit of the tree it takes
+ *  would leave that edit to write the page back into git (Keep mine, Apply). Your own staged edit is named (the page, or
+ *  a subpage by its title: every member reads a git page); another member's names nobody. */
+export const STAGED_HERE = 'Your changes stage an edit of this page: apply or discard it first. Nothing was changed.'
+export const stagedBelow = (title: string) => `Your changes stage an edit of ${title}, a subpage of this page: apply or discard it first. Nothing was changed.`
+export const STAGED_BY_A_MEMBER = "A member's changes stage an edit of this page or of a subpage of it, so it cannot leave the repository until that " +
+  'edit is applied or discarded. Nothing was changed.'
+
+/** L6 carries K4: a member's change file the server cannot read, while a page would leave the repository. */
+export const STAGED_UNREADABLE = "A member's changes cannot be read, so whether they stage an edit of this page is not known, and it cannot leave the " +
+  'repository until they can be. Nothing was changed.'
+
+/** Refuses 409 `STAGED` when any member's change holds a file op on one of `paths` (the tree a narrowing takes out of git):
+ *  the actor's own first, by what it edits; another member's in words that name nobody. */
+function refuseStaged(repo: string, by: string, id: string, paths: ReadonlyMap<string, string>, byId: ReadonlyMap<string, PageEntry>): void {
+  const touched = (ops: readonly unknown[]): string | null => {
+    for (const op of ops) if (isObj(op) && op.op === 'file' && typeof op.path === 'string' && paths.has(op.path)) return paths.get(op.path)!
+    return null
+  }
+  const { changes, unreadable } = new ChangeStore(repo).all()
+  const mine = changes.find(c => c.actor === by)
+  const at = mine ? touched(mine.ops) : null
+  if (at !== null) throw new Refusal(409, { code: 'STAGED', error: at === id ? STAGED_HERE : stagedBelow(byId.get(at)?.title || at) })
+  if (changes.some(c => c.actor !== by && touched(c.ops) !== null)) throw new Refusal(409, { code: 'STAGED', error: STAGED_BY_A_MEMBER })
+  // L6 carries K4: a change file that cannot be read may stage such an edit; the check fails closed.
+  if (unreadable > 0) throw new Refusal(409, { code: 'STAGED', error: STAGED_UNREADABLE })
+}
+
+/** A page's file op in a proposal as the private op that carries it once the page is kept in the store (§10.3's typed
+ *  deltas, R-L5-10.7): a delete, or the page's whole body. */
+function pageDelta(op: Record<string, unknown>, id: string): StagedPrivateOp {
+  if (op.text === null || typeof op.text !== 'string') return { op: 'delete-record', collection: 'pages', id }
+  const { front, body } = splitPage(op.text)
+  const { id: _id, visibility: _v, ...rest } = front
+  return { op: 'replace-record', collection: 'pages', id, value: { ...rest, markdown: body } }
+}
+
+/** A page and its subpages (§4.4): a private page narrowed in the store; a git page to members in git (its own
+ *  `visibility`, and `visibility: public` taken off its subpages, so nothing in it stays wider); stricter, out of git with
+ *  every git subpage (they would otherwise be looser than it), deleted in one commit and written to the store in the one
+ *  transaction around it, the closed proposals' file ops on them held as placeholders (R-L5-10.7). Refused: a page the
+ *  viewer may not see (404, as one that is not there); one another git page names by its title while looser than it will be
+ *  (409 REFERRED, controller ruling R-7a: its title would stay in git, or show to readers who may not read it); one or a
+ *  subpage that holds attachments (a private page holds none, §20 Q13); one an open proposal edits whole; one the store
+ *  already keeps. */
+function planPage(repo: string, by: string, id: string, next: ParsedLevel, viewer: Viewer,
+  store: PrivateStore | null, why: unknown, policy: VisibilityPolicy): Plan {
+  const token = formatLevel(next)
+  const byId = pageEntries(gitPages(repo), store ? storeRead(store, () => store.records('pages')) : [])
+  const entry = byId.get(id)
+  const cur = entry ? pageLevel(id, byId, policy) : null
+  if (!entry || !cur || !admits(cur, viewer)) throw new HttpError(404, NO_PAGE(id), 'NO_PAGE')
+  if (entry.where === 'store') {
+    const s = needStore(store, why)
+    const kept = storeRead(s, () => s.record('pages', id))
+    if (!kept) throw new HttpError(404, NO_PAGE(id), 'NO_PAGE')
+    judgeMove(cur, next, false)
+    judgeAdmitted(next, viewer)
+    return { subject: narrowSubject({ kind: 'store' }), files: [], moved: false, policy, before: w => w.putRecord({ ...kept, visibility: token }, by, null) }
+  }
+  const leaves = !gitAllows(next)
+  judgeMove(cur, next, false)
+  judgeAdmitted(next, viewer)
+  const subject = narrowSubject({ kind: 'page', id, level: token })
+  const pathOf = (p: string) => `pages/${p}.md`
+  const below = descendantsOf(id, byId).filter(d => byId.get(d)!.where === 'git')
+  const write = (e: PageEntry, front: Record<string, unknown>): FileWrite => {
+    const rel = pathOf(e.id)
+    try { return { rel, before: Buffer.from(e.text ?? '', 'utf8'), text: joinPage(front as never, e.markdown, e.text) } } catch (err) {
+      if ((err as { code?: unknown }).code === 'UNREADABLE_FRONT') throw new Refusal(422, { code: 'UNREADABLE_FRONT', error: (err as Error).message })
+      throw err
+    }
+  }
+  // The tree as the narrowing leaves it: the pages that would still name one of it by its title are refused (R-7a).
+  const after = new Map(byId)
+  const opened = leaves ? [] : below.map(d => byId.get(d)!).filter(e => e.front?.visibility === 'public')
+  if (leaves) for (const d of [id, ...below]) after.set(d, { ...byId.get(d)!, own: token })
+  else {
+    after.set(id, { ...entry, own: token })
+    for (const e of opened) { const { own: _own, ...rest } = e; after.set(e.id, rest) }
+  }
+  const treeIds = new Set([id, ...below])
+  const naming = labelledLinks(after, treeIds, d => pageLevel(d, after, policy), policy)
+  if (naming.length > 0) {
+    throw new Refusal(409, { code: 'REFERRED', error: NAMED_BY(naming.map(n => byId.get(n)!.title || n)) })
+  }
+  if (!leaves) {
+    const files = [write(entry, { ...entry.front, visibility: token }), ...opened.map(e => { const { visibility: _v, ...rest } = e.front!; return write(e, rest) })]
+    return { subject, files, moved: false, before: null, policy }
+  }
+  const tree = [entry, ...below.map(d => byId.get(d)!)]
+  const s = needStore(store, why)
+  for (const e of tree) {
+    if (existsSync(join(repo, 'pages', 'assets', e.id))) throw new Refusal(409, { code: 'NO_PRIVATE_ASSETS', error: NO_PRIVATE_ASSETS(token) })
+    if (storeRead(s, () => s.record('pages', e.id))) throw new Refusal(409, { code: 'PRIVATE_CONFLICT', error: pageConflict(e.id) })
+  }
+  const paths = new Map(tree.map(e => [pathOf(e.id), e.id]))
+  const ledgerNow = fileOf(repo, LEDGER)
+  if (ledgerNow.before !== null) {
+    for (const p of entriesFromText(ledgerNow.src, 'proposals') as unknown as Proposal[]) {
+      const held = (p.ops ?? []) as unknown as Record<string, unknown>[]
+      const touched = held.find(op => op.op === 'file' && typeof op.path === 'string' && paths.has(op.path))
+      if (touched && p.state === 'open') throw new Refusal(409, { code: 'PROPOSED', error: pageProposed(String(touched.path), String(p.id)) })
+    }
+  }
+  refuseStaged(repo, by, id, paths, byId)
+  // A closed proposal's file op on one of them holds its text: a placeholder from now on, its part decided and kept nowhere new.
+  const ledger = ledgerPlan(repo, op => (op.op === 'file' && typeof op.path === 'string' && paths.has(op.path)
+    ? { keep: null, moved: [pageDelta(op, paths.get(op.path)!)] } : null))
+  const privateBelow = descendantsOf(id, byId).filter(d => byId.get(d)!.where === 'store')
+  const kept = privateBelow.map(d => storeRead(s, () => s.record('pages', d))).filter(r => r !== null)
+  return {
+    subject, moved: true, policy, subpages: below.length,
+    files: [...tree.map(e => ({ rel: pathOf(e.id), before: Buffer.from(e.text ?? '', 'utf8'), text: null })), ...(ledger ? [ledger.file] : [])],
+    before: w => {
+      for (const e of tree) {
+        const { id: _id, title, parent, order, visibility: _v, meeting, from, ...extra } = e.front!
+        const body: Record<string, unknown> = { ...extra, title, parent, order, ...(meeting !== undefined ? { meeting } : {}), ...(from !== undefined ? { from } : {}), markdown: e.markdown }
+        w.putRecord({ collection: 'pages', id: e.id, visibility: token, body, rev: baseOf(body) ?? '' }, by, null)
+      }
+      // A private subpage already kept wider than the page is now is put at its level (never wider, R-L5-16.4).
+      for (const r of kept) {
+        if (r.visibility !== token && narrowerOrEqual(next, levelOfToken(r.visibility))) w.putRecord({ ...r, visibility: token }, by, null)
+      }
+      for (const row of ledger?.rows ?? []) w.putPending(row)
+    },
+    after: ratifiedApplied(s, ledger?.ratified ?? []),
+  }
+}
+// ── end DAO-OS L6 Task 7 ─────────────────────────────────────────────────────────────────────────────────────
+
 /** Write `files` and make the one commit; on any failure every file goes back to its bytes before, and the index with it. */
 async function commitFiles(repo: string, files: readonly FileWrite[], message: string, actor: KnownActor): Promise<string> {
   const trailers = { actor: actorTrailer(actor), rule: NARROW_RULE }
@@ -425,7 +589,7 @@ async function commitFiles(repo: string, files: readonly FileWrite[], message: s
     }
   }
   try {
-    for (const f of files) writeFileSync(join(repo, f.rel), f.text)
+    for (const f of files) { if (f.text === null) rmSync(join(repo, f.rel), { force: true }); else writeFileSync(join(repo, f.rel), f.text) }
     return await commitDataPaths(repo, files.map(f => f.rel), message, trailers, { ident: commitIdent(actor) })
   } catch (err) {
     const lost: string[] = []
@@ -438,6 +602,35 @@ async function commitFiles(repo: string, files: readonly FileWrite[], message: s
   }
 }
 const firstLine = (err: unknown) => (err instanceof Error ? err.message : String(err)).trim().split('\n')[0]
+
+
+// ── DAO-OS L6 §3.2 (merge M1): where Q77's `mayWrite` judges a workspace thing ──────────────────────────────────────
+
+/** The target lists Q77's `mayWrite` judges a narrowing of `t` at, as a write to it is judged (L6 §3.2): a page at its
+ *  tree, the store's pages included (`pageTargets` over the same entries `planPage` reads); a collection of class
+ *  `workspace` at its file's targets (a registry's own file, a custom or store-only private collection's
+ *  `data/collections/<id>.yaml`, R-1a). Undefined for anything else: its class judges it, as L5 has it. */
+export function writeTargets(repo: string, t: NarrowTarget, store: PrivateStore | null): string[][] | undefined {
+  if ('page' in t) {
+    const byId = pageEntries(gitPages(repo), store ? storeRead(store, () => store.records('pages')) : [])
+    const read = (p: string) => { const e = byId.get(p); return e ? { parent: e.parent ?? null } : null }
+    return [pageTargets(t.page, ancestorsOf(t.page, read))]
+  }
+  // Task 20 review I4 (PF-R99): a record the store keeps is judged at its own targets, as every route judges a private op
+  // (PF-R68, server/private/targets.ts): its collection's, and the agent layer's for Council memory.
+  if ('registry' in t && !knownOf(repo).has(t.registry)) {
+    return privateOpTargets({ op: 'update-record', collection: t.registry, id: t.id, set: {} }, treeReader(repo, store))
+  }
+  return collectionTargets(repo, 'registry' in t ? t.registry : t.collection)
+}
+
+/** A collection's targets (`writeTargets`); exported for GET /api/visibility `writable`, so one predicate draws the
+ *  control and judges the narrowing (Q77). */
+export function collectionTargets(repo: string, name: string): string[][] | undefined {
+  const def = registriesOf(repo).find(d => d.name === name)
+  const targets = targetsOfPath(def ? registryFileOf(def) : customFileOf(name), () => null)
+  return targets ? [targets] : undefined
+}
 
 /**
  * Narrow `input.target` to `input.level` (§9.7), as `actor`, judged with `deps.viewer` (hats read for the act). Refuses,
@@ -454,7 +647,9 @@ export async function narrow(repo: string, actor: KnownActor, input: NarrowInput
   const { store, why } = reach(deps.privateStore)
   const policy = readConfig(repo)
   const t = input.target
-  const plan = 'registry' in t
+  const plan = 'page' in t
+    ? planPage(repo, actor.id, t.page, next, deps.viewer, store, why, policy)
+    : 'registry' in t
     ? planRecord(repo, actor.id, t.registry, t.id, next, deps.viewer, store, why, policy)
     : t.field !== undefined
       ? planField(repo, actor.id, t.collection, t.field, next, deps.viewer, store, why, policy)
@@ -462,8 +657,13 @@ export async function narrow(repo: string, actor: KnownActor, input: NarrowInput
 
   // Who may narrow is who may write the thing (Q77): the predicate that draws the control (GET /api/visibility). Judged
   // after the plan, so a thing the actor may not read is still answered as one that is not there.
-  const registry = 'registry' in t ? t.registry : t.collection
-  const may = mayWrite(readRuleContext(repo, actor), registry)
+  // DAO-OS L6 (merge M1): a page, and a workspace collection, are judged at their targets (`writeTargets`).
+  const registry = 'page' in t ? 'pages' : 'registry' in t ? t.registry : t.collection
+  // Task 20 review I4 (PF-R99): a Council entry is judged as the memory route judges a write, then never narrowed alone.
+  if ('registry' in t) refuseCouncilNarrow(repo, actor, t.registry)
+  // L6 carries K2: Council memory's collection is judged as a write of its entries (at once, and at the agent layer's).
+  else if (!('page' in t) && t.field === undefined) judgeCouncilCollectionNarrow(repo, actor, t.collection)
+  const may = mayWrite(readRuleContext(repo, actor), registry, writeTargets(repo, t, store))
   if (may !== true) throw new Refusal(403, { code: 'MAY_NOT_WRITE', error: mayNotNarrow(registry, may) })
 
   await guardFiles(repo, plan.files.map(f => f.rel))
@@ -474,7 +674,10 @@ export async function narrow(repo: string, actor: KnownActor, input: NarrowInput
   assertGitSafe(repo, gitFiles(f => f.text), plan.policy, gitFiles(f => f.before?.toString('utf8') ?? null))
 
   const commitIt = async () => ({ commit: await commitFiles(repo, plan.files, plan.subject, actor) })
-  const answer = (commit: string): NarrowResult => ({ commit, moved: plan.moved })
+  const answer = (commit: string): NarrowResult => ({
+    commit, moved: plan.moved,
+    ...(plan.subpages !== undefined ? { subpages: plan.subpages, confirmation: PAGE_LEAVES_GIT(plan.subpages) } : {}),
+  })
   if (plan.before === null) return answer((await commitIt()).commit)
   const s = needStore(store, why)
   const before = plan.before

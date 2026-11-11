@@ -27,7 +27,7 @@ const has = (n: number | undefined) => (n ?? 0) > 0
 export function setupItems(s: SetupState): SetupItem[] {
   const add = (id: string, label: string, registry: string): SetupItem => ({ id, label, done: has(s.counts[id]), href: newRecordHref(registry, { steps: true }), act: 'Add' })
   return [
-    { id: 'door', label: 'Name and door', done: s.org !== null && s.org !== '', href: '/door', act: 'Open' },
+    { id: 'portal', label: 'Name and portal', done: s.org !== null && s.org !== '', href: '/portal', act: 'Open' },
     add('people', 'People', 'members'),
     { id: 'roles', label: 'Roles and who decides', done: s.rules > 0, href: '/governance/rules', act: 'Open' },
     add('projects', 'Projects', 'projects'),
@@ -88,7 +88,7 @@ export function SetupChecklist() {
             <span className="setup-l">{i.label}</span>
             {i.done
               ? <span className="sr-only">, done</span>
-              : i.href === '/door'
+              : i.href === '/portal'
                 ? <a className="setup-a" href={i.href} target="_blank" rel="noopener noreferrer">{i.act}<span className="sr-only">: {i.label} (opens in a new tab)</span></a>
                 : <Link className="setup-a" href={i.href}>{i.act}<span className="sr-only">: {i.label}</span></Link>}
           </li>

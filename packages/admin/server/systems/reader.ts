@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto'
 import { stateDir, fileSafe } from '../state.ts'
 import { str } from '../resources/util.ts'
 import type { Attention } from '../resources/types.ts'
-import { FAILED_READ_TTL_MS, READ_TIMEOUT_MS, guardedFetch, guardedPost, type ActionSpec, type Driver, type DriverContext, type DriverRead, type FetchLike, type OutcomeReading, type OutcomeRef, type Prepared, type PreparedAction, type PreparedStep, type ReadingState, type SystemRef } from './driver.ts'
+import { FAILED_READ_TTL_MS, READ_TIMEOUT_MS, guardedFetch, guardedPost, guardedText, type ActionSpec, type Driver, type DriverContext, type DriverRead, type FetchLike, type OutcomeReading, type OutcomeRef, type Prepared, type PreparedAction, type PreparedStep, type ReadingState, type SystemRef } from './driver.ts'
 import { readParams } from './actions.ts'
 import { chainsOf, prepareSafeTxs, safeAttach, withSafeApiKey } from './safe.ts'
 import { addressOf, caip10, sameAccount } from '../../lib/caip.mjs'
@@ -12,6 +12,7 @@ import { transition } from '../../lib/machines/run.mjs'
 import { reading } from '../../lib/machines/reading.mjs'
 import { CHAINS } from './chains.ts'
 import { inTree, normalHatId, parseHatRef, treeIdOf } from '../../lib/hats.mjs'
+import { isComposed } from '../../lib/compose.mjs'
 import { HostPacer } from './pacer.ts'
 import { DRIVERS } from './drivers.ts'
 import { readWearer, readWearers, type HatFact, type WearerReading, type WearersReading } from './hats.ts'
@@ -48,6 +49,8 @@ export interface SystemReaderOptions {
 }
 
 type System = Record<string, unknown>
+/** What `drive` reads of a driver: its name, hosts, pacing and time limit (a pseudo-driver has no `read`). */
+export type PseudoDriver = Pick<Driver, 'name' | 'hosts' | 'minGapMs' | 'timeoutMs'>
 /** A Safe transaction the safe driver would not prepare (a refusal in words, not a failed read). */
 class Refused extends Error {}
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
@@ -61,7 +64,10 @@ export type WearerRefusal = { ok: false; error: string; failed?: true }
  *  rejects: a failure is a read with `ok: false`, carrying the last good read so the page can show
  *  its age. */
 export class SystemReader {
-  private cache = new Map<string, { key: string; at: number; read: DriverRead }>()
+  private cache = new Map<string, { key: string; config: string; at: number; read: DriverRead }>()
+  /** The last good read of each system and the entry it was read under, kept apart from the TTL cache (which the tick
+   *  clears): what Sources shows, with its age, while a re-read runs (DAO-OS L6 Tasks 13–14 review M5). */
+  private good = new Map<string, { config: string; read: DriverRead }>()
   private inflight = new Map<string, { key: string; promise: Promise<DriverRead> }>()
   private pacer = new HostPacer()
   private states = new Map<string, ReadingState>()
@@ -87,6 +93,17 @@ export class SystemReader {
     if (r.ok) this.states.set(id, r.state as ReadingState)
   }
 
+  /** The read this reader last cached for `systemId` (any age, good or failed), else its last good read, with its state;
+   *  null when it holds none read under `system` as that entry is now (a read of an edited entry, another address, is
+   *  not this System's). Never asks a driver: what the Sources page and the from mark show (DAO-OS L6 §10, Task 14) is
+   *  what was read. */
+  cached(systemId: string, system: System): DriverRead | null {
+    const config = JSON.stringify(system)
+    const hit = this.cache.get(systemId)
+    const read = hit && hit.config === config ? hit.read : this.good.get(systemId)?.config === config ? this.good.get(systemId)!.read : null
+    return read ? { ...read, state: this.stateOf(systemId) } : null
+  }
+
   /** Where this system's reads stand. A fresh read whose cache entry is gone or past the TTL reads
    *  as aged (P4a ruling 8). */
   stateOf(systemId: string): ReadingState {
@@ -104,6 +121,11 @@ export class SystemReader {
 
   async read(system: System, members: Record<string, unknown>[] = []): Promise<DriverRead> {
     const id = String(system.id)
+    // A composed System is a plan: no driver, no request, nothing cached (L7 §4).
+    if (isComposed(system)) {
+      const read: DriverRead & { note: string } = { ok: true, readAt: null, facts: { composed: true }, sections: [], open: null, note: 'Composed, not deployed' }
+      return read
+    }
     // An edited entry, or a signer's new address, is read again at once.
     const key = JSON.stringify([system, members.map(m => (m.handles as Record<string, unknown> | undefined)?.address ?? null)])
     const at = this.now().getTime()
@@ -121,7 +143,9 @@ export class SystemReader {
         // A read overtaken by one of an edited entry is answered to its callers but not cached,
         // and does not move the state: the read that is cached does.
         if (this.inflight.get(id) === mine) {
-          this.cache.set(id, { key, at, read })
+          const config = JSON.stringify(system)
+          this.cache.set(id, { key, config, at, read })
+          if (read.ok) this.good.set(id, { config, read })
           this.move(id, read.ok ? 'GOT' : 'FAILED')
         }
         return read
@@ -156,6 +180,7 @@ export class SystemReader {
    * `ok: false`, which the caller shows as attention. Nothing is written here.
    */
   async outcome(system: System, ref: OutcomeRef, opened: string): Promise<OutcomeReading> {
+    if (isComposed(system)) return { ok: false, error: 'Composed, not deployed' }
     const drivers = this.opts.drivers ?? DRIVERS
     const name = str(system.driver) ?? 'link'
     const driver = drivers.find(d => d.name === name)
@@ -185,6 +210,7 @@ export class SystemReader {
    * `ok: false`; a read that could not be made is `ok: false` with `failed: true`. Posts nothing, writes nothing.
    */
   async prepare(system: System, input: Parameters<NonNullable<Driver['prepare']>>[1]): Promise<Prepared | { ok: false; error: string; failed: true }> {
+    if (isComposed(system)) return { ok: false, failed: true, error: 'Composed, not deployed' }
     const drivers = this.opts.drivers ?? DRIVERS
     const name = str(system.driver) ?? 'link'
     const driver = drivers.find(d => d.name === name)
@@ -230,6 +256,7 @@ export class SystemReader {
    *  hat made since is not asked about until the tree is read again. A refusal is a plain `ok: false`; a read that
    *  could not be made (the tree unreadable, the network failing, no network) adds `failed: true`. Never rejects. */
   async wearer(system: System, account: string): Promise<WearerReading | WearerRefusal> {
+    if (isComposed(system)) return { ok: false, error: 'Composed, not deployed' }
     const driver = this.hatsDriver(system)
     if (!('name' in driver)) return driver
     let who: string
@@ -245,6 +272,7 @@ export class SystemReader {
    *  tree and a hat outside it (`hat` a hat ref or a bare hat id), in words and without a request. A refusal is a plain
    *  `ok: false`; a read that could not be made adds `failed: true`. Never rejects. */
   async wearers(system: System, hat: string): Promise<WearersReading | WearerRefusal> {
+    if (isComposed(system)) return { ok: false, error: 'Composed, not deployed' }
     const driver = this.hatsDriver(system)
     if (!('name' in driver)) return driver
     const tree = treeIdOf(system.address)
@@ -272,6 +300,7 @@ export class SystemReader {
    * nothing is signed, sent or written.
    */
   async prepareAction(system: System, input: { proposal: { classes: readonly string[] }; action: string; params: unknown }, via: System | null): Promise<PreparedAction> {
+    if (isComposed(system) || (via !== null && isComposed(via))) return { ok: false, error: 'Composed, not deployed' }
     const drivers = this.opts.drivers ?? DRIVERS
     const name = str(system.driver) ?? 'link'
     const driver = drivers.find(d => d.name === name)
@@ -337,7 +366,19 @@ export class SystemReader {
   /** Run one driver call with the network it may have: `guardedFetch` to its declared hosts, paced per host, cut off
    *  at the read's time limit (which starts when its first request leaves the queue). Throws what the call throws, or
    *  the time limit's sentence. */
-  private async drive<T>(driver: Driver, members: Record<string, unknown>[], run: (ctx: DriverContext) => Promise<T>, system: System = {}): Promise<T> {
+  /**
+   * Reads that are not one System's (DAO-OS L7 Task 11: a composition's deployment, read as the pseudo-driver `deploy`),
+   * run on the same terms as a driver's read: the pseudo-driver's declared hosts only (and configured RPC hosts), paced
+   * per host with every other read of that host, cut off at its time limit. Never cached, nothing kept on disk; posts
+   * only reads (`postJson`'s guard). Throws what `run` throws, the time limit's sentence, or, with no network given,
+   * "this reader was given no network access".
+   */
+  async readAs<T>(driver: PseudoDriver, run: (ctx: DriverContext) => Promise<T>): Promise<T> {
+    if (driver.hosts.length > 0 && !this.opts.fetch) throw new Error('this reader was given no network access')
+    return this.drive(driver, [], run)
+  }
+
+  private async drive<T>(driver: PseudoDriver, members: Record<string, unknown>[], run: (ctx: DriverContext) => Promise<T>, system: System = {}): Promise<T> {
     const declared = driver.timeoutMs?.(system)
     const timeoutMs = this.opts.timeoutMs ?? (typeof declared === 'number' && Number.isFinite(declared) && declared > 0 ? declared : READ_TIMEOUT_MS)
     const queueLimitMs = this.opts.queueLimitMs ?? QUEUE_LIMIT_MS
@@ -385,7 +426,7 @@ export class SystemReader {
     const timeLeftMs = () => timeoutMs - (started === null ? 0 : Date.now() - started)
     try {
       return await Promise.race([
-        run({ fetchJson: guardedFetch(driver, fetch, controller.signal), postJson: guardedPost(driver, fetch, controller.signal, rpc), rpcUrl, now: () => this.now(), members, sleep, timeLeftMs }),
+        run({ fetchJson: guardedFetch(driver, fetch, controller.signal), fetchText: guardedText(driver, fetch, controller.signal), postJson: guardedPost(driver, fetch, controller.signal, rpc), rpcUrl, now: () => this.now(), members, sleep, timeLeftMs }),
         failure,
       ])
     } finally {

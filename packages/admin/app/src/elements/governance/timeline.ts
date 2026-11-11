@@ -31,6 +31,15 @@ function dateOf(iso: unknown): string {
   return Number.isNaN(d.getTime()) ? '' : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 const joined = (...parts: (string | null | undefined | false)[]) => parts.filter(Boolean).join(' · ')
+/** A date in its words inside `<time datetime=…>` (the route shots mask a time), then the rest of the line after " · ";
+ *  the line's words are what `joined` would say. */
+function dated(iso: unknown, ...rest: (ReactNode | null | undefined | false)[]): ReactNode {
+  const words = dateOf(iso)
+  const tail = rest.filter((r): r is ReactNode => r !== null && r !== undefined && r !== false && r !== '')
+  if (words === '') return tail.length === 0 ? undefined : createElement('span', null, ...tail.flatMap((r, i) => (i === 0 ? [r] : [' · ', r])))
+  const time = createElement('time', { dateTime: String(iso) }, words)
+  return createElement('span', null, time, ...tail.flatMap(r => [' · ', r]))
+}
 const names = (chains: string[]) => [...new Set(chains.map(chainName))].join(', ')
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -72,7 +81,7 @@ function approvalsStep(view: ProposalView, people: Part[], actor: string | null)
   const missing = people.find(p => p.evaluation.state !== 'met')?.evaluation.missing
   if (!met && closed) {
     const by = str(record(view.closed).by)
-    const line = view.state === 'withdrawn' && by ? `${by} withdrew it` : missing || view.evaluation.missing
+    const line = view.state === 'withdrawn' && by ? `${view.names?.[by] ?? by} withdrew it` : missing || view.evaluation.missing
     return { step: { id: 'approvals', title: closed, state: 'failed', line, ...withMeter }, met }
   }
   if (met) return { step: { id: 'approvals', title, state: 'done', ...withMeter }, met }
@@ -83,10 +92,11 @@ function approvalsStep(view: ProposalView, people: Part[], actor: string | null)
 }
 
 /** When the people decided: the closing of a ratified proposal, else the last approval or ballot at its rev. */
-function decidedAt(view: ProposalView): string {
-  if (view.state === 'ratified') return dateOf(record(view.closed).at)
+/** When the decision was made, as its record or the last approval says it (the ISO time, unread when none). */
+function decidedAt(view: ProposalView): unknown {
+  if (view.state === 'ratified') return record(view.closed).at
   const said = (view.events as unknown as Record<string, unknown>[]).filter(e => e.rev === view.rev && (e.kind === 'approve' || e.kind === 'vote'))
-  return said.length > 0 ? dateOf(said.at(-1)!.at) : ''
+  return said.length > 0 ? said.at(-1)!.at : undefined
 }
 
 /** How one chain's transaction stands for signing, and for reading back. */
@@ -152,13 +162,14 @@ function chainSteps(prepared: PreparedView[], decided: boolean): Step[] {
  *  read back. With nothing prepared and only records changed, no transaction is needed. */
 export function timelineOf(view: ProposalView, prepared: PreparedView[], actor: string | null): Step[] {
   const people = view.evaluation.parts.filter(p => !bySystem(p))
-  const proposed: Step = { id: 'proposed', title: 'Proposed', state: 'done', line: joined(dateOf(view.opened), String(view.author ?? '')) }
+  const author = String(view.author ?? '')
+  const proposed: Step = { id: 'proposed', title: 'Proposed', state: 'done', line: dated(view.opened, view.names?.[author] ?? author) }
   const { step: approvals, met } = approvalsStep(view, people, actor)
   const decision = str(record(view.closed).decision)
   const decided: Step = met
     ? { id: 'decided', title: 'Decided', state: 'done',
-        line: people.length === 0 ? undefined : createElement('span', null, joined(decidedAt(view), people.length === 1 ? 'rule met' : 'every rule met'),
-          decision ? ' · ' : null, decision ? createElement('span', { className: 'mono' }, decision) : null) }
+        line: people.length === 0 ? undefined : dated(decidedAt(view), people.length === 1 ? 'rule met' : 'every rule met',
+          decision ? createElement('span', { className: 'mono' }, decision) : null) }
     : { id: 'decided', title: 'Decided', state: 'waiting' }
 
   // the people said no (or it closed without them): nothing after them will happen (review M-2); the signed step still

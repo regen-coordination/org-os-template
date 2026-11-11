@@ -16,23 +16,24 @@
 // It never runs generate:schemas (P2-R20), never fetches (P2-R31) and never pushes. Callers hold the write lock.
 
 import { narrowedOps, narrowedSinceProposed } from '../private/guard.ts'
-import { readConfig } from '../visibility/config.ts'
+import { commitPolicy, readConfig } from '../visibility/config.ts'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { parse } from 'yaml'
 import { HttpError } from '../errors.ts'
 import { commitIdent, type Actor } from '../actor.ts'
 import { Refusal } from '../changes/apply.ts'
 import { MachineRefusal } from '../machines.ts'
-import { parseRecord } from '../changes/records.ts'
+import { fileOfRecord } from '../../lib/registries.mjs'
 import { entriesFromText } from '../registry.ts'
-import { REGISTRIES } from '../registries.ts'
+import { registriesOf, registryFileOf } from '../registries.ts'
 import {
   authorEmail, commitMerge, isAncestor, moveProposalBranch, mergeAbort, mergeInProgress, mergeNoFf, resolveRev, showFile,
   stageMergeFiles, stagedNames, trackedChanges, unmergedPaths, type CommitOptions, type GitIdent, type MergeStart,
 } from '../git.ts'
-import { buildBranch, buildFailureWords, type BranchProposal, type BuildResult } from './branch.ts'
+import { buildBranch, buildFailureWords, landingOps, type BranchProposal, type BuildResult } from './branch.ts'
+import { LANDING, refuseOutsideOpened, refuseRaisedPrivate, refuseRaisedTargets } from './opened.ts'
 import { closedLedgerText, readLedger, type LedgerOptions } from './ledger.ts'
 import { closingPreflight } from './preflight.ts'
 import { canWrite, judgedBy, machineContext } from './events.ts'
@@ -51,9 +52,19 @@ import { transition } from '../../lib/machines/run.mjs'
 import { proposal as machine, proposalGuards } from '../../lib/machines/proposal.mjs'
 import { HOUSE_IDENT, type TrailerValues } from '../../lib/trailers.mjs'
 import { gitOpsOf } from '../../lib/ops.mjs'
-import { applyPrivate, aroundGit, clearsOf, noStore, reach, STORE_FAILED, unavailable, type PrivateAccess, type StagedPrivateOp } from '../private/ops.ts'
-import { decidedWrites, pendingOps, placeholdersOf } from '../private/proposals.ts'
+import { applyPrivate, aroundGit, clearsOf, isNoStore, noStore, reach, STORE_FAILED, unavailable, type PrivateAccess, type StagedPrivateOp } from '../private/ops.ts'
+import { strictPrivateReads } from '../private/reads.ts'
+import { Levels } from '../visibility/gate.ts'
+import { appliedChainHeldErrors, systemsTouched } from '../deploy/private-flip.ts'
+import { decidedWrites, pendingOps, placeholdersOf, PRIVATE_STALE } from '../private/proposals.ts'
+import { assertGitSafe } from '../private/guard.ts'
+import { movedWrites } from '../private/ops.ts'
+import { privateTargetsOf } from '../private/targets.ts'
+import { movedTexts, planMoves, type PlannedMove } from '../workspace/move.ts'
+import { keptPageIds } from '../workspace/files.ts'
+import { StageError } from '../../lib/ops.mjs'
 import type { StageOp } from '../changes/types.ts'
+import { goneOfOps, targetsGone } from '../workspace/gone.ts'
 
 const LEDGER = 'data/proposals.yaml'
 const GOVERNANCE = 'data/governance.yaml'
@@ -72,8 +83,9 @@ export interface DecisionRow {
 export interface RatifyTexts { proposals: string; governance: string; decisions: string | null }
 
 export interface RatifyPlan {
-  /** The new texts, in the order they are written. */
-  files: { path: string; text: string }[]
+  /** The new texts, in the order they are written. `fresh`: a file the branch does not hold (DAO-OS L6 §12, a record or
+   *  page moved into git), so the merge's working tree has none and the rollback removes it. */
+  files: { path: string; text: string; fresh?: boolean }[]
   /** What the merge may stage: the files the ops name and the ledger files (spec §3.8 step 7). */
   allowed: string[]
   decision: DecisionRow
@@ -131,6 +143,8 @@ export interface RatifyResult {
 }
 
 const seconds = (d: Date): string => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+/** The walk review's G2 b: a proposal that would change what the chain holds of a deployed System, said naming none. */
+export const CHAIN_HELD_AT_RATIFY = 'Not ratified: this proposal changes what the chain holds of a deployed System, which is changed on the chain and then read back. Nothing was written.'
 const refuse = (status: 400 | 403 | 409 | 422 | 500 | 503, code: string, error: string, more: Record<string, unknown> = {}): Refusal =>
   new Refusal(status, { code, error, ...more })
 const firstLine = (err: unknown): string => (err instanceof Error ? err.message : String(err)).trim().split('\n')[0] ?? ''
@@ -239,7 +253,10 @@ export function planRatify(input: { id: string; actor: string; now: Date; evalua
     files.push({ path: DECISIONS, text: md.text })
   }
   // The git ops' files: a private placeholder names none (L5 §9.6).
-  const opsFiles = gitOpsOf(entry.ops ?? []).map(op => `data/${parseRecord(op.record).registry}.yaml`)
+  // A file op (L6 §11.2) names its own file.
+  // A record op's file is its registry's own, a custom collection's data/collections/<id>.yaml (L6 §7.1, ruling R-2b), a
+  // knowledge record's its kind's data/kb/<type>.yaml (Task 10).
+  const opsFiles = gitOpsOf(entry.ops ?? []).map(op => (op.op === 'file' ? op.path : fileOfRecord(String(op.record))))
   return {
     ok: true,
     plan: {
@@ -262,16 +279,22 @@ export async function newProblems(repo: string, commit: string, plan: { files: {
   const scratch = mkdtempSync(join(tmpdir(), 'ratify-tree-'))
   try {
     mkdirSync(join(scratch, 'data'))
-    for (const def of REGISTRIES) {
-      const rel = `data/${def.name}.yaml`
+    // Every registry's file, a custom collection's in its own folder (L6 §7.1).
+    for (const def of registriesOf(repo)) {
+      const rel = registryFileOf(def)
       let text: string
       try { text = await showFile(repo, commit, rel) } catch { continue }
+      mkdirSync(join(scratch, rel, '..'), { recursive: true })
       writeFileSync(join(scratch, rel), text)
     }
     const key = (p: { file?: string; id?: string; path: string; message: string }) => `${p.file}|${p.id ?? ''}|${p.path}|${p.message}`
     const errors = () => validate(scratch).filter(p => p.level === 'error')
     const before = new Set(errors().map(key))
-    for (const f of plan.files) if (f.path.startsWith('data/')) writeFileSync(join(scratch, f.path), f.text)
+    for (const f of plan.files) {
+      if (!f.path.startsWith('data/')) continue
+      mkdirSync(join(scratch, f.path, '..'), { recursive: true })
+      writeFileSync(join(scratch, f.path), f.text)
+    }
     return errors().filter(p => !before.has(key(p))).map(p => ({ file: String(p.file), path: p.path, message: p.message }))
   } finally {
     rmSync(scratch, { recursive: true, force: true })
@@ -292,7 +315,8 @@ export async function applyRatifyMerge(repo: string, at: { trunk: string; commit
   const abort = deps.abort ?? mergeAbort
   const stage = deps.stage ?? stageMergeFiles
   const commitIt = deps.commit ?? ((r: string, m: string, a: string[], t: TrailerValues, o?: CommitOptions) => commitMerge(r, m, a, t, o))
-  const write = deps.write ?? ((path: string, text: string) => writeFileSync(path, text))
+  // A fresh file (L6 §12) may be the first in its folder (pages/).
+  const write = deps.write ?? ((path: string, text: string) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text) })
   const show = deps.show ?? showFile
   const staged = deps.staged ?? stagedNames
   const unmerged = deps.unmerged ?? unmergedPaths
@@ -345,6 +369,12 @@ export async function applyRatifyMerge(repo: string, at: { trunk: string; commit
     for (const f of plan.files) {
       const path = join(repo, f.path)
       const working = existsSync(path) ? readFileSync(path) : null
+      if (f.fresh) {
+        if (working !== null) {
+          return await undo(409, 'TREE_DIFFERS', `after the merge, ${f.path} is in the working tree, where the branch has none, so ratify will not write over it`)
+        }
+        continue
+      }
       const blob = Buffer.from(await show(repo, commit, f.path), 'utf8')
       if (working === null || !working.equals(blob)) {
         return await undo(409, 'TREE_DIFFERS', `after the merge, ${f.path} in the working tree differs from the branch's ${f.path} (a conversion of line endings, or a filter, changed it), so ratify will not guess which to write`)
@@ -363,7 +393,11 @@ export async function applyRatifyMerge(repo: string, at: { trunk: string; commit
     } catch (err) {
       const lost: string[] = []
       for (const p of written) {
-        try { writeFileSync(join(repo, p), rollback.get(p) as Buffer) } catch { lost.push(p) }
+        try {
+          const was = rollback.get(p)
+          if (was === undefined) rmSync(join(repo, p), { force: true }) // a fresh file (§12): the merge had none
+          else writeFileSync(join(repo, p), was)
+        } catch { lost.push(p) }
       }
       try { await stage(repo, written, plan.allowed) } catch { /* the bytes are back; the index still holds the merge's own text */ }
       return await undo(503, 'RATIFY_UNDONE', `${written.at(-1)} could not be written or staged (${firstLine(err)})` +
@@ -541,13 +575,59 @@ export async function ratify(repo: string, actor: KnownActor, id: string, deps: 
   const held = placeholdersOf(entry.ops as unknown[])
   const { store: privateStore, why } = reach(deps.privateStore ?? noStore)
   if (held.length > 0 && !privateStore) throw unavailable(why)
+  // What the chain holds of a System is judged on the whole below; a store configured but not reached cannot be read for
+  // it, so a proposal touching a System is the store's 503 (the walk review's G2, carry-in 2). No store at all: git alone.
+  if (!privateStore && !isNoStore(why) && systemsTouched(gitOpsOf(entry.ops) as StageOp[], []).length > 0) throw unavailable(why)
+  // A file op never writes a page the private store keeps (Task 20 review C1, PF-R95): one that left the repository after
+  // this was proposed, or whose id the store holds, is not made again in git by the merge. The words name nothing private.
+  const [kept] = keptPageIds(repo, privateStore, gitOpsOf(entry.ops))
+  if (kept) throw refuse(409, 'NO_PAGE', `Not ratified: there is no page ${kept.id} in the repository for proposal ${id} to write. ${nothing}`)
   const privateOps: StagedPrivateOp[] = held.length > 0 ? pendingOps(privateStore!, entry) : []
   // A git record the proposal deletes takes its restricted fields with it, when the store can be reached (R-L5-14.3).
   const clears = privateStore ? clearsOf(gitOpsOf(entry.ops) as StageOp[]) : []
+  // DAO-OS L6 §12 (Task 11): the private records and pages this proposal moves into git, planned against the store and the
+  // trunk as they are now, nobody's admission asked again (R-L5-15.3). One that no longer applies (gone, changed into what
+  // cannot move, its id taken by the trunk) is PRIVATE_STALE, which names nothing.
+  // Split, and judged by rule 4, under the stricter of the policy now and the one the merge leaves (Task 11 review I-4).
+  const policy = commitPolicy(repo, gitOpsOf(entry.ops))
+  const staleMove = (err: unknown): never => {
+    if (err instanceof StageError || (err instanceof Refusal && err.status === 409)) throw new Refusal(409, { code: 'PRIVATE_STALE', error: PRIVATE_STALE })
+    throw err
+  }
+  let moves: PlannedMove[] = []
+  if (privateOps.length > 0) { try { moves = planMoves(repo, privateStore!, privateOps, policy, null) } catch (err) { staleMove(err) } }
 
   // 2. the branch, rebuilt on the trunk tip when it stands elsewhere; then "already in the trunk"; then C^ = T
   const trunk = await resolveRev(repo, 'HEAD')
   if (trunk === null) throw new HttpError(409, 'This repository has no commit yet, so there is no trunk to ratify on.')
+  // PF-R4: the ops as they will land on the trunk, judged again for the classes the proposal was opened for (a ledger an
+  // older replay re-based without this judgement, a trunk that moved a record into the floor's reach). Stale ops are left to
+  // the build, which refuses them.
+  const landing = await landingOps(repo, trunk, entry.ops)
+  if (!landing.stale) refuseOutsideOpened(repo, entry, landing.ops, held.map(h => String(h.class)), { not: 'Not ratified', instead: LANDING })
+  // What the chain holds of a deployed System, judged on the whole (git and the store, the git part as it lands and the
+  // private part as the store holds it) before anything is built (the walk review's G2 b, carry-in 2): the private part is
+  // applied here outside applyAs, and a System the store came to hold as deployed since Propose is judged now. 422, in a
+  // sentence naming no System or field: whether one is deployed may be kept from the ratifier (PF-R242).
+  if (!landing.stale) {
+    const lv = new Levels(repo, undefined, undefined, strictPrivateReads(privateStore ? () => privateStore : (deps.privateStore ?? noStore)))
+    if (appliedChainHeldErrors(repo, lv, landing.ops, privateOps).length > 0) throw refuse(422, 'CHAIN_HELD', CHAIN_HELD_AT_RATIFY)
+  }
+  // A move's git op is judged as it will land (L6 §12, Task 11): at its classes and, read now, where it lands (Task 11 review
+  // I-2: a tree raised since Propose). A refusal names nothing, as the ratifier may not be admitted to it (M-5): PRIVATE_STALE.
+  // Its restricted part is judged where it stands now too (Task 15 review I-1, as a move is): at its own targets, against
+  // data/governance.yaml as it is. A refusal names nothing: PRIVATE_STALE.
+  if (privateOps.length > 0) {
+    try { refuseRaisedPrivate(repo, entry, privateTargetsOf(repo, privateStore!, privateOps), { not: 'Not ratified', instead: LANDING }) } catch (err) { staleMove(err) }
+  }
+  if (moves.length > 0) {
+    const moved = moves.map(m => m.git as StageOp)
+    const words = { not: 'Not ratified', instead: LANDING }
+    try {
+      refuseOutsideOpened(repo, entry, moved, held.map(h => String(h.class)), words)
+      refuseRaisedTargets(repo, entry, moved, words)
+    } catch (err) { staleMove(err) }
+  }
   const ref = `refs/heads/proposal/${id}`
   const tip = await resolveRev(repo, ref)
   // Hosted, a branch whose tip the Hub did not author (built before the instance moved to hosting, L9 §5.5) is built again.
@@ -593,6 +673,17 @@ export async function ratify(repo: string, actor: KnownActor, id: string, deps: 
   // 4. every new text, then the whole tree, validated before anything is written
   const planned = planRatify({ id, actor: actor.id, now, evaluation, texts, as: deps.as, checked })
   if (!planned.ok) throw refuse(409, 'CANNOT_RECORD', `Not ratified: ${planned.reason} ${nothing}`)
+  // The moves' files join the merge's (L6 §12): each written on the branch's text, judged by rule 4 before it is written.
+  if (moves.length > 0) {
+    let moved: Awaited<ReturnType<typeof movedTexts>> = []
+    try { moved = await movedTexts(repo, commit, moves) } catch (err) { staleMove(err) }
+    assertGitSafe(repo, moved.map(f => ({ path: f.path, text: f.text })), policy,
+      moved.flatMap(f => (f.before === null ? [] : [{ path: f.path, text: f.before }])))
+    planned.plan.files.push(...moved.map(f => ({ path: f.path, text: f.text, ...(f.before === null ? { fresh: true } : {}) })))
+    planned.plan.allowed = unique([...planned.plan.allowed, ...moved.map(f => f.path)])
+    // Named in the merge (Task 11 review I-3), so validate:governance accepts exactly these creates.
+    planned.plan.trailers = { ...planned.plan.trailers, moved: moves.map(m => `${m.collection}:${m.id}`).join(', ') }
+  }
   const problems = await newProblems(repo, commit, planned.plan, deps.validate)
   if (problems.length > 0) {
     throw refuse(422, 'INVALID', `Not ratified: the trunk would not hold valid data after this ratification (${problems[0]!.file}: ${problems[0]!.message}). ${nothing}`, { errors: problems })
@@ -602,11 +693,22 @@ export async function ratify(repo: string, actor: KnownActor, id: string, deps: 
   // private ops written under the decision, the proposal's `pending` rows dropped, then the merge, then `applied` with the
   // merge commit. A merge that fails rolls the store back. A store that fails after the merge was committed leaves the
   // proposal ratified and its private part unapplied, which the next start applies (`reconcilePrivate`).
-  const merge = () => applyRatifyMerge(repo, { trunk, commit, plan: planned.plan, ident: commitIdent(actor) }, git)
+  // DAO-OS L6 R-9a (Task 9): what the merge deletes from git, read before it; its conversation goes once the merge is made.
+  let gone: string[] = []
+  try { gone = goneOfOps(repo, gitOpsOf(entry.ops) as StageOp[]) } catch { gone = [] }
+  const merge = async () => {
+    const sha = await applyRatifyMerge(repo, { trunk, commit, plan: planned.plan, ident: commitIdent(actor) }, git)
+    targetsGone(repo, gone)
+    return sha
+  }
   const merged = privateStore && privateOps.length + clears.length > 0
     ? await aroundGit(privateStore, {
       before: w => {
         applyPrivate(w, decidedWrites(privateStore, [...clears, ...privateOps]), actor.id, null, privateStore, planned.plan.decision.id)
+        // The moved records leave the store under the decision (§12); one changed since it was planned is PRIVATE_STALE.
+        let gone: ReturnType<typeof movedWrites> = []
+        try { gone = movedWrites(privateStore, moves) } catch (err) { staleMove(err) }
+        applyPrivate(w, gone, actor.id, null, privateStore, planned.plan.decision.id)
         if (held.length > 0) w.deletePending(id)
       },
       git: merge,

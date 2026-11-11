@@ -44,8 +44,9 @@ class Lines {
   }
 }
 
-/** Where each `key: value` pair of a block-style entity sits in the source. */
-function layoutOf(text: Lines, item: YAMLMap): Layout | null {
+/** Where each `key: value` pair of a block-style entity sits in the source. An entity of a list starts on its `- `
+ *  line; one of a map (`inMap`, L6 §7.1) starts on a line of its own under its key. */
+function layoutOf(text: Lines, item: YAMLMap, inMap = false): Layout | null {
   if (item.flow || !item.range || item.items.length === 0) return null
   const pairs: PairSpan[] = []
   let prefix = ''; let keyCol = -1
@@ -55,7 +56,7 @@ function layoutOf(text: Lines, item: YAMLMap): Layout | null {
     const first = text.lineOf(key.range[0]); const col = text.colOf(key.range[0])
     const before = text.lines[first]!.slice(0, col)
     if (pairs.length === 0) {
-      if (!/^\s*-\s+$/.test(before)) return null
+      if (!(inMap ? /^\s*$/ : /^\s*-\s+$/).test(before)) return null
       prefix = before; keyCol = col
     } else if (col !== keyCol || before.trim() !== '' || first <= pairs.at(-1)!.last) {
       return null
@@ -84,11 +85,12 @@ const indent = (lines: string[], by: string) => lines.map(l => (l === '' ? l : b
 
 /**
  * `item` is the entity as parsed from `src`; `mutated` is the same node after
- * the edit. `changed` names the keys whose value is new or different.
+ * the edit. `changed` names the keys whose value is new or different. `inMap`:
+ * the entity is the value of a map entry (L6 §7.1), not an item of a list.
  */
-export function spliceUpdate(src: string, item: YAMLMap, mutate: () => Set<string>): string | null {
+export function spliceUpdate(src: string, item: YAMLMap, mutate: () => Set<string>, inMap = false): string | null {
   const text = new Lines(src)
-  const layout = layoutOf(text, item) // read before mutating: ranges describe `src`
+  const layout = layoutOf(text, item, inMap) // read before mutating: ranges describe `src`
   const changed = mutate()
   if (!layout) return null
   const byKey = new Map(layout.pairs.map((p, i) => [p.key, i]))
@@ -98,7 +100,7 @@ export function spliceUpdate(src: string, item: YAMLMap, mutate: () => Set<strin
     const key = isScalar(pair.key) ? String(pair.key.value) : typeof pair.key === 'string' ? pair.key : null
     if (key === null) return null
     const at = byKey.get(key)
-    if (n === 0 && at !== 0) return null // the `- ` line must stay the first key's
+    if (!inMap && n === 0 && at !== 0) return null // the `- ` line must stay the first key's
     if (at === undefined) { // a key the entity did not have
       out.push(...indent(renderPair(pair as Pair), ' '.repeat(layout.keyCol)))
       continue
@@ -149,6 +151,45 @@ export function spliceDelete(src: string, seq: YAMLSeq, index: number): string |
   return lines.join('\n')
 }
 
+/** The lines a map entry (`key:` and its value) occupies, and the column of its key. */
+function pairSpan(text: Lines, pair: unknown): (Span & { keyCol: number }) | null {
+  const { key, value } = pair as Pair<unknown, { range?: [number, number, number] | null } | null>
+  if (!isScalar(key) || !key.range) return null
+  const first = text.lineOf(key.range[0]); const keyCol = text.colOf(key.range[0])
+  if (text.lines[first]!.slice(0, keyCol).trim() !== '') return null
+  return { first, last: Math.max(first, text.lastLineBefore(value?.range?.[1] ?? key.range[1])), keyCol }
+}
+
+/** Append the entry `key: value` after the last entry of a non-empty block map (L6 §7.1), at its keys' column. */
+export function spliceCreateKey(src: string, map: YAMLMap, key: string, value: Record<string, unknown>): string | null {
+  if (map.flow || map.items.length === 0) return null
+  const text = new Lines(src)
+  const tail = pairSpan(text, map.items.at(-1))
+  if (!tail) return null
+  const entry = new YAMLMap()
+  const doc = new Document()
+  entry.set(doc.createNode(key), doc.createNode(value))
+  doc.contents = entry
+  const rendered = doc.toString(STRINGIFY).replace(/\n$/, '').split('\n')
+  const lines = [...text.lines]
+  lines.splice(tail.last + 1, 0, ...indent(rendered, ' '.repeat(tail.keyCol)))
+  return lines.join('\n')
+}
+
+/** Remove the map entry at `index` (L6 §7.1), with the comment lines directly above it. */
+export function spliceDeleteKey(src: string, map: YAMLMap, index: number): string | null {
+  if (map.flow || map.items.length < 2) return null
+  const text = new Lines(src)
+  const span = pairSpan(text, map.items[index])
+  if (!span) return null
+  let { first } = span
+  while (first > 0 && /^\s*#/.test(text.lines[first - 1]!)) first--
+  const lines = [...text.lines]
+  lines.splice(first, span.last - first + 1)
+  if (first > 0 && lines[first - 1]!.trim() === '' && (lines[first] ?? '').trim() === '') lines.splice(first - 1, 1)
+  return lines.join('\n')
+}
+
 /** Append `value` as one flow-style line (`- { a: 1, b: 2 }`) after the last item of a non-empty block list,
  *  whatever kind of node that item is, at the indentation of its dash. Every other line stays as it is. Null
  *  when the list is flow or empty, or its last item is not led by a dash on its own line. */
@@ -166,7 +207,8 @@ export function spliceAppendFlow(src: string, seq: YAMLSeq, value: unknown): str
   return lines.join('\n')
 }
 
-/** `value` as flow-style YAML on one line, never folded. */
+/** `value` as flow-style YAML on one line, never folded. A string of several lines (a file op's text, DAO-OS L6 §11.2) is
+ *  written double-quoted on one line, its line ends escaped (JSON's escapes): a block scalar cannot stand inside a flow line. */
 export function flowText(value: unknown): string {
-  return new Document(value).toString({ ...STRINGIFY, collectionStyle: 'flow', flowCollectionPadding: true }).replace(/\n$/, '')
+  return new Document(value).toString({ ...STRINGIFY, collectionStyle: 'flow', flowCollectionPadding: true, blockQuote: false, doubleQuotedAsJSON: true }).replace(/\n$/, '')
 }

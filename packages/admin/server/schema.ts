@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
 import { readRegistry, registryPath, type Entity } from './registry.ts'
-import { loadSchema as loadSchemaFile, validateEntry, referenceErrors, referrersOf, addressability } from '../lib/data-validate.mjs'
+import { loadSchema as loadSchemaFile, validateEntry, referenceErrors, referrersOf, addressability, REFS } from '../lib/data-validate.mjs'
+import { refsOf, schemaOf } from '../lib/workspace/collections.mjs'
+import { customDefinition, registriesOf } from './registries.ts'
 
 export interface FieldError { field: string; message: string }
 export interface ValidationResult { valid: boolean; errors: FieldError[] }
@@ -28,6 +30,16 @@ function entriesThrough(repo: string, registry: string, overlay?: Overlay): Enti
 
 export interface Referrer { registry: string; id: string; field: string }
 
+/** The reference table of the instance at `repo`: lib/data-validate.mjs's REFS, and each custom collection's relations
+ *  (DAO-OS L6 §7.3, `refsOf`), so a record they name is not deleted from under them. */
+function refsFor(repo: string): typeof REFS {
+  const custom = registriesOf(repo).filter(d => d.custom).flatMap(d => {
+    const def = customDefinition(repo, d.name)
+    return def ? refsOf(def) : []
+  })
+  return custom.length === 0 ? REFS : [...REFS, ...custom]
+}
+
 /** The entries that name `id` of registry `name` in a reference field: what
  *  would be left pointing at nothing if it were deleted. The reference table
  *  and the matching are lib/data-validate.mjs's, the same as the writes use. */
@@ -38,7 +50,7 @@ export function referrers(repo: string, name: string, id: string, overlay?: Over
     // An entry with no id is named by its position (1-based, as validate:data names it), never "undefined".
     const { noId } = addressability(entries)
     return noId.length === 0 ? entries : entries.map((e, i) => (noId.includes(i) ? { ...e, id: `#${i + 1}` } : e))
-  })
+  }, refsFor(repo))
 }
 
 /**
@@ -63,12 +75,14 @@ function protoErrors(value: unknown, path: string[] = []): FieldError[] {
  *  `infrastructure` block) never refuse a save; its errors do. */
 export function validateEntity(repo: string, name: string, entity: Entity, overlay?: Overlay): ValidationResult {
   const errors: FieldError[] = protoErrors(entity)
-  for (const p of validateEntry(name, entity)) {
+  // A custom collection's record (DAO-OS L6 §7.3) against the schema its definition derives, and its relations checked.
+  const custom = customDefinition(repo, name)
+  for (const p of validateEntry(name, entity, custom ? schemaOf(custom) : undefined)) {
     if (p.level === 'error') errors.push({ field: p.path, message: p.message })
   }
   errors.push(...referenceErrors(name, entity, target => {
     const entries = entriesThrough(repo, target, overlay)
     return entries ? addressability(entries).ids : null
-  }))
+  }, refsFor(repo)))
   return { valid: errors.length === 0, errors }
 }

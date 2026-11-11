@@ -7,6 +7,27 @@ import { ago } from './safe.ts'
 /** Snapshot's hub: GraphQL, read-only here (https://docs.snapshot.box/tools/api). */
 export const SNAPSHOT_HUB = 'https://hub.snapshot.org/graphql'
 export const SNAPSHOT_HOST = 'hub.snapshot.org'
+/** The testnet hub, where Sepolia spaces live (snapshot.js src/constants.json; L7 spec §3, §8.4). Read-only here too. */
+export const SNAPSHOT_TESTNET_HUB = 'https://testnet.hub.snapshot.org/graphql'
+export const SNAPSHOT_TESTNET_HOST = 'testnet.hub.snapshot.org'
+const TESTNET_UI = 'testnet.snapshot.box'
+const SEPOLIA = 'eip155:11155111'
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+/** The host of a System's https URL, or null. */
+const urlHost = (url: unknown): string | null => {
+  if (typeof url !== 'string') return null
+  try { const u = new URL(url); return u.protocol === 'https:' ? u.hostname : null } catch { return null }
+}
+/** Whether a space is on Snapshot's testnet: its URL on testnet.snapshot.box, or composed on Sepolia. */
+const onTestnet = (system: Record<string, unknown>): boolean =>
+  urlHost(system.url) === TESTNET_UI || (isObj(system.deployment) && system.deployment.network === SEPOLIA)
+
+/** The hub a space is read on, by network (L7 Task 13, spec §8.4): the testnet hub for a testnet.snapshot.box URL or a
+ *  Sepolia network, else SNAPSHOT_HUB. */
+export function hubFor(system: Record<string, unknown>): string {
+  return onTestnet(system) ? SNAPSHOT_TESTNET_HUB : SNAPSHOT_HUB
+}
 
 const SPACE_ID = /^[a-z0-9][a-z0-9.-]*$/i
 
@@ -16,7 +37,7 @@ export function spaceOf(system: Record<string, unknown>): string {
     if (typeof system.url !== 'string') return null
     let u: URL
     try { u = new URL(system.url) } catch { return null }
-    if (u.protocol !== 'https:' || !['snapshot.box', 'snapshot.org'].includes(u.hostname)) return null
+    if (u.protocol !== 'https:' || !['snapshot.box', 'snapshot.org', TESTNET_UI].includes(u.hostname)) return null
     const m = /^#\/(?:s:)?([^/?]+)/.exec(u.hash)
     return m ? m[1]! : null
   }
@@ -26,9 +47,10 @@ export function spaceOf(system: Record<string, unknown>): string {
   return id
 }
 
-/** https://snapshot.box/#/s:<space>[/proposal/<id>]; `create` is the editor route (`create/:key?`, sx-monorepo apps/ui/src/routes/common.ts @ 61e3ed2). */
-export const snapshotLink = (space: string, proposal?: string): string =>
-  `https://snapshot.box/#/s:${space}${proposal ? `/proposal/${proposal}` : ''}`
+/** https://snapshot.box/#/s:<space>[/proposal/<id>] (testnet.snapshot.box for a testnet `system`); `create` is the editor
+ *  route (`create/:key?`, sx-monorepo apps/ui/src/routes/common.ts @ 61e3ed2). */
+export const snapshotLink = (space: string, proposal?: string, system?: Record<string, unknown>): string =>
+  `https://${system && onTestnet(system) ? TESTNET_UI : 'snapshot.box'}/#/s:${space}${proposal ? `/proposal/${proposal}` : ''}`
 
 export const SNAPSHOT_ACTIONS: ActionSpec[] = [{
   id: 'draft-proposal', label: 'Draft a Snapshot vote', class: null, params: [
@@ -130,7 +152,7 @@ function checkRef(system: Record<string, unknown>, raw: unknown): { ok: true; re
 async function outcome(system: Record<string, unknown>, ref: OutcomeRef, ctx: DriverContext & { opened: string }): Promise<OutcomeReading> {
   if (!isForeignRef(ref) || ref.payload.kind !== 'snapshot-proposal') throw new Error('a Snapshot space reads snapshot-proposal refs, not a Safe transaction or another system\'s ref')
   const space = spaceOf(system)
-  const data = await graphql<{ proposal: SnapshotProposal | null }>(ctx, SNAPSHOT_HUB, OUTCOME_QUERY, { id: ref.id })
+  const data = await graphql<{ proposal: SnapshotProposal | null }>(ctx, hubFor(system), OUTCOME_QUERY, { id: ref.id })
   if (!data.proposal) return { ok: true, outcome: 'pending', submitted: false, detail: 'not on Snapshot yet: post the draft in Snapshot, then attach its id' }
   return snapshotOutcome(data.proposal, ref, space, ctx.opened)
 }
@@ -143,7 +165,7 @@ async function prepareAction(system: Record<string, unknown>, input: ActionInput
   const title = String(p.title), body = String(p.body)
   const start = Number(p.start), end = Number(p.end)
   if (title.length > 256) return refuse(`"title" is ${title.length} characters; Snapshot takes at most 256`)
-  const data = await graphql<SpaceAnswer>(ctx, SNAPSHOT_HUB, QUERY, { s: space })
+  const data = await graphql<SpaceAnswer>(ctx, hubFor(system), QUERY, { s: space })
   if (!data.space) throw new Error(`Snapshot has no space ${space}`)
   const voting = data.space.voting ?? {}
   const type = typeof p.type === 'string' ? p.type : voting.type ?? 'single-choice'
@@ -159,14 +181,14 @@ async function prepareAction(system: Record<string, unknown>, input: ActionInput
   const earliest = Math.floor(ctx.now().getTime() / 1000) + (voting.delay ?? 0)
   if (start < earliest) return refuse(`the vote starts before ${iso(earliest)}, the earliest ${space} allows (now plus a delay of ${duration(voting.delay ?? 0)})`)
   return {
-    ok: true, action: 'draft-proposal', steps: [], attach: null, link: `${snapshotLink(space)}/create`,
+    ok: true, action: 'draft-proposal', steps: [], attach: null, link: `${snapshotLink(space, undefined, system)}/create`,
     draft: { space, type, title, body, choices, start, end, discussion: typeof p.discussion === 'string' ? p.discussion : '' },
   }
 }
 
 export const snapshotSpace: Driver = {
   name: 'snapshot-space',
-  hosts: [SNAPSHOT_HOST],
+  hosts: [SNAPSHOT_HOST, SNAPSHOT_TESTNET_HOST],
   minGapMs: 1000,
   actions: SNAPSHOT_ACTIONS,
   prepareAction,
@@ -174,7 +196,7 @@ export const snapshotSpace: Driver = {
   checkRef,
   async read(system: Record<string, unknown>, ctx: DriverContext): Promise<DriverRead> {
     const space = spaceOf(system)
-    const data = await graphql<SpaceAnswer>(ctx, SNAPSHOT_HUB, QUERY, { s: space })
+    const data = await graphql<SpaceAnswer>(ctx, hubFor(system), QUERY, { s: space })
     const s = data.space
     if (!s) throw new Error(`Snapshot has no space ${space}`)
     const now = ctx.now()
@@ -198,16 +220,16 @@ export const snapshotSpace: Driver = {
     const sections: DriverSection[] = [
       { title: 'Open votes', rows: open.map(({ p, live }) => ({
         cells: [short(p.title, 60), p.type, live ? `ends in ${span(p.end - now.getTime() / 1000, now)}` : `starts in ${span(p.start - now.getTime() / 1000, now)}`, leading(p)],
-        ...(live ? { attention: 'alert' as const } : {}), href: snapshotLink(space, p.id),
+        ...(live ? { attention: 'alert' as const } : {}), href: snapshotLink(space, p.id, system),
       })) },
       { title: 'Recent results', rows: (data.closed ?? []).map(p => ({
-        cells: [short(p.title, 60), result(p), `${p.votes} votes`, ago(iso(p.end), now)], href: snapshotLink(space, p.id),
+        cells: [short(p.title, 60), result(p), `${p.votes} votes`, ago(iso(p.end), now)], href: snapshotLink(space, p.id, system),
       })) },
       { title: 'Settings', rows: [
         ['Voting', v.type ?? 'any'], ['Period', duration(v.period)], ['Delay', duration(v.delay)], ['Quorum', v.quorum === null || v.quorum === undefined ? 'any' : String(v.quorum)],
         ['Strategies', facts.strategies.join(', ')], ['Validation', facts.validation ?? 'any'], ['Admins', String(admins.length)],
       ].map(cells => ({ cells })) },
     ]
-    return { ok: true, readAt: now.toISOString(), facts, sections, open: { url: snapshotLink(space), embeddable: false } }
+    return { ok: true, readAt: now.toISOString(), facts, sections, open: { url: snapshotLink(space, undefined, system), embeddable: false } }
   },
 }

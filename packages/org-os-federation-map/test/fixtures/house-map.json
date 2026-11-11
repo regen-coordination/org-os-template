@@ -1,0 +1,279 @@
+{
+  "version": "1",
+  "generated_at": "2026-10-29T12:00:00Z",
+  "self": {
+    "id": "Riverbend Commons",
+    "name": "Riverbend Commons",
+    "type": "Hub",
+    "emoji": null,
+    "url": null,
+    "counts": {
+      "entries": 142
+    }
+  },
+  "nodes": [
+    {
+      "id": "hillside-coop",
+      "kind": "instance",
+      "name": "Hillside Coop",
+      "type": "Coop",
+      "ring": 1,
+      "trust": "full",
+      "live": true,
+      "url": null,
+      "repo": "example/hillside-coop",
+      "counts": {
+        "members": 3,
+        "projects": 2
+      },
+      "last_seen": "2026-10-29T12:00:00Z",
+      "frontier": {
+        "fetched_at": "2026-10-29T10:00:00Z",
+        "source": "local",
+        "last_attempt_at": "2026-10-29T10:00:00Z",
+        "last_error": null
+      }
+    },
+    {
+      "id": "lowland-guild",
+      "kind": "instance",
+      "name": "Lowland Guild",
+      "type": "Guild",
+      "ring": 1,
+      "trust": "observer",
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {},
+      "last_seen": null
+    },
+    {
+      "id": "watershed-network",
+      "kind": "instance",
+      "name": "Watershed Network",
+      "type": "Network",
+      "ring": 1,
+      "trust": "full",
+      "live": false,
+      "url": null,
+      "repo": "example/watershed-network",
+      "counts": {},
+      "last_seen": null,
+      "frontier": {
+        "fetched_at": "2026-10-26T12:00:00Z",
+        "source": "https://raw.githubusercontent.com/example/watershed-network/HEAD/federation.yaml",
+        "last_attempt_at": "2026-10-29T11:00:00Z",
+        "last_error": "HTTP 404"
+      }
+    },
+    {
+      "id": "youth-circle",
+      "kind": "instance",
+      "name": "Youth Circle",
+      "type": "LocalNode",
+      "ring": 1,
+      "trust": "full",
+      "live": true,
+      "url": null,
+      "repo": "example/youth-circle",
+      "counts": {
+        "members": 2
+      },
+      "last_seen": "2026-10-29T12:00:00Z",
+      "frontier": {
+        "fetched_at": "2026-10-17T12:00:00Z",
+        "source": "local",
+        "last_attempt_at": "2026-10-17T12:00:00Z",
+        "last_error": null
+      }
+    },
+    {
+      "id": "market-garden",
+      "kind": "instance",
+      "name": "Market Garden",
+      "type": "LocalNode",
+      "ring": 1,
+      "trust": "observer",
+      "live": false,
+      "url": null,
+      "repo": "example/market-garden",
+      "counts": {},
+      "last_seen": null,
+      "frontier": {
+        "fetched_at": null,
+        "source": null,
+        "last_attempt_at": null,
+        "last_error": null
+      }
+    },
+    {
+      "id": "open-seed-library",
+      "kind": "instance",
+      "name": "open-seed-library",
+      "type": null,
+      "ring": 1,
+      "trust": null,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {},
+      "last_seen": null
+    },
+    {
+      "id": "field-notes-archive",
+      "kind": "source",
+      "name": "Field notes archive",
+      "type": null,
+      "ring": 3,
+      "ecosystem": "watershed-commons",
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "field notes"
+    },
+    {
+      "id": "seed-registry",
+      "kind": "source",
+      "name": "Seed registry",
+      "type": null,
+      "ring": 3,
+      "ecosystem": "watershed-commons",
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "seed records"
+    },
+    {
+      "id": "open-data-portal",
+      "kind": "source",
+      "name": "Open data portal",
+      "type": null,
+      "ring": 3,
+      "ecosystem": null,
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "public datasets"
+    },
+    {
+      "id": "watershed-commons",
+      "kind": "ecosystem",
+      "name": "Watershed Commons",
+      "type": null,
+      "ring": 3,
+      "url": null,
+      "counts": {}
+    },
+    {
+      "id": "Valley Commons",
+      "kind": "frontier",
+      "name": "Valley Commons",
+      "type": "Commons",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    },
+    {
+      "id": "Delta Alliance",
+      "kind": "frontier",
+      "name": "Delta Alliance",
+      "type": "Alliance",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    },
+    {
+      "id": "Pantry Network",
+      "kind": "frontier",
+      "name": "Pantry Network",
+      "type": "Network",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    }
+  ],
+  "edges": [
+    {
+      "from": "Riverbend Commons",
+      "to": "hillside-coop",
+      "kind": "federation"
+    },
+    {
+      "from": "Riverbend Commons",
+      "to": "lowland-guild",
+      "kind": "federation"
+    },
+    {
+      "from": "Riverbend Commons",
+      "to": "watershed-network",
+      "kind": "upstream"
+    },
+    {
+      "from": "Riverbend Commons",
+      "to": "youth-circle",
+      "kind": "downstream"
+    },
+    {
+      "from": "Riverbend Commons",
+      "to": "market-garden",
+      "kind": "downstream"
+    },
+    {
+      "from": "Riverbend Commons",
+      "to": "open-seed-library",
+      "kind": "knowledge"
+    },
+    {
+      "from": "field-notes-archive",
+      "to": "Riverbend Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "seed-registry",
+      "to": "Riverbend Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "open-data-portal",
+      "to": "Riverbend Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "watershed-commons",
+      "to": "field-notes-archive",
+      "kind": "provenance"
+    },
+    {
+      "from": "watershed-commons",
+      "to": "seed-registry",
+      "kind": "provenance"
+    },
+    {
+      "from": "hillside-coop",
+      "to": "Valley Commons",
+      "kind": "frontier"
+    },
+    {
+      "from": "watershed-network",
+      "to": "Delta Alliance",
+      "kind": "frontier"
+    },
+    {
+      "from": "youth-circle",
+      "to": "Pantry Network",
+      "kind": "frontier"
+    }
+  ]
+}

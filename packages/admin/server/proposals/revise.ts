@@ -10,14 +10,16 @@
 
 import { HttpError } from '../errors.ts'
 import { commitIdent, type Actor } from '../actor.ts'
-import { Refusal, StageRefusal } from '../changes/apply.ts'
+import { Refusal, StageRefusal, narrowedHereErrors } from '../changes/apply.ts'
 import { MachineRefusal } from '../machines.ts'
-import { classesOf, currentOf, ledgerErrors, staleOps, validateChange } from '../changes/stage.ts'
+import { currentOf, knowledgeOpErrors, ledgerErrors, staleOps, validateChange } from '../changes/stage.ts'
+import { registriesOf } from '../registries.ts'
 import { baseOf } from '../changes/canonical.ts'
 import { sealReceipts } from '../library/seal.ts'
 import { isStale } from '../changes/merge.ts'
 import { newChangeId, type ChangeStore } from '../changes/store.ts'
-import type { Change, Op } from '../changes/types.ts'
+import type { Change, Op, StageOp } from '../changes/types.ts'
+import { withoutBefore } from '../workspace/files.ts'
 import { resolveRev } from '../git.ts'
 import { buildBranch, buildFailureWords, recordAt, replayBranch, trunkMovedUnder, type BranchProposal } from './branch.ts'
 import { guardTrunk, readLedger, resolveTrunk, updateEntry, type LedgerWho } from './ledger.ts'
@@ -26,14 +28,18 @@ import { machineContext } from './events.ts'
 import { canonicalJson, methodOf, revOf, type Proposal } from '../../lib/proposals.mjs'
 import { gitOpsOf } from '../../lib/ops.mjs'
 import type { Viewer } from '../../lib/visibility.mjs'
-import { aroundGit, noStore, privateClasses as privateClassesOf, reach, resolvePrivate, stagePrivate, STORE_FAILED, unavailable, type PrivateAccess } from '../private/ops.ts'
+import { aroundGit, noStore, privateClasses as privateClassesOf, reach, stagePrivate, STORE_FAILED, unavailable, type PrivateAccess } from '../private/ops.ts'
+import { isMove, judgePrivate, planMoves } from '../workspace/move.ts'
 import { admittedTo, pendingOps, pendingPart, placeholdersOf, type LedgerPlaceholder } from '../private/proposals.ts'
 import type { PendingRow, PrivateStore } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { Levels, raisedTouched } from '../visibility/gate.ts'
 import { refuseOthersLink } from '../visibility/widen.ts'
 import { refuseNarrowed } from '../private/guard.ts'
-import { rulesForClasses, validTrunkName } from '../../lib/rules.mjs'
+import { privateTargetsOf } from '../private/targets.ts'
+import { refuseCouncilProposed } from '../workspace/memory.ts'
+import { validTrunkName } from '../../lib/rules.mjs'
+import { REVISE_WORDS, opName, refuseOutsideOpened, refuseRaisedPrivate } from './opened.ts'
 import { transition } from '../../lib/machines/run.mjs'
 import type { HatAct } from '../../lib/hat-readings.mjs'
 import { proposal as machine, proposalGuards } from '../../lib/machines/proposal.mjs'
@@ -66,7 +72,7 @@ function permitted(repo: string, actor: KnownActor, entry: Proposal, now: Date, 
   if (decided.ok) return
   // The author asking to replay a stale proposal without a choice is told which ops need one, as Propose and Apply say it.
   if (type === 'REPLAYED' && state === 'stale' && choose === undefined && actor.id === entry.author) {
-    const records = stale.map(i => String(gitOpsOf(entry.ops)[i]!.record))
+    const records = stale.map(i => opName(gitOpsOf(entry.ops)[i]!))
     throw refuse('STALE', `Not replayed: ${stale.length === 1 ? 'one op was' : `${stale.length} ops were`} staged against a record that has changed on the trunk since (${records.join(', ')}). ` +
       `Choose Keep mine or Take theirs for ${stale.length === 1 ? 'it' : 'them'}, then replay. ${NOTHING}`, { stale, records })
   }
@@ -78,7 +84,7 @@ const isEntry = (v: unknown): v is Record<string, unknown> => typeof v === 'obje
 /** The day a receipt was proposed (R-6): the `at` the proposal's stored op on that record was sealed with (a create's
  *  `value.at`, a removal's `set.removed.at`); for a receipt new in this revision, the day the proposal was opened. */
 const proposedOn = (entry: Proposal) => (record: string): string => {
-  const stored = entry.ops.find(o => o.record === record) as Record<string, unknown> | undefined
+  const stored = entry.ops.find(o => o.op !== 'file' && o.record === record) as Record<string, unknown> | undefined
   const sealed = stored?.op === 'create' && isEntry(stored.value) ? stored.value.at
     : stored?.op === 'update' && isEntry(stored.set) && isEntry(stored.set.removed) ? stored.set.removed.at : undefined
   return typeof sealed === 'string' && sealed !== '' ? sealed : String(entry.opened).slice(0, 10)
@@ -114,17 +120,28 @@ export async function revise(repo: string, actor: KnownActor, id: string, ops: O
 
   const ledgered = ledgerErrors(ops)
   if (ledgered.length > 0) throw new StageRefusal(ledgered)
+  // A knowledge op is a field edit of its entry, on a canon kms reads as the house does (Task 10, PF-R2), at Revise as at Stage.
+  const canon = knowledgeOpErrors(ops, registriesOf(repo), repo, NOTHING)
+  if (canon.length > 0) throw new StageRefusal(canon)
   refuseNarrowed(ops, readConfig(repo), 'Not revised') // a field narrowed since it was staged (R-L5-16.10)
+  // A value typed beside a narrowing of its field in the same change is refused as Apply refuses it (PF-R15, L6 carries K1),
+  // so it never sits in a ledger op.
+  const narrowedHere = narrowedHereErrors(repo, ops, 'Not revised')
+  if (narrowedHere.length > 0) throw new StageRefusal(narrowedHere)
   refuseOthersLink(repo, ops, actor.id) // a wallet link is widened only by its own person (L5 §9.7)
   const privateClasses = priv ? privateClassesOf(priv.store, priv.ops) : held.map(h => h.class)
-  const classes = [...new Set([...classesOf(ops, repo), ...privateClasses])]
-  const opened = (entry.classes ?? []).map(String)
-  const covered = rulesForClasses(entry.rules, classes)
-  for (const cls of classes) {
-    if (opened.includes(cls) && covered.find(c => c.class === cls)?.rule) continue
-    const op = ops.find(o => classesOf([o], repo).includes(cls))
-    throw refuse('CLASSES', `Not revised: ${op ? `the op on ${op.record}` : 'its restricted part'} is of the class ${cls}, and proposal ${id} was opened for ${opened.join(', ') || 'no class'}, ` +
-      `under ${entry.rules.map(r => `rule "${r.id}"`).join(' and ')}. A revision keeps to the classes its rules decide; propose the rest on its own. ${NOTHING}`)
+  // Its classes and, as a revision is new content, the rules that raise its workspace ops now (opened.ts). A move is judged
+  // where it lands as well (R-L6-T11-4, Task 11 review I-2): its git op beside the revision's, as Propose adds it. One that
+  // cannot be planned adds nothing here: `judgePrivate` refuses it below, and a ratify plans and judges it again.
+  let landing: StageOp[] = []
+  if (priv && priv.ops.some(isMove)) {
+    try { landing = planMoves(repo, priv.store, priv.ops, readConfig(repo), priv.viewer).map(p => p.git) } catch { landing = [] }
+  }
+  refuseOutsideOpened(repo, entry, [...ops, ...landing] as StageOp[], privateClasses, REVISE_WORDS, true)
+  // Its private part, judged now at its own targets (Task 15 review I-1); a Council entry is never proposed.
+  if (priv) {
+    refuseCouncilProposed(priv.ops)
+    refuseRaisedPrivate(repo, entry, privateTargetsOf(repo, priv.store, priv.ops), REVISE_WORDS)
   }
   const stale = staleOps(repo, ops)
   if (stale.length > 0) {
@@ -135,7 +152,7 @@ export async function revise(repo: string, actor: KnownActor, id: string, ops: O
   if (errors.length > 0) throw new StageRefusal(errors)
   // Sealed again, as Propose seals: the reviser (the author) and the same proposal, and the day each receipt was proposed
   // (R-6), so a proposal sent back unchanged on a later day is still unchanged.
-  const sealed = sealReceipts(ops.map(({ before: _before, ...op }) => op), { by: actor.id, at: proposedOn(entry), decision: { proposal: id } })
+  const sealed = sealReceipts(ops, { by: actor.id, at: proposedOn(entry), decision: { proposal: id } }).map(withoutBefore)
   // The private part: the proposal's own placeholders, unless the revising tray's ops differ from what they stand for.
   let placeholders: LedgerPlaceholder[] = held
   let rows: PendingRow[] | null = null
@@ -144,7 +161,7 @@ export async function revise(repo: string, actor: KnownActor, id: string, ops: O
     // A part the store no longer holds as recorded (a revision whose store write failed) is replaced, never compared.
     try { was = held.length > 0 ? pendingOps(priv.store, entry) : [] } catch (err) { if (!(err instanceof Refusal && err.body.code === 'PRIVATE_LOST')) throw err }
     if (was === null || canonicalJson(was) !== canonicalJson(priv.ops)) {
-      resolvePrivate(priv.store, priv.ops, priv.viewer) // judged for the reviser now, as Propose judges it
+      judgePrivate(repo, priv.store, priv.ops, priv.viewer, readConfig(repo)) // judged for the reviser now, as Propose judges it (a move too, L6 §12)
       const part = pendingPart(id, priv.ops)
       placeholders = part.placeholders
       rows = part.rows
@@ -265,7 +282,9 @@ export async function loadForRevision(repo: string, actor: KnownActor, id: strin
   const was = typeof entry.base === 'string' && entry.base !== '' ? await resolveRev(repo, entry.base) : null
   const ops: Op[] = []
   for (const op of gitOpsOf(entry.ops) as unknown as Op[]) {
-    const { before: _before, ...ledgerOp } = op as Op
+    // A file op (L6 §11.2) goes back to the tray as the ledger holds it: its base is its own.
+    if (op.op === 'file') { ops.push(op); continue }
+    const { before: _before, ...ledgerOp } = op
     let before: Record<string, unknown> | null = null
     if (op.op !== 'create') {
       const then = was === null ? null : await recordAt(repo, was, op.record)

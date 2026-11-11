@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { RECEIPTS, receiptIdFor, receiptProblems, checkReceipts, judgedOps, judgedFiles } from '../../lib/receipts.mjs'
 import { governedClassOf } from '../../lib/change-classes.mjs'
-import type { StageOp } from '../../server/changes/types.ts'
+import type { RecordOp as StageOp } from '../../server/changes/types.ts'
 
 // Pure: every op is built by hand, and `entriesOf` answers the files "as they are now" from a table.
 type Entity = Record<string, unknown>

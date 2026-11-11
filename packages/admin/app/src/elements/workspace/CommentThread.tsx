@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link } from 'wouter'
 import { Button } from '../../design/Button.tsx'
 import { Icon } from '../../design/Icon.tsx'
 import { useFrame } from '../../design/Shell.tsx'
@@ -21,7 +22,19 @@ export interface Comment {
   replies: Comment[]
   resolved?: { by: string }
   anchor?: { id: string; text: string }
+  /** DAO-OS L6 (as the Hub serves a comment, §8.2): the passage it was on is no longer in the page — quoted, not a link. */
+  unanchored?: { text: string; note: string }
+  /** Deleted by its author: the body is gone and `note` ("Deleted") is said instead. */
+  deleted?: { note: string }
+  /** DAO-OS L6 Task 18: lines said under the comment — who was not told of a mention, the task it became (with its link),
+   *  why it was not sent or an act on it was refused. */
+  notes?: CommentNote[]
+  /** DAO-OS L6 Task 18 fix round 1: the task it was turned into; Turn into a task is not offered again. */
+  task?: string
 }
+
+/** A line under a comment (DAO-OS L6 Task 18), a link when `href` is given. */
+export interface CommentNote { text: string; href?: string; link?: string; tone?: 'bad' }
 
 /** The thread's two forms (§10.3), by the frame's own width: a panel beside the page at 1200 and over, a sheet
  *  below (CC-13: 1200 is one of FRAME_BREAKS). */
@@ -39,8 +52,10 @@ export interface CommentThreadProps {
   onResolve(id: string): void
   /** Turn into a task: a workspace write (§10.3). */
   onTask(id: string): void
-  /** The viewer's handle: their comments say "You", and the composer draws their monogram. */
+  /** The viewer's handle: their comments say "You". */
   me?: string
+  /** Who the viewer is (the one display name, walk fix wave 4 G9): the composer's monogram. */
+  meName?: string
   now?: Date
   /** Left out, the frame's (`threadForm`); a /parts specimen names it. */
   form?: ThreadForm
@@ -50,6 +65,21 @@ export interface CommentThreadProps {
   inline?: boolean
   /** The thread's id, for the editor bar's toggle (`commentsId`). */
   id?: string
+  // --- DAO-OS L6 Task 18: the thread wired to the Hub
+  /** Show the passage an anchored comment is about, in the page's own editor (L4c C3's carry: the Hub wires this; left
+   *  out, a /parts specimen's marked text is found). */
+  onShowPassage?(anchor: { id: string; text: string }): void
+  /** Draws a comment's body (the Hub's inline subset: mentions and links); left out, its text. */
+  renderBody?(c: Comment): ReactNode
+  /** Reopen a resolved comment; given, the resolved line offers it. */
+  onReopen?(id: string): void
+  /** Delete the viewer's own comment; given, their comments offer it. */
+  onDelete?(id: string): void
+  /** The passage the next comment will be on (the page's selection), drawn over the composer with a way to drop it. */
+  quote?: { text: string; onDrop(): void }
+  /** The composers' mention picker (Composer's `mention`). */
+  mention?: (q: string, pick: (label: string, markdown: string) => void) => ReactNode
+  // --- end L6 Task 18
 }
 
 /** Scroll the page to the passage a comment is about, and mark it as the one shown. */
@@ -65,12 +95,15 @@ const STATE_WORD = { sending: 'Sending…', 'not-sent': 'Not sent' } as const
 
 /** One comment: the 28px monogram, who (13/500; "You" for the viewer), when (12 faint) or its sending state, the
  *  passage it is about, the body (14/1.5), and its actions. */
-function CommentItem({ c, reply, me, now, acts }: { c: Comment; reply: boolean; me?: string; now: Date; acts: ReactNode }) {
+function CommentItem({ c, reply, me, now, acts, show, body }: {
+  c: Comment; reply: boolean; me?: string; now: Date; acts: ReactNode
+  show(anchor: { id: string; text: string }): void; body?(c: Comment): ReactNode
+}) {
   const who = c.handle === me ? 'You' : c.role
   const age = ageText(c.at, now)
   return (
     <article className={`cmt cmt-${c.state}${reply ? ' cmt-reply' : ''}`} aria-label={`${who}, ${c.state === 'sent' ? age : STATE_WORD[c.state]}`}>
-      <span className="av av-lg" aria-hidden="true">{monogram(c.handle)}</span>
+      <span className="av av-lg" aria-hidden="true">{monogram(c.role)}</span>
       <div className="cmt-main">
         <div className="cmt-h">
           <span className="cmt-who">{who}</span>
@@ -79,11 +112,21 @@ function CommentItem({ c, reply, me, now, acts }: { c: Comment; reply: boolean; 
           {c.state === 'not-sent' && <span className="cmt-state save-bad"><Icon name="alert" size="xs" />{STATE_WORD['not-sent']}</span>}
         </div>
         {c.anchor && (
-          <button type="button" className="cmt-q" aria-label={`Show the passage: “${c.anchor.text}”`} onClick={() => showPassage(c.anchor!.id)}>
+          <button type="button" className="cmt-q" aria-label={`Show the passage: “${c.anchor.text}”`} onClick={() => show(c.anchor!)}>
             “{c.anchor.text}”
           </button>
         )}
-        <p className="cmt-b">{c.body}</p>
+        {c.unanchored && !c.anchor && <p className="cmt-q cmt-q-gone">“{c.unanchored.text}” <span className="cmt-note">{c.unanchored.note}</span></p>}
+        {c.deleted ? <p className="cmt-b cmt-gone">{c.deleted.note}</p> : <p className="cmt-b">{body ? body(c) : c.body}</p>}
+        {c.notes && c.notes.length > 0 && (
+          <ul className="cmt-notes">
+            {c.notes.map((n, i) => (
+              <li key={i} className={n.tone === 'bad' ? 'cmt-note save-bad' : 'cmt-note'}>
+                {n.text}{n.href && <>{' '}<Link href={n.href}>{n.link ?? 'Open'}</Link></>}
+              </li>
+            ))}
+          </ul>
+        )}
         {acts}
       </div>
     </article>
@@ -134,23 +177,29 @@ export function CommentThread(p: CommentThreadProps) {
         </div>
       )
     }
-    if (reply || c.state !== 'sent') return null
+    if (c.state !== 'sent') return null
+    // DAO-OS L6 Task 18: the author may delete their own comment, a reply too; a deleted one keeps only Reply.
+    const del = p.onDelete && c.handle === p.me && !c.deleted
+      ? <button type="button" className="cmt-a" onClick={() => p.onDelete!(c.id)}>Delete</button> : null
+    if (reply) return del ? <div className="cmt-f">{del}</div> : null
     return (
       <div className="cmt-f">
         <button type="button" className="cmt-a" aria-expanded={replying === c.id} onClick={() => setReplying(r => (r === c.id ? null : c.id))}>Reply</button>
-        {!c.resolved && <button type="button" className="cmt-a" onClick={() => p.onResolve(c.id)}>Resolve</button>}
-        <button type="button" className="cmt-a" onClick={() => p.onTask(c.id)}>Turn into a task</button>
+        {!c.resolved && !c.deleted && <button type="button" className="cmt-a" onClick={() => p.onResolve(c.id)}>Resolve</button>}
+        {!c.deleted && !c.task && <button type="button" className="cmt-a" onClick={() => p.onTask(c.id)}>Turn into a task</button>}
+        {del}
       </div>
     )
   }
 
+  const show = (a: { id: string; text: string }) => (p.onShowPassage ? p.onShowPassage(a) : showPassage(a.id))
   const thread = (c: Comment) => (
     <>
-      <CommentItem c={c} reply={false} me={p.me} now={now} acts={actsFor(c, false)} />
-      {c.replies.map(r => <CommentItem key={r.id} c={r} reply me={p.me} now={now} acts={actsFor(r, true)} />)}
+      <CommentItem c={c} reply={false} me={p.me} now={now} acts={actsFor(c, false)} show={show} body={p.renderBody} />
+      {c.replies.map(r => <CommentItem key={r.id} c={r} reply me={p.me} now={now} acts={actsFor(r, true)} show={show} body={p.renderBody} />)}
       {canWrite && replying === c.id && (
         <div className="cmt-reply cmt-reply-box">
-          <Composer me={p.me ?? ''} label={`Reply to ${c.handle === p.me ? 'yourself' : c.role}`} autoFocus
+          <Composer me={p.me ?? ''} name={p.meName} label={`Reply to ${c.handle === p.me ? 'yourself' : c.role}`} autoFocus mention={p.mention}
             onSend={body => { p.onSend(body, c.id); setReplying(null) }} />
         </div>
       )}
@@ -173,6 +222,7 @@ export function CommentThread(p: CommentThreadProps) {
                 <Icon name="check" size="xs" />
                 <span>{`Resolved by ${c.resolved.by} · ${c.replies.length} ${c.replies.length === 1 ? 'reply' : 'replies'} · `}
                   <button type="button" className="cmt-a" aria-expanded={shown.has(c.id)} onClick={() => toggle(c.id)}>{shown.has(c.id) ? 'Hide' : 'Show'}</button>
+                  {canWrite && p.onReopen && <>{' · '}<button type="button" className="cmt-a" onClick={() => p.onReopen!(c.id)}>Reopen</button></>}
                 </span>
               </div>
             )}
@@ -180,7 +230,13 @@ export function CommentThread(p: CommentThreadProps) {
           </li>
         ))}
       </ol>
-      {canWrite && <Composer me={p.me ?? ''} onSend={body => p.onSend(body)} />}
+      {canWrite && p.quote && (
+        <div className="cmt-on">
+          <span className="cmt-on-t">{`On “${p.quote.text}”`}</span>
+          <button type="button" className="cmt-a" onClick={p.quote.onDrop}>Not on this passage</button>
+        </div>
+      )}
+      {canWrite && <Composer me={p.me ?? ''} name={p.meName} onSend={body => p.onSend(body)} mention={p.mention} autoFocus={p.quote !== undefined} />}
     </aside>
   )
   return form === 'panel' ? panel : <ThreadSheet inline={p.inline ?? false} onClose={p.onClose}>{panel}</ThreadSheet>

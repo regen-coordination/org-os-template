@@ -8,6 +8,7 @@ import { trailingText, type NeedItem, type NeedKind } from './needs.ts'
 /** The glyph on a waiting item's clay tile, by what it waits on (§9.4). */
 const GLYPH: Record<NeedKind, IconName> = {
   proposal: 'proposal', signature: 'pen', 'empty-hat': 'hat', 'failed-read': 'alert', 'chains-disagree': 'safe', overdue: 'clock',
+  mention: 'at', // DAO-OS L6 Task 18
 }
 
 /** One Needs you item (§9.4): a 72px row, one link — the 32px tile (clay with the need's glyph while it waits on you;

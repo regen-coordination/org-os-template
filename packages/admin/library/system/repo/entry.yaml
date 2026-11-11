@@ -1,8 +1,8 @@
 id: system:repo
 shelf: system
 title: Code repository
-summary: The org's code repository, as a framed link. The platform does not read it.
-version: 1.0.0
+summary: Another GitHub repository's published files, read only. The Hub reads the listed YAML, JSON or Markdown files and never writes.
+version: 1.1.0
 source: framework
 standing: stated
 as_of: 2026-10-18
@@ -10,14 +10,16 @@ tags:
   function: [knowledge]
   domain: [operations]
   audience: [member]
-  maturity: raw
+  maturity: field-informed
 related: [system:link]
 config:
   properties:
     id: { type: string, default: repo, description: The id the org will call it by. }
     name: { type: string, description: What it is called here. }
-    url: { type: string, description: The address of the repository. }
-  required: [id, name, url]
+    url: { type: string, description: The address of the repository (https://github.com/<owner>/<repo>). }
+    branch: { type: string, description: The branch to read; absent reads the default branch. }
+    files: { type: array, items: { type: string }, minItems: 1, maxItems: 20, description: The published files to read, at most 20. }
+  required: [id, name, url, files]
 installs:
   - op: create
     record: "systems:${config.id}"
@@ -26,3 +28,5 @@ installs:
       name: "${config.name}"
       url: "${config.url}"
       kind: repo
+      driver: repo
+      files: "${config.files}"

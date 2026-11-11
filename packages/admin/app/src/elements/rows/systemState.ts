@@ -105,9 +105,19 @@ export function systemFacts(r: Resource): SystemFacts {
   return { kind, chains, agree, address, governs, read, open: href ? { label: OPEN_LABEL[kind] ?? 'Open', href } : null }
 }
 
-/** A good read's driver facts, for a System of `kind`: null when it is another kind, was never read, or failed. */
+/** Whether a System is composed and not deployed, as the server's read says it (server/systems/reader.ts: no driver is
+ *  asked, the read is good and its facts say `composed`). A composed System is a plan, not the org's own (whole-platform
+ *  walk I1, I2): its state is a draft, it raises no need, Home does not count it among the Systems read, and it is never
+ *  the main Safe. Every reader of that question asks this one helper. */
+export function isComposedRead(r: Resource): boolean {
+  const read = driverOf(r)
+  return read !== null && read.ok && record(read.facts).composed === true
+}
+
+/** A good read's driver facts, for a System of `kind`: null when it is another kind, was never read, failed, or is a
+ *  composed System's (which reads nothing). */
 function goodFacts(r: Resource, kind: string): Record<string, unknown> | null {
-  if (systemKind(r) !== kind) return null
+  if (systemKind(r) !== kind || isComposedRead(r)) return null
   const read = driverOf(r)
   return read !== null && read.ok ? read.facts : null
 }
@@ -160,11 +170,12 @@ export function emptyHats(r: Resource): Record<string, unknown>[] {
 }
 
 /** A System's one state, as a mark and its words (§9.2), from its driver's facts. The first that holds wins: a link
- *  is never read; a failed read; a read in flight; a Safe whose good chains disagree; signatures waiting; active hats
+ *  is never read; a composed System is not deployed (a draft: walk I2); a failed read; a read in flight; a Safe whose good chains disagree; signatures waiting; active hats
  *  with no wearer; a change proposed against it (`proposed`, its words); an old read; else up to date. A System
  *  nothing has read yet is open, "Not read yet". */
 export function systemState(r: Resource, opts: { proposed?: string } = {}): { mark: Mark; words: string } {
   if (systemKind(r) === 'link') return { mark: 'closed', words: 'Linked, not read' }
+  if (isComposedRead(r)) return { mark: 'draft', words: 'Not deployed' }
   const read = driverOf(r)
   if (read === null) return { mark: 'open', words: 'Not read yet' }
   if (!read.ok) return { mark: 'failed', words: 'Couldn’t read' }

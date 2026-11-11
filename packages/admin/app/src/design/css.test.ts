@@ -738,3 +738,16 @@ describe('design pass e2e fixes (2026-11-04)', () => {
     expect(views).toMatch(/\.boards-fold \.btn\.sm \{[^}]*height: auto;[^}]*max-inline-size: 100%;[^}]*white-space: normal;/)
   })
 })
+
+// Walk I17: at 390 px a library entry's lede ran off the card's right edge: the refusal's status mark keeps its words on
+// one line (`.smark` is nowrap), so the lede's one track was as wide as that sentence and the card clipped every line.
+describe('a library entry at 390 px (walk I17)', () => {
+  it('the lede and the main column hold no line wider than themselves: their items shrink and long words break', () => {
+    expect(blockAfter(library, '.lib-lede {')).toContain('grid-template-columns: minmax(0, 1fr)')
+    expect(blockAfter(library, '.lib-prev-m {')).toContain('grid-template-columns: minmax(0, 1fr)')
+    const state = blockAfter(library, '.lib-state {')
+    expect(state).toContain('min-width: 0')
+    expect(state).toContain('overflow-wrap: anywhere')
+    expect(blockAfter(library, '.lib-state .smark {')).toContain('white-space: normal')
+  })
+})

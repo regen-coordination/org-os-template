@@ -24,6 +24,27 @@ governance:
       decide: { by: stewards, method: approve, count: 1 }
 `
 
+/** The workspace is the stewards' to decide alone, but a task needs one steward's approval (a raised collection). */
+const RAISED = `schema_version: "2.0"
+governance:
+  model: steward-council
+  roles:
+    stewards: { members: [steward-a] }
+  rules:
+    - { id: work, applies_to: [workspace], propose: stewards, decide: { by: stewards, method: direct } }
+    - { id: tasks, applies_to: ["workspace:tasks"], propose: stewards, decide: { by: stewards, method: approve, count: 1 } }
+`
+/** The other way round: the workspace needs approval, the tasks are the stewards' alone (a looser collection). */
+const LOOSER = `schema_version: "2.0"
+governance:
+  model: steward-council
+  roles:
+    stewards: { members: [steward-a] }
+  rules:
+    - { id: work, applies_to: [workspace], propose: stewards, decide: { by: stewards, method: approve, count: 1 } }
+    - { id: tasks, applies_to: ["workspace:tasks"], propose: stewards, decide: { by: stewards, method: direct } }
+`
+
 let repo: string
 let app: Hono
 let events: unknown[]
@@ -40,6 +61,7 @@ const stageOps = (ops: unknown[]) => app.request('/api/changes/ops', json('POST'
 const view = async () => (await app.request('/api/changes')).json()
 const CREATE = { op: 'create', record: 'projects:new-one', value: { id: 'new-one', title: 'New one' } }
 const MEMBER = { op: 'update', record: 'members:ana', set: { role: 'Steward' } }
+const TASK = { op: 'create', record: 'tasks:t-1', value: { title: 'Draft the handbook', status: 'open', owner: 'steward-a', project: 'proj-001' } }
 
 describe('POST /api/changes/rule', () => {
   it('answers the rule a create would fall under, and stages, writes and announces nothing', async () => {
@@ -62,6 +84,24 @@ describe('POST /api/changes/rule', () => {
     expect(rule.sentence).toMatch(/Propose it instead\.$/)
     expect((await view()).ops.map((o: { record: string }) => o.record)).toEqual(['members:ana'])
     expect(events).toEqual([])
+  })
+
+  // Review I-1: judged where the tray judges it (L6 §3.2), at the ops' targets, not by class alone, so the form's line
+  // never says "applies at once" for a create the tray will hold for approval, nor the reverse.
+  it('a create in a collection a raised rule covers is not direct, as the tray says', async () => {
+    setup(RAISED)
+    const rule = await (await wouldRule({ ops: [TASK] })).json()
+    expect(rule).toMatchObject({ direct: false })
+    expect((await stageOps([TASK])).status).toBe(200)
+    expect((await view()).rule).toEqual(rule)
+  })
+
+  it('a create in a collection a looser rule covers is direct under a strict workspace rule, as the tray says', async () => {
+    setup(LOOSER)
+    const rule = await (await wouldRule({ ops: [TASK] })).json()
+    expect(rule).toMatchObject({ direct: true })
+    expect((await stageOps([TASK])).status).toBe(200)
+    expect((await view()).rule).toEqual(rule)
   })
 
   it('a body that is not ops is 400 in words', async () => {

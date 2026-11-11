@@ -549,18 +549,20 @@ async function outcomeOn(system: Record<string, unknown>, step: Step, get: (url:
   }
 
   const signatures = { confirmations: tx.confirmations?.length ?? 0, required: tx.confirmationsRequired }
+  // L7 gap B2: what the transaction does, now that it is the one attached (its hash checked), for the check to decode
+  const described = { tx: { to: String(tx.to), operation: tx.operation as number, data: tx.data ?? null } }
   if (tx.isExecuted) {
     const onChain = {
       ...(Number.isSafeInteger(tx.blockNumber) ? { block: tx.blockNumber as number } : {}),
       ...(typeof tx.transactionHash === 'string' && SAFE_TX_HASH.test(tx.transactionHash) ? { txHash: tx.transactionHash.toLowerCase() } : {}),
     }
-    if (tx.isSuccessful === true) return { ok: true, outcome: 'executed', ...signatures, detail: `executed on ${tx.executionDate}`, ...onChain }
-    if (tx.isSuccessful === false) return { ok: true, outcome: 'failed', ...signatures, detail: `executed on ${tx.executionDate}, and the transaction failed`, ...onChain }
+    if (tx.isSuccessful === true) return { ok: true, outcome: 'executed', ...signatures, detail: `executed on ${tx.executionDate}`, ...onChain, ...described }
+    if (tx.isSuccessful === false) return { ok: true, outcome: 'failed', ...signatures, detail: `executed on ${tx.executionDate}, and the transaction failed`, ...onChain, ...described }
     // Executed; success not known yet (L7 §11.1): pending to the evaluator, never ready to a card.
-    return { ok: true, outcome: 'pending', executed: true, ...signatures, detail: `executed on ${tx.executionDate}; the Safe does not say yet whether it succeeded`, ...onChain }
+    return { ok: true, outcome: 'pending', executed: true, ...signatures, detail: `executed on ${tx.executionDate}; the Safe does not say yet whether it succeeded`, ...onChain, ...described }
   }
   if (await nonceMoved(tx.nonce)) return mismatch(NONCE_MOVED)
-  return { ok: true, outcome: 'pending', ...signatures, detail: `${signatures.confirmations} of ${signatures.required} signatures` }
+  return { ok: true, outcome: 'pending', ...signatures, detail: `${signatures.confirmations} of ${signatures.required} signatures`, ...described }
 }
 
 /**

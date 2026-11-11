@@ -1,0 +1,5 @@
+name: riverbend-commons
+adapter: repo-data
+target: "."
+peers:
+  open-seed-library: "data/kb/cards/open-seed-library.yaml"

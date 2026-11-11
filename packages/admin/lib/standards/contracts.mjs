@@ -4,6 +4,7 @@
 // contract. Reads only the public projection. A Safe's extensions carry counts, never owners (rule 9).
 // Pure; relative imports only (vendored into instances).
 import { HATS_V1 } from '../hats.mjs'
+import { isComposed } from '../compose.mjs'
 import { contractIdsOf } from './ids.mjs'
 
 const CONTEXT = 'https://www.daostar.org/schemas'
@@ -46,6 +47,9 @@ export function contractsDoc(pub) {
   for (const system of pub.systems) {
     const kind = String(system.kind)
     if (!ON_CHAIN.has(kind)) continue
+    if (isComposed(system)) continue // a plan, not a contract (L7 §4)
+    // a registration by ENS text (L7-D13) is a text record of a name, not a contract: nothing to list, nothing to warn
+    if (kind === 'daouri-registration' && text(system.ens) && !text(system.address)) continue
     const ids = contractIdsOf(system)
     if (ids.length === 0) {
       problems.push({ level: 'warn', file: 'contracts.json', text: `system ${String(system.id)} (${kind}) has no usable chain and address (is the address quoted in YAML?): not listed as a contract` })

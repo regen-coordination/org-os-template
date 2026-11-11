@@ -66,10 +66,12 @@ export async function propose(base: string, input: { title: string; rationale?: 
 
 const setEmail = (repo: string, email: string) => execFileSync('git', ['config', 'user.email', email], { cwd: repo, stdio: 'pipe' })
 
-export interface Seeded { proposal: string; project: string }
+export interface Seeded { proposal: string; project: string; page: string; privatePage: string }
 
 /** Seeds a running fixture started with `governance: GOVERNANCE, systems: SYSTEMS`: `contributor` proposes a status
- *  change of the project, then `steward-a` stages a change of its tags. Leaves the fixture acting as `steward-a`. */
+ *  change of the project, then `steward-a` stages a change of its tags, writes a page (one workspace commit) and a private
+ *  page kept at the maintainer role (a record of the private store's `pages`, no commit; DAO-OS L6 Task 21). Leaves the
+ *  fixture acting as `steward-a`. */
 export async function seed(fx: { base: string; repo: string }): Promise<Seeded> {
   const project = 'proj-001'
   let proposal: string
@@ -81,7 +83,9 @@ export async function seed(fx: { base: string; repo: string }): Promise<Seeded> 
     setEmail(fx.repo, STEWARD_EMAIL)
   }
   await stage(fx.base, [{ op: 'update', record: `projects:${project}`, set: { tags: ['nodes', 'onboarding', 'season-two'] } }])
-  return { proposal, project }
+  const page = await send<{ id: string }>(fx.base, '/api/pages', { title: 'Season notes', markdown: 'What the second season plans, and who leads it.\n' })
+  const privatePage = await send<{ id: string }>(fx.base, '/api/pages', { title: 'Maintainers room', visibility: 'role:maintainer', markdown: 'Kept for the maintainers.\n' })
+  return { proposal, project, page: page.id, privatePage: privatePage.id }
 }
 
 /** One route the acceptance walks visit: its path, the stem its shots are stored under (`<slug>-<width>-<theme>.png`),
@@ -106,18 +110,30 @@ export async function acceptanceRoutes(base: string, s: Seeded): Promise<Accepta
       '/b/partners', '/b/ideas', '/b/meetings', '/b/organization', '/b/systems', '/b/outside-systems', '/b/sources',
       '/b/crew', '/b/modules', '/b/fleet', '/activity', '/all'].map(plain),
     { slug: 'all-registry', path: `/all/${encodeURIComponent(registry)}` },
+    // DAO-OS L6 Task 19: the Sources page, and the source editor on a file it edits whole
+    plain('/sources'),
+    { slug: 'files-governance', path: '/files/data/governance.yaml' },
     ...['/boards', '/governance/proposals', '/governance/decisions', '/governance/rules'].map(plain),
     { slug: 'proposal', path: proposal },
     { slug: 'record-project', path: `/r/project/${encodeURIComponent(s.project)}` },
     { slug: 'record-safe', path: `/r/system/${encodeURIComponent(SAFE_ID)}` },
+    // DAO-OS L6 Task 21: a page, and a private page (a record the private store keeps)
+    { slug: 'page', path: `/p/${encodeURIComponent(s.page)}` },
+    { slug: 'page-private', path: `/p/${encodeURIComponent(s.privatePage)}` },
     plain('/new/projects'),
     // the stepped form (spec 2026-11-04 §3, Option B) on a wide screen: a narrow one gets it at /new/projects already
     { slug: 'new-projects-steps', path: '/new/projects?steps=1' },
     plain('/library'),
     { slug: 'library-entry', path: `/library/${encodeURIComponent(entry)}` },
-    ...['/wizards/claim-handle', '/wizards/open-instance', '/changes', '/door', '/does-not-exist'].map(plain),
+    ...['/wizards/claim-handle', '/wizards/open-instance', '/changes', '/portal', '/does-not-exist'].map(plain),
     { slug: 'home-public', path: '/', preview: 'public' },
     { slug: 'proposal-public', path: proposal, preview: 'public' },
+    // DAO-OS L7 Task 17: the compose canvas (nothing composed on this fixture: the canvas and its shelf), and as Public
+    plain('/compose'),
+    { slug: 'compose-public', path: '/compose', preview: 'public' },
+    // DAO-OS L7 Task 18: the deployment's steps (nothing composed on this fixture: the plan's sentence), and as Public
+    plain('/deploy'),
+    { slug: 'deploy-public', path: '/deploy', preview: 'public' },
   ]
 }
 
@@ -135,10 +151,21 @@ export async function settle(page: Page): Promise<void> {
   if (await page.locator('.react-flow').count() > 0) await page.locator('.react-flow__node').first().waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {})
 }
 
-/** Previews the page as Public from the View as control the frame shows (the top bar's, or the phone bar's eye), and
- *  waits for the band. */
+/** settle, then the frame's own reads too (L7 Task 18 review M-5, PF-R211): the sidebar's groups and counts (the
+ *  Instance group, Needs you's count) come from reads of their own, which a page's h1 and skeletons do not wait for. A
+ *  fresh browser context's first page, on a server not yet read from, drew its sidebar before them, so `main` (as tall as
+ *  the frame) came out 36 px short. The route shots wait until the network has been quiet for half a second. */
+export async function settleFrame(page: Page): Promise<void> {
+  await settle(page)
+  await page.waitForLoadState('networkidle', { timeout: 15_000 })
+}
+
+/** Previews the page as Public from the View as control the frame shows (the top bar's, or the phone bar's eye), waits
+ *  for the band, then for the page drawn again from what the server answers the public (the walk review's G1: a preview
+ *  reads every answer again, `?as=public`). */
 export async function viewAsPublic(page: Page): Promise<void> {
   await page.locator('[data-view-as] button[aria-haspopup]').filter({ visible: true }).first().click()
   await page.getByRole('menuitemradio', { name: 'Public' }).click()
   await page.locator('.band').waitFor()
+  await settleFrame(page)
 }

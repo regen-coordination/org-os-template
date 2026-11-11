@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react'
+import { Link } from 'wouter'
 import { Button } from '../../design/Button.tsx'
 import { FieldRow, FieldTable } from '../../design/FieldRow.tsx'
 import { Icon, kindIcon } from '../../design/Icon.tsx'
 import { KindTile } from '../../design/KindTile.tsx'
+import { Note } from '../../design/Note.tsx'
 import { StatusMark } from '../../design/StatusMark.tsx'
 import { edgeGeometry, relationSentence, type Box } from '../../map/HouseEdge.tsx'
 import { HouseNode, type MapNodeData } from '../../map/HouseNode.tsx'
@@ -13,9 +15,11 @@ import { chainName } from '../atoms/chain.ts'
 import { kindWord } from '../records/RecordHeader.tsx'
 import type { StageOp } from '../../api.ts'
 import {
-  COMPOSE, canConnect, moveBy, nextOrder, opsForConnect, opsForDelete, opsForMove, opsForPlace, opsForRename, preparedCount, relationOf,
-  type ComposeEdge, type ComposeNode,
+  COMPOSE, DEPLOYED, DRAG_THRESHOLD_PX, HAT_HELD, ON_CHAIN, canConnect, contextOf, estimateSteps, isHat, keyOfHat, moveBy, nextOrder, opsForConnect, opsForDelete, opsForMove, opsForPlace,
+  opsForRename, opsForText, opsForThreshold, preparedCount, relationOf, removedWith, treeOfHat,
+  type ComposeCtx, type ComposeEdge, type ComposeNode,
 } from './compose.ts'
+import { CHAIN_HELD_SENTENCE } from '../../../../lib/chain-held.mjs'
 
 const DIRS: Record<string, Dir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }
 const SIDES = ['n', 'e', 's', 'w'] as const
@@ -25,6 +29,10 @@ const ROOM = 48
 
 const boxOf = (n: ComposeNode): Box => ({ x: n.x - COMPOSE.nodeW / 2, y: n.y - COMPOSE.nodeH / 2, w: COMPOSE.nodeW, h: COMPOSE.nodeH })
 const edgeKey = (e: Pick<ComposeEdge, 'from' | 'to'>) => `${e.from}>${e.to}`
+
+/** `0x00000000…00a1` for `eip155:11155111:0x…a1`: enough to tell owners apart. */
+const shortAddress = (caip: string) => { const a = caip.slice(caip.lastIndexOf(':') + 1); return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a }
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'hat'
 
 /** A fresh id for a node of this kind: `<kind>-<n>`, the first n not taken. */
 function freshId(kind: string, nodes: ComposeNode[]): string {
@@ -51,8 +59,23 @@ export function ComposeCanvas(p: {
   shelf: string[]; nodes: ComposeNode[]; edges: ComposeEdge[]; chain: string; onStage(ops: StageOp[]): void
   /** The node selected at first (a /parts specimen's); the Review order and Propose actions, L7's to wire. */
   selected?: string; onReview?(): void; onPropose?(): void
+  /** The planner's count of prepared transactions (spec §8.2). Left out (a /parts specimen), the canvas estimates from
+   *  its nodes; `null` is a page that has no plan read yet (/compose until Task 11's GET /api/deploy): no count is drawn. */
+  prepared?: { steps: number } | null
+  /** Whether the actor's change stages any of this composition. Without it (`false`) the foot says the composition is
+   *  composed, and offers no Review order or Propose: there is nothing to review. */
+  staged?: boolean
+  /** Drawn without its write controls, as previewing draws it: an actor who may not write here (no member). */
+  readOnly?: boolean
+  /** Where the plan's steps are (/deploy, DAO-OS L7 Task 18): the foot links there beside the count. Left out (no plan
+   *  read, a /parts specimen), no link. */
+  deployHref?: string
+  /** The composed Systems the chain holds: every step of theirs the plan prepares is done (GET /api/deploy), while the
+   *  records still say composed until Read back records them (whole-platform walk I13). Such a node, and a hat of such a
+   *  tree, reads "on chain", not "not deployed". */
+  onChain?: ReadonlySet<string>
 }) {
-  const canWrite = useCanWrite()
+  const canWrite = useCanWrite() && !p.readOnly
   const [nodes, setNodes] = useState(p.nodes)
   const [edges, setEdges] = useState(p.edges)
   const [selected, setSelected] = useState<string | null>(p.selected ?? null)
@@ -61,8 +84,25 @@ export function ComposeCanvas(p: {
   const [focusId, setFocusId] = useState<string | null>(null)
   const canvas = useRef<HTMLDivElement>(null)
   const plane = useRef<HTMLDivElement>(null)
+  const [refusal, setRefusal] = useState<string | null>(null)
   const drag = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null)
+  /** Drops the listeners of the pointer gesture in progress, if any. */
+  const letGo = useRef<(() => void) | null>(null)
+  const pending = useRef<{ nodes: ComposeNode[]; edges: ComposeEdge[] } | null>(null)
   const nameId = useId()
+  const descriptionId = useId()
+  const notesId = useId()
+
+  // New props re-seed the canvas, unless a drag is in progress: then they wait for its end (B9 M-2).
+  const seeded = useRef({ nodes: p.nodes, edges: p.edges })
+  useEffect(() => {
+    if (seeded.current.nodes === p.nodes && seeded.current.edges === p.edges) return
+    seeded.current = { nodes: p.nodes, edges: p.edges }
+    if (drag.current) { pending.current = seeded.current; return }
+    setNodes(p.nodes); setEdges(p.edges)
+  }, [p.nodes, p.edges])
+  const reseed = () => { const q = pending.current; pending.current = null; if (q) { setNodes(q.nodes); setEdges(q.edges) } }
+  useEffect(() => () => letGo.current?.(), [])
 
   useEffect(() => {
     if (focusId === null) return
@@ -72,7 +112,8 @@ export function ComposeCanvas(p: {
 
   const byId = new Map(nodes.map(n => [n.id, n]))
   const nameOf = (id: string) => byId.get(id)?.name ?? id
-  const stage = (ops: StageOp[]) => p.onStage(ops)
+  const stage = (ops: StageOp[]) => { if (ops.length > 0) p.onStage(ops) }
+  const ctxFor = (es: ComposeEdge[], ns: ComposeNode[] = nodes): ComposeCtx => contextOf(ns, es, p.chain)
 
   const place = (kind: string, at?: { x: number; y: number }) => {
     const c = canvas.current
@@ -80,14 +121,33 @@ export function ComposeCanvas(p: {
       ? { x: c.scrollLeft + c.clientWidth / 2, y: c.scrollTop + c.clientHeight / 2 }
       : { x: COMPOSE.canvasW / 2, y: COMPOSE.canvasH / 2 }
     const pos = at ?? centre
-    const n: ComposeNode = { id: freshId(kind, nodes), kind, name: `New ${kindWord(kind)}`, x: Math.round(pos.x), y: Math.round(pos.y), order: kind === 'link' ? 0 : nextOrder(nodes) }
+    const name = `New ${kindWord(kind)}`
+    // A hat lives in a tree: the selected hat's or tree's (a deployed one refuses it), else the first composed one.
+    const treeId = kind !== 'hat' ? undefined : [sel && (isHat(sel.id) ? treeOfHat(sel.id) : sel.kind === 'hats-tree' ? sel.id : undefined), nodes.find(m => m.kind === 'hats-tree' && !m.deployed)?.id].find(Boolean)
+    const taken = new Set(nodes.map(m => m.id))
+    let key = slug(name), k = 2
+    while (treeId && taken.has(`${treeId}/${key}`)) key = `${slug(name)}-${k++}`
+    const n: ComposeNode = {
+      id: kind === 'hat' ? `${treeId ?? ''}/${key}` : freshId(kind, nodes), kind, name, x: Math.round(pos.x), y: Math.round(pos.y),
+      order: kind === 'link' || kind === 'hat' ? 0 : nextOrder(nodes), ...(kind === 'hat' && treeId ? { tree: treeId, wearers: [] } : {}),
+      // a placed System is composed (opsForPlace's record says so): a Safe may wear a new tree's top hat at once
+      ...(kind === 'hat' ? {} : { deployment: { status: 'composed' } }),
+    }
+    const ops = opsForPlace(kind === 'hat' && !treeId ? { ...n, id: key } : n, ctxFor(edges))
+    if (typeof ops === 'string') { setRefusal(ops); return } // the error note says it once (Note)
+    setRefusal(null)
     setNodes(ns => [...ns, n])
     setSelected(n.id)
     setFocusId(n.id)
-    stage(opsForPlace(n))
+    stage(ops)
     announce(`${n.name} placed. Arrows move it.`)
   }
 
+  const setThreshold = (n: ComposeNode, t: number) => {
+    if (!n.owners || t < 1 || t > n.owners.length) return
+    moveTo({ ...n, threshold: t })
+    stage(opsForThreshold({ ...n, threshold: t }, t))
+  }
   const moveTo = (next: ComposeNode) => setNodes(ns => ns.map(n => (n.id === next.id ? next : n)))
 
   const connect = (from: string, to: string) => {
@@ -100,9 +160,11 @@ export function ComposeCanvas(p: {
     if (ok === true) {
       const label = relationOf(a.kind, b.kind)!
       const next = [...rest, { from, to, label }]
+      const ops = opsForConnect(from, next, ctxFor(next))
+      if (typeof ops === 'string') { setEdges([...rest, { from, to, label: '', invalid: ops }]); setNote(edgeKey({ from, to })); return }
       setEdges(next)
       if (note === edgeKey({ from, to })) setNote(null)
-      stage(opsForConnect(from, next))
+      stage(ops)
       announce(`${relationSentence(a.name, label, b.name)}. Staged.`)
     } else {
       setEdges([...rest, { from, to, label: '', invalid: ok }])
@@ -111,10 +173,13 @@ export function ComposeCanvas(p: {
   }
 
   const remove = (id: string) => {
-    const ops = opsForDelete(id, edges)
-    setNodes(ns => ns.filter(n => n.id !== id))
-    setEdges(es => es.filter(e => e.from !== id && e.to !== id))
-    if (note && note.split('>').includes(id)) setNote(null)
+    const ctx = ctxFor(edges)
+    const ops = opsForDelete(id, edges, ctx)
+    if (typeof ops === 'string') { announce(ops); return } // a deployed System is not removed here (L7 gap B1)
+    const gone = removedWith(id, ctx)
+    setNodes(ns => ns.filter(n => !gone.has(n.id)))
+    setEdges(es => es.filter(e => !gone.has(e.from) && !gone.has(e.to)))
+    if (note && note.split('>').some(x => gone.has(x))) setNote(null)
     setSelected(null)
     setConnecting(null)
     canvas.current?.focus()
@@ -144,6 +209,7 @@ export function ComposeCanvas(p: {
       return
     }
     const n = byId.get(id)
+    // a deployed System moves and connects as any (L7 gap B1); what the chain holds of it is never staged here
     if (!n || e.altKey || e.metaKey || e.ctrlKey) return
     if (DIRS[e.key]) {
       e.preventDefault()
@@ -166,38 +232,51 @@ export function ComposeCanvas(p: {
     setSelected(id)
   }
 
-  // A pointer drags a node (its position staged when it lands) or, from a handle, a connection to the node it is let go on.
+  // A pointer drags a node (its position staged when it lands, once it has travelled DRAG_THRESHOLD_PX) or, from a
+  // handle, a connection to the node it is let go on. pointercancel ends either with nothing staged.
   const grab = (e: PointerEvent, id: string) => {
     if (!canWrite || e.button !== 0) return
     const n = byId.get(id)
     const r = plane.current?.getBoundingClientRect()
     if (!n || !r) return
-    drag.current = { id, dx: e.clientX - r.left - n.x, dy: e.clientY - r.top - n.y, moved: false }
-    const move = (ev: globalThis.PointerEvent) => {
-      const d = drag.current
-      if (!d) return
-      d.moved = true
-      moveTo({ ...n, x: Math.max(COMPOSE.nodeW / 2, Math.round(ev.clientX - r.left - d.dx)), y: Math.max(COMPOSE.nodeH / 2, Math.round(ev.clientY - r.top - d.dy)) })
-    }
-    const up = (ev: globalThis.PointerEvent) => {
+    letGo.current?.()
+    const from = { x: e.clientX, y: e.clientY }
+    const d = { id, dx: e.clientX - r.left - n.x, dy: e.clientY - r.top - n.y, moved: false }
+    drag.current = d
+    const at = (ev: globalThis.PointerEvent): ComposeNode => ({ ...n, x: Math.max(COMPOSE.nodeW / 2, Math.round(ev.clientX - r.left - d.dx)), y: Math.max(COMPOSE.nodeH / 2, Math.round(ev.clientY - r.top - d.dy)) })
+    const end = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
-      const d = drag.current
+      window.removeEventListener('pointercancel', cancel)
       drag.current = null
-      if (d?.moved) stage(opsForMove({ ...n, x: Math.max(COMPOSE.nodeW / 2, Math.round(ev.clientX - r.left - d.dx)), y: Math.max(COMPOSE.nodeH / 2, Math.round(ev.clientY - r.top - d.dy)) }))
+      letGo.current = null
+      reseed()
     }
+    const move = (ev: globalThis.PointerEvent) => {
+      if (!d.moved && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < DRAG_THRESHOLD_PX) return
+      d.moved = true
+      moveTo(at(ev))
+    }
+    const up = (ev: globalThis.PointerEvent) => { const moved = d.moved; end(); if (moved) stage(opsForMove(at(ev))) }
+    const cancel = () => { const moved = d.moved; end(); if (moved) moveTo(n) }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', cancel)
+    letGo.current = end
   }
   const pull = (e: PointerEvent, from: string) => {
     if (!canWrite || e.button !== 0) return
     e.stopPropagation()
+    letGo.current?.()
+    const end = () => { window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', end); letGo.current = null }
     const up = (ev: globalThis.PointerEvent) => {
-      window.removeEventListener('pointerup', up)
+      end()
       const to = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('.cmp-canvas [data-node-id]')?.dataset.nodeId
       if (to) connect(from, to)
     }
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', end)
+    letGo.current = end
   }
 
   const onDragOver = (e: DragEvent) => { if (canWrite && e.dataTransfer.types.includes(KIND_DRAG)) e.preventDefault() }
@@ -214,6 +293,17 @@ export function ComposeCanvas(p: {
   const bad = note ? edges.find(e => edgeKey(e) === note && e.invalid) : undefined
   const badAt = bad && byId.has(bad.from) && byId.has(bad.to) ? edgeGeometry(boxOf(byId.get(bad.from)!), boxOf(byId.get(bad.to)!)) : null
   const sel = selected ? byId.get(selected) : undefined
+  // L7 gap B1: what the chain holds of a deployed System is shown read only, with the sentence; a hat of a deployed tree is
+  // all the chain's
+  const held = (field: string) => (sel?.deployed ? CHAIN_HELD_SENTENCE(field) : undefined)
+  const heldHat = !!sel?.deployed && isHat(sel.id)
+  // the planner's count, else (a specimen) an estimate; none while a page has read no plan
+  const count = p.prepared ? preparedCount(p.prepared) : p.prepared === null ? null : estimateSteps(nodes, edges)
+  const staged = p.staged !== false
+  /** A node still composed in the records whose System the chain holds (walk I13). */
+  const chainHolds = (n: ComposeNode) => !n.deployed && !!p.onChain?.has(n.tree ?? n.id)
+  const composedNodes = nodes.filter(n => !n.deployed)
+  const allOnChain = composedNodes.length > 0 && composedNodes.every(chainHolds)
 
   return (
     <div className="cmp">
@@ -228,6 +318,7 @@ export function ComposeCanvas(p: {
                 <Icon name={kindIcon(kind)} size="sm" /><span className="cmp-item-l">{kindWord(kind)}</span><span className="cmp-grip"><Icon name="grip" size="xs" /></span>
               </button>
             ))}
+            {refusal && <Note state="error">{refusal}</Note>}
           </div>
         )}
         <div ref={canvas} className="cmp-canvas" role="group" aria-label={`Compose canvas, ${nodes.length} Systems`} tabIndex={-1} onDragOver={onDragOver} onDrop={onDrop}>
@@ -241,12 +332,13 @@ export function ComposeCanvas(p: {
               const on = n.id === selected
               const data: MapNodeData = {
                 item: { id: n.id, kind: n.kind, name: n.name }, facts: n.kind === 'link' ? 'link' : chainName(p.chain),
-                states: on ? ['draft', 'selected'] : ['draft'], order: n.order > 0 ? n.order : undefined,
+                states: chainHolds(n) ? (on ? ['selected'] : []) : on ? ['draft', 'selected'] : ['draft'],
+                order: n.order > 0 && !chainHolds(n) ? n.order : undefined,
               }
               return (
                 <div key={n.id} className="cmp-node" style={{ left: n.x, top: n.y }}
                   onClick={() => onNodeClick(n.id)} onKeyDown={e => onNodeKey(e, n.id)} onPointerDown={e => grab(e, n.id)}>
-                  <HouseNode data={data} className={connecting?.target === n.id ? 'cmp-target' : undefined} />
+                  <HouseNode data={data} className={connecting?.target === n.id ? 'cmp-target' : undefined} tag={chainHolds(n) ? 'on chain' : undefined} />
                   {on && canWrite && SIDES.map(s => <span key={s} className={`cmp-handle cmp-handle-${s}`} data-side={s} aria-hidden="true" onPointerDown={e => pull(e, n.id)} />)}
                 </div>
               )
@@ -263,20 +355,74 @@ export function ComposeCanvas(p: {
             <>
               <div className="insp-h">
                 <KindTile kind={sel.kind} tone="moss" />
-                <div className="insp-hm"><div className="insp-k">{kindWord(sel.kind)} · not deployed</div><h3 className="insp-t">{sel.name}</h3></div>
+                <div className="insp-hm"><div className="insp-k">{kindWord(sel.kind)} · {sel.deployed ? 'deployed' : chainHolds(sel) ? 'deployed on chain' : 'not deployed'}</div><h3 className="insp-t">{sel.name}</h3></div>
               </div>
               <div className="insp-b">
+                {sel.deployed && <p className="cmp-hint">{DEPLOYED}</p>}
+                {chainHolds(sel) && <p className="cmp-hint">{ON_CHAIN}</p>}
                 <FieldTable label={`${sel.name} fields`}>
-                  <FieldRow label="Name" htmlFor={canWrite ? nameId : undefined}>
-                    {canWrite
+                  {/* L7 gap B1: a deployed System's name, description and notes are its record's; a deployed tree's hat's
+                      name is its details, which the chain holds */}
+                  <FieldRow label="Name" htmlFor={canWrite && !heldHat ? nameId : undefined} help={heldHat ? HAT_HELD : undefined}>
+                    {canWrite && !heldHat
                       ? <input key={sel.id} id={nameId} className="input" defaultValue={sel.name} onBlur={e => {
                           const name = e.currentTarget.value.trim()
-                          if (name && name !== sel.name) { moveTo({ ...sel, name }); stage(opsForRename(sel.id, name)) }
+                          if (!name || name === sel.name) return
+                          const ops = opsForRename(sel.id, name, ctxFor(edges, nodes))
+                          if (typeof ops === 'string') { announce(ops); return }
+                          moveTo({ ...sel, name }); stage(ops)
                         }} />
                       : sel.name}
                   </FieldRow>
-                  <FieldRow label="Chain">{chainName(p.chain)}</FieldRow>
-                  {sel.order > 0 && <FieldRow label="Deploys"><span className="mono">{sel.order} of {preparedCount(nodes, edges)}</span></FieldRow>}
+                  {!isHat(sel.id) && (canWrite || sel.description) && (
+                    <FieldRow label="Description" htmlFor={canWrite ? descriptionId : undefined}>
+                      {canWrite
+                        ? <input key={sel.id} id={descriptionId} className="input" defaultValue={sel.description ?? ''} onBlur={e => {
+                            const value = e.currentTarget.value.trim()
+                            if (value === (sel.description ?? '')) return
+                            moveTo({ ...sel, description: value || undefined }); stage(opsForText(sel.id, 'description', value))
+                          }} />
+                        : sel.description}
+                    </FieldRow>
+                  )}
+                  {!isHat(sel.id) && (canWrite || sel.notes) && (
+                    <FieldRow label="Notes" htmlFor={canWrite ? notesId : undefined}>
+                      {canWrite
+                        ? <textarea key={sel.id} id={notesId} className="input" rows={2} defaultValue={sel.notes ?? ''} onBlur={e => {
+                            const value = e.currentTarget.value.trim()
+                            if (value === (sel.notes ?? '')) return
+                            moveTo({ ...sel, notes: value || undefined }); stage(opsForText(sel.id, 'notes', value))
+                          }} />
+                        : sel.notes}
+                    </FieldRow>
+                  )}
+                  <FieldRow label="Chain" help={held('chain')}>{chainName(p.chain)}</FieldRow>
+                  {sel.deployed && sel.address && !isHat(sel.id) && (
+                    <FieldRow label="Address" help={held('address')}><span className="mono">{shortAddress(sel.address)}</span></FieldRow>
+                  )}
+                  {sel.owners && (
+                    <FieldRow label="Owners" help={held('deployment.owners')}>
+                      <ul className="cmp-list" aria-label="Owners">{sel.owners.map(o => <li key={o} className="mono">{shortAddress(o)}</li>)}</ul>
+                    </FieldRow>
+                  )}
+                  {sel.owners && sel.threshold !== undefined && (
+                    <FieldRow label="Threshold" help={held('deployment.threshold')}>
+                      {sel.deployed || !canWrite ? <span className="mono">{sel.threshold} of {sel.owners.length}</span> : <span className="stepper">
+                        <Button small iconOnly label="Lower threshold" unavailable={sel.threshold <= 1 ? 'At least one owner must sign.' : undefined}
+                          onClick={() => setThreshold(sel, sel.threshold! - 1)}>−</Button>
+                        <span className="mono">{sel.threshold} of {sel.owners.length}</span>
+                        <Button small iconOnly label="Raise threshold" unavailable={sel.threshold >= sel.owners.length ? 'No more than the number of owners.' : undefined}
+                          onClick={() => setThreshold(sel, sel.threshold! + 1)}>+</Button>
+                      </span>}
+                    </FieldRow>
+                  )}
+                  {sel.wearers && (
+                    <FieldRow label="Wearers" help={heldHat ? undefined : held('hats')}>
+                      {sel.wearers.length === 0 ? <span className="faint">No one yet</span>
+                        : <ul className="cmp-list" aria-label="Wearers">{sel.wearers.map(o => <li key={o} className="mono">{shortAddress(o)}</li>)}</ul>}
+                    </FieldRow>
+                  )}
+                  {sel.order > 0 && <FieldRow label="Deploys"><span className="mono">{count === null ? `${sel.order}` : `${sel.order} of ${count}`}</span></FieldRow>}
                   {edges.filter(e => !e.invalid && e.from === sel.id && e.label === 'signs').map(e => (
                     <FieldRow key={edgeKey(e)} label="Signs for">{nameOf(e.to)} <span className="faint">through Hats Signer Gate</span></FieldRow>
                   ))}
@@ -288,11 +434,17 @@ export function ComposeCanvas(p: {
             </>
           ) : <p className="cmp-hint">Select a System to see its fields.</p>}
         </section>
-        <div className="cmp-foot">
-          <StatusMark mark="draft" label="Staged · not yet deployed" />
-          <span>{plural(preparedCount(nodes, edges))}, in order · {chainName(p.chain)}</span>
-          {canWrite && <span className="cmp-acts"><Button onClick={p.onReview}>Review order</Button><Button primary onClick={p.onPropose}>Propose</Button></span>}
-        </div>
+        {/* an empty canvas has nothing composed to say or review (/compose before its first System) */}
+        {nodes.length > 0 && (
+          <div className="cmp-foot">
+            {allOnChain && !staged
+              ? <StatusMark mark="done" label="Deployed on chain · not yet read back" />
+              : <StatusMark mark="draft" label={staged ? 'Staged · not yet deployed' : 'Composed · not yet deployed'} />}
+            {count !== null ? <span>{plural(count)}, in order · {chainName(p.chain)}</span> : <span>{chainName(p.chain)}</span>}
+            {p.deployHref && <Link href={p.deployHref}>Open the prepared steps</Link>}
+            {canWrite && staged && <span className="cmp-acts"><Button onClick={p.onReview}>Review order</Button><Button primary onClick={p.onPropose}>Propose</Button></span>}
+          </div>
+        )}
       </div>
     </div>
   )

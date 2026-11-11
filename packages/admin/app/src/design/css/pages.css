@@ -1,0 +1,130 @@
+/* A page in the Hub (DAO-OS L6 Task 16, spec §15): what L6 adds around L4c's workspace chrome (workspace.css) — the
+   editor's own region inside PageBody's prose (ProseMirror's few required rules, the blocks the dialect adds: raw
+   wells "Kept as written", embeds, alerts, task items), the line with Copy link and who can see the page, Compare's three
+   wells, the floating toolbar and menus, and the page tree's subpage rows. Every length is a token. The page is a
+   positioned box, so the thread (Task 18) can lay over it where the frame is too narrow for it beside. Its class is
+   `hub-page` (Task 18 fix round 1): `pg-page` is a /parts group page's (parts.css), which capped this page at 1272. */
+
+.hub-page { position: relative; }
+
+/* The editable region: ProseMirror's own rules, then the dialect's blocks */
+.pg-editor .ProseMirror { position: relative; white-space: pre-wrap; word-wrap: break-word; font-variant-ligatures: none; outline: none; min-block-size: var(--sp-17); }
+.pg-editor .ProseMirror:focus-visible { outline: none; }
+.pg-editor .ProseMirror pre { white-space: pre-wrap; }
+.pg-editor .ProseMirror-hideselection *::selection { background: transparent; }
+.pg-editor .ProseMirror-selectednode { outline: var(--focus-w) solid var(--focus); outline-offset: var(--rule-w); }
+.pg-editor .ProseMirror-gapcursor { display: none; pointer-events: none; position: absolute; }
+.pg-editor .ProseMirror-focused .ProseMirror-gapcursor { display: block; }
+.pg-editor .ProseMirror-gapcursor::after { content: ""; display: block; position: absolute; inset-block-start: calc(-1 * var(--sp-1)); inline-size: var(--sp-11); border-block-start: var(--rule-w) solid var(--ink); }
+.pg-editor pre { margin: 0 0 var(--sp-10); padding: var(--sp-8) var(--sp-10); background: var(--sunken); border-radius: var(--radius); font: var(--fw-regular) var(--fs-meta)/var(--lh-row) var(--mono); }
+.pg-editor blockquote { margin: 0 0 var(--sp-10); padding-inline-start: var(--sp-10); border-inline-start: var(--rule-w-heavy) solid var(--rule); color: var(--mute); }
+.pg-editor hr { margin: var(--sp-12) 0; border: 0; border-block-start: var(--rule-w) solid var(--rule); }
+.pg-editor table:not(.tv-table) { margin: 0 0 var(--sp-10); border-collapse: collapse; font-size: var(--fs-body); }
+.pg-editor table:not(.tv-table) :is(th, td) { padding: var(--sp-5) var(--sp-7); border: var(--rule-w) solid var(--rule); text-align: start; vertical-align: top; }
+.pg-editor li.task-list-item { list-style: none; }
+.pg-editor li.task-list-item::before { content: "☐"; margin-inline: calc(-1 * var(--sp-11)) var(--sp-5); color: var(--mute); }
+.pg-editor li.task-list-item[data-checked="true"]::before { content: "☑"; }
+.pg-editor .markdown-alert { margin: 0 0 var(--sp-10); padding: var(--sp-9) var(--sp-10); background: var(--sunken); border-radius: var(--radius); font-size: var(--fs-body); line-height: var(--lh-body); }
+.pg-editor .markdown-alert::before { content: attr(data-title); display: block; margin-block-end: var(--sp-4); font-weight: var(--fw-strong); color: var(--mute); }
+.pg-editor .markdown-alert > :last-child { margin-block-end: 0; }
+.pg-editor .hub-embed { margin: 0 0 var(--sp-10); padding: var(--sp-7) var(--sp-10); background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius);
+  font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); }
+.pg-editor .hub-embed::before { content: "Embedded " attr(data-embed) " · "; color: var(--faint); }
+/* Walk I8: an embedded view draws its collection's rows (EmbeddedView), read-only; its block names nothing of its own. */
+.pg-editor .hub-embed-v { padding: var(--sp-7) var(--sp-8); font-size: var(--fs-body); color: var(--ink); }
+.pg-editor .hub-embed-v::before { content: none; }
+.embed-v { display: grid; gap: var(--sp-6); min-width: 0; }
+.embed-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3) var(--sp-6); font-size: var(--fs-meta); line-height: var(--lh-row); }
+.embed-t { font-weight: var(--fw-medium); color: var(--ink); }
+.embed-k { color: var(--faint); }
+.embed-open { margin-inline-start: auto; color: var(--ink); text-decoration: underline; text-underline-offset: var(--sp-2); }
+.embed-more, .embed-absent { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); }
+.pg-editor .hub-raw { margin: 0 0 var(--sp-10); padding: var(--sp-8) var(--sp-10); background: var(--sunken); border-radius: var(--radius);
+  font: var(--fw-regular) var(--fs-meta)/var(--lh-row) var(--mono); white-space: pre-wrap; color: var(--mute); }
+.pg-editor .hub-raw-label { display: block; margin-block-end: var(--sp-4); font-family: var(--sans); font-size: var(--fs-tiny); color: var(--faint); }
+.pg-editor .hub-mention { color: var(--accent); text-decoration: none; }
+.ed-title[contenteditable] { outline: none; }
+.ed-title[contenteditable]:focus-visible { text-decoration: underline var(--rule-w-heavy) var(--focus); text-underline-offset: var(--sp-3); }
+
+/* Copy link and who can see the page */
+.pg-share { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6) var(--sp-8); padding: var(--sp-6) var(--sp-10); border-block-end: var(--rule-w) solid var(--rule); }
+.pg-who { font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--mute); }
+.pg-share > .btn.ghost { margin-inline-start: auto; }
+.pg-share > .btn.ghost ~ .btn.ghost { margin-inline-start: 0; } /* walk I9: Move to… sits beside New subpage */
+.hub-page .ed > .note { margin: var(--sp-6) var(--sp-10) 0; }
+
+/* Compare: base, theirs and mine in Mono wells, then Keep mine and Take theirs */
+.pg-compare { display: grid; gap: var(--sp-8); padding: var(--sp-9) var(--sp-10); background: var(--attn-soft); border-block-end: var(--rule-w) solid var(--rule); }
+.pg-compare-t { margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); }
+.pg-compare-g { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--w-slash), 1fr)); gap: var(--sp-8); }
+.pg-well { margin: 0; min-width: 0; }
+.pg-well figcaption { margin-block-end: var(--sp-4); font-size: var(--fs-tiny); color: var(--mute); }
+.pg-well pre { margin: 0; max-block-size: var(--h-sheet-max); overflow: auto; padding: var(--sp-7) var(--sp-8); background: var(--raised); border-radius: var(--radius-sm);
+  font: var(--fw-regular) var(--fs-tiny)/var(--lh-row) var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.pg-compare-a { display: flex; flex-wrap: wrap; gap: var(--sp-6); }
+
+/* Suggest (L6 Task 16b): the proposal's title and note, what goes to git, then Suggest and Cancel */
+.pg-suggest { display: grid; gap: var(--sp-6); padding: var(--sp-9) var(--sp-10); background: var(--sunken); border-block-end: var(--rule-w) solid var(--rule); }
+.pg-suggest-t, .pg-suggest .meta, .pg-suggest .att { margin: 0; }
+.pg-suggest-t { font-size: var(--fs-body); line-height: var(--lh-body); }
+.pg-suggest-a { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin: 0; }
+.pp-compare { display: grid; gap: var(--sp-6); margin: var(--sp-6) 0 0; }
+.pp-compare > .meta { margin: 0; }
+
+/* The floating chrome: fixed at the caret (the engine says where); the toolbar sits above the selection */
+.pg-float { position: fixed; z-index: 30; }
+.pg-float-above { transform: translateY(calc(-100% - var(--sp-5))); }
+.pg-link { display: grid; gap: var(--sp-6); inline-size: var(--w-mpop); max-inline-size: 100%; box-sizing: border-box; padding: var(--sp-6); }
+.pg-link-a { display: flex; gap: var(--sp-6); }
+
+/* Backlinks under the page */
+.pg-backlinks { padding: 0 var(--sp-10) var(--sp-10); }
+
+/* The page tree on /workspace: subpages indented under their parent */
+.pg-tree { display: grid; gap: var(--sp-6); margin-block-end: var(--sp-13); }
+.pg-tree-h { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); }
+.pg-tree-t { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); }
+.pg-sub.pg-d1 { padding-inline-start: var(--sp-12); }
+.pg-sub.pg-d2 { padding-inline-start: var(--sp-14); }
+.pg-sub.pg-d3 { padding-inline-start: var(--sp-15); }
+
+/* Collections in the Hub (L6 Task 17): the tools under the view header (the save state, Save view…), the small forms
+   (New, Record a meeting, Save this view, New collection) on the filter form's look, a day opened on the calendar */
+.cl-page { display: grid; gap: var(--sp-8); }
+.cl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6) var(--sp-8); min-block-size: var(--sp-12); }
+.cl-tools > .meta { margin: 0; }
+.cl-form { flex-wrap: wrap; }
+.cl-form > .meta, .cl-form > .att { flex-basis: 100%; margin: 0; }
+.cl-day { display: grid; gap: var(--sp-6); }
+.cl-day-h { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); }
+.cl-day-t { margin: 0; font: var(--fw-strong) var(--fs-body)/var(--lh-title) var(--sans); }
+.cl-hub { display: grid; gap: var(--sp-6); margin-block-end: var(--sp-13); }
+.cl-new { display: grid; gap: var(--sp-6); padding: var(--sp-9) var(--sp-10); background: var(--sunken); border-radius: var(--radius); }
+.cl-new .meta, .cl-new .att { margin: 0; }
+.cl-fields { display: grid; gap: var(--sp-6); margin: 0; padding: 0; border: 0; min-inline-size: 0; }
+.cl-field { align-items: flex-end; }
+
+/* Conversation (L6 Task 18): the thread beside the page while the editor keeps 760 beside it (760 + the gap + the
+   thread's 320 = 1104 of the page box); narrower, it lies over the page at its inline end, under the editor bar so the
+   bar's comments toggle (which closes it) stays in reach, as long as it is (L4c C3's carry). Then the
+   lines under a comment (who was not told, the task it became, why it was not sent), a deleted comment, a quote whose
+   text is gone, the passage the next comment will be on, and the mention picker under the composer. */
+.ed-page.hub-page { container: pgpage / inline-size; }
+/* The floating chrome's holder takes no room in the row (its menus are fixed), so the editor meets the thread's edge */
+.ed-page.hub-page > .pg-floats { position: absolute; inset-block-start: 0; inset-inline-start: 0; }
+@container pgpage (max-width: 1103px) {
+  .ed-page.hub-page > .thread-panel { position: absolute; inset-block-start: calc(var(--h-ed-bar) + var(--rule-w)); inset-inline-end: 0; z-index: 2;
+    inline-size: min(var(--w-thread), 100%); box-shadow: var(--shadow-raise); }
+}
+.cmt-notes { display: grid; gap: var(--sp-2); margin: var(--sp-4) 0 0; padding: 0; list-style: none; }
+.cmt-note { font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--mute); overflow-wrap: anywhere; }
+.cmt-note.save-bad { color: var(--attn); }
+.cmt-note a { color: inherit; text-decoration: underline; text-decoration-color: var(--edge); text-underline-offset: var(--sp-2); }
+.cmt-gone { color: var(--faint); font-style: italic; }
+.cmt-q-gone { cursor: default; }
+.cmt-b code { font: var(--fw-regular) var(--fs-meta)/var(--lh-row) var(--mono); }
+.cmt-on { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-4) var(--sp-6); padding: var(--sp-6) var(--sp-10) 0; font-size: var(--fs-tiny);
+  line-height: var(--lh-tiny); color: var(--mute); border-block-start: var(--rule-w) solid var(--rule); }
+.cmt-on + .composer { border-block-start: 0; }
+.cmt-on-t { min-width: 0; overflow-wrap: anywhere; }
+.composer-pop { min-width: 0; }

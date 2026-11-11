@@ -16,7 +16,11 @@ export interface SectionDef {
   absentKey?: string           // the adapter whose absence card explains an empty section
   empty: string                // the Empty line: a board's own list, the map, and the sections without words
   words?: SectionWords         // what an empty section says, and its page head's about line (design pass, 2026-11-04)
+  place?: string               // the page its word opens when that is not its board (walk I15, D1: Meetings is /c/meetings)
 }
+
+/** The page a section's word opens (the sidebar, the palette, the path): its own place, else its board's route. */
+export const placeOf = (def: SectionDef): string => def.place ?? def.route
 
 /** One greyed example row of a filled list: its title, its second column and its end. Never a record. */
 export type ExampleRow = readonly [title: string, second: string, end: string]
@@ -137,11 +141,16 @@ export const SECTIONS: SectionDef[] = [
     empty: 'No partners yet.', words: WORDS.partners },
   { id: 'ideas', label: 'Ideas', route: '/b/ideas', group: 'organization', board: 'organization', kinds: ['idea'], newRegistry: 'ideas',
     empty: 'No ideas yet.', words: WORDS.ideas },
-  { id: 'meetings', label: 'Meetings', route: '/b/meetings', group: 'organization', board: 'organization', kinds: [], registry: 'meetings', newRegistry: 'meetings',
+  // The knowledge commons (spec §2, R-33): a Workspace collection, at L6's collection route. Its presence is the
+  // commons' own — the `knowledge` resource adapter answers one row for it — so it lists without waiting for attention.
+  { id: 'knowledge', label: 'Knowledge', route: '/c/knowledge', group: 'organization', board: 'organization', kinds: ['knowledge'],
+    empty: 'No knowledge commons here yet: its setup page sets one up.' },
+  // walk I15, D1: the word Meetings opens the collection (where "Record a meeting" is); /b/meetings is the Meetings board
+  { id: 'meetings', label: 'Meetings', route: '/b/meetings', place: '/c/meetings', group: 'organization', board: 'organization', kinds: [], registry: 'meetings', newRegistry: 'meetings',
     empty: 'No meetings yet.', words: WORDS.meetings },
   { id: 'treasury', label: 'Treasury', route: '/b/treasury', group: 'organization', board: 'organization', kinds: ['system'],
     systems: e => e.section === TREASURY, newRegistry: 'systems',
-    empty: 'No treasury here. To add one, give data/systems.yaml an entry with section: organization/treasury; a Safe also needs kind: safe, its chain and its address.',
+    empty: 'No treasury here. To add one, add a Safe from the Library, with its chain and its address.',
     words: WORDS.treasury },
   { id: 'crew', label: 'Crew', route: '/b/crew', group: 'systems', board: 'systems', kinds: ['role', 'seat'], absentKey: 'crew',
     empty: 'No crew roles or seats here.' },

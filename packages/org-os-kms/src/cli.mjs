@@ -9,7 +9,7 @@ import { addPeer, checkPeers, contribute } from './federate.mjs';
 import { promote } from './promote.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { buildMap } from './map.mjs';
-import { renderMapHtml, renderPortalIndex } from './render-map-html.mjs';
+import { loadDrawing, MissingMapPackage } from './drawing.mjs';
 import { fetchFrontier } from './frontier.mjs';
 import { OPS } from './ops.mjs';
 import { exportCommons } from './planes/export-commons.mjs';
@@ -32,6 +32,13 @@ function parseFlags(argv) {
   return { args, flags };
 }
 
+// A drawing surface, loaded on demand (R-38). Without the sibling map package: { error } with the plain message.
+async function drawing(name, what, run) {
+  let mod;
+  try { mod = await loadDrawing(name, what); } catch (e) { if (e instanceof MissingMapPackage) return { error: e.message }; throw e; }
+  return run(mod);
+}
+
 export function dispatch(argv, opts = {}) {
   const [verb, ...rest] = argv;
   const { args, flags } = parseFlags(rest);
@@ -45,10 +52,12 @@ export function dispatch(argv, opts = {}) {
     case 'render': {
       if (args[0] === 'map') {
         if (args[1] === 'html') {
-          const now = new Date().toISOString(); // one timestamp → artifact + index stay in sync
-          const html = renderMapHtml({ dir, out: flags.out || 'renders/federation-map.html', now });
-          const portals = renderPortalIndex({ dir, now });
-          return { ok: true, report: { ...html.report, portals: portals.report.wrote } };
+          return drawing('map-html', 'render map html', ({ renderMapHtml, renderLinksIndex }) => {
+            const now = new Date().toISOString(); // one timestamp → artifact + index stay in sync
+            const html = renderMapHtml({ dir, out: flags.out || 'renders/federation-map.html', now });
+            const links = renderLinksIndex({ dir, now });
+            return { ok: true, report: { ...html.report, links: links.report.wrote } };
+          });
         }
         // No loadKmsConfig here — the map degrades gracefully without kms.yaml (spec §6).
         const map = buildMap({ dir, surface: flags.surface || 'web' });
@@ -56,6 +65,10 @@ export function dispatch(argv, opts = {}) {
         mkdirSync(pathDirname(out), { recursive: true });
         writeFileSync(out, JSON.stringify(map, null, 2));
         return { ok: true, report: { wrote: out, nodes: map.nodes.length, edges: map.edges.length } };
+      }
+      if (args[0] === 'pages') {
+        if (flags.preview !== true) return { error: "render pages writes the steward's preview only (--preview); public pages are written by publish when publish.pages is true" };
+        return drawing('pages', 'render pages --preview', ({ writePreview }) => writePreview({ dir }));
       }
       const cfg = loadKmsConfig(dir);
       if (args[0] === 'site') return renderSiteData({ dir, target: cfg.target, outPath: (cfg.render && cfg.render.site_data) || 'src/data/kms-index.json' });

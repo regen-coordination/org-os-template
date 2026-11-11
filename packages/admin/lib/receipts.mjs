@@ -29,6 +29,7 @@ export function receiptIdFor(entryId, taken) {
 /** The registry and id of a record, or null for one that names no collection (other checks say so).
  *  @param {string} record @returns {{ registry: string, id: string } | null} */
 function parsed(record) {
+  if (typeof record !== 'string') return null // a file op names no record (DAO-OS L6 §11.2)
   try { return parseRecord(record) } catch (err) { if (err instanceof StageError) return null; throw err }
 }
 
@@ -80,18 +81,30 @@ function createdOf(receipt) {
   return created.flatMap(item => (item && typeof item === 'object' && typeof item.record === 'string' ? [item.record] : []))
 }
 
+/** The records a receipt says it modified (L7-D11), as written; [] for a value that holds none.
+ *  @param {unknown} receipt @returns {string[]} */
+function modifiedOf(receipt) {
+  const modified = receipt && typeof receipt === 'object' ? /** @type {Entity} */ (receipt).modified : undefined
+  if (!Array.isArray(modified)) return []
+  return modified.flatMap(item => (item && typeof item === 'object' && typeof item.record === 'string' ? [item.record] : []))
+}
+
 const NEVER_DELETED = 'A receipt is never deleted: Remove in the library marks it removed.'
 const ONLY_REMOVE = 'A receipt changes only by Remove in the library, which sets status and removed.'
 /** @param {string} receipt @param {string} record */
 const notCreated = (receipt, record) =>
   `${receipt} names ${record}, which this change does not create. Take the add out as a whole: remove its receipt op too, or discard the change.`
 /** @param {string} receipt @param {string} record */
+const notModified = (receipt, record) =>
+  `${receipt} names ${record} as modified, which this change does not change. Take the add out as a whole: remove its receipt op too, or discard the change.`
+/** @param {string} receipt @param {string} record */
 const notDeleted = (receipt, record) =>
   `${receipt} is marked removed, but ${record} is not deleted by this change. Take the removal out as a whole, or stage it again from the library.`
 
 /**
  * The change as a whole, against the files as they are before it (`entriesOf`). An add is whole: a
- * receipt create names only records the change creates. A removal is whole: a receipt marked removed
+ * receipt create names in `created` only records the change creates, and in `modified` (L7-D11) only records it
+ * updates or replaces. A removal is whole: a receipt marked removed
  * leaves none of its records that still exist without a delete op. A receipt is never deleted or
  * replaced. It moves one way, once: it is created `installed`, and an update sets `status: 'removed'`
  * (with or without `removed`, which the seal fills) on a receipt that is `installed` now, and nothing
@@ -106,6 +119,7 @@ export function receiptProblems(ops, entriesOf) {
   const problems = []
   const creates = new Set(ops.filter(o => o.op === 'create').map(o => o.record))
   const deletes = new Set(ops.filter(o => o.op === 'delete').map(o => o.record))
+  const changes = new Set(ops.filter(o => o.op === 'update' || o.op === 'replace').map(o => o.record))
   /** @param {string} record */
   const existsNow = record => {
     const at = parsed(record)
@@ -124,6 +138,7 @@ export function receiptProblems(ops, entriesOf) {
     if (op.op === 'create') {
       if (op.value.status !== 'installed') refuse(ONLY_REMOVE)
       for (const record of createdOf(op.value)) if (!creates.has(record)) refuse(notCreated(op.record, record))
+      for (const record of modifiedOf(op.value)) if (!changes.has(record)) refuse(notModified(op.record, record))
       continue
     }
     const receipt = entriesOf(RECEIPTS).find(e => named(e, at.id))
@@ -139,8 +154,8 @@ const UNSEALED = 'this receipt was committed without its decision; it was not wr
 
 /**
  * The committed tree: every field the seal fills must be filled. Each receipt with a null `by`, `at`,
- * `decision` or `created[n].base`, or on a removed receipt a null `removed.by/at/decision`, is one
- * problem per field. The shape itself is the schema's to say.
+ * `decision`, `created[n].base` or `modified[n].after`, or on a removed receipt a null `removed.by/at/decision`, is
+ * one problem per field. The shape itself is the schema's to say.
  * @param {Entity[]} entries
  * @returns {{ id: string, path: string, message: string }[]}
  */
@@ -154,6 +169,9 @@ export function checkReceipts(entries) {
     for (const key of ['by', 'at', 'decision']) if (receipt[key] === null) unsealed(key)
     if (Array.isArray(receipt.created)) {
       receipt.created.forEach((item, n) => { if (item && typeof item === 'object' && item.base === null) unsealed(`created.${n}.base`) })
+    }
+    if (Array.isArray(receipt.modified)) {
+      receipt.modified.forEach((item, n) => { if (item && typeof item === 'object' && item.after === null) unsealed(`modified.${n}.after`) })
     }
     const removed = receipt.removed
     if (receipt.status === 'removed' && removed && typeof removed === 'object') {

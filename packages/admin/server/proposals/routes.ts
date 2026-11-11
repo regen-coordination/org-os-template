@@ -8,22 +8,23 @@
 // three in revise.ts), POST /api/proposals/:id/ratify, POST /api/proposals/:id/close, POST
 // /api/proposals/:id/check, whose network read is made before the lock is taken, and POST /api/proposals/:id/prepare
 // (prepare.ts: 0.6's Safe transaction, or a typed action of any system), which reads and writes nothing, so takes no
-// lock; and GET /api/systems/:id/actions, the actions a system's driver prepares.
+// lock; and GET /api/systems/:id/actions, the actions a system's driver prepares. DAO-OS L6 Task 16b (R-L6-SUGGEST):
+// POST /api/sessions/:sid/suggest, a page's editing session (server/workspace/sessions.ts) proposed as Propose proposes.
 
 import type { Context, Hono } from 'hono'
 import type { SystemReader } from '../systems/reader.ts'
 import { HttpError } from '../errors.ts'
-import { Refusal } from '../changes/apply.ts'
+import { Refusal, StageRefusal } from '../changes/apply.ts'
 import { ChangeStore } from '../changes/store.ts'
 import { readStageOps, refuseRevising } from '../changes/routes.ts'
-import { changeClasses, changeView } from '../changes/stage.ts'
+import { changeView, freshen, staleOps, targetsOf } from '../changes/stage.ts'
 import type { Change, Op } from '../changes/types.ts'
-import { actorOf, hatActOf, knownActorOf, readerOf, viewerOf, wearerReadOf, type WithoutReading } from '../request.ts'
+import { actorOf, hatActOf, hatWearersReadOf, knownActorOf, readerOf, viewerOf, wearerReadOf, type WithoutReading } from '../request.ts'
 import { isKnown, walletOf } from '../actor.ts'
 import { readRuleContext } from '../governance/effective.ts'
 import { bookFor, bookOf, readLedger } from './ledger.ts'
 import { actHats, eventPermission, knownIds } from '../../lib/proposals.mjs'
-import { effectiveRules, mayPropose, rulesForClasses, type Rule } from '../../lib/rules.mjs'
+import { WORKSPACE_DIRECT, effectiveRules, mayPropose, rulesForTargets, type Rule } from '../../lib/rules.mjs'
 import { observationsOf, type HatAct } from '../../lib/hat-readings.mjs'
 import { propose, type ProposeDeps, type ProposeInput } from './propose.ts'
 import { writeEvent, readOutcome, recordOutcome, EVENT_KINDS_HERE, type EventInput, type EventKindHere, type OutcomeSource } from './events.ts'
@@ -36,12 +37,19 @@ import { readRegistryOrEmpty } from '../registry.ts'
 import { DRIVERS } from '../systems/drivers.ts'
 import { currentOf } from '../changes/stage.ts'
 import { gateProposals, gateRecord, Levels, MEMBERS, PUBLIC_NO_DIFF, proposalLevel, recordRef, withoutEchoOp } from '../visibility/gate.ts'
-import { admits, formatLevel } from '../../lib/visibility.mjs'
+import { admits, formatLevel, type Viewer } from '../../lib/visibility.mjs'
+import { displayNames } from '../session/names.ts'
+import type { Membership } from '../session/membership.ts'
 import { gitOpsOf } from '../../lib/ops.mjs'
 import { readConfig } from '../visibility/config.ts'
 import { noStore, reach, stagedPrivate, stagedView, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { closingDropsPending, placeholdersOf, shownTo } from '../private/proposals.ts'
 import type { ProposedPrivate } from './propose.ts'
+import { workspaceOf } from '../workspace/routes.ts'
+import { NO_SESSION } from '../workspace/sessions.ts'
+import { fileText, keptPageErrors } from '../workspace/files.ts'
+import { targetsOfOps } from '../changes/stage.ts'
+import { changePrivateTargets } from '../private/targets.ts'
 
 export interface ProposalRoutesDeps extends ProposeDeps, Pick<RatifyDeps, 'ratifyGit'>, Pick<CloseDeps, 'closeGit'> {
   repo: string
@@ -58,6 +66,19 @@ export interface ProposalRoutesDeps extends ProposeDeps, Pick<RatifyDeps, 'ratif
   /** Writes are off (Lane 3 Task 11, C1): a page visit builds no branch and records no reading. The write routes
    *  themselves are refused before they run (hosted/instance-writes.ts). */
   readOnly?: boolean
+  /** Membership from the Hats tree, so a CAIP-10 actor is named by the hat they wear (walk fix wave 4, G9). Absent: by
+   *  their short address. */
+  membership?: Membership | null
+}
+
+/** Walk fix wave 4 (G9: W2, W5; PF-R258): a member is shown who each actor of a proposal is, `names` (`displayNames`, read
+ *  as they may read it): its author, everyone who wrote an event, who closed it. The public is given ids, as before. */
+function withNames<V extends object>(view: V, viewer: Viewer, display: ((id: string) => string) | null): V {
+  if (viewer.kind !== 'member' || !display) return view
+  const v = view as { author?: unknown; events?: unknown; closed?: unknown }
+  const ids = [v.author, ...(Array.isArray(v.events) ? v.events.map(e => (isObject(e) ? e.by : null)) : []), isObject(v.closed) ? v.closed.by : null]
+    .filter((id): id is string => typeof id === 'string' && id !== '' && !id.startsWith('system:'))
+  return { ...view, names: Object.fromEntries([...new Set(ids)].map(id => [id, display(id)])) }
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -78,6 +99,17 @@ export function readProposeInput(body: unknown): ProposeInput {
     ...(body.rationale !== undefined ? { rationale: body.rationale as string } : {}),
     ...(body.statement !== undefined ? { statement: body.statement as Record<string, unknown> } : {}),
   }
+}
+
+const SUGGEST_SHAPE = 'The body must be {"markdown": "...", "title"?: "...", "proposal": {"title": "...", "rationale"?: "..."}}'
+
+/** The body of POST /api/sessions/:sid/suggest (R-L6-SUGGEST): the editor's whole text and the page's title, as a save
+ *  sends them, and the proposal's title and rationale, as Propose reads them. Else a 400 that says what it must be. */
+export function readSuggestInput(body: unknown): { page: { markdown: string; title?: string }; proposal: ProposeInput } {
+  if (!isObject(body) || typeof body.markdown !== 'string') throw new HttpError(400, `${SUGGEST_SHAPE}; "markdown" is missing.`)
+  if (body.title !== undefined && typeof body.title !== 'string') throw new HttpError(400, `${SUGGEST_SHAPE}; "title" is not text.`)
+  if (!isObject(body.proposal)) throw new HttpError(400, `${SUGGEST_SHAPE}; "proposal" is missing.`)
+  return { page: { markdown: body.markdown, ...(body.title !== undefined ? { title: body.title as string } : {}) }, proposal: readProposeInput(body.proposal) }
 }
 
 const EVENT_SHAPE = `The body must be {"kind": "${EVENT_KINDS_HERE.join('" | "')}", "text"?, "vote"?, "of"?, "ref"?}`
@@ -114,6 +146,8 @@ export function readReviseOps(body: unknown): Op[] {
   return ops.map((op, i) => {
     const r = raw[i] as Record<string, unknown>
     if (!Object.hasOwn(r, 'base') || (r.base !== null && typeof r.base !== 'string')) throw new HttpError(400, `${REVISE_SHAPE}; op ${i} has no "base".`)
+    // A file op (L6 §11.2) carries its base and no `before`: the ledger stores it as staged.
+    if (op.op === 'file') return { ...op, base: r.base as string | null }
     return { ...op, base: r.base as string | null, before: null } as Op
   })
 }
@@ -138,7 +172,9 @@ export function readCloseOutcome(body: unknown): CloseOutcome {
   return body.outcome as CloseOutcome
 }
 
-export function mountProposals(app: Hono, { repo, withLock, notify, systems, privateStore = noStore, ...deps }: ProposalRoutesDeps): void {
+export function mountProposals(app: Hono, { repo, withLock, notify, systems, privateStore = noStore, membership = null, ...deps }: ProposalRoutesDeps): void {
+  /** Who each actor is, for `viewer` (one read of the members per answer). */
+  const named = <V extends object>(view: V, viewer: Viewer): V => withNames(view, viewer, viewer.kind === 'member' ? displayNames(repo, membership, { viewer }) : null)
   const changes = new ChangeStore(repo)
   const clock = () => (deps.now ?? (() => new Date()))()
   /** When a page visit last read each attach (view.ts): at most once per the reader's window. */
@@ -148,7 +184,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
   /** Every proposal route answers the proposal as the actor sees it now (a ProposalView: `branchState` is the build
    *  state, `branch` the ledger's name for the branch), with what the write said beside it. */
   const answerView = async (c: Context, id: string, extra: Record<string, unknown>, status = 200): Promise<Response> => {
-    const view: ProposalView = shownTo(await viewById(repo, id, readerOf(c), clock()), viewerOf(c), privateStore, readConfig(repo))
+    const view: ProposalView = named(shownTo(await viewById(repo, id, readerOf(c), clock()), viewerOf(c), privateStore, readConfig(repo)), viewerOf(c))
     return Response.json({ ...view, ...extra }, { status })
   }
   /** A change's private part as Propose or Update proposal carries it (L5 §9.6): its staged ops read back from the store,
@@ -214,7 +250,21 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
     const governance = asking ? readRuleContext(repo, asking).governance : null
     if (!asking || !isKnown(asking) || !staged || (staged.ops.length === 0 && !staged.private?.length) || governance === null) return undefined
     // Its private part's classes too (L5 §10.3): their rules decide it as the git part's do.
-    const rules = rulesForClasses(effectiveRules(governance).rules, changeClasses(staged, repo)).flatMap(r => (r.rule ? [r.rule] : []))
+    // Its targets (L6 §3.2): a workspace op is decided by the rule that raises it, and workspace/direct by no role.
+    const rules = rulesForTargets(effectiveRules(governance).rules, targetsOf(staged, repo, changePrivateTargets(repo, privateStore, staged))).flatMap(r => (r.rule && r.rule !== WORKSPACE_DIRECT ? [r.rule] : []))
+    const book = bookFor(repo, null)
+    return actUnder(c, rules, 'open', () => rules.every(rule => mayPropose(rule, asking.id, book) === true))
+  }
+
+  /** The same for a Suggest (R-L6-SUGGEST): the rules the page's file op is decided by, judged where the page is now. */
+  const actSuggesting = async (c: Context, page: string): Promise<HatAct | undefined> => {
+    const asking = actorOf(c)
+    const governance = asking ? readRuleContext(repo, asking).governance : null
+    const path = `pages/${page}.md`
+    const text = fileText(repo, path)
+    if (!asking || !isKnown(asking) || governance === null || text === null) return undefined
+    const rules = rulesForTargets(effectiveRules(governance).rules, targetsOfOps([{ op: 'file', path, text, base: null }], repo))
+      .flatMap(r => (r.rule && r.rule !== WORKSPACE_DIRECT ? [r.rule] : []))
     const book = bookFor(repo, null)
     return actUnder(c, rules, 'open', () => rules.every(rule => mayPropose(rule, asking.id, book) === true))
   }
@@ -225,7 +275,8 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
   // A proposal on private data is then shown in full only to a viewer admitted to all of it (rule 8, private/proposals.ts).
   app.get('/api/proposals', c => answer(async () => {
     const viewer = viewerOf(c)
-    return Response.json(gateProposals(viewer, await listViews(repo, readerOf(c), clock()), new Levels(repo)).map(v => shownTo(v, viewer, privateStore, readConfig(repo))))
+    const display = viewer.kind === 'member' ? displayNames(repo, membership, { viewer }) : null
+    return Response.json(gateProposals(viewer, await listViews(repo, readerOf(c), clock()), new Levels(repo)).map(v => withNames(shownTo(v, viewer, privateStore, readConfig(repo)), viewer, display)))
   }))
   app.get('/api/proposals/:id', c => answer(async () => {
     const id = c.req.param('id')
@@ -237,6 +288,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
       const [view] = gateProposals(viewer, [await viewById(repo, id, readerOf(c), clock())], levels)
       const entry = readLedger(repo).entries.find(e => String(e.id) === id)
       const current = gitOpsOf(entry?.ops ?? []).map(op => {
+        if (op.op === 'file') return null // a file op names no record (L6 §11.2)
         const { registry } = recordRef(op.record)
         const record = currentOf(repo, String(op.record))
         return record === null ? null : gateRecord(viewer, registry, record, levels.config)
@@ -245,7 +297,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
     }
     const { build, startBranch } = deps
     const detail = await detailView(repo, id, readerOf(c), { withLock, now: clock(), build, startBranch, systems, visits, failedBuilds, hosted: deps.hosted, readOnly: deps.readOnly })
-    return Response.json({ ...shownTo(detail, viewer, privateStore, readConfig(repo)), visibility: formatLevel(level ?? MEMBERS) })
+    return Response.json({ ...named(shownTo(detail, viewer, privateStore, readConfig(repo)), viewer), visibility: formatLevel(level ?? MEMBERS) })
   }))
   app.post('/api/proposals/:id/revise', async c => {
     const ops = readReviseOps(await jsonBody(c))
@@ -275,7 +327,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
       const change = await loadForRevision(repo, actor, c.req.param('id'), changes, { now: deps.now }, { access: privateStore, viewer: viewerOf(c) })
       notify?.({ type: 'changes' })
       // The tray's own answer: the change as GET /api/changes gives it, marked revises.
-      return Response.json(changeView(repo, actor, change, stagedView(privateStore, change)))
+      return Response.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))
     }))
   })
   app.post('/api/proposals/:id/replay', async c => {
@@ -327,12 +379,43 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
           throw new Refusal(400, { code: 'EMPTY', error: 'Nothing is staged: the change holds no ops to propose.' })
         }
         refuseRevising(change)
-        const result = await propose(repo, actor, change, input, { ...deps, as }, privateOf(c, change))
-        // Only now, with the proposal committed, does the change go: its ops live in the ledger.
-        changes.clear(actor.id)
+        // A file op never writes a page the private store keeps, not even into the ledger (Task 20 review C1, PF-R95).
+        const kept = keptPageErrors(repo, reach(privateStore).store, change.ops, 'Nothing was written.')
+        if (kept.length > 0) throw new StageRefusal(kept)
+        // The walk's I5 (G6): ops the trunk moved past without touching their fields are proposed on the record as it is
+        // now; an op that is stale (a field it sets changed) does not hold the rest: they are proposed, and it stays in the
+        // tray (PF-R247). A change of stale ops alone is refused STALE by propose, as before.
+        const ops = freshen(repo, change.ops)
+        const staleAt = new Set(staleOps(repo, ops))
+        const some = staleAt.size > 0 && (staleAt.size < ops.length || (change.private?.length ?? 0) > 0)
+        const proposing: Change = { ...change, ops: some ? ops.filter((_, i) => !staleAt.has(i)) : ops }
+        const result = await propose(repo, actor, proposing, input, { ...deps, as }, privateOf(c, change))
+        // Only now, with the proposal committed, does the change go: its ops live in the ledger; a stale op stays.
+        if (some) {
+          const { private: _moved, ...rest } = change
+          changes.save({ ...rest, ops: ops.filter((_, i) => staleAt.has(i)), updated: clock().toISOString() })
+        } else changes.clear(actor.id)
         notify?.({ type: 'changes' })
         return answerView(c, String(result.proposal.id), { commit: result.commit, ...(result.note ? { note: result.note } : {}) }, 201)
       })
+    })
+  })
+  // A page's editing session proposed (R-L6-SUGGEST): its text staged as the page's file op and that op proposed, as the
+  // tray's Propose proposes a change; the rest of the tray stays. Answered as Propose answers: 201, the proposal.
+  app.post('/api/sessions/:sid/suggest', async c => {
+    const input = readSuggestInput(await jsonBody(c))
+    return answer(async () => {
+      const sid = c.req.param('sid')
+      const sessions = workspaceOf(app)?.sessions
+      if (!sessions) throw new HttpError(404, NO_SESSION(sid), 'NO_SESSION')
+      const actor = knownActorOf(c)
+      const as = await actSuggesting(c, sessions.pageOf(sid, actor))
+      // A `maintainer` role sourced from a hat is worn by the org's people: its wearers are read as Ratify reads its
+      // deciders (fix round 1, review S1), never from the suggester's own reading.
+      const wearers = hatWearersReadOf(c) ?? undefined
+      const result = await sessions.suggest(sid, actor, viewerOf(c), input.page, change => propose(repo, actor, change, input.proposal, { ...deps, as, suggested: true, wearers }))
+      notify?.({ type: 'changes' })
+      return answerView(c, String(result.proposal.id), { commit: result.commit, ...(result.note ? { note: result.note } : {}) }, 201)
     })
   })
   app.post('/api/proposals/:id/events', async c => {

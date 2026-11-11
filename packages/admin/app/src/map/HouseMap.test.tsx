@@ -13,14 +13,18 @@ import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { PanelProvider, usePanel } from '../parts/panels.tsx'
 import { FIXTURE_SOURCE, type VisibilitySource } from '../viewAs/visibility.ts'
 import {
-  DOOR_NODES, MAP_ANATOMY, MAP_FLOW, MAP_STARTER, MAP_LINKS, MAP_NETWORK, MAP_NODES, MAP_NODES_ROLES_RESTRICTED, MAP_SIGNER, MAP_TREASURY,
+  PORTAL_NODES, MAP_ANATOMY, MAP_FLOW, MAP_STARTER, MAP_LINKS, MAP_NETWORK, MAP_NODES, MAP_NODES_ROLES_RESTRICTED, MAP_SIGNER, MAP_TREASURY,
 } from '../test/fixtures/house/map.ts'
 
 // The view's geometry is not real in jsdom: the tests watch the map's fitView calls.
 const fitView = vi.hoisted(() => vi.fn())
+/** The props the map last gave ReactFlow (walk M16: its `onInit`). */
+const flowProps = vi.hoisted(() => ({ last: null as null | Record<string, unknown> }))
 vi.mock('@xyflow/react', async importOriginal => {
   const m = await importOriginal<typeof import('@xyflow/react')>()
-  return { ...m, useReactFlow: () => {
+  const { createElement } = await import('react')
+  const Flow = (props: Record<string, unknown>) => { flowProps.last = props; return createElement(m.ReactFlow as never, props) }
+  return { ...m, ReactFlow: Flow, useReactFlow: () => {
     const rf = m.useReactFlow()
     return { ...rf, fitView: (o?: Parameters<typeof rf.fitView>[0]) => { fitView(o); return Promise.resolve(true) } }
   } }
@@ -190,23 +194,23 @@ describe('the DAO map', () => {
     expect(nodeEl(MAP_SIGNER.id)!.classList.contains('is-dim')).toBe(false)
   })
 
-  it('on the door, a node with no page is no control: not a button, not a link, not in the tab order (B8 review M-4)', () => {
-    const { container } = render(<HouseNode data={{ ...DOOR_NODES[0]!, href: undefined }} variant="door" tabIndex={0} />)
+  it('on the portal, a node with no page is no control: not a button, not a link, not in the tab order (B8 review M-4)', () => {
+    const { container } = render(<HouseNode data={{ ...PORTAL_NODES[0]!, href: undefined }} variant="portal" tabIndex={0} />)
     const el = container.querySelector<HTMLElement>('.hnode')!
     expect(el.tagName).toBe('DIV')
     expect(el.hasAttribute('tabindex')).toBe(false)
     expect(screen.queryByRole('button')).toBeNull()
     expect(screen.queryByRole('link')).toBeNull()
-    expect(el.textContent).toContain(DOOR_NODES[0]!.item.name)
+    expect(el.textContent).toContain(PORTAL_NODES[0]!.item.name)
   })
 
-  it('the door variant draws links, with no needs, staged or draft state even if given (C-32), under "Also on"', async () => {
-    const withDraft = DOOR_NODES.map((d, i) => (i === 0 ? { ...d, states: [...d.states, 'draft' as const], order: 1 } : d))
-    render(<HouseMap items={withDraft} links={MAP_LINKS} variant="door" />)
+  it('the portal variant draws links, with no needs, staged or draft state even if given (C-32), under "Also on"', async () => {
+    const withDraft = PORTAL_NODES.map((d, i) => (i === 0 ? { ...d, states: [...d.states, 'draft' as const], order: 1 } : d))
+    render(<HouseMap items={withDraft} links={MAP_LINKS} variant="portal" />)
     await drawn()
     const links = document.querySelectorAll('.react-flow__node a.hnode')
-    expect(links).toHaveLength(DOOR_NODES.length)
-    expect(links[0]!.getAttribute('href')).toMatch(/^\/door\//)
+    expect(links).toHaveLength(PORTAL_NODES.length)
+    expect(links[0]!.getAttribute('href')).toMatch(/^\/portal\//)
     expect(document.querySelectorAll('.hnode.is-needs, .hnode.is-staged, .hnode.is-draft, .hnode-dot, .hnode-tag, .hnode-order')).toHaveLength(0)
     expect(screen.queryByRole('link', { name: /needs you|staged/ })).toBeNull()
     expect(document.querySelector('.hmap-linked-k')!.textContent).toBe('Also on')
@@ -335,6 +339,18 @@ describe('the map’s keys (§8.5)', () => {
     expect(onInspect).toHaveBeenCalledWith(MAP_TREASURY.id, { need: expect.stringMatching(/^Sign/) }) // opened at the need (E-46)
   })
 
+  // Walk M16: at 390 px the canvas cut its nodes off on its first draw: the fit asked before the canvas could pan and zoom
+  // did nothing. The canvas fits once it is ready (its onInit), with the map's own padding and zoom bounds.
+  it('fits when the canvas is ready: its onInit asks the map’s fit', async () => {
+    await setup()
+    const onInit = flowProps.last?.onInit as (() => void) | undefined
+    expect(typeof onInit).toBe('function')
+    fitView.mockClear()
+    act(() => onInit!())
+    expect(fitView).toHaveBeenCalledTimes(1)
+    expect(fitView.mock.calls[0]![0]).toMatchObject({ minZoom: 0.5, maxZoom: 1 })
+  })
+
   it('Fit is ⌘0 and the Fit button; zoom stays within 50–200 %', async () => {
     const { group } = await setup()
     fitView.mockClear()
@@ -420,6 +436,17 @@ describe('attention and value on the map (§8.5)', () => {
       expect(e.classList.contains('is-path')).toBe(true)
     }
     expect(document.querySelectorAll('.hedge-dash')).toHaveLength(0)
+  })
+
+  it('a flow edge dims with its end nodes under a selection (B8 M-5)', async () => {
+    // the Kickstarter pool is off the path of the node holding the other pool: its flow edge and both its ends dim
+    const off = MAP_LINKS.find(k => k.label === 'holds')!
+    render(<HouseMap items={MAP_NODES} links={MAP_LINKS} variant="members" flow={MAP_FLOW} selected={off.from} />)
+    await drawn()
+    const lit = (id: string) => !nodeEl(id)!.classList.contains('is-dim')
+    const flowEnds = MAP_FLOW.edges.filter(([a, b]) => !lit(a) && !lit(b))
+    expect(flowEnds.length).toBeGreaterThan(0)
+    for (const [a, b] of flowEnds) expect(edgeEl(b, a)!.classList.contains('is-dim')).toBe(true)
   })
 
   it('the sentence is announced once', async () => {

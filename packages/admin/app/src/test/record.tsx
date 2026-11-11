@@ -22,7 +22,7 @@ export const annotatedProjectSchema: JsonSchema = {
   properties: {
     id: { type: 'string' },
     title: { type: ['string', 'null'], title: 'Title' },
-    summary: { type: ['string', 'null'], title: 'Summary', description: 'One or two sentences, shown on cards and the door.', 'x-format': 'textarea' },
+    summary: { type: ['string', 'null'], title: 'Summary', description: 'One or two sentences, shown on cards and the portal.', 'x-format': 'textarea' },
     kind: { type: ['string', 'null'], title: 'Kind', examples: ['programme', 'project'] },
     lead: { type: ['string', 'null'], title: 'Lead', description: 'The person accountable for it.' },
     contributors: { type: ['array', 'null'], title: 'Contributors', items: { type: 'string' } },
@@ -48,6 +48,12 @@ export const projectRoutes = (over: Record<string, unknown> = {}, entries: () =>
   ...baseRoutes(),
   'GET /api/resources/project%3Ap1': { resource: p1, edges: [{ from: 'project:p1', to: 'person:steward-a', kind: 'lead' }], neighbours: [resource({ id: 'person:steward-a', kind: 'person', name: 'Steward A' })] },
   'GET /api/registries/projects': () => ({ name: 'projects', kind: 'collection', schemaVersion: '2.0', entries: entries() }),
+  // DAO-OS L6 Task 19: the record's from mark as the server sends it (its file and that file's last commit)
+  'GET /api/registries/projects?from=1': () => {
+    const mark = { file: 'data/projects.yaml', readAt: new Date().toISOString() }
+    return { name: 'projects', kind: 'collection', schemaVersion: '2.0', fromMark: mark,
+      entries: entries().map(e => (typeof e === 'object' && e !== null && 'id' in e ? { ...e, fromMark: mark } : e)) }
+  },
   'GET /api/schemas/projects': projectSchema,
   'GET /api/registries/members': { name: 'members', kind: 'collection', schemaVersion: '2.0', entries: [{ id: 'steward-a', name: 'Steward A' }, { id: 'steward-b', name: 'Steward B' }] },
   'GET /api/operations': [], 'GET /api/jobs': [],

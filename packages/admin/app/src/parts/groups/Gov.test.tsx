@@ -21,6 +21,15 @@ describe('/parts/gov', () => {
     expect([...others.querySelectorAll('.ptx-brief .ptx-never')]).toHaveLength(9)
   })
 
+  it('draws the account-step card: the step, its call, the unsigned transaction, and that the Hub never signs (L7 Task 18)', () => {
+    renderAt(<Gov />, '/parts/gov')
+    const part = screen.getByRole('region', { name: 'account step · a deployment step any account signs' })
+    const card = within(part).getByRole('region', { name: 'Deploy the Hats Signer Gate' })
+    expect(card.querySelector('.ptx-never')!.textContent).toBe('Sign this from your own wallet. The Hub never signs.')
+    expect(within(card).getByRole('button', { name: 'Copy data' })).toBeTruthy()
+    expect(within(card).getByRole('link', { name: /on the explorer/ })).toBeTruthy()
+  })
+
   it('then the proposal timeline, its other step states and the compact form; the proposal rows; the rule statuses; the events (B4)', () => {
     renderAt(<Gov />, '/parts/gov')
     const tl = screen.getByRole('region', { name: 'proposal timeline · each step’s states' })

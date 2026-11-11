@@ -53,8 +53,9 @@ function yamlDecisions(g: Record<string, unknown> | null): DecisionRow[] {
     if (!d || typeof d !== 'object') return []
     const e = d as Record<string, unknown>
     const status = str(e.status) ?? ''
+    const proposal = str(e.proposal)
     return [{ date: e.date === undefined || e.date === null ? '' : String(e.date), id: str(e.id) ?? '', title: str(e.title) ?? '',
-      status, group: groupOf(status), where: 'governance.yaml' }]
+      status, group: groupOf(status), where: 'governance.yaml', ...(proposal ? { proposal } : {}) }]
   })
 }
 

@@ -36,7 +36,7 @@ describe('RecordPage, reading', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Seed Library' })).toBeTruthy()
     const head = container.querySelector('header.rh')!
     expect(head.querySelector('.rh-id')!.textContent).toBe('p1')
-    expect(head.querySelector('.rh-meta')!.textContent).toMatch(/^Projectfrom data\/projects\.yaml · read just now$/)
+    expect(head.querySelector('.rh-meta')!.textContent).toMatch(/^Projectfrom the repository · read just now$/)
     expect(head.querySelector('.from time')!.getAttribute('datetime')).toMatch(/^\d{4}-\d\d-\d\dT/)
     const fields = screen.getByRole('group', { name: 'Fields' })
     expect(within(fields).getByRole('link', { name: 'Steward A' }).getAttribute('href')).toBe('/r/person/steward-a')
@@ -243,6 +243,20 @@ describe('RecordPage, reading', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Kick-off' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'steward-a' }).getAttribute('href')).toBe('/r/person/steward-a')
     expect(screen.queryByTestId('minimap')).toBeNull()
+  })
+
+  // Walk M5: a record no adapter makes a Resource of (a task, after a ratified move among them) said "No commit names
+  // this record yet": its history is read from its registry's commits (GET …/changed).
+  it('a registry-only record’s history is its last commit, read from its registry', async () => {
+    fetchRoutes({ ...baseRoutes(),
+      'GET /api/registries/tasks': { name: 'tasks', kind: 'collection', schemaVersion: '2.0', entries: [{ id: 't-1', title: 'Water the beds' }] },
+      'GET /api/schemas/tasks': { 'x-order': ['id', 'title'], properties: {} },
+      'GET /api/registries/tasks/t-1/changed': { changed: { at: new Date().toISOString(), by: 'Steward A' } } })
+    page('/r/tasks/t-1')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Water the beds' })).toBeTruthy()
+    const region = screen.getByRole('region', { name: 'History' })
+    expect(await within(region).findByText('Last changed by Steward A')).toBeTruthy()
+    expect(within(region).queryByText('No commit names this record yet.')).toBeNull()
   })
 
   it("shows an adapter's facts in their own State section, named by source", async () => {

@@ -2,10 +2,10 @@
  *  map's relations derived from what the drivers read (E-38), and the nodes' facts and states from each read (E-46).
  *  Pure: the blocks and pages hand it what they hold. Ids follow G-7: a System is its Resource id (`system:<id>`), a
  *  hat its ref. */
-import type { GraphEdge, Portal, Resource } from '../api.ts'
+import type { BoardLink, GraphEdge, Resource } from '../api.ts'
 import type { HatFact } from '../../../server/systems/hats.ts'
 import { driverOf } from '../systems/DriverView.tsx'
-import { list, num, record, str, systemFacts, systemKind, systemState } from '../elements/rows/systemState.ts'
+import { isComposedRead, list, num, record, str, systemFacts, systemKind, systemState } from '../elements/rows/systemState.ts'
 import { chainName, formatAmount, unitsToDecimal } from '../elements/atoms/chain.ts'
 import { ageText } from '../time.ts'
 import { mainSafeOf, type MapItem, type MapLink } from './layers.ts'
@@ -45,7 +45,8 @@ export function mapItemOf(r: Resource, entry: Record<string, unknown> | null, ha
   const kept = level === undefined ? undefined : hatOf(level)
   const item: RecordItem = { id: r.id, kind, name: kept === undefined ? r.name : `${kept} only`, ...(kept === undefined ? {} : { nameKept: kept }),
     ...(section ? { section } : {}), facts: r.facts, ...(own !== undefined ? { visibility: own } : {}),
-    ...(r.kind === 'system' && driverOf(r)?.ok === false ? { failed: true as const } : {}) }
+    ...(r.kind === 'system' && driverOf(r)?.ok === false ? { failed: true as const } : {}),
+    ...(r.kind === 'system' && isComposedRead(r) ? { composed: true as const } : {}) }
   return item
 }
 
@@ -127,8 +128,10 @@ export function derivedLinks(resources: Resource[]): MapLink[] {
   return out
 }
 
-/** A `relates` target as a map id: a hat ref as it is, a `system:` id as it is, else a System's id in systems.yaml. */
-const targetOf = (to: string) => (HAT_REF.test(to) || to.includes(':') ? to : `system:${to}`)
+/** A `relates` target as a map id: a hat ref as it is, a `system:` id as it is, a composed hat (`<tree>/<key>`, L7 §4.2)
+ *  as its tree (the map draws no composed hat of its own; PF-R129's carry, DAO-OS L7 Task 17), else a System's id in
+ *  systems.yaml. */
+const targetOf = (to: string) => (HAT_REF.test(to) || to.includes(':') ? to : `system:${to.split('/')[0]}`)
 
 /** The relations an entry names itself (`relates`, E-38): each `{ to, label }` whose label is one of RELATES. */
 export function relatesOf(r: Resource, entry: Record<string, unknown> | null): MapLink[] {
@@ -219,7 +222,8 @@ function systemLine(r: Resource, now: Date): string {
   return parts.join(' · ')
 }
 
-/** A node's states from what was read (§8.3): failed, reading, old read, linked, and staged (`proposed`). */
+/** A node's states from what was read (§8.3): failed, reading, old read, linked, not deployed (a composed System's
+ *  draft, walk I2), and staged (`proposed`). */
 function systemStates(r: Resource, proposed?: string): NodeState[] {
   const s = systemState(r, { proposed })
   switch (s.mark) {
@@ -228,6 +232,7 @@ function systemStates(r: Resource, proposed?: string): NodeState[] {
     case 'aged': return ['aged']
     case 'closed': return ['linked']
     case 'staged': return ['staged']
+    case 'draft': return ['draft']
     default: return proposed !== undefined ? ['staged'] : []
   }
 }
@@ -241,7 +246,7 @@ export function hatNumber(pretty: string): string {
 
 /** The map's nodes (E-46): each item with its facts line and its states, from the Resource it came from — a System's
  *  read, a hat's wearers (an active hat no one wears is empty), a record's status — and staged when `staged` names it.
- *  `flow` stays null until L7. A portal is the linked-node variant, "on <map>". `restricted` is the gate's marker on
+ *  `flow` stays null until L7. A link to the other map is the linked-node variant, "on <map>". `restricted` is the gate's marker on
  *  each record's file entry: a `status` the viewer is not admitted to never prints its value (rule 3, E-70) — the line
  *  is empty and `factsKept` carries the word the node draws as every restricted field is. */
 export function mapNodesOf(items: MapItem[], resources: Resource[], now: Date,
@@ -271,8 +276,8 @@ export function mapNodesOf(items: MapItem[], resources: Resource[], now: Date,
   })
 }
 
-/** A 0.6 portal (where a map's edges leave for the other map) as the linked-node variant (§14.2): "on <map> ↗". */
-export function portalNode(p: Portal): MapNodeData {
+/** A link to the other map (0.6: where a map's edges leave for it) as the linked-node variant (§14.2): "on <map> ↗". */
+export function linkNode(p: BoardLink): MapNodeData {
   const map = p.toBoard === 'organization' ? 'Organization map' : 'Systems map'
   return { item: { id: p.id, kind: 'link', name: p.text, facts: {} }, facts: `on ${map}`, states: ['linked'] }
 }

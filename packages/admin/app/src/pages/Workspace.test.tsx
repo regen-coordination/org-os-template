@@ -30,9 +30,37 @@ describe('/workspace', () => {
       'GET /api/registries': [{ name: 'projects', kind: 'collection', count: 2 }, { name: 'meetings', kind: 'collection', count: 3 }] })
     renderAt(<Workspace />, '/workspace')
     const list = await screen.findByRole('list', { name: 'Collections' })
-    await vi.waitFor(() => expect(within(list).getAllByRole('link')).toHaveLength(3))
+    await vi.waitFor(() => expect(within(list).getAllByRole('link')).toHaveLength(2))
+    // DAO-OS L6 Task 17 fix round 1: Meetings is the Hub's row now (Collections in the Hub, /c/meetings), listed once
     expect(within(list).getAllByRole('link').map(a => [a.querySelector('.drow-t')!.textContent, a.querySelector('.drow-s')!.textContent]))
-      .toEqual([['Meetings', '3 records'], ['Projects', '2 records'], ['Ideas', '1 record']])
+      .toEqual([['Projects', '2 records'], ['Ideas', '1 record']])
+  })
+
+  it('lists each collection once: Tasks and Meetings in the Hub’s rows, at /c/<id> (DAO-OS L6 Task 17)', async () => {
+    fetchRoutes({ ...baseRoutes(),
+      'GET /api/resources': [resource()],
+      'GET /api/collections': { collections: [], problems: [] },
+      'GET /api/registries': [{ name: 'projects', kind: 'collection', count: 1 }, { name: 'meetings', kind: 'collection', count: 3 }] })
+    renderAt(<Workspace />, '/workspace')
+    const hub = await screen.findByRole('list', { name: 'Collections in the Hub' })
+    await vi.waitFor(() => expect(within(screen.getByRole('list', { name: 'Collections' })).getAllByRole('link')).toHaveLength(1))
+    const rows = [...document.querySelectorAll('a.drow')].map(a => [a.querySelector('.drow-t')!.textContent, a.getAttribute('href')])
+    expect(rows.filter(([t]) => t === 'Meetings')).toEqual([['Meetings', '/c/meetings']])
+    expect(within(hub).getAllByRole('link').map(a => a.getAttribute('href'))).toEqual(['/c/tasks', '/c/meetings'])
+  })
+
+  // walk I15, D1: an imported collection named as a Hub collection ("Tasks") is told apart by its id
+  it('a collection whose name another shares says its id', async () => {
+    fetchRoutes({ ...baseRoutes(),
+      'GET /api/resources': [resource()],
+      'GET /api/collections': { collections: [{ id: 'imported-tasks', name: 'Tasks', builtin: false, fields: [] }], problems: [] },
+      'GET /api/registries': [{ name: 'tasks', kind: 'collection', count: 4 }, { name: 'imported-tasks', kind: 'collection', count: 2 }] })
+    renderAt(<Workspace />, '/workspace')
+    const hub = await screen.findByRole('list', { name: 'Collections in the Hub' })
+    await vi.waitFor(() => expect(within(hub).getAllByRole('link')).toHaveLength(3))
+    expect(within(hub).getAllByRole('link').map(a => [a.querySelector('.drow-t')!.textContent, a.querySelector('.drow-s')!.textContent])).toEqual([
+      ['Tasks', '4 records · tasks'], ['Meetings', '0 records'], ['Tasks', '2 records · imported-tasks'],
+    ])
   })
 
   it('a row of a page others have open ends in a 20px presence stack (fixture)', async () => {

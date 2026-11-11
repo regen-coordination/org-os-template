@@ -518,7 +518,7 @@ describe('Widening is a publication decision (§9.7)', () => {
     await stage(w, [{ op: 'update', record: 'projects:p-two', set: { visibility: 'public' } }])
     const [status, body] = await refused(await call(w.app, 'POST', '/api/proposals', { body: { title: 'Publish the second project' } }))
     expect([status, body.code]).toEqual([409, 'NO_RULE'])
-    expect(body.error).toBe('No rule in data/governance.yaml covers the class publication; nobody can propose it until a rule does. Nothing was written.')
+    expect(body.error).toBe('No rule of this org covers publication changes yet, so nobody can propose one until a rule does. Nothing was written.')
   })
 
   it('a wallet link is widened only by its own person: another member\'s proposal is 403', async () => {
@@ -665,14 +665,17 @@ governance:
     expect(w.store.record('projects', 'p-two')).toMatchObject({ visibility: `hat:${TOP}`, body: expect.objectContaining({ title: 'Two' }) })
   })
 
-  it('moving a private record into git is refused in words that promise no path that does not exist', async () => {
+  // DAO-OS L6 Task 11 replaced L5 Task 16's refusal ("… cannot be proposed here yet …"): the move is staged as
+  // `move-to-git`, a publication (tests/workspace/move.test.ts holds the rest).
+  it('moving a private record into git is staged as a move, a publication, proposed where the rules say so', async () => {
     const w = await world()
     await ok(await narrow(w, { registry: 'projects', id: 'p-two' }, `hat:${OPS}`))
-    const res = await call(w.app, 'POST', '/api/changes/ops', { body: { ops: [{ op: 'update', record: 'projects:p-two', set: { visibility: 'members' } }] } })
-    const [status, body] = await refused(res)
-    expect(status).toBe(422)
-    expect(body.errors[0].message).toBe('projects:p-two is private; making it members would move it into the repository, where more people read it. ' +
-      'Moving a private record into the repository is a publication that cannot be proposed here yet, so it stays private. Nothing was staged.')
+    const view = await stage(w, [{ op: 'update', record: 'projects:p-two', set: { visibility: 'members' } }])
+    expect(view.classes).toEqual(['records', 'publication'])
+    expect(view.private).toEqual([{ ref: expect.stringMatching(/^stg-\d+$/), class: 'records', op: { op: 'move-to-git', collection: 'projects', id: 'p-two', level: 'members' } }])
+    const [status, body] = await refused(await call(w.app, 'POST', '/api/changes/apply', { body: {} }))
+    expect([status, body.code]).toEqual([409, 'WIDENS'])
+    expect(w.store.record('projects', 'p-two')!.visibility).toBe(`hat:${OPS}`)
   })
 })
 
@@ -789,6 +792,21 @@ describe('Fix round 2: what the rules decide by stays in git; a private widening
   })
 })
 
+// ── PF-R227 (operator, 2026-11-07: refuse): what a deployed System requires stays in the repository ───────────────────
+
+describe('A field a deployed System requires is not narrowed above members (PF-R227)', () => {
+  it('narrowing systems.address to hat:Ops is refused 422 REQUIRED_IN_GIT in a sentence; nothing is written', async () => {
+    const w = await world({ governance: SOLO })
+    const before = head(w.repo)
+    const [status, body] = await refused(await narrow(w, { collection: 'systems', field: 'address' }, `hat:${OPS}`))
+    expect([status, body]).toEqual([422, { code: 'REQUIRED_IN_GIT', error:
+      'A deployed System must keep its address in the repository, so address cannot be kept above members: give it members or public. Nothing was written.' }])
+    expect(head(w.repo)).toBe(before)
+    expect(recordsOf(w.repo, 'systems')[0]).toMatchObject({ address: '13' })
+    expect(w.store.fieldsNamed('systems', 'address')).toEqual([])
+  })
+})
+
 // ── Task 20: who may narrow is who may write (coordinator Q77) ─────────────────────────────────────────────────────────
 
 describe('Who may narrow is who sees the control: one predicate (Q77)', () => {
@@ -822,7 +840,7 @@ describe('Who may narrow is who sees the control: one predicate (Q77)', () => {
     expect((await ok(await call(solo.app, 'GET', '/api/visibility'))).writable).toEqual(expect.arrayContaining(['projects', 'members', 'systems']))
   })
 
-  it('a private collection is listed for a member admitted to it who may write records; never for one who is not admitted', async () => {
+  it('a private collection is listed for a member admitted to it who may write it (a workspace collection, R-1a); never for one who is not admitted', async () => {
     const w = await world()
     await w.store.putCollection({ id: 'grants-private', visibility: `hat:${OPS}`, definition: { title: 'Grants' } }, 'steward-a')
     await w.signIn(A1)
@@ -832,8 +850,17 @@ describe('Who may narrow is who sees the control: one predicate (Q77)', () => {
     expect((await ok(await call(w.app, 'GET', '/api/visibility', { cookie: both }))).writable).toContain('grants-private')
     w.wear(A4, [TOP])
     const top = await w.signIn(A4)
-    // A4 is admitted (Top is above Ops) but holds no role that proposes records: not listed.
-    expect((await ok(await call(w.app, 'GET', '/api/visibility', { cookie: top }))).writable).not.toContain('grants-private')
+    // A store-only private collection is class workspace (R-1a): no rule names it, so workspace/direct admits A4, who is
+    // admitted to it (Top is above Ops) and wears a hat of the membership tree, though they hold no role that proposes records.
+    expect((await ok(await call(w.app, 'GET', '/api/visibility', { cookie: top }))).writable).toContain('grants-private')
+    // Raised by a split rule (`workspace:grants-private`) that Ops proposes under: A1 still listed, A4 (no Ops role) not.
+    const raised = await world({ governance: GOVERNANCE('members, records, publication, "workspace:grants-private"') })
+    await raised.store.putCollection({ id: 'grants-private', visibility: `hat:${OPS}`, definition: { title: 'Grants' } }, 'steward-a')
+    await raised.signIn(A1)
+    expect((await ok(await call(raised.app, 'GET', '/api/visibility'))).writable).toContain('grants-private')
+    raised.wear(A4, [TOP])
+    const topRaised = await raised.signIn(A4)
+    expect((await ok(await call(raised.app, 'GET', '/api/visibility', { cookie: topRaised }))).writable).not.toContain('grants-private')
     // Under the solo default A2, wearing Council alone, writes every collection, but is not admitted to an Ops one.
     const solo = await world({ governance: SOLO })
     await solo.store.putCollection({ id: 'grants-private', visibility: `hat:${OPS}`, definition: { title: 'Grants' } }, 'steward-a')

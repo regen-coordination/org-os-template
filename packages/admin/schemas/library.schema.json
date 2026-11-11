@@ -3,7 +3,7 @@
   "type": "object",
   "required": ["id", "entry", "version", "shelf", "created", "status", "by", "at", "decision"],
   "additionalProperties": false,
-  "x-order": ["id", "entry", "version", "shelf", "created", "status", "by", "at", "decision", "removed"],
+  "x-order": ["id", "entry", "version", "shelf", "created", "modified", "status", "by", "at", "decision", "removed"],
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "The entry id with ':' turned into '-', then -2, -3… when that is taken." },
     "entry": { "type": "string", "pattern": "^[a-z]+:[a-z0-9][a-z0-9-]*$", "description": "The library entry that was added: <kind>:<slug>." },
@@ -11,9 +11,14 @@
     "shelf": { "type": "string", "minLength": 1, "description": "The shelf it came from: the entry's `source`, which equals its shelf's name (framework, dao…)." },
     "created": {
       "type": "array",
+      "items": { "allOf": [{ "$ref": "#/$defs/recordBase" }, { "not": { "required": ["after"] } }] },
+      "description": "Every record the add created, with its hash as created: how a removal tells a record edited since the add. Empty for an add that only changed what the org had (then `modified` is not)."
+    },
+    "modified": {
+      "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/recordBase" },
-      "description": "Every record the add created, with its hash as created: how a removal tells a record edited since the add."
+      "items": { "allOf": [{ "$ref": "#/$defs/recordBase" }, { "required": ["after"] }] },
+      "description": "L7-D11: every record the add changed that the org already had. `base` is its hash before the add (a removal gives back the version with that hash, from git history); `after` its hash as the add left it (a removal asks before giving back a record whose hash is no longer `after`). Absent when the add changed nothing the org had."
     },
     "status": { "enum": ["installed", "removed"] },
     "by": { "type": ["string", "null"], "minLength": 1, "description": "Sealed: the member who applied or proposed the add. Null only while staged." },
@@ -40,7 +45,12 @@
     {
       "if": { "properties": { "status": { "const": "removed" } }, "required": ["status"] },
       "then": { "required": ["removed"], "properties": { "removed": { "type": "object" } } }
-    }
+    },
+    {
+      "if": { "properties": { "status": { "const": "installed" } }, "required": ["status"] },
+      "then": { "properties": { "removed": { "type": "null" } } }
+    },
+    { "anyOf": [{ "properties": { "created": { "minItems": 1 } } }, { "required": ["modified"] }] }
   ],
   "$defs": {
     "recordBase": {
@@ -48,8 +58,9 @@
       "required": ["record", "base"],
       "additionalProperties": false,
       "properties": {
-        "record": { "type": "string", "pattern": "^[a-z][a-z0-9-]*:.+$", "description": "<registry>:<id>." },
-        "base": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the record's canonical YAML as created. Null only while staged." }
+        "record": { "type": "string", "pattern": "^[a-z][a-z0-9-]*:[^\\s:][^\\s]*$", "description": "<registry>:<id>, the change engine's record (an id may hold colons; no spaces)." },
+        "base": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the record's canonical YAML as created (in `modified`: as it was before the add). Null only while staged." },
+        "after": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$", "description": "In `modified` only: SHA-256 of the record's canonical YAML as the add left it. Null only while staged." }
       }
     },
     "decision": {
@@ -76,5 +87,5 @@
       "description": "Sealed: a change applied directly, or a proposal ratified. Null only while staged."
     }
   },
-  "$comment": "data/library.yaml (DAO-OS L1, ruling L1-R1): the library's receipts. Written only through the library's Add and Remove; lib/receipts.mjs checkReceipts reports a committed receipt with a null seal. `modified` (an array of the same recordBase) is reserved for L7's entries that change existing records."
+  "$comment": "data/library.yaml (DAO-OS L1, ruling L1-R1): the library's receipts. Written only through the library's Add and Remove; lib/receipts.mjs checkReceipts reports a committed receipt with a null seal. `modified` (L7-D11) holds the records an add changed that the org already had, each a recordBase with `after`."
 }

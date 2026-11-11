@@ -3,7 +3,7 @@ import { Icon } from '../design/Icon.tsx'
 import { Menu, type MenuEntry } from '../design/Menu.tsx'
 import { useFrame } from '../design/Shell.tsx'
 import { setTheme, type Theme } from '../theme.ts'
-import type { OrgMark } from './sections.ts'
+import { PORTAL_LINKED, type OrgMark } from './sections.ts'
 
 /** The org's mark on --solid: the instance's own when its configuration gives one, else the neutral seal (§18
  *  answer 4) — never a DAO's logo by default. Decorative: the org's name says who it is. */
@@ -21,7 +21,7 @@ function subscribe(onChange: () => void): () => void {
 const shown = (): Theme | null => { const t = document.documentElement.dataset.theme; return t === 'light' || t === 'dark' ? t : null }
 
 /** The org switcher (§5.2 item 1): the seal, the name in Sans 600 (truncated, whole in `title`) and an up-down
- *  chevron. Its menu: the org's public door ↗, then Appearance — System, Light, Dark. (Switching org comes when
+ *  chevron. Its menu: the org's portal ↗, then Appearance — System, Light, Dark. (Switching org comes when
  *  a server hosts several.) On the rail it is the seal alone, still named. */
 export function OrgSwitcher({ org }: { org: OrgMark }) {
   const { expanded } = useFrame()
@@ -29,8 +29,7 @@ export function OrgSwitcher({ org }: { org: OrgMark }) {
   const [, redraw] = useReducer((n: number) => n + 1, 0)
   const choose = (t: Theme | null) => () => { setTheme(t); redraw() } // at once; the observer is for ⌘K's toggle
   const items: MenuEntry[] = [
-    { type: 'link', label: 'Public door', href: '/door', external: true, icon: 'globe' },
-    { type: 'separator' },
+    ...(PORTAL_LINKED ? [{ type: 'link', label: 'Portal', href: '/portal', external: true, icon: 'globe' } as const, { type: 'separator' } as const] : []),
     { type: 'header', label: 'Appearance' },
     { type: 'radio', label: 'System', checked: theme === null, onSelect: choose(null) },
     { type: 'radio', label: 'Light', checked: theme === 'light', onSelect: choose('light') },

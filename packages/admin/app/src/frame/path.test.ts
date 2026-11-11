@@ -14,6 +14,13 @@ describe('pathOf: the top bar’s path (§5.5)', () => {
     expect(pathOf('/b/home', {})).toEqual([{ label: 'Home', href: '/' }])
   })
 
+  it('the compose canvas sits under Systems (DAO-OS L7 Task 17)', () => {
+    expect(pathOf('/compose', {})).toEqual([{ label: 'Systems', href: '/systems' }, { label: 'Compose', href: '/compose' }])
+  })
+  it('the deployment’s steps sit under Systems beside it (DAO-OS L7 Task 18)', () => {
+    expect(pathOf('/deploy', {})).toEqual([{ label: 'Systems', href: '/systems' }, { label: 'Deploy', href: '/deploy' }])
+  })
+
   it('the Proposals tabs sit under Proposals', () => {
     expect(pathOf('/governance/decisions', {})).toEqual([
       { label: 'Proposals', href: '/governance/proposals' }, { label: 'Decisions', href: '/governance/decisions' },
@@ -25,6 +32,21 @@ describe('pathOf: the top bar’s path (§5.5)', () => {
     expect(pathOf('/r/project/proj-001', { 'project:proj-001': 'Node Onboarding Program' })).toEqual([
       { label: 'Workspace', href: '/workspace' }, { label: 'Projects', href: '/b/projects' },
       { label: 'Node Onboarding Program', href: '/r/project/proj-001' },
+    ])
+  })
+
+  // walk I15, D1: Meetings is the collection; its board is "Meetings board"
+  it('Meetings is /c/meetings under Workspace; /b/meetings is the Meetings board', () => {
+    expect(pathOf('/c/meetings', {})).toEqual([{ label: 'Workspace', href: '/workspace' }, { label: 'Meetings', href: '/c/meetings' }])
+    expect(pathOf('/b/meetings', {})).toEqual([{ label: 'Workspace', href: '/workspace' }, { label: 'Meetings board', href: '/b/meetings' }])
+  })
+
+  // DAO-OS L6 Task 19
+  it('Sources sits under Workspace, and a file of the source editor under Sources, its folders opened as folders', () => {
+    expect(pathOf('/sources', {})).toEqual([{ label: 'Workspace', href: '/workspace' }, { label: 'Sources', href: '/sources' }])
+    expect(pathOf('/files/data/governance.yaml', {})).toEqual([
+      { label: 'Workspace', href: '/workspace' }, { label: 'Sources', href: '/sources' }, { label: 'Files', href: '/files' },
+      { label: 'data', href: '/files/data/' }, { label: 'governance.yaml', href: '/files/data/governance.yaml' },
     ])
   })
 

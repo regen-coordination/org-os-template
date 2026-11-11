@@ -8,7 +8,7 @@
 
 import { REGISTRIES } from '../registries.ts'
 import { admits, formatLevel, fullLevel, parseLevel, type ParsedLevel, type Viewer, type VisibilityPolicy } from '../../lib/visibility.mjs'
-import { asUnavailable, type PrivateAccess } from './ops.ts'
+import { asUnavailable, isNoStore, reach, unavailable, type PrivateAccess } from './ops.ts'
 import type { PrivateCollection, PrivateField, PrivateRecord, PrivateStore } from './store.ts'
 
 /** What the gate reads from the store. Never throws: a store that cannot be reached, or fails to answer, reads as one
@@ -34,6 +34,24 @@ export function privateReads(access: PrivateAccess): PrivateReads {
     collections: () => safely(store => store.collections() as PrivateCollection[]),
     records: collection => safely(store => store.records(collection)),
     fields: (registry, record) => safely(store => store.fields(registry, record)),
+  }
+}
+
+/** The store's reads for a judgment (the walk review's G2 c and N1): what the chain holds of a System, whether a viewer
+ *  reads a whole composition, the whole a read-back's flip is made on. A store that is configured but cannot be reached,
+ *  or fails as it answers, throws its 503 (`PRIVATE_STORE`, its sentence; a failure after it opened raised as its
+ *  attention, its own words in the log only), never reads as holding nothing: what it keeps is not judged as absent. A
+ *  server with no store at all (`noStore`) holds nothing, and reads as empty. Never used for what a reader is shown. */
+export function strictPrivateReads(access: PrivateAccess): PrivateReads {
+  const strictly = <T>(fn: (store: PrivateStore) => T[]): T[] => {
+    const { store, why } = reach(access)
+    if (!store) { if (isNoStore(why)) return []; throw unavailable(why) }
+    try { return fn(store) } catch (err) { throw unavailable(err, store) }
+  }
+  return {
+    collections: () => strictly(store => store.collections() as PrivateCollection[]),
+    records: collection => strictly(store => store.records(collection)),
+    fields: (registry, record) => strictly(store => store.fields(registry, record)),
   }
 }
 

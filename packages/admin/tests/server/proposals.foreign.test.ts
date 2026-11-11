@@ -74,7 +74,7 @@ const UNNAMED = rule('unnamed', 'operations', 'dao-votes')
 const GRANTS = rule('grants', 'members', 'grants-pool')
 
 const NOW = new Date('2026-10-29T12:00:00Z')
-const P1 = 'p-2026-10-29-001', P2 = 'p-2026-10-29-002'
+const P1 = 'p-2026-10-29-001', P2 = 'p-2026-10-29-002', P3 = 'p-2026-10-29-003'
 
 let repo: string
 let app: Hono
@@ -328,8 +328,14 @@ describe('POST /api/proposals/:id/prepare with an action', () => {
   it('refuses, in words and with nothing written: a records proposal names the class; an unknown via or system is named', async () => {
     await open(P1, ROLES)
     await open(P2, VOTES)
+    await open(P3, rule('roles', 'records', 'dao-hats'))
     await unchanged(async () => {
-      const cls = await prepare(MINT, P2)
+      // DAO-OS L7 Task 8 replaces this check on purpose (L7-D16): P2 waits on dao-votes only, so the action is refused before
+      // its class is read; the class refusal is kept on a records proposal that waits on the tree (P3).
+      const elsewhere = await prepare(MINT, P2)
+      expect(elsewhere.status).toBe(409)
+      expect(await elsewhere.json()).toEqual({ code: 'NOT_PREPARED', error: `Not prepared: proposal ${P2} waits on dao-votes; attaching dao-hats would be refused.` })
+      const cls = await prepare(MINT, P3)
       expect(cls.status).toBe(409)
       expect(await cls.json()).toEqual({ code: 'NOT_PREPARED', error: 'Not prepared: "mint-hat" is an action of class governance; this proposal is of class records.' })
       const via = await prepare({ ...MINT, via: 'nope' })
@@ -395,7 +401,8 @@ describe('GET /api/systems/:id/actions', () => {
     const hats = await app.request('/api/systems/dao-hats/actions')
     expect(hats.status).toBe(200)
     const body = await hats.json()
-    expect(body.actions.map((a: { id: string }) => a.id)).toEqual(['mint-hat', 'transfer-hat', 'create-child', 'change-details'])
+    // DAO-OS L7 Task 8: add-role (§10.1) is listed fifth.
+    expect(body.actions.map((a: { id: string }) => a.id)).toEqual(['mint-hat', 'transfer-hat', 'create-child', 'change-details', 'add-role'])
     expect(body).toEqual({ actions: JSON.parse(JSON.stringify(HATS_ACTIONS)) })
     expect(await (await app.request('/api/systems/forum/actions')).json()).toEqual({ actions: [] })
     expect((await app.request('/api/systems/nope/actions')).status).toBe(404)

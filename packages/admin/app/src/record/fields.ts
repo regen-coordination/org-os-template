@@ -12,14 +12,21 @@ export const propOf = (schema: JsonSchema, key: string): Prop =>
   (schema.properties && Object.hasOwn(schema.properties, key) ? schema.properties[key]! : {})
 
 /** Schema order (`x-order`), then the schema's other properties (all of them while editing; those the
- *  entry holds while reading), then whatever the entry holds that the schema does not name. */
+ *  entry holds while reading), then whatever the entry holds that the schema does not name. A property that names the
+ *  kinds it belongs to (`x-kinds`, a System's: DAO-OS L7 Task 17) is left out of an entry of another kind that does not
+ *  hold it; an entry with no kind (a new record's form) is offered every property. */
 export function orderedKeys(schema: JsonSchema, value: Value, editing: boolean): string[] {
   const props = schema.properties ?? {}
-  const inSchema = (k: string) => Object.hasOwn(props, k)
+  const kind = typeof value.kind === 'string' ? value.kind : null
+  const ofKind = (k: string) => {
+    const kinds = Object.hasOwn(props, k) ? props[k]!['x-kinds'] : undefined
+    return kind === null || !Array.isArray(kinds) || kinds.includes(kind) || Object.hasOwn(value, k)
+  }
+  const inSchema = (k: string) => Object.hasOwn(props, k) && ofKind(k)
   const order = schema['x-order'] ?? []
   return [
     ...order.filter(k => inSchema(k) || k === 'id' || Object.hasOwn(value, k)),
-    ...Object.keys(props).filter(k => !order.includes(k) && (editing || Object.hasOwn(value, k))),
+    ...Object.keys(props).filter(k => !order.includes(k) && ofKind(k) && (editing || Object.hasOwn(value, k))),
     ...Object.keys(value).filter(k => !inSchema(k) && !order.includes(k)),
   ].filter((k, i, all) => k !== '__proto__' && all.indexOf(k) === i)
 }

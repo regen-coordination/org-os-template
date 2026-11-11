@@ -3,17 +3,19 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from './api.ts'
 import { useActor } from './actor.ts'
 import { useChanges } from './changes/useChanges.ts'
+import { heldCount } from './changes/rows.ts'
 import { Sidebar } from './frame/Sidebar.tsx'
 import { BottomBar } from './frame/BottomBar.tsx'
-import { INSTANCE_LINKS, WORKSPACE_ORDER, houseCounts, type Identity, type SideLink } from './frame/sections.ts'
-import { SECTIONS, sectionCount, sectionRows, type SectionDef } from './sections.ts'
+import { INSTANCE_LINKS, SOURCES_LINK, WORKSPACE_ORDER, houseCounts, type Identity, type SideLink } from './frame/sections.ts'
+import { SECTIONS, placeOf, sectionCount, sectionRows, type SectionDef } from './sections.ts'
 import { useRegistries, useResources, useStatus, useSystemEntries } from './queries.ts'
 import { useCanWrite, useViewer } from './viewAs/ViewAs.tsx'
-import { needsFrom } from './elements/needs/needs.ts'
-import { useNow } from './time.ts'
 import { useSessionView } from './session/session.ts'
 import type { SignedInView } from './api.ts'
 import { hatLevel, parseHatRef, prettyHatId } from '../../lib/hats.mjs'
+import { needsFrom } from './elements/needs/needs.ts'
+import { useMentionNeeds } from './workspace/mentionNeeds.ts' // DAO-OS L6 Task 18
+import { useNow } from './time.ts'
 
 /** A signed-in member as the identity draws them (L5 spec §11.3): the lowest worn hat's name (the deepest in the tree; the
  *  first of equals), the bare 0x address, that hat's pretty id, and the names of every hat worn. A reading that shows
@@ -39,11 +41,6 @@ export function sessionIdentity(s: SignedInView): Identity {
 
 const order = (id: string) => { const at = WORKSPACE_ORDER.indexOf(id); return at < 0 ? WORKSPACE_ORDER.length : at }
 
-/** The house's places on 0.6's queries (spec §5.2): the nine sections' counts — what needs you (Needs you's items:
- *  the proposals and Systems that wait on you), the open proposals, the Systems, your staged ops — each of what the
- *  viewer may see (rule 7); Workspace's collections are 0.6's organization sections that hold records (Q-L4-3);
- *  the Instance group is 0.6's org-os boards (C-8). The identity is the session's while one is live (L5 §11.3), else
- *  who git says you are (0.6's form). The sidebar and the phone's bottom bar both read it. */
 /** Workspace's collections (§5.2 item 4, Q-L4-3): 0.6's organization sections that hold a record the viewer may see,
  *  in WORKSPACE_ORDER. A registry-only one (meetings) is read from its file, which has no visibility of its own yet:
  *  it reads as members-only. The sidebar lists them, and /workspace. */
@@ -59,27 +56,36 @@ export function useWorkspaceCollections({ empty = false }: { empty?: boolean } =
   // in it they may see, is listed too, as empty; a members' file is not one for a Public preview (`sees({})`)
   const unset = (def: SectionDef) => empty && sees({}) && registries.some(g => g.name === (def.registry ?? def.newRegistry))
   const collections = SECTIONS.filter(d => d.group === 'organization' && d.id !== 'treasury' && (has(d) || unset(d)))
-    .sort((a, b) => order(a.id) - order(b.id)).map(def => ({ id: def.id, label: def.label, href: def.route, def, ...(has(def) ? {} : { empty: true }) }))
+    .sort((a, b) => order(a.id) - order(b.id)).map(def => ({ id: def.id, label: def.label, href: placeOf(def), def, ...(has(def) ? {} : { empty: true }) }))
   return { collections, has }
 }
 
+/** The house's places on 0.6's queries (spec §5.2): the nine sections' counts — what needs you (Needs you's items:
+ *  the proposals and Systems that wait on you), the open proposals, the Systems, your staged ops — each of what the
+ *  viewer may see (rule 7); Workspace's collections are 0.6's organization sections that hold records (Q-L4-3);
+ *  the Instance group is 0.6's org-os boards (C-8). The identity is the session's while one is live (L5 §11.3), else
+ *  who git says you are (0.6's form). The sidebar and the phone's bottom bar both read it. */
 function useHouseNav() {
   const resources = useResources().data ?? []
   const all = useQuery({ queryKey: ['proposals'], queryFn: api.proposals }).data
   const open = all?.filter(v => v.state === 'open') ?? []
-  const staged = useChanges().view?.ops.length ?? 0
+  const changes = useChanges().view
+  const staged = changes ? heldCount(changes) : 0 // the private part counts (L6 Task 21, PF-R111)
   const status = useStatus()
   const { actor } = useActor()
-  const { visible } = useViewer()
+  const { visible, sees } = useViewer()
   const canWrite = useCanWrite()
   const now = useNow(false)
   const id = actor && 'id' in actor ? actor.id : null
   // Needs you's items, as /needs and the map read them (E-34)
-  const needs = useMemo(() => needsFrom(resources, all ?? [], id, now), [resources, all, id, Math.floor(now.getTime() / 60_000)])
+  const mentions = useMentionNeeds(now) // DAO-OS L6 Task 18: the unread mentions count with them (§8.3)
+  const needs = useMemo(() => [...needsFrom(resources, all ?? [], id, now), ...mentions], [resources, all, id, Math.floor(now.getTime() / 60_000), mentions])
 
   const counts = houseCounts({ resources, open, needs, staged }, visible, canWrite)
   const { collections: listed, has } = useWorkspaceCollections({ empty: true })
-  const collections = listed.map(({ id, label, href, empty }) => ({ id, label, href, ...(empty ? { empty } : {}) }))
+  // DAO-OS L6 Task 19: Sources after Workspace's collections, for the members' side only (a Public preview: absent)
+  const collections = [...listed.map(({ id, label, href, empty }) => ({ id, label, href, ...(empty ? { empty } : {}) })),
+    ...(sees({}) ? [SOURCES_LINK] : [])]
   const link = (def: SectionDef): SideLink => ({ id: def.id, label: def.label, href: def.route })
   const boards = SECTIONS.filter(d => d.group === 'systems' && INSTANCE_LINKS.some(l => l.href === d.route) && has(d)).map(link)
   const instance = boards.length === 0 ? [] : INSTANCE_LINKS

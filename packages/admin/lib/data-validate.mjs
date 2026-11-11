@@ -10,12 +10,14 @@
 // an id an earlier entry already uses, a System kind no driver knows, the
 // deprecated `infrastructure` block. Warnings never fail a run.
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 import { isMap } from './yaml-util.mjs'
-import { REGISTRIES, REGISTRY_OF_KIND, resolveTopKey } from './registries.mjs'
+import { KNOWLEDGE, REGISTRIES, REGISTRY_OF_KIND, resolveTopKey, customRegistries } from './registries.mjs'
+import { readCollections, refsOf, schemaOf } from './workspace/collections.mjs'
+import { PAGE_FILE_NAME, pageEntries, treeProblems } from './workspace/pages.mjs'
 import { BASE_FIELDS, validateBoard } from './board-query.mjs'
 import { readGovernance, yamlDocuments } from './governance-read.mjs'
 import { checkGovernance } from './rules.mjs'
@@ -27,7 +29,23 @@ import { membershipTree } from './rules.mjs'
 import { parseCaip10 } from './caip.mjs'
 
 /** @typedef {{ file: string, id?: string, path: string, message: string, level: 'error'|'warn' }} Problem */
-/** @typedef {{ registry: string, field: string, target: string, array?: boolean }} Ref */
+/** A reference by `field` (a top-level key) or by `path` (dot path, `*` for every array item). `relation`: a value is a
+ *  map relation's target (systems.schema.json `relates`, L4c E-38), so a hat ref names no System and `system:<id>` names <id>.
+ *  @typedef {{ registry: string, field?: string, path?: string, target: string, array?: boolean, relation?: boolean }} Ref */
+
+/** DAO-OS L6 (Task 7): the git pages (`pages/<id>.md`, flat) as `treeProblems` reads them: a page's id is its file's name.
+ * The private store is not read here, so a page is judged against the git pages alone.
+ * @param {string} root @param {Record<string, any> | null} visibilityDoc @returns {Problem[]} */
+function pageProblems(root, visibilityDoc) {
+  /** @type {string[]} */
+  let names
+  try { names = readdirSync(join(root, 'pages')) } catch { return [] }
+  const git = names.filter(n => PAGE_FILE_NAME.test(n)).flatMap(n => {
+    try { return [{ id: n.slice(0, -3), text: readFileSync(join(root, 'pages', n), 'utf8') }] } catch { return [] }
+  })
+  const policy = readFullPolicy(visibilityDoc ?? {}).policy
+  return treeProblems(pageEntries(git, []), policy).map(p => ({ file: `pages/${p.id}.md`, path: p.path, message: p.message, level: p.level }))
+}
 
 const SCHEMA_DIR = new URL('../schemas/', import.meta.url)
 const ajv = new Ajv({ allErrors: true, strict: false })
@@ -59,8 +77,21 @@ export function boardFieldsOf(kind) {
 /** @type {Map<string, import('ajv').ValidateFunction>} */
 const compiled = new Map()
 
-/** Compiled once per registry name; by `$id`, since several names can share the generic schema. */
-function validator(name) {
+/** Compiled once per registry name; by `$id`, since several names can share the generic schema. A custom collection's
+ *  schema (DAO-OS L6 §7.3, `schemaOf`) is given: compiled once per text of it, since its definition can change.
+ *  @param {string} name @param {Record<string, any> & { $id: string }} [given] */
+function validator(name, given) {
+  if (given) {
+    const key = `custom:${JSON.stringify(given)}`
+    let fn = compiled.get(key)
+    if (!fn) {
+      const old = ajv.getSchema(given.$id)
+      if (old) ajv.removeSchema(given.$id)
+      fn = ajv.compile(given)
+      compiled.set(key, fn)
+    }
+    return fn
+  }
   let fn = compiled.get(name)
   if (!fn) {
     const schema = loadSchema(name)
@@ -80,7 +111,47 @@ export const REFS = [
   { registry: 'projects', field: 'funding_source', target: 'funding-opportunities' },
   { registry: 'meetings', field: 'participants', target: 'members', array: true },
   { registry: 'events', field: 'related_project', target: 'projects' },
+  // DAO-OS L6 §7.2: a task's project and meeting (Task 2's carry). Its owner may be a CAIP-10 id, and its page and proposal
+  // are no registry's records, so they are not checked here.
+  { registry: 'tasks', field: 'project', target: 'projects' },
+  { registry: 'tasks', field: 'meeting', target: 'meetings' },
+  // DAO-OS L7 (L1-Q1): a board block and a System's relation name a System the engine knows.
+  { registry: 'boards', path: 'blocks.*.source.system', target: 'systems' },
+  // A value `<tree>/<key>` names the System `<tree>`; the map's own forms (L4c E-38) are read as `relation` says.
+  { registry: 'systems', path: 'relates.*.to', target: 'systems', relation: true },
 ]
+
+/** A hat ref as the map writes one (app/src/map/fromRecords.ts HAT_REF, systems.schema.json `roles`). */
+const HAT_REF = /^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}:0x[0-9a-fA-F]{64}$/
+
+/** The values at a dot path with their concrete paths (`blocks.0.source.system`); `*` walks every array item.
+ *  @param {any} node @param {string[]} parts @param {string[]} [at]
+ *  @returns {{ path: string, value: unknown }[]} */
+function valuesAt(node, parts, at = []) {
+  if (parts.length === 0) return node === null || node === undefined ? [] : [{ path: at.join('.'), value: node }]
+  const [head, ...rest] = parts
+  if (head === '*') return Array.isArray(node) ? node.flatMap((item, i) => valuesAt(item, rest, [...at, String(i)])) : []
+  if (typeof node !== 'object' || node === null || Array.isArray(node)) return []
+  return valuesAt(node[head], rest, [...at, head])
+}
+
+/** Every reference a ref row finds in `entry`: the field's path and the id it names (`<tree>/<key>` names `<tree>`).
+ *  @param {Ref} ref @param {Record<string, any>} entry @returns {{ field: string, id: string }[]} */
+function refValues(ref, entry) {
+  if (ref.path) {
+    return valuesAt(entry, ref.path.split('.'))
+      .filter(v => typeof v.value === 'string' && !(ref.relation && HAT_REF.test(String(v.value))))
+      .map(v => {
+        const value = String(v.value)
+        const named = ref.relation && value.startsWith('system:') ? value.slice('system:'.length) : value
+        return { field: v.path, id: named.split('/')[0] }
+      })
+  }
+  const value = entry[/** @type {string} */ (ref.field)]
+  if (value === null || value === undefined) return []
+  const list = ref.array && Array.isArray(value) ? value : [value]
+  return list.filter(v => typeof v === 'string').map(v => ({ field: /** @type {string} */ (ref.field), id: v }))
+}
 
 /** The sentence a broken reference is reported in, by the server and the script alike.
  *  @param {string} target @param {string} id @returns {string} */
@@ -98,21 +169,18 @@ export function refMessage(target, id) {
  * @param {string} registry
  * @param {Record<string, any>} entry
  * @param {(target: string) => Set<string> | null} idsOf
+ * @param {readonly Ref[]} [refs] the reference table: REFS, and a custom collection's relations (`refsOf`, DAO-OS L6 §7.3)
  * @returns {{ field: string, message: string }[]}
  */
-export function referenceErrors(registry, entry, idsOf) {
+export function referenceErrors(registry, entry, idsOf, refs = REFS) {
   /** @type {{ field: string, message: string }[]} */
   const errors = []
-  for (const ref of REFS.filter(r => r.registry === registry)) {
-    const value = entry[ref.field]
-    if (value === null || value === undefined) continue
+  for (const ref of refs.filter(r => r.registry === registry)) {
+    const found = refValues(ref, entry)
+    if (found.length === 0) continue
     const ids = idsOf(ref.target)
     if (!ids) continue
-    const check = v => {
-      if (typeof v === 'string' && !ids.has(v)) errors.push({ field: ref.field, message: refMessage(ref.target, v) })
-    }
-    if (ref.array && Array.isArray(value)) value.forEach(check)
-    else check(value)
+    for (const { field, id } of found) if (!ids.has(id)) errors.push({ field, message: refMessage(ref.target, id) })
   }
   return errors
 }
@@ -124,21 +192,45 @@ export function referenceErrors(registry, entry, idsOf) {
  * @param {string} name
  * @param {string} id
  * @param {(registry: string) => Record<string, any>[] | null} entriesOf
+ * @param {readonly Ref[]} [refs] the reference table (see referenceErrors)
  * @returns {{ registry: string, id: string, field: string }[]}
  */
-export function referrersOf(name, id, entriesOf) {
+export function referrersOf(name, id, entriesOf, refs = REFS) {
   const found = []
-  for (const ref of REFS.filter(r => r.target === name)) {
+  for (const ref of refs.filter(r => r.target === name)) {
     const entries = entriesOf(ref.registry)
     if (!entries) continue
     for (const entry of entries) {
-      const value = entry[ref.field]
-      if (value === id || (ref.array && Array.isArray(value) && value.includes(id))) {
-        found.push({ registry: ref.registry, id: String(entry.id), field: ref.field })
+      for (const hit of refValues(ref, entry)) {
+        if (hit.id === id) found.push({ registry: ref.registry, id: String(entry.id), field: hit.field })
       }
     }
   }
   return found
+}
+
+/**
+ * The places in the governance file that name System `id`: a rule decided by it (`rules[<i>].decide.system`) and the
+ * membership tree (`membership.tree`). The governance file is no registry, so it is read here and not through REFS.
+ * @param {string} id
+ * @param {Record<string, unknown> | null} governance
+ * @returns {{ where: 'governance.yaml', field: string, message: string }[]}
+ */
+export function governanceReferrers(id, governance) {
+  /** @type {{ where: 'governance.yaml', field: string, message: string }[]} */
+  const out = []
+  if (!governance || typeof governance !== 'object') return out
+  const rules = Array.isArray(governance.rules) ? governance.rules : []
+  rules.forEach((rule, i) => {
+    const system = rule && typeof rule === 'object' ? rule.decide?.system : undefined
+    if (system === id) out.push({ where: 'governance.yaml', field: `rules[${i}].decide.system`, message: `governance.yaml rule ${rule.id ?? `#${i + 1}`} is decided by system "${id}" (rules[${i}].decide.system)` })
+  })
+  const membership = /** @type {any} */ (governance.membership)
+  const tree = membership && typeof membership === 'object' ? membership.tree : undefined
+  if (typeof tree === 'string' && tree.split('/')[0] === id) {
+    out.push({ where: 'governance.yaml', field: 'membership.tree', message: `governance.yaml names system "${id}" as the membership tree (membership.tree)` })
+  }
+  return out
 }
 
 /**
@@ -211,14 +303,16 @@ function warnings(registry, entry) {
 }
 
 /**
- * One entry (or one document block) against its registry's schema.
+ * One entry (or one document block) against its registry's schema, or, for a custom collection's record (DAO-OS L6
+ * §7.3), against the `schema` its definition derives (`schemaOf`).
  * `file` is left empty; validateRepo fills it in.
  * @param {string} registry
  * @param {unknown} entry
+ * @param {Record<string, any> & { $id: string }} [schema]
  * @returns {Problem[]}
  */
-export function validateEntry(registry, entry) {
-  const fn = validator(registry)
+export function validateEntry(registry, entry, schema) {
+  const fn = validator(registry, schema)
   const own = idOf(entry)
   const id = own === null ? {} : { id: own }
   /** @type {Problem[]} */
@@ -286,9 +380,10 @@ export function isGitSafetyProblem(p) {
  * repeated: the field is named.
  * @param {Map<string, Record<string, any>[]>} loaded @param {Record<string, any> | null} visibilityDoc
  * @param {Record<string, any> | null} governance @param {Record<string, any>[] | null} systems
+ * @param {Map<string, string>} [fileOf] the file each collection is read from (a custom collection's is its own)
  * @returns {Problem[]}
  */
-function gitHoldsNothingPrivate(loaded, visibilityDoc, governance, systems) {
+function gitHoldsNothingPrivate(loaded, visibilityDoc, governance, systems, fileOf = new Map()) {
   /** @type {Problem[]} */
   const out = []
   const { policy } = readFullPolicy(visibilityDoc ?? {})
@@ -297,7 +392,7 @@ function gitHoldsNothingPrivate(loaded, visibilityDoc, governance, systems) {
   if (visibilityDoc !== null) {
     const roles = isMap(governance?.roles) ? Object.keys(governance.roles) : []
     const tree = membershipTree(governance, systems)?.tree ?? null
-    for (const p of checkVisibilityPolicy(visibilityDoc, { registries: REGISTRIES.map(r => r.name), roles, tree })) {
+    for (const p of checkVisibilityPolicy(visibilityDoc, { registries: [...REGISTRIES.map(r => r.name), ...[...fileOf.keys()].filter(n => !REGISTRIES.some(r => r.name === n))], roles, tree })) {
       out.push({ file: 'data/visibility.yaml', path: p.path, message: p.message, level: p.level })
     }
   }
@@ -308,16 +403,16 @@ function gitHoldsNothingPrivate(loaded, visibilityDoc, governance, systems) {
       const own = idOf(entry)
       const id = own === null ? {} : { id: own }
       if (tooStrict(entry.visibility)) {
-        out.push({ file: `data/${name}.yaml`, ...id, path: 'visibility', level: 'error',
+        out.push({ file: fileOf.get(name) ?? `data/${name}.yaml`, ...id, path: 'visibility', level: 'error',
           message: `this record's visibility is ${String(entry.visibility).trim()}, stricter than members: it belongs in ${PRIVATE_STORE}` })
       }
       for (const [field, level] of Object.entries(restricted)) {
         if (!held(entry[field])) continue
-        out.push({ file: `data/${name}.yaml`, ...id, path: field, level: 'error',
+        out.push({ file: fileOf.get(name) ?? `data/${name}.yaml`, ...id, path: field, level: 'error',
           message: `the field ${field} is restricted to ${formatLevel(level)} by data/visibility.yaml, so its value is stricter than members: it belongs in ${PRIVATE_STORE}` })
       }
       if (link && name === WALLET_LINK.registry && held(entry[WALLET_LINK.field])) {
-        out.push({ file: `data/${name}.yaml`, ...id, path: WALLET_LINK.field, level: 'error',
+        out.push({ file: fileOf.get(name) ?? `data/${name}.yaml`, ...id, path: WALLET_LINK.field, level: 'error',
           message: `the field ${WALLET_LINK.field} holds ${linkKept}: it belongs in ${PRIVATE_STORE}` })
       }
     }
@@ -373,6 +468,10 @@ export function validateRepo(root) {
   let governanceBlock = null
   /** data/visibility.yaml's document, when it could be read. @type {Record<string, any> | null} */
   let visibilityDoc = null
+  /** data/collections.yaml's text, when there is one (DAO-OS L6 §7.3). @type {string | null} */
+  let collectionsText = null
+  /** The file each loaded collection is read from: a registry's, or a custom collection's own. @type {Map<string, string>} */
+  const fileOf = new Map()
   for (const def of REGISTRIES) {
     const file = `data/${def.name}.yaml`
     const full = join(root, file)
@@ -400,9 +499,21 @@ export function validateRepo(root) {
     const key = resolveTopKey(k => Object.hasOwn(top, k), def)
     const block = top[key]
 
+    if (def.name === 'collections') {
+      // DAO-OS L6 §7.3: the definitions, read as the server reads them; each problem an error.
+      collectionsText = text
+      for (const message of readCollections(text, REGISTRIES.map(r => r.name)).problems) {
+        const at = message.indexOf(': ')
+        problems.push({ file, path: at < 0 ? '' : message.slice(0, at), message: at < 0 ? message : message.slice(at + 2), level: 'error' })
+      }
+      continue
+    }
+
     if (def.kind === 'document') {
       if (def.name === 'visibility') visibilityDoc = top
       if (isMap(block)) problems.push(...validateEntry(def.name, block).map(p => ({ ...p, file })))
+      // A document that is a list, written whole (DAO-OS L6 §9.6: data/imports.yaml's receipts), against its list's schema.
+      else if (Array.isArray(block) && loadSchema(def.name).type === 'array') problems.push(...validateEntry(def.name, block).map(p => ({ ...p, file })))
       else if (block !== undefined && block !== null) {
         problems.push({ file, path: key, level: 'error', message: `\`${key}:\` is not a mapping of keys to values` })
       }
@@ -439,6 +550,40 @@ export function validateRepo(root) {
       entries.push(entry)
     })
     loaded.set(def.name, entries)
+    fileOf.set(def.name, file)
+  }
+
+  // DAO-OS L6 §7.3: each custom collection data/collections.yaml defines, its records in its own file, each against the
+  // schema its fields derive; its relations are references, as a registry's are.
+  /** @type {Ref[]} */
+  const refs = [...REFS]
+  const { collections: definitions } = readCollections(collectionsText, REGISTRIES.map(r => r.name))
+  const customDefs = customRegistries(definitions)
+  /** @type {Map<string, string>} */
+  const customFiles = new Map(customDefs.map(d => [d.name, /** @type {string} */ (d.file)]))
+  for (const custom of customDefs) {
+    const definition = definitions.find(d => d.id === custom.name)
+    if (!definition || !custom.file) continue
+    refs.push(...refsOf(definition))
+    const file = custom.file
+    if (!existsSync(join(root, file))) continue
+    const top = readTop(readFileSync(join(root, file), 'utf8'), file, problems)
+    if (top === undefined) continue
+    const block = top[custom.topKey]
+    if (block !== undefined && block !== null && !Array.isArray(block)) {
+      problems.push({ file, path: custom.topKey, level: 'error', message: `\`${custom.topKey}:\` is not a list of entries` })
+      continue
+    }
+    const schema = schemaOf(definition)
+    /** @type {Record<string, any>[]} */
+    const entries = []
+    for (const [index, entry] of (Array.isArray(block) ? block : []).entries()) {
+      if (!isMap(entry)) { problems.push({ file, id: `#${index + 1}`, path: '', level: 'error', message: 'this entry is not a mapping of fields to values' }); continue }
+      problems.push(...validateEntry(custom.name, idOf(entry) === null ? { ...entry, id: `#${index + 1}` } : entry, schema).map(p => ({ ...p, file })))
+      entries.push(entry)
+    }
+    loaded.set(custom.name, entries)
+    fileOf.set(custom.name, file)
   }
 
   // Roles and rules need the members and the systems, whatever order the registries load in.
@@ -456,13 +601,19 @@ export function validateRepo(root) {
     const known = name => loaded.get(name) ?? (existsSync(join(root, 'data', `${name}.yaml`)) ? null : [])
     problems.push(...checkProposals(ledger, {
       members: known('members'), governance: governanceBlock, systems: known('systems'), classes: CHANGE_CLASSES,
-      classOf: registry => classOf({ registry }),
+      // A record's class is its registry's file's (DAO-OS L6 ruling P-5): a custom collection's is its own file.
+      // Knowledge's records are in data/kb/ (L6 §7.5, Task 10): a ledger op on one is class workspace, as the server reads it.
+      classOf: registry => classOf({ path: fileOf.get(registry) ?? customFiles.get(registry) ?? (registry === KNOWLEDGE.name ? KNOWLEDGE.filesGlob : `data/${registry}.yaml`) }),
+      defs: [...REGISTRIES, ...(existsSync(join(root, 'data', 'kb')) ? [KNOWLEDGE] : []), ...customDefs],
     }).map(p => ({ ...p, file: 'data/proposals.yaml' })))
   }
 
   // Nothing stricter than members in git (DAO-OS L5 spec §10.5, house spec §11 rule 4), and the policy read against the org.
   problems.push(...gitHoldsNothingPrivate(loaded, visibilityDoc, governanceBlock,
-    loaded.get('systems') ?? null))
+    loaded.get('systems') ?? null, fileOf))
+
+  // DAO-OS L6 §4.1, §4.2, §4.5 (Task 7): the pages in git, read as the server reads them (lib/workspace/pages.mjs).
+  problems.push(...pageProblems(root, visibilityDoc))
 
   // The library's receipts: every field the seal fills is filled (a hand edit is not sealed).
   const receipts = loaded.get(RECEIPTS)
@@ -485,9 +636,9 @@ export function validateRepo(root) {
   }
   for (const [name, entries] of loaded) {
     for (const entry of entries) {
-      for (const { field, message } of referenceErrors(name, entry, idsOf)) {
+      for (const { field, message } of referenceErrors(name, entry, idsOf, refs)) {
         const id = idOf(entry)
-        problems.push({ file: `data/${name}.yaml`, ...(id === null ? {} : { id }), path: field, message, level: 'warn' })
+        problems.push({ file: fileOf.get(name) ?? `data/${name}.yaml`, ...(id === null ? {} : { id }), path: field, message, level: 'warn' })
       }
     }
   }

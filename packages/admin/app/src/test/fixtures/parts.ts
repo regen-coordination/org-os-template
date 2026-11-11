@@ -119,6 +119,7 @@ export function partsClient(): QueryClient {
     // Needs you reads the open proposals (the map lights its nodes from them, E-35); Recently the decisions
     [['proposals'], proposalViews], [['governance'], { model: null, description: null, rules: [], decisions: [], problems: [] }],
     [['registry', 'members'], { name: 'members', kind: 'collection', schemaVersion: '2.0', entries: [{ id: 'steward-a', name: 'Steward A' }] }],
+    [['notifications'], []], // DAO-OS L6 Task 18: Needs you's mention rows (none in the gallery)
   ]
   for (const [key, data] of set) qc.setQueryData(key, data)
   return qc

@@ -108,7 +108,15 @@ describe('approve', () => {
     const none = resolveRoles({ roles: { maintainer: { members: ['ana'] } } }, MEMBERS)
     const z = evaluate({ rule: APPROVE(1) as never, proposal: proposal([], { author: 'ana' }) as never, book: none, now: OPENED + 2 * H })
     expect(z.blocked).toBe('unmeetable')
-    expect(z.missing).toContain('only 0 maintainers other than the author, and the rule asks for 1')
+    expect(z.missing).toBe('cannot be met: no maintainer other than the author, and the rule asks for 1. Withdraw it, or change the rule')
+  })
+  it('a role sourced from a hat is never unmeetable: who wears it is known only as far as a reading says (walk I3, W6)', () => {
+    const HAT = `eip155:42220:0x0000000d0001${'0'.repeat(52)}`
+    const unread = resolveRoles({ roles: { maintainer: { hat: HAT }, member: { all: true } } }, MEMBERS)
+    const e = evaluate({ rule: APPROVE(1) as never, proposal: proposal([], { author: 'dora' }) as never, book: unread, now: OPENED + 2 * H })
+    expect(e.state).toBe('pending')
+    expect(e.blocked).toBeUndefined()
+    expect(e.missing).toBe('needs 1 more approval from a maintainer other than the author')
   })
 })
 

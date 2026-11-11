@@ -8,6 +8,9 @@ import { DataList } from '../elements/rows/DataList.tsx'
 import { DataRow } from '../elements/rows/DataRow.tsx'
 import { useNow } from '../time.ts'
 import { Skeleton } from '../design/Skeleton.tsx'
+import { PageTree } from '../workspace/PageTree.tsx' // DAO-OS L6 Task 16
+import { HubCollections } from '../workspace/HubCollections.tsx' // DAO-OS L6 Task 17
+import { WORKSPACE_BUILTINS } from '../workspace/collections.ts' // DAO-OS L6 Task 17
 
 /** Who has a page open, by its address: the workspace lane (L6) fills it; until then a fixture may (§7.12). */
 export type PresenceOf = (href: string) => { handle: string; role: string; editing?: boolean }[]
@@ -31,15 +34,24 @@ export default function Workspace({ presenceOf }: { presenceOf?: PresenceOf }) {
     ? registries.find(g => g.name === def.registry)?.count ?? 0
     : visible(sectionRows(def, resources.data ?? [], systems)).length
   const readAt = resources.dataUpdatedAt > 0 ? new Date(resources.dataUpdatedAt).toISOString() : null
+  // --- DAO-OS L6 Task 17: a collection the Hub lists (Tasks, Meetings) is one row, the Hub's, at /c/<id>
+  const listed = collections.filter(c => !WORKSPACE_BUILTINS.includes(c.id))
+  // --- end L6 Task 17
   return (
     <>
       <PageHead title="Workspace" from={org ? { repo: org, readAt } : undefined} now={now} />
+      {/* --- DAO-OS L6 Task 16: the pages, root pages and their subpages (spec §15) */}
+      <PageTree />
+      {/* --- end L6 Task 16 */}
+      {/* --- DAO-OS L6 Task 17: the Hub's collections, and New collection (spec §15) */}
+      <HubCollections />
+      {/* --- end L6 Task 17 */}
       {pending ? <Skeleton rows={4} shape="row" label="Collections" />
         : collections.length === 0
         ? <NoteBlock title="Nothing in the Workspace yet." line="Its collections appear here once they hold a record you may see." />
-        : (
+        : listed.length > 0 && ( /* DAO-OS L6 Task 17: `listed` */
           <DataList label="Collections">
-            {collections.map(c => {
+            {listed.map(c => {
               const n = countOf(c.def)
               return <DataRow key={c.id} kind="page" title={c.label} second={`${n} record${n === 1 ? '' : 's'}`} href={c.href} marks={[]} presence={presenceOf?.(c.href)} />
             })}

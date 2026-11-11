@@ -91,8 +91,8 @@
   --ls-amount: -.02em; /* a large amount, in Fraunces (§7.7) */
   --ls-av: .02em; /* a monogram's letters (§7.12) */
   --soft: 50; /* Fraunces' SOFT axis */
-  --soft-hero: 80; /* the door hero */
-  --soft-sec: 60; /* door section heads */
+  --soft-hero: 80; /* the portal hero */
+  --soft-sec: 60; /* portal section heads */
 
   /* space */
   --sp-1: 1px;
@@ -177,7 +177,7 @@
   --w-panel-form: 464px; /* a right-slot panel holding a form (Propose): a field row's two columns (420) and its padding (E-55) */
   --w-content: 1040px;
   --w-prose: 68ch;
-  --w-door: 1120px;
+  --w-portal: 1120px;
   --w-parts: 1272px; /* a /parts group page: the approved gallery's content width, 1320 less its 24px gutters (R-12) */
   --w-spec-two: 520px; /* a /parts card in a group laid out two a row, at its narrowest (the gallery's spec-grid two) */
   --w-node: 200px;
@@ -267,7 +267,7 @@
   --h-need: 72px; /* a Needs you row, at least (§9.4) */
   --h-call-n: 22px; /* a prepared call's number square (§9.6) */
   --h-tl-mark: 22px; /* a proposal timeline's step marker (§9.5) */
-  --h-tl-dot: 10px; /* a compact timeline's dot, in rows and on the door (§9.5) */
+  --h-tl-dot: 10px; /* a compact timeline's dot, in rows and on the portal (§9.5) */
   --w-tl-join: 14px; /* and the line that joins two dots */
   --h-rt-row: 44px; /* a role tree's row, at least (§9.7) */
   --h-rt-tg: 18px; /* its chevron toggle */
@@ -331,8 +331,8 @@
   --w-row-age: 84px; /* a Systems row's read-age column (§9.2) */
   --w-signin: 420px; /* the sign-in card, at its widest (§11.4) */
   --h-signin-go: 40px; /* its full-width primary, Sign in with Ethereum */
-  --h-door-top: 76px; /* the door's top bar (§12.1) */
-  --w-door-seal: 26px; /* its wordmark's square, the org's mark on --solid */
+  --h-portal-top: 76px; /* the portal's top bar (§12.1) */
+  --w-portal-seal: 26px; /* its wordmark's square, the org's mark on --solid */
   --h-lib-card: 172px; /* a library entry card, at least (§11.1) */
   --w-lib-card: 260px; /* and at its narrowest, in the shelf's grid */
   --fs-lib-t: .9375rem; /* its title, Sans 600 15 */
@@ -340,19 +340,19 @@
   --h-wiz-dot: 20px; /* a step's numbered circle */
   --fs-wiz-n: .65625rem; /* its number, Mono 500 10.5 */
   --fs-wiz-h: 1.25rem; /* a wizard screen's question, Sans 600 20 */
-  --radius-door-seal: 7px;
+  --radius-portal-seal: 7px;
   --fs-d-mark: 1.1875rem; /* the wordmark's name, Fraunces 500 19 */
-  --w-door-label: 240px; /* a section's sticky label column (§12.4) */
-  --w-door-lead: 34em; /* a section's lead, at its widest */
-  --w-door-desc: 42ch; /* the hero's description */
-  --lh-d-body: 1.6; /* the door's body and description */
+  --w-portal-label: 240px; /* a section's sticky label column (§12.4) */
+  --w-portal-lead: 34em; /* a section's lead, at its widest */
+  --w-portal-desc: 42ch; /* the hero's description */
+  --lh-d-body: 1.6; /* the portal's body and description */
   --fs-d-row: 1.1875rem; /* a ledger row's title, Fraunces 19 */
   --fs-d-hat: 1.125rem; /* a hat's name, Fraunces 18 */
   --lh-d-row: 1.3;
-  --radius-door-card: 18px; /* a pool card and the treasury's panels */
-  --w-door-dot: 20px; /* a signer's dot */
-  --w-door-dot-ring: 1.5px;
-  --w-door-id: 120px; /* the ledger's id column */
+  --radius-portal-card: 18px; /* a pool card and the treasury's panels */
+  --w-portal-dot: 20px; /* a signer's dot */
+  --w-portal-dot-ring: 1.5px;
+  --w-portal-id: 120px; /* the ledger's id column */
   --h-log: 260px;
   --h-embed: 480px;
   --h-canvas-chrome: 140px;

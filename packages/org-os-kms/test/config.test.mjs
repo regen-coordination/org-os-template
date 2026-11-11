@@ -11,12 +11,12 @@ function tmpInstance(yamlText) {
   return dir;
 }
 
-test('loads a valid kms.yaml and defaults render to {}', () => {
+test('loads a valid kms.yaml and defaults render to the house fonts only', () => {
   const dir = tmpInstance('instance: t\nadapter: repo-data\ntarget: "."\n');
   const cfg = loadKmsConfig(dir);
   assert.equal(cfg.instance, 't');
   assert.equal(cfg.adapter, 'repo-data');
-  assert.deepEqual(cfg.render, {});
+  assert.deepEqual(cfg.render, { fonts: 'house' });
 });
 
 test('throws a clear error when kms.yaml is absent', () => {

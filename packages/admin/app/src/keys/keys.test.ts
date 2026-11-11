@@ -27,9 +27,9 @@ describe('keyStep (§5.8)', () => {
     expect(afterG('h', G_WAIT)).toEqual({ go: '/' }) // 900 ms is still within
   })
 
-  it('g c opens the Changes tray, g d the public door', () => {
+  it('g c opens the Changes tray, g d the portal', () => {
     expect(afterG('c')).toEqual({ open: 'changes' })
-    expect(afterG('d')).toEqual({ open: 'door' })
+    expect(afterG('d')).toEqual({ open: 'portal' })
   })
 
   it('g then a key at +901 ms does nothing', () => {

@@ -1,11 +1,11 @@
 import { HOUSE_SECTIONS } from '../frame/sections.ts'
 
 /** What a key does in the house (§5.8). `go` is a section's page; `open` the palette, the key map, the Changes
- *  tray (`g c`), the public door (`g d`, in a new tab) or a page's New (`n`: Boards' New board, design pass
+ *  tray (`g c`), the portal (`g d`, in a new tab) or a page's New (`n`: Boards' New board, design pass
  *  2026-11-04, DP-18); `fold` folds or unfolds the sidebar; `view` toggles List · Map on the focused list; `move` is
  *  the next or previous row in a list. */
 export type KeyAction =
-  | { go: string } | { open: 'palette' | 'keymap' | 'changes' | 'door' | 'new' } | { fold: true } | { view: 'toggle' } | { move: 1 | -1 } | null
+  | { go: string } | { open: 'palette' | 'keymap' | 'changes' | 'portal' | 'new' } | { fold: true } | { view: 'toggle' } | { move: 1 | -1 } | null
 
 export interface KeyState { pendingG: number | null }
 export interface KeyPress { key: string; meta: boolean; ctrl: boolean; inField: boolean }
@@ -13,10 +13,10 @@ export interface KeyPress { key: string; meta: boolean; ctrl: boolean; inField: 
 /** `g` waits this long for its second key (§5.8). */
 export const G_WAIT = 900
 
-/** The second key after `g`: a section's own key goes there (h n p s r t w l); `c` opens the tray; `d` the door. */
+/** The second key after `g`: a section's own key goes there (h n p s r t w l); `c` opens the tray; `d` the portal. */
 function afterG(key: string): KeyAction {
   if (key === 'c') return { open: 'changes' }
-  if (key === 'd') return { open: 'door' }
+  if (key === 'd') return { open: 'portal' }
   const s = HOUSE_SECTIONS.find(x => x.key === key && x.id !== 'changes')
   return s ? { go: s.href } : null
 }

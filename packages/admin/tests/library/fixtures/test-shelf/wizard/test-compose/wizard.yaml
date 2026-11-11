@@ -1,0 +1,35 @@
+id: test-compose
+title: Compose a test council
+summary: A Safe and a council hat for the Test DAO, composed and not deployed.
+intro:
+  body: Two questions, then the composition is staged in your changes, where you review it.
+  writes: Nothing yet.
+steps:
+  - id: name
+    title: Name
+    ask: What is the organization called?
+    writes: Nothing yet.
+    fields:
+      - { id: name, label: Name, kind: text, required: true }
+      - { id: id, label: Id, kind: text, required: true, help: "The records are named from it: <id>-safe, <id>-roles, <id>-council. Filled from the name." }
+  - id: signers
+    title: Signers
+    ask: Who signs for the Safe, and how many of them must sign?
+    writes: Nothing yet.
+    fields:
+      - { id: owners, label: Signers, kind: addresses, required: true, help: One address per line. }
+      - { id: threshold, label: Signatures needed, kind: count, required: true }
+review:
+  title: Review
+  ask: Stage this composition in your changes?
+  writes: Stages the Safe, the council's Hats tree and a board in your changes, as one change. Nothing is deployed.
+done:
+  title: Staged
+  body: The composition is in your changes. Review it, then apply or propose it.
+result:
+  add: template:test-council
+  config:
+    id: "${field.id}"
+    name: "${field.name}"
+    owners: "${field.owners}"
+    threshold: "${field.threshold}"

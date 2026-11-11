@@ -10,6 +10,10 @@ export interface Mentionable {
   /** A role's wearers, counted ("8 people"). */
   count?: number
   canSee: boolean
+  /** DAO-OS L6 (Task 9 serves it): a record's collection, which its glyph is drawn from (never its id). */
+  recordKind?: string
+  /** DAO-OS L6: the Markdown target a mention of it is written with (`hub:member/<id>`, `./<id>.md` …). */
+  href?: string
 }
 
 /** The words a name is matched on: its own words, lower case. */
@@ -25,3 +29,30 @@ export function mentionables(people: Mentionable[], query: string): Mentionable[
   const offered = people.filter(m => (m.canSee || m.kind === 'person') && matches(m))
   return [...offered.filter(m => m.canSee), ...offered.filter(m => !m.canSee)]
 }
+
+// --- DAO-OS L6 Task 18: an `@` in a comment's text box (the composer's caret), and the mentions it picked
+
+/** What is typed after an `@` that starts a word, up to the caret; null when the caret is not in one. */
+export function mentionQuery(text: string, caret: number): string | null {
+  const m = /(?:^|\s)@([^\s@[\]()]*)$/u.exec(text.slice(0, caret))
+  return m ? m[1]! : null
+}
+
+/** A mention picked in the composer: written `@<label>` in the box, sent as `markdown`. */
+export interface MentionPick { label: string; markdown: string }
+
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** The text as sent: each picked `@<label>` still in it becomes its mention's Markdown (`[@Label](hub:member/<id>)`), the
+ *  longest label first so a shorter name inside a longer one is not taken for it; one already written as a link (after a
+ *  `[`) is left alone. What was not picked stays as typed. */
+export function expandMentions(text: string, picks: readonly MentionPick[]): string {
+  if (picks.length === 0) return text
+  const by = new Map(picks.map(p => [p.label, p.markdown]))
+  const labels = [...by.keys()].sort((a, b) => b.length - a.length).map(escape)
+  return text.replace(new RegExp(`(?<!\\[)@(${labels.join('|')})(?![\\p{L}\\p{N}])`, 'gu'), (_all, label: string) => by.get(label) ?? _all)
+}
+
+/** A mention's Markdown, as the editor writes one (§5.2): `[@<label>](<href>)`. */
+export const mentionMarkdown = (m: { label: string; href: string }): string => `[@${m.label.replace(/[[\]]/g, '')}](${m.href})`
+// --- end L6 Task 18

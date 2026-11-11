@@ -30,9 +30,10 @@ export function RestrictedValue({ hat }: { hat: string }) {
  *  by the caller (`how`). A hat the member does not wear, and that sits under no hat they wear, is listed after
  *  a separator, aria-disabled "you don’t wear it". A widening in flight reads "Members → Public, proposed", the
  *  target in moss. A `parent` puts its level in the menu's header. `offers` leaves out a level the thing cannot be given
- *  where it is drawn. */
-export function VisibilityControl({ value, parent, proposed, offers = () => true, onChoose }:
-  { value: Visibility; parent?: Visibility; proposed?: Visibility; offers?(v: Visibility): boolean; onChoose(v: Visibility, how: 'applies' | 'propose'): void }) {
+ *  where it is drawn. `more` (DAO-OS L6 Task 20) follows the levels after a separator: "Move into the repository…" for a
+ *  private record or page, or the proposal that holds a move in flight. */
+export function VisibilityControl({ value, parent, proposed, offers = () => true, more = [], onChoose }:
+  { value: Visibility; parent?: Visibility; proposed?: Visibility; offers?(v: Visibility): boolean; more?: MenuEntry[]; onChoose(v: Visibility, how: 'applies' | 'propose'): void }) {
   const source = useVisibilitySource()
   const worn = new Set(source.worn())
   const hats: Visibility[] = source.hats().map(h => ({ level: 'hat', hat: h.hat, name: h.name }))
@@ -54,6 +55,7 @@ export function VisibilityControl({ value, parent, proposed, offers = () => true
     ...[{ level: 'public' } as const, { level: 'members' } as const, ...hats].filter(mayChoose).map(choice),
     ...(notWorn.length === 0 ? [] : [{ type: 'separator' } as const,
       ...notWorn.map((h): MenuEntry => ({ type: 'item', label: visibilityWord(h), icon: 'lock', unavailable: 'you don’t wear it', onSelect: () => {} }))]),
+    ...(more.length === 0 ? [] : [{ type: 'separator' } as const, ...more]),
   ]
   const text = proposed
     ? <>{visibilityWord(value)} → <span className="vis-to">{visibilityWord(proposed)}, proposed</span></>

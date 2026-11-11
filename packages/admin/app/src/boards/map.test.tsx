@@ -41,15 +41,15 @@ const nodeOf = async (id: string) => {
 // its edges, §8.5; a node is moved by dragging it on the Organization map), and the Systems map's saved layout (it is
 // laid out by authority, §8.2; only the Organization map keeps a layout).
 describe('MapPage', () => {
-  it('heads the map with its name, opens the inspector for ?select=, and draws that node selected; a portal is a linked node', async () => {
+  it('heads the map with its name, opens the inspector for ?select=, and draws that node selected; a link to the other map is a linked node', async () => {
     routes()
     renderAt(<><BoardPage id="systems" /><Inspector /></>, '/b/systems?select=module%3Aa')
     expect(await screen.findByRole('heading', { level: 1, name: 'Systems map' })).toBeTruthy()
     const node = await nodeOf('module:a')
     expect(await screen.findByRole('complementary', { name: 'org-os-buzz inspector' })).toBeTruthy()
     await waitFor(() => expect(node.getAttribute('aria-current')).toBe('true'))
-    const portal = await nodeOf('portal:organization')
-    expect(portal.textContent).toContain('on Organization map')
+    const link = await nodeOf('portal:organization')
+    expect(link.textContent).toContain('on Organization map')
   })
 
   it('opens the inspector on a node, and keeps the selection in the address', async () => {

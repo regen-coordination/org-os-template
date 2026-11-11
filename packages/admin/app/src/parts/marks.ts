@@ -21,7 +21,7 @@ export function marksOf(r: Resource, ctx: MarkContext): Mark[] {
   const out: Mark[] = []
   if (r.attention) out.push('needs')
   const key = changeKeyOf(r)
-  const ops = key && ctx.change ? ctx.change.ops.flatMap((o, i) => (o.record === key ? [i] : [])) : []
+  const ops = key && ctx.change ? ctx.change.ops.flatMap((o, i) => (o.op !== 'file' && o.record === key ? [i] : [])) : []
   if (ops.some(i => ctx.change!.stale.includes(i)) || staleProposal(r)) out.push('stale')
   else if (ops.length > 0) out.push('staged')
   const job = ctx.jobs.get(r.id)

@@ -98,9 +98,13 @@ export function evaluate({ rule, proposal, book, now }) {
     const objectors = unique(events.filter(e => e.kind === 'object' && !e.answered && deciders.includes(e.by)).map(e => e.by))
     const tally = { for: approvers, objecting: objectors, needed: count }
     const other = selfOk ? '' : ' other than the author'
-    if (eligible.length < count) {
+    // Walk I3, W6 (PF-R257): a role sourced from a hat holds whoever a reading says wears it, and its wearers can change
+    // on the chain: who decides is not known in full, so such a rule is never "cannot be met". Each viewer then reads
+    // the same verdict, whatever their own reading names.
+    const fromHat = typeof book.roles.get(by)?.hat === 'string'
+    if (eligible.length < count && !fromHat) {
       result = { state: 'pending', blocked: 'unmeetable', tally, closes: expiry,
-        missing: `cannot be met: only ${plural(eligible.length, by)}${other}, and the rule asks for ${count}. Withdraw it, or change the rule` }
+        missing: `cannot be met: ${eligible.length === 0 ? `no ${by}` : `only ${plural(eligible.length, by)}`}${other}, and the rule asks for ${count}. Withdraw it, or change the rule` }
     } else if (objectors.length > 0) {
       result = { state: 'pending', tally, closes: expiry, missing: held(by, objectors) }
     } else if (approvers.length >= count) {

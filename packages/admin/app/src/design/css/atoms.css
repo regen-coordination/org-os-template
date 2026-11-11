@@ -29,7 +29,7 @@
 .addr-still { cursor: inherit; }
 .addr-warn { background: var(--attn-soft); color: var(--attn); }
 .addr-warn .addr-ic { color: var(--attn); }
-/* full (record pages, the door's treasury): the whole address, wrapping anywhere, on no fill */
+/* full (record pages, the portal's treasury): the whole address, wrapping anywhere, on no fill */
 .addr-full { flex: 0 1 auto; min-width: 0; block-size: auto; padding: 0; background: transparent; font-size: var(--fs-tiny); line-height: var(--lh-addr-full);
   white-space: normal; overflow-wrap: anywhere; text-align: start; }
 /* the clipboard refused: the whole value, selectable in one go, for the person's own copy */

@@ -1,16 +1,24 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { isAbsolute, join, resolve } from 'node:path'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Ajv from 'ajv'
 import { parse } from 'yaml'
 import { builtinBoards } from '../boards/read.ts'
 import type { BoardDef } from '../boards/types.ts'
-import { placeholdersOf } from './config.ts'
+import { strayPlaceholder } from './config.ts'
+import { readWizardFile, type WizardDef } from '../../lib/wizards.mjs'
+import { RECEIPTS } from '../../lib/receipts.mjs'
 import type { InstallOp, LibraryEntry, Shelf, ShelfProblem } from './types.ts'
 
 /** The framework's shelf: shipped with the platform, versioned with it. */
 export const LIBRARY_DIR = fileURLToPath(new URL('../../library/', import.meta.url))
-const SHELF_ORDER: Shelf[] = ['board', 'rules', 'system']
+const SHELF_ORDER: Shelf[] = ['board', 'rules', 'system', 'template', 'wizard']
+
+/** The folder each served entry was read from, kept beside the entry and never in it: an entry is sent to the browser
+ *  as it is, and no path the server resolved may reach it. */
+const FOLDERS = new WeakMap<LibraryEntry, string>()
+/** A shelf wizard's definition, read and checked with its entry. */
+const WIZARDS = new WeakMap<LibraryEntry, WizardDef>()
 
 const isMapping = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 /** A directory as its sentences print it: the framework's by its place in the repository, a registered shelf's by the
@@ -58,18 +66,46 @@ function readEntry(dir: string, id: string, check: (e: unknown) => string | null
   if (problem) throw new Error(`${where(shown, file)}: ${problem}`)
   const e = entry as LibraryEntry
   if (e.id !== id) throw new Error(`${where(shown, file)}: its id ${e.id} is not ${id}, the id its folder library/${shelf}/${slug} gives it.`)
-  const declared = Object.keys(e.config?.properties ?? {})
-  const undeclared = placeholdersOf(e).find(name => !declared.includes(name))
-  if (undeclared) throw new Error(`${where(shown, file)}: its installs name config.${undeclared}, which its config does not declare.`)
+  // Every ${config.…} must be ${config.<name>} with a name its config declares (L7 §5.1); ${hat.…} and ${system.…} are text.
+  const stray = strayPlaceholder(e)
+  if (stray !== null) throw new Error(`${id}: "${stray}" names no property of config.`)
   for (const op of e.installs ?? []) {
     const [registry = '', rid = ''] = op.record.split(':')
+    if (registry === RECEIPTS) throw new Error(`${id}: an entry never writes receipts (${RECEIPTS}:).`)
     if (registry === 'boards' && op.op === 'create') {
       const made = isMapping(op.value) ? op.value.id : undefined
       if (made !== rid) throw new Error(`${where(shown, file)}: it creates ${op.record}, but the board's own id is ${String(made)}. They must be the same.`)
       if (builtinIds.has(rid)) throw new Error(`${where(shown, file)}: it creates a board with the id ${rid}, which is a built-in board. A library entry never shadows a built-in; give it an id of its own.`)
     }
   }
+  const folder = join(dir, shelf, slug)
+  FOLDERS.set(e, folder)
+  if (e.wizard !== undefined) WIZARDS.set(e, wizardIn(folder, e, slug))
   return e
+}
+
+/** A wizard entry's wizard: a file inside the entry's own folder that lib/wizards.mjs reads as a wizard whose id is
+ *  the entry's slug. Throws the sentence that says what is wrong. */
+function wizardIn(folder: string, e: LibraryEntry, slug: string): WizardDef {
+  const path = resolve(folder, e.wizard!)
+  const inside = !isAbsolute(e.wizard!) && relative(folder, path) !== '' && !relative(folder, path).startsWith(`..${sep}`) && relative(folder, path) !== '..'
+  if (!inside || !existsSync(path) || !statSync(path).isFile()) throw new Error(`${e.id}: its wizard ${e.wizard} is not a file in its folder.`)
+  const { def, problems } = readWizardFile(path, e.wizard!)
+  if (!def) throw new Error(`${e.id}: ${problems[0]}`)
+  if (def.id !== slug) throw new Error(`${e.id}: ${e.wizard}: the id "${def.id}" must be the entry's slug, ${slug}.`)
+  return def
+}
+
+/** The folder an entry was read from (null for a built-in board). Server-side only. */
+export const entryFolder = (e: LibraryEntry): string | null => FOLDERS.get(e) ?? null
+
+/** Every wizard the instance's registered shelves serve, each with the id /api/wizards gives it: `<shelf>/<slug>`
+ *  (`<shelf>` is the shelf's name, the entry's `source`), so no shelf wizard clashes with the framework's flat ids. */
+export function shelfWizards(repo: string): WizardDef[] {
+  return loadLibrary(repo).entries.flatMap(e => {
+    const def = WIZARDS.get(e)
+    return def ? [{ ...def, id: `${e.source}/${e.id.slice(e.id.indexOf(':') + 1)}` }] : []
+  })
 }
 
 /** An entry.schema.json as a checker (the framework's, unless a test points elsewhere): the first problem in words, or null. Every shelf is checked against it. */

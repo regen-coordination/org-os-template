@@ -202,3 +202,23 @@ describe('compactPhrase', () => {
     expect(compactPhrase(timelineOf(RETURN_DECIDED, [PREPARED_IN.ready!], null))).toBe('Reading back')
   })
 })
+
+/** The `<time>` elements a step's line holds: their `dateTime` and their text. */
+function times(node: unknown): { dateTime: unknown; text: string }[] {
+  if (node === null || node === undefined || typeof node !== 'object') return []
+  if (Array.isArray(node)) return node.flatMap(times)
+  const el = node as { type?: unknown; props?: { children?: unknown; dateTime?: unknown } }
+  if (el.type === 'time') return [{ dateTime: el.props?.dateTime, text: text(el.props?.children) }]
+  return times(el.props?.children)
+}
+
+describe('a step’s date is a <time> (the route shots mask it: Tasks 19/17 review)', () => {
+  it('the Proposed and Decided lines hold their dates in <time datetime=…>, the words as before', () => {
+    const s = byId(timelineOf(RECORDS_RATIFIED, [], ACTOR))
+    expect(times(s.proposed.line)).toEqual([{ dateTime: RECORDS_RATIFIED.opened, text: expect.stringMatching(/^\d{1,2} [A-Z][a-z]{2} \d{4}$/) }])
+    expect(times(s.decided.line)).toHaveLength(1)
+    expect(text(s.decided.line)).toBe('15 Oct 2026 · rule met · gov-20261015-001')
+    expect(text(byId(timelineOf(approving, [], null)).proposed.line)).toBe('16 Oct 2026 · carla')
+  })
+})
+

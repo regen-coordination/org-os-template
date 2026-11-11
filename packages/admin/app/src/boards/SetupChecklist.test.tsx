@@ -40,7 +40,7 @@ describe("Home's setup checklist", () => {
     expect(within(region).getByText('4 of 9 set')).toBeTruthy()
     const items = within(region).getAllByRole('listitem')
     expect(items.map(li => li.querySelector('.setup-l')!.textContent)).toEqual(
-      ['Name and door', 'People', 'Roles and who decides', 'Projects', 'Connect the treasury', 'Track funding', 'Ideas', 'Meetings', 'First proposal'])
+      ['Name and portal', 'People', 'Roles and who decides', 'Projects', 'Connect the treasury', 'Track funding', 'Ideas', 'Meetings', 'First proposal'])
     // a done item says so to a screen reader and offers nothing; an open one links to its New, stepped (Option B, spec §1b)
     expect(items[1]!.textContent).toContain('done')
     expect(within(items[1]!).queryByRole('link')).toBeNull()
@@ -115,7 +115,7 @@ describe("Home's setup checklist", () => {
     const all = setupItems({ org: 'Fixture Org', counts: { people: 1, projects: 2, treasury: 1, funding: 1, ideas: 3, meetings: 1 }, rules: 1, proposals: 1 })
     expect(all.every(i => i.done)).toBe(true)
     const some = setupItems({ org: 'Fixture Org', counts: { people: 1 }, rules: 0, proposals: 0 })
-    expect(some.filter(i => i.done).map(i => i.id)).toEqual(['door', 'people'])
+    expect(some.filter(i => i.done).map(i => i.id)).toEqual(['portal', 'people'])
   })
 
   it('draws nothing once every item is set, live', async () => {

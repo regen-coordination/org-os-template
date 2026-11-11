@@ -6,7 +6,7 @@ import { DataRow } from '../../elements/rows/DataRow.tsx'
 import { useViewToggle, type ListView } from '../../keys/useViewToggle.ts'
 import { HouseMap } from '../../map/HouseMap.tsx'
 import { HouseNode, factsLine, type MapNodeData, type NodeState } from '../../map/HouseNode.tsx'
-import { DOOR_NODES, MAP_ANATOMY, MAP_FLOW, MAP_LINKS, MAP_NODES, MAP_TREASURY } from '../../test/fixtures/house/map.ts'
+import { PORTAL_NODES, MAP_ANATOMY, MAP_FLOW, MAP_LINKS, MAP_NODES, MAP_TREASURY } from '../../test/fixtures/house/map.ts'
 import { Card } from './spec.tsx'
 
 const noop = () => {}
@@ -34,7 +34,7 @@ function MembersMap() {
 
 /** /parts/map (§8, B8): the DAO map as members see it, the Treasury selected (its path moss, the rest dimmed) with the
  *  caption under it; one node in each state; value moving along transaction 18's edges (shot under reduced motion,
- *  so the still path); the map on a phone; and the door's map, read-only. Fixtures. */
+ *  so the still path); the map on a phone; and the portal's map, read-only. Fixtures. */
 export default function MapGroup() {
   return (
     <div className="pg">
@@ -57,8 +57,8 @@ export default function MapGroup() {
           </div>
         </Card>
       </div>
-      <Card cap="the door · public records, read-only, each node a link">
-        <HouseMap items={DOOR_NODES} links={MAP_LINKS} variant="door" />
+      <Card cap="the portal · public records, read-only, each node a link">
+        <HouseMap items={PORTAL_NODES} links={MAP_LINKS} variant="portal" />
       </Card>
     </div>
   )

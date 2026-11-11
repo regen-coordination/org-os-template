@@ -329,6 +329,46 @@ export function fullLevel(policy, collection, record, field) {
   return level
 }
 
+/**
+ * The stricter of two policies, field by field (DAO-OS L6 Task 11 review I-4): what a commit that also edits
+ * data/visibility.yaml is judged under, so neither the policy it starts from nor the one it leaves lets a value into git
+ * the other keeps out. A collection's default is members when either says so; a field's or a default's level is the
+ * narrower of the two tokens (one declared by only one policy is that one's); two that are not ordered (two hats, a hat
+ * and a role) both keep the value out of git, and the one `after` declares is taken.
+ * @param {VisibilityPolicy} before @param {VisibilityPolicy} after @returns {VisibilityPolicy}
+ */
+export function stricterOf(before, after) {
+  /** @param {string | undefined} a @param {string | undefined} b @returns {string | undefined} */
+  const narrower = (a, b) => {
+    if (a === undefined) return b
+    if (b === undefined) return a
+    const la = readLevel(a) ?? MEMBERS
+    const lb = readLevel(b) ?? MEMBERS
+    if (narrowerOrEqual(lb, la)) return b
+    if (narrowerOrEqual(la, lb)) return a
+    return b
+  }
+  /** @type {VisibilityPolicy} */
+  const out = { collections: {}, defaults: {} }
+  for (const name of new Set([...Object.keys(before?.collections ?? {}), ...Object.keys(after?.collections ?? {})])) {
+    const a = before?.collections?.[name]
+    const b = after?.collections?.[name]
+    /** @type {Record<string, string>} */
+    const fields = {}
+    for (const field of new Set([...Object.keys(a?.fields ?? {}), ...Object.keys(b?.fields ?? {})])) {
+      const level = narrower(a?.fields?.[field], b?.fields?.[field])
+      if (level !== undefined) fields[field] = level
+    }
+    const open = (a === undefined || a.default === 'public') && (b === undefined || b.default === 'public')
+    out.collections[name] = { default: open ? 'public' : 'members', fields }
+  }
+  for (const key of new Set([...Object.keys(before?.defaults ?? {}), ...Object.keys(after?.defaults ?? {})])) {
+    const level = narrower(before?.defaults?.[key], after?.defaults?.[key])
+    if (level !== undefined) out.defaults[key] = level
+  }
+  return out
+}
+
 /** A registry's fields declared stricter than members, with their levels; a malformed `hat:`/`role:` field is
  *  listed at a level that admits nobody (readLevel). @param {VisibilityPolicy | null | undefined} policy @param {string} registry
  *  @returns {Record<string, ParsedLevel>} */
@@ -371,6 +411,17 @@ export function defaultLinkLevel(policy, registry) {
   return contactLevel(policy)
 }
 
+/**
+ * The fields schemas/systems.schema.json requires of a deployed System: its top-level `required` and every kind branch's
+ * (a test keeps the two equal). The change engine validates a System's record in git and the Hub reads a tree's and a
+ * Safe's address there, so git must hold each: a policy keeping one above members is refused (PF-R227, the operator's
+ * ruling of 2026-11-07), by checkVisibilityPolicy and by a field's narrowing.
+ */
+export const DEPLOYED_SYSTEM_REQUIRES = Object.freeze(['id', 'kind', 'name', 'chain', 'address', 'url'])
+/** PF-R227's sentence, for a field of DEPLOYED_SYSTEM_REQUIRES. @param {string} field */
+export const requiredInGit = field =>
+  `A deployed System must keep its ${field} in the repository, so ${field} cannot be kept above members: give it members or public.`
+
 export const COLLECTION_IN_GIT = 'a collection in git is public or members; keep a private collection in the private store'
 const NOT_A_LEVEL = 'public, members, hat:<hat ref> or role:<role id>'
 const NO_TREE = 'no membership tree is named, so a hat level admits nobody; use role:<role id>'
@@ -381,8 +432,8 @@ const NO_TREE = 'no membership tree is named, so a hat level admits nobody; use 
  * First, every problem L8's readPolicy reports, as an error (its words, split at the first ": " into path and
  * message). Then L5's own checks on the raw document. Errors: a collection level stricter than members
  * (COLLECTION_IN_GIT); a `hat:` token L8 reads but that is no hat ref; a role that does not exist; a hat outside the
- * membership tree; `defaults.contact` that is not a hat or role. Warnings: a collection that is no registry; a hat
- * level with no membership tree.
+ * membership tree; `defaults.contact` that is not a hat or role; a field a deployed System requires kept above members
+ * (PF-R227). Warnings: a collection that is no registry; a hat level with no membership tree.
  * @param {unknown} doc
  * @param {{ registries: readonly string[], roles: readonly string[], tree: string | null }} ctx
  * @returns {VisibilityProblem[]}
@@ -427,7 +478,12 @@ export function checkVisibilityPolicy(doc, ctx) {
         const v = raw[key]
         if (v === 'private' || (typeof v === 'string' && STRICT_LOOKING.test(v))) err(`${at}.${key}`, COLLECTION_IN_GIT)
       }
-      if (isObj(raw.fields)) for (const [field, token] of Object.entries(raw.fields)) checkToken(`${at}.fields.${field}`, token)
+      if (isObj(raw.fields)) for (const [field, token] of Object.entries(raw.fields)) {
+        checkToken(`${at}.fields.${field}`, token)
+        // PF-R227: what a deployed System requires stays in git. A malformed hat:/role: token is reported above.
+        const l = isToken(token) ? parseLevel(token) : null
+        if (name === 'systems' && DEPLOYED_SYSTEM_REQUIRES.includes(field) && l && !gitAllows(l)) err(`${at}.fields.${field}`, requiredInGit(field))
+      }
     }
   }
 

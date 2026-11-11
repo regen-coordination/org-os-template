@@ -1,6 +1,18 @@
 import { createHash } from 'node:crypto'
 import { stringify } from 'yaml'
 import { STRINGIFY } from '../splice.ts'
+import { readGovernance } from '../../lib/governance-read.mjs'
+
+/** The record `governance:governance` as a governance file's text holds it: `{ roles, rules }`, a key the file does not
+ *  state absent, and no id. The one reading of it (stage, apply, a proposal's branch and revise, a receipt's base);
+ *  null when the file is not read (several documents, unparseable). */
+export function governanceRecord(text: string): Record<string, unknown> | null {
+  const block = readGovernance(text).governance as Record<string, unknown> | null
+  if (block === null) return null
+  const record: Record<string, unknown> = {}
+  for (const key of ['roles', 'rules']) if (block[key] !== undefined) record[key] = block[key]
+  return record
+}
 
 /** The one serialisation an entry is hashed in: YAML, keys sorted at every depth, never folded.
  *  It is made from the parsed value, so the file's comments, quotes and layout never reach it,

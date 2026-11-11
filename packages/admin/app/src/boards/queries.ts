@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { api, type BoardDef, type BoardRead, type ChangeView } from '../api.ts'
+import { api, type BoardDef, type BoardRead, type ChangeView, type RecordStaged } from '../api.ts'
 import { useChanges } from '../changes/useChanges.ts'
 
 export const useBoards = () => useQuery({ queryKey: ['boards'], queryFn: api.boards })
@@ -16,7 +16,7 @@ function asDef(v: Record<string, unknown>, id: string): BoardDef {
   }
 }
 
-const stagedOps = (id: string, change: ChangeView | null) => change?.ops.filter(o => o.record === `boards:${id}`) ?? []
+const stagedOps = (id: string, change: ChangeView | null) => change?.ops.filter((o): o is RecordStaged => o.op !== 'file' && o.record === `boards:${id}`) ?? []
 /** Whether your change ends by deleting an instance board that overrides a built-in: the built-in returns. */
 const deletesOverride = (id: string, read: BoardRead | undefined, change: ChangeView | null) =>
   read?.overrides === true && stagedOps(id, change).at(-1)?.op === 'delete'

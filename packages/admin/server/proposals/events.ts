@@ -19,10 +19,11 @@ import { readRegistryOrEmpty } from '../registry.ts'
 import type { SystemReader } from '../systems/reader.ts'
 import type { ForeignRef, OutcomeReading, OutcomeRef, SystemRef } from '../systems/driver.ts'
 import { DRIVERS } from '../systems/drivers.ts'
+import { NOT_ONE_ROLE, addRoleOf, sameWatch, watchOf } from './watches.ts'
 import { actObservations, appendEvent, bookOf, readLedger, setState, type LedgerOptions, type LedgerWho } from './ledger.ts'
 import { derivedState, knownIds, leadMethod, liveEvents, methodOf, type LedgerEvent, type Proposal } from '../../lib/proposals.mjs'
 import { observationsOf, type HatAct, type HatObservation } from '../../lib/hat-readings.mjs'
-import { safeTxHash, chainIdOf } from '../../lib/safe-tx.mjs'
+import { safeTxHash, chainIdOf, NOT_SEEN } from '../../lib/safe-tx.mjs'
 import { chainsOf } from '../systems/safe.ts'
 import { evaluateAll } from '../../lib/evaluate.mjs'
 import { gitOpsOf } from '../../lib/ops.mjs'
@@ -165,7 +166,7 @@ export async function writeEvent(repo: string, actor: KnownActor, id: string, in
 // ── a proposal that waits on an outside system (spec §3.11; DAO-OS L2 for other drivers than a Safe) ──────────────
 
 const ATTACH_SHAPE = 'An attach carries {"ref": {"system": "<id>", "id": "0x…", "chain"?: "<CAIP-2>", "payload": {"to", "value", "data_hash", "operation", "nonce"}, ' +
-  '"also"?: [{"chain", "id", "payload"}, …]}}, as prepare gives it'
+  '"also"?: [{"chain", "id", "payload"}, …], "watch"?: {"system", "id", "payload"}}}, as prepare gives it'
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const sameId = (a: unknown, b: unknown) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase()
 const refOf = (e: LedgerEvent | undefined): OutcomeRef | null => (e && isObject(e.ref) ? (e.ref as unknown as OutcomeRef) : null)
@@ -177,10 +178,11 @@ const idsOf = (ref: OutcomeRef | null): string[] =>
 /** What makes a foreign ref the same outside fact: its system, its id without case, and its payload (keys in order) —
  *  except a Snapshot vote, which is its system and id alone, whatever passing choice the payload names: one vote decides
  *  at most one proposal (controller ruling), so a second proposal attaching it with another label is ATTACHED_ELSEWHERE.
- *  Two proposals may wait on one hat for different wearers; never on the same hat for the same wearer. */
+ *  A new role (hats-role, DAO-OS L7 §10.2) is its system and hat id alone too: one new hat, whatever its wearers, is
+ *  added by one proposal. Two proposals may wait on one hat for different wearers; never on the same hat for the same wearer. */
 const foreignKey = (ref: ForeignRef): string => {
   const payload = ref.payload as Record<string, unknown>
-  if (payload.kind === 'snapshot-proposal') return JSON.stringify([ref.system, String(ref.id).toLowerCase()])
+  if (payload.kind === 'snapshot-proposal' || payload.kind === 'hats-role') return JSON.stringify([payload.kind, ref.system, String(ref.id).toLowerCase()])
   return JSON.stringify([ref.system, String(ref.id).toLowerCase(), Object.keys(payload).sort().map(k => [k, payload[k]])])
 }
 /** How a sentence names what a ref waits on. */
@@ -222,21 +224,41 @@ function attachRef(repo: string, entry: Proposal, raw: unknown): OutcomeRef {
   const ref = (typeof system.driver === 'string' ? system.driver : 'link') === 'safe'
     ? safeRef(raw, system, refuse)
     : foreignRef(entry, raw, system, refuse)
+  if (!foreign(ref)) {
+    // M-1: the watch is the transaction's: exactly the one prepare made for an add-role's transaction, and none for
+    // any other (a forged watch would hide the tree's reading, or hold another proposal's hat).
+    const expected = [ref.payload, ...(ref.also ?? []).map(a => a.payload)].map(p => watchOf(repo, p.data_hash)).find(w => w !== undefined)
+    if (raw.watch !== undefined) {
+      const watch = watchRef(repo, raw.watch, ref.chain ?? String(system.chain), refuse)
+      if (expected === undefined) {
+        throw refuse('ATTACH', `"watch" names ${watch.id}, and this transaction is no add-role this server prepared: prepare it again and attach what it gives.`)
+      }
+      if (!sameWatch(watch, expected)) {
+        throw refuse('ATTACH', `"watch" names ${watch.id}${String(watch.id).toLowerCase() === String(expected.id).toLowerCase() ? ' with other details or wearers' : ''}, and this transaction creates ${expected.id}: attach the watch prepare gave with it.`)
+      }
+      ref.watch = watch
+    } else if (expected !== undefined) {
+      throw refuse('ATTACH', `this transaction is an add-role, and its new hat ${expected.id} is read beside it: attach it with the "watch" prepare gave.`)
+    }
+  }
 
+  const mine = outsideFacts(ref)
   for (const other of readLedger(repo).entries) {
     if (String(other.id) === String(entry.id)) continue
     for (const e of liveEvents(other as never)) {
       if (e.kind !== 'attach') continue
       const held = refOf(e)
       if (held === null) continue
-      if (foreign(ref)) {
-        if (foreign(held) && foreignKey(held) === foreignKey(ref)) {
-          throw refuse('ATTACHED_ELSEWHERE', ref.payload.kind === 'snapshot-proposal'
-            ? `${ref.id} on ${ref.system} is already attached to proposal ${String(other.id)}; one vote decides at most one proposal.`
-            : `${ref.id} on ${ref.system} is already attached to proposal ${String(other.id)} for the same outcome; one outside outcome decides one proposal.`)
-        }
-        continue
+      const theirs = outsideFacts(held).map(foreignKey)
+      const same = mine.find(f => theirs.includes(foreignKey(f)))
+      if (same !== undefined) {
+        throw refuse('ATTACHED_ELSEWHERE', same.payload.kind === 'snapshot-proposal'
+          ? `${same.id} on ${same.system} is already attached to proposal ${String(other.id)}; one vote decides at most one proposal.`
+          : same.payload.kind === 'hats-role'
+            ? `${same.id} on ${same.system} is already attached to proposal ${String(other.id)} as a new role; one new hat is added by one proposal.`
+            : `${same.id} on ${same.system} is already attached to proposal ${String(other.id)} for the same outcome; one outside outcome decides one proposal.`)
       }
+      if (foreign(ref)) continue
       const taken = idsOf(ref).find(id => idsOf(held).some(h => sameId(h, id)))
       if (taken !== undefined) {
         throw refuse('ATTACHED_ELSEWHERE', `transaction ${taken} is already attached to proposal ${String(other.id)}; one transaction decides one proposal.`)
@@ -250,6 +272,39 @@ function attachRef(repo: string, entry: Proposal, raw: unknown): OutcomeRef {
     throw refuse('ATTACHED', `this proposal already waits on ${named(refOf(current))}, and the system has been read for it. Withdraw the proposal and propose again, or revise it.`)
   }
   return ref
+}
+
+/** The outside facts a ref holds, as ATTACHED_ELSEWHERE keys them: a foreign ref itself, a Safe ref's `watch` (PF-R205),
+ *  else none (its transactions are keyed by id). Safe on a malformed ledger ref. */
+const outsideFacts = (ref: OutcomeRef): ForeignRef[] => {
+  if (foreign(ref)) return [ref]
+  const watch = (ref as { watch?: unknown }).watch
+  return isObject(watch) && typeof watch.system === 'string' && foreign(watch as unknown as OutcomeRef) ? [watch as unknown as ForeignRef] : []
+}
+
+/** PF-R205 (PF-R201's gap): the hats-role ref an add-role carries beside the via Safe's transaction, checked as the tree's
+ *  driver checks an attach (no network): a Hats tree in data/systems.yaml on the transaction's `chain` (M-1), a hat of
+ *  it, a hats-role payload. attachRef then holds it to the one prepare made for that transaction. */
+function watchRef(repo: string, raw: unknown, chain: string, refuse: Refuse): ForeignRef {
+  if (!isObject(raw) || typeof raw.system !== 'string') {
+    throw new HttpError(400, `${ATTACH_SHAPE}; "watch", when given, is the hats-role ref an add-role prepared: {"system", "id", "payload"}.`)
+  }
+  const system = systemRecord(repo, raw.system)
+  if (!system) throw refuse('ATTACH', `"watch" names the system "${raw.system}", which data/systems.yaml does not hold.`)
+  const driver = DRIVERS.find(d => d.name === system.driver)
+  if (system.driver !== 'hats-tree' || !driver?.checkRef) {
+    throw refuse('ATTACH', `"watch" names ${raw.system}, which is not a Hats tree; only an add-role's new hat is read beside a Safe transaction.`)
+  }
+  // M-1: the new hat is created by this transaction, so its tree is on the transaction's chain.
+  if (String(system.chain) !== chain) {
+    throw refuse('ATTACH', `"watch" names ${raw.system}, which is on ${String(system.chain)}, and the Safe transaction on ${chain}: a new hat is read on the chain that creates it.`)
+  }
+  const checked = driver.checkRef(system, raw)
+  if (!checked.ok) throw refuse('ATTACH', `"watch": ${checked.error.replace(/\.$/, '')}.`)
+  if (checked.ref.payload.kind !== 'hats-role') {
+    throw refuse('ATTACH', `"watch" is a ${checked.ref.payload.kind} ref; only an add-role's hats-role ref is read beside a Safe transaction.`)
+  }
+  return checked.ref
 }
 
 /** A Safe's ref: the shape `prepare` gives, every step's id the hash of its payload on its own chain, no id twice. */
@@ -390,16 +445,71 @@ export async function readOutcome(repo: string, actor: KnownActor, id: string, s
   const system = systemRecord(repo, ref.system)
   if (!system) return { attach: attach.id, system: ref.system, ref, reading: { ok: false, error: `data/systems.yaml has no system "${ref.system}"` } }
   if (!systems) return { attach: attach.id, system: ref.system, ref, reading: { ok: false, error: 'this server was given no network access' } }
-  return { attach: attach.id, system: ref.system, ref, reading: await systems.outcome(system, ref, String(entry.opened)) }
+  const reading = await systems.outcome(system, ref, String(entry.opened))
+  const chain = foreign(ref) ? '' : ref.chain ?? String(system.chain)
+  return { attach: attach.id, system: ref.system, ref, reading: await besideWatch(repo, ref, reading, systems, String(entry.opened), chain) }
 }
+
+/** M-2: what a check says of a hat already at the id an unexecuted add-role transaction creates. */
+const NOT_NEWEST = NOT_ONE_ROLE('the hat it mints is not the newest under its admin, so the Hub cannot tell it is the one its createHat made')
+const ALREADY_THERE = 'A hat already exists at the id this transaction creates, and the transaction is not executed: another hat took this id; prepare it again.'
+
+/**
+ * PF-R205 (PF-R201's gap): a Safe ref that carries an add-role's hats-role ref (`watch`) is read on the tree too, and the
+ * tree's mismatch wins: a hat made under the admin since prepare (PF-R200's lastHatId read), or another hat at the
+ * predicted id (while the Safe transaction is not executed, any hat there, M-2), reads as a mismatch before anyone
+ * executes, whatever the Safe says. A tree that could not be read is a failed read (attention, nothing recorded), never
+ * the Safe's reading alone. The Safe's own mismatch or failure stands.
+ * L7 gap B2 (closes PF-R225): a Safe ref attached without a watch (prepare's memory lost it) is decoded from the
+ * transaction the Safe service described (`reading.tx`, its hash checked): an add-role rebuilds its watch
+ * (`addRoleOf`) and is read as above; a transaction that creates a hat and is not cleanly one add-role is a mismatch in
+ * words; any other is the Safe's reading. `tx` never leaves here. `chain`: the Safe transaction's.
+ * A hard guarantee (an on-chain id check) stays PF-R201's carry.
+ */
+async function besideWatch(repo: string, ref: OutcomeRef, given: OutcomeReading, systems: OutcomeSource, opened: string, chain: string): Promise<OutcomeReading> {
+  let reading = given
+  let tx: { to: string; operation: number; data: string | null } | undefined
+  if (given.ok && given.tx) { const { tx: described, ...rest } = given; tx = described; reading = rest }
+  let watch = outsideFacts(ref)
+  if (foreign(ref) || !reading.ok || reading.outcome === 'mismatch') return reading
+  const unseen = reading.submitted === false ? { submitted: false as const } : {}
+  /** The watch was rebuilt from the transaction, not prepare's (L7 gap B2). */
+  let decoded = false
+  if (watch.length === 0) {
+    const fromTx = tx ? addRoleOf(repo, chain, tx) : null
+    if (fromTx === null) return reading
+    if ('refused' in fromTx) return { ok: true, outcome: 'mismatch', detail: fromTx.refused, ...unseen }
+    watch = [fromTx.watch]
+    decoded = true
+  }
+  const role = watch[0]!
+  const tree = systemRecord(repo, role.system)
+  if (!tree) return { ok: false, error: `data/systems.yaml has no system "${role.system}", whose new hat is read beside the Safe transaction` }
+  const read = await systems.outcome(tree, role, opened)
+  if (!read.ok) return { ok: false, error: `${role.system} could not be read beside the Safe transaction (${read.error})` }
+  if (read.outcome === 'mismatch') return { ok: true, outcome: 'mismatch', detail: read.detail, ...unseen }
+  // M-2: while the Safe transaction is not executed, nothing it creates exists yet: any hat at its id (the same details
+  // or not, worn or not) is another's, and executing would not make the hat this proposal names.
+  const ran = reading.outcome === 'executed' || reading.outcome === 'failed' || reading.executed === true
+  if (!ran && read.exists === true) return { ok: true, outcome: 'mismatch', detail: ALREADY_THERE, ...unseen }
+  // The gaps review's M-2: a decoded add-role's minted hat must be the one its createHat made, its admin's newest child as
+  // the tree reads now; an older sibling minted beside a createHat cannot be told from it (prepare's watch knew the id).
+  if (decoded && read.exists === true && read.newest === false) return { ok: true, outcome: 'mismatch', detail: NOT_NEWEST, ...unseen }
+  return reading
+}
+
+/** How an unrecorded mismatch is said (fix I-1): as the proposal page says a recorded one, then that it is not recorded. */
+export const unseenMismatch = (system: string, detail: string): string =>
+  `${system} read a different transaction: ${detail.trim().replace(/[.\s]+$/, '')}. ${NOT_SEEN}`
 
 export interface OutcomeResult extends Omit<EventResult, 'commit'> {
   commit: string | null
   reading: OutcomeReading | null
   /** Whether a `system` event was appended: only when the reading differs from the latest one (§3.11 "Record"). */
   appended: boolean
-  /** A failed read raises attention on the proposal; nothing is recorded. */
-  attention?: { level: 'warn'; text: string }
+  /** A failed read raises attention on the proposal; nothing is recorded. So does a mismatch the outside service has not
+   *  seen (fix I-1): answered, never recorded, so it is said here, its detail in `mismatch` for the prepared card. */
+  attention?: { level: 'warn'; text: string; mismatch?: string }
 }
 
 /**
@@ -417,6 +527,11 @@ export async function recordOutcome(repo: string, actor: KnownActor, id: string,
   let commit: string | null = null
   let attention: OutcomeResult['attention']
   if (reading && !reading.ok) attention = { level: 'warn', text: `read failed: ${reading.error}` }
+  // Fix I-1: a mismatch of a transaction the Safe service has not seen is not recorded (it must not lock the attach), so
+  // the one who checks and every member who visits are told here, never shown Unsigned or "nothing changed".
+  else if (reading?.ok && reading.outcome === 'mismatch' && reading.submitted === false) {
+    attention = { level: 'warn', text: unseenMismatch(read.system ?? 'the system', reading.detail), mismatch: reading.detail }
+  }
   const attach = currentAttach(entry)
   // Recorded: a reading of the attach that still counts, of a transaction the service has seen.
   if (reading?.ok && reading.submitted !== false && read.ref && read.system && attach && attach.id === read.attach) {

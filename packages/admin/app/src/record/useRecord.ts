@@ -48,7 +48,7 @@ export function useRecord(kind: string, id: string): RecordModel {
   const entry = withoutRestricted(held)
   const problem = registry && index >= 0 ? addressProblem(entries, index, `data/${registry}.yaml`) : null
   const changeKey = registry && pos === null ? `${registry}:${entityId}` : null
-  const staged = (changes.data?.ops ?? []).filter(o => o.record === changeKey)
+  const staged = (changes.data?.ops ?? []).filter(o => o.op !== 'file' && o.record === changeKey)
   const createdHere = staged.some(o => o.op === 'create')
   const loading = (t.resourceId !== null && detail.isLoading) || (registry !== null && (reg.isLoading || schema.isLoading))
   let error: string | null = null

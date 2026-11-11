@@ -173,7 +173,7 @@ describe('the changes event (final review)', () => {
     expect((await app.request('/api/changes/ops/1', { method: 'DELETE' })).status).toBe(200)
     expect(events).toEqual([CHANGES])
 
-    writeFileSync(projects(), readFileSync(projects(), 'utf8').replace('title: "Node Onboarding Program"', 'title: "Theirs"'))
+    writeFileSync(projects(), readFileSync(projects(), 'utf8').replace('status: "execute"', 'status: "archive"')) // the field it sets (G6)
     git(repo, 'commit -qam outside')
     events.length = 0
     expect((await app.request('/api/changes/ops/0/rebase', json('POST', { keep: 'mine' }))).status).toBe(200)
@@ -196,7 +196,7 @@ describe('the changes event (final review)', () => {
     git(repo, 'config user.email admin-test@local')
     expect(events).toEqual([])
 
-    writeFileSync(projects(), readFileSync(projects(), 'utf8').replace('title: "Node Onboarding Program"', 'title: "Theirs"'))
+    writeFileSync(projects(), readFileSync(projects(), 'utf8').replace('status: "execute"', 'status: "archive"')) // the field it sets (G6)
     git(repo, 'commit -qam outside')
     const res = await apply()
     expect(res.status).toBe(409)

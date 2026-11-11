@@ -1,7 +1,12 @@
 import { Icon, kindIcon } from '../../design/Icon.tsx'
 import { monogram } from '../atoms/Presence.tsx'
+import { KIND_OF_REGISTRY } from '../../kinds.ts'
 import { Listbox } from './Listbox.tsx'
 import type { Mentionable } from './mentions.ts'
+
+/** A record's glyph from its collection (`recordKind`, as the Hub serves it; L4c C3's carry): never from its id. A
+ *  collection that backs a kind draws that kind's; another, its name as one record of it ("tasks" → "task"). */
+const recordGlyph = (collection: string | undefined) => kindIcon(collection === undefined ? 'record' : KIND_OF_REGISTRY[collection] ?? collection.replace(/s$/, ''))
 
 /** The trailing word of an option: a person's hat, a role's count, a record or a page as such; for a member who
  *  may not see the page, that (C-21). */
@@ -25,8 +30,8 @@ export function MentionPicker({ items, onPick }: { items: Mentionable[]; onPick(
         onPick: () => onPick(m),
         content: (
           <>
-            {m.kind === 'person' ? <span className="av" aria-hidden="true">{monogram(m.id)}</span>
-              : <Icon name={m.kind === 'role' ? 'hat' : m.kind === 'page' ? 'doc' : kindIcon(m.id.split(':')[0] ?? 'record')} />}
+            {m.kind === 'person' ? <span className="av" aria-hidden="true">{monogram(m.label)}</span>
+              : <Icon name={m.kind === 'role' ? 'hat' : m.kind === 'page' ? 'doc' : recordGlyph(m.recordKind)} />}
             <span className="mpop-n">{m.label}</span>
             {sub(m) && <span className="mpop-sub">{sub(m)}</span>}
           </>

@@ -217,7 +217,7 @@
   --w-rail: 56px;
   --w-content: 1040px;
   --w-prose: 68ch;
-  --w-door: 1120px;
+  --w-portal: 1120px;
   --w-parts: 1272px;
   --w-spec-two: 520px;
   --w-node-min: var(--w-node);
@@ -341,8 +341,8 @@
   --w-row-age: 84px;
   --w-signin: 420px;
   --h-signin-go: var(--h-ctl);
-  --h-door-top: 76px;
-  --w-door-seal: 26px;
+  --h-portal-top: 76px;
+  --w-portal-seal: 26px;
   --h-lib-card: 172px;
   --w-lib-card: 260px;
   --fs-lib-t: var(--fs-body);
@@ -350,19 +350,19 @@
   --h-wiz-dot: 20px;
   --fs-wiz-n: var(--fs-micro);
   --fs-wiz-h: var(--fs-sub);
-  --radius-door-seal: var(--radius);
+  --radius-portal-seal: var(--radius);
   --fs-d-mark: var(--fs-sub);
-  --w-door-label: 240px;
-  --w-door-lead: 34em;
-  --w-door-desc: 42ch;
+  --w-portal-label: 240px;
+  --w-portal-lead: 34em;
+  --w-portal-desc: 42ch;
   --lh-d-body: var(--lh-body);
   --fs-d-row: var(--fs-sub);
   --fs-d-hat: var(--fs-sub);
   --lh-d-row: var(--lh-body);
-  --radius-door-card: var(--radius);
-  --w-door-dot: 20px;
-  --w-door-dot-ring: var(--rule-w);
-  --w-door-id: 120px;
+  --radius-portal-card: var(--radius);
+  --w-portal-dot: 20px;
+  --w-portal-dot-ring: var(--rule-w);
+  --w-portal-id: 120px;
 
   /* icons (bare shows no menu icon; an icon drawn elsewhere takes the house sizes) */
   --ic-xs: 13px;

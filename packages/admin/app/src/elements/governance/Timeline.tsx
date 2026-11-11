@@ -17,7 +17,7 @@ function Line({ step }: { step: Step }) {
 }
 
 /** The proposal's path (§9.5): vertical, 22px markers joined by a 1px line (ink once passed), an `<ol>` whose items
- *  say their state in words. `compact` is the form for rows and the door: 10px dots joined by 14px lines and one
+ *  say their state in words. `compact` is the form for rows and the portal: 10px dots joined by 14px lines and one
  *  phrase ("Signing · 2 of 4"); the dots are decoration, the phrase says it. */
 export function Timeline({ steps, compact = false, label = 'Path' }: { steps: Step[]; compact?: boolean; label?: string }) {
   if (compact) {

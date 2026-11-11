@@ -1,0 +1,11 @@
+// A stand-in for a minified bundle: every place a "</" can legally sit in JS.
+// Kept as .txt so `node --test` does not run it. Evaluated by render-map-html.test.mjs.
+globalThis.out = [
+  "a<b</c".replace(/</g, "&lt;"),
+  /<\/script>/i.test("</SCRIPT>"),
+  /<\/Script\s*>/.source,
+  "</script><b>",
+  '</ScRiPt >'.length,
+  `</script>${1 + 1}`,
+  "x</y".split(/<\//).length,
+];

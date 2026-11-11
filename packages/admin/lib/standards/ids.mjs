@@ -4,6 +4,7 @@
 // Pure; imports only relative modules (it is vendored into instances without admin's npm deps).
 import { caip10 } from '../caip.mjs'
 import { treeRef } from '../hats.mjs'
+import { isComposed } from '../compose.mjs'
 
 /** L8-C5. @param {string} identityType @returns {'DAO'|'Foundation'|'Person'|'Entity'|'Organization'} */
 export function entityType(identityType) {
@@ -56,6 +57,7 @@ function attempt(f) { try { return f() } catch { return null } }
 /** The on-chain identifiers of a system (L8-C10); [] for kinds with no contract. Never throws.
  * @param {Record<string, unknown>} system @returns {{ id: string, chain: string }[]} */
 export function contractIdsOf(system) {
+  if (isComposed(system)) return [] // a plan, not a contract (L7 §4)
   const address = system.address
   const chains = systemChains(system)
   const kind = system.kind

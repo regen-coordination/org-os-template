@@ -1,0 +1,72 @@
+/* kms house CSS — rows (L4 §9.2–9.3; spec §4-6, §7, K-25). Ported from the house gallery's surfaces and rows
+   and its KMS block (index rows, deprecated rows, embedded rows). Tokens only. Rows read their own width
+   (`@container rows`): under 600 the date column goes; under 420 the mark keeps its shape and its word stays
+   as the accessible name (clipped, never display:none). */
+
+/* a card surface holding rows (L4 §3.6 "card") */
+.surf { background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+
+/* data rows */
+.rows { list-style: none; margin: 0; padding: 0; container: rows / inline-size; }
+.row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8);
+  min-height: var(--h-row); padding: var(--sp-7) var(--sp-10); border-top: var(--rule-w) solid var(--rule); transition: background-color var(--dur-1) var(--ease); }
+.rows > li:first-child > .row, .rows > .row:first-child { border-top: 0; }
+.row .t { display: block; font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); color: var(--ink); letter-spacing: var(--ls-name); overflow-wrap: break-word; }
+.row .s { font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); margin-top: var(--sp-2); min-width: 0; }
+.row .main { min-width: 0; }
+.row .end { display: flex; align-items: center; gap: var(--sp-10); color: var(--mute); font-size: var(--fs-meta); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row .end:empty { display: none; }
+.row .end svg.i { color: var(--faint); }
+a.row { color: inherit; }
+@media (hover: hover) { a.row:hover { background: var(--row-hover); } }
+.row:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: calc(-1 * var(--focus-w)); border-radius: var(--radius-sm); }
+.row.sel { background: var(--accent-soft); }
+.row.sel::before { content: ""; position: absolute; inset-block: var(--sp-5); inset-inline-start: 0; width: var(--rule-w-heavy); border-radius: var(--radius-mark); background: var(--accent); }
+
+/* a row with a mark: tile · main · mark column · date column (the commons index; spec §5.4) */
+.krow { grid-template-columns: var(--h-ktile) minmax(0, 1fr) 132px var(--w-dt); }
+.krow > .end { justify-self: end; color: var(--faint); font-size: var(--fs-tiny); }
+.krow .s { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* deprecated: told by the closed mark and colour steps that keep AA text contrast — never an opacity (K-25) */
+.row.dep .t { color: var(--mute); font-weight: var(--fw-regular); }
+.row.dep .s, .row.dep .end, .row.dep .age { color: var(--faint); }
+.row.dep .ktile { background: transparent; border: var(--rule-w) solid var(--rule); color: var(--faint); }
+
+/* group rows: a kind or a layer, inside the same list */
+.rows > .grp-h { display: flex; align-items: baseline; gap: var(--sp-6); padding: var(--sp-7) var(--sp-10); background: var(--sunken); border-top: var(--rule-w) solid var(--rule);
+  font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); }
+.rows > .grp-h:first-child { border-top: 0; border-radius: var(--radius) var(--radius) 0 0; }
+.rows > .grp-h .c { color: var(--faint); font-variant-numeric: tabular-nums; }
+.rows > .grp-h .end { margin-inline-start: auto; color: var(--mute); }
+
+/* field rows (L4 §9.3): a two-column <dl> in its own container, labels stack above values when the box is under 420 */
+.fields-box { container: fields / inline-size; min-width: 0; }
+.fields { display: grid; grid-template-columns: minmax(96px, 132px) minmax(0, 1fr); column-gap: var(--sp-10); margin: 0; }
+.fields > dt, .fields > dd { margin: 0; padding: var(--sp-6) 0; border-top: var(--rule-w) solid var(--rule); min-width: 0; }
+.fields > dt { font-size: var(--fs-meta); color: var(--mute); display: flex; align-items: center; gap: var(--sp-4); }
+.fields > dd { font-size: var(--fs-body); display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-5) var(--sp-6); overflow-wrap: anywhere; }
+.fields > dt:first-of-type, .fields > dd:first-of-type { border-top: 0; }
+
+/* embedded rows (house §10.1 embed block): related entries inside a page */
+.embed { border: var(--rule-w) solid var(--rule); border-radius: var(--radius); margin: 0 0 var(--sp-10); background: var(--raised); overflow: hidden; }
+.embed-h { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-10); border-bottom: var(--rule-w) solid var(--rule); font-size: var(--fs-tiny); color: var(--mute); }
+.embed-h .end { margin-inline-start: auto; }
+.embed .rows .row { min-height: calc(var(--h-row) - var(--sp-4)); }
+
+@container rows (max-width: 600px) {
+  .krow { grid-template-columns: var(--h-ktile) minmax(0, 1fr) auto; }
+  .krow > .end { display: none; }
+  .krow .s { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
+@container rows (max-width: 420px) {
+  .krow .c-mark .w { position: absolute; width: var(--sp-1); height: var(--sp-1); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* embedded rows move their mark under the title instead, word and all */
+  .embed .row { grid-template-columns: var(--h-ktile) minmax(0, 1fr); }
+  .embed .row > .c-mark, .embed .row > .end { grid-column: 2; }
+  .embed .krow .c-mark .w { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+}
+@container fields (max-width: 420px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .fields > dd { border-top: 0; padding-top: 0; }
+}

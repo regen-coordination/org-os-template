@@ -15,9 +15,11 @@ const holdsRestricted = (e: LedgerEvent) => Array.isArray(e.ops) && e.ops.some(o
 const NOUN: Record<string, string> = { object: 'objection', approve: 'approval', vote: 'vote', comment: 'comment' }
 
 /** An event in words (spec §3.14): what was done, and the text that goes with it (an objection's argument,
- *  a comment, a system's detail). `events` lets a retract name what it took back. */
-export function eventWords(e: LedgerEvent, events: readonly LedgerEvent[]): { lead: string; detail: string } {
-  const by = e.by
+ *  a comment, a system's detail). `events` lets a retract name what it took back. `names`: who each actor is (the view's
+ *  `names`, walk fix wave 4 G9); an actor it does not name is said by id. */
+export function eventWords(e: LedgerEvent, events: readonly LedgerEvent[], names: Readonly<Record<string, string>> = {}): { lead: string; detail: string } {
+  const who = (id: string) => names[id] ?? id
+  const by = who(e.by)
   const text = typeof e.text === 'string' ? e.text : ''
   const ref = e.ref as { system?: string; id?: string } | undefined
   switch (e.kind) {
@@ -27,13 +29,13 @@ export function eventWords(e: LedgerEvent, events: readonly LedgerEvent[]): { le
     case 'comment': return { lead: `${by} commented`, detail: text }
     case 'retract': {
       const target = events.find(x => x.id === e.of)
-      const whose = !target ? 'an' : target.by === by ? 'their' : `${target.by}'s`
+      const whose = !target ? 'an' : target.by === e.by ? 'their' : `${who(target.by)}'s`
       return { lead: `${by} took back ${whose} ${(target && NOUN[target.kind]) ?? 'event'}`, detail: '' }
     }
     case 'revise': return { lead: `${by} revised the proposal`, detail: '' }
     case 'replay': return { lead: 'the proposal was re-based on the trunk', detail: '' }
     case 'attach': return { lead: `${by} attached transaction ${ref?.id ?? '(unnamed)'} on ${ref?.system ?? 'a system'}`, detail: '' }
-    case 'system': return { lead: `${ref?.system ?? by.replace(/^system:/, '')} reported ${String(e.outcome ?? 'a reading')}`, detail: text }
+    case 'system': return { lead: `${ref?.system ?? e.by.replace(/^system:/, '')} reported ${String(e.outcome ?? 'a reading')}`, detail: text }
     case 'ratify': return { lead: `${by} ratified it`, detail: '' }
     case 'withdraw': return { lead: `${by} withdrew it`, detail: text }
     case 'reject': return { lead: `${by} rejected it`, detail: '' }
@@ -42,15 +44,15 @@ export function eventWords(e: LedgerEvent, events: readonly LedgerEvent[]): { le
   }
 }
 
-const said = (e: LedgerEvent, events: readonly LedgerEvent[]) => { const w = eventWords(e, events); return w.detail ? `${w.lead}: ${w.detail}` : w.lead }
+const said = (e: LedgerEvent, events: readonly LedgerEvent[], names: Readonly<Record<string, string>>) => { const w = eventWords(e, events, names); return w.detail ? `${w.lead}: ${w.detail}` : w.lead }
 
 /** Who wrote an event, as its thread draws them: a member's monogram, or the System's glyph for what the server read
  *  from one (`system:<id>`) and for the clock's own events (an expiry, a re-base). */
-function Who({ e }: { e: LedgerEvent }) {
+function Who({ e, name }: { e: LedgerEvent; name: string }) {
   const machine = e.kind === 'system' || e.kind === 'expire' || e.kind === 'replay' || String(e.by ?? '').startsWith('system:')
   return machine
     ? <span className="av av-lg evt-sys" aria-hidden="true"><Icon name="systems" size="sm" /></span>
-    : <span className="av av-lg" aria-hidden="true">{monogram(String(e.by ?? ''))}</span>
+    : <span className="av av-lg" aria-hidden="true">{monogram(name)}</span>
 }
 
 /** The events of a proposal, oldest first, each in words, drawn as a comment thread is (§14.1, C3's `.thread` and
@@ -58,21 +60,21 @@ function Who({ e }: { e: LedgerEvent }) {
  *  objection of an earlier version says it no longer holds, one taken back says so; an event that arrives while the log
  *  is open is announced once through the page's live region. `rev` is the proposal's current rev. It writes nothing:
  *  Comment… is the page's action, not the thread's. */
-export function EventLog({ events, rev, now = new Date() }: { events: readonly LedgerEvent[]; rev: string; now?: Date }) {
+export function EventLog({ events, rev, now = new Date(), names = {} }: { events: readonly LedgerEvent[]; rev: string; now?: Date; names?: Readonly<Record<string, string>> }) {
   const seen = useRef<Set<string>>(new Set(events.map(e => String(e.id))))
   useEffect(() => {
     const fresh = events.filter(e => !seen.current.has(String(e.id)))
     if (fresh.length === 0) return
     for (const e of fresh) seen.current.add(String(e.id))
-    announce(fresh.map(e => said(e, events)).join('; '))
-  }, [events])
+    announce(fresh.map(e => said(e, events, names)).join('; '))
+  }, [events, names])
   if (events.length === 0) return <Empty>No events yet.</Empty>
   const taken = new Set(events.filter(e => e.kind === 'retract').map(e => e.of))
   return (
     <div className="thread evs-w">
       <ol className="thread-l" aria-label="Events">
         {events.map(e => {
-          const { lead, detail } = eventWords(e, events)
+          const { lead, detail } = eventWords(e, events, names)
           const notes = [
             e.kind === 'object' && e.rev !== rev ? 'about an earlier version, answered' : '',
             e.kind === 'revise' && e.rev !== rev && holdsRestricted(e) ? EARLIER_RESTRICTED : '',
@@ -81,7 +83,7 @@ export function EventLog({ events, rev, now = new Date() }: { events: readonly L
           return (
             <li key={String(e.id)} className={`thread-i evt evt-${e.kind}`} data-event={String(e.id)}>
               <div className="cmt">
-                <Who e={e} />
+                <Who e={e} name={names[e.by] ?? String(e.by ?? '')} />
                 <div className="cmt-main">
                   <p className="cmt-h evt-h"><span className="cmt-who">{lead}</span> <time className="cmt-at evt-at" dateTime={e.at}>{ago(e.at, now)}</time>
                     {notes.length > 0 && <span className="evt-notes"> ({notes.join('; ')})</span>}</p>

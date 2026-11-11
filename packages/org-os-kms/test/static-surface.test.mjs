@@ -22,9 +22,9 @@ const manifest = { version: 1, objects: { 'id-a': { slug: 'a', type: 'resource',
 const config = { instance: 't', publish: { base_url: 'https://kc.example', types_opt_in: ['source-system'] }, atproto: { did: 'did:plc:me', nsid_authority: 'xyz.regencoordination.kb' }, geo: { parent_space: 'p', space: null },
   connectors: [{ name: 'atproto', config: { peers: ['did:plc:peer'] } }] };
 
-test('projected entries, absolute @context, merged knowledge.json, allowlisted .well-known', () => {
+test('projected entries, absolute @context, merged knowledge.json, allowlisted .well-known', async () => {
   const dir = setup();
-  const { files } = writeStaticSurface({ dir, items, allItems, manifest, config });
+  const { files } = await writeStaticSurface({ dir, items, allItems, manifest, config });
   const pub = (p) => JSON.parse(readFileSync(join(dir, 'public', p), 'utf8'));
   const one = pub('api/resource/id-a.json');
   assert.equal(one['@context'], 'https://kc.example/api/context.jsonld');
@@ -40,73 +40,73 @@ test('projected entries, absolute @context, merged knowledge.json, allowlisted .
   assert.ok(files.includes('api/context.jsonld'));
 });
 
-test('base_url is required', () => {
+test('base_url is required', async () => {
   const dir = setup();
-  assert.throws(() => writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: {} } }), /base_url/);
+  await assert.rejects(writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: {} } }), /base_url/);
 });
 
-test('source-system cards honor the opt-in type gate', () => {
+test('source-system cards honor the opt-in type gate', async () => {
   const dir = setup();
-  writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: { base_url: 'https://kc.example' } } });
+  await writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: { base_url: 'https://kc.example' } } });
   const km = JSON.parse(readFileSync(join(dir, 'public', '.well-known', 'knowledge.json'), 'utf8'));
   assert.deepEqual(km.sources.map((s) => s.title), ['Existing']);
 });
 
-test('re-running removes api/ files for objects/schemas no longer published', () => {
+test('re-running removes api/ files for objects/schemas no longer published', async () => {
   const dir = setup();
   const two = [...items, { schema: 'resource', ref: 'r#b', object: { title: 'B', type: 'resource', public_use: 'ok-with-caveat', id: 'id-b' } }];
-  writeStaticSurface({ dir, items: two, allItems: two, manifest, config });
+  await writeStaticSurface({ dir, items: two, allItems: two, manifest, config });
   assert.ok(existsSync(join(dir, 'public', 'api', 'resource', 'id-b.json')));
-  writeStaticSurface({ dir, items, allItems: items, manifest, config });
+  await writeStaticSurface({ dir, items, allItems: items, manifest, config });
   assert.ok(!existsSync(join(dir, 'public', 'api', 'resource', 'id-b.json')), 'dropped object removed');
   assert.ok(existsSync(join(dir, 'public', 'api', 'resource', 'id-a.json')), 'kept object present');
-  writeStaticSurface({ dir, items: [], allItems: [], manifest, config });
+  await writeStaticSurface({ dir, items: [], allItems: [], manifest, config });
   assert.ok(!existsSync(join(dir, 'public', 'api', 'resource.json')), 'emptied schema index removed');
   assert.ok(!existsSync(join(dir, 'public', 'api', 'resource', 'id-a.json')));
 });
 
-test('outDir must be a non-empty relative path inside dir', () => {
+test('outDir must be a non-empty relative path inside dir', async () => {
   for (const outDir of ['../escape', '/abs', '']) {
     const dir = setup();
-    assert.throws(() => writeStaticSurface({ dir, outDir, items, allItems, manifest, config }), /outDir/, `outDir=${JSON.stringify(outDir)}`);
+    await assert.rejects(writeStaticSurface({ dir, outDir, items, allItems, manifest, config }), /outDir/, `outDir=${JSON.stringify(outDir)}`);
   }
 });
 
-test('an object carrying its own @context cannot override the entry @context', () => {
+test('an object carrying its own @context cannot override the entry @context', async () => {
   const dir = setup();
   const evil = [{ schema: 'resource', ref: 'r#e', object: { title: 'E', type: 'resource', public_use: 'ok-with-caveat', id: 'id-e', '@context': 'https://evil.example/ctx' } }];
-  writeStaticSurface({ dir, items: evil, allItems: evil, manifest: { version: 1, objects: {} }, config });
+  await writeStaticSurface({ dir, items: evil, allItems: evil, manifest: { version: 1, objects: {} }, config });
   const pub = (p) => JSON.parse(readFileSync(join(dir, 'public', p), 'utf8'));
   assert.equal(pub('api/resource/id-e.json')['@context'], 'https://kc.example/api/context.jsonld');
   assert.equal(pub('api/resource.json').items[0]['@context'], 'https://kc.example/api/context.jsonld');
 });
 
-test('a root-authored did/geo survives when the config sets neither; config still wins when set', () => {
+test('a root-authored did/geo survives when the config sets neither; config still wins when set', async () => {
   const dir = setup();
   writeFileSync(join(dir, '.well-known', 'knowledge.json'), JSON.stringify({ '@context': 'https://www.daostar.org/schemas', type: 'KnowledgeManifest', domains: [], sources: [], did: 'did:plc:root', geo: { space: 'root-space' } }));
   const bare = { instance: 't', publish: { base_url: 'https://kc.example' } };
-  writeStaticSurface({ dir, items, allItems, manifest, config: bare });
+  await writeStaticSurface({ dir, items, allItems, manifest, config: bare });
   const pub = (p) => JSON.parse(readFileSync(join(dir, 'public', p), 'utf8'));
   assert.equal(pub('.well-known/knowledge.json').did, 'did:plc:root');
   assert.deepEqual(pub('.well-known/knowledge.json').geo, { space: 'root-space' });
-  writeStaticSurface({ dir, items, allItems, manifest, config });
+  await writeStaticSurface({ dir, items, allItems, manifest, config });
   assert.equal(pub('.well-known/knowledge.json').did, 'did:plc:me');
   assert.deepEqual(pub('.well-known/knowledge.json').geo, { parent_space: 'p', space: null });
 });
 
-test('publish.disclose_subscriptions: true lists the atproto peer DIDs and static-json base_urls under exchange.subscribed_domains', () => {
+test('publish.disclose_subscriptions: true lists the atproto peer DIDs and static-json base_urls under exchange.subscribed_domains', async () => {
   const dir = setup();
   const cfg = { ...config, publish: { ...config.publish, disclose_subscriptions: true },
     connectors: [{ name: 'atproto', config: { peers: ['did:plc:peer'] } }, { name: 'static-json', config: { base_url: 'https://haven.example' } }] };
-  writeStaticSurface({ dir, items, allItems, manifest, config: cfg });
+  await writeStaticSurface({ dir, items, allItems, manifest, config: cfg });
   const km = JSON.parse(readFileSync(join(dir, 'public', '.well-known', 'knowledge.json'), 'utf8'));
   assert.deepEqual(km.exchange.subscribed_domains, ['did:plc:peer', 'https://haven.example']);
 });
 
-test('only an explicit true discloses: false, absent, or a truthy non-boolean does not', () => {
+test('only an explicit true discloses: false, absent, or a truthy non-boolean does not', async () => {
   for (const v of [false, undefined, 'yes', 1]) {
     const dir = setup();
-    writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: { ...config.publish, disclose_subscriptions: v } } });
+    await writeStaticSurface({ dir, items, allItems, manifest, config: { ...config, publish: { ...config.publish, disclose_subscriptions: v } } });
     const km = JSON.parse(readFileSync(join(dir, 'public', '.well-known', 'knowledge.json'), 'utf8'));
     assert.deepEqual(km.exchange.subscribed_domains, [], String(v));
   }

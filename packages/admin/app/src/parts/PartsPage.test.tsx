@@ -15,7 +15,7 @@ import { renderAt } from '../test/render.tsx'
 import { flowEnv } from '../test/flowEnv.ts'
 import Inspector from '../inspector/Inspector.tsx'
 
-const IDS = ['tokens', 'frame', 'controls', 'atoms', 'rows', 'needs', 'views', 'map', 'map-compose', 'gov', 'gov-roles', 'work', 'lib', 'tray', 'door', 'blocks', 'machines']
+const IDS = ['tokens', 'frame', 'controls', 'atoms', 'rows', 'needs', 'views', 'map', 'map-compose', 'gov', 'gov-roles', 'work', 'lib', 'tray', 'portal', 'blocks', 'machines']
 
 describe('/parts, the index', () => {
   it('links every group in order', async () => {
@@ -128,10 +128,10 @@ describe('/parts/:group', () => {
   })
 })
 
-// walk 2026-11-04, L4c-fix 14: /parts/work, /tray and /door drew 3, 6 and 2 h1 — the elements' page headings, drawn
+// walk 2026-11-04, L4c-fix 14: /parts/work, /tray and /portal drew 3, 6 and 2 h1 — the elements' page headings, drawn
 // inside the gallery's cards. A group page has one h1, its own; a specimen's page heading sits under its card's cap.
 describe('/parts/:group has one h1', () => {
-  for (const id of ['work', 'tray', 'door']) {
+  for (const id of ['work', 'tray', 'portal']) {
     it(`/parts/${id}`, async () => {
       flowEnv()
       fetchRoutes({})

@@ -150,7 +150,7 @@ describe('the file (spec §10.1, §10.2)', () => {
       expect(columns('roles_meta')).toEqual(['k', 'v'])
       expect(columns('sign_in_links')).toEqual(['token_hash', 'person_id', 'return_to', 'created', 'expires', 'used_at'])
       expect(db.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'wal' })
-      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 })
+      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 }) // DAO-OS L6 §8.1: schema 2
     } finally { db.close() }
   })
 
@@ -166,7 +166,7 @@ describe('the file (spec §10.1, §10.2)', () => {
   it('a newer user_version is refused in words', async () => {
     const r = repo(); const dir = storeDir()
     const db = new DatabaseSync(join(dir, 'house.db'))
-    db.exec('PRAGMA user_version = 3')
+    db.exec('PRAGMA user_version = 3') // DAO-OS L6: this org-os writes schema 2, so 3 is the newer one
     db.close()
     const err = await refusal(openPrivateStore(r, { dir }))
     expect(err).toBeInstanceOf(StoreUnavailable)

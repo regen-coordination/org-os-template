@@ -566,7 +566,8 @@ test('--range origin/main..HEAD on a branch that synced main judges only the bra
   vcs(clones.a, ['switch', '-q', '-c', 'feature'])
   const own = commit(clones.a, { 'docs/feature.md': 'feature\n' }, 'a feature note', { who: 'ana', date: at('11:20') })
   vcs(clones.a, ['switch', '-q', '-c', 'sub'])
-  const pr = commit(clones.a, { 'data/tasks.yaml': 'tasks:\n  - { id: t1, title: A task }\n' }, 'carla adds a task on the branch', { who: 'carla', date: at('11:30') })
+  // A records file: data/tasks.yaml is class workspace since DAO-OS L6, written at once by any member.
+  const pr = commit(clones.a, { 'data/ideas.yaml': 'ideas:\n  - { id: i1, title: An idea }\n' }, 'carla adds an idea on the branch', { who: 'carla', date: at('11:30') })
   vcs(clones.a, ['fetch', '-q', 'origin'])
   sync(clones.a, { message: 'sync main into sub' })
   vcs(clones.a, ['switch', '-q', 'feature'])
@@ -576,7 +577,7 @@ test('--range origin/main..HEAD on a branch that synced main judges only the bra
   const r = run([clones.a, '--strict', '--range', 'origin/main..HEAD'])
   assert.equal(r.status, 1, r.stdout + r.stderr)
   assert.equal(errorsOf(r).length, 1, r.stdout)
-  assert.ok(errorsOf(r)[0].startsWith(`✗ ${pr} "carla adds a task on the branch"`), r.stdout)
+  assert.ok(errorsOf(r)[0].startsWith(`✗ ${pr} "carla adds an idea on the branch"`), r.stdout)
   assert.ok(!r.stdout.includes(own), r.stdout)
 })
 

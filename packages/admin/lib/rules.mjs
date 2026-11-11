@@ -17,6 +17,7 @@ import { gitEmails, memberKind } from './members.mjs'
 import { hatRef, inTree, parseHatRef, parseTreeRef, treeRef } from './hats.mjs'
 import { actorIdOf, standing, walletsOf } from './hat-readings.mjs'
 import { parseCaip10 } from './caip.mjs'
+import { isComposed } from './compose.mjs'
 
 /** @typedef {'direct'|'approve'|'consent'|'vote'|'system'} Method */
 /**
@@ -279,6 +280,8 @@ export function mayDecideAlone(rule, actorId, book) {
  * @param {Partial<Rule>} rule @returns {string}
  */
 export function describeRule(rule) {
+  // DAO-OS L6 R-L6-SUGGEST-2: the built-in rule a suggested edit to the Hub is decided by.
+  if (isWorkspaceSuggest(rule)) return SUGGEST_SENTENCE
   const applies = rule.applies_to ?? []
   const where = applies.length === 1 && applies[0] === 'all' ? 'everything' : applies.length > 0 ? applies.join(', ') : 'nothing named'
   const decide = rule.decide ? asks(/** @type {Rule} */ (rule)) : 'decides by no method named'
@@ -344,7 +347,7 @@ export const SEVERAL_TREES = 'several Hats trees; name the membership tree in go
  * @returns {{ id: string, tree: string } | null}
  */
 export function membershipTree(governance, systems) {
-  const trees = (Array.isArray(systems) ? systems : []).filter(s => isMap(s) && s.kind === 'hats-tree')
+  const trees = (Array.isArray(systems) ? systems : []).filter(s => isMap(s) && s.kind === 'hats-tree' && !isComposed(s))
   const membership = isMap(governance?.membership) ? governance.membership : null
   const named = membership && typeof membership.tree === 'string' && membership.tree !== '' ? membership.tree : null
   const system = named !== null ? trees.find(s => String(s.id) === named) : trees.length === 1 ? trees[0] : undefined
@@ -463,7 +466,7 @@ export function checkGovernance(governance, ctx) {
       const system = systems.find(s => isMap(s) && String(s.id) === membership.tree)
       if (!system) add('error', 'membership.tree', `membership.tree names "${membership.tree}", and data/systems.yaml has no system by that id`)
       else if (system.kind !== 'hats-tree') add('error', 'membership.tree', `membership.tree names "${membership.tree}", which is a ${String(system.kind)} System, not a hats-tree`)
-    } else if (systems.filter(s => isMap(s) && s.kind === 'hats-tree').length > 1) add('warn', 'membership', SEVERAL_TREES)
+    } else if (systems.filter(s => isMap(s) && s.kind === 'hats-tree' && !isComposed(s)).length > 1) add('warn', 'membership', SEVERAL_TREES)
     const tree = membershipTree(governance, systems)
     const parsed = tree ? parseTreeRef(tree.tree) : null
     for (const role of book.roles.values()) {
@@ -648,7 +651,8 @@ export function checkGovernance(governance, ctx) {
   // Coverage and the model, over the rules as normalised.
   const { rules } = effectiveRules(governance)
   if (classes) {
-    const uncovered = classes.filter(c => ruleFor(rules, c) === null)
+    // DAO-OS L6 §3.2: the workspace is never uncovered: a target no rule names is written under workspace/direct.
+    const uncovered = classes.filter(c => c !== WORKSPACE_CLASS && ruleFor(rules, c) === null)
     const governanceUncovered = uncovered.includes('governance')
     const rest = uncovered.filter(c => c !== 'governance')
     if (rest.length > 0) {
@@ -663,4 +667,129 @@ export function checkGovernance(governance, ctx) {
     }
   }
   return out
+}
+
+// ---------------------------------------------------------------------------
+// DAO-OS L6: the workspace's implied rule, and raising by split (spec §3.2)
+// ---------------------------------------------------------------------------
+
+const WORKSPACE_CLASS = 'workspace'
+
+/** The rule for a workspace target that no written rule names (L6 §3.2). Not written in governance.yaml: the class's own
+ *  default, as `visibility/narrow` is a named rule outside it. Its id is what `Org-Rule` carries.
+ *  @type {Readonly<Rule>} */
+export const WORKSPACE_DIRECT = Object.freeze({
+  id: 'workspace/direct', applies_to: Object.freeze([WORKSPACE_CLASS]), decide: Object.freeze({ method: 'direct' }),
+})
+
+/** DAO-OS L6 R-L6-SUGGEST-2 (the operator: "Everywhere, maintainers decide"): the rule a suggested edit is decided by
+ *  where its page's rule is WORKSPACE_DIRECT. Built in, as WORKSPACE_DIRECT is: never written in governance.yaml, held in
+ *  a proposal's snapshot (the proposal marked `suggested: true`) as it stands here. One approval from a member of the
+ *  org's own `maintainer` role other than the author (no self_approve), then Ratify. Who may suggest is who may write the
+ *  page (`mayWriteWorkspace`), so it names no `propose` role.
+ *  @type {Readonly<Rule>} */
+export const WORKSPACE_SUGGEST = Object.freeze({
+  id: 'workspace/suggest', applies_to: Object.freeze([WORKSPACE_CLASS]), decide: Object.freeze({ by: MAINTAINER, method: 'approve', count: 1 }),
+})
+
+/** Is `rule` WORKSPACE_SUGGEST exactly (whatever the order of its keys), as a snapshot holds it? @param {unknown} rule */
+export function isWorkspaceSuggest(rule) {
+  if (!isMap(rule) || rule.id !== WORKSPACE_SUGGEST.id) return false
+  const d = rule.decide
+  return Object.keys(rule).sort().join() === 'applies_to,decide,id' && Array.isArray(rule.applies_to) &&
+    rule.applies_to.length === 1 && rule.applies_to[0] === WORKSPACE_CLASS && isMap(d) && Object.keys(d).sort().join() === 'by,count,method' &&
+    d.by === MAINTAINER && d.method === 'approve' && d.count === 1
+}
+
+/** WORKSPACE_SUGGEST in words (`describeRule`). */
+export const SUGGEST_SENTENCE = 'a suggested edit to the Hub · anyone who may edit the page suggests · needs 1 approval from a maintainer other than its author'
+
+/** Said when a suggestion under WORKSPACE_SUGGEST would have nobody to decide it: the org names no `maintainer` role, or
+ *  nobody wears it (R-L6-SUGGEST-2). Never said of a role whose wearers could not be read: see SUGGEST_WEARERS_UNREAD. */
+export const NO_SUGGEST_DECIDERS = 'No one in this org decides suggestions yet: name a maintainer role in data/governance.yaml, and put someone in it. Nothing was proposed.'
+/** Said when its only decider would be its author, who cannot approve it. */
+export const ONLY_AUTHOR_DECIDES = 'You are the only maintainer, and a suggestion is decided by a maintainer other than its author: save the page instead, or add a maintainer. Nothing was proposed.'
+/** Said instead of NO_SUGGEST_DECIDERS when the `maintainer` role is sourced from a hat and who wears it could not be read
+ *  just now (fix round 1, review S1): what is known, never the claim that nobody decides it — the org's own data says the
+ *  role is written and its hat worn, so its wearers are a question for the chain, not for data/governance.yaml. */
+export const SUGGEST_WEARERS_UNREAD = "The org's maintainers are whoever wears the hat its `maintainer` role is sourced from, and its wearers could not be read just now, so it is not known who would decide this suggestion. Nothing was proposed."
+/** Said instead of NO_SUGGEST_DECIDERS or ONLY_AUTHOR_DECIDES when the hat's wearer list was not read whole (no explorer
+ *  for its chain, or a page of holders left unread) and names no wearer but the author (fix round 2, review I3): who else
+ *  wears it is not known, so neither "nobody" nor "only you" is said. */
+export const SUGGEST_WEARERS_PARTIAL = "The org's maintainers are whoever wears the hat its `maintainer` role is sourced from, and its wearer list could not be read whole just now, so it is not known whether anyone but you would decide this suggestion. Nothing was proposed."
+
+/**
+ * Whether a suggestion by `author` can be decided under WORKSPACE_SUGGEST with `book` (R-L6-SUGGEST-2): the org names a
+ * `maintainer` role (the implied one, every person, does not count) and someone other than the author is in it, a person
+ * (an agent and an organization never decide). True, or the sentence to refuse it with.
+ * @param {RoleBook} book @param {string} author @returns {true | string}
+ */
+export function suggestDecidable(book, author) {
+  const role = book.roles.get(MAINTAINER)
+  const deciders = role?.defined ? role.members.filter(m => !book.agents.has(m) && !book.organizations.has(m)) : []
+  if (deciders.length === 0) return NO_SUGGEST_DECIDERS
+  return deciders.some(m => m !== author) ? true : ONLY_AUTHOR_DECIDES
+}
+
+/** The hat a written `maintainer` role is sourced from, when it is one (R-L6-SUGGEST-2, fix round 1, review S1): its
+ *  wearers are then a question for the chain, so a book built only from one actor's readings cannot say who they are.
+ *  Undefined for a role written with members or everyone, and for the implied maintainer (F2-R2). @param {RoleBook} book */
+export function maintainerHat(book) {
+  return book.roles.get(MAINTAINER)?.hat
+}
+
+/** Is `target` the workspace or one of its splits (`workspace:tasks`, `workspace:tree-<page id>`)? @param {string} target */
+export const isWorkspaceTarget = target => target === WORKSPACE_CLASS || target.startsWith(`${WORKSPACE_CLASS}:`)
+
+/**
+ * The rule a workspace write is judged by (L6 §3.2): the first of its targets (most specific first, ending in `workspace`,
+ * lib/workspace/targets.mjs) that a written rule names exactly. `all` is never consulted: an org's catch-all rule does not
+ * reach the workspace. With none named, WORKSPACE_DIRECT.
+ * @param {readonly Rule[]} rules @param {readonly string[]} targets @returns {Rule}
+ */
+export function workspaceRuleFor(rules, targets) {
+  for (const target of targets) {
+    const named = rules.find(r => r.applies_to.includes(target))
+    if (named) return named
+  }
+  return /** @type {Rule} */ (WORKSPACE_DIRECT)
+}
+
+/**
+ * The rule for one op's targets (`targetsOf`): a workspace op's by `workspaceRuleFor`, any other by its class (`ruleFor`).
+ * @param {readonly Rule[]} rules @param {readonly string[]} targets @returns {Rule | null}
+ */
+export function ruleForTargets(rules, targets) {
+  if (targets.length === 0) return null
+  return isWorkspaceTarget(targets[0]) ? workspaceRuleFor(rules, targets) : ruleFor(rules, targets[0])
+}
+
+/**
+ * One rule per op's targets, as `rulesForClasses` gives one per class.
+ * @param {readonly Rule[]} rules @param {readonly (readonly string[])[]} lists
+ * @returns {{ targets: readonly string[], rule: Rule | null }[]}
+ */
+export function rulesForTargets(rules, lists) {
+  return lists.map(targets => ({ targets, rule: ruleForTargets(rules, targets) }))
+}
+
+/** 0.6's sentence for a git identity no member holds. */
+export const READ_ONLY = 'Read-only: no member matches this git identity.'
+
+/**
+ * Whether `actor` may write under WORKSPACE_DIRECT (L6 §3.2): a member id (agents included, Q72), or a CAIP-10 id whose
+ * reading (`hats`) wears a hat of the membership tree `tree` (a tree ref, `eip155:42220:13`). Not `mayDecideAlone`, which
+ * refuses agents. True, or the sentence to show.
+ * @param {{ id: string, hats?: readonly string[] }} actor @param {ReadonlySet<string>} known
+ * @param {string | null} tree @returns {true | string}
+ */
+export function mayWriteWorkspace(actor, known, tree) {
+  if (known.has(actor.id)) return true
+  if (parseCaip10(actor.id) === null) return READ_ONLY
+  const t = parseTreeRef(tree)
+  const wears = t !== null && (actor.hats ?? []).some(h => {
+    const hat = parseHatRef(h)
+    return hat !== null && hat.chain === t.chain && inTree(hat.hatId, t.treeId)
+  })
+  return wears ? true : `Read-only: the address ${actor.id} wears no hat of the membership tree.`
 }
