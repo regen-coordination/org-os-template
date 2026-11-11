@@ -12,7 +12,8 @@ import { WRITTEN_UNFILLED } from '../private/store.ts'
 
 /** A written level as a level; one that does not parse admits nobody (no hat ref, so nobody wears it), as the store's levels
  *  read (private/reads.ts `levelOfToken`; not imported, so the store's own modules may read this one). */
-const levelOf = (token: string): ParsedLevel => parseLevel(token) ?? { level: 'hat', hat: token }
+export const writtenLevelOf = (token: string): ParsedLevel => parseLevel(token) ?? { level: 'hat', hat: token }
+const levelOf = writtenLevelOf
 
 /** What a row written before the column existed holds until the start fills it (schema 3's migration, PR7-R45). */
 export const UNFILLED = WRITTEN_UNFILLED

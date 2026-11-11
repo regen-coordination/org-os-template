@@ -25,7 +25,7 @@ import { resolveTrunk } from '../../server/proposals/ledger.ts'
 import { stateDir } from '../../server/state.ts'
 import {
   ANCHOR_CHANGED, ANCHOR_MAX_CHARS, COMMENT_MAX_CHARS, COMMENT_TOO_LONG, NOT_TOLD, commentView, mentionablesFor, mountConversation,
-  targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, plainLine,
+  targetLevel, tell, tellAtCommit, viewerFor, type CommentRow, type Target, TASK_ALREADY, TASK_NO_LEVEL, plainLine,
 } from '../../server/workspace/conversation.ts'
 import { mountPresence, Presence } from '../../server/workspace/presence.ts'
 import { admits } from '../../lib/visibility.mjs'
@@ -853,6 +853,56 @@ describe('PR7-R45: the conversation floor (a row is read at its target\'s level 
     expect((await call(w.app, '/api/reads', json('POST', { target: T }))).body).toMatchObject({ read: 1 })
     expect(w.store.notifications('steward-c').map(n => [n.id, n.readAt !== null])).toEqual([['n-page', true], ['n-hidden', false]])
     asA(w.repo)
+  })
+
+  // T2e C1 (Rule 4): Turn into a task takes the floor of the comment (its target's level now, the level it was written at,
+  // and those of the comments above it). Git only when every one of them is members or public; else a private task at the
+  // narrowest of them; none narrowest (a hat and a role): refused, naming nothing.
+  it('Turn into a task on talk written at Ops, its page widened to members since: a task kept at Ops in the store, nothing in git', async () => {
+    const { w, top } = await opsTalk()
+    await hubLevel(w, 'members')
+    const before = commits(w.repo)
+    const tasksFile = () => (existsSync(join(w.repo, 'data', 'tasks.yaml')) ? readFileSync(join(w.repo, 'data', 'tasks.yaml'), 'utf8') : '')
+    const made = await call(w.app, `/api/comments/${top}/task`, json('POST'))
+    expect(made.status).toBe(201)
+    expect(made.body).toEqual({ task: expect.stringMatching(/^t-[0-9a-f]{12}$/), visibility: OPS_LEVEL })
+    expect(w.store.record('tasks', made.body.task)).toMatchObject({ visibility: OPS_LEVEL, body: { title: '@steward-b Ops talk', page: 'scratch-0001' } })
+    // A reply written at members after the widening, under the Ops talk: its task is kept at Ops too.
+    const late = await call(w.app, '/api/comments', json('POST', { target: T, body: 'Late members reply', parent: top }))
+    expect(w.store.comment(late.body.comment.id)?.writtenLevel).toBe('members')
+    const lateTask = await call(w.app, `/api/comments/${late.body.comment.id}/task`, json('POST'))
+    expect(lateTask.status).toBe(201)
+    expect(lateTask.body).toEqual({ task: expect.stringMatching(/^t-[0-9a-f]{12}$/), visibility: OPS_LEVEL })
+    expect(commits(w.repo)).toBe(before)
+    expect(tasksFile()).not.toContain('Ops talk')
+    expect(tasksFile()).not.toContain('Late members reply')
+    expect(git(w.repo, 'log --format=%B')).not.toContain('Ops talk')
+    expect(git(w.repo, 'log --format=%B')).not.toContain('Late members reply')
+    // A members comment on the members page: git, as before (one commit, the task linked to the page).
+    const open = await call(w.app, '/api/comments', json('POST', { target: T, body: 'Members can do this' }))
+    const gitTask = await call(w.app, `/api/comments/${open.body.comment.id}/task`, json('POST'))
+    expect(gitTask.status).toBe(201)
+    expect(gitTask.body).toMatchObject({ task: 'members-can-do-this', commit: expect.any(String) })
+    expect(commits(w.repo)).toBe(before + 1)
+    expect(tasksFile()).toContain('page: scratch-0001')
+  })
+
+  it('Turn into a task on talk written at a role, its page at a hat now: no level is narrower than both, so it is refused (409), naming nothing', async () => {
+    const w = await world({ pages: { 'scratch-0001': atLevel('scratch-0001', 'role:stewards') } })
+    await w.prime(A1, A2)
+    const sent = await call(w.app, '/api/comments', json('POST', { target: T, body: 'Stewards talk' }))
+    expect(sent.status).toBe(201)
+    expect(w.store.comment(sent.body.comment.id)?.writtenLevel).toBe('role:stewards')
+    await hubLevel(w, OPS_LEVEL)
+    expect(await thread(w, asA)).toEqual(['Stewards talk']) // steward-a holds stewards and wears Ops: they read it
+    const before = commits(w.repo)
+    const tasks = w.store.records('tasks').length
+    const refused = await call(w.app, `/api/comments/${sent.body.comment.id}/task`, json('POST'))
+    expect(refused).toEqual({ status: 409, body: { error: TASK_NO_LEVEL, code: 'NO_LEVEL' } })
+    expect(TASK_NO_LEVEL).not.toMatch(/stewards|hat|role|Ops|0x/i)
+    expect(w.store.records('tasks')).toHaveLength(tasks)
+    expect(commits(w.repo)).toBe(before)
+    expect(w.store.comment(sent.body.comment.id)?.task ?? null).toBeNull()
   })
 
   it('a conversation event names the floor of what changed: it reaches only those admitted to it, and the floor is not sent', async () => {

@@ -38,7 +38,7 @@ import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, NOBODY } from '../visibility/gate.ts'
 import { commitOrStage, guardPageRefs, mayWritePrivate } from './pages.ts'
 import { bury, onHousekeeping, onTargetsGone, tombstones, unbury } from './gone.ts'
-import { floorsAbove, mayRead, NOBODY_WRITTEN, readableRows } from './written.ts'
+import { floorsAbove, mayRead, NOBODY_WRITTEN, readableRows, writtenLevelOf } from './written.ts'
 import { readRegistryOrEmpty } from '../registry.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, type ParsedLevel, type Viewer } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
@@ -80,6 +80,9 @@ export const NOT_ON_TARGET = (id: string, t: Target) => `Comment ${id} is not on
 export const DELETED_NO_TASK = 'A deleted comment cannot be turned into a task. Nothing was written.'
 /** DAO-OS L6 Task 18 fix round 1: a comment becomes one task only. */
 export const TASK_ALREADY = (task: string) => `This comment was turned into the task ${task} already. Nothing was written.`
+/** T2e C1: the levels a comment's talk is kept at (its target's now, its own, those of the comments above it) have no one
+ *  level narrower than or equal to all of them, so no task can hold it. Names nothing. */
+export const TASK_NO_LEVEL = 'This comment cannot be turned into a task: no one level holds everyone who may read it and the comments above it. Nothing was written.'
 const COMMENT_BODY = 'The body must be {"target": "page:<id>" or "record:<collection>:<id>", "body", "parent"?, "anchor"?: {"exact", "prefix"?, "suffix"?}}.'
 const TARGET_QUERY = 'Name what the comments are on: ?target=page:<id> or ?target=record:<collection>:<id>.'
 const READ_BODY = 'The body must be {"ids": [<notification id>, …]} or {"target": "page:<id>" or "record:<collection>:<id>"}.'
@@ -591,18 +594,24 @@ function linkOf(t: Target): Record<string, string> {
 
 /**
  * Turn into a task (§8.2): a workspace write creating a task whose title is the comment's first line, linked to its target.
- * On a target git may hold, one commit (or staged where the rule is raised), at members at the loosest (M-5: never public
- * at once, whatever the target or the tasks' default); on a target
- * stricter than members, a private task in the store at the target's level, with an opaque id (`t-<12 hex>`, §4.5), and no
- * commit. The caller holds the write lock.
+ * The task's level is the comment's floor (T2e C1, PR7-R45): its target's level now and `floor`, the level the comment was
+ * written at and those of the comments above it. When every one of them is members or public, one commit (or staged where
+ * the rule is raised), at members at the loosest (M-5: never public at once, whatever the target or the tasks' default).
+ * Otherwise a private task in the store at the narrowest of them (one narrower than or equal to every other), with an opaque
+ * id (`t-<12 hex>`, §4.5), and no commit: no text written at a stricter level reaches git, in the task or its message. With
+ * no such level (a hat and a role, neither within the other): 409, naming nothing. The caller holds the write lock.
  */
-export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: KnownActor, deps: ConversationDeps & { notify?: (msg: { type: 'changes' }) => void }):
+export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: KnownActor, deps: ConversationDeps & { notify?: (msg: { type: 'changes' }) => void },
+  floor: readonly (string | null)[] = [row.writtenLevel]):
   Promise<{ task: string; commit: string } | { task: string; staged: true } | { task: string; visibility: string }> {
   if (row.deleted) throw new HttpError(409, DELETED_NO_TASK, 'DELETED')
   if (row.task) throw new HttpError(409, TASK_ALREADY(row.task), 'TASKED')
+  const levels: ParsedLevel[] = [info.level, ...floor.map(w => writtenLevelOf(w ?? ''))]
+  const narrowest = levels.find(l => levels.every(o => narrowerOrEqual(l, o)))
+  if (!narrowest) throw new HttpError(409, TASK_NO_LEVEL, 'NO_LEVEL')
   const title = plainLine(row.body.split('\n').map(l => l.trim()).find(l => l !== '') ?? '')
   const link = linkOf(row.target as Target)
-  if (gitAllows(info.level)) {
+  if (levels.every(l => gitAllows(l))) {
     let taken: Set<string>
     try { taken = new Set(currentEntries(deps.repo, 'tasks').map(e => String(e.id))) } catch { taken = new Set() }
     const base = slugOf(title)
@@ -619,7 +628,7 @@ export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: Kno
   const body = { title, ...link }
   const op: RecordOp = { op: 'create', record: `tasks:${id}`, value: { id, ...body } }
   mayWritePrivate(deps.repo, actor, targetsOfOps([op], deps.repo))
-  const visibility = formatLevel(info.level)
+  const visibility = formatLevel(narrowest)
   try { await deps.store.putRecord({ collection: 'tasks', id, visibility, body, rev: baseOf(body) ?? '' }, actor.id, null) } catch (err) { throw unavailable(err, deps.store) }
   return { task: id, visibility }
 }
@@ -809,7 +818,7 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
     return deps.withLock(async () => {
       const store = await needStore()
       const { row, info, rows } = visibleComment(store, c.req.param('id'), viewer)
-      const out = await turnIntoTask(row, info, actor, { repo, store, membership, now, notify: msg => deps.notify?.(msg) })
+      const out = await turnIntoTask(row, info, actor, { repo, store, membership, now, notify: msg => deps.notify?.(msg) }, floorOf(row, rows))
       // Task 18 fix round 1: the comment keeps the task it became, so everyone admitted sees it and it is not made twice.
       await write(store, { comments: [{ ...row, task: out.task }] })
       notify(row.target as Target, floorOf(row, rows))
