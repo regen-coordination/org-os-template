@@ -10,7 +10,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 
-export const INSTANCE_THEMES_PATH = '/api/house/themes'
+export const INSTANCE_THEMES_PATH = '/api/instance/themes'
 export const INSTANCE_THEMES_FILE = join('house', 'themes.yaml')
 export const INSTANCE_THEMES_CSS = join('house', 'themes.css')
 export const INSTANCE_THEMES_MAX_BYTES = 16 * 1024

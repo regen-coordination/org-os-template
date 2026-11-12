@@ -355,9 +355,9 @@ export const api = {
   // P4c: boards (contract "P4c produces"). Written only through stage().
   boards: () => fetchJSON<BoardRead[]>('/api/boards'),
   /** The instance's sites bar (server/instanceBar.ts): no sites when the instance carries none. */
-  houseBar: () => fetchJSON<InstanceBar>('/api/house/bar'),
+  instanceBar: () => fetchJSON<InstanceBar>('/api/instance/bar'),
   /** The instance's themes (server/instanceThemes.ts): none when it offers none. */
-  houseThemes: () => fetchJSON<InstanceThemes>('/api/house/themes'),
+  instanceThemes: () => fetchJSON<InstanceThemes>('/api/instance/themes'),
   board: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}`),
   builtinBoard: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}/builtin`),
   // The library: its list, a preview that writes nothing, and Add and Remove, which stage into your change (the tray's).

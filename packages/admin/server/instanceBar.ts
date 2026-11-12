@@ -12,7 +12,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 
-export const INSTANCE_BAR_PATH = '/api/house/bar'
+export const INSTANCE_BAR_PATH = '/api/instance/bar'
 /** Where an instance keeps its bar, from its root. */
 export const INSTANCE_BAR_FILE = join('house', 'bar.yaml')
 /** A bar is a handful of lines; a bigger file is a mistake, not a bar. */

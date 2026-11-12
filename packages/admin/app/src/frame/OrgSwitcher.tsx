@@ -34,7 +34,7 @@ export function OrgSwitcher({ org }: { org: OrgMark }) {
   const theme = useSyncExternalStore(subscribe, shown, () => null)
   const [, redraw] = useReducer((n: number) => n + 1, 0)
   const orgTheme = useSyncExternalStore(subscribe, shownOrgTheme, () => null)
-  const offered = useQuery({ queryKey: ['house', 'themes'], queryFn: api.houseThemes, retry: false, staleTime: Infinity }).data?.themes ?? []
+  const offered = useQuery({ queryKey: ['instance', 'themes'], queryFn: api.instanceThemes, retry: false, staleTime: Infinity }).data?.themes ?? []
   // A theme chosen here that the instance no longer offers is not kept: the instance's own look shows instead.
   const stale = offered.length > 0 && orgTheme !== null && !offered.some(t => t.id === orgTheme)
   useEffect(() => { if (stale) setOrgTheme(null) }, [stale])

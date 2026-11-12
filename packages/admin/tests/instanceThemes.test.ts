@@ -43,7 +43,7 @@ describe('readInstanceThemes', () => {
     write('themes.yaml', '- { id: a, label: A, scheme: dark }\n')
     expect(readInstanceThemes(repo)).toEqual({ themes: [] })
   })
-  it('is answered at /api/house/themes', async () => {
+  it('is answered at /api/instance/themes', async () => {
     write('themes.yaml', 'themes:\n  - { id: deep, label: Deep, scheme: dark }\n')
     const res = await createApp(repo).request(INSTANCE_THEMES_PATH)
     expect(res.status).toBe(200)

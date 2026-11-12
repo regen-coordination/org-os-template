@@ -936,7 +936,7 @@ sites:
 ```
 
 A site's `href` is an http(s) address (it opens in its own tab) or a rooted path (a place in the house); a site
-without a label, or with any other address, is left out, and at most eight are kept. `GET /api/house/bar` answers
+without a label, or with any other address, is left out, and at most eight are kept. `GET /api/instance/bar` answers
 it to members; with no file there are no sites and no bar. A note block's Markdown follows the same rule for its
 links: `[Needs you](/needs)` stays in the house, `[site](https://example.org)` opens in a new tab.
 
@@ -1000,7 +1000,7 @@ instead of the neutral seal.
 
 **An instance's themes.** Beside its own look, an instance may offer up to 8 themes a viewer picks in Appearance
 (the org menu). `house/themes.yaml` names them, `themes: [{ id, label, scheme: light | dark, note? }]` (`id` is
-`a-z0-9-`, at most 24 characters), and `house/themes.css` draws them; the server answers `GET /api/house/themes`, and
+`a-z0-9-`, at most 24 characters), and `house/themes.css` draws them; the server answers `GET /api/instance/themes`, and
 `/instance-skin.css` serves the themes' CSS after the skin's (each file held to 64 KB). Picking one sets
 `data-org-theme="<id>"` on `<html>` and `data-theme` to its scheme, kept for this browser and applied by the inline
 script before the first paint, so write each theme as `html:root[data-skin][data-theme][data-org-theme="<id>"] { … }`,

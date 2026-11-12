@@ -97,7 +97,7 @@ export function SitesBarView({ bar, themes = [] }: { bar: InstanceBar; themes?: 
  *  server has none to give (an older server, an instance without `house/bar.yaml`), nothing is drawn. The themes
  *  are the ones the org menu offers (the same query), none while they have not answered. */
 export function SitesBar() {
-  const q = useQuery({ queryKey: ['house', 'bar'], queryFn: api.houseBar, retry: false, staleTime: Infinity })
-  const themes = useQuery({ queryKey: ['house', 'themes'], queryFn: api.houseThemes, retry: false, staleTime: Infinity }).data?.themes
+  const q = useQuery({ queryKey: ['instance', 'bar'], queryFn: api.instanceBar, retry: false, staleTime: Infinity })
+  const themes = useQuery({ queryKey: ['instance', 'themes'], queryFn: api.instanceThemes, retry: false, staleTime: Infinity }).data?.themes
   return q.data && Array.isArray(q.data.sites) ? <SitesBarView bar={q.data} themes={Array.isArray(themes) ? themes : []} /> : null
 }
