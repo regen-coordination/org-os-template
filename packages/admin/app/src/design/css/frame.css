@@ -253,6 +253,9 @@ button.who { cursor: pointer; }
 .sheet-grab { display: grid; place-items: center; padding: var(--sp-8) 0 var(--sp-8); touch-action: none; cursor: grab; }
 .sheet-grab::before { content: ""; inline-size: var(--w-grab); block-size: var(--h-grab); border-radius: var(--radius-grab); background: var(--rule-strong); }
 .sheet-nav { display: grid; gap: var(--sp-1); }
+/* an instance's group in the sheet (house/nav.yaml): a heading over its rows, as the sidebar's */
+.sheet-g { display: grid; gap: var(--sp-1); }
+.sheet-h { padding: var(--sp-10) var(--sp-6) var(--sp-5); color: var(--faint); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); }
 .sheet-a { display: flex; align-items: center; gap: var(--sp-7); block-size: var(--h-ctl-touch); min-width: 0; padding: var(--nav-pad); border: 0;
   border-radius: var(--radius-ctl); background: none; color: var(--nav-ink); font: inherit; font-size: var(--fs-sub); text-align: start;
   text-decoration: none; cursor: pointer; transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }

@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { fireEvent, screen, within } from '@testing-library/react'
 import { Sidebar } from './Sidebar.tsx'
+import { BottomBar } from './BottomBar.tsx'
+import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { currentNavItem, resolveNav, type HouseCounts, type Identity } from './sections.ts'
 import { isIconName } from '../design/Icon.tsx'
 import { renderAt } from '../test/render.tsx'
@@ -108,3 +110,41 @@ describe('the sidebar with an instance nav', () => {
     expect(within(hub()).queryByRole('button', { name: 'More' })).toBeNull()
   })
 })
+
+describe('the phone with an instance nav', () => {
+  const phone = (roles: string[] | null, shown = true) =>
+    <ViewAsProvider><BottomBar counts={COUNTS} identity={WHO} nav={nav(roles)} shown={shown} /></ViewAsProvider>
+  const bar = () => screen.getByRole('navigation', { name: 'Hub' })
+  const sheet = () => screen.getByRole('navigation', { name: 'More' })
+  it('keeps the bar’s four sections, each under the instance’s label for it', () => {
+    renderAt(phone(['steward']), '/')
+    expect(within(bar()).getAllByRole('link').map(a => a.querySelector('.bbar-l')?.textContent)).toEqual(['Dashboard', 'Needs you', 'Proposals', 'Workspace'])
+    expect(within(bar()).getByRole('link', { name: 'Dashboard' }).getAttribute('aria-current')).toBe('page')
+  })
+  it('draws the groups in the sheet, less what the bar holds, then the sections they did not name under More', () => {
+    renderAt(phone(['steward']), '/')
+    expect(within(sheet()).queryByRole('link', { name: /Needs you/ })).toBeNull()
+    expect(labels2(within(sheet()).getByRole('group', { name: 'Governance' }))).toEqual(['Decided', 'Council', 'Funds'])
+    expect(within(sheet()).getByRole('link', { name: 'Funds (opens in a new tab)' }).getAttribute('target')).toBe('_blank')
+    const more = within(sheet()).getByRole('group', { name: 'More' })
+    expect(labels2(more)).toEqual(['Systems', 'Treasury', 'Library', 'Changes'])
+    expect(within(more).getByRole('link', { name: 'Changes, 2' })).toBeTruthy()
+  })
+  it('draws a Network Member no Governance group in the sheet', () => {
+    renderAt(phone(['network-member']), '/')
+    expect(within(sheet()).queryByRole('group', { name: 'Governance' })).toBeNull()
+    expect(labels2(within(sheet()).getByRole('group', { name: 'Network' }))).toEqual(['Local Nodes'])
+  })
+  it('on a page of the groups the bar does not hold, draws More current and the item current in the sheet', () => {
+    renderAt(phone(['steward']), '/governance/decisions')
+    expect(within(bar()).getByRole('button', { name: 'More' }).getAttribute('aria-current')).toBe('true')
+    expect(within(bar()).queryByRole('link', { name: 'Proposals' })?.getAttribute('aria-current')).toBeNull()
+    expect(within(sheet()).getByRole('link', { name: 'Decided' }).getAttribute('aria-current')).toBe('page')
+  })
+  it('draws the house’s five under More as before when the instance carries no nav', () => {
+    renderAt(<ViewAsProvider><BottomBar counts={COUNTS} identity={WHO} shown /></ViewAsProvider>, '/')
+    expect(within(sheet()).queryByRole('group')).toBeNull()
+    expect(within(sheet()).getByRole('link', { name: /^Roles/ })).toBeTruthy()
+  })
+})
+const labels2 = (el: HTMLElement) => within(el).getAllByRole('link').map(a => a.querySelector('.sheet-l')?.textContent)

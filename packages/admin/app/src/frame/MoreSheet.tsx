@@ -1,27 +1,43 @@
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import { Link } from 'wouter'
 import { Icon } from '../design/Icon.tsx'
 import { closeDialog, useSlot } from '../parts/panels.tsx'
 import { openViewAs, useViewer, viewerWord } from '../viewAs/ViewAs.tsx'
 import { Identity } from './Identity.tsx'
 import { usePortalOrigin } from '../session/session.ts'
-import { HOUSE_SECTIONS, countText, type HouseCounts, type Identity as Who, type SectionId } from './sections.ts'
+import { HOUSE_SECTIONS, countText, type HouseCounts, type HouseSection, type Identity as Who, type NavLink, type ResolvedNav, type SectionId } from './sections.ts'
 
+/** The four sections the bottom bar holds before More (C-7). */
+export const ON_BAR: readonly SectionId[] = ['home', 'needs', 'proposals', 'workspace']
 /** The sections the bottom bar leaves to More (§5.4, C-7), in the house's order. */
 export const UNDER_MORE: readonly SectionId[] = ['systems', 'roles', 'treasury', 'library', 'changes']
+
+/** One of an instance's groups in the sheet (house/nav.yaml): its label as a heading over its rows, or, unlabelled,
+ *  the rows alone — as the sidebar draws it. */
+function SheetGroup({ label, children }: { label: string | null; children: ReactNode }) {
+  const id = useId()
+  if (label === null) return <>{children}</>
+  return <div className="sheet-g" role="group" aria-labelledby={id}><div className="sheet-h" id={id}>{label}</div>{children}</div>
+}
 
 /** A drag down on the grab handle further than this closes the sheet (§5.4). */
 const DRAG_CLOSE = 80
 
 /** The More sheet (§5.4): a bottom sheet over the scrim, with a grab handle, listing Systems, Roles, Treasury,
- *  Library, Changes (with their counts), Portal ↗ (only with a portal origin, and to it: D-5), View as… (who is viewed trailing it), then the signed-in
+ *  Library, Changes (with their counts) — or, when the instance groups its sidebar (house/nav.yaml), its groups for
+ *  this viewer, less what the bar holds, then the sections they did not name under their heading — Portal ↗ (only with a portal origin, and to it: D-5), View as… (who is viewed trailing it), then the signed-in
  *  identity, drawn whole. 44px rows, 16px labels. It is a modal `<dialog>` (showModal): focus moves in; Esc, a
  *  tap on the scrim, a followed link or a drag down past 80px closes it, and focus returns to More. It is the
  *  panels' `overlay` slot, so the Escape stack closes it first and hands focus back. `inline` draws it open in
  *  place, not modal and in no slot: a /parts specimen. */
-export function MoreSheet({ id, open, onClose, opener, counts, identity, current, inline = false }: {
+export function MoreSheet({ id, open, onClose, opener, counts, identity, current, inline = false, nav = null, navCurrent = null }: {
   id: string; open: boolean; onClose(): void; opener: RefObject<HTMLElement | null>; counts: HouseCounts; identity: Who
   current: SectionId | null; inline?: boolean
+  /** The instance's groups for this viewer (resolveNav): with any, the sheet draws them, less what the bar holds, then
+   *  the sections they did not name under their own heading, in place of the five sections. */
+  nav?: ResolvedNav | null
+  /** The item of `nav` that is the page you are on (currentNavItem). */
+  navCurrent?: NavLink | null
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const { viewer } = useViewer()
@@ -58,6 +74,21 @@ export function MoreSheet({ id, open, onClose, opener, counts, identity, current
   // View as… (the row, or the identity's menu): the sheet closes, then the phone bar's eye opens its menu.
   const viewAs = () => { onClose(); openViewAs() }
 
+  // A section's row: its icon, its label (the instance's, when it renames it), and its count where the house keeps one.
+  const row = (s: HouseSection, label: string | null, here: boolean) => {
+    const n = s.id in counts ? counts[s.id as keyof HouseCounts] : 0
+    const text = countText(n)
+    const name = label ?? s.label
+    return (
+      <Link key={s.id} href={s.href} className="sheet-a" aria-current={here ? 'page' : undefined}
+        aria-label={text ? `${name}, ${n}` : undefined}>
+        <Icon name={s.icon} /><span className="sheet-l">{name}</span>
+        {/* a space the flex row does not draw: the visible words read "Systems 9", as the name (2.5.3) */}
+        {text && <>{' '}<span className={s.id === 'changes' ? 'n accent' : 'n'}>{text}</span></>}
+      </Link>
+    )
+  }
+
   return (
     <>
       {inline && <div className="sheet-scrim" aria-hidden="true" />}
@@ -67,19 +98,25 @@ export function MoreSheet({ id, open, onClose, opener, counts, identity, current
         <div className="sheet-in">
           <div className="sheet-grab" aria-hidden="true" onPointerDown={grab} onPointerMove={drag} onPointerUp={drop} onPointerCancel={drop} />
           <nav className="sheet-nav" aria-label="More" onClick={followed}>
-            {UNDER_MORE.map(sid => {
-              const s = HOUSE_SECTIONS.find(x => x.id === sid)!
-              const n = sid === 'systems' ? counts.systems : sid === 'changes' ? counts.changes : 0
-              const text = countText(n)
-              return (
-                <Link key={sid} href={s.href} className="sheet-a" aria-current={current === sid ? 'page' : undefined}
-                  aria-label={text ? `${s.label}, ${n}` : undefined}>
-                  <Icon name={s.icon} /><span className="sheet-l">{s.label}</span>
-                  {/* a space the flex row does not draw: the visible words read "Systems 9", as the name (2.5.3) */}
-                  {text && <>{' '}<span className={sid === 'changes' ? 'n accent' : 'n'}>{text}</span></>}
-                </Link>
-              )
-            })}
+            {nav ? <>
+              {nav.groups.map((g, n) => {
+                const rows = g.items.filter(i => i.kind === 'link' || !ON_BAR.includes(i.section.id))
+                return rows.length > 0 && <SheetGroup key={n} label={g.label}>{rows.map(i => i.kind === 'section'
+                  ? row(i.section, i.label, navCurrent === i)
+                  : i.external
+                    ? <a key={i.href} className="sheet-a" href={i.href} target="_blank" rel="noopener noreferrer">
+                        {i.icon && <Icon name={i.icon} />}<span className="sheet-l">{i.label}</span><span className="sr-only"> (opens in a new tab)</span>
+                        <Icon name="external" size="xs" />
+                      </a>
+                    : <Link key={i.href} href={i.href} className="sheet-a" aria-current={navCurrent === i ? 'page' : undefined}>
+                        {i.icon && <Icon name={i.icon} />}<span className="sheet-l">{i.label}</span>
+                      </Link>)}</SheetGroup>
+              })}
+              {(() => {
+                const rest = nav.more.sections.filter(s => !ON_BAR.includes(s.id))
+                return rest.length > 0 && <SheetGroup label={nav.more.label}>{rest.map(s => row(s, s.label, navCurrent === null && current === s.id))}</SheetGroup>
+              })()}
+            </> : UNDER_MORE.map(sid => row(HOUSE_SECTIONS.find(x => x.id === sid)!, null, current === sid))}
             {portal !== null && <a className="sheet-a" href={portal} target="_blank" rel="noopener noreferrer">
               <Icon name="globe" /><span className="sheet-l">Portal</span><span className="sr-only"> (opens in a new tab)</span>
               <Icon name="external" size="xs" />

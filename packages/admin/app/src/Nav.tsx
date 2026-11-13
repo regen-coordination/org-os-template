@@ -119,6 +119,6 @@ export default function Nav() {
 
 /** The phone's bottom bar and its More sheet (§5.4), on the same counts. */
 export function HouseBottom() {
-  const { counts, identity, collections } = useHouseNav()
-  return <BottomBar counts={counts} identity={identity} collections={collections} />
+  const { counts, identity, collections, nav } = useHouseNav()
+  return <BottomBar counts={counts} identity={identity} collections={collections} nav={nav} />
 }
