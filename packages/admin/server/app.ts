@@ -25,6 +25,7 @@ import { cachedReads, withFromMarks, type SourceReader } from './workspace/sourc
 import { chainKept } from './deploy/private-flip.ts'
 import { INSTANCE_BAR_PATH, readInstanceBar } from './instanceBar.ts'
 import { INSTANCE_THEMES_PATH, readInstanceThemes } from './instanceThemes.ts'
+import { INSTANCE_NAV_PATH, readInstanceNav } from './instanceNav.ts'
 import { instanceMark } from './instanceAssets.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
@@ -149,6 +150,8 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
   app.get(INSTANCE_BAR_PATH, c => c.json(readInstanceBar(repo)))
   // The instance's themes (instanceThemes.ts), offered in Appearance; none when it names none.
   app.get(INSTANCE_THEMES_PATH, c => c.json(readInstanceThemes(repo)))
+  // The instance's sidebar groups (instanceNav.ts); none when it carries none, and the house draws its own sections.
+  app.get(INSTANCE_NAV_PATH, c => c.json(readInstanceNav(repo)))
 
   app.get('/api/registries', c => c.json(gateRegistryList(viewerOf(c), repo, levels())))
   app.get('/api/registries/:name', async c => {

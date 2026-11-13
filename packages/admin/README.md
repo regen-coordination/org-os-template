@@ -1007,6 +1007,27 @@ script before the first paint, so write each theme as `html:root[data-skin][data
 more specific than the skin's blocks. System, Light or Dark hands back to the instance's own look. Check contrast
 yourself, as for the skin.
 
+**An instance's sidebar.** An instance may group its sidebar its own way with `house/nav.yaml`: up to 8 groups of
+up to 12 items, each item a house section by id (`{ section: roles, label: Council }`, the label optional) or a link
+(`{ label, href }`, a rooted path or an http(s) address, which opens in a new tab). The server answers
+`GET /api/instance/nav`. The groups are drawn in place of the nine sections, and the sections the file does not name
+stay reachable under a collapsed group at the foot (`more: <label>`, "More" by default). An item may name an
+`icon` the house draws, and an `audience`, the Roles it is drawn for (`[steward, node-lead, network-member]`): a person
+signed in with an emailed link sees the items for their Roles, and anyone else sees every item. An audience only
+arranges the sidebar: what a person may open is still the server's gate. An item marked `hidden: true` keeps its slot
+in the file and is never answered. With no file, the sidebar is the house's own.
+
+```yaml
+groups:
+  - items:
+      - { section: home, label: Dashboard }
+      - { section: needs }
+  - label: Governance
+    items:
+      - { label: Decided, href: /governance/decisions, audience: [steward] }
+      - { label: Funds, href: "https://old.example.org/funds", audience: [steward] }
+```
+
 To add a skin `calm`:
 
 1. Copy `skins/bare.css` to `skins/calm.css` and replace `bare` with `calm` in its three selectors

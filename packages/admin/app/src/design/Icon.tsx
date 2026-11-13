@@ -33,6 +33,9 @@ const LUCIDE: Record<Exclude<IconName, HouseGlyphName>, Glyph> = {
   pencil: Pencil, doc: FileText, // the gallery's page-mention and editing-badge glyphs: a lined document, a pencil with its ferrule
 }
 
+/** Is this a name the house draws? (An instance's nav names an icon by a word it cannot check.) */
+export const isIconName = (name: string): name is IconName => Object.hasOwn(LUCIDE, name) || Object.hasOwn(HOUSE_GLYPHS, name)
+
 /** Only arrows and chevrons mirror under dir="rtl" (§3.9). */
 const MIRRORS = new Set<IconName>(['arrow-right', 'chevron-left', 'chevron-right'])
 
