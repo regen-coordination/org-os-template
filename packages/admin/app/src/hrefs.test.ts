@@ -16,7 +16,9 @@ describe('hrefs', () => {
 
   it("sends a registry entry to its kind's page, or to the registry's own", () => {
     expect(entryHref('funding-opportunities', 'x')).toBe('/r/funding/x')
-    expect(entryHref('meetings', '2026-10-16')).toBe('/r/meetings/2026-10-16')
+    // a registry that backs a kind (funding, and meetings since the meeting kind) goes to the kind's page
+    expect(entryHref('meetings', '2026-10-16')).toBe('/r/meeting/2026-10-16')
+    expect(entryHref('a-registry', 'x')).toBe('/r/a-registry/x')
   })
 
   it('reads change keys by registry name, splitting at the first colon', () => {
