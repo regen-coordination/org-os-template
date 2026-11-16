@@ -17,7 +17,7 @@ _(Append changes here as they land.)_
   `docs/agent-plans/**` in the source editor (`GET /api/files`), and read them in a proposal's text and diff. Now only
   those who decide under the workspace rule that governs those files read them: the members of the rule's deciding role,
   or, where the org has written no workspace rule, of its own `maintainer` role. Anyone else is answered exactly as for a
-  file that is not there and is shown no link to it. They cannot stage, revise, load or apply an edit to it. They see
+  file that is not there and is shown no link to it. They cannot stage, revise, replay, load or apply an edit to it. They see
   proposals, the ledger and its revisions without that file's text, path or diff (the rest of each proposal is unchanged),
   and crew's seats recorded in `memory/crew/` are not on their map. The person at the machine reads these files as before. An org that
   writes no workspace rule and defines no `maintainer` role should name one in `data/governance.yaml`: until it does,
