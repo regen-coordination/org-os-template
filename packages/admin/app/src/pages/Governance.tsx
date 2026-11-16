@@ -95,7 +95,10 @@ export default function Governance({ part }: { part: string }) {
   // only when the governance document itself is a record Public sees (none is listed, so none is shown).
   const asPublic = viewer.as === 'public'
   const docShown = !asPublic || (resources.data?.some(r => r.source?.registry === 'governance' && sees(r)) ?? false)
-  const decisions = v && !asPublic ? [...v.decisions].sort((a, b) => b.date.localeCompare(a.date)) : []
+  const allDecisions = v && !asPublic ? [...v.decisions].sort((a, b) => b.date.localeCompare(a.date)) : []
+  // A record in the open group is not decided yet (an instance's open_decisions, or an open status word): listed apart.
+  const openDecisions = allDecisions.filter(d => d.group === 'open')
+  const decisions = allDecisions.filter(d => d.group !== 'open')
   const rules = v && docShown ? v.rules : []
   // The tabs are the section's navigation: drawn while governance is read, or cannot be, each count once it is known.
   // Decided counts what it lists: the decisions and the closed proposals (review M-2), a ratified proposal its decision row
@@ -115,7 +118,16 @@ export default function Governance({ part }: { part: string }) {
       {canWrite && sync.head}
     </>
   )
-  const shownDecision = decisions.find(d => d.anchor !== undefined && d.anchor === open)
+  const shownDecision = allDecisions.find(d => d.anchor !== undefined && d.anchor === open)
+  const decisionRow = (d: DecisionRow, i: number) => (
+    <DataRow key={d.anchor ?? `${d.where}:${i}`} kind="decision" title={d.title} marks={[]}
+      second={<>{d.id && <span className="prow-id">{d.id}</span>}<span className="prow-route">{whereWords(d.where)}</span>{d.date && <span>{d.date}</span>}</>}
+      trailing={<>
+        <Outcome d={d} />
+        {d.anchor && <Button small variant="ghost" expanded={open === d.anchor} label={`Read ${d.title}`}
+          onClick={() => setOpen(open === d.anchor ? null : d.anchor!)}>{open === d.anchor ? 'Hide' : 'Read'}</Button>}
+      </>} />
+  )
 
   // One shape in every state, so the tab bar is not drawn anew (and a focused tab not lost) when governance arrives.
   return (
@@ -146,20 +158,15 @@ export default function Governance({ part }: { part: string }) {
 
         {tab === 'decisions' && (
           <>
+            {openDecisions.length > 0 && (
+              <Section label="Open decisions" note="not decided yet">
+                <DataList label="Open decisions">{openDecisions.map(decisionRow)}</DataList>
+              </Section>
+            )}
             <Section label="Decisions" note="newest first">
               {asPublic ? <Empty>Previewing as Public, no decision is shown.</Empty>
                 : decisions.length === 0 ? <EmptyWhen query={g}>No decisions recorded yet.</EmptyWhen> : (
-                <DataList label="Decisions">
-                  {decisions.map((d, i) => (
-                    <DataRow key={d.anchor ?? `${d.where}:${i}`} kind="decision" title={d.title} marks={[]}
-                      second={<>{d.id && <span className="prow-id">{d.id}</span>}<span className="prow-route">{whereWords(d.where)}</span>{d.date && <span>{d.date}</span>}</>}
-                      trailing={<>
-                        <Outcome d={d} />
-                        {d.anchor && <Button small variant="ghost" expanded={open === d.anchor} label={`Read ${d.title}`}
-                          onClick={() => setOpen(open === d.anchor ? null : d.anchor!)}>{open === d.anchor ? 'Hide' : 'Read'}</Button>}
-                      </>} />
-                  ))}
-                </DataList>
+                <DataList label="Decisions">{decisions.map(decisionRow)}</DataList>
               )}
               {shownDecision && <DecisionText key={shownDecision.anchor} d={shownDecision} />}
             </Section>
