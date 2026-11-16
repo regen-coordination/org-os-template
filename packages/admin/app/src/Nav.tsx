@@ -6,7 +6,8 @@ import { useChanges } from './changes/useChanges.ts'
 import { heldCount } from './changes/rows.ts'
 import { Sidebar } from './frame/Sidebar.tsx'
 import { BottomBar } from './frame/BottomBar.tsx'
-import { INSTANCE_LINKS, SOURCES_LINK, WORKSPACE_ORDER, houseCounts, type Identity, type SideLink } from './frame/sections.ts'
+import { INSTANCE_LINKS, SOURCES_LINK, WORKSPACE_ORDER, houseCounts, resolveNav, type Identity, type SideLink } from './frame/sections.ts'
+import { isIconName } from './design/Icon.tsx'
 import { SECTIONS, placeOf, sectionCount, sectionRows, type SectionDef } from './sections.ts'
 import { useRegistries, useResources, useStatus, useSystemEntries } from './queries.ts'
 import { useCanWrite, useViewer } from './viewAs/ViewAs.tsx'
@@ -101,17 +102,23 @@ function useHouseNav() {
     : 'id' in actor ? { hatName: actor.name, address: null, hatId: null, hats: [] }
     : { hatName: 'Read-only', address: null, hatId: null, hats: [] }
 
-  return { org: { name: status.data?.org ?? 'org-os', mark: null }, counts, identity, collections, instance }
+  // The instance's groups (house/nav.yaml), for this viewer: a person signed in with an emailed link is drawn the items
+  // for their Roles; anyone else every item. None: the house's nine sections.
+  const navFile = useQuery({ queryKey: ['instance', 'nav'], queryFn: api.instanceNav, retry: false, staleTime: Infinity }).data
+  const roles = session?.signedIn && session.via === 'email' ? session.person.roles : null
+  const nav = useMemo(() => resolveNav(navFile, roles, isIconName), [navFile, roles?.join(' ')])
+
+  return { org: { name: status.data?.org ?? 'org-os', mark: status.data?.mark ?? null }, counts, identity, collections, instance, nav }
 }
 
 /** The house sidebar (§5.2). */
 export default function Nav() {
-  const { org, counts, identity, collections, instance } = useHouseNav()
-  return <Sidebar org={org} counts={counts} identity={identity} collections={collections} instance={instance} />
+  const { org, counts, identity, collections, instance, nav } = useHouseNav()
+  return <Sidebar org={org} counts={counts} identity={identity} collections={collections} instance={instance} nav={nav} />
 }
 
 /** The phone's bottom bar and its More sheet (§5.4), on the same counts. */
 export function HouseBottom() {
-  const { counts, identity, collections } = useHouseNav()
-  return <BottomBar counts={counts} identity={identity} collections={collections} />
+  const { counts, identity, collections, nav } = useHouseNav()
+  return <BottomBar counts={counts} identity={identity} collections={collections} nav={nav} />
 }

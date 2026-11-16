@@ -921,6 +921,25 @@ Two skins ship:
 
 `sleek` and `sample` are gone.
 
+**The instance's own.** An instance may carry `house/skin.css`: token values that re-tint the house, served at
+`/instance-skin.css` and linked in the head. It may also carry `house/bar.yaml`, its sites bar: the sites an
+organisation keeps side by side, drawn as one row over every page: a lockup (the label, a way home, then the site
+this house is, marked `current`, which opens the list of sites with each one's note) and, at the far end, the theme
+control (the instance's themes under Auto; with none, a light or dark switch). The mark beside the label is an empty
+box (`.sites-mark`) for the instance's skin to fill; beside the open sidebar the label is not said twice.
+
+```yaml
+label: Example Org              # optional: whose sites these are
+sites:
+  - { label: Knowledge, href: "https://knowledge.example.org", note: "What we know" }
+  - { label: House, href: /, current: true }
+```
+
+A site's `href` is an http(s) address (it opens in its own tab) or a rooted path (a place in the house); a site
+without a label, or with any other address, is left out, and at most eight are kept. `GET /api/instance/bar` answers
+it to members; with no file there are no sites and no bar. A note block's Markdown follows the same rule for its
+links: `[Needs you](/needs)` stays in the house, `[site](https://example.org)` opens in a new tab.
+
 **Fonts.** The house sets type in three self-hosted variable fonts: Fraunces (`--display`: the greeting, the portal),
 Geist (`--sans`: everything else) and Geist Mono (`--mono`: ids, addresses, wells). The WOFF2 files sit in
 `app/src/design/fonts/` with their OFL licences, latin and latin-ext. They are copied from the
@@ -962,6 +981,52 @@ Tokens come in groups (each skin's file is written in this order):
   the edge of a control), `--nav-pad` (a menu entry), and three that show markup bare hides: `--icon-display` (the icon
   before a menu entry), `--brand-dot-display` (the org's seal beside its name) and `--product-display` (the product's
   name in the menu foot). Bare sets each to what it drew before the token existed (padding 0, the edge colour, `none`).
+
+**An instance's own look.** An instance may carry `house/skin.css` at its root: token values that re-tint the
+`house` skin, light and dark, so an org can wear its own colours and type with nothing of it written here. The server
+answers `GET /instance-skin.css` with that file (read on each request, at most 64 KB; empty when there is none), and
+`index.html` links it in the head, so the first frame is drawn in it. Write its blocks with `html:root[...]`
+selectors (`html:root[data-skin="house"]`, the same under `prefers-color-scheme: dark` with
+`:not([data-theme="light"])`, and `html:root[data-skin="house"][data-theme="dark"]`), one element more specific
+than `house.css`, so they win in a build and in dev alike. The tests do not see it: check its contrast yourself
+(text against paper, raised and sunken, 4.5:1 or more). `bare` and any other skin a viewer picks are left alone.
+
+**An instance's images and mark.** Images the skin draws (a wordmark, a texture) live as files in `house/`, not as
+base64 in the CSS: the server answers `GET /instance-assets/<name>` for a plain name (`a-z0-9-`, one of `.svg .png
+.webp .jpg`, at most 256 KB) directly in `house/`, so the skin writes `url(/instance-assets/wordmark.svg)`. An SVG is
+served with a locked-down `Content-Security-Policy` (no script, no fetches). The instance's mark is `house/mark.svg`,
+`.png` or `.webp` (the first there is): `/api/status` names it as `mark`, and the org seal draws it (`org.mark`)
+instead of the neutral seal.
+
+**An instance's themes.** Beside its own look, an instance may offer up to 8 themes a viewer picks in Appearance
+(the org menu). `house/themes.yaml` names them, `themes: [{ id, label, scheme: light | dark, note? }]` (`id` is
+`a-z0-9-`, at most 24 characters), and `house/themes.css` draws them; the server answers `GET /api/instance/themes`, and
+`/instance-skin.css` serves the themes' CSS after the skin's (each file held to 64 KB). Picking one sets
+`data-org-theme="<id>"` on `<html>` and `data-theme` to its scheme, kept for this browser and applied by the inline
+script before the first paint, so write each theme as `html:root[data-skin][data-theme][data-org-theme="<id>"] { … }`,
+more specific than the skin's blocks. System, Light or Dark hands back to the instance's own look. Check contrast
+yourself, as for the skin.
+
+**An instance's sidebar.** An instance may group its sidebar its own way with `house/nav.yaml`: up to 8 groups of
+up to 12 items, each item a house section by id (`{ section: roles, label: Council }`, the label optional) or a link
+(`{ label, href }`, a rooted path or an http(s) address, which opens in a new tab). The server answers
+`GET /api/instance/nav`. The groups are drawn in place of the nine sections, and the sections the file does not name
+stay reachable under a collapsed group at the foot (`more: <label>`, "More" by default). An item may name an
+`icon` the house draws, and an `audience`, the Roles it is drawn for (`[steward, node-lead, network-member]`): a person
+signed in with an emailed link sees the items for their Roles, and anyone else sees every item. An audience only
+arranges the sidebar: what a person may open is still the server's gate. An item marked `hidden: true` keeps its slot
+in the file and is never answered. With no file, the sidebar is the house's own.
+
+```yaml
+groups:
+  - items:
+      - { section: home, label: Dashboard }
+      - { section: needs }
+  - label: Governance
+    items:
+      - { label: Decided, href: /governance/decisions, audience: [steward] }
+      - { label: Funds, href: "https://old.example.org/funds", audience: [steward] }
+```
 
 To add a skin `calm`:
 

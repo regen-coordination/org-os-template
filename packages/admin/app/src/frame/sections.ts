@@ -1,6 +1,7 @@
 import type { IconName } from '../design/Icon.tsx'
 import { SECTIONS } from '../sections.ts'
 import { safeDecode } from '../hrefs.ts'
+import type { InstanceNav, NavItem } from '../api.ts'
 
 /** The house's nine sections (spec §5.2), in the house spec's order, with their g-key (§5.8). */
 export type SectionId = 'home' | 'needs' | 'proposals' | 'systems' | 'roles' | 'treasury' | 'workspace' | 'library' | 'changes'
@@ -110,4 +111,53 @@ export function sectionOf(path: string, collections: readonly SideLink[] = []): 
 /** Is this link the page you are on, or an ancestor of it? */
 export function isCurrent(path: string, href: string): boolean {
   return under(strip(path), href)
+}
+
+/** An instance's sidebar item as the sidebar draws it: one of the house's sections (its icon, count and key, the label
+ *  the instance gave it or its own), or a link — to a place in the house, or to another site (`external`). */
+export type NavLink =
+  | { kind: 'section'; section: HouseSection; label: string }
+  | { kind: 'link'; label: string; href: string; external: boolean; icon: IconName | null }
+export interface NavShown { label: string | null; items: NavLink[] }
+/** The instance's groups as this viewer sees them, and the house's sections it did not name, under `more`. */
+export interface ResolvedNav { groups: NavShown[]; more: { label: string; sections: HouseSection[] } }
+
+/** The instance's nav (server/instanceNav.ts) for one viewer. `roles` are the Roles of a person signed in with an emailed
+ *  link; an item with an audience is drawn for them only when they hold one of its Roles. Anyone else (a member by git
+ *  or by wallet, who has no Roles) is drawn every item. A group left with nothing is not drawn. The sections the file
+ *  does not name go under `more`, so the house loses none — one named for an audience the viewer is not in stays out.
+ *  Null when the instance carries no nav: the house draws its own sections. The sidebar's arrangement only; what a
+ *  person may open is the server's gate. */
+export function resolveNav(nav: InstanceNav | null | undefined, roles: readonly string[] | null, isIcon: (name: string) => name is IconName): ResolvedNav | null {
+  if (!nav || nav.groups.length === 0) return null
+  const named = new Set(nav.groups.flatMap(g => g.items.map(i => i.section).filter(Boolean)))
+  const forViewer = (i: NavItem) => !i.audience || roles === null || i.audience.some(r => roles.includes(r))
+  const groups: NavShown[] = []
+  for (const g of nav.groups) {
+    const items: NavLink[] = []
+    for (const i of g.items.filter(forViewer)) {
+      if (i.section) {
+        const section = HOUSE_SECTIONS.find(s => s.id === i.section)
+        if (section) items.push({ kind: 'section', section, label: i.label ?? section.label })
+      } else if (i.label && i.href) {
+        items.push({ kind: 'link', label: i.label, href: i.href, external: /^https?:/i.test(i.href), icon: i.icon && isIcon(i.icon) ? i.icon : null })
+      }
+    }
+    if (items.length > 0) groups.push({ label: g.label, items })
+  }
+  return { groups, more: { label: nav.more ?? 'More', sections: HOUSE_SECTIONS.filter(s => !named.has(s.id)) } }
+}
+
+/** The one item of a resolved nav that is the page you are on: a link in the house the path is at or under, the
+ *  longest (so /governance/decisions is "Decided", not the Proposals section at /governance); else the section the path
+ *  belongs to (sectionOf). Another site is never current. */
+export function currentNavItem(path: string, nav: ResolvedNav, collections: readonly SideLink[] = []): NavLink | null {
+  const items = nav.groups.flatMap(g => g.items)
+  let best: NavLink | null = null, len = -1
+  for (const i of items) {
+    if (i.kind === 'link' && !i.external && isCurrent(path, i.href) && i.href.length > len) { best = i; len = i.href.length }
+  }
+  if (best) return best
+  const at = sectionOf(path, collections)
+  return items.find(i => i.kind === 'section' && i.section.id === at) ?? null
 }

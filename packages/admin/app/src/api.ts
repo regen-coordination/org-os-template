@@ -6,6 +6,7 @@ import type { OutcomeReading } from '../../server/systems/driver.ts'
 import type { EventInput } from '../../server/proposals/events.ts'
 import type { Actor } from '../../server/actor.ts'
 import type { BoardRead } from '../../server/boards/types.ts'
+import type { InstanceBar } from '../../server/instanceBar.ts'
 import type { LibraryList, LibraryPreview, Receipt, RemovalPreview } from '../../server/library/types.ts'
 import type { DeployPlan } from '../../server/deploy/prepare.ts'
 import type { ReadBackAnswer, Ran } from '../../server/deploy/readback.ts'
@@ -48,6 +49,11 @@ export type { EventInput as ProposalEventInput, EventKindHere as ProposalEventKi
 export type { DriverRead, DriverSection, Driver, DriverContext } from '../../server/systems/driver.ts'
 export type { Actor } from '../../server/actor.ts'
 export type { Shelf, Maturity, Standing, Fits, ListedEntry, ShelfProblem, LibraryList, LibraryPreview, Receipt, ReceiptDecision, RemovalPreview } from '../../server/library/types.ts'
+export type { InstanceBar, BarSite } from '../../server/instanceBar.ts'
+import type { InstanceThemes } from '../../server/instanceThemes.ts'
+import type { InstanceNav } from '../../server/instanceNav.ts'
+export type { InstanceNav, NavGroup, NavItem, NavSection } from '../../server/instanceNav.ts'
+export type { InstanceThemes, InstanceTheme } from '../../server/instanceThemes.ts'
 export type { Layout, GridPlace, CanvasPlace, Place, BlockEntry, BoardDef, BoardRead } from '../../server/boards/types.ts'
 export type { Kind as ResourceKind, EdgeKind } from '../../server/resources/types.ts'
 export type { MemberKind } from '../../lib/members.mjs'
@@ -66,7 +72,8 @@ export type ChangeView = ServerChangeView
 
 export interface RegistrySummary { name: string; kind: 'collection' | 'document'; count: number | null }
 /** `instanceWrites` is said only while the Hub's writes are off (Lane 3 Task 11). */
-export interface Status { org: string; branch: string; dirty: boolean; instanceWrites?: 'off' }
+/** `mark`: the instance's mark for the org seal (server/instanceAssets.ts), absent when it carries none. */
+export interface Status { org: string; mark?: string | null; branch: string; dirty: boolean; instanceWrites?: 'off' }
 export type Entity = Record<string, unknown> & { id: string }
 export interface RegistryRead {
   name: string; kind: 'collection' | 'document'; schemaVersion: string | null
@@ -349,6 +356,12 @@ export const api = {
   actor: () => fetchJSON<Actor>('/api/actor'),
   // P4c: boards (contract "P4c produces"). Written only through stage().
   boards: () => fetchJSON<BoardRead[]>('/api/boards'),
+  /** The instance's sites bar (server/instanceBar.ts): no sites when the instance carries none. */
+  instanceBar: () => fetchJSON<InstanceBar>('/api/instance/bar'),
+  /** The instance's themes (server/instanceThemes.ts): none when it offers none. */
+  instanceThemes: () => fetchJSON<InstanceThemes>('/api/instance/themes'),
+  /** The instance's sidebar groups (server/instanceNav.ts): none when it carries none. */
+  instanceNav: () => fetchJSON<InstanceNav>('/api/instance/nav'),
   board: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}`),
   builtinBoard: (id: string) => fetchJSON<BoardRead>(`/api/boards/${enc(id)}/builtin`),
   // The library: its list, a preview that writes nothing, and Add and Remove, which stage into your change (the tray's).

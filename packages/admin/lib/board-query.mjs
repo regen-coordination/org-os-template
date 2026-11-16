@@ -28,7 +28,7 @@ export const MAPS = Object.freeze(['organization', 'systems'])
 export const SECTION_IDS = Object.freeze(['projects', 'people', 'funding', 'partners', 'ideas', 'knowledge', 'meetings',
   'treasury', 'crew', 'modules', 'fleet', 'sources', 'systems'])
 /** The kinds a source may name ("*" is any): app/src/kinds.ts RESOURCE_KINDS (a test keeps the two equal). */
-export const RECORD_KINDS = Object.freeze(['person', 'project', 'idea', 'funding', 'partner', 'knowledge-gaps', 'proposal',
+export const RECORD_KINDS = Object.freeze(['person', 'project', 'idea', 'funding', 'partner', 'meeting', 'event', 'organization', 'task', 'knowledge-gaps', 'proposal',
   'knowledge', 'role', 'seat', 'module', 'instance', 'connector', 'source', 'channel', 'system'])
 /** The proposals a `proposals` block may read: GET /api/proposals, narrowed. */
 export const PROPOSAL_SOURCES = Object.freeze(['open', 'closed', 'mine', 'needs-me'])
@@ -69,16 +69,18 @@ export function fieldOf(r, field, entry) {
 
 /** One `where` test on one value (P4b's rules). A plain value equals by text, an array holding it matches,
  *  and null asks for nothing there. `not` keeps what does not hold the field. `in`, `before` and `after`
- *  need it, with dates compared as text. `has` asks whether it is there.
- *  @param {unknown} v @param {unknown} test @returns {boolean} */
-export function matches(v, test) {
+ *  need it, with dates compared as text; `before` and `after` may name "now", the moment the query is read
+ *  (ISO, UTC), so a board can ask for what is coming or what has passed. `has` asks whether it is there.
+ *  @param {unknown} v @param {unknown} test @param {() => Date} [now] @returns {boolean} */
+export function matches(v, test, now = () => new Date()) {
   if (test === null || typeof test !== 'object' || Array.isArray(test)) return test === null ? absent(v) : !absent(v) && same(v, test)
   const t = /** @type {Record<string, unknown>} */ (test)
   if ('has' in t && Boolean(t.has) === absent(v)) return false
   if ('not' in t && !absent(v) && same(v, t.not)) return false
   if ('in' in t && (absent(v) || !Array.isArray(t.in) || !t.in.some(x => same(v, x)))) return false
-  if ('before' in t && (absent(v) || !(String(v) < String(t.before)))) return false
-  if ('after' in t && (absent(v) || !(String(v) > String(t.after)))) return false
+  const at = (/** @type {unknown} */ x) => (x === 'now' ? now().toISOString() : String(x))
+  if ('before' in t && (absent(v) || !(String(v) < at(t.before)))) return false
+  if ('after' in t && (absent(v) || !(String(v) > at(t.after)))) return false
   return true
 }
 

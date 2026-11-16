@@ -45,6 +45,28 @@ describe('GET /api/governance', () => {
     expect(view.problems).toContainEqual(expect.stringMatching(/solo-maintainer.*2 people/))
   })
 
+  it('open_decisions: an undecided record is listed too, in the open group whatever its word, beside the decided ones', async () => {
+    repo = makeChangeRepo(`schema_version: "2.0"
+governance:
+  model: "solo-maintainer"
+  decisions:
+    - id: "gov-001"
+      title: "Adopt the platform"
+      date: "2026-10-14"
+      status: "ratified"
+  open_decisions:
+    - id: "gov-002"
+      title: "Choose a legal home"
+      date: "2026-10-20"
+      status: "consent-window"
+`)
+    const view = await governance()
+    expect(view.decisions).toEqual([
+      { date: '2026-10-20', id: 'gov-002', title: 'Choose a legal home', status: 'consent-window', group: 'open', where: 'governance.yaml' },
+      { date: '2026-10-14', id: 'gov-001', title: 'Adopt the platform', status: 'ratified', group: 'ratified', where: 'governance.yaml' },
+    ])
+  })
+
   it('a consensus model: its rule sentence, and nothing is direct', async () => {
     repo = makeChangeRepo(CONSENSUS)
     const view = await governance()

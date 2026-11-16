@@ -50,6 +50,13 @@ describe('Shell (§5.1)', () => {
     expect(screen.getByRole('link', { name: 'Skip to content' }).getAttribute('href')).toBe('#main')
   })
 
+  it('given the sites bar, draws it as a row of its own over the top bar', () => {
+    const { container } = render(<Shell title="example-os" width={1440} nav={<nav aria-label="Sections" />} sites={<nav aria-label="Sites">sites</nav>} top={<div>top bar</div>}><h1>Home</h1></Shell>)
+    const areas = [...container.querySelector('.frame-main')!.children].map(c => c.className)
+    expect(areas).toEqual(['frame-sites', 'frame-top', 'frame-band', 'frame-scroll', 'frame-tray'])
+    expect(screen.getByRole('navigation', { name: 'Sites' }).closest('.frame-sites')).not.toBeNull()
+  })
+
   // C10 (ledger): 0.6's NavItem and NavGroup are gone with their callers (the sidebar draws the sections, frame/Sidebar).
   it('draws the nav it is given in the sidebar', () => {
     render(ui(1440))

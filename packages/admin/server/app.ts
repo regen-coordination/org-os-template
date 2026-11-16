@@ -23,6 +23,10 @@ import { mountLibrary } from './library/routes.ts'
 import { mountWorkspace } from './workspace/routes.ts'
 import { cachedReads, withFromMarks, type SourceReader } from './workspace/sources.ts'
 import { chainKept } from './deploy/private-flip.ts'
+import { INSTANCE_BAR_PATH, readInstanceBar } from './instanceBar.ts'
+import { INSTANCE_THEMES_PATH, readInstanceThemes } from './instanceThemes.ts'
+import { INSTANCE_NAV_PATH, readInstanceNav } from './instanceNav.ts'
+import { instanceMark } from './instanceAssets.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
 import { LEDGER_SENTENCE } from './changes/stage.ts'
@@ -138,8 +142,16 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
     if (viewerOf(c).kind === 'public') return c.json(publicStatus(repo))
     const s = await repoStatus(repo)
     // While writes are off (Lane 3 Task 11) the client hides every write control; on, the answer is as before.
-    return c.json({ org: orgName(repo), ...s, ...(opts.instanceWrites === 'off' ? { instanceWrites: 'off' as const } : {}) })
+    const mark = instanceMark(repo) // named only when the instance carries one, so the status reads as before otherwise
+    return c.json({ org: orgName(repo), ...(mark ? { mark } : {}), ...s, ...(opts.instanceWrites === 'off' ? { instanceWrites: 'off' as const } : {}) })
   })
+
+  // The instance's sites bar (instanceBar.ts): read per request; no sites when the instance carries none.
+  app.get(INSTANCE_BAR_PATH, c => c.json(readInstanceBar(repo)))
+  // The instance's themes (instanceThemes.ts), offered in Appearance; none when it names none.
+  app.get(INSTANCE_THEMES_PATH, c => c.json(readInstanceThemes(repo)))
+  // The instance's sidebar groups (instanceNav.ts); none when it carries none, and the house draws its own sections.
+  app.get(INSTANCE_NAV_PATH, c => c.json(readInstanceNav(repo)))
 
   app.get('/api/registries', c => c.json(gateRegistryList(viewerOf(c), repo, levels())))
   app.get('/api/registries/:name', async c => {

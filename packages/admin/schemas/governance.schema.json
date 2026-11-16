@@ -2,7 +2,7 @@
   "$id": "orgos://registry/governance",
   "type": "object",
   "additionalProperties": true,
-  "x-order": ["model", "description", "current_phase", "trunk", "membership", "roles", "rules", "decisions", "elections", "infrastructure"],
+  "x-order": ["model", "description", "current_phase", "trunk", "membership", "roles", "rules", "decisions", "open_decisions", "elections", "infrastructure"],
   "properties": {
     "model": {
       "enum": ["solo-maintainer", "consensus", "steward-council", "multisig", "assembly", "conviction", "other"]
@@ -54,6 +54,21 @@
           "outcome": { "enum": ["ratified", "rejected", "expired"] },
           "by": { "type": "array", "items": { "type": "string" }, "description": "Member ids who carried it." },
           "summary": { "type": "string" }
+        }
+      }
+    },
+    "open_decisions": {
+      "type": ["array", "null"],
+      "description": "Decision records not decided yet (a consent window, a draft, a queue): the rows decisions holds, before they are decided. The Hub lists them as open, apart from the decided ones.",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "date": { "type": "string", "format": "date" },
+          "status": { "type": "string", "minLength": 1, "description": "Free word, as written; the Hub shows the record as open whatever it says." }
         }
       }
     },

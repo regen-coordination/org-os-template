@@ -108,6 +108,11 @@ const HOOKS = new Set([
   'evt',             // one event in a proposal's event list (EventLog.test, PartsPage.test, groups/Gov.test)
   'rst-tally',       // a rule status's tally line (RuleStatus.test)
   'rst-clock',       // a rule status's window clock (RuleStatus.test)
+  // The shared bar's words, drawn by their parent (the lockup, the switcher's summary, the theme face) and named so a
+  // test, and an instance's skin, can find them (SitesBar.test; a skin may hide the theme's name on a phone)
+  'sites-org',       // the org's name in the lockup
+  'sites-here',      // where the reader is, in the site switcher's summary
+  'sites-theme-nm',  // the chosen theme's name in the theme control
 ])
 
 describe('nothing is left on 0.6’s look (C10)', () => {

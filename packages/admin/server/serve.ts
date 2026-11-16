@@ -7,6 +7,8 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { Hono } from 'hono'
 import { createApp } from './app.ts'
+import { INSTANCE_SKIN_PATH, readInstanceSkin } from './instanceSkin.ts'
+import { assetHeaders, INSTANCE_ASSETS_PREFIX, readInstanceAsset } from './instanceAssets.ts'
 import { storeAccess } from './private/ops.ts'
 import { reconcilePrivate } from './private/proposals.ts'
 import { repoStatus } from './git.ts'
@@ -328,6 +330,13 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   if (portalOrigin) app.on('GET', ['/portal', '/portal/*', '/door', '/door/*'], c => {
     const u = new URL(c.req.url)
     return c.redirect(`${portalOrigin}${u.pathname.replace(/^\/(?:portal|door)/, '')}${u.search}`, 302)
+  })
+  // The instance's own skin (instanceSkin.ts): read per request, so an edit shows on reload; empty when there is none.
+  app.get(INSTANCE_SKIN_PATH, c => c.body(readInstanceSkin(repo), 200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'no-cache' }))
+  // The instance's images (instanceAssets.ts): its mark and what its skin draws, by plain name from house/.
+  app.get(`${INSTANCE_ASSETS_PREFIX}:name`, c => {
+    const asset = readInstanceAsset(repo, c.req.param('name'))
+    return asset ? c.body(new Uint8Array(asset.body), 200, assetHeaders(asset.type)) : c.body(null, 404)
   })
   if (appDist && existsSync(appDist)) {
     app.use('/*', serveStatic({ root: appDist }))

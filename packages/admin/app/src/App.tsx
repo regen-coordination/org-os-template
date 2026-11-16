@@ -55,11 +55,12 @@ import { KeyMap } from './keys/KeyMap.tsx'
 import { HouseKeys } from './keys/useHouseKeys.ts'
 import { useServerEvents } from './ws.ts'
 import { useResources, useStatus } from './queries.ts'
-import { applyTheme, storedTheme } from './theme.ts'
 import { applySkin, chosenSkin } from './skin.ts'
+import { applyStoredAppearance } from './orgTheme.ts'
 import { ViewAsBand, ViewAsProvider, useCanWrite, useViewer, useVisibilitySource } from './viewAs/ViewAs.tsx'
 import { TopBar } from './frame/TopBar.tsx'
 import { PhoneBar } from './frame/PhoneBar.tsx'
+import { SitesBar } from './frame/SitesBar.tsx'
 import { namedIn, pathOf } from './frame/path.ts'
 import { useEntryOfResources } from './blocks/entries.ts'
 import { shownName } from './record/restricted.ts'
@@ -186,7 +187,9 @@ export default function App() {
 
 function HubApp() {
   useServerEvents()
-  useEffect(() => { applyTheme(storedTheme()); applySkin(chosenSkin()) }, [])
+  // An instance theme chosen here (orgTheme.ts) carries its scheme: it wins over the light or dark choice, as the inline
+  // script in index.html already drew it.
+  useEffect(() => { applyStoredAppearance(); applySkin(chosenSkin()) }, [])
   const status = useStatus()
   const [location] = useLocation()
   // What may be seen is read from the session (L5 spec §11.2): the fixtures' source until GET /api/visibility answers.
@@ -197,7 +200,7 @@ function HubApp() {
   // phone sheet reads the frame's width (frame.css).
   return (
     <ViewAsProvider source={source}><PanelProvider><InspectorProvider><SessionProvider>
-      {location === '/sign-in' ? <SignInPage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: null }} nav={<Nav />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
+      {location === '/sign-in' ? <SignInPage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: status.data?.mark ?? null }} nav={<Nav />} sites={<SitesBar />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
         band={<><ViewAsBand /><ReadOnlyNotice /></>} aside={<RightSlot />} foot={<Dock />} bottom={<HouseBottom />}>
         <Switch>
           <Route path="/"><ToBoard id="home" /></Route>

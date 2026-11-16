@@ -47,16 +47,18 @@ function rulesInForce(ctx: RuleContext): RuleSummary[] {
   return [{ direct: false, source: rule.source, sentence: `applies to everything · decided by ${model.replace(/-/g, ' ')}; no rule is written, so nothing can be proposed` }]
 }
 
+/** governance.yaml's decision records: `decisions`, then `open_decisions`, the records not decided yet. An open record is
+ *  in the open group whatever its status word says (a consent window, a draft…): where it is written says it is open. */
 function yamlDecisions(g: Record<string, unknown> | null): DecisionRow[] {
-  const raw = Array.isArray(g?.decisions) ? (g!.decisions as unknown[]) : []
-  return raw.flatMap((d): DecisionRow[] => {
+  const rows = (list: unknown, open: boolean): DecisionRow[] => (Array.isArray(list) ? (list as unknown[]) : []).flatMap((d): DecisionRow[] => {
     if (!d || typeof d !== 'object') return []
     const e = d as Record<string, unknown>
     const status = str(e.status) ?? ''
     const proposal = str(e.proposal)
     return [{ date: e.date === undefined || e.date === null ? '' : String(e.date), id: str(e.id) ?? '', title: str(e.title) ?? '',
-      status, group: groupOf(status), where: 'governance.yaml', ...(proposal ? { proposal } : {}) }]
+      status, group: open ? 'open' : groupOf(status), where: 'governance.yaml', ...(proposal ? { proposal } : {}) }]
   })
+  return [...rows(g?.decisions, false), ...rows(g?.open_decisions, true)]
 }
 
 /** GET /api/governance. It reads governance.yaml through F1's lenient reader and DECISIONS.md, and never writes. */

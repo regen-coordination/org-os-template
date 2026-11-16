@@ -1,11 +1,18 @@
 // packages/admin/app/src/blocks/markdown.tsx
 import type { ReactNode } from 'react'
+import { Link } from 'wouter'
 import { Callout } from '../elements/workspace/PageBody.tsx'
 
-/** Only these schemes become links (Review Focus 4); anything else stays text. */
+/** Only these schemes become links out of the house (Review Focus 4); a rooted path is `internalHref`'s. */
 export function safeHref(url: string): string | null {
   const u = url.trim()
   return /^(https?:\/\/|mailto:)/i.test(u) ? u : null
+}
+
+/** A place in the house itself: one rooted path (`/needs`, `/b/projects?view=map`), drawn as an in-app link. Never
+ *  `//host` (another site by another name), a backslash, or a control character; anything else stays text. */
+export function internalHref(url: string): string | null {
+  return /^\/(?![/\\])[^\s\\\x00-\x1f]*$/.test(url) ? url : null
 }
 
 /** Inline: **strong**, *em*, `code`, [text](url). Built as React elements, so HTML in the text is text. */
@@ -23,8 +30,10 @@ function inline(text: string, key: string): ReactNode[] {
     else if (m[3] !== undefined) out.push(<em key={k}>{m[3]}</em>)
     else if (m[4] !== undefined) out.push(<code key={k}>{m[4]}</code>)
     else {
-      const href = safeHref(m[6]!)
-      out.push(href ? <a key={k} href={href} rel="noreferrer noopener" target="_blank">{m[5]}</a> : m[5]!)
+      const here = internalHref(m[6]!)
+      const href = here ? null : safeHref(m[6]!)
+      out.push(here ? <Link key={k} href={here}>{m[5]}</Link>
+        : href ? <a key={k} href={href} rel="noreferrer noopener" target="_blank">{m[5]}</a> : m[5]!)
     }
     last = m.index + m[0].length
   }
@@ -34,7 +43,7 @@ function inline(text: string, key: string): ReactNode[] {
 
 /** The Markdown a note needs (spec §4.3): headings (# to ###, drawn one level under the block's head),
  *  paragraphs, `-`/`*` lists, quoted lines (`> `) as a callout (§14.2, the workspace's), and the inline marks
- *  above. No HTML, no images. */
+ *  above. A link to a rooted path (`[Needs you](/needs)`) stays in the house; any other opens in a new tab. No HTML, no images. */
 export function renderMarkdown(text: string): ReactNode {
   const blocks: ReactNode[] = []
   const lines = text.replace(/\r\n?/g, '\n').split('\n')

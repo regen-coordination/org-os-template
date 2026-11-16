@@ -196,6 +196,7 @@
   --pad-reply: 48px;
   --h-composer: 40px;
   --w-menu: 220px;
+  --w-sites: 272px; /* the sites bar's list of sites (frame/SitesBar.tsx) */
   --w-tip: 32ch;
   --w-chip: 24ch;
   --w-filter: 14em;

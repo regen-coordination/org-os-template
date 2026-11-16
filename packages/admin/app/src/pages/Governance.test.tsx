@@ -90,6 +90,19 @@ describe('Governance', () => {
     expect(within(decisions).queryByRole('button', { name: 'Read adopt the solo model' })).toBeNull()
   })
 
+  it('lists open decision records apart, marked open, before the decided ones; Decided counts only the decided', async () => {
+    const open = { date: '2026-10-20', id: 'gov-002', title: 'choose a legal home', status: 'consent-window', group: 'open', where: 'governance.yaml' as const }
+    fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view({ decisions: [...view().decisions, open] }) })
+    renderAt(<Governance part="decisions" />, '/governance/decisions')
+    const openSection = await screen.findByRole('region', { name: 'Open decisions' })
+    const openList = within(openSection).getByRole('list', { name: 'Open decisions' })
+    expect([...openList.querySelectorAll('.prow-id')].map(e => e.textContent)).toEqual(['gov-002'])
+    expect(within(openList).getByText('consent-window · open').closest('.smark')!.className).toBe('smark smark-open')
+    const decided = screen.getByRole('region', { name: 'Decisions' })
+    expect([...decided.querySelectorAll('.prow-id')].map(e => e.textContent)).toEqual(['LD-2026-034', 'LD-2026-032', 'gov-1'])
+    expect(openSection.compareDocumentPosition(decided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('keeps decisions with no id and no anchor apart, one row each (C8)', async () => {
     fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view({ decisions: [
       { date: '2026-10-01', id: '', title: 'first without an id', status: 'adopted', group: null, where: 'governance.yaml' },

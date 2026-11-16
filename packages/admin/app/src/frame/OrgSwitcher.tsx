@@ -1,4 +1,7 @@
-import { useReducer, useSyncExternalStore } from 'react'
+import { useEffect, useReducer, useSyncExternalStore } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '../api.ts'
+import { setOrgTheme, storedOrgTheme } from '../orgTheme.ts'
 import { Icon } from '../design/Icon.tsx'
 import { Menu, type MenuEntry } from '../design/Menu.tsx'
 import { useFrame } from '../design/Shell.tsx'
@@ -16,27 +19,40 @@ export function OrgSeal({ org }: { org: OrgMark }) {
  *  browser could not store still shows for the session. */
 function subscribe(onChange: () => void): () => void {
   const watch = new MutationObserver(onChange)
-  watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-org-theme'] })
   return () => watch.disconnect()
 }
 const shown = (): Theme | null => { const t = document.documentElement.dataset.theme; return t === 'light' || t === 'dark' ? t : null }
+const shownOrgTheme = (): string | null => document.documentElement.dataset.orgTheme ?? null
 
 /** The org switcher (§5.2 item 1): the seal, the name in Sans 600 (truncated, whole in `title`) and an up-down
  *  chevron. Its menu: the org's portal ↗ (only when the Hub has a portal origin, and to it: D-5), then Appearance — System,
- *  Light, Dark. (Switching org comes when
- *  a server hosts several.) On the rail it is the seal alone, still named. */
+ *  Light, Dark, and the themes the instance offers (server/instanceThemes.ts), each with its note. (Switching org comes
+ *  when a server hosts several.) On the rail it is the seal alone, still named. */
 export function OrgSwitcher({ org }: { org: OrgMark }) {
   const { expanded } = useFrame()
   const theme = useSyncExternalStore(subscribe, shown, () => null)
   const [, redraw] = useReducer((n: number) => n + 1, 0)
-  const choose = (t: Theme | null) => () => { setTheme(t); redraw() } // at once; the observer is for ⌘K's toggle
+  const orgTheme = useSyncExternalStore(subscribe, shownOrgTheme, () => null)
+  const offered = useQuery({ queryKey: ['instance', 'themes'], queryFn: api.instanceThemes, retry: false, staleTime: Infinity }).data?.themes ?? []
+  // A theme chosen here that the instance no longer offers is not kept: the instance's own look shows instead.
+  const stale = offered.length > 0 && orgTheme !== null && !offered.some(t => t.id === orgTheme)
+  useEffect(() => { if (stale) setOrgTheme(null) }, [stale])
+  const choose = (t: Theme | null) => () => { setOrgTheme(null); setTheme(t); redraw() } // at once; the observer is for ⌘K's toggle
+  const own = orgTheme === null || !offered.some(t => t.id === orgTheme)
   const portal = usePortalOrigin()
   const items: MenuEntry[] = [
     ...(portal !== null ? [{ type: 'link', label: 'Portal', href: portal, external: true, icon: 'globe' } as const, { type: 'separator' } as const] : []),
     { type: 'header', label: 'Appearance' },
-    { type: 'radio', label: 'System', checked: theme === null, onSelect: choose(null) },
-    { type: 'radio', label: 'Light', checked: theme === 'light', onSelect: choose('light') },
-    { type: 'radio', label: 'Dark', checked: theme === 'dark', onSelect: choose('dark') },
+    { type: 'radio', label: 'System', checked: own && theme === null, onSelect: choose(null) },
+    { type: 'radio', label: 'Light', checked: own && theme === 'light', onSelect: choose('light') },
+    { type: 'radio', label: 'Dark', checked: own && theme === 'dark', onSelect: choose('dark') },
+    ...(offered.length > 0 ? [
+      { type: 'separator' as const },
+      { type: 'header' as const, label: 'Themes' },
+      ...offered.map(t => ({ type: 'radio' as const, label: t.label, ...(t.note ? { hint: t.note } : {}), checked: orgTheme === t.id,
+        onSelect: () => { setOrgTheme({ id: t.id, scheme: t.scheme }); redraw() } })),
+    ] : []),
   ]
   const face = <><OrgSeal org={org} /><span className={expanded ? 'side-org-nm' : 'side-org-nm sr-only'} title={org.name}>{org.name}</span></>
   return <Menu label={org.name} face="side-org" text={face} items={items} trail={expanded ? 'up-down' : null} />

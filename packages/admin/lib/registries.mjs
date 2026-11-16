@@ -81,7 +81,7 @@ export function resolveTopKey(has, def) {
  *  @type {Readonly<Record<string, string>>} */
 export const REGISTRY_OF_KIND = Object.freeze({
   person: 'members', project: 'projects', funding: 'funding-opportunities', partner: 'relationships',
-  idea: 'ideas', source: 'sources', channel: 'channels', system: 'systems',
+  idea: 'ideas', source: 'sources', channel: 'channels', system: 'systems', meeting: 'meetings', event: 'events',
 })
 
 /**

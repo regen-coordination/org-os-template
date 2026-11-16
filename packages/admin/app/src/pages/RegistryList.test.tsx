@@ -18,7 +18,7 @@ describe('RegistryList', () => {
     const table = await screen.findByRole('table', { name: 'Meetings' })
     // C9 (§14.1): a registry is a table view
     expect(table.className).toBe('tv-table')
-    expect(within(table).getByRole('link', { name: 'm-1' }).getAttribute('href')).toBe('/r/meetings/m-1')
+    expect(within(table).getByRole('link', { name: 'm-1' }).getAttribute('href')).toBe('/r/meeting/m-1')
     expect(within(table).getByText('steward-a, ana')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'New' }).getAttribute('href')).toBe('/new/meetings')
   })
@@ -80,7 +80,7 @@ describe('RegistryList', () => {
       'GET /api/registries': [{ name: 'meetings', kind: 'collection', count: 4 }] })
     renderAt(<RegistryList registry="meetings" title="Meetings" />)
     const table = await screen.findByRole('table', { name: 'Meetings' })
-    expect(within(table).getByRole('link', { name: '#2' }).getAttribute('href')).toBe('/r/meetings/%232')
+    expect(within(table).getByRole('link', { name: '#2' }).getAttribute('href')).toBe('/r/meeting/%232')
     expect(within(table).getAllByText('appears 2 times')).toHaveLength(2)
   })
 })

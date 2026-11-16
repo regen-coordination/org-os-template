@@ -12,6 +12,7 @@ import { boardOfKind } from '../kinds.ts'
 import { newRecordHref, selectHref } from '../hrefs.ts'
 import { SECTIONS, placeable } from '../sections.ts'
 import { toggleTheme } from '../theme.ts'
+import { setOrgTheme } from '../orgTheme.ts'
 import { setSkin } from '../skin.ts'
 import { useMachine } from '../machines.ts'
 import { palette } from '../machines/palette.ts'
@@ -194,7 +195,7 @@ export default function Palette() {
       if (item.go) { navigate(item.go); return }
       if (item.open) { window.open(item.open, '_blank', 'noopener,noreferrer'); return }
       switch (item.action) {
-        case 'theme': toggleTheme(); break
+        case 'theme': setOrgTheme(null); toggleTheme(); break // light or dark is the instance's own look
         case 'apply': window.dispatchEvent(new Event('apply-changes')); break
         case 'discard': window.dispatchEvent(new Event('discard-changes')); break
         case 'edit': navigate(`${path}?edit=1`); break
