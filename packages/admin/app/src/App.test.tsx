@@ -38,7 +38,8 @@ describe('the routes, in the order App.tsx tries them', () => {
     await waitFor(() => expect(loc.history.at(-1)).toBe('/b/projects?select=project%3Ap1'))
   })
 
-  it.each([['/needs', 'Needs you'], ['/systems', 'Systems'], ['/roles', 'Roles'], ['/workspace', 'Workspace']])('%s is the Hub’s own page, before /:section', async (path, name) => {
+  // DAO-OS L6 Task 19: /sources is the Hub's Sources page (it was /:section's way to /b/sources)
+  it.each([['/needs', 'Needs you'], ['/systems', 'Systems'], ['/roles', 'Roles'], ['/workspace', 'Workspace'], ['/sources', 'Sources']])('%s is the Hub’s own page, before /:section', async (path, name) => {
     const { loc } = renderAt(<App />, path)
     expect((await screen.findByRole('heading', { level: 1, name })).textContent).toBe(name)
     expect(loc.history.at(-1)).toBe(path)
@@ -64,6 +65,28 @@ describe('the routes, in the order App.tsx tries them', () => {
     expect(await screen.findByRole('group', { name: 'Your change' })).toBeTruthy()
     expect(screen.getAllByRole('region', { name: 'Changes' })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+  })
+
+  // 2026-11-05 (PF-R118): the public door is the portal, at /portal; its old address still lands, replaced
+  it('/portal is the portal, drawn alone: its own skip link, no sidebar, no tray', async () => {
+    const { loc } = renderAt(<App />, '/portal')
+    expect((await screen.findByRole('link', { name: 'Skip to the portal' })).getAttribute('href')).toBe('#portal-main')
+    expect(screen.queryByRole('region', { name: 'Changes' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Hub' })).toBeNull()
+    expect(loc.history).toEqual(['/portal'])
+    // D-5: a Hub with no portal origin (a hosted one with it sends /portal there before the app) draws the sample page
+    expect(screen.getByText('Sample values: this portal is drawn from fixtures. The real one is built from the org’s public records.')).toBeTruthy()
+  })
+
+  it.each([['/door', '/portal'], ['/door?from=card', '/portal?from=card'], ['/door/systems/a', '/portal/systems/a']])('%s, the portal’s old address, lands on %s in place of it', async (path, lands) => {
+    const { loc } = renderAt(<App />, path)
+    await waitFor(() => expect(loc.history.at(-1)).toBe(lands))
+    expect(loc.history).toEqual([lands])
+  })
+
+  it('/doorway is no old address of the portal', async () => {
+    renderAt(<App />, '/doorway')
+    expect((await screen.findByRole('heading', { level: 1, name: 'No page at /doorway.' })).textContent).toBe('No page at /doorway.')
   })
 
   // C7 (ledger, E-59): "/governance goes to its rules" — /governance is the Proposals section, its first tab Open.
@@ -142,6 +165,22 @@ describe('a restricted name in the path (D-12)', () => {
     const bar = document.querySelector('.crumbs [aria-current="page"], .ptop-t')!
     expect(bar.textContent).toBe('Ops only')
     expect(document.querySelector('.frame-top, .tb, .ptop')?.textContent ?? '').not.toContain('Seed Library')
+  })
+})
+
+// Walk M14: the top bar named a shelf wizard by its id ("test-shelf/test-compose"); it is named by its title.
+describe('a wizard in the path (walk M14)', () => {
+  it('names /wizards/<id> by the wizard’s title, never its id', async () => {
+    const def = { id: 'test-shelf/test-compose', title: 'Compose a test council', summary: '', intro: { body: '', writes: 'Nothing yet.' },
+      steps: [{ id: 'name', title: 'Name', ask: '', writes: 'Nothing yet.', fields: [{ id: 'name', label: 'Name', kind: 'text', required: true }] }],
+      review: { title: 'Review', ask: '', writes: '' }, done: { title: 'Staged', body: '' }, result: { add: 'template:test-council', config: { name: '${field.name}' } } }
+    fetchRoutes({ ...baseRoutes(), 'GET /api/registries': [], 'GET /api/resources': [],
+      'GET /api/wizards/test-shelf%2Ftest-compose': def, 'GET /api/wizards/test-shelf%2Ftest-compose/draft': null })
+    renderAt(<App />, '/wizards/test-shelf%2Ftest-compose')
+    await waitFor(() => expect(document.title).toContain('Compose a test council'))
+    expect(document.title).not.toContain('test-shelf/test-compose')
+    const bar = document.querySelector('.crumbs [aria-current="page"], .ptop-t')!
+    expect(bar.textContent).toBe('Compose a test council')
   })
 })
 

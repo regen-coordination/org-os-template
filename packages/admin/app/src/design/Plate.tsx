@@ -53,7 +53,7 @@ function Example({ rows }: { rows: SectionWords['example'] }) {
 
 /** Empty, and you can add: why it is worth filling, at most three first steps, the actions, the example and where the
  *  list is kept. *Import from a sheet* is drawn only when there is an import to open (`onImport`). */
-export function AddPlate({ words, file, addHref, onImport, level }:
+export function AddPlate({ words, addHref, onImport, level }:
   { words: SectionWords; file: string; addHref: string; onImport?: () => void; level: PlateLevel }) {
   const [good, setGood] = useState(false)
   const goodId = useId()
@@ -67,7 +67,7 @@ export function AddPlate({ words, file, addHref, onImport, level }:
         <Button variant="ghost" expanded={good} controls={good ? goodId : undefined} onClick={() => setGood(g => !g)}>What a good entry looks like</Button>
       </>}
       aside={<div className="plate-side"><Example rows={words.example} />
-        <p className="plate-foot">Kept in <code>{file}</code>. Edit it here, or in the file. Both land as a staged change.</p></div>}>
+        <p className="plate-foot">Kept in the repository. Edit it here, or in its file. Both land as a staged change.</p></div>}>
       <p className="plate-l">{words.why}</p>
       <ol className="plate-steps">
         {steps.map((s, i) => (

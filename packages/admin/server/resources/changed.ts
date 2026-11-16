@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { simpleGit } from 'simple-git'
 import { parseDocument, isSeq, isMap, LineCounter } from 'yaml'
 import { registryDef, resolveTopKey } from '../registries.ts'
+import { parseTrailers } from '../../lib/trailers.mjs'
 import type { Changed } from './types.ts'
 
 // This module only reads git: `blame` and `log`. It sits outside server/git.ts because that
@@ -33,6 +34,28 @@ export function parseBlame(porcelain: string): BlameLine[] {
 
 const cache = new Map<string, { key: string; changes: Map<string, Changed> }>()
 
+/** Who made each commit (walk fix wave 4, G9: W1): its Org-Actor trailer (a member id, a CAIP-10 account, `unknown
+ *  <email>`), else git's author name for a commit the house did not write. Read-only. */
+async function actorsOf(repo: string, shas: readonly string[], authors: ReadonlyMap<string, string>): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (shas.length === 0) return out
+  try {
+    const raw = await simpleGit(repo).raw(['show', '-s', '--format=%H%x1f%B%x1e', ...shas])
+    for (const part of raw.split('\x1e')) {
+      const [sha, body] = part.replace(/^\s+/, '').split('\x1f')
+      if (!sha || body === undefined) continue
+      const actor = (parseTrailers(body) as { actor?: string }).actor
+      if (actor) out.set(sha.trim(), actor)
+    }
+  } catch { /* git's author names stand */ }
+  for (const sha of shas) if (!out.has(sha)) out.set(sha, authors.get(sha) ?? '')
+  return out
+}
+
+/** Who a person is, as history says them (session/names.ts `displayNames`); the id as it is when none is given. */
+export type NameOf = (actor: string) => string
+const asIs: NameOf = actor => actor
+
 /** The commit HEAD points at, or '' when there is none. Read-only. */
 async function headOf(repo: string): Promise<string> {
   try { return (await simpleGit(repo).raw(['rev-parse', 'HEAD'])).trim() } catch { return '' }
@@ -51,7 +74,15 @@ async function commitOrder(repo: string): Promise<Map<string, number>> {
 /** For each entity of a collection registry: the newest commit that touched one of its lines,
  *  or "not committed yet" when one of its lines differs from the last commit. Kept per file
  *  content and HEAD, so blame runs again when the file or the history changes. */
-export async function entityChanges(repo: string, registry: string): Promise<Map<string, Changed>> {
+export async function entityChanges(repo: string, registry: string, name: NameOf = asIs): Promise<Map<string, Changed>> {
+  const changes = await entityActors(repo, registry)
+  return new Map([...changes].map(([id, c]) => [id, c.by === NOT_COMMITTED ? c : { at: c.at, by: name(c.by) }]))
+}
+
+const NOT_COMMITTED = 'not committed yet'
+
+/** `entityChanges` with each commit's actor as its trailer holds it (not yet named). */
+async function entityActors(repo: string, registry: string): Promise<Map<string, Changed>> {
   const rel = `data/${registry}.yaml`
   const path = join(repo, rel)
   if (!existsSync(path)) return new Map()
@@ -81,6 +112,7 @@ export async function entityChanges(repo: string, registry: string): Promise<Map
   const doc = parseDocument(src, { lineCounter: lines })
   const seq = doc.get(resolveTopKey(k => doc.has(k), registryDef(registry)), true)
   const changes = new Map<string, Changed>()
+  const found = new Map<string, BlameLine | 'uncommitted'>()
   if (isSeq(seq)) {
     const mtime = statSync(path).mtime.toISOString()
     for (const item of seq.items) {
@@ -97,9 +129,12 @@ export async function entityChanges(repo: string, registry: string): Promise<Map
         if (!best || await newer(line, best)) best = line
       }
       if (!best) continue
-      changes.set(String(id), best.sha === UNCOMMITTED
-        ? { at: mtime, by: 'not committed yet' }
-        : { at: new Date(best.time * 1000).toISOString(), by: best.author })
+      found.set(String(id), best.sha === UNCOMMITTED ? 'uncommitted' : best)
+    }
+    const used = [...new Set([...found.values()].flatMap(b => (b === 'uncommitted' ? [] : [b.sha])))]
+    const actors = await actorsOf(repo, used, new Map(blame.map(b => [b.sha, b.author])))
+    for (const [id, b] of found) {
+      changes.set(id, b === 'uncommitted' ? { at: mtime, by: NOT_COMMITTED } : { at: new Date(b.time * 1000).toISOString(), by: actors.get(b.sha) ?? b.author })
     }
   }
   cache.set(slot, { key, changes })
@@ -107,11 +142,13 @@ export async function entityChanges(repo: string, registry: string): Promise<Map
 }
 
 /** The last commit that touched `rel` (a file or `.`), or null when it has none. */
-export async function lastCommit(repo: string, rel: string): Promise<Changed | null> {
+export async function lastCommit(repo: string, rel: string, name: NameOf = asIs): Promise<Changed | null> {
   try {
-    const out = (await simpleGit(repo).raw(['log', '-1', '--format=%aI%x09%an', '--', rel])).trim()
+    const out = (await simpleGit(repo).raw(['log', '-1', '--format=%aI%x1f%an%x1f%B', '--', rel])).trim()
     if (!out) return null
-    const [at, by] = out.split('\t')
-    return { at: at!, by: by ?? '' }
+    const [at, author, body] = out.split('\x1f')
+    // walk fix wave 4 (G9: W1): who made it is its Org-Actor trailer, else git's author name
+    const actor = (parseTrailers(body ?? '') as { actor?: string }).actor
+    return { at: at!, by: actor ? name(actor) : author ?? '' }
   } catch { return null }
 }

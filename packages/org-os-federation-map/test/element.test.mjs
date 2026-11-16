@@ -11,7 +11,8 @@ test('element module imports cleanly in node (no top-level DOM access)', async (
 
 test('index.mjs re-exports the full surface', async () => {
   const mod = await import('../src/index.mjs');
-  for (const k of ['FederationMap', 'define', 'normalizeMap', 'buildLayout', 'renderSVG']) {
+  for (const k of ['FederationMap', 'define', 'normalizeMap', 'layoutMap', 'renderStaticMap']) {
     assert.ok(k in mod, `missing export: ${k}`);
   }
+  for (const k of ['buildLayout', 'renderSVG', 'RING_RADIUS', 'nodeRadius']) assert.ok(!(k in mod), `${k} is gone`);
 });

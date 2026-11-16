@@ -30,7 +30,7 @@ describe('the plate', () => {
     expect(ex.textContent).toContain('Open source round, spring')
     // not in the accessible tree: every example word sits under the aria-hidden example
     for (const el of screen.getAllByText('Open source round, spring')) expect(el.closest('[aria-hidden="true"]')).toBe(ex)
-    expect(document.querySelector('.plate-foot')!.textContent).toBe('Kept in data/funding-opportunities.yaml. Edit it here, or in the file. Both land as a staged change.')
+    expect(document.querySelector('.plate-foot')!.textContent).toBe('Kept in the repository. Edit it here, or in its file. Both land as a staged change.')
     // What a good entry looks like: a disclosure of the first example as field rows, said to be an example
     const good = screen.getByRole('button', { name: 'What a good entry looks like' })
     expect(good.getAttribute('aria-expanded')).toBe('false')

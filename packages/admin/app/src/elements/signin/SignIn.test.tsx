@@ -13,7 +13,7 @@ const HATS = ['Council steward', 'Treasury signer']
 const noop = () => {}
 
 function draw(over: Partial<SignInProps> = {}) {
-  const p: SignInProps = { org: 'Example DAO', state: 'idle', onSignIn: vi.fn(), onCancel: vi.fn(), doorHref: '/door', ...over }
+  const p: SignInProps = { org: 'Example DAO', state: 'idle', onSignIn: vi.fn(), onCancel: vi.fn(), portalHref: 'https://portal.example.test', ...over }
   const r = renderAt(<SignIn {...p} />, '/sign-in')
   return { ...r, p, card: screen.getByRole('group', { name: 'Sign in with your wallet' }) }
 }
@@ -67,12 +67,12 @@ describe('SignIn (§11.4)', () => {
     expect(document.querySelector('.who-s')!.textContent).toBe('1 hat')
   })
 
-  it('not a member: the sentence names the org from its prop, and Read the public door links to doorHref', () => {
-    const { card } = draw({ org: 'Example DAO', state: 'not-member', address: ADDRESS, doorHref: '/door' })
+  it('not a member: the sentence names the org from its prop, and Read the portal links to portalHref (D-5)', () => {
+    const { card } = draw({ org: 'Example DAO', state: 'not-member', address: ADDRESS, portalHref: 'https://portal.example.test' })
     expect(card.querySelector('.signin-k')!.textContent).toBe('Example DAO · members')
-    expect(within(card).getByText('This address wears no hat in Example DAO’s tree. You can still read the public door.')).toBeTruthy()
-    const door = within(card).getByRole('link', { name: 'Read the public door' })
-    expect(door.getAttribute('href')).toBe('/door')
+    expect(within(card).getByText('This address wears no hat in Example DAO’s tree. You can still read the portal.')).toBeTruthy()
+    const portal = within(card).getByRole('link', { name: 'Read the portal' })
+    expect(portal.getAttribute('href')).toBe('https://portal.example.test')
     expect(within(card).queryAllByRole('button')).toEqual([])
   })
 
@@ -91,15 +91,15 @@ describe('SignIn (§11.4)', () => {
   })
 
   it('moves focus to the new state’s action, and says the new state once through the live region', () => {
-    const p: SignInProps = { org: 'Example DAO', state: 'idle', onSignIn: noop, onCancel: noop, doorHref: '/door' }
+    const p: SignInProps = { org: 'Example DAO', state: 'idle', onSignIn: noop, onCancel: noop, portalHref: 'https://portal.example.test' }
     const { rerender } = renderAt(<SignIn {...p} />)
     screen.getByRole('button', { name: 'Sign in with Ethereum' }).focus()
     rerender(<SignIn {...p} state="waiting" />)
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByTestId('live').textContent).toBe('Waiting for your wallet to sign…')
     rerender(<SignIn {...p} state="not-member" />)
-    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Read the public door' }))
-    expect(screen.getByTestId('live').textContent).toBe('This address wears no hat in Example DAO’s tree. You can still read the public door.')
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Read the portal' }))
+    expect(screen.getByTestId('live').textContent).toBe('This address wears no hat in Example DAO’s tree. You can still read the portal.')
     rerender(<SignIn {...p} state="failed" error="The signature did not match." />)
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Try again' }))
     rerender(<SignIn {...p} state="signed-in" hats={HATS} address={ADDRESS} />)
@@ -108,7 +108,7 @@ describe('SignIn (§11.4)', () => {
   })
 
   it('says nothing and takes no focus when it first draws', () => {
-    renderAt(<SignIn org="Example DAO" state="waiting" onSignIn={noop} onCancel={noop} doorHref="/door" />)
+    renderAt(<SignIn org="Example DAO" state="waiting" onSignIn={noop} onCancel={noop} portalHref="https://portal.example.test" />)
     expect(document.activeElement).toBe(document.body)
     expect(screen.getByTestId('live').textContent).toBe('')
   })

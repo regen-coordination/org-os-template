@@ -3,6 +3,9 @@ import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync, rmSyn
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from '../framework.mjs';
+import { removePublicPages } from '../pages/owned.mjs';
+import { loadDrawing } from '../drawing.mjs';
+import { readReads } from '../reads.mjs';
 
 // Never add extensions.yaml here: it is GENERATED below from the instance's packs, never copied from a hand-authored root file.
 const WELL_KNOWN_ALLOW = ['dao.json'];
@@ -10,12 +13,15 @@ const WELL_KNOWN_ALLOW = ['dao.json'];
 const GEO_PUBLIC = new Set(['network', 'space', 'parent_space']);
 const publicGeo = (g) => { if (!g || typeof g !== 'object') return undefined; const out = Object.fromEntries(Object.entries(g).filter(([k]) => GEO_PUBLIC.has(k))); return Object.keys(out).length ? out : undefined; };
 
-export function writeStaticSurface({ dir, outDir = 'public', items, allItems = items, manifest, config }) {
+// Async: with publish.pages: true it loads the pages (and through them the map package) first, before anything is
+// written, so a missing map package fails the surface plainly and leaves the output folder as it was (R-38).
+export async function writeStaticSurface({ dir, outDir = 'public', items, allItems = items, manifest, config }) {
   const baseUrl = config.publish?.base_url?.replace(/\/$/, '');
   if (!baseUrl) throw new Error('publish.base_url is required for the static surface');
   if (typeof outDir !== 'string' || !outDir || isAbsolute(outDir)) throw new Error('outDir must be a relative path inside dir');
   const rel = relative(resolve(dir), resolve(dir, outDir));
   if (!rel || rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) throw new Error('outDir must be a relative path inside dir');
+  const pages = config.publish?.pages === true ? await loadDrawing('pages', 'publish.pages') : null;
   const CONTEXT = `${baseUrl}/api/context.jsonld`;
   const out = join(dir, outDir); const files = [];
   // This function owns the api/ subtree: drop stale entries (unpublished / opted-out / deleted objects) before rewriting.
@@ -66,5 +72,13 @@ export function writeStaticSurface({ dir, outDir = 'public', items, allItems = i
     const src = join(dir, '.well-known', f);
     if (existsSync(src)) { mkdirSync(join(out, '.well-known'), { recursive: true }); copyFileSync(src, join(out, '.well-known', f)); files.push(`.well-known/${f}`); }
   }
+  // Pages are opt-in. Either way, drop what an earlier pages run wrote (only if its marker is there); write them again when asked.
+  if (pages) {
+    let reads = {};
+    let reads_warning;
+    try { reads = readReads(dir); } catch (e) { reads = {}; reads_warning = `data/kms-reads.json not read: ${e.message}`; } // pages still written, without "read N d ago"
+    files.push(...pages.writePublicPages({ out, items, allItems, manifest, config, reads }));
+    return reads_warning ? { files, reads_warning } : { files };
+  } else removePublicPages(out);
   return { files };
 }

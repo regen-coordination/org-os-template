@@ -97,12 +97,7 @@ describe('readHostedConfig', () => {
   })
 })
 
-describe('the settings named for the door until 0.6.2', () => {
-  const warningsOf = (env: Record<string, string | undefined>): string[] => {
-    const r = readHostedConfig(env, repo)
-    if (!('config' in r)) throw new Error(`refused: ${r.refuse}`)
-    return r.warnings
-  }
+describe('the settings named for the door until 0.6.2, no longer read in 0.7', () => {
   it('maps each old name to its new one', () => {
     expect(RENAMED_ENV).toEqual({
       ORG_OS_DOOR_ORIGIN: 'ORG_OS_PORTAL_ORIGIN', ORG_OS_DOOR_DIR: 'ORG_OS_PORTAL_DIR', ORG_OS_DOOR_EVERY: 'ORG_OS_PORTAL_EVERY',
@@ -112,33 +107,22 @@ describe('the settings named for the door until 0.6.2', () => {
       expect(HOSTED_ENV).not.toContain(old)
     }
   })
-  it('the new names alone: no warning', () => {
-    expect(warningsOf({ ...base, ORG_OS_PORTAL_ORIGIN: 'https://portal.example.test', ORG_OS_PORTAL_DIR: '/srv/p', ORG_OS_PORTAL_EVERY: '2h' })).toEqual([])
-    expect(warningsOf(base)).toEqual([])
+  it('the new names alone: the configuration, and no warnings any more', () => {
+    const r = readHostedConfig({ ...base, ORG_OS_PORTAL_ORIGIN: 'https://portal.example.test', ORG_OS_PORTAL_DIR: '/srv/p', ORG_OS_PORTAL_EVERY: '2h' }, repo)
+    expect(r).toEqual({ config: expect.objectContaining({ portalOrigin: 'https://portal.example.test', portalDir: '/srv/p', portalEveryMs: 7_200_000 }) })
+    expect(Object.keys(r)).toEqual(['config'])
   })
-  it('an old name alone is read, with a warning naming its new one', () => {
-    const env = { ...base, ORG_OS_DOOR_ORIGIN: 'https://portal.example.test', ORG_OS_DOOR_DIR: '/srv/door', ORG_OS_DOOR_EVERY: '30m' }
-    expect(ok(env)).toMatchObject({ portalOrigin: 'https://portal.example.test', portalDir: '/srv/door', portalEveryMs: 1_800_000 })
-    expect(warningsOf(env)).toEqual([
-      'ORG_OS_DOOR_ORIGIN is the old name of ORG_OS_PORTAL_ORIGIN. This Hub reads it until org-os 0.7: rename it to ORG_OS_PORTAL_ORIGIN.',
-      'ORG_OS_DOOR_DIR is the old name of ORG_OS_PORTAL_DIR. This Hub reads it until org-os 0.7: rename it to ORG_OS_PORTAL_DIR.',
-      'ORG_OS_DOOR_EVERY is the old name of ORG_OS_PORTAL_EVERY. This Hub reads it until org-os 0.7: rename it to ORG_OS_PORTAL_EVERY.',
-    ])
+  it('an old name is not read: set, it stops the start with a sentence naming its new name', () => {
+    for (const [old, now] of Object.entries(RENAMED_ENV)) {
+      const value = old === 'ORG_OS_DOOR_ORIGIN' ? 'https://portal.example.test' : old === 'ORG_OS_DOOR_DIR' ? '/srv/door' : '30m'
+      const sentence = `${old} was renamed ${now} in org-os 0.6.2 and is no longer read: rename it to ${now}, then start again.`
+      expect(refused({ ...base, [old]: value })).toBe(sentence)
+      // Beside its new name, even with the same value: still refused, so the old name is never left in place.
+      expect(refused({ ...base, [old]: value, [now]: value })).toBe(sentence)
+    }
   })
-  it('an old name\'s refusal names the old name, as set', () => {
-    expect(refused({ ...base, ORG_OS_DOOR_ORIGIN: 'https://hub.example.org' })).toBe(
-      'The portal and the members\' side need two hosts: ORG_OS_DOOR_ORIGIN and ORG_OS_PUBLIC_ORIGIN are the same.')
-    expect(refused({ ...base, ORG_OS_DOOR_EVERY: 'soon' })).toBe('ORG_OS_DOOR_EVERY is "soon", not a time such as 1h (or off).')
-    expect(refused({ ...base, ORG_OS_DOOR_DIR: `${repo}/.org-os/door` })).toBe('ORG_OS_DOOR_DIR is inside the repository. Put it on its own volume, then start again.')
-  })
-  it('both names with the same value: the value, and the warning', () => {
-    const env = { ...base, ORG_OS_DOOR_EVERY: '2h', ORG_OS_PORTAL_EVERY: '2h' }
-    expect(ok(env).portalEveryMs).toBe(7_200_000)
-    expect(warningsOf(env)).toHaveLength(1)
-  })
-  it('both names with different values stop the start', () => {
-    expect(refused({ ...base, ORG_OS_DOOR_ORIGIN: 'https://a.example.test', ORG_OS_PORTAL_ORIGIN: 'https://b.example.test' })).toBe(
-      'ORG_OS_DOOR_ORIGIN and ORG_OS_PORTAL_ORIGIN are both set, to different values. ORG_OS_PORTAL_ORIGIN is the name now: remove ORG_OS_DOOR_ORIGIN, then start again.')
+  it('an old name set empty is not set', () => {
+    expect(ok({ ...base, ORG_OS_DOOR_ORIGIN: '', ORG_OS_DOOR_DIR: '  ' }).portalOrigin).toBeNull()
   })
 })
 

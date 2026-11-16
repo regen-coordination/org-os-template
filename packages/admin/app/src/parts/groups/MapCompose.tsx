@@ -24,7 +24,7 @@ export default function MapCompose() {
         </Card>
       </div>
       <Card cap="compose canvas · the Signers selected · a link that cannot sign for a Safe">
-        <ComposeCanvas shelf={COMPOSE_SHELF} nodes={COMPOSE_NODES} edges={COMPOSE_EDGES} chain={COMPOSE_CHAIN} onStage={noop} selected="signers" />
+        <ComposeCanvas shelf={COMPOSE_SHELF} nodes={COMPOSE_NODES} edges={COMPOSE_EDGES} chain={COMPOSE_CHAIN} onStage={noop} selected="test-roles/signers" />
       </Card>
     </div>
   )

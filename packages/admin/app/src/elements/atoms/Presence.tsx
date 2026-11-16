@@ -1,9 +1,12 @@
 import { Icon } from '../../design/Icon.tsx'
 
-/** Two letters from a member's handle, upper case (§7.12): the first letter of its first two words, or the first two
- *  letters of a one-word handle. Monograms, never pictures or identicons (C-22). */
-export function monogram(handle: string): string {
-  const words = handle.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+/** Two letters from who someone is, upper case (§7.12): the first letter of the first two words of their one display name
+ *  (walk fix wave 4, G9: the server's `displayNames`, so a person has the same letters everywhere), or the first two
+ *  letters of a one-word name. Of a hat's name and a short address ("Council · 0x00C0…0C01"), the hat's ("CO").
+ *  Monograms, never pictures or identicons (C-22). */
+export function monogram(name: string): string {
+  const named = name.split(' · ')[0] ?? name
+  const words = named.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
   const letters = words.length > 1 ? words[0]!.charAt(0) + words[1]!.charAt(0) : (words[0] ?? '').slice(0, 2)
   return letters.toUpperCase()
 }
@@ -23,7 +26,7 @@ export function Presence({ people, small = false }: { people: { handle: string; 
     <span className={small ? 'pres pres-sm' : 'pres'} role="img" aria-label={name}>
       {people.slice(0, SHOWN).map(p => (
         <span className="av" key={p.handle}>
-          {monogram(p.handle)}
+          {monogram(p.role)}
           {p.editing && <span className="av-pen"><Icon name="pencil" size="xs" /></span>}
         </span>
       ))}

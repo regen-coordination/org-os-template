@@ -32,4 +32,22 @@ describe('useChanges', () => {
     fireEvent.click(screen.getByText('discard'))
     await waitFor(() => expect(screen.getByTestId('n').textContent).toBe('0'))
   })
+
+  it('Apply and Keep mine / Take theirs make every file read by the source editor stale (T19 review I3)', async () => {
+    fetchRoutes({
+      'GET /api/changes': () => changeView({ ops: [op] }),
+      'POST /api/changes/ops/0/rebase': () => changeView(),
+      'POST /api/changes/apply': () => ({ commit: 'abc1234' }),
+    })
+    function Acts() {
+      const c = useChanges()
+      return <><button onClick={() => void c.rebase(0, 'theirs')}>rebase</button><button onClick={() => void c.apply()}>apply</button></>
+    }
+    const { qc } = renderAt(<Acts />)
+    for (const act of ['rebase', 'apply']) {
+      qc.setQueryData(['file', 'data/governance.yaml'], { path: 'data/governance.yaml', text: '', base: 'b1', class: 'governance', editor: 'rules+source' })
+      fireEvent.click(screen.getByText(act))
+      await waitFor(() => expect(qc.getQueryState(['file', 'data/governance.yaml'])!.isInvalidated).toBe(true))
+    }
+  })
 })

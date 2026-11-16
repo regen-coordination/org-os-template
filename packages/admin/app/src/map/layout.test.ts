@@ -20,7 +20,7 @@ describe('layoutBoard', () => {
     expect(pos['project:y']!.y).toBeLessThan(pos['project:x']!.y)
   })
 
-  it('places portals after the last column, and lets saved positions win for known cards only', () => {
+  it('places the links to the other map after the last column, and lets saved positions win for known cards only', () => {
     const pos = layoutBoard([n('module:m', 'module')], [], [{ id: 'portal:organization' }], { 'module:m': { x: 5, y: 6 }, 'module:gone': { x: 1, y: 1 } })
     expect(pos).toEqual({ 'module:m': { x: 5, y: 6 }, 'portal:organization': { x: COL_W, y: 0 } })
   })

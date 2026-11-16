@@ -83,8 +83,10 @@ function classNameTokens(p: string): string[] {
   return out
 }
 
-/** Classes drawn by a library, not by us: React Flow puts these on its own elements, and map.css scopes them. */
-const LIBRARY_DRAWN = ['react-flow__']
+/** Classes drawn by a library, not by us: React Flow puts these on its own elements, and map.css scopes them; ProseMirror
+ *  (prosemirror-view, the page editor's engine: DAO-OS L6 Task 6) puts `ProseMirror` and its `ProseMirror-*` states on
+ *  the editor's own nodes, and pages.css scopes them. */
+const LIBRARY_DRAWN = ['react-flow__', 'ProseMirror']
 /** Class names that are hooks, not looks: no sheet draws them, and each is read by a library or found by a test or a
  *  module. A new one is a decision made here, with its reason. */
 const HOOKS = new Set([
@@ -92,7 +94,7 @@ const HOOKS = new Set([
   // Found by tests (C10 review: listed, so a new test-only hook is a decision): each names a part its parent draws
   'band-ro',         // the read-only band among the bands (ReadOnly.test, ClaimHandle.test, e2e claim)
   'smark-word',      // a status mark's word, beside its shape (states.test, PreparedTx.test, RuleStatus.test, Proposal.test)
-  'door-pool',       // one grant pool's card on the door (DoorPage.test)
+  'portal-pool',       // one grant pool's card on the portal (PortalPage.test)
   'from',            // the from mark in a meta line (Record.test, NewRecord.test, collection.test, treasury.test)
   'ff-t',            // a fund flow's label text in the SVG (FundFlow.test)
   'ptx-brief',       // the prepared card's brief form (PreparedTx.test, groups/Gov.test)

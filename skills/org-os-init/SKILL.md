@@ -228,7 +228,18 @@ When the operator says "close", "wrap up", "done for now", or when `/close` is t
 ────────────────────────────────────────────────────────────────────
 ```
 
-2. **Write memory** — Append to `memory/YYYY-MM-DD.md`:
+2. **Write memory** — Ask of each entry, before writing it: **members or Council?** (the close command's step 2 says it
+   in full).
+
+   - **members** (org memory: what every member may read) — append a session entry to `memory/YYYY-MM-DD.md`, by hand
+     or with `npm run memory -- add --level members --date YYYY-MM-DD --title "Session — HH:MM" --file <entry.md>`
+     (nothing is committed; step 5 commits it).
+   - **Council** (Council memory: a person's situation, pay, contact details, a negotiation, anything Steward-only) —
+     never in `memory/`, `MEMORY.md` or `HEARTBEAT.md`: write it through the running Hub with
+     `npm run memory -- add --level hat:<steward hat> --date YYYY-MM-DD --title "<title>" -` and its body on stdin from
+     a heredoc. If the Hub is not running, start it; if it answers `LEVEL`, never lower the entry's level: ask a steward.
+
+   When unsure, it is Council. A members entry's format:
 
 ```markdown
 ## Session — [HH:MM]

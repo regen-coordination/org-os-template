@@ -22,7 +22,8 @@ import {
 } from '../helpers/instance-fixtures.mjs';
 
 const frameworkDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const read = (dir) => readInstance(dir, { frameworkDir, runValidators: false });
+// No ORG_OS_PRIVATE_DIR from the shell: the store is looked for in the temp instance only (Task 15 review M-5).
+const read = (dir) => readInstance(dir, { frameworkDir, runValidators: false, env: {} });
 
 function withInstance(shape, fn) {
   const dir = makeInstance(shape);
@@ -65,9 +66,13 @@ test('reads the framework it is being run from', () => {
 });
 
 test('the framework checkout identifies itself as the framework', () => {
-  const s = readInstance(frameworkDir, { frameworkDir, runValidators: false });
-  assert.equal(s.isFramework, true);
-  assert.equal(assessSnapshot(s).checks.find((c) => c.id === 'identity').status, 'OK');
+  // A temp folder shaped as the framework (its registry of instances, its template package name), so no test reads this
+  // checkout's own memory/ or private store (Task 15 review M-5).
+  withInstance({ name: 'org-os', pkgName: 'organizational-os-template', files: { 'data/instances.yaml': 'instances: []\n' } }, (dir) => {
+    const s = read(dir);
+    assert.equal(s.isFramework, true);
+    assert.equal(assessSnapshot(s).checks.find((c) => c.id === 'identity').status, 'OK');
+  });
 });
 
 // --- the six real signatures --------------------------------------------
@@ -155,7 +160,7 @@ test('machinery fingerprints compare the instance copy against the framework cop
 
 test('running the validators is opt-in and reports their real results', () => {
   withInstance({}, (dir) => {
-    const s = readInstance(dir, { frameworkDir, runValidators: true });
+    const s = readInstance(dir, { frameworkDir, runValidators: true, env: {} });
     assert.equal(s.validators.structure.ran, true);
     assert.equal(s.validators.schemas.ran, true);
     assert.equal(typeof s.validators.schemas.exitCode, 'number');

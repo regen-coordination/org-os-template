@@ -2,12 +2,19 @@ import type { StagedPrivateOp } from '../private/ops.ts'
 
 /** The change engine's shapes (docs/superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md
  *  §4.3, Change). The client re-exports them through app/src/api.ts. */
-export type StageOp =
+export type RecordOp =
   | { op: 'update'; record: string; set: Record<string, unknown> }          // record = '<registry>:<id>'
   | { op: 'create'; record: string; value: Record<string, unknown> }
   | { op: 'delete'; record: string }
   | { op: 'replace'; record: string; value: Record<string, unknown> }        // whole-entry, from the source toggle
-export type Op = StageOp & { base: string | null; before: Record<string, unknown> | null } // base = sha256 of canonical YAML of the entry at stage time; null for create
+/** A governed file edited whole (DAO-OS L6 §11.2): the source editor's op. `text` null deletes the file; `base` is the file's
+ *  git blob id when it was staged, null for a file that was not there. Its class is `governedClassOf(path)`. */
+export type FileOp = { op: 'file'; path: string; text: string | null; base: string | null }
+export type StageOp = RecordOp | FileOp
+/** A staged op: a record op with `base` (sha256 of canonical YAML of the entry at stage time; null for create) and `before`
+ *  (the entry it was staged against), or a file op, which carries its own base. */
+export type RecordStaged = RecordOp & { base: string | null; before: Record<string, unknown> | null }
+export type Op = RecordStaged | FileOp
 /** `revises` is the proposal the change was loaded from by *Revise* (0.6 P2 spec §3.4): the tray's primary action is then
  *  Update proposal. It goes with the change, and is gone when the change is. */
 /** An op on private data as the change file keeps it (L5 spec §10.2, §10.3): a placeholder for the op the private
@@ -24,7 +31,8 @@ export type ChangeState = 'empty' | 'staged' | 'stale' | 'applying'
  *  as they typed it (null when the private store cannot be read). */
 export interface PrivateEntry { ref: string; class: string; op: StagedPrivateOp | null }
 export interface ChangeView extends Omit<Change, 'private'> { classes: string[]; rule: RuleSummary; stale: number[]; current: (Record<string, unknown> | null)[]; state: ChangeState; private?: PrivateEntry[] }
-export interface DecisionRow { date: string; id: string; title: string; status: string; group: string | null; where: 'governance.yaml' | 'DECISIONS.md'; anchor?: string }
+/** `proposal`: the proposal a ratify wrote this governance.yaml row for (walk M4), when the row names one. */
+export interface DecisionRow { date: string; id: string; title: string; status: string; group: string | null; where: 'governance.yaml' | 'DECISIONS.md'; anchor?: string; proposal?: string }
 export interface GovernanceView { model: string | null; description: string | null; rules: RuleSummary[]; decisions: DecisionRow[]; problems: string[] }
 
 /** One error of a staged op, the body of the change routes' 422. `field` is '' when the op as a

@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import Nav from './Nav.tsx'
+import ReadOnlyNotice from './ReadOnly.tsx'
 import { fetchRoutes } from './test/fetchRoutes.ts'
 import { renderAt } from './test/render.tsx'
 import { baseRoutes, changeView, resource } from './test/data.ts'
@@ -50,9 +51,10 @@ describe('Nav: the house sidebar on 0.6’s queries (§5.2)', () => {
     renderAt(<ViewAsProvider><Nav /><PreviewPublic /></ViewAsProvider>)
     await within(house()).findByRole('link', { name: 'Needs you, 1' })
     fireEvent.click(screen.getByRole('button', { name: 'preview' }))
+    // the walk review's G1: a preview reads every answer again, for the previewed viewer, before it counts
+    expect(await within(house()).findByRole('link', { name: 'Systems, 1' })).toBeTruthy()
     expect(within(house()).getByRole('link', { name: 'Needs you' })).toBeTruthy()
     expect(within(house()).getByRole('link', { name: 'Proposals' })).toBeTruthy()
-    expect(within(house()).getByRole('link', { name: 'Systems, 1' })).toBeTruthy()
     expect(within(house()).getByRole('link', { name: 'Changes' })).toBeTruthy()
   })
 
@@ -67,7 +69,34 @@ describe('Nav: the house sidebar on 0.6’s queries (§5.2)', () => {
     expect(within(house()).getByRole('link', { name: 'Meetings, empty' }).querySelector('.side-dot')).not.toBeNull()
     expect(within(house()).queryByRole('link', { name: /^Funding/ })).toBeNull()
     const names = within(house()).getAllByRole('link').map(a => a.getAttribute('aria-label'))
-    expect(names.slice(names.indexOf('Workspace') + 1, names.indexOf('Library'))).toEqual(['Meetings, empty', 'Projects'])
+    // DAO-OS L6 Task 19: then Sources (§15)
+    expect(names.slice(names.indexOf('Workspace') + 1, names.indexOf('Library'))).toEqual(['Meetings, empty', 'Projects', 'Sources'])
+  })
+
+  // walk I15, D1: each word once in the sidebar; Meetings opens the collection, where "Record a meeting" lives
+  it('Meetings opens /c/meetings, the collection, not its board; no label is listed twice', async () => {
+    routes()
+    renderAt(<ViewAsProvider><Nav /></ViewAsProvider>, '/c/meetings')
+    const meetings = await within(house()).findByRole('link', { name: /^Meetings/ })
+    expect(meetings.getAttribute('href')).toBe('/c/meetings')
+    expect(meetings.getAttribute('aria-current')).toBe('page')
+    const labels = within(house()).getAllByRole('link').map(a => a.querySelector('.side-l')?.textContent)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  // DAO-OS L6 Task 19
+  it('lists Sources under Workspace after its collections, current on /sources; absent previewing as Public', async () => {
+    routes()
+    const { unmount } = renderAt(<ViewAsProvider><Nav /></ViewAsProvider>, '/sources')
+    const sources = await within(house()).findByRole('link', { name: 'Sources' })
+    expect(sources.getAttribute('href')).toBe('/sources')
+    expect(sources.getAttribute('aria-current')).toBe('page')
+    expect(within(house()).getByRole('link', { name: 'Workspace' }).classList.contains('on')).toBe(true)
+    unmount()
+    routes()
+    renderAt(<ViewAsProvider initial={{ as: 'public' }}><Nav /></ViewAsProvider>, '/workspace')
+    await within(house()).findByRole('link', { name: 'Systems, 1' })
+    expect(within(house()).queryByRole('link', { name: 'Sources' })).toBeNull()
   })
 
   it('lists no empty collection while previewing as Public', async () => {
@@ -132,6 +161,25 @@ describe('Nav: the house sidebar on 0.6’s queries (§5.2)', () => {
       await waitFor(() => expect(container.querySelector('.who-t')?.textContent).toBe(said))
       unmount()
     }
+  })
+
+  // R2 (plan §5): a member signed in by an emailed link (0.6.1): a person id, no wallet, no hats. The identity is their
+  // name, as the server says it (their member name) and as their comments are signed, with their Roles; no address.
+  it('a member signed in by an emailed link: their name and their Roles, no address, no hat; the read-only band says nothing', async () => {
+    const ID = 'example-org:person:example-steward'
+    routes({
+      'GET /api/actor': { id: ID, name: 'Example Steward', kind: 'person', via: 'email', roles: ['steward'], nodes: [] },
+      'GET /api/session': { mode: 'hosted', signedIn: true, via: 'email', actor: ID, viewer: 'member', expiresAt: '2026-10-31T10:00:00.000Z',
+        person: { id: ID, name: 'Example Steward', roles: ['network-member', 'steward'], nodes: [] }, signIn: null, methods: ['email'], instanceWrites: 'on' },
+    })
+    const { container } = renderAt(<ViewAsProvider><Nav /><ReadOnlyNotice /></ViewAsProvider>)
+    const who = await screen.findByRole('button', { name: /^Example Steward/ })
+    await waitFor(() => expect(container.querySelector('.who-t')!.textContent).toBe('Example Steward'))
+    expect(container.querySelector('.who-s')!.textContent).toBe('Network Member · Steward')
+    expect(container.textContent).not.toMatch(/0x|No hats|Hats not read/)
+    expect(container.querySelector('.band-ro')).toBeNull()
+    fireEvent.click(who)
+    expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual(expect.arrayContaining(['Network Member', 'Steward']))
   })
 
   it('the identity is who git says you are', async () => {

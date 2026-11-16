@@ -20,7 +20,7 @@ export const LIMIT = 0.001
 
 /** The committed visual record (ruling R-3): light only, WebP, `docs/design/house-record/<name>-light.webp`.
  *  The one list of what L4 records (L4a's six, then L4b's, G-4); a task that draws one of these groups refreshes its files. */
-export const RECORD = ['tokens-1440', 'controls-1440', 'atoms-1440', 'frame-1440', 'frame-390', 'tray-1440', 'rows-1440', 'needs-1440', 'views-1440', 'gov-1440', 'gov-roles-1440', 'map-1440', 'map-390', 'map-compose-1440', 'work-1440', 'lib-1440', 'door-1440'] as const
+export const RECORD = ['tokens-1440', 'controls-1440', 'atoms-1440', 'frame-1440', 'frame-390', 'tray-1440', 'rows-1440', 'needs-1440', 'views-1440', 'gov-1440', 'gov-roles-1440', 'map-1440', 'map-390', 'map-compose-1440', 'work-1440', 'lib-1440', 'portal-1440'] as const
 
 /** The record names of one group (or all of them for `null`). */
 export function recordsFor(group: string | null): string[] {
@@ -106,7 +106,7 @@ export interface Job {
   path: string
   /** Waits for what the page draws after its h1 (a map's edges…). */
   ready?: (p: Page) => Promise<void>
-  /** Shoot the whole page (the frame, the door) instead of `main`. */
+  /** Shoot the whole page (the frame, the portal) instead of `main`. */
   full?: boolean
 }
 

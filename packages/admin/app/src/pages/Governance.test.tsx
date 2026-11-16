@@ -50,7 +50,7 @@ describe('Governance', () => {
     fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view() })
     const { container } = renderAt(<Governance part="rules" />)
     const rules = await screen.findByRole('region', { name: 'Rules' })
-    expect(container.querySelector('.rh .rh-meta')!.textContent).toBe('model: solo-maintainer · data/governance.yaml')
+    expect(container.querySelector('.rh .rh-meta')!.textContent).toBe('model: solo-maintainer') // walk W3, D3: no file path
     // C7 (ledger): a rule is a field row — what it applies to, then its sentence and where it is written — not a table row
     const rows = within(rules).getByRole('group', { name: 'Rules in force' })
     expect([...rows.querySelectorAll('dt')].map(d => d.textContent)).toEqual(['everything'])
@@ -153,9 +153,9 @@ describe('Governance', () => {
       'GET /api/registries/governance': { name: 'governance', kind: 'document', schemaVersion: '2.0', document: { model: 'solo-maintainer' } } })
     renderAt(<Governance part="rules" />)
     // C7 (ledger): "source" became "Show governance.yaml", and the YAML a Mono well
-    fireEvent.click(await screen.findByRole('button', { name: 'Show governance.yaml' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Show the rules as written' }))
     // The server hands back what is under `governance:`, already unwrapped (registry.ts).
-    await waitFor(() => expect(screen.getByLabelText('governance.yaml').textContent).toBe('model: solo-maintainer\n'))
+    await waitFor(() => expect(screen.getByLabelText('The rules as written').textContent).toBe('model: solo-maintainer\n'))
   })
 
   it("says why when governance can't be read", async () => {
@@ -347,7 +347,8 @@ describe('Governance', () => {
     it('says generated files are behind the data when the server says so, with no button', async () => {
       routes({ 'GET /api/generated': { behind: true, since: 'abc1234' } })
       renderAt(<Governance part="rules" />)
-      const line = await screen.findByText('Generated files are behind the data: run npm run generate:schemas and commit .well-known/.')
+      // walk I7, D4: in words, no command; the server answers it to maintainers only
+      const line = await screen.findByText('Generated files are behind the data: regenerate them from the records and commit them.')
       expect(line.closest('.problem')!.querySelector('button')).toBeNull()
     })
 
@@ -406,7 +407,7 @@ describe('Governance', () => {
       expect(screen.queryByText('Pay the Q3 stipends')).toBeNull()
     })
 
-    it('as Public, none of the governance the door never shows: no problems, no decision or its text, no source well, no rule (I-2)', async () => {
+    it('as Public, none of the governance the portal never shows: no problems, no decision or its text, no source well, no rule (I-2)', async () => {
       fetchRoutes({ ...baseRoutes(), 'GET /api/proposals': [], 'GET /api/resources': [PUBLIC_RECORD],
         'GET /api/governance': view({ problems: ['data/governance.yaml holds 2 YAML documents.'], description: 'How the org decides.' }) })
       const { rerender } = renderAt(<ViewAsProvider initial={{ as: 'public' }}><Governance part="decisions" /></ViewAsProvider>, '/governance/decisions')
@@ -420,7 +421,7 @@ describe('Governance', () => {
       rerender(<ViewAsProvider initial={{ as: 'public' }}><Governance part="rules" /></ViewAsProvider>)
       expect(await screen.findByText('Previewing as Public, the rules in force are not shown.')).toBeTruthy()
       expect(screen.queryByText(/the maintainer decides alone/)).toBeNull()
-      expect(screen.queryByRole('button', { name: 'Show governance.yaml' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Show the rules as written' })).toBeNull()
       expect(screen.getByRole('tab', { name: /^Rules/ }).textContent).toBe('Rules')
     })
 
@@ -429,7 +430,40 @@ describe('Governance', () => {
       fetchRoutes({ ...baseRoutes(), 'GET /api/proposals': [], 'GET /api/resources': [doc], 'GET /api/governance': view() })
       renderAt(<ViewAsProvider initial={{ as: 'public' }}><Governance part="rules" /></ViewAsProvider>, '/governance/rules')
       expect(await screen.findByText('a maintainer proposes · the maintainer decides alone')).toBeTruthy()
-      expect(screen.queryByRole('button', { name: 'Show governance.yaml' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Show the rules as written' })).toBeNull()
     })
+  })
+})
+
+describe('governance words (walk fix wave 4, G10)', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(PROPOSAL_NOW) })
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+  const ruled = view({ model: 'consensus', rules: [
+    { direct: false, sentence: 'applies to records · member proposes · needs 1 approval from the council', source: 'data/governance.yaml rules: records' },
+  ] })
+
+  it('I6: with approval rules in force and none open, it never says every change applies directly', async () => {
+    fetchRoutes({ ...baseRoutes(), 'GET /api/governance': ruled, 'GET /api/proposals': [] })
+    renderAt(<Governance part="proposals" />, '/governance/proposals')
+    const panel = await screen.findByRole('tabpanel', { name: 'Open' })
+    await waitFor(() => expect(within(panel).getByText(/^None open\./)).toBeTruthy())
+    expect(panel.textContent).not.toMatch(/applies directly/)
+  })
+
+  it('I6: under the solo rule, where every change does apply directly, it still says so', async () => {
+    fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view(), 'GET /api/proposals': [] })
+    renderAt(<Governance part="proposals" />, '/governance/proposals')
+    const panel = await screen.findByRole('tabpanel', { name: 'Open' })
+    await waitFor(() => expect(panel.textContent).toMatch(/every change applies directly/))
+  })
+
+  it('M4: a ratified proposal its decision row names is counted once under Decided', async () => {
+    const ratified = proposalView({ id: 'p-2026-11-07-001', state: 'ratified', derived: 'ratified' } as never)
+    const withdrawn = proposalView({ id: 'p-2026-11-07-002', state: 'withdrawn', derived: 'withdrawn' } as never)
+    const decisions = [{ date: '2026-11-07', id: 'gov-20261107-001', title: 'Move the garden seat to the board', status: 'ratified', group: 'ratified',
+      where: 'governance.yaml' as const, proposal: 'p-2026-11-07-001' }]
+    fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view({ decisions }), 'GET /api/proposals': [ratified, withdrawn] })
+    renderAt(<Governance part="decisions" />, '/governance/decisions')
+    await waitFor(() => expect(screen.getByRole('tab', { name: /^Decided/ }).textContent).toBe('Decided 2'))
   })
 })

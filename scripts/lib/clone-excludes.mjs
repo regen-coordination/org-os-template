@@ -245,6 +245,17 @@ export const EXCLUDE_FILES = new Set([
   "tests/scripts/validate-governance.merges.test.mjs",
   // DAO-OS L5 Task 10: the house's commits, hat readings and Org-Hat (lib/hat-readings.mjs, lib/proposals.mjs); the same reason.
   "tests/scripts/validate-governance.hats.test.mjs",
+  // DAO-OS L6 Task 1: workspace/direct commits and raised targets (lib/proposals.mjs revOf); the same reason.
+  "tests/scripts/validate-governance.workspace.test.mjs",
+  // DAO-OS L6 Task 16c (R-L6-SUGGEST-2; review I5): a suggestion under workspace/suggest (lib/rules.mjs, lib/proposals.mjs); the same reason.
+  "tests/scripts/validate-governance.suggest.test.mjs",
+  // DAO-OS L6 Task 10: publishing judged offline, a page made public or a knowledge object publishable; the same reason.
+  "tests/scripts/validate-governance.publishes.test.mjs",
+  // DAO-OS L6 Task 11 review I-3: a ratify that moves a private record or page into git (Org-Moved); the same reason.
+  "tests/scripts/validate-governance.moves.test.mjs",
+  // DAO-OS L6 Task 15: npm run memory ships (node built-ins and js-yaml only; an instance's close step names it), but
+  // its suite also pins the framework's generated close skill (skills/commands/), which an instance does not receive.
+  "tests/scripts/memory.test.mjs",
   "tests/scripts/fixtures/ledger-write.mjs",
   // The pre-commit hook's linked-worktree skip (0.6 P2 final review I1): the hook ships, but this suite pins
   // the framework's reason for the skip, the admin's branch builds, which an instance does not receive.

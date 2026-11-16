@@ -607,6 +607,13 @@
           ]
         }
       },
+      "notes": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
       "tags": {
         "type": [
           "array",
@@ -671,6 +678,13 @@
           "null"
         ],
         "format": "uri"
+      },
+      "ens": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+eth$"
       },
       "space": {
         "type": [
@@ -809,6 +823,24 @@
           }
         ]
       },
+      "branch": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "files": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "minItems": 1,
+        "maxItems": 20,
+        "items": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(^|/)\\.{1,2}(/|$))(?!.*//)[^\\s]+$"
+        }
+      },
       "relates": {
         "type": [
           "array",
@@ -855,6 +887,208 @@
           ]
         }
       },
+      "deployment": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "composed",
+              "deployed"
+            ]
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "threshold": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "salt": {
+            "type": "string"
+          },
+          "top": {
+            "type": "object",
+            "properties": {
+              "details": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string"
+              },
+              "worn_by": {
+                "type": "string"
+              },
+              "hat": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^eip155:[0-9]+:0x[0-9a-fA-F]{64}$"
+              }
+            }
+          },
+          "network": {
+            "type": "string"
+          },
+          "settings": {
+            "type": "object"
+          },
+          "on_deploy": {
+            "type": "object",
+            "properties": {
+              "roles": {
+                "type": "object"
+              },
+              "rules": {
+                "type": "array"
+              }
+            }
+          },
+          "read_back": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "hats": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "object",
+          "required": [
+            "key"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "details": {
+              "type": "string"
+            },
+            "admin": {
+              "type": "string"
+            },
+            "max_supply": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "mutable": {
+              "type": "boolean"
+            },
+            "wearers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "role": {
+              "enum": [
+                "decides",
+                "acts"
+              ]
+            },
+            "image": {
+              "type": "string"
+            },
+            "hat": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      },
+      "signer_gate": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "hats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "threshold": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "enum": [
+                  "absolute",
+                  "proportional"
+                ]
+              },
+              "min": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "target": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "claimable_for": {
+            "type": "boolean"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "role": {
+        "enum": [
+          "decides",
+          "acts",
+          null
+        ]
+      },
+      "position": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "required": [
+          "x",
+          "y"
+        ],
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "order": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "minimum": 0
+      },
       "notes": {
         "type": [
           "string",
@@ -892,14 +1126,31 @@
                 "safe",
                 "gardens-community",
                 "gardens-pool",
-                "hats-tree",
-                "daouri-registration"
+                "hats-tree"
               ]
             }
           },
           "required": [
             "kind"
-          ]
+          ],
+          "not": {
+            "properties": {
+              "deployment": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "composed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "deployment"
+            ]
+          }
         },
         "then": {
           "required": [
@@ -913,6 +1164,92 @@
             "address": {
               "type": "string"
             }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "daouri-registration"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "not": {
+            "properties": {
+              "deployment": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "composed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "deployment"
+            ]
+          }
+        },
+        "then": {
+          "required": [
+            "chain"
+          ],
+          "properties": {
+            "chain": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            },
+            "ens": {
+              "type": "string"
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "address"
+              ]
+            },
+            {
+              "required": [
+                "ens"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "daouri-registration"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "not": {
+            "properties": {
+              "address": {
+                "type": "string"
+              },
+              "ens": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "address",
+              "ens"
+            ]
           }
         }
       },
@@ -983,6 +1320,45 @@
           "properties": {
             "url": {
               "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "repo"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "if": {
+            "required": [
+              "driver"
+            ],
+            "properties": {
+              "driver": {
+                "const": "repo"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "files"
+            ],
+            "properties": {
+              "url": {
+                "pattern": "^https://github\\.com/(?!\\.{1,2}/)[A-Za-z0-9_.-]+/(?!\\.{1,2}/?$)(?![A-Za-z0-9_.-]*\\.git/?$)[A-Za-z0-9_.-]+/?$"
+              },
+              "files": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 20
+              }
             }
           }
         }

@@ -22,6 +22,11 @@ import { GeneratedBehind } from '../parts/SyncParts.tsx'
 import { Skeleton } from '../design/Skeleton.tsx'
 import { NO_MODEL } from '../../../lib/governance-read.mjs'
 
+/** Walk W3, D3: where a rule is written, in words (no file path): "data/governance.yaml rules: people" → "rule people". */
+export const sourceWords = (source: string): string => source.replace(/^data\/governance\.yaml rules(: )?/, (_m, colon) => (colon ? 'rule ' : 'the written rules'))
+/** Where a decision is recorded, in words: the governance record or the decisions log, never a file name. */
+export const whereWords = (where: string): string => (where === 'governance.yaml' ? 'in the governance record' : where === 'DECISIONS.md' ? 'in the decisions log' : where)
+
 /** "applies to everything · a maintainer proposes · the maintainer decides alone" → its three columns. */
 export function ruleCells(sentence: string): [string, string, string] | null {
   const parts = sentence.split(' · ')
@@ -85,7 +90,7 @@ export default function Governance({ part }: { part: string }) {
   const closedOnes = shown.filter(p => p.state !== 'open')
   const counted = proposals.data !== undefined
   const v = g.data
-  // Previewed as Public, the page shows what the door would, failing closed (L4-R13, R-L5-13.3): never the problems,
+  // Previewed as Public, the page shows what the portal would, failing closed (L4-R13, R-L5-13.3): never the problems,
   // DECISIONS.md's rows or governance.yaml's decisions, nor the source well; the model, the description and the rules
   // only when the governance document itself is a record Public sees (none is listed, so none is shown).
   const asPublic = viewer.as === 'public'
@@ -93,11 +98,16 @@ export default function Governance({ part }: { part: string }) {
   const decisions = v && !asPublic ? [...v.decisions].sort((a, b) => b.date.localeCompare(a.date)) : []
   const rules = v && docShown ? v.rules : []
   // The tabs are the section's navigation: drawn while governance is read, or cannot be, each count once it is known.
-  // Decided counts what it lists: the decisions and the closed proposals (review M-2).
+  // Decided counts what it lists: the decisions and the closed proposals (review M-2), a ratified proposal its decision row
+  // names once (walk M4, PF-R262).
+  const decidedBy = new Set(decisions.map(d => d.proposal).filter((p): p is string => typeof p === 'string'))
+  const decidedCount = decisions.length + closedOnes.filter(p => !decidedBy.has(String(p.id))).length
+  // Walk I6: "every change applies directly" only while it is so: every rule in force is direct.
+  const allDirect = rules.length > 0 && rules.every(r => r.direct)
   const tabs = TABS.map(t => ({ ...t,
     count: t.id === 'proposals' ? (counted ? openOnes.length : undefined)
       : v === undefined ? undefined
-        : t.id === 'decisions' ? (counted ? decisions.length + closedOnes.length : undefined)
+        : t.id === 'decisions' ? (counted ? decidedCount : undefined)
           : docShown ? rules.length : undefined }))
   const head = (meta: string[] = []) => (
     <>
@@ -110,7 +120,7 @@ export default function Governance({ part }: { part: string }) {
   // One shape in every state, so the tab bar is not drawn anew (and a focused tab not lost) when governance arrives.
   return (
     <>
-      {head(v && docShown ? [`model: ${v.model ?? 'none set'}`, 'data/governance.yaml'] : [])}
+      {head(v && docShown ? [`model: ${v.model ?? 'none set'}`] : [])}
       {v && canWrite && sync.panel}
       {v && !asPublic && generated.data?.behind && <GeneratedBehind />}
       {/* a fault of the file is a house error note, worded by the server with its subject (walk 2026-11-04); NO_MODEL
@@ -127,7 +137,9 @@ export default function Governance({ part }: { part: string }) {
             {proposals.error ? <Note state="error">{proposals.error.message}</Note>
               : !counted ? <DataList label="Open proposals" loading={2}>{null}</DataList>
                 : openOnes.length === 0
-                  ? <Empty>None open. Under the rule in force every change applies directly; a proposal opens when a rule asks for someone else's say.</Empty>
+                  ? <Empty>{allDirect
+                    ? "None open. Under the rule in force every change applies directly; a proposal opens when a rule asks for someone else's say."
+                    : "None open. A proposal opens when a change needs someone else's say under the rules in force."}</Empty>
                   : <DataList label="Open proposals">{openOnes.map(p => <ProposalRow key={String(p.id)} view={p} now={now} actor={me} />)}</DataList>}
           </Section>
         )}
@@ -140,7 +152,7 @@ export default function Governance({ part }: { part: string }) {
                 <DataList label="Decisions">
                   {decisions.map((d, i) => (
                     <DataRow key={d.anchor ?? `${d.where}:${i}`} kind="decision" title={d.title} marks={[]}
-                      second={<>{d.id && <span className="prow-id">{d.id}</span>}<span className="prow-route">{d.where}</span>{d.date && <span>{d.date}</span>}</>}
+                      second={<>{d.id && <span className="prow-id">{d.id}</span>}<span className="prow-route">{whereWords(d.where)}</span>{d.date && <span>{d.date}</span>}</>}
                       trailing={<>
                         <Outcome d={d} />
                         {d.anchor && <Button small variant="ghost" expanded={open === d.anchor} label={`Read ${d.title}`}
@@ -170,17 +182,17 @@ export default function Governance({ part }: { part: string }) {
                   return (
                     <FieldRow key={i} label={cells ? cells[0] : `Rule ${i + 1}`}>
                       <span className="rule-s">{cells ? `${cells[1]} · ${cells[2]}` : r.sentence}</span>
-                      <span className="rule-src">{r.source}</span>
+                      <span className="rule-src">{sourceWords(r.source)}</span>
                     </FieldRow>
                   )
                 })}
               </FieldTable>
             )}
             {!asPublic && <p className="gov-src">
-              <Button expanded={source} onClick={() => setSource(s => !s)}>{source ? 'Hide governance.yaml' : 'Show governance.yaml'}</Button>
+              <Button expanded={source} onClick={() => setSource(s => !s)}>{source ? 'Hide the rules as written' : 'Show the rules as written'}</Button>
             </p>}
             {!asPublic && source && (doc.error ? <Note state="error">{doc.error.message}</Note>
-              : <pre className="gov-well" aria-label="governance.yaml">{doc.data ? stringify(doc.data.document ?? {}) : 'Loading…'}</pre>)}
+              : <pre className="gov-well" aria-label="The rules as written">{doc.data ? stringify(doc.data.document ?? {}) : 'Loading…'}</pre>)}
           </Section>
         )}
       </div>)}

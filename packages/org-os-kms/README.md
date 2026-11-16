@@ -26,3 +26,17 @@ This is the adoption vehicle for ReFi DAO / ReFi BCN / future communities (build
 ## Extension packs
 
 Sibling packages that add typed schemas, entities, connectors and registry bindings without editing the framework — opt in with `kms.yaml` `extensions: [<pack>]`. First pack: [`org-os-territory`](../org-os-territory/README.md). Contract and rules: [`docs/CONNECTORS.md` §13](docs/CONNECTORS.md#13-extension-packs).
+
+## What kms draws
+
+Every page kms writes for people speaks the house element set (tokens generated from the house skin; Fraunces, Geist and Geist Mono vendored and inlined), stays static and self-contained, and requests nothing from any other host:
+
+- **The federation map** (`org-os-kms render map html` → `renders/federation-map.html`) — the steward's copy: the map laid out in layers by the direction knowledge travels, with what needs a steward marked, complete without JavaScript and enhanced by the `<federation-map>` component when it runs. Nodes one hop beyond sit further out from whoever reported them. Beside it, `renders/federation-links.md` lists the map's links, one a node, for the note graph. In `map.json` v1 a node's link is its `portal` key (from `portal_web` / `portal_vault` in `data/source-systems.yaml`): a data key a peer may read, kept until map.json v2; "portal" itself names the house's public site.
+- **The commons as pages** (opt-in: `publish.pages: true` in `kms.yaml`) — `publish` writes `index.html`, kind pages under `k/<kind>/` and one read-only page per published entry beside the JSON API. Only what the publication gate let through appears; a reference to anything else is dropped, so a private entry cannot be inferred. Without the flag, `public/` is exactly what it was.
+- **The steward's preview** (`org-os-kms render pages --preview` → `renders/preview/`) — the same pages over the whole canon, with internal entries, broken references and the review queue shown. It is never published.
+
+`render.fonts: system` turns the vendored fonts off; `render.labels` renames body field headings. See `docs/CONNECTORS.md`.
+
+## Checking the pages
+
+`scripts/shoot.mjs` is a dev-only page checker: `node scripts/shoot.mjs --html <file.html> --out <dir> --name <surface> [--widths 1440,390] [--themes light,dark] [--reflow 390,320] [--axe] [--full-page]`. It writes one JPEG per width and theme plus `<name>-report.json` (horizontal overflow at the reflow widths, every request that is not `file:` or `data:`, console errors, and with `--axe` the WCAG 2.x A/AA violations), and exits 1 on any finding. It needs `playwright-core` (and `axe-core` for `--axe`) and the installed Chrome; none are dependencies of this package. Set `KMS_SHOOT_MODULES` to a directory containing `node_modules/` with them, otherwise `packages/admin` and then this package are tried; exit code 2 means they were not found.

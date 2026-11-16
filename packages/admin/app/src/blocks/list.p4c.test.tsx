@@ -56,7 +56,7 @@ describe('the list block, for boards (P4c)', () => {
   it("leaves a lone section list's Add to the page head: no New in its view header, the file's unaddressable line in the foot", async () => {
     fetchRoutes(projects([{ id: 'p1' }, { title: 'no id' }]))
     renderAt(<Layout layout="flow" blocks={[listEntry({ new: true })]} />)
-    expect(await screen.findByText(/1 entry in data\/projects.yaml cannot be addressed/)).toBeTruthy()
+    expect(await screen.findByText(/1 entry in this list cannot be addressed/)).toBeTruthy()
     await screen.findByRole('link', { name: 'Alpha' })
     expect(document.querySelector('.vhead')).not.toBeNull()
     expect(screen.queryByRole('link', { name: 'New' })).toBeNull()

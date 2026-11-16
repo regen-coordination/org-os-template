@@ -1,5 +1,5 @@
 import { simpleGit } from 'simple-git'
-import type { Adapter, AdapterResult, Board, BoardView, Edge, Graph, Portal, Resource } from './types.ts'
+import type { Adapter, AdapterResult, Board, BoardLink, BoardView, Edge, Graph, Resource } from './types.ts'
 
 export const isBoard = (v: unknown): v is Board => v === 'organization' || v === 'systems'
 
@@ -72,13 +72,17 @@ export function assemble(results: { adapter: Pick<Adapter, 'name' | 'board' | 't
   return { nodes, edges }
 }
 
-/** One canvas: its cards, the edges inside it, and one portal gathering every edge that leaves it. */
+/** One canvas: its cards, the edges inside it, and one link node gathering every edge that leaves it
+ *  (on the wire `portals`, PF-R119). The Systems map takes every System, wherever its section places it (a Safe in the
+ *  treasury is the Organization's too): the DAO map draws the main Safe (whole-platform walk I14). An edge is inside when
+ *  both its ends are here, and leaves when one is. */
 export function boardView(graph: Graph, board: Board): BoardView {
-  const nodes = graph.nodes.filter(n => n.board === board)
+  const nodes = graph.nodes.filter(n => n.board === board || (board === 'systems' && n.kind === 'system'))
   const here = new Set(nodes.map(n => n.id))
-  const edges = graph.edges.filter(e => !e.crosses && here.has(e.from))
-  const crossing = graph.edges.filter(e => e.crosses && (here.has(e.from) || here.has(e.to)))
-  const portals: Portal[] = []
+  // inside this canvas an edge crosses nothing, though its ends sit on two boards
+  const edges = graph.edges.filter(e => here.has(e.from) && here.has(e.to)).map(e => ({ from: e.from, to: e.to, kind: e.kind }))
+  const crossing = graph.edges.filter(e => here.has(e.from) !== here.has(e.to))
+  const portals: BoardLink[] = []
   if (crossing.length > 0) {
     const targets = [...new Set(crossing.map(e => (here.has(e.from) ? e.to : e.from)))]
     const sources = new Set(crossing.map(e => (here.has(e.from) ? e.from : e.to)))

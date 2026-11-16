@@ -1,6 +1,6 @@
 // tests/instance-doctor/assess-report.test.mjs
 //
-// B7 — the scorecard. assessSnapshot() runs the six checks over one snapshot
+// B7 — the scorecard. assessSnapshot() runs the seven checks over one snapshot
 // and is pure; renderScorecard() and toJson() shape the two output modes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,11 +55,12 @@ function healthySnapshot(patch = {}) {
   };
 }
 
-test('assessSnapshot runs all six checks in a stable order', () => {
+// DAO-OS L6 Task 15 replaced "runs all six checks": the agent layer (§14, Q76) is the seventh, read last.
+test('assessSnapshot runs all seven checks in a stable order', () => {
   const a = assessSnapshot(healthySnapshot());
   assert.deepEqual(
     a.checks.map((c) => c.id),
-    ['identity', 'lineage', 'versions', 'machinery', 'structure', 'freshness'],
+    ['identity', 'lineage', 'versions', 'machinery', 'structure', 'freshness', 'agent-layer'],
   );
 });
 

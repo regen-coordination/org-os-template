@@ -81,6 +81,9 @@ site/test-results/
 # The no-names guard's list of real names (packages/admin app/src/test/no-names.test.ts): local only, never committed
 .org-os/names.local
 
+# kms render previews (written by the render op, regenerated on demand)
+renders/preview/
+
 # The private store (dao-os L5 spec §10.1): private records, restricted fields, sessions, their backups. Never in git;
 # the admin server refuses to open a store inside the repository that git does not ignore.
 .org-os/private/

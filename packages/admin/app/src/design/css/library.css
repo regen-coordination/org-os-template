@@ -67,7 +67,7 @@
 .lib-prev-in { display: grid; grid-template-columns: minmax(0, 1fr) var(--w-panel); overflow: hidden; background: var(--raised);
   border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
 .lib-prev-in.lib-prev-one { grid-template-columns: minmax(0, 1fr); }
-.lib-prev-m { display: grid; gap: var(--sp-12); align-content: start; padding: var(--sp-12); min-width: 0; }
+.lib-prev-m { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-12); align-content: start; padding: var(--sp-12); min-width: 0; }
 .lib-prev-s { display: grid; gap: var(--sp-11); align-content: start; padding: var(--sp-12) var(--sp-11); min-width: 0;
   background: var(--sunken); border-inline-start: var(--rule-w) solid var(--rule); }
 @container prev (max-width: 679px) {
@@ -82,8 +82,10 @@
 .lib-prev-t:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
 .lib-p { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); max-width: var(--w-prose); overflow-wrap: anywhere; }
 .lib-sum { color: var(--ink); }
-.lib-lede { display: grid; gap: var(--sp-5); min-width: 0; }
-.lib-state { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); }
+/* walk I17: one track that shrinks to the column, and a status sentence that wraps, so no line runs off the card at 390 px */
+.lib-lede { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); min-width: 0; }
+.lib-state { margin: 0; font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); min-width: 0; overflow-wrap: anywhere; }
+.lib-state .smark { white-space: normal; }
 .lib-sec { display: grid; gap: var(--sp-6); align-content: start; min-width: 0; }
 .lib-h { margin: 0; font: var(--fw-strong) var(--fs-ui)/var(--lh-label) var(--sans); color: var(--ink); }
 .lib-ul { margin: 0; padding-inline-start: var(--sp-10); font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); }

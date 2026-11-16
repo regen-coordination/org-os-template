@@ -13,7 +13,7 @@ export type MentionProps =
 /** A mention (§7.11): inline, at the text's own size, a --wash pill. A person or **you** (moss on --accent-soft)
  *  after a faint "@" that assistive tech skips; a record with its kind's glyph; a page with the document glyph. Each is
  *  a link — person → member record, record → record page. One the reader may not see is the dashed inline form,
- *  with no title and nothing to follow ("Members only" on the door, "Not visible to you" on the members' side).
+ *  with no title and nothing to follow ("Members only" on the portal, "Not visible to you" on the members' side).
  *  A long title truncates with an ellipsis inside the pill; the whole of it stays in the DOM and in `title`. */
 export function Mention(props: MentionProps) {
   if (props.restricted !== undefined) return <span className="mention mention-gone">{RESTRICTED[props.restricted]}</span>

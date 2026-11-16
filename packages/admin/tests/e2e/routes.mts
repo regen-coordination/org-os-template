@@ -12,7 +12,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { startFixture } from './setup.mts'
-import { acceptanceRoutes, GOVERNANCE, SYSTEMS, seed, settle, viewAsPublic } from './seed.mts'
+import { acceptanceRoutes, GOVERNANCE, SYSTEMS, seed, settleFrame, viewAsPublic } from './seed.mts'
 import { shootAll, type Job } from './shoot.mts'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -28,10 +28,10 @@ try {
   const seeded = await seed(fx)
   const routes = (await acceptanceRoutes(fx.base, seeded)).filter(r => !only || only.has(r.slug))
   if (only && routes.length !== only.size) throw new Error(`--only names a slug that is no route: ${[...only].join(', ')}`)
-  // the door and the previews are shot whole: the door is a page outside the frame, and the band sits above main
+  // the portal and the previews are shot whole: the portal is a page outside the frame, and the band sits above main
   const jobs: Job[] = routes.map(r => ({
-    name: r.slug, path: r.path, full: r.path === '/door' || !!r.preview,
-    ready: async p => { await settle(p); if (r.preview === 'public') await viewAsPublic(p) },
+    name: r.slug, path: r.path, full: r.path === '/portal' || !!r.preview,
+    ready: async p => { await settleFrame(p); if (r.preview === 'public') await viewAsPublic(p) },
   }))
   problems = await shootAll({ base: fx.base, jobs, dir: DIR, update, mask: ['time', '[data-volatile]', `text=${seeded.proposal}`] })
   console.log(`${routes.length} routes, ${routes.length * 4} shots`)

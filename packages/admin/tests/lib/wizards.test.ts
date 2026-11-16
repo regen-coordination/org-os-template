@@ -38,7 +38,7 @@ describe('validateWizard', () => {
     expect(faults(w => { w.steps[0].doors = [] })).toEqual(expect.arrayContaining([expect.stringMatching(/doors/)]))
     expect(faults(w => { w.steps[0].doors = [{ value: 'a' }] })).toEqual(expect.arrayContaining([expect.stringMatching(/door.*value and a label/)]))
     expect(faults(w => { w.steps[0].fields = [{ id: 'n', label: 'N', kind: 'text' }] })).toEqual([])
-    expect(faults(w => { w.steps[0].fields = [{ id: 'n', label: 'N', kind: 'date' }] })).toEqual(expect.arrayContaining([expect.stringMatching(/kind that is not text, email or choice/)]))
+    expect(faults(w => { w.steps[0].fields = [{ id: 'n', label: 'N', kind: 'date' }] })).toEqual(expect.arrayContaining([expect.stringMatching(/kind that is not text, email, choice, addresses or count/)]))
     expect(faults(w => { w.steps[0].fields = [{ id: 'n', label: 'N', kind: 'choice' }] })).toEqual(expect.arrayContaining([expect.stringMatching(/needs options/)]))
     expect(faults(w => { w.steps[0].fields = [{ id: 'n', label: 'N', kind: 'text' }, { id: 'n', label: 'M', kind: 'text' }] })).toEqual(expect.arrayContaining([expect.stringMatching(/used twice/)]))
   })

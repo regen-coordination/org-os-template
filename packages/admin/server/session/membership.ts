@@ -54,6 +54,14 @@ export type ActRefused = Refused & { code: ActRefusalCode }
 
 interface Kept { hats: string[]; block: number; readAt: string; at: number }
 
+/**
+ * Every account wearing `hat` now, read through the tree's own hat list (`SystemReader.wearers`, as `actFor` reads the list
+ * an act records). A role sourced from a hat is worn by these (R-L6-SUGGEST-2, fix round 1 of Task 16c: review S1), so a
+ * suggestion's deciding role is resolved from them rather than from one actor's reading. Refused, writing nothing, when
+ * there is no tree, the value is no hat ref, or the list cannot be read.
+ */
+export interface HatWearers { (hat: string): Promise<{ ok: true; accounts: string[]; complete: boolean; block: number; readAt: string } | Refused> }
+
 /** Membership read from the DAO's Hats tree (L5 spec §5), through `SystemReader.wearer`/`wearers`.
  *  It keeps each account's last good reading. A read (`forRead`) answers that reading and never waits on the network,
  *  refreshing it in the background once it is older than `HATS_FRESH_MS`; an act (`forAct`, `actFor`) reads now (the
@@ -143,8 +151,29 @@ export class Membership {
     return { ok: true, tree, id, hats: r.hats, block: r.block, readAt: r.readAt }
   }
 
-  /** A hat's name for people: the governance role sourced from exactly that hat, else its pretty id. */
-  hatName(hat: string): string {
+  /**
+   * Every account wearing `hat` now, read through the tree's own hat list as `actFor` reads the list an act records. A role
+   * sourced from a hat is worn by these (`HatWearers`; R-L6-SUGGEST-2, fix round 1, review S1). Refused, nothing written,
+   * when there is no tree, the value is no hat ref, or the list cannot be read: then it is not known who wears it.
+   * `complete` false: the list was not read whole (no explorer, or a page left), so it names some wearers, not all
+   * (fix round 2, review I3).
+   */
+  async wearersOf(hat: string): Promise<{ ok: true; accounts: string[]; complete: boolean; block: number; readAt: string } | Refused> {
+    const parsed = parseHatRef(hat)
+    if (!parsed) return { ok: false, error: `${hat} is not a hat ref (eip155:<chain id>:0x followed by 64 hex digits).` }
+    const tree = this.tree()
+    if (!tree) return { ok: false, error: 'This organisation names no Hats tree for its membership, so a hat has no wearers to read.' }
+    const ref = hatRef(parsed.chain, parsed.hatId)
+    const w = await this.reader.wearers(tree.system, ref)
+    if (!w.ok) return { ok: false, error: w.error }
+    return { ok: true, accounts: w.wearers, complete: w.complete, block: w.block, readAt: w.readAt }
+  }
+
+  /** A hat's name for people: the governance role sourced from exactly that hat, else its name in `details` (the tree's
+   *  read, by canonical hat ref: plain text only, `hatDetailsName`), else its pretty id. `details` is the caller's to give
+   *  only to a viewer who may read the tree (Rule 4: GET /api/visibility, `namesFor`); without it no read is named from
+   *  (whole-platform walk M18). */
+  hatName(hat: string, details?: ReadonlyMap<string, string>): string {
     const parsed = parseHatRef(hat)
     if (!parsed) return hat
     const ref = hatRef(parsed.chain, parsed.hatId)
@@ -155,7 +184,7 @@ export class Membership {
         if (p && hatRef(p.chain, p.hatId) === ref) return id
       }
     }
-    return prettyHatId(parsed.hatId)
+    return details?.get(ref) ?? prettyHatId(parsed.hatId)
   }
 
   /** Keeps a good reading for reads, only for an account that wears a hat, already has a kept reading (a member whose
@@ -197,6 +226,14 @@ export class Membership {
       return existsSync(join(this.repo, 'data', 'systems.yaml')) ? (readRegistry(this.repo, 'systems').entries ?? []) as System[] : []
     } catch { return [] }
   }
+}
+
+/** A hat's details as a name: plain text, trimmed; null for none, a link (`ipfs://…`, `https://…`) or JSON, which are
+ *  not names (as the Roles page reads them, elements/governance/roles.ts). */
+export function hatDetailsName(details: unknown): string | null {
+  if (typeof details !== 'string') return null
+  const t = details.trim()
+  return t === '' || /^[a-z][a-z0-9+.-]*:\/\//i.test(t) || /^[[{]/.test(t) ? null : t
 }
 
 /** The CAIP-10 id of `account` (a bare address or CAIP-10) on `chain`; null for what is no address or is on another

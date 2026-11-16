@@ -629,10 +629,13 @@ describe('commitMerge', () => {
     expect(await git.mergeFfOnly(dir, feat)).not.toMatch(/autostash/i)
     expect(hasStash()).toBe(false)
   })
-  it('commitDataPaths still refuses anything outside data/', async () => {
+  // DAO-OS L6 §11.3 (replaces "commitDataPaths still refuses anything outside data/"): commitPaths writes the allow-list,
+  // and DECISIONS.md is ratify's alone.
+  it('commitPaths refuses a path off the allow-list, and DECISIONS.md, which only ratify writes', async () => {
     const { dir } = pending()
-    await expect(git.commitDataPaths(dir, ['extra.txt'], 'm')).rejects.toThrow(/outside data\//)
-    await expect(git.commitDataPaths(dir, ['DECISIONS.md'], 'm')).rejects.toThrow(/outside data\//)
+    await expect(git.commitPaths(dir, ['extra.txt'], 'm')).rejects.toThrow(/guardrail: refusing to write extra\.txt: /)
+    await expect(git.commitPaths(dir, ['DECISIONS.md'], 'm')).rejects.toThrow(/guardrail: refusing to write DECISIONS\.md: .*ratify/)
+    await expect(git.commitDataPaths(dir, ['extra.txt'], 'm')).rejects.toThrow(/guardrail: refusing to write extra\.txt: /)
   })
 })
 
@@ -703,11 +706,16 @@ describe('stageMergeFiles and hiddenMergePaths: ratify’s three files, DECISION
     ])
     for (const bad of ['README.md', '../x', 'data/../README.md']) await expect(git.hiddenMergePaths(dir, [bad]), bad).rejects.toThrow(/guardrail/)
   })
-  it('the data-only functions are as strict as before: DECISIONS.md is refused by each', async () => {
+  // DAO-OS L6 §11.3 (replaces "the data-only functions are as strict as before"): they read the allow-list, where
+  // DECISIONS.md is ratify's alone, so each still refuses it, and README.md, which is on no list.
+  it('restageDataPaths, hiddenDataPaths and uncommittedDataPaths refuse DECISIONS.md and a path off the allow-list', async () => {
     const { dir } = pendingMerge()
-    await expect(git.restageDataPaths(dir, ['DECISIONS.md'])).rejects.toThrow(/outside data\//)
-    await expect(git.hiddenDataPaths(dir, ['DECISIONS.md'])).rejects.toThrow(/outside data\//)
-    await expect(git.uncommittedDataPaths(dir, ['DECISIONS.md'])).rejects.toThrow(/outside data\//)
+    for (const bad of ['DECISIONS.md', 'README.md']) {
+      await expect(git.restageDataPaths(dir, [bad]), bad).rejects.toThrow(/guardrail: refusing to write/)
+      await expect(git.hiddenDataPaths(dir, [bad]), bad).rejects.toThrow(/guardrail: refusing to write/)
+      await expect(git.uncommittedDataPaths(dir, [bad]), bad).rejects.toThrow(/guardrail: refusing to write/)
+    }
+    expect(await git.uncommittedDataPaths(dir, ['federation.yaml'])).toEqual([])
   })
 })
 
@@ -733,5 +741,55 @@ describe('unmergedPaths: the index entries a merge left unmerged (Task 11a fix r
     await git.mergeNoFf(clean, f2)
     expect(await git.unmergedPaths(clean)).toEqual([])
     await git.mergeAbort(clean)
+  })
+})
+
+describe('assertWritablePath and commitPaths: where the server may write (DAO-OS L6 §11.3)', () => {
+  it('refuses .git/config, ../x, /etc/x, .org-os/private/house.db and .well-known/dao.json, before git runs', async () => {
+    const dir = repoAt()
+    for (const bad of ['.git/config', '../x', '/etc/x', '.org-os/private/house.db', '.well-known/dao.json', 'data/../README.md', './data/x.yaml', '-f', 'README.md', 'data/', '']) {
+      expect(() => git.assertWritablePath(dir, bad), bad).toThrow(/^guardrail: refusing to write /)
+    }
+    expect(() => git.assertWritablePath(dir, '.well-known/dao.json')).toThrow(/generated from the records/)
+  })
+  it('accepts pages/a-1f2e.md, data/kb/claim.yaml, memory/2026-10-30.md and the rest of the list', () => {
+    const dir = repoAt()
+    for (const ok of ['pages/a-1f2e.md', 'data/kb/claim.yaml', 'memory/2026-10-30.md', 'data/members.yaml', 'IDENTITY.md', 'federation.yaml',
+      'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/QUEUE.md', 'docs/agent-plans/a.md', 'pages/assets/a-1f2e/x.png']) {
+      expect(() => git.assertWritablePath(dir, ok), ok).not.toThrow()
+    }
+    expect(() => git.assertWritablePath(dir, 'DECISIONS.md')).toThrow(/ratify/)
+    expect(() => git.assertWritablePath(dir, 'DECISIONS.md', { ratify: true })).not.toThrow()
+  })
+  it('commitPaths refuses a path git ignores, and commits federation.yaml, IDENTITY.md and a page in one commit', async () => {
+    const dir = repoAt()
+    sh(dir, 'git config user.name Test && git config user.email test@example.org')
+    commitFile(dir, '.gitignore', 'memory/private-*.md\n')
+    mkdirSync(join(dir, 'memory'))
+    writeFileSync(join(dir, 'memory', 'private-1.md'), 'x\n')
+    await withGitTrace(async started => {
+      await expect(git.commitPaths(dir, ['memory/private-1.md'], 'm')).rejects.toThrow(/^guardrail: refusing to write memory\/private-1\.md: git ignores it/)
+      expect(started().filter(line => !line.startsWith('check-ignore'))).toEqual([])
+    })
+    mkdirSync(join(dir, 'pages'))
+    writeFileSync(join(dir, 'federation.yaml'), 'identity:\n  name: Org\n')
+    writeFileSync(join(dir, 'IDENTITY.md'), '# Org\n')
+    writeFileSync(join(dir, 'pages', 'a-1f2e.md'), '# A\n')
+    const made = await git.commitPaths(dir, ['federation.yaml', 'IDENTITY.md', 'pages/a-1f2e.md'], 'admin(identity): edit')
+    expect(made).toBe(sha(dir))
+    expect(sh(dir, 'git show --name-only --format= HEAD').trim().split('\n').sort()).toEqual(['IDENTITY.md', 'federation.yaml', 'pages/a-1f2e.md'])
+  })
+  it('stageMergeFiles takes the same list, DECISIONS.md included', async () => {
+    const dir = repoAt()
+    sh(dir, 'git config user.name Test && git config user.email test@example.org')
+    sh(dir, 'git checkout -q -b feat')
+    commitFile(dir, 'data/x.yaml', 'x: 2\n')
+    const feat = sha(dir)
+    sh(dir, 'git checkout -q main')
+    await git.mergeNoFf(dir, feat)
+    writeFileSync(join(dir, 'IDENTITY.md'), '# Org\n')
+    await git.stageMergeFiles(dir, ['IDENTITY.md'], ['IDENTITY.md'])
+    await expect(git.stageMergeFiles(dir, ['.well-known/dao.json'], ['.well-known/dao.json'])).rejects.toThrow(/guardrail/)
+    await git.mergeAbort(dir)
   })
 })

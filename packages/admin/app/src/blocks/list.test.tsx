@@ -11,6 +11,7 @@ import { renderAt } from '../test/render.tsx'
 import { baseRoutes, changeView, refuse, resource } from '../test/data.ts'
 import { flowEnv } from '../test/flowEnv.ts'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
+import { clientWith, statusRoute } from '../test/writesOff.ts'
 import { TOGGLE_VIEW } from '../keys/useHouseKeys.ts'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -275,4 +276,27 @@ describe('the list block', () => {
     expect(await screen.findByRole('group', { name: 'Projects map' })).toBeTruthy()
     expect(screen.queryByRole('grid', { name: 'Projects' })).toBeNull()
   })
+})
+
+// R2b (review M-2): a collection's map keeps its positions in this browser only (localStorage), nothing the Hub writes:
+// a node is dragged and Auto-layout offered whether the Hub's writes are off or on.
+describe('a collection\'s map, the Hub\'s writes off and on', () => {
+  afterEach(() => { localStorage.clear() })
+  for (const off of [true, false]) {
+    it(off ? 'off: nodes move, kept in this browser; Auto-layout is offered' : 'on: the same', async () => {
+      flowEnv()
+      const { calls } = routes({ 'GET /api/graph/organization': { board: 'organization', nodes: projects, edges: [], portals: [] }, ...statusRoute(off) })
+      renderAt(<BlockFrame def={listBlock} cfg={{ ...section, view: { ...section.view, mapKey: `m2-${off}` } }} id="projects" />, '/', { queryClient: clientWith(off) })
+      fireEvent.click(await screen.findByRole('tab', { name: 'Map' }))
+      await waitFor(() => expect(document.querySelector('[data-node-id="project:br"]')).not.toBeNull())
+      const node = document.querySelector('[data-node-id="project:br"]') as HTMLElement
+      await waitFor(() => expect((node.closest('.react-flow__node') as HTMLElement).classList.contains('draggable')).toBe(true))
+      expect(screen.getByRole('button', { name: 'Auto-layout' })).toBeTruthy()
+      fireEvent.keyDown(node, { key: 'm' })
+      fireEvent.keyDown(node, { key: 'ArrowRight' })
+      fireEvent.keyDown(node, { key: 'Enter' })
+      await waitFor(() => expect(Object.keys(JSON.parse(localStorage.getItem(`org-os-admin.layout.m2-${off}`) ?? '{}'))).toEqual(['project:br']))
+      expect(calls.filter(c => c.method !== 'GET')).toEqual([])
+    })
+  }
 })

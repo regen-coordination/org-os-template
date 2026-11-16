@@ -2,7 +2,8 @@
 import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { readFileSync, mkdtempSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, mkdtempSync, existsSync, statSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fw, loadExtensions, reset, cleanup } from '../demo/capture/env.mjs';
@@ -17,7 +18,7 @@ import { attempts } from '../demo/capture/attempts.mjs';
 import { territory } from '../demo/capture/territory.mjs';
 import { verified } from '../demo/capture/verified.mjs';
 import { capture } from '../demo/capture.mjs';
-import { assemble, build, stripExports, safeJson, DEFAULT_OUT } from '../demo/build.mjs';
+import { assemble, build, stripExports, safeJson, pageScript, withoutFontFaces, DEFAULT_OUT } from '../demo/build.mjs';
 import * as R from '../demo/render.mjs';
 
 beforeEach(() => reset());
@@ -142,13 +143,47 @@ test('territory: queries computed by the real helpers for every unit; unknown re
   assert.equal(t.streams.streams.length, 5);
 });
 
-test('verified (--skip-suites): commit list and the no-pre-existing-test-modified check are real; suites are marked skipped', () => {
+test('verified (--skip-suites): commit list and the modified-test list are read from git (shape only — this worktree is read, never written); suites are marked skipped', () => {
   const v = verified({ skipSuites: true });
   assert.equal(v.skipped, true);
   assert.match(v.base, /^[0-9a-f]{40}$/);
   assert.ok(Array.isArray(v.commits) && v.commits.every((c) => /^[0-9a-f]{7,} \S/.test(c)), 'each commit line is "<hash> <subject>"');
-  assert.equal(v.testDirsUnmodified, true);
+  assert.ok(Array.isArray(v.testDirsModified) && v.testDirsModified.every((p) => /^packages\/(toolkit-framework|org-os-kms)\/test\//.test(p)), 'modified pre-existing tests, by path');
+  assert.equal(v.testDirsUnmodified, v.testDirsModified.length === 0);
   assert.deepEqual(v.suites, []);
+});
+
+// R-3: a branch that changes pre-existing tests on purpose is reported, not refused. Run against a fresh repo under os.tmpdir().
+test('verified: modified pre-existing tests are listed as evidence (equal to what git reports), never a build failure', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'demo-verified-'));
+  try {
+    const git = (...a) => {
+      const r = spawnSync('git', ['-c', 'user.name=Field steward', '-c', 'user.email=steward@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...a], { cwd: repo, encoding: 'utf8' });
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const put = (rel, text) => { mkdirSync(join(repo, rel, '..'), { recursive: true }); writeFileSync(join(repo, rel), text); };
+    git('init', '-q', '-b', 'main');
+    put('packages/org-os-kms/test/a.test.mjs', 'a\n');
+    put('packages/org-os-kms/test/keep.test.mjs', 'keep\n');
+    put('packages/toolkit-framework/test/b.test.mjs', 'b\n');
+    put('packages/other/test/c.test.mjs', 'c\n');
+    git('add', 'packages');
+    git('commit', '-q', '-m', 'base');
+    git('checkout', '-q', '-b', 'feat');
+    put('packages/org-os-kms/test/a.test.mjs', 'a changed\n');
+    rmSync(join(repo, 'packages/toolkit-framework/test/b.test.mjs'));
+    put('packages/org-os-kms/test/new.test.mjs', 'added, not pre-existing\n');
+    put('packages/other/test/c.test.mjs', 'c changed, outside the two directories\n');
+    git('add', 'packages');
+    git('commit', '-q', '-m', 'change two pre-existing tests');
+    const v = verified({ skipSuites: true, repo });
+    const fromGit = git('diff', `${v.base}..HEAD`, '--name-only', '--diff-filter=MDR', '--', 'packages/toolkit-framework/test', 'packages/org-os-kms/test').split('\n').filter(Boolean);
+    assert.deepEqual(v.testDirsModified, fromGit);
+    assert.deepEqual(v.testDirsModified, ['packages/org-os-kms/test/a.test.mjs', 'packages/toolkit-framework/test/b.test.mjs']);
+    assert.equal(v.testDirsUnmodified, false);
+    assert.equal(v.commits.length, 1);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
 test('capture: every section key is present, the whole thing serialises, and it fits the page budget', async () => {
@@ -173,27 +208,63 @@ test('build helpers: safeJson can never end its script block; stripExports remov
   assert.equal(stripExports('export const a = 1;\nexport function b() {}\nexport async function c() {}\nconst d = 2;'), 'const a = 1;\nfunction b() {}\nasync function c() {}\nconst d = 2;');
 });
 
-test('the page: header, banner, theme control, the seam section, embedded facts; no external resources; compiles; within budget', async () => {
+test('the page: the house shell — artifact bar, intro callout, the seam section, embedded facts; no theme control (K-19), no table, no request; compiles; within budget (P-10)', async () => {
   const facts = await getFacts();
   const html = assemble(facts);
   assert.match(html, /<section id="seam"/);
   assert.match(html, /captured by running the real code/);
-  assert.match(html, /data-action="toggle-theme"/);
+  assert.match(html, /<header class="art-bar">[\s\S]*?<h1 class="art-name">Packs for the knowledge plane<\/h1>/, 'the artifact bar, from kms');
+  assert.ok(html.includes(`<time datetime="${facts.meta.capturedAt}">`), 'the capture time, machine-readable');
+  assert.ok(!/toggle-theme/.test(html) && !/<html[^>]*\sdata-theme=/.test(html) && !/<button[^>]*>[^<]*theme/i.test(html), 'no theme control: light and dark follow the reader (the house tokens answer prefers-color-scheme)');
+  assert.ok(!/<table\b/i.test(html), 'every table became rows');
   assert.match(html, /class="skip" href="#main"/);
+  assert.match(html, /<main id="main"/);
   const m = /<script type="application\/json" id="facts">([\s\S]*?)<\/script>/.exec(html);
   assert.deepEqual(JSON.parse(m[1]), JSON.parse(JSON.stringify(facts)));
   assert.equal((html.match(/<\/script>/g) || []).length, 2, 'exactly the facts block and the code block');
-  assert.doesNotThrow(() => new vm.Script(stripExports(demoSrc('render.mjs')) + '\n' + demoSrc('app.js')), 'the inlined code must compile');
-  assert.ok(!/(?:src|href)\s*=\s*["']https?:/i.test(html) && !/url\(\s*["']?https?:/i.test(html) && !/\bfetch\s*\(/.test(html), 'no external resources');
-  assert.ok(Buffer.byteLength(html) < 300 * 1024, 'under the size budget');
+  assert.doesNotThrow(() => new vm.Script(pageScript()), 'the inlined code must compile');
+  assert.ok(!/(?:src|href)\s*=\s*["']https?:/i.test(html) && !/url\(\s*["']?https?:/i.test(html) && !/\bfetch\s*\(/.test(html) && !/@import\b/.test(html), 'no external resources');
+  assert.ok((html.match(/@font-face/g) || []).length >= 3 && /url\("data:font\/woff2;base64,/.test(html), 'the house fonts are inlined');
+  const lean = withoutFontFaces(html);
+  assert.ok(!/@font-face/.test(lean));
+  assert.ok(Buffer.byteLength(lean) < 300 * 1024, `under the size budget with the font block removed: ${Buffer.byteLength(lean)} bytes`);
+  for (const use of html.matchAll(/href="#i-([a-z0-9-]+)"/g)) assert.ok(html.includes(`<symbol id="i-${use[1]}"`), `glyph ${use[1]} is in the sprite`);
 });
 
-test('renderSeam: reads the core schema count and the pack-added schemas from the captured facts', async () => {
+test('demo/styles.css: report layout only, tokens only — no colour literal, no token definitions, no theme rules', () => {
+  const css = demoSrc('styles.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/#[0-9a-f]{3,8}\b/i.test(css), 'no hex colour');
+  assert.ok(!/\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i.test(css), 'no colour function');
+  const named = /(?:^|[\s:,(])(?:white|black|red|green|blue|gray|grey|silver|maroon|purple|fuchsia|lime|olive|yellow|navy|teal|aqua|orange|pink|brown)(?=[\s;,)!]|$)/im;
+  assert.ok(!named.test(css), 'no named colour');
+  assert.ok(!/(?:^|[{;\s])--[a-z0-9-]+\s*:/i.test(css), 'tokens come from the house; the report defines none');
+  assert.ok(!/prefers-color-scheme|data-theme/.test(css), 'the house tokens own light and dark');
+  assert.ok(!/<table|\btable\b|\bth\b|\btd\b/.test(css), 'no table styles');
+});
+
+test('the page script: render atoms come from kms (mark, icon, note, callout), and the browser gets the same ones', () => {
+  assert.match(R.mk('done', 'Held'), /^<span class="sm done"><i aria-hidden="true"><\/i><span class="w">Held<\/span><\/span>$/);
+  assert.equal(R.mk('open', '<x>'), '<span class="sm open"><i aria-hidden="true"></i><span class="w">&lt;x&gt;</span></span>');
+  assert.equal(R.ic('check'), '<svg class="i" aria-hidden="true"><use href="#i-check"/></svg>');
+  assert.match(R.ck(), /class="ck"/);
+  const ctx = {};
+  vm.runInNewContext(`${pageScript({ app: '' })}\nthis.out = mk('done', 'Held') + ic('check');`, ctx);
+  assert.equal(ctx.out, R.mk('done', 'Held') + R.ic('check'));
+});
+
+test('renderSeam: reads the core schema count and the pack-added schemas from the captured facts; before/after surfaces with the pack in a moss slot; the claims are check rows', async () => {
   const f = await getFacts();
   const h = R.renderSeam(f);
   assert.ok(h.includes(`core schemas <b>${f.packInfo.none.schemas.length}</b>`));
-  for (const s of f.packInfo.territory.added.schemas) assert.ok(h.includes(`<code>${s}</code>`), s);
+  assert.match(h, /<div class="vs">[\s\S]*Before[\s\S]*After/);
+  const slot = /<div class="slot on">([\s\S]*?)<\/div>/.exec(h);
+  assert.ok(slot, 'the pack addition sits in the moss slot');
+  for (const s of f.packInfo.territory.added.schemas) assert.ok(slot[1].includes(`<code>${s}</code>`), s);
   assert.match(h, /unchanged/);
+  assert.equal((h.match(/<li class="claim">/g) || []).length, 4);
+  assert.equal((h.match(/class="ck"/g) || []).length, 4, 'each claim carries the done disc');
+  assert.match(h, /<span class="ev">/, 'each claim names its evidence');
+  assert.ok(!/<table\b/.test(h));
 });
 
 test('build writes the file where told and nowhere else', async () => {
@@ -209,10 +280,8 @@ function runApp(facts) {
     getElementById: () => ({ textContent: JSON.stringify(facts) }),
     addEventListener: (type, fn) => { listeners[type] = fn; },
     querySelector: (sel) => { const m = /data-panel="([^"]+)"/.exec(sel); return m ? (panels[m[1]] ??= { innerHTML: '' }) : null; },
-    documentElement: { dataset: { theme: 'auto' } },
   };
-  const win = { matchMedia: () => ({ matches: false }) };
-  vm.runInNewContext(stripExports(demoSrc('render.mjs')) + '\n' + demoSrc('app.js'), { document: doc, window: win });
+  vm.runInNewContext(pageScript(), { document: doc });
   const el = (dataset) => ({ dataset, setAttribute() {}, parentElement: { querySelectorAll: () => [] } });
   return {
     panels, doc,
@@ -221,15 +290,19 @@ function runApp(facts) {
   };
 }
 
-test('section 2: the pack panel is rendered from the captured facts; the selector switches it; the theme toggle works', async () => {
+test('section 2: the pack panel is rendered from the captured facts as rows; the selector switches it; there is no theme toggle', async () => {
   const f = await getFacts();
   const on = R.renderPackPanel(f, 'territory');
   assert.match(on, /territorial-unit/);
   assert.match(on, /maps_to_core/);
   assert.ok(on.includes('<code>place</code>') && on.includes('<code>artifact</code>'));
-  assert.ok(on.includes('<code>unit_id</code>'), 'lexicon property table');
-  assert.match(on, /&gt;=0\.3\.0/, 'the manifest requires floor');
+  assert.ok(on.includes('<span class="t"><code>unit_id</code>'), 'a lexicon property is a row');
+  assert.ok(on.includes('<span class="t"><code>territorial-unit</code></span>'), 'an entity is a row');
+  assert.ok(on.includes('<code>data/territorial-units.yaml</code>'), 'a registry binding is a row');
+  assert.match(on, /<pre class="well">[\s\S]*&gt;=0\.3\.0/, 'the manifest, with its requires floor, in a well');
   assert.match(on, /flat: [a-z, ]*boolean/);
+  assert.ok(!/<table\b/.test(on));
+  assert.ok(on.includes(`<b>${f.packInfo.territory.lexiconCount} lexicons</b>`));
   assert.ok(R.renderPack(f).includes('role="group" aria-label="Instance configuration"'), 'the selector is a labelled group');
   const off = R.renderPackPanel(f, 'none');
   assert.match(off, /No pack loaded/);
@@ -242,10 +315,7 @@ test('section 2: the pack panel is rendered from the captured facts; the selecto
   assert.match(app.panels.pack.innerHTML, /No pack loaded/);
   app.click('pick-pack', { which: 'territory' });
   assert.match(app.panels.pack.innerHTML, /territorial-unit/);
-  app.click('toggle-theme');
-  assert.equal(app.doc.documentElement.dataset.theme, 'dark');
-  app.click('toggle-theme');
-  assert.equal(app.doc.documentElement.dataset.theme, 'light');
+  assert.ok(!/theme|matchMedia/.test(demoSrc('app.js')), 'light and dark follow the reader (K-19)');
 });
 
 test('section 3: each of the five configurations renders its captured result; the one-process panel shows the leak, the filtered call and the stale file', async () => {
@@ -262,6 +332,11 @@ test('section 3: each of the five configurations renders its captured result; th
   assert.ok(h('pack-units').includes('<li><code>unit_id</code></li>'));
   assert.ok(!h('pack-units').includes('<li><code>notes</code></li>'), 'the private notes field is never among the published fields');
   assert.ok(h('pack-units-streams').includes('cat.regenerant.kb.dataStream'));
+  const units = f.matrix.find((m) => m.id === 'pack-units');
+  for (const c of units.collections) assert.ok(h('pack-units').includes(`<span class="t"><code>${c.collection}</code></span></span><span class="end">${c.count}</span>`), `${c.collection} is a row with its record count`);
+  for (const m of f.matrix) assert.ok(!/<table\b/.test(h(m.id)), `${m.id}: rows, not a table`);
+  assert.match(h('no-pack-optin'), /<pre class="well">[^<]*unknown publishable type/, 'the refusal, verbatim, in a well');
+  assert.ok(R.renderGuarantees(f).includes('role="group" aria-label="Publish configuration"'));
   const o = R.renderOneProcess(f);
   assert.match(o, /toJsonLdContext\(\)/);
   assert.match(o, /packs: \[\]/);
@@ -286,6 +361,7 @@ test('section 4: every attempt renders its real input and real error; the known 
   assert.match(R.renderAttemptPanel(f, 'connector-core-name'), /known gap/i);
   assert.match(R.renderAttemptPanel(f, 'schema-core-collision'), /names the pack/i);
   assert.match(R.renderAttemptPanel(f, 'missing-pack'), /no files/i);
+  for (const a of f.attempts) assert.ok(R.renderAttemptPanel(f, a.id).includes(`<pre class="well">${R.esc(a.error)}</pre>`), `${a.id}: the error sits in a well`);
   assert.ok(R.renderAttemptPanel(f, 'unquoted-yaml').includes('&lt;packages&gt;/bad-pack/pack.yaml'));
   assert.ok(R.sections().some((s) => s.id === 'attempts' && s.order === 4));
   assert.ok(R.renderAttempts(f).includes(`${f.attempts.length} ways to get a pack wrong`), 'the attempts count is read from the facts');
@@ -294,19 +370,28 @@ test('section 4: every attempt renders its real input and real error; the known 
   assert.match(app.panels.attempt.innerHTML, /requires framework &gt;=99\.0\.0/);
 });
 
-test('section 7: suites, the no-pre-existing-test-modified check and the commit list render from the facts; a skipped build says so', async () => {
+test('section 7: suites as rows, the pre-existing-test check and the commit list render from the facts; a skipped build says so; modified tests are listed in Mono as deliberate', async () => {
   const f = await getFacts();
   const skipped = R.renderVerified(f);
   assert.match(skipped, /not run in this build/i);
-  assert.match(skipped, /<h3>No pre-existing test was modified<\/h3>/);
+  assert.match(skipped, /<h3>Pre-existing tests<\/h3>/);
   // Branch-specific output depends on whether the branch has commits over main, so it is asserted on explicit facts, never on git state.
-  const withBranch = R.renderVerified({ ...f, verified: { ...f.verified, commits: ['abcdef0 a subject', '1234567 another'] } });
+  const clean = { ...f.verified, commits: ['abcdef0 a subject', '1234567 another'], testDirsModified: [], testDirsUnmodified: true };
+  const withBranch = R.renderVerified({ ...f, verified: clean });
   assert.match(withBranch, /diff-filter=MDR/);
   assert.match(withBranch, /printed nothing/);
   assert.ok(withBranch.includes('<code>abcdef0</code> a subject') && withBranch.includes('<code>1234567</code> another'));
   assert.match(withBranch, /2 commits over/);
-  const ran = R.renderVerified({ ...f, verified: { ...f.verified, skipped: false, commits: ['abcdef0 a subject'], suites: [{ name: 'toolkit-framework', tests: 205, pass: 205, fail: 0, skipped: 0 }, { name: 'org-os-kms', tests: 181, pass: 180, fail: 0, skipped: 1 }] } });
-  assert.ok(ran.includes('<td>205</td>') && ran.includes('org-os-kms'));
+  const modified = ['packages/org-os-kms/test/map.test.mjs', 'packages/toolkit-framework/test/x.test.mjs'];
+  const changed = R.renderVerified({ ...f, verified: { ...clean, testDirsModified: modified, testDirsUnmodified: false } });
+  assert.doesNotMatch(changed, /printed nothing/);
+  assert.match(changed, /changes these pre-existing tests on purpose/);
+  assert.match(changed, /2 pre-existing test files/);
+  for (const p of modified) assert.ok(changed.includes(`<li><code>${p}</code></li>`), `${p} listed in Mono`);
+  const ran = R.renderVerified({ ...f, verified: { ...clean, skipped: false, commits: ['abcdef0 a subject'], suites: [{ name: 'toolkit-framework', tests: 205, pass: 205, fail: 0, skipped: 0 }, { name: 'org-os-kms', tests: 181, pass: 180, fail: 0, skipped: 1 }] } });
+  assert.ok(ran.includes('<span class="t">toolkit-framework</span>') && ran.includes('<span class="t">org-os-kms</span>'), 'each suite is a row');
+  assert.ok(ran.includes('<b>205</b> tests') && ran.includes('<b>180</b> pass') && ran.includes('<b>1</b> skipped'));
+  assert.ok(!/<table\b/.test(ran));
   assert.ok(!/not run in this build/i.test(ran));
   assert.ok(ran.includes('<code>abcdef0</code> a subject'));
   assert.ok(R.sections().some((s) => s.id === 'verified' && s.order === 7));
@@ -331,6 +416,8 @@ test('section 5: the schematic lists every unit by layer; a unit panel shows the
   assert.ok(osona.includes('administrative:municipi:vic'));
   const pv = R.renderUnitPanel(f, 'landscape:unit:plana-de-vic');
   assert.ok(pv.includes('0.93') && pv.includes('0.42'));
+  assert.ok(pv.includes('<span class="t"><code>administrative:comarca:osona</code></span>'), 'each overlap is a row');
+  assert.ok(!/<table\b/.test(pv) && !/<table\b/.test(t));
   assert.match(pv, /invented/i);
   assert.match(t, /custom:site:ghost/);
   assert.match(R.renderOverlapPanel(f, 'valid'), /valid/);
@@ -346,13 +433,14 @@ test('section 5: the schematic lists every unit by layer; a unit panel shows the
 test('section 6: the stream catalogue, published extensions.yaml with the federateCheck verdict, the 14-vs-12 peer view, and inbound projection', async () => {
   const f = await getFacts();
   const h = R.renderFederation(f);
-  for (const s of f.territory.streams.streams) assert.ok(h.includes(R.esc(s.title)), s.title);
+  for (const s of f.territory.streams.streams) assert.ok(h.includes(`<span class="t">${R.esc(s.title)}</span>`), `${s.title} is a row`);
+  assert.ok(!/<table\b/.test(h));
   for (const p of f.territory.streams.providers) assert.ok(h.includes(R.esc(p.title)), p.title);
   assert.match(h, /unverified/);
   assert.match(h, /CC-BY-NC-4\.0/);
   assert.ok(h.includes('territorial-unit:'), 'the published extensions.yaml');
   assert.match(h, /incompatible/i);
-  assert.ok(h.includes('<strong>14</strong>') && h.includes('<strong>12</strong>'));
+  assert.ok(h.includes('<b>14</b>') && h.includes('<b>12</b>'));
   assert.ok(h.includes('territorialUnit') && h.includes('dataStream'));
   assert.match(h, /dropped/i);
   assert.ok(R.sections().some((s) => s.id === 'federation' && s.order === 6));
@@ -365,9 +453,8 @@ test('section 5: a cross-layer unit pick clears the previous selection (exactly 
     getElementById: () => ({ textContent: JSON.stringify(f) }),
     addEventListener: (type, fn) => { listeners[type] = fn; },
     querySelector: (sel) => { const m = /data-panel="([^"]+)"/.exec(sel); return m ? (panels[m[1]] ??= { innerHTML: '' }) : null; },
-    documentElement: { dataset: { theme: 'auto' } },
   };
-  vm.runInNewContext(stripExports(demoSrc('render.mjs')) + '\n' + demoSrc('app.js'), { document: doc, window: { matchMedia: () => ({ matches: false }) } });
+  vm.runInNewContext(pageScript(), { document: doc });
   const layerA = { kids: [] }; const layerB = { kids: [] }; const schematic = { kids: [] };
   for (const l of [layerA, layerB]) l.querySelectorAll = () => l.kids;
   schematic.querySelectorAll = () => [...layerA.kids, ...layerB.kids];
@@ -401,10 +488,13 @@ test('the whole page: seven sections in order, navigable, accessible basics, and
   assert.equal((html.match(/<button(?![^>]*\stype=)/g) || []).length, 0, 'every button has an explicit type');
   assert.ok(!/<img\b/.test(html), 'no images to describe');
   assert.ok((html.match(/aria-pressed="(true|false)"/g) || []).length >= 15, 'segmented controls expose their state');
-  assert.ok(html.includes(`<strong>${f.packInfo.territory.lexiconCount} lexicons</strong>`));
-  assert.ok(html.includes(`<strong>${f.federation.peer.withPack.count}</strong>`));
+  assert.ok(!/<table\b/.test(html), 'no table anywhere');
+  assert.ok(html.includes(`<b>${f.packInfo.territory.lexiconCount} lexicons</b>`));
+  assert.ok(html.includes(`<b>${f.federation.peer.withPack.count}</b>`));
   for (const a of f.attempts) assert.ok(html.includes(R.esc(a.title)), `attempt "${a.id}" is selectable`);
-  assert.ok(Buffer.byteLength(html) < 300 * 1024);
+  assert.ok(Buffer.byteLength(withoutFontFaces(html)) < 300 * 1024);
+  assert.equal((html.match(/<main\b/g) || []).length, 1);
+  assert.equal((html.match(/<h1\b/g) || []).length, 1);
 });
 
 test('the generator writes only to demo/dist by default', () => {

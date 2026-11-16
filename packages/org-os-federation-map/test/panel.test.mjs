@@ -41,3 +41,10 @@ test('nodePanelHTML escapes dl values (type from a peer manifest)', () => {
   assert.ok(!html.includes('<b>DAO</b>'));
   assert.ok(html.includes('&lt;b&gt;DAO'));
 });
+
+// 2026-11-05 (PF-R118): "portal" is the house's public site; a node's map.json `portal` key holds its link
+test('nodePanelHTML calls a node\'s vault link "view inside", never a portal', () => {
+  const html = nodePanelHTML({ id: 'x', kind: 'source', ring: 3, name: 'X', portal: 'obsidian://open?vault=v&file=x' });
+  assert.match(html, /<a href="obsidian:\/\/open\?vault=v&amp;file=x"[^>]*>→ view inside<\/a>/);
+  assert.doesNotMatch(html, /portal/i);
+});

@@ -6,6 +6,7 @@
  *   npm run doctor -- --dir ../refi-med-os  assess a sibling from the framework
  *   npm run doctor -- sync --dir ../x       repair + sync that instance
  *   npm run doctor -- sync --dry-run        print the plan, change nothing
+ *   npm run doctor -- --before-widening     before membership widens: personal data in the agent layer blocks
  *
  * Hub mode (`--dir`) is the one that matters: an instance whose sync machinery
  * is missing, stubbed, or pointed at the wrong repository cannot fix itself,
@@ -19,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assessSnapshot } from './assess.mjs';
-import { readInstance } from './snapshot.mjs';
+import { readInstance, storeEnvFor } from './snapshot.mjs';
 import { renderScorecard, toJson, exitCodeFor } from './report.mjs';
 import { runSync } from './run-sync.mjs';
 import { realIo } from './io.mjs';
@@ -39,6 +40,8 @@ Options:
   --strict            treat warnings as failures (assess only)
   --dry-run           print the sync plan and change nothing (sync only)
   --no-validators     skip the structure/schema validator subprocesses
+  --before-widening   membership is about to widen (Q67): personal data in the
+                      agent layer (memory, plans, HEARTBEAT) is a blocker (assess only)
   -h, --help          this message
 
 Exit codes: 0 fine · 1 blockers found, or the sync aborted · 2 bad usage.`;
@@ -52,6 +55,7 @@ function parseArgs(argv) {
     strict: false,
     dryRun: false,
     runValidators: true,
+    beforeWidening: false,
     help: false,
   };
 
@@ -81,6 +85,9 @@ function parseArgs(argv) {
         break;
       case '--no-validators':
         opts.runValidators = false;
+        break;
+      case '--before-widening':
+        opts.beforeWidening = true;
         break;
       case '-h':
       case '--help':
@@ -119,6 +126,9 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
   const snapshot = readInstance(opts.dir, {
     frameworkDir,
     runValidators: opts.runValidators,
+    beforeWidening: opts.beforeWidening,
+    // Hub mode counts the target's own store, never the one the shell names for the current instance (M-4).
+    env: storeEnvFor(process.env, opts.dir, process.cwd()),
   });
 
   if (opts.command === 'assess') {
@@ -157,7 +167,7 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
   const io = {
     ...realIo,
     reassess: (dir) =>
-      assessSnapshot(readInstance(dir, { frameworkDir, runValidators: opts.runValidators })),
+      assessSnapshot(readInstance(dir, { frameworkDir, runValidators: opts.runValidators, env: storeEnvFor(process.env, dir, process.cwd()) })),
   };
 
   const result = runSync(snapshot, {}, io);

@@ -151,15 +151,19 @@ describe('SIWE from configuration (the app)', () => {
     expect(await res.json()).toMatchObject({ mode: 'hosted', signedIn: true, account: `${CELO}:${addressOfKey(sk)}` })
   })
 
-  it('GET /api/session answers the portal origin, or null when there is none (and as door, its name until 0.6.2)', async () => {
+  it('GET /api/session answers the portal origin, or null when there is none; `door`, its name until 0.6.2, is gone in 0.7', async () => {
     const P = 'https://portal.example.test'
     const withPortal = await house()
-    expect(await (await call(withPortal.app, 'GET', '/api/session')).json()).toMatchObject({ mode: 'hosted', signedIn: false, portal: P, door: P })
+    const anon = await (await call(withPortal.app, 'GET', '/api/session')).json()
+    expect(anon).toMatchObject({ mode: 'hosted', signedIn: false, portal: P })
+    expect(anon).not.toHaveProperty('door')
     const token = hostTokenOf(await signIn(withPortal.app, key()))
-    expect(await (await call(withPortal.app, 'GET', '/api/session', { cookie: `__Host-house_session=${token}` })).json())
-      .toMatchObject({ signedIn: true, portal: P, door: P })
-    const noPortal = await house(config())
-    expect(await (await call(noPortal.app, 'GET', '/api/session')).json()).toMatchObject({ signedIn: false, portal: null, door: null })
+    const signed = await (await call(withPortal.app, 'GET', '/api/session', { cookie: `__Host-house_session=${token}` })).json()
+    expect(signed).toMatchObject({ signedIn: true, portal: P })
+    expect(signed).not.toHaveProperty('door')
+    const none = await (await call((await house(config())).app, 'GET', '/api/session')).json()
+    expect(none).toMatchObject({ signedIn: false, portal: null })
+    expect(none).not.toHaveProperty('door')
   })
 })
 

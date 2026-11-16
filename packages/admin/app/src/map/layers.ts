@@ -14,6 +14,8 @@ export interface MapItem {
   nameKept?: string
   /** A System whose last read failed: it never wins the main Safe's tie (walk 2026-11-04). */
   failed?: true
+  /** A System composed and not deployed (`isComposedRead`): never the main Safe (whole-platform walk I1). */
+  composed?: true
 }
 export interface MapLink { from: string; to: string; label: string }
 export interface Placed { id: string; layer: Layer; x: number; y: number; w: number; big: boolean }
@@ -60,11 +62,11 @@ const linksAmong = (items: MapItem[], links: MapLink[]) => {
 }
 
 /** The DAO's main Safe: the Safe in `organization/treasury` (if several, the one more edges point at), else the Safe
- *  most edges point at; never a Safe whose read failed while one was read; a tie goes by name. `null` when the map
- *  has no Safe. */
+ *  most edges point at; never a Safe whose read failed while one was read; never a composed Safe (it is a plan, not the
+ *  org's treasury: walk I1); a tie goes by name. `null` when the map has no deployed Safe. */
 export function mainSafeOf(items: MapItem[], links: MapLink[]): string | null {
   const all = unique(items)
-  const safes = all.filter(i => i.kind === 'safe')
+  const safes = all.filter(i => i.kind === 'safe' && !i.composed)
   if (!safes.length) return null
   const known = new Set(all.map(i => i.id))
   const incoming = (id: string) => links.filter(k => k.to === id && k.from !== id && known.has(k.from)).length

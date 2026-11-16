@@ -36,9 +36,10 @@ The Hub's folders are then subfolders of it, which are the defaults (`env.exampl
 | `/srv/portal` | `ORG_OS_PORTAL_DIR` | the portal's releases (later) |
 
 If the volume is mounted elsewhere, set each variable to the folder under that path. (Until 0.6.2 the portal's
-settings were `ORG_OS_DOOR_ORIGIN`, `ORG_OS_DOOR_DIR` and `ORG_OS_DOOR_EVERY`, with `/srv/door`. A Hub reads the old
-names until org-os 0.7, and `hub check` says to rename them.) The instance is a subfolder,
-never the mount itself, because a fresh volume may hold `lost+found` and `hub init` takes only an empty folder.
+settings were `ORG_OS_DOOR_ORIGIN`, `ORG_OS_DOOR_DIR` and `ORG_OS_DOOR_EVERY`, with `/srv/door`. Since org-os 0.7 a
+Hub no longer reads the old names: one still set stops the start, and `hub check` names its new name.) The instance
+is a subfolder, never the mount itself, because a fresh volume may hold `lost+found` and `hub init` takes only an
+empty folder.
 
 The image runs as the user `hub` (uid 10001), not root. A volume that Railway mounts owned by root cannot be
 written by it. `hub check` says so: "ORG_OS_PRIVATE_DIR cannot be written by the Hub's user." Give the folders to

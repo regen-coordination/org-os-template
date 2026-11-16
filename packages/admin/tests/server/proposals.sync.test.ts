@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
@@ -10,6 +10,7 @@ import { removeFixtureRepo } from '../fixtures.ts'
 import { createApp } from '../../server/app.ts'
 import { mountProposals } from '../../server/proposals/routes.ts'
 import { mountSync } from '../../server/proposals/sync.ts'
+import { goneSettled, onHousekeeping } from '../../server/workspace/gone.ts'
 import { mountOperations } from '../../server/operations/routes.ts'
 import { opById, needsConfirm, type InProcess } from '../../server/operations/catalogue.ts'
 import { LocalExecutor } from '../../server/operations/executor.ts'
@@ -192,6 +193,29 @@ describe('the fetch operation', () => {
 })
 
 describe('POST /api/sync and GET /api/sync', () => {
+  // PR7-R45: Sync moves the trunk without applyOps; after a fast-forward and after a merge the conversation's housekeeping
+  // runs (workspace/gone.ts: the talk of targets that are not there now goes). Nothing is read of the history.
+  it('the conversation\'s housekeeping runs after the fast-forward and after a merge, and not when there is nothing to bring', async () => {
+    const { a, b } = world()
+    const served = serve(b)
+    let ran = 0
+    onHousekeeping(b, async () => { ran++ })
+    expect((await sync(served.app)).body).toMatchObject({ state: 'up-to-date' })
+    await goneSettled(b)
+    expect(ran).toBe(0)
+    commitFile(a, 'new.txt', 'n\n'); sh(a, 'git push -q origin main')
+    tick()
+    expect((await sync(served.app)).body).toMatchObject({ state: 'fast-forwarded' })
+    await goneSettled(b)
+    expect(ran).toBe(1)
+    commitFile(a, 'two.txt', 't\n'); sh(a, 'git push -q origin main')
+    commitFile(b, 'mine.txt', 'm\n')
+    tick()
+    expect((await sync(served.app)).body).toMatchObject({ state: 'merged' })
+    await goneSettled(b)
+    expect(ran).toBe(2)
+  })
+
   it('behind and clean: a fast-forward', async () => {
     const { a, b } = world()
     commitFile(a, 'new.txt', 'n\n'); sh(a, 'git push -q origin main')

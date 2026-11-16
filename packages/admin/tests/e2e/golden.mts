@@ -59,7 +59,7 @@ try {
 
   // the docked tray shows one staged op → Review opens it over the page → Apply
   const tray = page.getByRole('region', { name: 'Changes' })
-  await tray.getByText('1 staged change', { exact: true }).waitFor()
+  await tray.getByText('1 staged op', { exact: true }).waitFor()
   await tray.getByRole('button', { name: 'Review' }).click()
   const change = tray.getByRole('group', { name: 'Your change' })
   const rows = await change.getByRole('list', { name: 'Staged ops' }).getByRole('listitem').count()
@@ -129,7 +129,7 @@ try {
   await page.getByRole('button', { name: 'Done' }).click()
   await page.getByRole('button', { name: 'Stage' }).click()
   const tray2 = page.getByRole('region', { name: 'Changes' })
-  await tray2.getByText('1 staged change', { exact: true }).waitFor()
+  await tray2.getByText('1 staged op', { exact: true }).waitFor()
   const before2 = git('rev-parse HEAD')
   await tray2.getByRole('button', { name: 'Review' }).click()
   await tray2.getByRole('group', { name: 'Your change' }).getByRole('button', { name: 'Apply', exact: true }).click()

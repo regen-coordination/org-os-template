@@ -79,7 +79,7 @@ export function usePanel(slot: Slot): {
   }
 }
 
-/** What a slot shows now, or null — also outside a PanelProvider (a map drawn on the door, a /parts specimen), where
+/** What a slot shows now, or null — also outside a PanelProvider (a map drawn on the portal, a /parts specimen), where
  *  no slot is ever open. */
 export function useSlotOpen(slot: Slot): string | null {
   return useContext(Ctx)?.slots[slot].id ?? null

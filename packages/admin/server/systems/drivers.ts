@@ -5,6 +5,7 @@ import { gardensCommunity, gardensPool } from './gardens.ts'
 import { hatsTree } from './hats.ts'
 import { snapshotSpace } from './snapshot.ts'
 import { daoUriRegistration } from './registration.ts'
+import { repoDriver } from './repo.ts'
 
 /** Every driver this server has. An entry names one in `driver` (absent = link, F1 §3.4). */
-export const DRIVERS: Driver[] = [link, safe, hatsTree, snapshotSpace, gardensCommunity, gardensPool, daoUriRegistration]
+export const DRIVERS: Driver[] = [link, safe, hatsTree, snapshotSpace, gardensCommunity, gardensPool, daoUriRegistration, repoDriver]

@@ -1,3 +1,4 @@
+import { AccountStep } from '../../elements/governance/AccountStep.tsx'
 import { PreparedTx } from '../../elements/governance/PreparedTx.tsx'
 import { ProposalRow } from '../../elements/governance/ProposalRow.tsx'
 import { Timeline } from '../../elements/governance/Timeline.tsx'
@@ -6,6 +7,7 @@ import { DataList } from '../../elements/rows/DataList.tsx'
 import {
   ACTOR, ADD_SIGNER, PREPARED_IN, PREPARED_RETURN, PROPOSAL_ROWS, RECORDS_RATIFIED, RETURN_DECIDED, RULE_RESULTS,
 } from '../../test/fixtures/house/governance.ts'
+import { STEP_GATE_READY } from '../../test/fixtures/house/deploy.ts'
 import { FIXED_NOW } from '../../test/fixtures/parts.ts'
 import type { LedgerEvent } from '../../../../lib/proposals.mjs'
 import { EventLog } from '../EventLog.tsx'
@@ -27,7 +29,8 @@ const OTHER_STEPS = [
 ]
 
 /** /parts/gov (§9.5–9.8): the prepared-transaction card (B5) — partly signed in full (two calls, the total, the closed
- *  payload, the foot), then its other states as the gallery draws them, the head and its strip; then (B4) the proposal
+ *  payload, the foot), then its other states as the gallery draws them, the head and its strip; the account-step card
+ *  (DAO-OS L7 Task 18: a deployment step signed from the signer's own wallet, synthetic addresses); then (B4) the proposal
  *  timeline with its other step states and its compact form, the proposal rows, the rule statuses and the events.
  *  The role tree and the fund flow (B6) are the gallery section's second screen, /parts/gov-roles (GovRoles.tsx): one
  *  record could not hold the whole section within 150 KiB (ruling B4-a). Fixtures, read against FIXED_NOW. */
@@ -42,11 +45,14 @@ export default function Gov() {
         <Card cap="prepared transaction · other states">
           {OTHERS.map(s => <PreparedTx key={s} tx={PREPARED_IN[s]!} now={FIXED_NOW} onPrepareAgain={noop} brief />)}
         </Card>
+        <Card cap="account step · a deployment step any account signs">
+          <AccountStep step={STEP_GATE_READY} />
+        </Card>
         <Card cap="proposal timeline · each step’s states">
           <Timeline steps={PATH} label={`Path of ${String(RETURN_DECIDED.id)}`} />
           <h3 className="pg-cap">other step states</h3>
           <Timeline steps={OTHER_STEPS} label="Other step states" />
-          <h3 className="pg-cap">compact · in rows and on the door</h3>
+          <h3 className="pg-cap">compact · in rows and on the portal</h3>
           <Timeline steps={PATH} compact />
         </Card>
         <Card cap="proposal rows">

@@ -65,7 +65,7 @@ live patches get room, dormant things shrink to pods.
 ║                                          ⊕                                           ║
 ║ ┏━ PACKAGES · travelers · matrix ×23 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ ║
 ║ ┃ ╭─toolkit █─╮ ╭─kms █───╮ ╭─fed-map █────╮ ╭─operations █─╮ ╭─paperclip ☓──────╮ ┃ ║
-║ ┃ │ 100/100 ✓ │ │ 44/44 ✓ │ │ the torch·d3 │ │ bcn·dao      │ │ rgc fork AHEAD   │ ┃ ║
+║ ┃ │ 100/100 ✓ │ │ 44/44 ✓ │ │ zero-dep map │ │ bcn·dao      │ │ rgc fork AHEAD   │ ┃ ║
 ║ ┃ ╰───────────╯ ╰─────────╯ ╰──────────────╯ ╰──────────────╯ │ backport pending │ ┃ ║
 ║ ┃                                                             ╰──────────────────╯ ┃ ║
 ║ ┃ ╭─regen-agents █─╮ ╭─webapps █─╮ ╭─hermes ▓───────╮ ╭─opencode ▓─────╮           ┃ ║

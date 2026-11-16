@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { QueryClientContext } from '@tanstack/react-query'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { QueryClientContext, useQuery } from '@tanstack/react-query'
+import { api, setPreviewAs } from '../api.ts'
 import { Button } from '../design/Button.tsx'
 import { Icon, type IconName } from '../design/Icon.tsx'
 import { Menu, type MenuEntry } from '../design/Menu.tsx'
@@ -34,15 +35,32 @@ function bandWords(v: Exclude<Viewer, { as: 'you' }>): [string, string] {
   return [`Previewing as ${who}.`, `Only what ${what} can read is shown. Nothing can be changed here.`]
 }
 
+/** The viewer as a read names it to the server (`?as=`, the walk review's G1); null: you. */
+export function asOf(v: Viewer): string | null {
+  return v.as === 'you' ? null : v.as === 'hat' ? `hat:${v.hat}` : v.as
+}
+/** The reads that stay yours whoever is previewed (api.ts sends them without `as`): the session, who you are (the actor is
+ *  never previewed, only the viewer), and the tree's hats the control offers. */
+const READ_AS_YOU = new Set(['session', 'actor', 'visibility'])
+
 /** `initial` starts a provider already previewing (a /parts specimen: the rail as Public); the house starts as you. */
 export function ViewAsProvider({ source = FIXTURE_SOURCE, initial = YOU, children }: { source?: VisibilitySource; initial?: Viewer; children: ReactNode }) {
   const [viewer, set] = useState<Viewer>(initial)
+  const qc = useContext(QueryClientContext)
+  const chose = useRef(false)
+  // A preview chosen here and still on when the provider goes is ended with it, so no later read is previewed.
+  useEffect(() => () => { if (chose.current) setPreviewAs(null) }, [])
   // Entering a preview is said once, through the page's one polite region; leaving it too, as the band goes.
+  // View as at the server (the walk review's G1): every read from now on names the viewer (api.ts), and every answer
+  // already held is dropped and read again, in-flight ones cancelled, so nothing drawn was answered to another viewer.
   const setViewer = useCallback((v: Viewer) => {
     if (sameViewer(v, viewer)) return
+    chose.current = true
+    setPreviewAs(asOf(v))
     set(v)
+    void qc?.resetQueries({ predicate: q => !READ_AS_YOU.has(String(q.queryKey[0])) })
     announce(v.as === 'you' ? 'Preview ended.' : bandWords(v).join(' '))
-  }, [viewer])
+  }, [viewer, qc])
   const value = useMemo(() => ({ viewer, setViewer, source }), [viewer, setViewer, source])
   return <ViewAsContext.Provider value={value}>{children}</ViewAsContext.Provider>
 }
@@ -68,14 +86,43 @@ export function useCanWrite(): boolean {
   return useContext(ViewAsContext).viewer.as === 'you' && !off
 }
 
+/** False while previewing, true otherwise, whether or not the Hub's writes are off: what a read-only Hub still writes
+ *  (plan D-6) — the private store's conversation and per-member state (comments, their resolve, reopen and delete,
+ *  a comment on a selected passage, read marks, view state) — and what is no instance write at all (a map's layout in
+ *  the admin state folder, PUT /api/layout; a collection map's positions in this browser) is offered as long as you are
+ *  you (R2b M-2). Turn into a task writes a task: it asks `useCanWrite`. */
+export function useCanConverse(): boolean {
+  return useContext(ViewAsContext).viewer.as === 'you'
+}
+
+/** The sentence a write refused while the Hub's writes are off says (server/hosted/instance-writes.ts READ_ONLY, the
+ *  same words: a test holds them together), for a page that says it without asking. */
+export const READ_ONLY = 'This Hub is read-only until writes are turned on. Nothing was written.'
+
 /** Whether `GET /api/status`, as the client last read it, says the Hub's writes are off. It reads the cache only, so it
  *  asks the server nothing itself, and draws as on with no query client (/parts, element tests). */
-function useWritesOff(): boolean {
+export function useWritesOff(): boolean {
   const client = useContext(QueryClientContext)
   return useSyncExternalStore(
     useCallback((changed: () => void) => (client ? client.getQueryCache().subscribe(changed) : () => {}), [client]),
     () => client?.getQueryData<{ instanceWrites?: string }>(['status'])?.instanceWrites === 'off',
   )
+}
+
+/** Whether `GET /api/status` has been read and does not say the Hub's writes are off: what a write that fires on its own
+ *  asks before it goes (R2b M-1) — the commons' dry read, a page's editing session opened on arrival — so that on a
+ *  read-only Hub it is never sent before the switch is known. It asks the status itself (the frame's query, shared), so a
+ *  page drawn without the frame learns it too; until it answers, or when it cannot, the writes count as off here. */
+export function useWritesKnownOn(): boolean {
+  return useWritesKnown() === 'on'
+}
+
+/** The switch as far as `GET /api/status` has said it: `unknown` until it answers; a status that cannot be read is
+ *  `off` (fails closed). */
+export function useWritesKnown(): 'on' | 'off' | 'unknown' {
+  const status = useQuery({ queryKey: ['status'], queryFn: api.status })
+  if (status.data !== undefined) return (status.data as { instanceWrites?: string }).instanceWrites === 'off' ? 'off' : 'on'
+  return status.isError ? 'off' : 'unknown'
 }
 
 /** The control (§5.9): eye + "View as: you" + chevron, 28px outlined, in the top bar; `compact` is the phone's

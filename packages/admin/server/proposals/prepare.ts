@@ -14,9 +14,21 @@ import { HttpError } from '../errors.ts'
 import { Refusal } from '../changes/apply.ts'
 import { readRegistryOrEmpty } from '../registry.ts'
 import type { SystemReader } from '../systems/reader.ts'
-import type { PreparedAction, SafePayload, SystemRef, TxInput } from '../systems/driver.ts'
+import { isForeignRef, type PreparedAction, type SafePayload, type SystemRef, type TxInput } from '../systems/driver.ts'
+import { safeAttach } from '../systems/safe.ts'
 import { readLedger } from './ledger.ts'
-import { methodOf } from '../../lib/proposals.mjs'
+import { keepWatch } from './watches.ts'
+import { methodOf, type Proposal } from '../../lib/proposals.mjs'
+
+/** The systems a proposal's rules wait on (method `system`), in the order its rules name them. */
+const waitsOn = (entry: Proposal): string[] => [...new Set(entry.rules.filter(r => methodOf(r) === 'system').map(r => String(r.decide?.system)))]
+
+/** L7-D16: only an open proposal is prepared. Checked before anything is read. */
+function mustBeOpen(entry: Proposal, id: string): void {
+  if (entry.state !== 'open') {
+    throw new Refusal(409, { code: 'NOT_PREPARED', error: `Not prepared: proposal ${id} is ${String(entry.state)}; only an open proposal is prepared.` })
+  }
+}
 
 /** What prepare reads with: the server's SystemReader, or a test's stand-in. */
 export type PrepareSource = Pick<SystemReader, 'prepare'>
@@ -71,8 +83,9 @@ export function readPrepareBody(body: unknown): PrepareBody {
 export async function prepare(repo: string, id: string, tx: TxInput, systems: PrepareSource | undefined, chain?: string): Promise<PrepareResult> {
   const entry = readLedger(repo).entries.find(e => String(e.id) === id)
   if (!entry) throw new HttpError(404, `The ledger has no proposal ${id}.`)
+  mustBeOpen(entry, id)
   const refuse = (error: string) => new Refusal(409, { code: 'NOT_PREPARED', error: `Not prepared: ${error}` })
-  const waits = [...new Set(entry.rules.filter(r => methodOf(r) === 'system').map(r => String(r.decide?.system)))]
+  const waits = waitsOn(entry)
   if (waits.length === 0) throw refuse(`proposal ${id} waits on no outside system; its rules are decided by people.`)
   const systemId = waits[0]!
   const system = (readRegistryOrEmpty(repo, 'systems').entries ?? []).find(s => isObject(s) && String(s.id) === systemId)
@@ -95,20 +108,29 @@ const sentence = (text: string) => text.replace(/[.\s]+$/, '') + '.'
 
 /**
  * Prepare the typed action `body` for proposal `id` (DAO-OS L2): `system` and `via` are ids in data/systems.yaml. 404 for
- * a proposal not in the ledger; 409 `NOT_PREPARED`, in words, for an id data/systems.yaml does not hold and for whatever
- * the reader or the driver refuses (an action of another class than the proposal's, a parameter that is wrong, a hat the
- * Safe is no admin of); 502 when a system could not be read. Answers the PreparedAction's ok form. Reads only: nothing is
- * signed, sent or written, and no lock is taken.
+ * a proposal not in the ledger; 409 `NOT_PREPARED`, in words, for a proposal that is not open and for an action on a
+ * system none of its rules waits on, directly or through the `via` Safe (L7-D16: its attach would be refused), for an id
+ * data/systems.yaml does not hold and for whatever the reader or the driver refuses (an action of another class than the
+ * proposal's, a parameter that is wrong, a hat the Safe is no admin of); 502 when a system could not be read. When the
+ * rules wait on the `via` Safe and not on `system`, the attach is the Safe's transactions (safeAttach), the ref the
+ * proposal can hold; an add-role's hats-role ref rides beside them as `watch` (PF-R205). Answers the PreparedAction's
+ * ok form. Reads only: nothing is signed, sent or written, and no lock is taken.
  */
 export async function prepareAction(repo: string, id: string, body: ActionBody, systems: ActionSource | undefined): Promise<Extract<PreparedAction, { ok: true }>> {
   const entry = readLedger(repo).entries.find(e => String(e.id) === id)
   if (!entry) throw new HttpError(404, `The ledger has no proposal ${id}.`)
+  mustBeOpen(entry, id)
   const refuse = (error: string) => new Refusal(409, { code: 'NOT_PREPARED', error: `Not prepared: ${sentence(error)}` })
   const records = (readRegistryOrEmpty(repo, 'systems').entries ?? []).filter(isObject)
   const system = records.find(s => String(s.id) === body.system)
   if (!system) throw refuse(`data/systems.yaml has no system "${body.system}"`)
   const via = body.via === undefined ? null : records.find(s => String(s.id) === body.via)
   if (via === undefined) throw refuse(`data/systems.yaml has no system "${body.via}" to sign with (via)`)
+  const waits = waitsOn(entry)
+  const direct = waits.includes(body.system)
+  if (!direct && !(body.via !== undefined && waits.includes(body.via))) {
+    throw refuse(`proposal ${id} waits on ${waits.length > 0 ? waits.join(', ') : 'no outside system'}; attaching ${body.system} would be refused`)
+  }
   const failed = (why: string) => new HttpError(502, `Not prepared: ${body.system} could not be read (${why}). Nothing was sent; try again.`)
   if (!systems) throw failed('this server was given no network access')
   const prepared = await systems.prepareAction(system, { proposal: { classes: entry.classes ?? [] }, action: body.action, params: body.params }, via)
@@ -118,5 +140,13 @@ export async function prepareAction(repo: string, id: string, body: ActionBody, 
     if (prepared.failed) throw failed(error)
     throw refuse(error)
   }
-  return prepared
+  if (direct) return prepared
+  // The rules wait on the via Safe: the proposal holds its transactions, whatever the target's driver would attach.
+  const attach = safeAttach(prepared.steps)
+  if (attach === null) throw refuse(`proposal ${id} waits on ${body.via}, and ${body.action} prepares a step ${body.via} does not sign; attaching ${body.system} would be refused`)
+  // PF-R205 (PF-R201's gap): an add-role's hats-role ref rides beside the Safe transaction, so a check reads the tree too.
+  const role = prepared.attach !== null && isForeignRef(prepared.attach) && prepared.attach.payload.kind === 'hats-role' ? prepared.attach : null
+  // M-1: the server keeps which transaction carries which watch; an attach of it must carry exactly this one.
+  if (role) for (const p of [attach.payload, ...(attach.also ?? []).map(a => a.payload)]) keepWatch(repo, p.data_hash, role)
+  return { ...prepared, attach: role ? { ...attach, watch: role } : attach }
 }

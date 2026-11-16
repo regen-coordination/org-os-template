@@ -11,16 +11,16 @@ export type NodeState = 'default' | 'selected' | 'needs' | 'staged' | 'aged' | '
 
 /** One node of the map: its item (for layout and visibility), its one line of facts in Mono (`hat 13.1 · 8 wear it`,
  *  `4 of 8 · 7 chains`), its states, the need it is lit for (§8.5), its deployment order on the compose canvas, and
- *  its page on the door. `factsKept` is the hat word when the viewer is not admitted to the record's `status` (rule 3,
+ *  its page on the portal. `factsKept` is the hat word when the viewer is not admitted to the record's `status` (rule 3,
  *  E-70): the line then reads "<hat> only", drawn as every restricted field is, and `facts` is empty. */
 export interface MapNodeData { item: MapItem; facts: string; factsKept?: string; states: NodeState[]; need?: string; order?: number; href?: string }
 
-/** The states the door never shows, even if given: what needs a member, and what members have staged or composed
+/** The states the portal never shows, even if given: what needs a member, and what members have staged or composed
  *  (C-32). */
-const NOT_ON_THE_DOOR: ReadonlySet<NodeState> = new Set<NodeState>(['needs', 'staged', 'draft'])
+const NOT_ON_THE_PORTAL: ReadonlySet<NodeState> = new Set<NodeState>(['needs', 'staged', 'draft'])
 
-export function statesFor(d: MapNodeData, variant: 'members' | 'door'): NodeState[] {
-  return d.states.filter(s => s !== 'default' && (variant === 'members' || !NOT_ON_THE_DOOR.has(s)))
+export function statesFor(d: MapNodeData, variant: 'members' | 'portal'): NodeState[] {
+  return d.states.filter(s => s !== 'default' && (variant === 'members' || !NOT_ON_THE_PORTAL.has(s)))
 }
 
 /** The facts line as read: "reading…" while a read runs; an empty hat says it has no wearer; a restricted status reads
@@ -50,7 +50,7 @@ export interface HouseNodeProps {
   data: MapNodeData
   /** The main Safe (§8.3): the kind's eyebrow, the name in the display face, the edge outline. */
   big?: boolean
-  variant?: 'members' | 'door'
+  variant?: 'members' | 'portal'
   /** A picture's node (a machine diagram): a plain box, not a control. */
   still?: boolean
   /** A word on the top edge (a machine's "initial" and "final"). */
@@ -66,7 +66,7 @@ export interface HouseNodeProps {
   onFocus?(e: FocusEvent<HTMLElement>): void
 }
 
-/** A map node (§8.3): a `<button>` (an `<a>` on the door, a plain box there when it has no page), glyph and name on the first line, one line of facts in
+/** A map node (§8.3): a `<button>` (an `<a>` on the portal, a plain box there when it has no page), glyph and name on the first line, one line of facts in
  *  Mono on the second, and its states as classes (`is-<state>`), tags and the clay dot. Its name is `nodeName`; the
  *  drawn text is decoration for it. */
 export function HouseNode({ data: d, big = false, variant = 'members', still = false, tag, more, className, style, tabIndex, describedBy, dataState, onFocus }: HouseNodeProps) {
@@ -105,8 +105,8 @@ export function HouseNode({ data: d, big = false, variant = 'members', still = f
   }
   if (still) return <div {...common}>{body}</div>
   const name = nodeName(d, states, { big, tag, more })
-  if (variant === 'door') {
-    // the door's node is a link to its public page; with no page it is no control, only its words (B8 review M-4)
+  if (variant === 'portal') {
+    // the portal's node is a link to its public page; with no page it is no control, only its words (B8 review M-4)
     if (d.href) return <a {...common} href={d.href} aria-label={name}>{body}</a>
     return <div {...common} tabIndex={undefined}>{body}</div>
   }

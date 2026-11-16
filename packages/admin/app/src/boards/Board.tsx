@@ -84,14 +84,14 @@ export function BlockSlot({ entry, bare = false }: { entry: BlockEntry; bare?: b
   if (!def) {
     return (
       <section className="bf" role="region" aria-label={entry.title ?? entry.id} data-block={entry.id}>
-        <Note state="error">Block “{entry.id}” has type “{entry.type}”, which this platform does not have. Arrange can remove it, or npm run validate:data names the fix.</Note>
+        <Note state="error">Block “{entry.id}” has type “{entry.type}”, which this platform does not have. Arrange can remove it, or the repository’s data check names the fix.</Note>
       </section>
     )
   }
   if (problems.length > 0) {
     return (
       <section className="bf" role="region" aria-label={entry.title ?? entry.id} data-block={entry.id} data-type={def.type}>
-        <Note state="error">Block “{entry.id}” cannot be read: {problems.join('; ')}; Arrange can change its settings, or npm run validate:data names the fix.</Note>
+        <Note state="error">Block “{entry.id}” cannot be read: {problems.join('; ')}; Arrange can change its settings, or the repository’s data check names the fix.</Note>
       </section>
     )
   }

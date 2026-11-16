@@ -81,6 +81,15 @@ describe('sealReceipts', () => {
     expect((twice[2] as { set: Record<string, unknown> }).set.removed).toEqual({ by: 'ana', at: '2026-10-30', decision: { proposal: 'p-2026-10-30-001-ab12' } })
   })
 
+  // L7 meets L6 (the platform merge): a change may hold an update of a custom collection's record (L6 §7.3), which no
+  // registry of the built-in list names; the seal reads only whether it is governance's, and leaves the op as it is.
+  it("seals beside an update of a custom collection's record, with its before, and leaves that op as it is", () => {
+    const custom = { op: 'update' as const, record: 'contacts:ana', set: { role: 'steward' }, base: 'b', before: { id: 'ana', role: 'guest' } }
+    const sealed = sealReceipts([BOARD, custom, RECEIPT], DIRECT)
+    expect(sealed[1]).toEqual(custom)
+    expect(baseIn(sealed[2])).toBe(baseOf(BOARD_VALUE))
+  })
+
   it('keeps the base and before an engine op carries', () => {
     const op = { ...RECEIPT, base: null, before: null }
     const [sealed] = sealReceipts([{ ...BOARD, base: null, before: null }, op], DIRECT).slice(1)

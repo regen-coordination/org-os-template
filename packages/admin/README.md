@@ -238,7 +238,7 @@ clears them.
 
 | Call | Answer |
 |---|---|
-| `GET /api/graph/:board` | `{ board, nodes, edges, portals }` for `organization` or `systems` |
+| `GET /api/graph/:board` | `{ board, nodes, edges, portals }` for `organization` or `systems`; `portals` keeps its 0.6 wire name and holds the map's links to the other map, each one node, `portal:<board>` |
 | `GET /api/resources?board=&kind=` | the resources, filtered |
 | `GET /api/resources?kind=system` | the outside systems in `data/systems.yaml`; `facts.driver` holds the driver's read (`ok`, `readAt`, `error`, `facts`, `sections`, `open`), read again every 5 minutes, each read limited to 8 s; only the server's reader has the network, and a driver reaches only the https hosts it declares |
 | `GET /api/resources/:id` | `{ resource, edges, neighbours }`; encode the id (`person%3Agithub%3Ax`) |
@@ -302,21 +302,170 @@ edits), never touching the tray, and its commit carries the same trailers.
 Every governed file has a stated path through the Hub (ruling F-L3-3): the registries in `lib/registries.mjs`, the
 files `schemas/change-classes.json` classes, and an instance's own data files. `app/src/editors.ts` holds the table;
 this one is written from it, and `app/src/editors.test.ts` fails when either list names a file the table leaves out.
-A registry page of a file with no path yet says "Read only here: a change to this file has no path in the Hub yet."
+A document registry's page links to the source editor (`/files/<path>`), where it is edited whole (L6 Task 19).
 
 | File | How the Hub edits it |
 |---|---|
-| data/members.yaml; data/projects.yaml; data/meetings.yaml; data/ideas.yaml; data/funding-opportunities.yaml; data/relationships.yaml; data/sources.yaml; data/events.yaml; data/channels.yaml; data/assets.yaml; data/knowledge-gaps.yaml; data/systems.yaml | The record editor: field rows, and the whole-entry source editor on the record page. |
+| data/members.yaml; data/projects.yaml; data/meetings.yaml; data/ideas.yaml; data/funding-opportunities.yaml; data/relationships.yaml; data/sources.yaml; data/events.yaml; data/channels.yaml; data/assets.yaml; data/knowledge-gaps.yaml; data/systems.yaml; data/tasks.yaml | The record editor: field rows, and the whole-entry source editor on the record page. |
 | data/boards.yaml | Arrange and block settings on the board, and the source editor on the record page. |
 | data/proposals.yaml, the proposals ledger | Its own routes, by design: propose, approve, ratify and the rest write it, never an edit. |
 | data/library.yaml, the library’s receipts | Its own routes, by design: the library’s Add and Remove. |
+| data/kb/, the knowledge commons’ canon | Its own routes: the commons’ entry page prepares an edit and applies it in one commit, under the org’s rules. |
+| pages/, the workspace’s pages | The page editor: a page is written in place, one commit per editing session; Suggest makes the edit a proposal. |
+| data/collections/, the records of the org’s own collections | The collection’s views and the record editor. |
 | the published files under .well-known/ | Generated from the data files, never edited (L8’s builder). |
-| data/finances.yaml; data/knowledge-manifest.yaml; IDENTITY.md; federation.yaml | Read only here. The source editor comes with L6; until then a change to it has no path in the Hub. |
-| data/governance.yaml, the rules | Read only here. The source editor comes with L6; until then a change to it has no path in the Hub. It is never staged today (R-L5-11.7): a later edit path must run the governance check (§7.6). |
-| data/visibility.yaml, what is public | Read only here. The source editor comes with L6; until then a change to it has no path in the Hub. Narrowing a record has its own route (L5); widening one is a publication, decided as a proposal. |
-| an instance’s own data files outside the registry list, such as data/horizon.yaml and data/access-grants.yaml | Read only here. The source editor comes with L6; until then a change to it has no path in the Hub. Rules govern each as a record of the org. |
+| data/finances.yaml; data/knowledge-manifest.yaml; data/imports.yaml, the imports’ record; IDENTITY.md; federation.yaml | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. |
+| data/governance.yaml, the rules | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. The governance check (§7.6) runs on it, so a text that would lock the org out is refused; the Rules page reads it. Its `roles` and `rules` are also a record of the change engine, `governance:governance` (see Governance below): a rule set's add writes them that way. |
+| data/visibility.yaml, what is public | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. Narrowing a record has its own route (L5); a text that widens what is public is a publication. |
+| an instance’s own data files outside the registry list, such as data/horizon.yaml and data/access-grants.yaml | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. Rules govern each as a record of the org. |
+| data/collections.yaml, the collections and their saved views | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. New collection and Save view on the Workspace write their definitions through their own routes. |
+| memory/**; MEMORY.md; HEARTBEAT.md; docs/plans/**; docs/agent-plans/** | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. The agents’ own tools commit it too. |
 
-## Governance (read-only)
+## The workspace
+
+The org's working surface (DAO-OS L6): pages, collections and their views, conversation and presence, imports, the
+Sources page and the source editor, Council memory, and private things moved into the repository by a decision. Its
+words are the house's: a *page*, a *collection*, a *view*, a *workspace write*, *conversation*, *visibility* and
+*publication*. Nothing stricter than members enters git, down to one field, one title or one comment: what is stricter
+lives in the private store (above); the one title an author gives a proposal is the exception that is theirs to keep
+clean, since it is written to git at once (below), and every read goes through the gate, so a thing the viewer may not see has no title,
+count, backlink, presence, comment or Sources row.
+
+A workspace write is judged at its targets, most specific first: a page at `workspace:tree-<page id>` for itself and each
+ancestor, then `workspace:pages`; a record at `workspace:<collection>`; the agent layer at `workspace:agent`; then
+`workspace`. The first target a written rule names decides (`workspaceRuleFor`); `all` never reaches the workspace, and
+with no rule naming one the write is direct (`Org-Rule: workspace/direct`). A rule that names a tree raises it: its saves
+are staged into the tray and proposed.
+
+### Pages
+
+A page the members (or the public) read is a file, `pages/<id>.md`, its place in the tree in front matter (`id`, `title`,
+`parent`, `order`, `visibility` when its own, `meeting` for a meeting's notes); a stricter page is a record of the private
+store's `pages`, and its writes make no commit. A page's level is its own, else its parent's, else
+`collections.pages.default`, else members, and a page is never looser than its parent. The editor (`/p/<id>`) writes the
+Hub's Markdown dialect; raw HTML, footnotes and anything it does not model are kept byte for byte. A page is written in
+place through an editing session: drafts are sent 800 ms after typing stops, and the session ends, as one commit, when
+the page is left in the Hub, after 60 s idle or 30 min at most; a tab that closes leaves it to its idle end. Two sessions
+on one page merge three ways or reach Compare. Under a raised tree the save reads "Staged · needs approval"; Suggest turns
+a session into a proposal on any page in git.
+
+| Route | Does |
+|---|---|
+| `GET /api/pages` | the tree the viewer may see (the public: public pages only) |
+| `GET /api/pages/:id` | the page, how the viewer may write it, its backlinks and its from mark; 404 alike for absent and invisible |
+| `POST /api/pages` `{ title, parent?, visibility?, markdown?, meeting? }` | a new page (201): one commit, staged under a raised tree, or a store record when stricter than members |
+| `POST /api/pages/:id/move` `{ parent, before? }` | put under another page or among its siblings (siblings renumbered when too close); a git page moved under a private one leaves git as a narrowing does |
+| `DELETE /api/pages/:id` | refused while it holds subpages |
+| `POST /api/pages/:id/assets` `{ name, data }` | an attachment (git pages only, at most 5 MB) |
+| `POST /api/meetings` `{ title, date, type? }` | Record a meeting: the meeting and its notes page in one commit |
+| `POST /api/pages/:id/sessions`, `PUT /api/sessions/:sid`, `POST /api/sessions/:sid/close`, `…/resolve`, `GET …/compare` | the editing session: open, save a draft, end, resolve a conflict (`mine`/`theirs`), compare |
+| `POST /api/sessions/:sid/suggest` | the session's text as a proposal (a git page only) |
+
+### Collections
+
+`tasks` and `meetings` (`data/tasks.yaml`, `data/meetings.yaml`), the org's own collections (`data/collections.yaml`
+defines them, `data/collections/<id>.yaml` holds their records) and the private collections the store keeps. Each has
+five views, Table, Board, Calendar, List and Map, at `/c/<collection>` and `/c/<collection>/<view>`, and saved views.
+Inline edits in a view are batched per member and collection: one commit after 10 s without a write. A field kept from
+the viewer reads "<hat> only"; a record kept from them is absent.
+
+| Route | Does |
+|---|---|
+| `GET /api/collections` | the definitions the viewer may see, the private ones among them |
+| `POST /api/collections`, `PUT /api/collections/:id`, `DELETE /api/collections/:id` | a collection defined, changed or removed (a stricter one in the store) |
+| `PUT /api/collections/:id/views/:view` | a saved view |
+| `GET/PUT /api/view-state/:collection` | the member's own filters and sort, kept for them only |
+| `POST /api/workspace/records` | a batched record write (a private part is written to the store at once) |
+
+### Conversation and presence
+
+Comments on a page or a record, mentions and notifications live in the private store, never in git. Each keeps the level
+its target had when it was written, and is read only by someone admitted to that level and to the target's level now (a
+reply only with the comments above it). Narrow the page and the talk is gone for whoever it no longer admits; widen it, in
+the Hub or outside, and the earlier talk stays with those who could read it before, while what is written after is read at
+the new level. A page deleted and made again under its id shows its old talk only to those who could read it then. After
+the trunk moves (Refresher, Sync) and at the start, the talk of pages and records that are no longer there is removed. A
+mention tells only those who may see what it is on; the rest are named back as not told. Presence is in the server's
+memory only (a beat every 20 s, gone 45 s after the last), shown only to those who may see the thing.
+
+| Route | Does |
+|---|---|
+| `GET /api/comments?target=`, `POST /api/comments` `{ target, body, parent?, anchor? }` | a target's comments; a new one (201 `{ comment, notTold }`) |
+| `POST /api/comments/:id/resolve`, `…/reopen`, `DELETE /api/comments/:id`, `POST /api/comments/:id/task` | resolve, reopen, delete, make a task of it (at the comment's level, members at the loosest: a task is never public at once, and widening it is a publication) |
+| `GET /api/mentionables?target=&q=` | who and what an `@` may name there, a member who may not see it drawn disabled |
+| `GET /api/notifications`, `POST /api/notifications/read`, `POST /api/reads` | Needs you's mention rows; read state |
+| `POST /api/presence` `{ target, editing }`, `GET /api/presence?targets=` | beat; who else is on a target |
+
+### Imports
+
+From the command line, on the machine that holds the instance, while no Hub server runs for it:
+
+    npm run import -- notion <folder> [--map <file>] [--apply]
+    npm run import -- fileverse <folder> [--map <file>] [--apply]
+
+`<folder>` is an unzipped Notion Markdown & CSV export, or a Fileverse pull. Without `--apply` nothing is written in the
+instance: the report is printed and the map is written beside the export (never inside the repository: there it is
+printed), for the operator to edit. The map gives each database `into` (a new collection, `notion-<name>`, by default),
+its `level` (members, or stricter: it then lands in the private store; public is refused) and its fields' types; the
+pages' level; each name seen in a people field, linked to a member id or left as text kept at `defaults.contact`; and
+`keep_authors`. With `--apply` the import is one workspace commit, its private part in one store transaction around it,
+and a receipt in `data/imports.yaml` that names no private item. Nothing is matched by title when an id exists; what
+cannot land is reported by name. A second run updates only what the Hub left as imported.
+
+### Sources and the source editor
+
+`/sources` says where what the Hub shows comes from: the instance (its collections with counts, its pages, its other
+governed files, its last commit), each System (what its driver supplies, and the read's age), and each import (the items
+of that export the viewer may read). It lists, too, where each governed file is edited, every row linking to its editor
+(`GET /api/editors`, the table above). A record, a collection, a page and an imported item carry a from mark ("from
+Notion · exported 12 Aug", "from data/tasks.yaml", "from <owner>/<repo>").
+
+The source editor, `/files/<path>`, opens a governed file whole in a Mono well; Save stages a `file` op into your change,
+checked when staged and again when applied. A generated file is shown, never saved.
+
+| Route | Does |
+|---|---|
+| `GET /api/sources` | the sources, each with what it supplies and its read |
+| `GET /api/editors` | the table of what edits each governed file |
+| `GET /api/files?path=` | a governed file as the source editor opens it, its editor and its base |
+
+### Council memory
+
+The agent layer's memory is split by who may read it. Org memory is `memory/<date>.md`, in the repository, read by every
+member. Council memory is a record of the private collection `council-memory`, at a hat or a role, written through the
+Hub so the gate applies:
+
+    npm run memory -- add --level <members | hat:<hat ref> | role:<role id>> --date <YYYY-MM-DD> --title <t> (--file <md> | -)
+    npm run memory -- list --date <YYYY-MM-DD>
+
+`--level members` appends to `memory/<date>.md` and commits nothing (the session's close does); a stricter level is
+posted to the running Hub (`POST /api/memory`, read back with `GET /api/memory?date=`), and with no Hub running it is
+refused in words. The close skill asks "members or Council?" of each entry. The instance doctor's agent-layer check
+counts what in the agent layer's files looks like personal data, never printing a value.
+
+### Moving into the repository
+
+A private record or page is moved into git by a publication decision: its visibility control offers "Move into the
+repository…", which asks who may read it there (Members, or Public where its parent allows) and stages the move into your
+change as a private part. It is applied where the rule for `publication` lets you decide alone, and proposed otherwise;
+until it is decided the ledger holds a placeholder only. The proposal's title is the exception: the title its author gives
+is written to `data/proposals.yaml` in git at once, at Propose, so it must not carry restricted text. The Propose panel
+suggests "A change to a restricted collection" for a change whose only part is private; keep it, or give one that names
+nothing restricted. The move writes the record's git part in one commit (a ratify's
+merge names it in `Org-Moved`), keeps the fields the policy restricts in the store, and deletes the store's record. While
+an open proposal holds a move, the record or page holds still: an edit, a page-tree move and a removal are refused in the
+move's words. A narrowing goes the other way (L5's `POST /api/visibility/narrow`): a page narrowed below members leaves
+git with its git subpages, in one commit, asked first with their count.
+
+## Governance
+
+The routes below read. Writing goes through the change engine: besides the source editor (above), the one record
+`governance:governance` takes `{ op: 'update', record: 'governance:governance', set: { roles?, rules? } }` (DAO-OS
+L7-D10), each block written whole, `null` taking a block out. Only those two blocks are written, in place: every other
+byte of data/governance.yaml (comments, quoting, the model, the decision rows) stays as the file holds it. Any other op
+or field is refused ("Only roles and rules of data/governance.yaml are edited here."); the lockout check runs on the
+file as the change would leave it; a file of several YAML documents is refused, to be edited by hand. The op stages,
+proposes and applies like any other, under the org's rule for class `governance`.
 
 | Route | Does |
 |---|---|
@@ -398,7 +547,7 @@ when you apply or propose that change, like any other.
 | `GET /api/library` | `{ sources, shelves, entries, problems }`: each entry as a row (kind, title, summary, version, source, standing, what it adds in a line, whether this org has what it needs, and `added`: its receipts still in force, `{ receipt, at }`). No values |
 | `GET /api/library/:id` | One entry's manifest, with its `installs`; 404 for an id it does not hold |
 | `GET /api/library/:id/preview` | What adding it would change, without adding it: the records it would create and their change classes, who decides each under the rule in force, what it needs and whether the org has it, the `fields` it asks for (name, description, default, required), the hosts a driver would reach (read only), `cannotAdd` (the sentence that keeps it from being added, or null), the `refusal` with the next free id when its id is taken, and its `receipts` (`{ id, at, by }`) |
-| `POST /api/library/:id/add` | `{ config? }`: stages the entry's records and its receipt in your change, as one. Answers your change; 409 `{ code: 'NOT_ADDABLE', error }`, 409 `{ code: 'TAKEN', error, nextFreeId }`, 422 `{ errors: [{ record, field: 'config.<name>', message }] }`, 403 for a reader who is no member, 404, 400 for a body that is not `{}` or `{ config: {...} }` |
+| `POST /api/library/:id/add` | `{ config? }`: stages the entry's records and its receipt in your change, as one. Answers your change; 409 `{ code: 'NOT_ADDABLE', error }`, 409 `{ code: 'TAKEN', error, nextFreeId }`, 422 `{ errors: [{ record, field, message }] }` (a config problem on `config.<name>`; a template's composition problem on the System's field), 403 for a reader who is no member, 404, 400 for a body that is not `{}` or `{ config: {...} }` |
 | `GET /api/library/receipts` | Every receipt in `data/library.yaml`, removed ones too |
 | `GET /api/library/receipts/:id/removal` | What removing that add would do, without removing it: each record it created, `as added`, `edited` (since the add) or `gone`, with the records that still name it; `asks` (the edited ones); who decides; a `refusal` when it was already removed |
 | `POST /api/library/receipts/:id/remove` | `{ take? }`: stages the deletes of what the add created and the receipt's removal. Answers your change; 409 `{ code: 'ASK', asks, error }` when `take` does not name every edited record, 409 `{ code: 'REMOVED', error }`, 422 `{ errors }` from the change engine's own delete check (a record another record still names), 403 for a reader who is no member, 404, 400 for a body that is not `{}` or `{ take: [...] }` |
@@ -422,6 +571,19 @@ A registered shelf that cannot be read, or one bad entry in it, leaves out only 
 `problems` says so in a sentence (a shelf missing or malformed, an entry that fails the schema or says it comes from
 another shelf, an id the framework already serves: the framework's copy wins). The list never answers 500 for it.
 
+**DAO templates and wizards** (DAO-OS L7). Two shelf kinds join `board`, `rules` and `system`: `template` (labelled
+"DAO template") and `wizard` ("Wizard"). A template's installs create composed Systems (`deployment.status:
+composed`: a Safe, a Hats tree and its hats, often a board), with the governance for after deployment in the Safe's
+`deployment.on_deploy`; nothing is written to data/governance.yaml at add, and nothing is deployed. A wizard entry names
+its wizard file (`wizard: wizard.yaml`, in the entry's folder); `GET /api/wizards` serves it as `<shelf name>/<slug>`
+(the slash sent as `%2F`), and its `result` (`add: <template id>`, `config: { <name>: "${field.<id>}" }`) is what it
+adds. An install's record id may hold a placeholder (`systems:${config.id}-safe`); the id it makes is checked at add.
+Adding a template is judged as a composition: a problem with the Systems it creates (an owner that is no account on the
+chain, a threshold above the owners, a gate hat that is no composed hat) is a 422 on that field. Removing a template
+whose Systems are deployed is refused (409 `DEPLOYED`, "Its Systems are deployed. Remove each System as its own change;
+the chain keeps them."). Check a shelf before serving it: `npm run check:shelf -- <dir>` here, or from another
+repository `npm --prefix "$ORG_OS_FRAMEWORK/packages/admin" run --silent check:shelf -- <dir>`.
+
 **Config.** An entry's `installs` may hold `"${config.<name>}"` (quoted in YAML) in a record id and in any string of
 `value` or `set`. A string that is exactly a placeholder becomes the value given, with its type; a string that holds one
 has it written in. Every placeholder must name a property of the entry's `config`, or the entry is refused when the
@@ -437,14 +599,25 @@ add: its `id` (the entry id with `:` → `-`, then `-2`, `-3`…), `entry`, `ver
 the rule and the change's id) or proposed (the proposer, the day, the proposal's id; Revise seals again). A committed
 receipt with any of them null is an error in `validate:data`. A removal is sealed the same way, into `removed`.
 
+**Modifying installs** (DAO-OS L7-D11). An entry may `update` a record the org already has (a rule set adds to
+`governance:governance`). Its receipt then holds `modified: [{ record, base, after }]`: `base` the record's hash before
+the add, `after` its hash as the add left it (sealed with the rest). A rule set merges by id: its rules after the
+org's, its roles beside them; a rule or role id already written is refused, and so is the id of the rule an org on
+implied rules follows (`solo`). On an org with no written rules, the implied rule is written first, so what was in
+force stays in force; an add that would narrow a solo org to a `maintainer` role is refused in words. Removal gives
+each modified record back as it was at `base`, read from the repository's own history (read only); a base no commit
+holds is 409 `RESTORE`, and the removal is refused unless the change gives every modified record back. `replace` and
+`delete` installs stay refused.
+
 A receipt rides along in class judgement: an add is decided by the classes of what it creates, and the receipt's own
 class counts only in a change that holds nothing else. Apply, Propose and the tray keep an add or a removal whole: the
 receipt does not go without its records, nor its records without it.
 
 **Refusals, in this order (the first that applies is said):** a built-in board; an entry that adds nothing; an entry
-that changes records the org already has (a rule set says its own sentence); an entry whose maturity is `raw`; one that
-needs something this org does not have yet (read through your own staged change); a record id that is already taken
-when the entry has no `id` in its config. A taken id the person can change is not a refusal of the entry: the preview
+that replaces or deletes a record; an entry whose maturity is `raw`; one that needs something this org does not have
+yet (read through your own staged change); an update while your change already edits that record ("Apply or propose it
+first, then add this."), or of a record this organization does not have; a rule set that cannot merge (above); a
+record id that is already taken when the entry has no `id` in its config. A taken id the person can change is not a refusal of the entry: the preview
 offers the next free id, and Add answers 409 `TAKEN` with it.
 
 **Remove** undoes exactly what an add created. A record edited since the add is deleted with its edits only when `take`
@@ -454,8 +627,7 @@ delete check, and the removal preview lists those records in advance. The record
 as their referrers are: one you deleted there is gone, one you edited there is edited. If records were edited after you
 opened the removal, the page looks again and names them rather than saying the API's sentence.
 
-**Not here yet:** entries that change records the org already has (rule sets among them) come with L7; the toolkit's
-knowledge shelf (waits on the licence decision); update to a newer version; *Preview on my data*; the *For this org*
+**Not here yet:** the toolkit's knowledge shelf (waits on the licence decision); update to a newer version; *Preview on my data*; the *For this org*
 ranking; the doctor's drift check.
 
 ## Scope (M1)
@@ -493,11 +665,13 @@ ranking; the doctor's drift check.
 
 ## Wizards
 
-A wizard is data in `wizards/<id>.yaml` (checked by `lib/wizards.mjs`), walked by the wizard machine
+A wizard is data in `wizards/<id>.yaml` (checked by `lib/wizards.mjs`), or a shelf's wizard entry (see Library),
+walked by the wizard machine
 (`lib/machines/wizard.mjs`: intro, steps, review, running, done or failed) and drawn by the wizard part
 (`app/src/wizards/WizardFrame.tsx`, shown in each state on `/parts`). One decision per screen; every
 screen says what it writes; nothing is written before the review is confirmed, and `running` is entered
-from the review and nowhere else. Answers in progress are a draft kept outside the repository.
+from the review and nowhere else. Answers in progress are a draft kept outside the repository, one per wizard and
+actor: read back only by the actor who saved it; with no actor none is read, and a write is 401 `SIGN_IN`.
 
 | Route | Does |
 |---|---|
@@ -522,6 +696,193 @@ and shows that command and its config at the review. It runs nothing: creating a
 this app does not have. It stops before "how it decides" and "starting set" (they need the library and
 rules) and before "run".
 
+## Compose and deploy (DAO-OS L7)
+
+A DAO is first **composed**: its Safe, its Hats tree and hats, its signer gate are records in `data/systems.yaml` with
+`deployment.status: composed`, staged and decided like any other change. A composed System is a plan, not a thing on a
+chain: no driver reads it (its card says "Composed, not deployed"), it is never the membership tree, and nothing about
+it is published. Once the composition is applied (or its proposal ratified), **`/deploy`** prepares its deployment step
+by step and **Read back** turns what the chain holds into live Systems (see Deploy, below). The Hub reads, plans and
+stages; it never signs or sends: a signer signs in the Safe app or their own wallet. Deploying is built for Sepolia
+only, and has been tested against a fake node, not yet run on a chain or a fork (the fork harness, L7 Task 20, waits
+for the operator's go on a Sepolia RPC).
+
+**Compose a DAO** (the template wizard). A shelf wizard with a `result` (the dao-os shelf's "Compose a DAO";
+`wizard:test-compose` on the test shelf) runs in the template runner at `/wizards/<shelf>%2F<slug>`: one question per
+screen, the eyebrow counting them ("Compose a DAO · 3 of 5"); addresses one per line (0x, or CAIP-10 on the composed
+chain), counts as whole numbers; the council's wearers start as the signers until you write there. The review lists
+your answers and the records the add will stage; **Stage in your changes** adds the template with your answers as its
+config and opens `/compose`. A refusal goes back to the step that holds its field, with the sentence under it; one no
+field holds is said on the failed screen, and nothing is staged. A "Start blank" door opens the canvas with nothing
+staged. Drafts are your own (see Wizards). Previewing as someone else, or as an actor who is no member, the runner
+stages nothing and keeps no draft.
+
+**`/compose`** (under Systems). The compose canvas on the org's composed Systems, read from `data/systems.yaml`
+through your own change, so what you stage shows at once. The shelf places a Safe, a Hats tree, a hat, a Snapshot space
+and a link (a link is listed, never deployed); a hat lives in its tree, as `<tree>/<key>`. Placing, moving, renaming,
+connecting (a hat signs for a Safe; a Safe holds a Hats tree, wearing its top hat; a hat appoints another) and deleting each stage ops through
+`POST /api/changes/ops`; the composition is checked as a whole when staged, on the fields the records state (a Safe with
+no owners yet is incomplete, not wrong). A refused stage is an error note above the canvas, said once through the
+page's live region, and the canvas is drawn again as your change stands. The foot reads "Composed · not yet deployed" and
+offers nothing to review until something of the composition is staged; then it reads "Staged · not yet deployed",
+**Review order** opens the Changes tray and **Propose** its Propose panel. Only the records you may read are drawn; previewing, nothing staged is projected and nothing that writes is
+drawn; an actor who is no member reads the canvas without its write controls. Once the composition is decided, the
+foot counts the plan's steps ("7 prepared transactions, in order · Sepolia") and links to them ("Open the prepared
+steps", `/deploy`); while the plan is read, when there is none, or previewing, it counts nothing.
+
+**What the chain holds of a deployed System.** A System read back from the chain (`deployment.status: deployed`) is
+edited like any record but for the fields the chain holds (`lib/chain-held.mjs`): its `kind`, `driver` (which driver
+reads it), `chain` and `address`, its `deployment` but `on_deploy`, a Safe's other `chains` and its `signer_gate`, a
+tree's `hats` (a hat's `role` aside, and its wearers may be dropped), a space's `space` and `url`, a registration's
+`ens`. The server refuses any op that changes one, on every write path (stage, Propose, Revise, Apply and a ratify),
+422 on that field: "<field> of a deployed System is what the chain holds: change it on the chain, then read it back."
+It judges a field the private
+store keeps (a restricted field, a System kept private whole, a `deployment` held there while the rest is in git) the
+same way, before anything is staged, and Apply judges the whole again (a System another change read back since). An
+edit is also judged against the change it joins: once your change holds a read-back's flip of a System, a hand edit of
+what the chain holds of it is refused too. The read-back's own writes pass: a composed System flipped deployed, a
+deployed tree's wearers dropped once its gate registered them, a Safe's `on_deploy` taken out once the composition is
+whole. A Safe's `on_deploy` stays editable while it is deployed: one set by hand becomes the org's governance at the next
+read-back that finds the composition whole, staged in that actor's change and judged, like any governance change, under
+the rule that covers it for them. Everything else (its name, description, notes, `relates`,
+`roles`, `role`, tags, `position`, `order`) is edited in the record and source editors and on the canvas. A System
+registered by hand (no `deployment`) keeps every field editable. As before, an op that writes a deployed System back to
+`composed` is 422 on `deployment.status`; a System that data/governance.yaml names (the membership tree, a rule it
+decides) cannot be deleted until governance stops naming it; and a change that would leave several deployed Hats trees
+while `governance.membership.tree` names none is 422 ("Name the membership tree in data/governance.yaml first: …").
+
+On the canvas a deployed node (one the composition names) moves, connects from and is renamed as any: its place, its
+`relates`, its name, description and notes are staged; a connection that would write what the chain holds (a hat
+signing for a deployed Safe whose gate does not list it, a hat of a deployed tree made to appoint) is refused in words.
+Its inspector says "Deployed: what the chain holds is shown as it is; its name, description, notes, place and relations
+are edited here.", and shows its chain, address, owners, threshold and wearers read only, each with the sentence above.
+A hat of a deployed tree is the chain's: its name (its details) is read only, and no hat is placed into the tree. A
+deployed node is not removed on the canvas ("Delete its record on its own page"), and its threshold has no stepper.
+
+**A System's record page** shows the fields of its kind (`x-kinds` in the schema): a Safe's signer gate, a tree's hats,
+a repo's branch and files; `deployment`, `role`, `position` and `order` where held.
+
+**Safe reads from the chain.** When the Safe Transaction Service cannot answer for a Safe (404: a Safe it has not
+indexed, a fork's included; 403 or 429: its keyless quota), the Safe driver reads the Safe from the chain by `eth_call`
+(owners, threshold, nonce, version, the first ten modules, guard, fallback handler, singleton) and says so on the card
+(`source: chain`, with a note): waiting transactions and balances are the service's to say, so they are absent then. A
+view that reverts is the Safe's answer (an older Safe's optional view reads "not known"); a node error fails the read,
+naming the host only. `ORG_OS_SAFE_API_KEY`, when set, goes to the service's host only, as a bearer token, and never
+into an error, a log or a note.
+
+**Hats: add a role.** On a Hats tree, the proposal page's actions include **Add a role: a new hat and its first
+wearers** (class `governance`): `createHat`, then `batchMintHats` of the new hat to each first wearer, both signed by
+the hat's admin. When a Safe is the admin the two are **one Safe transaction**, through MultiSendCallOnly 1.4.1, so no
+other hat can take the new hat's id between them. It is refused before anything is prepared for no wearers, a wearer
+listed twice, more wearers than the hat's supply, an ineligible wearer, or a signer that is no admin. The proposal
+attaches the new hat (`hats-role`) and reads executed once the hat holds these details and every wearer wears it.
+Prepare (this and the Safe's) is only for an open proposal, and only for a System one of its rules waits on (409
+`NOT_PREPARED` otherwise).
+
+**The warning before execution.** Prepared, the transaction names the id the new hat will get; another hat created
+under the same admin before it is executed takes that id. The proposal reads this before anyone executes and says
+"Doesn't match": "Another hat was created under the admin since this was prepared: prepare it again.", or "A hat already
+exists at the id this transaction creates, and the transaction is not executed: …". When the rules wait on the Safe,
+the attach is the Safe's transaction with the new hat beside it (its `watch`, which prepare gave and the attach must
+carry as given; anything else is refused, nothing written), and every check reads the tree too. The server keeps
+that watch in memory; when it has lost it (a restart, or many add-roles prepared since), the transaction is attached
+as a plain Safe transaction, and a check rebuilds the watch from the transaction itself once the Safe service has seen
+it: the hat id its mint names and the wearers it names, read on the tree the same way. A transaction that calls Hats
+at all (directly, or in any call of its bundle, whatever it does there) and is not cleanly one add-role (createHat, with
+non-zero modules and room for every wearer, then batchMintHats on Hats, the mint naming the child of the admin the hat
+is created under, and that child the admin's newest as the tree reads it), or that delegates its call to anything but
+MultiSendCallOnly 1.4.1, reads "Doesn't match": "The Safe transaction may change hats, and the Hub cannot read it as
+one new role: …", never executed. A mismatch of a
+transaction the Safe service has not seen yet is not recorded; it is said on the proposal page, to whoever checks, to
+every member who visits and, once a member's read found it, to one who is no member, ending "Not recorded yet: the Safe service has not seen this transaction. Prepare it
+again and attach what it gives." This is a warning, not a lock: nothing on chain stops a signer who executes anyway.
+
+**A repo System** (`kind: repo`, driver `repo`) reads another public GitHub repository's published files (1 to 20,
+YAML, JSON or Markdown front matter) at its branch's commit, read only: what it lists, never the file content. A
+private or missing repository reads "not published, or private".
+
+### Deploy
+
+**`/deploy`** (under Systems in the path; in ⌘K as "Deploy" for a member who reads a composed System) shows the
+deployment of the **decided** composition, the Systems applied or ratified, never your staged change, as the chain
+reads now ("Read 2 min ago"). Each step in order: its title, who signs it, for which System, and a mark, **Ready**,
+**Waits** (with what for), **Done** or **Doesn't match** (with what the chain shows instead). A ready step may carry
+warnings to read before running it. The steps are spec §8.2's:
+
+1. Create the Safe — any account.
+2. Mint the top hat to the Safe — any account.
+3. Create the child hats, and 4. Give the hats to their first wearers — the Safe, on consecutive nonces.
+5. Deploy the Hats Signer Gate — any account.
+6. Wire the gate to the Safe — the Safe (its warning: until step 7, the founding owners are not registered signers).
+7. Register the signers — any account.
+8. The Snapshot space — the ENS name's owner, in the Snapshot app (off chain).
+9. Register the daoURI — the ENS name's owner, from their own wallet: the name's `daouri` text record set to
+   `identity.daoURI` in federation.yaml. Another text there is replaced, with a warning; a text the Hub cannot decode
+   is a failed read, and the step waits.
+
+A step that needs an earlier one's result waits until that one is read back, so the deployment goes in waves: run
+what is ready, read back, run what is ready next.
+
+**What to run.** A ready Safe step is its Safe transaction, unsigned, on the prepared-transaction card ("0 of 3 signed",
+the threshold as the Safe reads on chain), opened in the Safe app. A ready account step is the account-step card: the
+call in words, the unsigned transaction (chain, `to`, value, data), **Copy data** and **Open <to> on the explorer**, and
+the line "Sign this from your own wallet. The Hub never signs." Step 8 is the space's settings as JSON, with **Copy
+settings** and three links (the name in the ENS app, Create the space, Open the space): you paste them; nothing is
+posted, and on a mismatch the settings stay there to paste again. Step 9's sentence says that your account must own the
+name (or hold `ROLE_SET_TEXT` on its resolver); any other account is refused by the resolver.
+
+**The Hub never signs or sends.** It holds no key and connects to no wallet; it reads the chain by `eth_call` (and the
+Snapshot testnet hub by query) through the paced System reader, and prepares. Signing and sending are the signer's, in
+the Safe app or their own wallet.
+
+**Read back** (the page's one primary, for a member) reads the chain again, with the steps you ran and what each was
+prepared to predict, and stages what the chain holds as live Systems into your change: a Safe's and a gate's addresses,
+a tree's id and hats, `deployment.status: deployed` with the day; a tree's top hat as soon as it is minted. When every
+Safe and tree is deployed, the governance the template carried (`deployment.on_deploy`) is added to data/governance.yaml
+in the same change. What data/visibility.yaml keeps above members — a System kept in the private store, a field the
+policy restricts — is staged in the private store, as any edit of it is, and never in git; the change's one Apply writes
+both (a store that fails after the commit keeps its part in the change, for the next Apply). Nothing is applied here: the change is decided by the org's rules like any other, and the Changes
+tray opens on it. The page reads the plan again after every answer, when the window takes focus, and when it is shown
+again; a System a newer read-back found deployed is drawn Done ("Read back as deployed.").
+
+**When Read back refuses**, nothing is staged and the sentence says why:
+
+- *Doesn't match.* "Not staged: <System>: …". Something on chain is not what was composed (owners, threshold, the
+  singleton, a module or a guard that is not the gate, the space's name, network, strategies, who may propose (a space
+  letting anyone propose), minimum score, admins or voting where the settings set them), or a place a step you
+  ran was prepared for is now someone else's (another top hat took the id): the read-back's rows say which. Prepare
+  again.
+- *Your changes already edit <record>.* Your change sets a field the read-back would set otherwise: apply, propose or
+  discard it, then read back.
+- *Part of this composition is not yours to read.* Someone who can read all of it reads it back.
+- *This read-back would copy a value kept outside the repository into what the repository holds.* A value kept above
+  members would land in git: the governance's `${hat.…}` or `${system.….address}` read from a tree's hats or a System's
+  address kept above members, or a tree's `roles` (keyed by its hat refs) while its hats are kept and its roles are not.
+- *Part of a System of this composition is held outside the repository with no level in data/visibility.yaml.* The
+  private store holds a field the read-back writes, and data/visibility.yaml gives that field no level: give it its level
+  there first.
+- *Part of what this read-back writes is kept at a level you are not admitted to.* Someone admitted to it reads it back.
+  None of these three names the field.
+- *must have required property 'address'* (422): data/visibility.yaml keeps `systems.address` above members, and a
+  deployed System must hold its address in the repository.
+- *Name the membership tree in data/governance.yaml first* (422): the read-back would make a second deployed Hats tree
+  in the repository while `governance.membership.tree` names none, and the Hub would no longer know which tree holds the
+  org's roles. A tree the private store keeps is never counted: the Hub reads the membership tree from git.
+- *Apply or propose the composition first* / *Nothing is composed.*
+- *Nobody can propose* (422, the governance check's sentence): adding the governance would lock the org out. The page
+  adds "Add a wearer who can propose to the composed tree, then read back again."
+- *The chain could not be read* (502): the node named by its host only.
+
+**What a partial reader sees.** Previewing as someone else: "Nothing composed is shown.", and nothing is asked. One who
+may read only part of the composition, or not every field of it: the note "Part of this composition is not yours to
+read: someone who can read all of it prepares it.", no steps and nothing hidden named. One who reads none of it:
+"Nothing is composed…". An actor who is no member: the steps, without Read back. Not signed in: an unavailable note.
+
+| Route | Does |
+|---|---|
+| `GET /api/deploy` | `{ chain, composed, steps, readAt, problems }`: each step `{ id, system, title, status, waits?, signer, step?, link?, predicts, differs?, draft?, threshold? }` (`step`, the prepared call or Safe transaction, on a ready step only; `draft`, step 8's settings and links). A step of a System with a chain field (`address`, `signer_gate`, `hats`, `deployment`, `space`, `url`, `ens`) kept from the viewer, or signed by a Safe whose address is, shows its id, title, signer and status with no `predicts`, `step`, `link`, `differs` or `draft`; so does a step naming one of their values, and a `waits` or problem naming one is left out. 409 `NOTHING_COMPOSED`, `STAGED_ONLY`, `PART_HIDDEN`; 502 `READ_FAILED`; 401 for the public. Writes nothing |
+| `POST /api/deploy/read-back` `{ ran? }` | `ran: [{ step, system?, predicts: [{ kind, value }] }]`, the steps run. `{ readBack, staged, change? }` (the flip's part above members in `change.private`; `readBack.found` without what the viewer may not read: no value of a System whose `address` is kept from them, a tree's top hat and hats included, and no `differs` of one with any chain field kept; every answer below carries the same `readBack`, and MISMATCH's sentence names such a System only); 409 `MISMATCH` `{ readBack }`, `CHANGE_EDITS` `{ readBack }`, `KEPT_PRIVATE` `{ readBack }`, `NOT_ADMITTED` `{ readBack }`, `PART_HIDDEN`, `STAGED_ONLY`, `NOTHING_COMPOSED`, `PRIVATE_LOST`; 422 `{ errors, readBack }`; 503 `PRIVATE_STORE`; 502 `READ_FAILED`; 400 for another body; 401/403 for one who cannot stage. Stages, never applies |
+
 ## The Hub's look
 
 The Hub is drawn with one element set, the "house": a frame (sidebar, top bar, tray, inspector), atoms, rows, record
@@ -536,7 +897,7 @@ and `npm run e2e:parts` compares it against stored images. A few of those images
 look, in `docs/design/house-record/` (WebP, light, at most 150 KiB each).
 
 Each group's rules live in its own sheet under `app/src/design/css/` (`controls`, `states`, `atoms`, `frame`,
-`parts`, `rows`, `needs`, `views`, `workspace`, `governance`, `map`, `library`, `door`, and `utilities` last, so a
+`parts`, `rows`, `needs`, `views`, `workspace`, `governance`, `map`, `library`, `portal`, and `utilities` last, so a
 text helper wins over a group's rule of the same weight). `design.css` only imports them. `design/legacy.test.ts`
 fails when a sheet draws a class no element names, or an element names a class no sheet draws that is not on its
 commented list of hooks (a class a library reads, or a test finds a part by).
@@ -560,7 +921,7 @@ Two skins ship:
 
 `sleek` and `sample` are gone.
 
-**Fonts.** The house sets type in three self-hosted variable fonts: Fraunces (`--display`: the greeting, the door),
+**Fonts.** The house sets type in three self-hosted variable fonts: Fraunces (`--display`: the greeting, the portal),
 Geist (`--sans`: everything else) and Geist Mono (`--mono`: ids, addresses, wells). The WOFF2 files sit in
 `app/src/design/fonts/` with their OFL licences, latin and latin-ext. They are copied from the
 `@fontsource-variable/*` packages (named, with a hash per file, at the top of `fonts.css`), not depended on. No font
@@ -582,11 +943,11 @@ Tokens come in groups (each skin's file is written in this order):
   `--nav-ink`, `--nav-on-bg`, `--input-fill`, `--input-edge` and `--block-bg` (a block's surface against the page).
   Bare sets each to the colour it drew, by naming another token (`--accent: var(--ink)`) or `transparent`.
 - **type**: the families (`--display --sans --mono`, and `--soft`, Fraunces' softness), `--fs-*` (`--fs-d-*` for the
-  door), `--lh-*`, `--fw-*` and `--ls-*`. Then the faces a skin chooses for a kind of text: `--label-font` and
+  portal), `--lh-*`, `--fw-*` and `--ls-*`. Then the faces a skin chooses for a kind of text: `--label-font` and
   `--label-case` (the small labels over rows and fields, and the section heads), `--font-btn`, `--nav-on-weight`, and
   `--font-data` / `--data-nums` (what carries data: meta lines, status, dates, chips, segments, tabs, counts). The
   house reads them all in Geist as written; bare draws labels and section heads in mono capitals, and data in mono.
-- **space**: `--sp-1` … `--sp-18`, in order (16 to 18 are the door's rhythm).
+- **space**: `--sp-1` … `--sp-18`, in order (16 to 18 are the portal's rhythm).
 - **rules, marks, corners, depth, motion**: `--rule-w*`, `--stroke-w`, `--focus-w` (the ring), `--input-bw` (an input's
   four borders: bare draws only the underline); the corners `--radius-xs`, `--radius-sm`, `--radius-ctl` (buttons),
   `--radius-input`, `--radius` (surfaces, map nodes, cards), `--radius-pop`, `--radius-lg`, `--radius-plate`,
@@ -694,6 +1055,11 @@ While it is `off`, the house writes nothing to its instance:
   sync, the push's retry, the claim and commands. A write route the table (`server/hosted/instance-writes.ts`) does
   not name is refused too.
 - Sign-in, sign-out, wizard drafts and board layouts still work. They are kept outside the instance.
+- The workspace's conversation and per-member state still work too: comments (post, resolve, reopen, delete),
+  notifications read, read marks, a collection's view state, and presence (which never says editing while off).
+  They live in the private store or in memory. Everything else the workspace writes is refused, even where its target
+  is the private store: pages and editing sessions, collections and saved views, records, meetings, Council memory,
+  the knowledge commons, the deploy read-back, and a comment's Turn into a task, since that writes a task.
 - A proposal's page builds no branch and records no reading. The private store is not reconciled at start. No push
   runs, whatever `ORG_OS_PUSH` says.
 - `GET /api/status` says `instanceWrites: "off"`, and the app hides the tray and every other write control.
@@ -765,7 +1131,7 @@ encrypted (AES-256-GCM) under a key that a maintainer holds:
 
     npm test                          # vitest: server services, API, the elements and pages
     npm run typecheck                 # tsc, no emit
-    npm run e2e                       # the golden path, the claim wizard, the proposals walk (two clones) and sign-in, in Chrome
+    npm run e2e                       # the golden path, the claim wizard, the proposals walk (two clones), sign-in and the workspace walk, in Chrome
     npm run e2e:parts                 # every /parts group, at 1440 and 390, light and dark, against its stored images
     npm run e2e:parts -- --group map  # one group
     npm run e2e:parts -- --update     # store what it sees (the first run on a machine, or after a redraw)
@@ -777,7 +1143,7 @@ encrypted (AES-256-GCM) under a key that a maintainer holds:
     npx tsx tests/e2e/gallery-compare.mts <dir>   # after e2e:parts: the gallery's shots beside this build's, in one page
 
 The stored `/parts` images are kept out of git (`app/e2e/parts/`), and so are the route shots (`app/e2e/routes/`) and the
-reflow walk's text-200 % and forced-colours shots (`app/e2e/reflow/`); the first `e2e:parts` or `e2e:routes` on a
+reflow walk's text-200 % and forced-colours shots (`app/e2e/reflow/`), and the workspace walk's (`app/e2e/workspace/`); the first `e2e:parts` or `e2e:routes` on a
 machine is a `--update`. `-- --group <id> --record` writes that group's committed record files to `docs/design/house-record/`,
 after a passing compare, for the groups `tests/e2e/shoot.mts` names. `gallery-compare` refuses a `<dir>` inside a git
 repository: the page it writes is a look, not something to commit.

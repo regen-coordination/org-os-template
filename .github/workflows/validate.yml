@@ -77,11 +77,12 @@ jobs:
       - name: Tests
         run: npm test
 
+      # Skips the root and admin suites, which the Tests step above and the Admin package tests
+      # step below run once each: running them twice put 0.7's job at about 28 of its 30 minutes.
       - name: Selftest (full reliability suite)
-        run: npm run selftest
+        run: npm run selftest -- --skip admin,tests
 
-      # Explicit row as well as the selftest step: if selftest ever stops
-      # covering it, the gate should break here rather than go quiet.
+      # The admin suite's one run in this job: selftest above skips it.
       - name: Admin package tests
         run: npm run test:admin
 

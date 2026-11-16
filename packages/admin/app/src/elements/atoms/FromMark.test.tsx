@@ -13,9 +13,15 @@ const read = (over: Partial<DriverRead> = {}): DriverRead => ({ ok: true, readAt
 const draw = (from: From) => render(<FromMark from={from} now={NOW} />).container.firstElementChild as HTMLElement
 
 describe('the from mark (E-1, Q70)', () => {
+  // walk W3, D3: no file path on a member's page: a file of this repository is the repository, another's is that one
+  it('says a file in words, never its path: "from the repository", "from <repo>" (walk W3, D3)', () => {
+    expect(draw({ file: 'data/projects.yaml', readAt: null }).textContent).toBe('from the repository')
+    expect(draw({ repo: 'org-os', file: 'data/meetings.yaml', readAt: null }).textContent).toBe('from org-os')
+  })
+
   it('names a file of this repository and how long ago it was read; the age is a volatile <time>', () => {
     const mark = draw({ file: 'data/projects.yaml', readAt: ago(2) })
-    expect(mark.textContent).toBe('from data/projects.yaml · read 2 min ago')
+    expect(mark.textContent).toBe('from the repository · read 2 min ago')
     const time = mark.querySelector('time')!
     expect(time.getAttribute('datetime')).toBe(ago(2))
     expect(time.hasAttribute('data-volatile')).toBe(true)
@@ -23,7 +29,7 @@ describe('the from mark (E-1, Q70)', () => {
 
   it('names another repository, and the file in it when there is one', () => {
     expect(draw({ repo: 'org-os', readAt: ago(2) }).textContent).toBe('from org-os · read 2 min ago')
-    expect(draw({ repo: 'org-os', file: 'data/meetings.yaml', readAt: ago(60) }).textContent).toBe('from org-os · data/meetings.yaml · read 1 h ago')
+    expect(draw({ repo: 'org-os', file: 'data/meetings.yaml', readAt: ago(60) }).textContent).toBe('from org-os · read 1 h ago')
   })
 
   it('names a System and its read age, and says a failed read failed, with the last good age', () => {
@@ -36,9 +42,9 @@ describe('the from mark (E-1, Q70)', () => {
 
   it('shows the source alone when there is no time to name', () => {
     const mark = draw({ file: 'data/projects.yaml' })
-    expect(mark.textContent).toBe('from data/projects.yaml')
+    expect(mark.textContent).toBe('from the repository')
     expect(mark.querySelector('time')).toBeNull()
-    expect(draw({ file: 'data/projects.yaml', readAt: null }).textContent).toBe('from data/projects.yaml')
+    expect(draw({ file: 'data/projects.yaml', readAt: null }).textContent).toBe('from the repository')
     expect(draw({ repo: 'org-os', readAt: 'not a time' }).textContent).toBe('from org-os')
   })
 
@@ -48,6 +54,26 @@ describe('the from mark (E-1, Q70)', () => {
     expect(mark.querySelector('time')!.getAttribute('datetime')).toBe('2026-08-12T09:00:00Z')
     expect(mark.textContent).not.toMatch(/read/)
     expect(draw({ import: 'Notion', exportedAt: '2025-08-12T09:00:00Z' }).textContent).toBe('from Notion · exported 12 Aug 2025')
+  })
+
+  it('names the instance, for a page or a record the private store keeps, as it names a file (L6 §10)', () => {
+    expect(draw({ instance: 'Fixture Org', readAt: ago(2) }).textContent).toBe('from Fixture Org · read 2\u00a0min ago')
+    expect(draw({ instance: 'Fixture Org', readAt: null }).textContent).toBe('from Fixture Org')
+  })
+
+  it('reads a bare export day as that day wherever it is drawn, west of UTC too (Tasks 13–14 review M6)', () => {
+    const zone = process.env.TZ
+    process.env.TZ = 'America/Sao_Paulo' // UTC−3: a bare day read as UTC midnight is the evening before here
+    try {
+      expect(new Date('2026-08-12').getDate()).toBe(11) // the zone is in force: the old reading's day before
+      expect(draw({ import: 'Notion', exportedAt: '2026-08-12' }).textContent).toBe('from Notion · exported 12 Aug')
+      expect(draw({ import: 'Fileverse', exportedAt: '2026-01-01' }).textContent).toBe('from Fileverse · exported 1 Jan')
+      expect(draw({ import: 'Notion', exportedAt: '2025-12-31' }).textContent).toBe('from Notion · exported 31 Dec 2025')
+      expect(draw({ import: 'Notion', exportedAt: '2026-08-12' }).querySelector('time')!.getAttribute('datetime')).toBe('2026-08-12')
+    } finally {
+      if (zone === undefined) delete process.env.TZ
+      else process.env.TZ = zone
+    }
   })
 
   it('names an import alone when its export time is not known (R-L6-FM)', () => {
@@ -61,20 +87,20 @@ describe('the from mark in the headers (E-2)', () => {
   const from = { file: 'data/projects.yaml', readAt: ago(2) }
   it('sits in a record header’s meta line, after its items', () => {
     const { container } = render(<RecordHeader variant="record" kind="project" id="project:br" title="Brasil" meta={['Opened 2 Oct']} from={from} now={NOW} />)
-    expect([...container.querySelectorAll('.rh-meta .rh-m')].map(m => m.textContent)).toEqual(['Opened 2 Oct', 'from data/projects.yaml · read 2\u00a0min ago'])
+    expect([...container.querySelectorAll('.rh-meta .rh-m')].map(m => m.textContent)).toEqual(['Opened 2 Oct', 'from the repository · read 2\u00a0min ago'])
   })
 
   it('sits at the end of a System header’s facts line', () => {
     const { container } = render(<RecordHeader variant="system" kind="safe" name="Treasury" read={read()} now={NOW} from={{ file: 'data/systems.yaml', readAt: ago(2) }} />)
-    expect(container.querySelector('.rh-facts')!.lastElementChild!.textContent).toBe('from data/systems.yaml · read 2\u00a0min ago')
+    expect(container.querySelector('.rh-facts')!.lastElementChild!.textContent).toBe('from the repository · read 2\u00a0min ago')
   })
 
   it('follows a page head’s meta, or stands alone in it', () => {
     const { container, unmount } = render(<PageHead title="Projects" meta={['data/projects.yaml', 'main']} from={from} now={NOW} />)
-    expect(container.querySelector('.rh-meta')!.textContent).toBe('data/projects.yaml · main · from data/projects.yaml · read 2\u00a0min ago')
+    expect(container.querySelector('.rh-meta')!.textContent).toBe('data/projects.yaml · main · from the repository · read 2\u00a0min ago')
     unmount()
     const alone = render(<PageHead title="Projects" from={from} now={NOW} />)
-    expect(alone.container.querySelector('.rh-meta')!.textContent).toBe('from data/projects.yaml · read 2\u00a0min ago')
+    expect(alone.container.querySelector('.rh-meta')!.textContent).toBe('from the repository · read 2\u00a0min ago')
   })
 
   it('draws nothing new where no from is given', () => {

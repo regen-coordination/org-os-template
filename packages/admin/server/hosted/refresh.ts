@@ -5,10 +5,12 @@
 // history that diverged from the remote's (the copy holds commits the remote does not), or a fast-forward git refuses
 // stops it with an alert until the Hub starts again; a remote it cannot read is a warning, and it asks again at the next
 // refresh. While writes are on there is no Refresher: the Hub is then the one writer, and the Pusher sends its commits.
-// What it last did is a row on the Sources page (`state()`, read by the sources adapter) and server attention.
+// What it last did is a row on the Sources page (`state()`, read by the sources adapter) and server attention. After it
+// moves the trunk, the conversation's housekeeping runs (workspace/gone.ts `trunkMoved`, PR7-R45).
 
 import { fetchRemote, isAncestor, mergeFfOnly, remoteUrl, repoStatus, resolveRev } from '../git.ts'
 import type { ServerAttention } from '../attention.ts'
+import { trunkMoved } from '../workspace/gone.ts'
 
 /** The refresh runs this often unless `ORG_OS_REFRESH_EVERY` says otherwise. */
 export const REFRESH_EVERY_MS = 15 * 60_000
@@ -139,6 +141,7 @@ export class Refresher {
     } catch {
       return { kind: 'stop', trunk, sentence: REFRESH_REFUSED }
     }
+    trunkMoved(repo) // PR7-R45: the housekeeping, queued: it runs after this refresh ends
     return { kind: 'advanced', trunk, commit: (await resolveRev(repo, `refs/heads/${trunk}`)) ?? theirs }
   }
 

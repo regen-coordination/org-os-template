@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Resource } from '../api.ts'
-import { EDGE_WORDS, daoMapOf, derivedLinks, hatNumber, mainSafeOfResources, mapItemOf, mapLinksOf, mapNodesOf, portalNode, relatesOf } from './fromRecords.ts'
+import { EDGE_WORDS, daoMapOf, derivedLinks, hatNumber, mainSafeOfResources, mapItemOf, mapLinksOf, mapNodesOf, linkNode, relatesOf } from './fromRecords.ts'
 import { layerOf, layoutMap, mainSafeOf } from './layers.ts'
 import { resource } from '../test/data.ts'
 import { restrictedHat } from '../record/restricted.ts'
@@ -112,6 +112,12 @@ describe('relates and roles in systems.yaml (E-38)', () => {
     expect(links).toContainEqual({ from: VOTES.id, to: hatRefOf(2), label: 'appoints' })
   })
 
+  // DAO-OS L7 Task 17 (PF-R129's carry): a relation to a composed hat is written `<tree>/<key>`; the house map draws no
+  // composed hat of its own, so it reaches the hat's tree.
+  it('relates: a relation to a composed hat, `<tree>/<key>`, reaches its tree', () => {
+    expect(relatesOf(VOTES, { relates: [{ to: 'roles/council', label: 'elects' }] })).toEqual([{ from: VOTES.id, to: 'system:roles', label: 'elects' }])
+  })
+
   it('a relation the chain already gives keeps the chain’s label: the first wins', () => {
     const links = mapLinksOf([], { resources: SYSTEMS, entryOf: entryOf({ 'council-safe': { relates: [{ to: 'garden', label: 'pool' }] } }) })
     expect(links.filter(k => k.from === COUNCIL_SAFE.id && k.to === GARDEN.id)).toEqual([{ from: COUNCIL_SAFE.id, to: GARDEN.id, label: 'admin' }])
@@ -208,8 +214,8 @@ describe('the DAO map of the house’s Systems', () => {
     expect(hatNumber('not-a-hat')).toBe('not-a-hat')
   })
 
-  it('a 0.6 portal is the linked-node variant, "on <map>"', () => {
-    expect(portalNode({ id: 'portal:systems', toBoard: 'systems', text: '1 link', targets: [] }))
+  it('a link to the other map is the linked-node variant, "on <map>"', () => {
+    expect(linkNode({ id: 'portal:systems', toBoard: 'systems', text: '1 link', targets: [] }))
       .toEqual({ item: { id: 'portal:systems', kind: 'link', name: '1 link', facts: {} }, facts: 'on Systems map', states: ['linked'] })
   })
 })

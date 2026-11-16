@@ -12,7 +12,11 @@
 // the store only when they are applied (`resolvePrivate`): one source of the composition logic, as for a direct apply.
 
 import { randomBytes } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { REGISTRIES } from '../registries.ts'
+import { currentEntries } from '../changes/stage.ts'
+import { readConfig } from '../visibility/config.ts'
 import { Refusal } from '../changes/apply.ts'
 import { resolveRev } from '../git.ts'
 import { readLedger } from '../proposals/ledger.ts'
@@ -21,16 +25,18 @@ import { isPlaceholder } from '../../lib/ops.mjs'
 import { sha256Hex } from '../../lib/sha256.mjs'
 import { admits, formatLevel, restrictedFields, type Viewer, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { levelOfToken } from './reads.ts'
+import { splitPage } from '../../lib/workspace/pages.mjs'
 import {
-  applyPrivate, asUnavailable, privateClass, reach, resolvePrivate, RESTRICTED_SUBJECT, unavailable,
-  type PrivateAccess, type StagedPrivateOp,
+  applyPrivate, asUnavailable, isMove, movedWrites, MOVES, moveSplit, privateClass, reach, resolvePrivate, RESTRICTED_SUBJECT, shownOp, unavailable,
+  type MoveToGit, type PrivateAccess, type StagedPrivateOp,
 } from './ops.ts'
 import type { PendingRow, PrivateStore } from './store.ts'
 
 /** A private op as the ledger holds it (§9.6): no record, no value. */
 export type LedgerPlaceholder = { op: 'private'; ref: string; class: string; digest: string }
-/** One private op as an admitted viewer is shown it: its placeholder's ref and class, and the op itself. */
-export interface ShownPrivate { ref: string; class: string; op: StagedPrivateOp }
+/** One private op as an admitted viewer is shown it: its placeholder's ref and class, and the op itself; a move into the
+ *  repository (DAO-OS L6 §12) also says what it does (`MOVES`). */
+export interface ShownPrivate { ref: string; class: string; op: StagedPrivateOp; says?: string }
 
 /** What a viewer not admitted to a proposal's private part reads where its changes would be (rule 8). */
 export const RESTRICTED_NOTE = 'This proposal changes a restricted collection: what it changes is shown only to those admitted to it.'
@@ -106,6 +112,11 @@ function levelsOf(store: PrivateStore, op: StagedPrivateOp, policy: VisibilityPo
     return out.length > 0 ? out : null
   }
   if (op.op === 'clear-fields') return null
+  // DAO-OS L6 §12: a move reads the record at the level it is kept at (its own collection may be `pages`, or a custom one).
+  if (op.op === 'move-to-git') {
+    const kept = store.record(op.collection, op.id)
+    return kept ? [kept.visibility] : null
+  }
   if (!KNOWN.has(op.collection)) {
     const listed = store.collections().find(c => c.id === op.collection)
     if (!listed) return null
@@ -115,6 +126,13 @@ function levelsOf(store: PrivateStore, op: StagedPrivateOp, policy: VisibilityPo
   const kept = store.record(op.collection, op.id)
   if (kept) out.push(kept.visibility)
   return out.length > 0 ? out : null
+}
+
+/** Rule 8's words for a move (§12), to a viewer admitted to it: the record by its title (move.ts `moveLabel`). */
+function movesSays(store: PrivateStore, op: MoveToGit): string {
+  const body = store.record(op.collection, op.id)?.body ?? {}
+  const label = typeof body.title === 'string' && body.title.trim() !== '' ? body.title : `${op.collection}:${op.id}`
+  return MOVES(label, op.level)
 }
 
 /** Whether `viewer` is admitted to every level `ops` write at or read from, `policy` being data/visibility.yaml as it is
@@ -136,7 +154,7 @@ function privateShown(view: { id?: unknown; ops?: unknown }, viewer: Viewer, acc
   try {
     const part = pendingOf(store, { id: String(view.id), ops: view.ops as Proposal['ops'] })
     if (!admittedTo(store, part.flatMap(p => p.ops), viewer, policy)) return null
-    return part.flatMap(p => p.ops.map(op => ({ ref: p.placeholder.ref, class: p.placeholder.class, op })))
+    return part.flatMap(p => p.ops.map(op => ({ ref: p.placeholder.ref, class: p.placeholder.class, op: shownOp(op), ...(isMove(op) ? { says: movesSays(store, op) } : {}) })))
   } catch (err) {
     if (!(err instanceof Refusal)) asUnavailable(err, store) // a failure of the store is its attention; the view goes on
     return null
@@ -180,7 +198,7 @@ export const PRIVATE_STALE = 'Not ratified: the restricted part of this proposal
 /** `resolvePrivate` for a decided proposal (no one's admission asked again, R-L5-15.3), its refusals answered with
  *  `PRIVATE_STALE`. */
 export function decidedWrites(store: PrivateStore, ops: StagedPrivateOp[]) {
-  try { return resolvePrivate(store, ops, null) } catch (err) {
+  try { return resolvePrivate(store, ops.filter(op => !isMove(op)), null) } catch (err) {
     if (err instanceof Refusal && err.status === 409) throw new Refusal(409, { code: 'PRIVATE_STALE', error: PRIVATE_STALE })
     throw err
   }
@@ -197,6 +215,40 @@ export async function closingDropsPending<T>(access: PrivateAccess, id: string, 
     if (store.pending(id).length > 0) await store.tx(w => w.deletePending(id))
   } catch (err) { asUnavailable(err, store) }
   return out
+}
+
+/** A ratified move's store part, at start (§12): the record as the store holds it, and the fields it keeps. Throws (and
+ *  the reconcile leaves the part) when the store no longer holds it or git does not hold what the merge moved.
+ *
+ *  The fields kept (Task 11 review M-2): every key of the record that git's copy does not hold, at the level the policy
+ *  gives it now, else (a field no longer restricted, which the merge kept out) the level the record was kept at; a field
+ *  the store already holds a row of (the narrow control moved git's value there since the merge) is never overwritten.
+ *  So whatever the policy did between the merge and the restart, nothing of the record is lost and nothing enters git. */
+function movedPartOf(repo: string, store: PrivateStore, m: MoveToGit) {
+  const kept = store.record(m.collection, m.id)
+  if (!kept) throw new Refusal(409, { code: 'PRIVATE_STALE', error: PRIVATE_STALE })
+  const inGit = gitKeysOf(repo, m)
+  if (inGit === null) throw new Refusal(409, { code: 'MOVE_NOT_IN_GIT', error: `${m.collection}:${m.id} is not in the repository` })
+  let levels = new Map<string, string>()
+  try { levels = new Map(moveSplit(readConfig(repo), m.collection, m.id, kept.body).fields.map(f => [f.field, f.visibility])) } catch { /* the record's level */ }
+  const rows = new Set(store.fields(m.collection, m.id).map(f => f.field))
+  const isMarker = (k: string, v: unknown) => k === 'restricted' && typeof v === 'object' && v !== null && !Array.isArray(v)
+  const fields = Object.entries(kept.body)
+    .filter(([k, v]) => k !== 'id' && k !== 'visibility' && !isMarker(k, v) && v !== null && v !== undefined && !inGit.has(k) && !rows.has(k))
+    .map(([field, value]) => ({ registry: m.collection, record: m.id, field, visibility: levels.get(field) ?? kept.visibility, value }))
+  return { collection: m.collection, id: m.id, visibility: kept.visibility, body: kept.body, fields }
+}
+
+/** The keys git's copy of a moved record holds (a page's front matter and its markdown), or null when git holds none. */
+function gitKeysOf(repo: string, m: MoveToGit): Set<string> | null {
+  if (m.collection === 'pages') {
+    const path = join(repo, 'pages', `${m.id}.md`)
+    if (!existsSync(path)) return null
+    const { front } = splitPage(readFileSync(path, 'utf8'))
+    return new Set([...Object.keys(front), 'markdown'])
+  }
+  const entry = currentEntries(repo, m.collection).find(e => String(e.id) === m.id)
+  return entry ? new Set(Object.keys(entry)) : null
 }
 
 const firstLine = (err: unknown) => (err instanceof Error ? err.message : String(err)).trim().split('\n')[0] ?? ''
@@ -219,7 +271,11 @@ export async function reconcilePrivate(repo: string, store: PrivateStore): Promi
     const closed = (entry.closed ?? null) as { by?: unknown; decision?: unknown } | null
     if (entry.state === 'ratified' && placeholdersOf(entry.ops as unknown[]).length > 0 && store.applied(id) === null) {
       try {
-        const writes = decidedWrites(store, pendingOps(store, entry))
+        const ops = pendingOps(store, entry)
+        // DAO-OS L6 §12: a move's git part is in the merge; its store part (the restricted fields kept, the record gone) is
+        // written now, and only when git holds what was moved (else it is left for the operator, as any part that fails).
+        const moves = ops.filter(isMove).map(m => movedPartOf(repo, store, m))
+        const writes = [...decidedWrites(store, ops), ...movedWrites(store, moves)]
         const by = typeof closed?.by === 'string' && closed.by !== '' ? closed.by : String(entry.author)
         const decision = typeof closed?.decision === 'string' && closed.decision !== '' ? closed.decision : null
         await store.tx(w => {

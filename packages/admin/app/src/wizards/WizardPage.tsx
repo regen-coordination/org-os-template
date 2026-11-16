@@ -6,10 +6,12 @@ import { Note } from '../design/Note.tsx'
 import NotFound from '../pages/NotFound.tsx'
 import ClaimHandle from './ClaimHandle.tsx'
 import OpenInstance from './OpenInstance.tsx'
+import TemplateWizard from './TemplateWizard.tsx'
 import { PageLoading } from '../frame/PageLoading.tsx'
 
 /** The screens each wizard definition has. A definition is data (wizards/*.yaml); the page that draws
- *  its steps is code, one per wizard, and a definition without one says so rather than draw nothing. */
+ *  its steps is code, one per wizard, and a definition without one says so rather than draw nothing. A shelf wizard
+ *  whose definition carries a `result` (DAO-OS L7 §7.1) runs in the template runner, which every such wizard shares. */
 const FLOWS: Record<string, ComponentType<{ def: WizardDef }>> = { 'claim-handle': ClaimHandle, 'open-instance': OpenInstance }
 
 export default function WizardPage({ id }: { id: string }) {
@@ -21,7 +23,7 @@ export default function WizardPage({ id }: { id: string }) {
     return <><PageHead title="Wizard" meta={[id]} /><Note state="error">{q.error.message}</Note></>
   }
   const def = q.data
-  const Flow = FLOWS[def.id]
+  const Flow = FLOWS[def.id] ?? (def.result ? TemplateWizard : undefined)
   return (
     <>
       <PageHead title={def.title} meta={['wizard', `${def.steps.length + 1} steps`, def.id === 'open-instance' ? 'runs nothing yet' : 'nothing is written until the last is confirmed']} />

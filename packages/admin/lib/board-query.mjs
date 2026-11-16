@@ -25,11 +25,11 @@ export const CANVAS_MIN = Object.freeze({ w: 240, h: 120 })
 /** The map boards: the existing `Board` ids (P4-R3). */
 export const MAPS = Object.freeze(['organization', 'systems'])
 /** Today's sections: app/src/sections.ts SECTIONS, in its order (a test keeps the two equal). */
-export const SECTION_IDS = Object.freeze(['projects', 'people', 'funding', 'partners', 'ideas', 'meetings', 'treasury',
-  'crew', 'modules', 'fleet', 'sources', 'systems'])
+export const SECTION_IDS = Object.freeze(['projects', 'people', 'funding', 'partners', 'ideas', 'knowledge', 'meetings',
+  'treasury', 'crew', 'modules', 'fleet', 'sources', 'systems'])
 /** The kinds a source may name ("*" is any): app/src/kinds.ts RESOURCE_KINDS (a test keeps the two equal). */
 export const RECORD_KINDS = Object.freeze(['person', 'project', 'idea', 'funding', 'partner', 'knowledge-gaps', 'proposal',
-  'role', 'seat', 'module', 'instance', 'connector', 'source', 'channel', 'system'])
+  'knowledge', 'role', 'seat', 'module', 'instance', 'connector', 'source', 'channel', 'system'])
 /** The proposals a `proposals` block may read: GET /api/proposals, narrowed. */
 export const PROPOSAL_SOURCES = Object.freeze(['open', 'closed', 'mine', 'needs-me'])
 /** The fields every record has, the three derived ones included (P4-C9). */

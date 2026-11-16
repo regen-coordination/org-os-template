@@ -12,7 +12,7 @@ import { isKnown, type Actor } from '../actor.ts'
 import { Refusal } from '../changes/apply.ts'
 import { MachineRefusal } from '../machines.ts'
 import { readRuleContext } from '../governance/effective.ts'
-import { diffText, resolveRev } from '../git.ts'
+import { diffText, resolveRev, showFile } from '../git.ts'
 import type { RuleSummary } from '../changes/types.ts'
 import { currentOf } from '../changes/stage.ts'
 import { OUTCOME_TTL_MS } from '../systems/reader.ts'
@@ -23,9 +23,12 @@ import type { ProposeDeps } from './propose.ts'
 import { actHats, decidersOf, liveEvents, methodOf, type Proposal } from '../../lib/proposals.mjs'
 import { HOUSE_IDENT } from '../../lib/trailers.mjs'
 import { gitOpsOf } from '../../lib/ops.mjs'
+import { pagesMadePublic, splitPage } from '../../lib/workspace/pages.mjs'
+import { gitPages } from '../workspace/files.ts'
+import { readConfig } from '../visibility/config.ts'
 import type { ShownPrivate } from '../private/proposals.ts'
 import { hatRef, parseHatRef } from '../../lib/hats.mjs'
-import { describeRule, validTrunkName, type Rule, type RoleBook } from '../../lib/rules.mjs'
+import { describeRule, isWorkspaceSuggest, maintainerHat, validTrunkName, type Rule, type RoleBook } from '../../lib/rules.mjs'
 import type { HatObservation } from '../../lib/hat-readings.mjs'
 import type { evaluateAll } from '../../lib/evaluate.mjs'
 
@@ -40,6 +43,9 @@ export interface ProposalView extends Omit<Proposal, 'rules'> {
   stale: number[]
   /** The actor's say is still wanted: a decider whose approval or ballot would count, who has not given one. */
   needsYou: boolean
+  /** Who each actor of the proposal is, by id (walk fix wave 4, G9; routes.ts `withNames`): its author, everyone who wrote
+   *  an event, who closed it. A member's answer only; absent for the public. */
+  names?: Record<string, string>
   /** The events the actor may write now, as the proposal machine says (P4 §3.2: the client never decides). */
   can: string[]
   /** Each event the actor may not write now, with the machine's sentence: what a disabled action says (spec §3.14).
@@ -49,8 +55,9 @@ export interface ProposalView extends Omit<Proposal, 'rules'> {
   check: true | string
   /** Whether `proposal/<id>` stands and, while the proposal is open, holds its current rev (an outdated branch is missing). */
   branchState: BranchState
-  /** A read of the outside system failed, or its reading could not be recorded. */
-  attention?: { level: 'warn' | 'alert'; text: string }
+  /** A read of the outside system failed, or its reading could not be recorded; or it read a mismatch the outside service
+   *  has not seen, which is never recorded (fix I-1): its detail is then `mismatch`, and the prepared card says it. */
+  attention?: { level: 'warn' | 'alert'; text: string; mismatch?: string }
   /** A proposal on private data (L5 §9.6), as shown to a viewer admitted to all of it: its private ops, merged from the
    *  store, beside its git `ops` (routes.ts, private/proposals.ts `shownTo`). */
   private?: ShownPrivate[]
@@ -72,7 +79,15 @@ export interface ProposalDetail extends ProposalView {
   note?: string
   /** Each op's record as the trunk holds it now (null when there is none): what an op changes, and what a stale op finds. */
   current: (Record<string, unknown> | null)[]
+  /** DAO-OS L6 Task 16b (R-L6-SUGGEST): for each git op that writes a page (`pages/<id>.md`), Compare's two texts, the page's
+   *  body at the proposal's base (`was`; null for a page the base does not hold) and as the op writes it (`now`; null for a
+   *  delete); null for any other op. Absent when no op writes a page. `widens` (Task 20 review I2): the op makes the page
+   *  public, with this many subpages that take its level. */
+  compare?: ({ was: string | null; now: string | null; widens?: number } | null)[]
 }
+
+/** A page's file (L6 §4.1): the only files Compare draws on a proposal. */
+const PAGE_FILE = /^pages\/[^/]+\.md$/
 
 type Book = RoleBook
 
@@ -125,8 +140,21 @@ function partialHats(entry: Proposal, hats: string[]): string[] {
 }
 
 /** A rule of the snapshot as the Governance page writes a rule in force: one sentence, and where it is written. */
-const summary = (id: string, rule: Rule): RuleSummary =>
-  ({ direct: methodOf(rule) === 'direct', sentence: describeRule(rule), source: `data/proposals.yaml ${id} rules: ${rule.id}` })
+const summary = (id: string, rule: Rule, maintainers: string | null = null): RuleSummary =>
+  ({ direct: methodOf(rule) === 'direct', sentence: `${describeRule(rule)}${maintainers ?? ''}`, source: `data/proposals.yaml ${id} rules: ${rule.id}` })
+
+/** DAO-OS L6 R-L6-SUGGEST-2: for a member, who decides a suggestion under workspace/suggest, from data/members.yaml (the
+ *  id where a member has no name); '' for any other rule. A `maintainer` role sourced from a hat is whoever wears it: the
+ *  proposal's own readings name only those who acted, so it is said as the hat, with the wearers read so far (fix round
+ *  2, review I2), never "nobody". */
+function maintainersOf(rule: Rule, book: Book, members: Record<string, unknown>[]): string {
+  if (!isWorkspaceSuggest(rule)) return ''
+  const names = decidersOf(rule, book).map(m => String(members.find(e => String(e.id) === m)?.name ?? m))
+  if (maintainerHat(book) !== undefined) {
+    return `. The maintainers decide: whoever wears the hat the maintainer role is sourced from${names.length > 0 ? ` (read so far: ${names.join(', ')})` : ''}`
+  }
+  return `. The maintainers decide: ${names.length > 0 ? names.join(', ') : 'nobody, now'}`
+}
 
 /**
  * Whether the branch stands for the proposal as it is. While the proposal is open, a branch built from another rev (its
@@ -173,7 +201,7 @@ export async function viewOf(repo: string, entry: Proposal, vc: ViewContext): Pr
   const cannot = vc.actor === null ? {} : cannotWrite(state, context, entry, vc.actor)
   const { rules, ...rest } = entry
   return {
-    ...rest, derived: state, evaluation, rules: (rules ?? []).map(r => summary(String(entry.id), r)), stale,
+    ...rest, derived: state, evaluation, rules: (rules ?? []).map(r => summary(String(entry.id), r, vc.actor === null ? null : maintainersOf(r, book, vc.members))), stale,
     needsYou: vc.actor === null ? false : needsYou(entry, state, evaluation, can, vc.actor, book),
     can, cannot, check: vc.actor === null ? 'only a member can ask the system for a reading.' : mayCheck(entry, state, context),
     branchState: await branchStateOf(repo, entry),
@@ -228,15 +256,19 @@ const firstLine = (err: unknown): string => (err instanceof Error ? err.message 
  * A page visit's system read (P2-R12): when the proposal is open and has a live attach on its current rev, and the one
  * visiting is a member, read the outcome as POST …/check does (outside the write lock), and record a changed reading
  * (inside it). At most once per attach per the reader's window (`OUTCOME_TTL_MS`). A failed read records nothing and is
- * the view's attention; so is a reading that could not be recorded. A proposal the machine takes no system event for now
+ * the view's attention; so is a reading that could not be recorded, and a mismatch the outside service has not seen
+ * (fix I-1: never recorded, so every member who visits is told by the attention). A proposal the machine takes no system event for now
  * (a stale one) is not read.
  */
 async function visitRead(repo: string, actor: Actor, entry: Proposal, deps: DetailDeps): Promise<ProposalView['attention']> {
   const attach = currentAttach(entry)
   // Recording a reading appends to the ledger (ledger 149's path): not while writes are off.
-  if (deps.readOnly || !isKnown(actor) || entry.state !== 'open' || !attach) return undefined
+  if (deps.readOnly || entry.state !== 'open' || !attach) return undefined
   const key = `${entry.id}\0${attach.id}`
   const last = deps.visits.get(key)
+  // Fix I-1: one who is no member asks for no read, but is told of the unrecorded mismatch a member's read found for this
+  // attach (a signer may be no member of the Hub): nothing else of the reading, which is the members'.
+  if (!isKnown(actor)) return last?.attention?.mismatch !== undefined ? last.attention : undefined
   if (last && deps.now.getTime() - last.at < OUTCOME_TTL_MS) return last.attention
   let attention: ProposalView['attention']
   try {
@@ -307,6 +339,18 @@ export async function detailView(repo: string, id: string, actor: Actor, deps: D
   const entry = entriesOf(repo).find(e => String(e.id) === id) ?? found
   const view = await viewOf(repo, entry, viewContext(repo, actor, deps.now))
   // The git ops' records (a private placeholder names none): positions as `stale` counts them.
-  const current = gitOpsOf(entry.ops).map(op => currentOf(repo, String(op.record)))
-  return { ...view, ...diff, current, ...(attention ? { attention } : {}) }
+  const current = gitOpsOf(entry.ops).map(op => (op.op === 'file' ? null : currentOf(repo, String(op.record))))
+  // DAO-OS L6 Task 16b: a page's text at the proposal's base beside the text its op writes (Compare, old next to new).
+  const compare = await Promise.all(gitOpsOf(entry.ops).map(async raw => {
+    const op = raw as { op: string; path?: unknown; text?: unknown }
+    if (op.op !== 'file' || typeof op.path !== 'string' || !PAGE_FILE.test(op.path)) return null
+    const was = entry.base ? await showFile(repo, String(entry.base), op.path).catch(() => null) : null
+    // Task 20 review I2 (PF-R97): an open proposal that makes the page public says how many of its subpages go public with
+    // it (those that take its level), read against the git pages as they are; every member reads a git page.
+    const page = op.path.slice('pages/'.length, -'.md'.length)
+    const made = entry.state === 'open' && typeof op.text === 'string' ? pagesMadePublic(gitPages(repo), page, op.text, readConfig(repo)) : []
+    return { was: was === null ? null : splitPage(was).body, now: typeof op.text === 'string' ? splitPage(op.text).body : null,
+      ...(made.includes(page) ? { widens: made.length - 1 } : {}) }
+  }))
+  return { ...view, ...diff, current, ...(compare.some(c => c !== null) ? { compare } : {}), ...(attention ? { attention } : {}) }
 }

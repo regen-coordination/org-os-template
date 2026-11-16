@@ -9,6 +9,7 @@
  */
 
 import { BLOCKER, WARN } from './lib/finding.mjs';
+import { agentLayerLines } from './checks/agent-layer.mjs';
 
 const ICON = { OK: '✓', WARN: '⚠', BLOCKER: '✗' };
 
@@ -31,6 +32,8 @@ export function renderScorecard(assessment) {
 
   for (const check of assessment.checks) {
     lines.push(`  ${ICON[check.status]} ${check.title.padEnd(24)} ${check.status}`);
+    // The agent layer says what it looked at (DAO-OS L6 §14): counts and levels, never a value or a title.
+    if (check.id === 'agent-layer') for (const l of agentLayerLines(check)) lines.push(`      · ${l}`);
     for (const f of check.findings) {
       lines.push(`      ${ICON[f.level]} [${f.code}] ${f.message}`);
       if (f.hint) lines.push(`         → ${f.hint}`);
@@ -76,6 +79,14 @@ export function toJson(assessment) {
           message: f.message,
           hint: f.hint ?? null,
         })),
+        // The agent layer's listing (DAO-OS L6 §14): each file with its level and its markers' counts; the Council
+        // memory's count. Never a value, never a title.
+        ...(c.id === 'agent-layer'
+          ? {
+              files: (c.files ?? []).map((f) => ({ path: f.path, level: f.level, markers: f.markers ?? null })),
+              councilMemory: c.councilMemory ?? null,
+            }
+          : {}),
       })),
     },
     null,

@@ -27,7 +27,7 @@ describe('shownFor (E-50, rule 8)', () => {
     expect(shownFor(on('p-1', 'projects:open'), undefined, MEMBERS, seesAs(MEMBERS))).toBeNull()
   })
 
-  describe('as Public (the door’s view)', () => {
+  describe('as Public (the portal’s view)', () => {
     const res = [own('p-1', 'public'), own('p-2', 'public'), record('projects', 'open', 'public'), record('projects', 'closed')]
     it('shows a proposal whose own record and every touched record are public', () => {
       const v = on('p-1', 'projects:open')

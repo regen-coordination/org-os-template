@@ -2,6 +2,8 @@
  *  wearers and the wearers of the hats above it. A client model with an injectable source: L4 reads an item's
  *  `facts.visibility` from the fixtures, else `members`; L5 passes its own source, not new components. */
 
+import { parseHatRef, prettyHatId } from '../../../lib/hats.mjs'
+
 export type Visibility = { level: 'public' } | { level: 'members' } | { level: 'hat'; hat: string; name: string }
 
 /** Whose eyes the house is drawn for: you (the signed-in member: everything, in L4), or a preview. */
@@ -20,6 +22,19 @@ export interface VisibilitySource {
 
 const PUBLIC: Visibility = { level: 'public' }
 const MEMBERS: Visibility = { level: 'members' }
+
+/** A hat ref as the server writes it (`hatRef`: lower-case 64-hex id), so a token written in another case finds the tree's
+ *  name (whole-platform walk M18); anything that is no hat ref is kept as it is (the fixture tree's ids, `role:<id>`). */
+export function canonicalHat(hat: string): string {
+  const p = parseHatRef(hat)
+  return p ? `${p.chain}:${p.hatId}` : hat
+}
+
+/** A hat's name when the tree names it not: its pretty id (`0x0000000d.0002`), never its whole ref (walk M18). */
+export function unnamedHat(hat: string): string {
+  const p = parseHatRef(hat)
+  return p ? prettyHatId(p.hatId) : hat
+}
 
 /** The fixture tree: Top, and under it Council (with Ops under it) and Treasurer. The fixture member wears
  *  Council and Ops. Ids are placeholders; L5's source answers with the tree read from the chain. */

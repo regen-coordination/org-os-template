@@ -1,0 +1,1585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>org-os-kms house interface</title>
+<meta name="description" content="Every surface org-os-kms renders, redrawn with the DAO-OS house element set, in light and dark, desktop and phone. Fixture values only; the organisation and peers are invented.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..600,0..100;1,9..144,300..600,0..100&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* The house element set's CSS is copied verbatim from docs/design/dao-os-element-gallery.html (L4 spec §3–§10),
+   so this gallery cannot drift from it; the kms block after it adds only what kms needs, drawn with the same tokens. */
+/* ============================================================================================
+   THE HOUSE SKIN — token set (L4 spec §3). Every value an element draws is one of these.
+   Light is :root / .t-light; dark is the media block, [data-theme="dark"] and .t-dark (same values).
+   ============================================================================================ */
+:root, .t-light {
+  /* colour — neutrals */
+  --paper: #f4f2ec;
+  --raised: #fdfcf9;
+  --pop: #fdfcf9;
+  --sunken: #efede6;
+  --wash: #ebe8e0;
+  --wash-strong: #e2ded4;
+  --rule: #e2dfd6;
+  --rule-strong: #d6d2c7;
+  --edge: #827e73;
+  --ink: #1c1d1a;
+  --mute: #57554e;
+  --faint: #6b685f;
+  /* colour — moss (selection, staged, yours) and clay (needs you) */
+  --accent: #2e5c4a;
+  --accent-soft: #e2ebe4;
+  --on-accent: #ffffff;
+  --attn: #a8452a;
+  --attn-soft: #f6e5dc;
+  --solid: #1c1d1a;
+  --on-solid: #fdfcf9;
+  --focus: #2e5c4a;
+  --map-dot: #d9d5ca;
+  --row-hover: var(--wash);
+  --nav-ink: var(--mute);
+  --nav-on-bg: var(--wash);
+  --input-fill: var(--raised);
+  --input-edge: var(--edge);
+  --block-bg: var(--raised);
+  /* depth */
+  --shadow-card: 0 1px 0 rgba(28, 29, 26, .03), 0 1px 3px rgba(28, 29, 26, .05);
+  --shadow-raise: 0 1px 0 rgba(28, 29, 26, .03), 0 10px 28px -14px rgba(28, 29, 26, .28);
+  --shadow-pop: 0 0 0 1px rgba(28, 29, 26, .06), 0 18px 44px -14px rgba(28, 29, 26, .30), 0 4px 10px -4px rgba(28, 29, 26, .08);
+  --scrim: rgba(28, 29, 26, .32);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121412; --raised: #1a1d1b; --pop: #1f2321; --sunken: #0e100f; --wash: #232725; --wash-strong: #2c312e;
+    --rule: #2b2f2c; --rule-strong: #3a3f3b; --edge: #727771; --ink: #ecebe5; --mute: #aeaca3; --faint: #9a978e;
+    --accent: #8fc2a6; --accent-soft: #1b2b23; --on-accent: #0e1a13; --attn: #e8916a; --attn-soft: #33231b;
+    --solid: #ecebe5; --on-solid: #121412; --focus: #8fc2a6; --map-dot: #262a27;
+    --shadow-card: 0 1px 0 rgba(0, 0, 0, .25);
+    --shadow-raise: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 30px -14px rgba(0, 0, 0, .75);
+    --shadow-pop: 0 0 0 1px rgba(236, 235, 229, .07), 0 22px 50px -14px rgba(0, 0, 0, .8);
+    --scrim: rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"], .t-dark {
+  --paper: #121412; --raised: #1a1d1b; --pop: #1f2321; --sunken: #0e100f; --wash: #232725; --wash-strong: #2c312e;
+  --rule: #2b2f2c; --rule-strong: #3a3f3b; --edge: #727771; --ink: #ecebe5; --mute: #aeaca3; --faint: #9a978e;
+  --accent: #8fc2a6; --accent-soft: #1b2b23; --on-accent: #0e1a13; --attn: #e8916a; --attn-soft: #33231b;
+  --solid: #ecebe5; --on-solid: #121412; --focus: #8fc2a6; --map-dot: #262a27;
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, .25);
+  --shadow-raise: 0 1px 0 rgba(0, 0, 0, .25), 0 12px 30px -14px rgba(0, 0, 0, .75);
+  --shadow-pop: 0 0 0 1px rgba(236, 235, 229, .07), 0 22px 50px -14px rgba(0, 0, 0, .8);
+  --scrim: rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+:root {
+  /* type */
+  --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-micro: .6875rem; --fs-tiny: .75rem; --fs-label: .75rem; --fs-code: .78125rem; --fs-meta: .8125rem; --fs-ui: .8125rem;
+  --fs-body: .875rem; --fs-sub: 1rem; --fs-title: 1.5rem; --fs-greet: 1.75rem; --fs-page: 2rem; --fs-amount: 2rem;
+  --fs-d-hero: clamp(2.5rem, 1.25rem + 4.2vw, 4.75rem); --fs-d-sec: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+  --fs-d-card: 1.5rem; --fs-d-lead: clamp(1.1875rem, 1.05rem + .5vw, 1.375rem); --fs-d-body: 1.0625rem;
+  --fs-d-fig: clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem); --fs-d-fact: 1.625rem;
+  --lh-body: 1.5; --lh-row: 1.35; --lh-title: 1.25; --lh-prose: 1.65; --lh-code: 1.6;
+  --lh-d-hero: 1.02; --lh-d-sec: 1.1; --lh-d-lead: 1.45;
+  --fw-regular: 400; --fw-medium: 500; --fw-strong: 600; --fw-display: 350;
+  --ls-title: -.015em; --ls-display: -.025em; --ls-d-sec: -.02em; --ls-eyebrow: .08em; --ls-name: -.005em; --ls-label: 0;
+  --soft: 50;
+  /* space */
+  --sp-1: 1px; --sp-2: 2px; --sp-3: 3px; --sp-4: 4px; --sp-5: 6px; --sp-6: 8px; --sp-7: 10px; --sp-8: 12px;
+  --sp-9: 14px; --sp-10: 16px; --sp-11: 20px; --sp-12: 24px; --sp-13: 32px; --sp-14: 40px; --sp-15: 56px;
+  --sp-16: 72px; --sp-17: 96px; --sp-18: 128px;
+  /* rules, corners */
+  --rule-w: 1px; --rule-w-heavy: 2px; --focus-w: 2px; --mark: 8px; --mark-bar: 2px;
+  --radius-xs: 4px; --radius-sm: 6px; --radius-ctl: 7px; --radius-input: 7px; --radius: 10px; --radius-pop: 12px;
+  --radius-lg: 16px; --radius-plate: 22px; --radius-chip: 999px;
+  /* structure */
+  --w-nav: 240px; --w-rail: 56px; --w-inspector: 360px; --w-palette: 640px; --w-content: 1040px; --w-prose: 68ch;
+  --w-portal: 1120px; --w-node: 200px; --w-node-min: 148px; --w-kcol: 280px;
+  --h-topbar: 52px; --h-row: 56px; --h-row-1: 40px; --h-tray: 56px; --h-bottombar: 60px; --h-ctl: 32px; --h-ctl-touch: 44px;
+  --h-input: 36px; --h-chip: 22px; --h-addr: 24px;
+  /* motion */
+  --dur-1: 120ms; --dur-press: 150ms; --dur-2: 200ms; --dur-3: 320ms; --dur-flow: 1100ms;
+  --ease: cubic-bezier(.2, 0, 0, 1); --press-scale: .96; --o-disabled: .45; --o-dim: .38;
+}
+
+/* ============================================================================================
+   BASE
+   ============================================================================================ */
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; -webkit-text-size-adjust: 100%; scroll-padding-top: 64px; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--sans); overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea, select { font: inherit; color: inherit; }
+:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
+::selection { background: var(--accent-soft); color: var(--ink); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.s14 { width: 14px; height: 14px; } svg.i.s13 { width: 13px; height: 13px; } svg.i.s18 { width: 18px; height: 18px; } svg.i.s20 { width: 20px; height: 20px; }
+.mono { font-family: var(--mono); font-size: var(--fs-code); font-variant-numeric: tabular-nums slashed-zero; }
+.num { font-variant-numeric: tabular-nums; }
+.mute { color: var(--mute); } .faint { color: var(--faint); } .ink { color: var(--ink); }
+.eyebrow { font: var(--fw-medium) var(--fs-micro)/1 var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.serif { font-family: var(--display); font-variation-settings: "SOFT" var(--soft); }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dot-sep::before { content: "·"; margin-inline: var(--sp-5); color: var(--faint); }
+
+/* ============================================================================================
+   ELEMENTS — controls
+   ============================================================================================ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-5); height: var(--h-ctl); padding: 0 var(--sp-8);
+  border-radius: var(--radius-ctl); font: var(--fw-medium) var(--fs-ui)/1 var(--sans); white-space: nowrap;
+  background: var(--raised); color: var(--ink); border: var(--rule-w) solid var(--rule-strong); box-shadow: var(--shadow-card);
+  transition-property: background-color, border-color, scale, opacity; transition-duration: var(--dur-1); transition-timing-function: var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn svg.i { width: 14px; height: 14px; }
+.btn.has-ico { padding-inline-start: var(--sp-7); }
+.btn:not(:disabled):not([aria-disabled="true"]):active { scale: var(--press-scale); transition-duration: var(--dur-press); }
+.btn.primary { background: var(--solid); color: var(--on-solid); border-color: var(--solid); }
+.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--mute); }
+.btn.icon { width: var(--h-ctl); padding: 0; }
+.btn.sm { height: 26px; padding: 0 var(--sp-7); font-size: var(--fs-tiny); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: var(--o-disabled); cursor: not-allowed; }
+@media (hover: hover) {
+  .btn:not(:disabled):hover { background: var(--wash); }
+  .btn.primary:not(:disabled):hover { background: var(--solid); opacity: .88; }
+  .btn.ghost:not(:disabled):hover { background: var(--wash); color: var(--ink); }
+}
+.btn.is-hover { background: var(--wash); } .btn.primary.is-hover { opacity: .88; background: var(--solid); } .btn.ghost.is-hover { background: var(--wash); color: var(--ink); }
+.btn.is-focus { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; }
+.btn.is-press { scale: var(--press-scale); }
+@media (pointer: coarse) { .btn { height: var(--h-ctl-touch); padding: 0 var(--sp-10); } .btn.icon { width: var(--h-ctl-touch); } }
+.spin { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 1.5px solid currentColor; border-inline-end-color: transparent; opacity: .8; }
+@media (prefers-reduced-motion: no-preference) { .spin { animation: spin .8s linear infinite; } }
+@keyframes spin { to { rotate: 1turn; } }
+
+kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 var(--sp-4);
+  font: var(--fw-medium) var(--fs-micro)/1 var(--sans); color: var(--faint); background: var(--raised);
+  border: var(--rule-w) solid var(--rule-strong); border-bottom-width: 2px; border-radius: var(--radius-xs); }
+
+.field { display: grid; gap: var(--sp-5); min-width: 0; }
+.field > label, .field .lbl { font: var(--fw-medium) var(--fs-label)/1.3 var(--sans); color: var(--mute); display: flex; gap: var(--sp-5); align-items: center; }
+.input { height: var(--h-input); width: 100%; padding: 0 var(--sp-7); border-radius: var(--radius-input); background: var(--input-fill);
+  border: var(--rule-w) solid var(--input-edge); font-size: var(--fs-body); color: var(--ink); min-width: 0;
+  transition: border-color var(--dur-1) var(--ease); }
+.input::placeholder { color: var(--faint); }
+.input:focus-visible, .input.is-focus { outline: var(--focus-w) solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+.input[aria-invalid="true"] { border-color: var(--attn); }
+.input:disabled { opacity: var(--o-disabled); }
+.input.mono-in { font-family: var(--mono); font-size: var(--fs-code); }
+textarea.input { height: auto; min-height: 84px; padding: var(--sp-6) var(--sp-7); line-height: var(--lh-body); resize: vertical; }
+@media (max-width: 759px) { .input { font-size: 1rem; } .input.mono-in { font-size: .9375rem; } }
+.hint { font-size: var(--fs-tiny); color: var(--faint); }
+.err-msg { font-size: var(--fs-tiny); color: var(--attn); display: flex; gap: var(--sp-4); align-items: center; }
+.was { font: var(--fs-code) var(--mono); color: var(--faint); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--wash); border-radius: 9px; }
+.seg button { height: 26px; padding: 0 var(--sp-7); border-radius: var(--radius-ctl); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--mute);
+  display: inline-flex; align-items: center; gap: var(--sp-5); transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.seg button[aria-pressed="true"], .seg button[aria-selected="true"] { background: var(--raised); color: var(--ink); box-shadow: var(--shadow-card); }
+.seg svg.i { width: 14px; height: 14px; }
+
+.tabs { display: flex; gap: var(--sp-11); border-bottom: var(--rule-w) solid var(--rule); overflow-x: auto; scrollbar-width: none; }
+.tabs button { height: 36px; font: var(--fw-medium) var(--fs-ui)/1 var(--sans); color: var(--mute); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: inline-flex; gap: var(--sp-5); align-items: center; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tabs .cnt { color: var(--faint); font-variant-numeric: tabular-nums; }
+
+.menu { background: var(--pop); border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); padding: var(--sp-4); min-width: 220px; border: 1px solid transparent; overscroll-behavior: contain; }
+.menu .mi { display: flex; align-items: center; gap: var(--sp-6); width: 100%; height: 32px; padding: 0 var(--sp-6); border-radius: 8px; font-size: var(--fs-ui); color: var(--ink); text-align: start; }
+.menu .mi svg.i { color: var(--mute); width: 15px; height: 15px; }
+.menu .mi .end { margin-inline-start: auto; display: inline-flex; gap: var(--sp-2); color: var(--faint); font-size: var(--fs-tiny); }
+.menu .mi.on, .menu .mi:hover { background: var(--wash); }
+.menu .mi[aria-checked="true"] .chk { opacity: 1; } .menu .chk { opacity: 0; color: var(--accent); }
+.menu .sep { height: 1px; background: var(--rule); margin: var(--sp-4) calc(var(--sp-4) * -1); }
+.menu .mh { padding: var(--sp-6) var(--sp-6) var(--sp-4); }
+.menu .mi[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+.menu .mi .sub { font-size: var(--fs-tiny); color: var(--faint); }
+
+.tip { display: inline-block; background: var(--solid); color: var(--on-solid); font: var(--fw-medium) var(--fs-tiny)/1.35 var(--sans); padding: var(--sp-4) var(--sp-6); border-radius: var(--radius-sm); max-width: 32ch; }
+
+/* note: the one empty / loading / error / not-yet / unavailable line */
+.note { display: flex; align-items: flex-start; gap: var(--sp-6); font-size: var(--fs-meta); color: var(--mute); line-height: var(--lh-body); }
+.note svg.i, .note .spin { margin-top: 2px; }
+.note.empty { color: var(--faint); }
+.note.error { color: var(--attn); }
+.note .act { color: var(--ink); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: from-font; }
+.note-block { padding: var(--sp-12) var(--sp-11); border: 1px dashed var(--rule-strong); border-radius: var(--radius); display: grid; justify-items: start; gap: var(--sp-6); }
+.note-block b { font-weight: var(--fw-medium); color: var(--ink); font-size: var(--fs-body); }
+
+/* ============================================================================================
+   ELEMENTS — data atoms
+   ============================================================================================ */
+.addr { display: inline-flex; align-items: center; gap: var(--sp-5); height: var(--h-addr); padding: 0 var(--sp-5) 0 var(--sp-6); border-radius: var(--radius-sm);
+  background: var(--wash); color: var(--ink); font: var(--fw-regular) var(--fs-code)/1 var(--mono); font-variant-numeric: tabular-nums slashed-zero;
+  white-space: nowrap; position: relative; transition: background-color var(--dur-1) var(--ease); }
+.addr svg.i { width: 13px; height: 13px; color: var(--faint); }
+.addr .ic { position: relative; width: 13px; height: 13px; display: inline-grid; }
+.addr .ic > * { grid-area: 1 / 1; transition: opacity 300ms var(--ease), scale 300ms var(--ease), filter 300ms var(--ease); }
+.addr .ic .ok { opacity: 0; scale: .25; filter: blur(4px); color: var(--accent); }
+.addr[data-copied] .ic .cp { opacity: 0; scale: .25; filter: blur(4px); }
+.addr[data-copied] .ic .ok { opacity: 1; scale: 1; filter: none; }
+@media (prefers-reduced-motion: reduce) { .addr .ic > * { transition-property: opacity; scale: 1 !important; filter: none !important; } }
+@media (hover: hover) { .addr:hover { background: var(--wash-strong); } }
+.addr.is-hover { background: var(--wash-strong); }
+.addr .name { font-family: var(--sans); font-size: var(--fs-tiny); font-weight: var(--fw-medium); }
+.addr.warn { background: var(--attn-soft); color: var(--attn); } .addr.warn svg.i { color: var(--attn); }
+.addr.plain { background: transparent; padding: 0; height: auto; }
+.copied-tip { position: absolute; inset-block-end: calc(100% + 6px); inset-inline-start: 50%; translate: -50% 0; }
+
+.chain { display: inline-flex; align-items: center; gap: var(--sp-5); height: var(--h-chip); padding: 0 var(--sp-6); border-radius: var(--radius-chip);
+  border: 1px solid var(--rule-strong); background: var(--raised); color: var(--mute); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); white-space: nowrap; }
+.chain .glyph { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--faint); flex: none; }
+.chain.multi .glyph { width: 11px; border-radius: 4px; background: linear-gradient(90deg, var(--faint) 0 3px, transparent 3px 4px, var(--faint) 4px 7px, transparent 7px 8px, var(--faint) 8px); border: 0; height: 6px; }
+.chain.test { border-style: dashed; }
+.chain.split { border-color: var(--attn); color: var(--attn); } .chain.split .glyph { border-color: var(--attn); }
+
+.amt { font: var(--fw-medium) var(--fs-code)/1.2 var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--ink); white-space: nowrap; }
+.amt .u { font-weight: var(--fw-regular); color: var(--mute); margin-inline-start: .35em; }
+.amt.body { font-size: var(--fs-body); }
+.amt.lg { font: var(--fw-display) var(--fs-amount)/1 var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: -.02em; font-variant-numeric: lining-nums tabular-nums; }
+.amt.lg .u { font: var(--fw-regular) var(--fs-tiny) var(--mono); letter-spacing: 0; }
+.amt.aged { color: var(--mute); }
+.amt.none { color: var(--faint); font-weight: var(--fw-regular); }
+
+.sm { display: inline-flex; align-items: center; gap: var(--sp-5); font: var(--fw-medium) var(--fs-tiny)/1.2 var(--sans); color: var(--mute); white-space: nowrap; }
+.sm > i { width: var(--mark); height: var(--mark); flex: none; display: inline-block; box-sizing: border-box; }
+.sm.needs { color: var(--attn); } .sm.needs > i { border-radius: 50%; background: var(--attn); }
+.sm.staged { color: var(--accent); } .sm.staged > i { border-radius: 2px; background: var(--accent); }
+.sm.stale { color: var(--attn); } .sm.stale > i { border-radius: 2px; border: 1.5px solid var(--attn); }
+.sm.open > i { border-radius: 50%; border: 1.5px solid var(--mute); }
+.sm.ok > i { border-radius: 50%; background: var(--mute); }
+.sm.done > i { width: 10px; height: 10px; background: none; border: 0; }
+.sm.done > i::before { content: ""; display: block; width: 4px; height: 7px; margin: 0 0 0 3px; border: solid var(--mute); border-width: 0 1.5px 1.5px 0; rotate: 45deg; }
+.sm.failed { color: var(--attn); } .sm.failed > i { height: var(--mark-bar); width: 9px; background: var(--attn); border-radius: 1px; }
+.sm.aged > i { border-radius: 50%; border: 1.5px dashed var(--faint); }
+.sm.running > i { border-radius: 50%; border: 1.5px solid var(--mute); border-inline-end-color: transparent; }
+@media (prefers-reduced-motion: no-preference) { .sm.running > i { animation: spin .9s linear infinite; } }
+.sm.closed > i { height: var(--mark-bar); width: 9px; background: var(--faint); border-radius: 1px; } .sm.closed { color: var(--faint); }
+.sm.draft > i { border-radius: 2px; border: 1.5px dashed var(--accent); } .sm.draft { color: var(--accent); }
+
+.age { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-tiny); color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.age svg.i { width: 13px; height: 13px; }
+.age.aged { color: var(--mute); }
+.age.failed { color: var(--attn); }
+
+.vis { display: inline-flex; align-items: center; gap: var(--sp-4); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--mute); white-space: nowrap; }
+.vis svg.i { width: 14px; height: 14px; }
+button.vis { height: 26px; padding: 0 var(--sp-6); border-radius: var(--radius-ctl); border: 1px solid var(--rule-strong); background: var(--raised); }
+button.vis .chev { width: 12px; height: 12px; color: var(--faint); }
+.members-only { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-9) var(--sp-10); border: 1px dashed var(--rule-strong); border-radius: var(--radius);
+  color: var(--faint); font-size: var(--fs-meta); background: transparent; }
+
+.mention { display: inline-flex; align-items: baseline; gap: 1px; padding: 0 var(--sp-3); border-radius: var(--radius-xs); background: var(--wash); color: var(--ink); font-weight: var(--fw-medium); white-space: nowrap; }
+.mention .at { color: var(--faint); }
+.mention.rec { gap: var(--sp-3); align-items: center; } .mention.rec svg.i { width: 13px; height: 13px; color: var(--mute); align-self: center; }
+.mention.you { background: var(--accent-soft); color: var(--accent); } .mention.you .at { color: var(--accent); }
+.mention.gone { background: transparent; color: var(--faint); font-weight: var(--fw-regular); border: 1px dashed var(--rule-strong); }
+
+.av { width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--wash-strong); color: var(--ink);
+  font: var(--fw-strong) 10px/1 var(--sans); letter-spacing: .02em; flex: none; position: relative; }
+.av.lg { width: 28px; height: 28px; font-size: 11px; }
+.pres { display: inline-flex; align-items: center; }
+.pres .av { box-shadow: 0 0 0 2px var(--paper); }
+.pres { isolation: isolate; } .pres .av + .av { margin-inline-start: -4px; }
+.pres .av:nth-child(1) { z-index: 4; } .pres .av:nth-child(2) { z-index: 3; } .pres .av:nth-child(3) { z-index: 2; } .pres .av:nth-child(4) { z-index: 1; }
+.pres .more { background: var(--raised); color: var(--mute); border: 1px solid var(--rule-strong); }
+.av .pen { position: absolute; inset-block-end: -3px; inset-inline-end: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--solid); color: var(--on-solid); display: grid; place-items: center; box-shadow: 0 0 0 2px var(--paper); }
+.av .pen svg.i { width: 8px; height: 8px; stroke-width: 2; }
+.hatmark { width: 24px; height: 24px; border-radius: 50%; background: var(--wash); color: var(--mute); display: inline-grid; place-items: center; flex: none; }
+.hatmark svg.i { width: 14px; height: 14px; }
+
+.meter { display: inline-flex; align-items: center; gap: 3px; vertical-align: middle; }
+.meter i { width: 12px; height: 4px; border-radius: 2px; background: var(--rule-strong); }
+.meter i.on { background: var(--ink); }
+.meter i.you { background: var(--accent); }
+.meter.bar { width: 96px; height: 4px; border-radius: 2px; background: var(--rule-strong); position: relative; overflow: hidden; }
+.meter.bar > b { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--ink); border-radius: 2px; }
+.meter-l { font-size: var(--fs-tiny); color: var(--mute); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ktile { width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--wash); color: var(--mute); display: grid; place-items: center; flex: none; }
+.ktile.lg { width: 40px; height: 40px; border-radius: var(--radius); } .ktile.lg svg.i { width: 20px; height: 20px; }
+.ktile.attn { background: var(--attn-soft); color: var(--attn); }
+.ktile.accent { background: var(--accent-soft); color: var(--accent); }
+
+/* ============================================================================================
+   ELEMENTS — surfaces, sections, rows
+   ============================================================================================ */
+.surf { background: var(--raised); border: 1px solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.sec-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-6); margin: 0 0 var(--sp-8); min-width: 0; }
+.sec-h h3, .sec-h h2 { margin: 0; font: var(--fw-strong) var(--fs-body)/1.3 var(--sans); letter-spacing: var(--ls-name); }
+.sec-h .cnt { color: var(--faint); font-size: var(--fs-meta); font-variant-numeric: tabular-nums; }
+.sec-h .end { margin-inline-start: auto; font-size: var(--fs-meta); color: var(--mute); display: inline-flex; gap: var(--sp-8); align-items: center; }
+
+.rows { list-style: none; margin: 0; padding: 0; container: rows / inline-size; }
+.row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8);
+  min-height: var(--h-row); padding: var(--sp-7) var(--sp-10); border-top: 1px solid var(--rule); transition: background-color var(--dur-1) var(--ease); }
+.rows > li:first-child > .row, .rows > .row:first-child { border-top: 0; }
+.row .t { font: var(--fw-medium) var(--fs-body)/var(--lh-row) var(--sans); color: var(--ink); letter-spacing: var(--ls-name); }
+.row .s { font-size: var(--fs-meta); line-height: var(--lh-row); color: var(--mute); display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); margin-top: var(--sp-2); min-width: 0; }
+.row .main { min-width: 0; }
+.row .end { display: flex; align-items: center; gap: var(--sp-10); color: var(--mute); font-size: var(--fs-meta); white-space: nowrap; }
+.row .end svg.i { color: var(--faint); }
+a.row, button.row { width: 100%; text-align: start; }
+@media (hover: hover) { a.row:hover, button.row:hover, .row.link:hover { background: var(--row-hover); } }
+.row.is-hover { background: var(--row-hover); }
+.row:focus-visible, .row.is-focus { outline: var(--focus-w) solid var(--focus); outline-offset: -2px; border-radius: var(--radius-sm); }
+.row.sel { background: var(--accent-soft); }
+.row.sel::before { content: ""; position: absolute; inset-block: 6px; inset-inline-start: 0; width: 2px; border-radius: 2px; background: var(--accent); }
+.row.faint { opacity: var(--o-dim); }
+.row.skel .t, .row.skel .s { color: transparent; }
+.skel-bar { display: block; height: 10px; border-radius: 5px; background: var(--wash); }
+@media (prefers-reduced-motion: no-preference) { .skel-bar { animation: breathe 1.4s var(--ease) infinite alternate; } }
+@keyframes breathe { from { opacity: 1; } to { opacity: .55; } }
+
+/* ============================================================================================
+   THE FRAME
+   ============================================================================================ */
+.house { container: house / inline-size; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--paper); box-shadow: var(--shadow-raise); }
+.frame { display: grid; grid-template-columns: var(--w-nav) minmax(0, 1fr); height: 860px; }
+.frame.short { height: 640px; }
+.side { background: var(--paper); border-inline-end: 1px solid var(--rule); display: flex; flex-direction: column; padding: var(--sp-7) var(--sp-7) var(--sp-8); gap: var(--sp-6); min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.org { display: flex; align-items: center; gap: var(--sp-6); height: 36px; padding: 0 var(--sp-5); border-radius: var(--radius-ctl); font-weight: var(--fw-strong); }
+.org .seal { width: 22px; height: 22px; border-radius: 6px; background: var(--solid); color: var(--on-solid); display: grid; place-items: center; flex: none; }
+.org .seal svg { width: 13px; height: 13px; }
+.org .chev { margin-inline-start: auto; color: var(--faint); width: 14px; height: 14px; }
+.search { display: flex; align-items: center; gap: var(--sp-6); height: 32px; padding: 0 var(--sp-6) 0 var(--sp-7); border-radius: var(--radius-ctl);
+  background: var(--raised); border: 1px solid var(--rule-strong); color: var(--faint); font-size: var(--fs-ui); box-shadow: var(--shadow-card); }
+.search kbd { margin-inline-start: auto; }
+.nav { display: grid; gap: 1px; }
+.nav-h { font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--faint); padding: var(--sp-10) var(--sp-6) var(--sp-5); display: flex; align-items: center; gap: var(--sp-4); }
+.nav a { display: flex; align-items: center; gap: var(--sp-7); height: 32px; padding: 0 var(--sp-6); border-radius: var(--radius-ctl); color: var(--nav-ink); font-size: var(--fs-body); transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.nav a svg.i { color: var(--faint); }
+.nav a .n { margin-inline-start: auto; font-size: var(--fs-tiny); color: var(--faint); font-variant-numeric: tabular-nums; }
+.nav a .n.attn { color: var(--attn); font-weight: var(--fw-medium); }
+.nav a .n.accent { color: var(--accent); font-weight: var(--fw-medium); }
+.nav a[aria-current="page"] { background: var(--nav-on-bg); color: var(--ink); font-weight: var(--fw-medium); }
+.nav a[aria-current="page"] svg.i { color: var(--ink); }
+@media (hover: hover) { .nav a:hover { background: var(--wash); color: var(--ink); } }
+.nav a.sub { padding-inline-start: 34px; height: 28px; font-size: var(--fs-ui); }
+.side-foot { margin-top: auto; display: grid; gap: 1px; padding-top: var(--sp-6); border-top: 1px solid var(--rule); }
+.who { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-6) 0; min-width: 0; }
+.who .w-t { font-size: var(--fs-ui); font-weight: var(--fw-medium); line-height: 1.25; }
+.who .w-s { font: var(--fs-micro) var(--mono); color: var(--faint); }
+.mainc { display: grid; grid-template-rows: var(--h-topbar) auto minmax(0, 1fr) auto; grid-template-areas: "top" "band" "scroll" "tray"; min-width: 0; min-height: 0; position: relative; }
+.mainc > .topbar, .mainc > .ptop { grid-area: top; } .mainc > .band { grid-area: band; } .mainc > .scroll { grid-area: scroll; } .mainc > .tray { grid-area: tray; } .mainc > .bbar { grid-area: bbar; }
+.topbar { display: flex; align-items: center; gap: var(--sp-8); padding: 0 var(--sp-10) 0 var(--sp-12); border-bottom: 1px solid var(--rule); min-width: 0; }
+.crumbs { display: flex; align-items: center; gap: var(--sp-5); font-size: var(--fs-ui); color: var(--mute); min-width: 0; }
+.crumbs b { color: var(--ink); font-weight: var(--fw-medium); }
+.crumbs .slash { color: var(--rule-strong); }
+.topbar .tools { margin-inline-start: auto; display: flex; align-items: center; gap: var(--sp-6); }
+.viewas { display: inline-flex; align-items: center; gap: var(--sp-5); height: 28px; padding: 0 var(--sp-6) 0 var(--sp-7); border-radius: var(--radius-ctl); color: var(--mute); font-size: var(--fs-tiny); font-weight: var(--fw-medium); border: 1px solid var(--rule-strong); background: var(--raised); }
+.viewas svg.i { width: 14px; height: 14px; }
+.band { display: flex; align-items: center; gap: var(--sp-8); padding: var(--sp-6) var(--sp-12); background: var(--solid); color: var(--on-solid); font-size: var(--fs-ui); min-width: 0; flex-wrap: wrap; }
+.band svg.i { width: 15px; height: 15px; }
+.band .btn { height: 26px; background: transparent; color: var(--on-solid); border-color: currentColor; box-shadow: none; margin-inline-start: auto; font-size: var(--fs-tiny); }
+.band b { font-weight: var(--fw-strong); }
+.scroll { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+.content { max-width: var(--w-content); margin: 0 auto; padding: var(--sp-13) var(--sp-13) var(--sp-15); display: grid; gap: var(--sp-14); }
+.greet .eyebrow { margin-bottom: var(--sp-6); display: block; }
+.greet h1 { margin: 0; font: var(--fw-regular) var(--fs-greet)/1.15 var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: -.015em; }
+.greet p { margin: var(--sp-5) 0 0; color: var(--mute); font-size: var(--fs-meta); display: flex; gap: var(--sp-6); flex-wrap: wrap; align-items: center; }
+.rail-toggle { color: var(--faint); }
+
+/* Changes tray (docked) */
+.tray { display: flex; align-items: center; gap: var(--sp-8); min-height: var(--h-tray); padding: var(--sp-6) var(--sp-10) var(--sp-6) var(--sp-12); border-top: 1px solid var(--rule); background: var(--raised); min-width: 0; }
+.tray .cnt { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font: var(--fw-strong) var(--fs-tiny)/1 var(--sans); font-variant-numeric: tabular-nums; }
+.tray .what { min-width: 0; display: grid; }
+.tray .what b { font-size: var(--fs-ui); font-weight: var(--fw-medium); }
+.tray .what span { font-size: var(--fs-tiny); color: var(--mute); }
+.tray .acts { margin-inline-start: auto; display: flex; gap: var(--sp-6); }
+
+/* phone bottom bar */
+.bbar { display: none; }
+.ptop { display: none; }
+.bbar a { display: grid; justify-items: center; gap: 3px; font: var(--fw-medium) 11px/1 var(--sans); color: var(--mute); padding-top: var(--sp-6); position: relative; min-width: 0; }
+.bbar a[aria-current="page"] { color: var(--ink); }
+.bbar a svg.i { width: 20px; height: 20px; }
+.bbar a .badge { position: absolute; inset-block-start: 4px; inset-inline-start: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--attn); color: var(--on-accent); font: var(--fw-strong) 10px/16px var(--sans); text-align: center; box-shadow: 0 0 0 2px var(--raised); }
+.t-dark .bbar a .badge, :root[data-theme="dark"] .bbar a .badge { color: var(--on-solid); }
+
+/* collapsed rail */
+.frame.rail { grid-template-columns: var(--w-rail) minmax(0, 1fr); }
+.frame.rail .side { padding-inline: var(--sp-4); align-items: center; }
+.frame.rail .side .nav a { width: 40px; justify-content: center; padding: 0; position: relative; }
+.frame.rail .side .nav a .lbl, .frame.rail .side .nav-h, .frame.rail .search .lbl, .frame.rail .search kbd, .frame.rail .org .nm, .frame.rail .org .chev, .frame.rail .side .who .w, .frame.rail .side .nav a.sub { display: none; }
+.frame.rail .side .nav a .n { position: absolute; inset-block-start: 3px; inset-inline-end: 3px; font-size: 10px; }
+.frame.rail .search { width: 40px; padding: 0; justify-content: center; }
+.frame.rail .org { padding: 0; justify-content: center; width: 40px; }
+.frame.rail .side .who { padding: var(--sp-6) 0 0; justify-content: center; }
+
+@container house (max-width: 1100px) {
+  .frame:not(.full) { grid-template-columns: var(--w-rail) minmax(0, 1fr); }
+  .frame:not(.full) .side { padding-inline: var(--sp-4); align-items: center; }
+  .frame:not(.full) .side .nav a { width: 40px; justify-content: center; padding: 0; position: relative; }
+  .frame:not(.full) .side .nav a .lbl, .frame:not(.full) .side .nav-h, .frame:not(.full) .search .lbl, .frame:not(.full) .search kbd, .frame:not(.full) .org .nm, .frame:not(.full) .org .chev, .frame:not(.full) .side .who .w, .frame:not(.full) .side .nav a.sub { display: none; }
+  .frame:not(.full) .side .nav a .n { position: absolute; inset-block-start: 3px; inset-inline-end: 3px; font-size: 10px; }
+  .frame:not(.full) .search { width: 40px; padding: 0; justify-content: center; }
+  .frame:not(.full) .org { padding: 0; justify-content: center; width: 40px; }
+  .frame:not(.full) .side .who { padding: var(--sp-6) 0 0; justify-content: center; }
+}
+@container house (max-width: 759px) {
+  .frame, .frame.rail, .frame:not(.full) { grid-template-columns: minmax(0, 1fr); height: 780px; }
+  .frame .side { display: none; }
+  .mainc { grid-template-rows: 48px auto minmax(0, 1fr) auto auto; grid-template-areas: "top" "band" "scroll" "tray" "bbar"; }
+  .topbar { display: none; }
+  .ptop { display: flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-6) 0 var(--sp-10); border-bottom: 1px solid var(--rule); }
+  .ptop .seal { width: 22px; height: 22px; border-radius: 6px; background: var(--solid); color: var(--on-solid); display: grid; place-items: center; }
+  .ptop .seal svg { width: 13px; height: 13px; }
+  .ptop b { font-weight: var(--fw-strong); font-size: var(--fs-body); }
+  .ptop .tools { margin-inline-start: auto; display: flex; gap: var(--sp-2); }
+  .content { padding: var(--sp-11) var(--sp-10) var(--sp-13); gap: var(--sp-13); }
+  .greet h1 { font-size: 1.5rem; }
+  .bbar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); height: calc(var(--h-bottombar) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--raised); border-top: 1px solid var(--rule); }
+  .tray { margin: 0 var(--sp-6) var(--sp-6); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow-pop); padding: var(--sp-5) var(--sp-5) var(--sp-5) var(--sp-8); min-height: 48px; }
+  .tray .what span { display: none; }
+  .tray .acts .btn:not(.primary) { display: none; }
+  .band { padding: var(--sp-6) var(--sp-10); }
+}
+
+/* the sheet (phone "More", phone inspector) */
+.sheet { background: var(--pop); border-radius: 16px 16px 0 0; box-shadow: var(--shadow-pop); padding: var(--sp-5) var(--sp-6) var(--sp-10); }
+.sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--rule-strong); margin: var(--sp-4) auto var(--sp-8); }
+.sheet .nav a { height: 44px; font-size: var(--fs-sub); }
+
+/* command palette */
+.pal { width: min(var(--w-palette), 100%); background: var(--pop); border-radius: 14px; box-shadow: var(--shadow-pop); overflow: hidden; border: 1px solid transparent; }
+.pal-in { display: flex; align-items: center; gap: var(--sp-8); height: 52px; padding: 0 var(--sp-10); border-bottom: 1px solid var(--rule); }
+.pal-in svg.i { color: var(--faint); width: 18px; height: 18px; }
+.pal-in input { flex: 1; min-width: 0; border: 0; background: none; font-size: 1rem; color: var(--ink); outline: none; }
+.pal-in input::placeholder { color: var(--faint); }
+.pal-in .scope { font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); padding: var(--sp-4) var(--sp-6); border-radius: var(--radius-xs); background: var(--wash); color: var(--mute); }
+.pal-list { max-height: 380px; overflow-y: auto; padding: var(--sp-4) var(--sp-4) var(--sp-6); overscroll-behavior: contain; }
+.pal-g { font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--faint); padding: var(--sp-8) var(--sp-7) var(--sp-5); }
+.pal-o { display: flex; align-items: center; gap: var(--sp-8); height: 40px; padding: 0 var(--sp-7); border-radius: 8px; font-size: var(--fs-body); color: var(--ink); min-width: 0; }
+.pal-o svg.i { color: var(--mute); }
+.pal-o .sub { color: var(--faint); font-size: var(--fs-meta); }
+.pal-o .end { margin-inline-start: auto; display: flex; gap: var(--sp-2); align-items: center; color: var(--faint); font-size: var(--fs-tiny); }
+.pal-o[aria-selected="true"] { background: var(--wash); }
+.pal-o mark { background: none; color: var(--ink); font-weight: var(--fw-strong); }
+.pal-foot { display: flex; gap: var(--sp-11); padding: var(--sp-6) var(--sp-10); border-top: 1px solid var(--rule); font-size: var(--fs-tiny); color: var(--faint); flex-wrap: wrap; }
+.pal-foot span { display: inline-flex; gap: var(--sp-4); align-items: center; }
+.overlay { position: fixed; inset: 0; background: var(--scrim); display: none; align-items: flex-start; justify-content: center; padding: 12vh var(--sp-10) var(--sp-10); z-index: 50; }
+.overlay.open { display: flex; }
+@media (prefers-reduced-motion: no-preference) { .overlay.open .pal { animation: pop-in var(--dur-2) var(--ease); } }
+@keyframes pop-in { from { opacity: 0; scale: .98; translate: 0 -4px; } }
+.keymap { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--sp-4) var(--sp-12); padding: var(--sp-10) var(--sp-11) var(--sp-11); }
+.keymap div { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); height: 30px; font-size: var(--fs-ui); color: var(--mute); border-bottom: 1px solid var(--rule); }
+.keymap span { display: inline-flex; gap: 3px; }
+
+/* inspector */
+.insp { background: var(--raised); border-inline-start: 1px solid var(--rule); display: flex; flex-direction: column; min-width: 0; }
+.insp-h { display: flex; align-items: flex-start; gap: var(--sp-8); padding: var(--sp-10) var(--sp-10) var(--sp-8); }
+.insp-h .t { font: var(--fw-strong) var(--fs-sub)/1.3 var(--sans); letter-spacing: var(--ls-name); }
+.insp-b { padding: 0 var(--sp-10) var(--sp-10); display: grid; gap: var(--sp-11); }
+
+/* field rows (record body) */
+.fields { display: grid; grid-template-columns: minmax(96px, 132px) minmax(0, 1fr); column-gap: var(--sp-10); }
+.fields > dt, .fields > dd { margin: 0; padding: var(--sp-6) 0; border-top: 1px solid var(--rule); min-width: 0; }
+.fields > dt { font-size: var(--fs-meta); color: var(--mute); display: flex; align-items: center; gap: var(--sp-4); }
+.fields > dd { font-size: var(--fs-body); display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-5) var(--sp-6); }
+.fields > dt:first-of-type, .fields > dd:first-of-type { border-top: 0; }
+.fields dd.staged { box-shadow: inset 2px 0 0 var(--accent); padding-inline-start: var(--sp-6); }
+.fields dd.stale { box-shadow: inset 2px 0 0 var(--attn); padding-inline-start: var(--sp-6); }
+.fields dd .restricted, .fields dt .restricted { color: var(--faint); display: inline-flex; gap: var(--sp-4); align-items: center; font-size: var(--fs-meta); }
+@container (max-width: 420px) { .fields { grid-template-columns: minmax(0, 1fr); } .fields > dd { border-top: 0; padding-top: 0; } }
+
+/* record header */
+.rh { display: grid; gap: var(--sp-6); }
+.rh .top { display: flex; align-items: center; gap: var(--sp-6) var(--sp-8); flex-wrap: wrap; font-size: var(--fs-tiny); color: var(--mute); }
+.rh h1 { margin: 0; font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); text-wrap: balance; }
+.rh .meta { color: var(--mute); font-size: var(--fs-meta); display: flex; flex-wrap: wrap; gap: var(--sp-2) 0; align-items: center; }
+.rh .acts { display: flex; gap: var(--sp-6); flex-wrap: wrap; }
+.rh-sys { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-10); align-items: start; }
+.rh-sys .facts { display: flex; flex-wrap: wrap; gap: var(--sp-6); align-items: center; margin-top: var(--sp-6); }
+@container (max-width: 560px) { .rh-sys { grid-template-columns: auto minmax(0, 1fr); } .rh-sys .acts { grid-column: 1 / -1; } }
+/* ============================================================================================
+   VIEWS
+   ============================================================================================ */
+.vbar { display: flex; align-items: center; gap: var(--sp-6); flex-wrap: wrap; margin-bottom: var(--sp-8); min-width: 0; }
+.vbar .tabs { border: 0; gap: var(--sp-10); min-width: 0; max-width: 100%; }
+.vbar .end { margin-inline-start: auto; display: flex; gap: var(--sp-5); align-items: center; flex-wrap: wrap; }
+.fchip { display: inline-flex; align-items: center; gap: var(--sp-4); height: 26px; padding: 0 var(--sp-5) 0 var(--sp-7); border-radius: var(--radius-chip); background: var(--wash); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--ink); }
+.fchip .k { color: var(--mute); font-weight: var(--fw-regular); }
+.fchip svg.i { width: 12px; height: 12px; color: var(--faint); }
+.fchip.add { background: transparent; border: 1px dashed var(--rule-strong); color: var(--mute); padding-inline-end: var(--sp-7); }
+
+.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-body); }
+.tbl th { height: 36px; padding: 0 var(--sp-8); text-align: start; font: var(--fw-medium) var(--fs-label)/1 var(--sans); color: var(--faint); border-bottom: 1px solid var(--rule); white-space: nowrap; position: sticky; top: 0; background: var(--raised); }
+.tbl th button { display: inline-flex; align-items: center; gap: var(--sp-3); color: inherit; font: inherit; }
+.tbl th[aria-sort] { color: var(--ink); }
+.tbl td { height: var(--h-row-1); padding: 0 var(--sp-8); border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl td.n, .tbl th.n { text-align: end; }
+.tbl td.name { font-weight: var(--fw-medium); max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.tbl tr.grp td { background: var(--sunken); height: 32px; font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--mute); }
+.tbl tr.grp td .c { color: var(--faint); margin-inline-start: var(--sp-5); }
+.tbl tr.sel td { background: var(--accent-soft); }
+.tbl tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.tbl td.staged-cell { box-shadow: inset 0 -2px 0 var(--accent); }
+.tbl td.editing { padding: 0 var(--sp-3); } .tbl td.editing .input { height: 30px; }
+@media (hover: hover) { .tbl tbody tr:not(.grp):hover td { background: var(--row-hover); } }
+.tbl .cb { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--edge); display: inline-grid; place-items: center; vertical-align: middle; background: var(--raised); }
+.tbl .cb.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tbl .cb.on svg.i { width: 11px; height: 11px; stroke-width: 2.5; }
+.tblwrap { container: tbl / inline-size; }
+.tbl-cards { display: none; }
+@container tbl (max-width: 600px) { .tblwrap .tbl { display: none; } .tblwrap .tbl-cards { display: block; } }
+/* ============================================================================================
+   THE MAP
+   ============================================================================================ */
+.mapbox { position: relative; background-color: var(--sunken); background-image: radial-gradient(var(--map-dot) 1px, transparent 1.3px); background-size: 18px 18px; background-position: 9px 9px;
+  border: 1px solid var(--rule); border-radius: var(--radius-lg); container: map / inline-size; overflow: hidden; }
+.map-tools { position: absolute; inset-block-start: var(--sp-8); inset-inline-end: var(--sp-8); display: flex; gap: var(--sp-4); z-index: 3; }
+.map-tools .btn { background: var(--raised); }
+.map-cap { position: absolute; inset-block-start: var(--sp-9); inset-inline-start: var(--sp-10); z-index: 3; display: flex; gap: var(--sp-6); align-items: center; font-size: var(--fs-tiny); color: var(--mute); }
+.map { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 64px; column-gap: var(--sp-10); padding: 64px var(--sp-12) var(--sp-13);
+  grid-template-areas: "votes . council . ops" ". . signer . wallet" "linked . safe . ." ". ni garden lnk ."; }
+.map > svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 0; }
+.edge { fill: none; stroke: var(--edge); stroke-width: 1.25; }
+.edge.dim { opacity: .3; }
+.edge.on { stroke: var(--accent); stroke-width: 1.75; }
+.edge.flow { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: .1 11; opacity: 0; }
+.map.flowing .edge.flow.go { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) { .map.flowing .edge.flow.go { animation: flow var(--dur-flow) linear 3; } }
+.map.flowed .edge.go-path { stroke: var(--accent); stroke-width: 1.75; }
+@keyframes flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -22; } }
+.elabel { position: absolute; z-index: 1; translate: -50% -50%; font: var(--fw-medium) var(--fs-micro)/1 var(--mono); color: var(--mute); background: var(--sunken); padding: 3px 5px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+.elabel.on { color: var(--accent); }
+.node { position: relative; z-index: 2; justify-self: center; align-self: center; width: min(100%, var(--w-node)); min-width: 0; text-align: start; display: grid; gap: 3px;
+  padding: var(--sp-7) var(--sp-8); background: var(--raised); border: 1px solid var(--rule-strong); border-radius: var(--radius); box-shadow: var(--shadow-raise);
+  transition-property: border-color, box-shadow, opacity; transition-duration: var(--dur-2); transition-timing-function: var(--ease); }
+@media (hover: hover) { button.node:hover { border-color: var(--edge); } }
+.node .nt { display: flex; align-items: center; gap: var(--sp-5); font: var(--fw-medium) var(--fs-ui)/1.25 var(--sans); color: var(--ink); min-width: 0; }
+.node .nt svg.i { width: 14px; height: 14px; color: var(--mute); }
+.node .nt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node .nm { font: var(--fs-micro)/1.3 var(--mono); color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; display: flex; gap: var(--sp-4); align-items: center; }
+.node .nm svg.i { width: 11px; height: 11px; }
+.node .nk { font: var(--fw-medium) 10px/1 var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
+.node.big { width: min(100%, 236px); padding: var(--sp-9) var(--sp-10); border-color: var(--edge); }
+.node.big .nt { font: var(--fw-regular) 1.0625rem/1.2 var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: -.01em; }
+.node.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-raise); }
+.node.staged { border-color: var(--accent); border-width: 1.5px; }
+.node .tag { position: absolute; inset-block-start: -9px; inset-inline-start: var(--sp-8); height: 18px; padding: 0 6px; border-radius: 9px; font: var(--fw-medium) 10.5px/18px var(--sans); background: var(--accent); color: var(--on-accent); }
+.node .tag.draft { background: var(--sunken); color: var(--accent); border: 1px dashed var(--accent); line-height: 16px; }
+.node.link { background: transparent; border-style: dashed; box-shadow: none; }
+.node.empty { background: transparent; border-style: dashed; box-shadow: none; }
+.node.empty .nt { color: var(--mute); }
+.node.draft { border: 1.5px dashed var(--accent); box-shadow: none; background: var(--raised); }
+.node.failed .nm { color: var(--attn); }
+.node.dim { opacity: var(--o-dim); }
+.node .attn-dot { position: absolute; inset-block-start: -5px; inset-inline-end: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--attn); box-shadow: 0 0 0 2.5px var(--sunken); }
+.node .attn-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1.25px solid var(--attn); opacity: 0; }
+@media (prefers-reduced-motion: no-preference) { .node .attn-dot::after { animation: ring 2.4s var(--ease) 2; } }
+@keyframes ring { 0% { scale: .6; opacity: .9; } 80%, 100% { scale: 2.2; opacity: 0; } }
+.node .order { position: absolute; inset-block-start: -9px; inset-inline-end: var(--sp-8); width: 18px; height: 18px; border-radius: 50%; background: var(--solid); color: var(--on-solid); font: var(--fw-strong) 10px/18px var(--mono); text-align: center; }
+.node .handle { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--raised); border: 1.5px solid var(--accent); }
+.node .handle.n { inset-block-start: -5px; inset-inline-start: calc(50% - 4.5px); } .node .handle.s { inset-block-end: -5px; inset-inline-start: calc(50% - 4.5px); }
+.node .handle.w { inset-inline-start: -5px; inset-block-start: calc(50% - 4.5px); } .node .handle.e { inset-inline-end: -5px; inset-block-start: calc(50% - 4.5px); }
+.linked { grid-area: linked; justify-self: stretch; display: grid; gap: var(--sp-6); padding: var(--sp-8); border: 1px dashed var(--rule-strong); border-radius: 14px; position: relative; z-index: 2; align-self: center; }
+.linked .eyebrow { margin-bottom: var(--sp-2); }
+.linked .node { width: 100%; }
+.map-capt { display: flex; gap: var(--sp-8); align-items: flex-start; margin: 0 var(--sp-10) var(--sp-10); padding: var(--sp-9) var(--sp-10); background: var(--raised); border: 1px solid var(--rule); border-radius: 12px; position: relative; z-index: 3; }
+.map-capt b { font-weight: var(--fw-medium); }
+.map-capt p { margin: 2px 0 0; color: var(--mute); font-size: var(--fs-meta); }
+@container map (max-width: 680px) {
+  .map { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--sp-5); row-gap: 52px; padding: 56px var(--sp-6) var(--sp-11);
+    grid-template-areas: "votes council ops" ". signer wallet" ". safe ." "ni garden lnk" "linked linked linked"; }
+  .node { padding: var(--sp-6) var(--sp-6); }
+  .node .nt { font-size: var(--fs-tiny); gap: var(--sp-4); }
+  .node .nt svg.i { display: none; }
+  .node .nm { font-size: 10px; }
+  .node.big { padding: var(--sp-7) var(--sp-8); }
+  .node.big .nt { font-size: .9375rem; }
+  .node.big .nm { white-space: normal; }
+  .linked { grid-template-columns: 1fr 1fr; }
+  .linked .eyebrow { grid-column: 1 / -1; }
+  .elabel { font-size: 10px; padding: 2px 4px; }
+  .map-capt { margin: 0 var(--sp-6) var(--sp-6); }
+  .map-cap .legend { display: none; }
+}
+.mini { position: relative; height: 188px; background-color: var(--sunken); background-image: radial-gradient(var(--map-dot) 1px, transparent 1.3px); background-size: 14px 14px; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; }
+.mini .mnode { position: absolute; translate: -50% -50%; padding: var(--sp-4) var(--sp-6); background: var(--raised); border: 1px solid var(--rule-strong); border-radius: 7px; font: var(--fw-medium) var(--fs-tiny)/1.2 var(--sans); white-space: nowrap; display: flex; gap: var(--sp-4); align-items: center; z-index: 2; box-shadow: var(--shadow-card); }
+.mini .mnode svg.i { width: 12px; height: 12px; color: var(--mute); }
+.mini .mnode.me { border-color: var(--ink); font-weight: var(--fw-strong); }
+.mini .mnode.attn::after { content: ""; position: absolute; inset-block-start: -4px; inset-inline-end: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--attn); box-shadow: 0 0 0 2px var(--sunken); }
+.mini > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.well { margin: 0 var(--sp-10) var(--sp-10); padding: var(--sp-8) var(--sp-9); background: var(--sunken); border: 1px solid var(--rule); border-radius: 8px; font: var(--fs-tiny)/var(--lh-code) var(--mono); color: var(--ink); overflow-wrap: anywhere; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-2) var(--sp-10); font-variant-numeric: tabular-nums slashed-zero; }
+.well dt { color: var(--faint); } .well dd { margin: 0; }
+.tree { list-style: none; margin: 0; padding: 0; }
+.tree ul { list-style: none; margin: 0; padding: 0 0 0 22px; position: relative; }
+.tree ul::before { content: ""; position: absolute; inset-inline-start: 13px; inset-block: 0 18px; width: 1px; background: var(--rule-strong); }
+.tnode { display: grid; grid-template-columns: 18px 26px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5); min-height: 44px; padding: var(--sp-4) var(--sp-6); border-radius: 8px; position: relative; }
+.tree ul > li > .tnode::before { content: ""; position: absolute; inset-inline-start: -9px; inset-block-start: 50%; width: 9px; height: 1px; background: var(--rule-strong); }
+.tnode .tg { width: 18px; height: 18px; display: grid; place-items: center; color: var(--faint); border-radius: 4px; }
+.tnode .tg svg.i { width: 12px; height: 12px; transition: rotate var(--dur-1) var(--ease); }
+.tnode[aria-expanded="true"] .tg svg.i { rotate: 90deg; }
+.tnode .hat { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--rule-strong); display: grid; place-items: center; color: var(--mute); background: var(--raised); }
+.tnode .hat svg.i { width: 14px; height: 14px; }
+.tnode .nmx { min-width: 0; display: flex; align-items: baseline; gap: var(--sp-6); flex-wrap: wrap; }
+.tnode .nmx b { font-weight: var(--fw-medium); font-size: var(--fs-body); }
+.tnode .nmx .mono { color: var(--faint); font-size: var(--fs-tiny); }
+.tnode .wear { display: flex; align-items: center; gap: var(--sp-6); font-size: var(--fs-meta); color: var(--mute); white-space: nowrap; }
+.tnode.empty .hat { border-style: dashed; background: transparent; color: var(--faint); }
+.tnode.empty .nmx b { color: var(--mute); }
+.tnode.sel { background: var(--accent-soft); }
+.tnode.yours .hat { border-color: var(--accent); color: var(--accent); }
+@media (hover: hover) { .tnode:hover { background: var(--row-hover); } .tnode.sel:hover { background: var(--accent-soft); } }
+.tnode:focus-visible { outline-offset: -2px; }
+@container (max-width: 520px) { .tnode { grid-template-columns: 18px 26px minmax(0, 1fr); } .tnode .wear { grid-column: 3; } }
+/* ============================================================================================
+   WORKSPACE
+   ============================================================================================ */
+.ed { container: ed / inline-size; background: var(--raised); border: 1px solid var(--rule); border-radius: var(--radius-lg); overflow: hidden; }
+.ed-bar { display: flex; align-items: center; gap: var(--sp-8); height: 48px; padding: 0 var(--sp-10); border-bottom: 1px solid var(--rule); min-width: 0; }
+.ed-bar .crumbs { flex: 1; }
+.ed-bar .tools { display: flex; align-items: center; gap: var(--sp-6); }
+.save { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-tiny); color: var(--faint); white-space: nowrap; }
+.save svg.i { width: 13px; height: 13px; }
+.save.bad { color: var(--attn); }
+.ed-body { max-width: calc(var(--w-prose) + 2 * var(--sp-13)); margin: 0 auto; padding: var(--sp-14) var(--sp-13) var(--sp-15); }
+.ed-meta { display: flex; flex-wrap: wrap; gap: var(--sp-6) var(--sp-10); align-items: center; margin-bottom: var(--sp-8); font-size: var(--fs-tiny); color: var(--faint); }
+.ed-title { margin: 0 0 var(--sp-11); font: var(--fw-regular) var(--fs-page)/1.15 var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: -.02em; text-wrap: balance; }
+.prose { font-size: var(--fs-sub); line-height: var(--lh-prose); color: var(--ink); text-wrap: pretty; }
+.prose p { margin: 0 0 var(--sp-10); max-width: var(--w-prose); }
+.prose h2 { font: var(--fw-strong) 1.25rem/1.3 var(--sans); letter-spacing: var(--ls-title); margin: var(--sp-13) 0 var(--sp-8); }
+.prose ul { margin: 0 0 var(--sp-10); padding-inline-start: 1.25em; } .prose li { margin-bottom: var(--sp-4); }
+.prose a { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: from-font; text-decoration-color: var(--edge); }
+.callout { display: flex; gap: var(--sp-8); padding: var(--sp-9) var(--sp-10); background: var(--sunken); border-radius: var(--radius); margin: 0 0 var(--sp-10); font-size: var(--fs-body); line-height: var(--lh-body); }
+.callout svg.i { color: var(--mute); margin-top: 3px; }
+.embed { border: 1px solid var(--rule); border-radius: var(--radius); margin: 0 0 var(--sp-10); background: var(--raised); overflow: hidden; }
+.embed-h { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-6) var(--sp-10); border-bottom: 1px solid var(--rule); font-size: var(--fs-tiny); color: var(--mute); }
+.embed-h .end { margin-inline-start: auto; }
+.cursor-line { box-shadow: inset 2px 0 0 var(--focus); padding-inline-start: var(--sp-6); margin-inline-start: calc(var(--sp-6) * -1); }
+.selbar { display: inline-flex; gap: 2px; padding: 3px; background: var(--pop); border-radius: 10px; box-shadow: var(--shadow-pop); }
+.selbar .btn { height: 28px; width: 28px; border: 0; box-shadow: none; background: transparent; padding: 0; }
+.selbar .btn.on { background: var(--wash); }
+.selbar .sep { width: 1px; background: var(--rule); margin: 4px 2px; }
+.hl { background: var(--accent-soft); border-radius: 2px; box-shadow: 0 0 0 2px var(--accent-soft); }
+.cmt-mark { background: var(--attn-soft); border-bottom: 1.5px solid var(--attn); }
+@container ed (max-width: 600px) { .ed-body { padding: var(--sp-12) var(--sp-10) var(--sp-13); } .ed-title { font-size: 1.625rem; } .ed-bar .save .lbl { display: none; } .ed-bar .crumbs .mid { display: none; } }
+/* ============================================================================================
+   GALLERY CHROME (not an element; it frames the review)
+   ============================================================================================ */
+.g-top { position: sticky; top: 0; z-index: 20; background: var(--paper); border-bottom: 1px solid var(--rule); }
+.g-top .in { max-width: 1320px; margin: 0 auto; padding: 0 var(--sp-12); height: 56px; display: flex; align-items: center; gap: var(--sp-10); }
+.g-top .ttl { font: var(--fw-regular) 1.125rem/1 var(--display); font-variation-settings: "SOFT" var(--soft); white-space: nowrap; }
+.g-top .ttl span { color: var(--faint); font: var(--fw-medium) var(--fs-tiny) var(--sans); margin-inline-start: var(--sp-6); }
+.g-top .end { margin-inline-start: auto; display: flex; gap: var(--sp-8); align-items: center; }
+.g { max-width: 1320px; margin: 0 auto; padding: 0 var(--sp-12) var(--sp-17); }
+.g-intro { padding: var(--sp-15) 0 var(--sp-13); display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--sp-14); align-items: end; border-bottom: 1px solid var(--rule); }
+.g-intro h1 { margin: var(--sp-8) 0 0; font: var(--fw-display) clamp(2.25rem, 1.5rem + 3vw, 3.5rem)/1.04 var(--display); font-variation-settings: "SOFT" 80; letter-spacing: var(--ls-display); text-wrap: balance; }
+.g-intro h1 em { color: var(--accent); }
+.g-intro p { margin: 0; color: var(--mute); max-width: 52ch; text-wrap: pretty; }
+.g-toc { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-11); padding: var(--sp-10) 0; font-size: var(--fs-meta); color: var(--mute); border-bottom: 1px solid var(--rule); }
+.g-toc a:hover { color: var(--ink); }
+.g-toc .no { font: var(--fs-micro) var(--mono); color: var(--faint); margin-inline-end: var(--sp-4); }
+.g-sec { padding: var(--sp-16) 0 var(--sp-6); border-bottom: 1px solid var(--rule); scroll-margin-top: 56px; }
+.g-head { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--sp-14); margin-bottom: var(--sp-13); }
+.g-head .no { font: var(--fw-medium) var(--fs-tiny)/1 var(--mono); color: var(--faint); }
+.g-head h2 { margin: var(--sp-6) 0 0; font: var(--fw-display) 2rem/1.1 var(--display); font-variation-settings: "SOFT" 60; letter-spacing: var(--ls-d-sec); }
+.g-head p { margin: 0; color: var(--mute); max-width: 68ch; align-self: end; text-wrap: pretty; }
+.g-sub { font: var(--fw-strong) var(--fs-ui)/1.3 var(--sans); margin: var(--sp-14) 0 var(--sp-8); display: flex; align-items: baseline; gap: var(--sp-8); flex-wrap: wrap; }
+.g-sub span { font-weight: var(--fw-regular); color: var(--faint); font-size: var(--fs-tiny); }
+.spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: var(--sp-8); }
+.spec-grid.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+.spec-grid.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
+.spec { background: var(--raised); border: 1px solid var(--rule); border-radius: 12px; padding: var(--sp-10); display: grid; gap: var(--sp-8); align-content: start; min-width: 0; container-type: inline-size; }
+.spec.flat { background: transparent; border-style: dashed; }
+.spec.pad0 { padding: 0; overflow: hidden; }
+.spec > .cap, .cap { font: var(--fw-medium) var(--fs-micro)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); display: flex; gap: var(--sp-6); align-items: center; flex-wrap: wrap; }
+.spec.pad0 > .cap { padding: var(--sp-8) var(--sp-10) 0; }
+.spec .demo { display: flex; flex-wrap: wrap; gap: var(--sp-6); align-items: center; min-width: 0; }
+.statecol { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); }
+.statecol > div { display: flex; align-items: center; gap: var(--sp-8); justify-content: space-between; min-height: 30px; border-bottom: 1px dashed var(--rule); padding-bottom: var(--sp-5); flex-wrap: wrap; }
+.statecol > div:last-child { border-bottom: 0; }
+.statecol .cap { min-width: 92px; }
+.phone { width: 100%; max-width: 390px; }
+.side-by { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: var(--sp-12); align-items: start; }
+.swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.swpane { border-radius: 14px; padding: var(--sp-10); background: var(--paper); border: 1px solid var(--rule); color: var(--ink); display: grid; gap: var(--sp-6); }
+.sw { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: var(--sp-8); align-items: center; font-size: var(--fs-tiny); }
+.sw i { width: 36px; height: 28px; border-radius: 6px; border: 1px solid var(--rule); }
+.sw b { font: var(--fw-medium) var(--fs-tiny)/1.2 var(--mono); }
+.sw .r { font: var(--fs-micro) var(--mono); color: var(--mute); text-align: end; }
+.typespec { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: var(--sp-6) var(--sp-12); align-items: baseline; }
+.typespec .cap { padding-top: 4px; }
+.typespec > div:nth-child(even) { min-width: 0; overflow-wrap: anywhere; border-bottom: 1px solid var(--rule); padding-bottom: var(--sp-8); }
+.scale { display: flex; align-items: flex-end; gap: var(--sp-6); flex-wrap: wrap; }
+.scale div { display: grid; gap: var(--sp-4); justify-items: center; font: var(--fs-micro) var(--mono); color: var(--faint); }
+.scale i { background: var(--accent-soft); border: 1px solid var(--accent); display: block; }
+.depths { display: flex; gap: var(--sp-12); flex-wrap: wrap; }
+.depths div { width: 140px; height: 84px; border-radius: var(--radius); background: var(--raised); display: grid; place-items: center; font: var(--fs-micro) var(--mono); color: var(--mute); }
+.radii { display: flex; gap: var(--sp-10); flex-wrap: wrap; }
+.radii div { display: grid; gap: var(--sp-4); justify-items: center; font: var(--fs-micro) var(--mono); color: var(--faint); }
+.radii i { width: 64px; height: 44px; background: var(--wash); border: 1px solid var(--rule-strong); display: block; }
+.g-foot { padding: var(--sp-14) 0; color: var(--faint); font-size: var(--fs-tiny); display: flex; justify-content: space-between; gap: var(--sp-10); flex-wrap: wrap; }
+@media (max-width: 1100px) { .side-by { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) {
+  .g-intro, .g-head { grid-template-columns: minmax(0, 1fr); gap: var(--sp-8); }
+  .swatches { grid-template-columns: minmax(0, 1fr); }
+  .typespec { grid-template-columns: minmax(0, 1fr); }
+  .typespec > div:nth-child(odd) { padding-top: var(--sp-6); }
+}
+@media (max-width: 759px) {
+  .g-top .in, .g { padding-inline: var(--sp-10); }
+  .g-top .ttl span, .g-top [data-open-palette] { display: none; }
+  .g-sec { padding-top: var(--sp-15); }
+  .g-intro { padding-top: var(--sp-13); }
+}
+@media (max-width: 400px) { .g-top .ttl { font-size: 1rem; } .g-top [data-theme-set="system"] { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 1ms !important; } }
+
+/* ============================================================================================
+   KMS — what org-os-kms adds on top of the house element set (kms house spec). Tokens only.
+   ============================================================================================ */
+.frame.auto { height: auto; }
+.frame.auto .scroll { overflow: visible; }
+.frame.auto .side { overflow: visible; }
+.content.wide { max-width: none; }
+
+/* the single-page artifact head (vault map, pack pages): no sidebar, one bar */
+.art { container: art / inline-size; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--paper); box-shadow: var(--shadow-raise); }
+.art-bar { display: flex; align-items: center; gap: var(--sp-8); min-height: var(--h-topbar); padding: var(--sp-5) var(--sp-10) var(--sp-5) var(--sp-11); border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.art-bar .org { height: auto; padding: 0; }
+.art-bar .what { display: grid; gap: 2px; min-width: 0; flex: 1 1 160px; }
+.art-bar .what b { font: var(--fw-strong) var(--fs-body)/1.25 var(--sans); }
+.art-bar .what span { font-size: var(--fs-tiny); color: var(--faint); }
+.art-bar .tools { margin-inline-start: auto; display: flex; align-items: center; gap: var(--sp-6); flex-wrap: wrap; }
+.art-body { padding: var(--sp-12); display: grid; gap: var(--sp-12); }
+@container art (max-width: 759px) { .art-body { padding: var(--sp-10) var(--sp-6); gap: var(--sp-10); } .art-bar { padding-inline: var(--sp-10); } .art-bar .gen { display: none; } }
+
+/* the federation map: computed layers, drawn per house §8 */
+/* columns sized so a same-layer edge (peers, reads, one hop) is long enough to carry its word at 1440 */
+.map.kfed { grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.1fr) repeat(2, minmax(0, 1fr)); column-gap: var(--sp-14); row-gap: 56px; padding: 72px var(--sp-10) var(--sp-13);
+  grid-template-areas:
+    ".      .      delta  .      ."
+    "eco    eco    up     .      src"
+    "valley hill   self   seed   ."
+    ".      youth  .      market ."
+    ".      pantry .      .      ."; }
+.map.kfed > .node:not(.big) { width: min(100%, 192px); }
+.map.kfed .node.big { width: min(100%, 220px); }
+/* a node's name and facts are data: they wrap (hyphenated), never ellipse */
+.map.kfed .node .nt span, .node.big .nt span { white-space: normal; overflow-wrap: break-word; hyphens: auto; text-wrap: balance; }
+.map.kfed .node .nm { display: block; white-space: normal; overflow-wrap: break-word; }
+.map.kfed .node .nm svg.i { display: inline-block; vertical-align: -2px; margin-inline-end: var(--sp-4); }
+.map.kfed .group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.map.kfed .group .eyebrow { grid-column: 1 / -1; }
+.node.beyond { background: transparent; border-style: dashed; box-shadow: none; }
+.node.beyond .nt { color: var(--mute); }
+.node.away { background: transparent; border-style: dashed; box-shadow: none; }
+.node.away .nm { color: var(--faint); }
+.node.aged .nm { color: var(--mute); }
+.node .nk-row { display: flex; justify-content: space-between; gap: var(--sp-6); }
+.group { justify-self: stretch; align-self: center; display: grid; gap: var(--sp-6); padding: var(--sp-8); border: 1px dashed var(--rule-strong); border-radius: 14px; position: relative; z-index: 2; background: var(--sunken); }
+.group .eyebrow { display: flex; align-items: center; gap: var(--sp-4); }
+.group .eyebrow svg.i { width: 12px; height: 12px; }
+.group .node { width: 100%; }
+.map-status { display: flex; gap: var(--sp-6); align-items: center; flex-wrap: wrap; }
+@container map (max-width: 680px) {
+  .map.kfed { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 44px; padding-top: 60px;
+    grid-template-areas:
+      ".      delta  ."
+      "eco    up     src"
+      "hill   self   seed"
+      "valley youth  market"
+      ".      pantry ."; }
+  .map.kfed { column-gap: var(--sp-5); padding-inline: var(--sp-6); }
+  .group, .map.kfed .group { padding: var(--sp-5); gap: var(--sp-4); grid-template-columns: minmax(0, 1fr); }
+  .map.kfed .node { padding: var(--sp-5) var(--sp-5) var(--sp-6); }
+  .map.kfed .node.big { padding: var(--sp-6); }
+  .map.kfed .node .nk { letter-spacing: .04em; }
+  .group .eyebrow { font-size: 10px; letter-spacing: .04em; }
+  .map-status .long, .map.kfed .long { display: none; }
+}
+@container map (max-width: 300px) { .map.kfed .node.big { padding-inline: var(--sp-5); } .map.kfed .node.big .nt { font-size: var(--fs-tiny); } }
+/* the small map's neighbours can be links */
+.mini a.mnode { color: inherit; }
+.mini .mnode.away { border-style: dashed; background: var(--sunken); box-shadow: none; }
+
+/* list twin of the map: the same nodes as data rows */
+.twin .grp-h { display: flex; align-items: center; gap: var(--sp-6); padding: var(--sp-8) var(--sp-10) var(--sp-5); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--faint); background: var(--sunken); border-top: 1px solid var(--rule); }
+.twin .grp-h:first-child { border-top: 0; border-radius: var(--radius) var(--radius) 0 0; }
+.twin .grp-h .c { font-variant-numeric: tabular-nums; }
+.ktile.dashed { background: transparent; border: 1px dashed var(--rule-strong); }
+
+/* node anatomy board: every cell reads from the top-left, whatever its node's height */
+.anat { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--sp-13) var(--sp-10); position: relative; z-index: 2; }
+.anat > div { display: grid; gap: var(--sp-6); align-content: start; justify-items: start; min-width: 0; }
+.anat .node, .anat .group { justify-self: stretch; max-width: var(--w-node); }
+.anat .node.big { max-width: 236px; }
+
+/* deprecated: told by the closed mark and colour steps that keep AA text contrast — not --o-dim (K-25) */
+.row.dep .t { color: var(--mute); font-weight: var(--fw-regular); }
+.row.dep .s, .row.dep .sum, .row.dep .age { color: var(--faint); }
+.row.dep .ktile { background: transparent; border: 1px solid var(--rule); color: var(--faint); }
+
+/* the commons: index rows */
+.kh { display: grid; gap: var(--sp-5); }
+.kh h1 { margin: 0; font: var(--fw-strong) var(--fs-title)/var(--lh-title) var(--sans); letter-spacing: var(--ls-title); text-wrap: balance; }
+.kh .facts-l { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) 0; font-size: var(--fs-meta); color: var(--mute); }
+.kh p { margin: var(--sp-4) 0 0; color: var(--mute); max-width: 62ch; font-size: var(--fs-body); text-wrap: pretty; }
+.idx .grp-h { display: flex; align-items: baseline; gap: var(--sp-6); padding: var(--sp-7) var(--sp-10); background: var(--sunken); border-top: 1px solid var(--rule); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--mute); }
+.idx .grp-h:first-child { border-top: 0; border-radius: var(--radius) var(--radius) 0 0; }
+.idx .grp-h .c { color: var(--faint); font-variant-numeric: tabular-nums; }
+.idx .grp-h .end { margin-inline-start: auto; color: var(--mute); }
+.idx .row .sum { display: block; color: var(--mute); font-size: var(--fs-meta); line-height: var(--lh-row); margin-top: var(--sp-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.krow { grid-template-columns: 28px minmax(0, 1fr) 132px 72px; }
+.krow .c-age { justify-self: end; }
+@container rows (max-width: 600px) { .krow { grid-template-columns: 28px minmax(0, 1fr) auto; } .krow .c-age { display: none; } .idx .row .sum { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
+/* under 420 the mark keeps its shape and its word stays as the accessible name (clipped, not display:none) */
+@container rows (max-width: 420px) { .krow .c-mark .w { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
+.ext { display: inline-flex; align-items: center; gap: var(--sp-3); color: var(--mute); }
+.ext svg.i { width: 12px; height: 12px; }
+.search-f { display: flex; align-items: center; gap: var(--sp-6); height: 32px; padding: 0 var(--sp-6) 0 var(--sp-7); border-radius: var(--radius-ctl); background: var(--raised); border: 1px solid var(--edge); color: var(--faint); font-size: var(--fs-ui); min-width: 0; flex: 1 1 200px; max-width: 320px; }
+.search-f kbd { margin-inline-start: auto; }
+
+/* a knowledge page: §10.1 body, read-only — no editor chrome */
+.kpage { container: kpage / inline-size; }
+.kp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--sp-14); align-items: start; }
+.kp-body { max-width: var(--w-prose); min-width: 0; }
+.kp-aside { display: grid; gap: var(--sp-11); position: sticky; top: var(--sp-10); min-width: 0; container-type: inline-size; }
+.kp-aside h2 { margin: 0 0 var(--sp-6); font: var(--fw-strong) var(--fs-ui)/1.3 var(--sans); }
+.kp-meta { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-10); align-items: center; margin-bottom: var(--sp-8); font-size: var(--fs-tiny); color: var(--faint); }
+.kp-meta .eyebrow { color: var(--mute); }
+.kp-body .ed-title { margin-bottom: var(--sp-10); }
+.kp-body .lead { font-size: 1.0625rem; line-height: var(--lh-prose); color: var(--mute); margin: 0 0 var(--sp-12); text-wrap: pretty; }
+.prose h3 { font: var(--fw-strong) 1rem/1.35 var(--sans); margin: var(--sp-12) 0 var(--sp-6); }
+.callout.caveat { background: var(--sunken); }
+.callout b { font-weight: var(--fw-medium); }
+.embed .rows .row { min-height: 52px; }
+.kp-foot { margin-top: var(--sp-14); padding-top: var(--sp-10); border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: var(--sp-6) var(--sp-11); font-size: var(--fs-tiny); color: var(--faint); align-items: center; }
+.kp-foot a { color: var(--mute); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--edge); text-decoration-thickness: from-font; }
+.uri { font: var(--fs-tiny) var(--mono); color: var(--mute); overflow-wrap: anywhere; font-variant-numeric: tabular-nums slashed-zero; }
+@container kpage (max-width: 900px) { .kp-grid { grid-template-columns: minmax(0, 1fr); gap: var(--sp-13); } .kp-aside { position: static; } }
+@container kpage (max-width: 600px) { .kpage .ed-title { font-size: 1.625rem; } .kp-body .lead { font-size: 1rem; } }
+
+/* the band for preview / view as (house §5.9) */
+.band.static { border-radius: var(--radius); align-items: flex-start; }
+.band.static > span { flex: 1 1 220px; min-width: 0; }
+.band.static > svg.i { margin-top: 2px; }
+
+/* territory explorer: layer trees + the place inspector */
+.xp { container: xp / inline-size; }
+.xp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--sp-12); align-items: start; }
+.xp-layer + .xp-layer { margin-top: var(--sp-11); }
+.xp-layer .eyebrow { display: block; margin: 0 0 var(--sp-5) var(--sp-6); }
+.tnode .pin { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--rule-strong); display: grid; place-items: center; color: var(--mute); background: var(--raised); }
+.tnode .pin svg.i { width: 14px; height: 14px; }
+.tnode.sel .pin { border-color: var(--accent); color: var(--accent); }
+.tnode.over .pin { border-style: dashed; }
+.tnode .lvl { font-size: var(--fs-tiny); color: var(--faint); }
+.tnode .cntc { font-size: var(--fs-tiny); color: var(--mute); font-variant-numeric: tabular-nums; }
+.overmark { display: inline-flex; align-items: center; gap: var(--sp-3); font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--accent); }
+.overmark svg.i { width: 13px; height: 13px; }
+.insp.card { border: 1px solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.insp .eyebrow { display: block; margin-bottom: var(--sp-3); }
+.insp .sec-h { margin: 0 0 var(--sp-5); }
+.share { display: flex; align-items: center; gap: var(--sp-6); }
+.coach { position: relative; max-width: 300px; background: var(--pop); border-radius: var(--radius-pop); box-shadow: var(--shadow-pop); padding: var(--sp-10); display: grid; gap: var(--sp-6); border: 1px solid transparent; }
+.coach .step { font: var(--fw-medium) var(--fs-micro)/1 var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+.coach h3 { margin: 0; font: var(--fw-strong) var(--fs-body)/1.3 var(--sans); }
+.coach p { margin: 0; font-size: var(--fs-meta); color: var(--mute); }
+.coach .acts { display: flex; gap: var(--sp-6); justify-content: flex-end; margin-top: var(--sp-4); }
+@container xp (max-width: 860px) { .xp-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* packs report: numbered sections, Geist heads */
+.rep { container: rep / inline-size; }
+.rsec { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--sp-13); padding: var(--sp-13) 0; border-top: 1px solid var(--rule); }
+.rsec:first-child { border-top: 0; padding-top: 0; }
+.rsec .lbl .no { font: var(--fw-medium) var(--fs-tiny)/1 var(--mono); color: var(--faint); }
+.rsec .lbl h3 { margin: var(--sp-6) 0 0; font: var(--fw-strong) 1.25rem/1.25 var(--sans); letter-spacing: var(--ls-title); }
+.rsec .lbl p { margin: var(--sp-5) 0 0; font-size: var(--fs-meta); color: var(--mute); }
+.claims { list-style: none; margin: 0; padding: 0; }
+.claims li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: var(--sp-6) var(--sp-8); padding: var(--sp-9) 0; border-top: 1px solid var(--rule); }
+.claims li:first-child { border-top: 0; padding-top: 0; }
+.claims .ck { width: 20px; height: 20px; border-radius: 50%; background: var(--solid); color: var(--on-solid); display: grid; place-items: center; margin-top: 1px; }
+.claims .ck svg.i { width: 12px; height: 12px; stroke-width: 2.25; }
+.claims b { font-weight: var(--fw-medium); }
+.claims .ev { grid-column: 2; display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-8); font-size: var(--fs-tiny); color: var(--faint); }
+.claims .well { margin: var(--sp-5) 0 0; grid-column: 2; display: block; }
+.vs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--sp-8); align-items: stretch; }
+.vs > .surf { padding: var(--sp-10); display: grid; gap: var(--sp-6); align-content: start; }
+.vs > svg.i { align-self: center; color: var(--faint); }
+.vs .slot { border: 1px dashed var(--rule-strong); border-radius: 8px; padding: var(--sp-6) var(--sp-8); font-size: var(--fs-meta); }
+.vs .slot.on { border: 1px solid var(--accent); background: var(--accent-soft); }
+.vs .slot b { font-variant-numeric: tabular-nums; }
+@container rep (max-width: 700px) { .rsec { grid-template-columns: minmax(0, 1fr); gap: var(--sp-8); } .vs { grid-template-columns: minmax(0, 1fr); } .vs > svg.i { rotate: 90deg; justify-self: center; } }
+
+/* token sync strip */
+.tokstrip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.tokrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-8) var(--sp-6); }
+.tokrow div { display: grid; gap: var(--sp-3); font: var(--fs-micro)/1.2 var(--mono); color: var(--mute); min-width: 0; }
+.tokrow i { height: 36px; border-radius: 8px; border: 1px solid var(--rule); display: block; }
+pre.well { display: block; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; margin: 0; max-width: 100%; }
+code.mono { overflow-wrap: anywhere; }
+@media (max-width: 759px) { .tokstrip { grid-template-columns: minmax(0, 1fr); } }
+
+/* the before/after board */
+.befaft { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: var(--sp-8); }
+@container rows (max-width: 420px) { .embed .row, .rows .row.wrap-end { grid-template-columns: auto minmax(0, 1fr); } .embed .row .end { grid-column: 2; } }
+.edge-key { max-width: 240px; }
+@container rows (max-width: 420px) { .rows .row.wrap-end .end { grid-column: 2; } }
+@container (max-width: 520px) { .tnode .cntc, .tnode .overmark { grid-column: 3; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-needs" viewBox="0 0 24 24"><path d="M4 13.5h4.2l1.3 2.5h5l1.3-2.5H20"/><path d="M5.6 6.2 4 13.5V18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4.5l-1.6-7.3A1.5 1.5 0 0 0 16.9 5H7.1a1.5 1.5 0 0 0-1.5 1.2z"/></symbol>
+    <symbol id="i-prop" viewBox="0 0 24 24"><circle cx="6.5" cy="6" r="2.25"/><circle cx="6.5" cy="18" r="2.25"/><circle cx="17.5" cy="18" r="2.25"/><path d="M6.5 8.25v7.5M17.5 15.75V10a3 3 0 0 0-3-3H11"/><path d="m13 5-2 2 2 2"/></symbol>
+    <symbol id="i-sys" viewBox="0 0 24 24"><path d="m12 3.5 7.5 4.25v8.5L12 20.5l-7.5-4.25v-8.5z"/><path d="M12 12v8.5M12 12l7.5-4.25M12 12 4.5 7.75"/></symbol>
+    <symbol id="i-roles" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2"/><circle cx="6" cy="18.5" r="2"/><circle cx="18" cy="18.5" r="2"/><path d="M12 7.5v4M6 16.5v-2.5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.5"/></symbol>
+    <symbol id="i-vault" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="12" cy="12" r="3.25"/><path d="M12 8.75V7.5M12 16.5v-1.25M15.25 12h1.25M7.5 12h1.25M6.5 19.5v1M17.5 19.5v1"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 12.5h6M9 16h4"/></symbol>
+    <symbol id="i-lib" viewBox="0 0 24 24"><path d="M5 4.5h3.5v15H5zM10.5 4.5H14v15h-3.5z"/><path d="m15.8 5.4 3.3-.9 3.4 13.6-3.3.9z" transform="translate(-1.6 .4)"/></symbol>
+    <symbol id="i-changes" viewBox="0 0 24 24"><path d="m12 4 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4"/><path d="m4 16 8 4 8-4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+    <symbol id="i-chev-d" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m10 7 5 5-5 5"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m14 7-5 5 5 5"/></symbol>
+    <symbol id="i-updown" viewBox="0 0 24 24"><path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/></symbol>
+    <symbol id="i-arrow-r" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-ext" viewBox="0 0 24 24"><path d="M9 5H6a1.5 1.5 0 0 0-1.5 1.5v11.5A1.5 1.5 0 0 0 6 19.5h11.5A1.5 1.5 0 0 0 19 18v-3M14 4.5h5.5V10M19.5 4.5 11 13"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.2 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.2-3.5-8.5s1.1-6.1 3.5-8.5z"/></symbol>
+    <symbol id="i-members" viewBox="0 0 24 24"><circle cx="9" cy="9" r="3"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><path d="M15.5 6.3a3 3 0 0 1 0 5.4M17.5 14.8c1.6.6 2.6 2 3 4.2"/></symbol>
+    <symbol id="i-hat" viewBox="0 0 24 24"><path d="M7 16.5V6.5A1.5 1.5 0 0 1 8.5 5h7A1.5 1.5 0 0 1 17 6.5v10"/><path d="M3.5 17.5c0 .8 3.8 1.5 8.5 1.5s8.5-.7 8.5-1.5-3.8-1.5-8.5-1.5-8.5.7-8.5 1.5z"/><path d="M7 12.5h10"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.75"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r=".9" fill="currentColor"/><circle cx="12" cy="12" r=".9" fill="currentColor"/><circle cx="18" cy="12" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4.5v15M4 16.5l3 3 3-3M14 7h6M14 12h4.5M14 17h3"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 10v9"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="4" y="5" width="4.5" height="14" rx="1.25"/><rect x="9.75" y="5" width="4.5" height="9" rx="1.25"/><rect x="15.5" y="5" width="4.5" height="11.5" rx="1.25"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="5" cy="6.5" r=".9" fill="currentColor"/><circle cx="5" cy="12" r=".9" fill="currentColor"/><circle cx="5" cy="17.5" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2.25"/><circle cx="5.5" cy="18" r="2.25"/><circle cx="18.5" cy="18" r="2.25"/><path d="M11 7.5 6.6 16M13 7.5l4.4 8.5M7.75 18h8.5"/></symbol>
+    <symbol id="i-sprout" viewBox="0 0 24 24"><path d="M12 20v-8"/><path d="M12 12c0-3.5-2.5-6-6.5-6 0 3.8 2.6 6 6.5 6zM12 14c0-3.1 2.2-5.5 6.5-5.5 0 3.4-2.4 5.5-6.5 5.5z"/><path d="M7 20h10"/></symbol>
+    <symbol id="i-pool" viewBox="0 0 24 24"><path d="M12 4v8M8.5 8.5 12 12l3.5-3.5"/><path d="M4 15c2 0 2 1.5 4 1.5s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5M4 19c2 0 2 1.5 4 1.5s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/></symbol>
+    <symbol id="i-ballot" viewBox="0 0 24 24"><path d="M4.5 13.5h15V19a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"/><path d="M7.5 13.5V5.5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v8"/><path d="m10 9 1.5 1.5L14.5 7.5"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M18.5 8V6.5A1.5 1.5 0 0 0 17 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a1.5 1.5 0 0 0 1.5-1.5V9.5A1.5 1.5 0 0 0 18 8H6a2 2 0 0 1-2-2"/><circle cx="15.75" cy="13.5" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.5 21 19.5H3z"/><path d="M12 10v4M12 17v.01"/></symbol>
+    <symbol id="i-comment" viewBox="0 0 24 24"><path d="M5 5.5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5v-3.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M15.5 12v1.5a2.5 2.5 0 0 0 5 0V12a8.5 8.5 0 1 0-3.4 6.8"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.75"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></symbol>
+    <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M9.5 5v14"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="m14.5 6 3.5 3.5M5 19l1-4.5L15.5 5a1.4 1.4 0 0 1 2 0L19 6.5a1.4 1.4 0 0 1 0 2L9.5 18z"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.75"/><path d="m10.7 12.3 8.3-8.3M16 7l2.5 2.5M13.5 9.5 15.5 11.5"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1" fill="currentColor"/><circle cx="15" cy="6" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="18" r="1" fill="currentColor"/><circle cx="15" cy="18" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-bold" viewBox="0 0 24 24"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"/></symbol>
+    <symbol id="i-italic" viewBox="0 0 24 24"><path d="M10 5h8M6 19h8M14.5 5l-5 14"/></symbol>
+    <symbol id="i-h" viewBox="0 0 24 24"><path d="M6 5v14M16 5v14M6 12h10"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.75v.01"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3L19.5 9M19.5 4.5V9H15"/></symbol>
+    <symbol id="i-dash-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/></symbol>
+    <symbol id="i-seal" viewBox="0 0 24 24"><path d="M12 3.5c3 2.6 5.5 5.9 5.5 9.4a5.5 5.5 0 0 1-11 0c0-3.5 2.5-6.8 5.5-9.4z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5c2.8-.8 5.5-.5 8 1.2v13c-2.5-1.7-5.2-2-8-1.2z"/><path d="M20 5.5c-2.8-.8-5.5-.5-8 1.2v13c2.5-1.7 5.2-2 8-1.2z"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6.5" cy="5.5" r="2"/><circle cx="6.5" cy="18.5" r="2"/><circle cx="17.5" cy="8" r="2"/><path d="M6.5 7.5v9M17.5 10c0 4-4.5 3.5-9.5 7"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><circle cx="7.5" cy="9.5" r="2.25" fill="currentColor"/><path d="M9.75 9.5c0 3.9-1.8 6.4-4.75 7.75"/><circle cx="16.5" cy="9.5" r="2.25" fill="currentColor"/><path d="M18.75 9.5c0 3.9-1.8 6.4-4.75 7.75"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 7h8M17 7h2M5 17h2M11 17h8"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path d="m13.5 9.5-8 8a1.6 1.6 0 0 0 2.3 2.2l8-8"/><path d="M11 6.5 14.5 3l6.5 6.5-3.5 3.5-2-2-1.5 1.5-3-3 1.5-1.5z"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="18.5" r="2"/><circle cx="18" cy="5.5" r="2"/><path d="M8 18.5h7.5a3 3 0 0 0 0-6h-7a3 3 0 0 1 0-6H16"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.75"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 20.5s6-5.6 6-10.5a6 6 0 0 0-12 0c0 4.9 6 10.5 6 10.5z"/><circle cx="12" cy="10" r="2.25"/></symbol>
+    <symbol id="i-stream" viewBox="0 0 24 24"><path d="M3.5 8c2 0 2-1.5 4.25-1.5S9.75 8 12 8s2-1.5 4.25-1.5S18.5 8 20.5 8M3.5 12.5c2 0 2-1.5 4.25-1.5s2 1.5 4.25 1.5 2-1.5 4.25-1.5 2.25 1.5 4.25 1.5M3.5 17c2 0 2-1.5 4.25-1.5S9.75 17 12 17s2-1.5 4.25-1.5S18.5 17 20.5 17"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4.5 8.5h14M15 5l3.5 3.5L15 12M19.5 15.5h-14M9 12l-3.5 3.5L9 19"/></symbol>
+    <symbol id="i-inst" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 12.5h8M8 16h5"/></symbol>
+    <symbol id="i-braces" viewBox="0 0 24 24"><path d="M8.5 4.5H8A2 2 0 0 0 6 6.5v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h.5M15.5 4.5h.5a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2h-.5"/></symbol>
+  </defs>
+</svg>
+
+<header class="g-top">
+  <div class="in">
+    <div class="ttl">org-os-kms in the house <span>for review · fixture values</span></div>
+    <div class="end">
+      <div class="seg" role="group" aria-label="Appearance">
+        <button type="button" data-theme-set="system" aria-pressed="true">System</button>
+        <button type="button" data-theme-set="light" aria-pressed="false"><svg class="i"><use href="#i-sun"/></svg><span class="sr-only">Light</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false"><svg class="i"><use href="#i-moon"/></svg><span class="sr-only">Dark</span></button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="g" id="top">
+  <div class="g-intro">
+    <div>
+      <span class="eyebrow">org-os-kms · the knowledge system · interface</span>
+      <h1>A knowledge commons, <em>drawn like the house</em>.</h1>
+    </div>
+    <p>Every surface org-os-kms writes, redrawn with the DAO-OS house element set: the federation map laid out in layers, the commons as data rows, each entry as a page with a Fraunces title and a 68-character measure. Kinds are told by glyph, never by colour. Moss marks the selected path; clay marks what needs a steward: a peer that couldn’t be read, a frontier never fetched, a reference that points nowhere. The organisation, places and peers are invented placeholders.</p>
+  </div>
+  <nav class="g-toc" aria-label="Sections">
+    <a href="#tokens"><span class="no">01</span>Tokens</a><a href="#map"><span class="no">02</span>Federation map</a><a href="#mapphone"><span class="no">03</span>Map on a phone</a>
+    <a href="#commons"><span class="no">04</span>The commons</a><a href="#page"><span class="no">05</span>A knowledge page</a><a href="#phone"><span class="no">06</span>Pages on a phone</a>
+    <a href="#explorer"><span class="no">07</span>Territory explorer</a><a href="#report"><span class="no">08</span>Packs report</a><a href="#states"><span class="no">09</span>States</a><a href="#before"><span class="no">10</span>Today</a>
+  </nav>
+
+  <!-- =============================================== 01 TOKENS -->
+  <section class="g-sec" id="tokens" aria-labelledby="h-tokens">
+    <div class="g-head"><div><div class="no">01</div><h2 id="h-tokens">Tokens</h2></div>
+      <p>kms draws with the house skin’s values, not its own. A generated <code class="mono">house-tokens.css</code> is derived from <code class="mono">packages/admin/app/src/design/skins/house.css</code> and inlined into every page kms writes; a test fails when the two disagree. No page kms emits asks a third party for a font.</p></div>
+    <div class="tokstrip">
+      <div class="swpane t-light"><div class="cap">Light · what kms uses</div>
+        <div class="tokrow">
+          <div><i style="background:var(--paper)"></i>paper</div><div><i style="background:var(--raised)"></i>raised</div><div><i style="background:var(--sunken)"></i>sunken</div>
+          <div><i style="background:var(--ink)"></i>ink</div><div><i style="background:var(--mute)"></i>mute</div><div><i style="background:var(--edge)"></i>edge</div>
+          <div><i style="background:var(--accent)"></i>moss</div><div><i style="background:var(--attn)"></i>clay</div>
+        </div></div>
+      <div class="swpane t-dark"><div class="cap">Dark · same names</div>
+        <div class="tokrow">
+          <div><i style="background:var(--paper)"></i>paper</div><div><i style="background:var(--raised)"></i>raised</div><div><i style="background:var(--sunken)"></i>sunken</div>
+          <div><i style="background:var(--ink)"></i>ink</div><div><i style="background:var(--mute)"></i>mute</div><div><i style="background:var(--edge)"></i>edge</div>
+          <div><i style="background:var(--accent)"></i>moss</div><div><i style="background:var(--attn)"></i>clay</div>
+        </div></div>
+    </div>
+    <div class="g-sub">The generated file’s head <span>packages/org-os-kms/src/house/house-tokens.css</span></div>
+<pre class="well">/* GENERATED by scripts/sync-house-tokens.mjs — do not edit.
+   source: packages/admin/app/src/design/skins/house.css  sha256 9c41…e07a
+   blocks: light · dark (prefers-color-scheme, unless data-theme="light") · dark (data-theme="dark")
+   test:   test/house-tokens.test.mjs fails when a value here and in the skin disagree. */
+:root { --paper: #f4f2ec; --raised: #fdfcf9; --sunken: #efede6; --ink: #1c1d1a; … }</pre>
+  </section>
+
+  <!-- =============================================== 02 MAP -->
+  <section class="g-sec" id="map" aria-labelledby="h-map">
+    <div class="g-head"><div><div class="no">02</div><h2 id="h-map">The federation map</h2></div>
+      <p><code class="mono">render map html</code> writes one self-contained page. The layout is computed, in layers by the direction knowledge travels: what feeds the instance above it, the instance at the centre with its peers beside it, what it feeds below, and each peer-of-a-peer one hop further out from whoever reported it. This is the steward’s copy, so it carries attention; the public copy does not.</p></div>
+
+    <div class="art">
+      <div class="art-bar">
+        <span class="org"><span class="seal"><svg><use href="#i-seal"/></svg></span></span>
+        <div class="what"><b>Example DAO Commons</b><span>Federation map<span class="gen"> · generated <span class="mono">29 Oct 2026 06:10</span></span></span></div>
+        <div class="tools">
+          <span class="seg" role="group" aria-label="View"><button type="button" aria-pressed="false" data-view="list"><svg class="i"><use href="#i-list"/></svg>List</button><button type="button" aria-pressed="true" data-view="map"><svg class="i"><use href="#i-map"/></svg>Map</button></span>
+          <button class="btn icon" type="button" aria-label="Fit to view"><svg class="i"><use href="#i-fit"/></svg></button>
+        </div>
+      </div>
+      <div class="art-body" style="padding:var(--sp-8)">
+        <div class="mapbox" id="fedmap">
+          <div class="map-cap map-status"><span class="sm failed"><i></i></span><span>8 instances · 3 sources · <span class="ink">1 couldn’t be read</span><span class="long"> · frontier read 2 d ago</span></span></div>
+          <div class="map kfed" role="group" aria-label="8 instances and 3 sources, as a map"
+               data-edges="delta>up:one hop|up>self:upstream|eco>self:feeds|src>self:feeds|hill>self:peers|valley>hill:one hop|self>seed:reads|self>youth:downstream|self>market:downstream|youth>pantry:one hop"
+               data-on="hill>self,valley>hill">
+            <svg class="edges" aria-hidden="true"></svg>
+            <button class="node beyond" style="grid-area:delta" data-id="delta" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Delta Alliance</span></span><span class="nm">one hop<span class="long"> · via Watershed</span></span></button>
+            <div class="group" style="grid-area:eco" data-id="eco"><span class="eyebrow"><svg class="i"><use href="#i-sprout"/></svg>Meadow Network</span>
+              <button class="node" type="button" data-id="s1"><span class="nt"><svg class="i"><use href="#i-db"/></svg><span>Field notes archive</span></span><span class="nm">source<span class="long"> · field notes</span></span></button>
+              <button class="node" type="button" data-id="s2"><span class="nt"><svg class="i"><use href="#i-db"/></svg><span>Seed registry</span></span><span class="nm">source<span class="long"> · seed records</span></span></button>
+            </div>
+            <button class="node failed" style="grid-area:up" data-id="up" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Watershed Network</span></span><span class="nm"><svg class="i"><use href="#i-alert"/></svg>couldn’t read<span class="long"> · 3 d</span></span><span class="attn-dot" aria-hidden="true"></span><span class="sr-only">Needs a steward: its manifest couldn’t be read; showing the copy from 3 days ago</span></button>
+            <button class="node" style="grid-area:src" data-id="src" type="button"><span class="nt"><svg class="i"><use href="#i-db"/></svg><span>Open data portal</span></span><span class="nm">source<span class="long"> · public datasets</span></span></button>
+            <button class="node beyond" style="grid-area:valley" data-id="valley" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Valley Commons</span></span><span class="nm">one hop<span class="long"> · via Hillside</span></span></button>
+            <button class="node sel" style="grid-area:hill" data-id="hill" type="button" aria-pressed="true"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Hillside Coop</span></span><span class="nm"><span class="long">DAO · </span>9 members</span></button>
+            <button class="node big" style="grid-area:self" data-id="self" type="button"><span class="nk">This instance</span><span class="nt"><span>Example DAO Commons</span></span><span class="nm">142 entries<span class="long"> · 9 sources</span></span></button>
+            <button class="node" style="grid-area:seed" data-id="seed" type="button"><span class="nt"><svg class="i"><use href="#i-book"/></svg><span>Open Seed Library</span></span><span class="nm">knowledge<span class="long"> peer · AT Proto</span></span></button>
+            <button class="node aged" style="grid-area:youth" data-id="youth" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Youth Circle</span></span><span class="nm"><svg class="i"><use href="#i-clock"/></svg><span class="long">LocalNode · </span>12 d</span></button>
+            <button class="node away" style="grid-area:market" data-id="market" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Market Garden</span></span><span class="nm">not reached<span class="long"> · no clone</span></span></button>
+            <button class="node beyond" style="grid-area:pantry" data-id="pantry" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Pantry Network</span></span><span class="nm">one hop<span class="long"> · via Youth Circle</span></span></button>
+          </div>
+          <div class="map-capt" aria-live="polite"><span class="ktile"><svg class="i"><use href="#i-inst"/></svg></span><div><b>Hillside Coop</b> <span class="faint mono" style="font-size:var(--fs-tiny)">DAO · peer · read 4 min ago</span><p>A peer Example DAO Commons federates with, read from its local clone. Its own manifest lists four peers; one of them, Valley Commons, is not ours yet — one hop beyond.</p></div></div>
+        </div>
+        <ul class="rows surf twin" id="fedlist" hidden aria-label="8 instances and 3 sources, as a list"></ul>
+      </div>
+    </div>
+
+    <div class="g-sub">Node anatomy <span>kind glyph · name · facts in mono, wrapped, never cut · marks — kinds by glyph, never hue</span></div>
+    <div class="mapbox" style="padding:var(--sp-13) var(--sp-12) var(--sp-12)">
+      <div class="anat">
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">this instance</span><button class="node big" type="button"><span class="nk">This instance</span><span class="nt"><span>Example DAO Commons</span></span><span class="nm">142 entries · 9 sources</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">peer, read</span><button class="node" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Hillside Coop</span></span><span class="nm">DAO · 9 members</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">selected</span><button class="node sel" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Hillside Coop</span></span><span class="nm">DAO · 9 members</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">knowledge peer</span><button class="node" type="button"><span class="nt"><svg class="i"><use href="#i-book"/></svg><span>Open Seed Library</span></span><span class="nm">knowledge peer · AT Proto</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">not reached</span><button class="node away" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Market Garden</span></span><span class="nm">not reached · no clone</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">one hop beyond</span><button class="node beyond" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Valley Commons</span></span><span class="nm">one hop · via Hillside</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">frontier never fetched</span><button class="node" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Coastline Lab</span></span><span class="nm">no frontier yet</span><span class="attn-dot"></span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">frontier couldn’t be read</span><button class="node failed" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Watershed Network</span></span><span class="nm"><svg class="i"><use href="#i-alert"/></svg>couldn’t read · 3 d</span><span class="attn-dot"></span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">frontier read long ago</span><button class="node aged" type="button"><span class="nt"><svg class="i"><use href="#i-inst"/></svg><span>Youth Circle</span></span><span class="nm"><svg class="i"><use href="#i-clock"/></svg>LocalNode · 12 d</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">source</span><button class="node" type="button"><span class="nt"><svg class="i"><use href="#i-db"/></svg><span>Seed registry</span></span><span class="nm">source · seed records</span></button></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">ecosystem (a group)</span><div class="group" style="align-self:start"><span class="eyebrow"><svg class="i"><use href="#i-sprout"/></svg>Meadow Network</span><span class="faint" style="font-size:var(--fs-tiny)">2 sources</span></div></div>
+        <div style="display:grid;gap:var(--sp-6)"><span class="cap">edges</span>
+          <svg class="edge-key" viewBox="0 0 200 108" style="width:100%;height:auto" aria-hidden="true">
+            <path class="edge" d="M10 14 H190"/><text x="10" y="32" style="font:10px var(--mono);fill:var(--mute)">relation · labelled in words</text>
+            <path class="edge on" d="M10 50 H190"/><text x="10" y="68" style="font:10px var(--mono);fill:var(--accent)">the selected path</text>
+            <path class="edge dim" d="M10 84 H190"/><text x="10" y="102" style="font:10px var(--mono);fill:var(--faint)">off the selected path</text>
+          </svg></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================== 03 MAP ON A PHONE -->
+  <section class="g-sec" id="mapphone" aria-labelledby="h-mapphone">
+    <div class="g-head"><div><div class="no">03</div><h2 id="h-mapphone">Map on a phone</h2></div>
+      <p>At 390 the map stays a map: the same layers on a three-column grid, glyphs dropped, facts cut to one word, names wrapped onto a second line rather than cut. Its list twin — the same nodes as data rows, grouped by layer — is one tap away, and is what a screen reader meets first.</p></div>
+    <div class="spec-grid two">
+      <div class="spec"><div class="cap">map · three columns</div>
+        <div class="phone"><div class="mapbox">
+          <div class="map-cap map-status"><span class="sm failed"><i></i></span><span>8 instances · 1 couldn’t be read</span></div>
+          <div class="map kfed" data-edges="delta>up:one hop|up>self:upstream|eco>self:feeds|src>self:feeds|hill>self:peers|valley>hill:one hop|self>seed:reads|self>youth:downstream|self>market:downstream|youth>pantry:one hop" data-on="hill>self,valley>hill">
+            <svg class="edges" aria-hidden="true"></svg>
+            <button class="node beyond" style="grid-area:delta" data-id="delta"><span class="nt"><span>Delta Alliance</span></span><span class="nm">one hop</span></button>
+            <div class="group" style="grid-area:eco" data-id="eco"><span class="eyebrow">Meadow Network</span>
+              <button class="node" data-id="s1"><span class="nt"><span>Field notes archive</span></span></button>
+              <button class="node" data-id="s2"><span class="nt"><span>Seed registry</span></span></button></div>
+            <button class="node failed" style="grid-area:up" data-id="up"><span class="nt"><span>Watershed Network</span></span><span class="nm">couldn’t read</span><span class="attn-dot"></span></button>
+            <button class="node" style="grid-area:src" data-id="src"><span class="nt"><span>Open data portal</span></span><span class="nm">source</span></button>
+            <button class="node sel" style="grid-area:hill" data-id="hill"><span class="nt"><span>Hillside Coop</span></span><span class="nm">9 members</span></button>
+            <button class="node big" style="grid-area:self" data-id="self"><span class="nk">This instance</span><span class="nt"><span>Example DAO Commons</span></span><span class="nm">142 entries</span></button>
+            <button class="node" style="grid-area:seed" data-id="seed"><span class="nt"><span>Open Seed Library</span></span><span class="nm">knowledge</span></button>
+            <button class="node beyond" style="grid-area:valley" data-id="valley"><span class="nt"><span>Valley Commons</span></span><span class="nm">one hop</span></button>
+            <button class="node aged" style="grid-area:youth" data-id="youth"><span class="nt"><span>Youth Circle</span></span><span class="nm">12 d</span></button>
+            <button class="node away" style="grid-area:market" data-id="market"><span class="nt"><span>Market Garden</span></span><span class="nm">not reached</span></button>
+            <button class="node beyond" style="grid-area:pantry" data-id="pantry"><span class="nt"><span>Pantry Network</span></span><span class="nm">one hop</span></button>
+          </div>
+        </div></div>
+      </div>
+      <div class="spec"><div class="cap">its list twin · v or one tap</div>
+        <div class="phone"><ul class="rows surf twin" id="twin-phone" aria-label="Federation, as a list"></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================== 04 THE COMMONS -->
+  <section class="g-sec" id="commons" aria-labelledby="h-commons">
+    <div class="g-head"><div><div class="no">04</div><h2 id="h-commons">The commons</h2></div>
+      <p>The public pages kms can write beside its JSON API (opt-in, <code class="mono">publish.pages: true</code>). A static frame: sidebar of kinds with counts, the commons as data rows grouped by kind, filter chips and a search that works over a static index. Only what the publication gate let through is here, and only that is counted.</p></div>
+    <div class="house">
+      <div class="frame auto full">
+        <nav class="side" aria-label="Commons">
+          <div class="org"><span class="seal"><svg><use href="#i-seal"/></svg></span><span class="nm">Example DAO Commons</span></div>
+          <div class="search"><svg class="i"><use href="#i-search"/></svg><span class="lbl">Search the commons</span><kbd>⌘K</kbd></div>
+          <div class="nav">
+            <a href="#commons" aria-current="page"><svg class="i"><use href="#i-list"/></svg><span class="lbl">Commons</span><span class="n">142</span></a>
+            <a href="#map"><svg class="i"><use href="#i-map"/></svg><span class="lbl">Federation map</span></a>
+          </div>
+          <div class="nav"><div class="nav-h">Kinds</div>
+            <a href="#page"><svg class="i"><use href="#i-book"/></svg><span class="lbl">Encyclopedia</span><span class="n">31</span></a>
+            <a href="#page"><svg class="i"><use href="#i-branch"/></svg><span class="lbl">Concepts</span><span class="n">24</span></a>
+            <a href="#page"><svg class="i"><use href="#i-quote"/></svg><span class="lbl">Claims</span><span class="n">22</span></a>
+            <a href="#page"><svg class="i"><use href="#i-hammer"/></svg><span class="lbl">Implementations</span><span class="n">18</span></a>
+            <a href="#page"><svg class="i"><use href="#i-sliders"/></svg><span class="lbl">Options</span><span class="n">12</span></a>
+            <a href="#page"><svg class="i"><use href="#i-route"/></svg><span class="lbl">Tracks</span><span class="n">4</span></a>
+            <a href="#page"><svg class="i"><use href="#i-db"/></svg><span class="lbl">Sources</span><span class="n">9</span></a>
+          </div>
+          <div class="side-foot">
+            <a class="nav-like" href="#commons" style="display:flex;align-items:center;gap:var(--sp-7);height:32px;padding:0 var(--sp-6);color:var(--mute);font-size:var(--fs-body)"><svg class="i"><use href="#i-braces"/></svg><span class="lbl">JSON API</span><svg class="i s13" style="margin-inline-start:auto;color:var(--faint)"><use href="#i-ext"/></svg></a>
+            <div class="who"><span class="hatmark"><svg class="i"><use href="#i-seal"/></svg></span><div class="w"><div class="w-t">Published commons</div><div class="w-s">did:plc:7f3k…q2va</div></div></div>
+          </div>
+        </nav>
+        <div class="mainc">
+          <div class="topbar"><div class="crumbs"><span>Example DAO Commons</span><span class="slash">/</span><b>Commons</b></div><div class="tools"><span class="faint" style="font-size:var(--fs-tiny)">Updated 29 Oct</span></div></div>
+          <div class="ptop"><span class="seal"><svg><use href="#i-seal"/></svg></span><b>Commons</b><span class="tools"><button class="btn icon ghost" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button><button class="btn icon ghost" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button></span></div>
+          <div class="scroll"><div class="content">
+            <div class="kh">
+              <span class="eyebrow">Knowledge commons</span>
+              <h1>Example DAO Commons</h1>
+              <div class="facts-l"><span>142 entries</span><span class="dot-sep"></span><span>7 kinds</span><span class="dot-sep"></span><span>9 sources</span><span class="dot-sep"></span><span>2 peers read</span></div>
+              <p>What a river valley’s neighbourhood groups know about seed, water and shared tools — written down, sourced, and reviewed before it is published.</p>
+            </div>
+            <div>
+              <div class="vbar">
+                <div class="tabs" role="tablist" aria-label="Views"><button role="tab" aria-selected="true"><svg class="i s14"><use href="#i-list"/></svg>List</button><button role="tab" aria-selected="false"><svg class="i s14"><use href="#i-table"/></svg>Table</button></div>
+                <div class="end"><span class="fchip"><span class="k">Kind is</span> Encyclopedia, Implementation, Concept<svg class="i"><use href="#i-x"/></svg></span><span class="fchip add"><svg class="i"><use href="#i-plus"/></svg>Filter</span><span class="fchip add"><svg class="i"><use href="#i-sort"/></svg>Updated</span></div>
+              </div>
+              <div class="surf idx"><ul class="rows">
+                <li class="grp-h"><span>Encyclopedia</span><span class="c">31</span><a class="end" href="#commons">All 31</a></li>
+                <li><a class="row krow" href="#page"><span class="ktile"><svg class="i"><use href="#i-book"/></svg></span><span class="main"><span class="t">Community seed libraries</span><span class="sum">How neighbourhoods keep, lend and return seed so the varieties that suit the place stay in circulation.</span></span><span class="c-mark"><span class="sm done"><i></i><span class="w">Reviewed</span></span></span><span class="age c-age"><time datetime="2026-10-12">12 Oct</time></span></a></li>
+                <li><a class="row krow" href="#page"><span class="ktile"><svg class="i"><use href="#i-book"/></svg></span><span class="main"><span class="t">Watershed councils</span><span class="sum">A council per catchment: who sits on it, what it decides, how it reports back to the groups upstream.</span></span><span class="c-mark"><span class="sm ok"><i></i><span class="w">Source-linked</span></span></span><span class="age c-age">3 Oct</span></a></li>
+                <li><a class="row krow" href="#page"><span class="ktile"><svg class="i"><use href="#i-book"/></svg></span><span class="main"><span class="t">Commons without enclosure</span><span class="sum">Why a shared tool shed stays shared: the rules that kept it open, written down as they were found.</span></span><span class="c-mark"><span class="sm open"><i></i><span class="w">Draft</span></span></span><span class="age c-age">28 Sep</span></a></li>
+                <li class="grp-h"><span>Implementations</span><span class="c">18</span><a class="end" href="#commons">All 18</a></li>
+                <li><a class="row krow" href="#page"><span class="ktile"><svg class="i"><use href="#i-hammer"/></svg></span><span class="main"><span class="t">Example DAO seed library, year one</span><span class="sum">What worked: monthly swap days. What failed: the paper ledger. What returns to the commons: the lending form.</span></span><span class="c-mark"><span class="sm done"><i></i><span class="w">Field-informed</span></span></span><span class="age c-age">21 Sep</span></a></li>
+                <li><a class="row krow" href="#page"><span class="ktile"><svg class="i"><use href="#i-hammer"/></svg></span><span class="main"><span class="t">Shared tool shed, Hill town</span><span class="sum">A two-year record of lending, repair days and the one rule change that mattered.</span></span><span class="c-mark"><span class="sm done"><i></i><span class="w">Reviewed</span></span></span><span class="age c-age">9 Sep</span></a></li>
+                <li class="grp-h"><span>Concepts</span><span class="c">24</span><a class="end" href="#commons">All 24</a></li>
+                <li><a class="row krow" href="#page"><span class="ktile dashed"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Seed sovereignty</span><span class="sum"><span class="ext"><svg class="i"><use href="#i-link"/></svg>from Open Seed Library ↗</span> · read 3 d ago</span></span><span class="c-mark"><span class="sm done"><i></i><span class="w">Reviewed</span></span></span><span class="age c-age">4 Aug</span></a></li>
+                <li><a class="row krow dep" href="#page"><span class="ktile"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Stewardship (2024 wording)</span><span class="sum">Kept for its links. Superseded by “Stewardship”.</span></span><span class="c-mark"><span class="sm closed"><i></i><span class="w">Deprecated</span></span></span><span class="age c-age">2 Feb</span></a></li>
+              </ul></div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================== 05 A KNOWLEDGE PAGE -->
+  <section class="g-sec" id="page" aria-labelledby="h-page">
+    <div class="g-head"><div><div class="no">05</div><h2 id="h-page">A knowledge page</h2></div>
+      <p>One page per published entry, built from the same projection as its JSON. House §10.1 body styles, read-only: Fraunces title, Geist prose at 68 characters, a callout for the entry’s caveat, related entries embedded as data rows, the entry’s facts as field rows beside it, and its one-hop neighbourhood as a small map.</p></div>
+    <div class="house">
+      <div class="frame auto full">
+        <nav class="side" aria-label="Commons">
+          <div class="org"><span class="seal"><svg><use href="#i-seal"/></svg></span><span class="nm">Example DAO Commons</span></div>
+          <div class="search"><svg class="i"><use href="#i-search"/></svg><span class="lbl">Search the commons</span><kbd>⌘K</kbd></div>
+          <div class="nav">
+            <a href="#commons"><svg class="i"><use href="#i-list"/></svg><span class="lbl">Commons</span><span class="n">142</span></a>
+            <a href="#map"><svg class="i"><use href="#i-map"/></svg><span class="lbl">Federation map</span></a>
+          </div>
+          <div class="nav"><div class="nav-h">Kinds</div>
+            <a href="#page" aria-current="page"><svg class="i"><use href="#i-book"/></svg><span class="lbl">Encyclopedia</span><span class="n">31</span></a>
+            <a href="#page"><svg class="i"><use href="#i-branch"/></svg><span class="lbl">Concepts</span><span class="n">24</span></a>
+            <a href="#page"><svg class="i"><use href="#i-quote"/></svg><span class="lbl">Claims</span><span class="n">22</span></a>
+            <a href="#page"><svg class="i"><use href="#i-hammer"/></svg><span class="lbl">Implementations</span><span class="n">18</span></a>
+            <a href="#page"><svg class="i"><use href="#i-sliders"/></svg><span class="lbl">Options</span><span class="n">12</span></a>
+            <a href="#page"><svg class="i"><use href="#i-route"/></svg><span class="lbl">Tracks</span><span class="n">4</span></a>
+            <a href="#page"><svg class="i"><use href="#i-db"/></svg><span class="lbl">Sources</span><span class="n">9</span></a>
+          </div>
+        </nav>
+        <div class="mainc">
+          <div class="topbar"><div class="crumbs"><span>Commons</span><span class="slash">/</span><span>Encyclopedia</span><span class="slash">/</span><b>Community seed libraries</b></div><div class="tools"><a class="btn sm ghost has-ico" href="#page"><svg class="i"><use href="#i-braces"/></svg>JSON</a></div></div>
+          <div class="ptop"><span class="seal"><svg><use href="#i-seal"/></svg></span><b>Encyclopedia</b><span class="tools"><button class="btn icon ghost" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button><button class="btn icon ghost" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button></span></div>
+          <div class="scroll"><div class="content wide kpage">
+            <div class="kp-grid">
+              <article class="kp-body">
+                <div class="kp-meta"><span class="eyebrow">Encyclopedia · concept</span><span class="vis"><svg class="i"><use href="#i-globe"/></svg>Public</span><span>Updated <time datetime="2026-10-12">12 Oct</time></span><span>3 backlinks</span></div>
+                <h1 class="ed-title">Community seed libraries</h1>
+                <p class="lead">A seed library lends seed the way a book library lends books: borrow in spring, return saved seed in autumn. Kept by a neighbourhood, it keeps the varieties that suit the place in circulation.</p>
+                <div class="callout caveat"><svg class="i"><use href="#i-info"/></svg><div><b>Reviewed for explanation.</b> This entry explains the idea; it is not yet guidance for starting one. For what one group actually did, read the implementation record below.</div></div>
+                <div class="prose">
+                  <h2>How it works</h2>
+                  <p>Members borrow a packet, grow it out, and save seed from the strongest plants. What comes back is a little better suited to the valley than what went out. Over a few seasons the collection drifts toward what grows here.</p>
+                  <h2>Known tensions</h2>
+                  <ul><li>Returns are uneven: a dry year means fewer packets come back than went out.</li><li>Cross-pollinating crops need distance a small garden can’t give.</li><li>A library is only as good as its ledger, and ledgers are tedious.</li></ul>
+                  <h3>Related</h3>
+                </div>
+                <div class="embed">
+                  <div class="embed-h"><svg class="i s14"><use href="#i-link"/></svg><span>4 entries</span><span class="end">from this commons and one peer</span></div>
+                  <ul class="rows">
+                    <li><a class="row" href="#page"><span class="ktile dashed"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Seed sovereignty</span><span class="s">Concept <span class="ext"><svg class="i"><use href="#i-link"/></svg>from Open Seed Library ↗</span></span></span><span class="end"><span class="sm done"><i></i>Reviewed</span></span></a></li>
+                    <li><a class="row" href="#page"><span class="ktile"><svg class="i"><use href="#i-hammer"/></svg></span><span class="main"><span class="t">Example DAO seed library, year one</span><span class="s">Implementation record</span></span><span class="end"><span class="sm done"><i></i>Field-informed</span></span></a></li>
+                    <li><a class="row" href="#page"><span class="ktile"><svg class="i"><use href="#i-quote"/></svg></span><span class="main"><span class="t">Locally saved seed adapts within a few seasons</span><span class="s">Claim · 2 sources</span></span><span class="end"><span class="sm ok"><i></i>Source-linked</span></span></a></li>
+                    <li><a class="row" href="#page"><span class="ktile"><svg class="i"><use href="#i-sliders"/></svg></span><span class="main"><span class="t">Seed swap days</span><span class="s">Option</span></span><span class="end"><span class="sm open"><i></i>Draft</span></span></a></li>
+                  </ul>
+                </div>
+                <div class="prose"><h3>Where this comes from</h3><p>Two seasons of <span class="mention rec"><svg class="i"><use href="#i-db"/></svg>Field notes archive</span> and the lending form the library kept, read by the field steward in October.</p></div>
+                <div class="kp-foot"><span>Published by Example DAO Commons</span><span class="uri">at://did:plc:7f3k…q2va/…encyclopedia-entry/3l2xk7</span><a href="#page">JSON</a><a href="#page">How to cite</a></div>
+              </article>
+              <aside class="kp-aside" aria-label="About this entry">
+                <div><h2>About this entry</h2>
+                  <dl class="fields">
+                    <dt>Kind</dt><dd>Encyclopedia entry</dd>
+                    <dt>Page type</dt><dd>Concept</dd>
+                    <dt>Maturity</dt><dd><span class="sm done"><i></i>Reviewed</span></dd>
+                    <dt>Public use</dt><dd>Reviewed for explanation</dd>
+                    <dt>Currentness</dt><dd>Current</dd>
+                    <dt>Audience</dt><dd>Neighbourhood groups</dd>
+                    <dt>Steward</dt><dd>Field steward</dd>
+                    <dt>Record</dt><dd><button class="addr" type="button" data-copy="at://did:plc:7f3k…/3l2xk7">3l2xk7<span class="ic"><svg class="i cp"><use href="#i-copy"/></svg><svg class="i ok"><use href="#i-check"/></svg></span></button></dd>
+                  </dl></div>
+                <div><h2>Neighbourhood</h2>
+                  <div class="mini" style="height:220px">
+                    <svg aria-hidden="true"></svg>
+                    <span class="mnode me" style="left:50%;top:50%"><svg class="i"><use href="#i-book"/></svg>Seed libraries</span>
+                    <a class="mnode away" href="#page" style="left:28%;top:16%"><svg class="i"><use href="#i-branch"/></svg>Seed sovereignty</a>
+                    <a class="mnode" href="#page" style="left:74%;top:16%"><svg class="i"><use href="#i-hammer"/></svg>Year one</a>
+                    <a class="mnode" href="#page" style="left:26%;top:84%"><svg class="i"><use href="#i-quote"/></svg>Adapts locally</a>
+                    <a class="mnode" href="#page" style="left:74%;top:84%"><svg class="i"><use href="#i-sliders"/></svg>Swap days</a>
+                  </div></div>
+                <div><h2>Referenced by <span class="faint" style="font-weight:400">3</span></h2>
+                  <ul class="rows surf"><li><a class="row" href="#page" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-route"/></svg></span><span class="main"><span class="t">Starting a neighbourhood commons</span></span><span></span></a></li>
+                  <li><a class="row" href="#page" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-sliders"/></svg></span><span class="main"><span class="t">Seed swap days</span></span><span></span></a></li>
+                  <li><a class="row" href="#page" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-book"/></svg></span><span class="main"><span class="t">Watershed councils</span></span><span></span></a></li></ul></div>
+              </aside>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================== 06 PAGES ON A PHONE -->
+  <section class="g-sec" id="phone" aria-labelledby="h-phone">
+    <div class="g-head"><div><div class="no">06</div><h2 id="h-phone">Pages on a phone</h2></div>
+      <p>Under 760 the sidebar becomes a top bar with search and a menu sheet; rows drop their date column and keep the mark; the page’s facts move under the article. No bottom bar: these are pages to read, not an app to work in.</p></div>
+    <div class="spec-grid two">
+      <div class="spec"><div class="cap">the commons · 390</div>
+        <div class="phone"><div class="house"><div class="frame auto"><div class="mainc">
+          <div class="ptop"><span class="seal"><svg><use href="#i-seal"/></svg></span><b>Commons</b><span class="tools"><button class="btn icon ghost" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button><button class="btn icon ghost" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button></span></div>
+          <div class="scroll"><div class="content">
+            <div class="kh"><span class="eyebrow">Knowledge commons</span><h1>Example DAO Commons</h1><div class="facts-l"><span>142 entries</span><span class="dot-sep"></span><span>7 kinds</span></div></div>
+            <div><div class="vbar"><span class="fchip"><span class="k">Kind is</span> 3 kinds<svg class="i"><use href="#i-x"/></svg></span><span class="fchip add"><svg class="i"><use href="#i-plus"/></svg>Filter</span></div>
+            <div class="surf idx"><ul class="rows">
+              <li class="grp-h"><span>Encyclopedia</span><span class="c">31</span></li>
+              <li><a class="row krow" href="#page"><span class="ktile"><svg class="i"><use href="#i-book"/></svg></span><span class="main"><span class="t">Community seed libraries</span><span class="sum">How neighbourhoods keep, lend and return seed.</span></span><span class="c-mark"><span class="sm done"><i></i><span class="w">Reviewed</span></span></span><span class="age c-age">12 Oct</span></a></li>
+              <li><a class="row krow" href="#page"><span class="ktile"><svg class="i"><use href="#i-book"/></svg></span><span class="main"><span class="t">Watershed councils</span><span class="sum">A council per catchment and what it decides.</span></span><span class="c-mark"><span class="sm ok"><i></i><span class="w">Source-linked</span></span></span><span class="age c-age">3 Oct</span></a></li>
+              <li class="grp-h"><span>Concepts</span><span class="c">24</span></li>
+              <li><a class="row krow" href="#page"><span class="ktile dashed"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Seed sovereignty</span><span class="sum"><span class="ext">from Open Seed Library ↗</span></span></span><span class="c-mark"><span class="sm done"><i></i><span class="w">Reviewed</span></span></span><span class="age c-age">4 Aug</span></a></li>
+            </ul></div></div>
+          </div></div></div></div></div></div>
+      </div>
+      <div class="spec"><div class="cap">a page · 390</div>
+        <div class="phone"><div class="house"><div class="frame auto"><div class="mainc">
+          <div class="ptop"><span class="seal"><svg><use href="#i-seal"/></svg></span><b>Encyclopedia</b><span class="tools"><button class="btn icon ghost" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button><button class="btn icon ghost" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button></span></div>
+          <div class="scroll"><div class="content kpage">
+            <article class="kp-body">
+              <div class="kp-meta"><span class="eyebrow">Encyclopedia · concept</span><span>Updated 12 Oct</span></div>
+              <h1 class="ed-title">Community seed libraries</h1>
+              <p class="lead">A seed library lends seed the way a book library lends books: borrow in spring, return saved seed in autumn.</p>
+              <div class="callout caveat"><svg class="i"><use href="#i-info"/></svg><div><b>Reviewed for explanation.</b> Not yet guidance for starting one.</div></div>
+              <div class="prose"><h2>How it works</h2><p>Members borrow a packet, grow it out, and save seed from the strongest plants. Over a few seasons the collection drifts toward what grows here.</p></div>
+              <div class="embed"><div class="embed-h"><svg class="i s14"><use href="#i-link"/></svg><span>4 entries</span></div>
+                <ul class="rows"><li><a class="row" href="#page"><span class="ktile dashed"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Seed sovereignty</span><span class="s">from Open Seed Library ↗</span></span><span class="end"><span class="sm done"><i></i><span class="sr-only">Reviewed</span></span></span></a></li>
+                <li><a class="row" href="#page"><span class="ktile"><svg class="i"><use href="#i-hammer"/></svg></span><span class="main"><span class="t">Example DAO seed library, year one</span><span class="s">Implementation record</span></span><span class="end"><span class="sm done"><i></i><span class="sr-only">Field-informed</span></span></span></a></li></ul></div>
+            </article>
+            <dl class="fields"><dt>Maturity</dt><dd><span class="sm done"><i></i>Reviewed</span></dd><dt>Public use</dt><dd>Reviewed for explanation</dd><dt>Steward</dt><dd>Field steward</dd></dl>
+          </div></div></div></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================== 07 TERRITORY EXPLORER -->
+  <section class="g-sec" id="explorer" aria-labelledby="h-explorer">
+    <div class="g-head"><div><div class="no">07</div><h2 id="h-explorer">Territory explorer</h2></div>
+      <p>The territory pack’s explorer, on the same elements. Each layer is a tree (house §9.7); the selected place is moss and the places it overlaps on other layers carry an overlap mark with their share. The place opens in an inspector: field rows, what is placed here, what it overlaps, the data about it. “Who sees what” becomes the house’s View as.</p></div>
+    <div class="art xp">
+      <div class="art-bar">
+        <span class="org"><span class="seal"><svg><use href="#i-seal"/></svg></span></span>
+        <div class="what"><b>A territory in org-os</b><span>org-os-territory · explorer · illustrative sample</span></div>
+        <div class="tools"><button class="btn has-ico" type="button"><svg class="i"><use href="#i-play"/></svg>Take the tour</button><button class="viewas" type="button"><svg class="i"><use href="#i-eye"/></svg>View as: you<svg class="i s13"><use href="#i-chev-d"/></svg></button></div>
+      </div>
+      <div class="art-body">
+        <div class="callout" style="margin:0"><svg class="i"><use href="#i-info"/></svg><div><b>Illustrative sample.</b> Place names are examples, codes are placeholders, overlap shares are invented, and there is no geometry: the layers are a schematic, not a map.</div></div>
+        <div class="xp-grid">
+          <div class="surf" style="padding:var(--sp-10)">
+            <div class="xp-layer"><span class="eyebrow">Administrative</span>
+              <ul class="tree" role="tree" aria-label="Administrative layer">
+                <li role="none"><div class="tnode" role="treeitem" aria-expanded="true" aria-level="1"><span class="tg"><svg class="i"><use href="#i-chev-r"/></svg></span><span class="pin"><svg class="i"><use href="#i-pin"/></svg></span><span class="nmx"><b>River Region</b><span class="lvl">region</span></span><span class="cntc">7</span></div>
+                  <ul role="group"><li role="none"><div class="tnode" role="treeitem" aria-expanded="true" aria-level="2"><span class="tg"><svg class="i"><use href="#i-chev-r"/></svg></span><span class="pin"><svg class="i"><use href="#i-pin"/></svg></span><span class="nmx"><b>Lower District</b><span class="lvl">district</span></span><span class="cntc">5</span></div>
+                    <ul role="group">
+                      <li role="none"><div class="tnode sel" role="treeitem" aria-selected="true" aria-level="3"><span class="tg"></span><span class="pin"><svg class="i"><use href="#i-pin"/></svg></span><span class="nmx"><b>Example town</b><span class="lvl">town</span></span><span class="cntc">3</span></div></li>
+                      <li role="none"><div class="tnode" role="treeitem" aria-level="3"><span class="tg"></span><span class="pin"><svg class="i"><use href="#i-pin"/></svg></span><span class="nmx"><b>Hill town</b><span class="lvl">town</span></span><span class="cntc">2</span></div></li>
+                    </ul></li></ul></li>
+              </ul></div>
+            <div class="xp-layer"><span class="eyebrow">Landscape</span>
+              <ul class="tree" role="tree" aria-label="Landscape layer">
+                <li role="none"><div class="tnode over" role="treeitem" aria-level="1"><span class="tg"></span><span class="pin"><svg class="i"><use href="#i-pin"/></svg></span><span class="nmx"><b>Valley floor</b><span class="lvl">landscape unit</span></span><span class="overmark"><svg class="i"><use href="#i-swap"/></svg>overlaps · 60%</span></div></li>
+                <li role="none"><div class="tnode" role="treeitem" aria-level="1"><span class="tg"></span><span class="pin"><svg class="i"><use href="#i-pin"/></svg></span><span class="nmx"><b>Terraced slopes</b><span class="lvl">landscape unit</span></span><span class="cntc">1</span></div></li>
+              </ul></div>
+            <div class="xp-layer"><span class="eyebrow">Hydrological</span>
+              <ul class="tree" role="tree" aria-label="Hydrological layer">
+                <li role="none"><div class="tnode over" role="treeitem" aria-level="1"><span class="tg"></span><span class="pin"><svg class="i"><use href="#i-pin"/></svg></span><span class="nmx"><b>Upper catchment</b><span class="lvl">catchment</span></span><span class="overmark"><svg class="i"><use href="#i-swap"/></svg>overlaps · 100%</span></div></li>
+              </ul></div>
+          </div>
+          <aside class="insp card" aria-label="Example town">
+            <div class="insp-h"><span class="ktile lg"><svg class="i"><use href="#i-pin"/></svg></span><div style="min-width:0"><span class="eyebrow">Place · administrative · town</span><div class="t">Example town</div></div></div>
+            <div class="insp-b">
+              <dl class="fields">
+                <dt>Inside</dt><dd>Lower District › River Region</dd>
+                <dt>Codes</dt><dd><span class="mono">stat:0841</span></dd>
+                <dt><svg class="i s13"><use href="#i-lock"/></svg>Private note</dt><dd><span class="restricted">Yours only · never leaves</span></dd>
+              </dl>
+              <div><div class="sec-h"><h3>What’s here</h3><span class="cnt">3</span></div>
+                <ul class="rows surf"><li><div class="row" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-book"/></svg></span><span class="main"><span class="t">Community seed libraries</span></span><span></span></div></li><li><div class="row" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-hammer"/></svg></span><span class="main"><span class="t">Example DAO seed library</span></span><span></span></div></li>
+                <li><div class="row" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-doc"/></svg></span><span class="main"><span class="t">Flood-plain walk notes</span></span><span></span></div></li></ul></div>
+              <div><div class="sec-h"><h3>Overlaps with</h3><span class="cnt">2</span></div>
+                <ul class="rows surf"><li><div class="row wrap-end" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-swap"/></svg></span><span class="main"><span class="t">Valley floor</span><span class="s">landscape</span></span><span class="end"><span class="meter bar" aria-hidden="true"><b style="width:60%"></b></span><span class="meter-l">60%</span></span></div></li>
+                <li><div class="row wrap-end" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-swap"/></svg></span><span class="main"><span class="t">Upper catchment</span><span class="s">hydrological</span></span><span class="end"><span class="meter bar" aria-hidden="true"><b style="width:100%"></b></span><span class="meter-l">100%</span></span></div></li></ul></div>
+              <div><div class="sec-h"><h3>Data about this place</h3><span class="cnt">2</span></div>
+                <ul class="rows surf"><li><div class="row" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-stream"/></svg></span><span class="main"><span class="t">River gauge readings</span><span class="s">open licence · trust: verified</span></span><span></span></div></li>
+                <li><div class="row" style="min-height:44px;padding-block:var(--sp-6)"><span class="ktile"><svg class="i"><use href="#i-stream"/></svg></span><span class="main"><span class="t">Allotment waiting list</span><span class="s"><svg class="i s13"><use href="#i-lock"/></svg>never leaves · yours only</span></span><span></span></div></li></ul></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+    <div class="g-sub">View as a peer, and the tour <span>the band is house §5.9; the tour is a pop card anchored to its target</span></div>
+    <div class="spec-grid two">
+      <div class="spec"><div class="cap">previewing as a peer with the pack</div>
+        <div class="band static"><svg class="i"><use href="#i-eye"/></svg><span><b>Previewing as a peer with the pack.</b> They receive your 9 places and 4 data streams. The private note and 1 stream never leave.</span><button class="btn" type="button">Exit preview</button></div>
+        <p class="faint" style="margin:0;font-size:var(--fs-meta)">What the peer would not receive is not drawn while previewing — the private note row and the “Allotment waiting list” stream are absent, as in the house.</p>
+      </div>
+      <div class="spec"><div class="cap">tour · step 3 of 6</div>
+        <div class="coach" role="dialog" aria-labelledby="coach-h"><span class="step">Step 3 of 6</span><h3 id="coach-h">Places overlap across layers</h3><p>Example town sits 60% on the Valley floor and wholly inside the Upper catchment. The share is derived data, kept beside the places, not in them.</p><div class="acts"><button class="btn ghost" type="button">Back</button><button class="btn primary" type="button">Next</button></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================== 08 PACKS REPORT -->
+  <section class="g-sec" id="report" aria-labelledby="h-report">
+    <div class="g-head"><div><div class="no">08</div><h2 id="h-report">Packs report</h2></div>
+      <p>The extension-packs demo is an engineering report built from real runs. It keeps its seven sections and its fail-closed build; it gains the house’s numbered sections, marks for what held, and wells for captured output. Tables become rows so nothing scrolls sideways at 390. Shown here: sections 01, 03 and 04 of the seven, with their own numbers.</p></div>
+    <div class="art rep">
+      <div class="art-bar"><span class="org"><span class="seal"><svg><use href="#i-seal"/></svg></span></span><div class="what"><b>Packs for the knowledge plane</b><span>a report from real runs · captured 29 Oct 2026</span></div></div>
+      <div class="art-body">
+        <div class="rsec"><div class="lbl"><div class="no">01</div><h3>The seam</h3><p>What changed in the framework, and what did not.</p></div>
+          <div class="vs">
+            <div class="surf"><span class="eyebrow">Before</span><div class="slot">core schemas <b>25</b></div><span class="faint" style="font-size:var(--fs-meta)">A new type meant editing the framework.</span></div>
+            <svg class="i s20"><use href="#i-arrow-r"/></svg>
+            <div class="surf"><span class="eyebrow">After</span><div class="slot">core schemas <b>25</b></div><div class="slot on">+ pack <span class="mono">territorial-unit</span> <span class="mono">data-stream</span></div><span class="faint" style="font-size:var(--fs-meta)">Core wins on every name; a collision is a load error.</span></div>
+          </div></div>
+        <div class="rsec"><div class="lbl"><div class="no">03</div><h3>Guarantees</h3><p>Each held when the page was built.</p></div>
+          <ul class="claims">
+            <li><span class="ck"><svg class="i"><use href="#i-check"/></svg></span><span>An instance without <span class="mono">extensions</span> is <b>unchanged</b>: its schemas are exactly the 25 core ones.</span><span class="ev"><span class="mono">packs-e2e.test.mjs</span><span>6 assertions</span></span></li>
+            <li><span class="ck"><svg class="i"><use href="#i-check"/></svg></span><span>Pack types are publish-eligible, <b>never published by default</b>.</span><span class="ev"><span class="mono">type-enablement.test.mjs</span><span>4 assertions</span></span></li>
+          </ul></div>
+        <div class="rsec"><div class="lbl"><div class="no">04</div><h3>Break it</h3><p>Every wrong way to load a pack fails loudly and says why.</p></div>
+          <ul class="claims">
+            <li><span class="ck"><svg class="i"><use href="#i-check"/></svg></span><span>A pack that isn’t there is <b>refused</b>, by name.</span><pre class="well">extension pack "org-os-absent" not found (expected a sibling package at packages/org-os-absent)</pre></li>
+          </ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================== 09 STATES -->
+  <section class="g-sec" id="states" aria-labelledby="h-states">
+    <div class="g-head"><div><div class="no">09</div><h2 id="h-states">States</h2></div>
+      <p>The kms-specific states, each drawn with the house’s treatments. Two rules decide most of them: attention (clay) appears only on the steward’s side — the map artifact and the preview — never on public pages; and on a public page, a reference to something private and a reference to nothing look the same, because both are simply absent.</p></div>
+    <div class="spec-grid wide">
+      <div class="spec"><div class="cap">empty commons</div>
+        <div class="note-block"><b>Nothing published yet.</b><span class="faint" style="font-size:var(--fs-meta)">Entries appear here once their public use allows it and the commons has been exported.</span></div></div>
+      <div class="spec"><div class="cap">no peers yet · map</div>
+        <div class="mapbox" style="padding:var(--sp-12) var(--sp-10);display:grid;gap:var(--sp-10);justify-items:center"><button class="node big" type="button" style="position:relative"><span class="nk">This instance</span><span class="nt"><span>Example DAO Commons</span></span><span class="nm">142 entries</span></button>
+          <div class="note empty" style="position:relative;z-index:2"><svg class="i"><use href="#i-dash-circle"/></svg><span>No peers yet. Add one with <span class="mono">org-os-kms federate add --card &lt;file&gt;</span>.</span></div></div></div>
+      <div class="spec"><div class="cap">frontier never fetched · steward</div>
+        <div class="note"><svg class="i" style="color:var(--attn)"><use href="#i-alert"/></svg><span><span class="ink">Coastline Lab’s peers have never been read.</span> Run <span class="mono">org-os-kms federate frontier</span>; the map keeps its last copy if a read fails.</span></div></div>
+      <div class="spec"><div class="cap">broken reference · preview only</div>
+        <ul class="rows surf"><li><div class="row"><span class="ktile attn"><svg class="i"><use href="#i-alert"/></svg></span><span class="main"><span class="t">soil-carbon-basics</span><span class="s" style="color:var(--attn)">No entry with this name. Fix the reference or publish the entry.</span></span><span></span></div></li></ul></div>
+      <div class="spec"><div class="cap">private entry · preview vs public</div>
+        <ul class="rows surf"><li><div class="row"><span class="ktile"><svg class="i"><use href="#i-lock"/></svg></span><span class="main"><span class="t">Allotment negotiations</span><span class="s"><span class="vis"><svg class="i"><use href="#i-lock"/></svg>Internal only</span></span></span><span></span></div></li></ul>
+        <div class="note empty"><svg class="i"><use href="#i-dash-circle"/></svg><span>Public page: not drawn, not counted, no gap.</span></div></div>
+      <div class="spec"><div class="cap">from a peer · read 3 d ago</div>
+        <ul class="rows surf"><li><div class="row"><span class="ktile dashed"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Seed sovereignty</span><span class="s"><span class="ext"><svg class="i"><use href="#i-link"/></svg>Open Seed Library ↗</span><span class="age">read 3 d ago</span></span></span><span></span></div></li></ul></div>
+      <div class="spec"><div class="cap">from a peer · couldn’t read · steward</div>
+        <ul class="rows surf"><li><div class="row"><span class="ktile dashed"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Seed sovereignty</span><span class="s"><span class="age failed"><svg class="i"><use href="#i-alert"/></svg>couldn’t read · last 9 d ago</span></span></span><span></span></div></li></ul></div>
+      <div class="spec"><div class="cap">awaiting review · preview only</div>
+        <ul class="rows surf"><li><div class="row"><span class="ktile attn"><svg class="i"><use href="#i-quote"/></svg></span><span class="main"><span class="t">Gauges undercount spring floods</span><span class="s">Claim · candidate</span></span><span class="end"><span class="sm needs"><i></i>Awaiting review</span></span></div></li></ul></div>
+      <div class="spec"><div class="cap">deprecated · public</div>
+        <ul class="rows surf"><li><div class="row dep"><span class="ktile"><svg class="i"><use href="#i-branch"/></svg></span><span class="main"><span class="t">Stewardship (2024 wording)</span><span class="s">Superseded by “Stewardship”</span></span><span class="end"><span class="sm closed"><i></i>Deprecated</span></span></div></li></ul></div>
+      <div class="spec"><div class="cap">preview band · steward</div>
+        <div class="band static"><svg class="i"><use href="#i-eye"/></svg><span><b>Preview — not published.</b> Internal entries, broken references and the review queue are shown here; the public pages leave them out.</span></div></div>
+      <div class="spec"><div class="cap">search with no script</div>
+        <div class="note"><svg class="i"><use href="#i-info"/></svg><span>Search needs JavaScript. <a class="act" href="#commons">Browse the commons by kind</a> instead.</span></div></div>
+      <div class="spec"><div class="cap">caveat · public use</div>
+        <div class="callout caveat" style="margin:0"><svg class="i"><use href="#i-info"/></svg><div><b>Use with care.</b> Linked to its sources, not yet reviewed.</div></div></div>
+    </div>
+  </section>
+
+  <!-- =============================================== 10 TODAY -->
+  <section class="g-sec" id="before" aria-labelledby="h-before">
+    <div class="g-head"><div><div class="no">10</div><h2 id="h-before">Today</h2></div>
+      <p>What kms and its pack draw now, captured from the real renderers on the test fixtures. The vault map artifact currently renders blank: its script escaping breaks the inlined bundle (spec §2.2).</p></div>
+    <div class="befaft">
+      <figure class="spec" style="margin:0"><figcaption class="cap">vault map artifact · as written</figcaption><img src="kms-gallery-shots/before/fedmap-artifact-1440.jpg" alt="The federation map artifact: a dark page with a title and a footnote, and no map." style="width:100%;height:auto;border-radius:8px"></figure>
+      <figure class="spec" style="margin:0"><figcaption class="cap">the torch · bundle loaded unmodified</figcaption><img src="kms-gallery-shots/before/torch-1440.jpg" alt="The torch: a dark orbital graph with gold, teal and violet dots." style="width:100%;height:auto;border-radius:8px"></figure>
+      <figure class="spec" style="margin:0"><figcaption class="cap">packs demo</figcaption><img src="kms-gallery-shots/before/packs-demo-1440.jpg" alt="The packs demo: a light report with blue accents and pill tabs." style="width:100%;height:auto;border-radius:8px"></figure>
+      <figure class="spec" style="margin:0"><figcaption class="cap">territory explorer</figcaption><img src="kms-gallery-shots/before/explorer-1440.jpg" alt="The territory explorer: nested boxes per layer and a side panel." style="width:100%;height:auto;border-radius:8px"></figure>
+    </div>
+  </section>
+
+  <footer class="g-foot"><span>org-os-kms · house interface · gallery for the kms house interface spec (with the process records: <span class="mono">docs/superpowers/history/org-os-0.7.md</span>)</span><span>This gallery loads Fraunces, Geist and Geist Mono from Google Fonts because it is one file; pages kms writes never do.</span></footer>
+</main>
+<p class="sr-only" id="live" aria-live="polite"></p>
+<script>
+(() => {
+  const root = document.documentElement;
+  const live = document.getElementById('live');
+  const setTheme = t => {
+    const css = document.createElement('style'); css.textContent = '*,*::before,*::after{transition:none!important}'; document.head.appendChild(css);
+    if (t === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+    document.querySelectorAll('[data-theme-set]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeSet === t)));
+    getComputedStyle(css).opacity; requestAnimationFrame(() => requestAnimationFrame(() => css.remove()));
+    try { localStorage.setItem('kms-gallery-theme', t); } catch (e) {}
+    requestAnimationFrame(drawAll);
+  };
+  document.querySelectorAll('[data-theme-set]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
+  try { const s = localStorage.getItem('kms-gallery-theme'); if (s && s !== 'system') setTheme(s); } catch (e) {}
+
+  // the map's list twin: the same nodes as data rows, grouped by layer (in kms: rendered at build time from map.json)
+  const TWIN = [
+    ['Upstream', [['i-inst', 'Watershed Network', 'upstream · 12 members', 'failed', 'Couldn’t read']]],
+    ['Peers', [['i-inst', 'Hillside Coop', 'DAO · peer · 9 members', 'ok', 'Read 4 min ago'], ['i-book', 'Open Seed Library', 'knowledge peer · AT Proto', 'ok', 'Read 3 d ago']]],
+    ['Downstream', [['i-inst', 'Youth Circle', 'LocalNode · downstream', 'aged', 'Frontier 12 d'], ['i-inst', 'Market Garden', 'downstream', 'open', 'Not reached']]],
+    ['One hop beyond', [['i-inst', 'Valley Commons', 'via Hillside Coop', 'open', ''], ['i-inst', 'Delta Alliance', 'via Watershed Network', 'open', ''], ['i-inst', 'Pantry Network', 'via Youth Circle', 'open', '']]],
+    ['Sources', [['i-db', 'Field notes archive', 'Meadow Network', 'ok', ''], ['i-db', 'Seed registry', 'Meadow Network', 'ok', ''], ['i-db', 'Open data portal', 'source', 'ok', '']]],
+  ];
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const twinHTML = TWIN.map(([g, items]) => `<li class="grp-h"><span>${g}</span><span class="c">${items.length}</span></li>` + items.map(([ic, t, s, m, w]) =>
+    `<li><a class="row" href="#map"><span class="ktile${g === 'One hop beyond' ? ' dashed' : ''}"><svg class="i"><use href="#${ic}"/></svg></span><span class="main"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></span><span class="end">${w ? `<span class="sm ${m}"><i></i>${esc(w)}</span>` : ''}</span></a></li>`).join('')).join('');
+  document.querySelectorAll('#fedlist, #twin-phone').forEach(u => u.innerHTML = twinHTML);
+
+  // List · Map (v)
+  const box = document.getElementById('fedmap'), list = document.getElementById('fedlist');
+  const show = v => {
+    box.hidden = v === 'list'; list.hidden = v !== 'list';
+    document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+    live.textContent = v === 'list' ? 'Showing the list' : 'Showing the map'; if (v === 'map') requestAnimationFrame(drawAll);
+  };
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => show(b.dataset.view)));
+  document.addEventListener('keydown', e => { if (e.key === 'v' && !/input|textarea/i.test(document.activeElement.tagName)) show(box.hidden ? 'map' : 'list'); });
+
+  // copy chip
+  document.querySelectorAll('button.addr').forEach(b => b.addEventListener('click', async () => {
+    const v = b.dataset.copy || b.textContent.trim();
+    try { await navigator.clipboard.writeText(v); } catch (e) {}
+    b.setAttribute('data-copied', ''); live.textContent = 'Copied ' + v; setTimeout(() => b.removeAttribute('data-copied'), 1600);
+  }));
+
+  // edges: drawn from where the nodes sit (in kms the positions are computed at build time and the SVG is static)
+  const ns = 'http://www.w3.org/2000/svg';
+  function drawMap(map) {
+    const svg = map.querySelector('svg.edges'); if (!svg) return;
+    svg.innerHTML = ''; map.querySelectorAll('.elabel').forEach(l => l.remove());
+    const b = map.getBoundingClientRect(); if (!b.width) return;
+    const at = id => { const el = map.querySelector(`[data-id="${id}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left - b.left, y: r.top - b.top, w: r.width, h: r.height }; };
+    const on = (map.dataset.on || '').split(','); const placed = [];
+    (map.dataset.edges || '').split('|').forEach(spec => {
+      const [pair, label] = spec.split(':'); const [a, c] = pair.split('>'); const A = at(a), B = at(c); if (!A || !B) return;
+      let d, mx, my, gap = 999;
+      const sameRow = Math.abs((A.y + A.h / 2) - (B.y + B.h / 2)) < 14;
+      if (sameRow) {
+        const l = A.x < B.x ? A : B, r = A.x < B.x ? B : A;
+        const x1 = l.x + l.w, y1 = l.y + l.h / 2, x2 = r.x, y2 = r.y + r.h / 2;
+        d = `M${x1} ${y1} L${x2} ${y2}`; mx = (x1 + x2) / 2; my = (y1 + y2) / 2; gap = x2 - x1;
+      } else {
+        const t = A.y < B.y ? A : B, u = A.y < B.y ? B : A;
+        const x1 = t.x + t.w / 2, y1 = t.y + t.h, x2 = u.x + u.w / 2, y2 = u.y, k = (y2 - y1) / 2;
+        d = `M${x1} ${y1} C${x1} ${y1 + k}, ${x2} ${y2 - k}, ${x2} ${y2}`; mx = (x1 + x2) / 2; my = (y1 + y2) / 2; gap = y2 - y1;
+      }
+      const isOn = on.includes(pair);
+      const p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'edge' + (isOn ? ' on' : '')); svg.appendChild(p);
+      if (!label) return;
+      // measure the real pill; keep it only when the edge has room for it plus 4px a side and it meets no other label
+      const s = document.createElement('span'); s.className = 'elabel' + (isOn ? ' on' : ''); s.textContent = label; s.style.left = mx + 'px'; s.style.top = my + 'px'; map.appendChild(s);
+      const lw = s.offsetWidth, lh = s.offsetHeight, lr = { l: mx - lw / 2 - 4, r: mx + lw / 2 + 4, t: my - lh / 2 - 2, b: my + lh / 2 + 2 };
+      const need = sameRow ? lw + 6 : lh + 16;
+      const clash = placed.some(q => !(lr.r < q.l || lr.l > q.r || lr.b < q.t || lr.t > q.b));
+      if (gap < need || clash) s.remove(); else placed.push(lr);
+    });
+  }
+  function drawMini(mini) {
+    const svg = mini.querySelector('svg'); const b = mini.getBoundingClientRect(); if (!b.width) return;
+    const me = mini.querySelector('.me'); if (!me) return; const m = me.getBoundingClientRect();
+    const cx = m.left - b.left + m.width / 2, cy = m.top - b.top + m.height / 2; svg.innerHTML = '';
+    mini.querySelectorAll('.mnode:not(.me)').forEach(n => { const r = n.getBoundingClientRect(); const p = document.createElementNS(ns, 'path'); p.setAttribute('class', 'edge'); p.setAttribute('d', `M${cx} ${cy} L${r.left - b.left + r.width / 2} ${r.top - b.top + r.height / 2}`); svg.appendChild(p); });
+  }
+  function drawAll() { document.querySelectorAll('.map[data-edges]').forEach(drawMap); document.querySelectorAll('.mini').forEach(drawMini); }
+  const ro = new ResizeObserver(() => requestAnimationFrame(drawAll));
+  document.querySelectorAll('.map[data-edges], .mini').forEach(m => ro.observe(m));
+  document.fonts && document.fonts.ready.then(drawAll);
+  window.addEventListener('load', drawAll);
+})();
+</script>
+</body>
+</html>

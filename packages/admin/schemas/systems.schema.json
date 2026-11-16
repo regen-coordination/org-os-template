@@ -3,7 +3,7 @@
   "type": "object",
   "required": ["id", "kind", "name"],
   "additionalProperties": true,
-  "x-order": ["id", "kind", "name", "chain", "chains", "address", "url", "space", "driver", "section", "embeddable", "description", "grant_pool", "relates", "roles", "notes"],
+  "x-order": ["id", "kind", "name", "chain", "chains", "address", "url", "space", "ens", "driver", "section", "embeddable", "branch", "files", "description", "grant_pool", "deployment", "hats", "signer_gate", "relates", "roles", "role", "position", "order", "notes"],
   "x-groups": [
     { "label": "What it is", "fields": ["kind", "name", "description"] },
     { "label": "Where it is", "fields": ["chain", "address", "url"] },
@@ -38,17 +38,20 @@
       "$comment": "For on-chain kinds, bare (CAIP-10 is `chain` + `address`). A Safe, a Gardens community or a Gardens pool is a 0x address; a Hats tree is its tree id, decimal or short hex."
     },
     "url": { "title": "Link", "description": "For an off-chain system: where it is.", "type": ["string", "null"], "format": "uri", "$comment": "For off-chain kinds." },
+    "ens": { "x-kinds": ["daouri-registration"], "title": "ENS name", "description": "For a daoURI registration by ENS text: the Sepolia ENS name whose daouri text record holds the daoURI.", "type": ["string", "null"], "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+eth$", "$comment": "L7-D13: read through the ENS Universal Resolver (lib/ens.mjs); lower-case names only." },
     "space": { "title": "Snapshot space", "description": "For a Snapshot space: its id, when the link does not say it.", "type": ["string", "null"], "$comment": "For a snapshot-space: the space's id on the hub, when the url does not say it." },
     "driver": { "title": "Driver", "description": "What reads it. Left empty, it is shown as a link.", "type": ["string", "null"], "$comment": "The platform driver that reads it; absent means a framed link." },
     "section": { "title": "Section", "description": "Where the Hub shows it, for example organization/treasury.", "type": ["string", "null"], "$comment": "Where the platform shows it, for example organization/treasury." },
     "embeddable": { "title": "Embeddable", "description": "Whether it can be shown inside the Hub.", "type": ["boolean", "null"] },
     "description": { "title": "Description", "description": "What the system is for, in a sentence.", "x-format": "textarea", "type": ["string", "null"], "$comment": "What the system is for, in a sentence. Published as the grant pool's description when the system is one."},
     "grant_pool": { "title": "Grant pool", "description": "For a Gardens pool that funds: what to publish about it as a grant pool.", "$comment": "A Gardens pool that funds: false (or absent) says it is not published as a DAOIP-5 grant pool. An object publishes it, with what the read cannot know.", "oneOf": [{"const": false}, {"type": "object", "additionalProperties": false, "required": ["mechanism"], "properties": {"mechanism": {"enum": ["Direct Grants", "Quadratic Funding", "Streaming Quadratic Funding", "Retro Funding", "Conviction Voting", "Self-Curated Registries", "Gift Circles", "Social Media-Based Capital Allocation", "Futarchy", "Assurance Contracts", "Cookie Jar", "Impact Attestations", "Stokvel", "Request for Proposal", "Delegated Domain Allocation", "Evolutionary Grants Games", "Direct to Contract Incentives", "Angel Investment", "Dominant Assurance Contracts", "Community Currencies", "Universal Basic Income", "Bounties", "Gnosis Safe", "Waqf", "Ranked Choice Voting", "Honour", "Mutual Aid Networks", "Bonding Curves", "Zakat", "Decentralized Validators", "Revnets"], "description": "One of DAOIP-5's funding mechanisms (copied; a test keeps this list equal to lib/standards/daoip5.mjs MECHANISMS)."}, "description": {"type": "string"}, "is_open": {"type": "boolean"}, "close_date": {"type": "string", "format": "date-time"}, "size": {"type": "array", "items": {"type": "object", "required": ["amount", "denomination"], "additionalProperties": false, "properties": {"amount": {"type": ["number", "string"]}, "denomination": {"type": "string"}}}}, "usd": {"type": "object", "required": ["amount", "as_of"], "additionalProperties": false, "properties": {"amount": {"type": "number", "minimum": 0}, "as_of": {"type": "string", "format": "date-time"}}}, "email": {"type": "string"}, "image": {"type": "string"}}}]},
+    "branch": { "x-kinds": ["repo"], "title": "Branch", "type": ["string", "null"], "description": "A repo System: the branch read (absent: the repository's default)." },
+    "files": { "x-kinds": ["repo"], "title": "Files", "type": ["array", "null"], "minItems": 1, "maxItems": 20, "items": { "type": "string", "pattern": "^(?!/)(?!.*(^|/)\\.{1,2}(/|$))(?!.*//)[^\\s]+$" }, "description": "A repo System: the published files read (YAML, JSON, or Markdown front matter), at most 20." },
     "relates": {
       "title": "Relations",
       "description": "Relations the map draws from this system that the chain does not give.",
       "type": ["array", "null"],
-      "$comment": "Relations the DAO map draws from this System that the chain does not give (L4c E-38). `to` is a System id in this file, a system:<id>, or a hat ref; `label` the relation in plain words.",
+      "$comment": "Relations the DAO map draws from this System that the chain does not give (L4c E-38). `to` is a System id in this file, a system:<id>, a hat ref, or a composed hat as <tree id>/<hat key> (DAO-OS L7, Q58); `label` the relation in plain words.",
       "items": {
         "title": "Relation", "type": "object", "additionalProperties": false, "required": ["to", "label"],
         "properties": {
@@ -65,6 +68,82 @@
       "propertyNames": { "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}:0x[0-9a-fA-F]{64}$" },
       "additionalProperties": { "enum": ["decides", "acts"] }
     },
+    "deployment": {
+      "x-kinds": [],
+      "title": "Deployment",
+      "description": "For a System composed here: whether it is on chain yet, and what its deployment needs.",
+      "type": ["object", "null"],
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["composed", "deployed"], "description": "composed: planned, not on chain (never read, never published); deployed: read back from the chain." },
+        "owners": { "type": "array", "items": { "type": "string" }, "description": "A Safe: its owners. The library's add writes them as CAIP-10 accounts; a bare 0x address written by hand is read on the composition's chain." },
+        "threshold": { "type": "integer", "minimum": 1 },
+        "salt": { "type": "string", "description": "saltNonce, decimal text." },
+        "top": {
+          "type": "object",
+          "description": "A Hats tree: { details, image, worn_by, hat? }.",
+          "properties": {
+            "details": { "type": "string" },
+            "image": { "type": "string" },
+            "worn_by": { "type": "string", "description": "The composed Safe that wears the top hat." },
+            "hat": { "type": ["string", "null"], "pattern": "^eip155:[0-9]+:0x[0-9a-fA-F]{64}$", "description": "The top hat's ref (lib/hats.mjs hatRef), recorded by the read-back once the top hat is minted; the tree stays composed." }
+          }
+        },
+        "network": { "type": "string", "description": "A Snapshot space: the CAIP-2 chain it votes on." },
+        "settings": { "type": "object" },
+        "on_deploy": {
+          "type": "object",
+          "properties": { "roles": { "type": "object" }, "rules": { "type": "array" } }
+        },
+        "read_back": { "type": ["string", "null"], "description": "ISO date of the read-back." }
+      }
+    },
+    "hats": {
+      "x-kinds": ["hats-tree"],
+      "title": "Hats",
+      "description": "For a Hats tree composed here: its hats, each with its wearers.",
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "required": ["key"],
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "details": { "type": "string" },
+          "admin": { "type": "string", "description": "top, or another hat's key in this tree." },
+          "max_supply": { "type": "integer", "minimum": 1 },
+          "mutable": { "type": "boolean" },
+          "wearers": { "type": "array", "items": { "type": "string" } },
+          "role": { "enum": ["decides", "acts"] },
+          "image": { "type": "string" },
+          "hat": { "type": ["string", "null"], "description": "The hat ref, filled at read-back." }
+        }
+      }
+    },
+    "signer_gate": {
+      "x-kinds": ["safe"],
+      "title": "Signer gate",
+      "description": "For a Safe composed here: the hats whose wearers sign, and how many must.",
+      "type": ["object", "null"],
+      "properties": {
+        "hats": { "type": "array", "items": { "type": "string" }, "description": "<tree id>/<hat key>." },
+        "threshold": {
+          "type": "object",
+          "properties": { "type": { "enum": ["absolute", "proportional"] }, "min": { "type": "integer", "minimum": 0 }, "target": { "type": "integer", "minimum": 0 } }
+        },
+        "claimable_for": { "type": "boolean" },
+        "address": { "type": ["string", "null"] }
+      }
+    },
+    "role": { "x-kinds": [], "title": "Role", "description": "Where the System sits on the map: deciding or acting.", "enum": ["decides", "acts", null] },
+    "position": {
+      "x-kinds": [],
+      "title": "Position",
+      "description": "Where the System is drawn on the compose canvas.",
+      "type": ["object", "null"],
+      "required": ["x", "y"],
+      "properties": { "x": { "type": "number", "minimum": 0 }, "y": { "type": "number", "minimum": 0 } }
+    },
+    "order": { "x-kinds": [], "title": "Order", "description": "Its place in the order of deployment.", "type": ["integer", "null"], "minimum": 0 },
     "notes": { "title": "Notes", "description": "Anything worth keeping in mind.", "x-format": "textarea", "type": ["string", "null"] }
   },
   "allOf": [
@@ -75,9 +154,13 @@
     {
       "if": {
         "properties": {
-          "kind": { "enum": ["safe", "gardens-community", "gardens-pool", "hats-tree", "daouri-registration"] }
+          "kind": { "enum": ["safe", "gardens-community", "gardens-pool", "hats-tree"] }
         },
-        "required": ["kind"]
+        "required": ["kind"],
+        "not": {
+          "properties": { "deployment": { "type": "object", "properties": { "status": { "const": "composed" } }, "required": ["status"] } },
+          "required": ["deployment"]
+        }
       },
       "then": {
         "required": ["chain", "address"],
@@ -86,6 +169,31 @@
           "address": { "type": "string" }
         }
       }
+    },
+    {
+      "$comment": "A daoURI registration (L8) at an address, or by the ENS text record daouri of `ens` (L7-D13): either names it.",
+      "if": {
+        "properties": { "kind": { "const": "daouri-registration" } },
+        "required": ["kind"],
+        "not": {
+          "properties": { "deployment": { "type": "object", "properties": { "status": { "const": "composed" } }, "required": ["status"] } },
+          "required": ["deployment"]
+        }
+      },
+      "then": {
+        "required": ["chain"],
+        "properties": {
+          "chain": { "type": "string" },
+          "address": { "type": "string" },
+          "ens": { "type": "string" }
+        },
+        "anyOf": [{ "required": ["address"] }, { "required": ["ens"] }]
+      }
+    },
+    {
+      "$comment": "A daoURI registration names an address or an ENS name, never both (fix M-4), composed or deployed.",
+      "if": { "properties": { "kind": { "const": "daouri-registration" } }, "required": ["kind"] },
+      "then": { "not": { "properties": { "address": { "type": "string" }, "ens": { "type": "string" } }, "required": ["address", "ens"] } }
     },
     {
       "if": {
@@ -125,6 +233,13 @@
         "properties": {
           "url": { "type": "string" }
         }
+      }
+    }
+    ,{
+      "if": { "properties": { "kind": { "const": "repo" } }, "required": ["kind"] },
+      "then": {
+        "if": { "required": ["driver"], "properties": { "driver": { "const": "repo" } } },
+        "then": { "required": ["files"], "properties": { "url": { "pattern": "^https://github\\.com/(?!\\.{1,2}/)[A-Za-z0-9_.-]+/(?!\\.{1,2}/?$)(?![A-Za-z0-9_.-]*\\.git/?$)[A-Za-z0-9_.-]+/?$" }, "files": { "type": "array", "minItems": 1, "maxItems": 20 } } }
       }
     }
   ],

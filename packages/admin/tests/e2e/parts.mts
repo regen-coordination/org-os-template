@@ -40,9 +40,9 @@ const READY: Record<string, Job['ready']> = {
   blocks: p => p.locator('.react-flow__edge').first().waitFor({ state: 'attached' }),
   // attached, not visible: the map's first edge may run level, a box of no height, which is never "visible"
   map: p => p.locator('.react-flow__edge').first().waitFor({ state: 'attached' }),
-  door: p => p.locator('.door-plate .react-flow__edge').first().waitFor({ state: 'attached' }),
+  portal: p => p.locator('.portal-plate .react-flow__edge').first().waitFor({ state: 'attached' }),
 }
-const FULL = new Set(['frame', 'door'])
+const FULL = new Set(['frame', 'portal'])
 const ids = group !== null ? [group] : GROUPS.filter(g => g.drawn).map(g => g.id)
 const jobs: Job[] = ids.map(id => ({ name: id, path: `/parts/${id}`, ready: READY[id], full: FULL.has(id) }))
 

@@ -1,0 +1,78 @@
+# The DAO template in miniature (DAO-OS L7 spec §4.1, §5.1): one composed Safe that carries the governance for after
+# deployment, one composed Hats tree with one hat, and a board that names them. Invented names only.
+id: template:test-council
+shelf: template
+title: Test council
+summary: A Safe, a council hat that signs for it, and a board for both, composed and not deployed.
+version: 1.0.0
+source: test-shelf
+standing: stated
+as_of: 2026-10-30
+tags:
+  maturity: field-informed
+config:
+  properties:
+    id: { type: string, default: test-dao, description: The id the records are named from (<id>-safe, <id>-roles, <id>-council). }
+    name: { type: string, default: Test DAO, description: What the organization is called. }
+    chainId: { type: string, default: "eip155:11155111", description: The chain it is composed for (CAIP-2). }
+    owners: { type: array, items: { type: string }, minItems: 1, description: The signers, one CAIP-10 address each. }
+    threshold: { type: integer, minimum: 1, description: How many signers must sign. }
+    council: { type: string, default: Council, description: What the council hat is called. }
+  required: [owners, threshold]
+installs:
+  - op: create
+    record: "systems:${config.id}-safe"
+    value:
+      id: "${config.id}-safe"
+      kind: safe
+      driver: safe
+      name: "${config.name} Safe"
+      chain: "${config.chainId}"
+      section: organization/treasury
+      position: { x: 360, y: 220 }
+      order: 1
+      deployment:
+        status: composed
+        owners: "${config.owners}"
+        threshold: "${config.threshold}"
+        salt: "1"
+        on_deploy:
+          roles: { council: { hat: "${hat.${config.id}-roles/council}" } }
+          rules: [{ id: treasury, applies_to: [treasury], propose: council, decide: { by: system, system: "${config.id}-safe" } }]
+      signer_gate:
+        hats: ["${config.id}-roles/council"]
+        threshold: { type: absolute, min: "${config.threshold}", target: "${config.threshold}" }
+        claimable_for: true
+        address: null
+  - op: create
+    record: "systems:${config.id}-roles"
+    value:
+      id: "${config.id}-roles"
+      kind: hats-tree
+      driver: hats-tree
+      name: "${config.name} roles"
+      chain: "${config.chainId}"
+      position: { x: 360, y: 60 }
+      order: 2
+      deployment:
+        status: composed
+        top: { details: "${config.name}", image: "", worn_by: "${config.id}-safe" }
+      hats:
+        - key: council
+          details: "${config.council}"
+          admin: top
+          max_supply: 5
+          mutable: true
+          wearers: "${config.owners}"
+          role: decides
+          hat: null
+  - op: create
+    record: "boards:${config.id}-council"
+    value:
+      id: "${config.id}-council"
+      name: "${config.name} council"
+      audience: members
+      layout: flow
+      blocks:
+        - { id: safe, type: system, title: The Safe, source: { system: "${config.id}-safe" } }
+        - { id: roles, type: system, title: The roles, source: { system: "${config.id}-roles" } }

@@ -1,0 +1,10 @@
+{
+  "fetched_at": "2026-10-29T10:00:00Z",
+  "source": "local",
+  "peers": [
+    { "id": "Valley Commons", "name": "Valley Commons", "repo": null, "url": null, "type": "Commons" },
+    { "id": "Example DAO Commons", "name": "Example DAO Commons", "repo": null, "url": null, "type": "Hub" }
+  ],
+  "last_attempt_at": "2026-10-29T10:00:00Z",
+  "last_error": null
+}

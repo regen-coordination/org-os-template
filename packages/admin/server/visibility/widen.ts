@@ -7,6 +7,7 @@
 
 import { Refusal } from '../changes/apply.ts'
 import { beforeOf } from '../changes/stage.ts'
+import { recordDeltasOf } from '../workspace/files.ts'
 import type { StageOp } from '../changes/types.ts'
 import { walletsWidened } from '../../lib/change-classes.mjs'
 import { walletsOf } from '../../lib/hat-readings.mjs'
@@ -18,8 +19,10 @@ export { OWN_LINK }
  *  neither the member whose record it is nor the address itself. */
 export function refuseOthersLink(repo: string, ops: readonly StageOp[], actor: string): void {
   const self = walletsOf({ handles: { wallet: actor } })[0] ?? null
-  for (const op of ops) {
-    const widened = walletsWidened(op, beforeOf(repo, op))
+  // A file op on data/members.yaml (L6 §11.2) is judged as the record ops it amounts to, each against the entry it replaces.
+  const judged = ops.flatMap(op => (op.op === 'file' ? recordDeltasOf(repo, op) : [{ op, before: beforeOf(repo, op) }]))
+  for (const { op, before } of judged) {
+    const widened = walletsWidened(op, before)
     if (!widened) continue
     if (actor === widened.member || (self !== null && widened.added.every(a => a === self))) continue
     throw new Refusal(403, { code: 'OWN_LINK', error: OWN_LINK })

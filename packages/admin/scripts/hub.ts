@@ -56,7 +56,6 @@ async function check(repo: string, io: HubIo): Promise<HostedConfig | null> {
   const read = readHostedConfig(io.env, repo)
   if ('refuse' in read) { fail(read.refuse); return null }
   const config = read.config
-  for (const w of read.warnings) io.err(`Configuration: ${w}`)
   pass('Configuration: the members\' address and every setting read as they should.')
 
   if (!existsSync(resolve(repo, 'data')) || !existsSync(resolve(repo, 'federation.yaml'))) {

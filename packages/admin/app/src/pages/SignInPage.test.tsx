@@ -73,14 +73,24 @@ describe('the sign-in page (L5 spec §11.1)', () => {
       await waitFor(() => expect(loc.history.at(-1)).toBe(lands))
     })
 
-  it('a not-member: the sentence, and Read the public door going to /door', async () => {
-    routes({ 'POST /api/session': { signedIn: false, notMember: true } })
+  // D-5: Read the portal goes to the portal's origin (GET /api/session's `portal`), and only when the Hub has one.
+  it('a not-member, the Hub with a portal origin: the sentence, and Read the portal going there', async () => {
+    routes({ 'GET /api/session': { ...OUT, portal: 'https://portal.example.test' }, 'POST /api/session': { signedIn: false, notMember: true } })
     wallet()
     renderAt(<SignInPage />, '/sign-in')
     fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Ethereum' }))
-    const door = await screen.findByRole('link', { name: 'Read the public door' })
-    expect(door.getAttribute('href')).toBe('/door')
-    expect(within(card()).getByText('This address wears no hat in Fixture Org’s tree. You can still read the public door.')).toBeTruthy()
+    const portal = await screen.findByRole('link', { name: 'Read the portal' })
+    expect(portal.getAttribute('href')).toBe('https://portal.example.test')
+    expect(within(card()).getByText('This address wears no hat in Fixture Org’s tree. You can still read the portal.')).toBeTruthy()
+  })
+
+  it('a not-member, the Hub with no portal origin: the sentence alone, no link', async () => {
+    routes({ 'GET /api/session': { ...OUT, portal: null }, 'POST /api/session': { signedIn: false, notMember: true } })
+    wallet()
+    renderAt(<SignInPage />, '/sign-in')
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Ethereum' }))
+    expect(await within(card()).findByText('This address wears no hat in Fixture Org’s tree.')).toBeTruthy()
+    expect(within(card()).queryAllByRole('link')).toEqual([])
   })
 
   it('a 401 from the session post: the server’s sentence, and Try again, which signs again', async () => {
@@ -100,6 +110,52 @@ describe('the sign-in page (L5 spec §11.1)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Ethereum' }))
     expect(await within(card()).findByText(NO_WALLET)).toBeTruthy()
     expect(within(card()).getByRole('button', { name: 'Try again' })).toBeTruthy()
+  })
+})
+
+// R4a (the hosted walk): the emailed-link sign-in (0.6.1, Lane 3 Task 10) is asked for on this page. GET /api/session's
+// `methods` says what is offered: with `email`, SignIn's email form; with `wallet` too, the wallet beside it.
+describe('the emailed-link sign-in on /sign-in', () => {
+  const SENT = "If this address is on Fixture Org's records, a link is on its way."
+  const EMAIL_OUT = { mode: 'hosted', signIn: null, signedIn: false, methods: ['email'], instanceWrites: 'off' } as unknown as SessionView
+  const both = { ...EMAIL_OUT, signIn: OUT.signedIn ? null : OUT.signIn, methods: ['email', 'wallet'] } as unknown as SessionView
+  const group = () => screen.getByRole('group', { name: 'Sign in' })
+
+  it('a Hub offering email draws the email form; a link is asked for with where to return, and the server’s sentence is said', async () => {
+    const { calls } = routes({ 'GET /api/session': EMAIL_OUT, 'POST /api/session/email': { sent: true, sentence: SENT } })
+    renderAt(<SignInPage />, '/sign-in?next=%2Fworkspace')
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'steward@example.org' } })
+    expect(within(group()).queryByRole('button', { name: /wallet|Ethereum/ })).toBeNull()
+    fireEvent.click(within(group()).getByRole('button', { name: 'Email me a link' }))
+    expect(await within(group()).findByText(SENT)).toBeTruthy()
+    expect(calls.filter(c => c.method === 'POST').map(c => [c.path, c.body])).toEqual([['/api/session/email', { email: 'steward@example.org', return: '/workspace' }]])
+  })
+
+  it('a Hub offering email and a wallet draws both; the wallet still signs in', async () => {
+    const { calls } = routes({ 'GET /api/session': both })
+    wallet()
+    renderAt(<SignInPage />, '/sign-in')
+    await screen.findByLabelText('Email')
+    fireEvent.click(within(group()).getByRole('button', { name: 'Sign in with a wallet' }))
+    await waitFor(() => expect(calls.filter(c => c.method === 'POST').map(c => c.path)).toContain('/api/session/nonce'))
+  })
+
+  it('a local Hub keeps the wallet alone, whatever the methods say (its email links go to the log: PR7-R68)', async () => {
+    routes({ 'GET /api/session': { ...both, mode: 'local' } as SessionView })
+    renderAt(<SignInPage />, '/sign-in')
+    // the session read (the tree it names is drawn), then: no email form
+    await waitFor(() => expect(card().querySelector('.signin-p')!.textContent).toContain('Your role is the hat you wear in tree #13.'))
+    expect(screen.getByRole('button', { name: 'Sign in with Ethereum' })).toBeTruthy()
+    expect(screen.queryByLabelText('Email')).toBeNull()
+    expect(screen.getAllByRole('heading', { level: 1 }).map(h => h.textContent)).toEqual(['Sign in with your wallet'])
+  })
+
+  it('a refused ask says the server’s sentence under the form', async () => {
+    routes({ 'GET /api/session': EMAIL_OUT, 'POST /api/session/email': refuse(400, { error: 'Send { email }: the address to send the sign-in link to.' }) })
+    renderAt(<SignInPage />, '/sign-in')
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'not-an-address@x' } })
+    fireEvent.click(within(group()).getByRole('button', { name: 'Email me a link' }))
+    expect(await within(group()).findByText('Send { email }: the address to send the sign-in link to.')).toBeTruthy()
   })
 })
 

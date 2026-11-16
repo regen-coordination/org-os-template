@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, resolve, sep } from 'node:path'
 import { simpleGit, type SimpleGit, type SimpleGitOptions } from 'simple-git'
 import { withTrailers, parseTrailers, type TrailerValues } from '../lib/trailers.mjs'
@@ -40,6 +40,7 @@ const ALLOWED: Record<string, readonly string[]> = {
   'ls-files': ['-v', '--error-unmatch'],
   'merge-base': ['--is-ancestor'],
   merge: ['--no-ff', '--no-commit', '--ff-only', '--abort', '--no-autostash'],
+  'merge-file': ['-p'],
   'merge-tree': ['--write-tree', '--name-only'],
   push: [],
   'rev-list': ['--first-parent', '--reverse', '--count'],
@@ -56,7 +57,7 @@ const CLIENT_METHODS = ['add', 'commit', 'status', 'revparse', 'getConfig', 'raw
 /** Who a commit is authored and committed by, when it is not git's own configured identity (L5 spec §6.4). */
 export interface GitIdent { name: string; email: string }
 /** How a commit is made. `ident`: authored and committed by it (HOUSE_IDENT for a signed-in actor, `commitIdent`);
- *  absent, by git's configured identity, as 0.6. `allowEmpty`: `commitDataPaths` with no paths makes an empty commit (the
+ *  absent, by git's configured identity, as 0.6. `allowEmpty`: `commitPaths` with no paths makes an empty commit (the
  *  record of a change to private data, L5 spec §10.3) instead of refusing. One options object for every commit helper
  *  (controller ruling P11). */
 export interface CommitOptions { ident?: GitIdent; allowEmpty?: boolean }
@@ -130,6 +131,12 @@ function checkArgv(argv: readonly string[]): void {
       refuse('merge-tree takes --write-tree [--name-only] <a> <b>, nothing else.')
     }
   }
+  if (sub === 'merge-file') {
+    // DAO-OS L6 §6: the result to stdout (-p), never written over the first file; three files, none read as a flag.
+    if (args.length !== 4 || args[0] !== '-p' || args.slice(1).some(a => a.startsWith('-') || a.startsWith('+'))) {
+      refuse('merge-file takes -p <mine> <base> <theirs>, nothing else.')
+    }
+  }
   if (sub === 'fetch') {
     const [remote] = args
     if (args.length !== 1 || !REMOTE_NAME.test(remote!)) refuse('fetch takes the name of one remote (not a URL, not a refspec).')
@@ -177,9 +184,9 @@ export class GitExit extends Error {
 export interface CommitEvent { repo: string; commit: string }
 const commitListeners = new Set<(e: CommitEvent) => void>()
 
-/** Hears every commit `commitDataPaths` and `commitMerge` make once it has landed, the build commits among them (a build
- *  commits through `commitDataPaths` in its worktree, so its `repo` is that worktree). The Pusher and the PortalPublisher
- *  listen. Answers the unsubscribe. A listener that throws is not the commit's failure, and the others still hear it. */
+/** Hears every commit `commitPaths` (`commitDataPaths`) and `commitMerge` make once it has landed, the build commits
+ *  among them (a build commits through `commitPaths` in its worktree, so its `repo` is that worktree). The Pusher and the
+ *  PortalPublisher listen. Answers the unsubscribe. A listener that throws is not the commit's failure, and the others still hear it. */
 export function onCommit(listener: (e: CommitEvent) => void): () => void {
   commitListeners.add(listener)
   return () => { commitListeners.delete(listener) }
@@ -230,17 +237,44 @@ export const __internal = { run, checkArgv, ALLOWED, CLIENT_METHODS }
 const lines = (text: string): string[] => text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l !== '')
 const firstLine = (text: string): string => text.trim().split('\n')[0] ?? ''
 
-function assertInsideData(repo: string, path: string): void {
-  const dataRoot = resolve(repo, 'data') + sep
-  if (!resolve(repo, path).startsWith(dataRoot)) {
-    throw new Error(`guardrail: refusing to commit path outside data/: ${path}`)
-  }
+// ── where the server may write (DAO-OS L6 §11.3) ──────────────────────────────────────────────
+
+/** The files the server may write: the records, the pages, the identity files and the agent layer. `<dir>/` is
+ *  everything under it. DECISIONS.md is ratify's alone (`{ ratify: true }`). */
+const WRITABLE_FILES = ['IDENTITY.md', 'federation.yaml', 'MEMORY.md', 'HEARTBEAT.md']
+const WRITABLE_DIRS = ['data/', 'pages/', 'memory/', 'docs/plans/', 'docs/agent-plans/']
+/** Never written, whatever a list says: git's own, the platform's private state, and what is generated from the records. */
+const NEVER: readonly [string, string][] = [
+  ['.git/', "it is git's own"],
+  ['.org-os/', "it is the platform's private state"],
+  ['.well-known/', 'it is generated from the records (npm run generate:schemas)'],
+]
+
+/**
+ * Throws, before any git runs, unless the server may write `path` (DAO-OS L6 §11.3): a plain path relative to the
+ * repository (no `.` or `..` segment, nothing absolute, nothing git could read as a flag) under `data/`, `pages/`,
+ * `memory/`, `docs/plans/` or `docs/agent-plans/`, or exactly `IDENTITY.md`, `federation.yaml`, `MEMORY.md` or
+ * `HEARTBEAT.md`; `DECISIONS.md` only with `ratify`. Never `.git/`, `.org-os/` or `.well-known/`. A path git ignores is
+ * `commitPaths`' to refuse: it takes git to know.
+ */
+export function assertWritablePath(repo: string, path: string, opts: { ratify?: boolean } = {}): void {
+  const refuse = (why: string): never => { throw new Error(`guardrail: refusing to write ${path}: ${why}.`) }
+  if (typeof path !== 'string' || path === '') refuse('there is no path')
+  if (isAbsolute(path) || path.startsWith('/')) refuse('it is an absolute path, and the server writes only inside the repository')
+  if (path.startsWith('-') || path.startsWith('+')) refuse('git could read it as a flag')
+  const segs = path.split('/')
+  if (path.includes('\\') || segs.some(seg => seg === '' || seg === '.' || seg === '..')) refuse('it is not a plain path (no ".", "..", empty segment or backslash)')
+  if (!resolve(repo, path).startsWith(resolve(repo) + sep)) refuse('it is outside the repository')
+  for (const [dir, why] of NEVER) if (path.startsWith(dir)) refuse(why)
+  if (path === 'DECISIONS.md') { if (opts.ratify) return; refuse('it is written by ratify only') }
+  if (WRITABLE_FILES.includes(path) || WRITABLE_DIRS.some(dir => path.startsWith(dir) && path.length > dir.length)) return
+  refuse('it is not a file the server writes (data/, pages/, IDENTITY.md, federation.yaml and the agent layer)')
 }
 
 /** Which of `paths` differ from the last commit, staged or not. A save commits
  *  the whole file, so edits already sitting in it would be committed with it. */
 export async function uncommittedDataPaths(repo: string, paths: string[]): Promise<string[]> {
-  for (const p of paths) assertInsideData(repo, p)
+  for (const p of paths) assertWritablePath(repo, p)
   const status = await simpleGit(repo).status(['--', ...paths])
   return status.files.map(f => f.path)
 }
@@ -252,7 +286,7 @@ export interface HiddenPath { path: string; flag: 'assume-unchanged' | 'skip-wor
  *  clean whatever it holds, so `uncommittedDataPaths` cannot speak for it.
  *  `git ls-files -v` marks the first with a lower-case letter, the second with S. */
 export async function hiddenDataPaths(repo: string, paths: string[]): Promise<HiddenPath[]> {
-  for (const p of paths) assertInsideData(repo, p)
+  for (const p of paths) assertWritablePath(repo, p)
   return hiddenOf(repo, paths)
 }
 
@@ -286,21 +320,24 @@ function writer(repo: string, ident?: GitIdent): SimpleGit {
   }, ident)
 }
 
-/** Commit `paths` (inside data/ only) with `message` and, after a blank line, the
- *  Org-* trailers (lib/trailers.mjs); authored and committed by `opts.ident` when given. Answers the new commit's full
- *  sha. Throws only when no commit was made: once it has landed, a failure to read its sha, or git exiting non-zero
- *  after the ref update, is not a failure of the commit. */
-export async function commitDataPaths(repo: string, paths: string[], message: string, trailers?: TrailerValues, opts: CommitOptions = {}): Promise<string> {
-  return committed(repo, await commitPaths(repo, paths, message, trailers, opts))
+/** Commit `paths` (each one the server may write, `assertWritablePath`, and none that git ignores) with `message` and,
+ *  after a blank line, the Org-* trailers (lib/trailers.mjs); authored and committed by `opts.ident` when given. Answers
+ *  the new commit's full sha. Throws only when no commit was made: once it has landed, a failure to read its sha, or git
+ *  exiting non-zero after the ref update, is not a failure of the commit. Once landed, every `onCommit` listener hears it. */
+export async function commitPaths(repo: string, paths: string[], message: string, trailers?: TrailerValues, opts: CommitOptions = {}): Promise<string> {
+  return committed(repo, await commitPathsBefore(repo, paths, message, trailers, opts))
 }
 
-/** `commitDataPaths` before the event. */
-async function commitPaths(repo: string, paths: string[], message: string, trailers: TrailerValues | undefined, opts: CommitOptions): Promise<string> {
+/** `commitPaths` before the event. */
+async function commitPathsBefore(repo: string, paths: string[], message: string, trailers: TrailerValues | undefined, opts: CommitOptions): Promise<string> {
   if (paths.length === 0) {
     if (!opts.allowEmpty) throw new Error('no paths to commit')
     return commitEmpty(repo, message, trailers, opts.ident)
   }
-  for (const p of paths) assertInsideData(repo, p)
+  for (const p of paths) assertWritablePath(repo, p)
+  for (const p of paths) {
+    if (await isIgnored(repo, p)) throw new Error(`guardrail: refusing to write ${p}: git ignores it, and a commit never carries what git was told to leave out.`)
+  }
   await writer(repo).add(paths)
   const full = withTrailers(message, trailers ?? {})
   const before = await headSha(repo)
@@ -318,6 +355,9 @@ async function commitPaths(repo: string, paths: string[], message: string, trail
   // back, over a change git already holds.
   return landedSha(repo, made.commit)
 }
+
+/** 0.6's name for `commitPaths`, kept for the callers that write records only. */
+export const commitDataPaths = commitPaths
 
 /** An empty commit: HEAD's tree again, with `message` and the trailers. Refused, before git runs, while anything is
  *  staged: git would carry it into this commit. */
@@ -372,7 +412,7 @@ async function landedSha(repo: string, short: string): Promise<string> {
  *  A save starts only when the file has no uncommitted edits, so the file put
  *  back is the committed one and this leaves the index as the save found it. */
 export async function restageDataPaths(repo: string, paths: string[]): Promise<void> {
-  for (const p of paths) assertInsideData(repo, p)
+  for (const p of paths) assertWritablePath(repo, p)
   await writer(repo).add(paths)
 }
 
@@ -396,6 +436,16 @@ export async function gitVersion(): Promise<GitVersion> {
 export async function showFile(repo: string, rev: string, path: string): Promise<string> {
   try { return await run('show', [`${rev}:${path}`], repo) } catch (err) {
     if (err instanceof GitExit) throw new Error(`${path} is not in ${rev} (${firstLine(err.message)}).`)
+    throw err
+  }
+}
+
+/** A blob's text by its id (`git show <blob>`): what a file op was staged against (DAO-OS L6 Task 20 review I1, Keep mine's
+ *  three-way merge). Null when git does not hold it. */
+export async function blobText(repo: string, id: string): Promise<string | null> {
+  if (!/^[0-9a-f]{40,64}$/.test(id)) return null
+  try { return await run('show', [id], repo) } catch (err) {
+    if (err instanceof GitExit) return null
     throw err
   }
 }
@@ -556,6 +606,31 @@ export async function mergeTree(repo: string, a: string, b: string): Promise<Mer
   return { tree, conflicts }
 }
 
+/** One temporary name per merge in this process: three files in the state directory, removed when the merge is read. */
+let mergeSeq = 0
+
+/**
+ * A three-way merge of texts (DAO-OS L6 §6: an editing session's draft over a newer version): `git merge-file -p <mine>
+ * <base> <theirs>`, the three written to files of their own in the admin state directory (outside the repository) and
+ * removed after. Clean: the merged text, byte for byte. Not clean (git counts the conflicts in its exit status): `{ clean:
+ * false }`, and the text with conflict markers is not kept. A failure of git itself (exit 255) throws.
+ */
+export async function mergeThree(repo: string, base: string, theirs: string, mine: string): Promise<{ clean: true; text: string } | { clean: false }> {
+  const dir = join(stateDir(repo), 'merge')
+  mkdirSync(dir, { recursive: true })
+  const stem = join(dir, `${process.pid}-${Date.now()}-${++mergeSeq}`)
+  const files = { mine: `${stem}-mine`, base: `${stem}-base`, theirs: `${stem}-theirs` }
+  try {
+    writeFileSync(files.mine, mine); writeFileSync(files.base, base); writeFileSync(files.theirs, theirs)
+    try { return { clean: true, text: await run('merge-file', ['-p', files.mine, files.base, files.theirs], repo) } } catch (err) {
+      if (err instanceof GitExit && err.code > 0 && err.code < 128) return { clean: false }
+      throw err
+    }
+  } finally {
+    for (const f of Object.values(files)) rmSync(f, { force: true })
+  }
+}
+
 /** `git fetch <remote>`: the one network read. Called by the `fetch` operation's job and by a read-only Hub's refresh
  *  (`hosted/refresh.ts`, which ends a fetch that says nothing for `blockMs`). The remote is `origin`, the one
  *  `lastFetch` reads and Share pushes to, and it must be configured (`remote.origin.url`): git reads a bare word that names
@@ -616,17 +691,14 @@ async function commitPendingMerge(repo: string, message: string, allowedPaths: s
   return (await headSha(repo)) ?? ''
 }
 
-/** A path ratify's merge may stage or ask about: exactly `DECISIONS.md` at the root, or a plain path under `data/`
- *  (no `.` or `..` segment, nothing absolute, nothing that git could read as a flag). Throws before any git runs. */
+/** A path ratify's merge may stage or ask about: one the server may write (`assertWritablePath`), `DECISIONS.md` included
+ *  (DAO-OS L6 §11.3: `stageMergeFiles` uses the same list). Throws before any git runs. */
 function assertMergePath(repo: string, path: string): void {
-  const plain = path === 'DECISIONS.md'
-    || (path.startsWith('data/') && path.split('/').every(seg => seg !== '' && seg !== '.' && seg !== '..')
-      && resolve(repo, path).startsWith(resolve(repo, 'data') + sep))
-  if (!plain) throw new Error(`guardrail: refusing ${path}: a merge stages only DECISIONS.md and files under data/.`)
+  assertWritablePath(repo, path, { ratify: true })
 }
 
 /** `git add` of `paths` into the pending merge (ratify, spec §3.8 step 6). Refuses, before git runs, a path that is
- *  not in `allowedPaths` or is neither `DECISIONS.md` nor under `data/`; then refuses unless a merge is pending (the
+ *  not in `allowedPaths` or is not one the server may write (`assertMergePath`); then refuses unless a merge is pending (the
  *  `MERGE_HEAD` file). `DECISIONS.md` is staged by nothing else. */
 export async function stageMergeFiles(repo: string, paths: string[], allowedPaths: string[]): Promise<void> {
   if (paths.length === 0) throw new Error('no paths to stage')
@@ -638,7 +710,7 @@ export async function stageMergeFiles(repo: string, paths: string[], allowedPath
   await writer(repo).add(paths)
 }
 
-/** `hiddenDataPaths` for ratify's three files: the same reading, with `DECISIONS.md` allowed beside `data/`. */
+/** `hiddenDataPaths` for ratify's files: the same reading, with `DECISIONS.md` allowed beside the rest of the list. */
 export async function hiddenMergePaths(repo: string, paths: string[]): Promise<HiddenPath[]> {
   for (const p of paths) assertMergePath(repo, p)
   return hiddenOf(repo, paths)

@@ -1,0 +1,82 @@
+/* kms house CSS — a knowledge page (spec §5.5, §5.6, §7, §8; L4 §8.6, §9.3, §10.1 read-only; gallery §05–06). The frame
+   is frame.css's; this is the body: meta line, the title (the only Fraunces on the page — K-16), the lead, one callout,
+   the body fields (H2 Sans 600 20, prose 16/1.65 at --w-prose), the related block, the foot, and the aside beside the
+   article ≥900px, after it below. Tokens only; raw values only where L4 has no token (type sizes 20 and the 1.2–1.35
+   line heights of headings and pills). */
+
+.content.kpage { max-width: none; }
+.kp-grid { display: grid; grid-template-columns: minmax(0, 1fr) var(--w-aside); gap: var(--sp-14); align-items: start; min-width: 0; }
+.kp-body { max-width: var(--w-prose); min-width: 0; }
+
+/* the meta line: eyebrow "<Kind> · <page type>", visibility, the peer it came from, updated, backlinks */
+.kp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-10); margin-bottom: var(--sp-8);
+  font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+.kp-meta .eyebrow { color: var(--mute); }
+.kp-meta .ext { gap: var(--sp-3); }
+.kp-meta .ext a { color: var(--mute); text-decoration: underline; text-underline-offset: var(--sp-3); text-decoration-thickness: from-font; text-decoration-color: var(--edge); }
+
+/* the title: Fraunces 32 — the one Fraunces element on a knowledge page */
+.ed-title { margin: 0 0 var(--sp-10); font: var(--fw-regular) var(--fs-page)/var(--lh-greet) var(--display); font-variation-settings: "SOFT" var(--soft);
+  letter-spacing: -.02em; color: var(--ink); text-wrap: balance; overflow-wrap: break-word; }
+
+/* the description, whole, as the lead: 17/1.65 mute */
+.lead { margin: 0 0 var(--sp-12); font-size: var(--fs-d-body); line-height: var(--lh-prose); color: var(--mute); text-wrap: pretty; }
+.lead + .lead { margin-top: calc(-1 * var(--sp-6)); }
+
+/* one callout: the caveat, or "Deprecated — superseded by …" (K-25) — --sunken, the info glyph */
+.callout.caveat, .callout.dep { background: var(--sunken); }
+.callout a { text-decoration: underline; text-underline-offset: var(--sp-3); text-decoration-thickness: from-font; text-decoration-color: var(--edge); }
+
+/* the body: prose 16/1.65; each field under its label as an H2 (Sans 600 20) */
+.prose { font-size: var(--fs-sub); line-height: var(--lh-prose); color: var(--ink); text-wrap: pretty; }
+.prose:empty { display: none; }
+.prose p { margin: 0 0 var(--sp-10); }
+.prose ul { margin: 0 0 var(--sp-10); padding-inline-start: 1.25em; }
+.prose li { margin-bottom: var(--sp-4); }
+.prose a { text-decoration: underline; text-underline-offset: var(--sp-3); text-decoration-thickness: from-font; text-decoration-color: var(--edge); }
+.prose h2.fh { margin: var(--sp-13) 0 var(--sp-8); font: var(--fw-strong) 1.25rem/var(--lh-label) var(--sans); letter-spacing: var(--ls-title); color: var(--ink); }
+.prose h2.fh:first-child { margin-top: var(--sp-12); }
+/* the sections after the body: Related, Where this comes from (Sans 600 16) */
+.h-sec { margin: var(--sp-12) 0 var(--sp-6); font: var(--fw-strong) var(--fs-sub)/var(--lh-row) var(--sans); color: var(--ink); }
+
+/* related: the embedded record block (rows.css .embed); a peer's words sit on the line, broken refs in clay (preview) */
+.embed .row .s .ext, .embed .row .s .vis { display: inline-flex; font-size: inherit; line-height: inherit; }
+.embed .row .s .vis svg.i, .embed .row .s .ext svg.i { width: var(--ic-xs); height: var(--ic-xs); }
+.embed-h { flex-wrap: wrap; row-gap: var(--sp-2); }
+.embed-h > span { white-space: nowrap; }
+.embed-h .bad { color: var(--attn); }
+.row.broken .t code { font-size: var(--fs-code); }
+.row.broken .s { color: var(--attn); }
+
+/* a record mention (L4 §7.11): kind glyph + name, a link */
+.mention { display: inline-flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-3); border-radius: var(--radius-xs);
+  background: var(--wash); color: var(--ink); font-weight: var(--fw-medium); white-space: nowrap; }
+.mention svg.i { width: var(--ic-xs); height: var(--ic-xs); color: var(--mute); }
+.prose a.mention { text-decoration: none; }
+@media (hover: hover) { a.mention:hover { background: var(--wash-strong); } }
+.prose #cite { color: var(--mute); font-size: var(--fs-body); line-height: var(--lh-body); }
+
+/* the foot: Published by, the AT URI in Mono, JSON, How to cite */
+.kp-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6) var(--sp-11); margin-top: var(--sp-14); padding-top: var(--sp-10);
+  border-top: var(--rule-w) solid var(--rule); font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); min-width: 0; }
+.kp-foot .uri { min-width: 0; overflow-wrap: anywhere; }
+.kp-foot a { color: var(--mute); text-decoration: underline; text-underline-offset: var(--sp-3); text-decoration-thickness: from-font; text-decoration-color: var(--edge); }
+@media (hover: hover) { .kp-foot a:hover, .kp-meta .ext a:hover, .callout a:hover { color: var(--ink); } }
+
+/* the aside: About this entry, Neighbourhood, Referenced by */
+.kp-aside { display: grid; gap: var(--sp-12); min-width: 0; }
+.kp-aside section { min-width: 0; }
+.kp-aside h2 { margin: 0 0 var(--sp-6); font: var(--fw-strong) var(--fs-ui)/var(--lh-label) var(--sans); color: var(--ink); }
+.kp-aside h2 .faint { font-weight: var(--fw-regular); }
+.kp-aside .fields > dt { padding-bottom: var(--sp-2); }
+.row.compact { min-height: var(--h-ctl-touch); padding-block: var(--sp-6); }
+
+/* under 900px the aside follows the article */
+@media (max-width: 899px) {
+  .kp-grid { grid-template-columns: minmax(0, 1fr); gap: var(--sp-13); }
+}
+/* phones: title 26, lead 16 */
+@media (max-width: 759px) {
+  .kpage .ed-title { font-size: var(--fs-d-fact); }
+  .kpage .lead { font-size: var(--fs-sub); }
+}

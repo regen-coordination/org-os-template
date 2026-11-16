@@ -14,11 +14,12 @@ export function useChanges() {
       error: q.error ? q.error.message : null,
       stage: async (ops: StageOp[]) => put(await api.stage(ops)),
       unstage: async (n: number) => put(await api.unstage(n)),
-      rebase: async (n: number, keep: 'mine' | 'theirs') => put(await api.rebase(n, keep)),
+      // T19 review I3: Keep mine / Take theirs and Apply re-read every file the source editor holds (['file']).
+      rebase: async (n: number, keep: 'mine' | 'theirs') => { put(await api.rebase(n, keep)); void qc.invalidateQueries({ queryKey: ['file'] }) },
       discard: async () => { await api.discard(); await qc.invalidateQueries({ queryKey: ['changes'] }) },
       apply: async () => {
         const done = await api.apply()
-        for (const queryKey of [['changes'], ['registry'], ['resource'], ['resources'], ['graph'], ['boards'], ['generated']]) void qc.invalidateQueries({ queryKey })
+        for (const queryKey of [['changes'], ['registry'], ['resource'], ['resources'], ['graph'], ['boards'], ['generated'], ['file'], ['deploy']]) void qc.invalidateQueries({ queryKey })
         return done
       },
     }

@@ -52,6 +52,10 @@ const mapOf = (b: BoardRead): string | undefined => {
 }
 const MAP_WORDS: Record<string, string> = { organization: 'Who’s in what', systems: 'Safes, hats, spaces' }
 
+/** A section board as /boards names it (walk I15, D1): "<word> board", so no board shares its name with the page its word
+ *  opens (Meetings is /c/meetings, Knowledge /c/knowledge, Sources /sources). A name that says so already is kept. */
+export const sectionBoardName = (title: string): string => (/\bboard$/i.test(title) ? title : `${title} board`)
+
 type Shelf = 'section' | 'system' | 'map' | 'page'
 function shelfOf(b: BoardRead): { shelf: Shelf; def?: SectionDef; map?: string } {
   const def = sectionOfBoard(b)
@@ -111,7 +115,7 @@ export default function Boards() {
   // the sections in the house's order (SECTIONS), the rest as served
   const at = (r: { def?: SectionDef }) => (r.def ? SECTIONS.indexOf(r.def) : SECTIONS.length)
   const builtin = list.filter(b => b.origin === 'builtin').map(b => ({ b, ...shelfOf(b) })).sort((x, y) => at(x) - at(y))
-  const staged = (id: string) => (ch.view?.ops ?? []).some(o => o.record === `boards:${id}`)
+  const staged = (id: string) => (ch.view?.ops ?? []).some(o => o.op !== 'file' && o.record === `boards:${id}`)
   const found = <T extends { b: BoardRead }>(rows: T[]) => rows.filter(r => matches(boardTitle(r.b, org), query))
   // a count is said once the records are read: "empty" is never said before the first answer
   const read = resources.data !== undefined && registries.data !== undefined
@@ -130,14 +134,14 @@ export default function Boards() {
     setRefused([])
     try {
       await ch.stage([op])
-      const text = `A copy of ${boardTitle(b, org)} is in your changes. Apply it to make it yours.`
+      const text = `A copy of ${sectionBoardName(boardTitle(b, org))} is in your changes. Apply it to make it yours.`
       setSaid(text)
       announce(text)
     } catch (err) { setRefused(refusalErrors(err, op.record).map(e => e.message)) }
   }
 
   const sectionRow = ({ b, def }: { b: BoardRead; def?: SectionDef }) => {
-    const title = boardTitle(b, org)
+    const title = sectionBoardName(boardTitle(b, org))
     const n = def ? countOf(def) : null
     // empty: Set up opens the section, where its plate is (a section with words); else Copy to yours. Both are for a
     // member who can write, never while previewing (C-23); Copy once per change
@@ -175,7 +179,7 @@ export default function Boards() {
 
   return (
     <>
-      <PageHead title="Boards" about={<>Ways of looking at the org’s records. Built-in boards come with the framework; yours are kept in <code>data/boards.yaml</code>.</>}>
+      <PageHead title="Boards" about={<>Ways of looking at the org’s records. Built-in boards come with the framework; yours are kept in the repository.</>}>
         <label className="boards-find" htmlFor={searchId}><span className="sr-only">Search boards</span>
           <input id={searchId} className="input" type="search" placeholder="Search boards" autoComplete="off" value={query} onChange={e => setQuery(e.target.value)} />
         </label>

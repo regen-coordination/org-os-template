@@ -95,9 +95,10 @@ const wearing = (account: string, hat: string) => `${account.toLowerCase()}|${ha
 const SAFE_ADMIN = (hat: string) => wearing(SAFE_ADDR, hat)
 
 describe('HATS_ACTIONS', () => {
-  it('four actions, all of class governance, with the planned inputs', () => {
+  // DAO-OS L7 Task 8 replaces "four actions" on purpose: add-role (§10.1, Q67) is the fifth; its inputs are pinned in hats.add-role.test.ts.
+  it('five actions, all of class governance, with the planned inputs', () => {
     expect(hatsTree.actions).toBe(HATS_ACTIONS)
-    expect(HATS_ACTIONS.map(a => [a.id, a.class])).toEqual([['mint-hat', 'governance'], ['transfer-hat', 'governance'], ['create-child', 'governance'], ['change-details', 'governance']])
+    expect(HATS_ACTIONS.map(a => [a.id, a.class])).toEqual([['mint-hat', 'governance'], ['transfer-hat', 'governance'], ['create-child', 'governance'], ['change-details', 'governance'], ['add-role', 'governance']])
     const params = (id: string) => HATS_ACTIONS.find(a => a.id === id)!.params.map(p => `${p.name}:${p.type}${p.optional ? '?' : ''}`)
     expect(params('mint-hat')).toEqual(['hat:hat', 'wearer:address'])
     expect(params('transfer-hat')).toEqual(['hat:hat', 'from:address', 'to:address'])

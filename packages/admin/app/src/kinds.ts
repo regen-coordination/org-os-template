@@ -3,11 +3,11 @@ import { ago } from './time.ts'
 import { REGISTRY_OF_KIND } from '../../lib/registries.mjs'
 
 /** Left to right on a map: people before what they lead; running parts before what they feed. */
-export const KIND_ORDER = ['person', 'project', 'idea', 'funding', 'partner', 'knowledge-gaps', 'proposal',
+export const KIND_ORDER = ['person', 'project', 'idea', 'funding', 'partner', 'knowledge-gaps', 'proposal', 'knowledge',
   'role', 'seat', 'module', 'instance', 'connector', 'source', 'channel', 'system', 'absent']
 
 const LABEL: Record<string, string> = {
-  'knowledge-gaps': 'knowledge gaps', role: 'crew role', seat: 'crew seat', connector: 'KMS connector', absent: 'not here',
+  'knowledge-gaps': 'knowledge gaps', knowledge: 'knowledge commons', role: 'crew role', seat: 'crew seat', connector: 'KMS connector', absent: 'not here',
 }
 export const kindLabel = (kind: string): string => LABEL[kind] ?? kind
 

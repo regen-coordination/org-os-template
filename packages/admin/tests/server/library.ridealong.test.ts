@@ -122,7 +122,7 @@ describe('an add is decided by what it creates (L1-C5)', () => {
     const id = String((await ok(await app.request('/api/proposals', json({ title: 'Add the desk link' })), 201)).id)
     const entry = readLedger(repo).entries.find(e => String(e.id) === id)!
     expect(entry.classes).toEqual(['systems'])
-    expect(entry.ops.map(o => o.record)).toEqual(['systems:desk-link', 'library:system-desk-link'])
+    expect(entry.ops.map(o => (o as { record?: string }).record)).toEqual(['systems:desk-link', 'library:system-desk-link'])
     const problems = validateRepo(repo).filter((p: { level: string; file: string }) => p.level === 'error' && p.file.endsWith('proposals.yaml'))
     expect(problems).toEqual([])
   })

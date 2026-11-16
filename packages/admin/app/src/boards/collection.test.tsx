@@ -32,7 +32,7 @@ describe('a Workspace collection', () => {
     expect(title.closest('.rh')).not.toBeNull()
     expect(within(head as HTMLElement).getByRole('tablist', { name: 'Views of Projects' })).toBeTruthy()
     // where the collection was read from, in the view header's meta line (Q70)
-    expect(head.querySelector('.vhead-meta')!.textContent).toMatch(/^from data\/projects\.yaml · read /)
+    expect(head.querySelector('.vhead-meta')!.textContent).toMatch(/^from the repository · read /)
     // the page head names the page once and carries no second from mark
     expect(title.closest('.rh')!.querySelector('.from')).toBeNull()
     const table = await screen.findByRole('grid', { name: 'Projects' })
@@ -152,7 +152,7 @@ describe('a Workspace collection', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Keep a record of every meeting' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Add the first meeting' }).getAttribute('href')).toBe('/new/meetings')
     expect(screen.getByRole('link', { name: 'Add meeting' }).closest('.rh')).not.toBeNull()
-    expect(document.querySelector('.plate-foot')!.textContent).toContain('data/meetings.yaml')
+    expect(document.querySelector('.plate-foot')!.textContent).toContain('Kept in the repository')
     page.unmount()
     routes(() => new Response(JSON.stringify({ error: 'data/meetings.yaml cannot be read: at line 4, column 3, *x reuses a value marked &x.' }), { status: 409 }))
     renderAt(<BoardPage id="meetings" />, '/b/meetings')

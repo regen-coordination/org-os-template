@@ -8,6 +8,7 @@ import { REGISTRIES } from '../registries.mjs'
 import { parseRecord } from '../ops.mjs'
 import { caip10, parseCaip10, isAddress } from '../caip.mjs'
 import { parseHatRef, treeIdOf, inTree, hatRef } from '../hats.mjs'
+import { isComposed } from '../compose.mjs'
 import { originOf, memberUri, systemChains, snapshotProposalUri, applicationId, contractIdsOf } from './ids.mjs'
 import { MECHANISMS, APPLICATION_STATUSES } from './daoip5.mjs'
 import { GENERATOR_MARK_KEY, GENERATOR_MARK } from './dao.mjs'
@@ -71,7 +72,7 @@ export const VOCABULARY = Object.freeze([
   'open', 'ratified', 'rejected', 'withdrawn', 'expired',
   'approve', 'object', 'vote', 'comment', 'retract', 'revise', 'replay', 'attach', 'system', 'withdraw', 'reject', 'expire', 'ratify', 'opened',
   // attach payload kinds (server/systems/driver.ts ForeignRef)
-  'snapshot-proposal', 'hats-wearer', 'hats-hat', 'gardens-proposal',
+  'snapshot-proposal', 'hats-wearer', 'hats-hat', 'hats-role', 'gardens-proposal',
   // Gardens proposal statuses (grants.mjs GARDENS_STATUS), and pool types (server/systems/gardens.ts POOL_TYPES: a dropped
   // read's `type` is a secret candidate, and `funding` is a word of the key grantFundingMechanism)
   'inactive', 'active', 'paused', 'disputed', 'executed', 'cancelled',
@@ -281,7 +282,7 @@ export function projectPublic(input) {
     reads[id] = /** @type {DriverRead} */ ({ ...read, sections: [] })
   }
   /** Public hats trees, from the public views only (a withheld chain or address is no tree): for actors. */
-  const trees = systems.filter(s => s.kind === 'hats-tree').flatMap(s => {
+  const trees = systems.filter(s => s.kind === 'hats-tree' && !isComposed(s)).flatMap(s => {
     const tree = treeOfView(s)
     return tree ? [tree] : []
   })
@@ -424,7 +425,7 @@ export function projectPublic(input) {
         return space ? [snapshotProposalUri(space, ref.id)] : []
       }
       if (kind === 'hats-tree') {
-        const tree = treeOfView(system)
+        const tree = isComposed(system) ? null : treeOfView(system)
         const hat = tree ? hatIn(tree, ref.id) : null
         return hat ? [hat] : []
       }
@@ -599,7 +600,7 @@ function subtract(candidates, pub, sectionCandidates = new Set()) {
 
 /** Which System kind reads each foreign ref's payload kind (server/systems/driver.ts ForeignRef); a Safe ref has none. */
 const KIND_OF_PAYLOAD = /** @type {Record<string, string>} */ ({
-  'snapshot-proposal': 'snapshot-space', 'hats-wearer': 'hats-tree', 'hats-hat': 'hats-tree', 'gardens-proposal': 'gardens-pool',
+  'snapshot-proposal': 'snapshot-space', 'hats-wearer': 'hats-tree', 'hats-hat': 'hats-tree', 'hats-role': 'hats-tree', 'gardens-proposal': 'gardens-pool',
 })
 
 /** A hats-tree System's chain and tree id from its public view; null when either is withheld or unreadable.

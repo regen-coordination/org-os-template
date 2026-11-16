@@ -1,0 +1,116 @@
+/* The steward's side of the knowledge commons: the gate plate, the standline and the entry's blocks (spec §5-N1–N5).
+   Tokens only — no colour, size, space, rule, corner, shadow or movement that the skin does not define, and no
+   line-height of its own. The house's guard (app/src/design/skins/skins.test.ts) is what keeps this true. */
+
+/* A row of inline pieces (0.6's `.row`, which L4c retired: C10): flex, wrapping, centred. */
+.kn-row { display: flex; gap: var(--sp-6); align-items: center; flex-wrap: wrap; }
+
+/* N2 · Gate plate — the record header's facts line, raised to a plate: what may, what is, what writes (spec §4.1). */
+.gateplate { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.35fr) minmax(0, .9fr); background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); overflow: hidden; }
+.gateplate > div { padding: var(--sp-10) var(--sp-11); min-width: 0; }
+.gateplate > div + div { border-inline-start: var(--rule-w) solid var(--rule); }
+.gateplate .gp-cap { font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--faint); margin-bottom: var(--sp-7); }
+.gp-counts { display: grid; gap: var(--sp-3); }
+.gp-counts a, .gp-counts span.count { display: flex; align-items: baseline; gap: var(--sp-6); font-size: var(--fs-meta); color: var(--ink);
+  padding: var(--sp-3) var(--sp-4); margin-inline-start: calc(var(--sp-4) * -1); border-radius: var(--radius-xs); min-width: 0; }
+.gp-counts a:hover { background: var(--wash); }
+.gp-counts b { font: var(--fw-strong) var(--fs-title)/var(--lh-ui) var(--sans); font-variant-numeric: tabular-nums; letter-spacing: var(--ls-title); }
+.gp-counts .w { color: var(--mute); font-size: var(--fs-tiny); }
+.gp-counts .smark { margin-inline-start: auto; }
+.gp-dec { display: grid; gap: var(--sp-6); font-size: var(--fs-meta); line-height: var(--lh-body); color: var(--mute); }
+.gp-dec b { color: var(--ink); font-weight: var(--fw-medium); }
+.gp-dec div { display: grid; grid-template-columns: var(--ic) minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
+.gp-plane { display: grid; gap: var(--sp-5); align-content: start; }
+.gp-plane .gp-path { font: var(--fw-regular) var(--fs-code)/var(--lh-code) var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.gp-plane .faint { font-size: var(--fs-tiny); }
+@container knowledge (max-width: 900px) {
+  .gateplate { grid-template-columns: minmax(0, 1fr); }
+  .gateplate > div + div { border-inline-start: 0; border-top: var(--rule-w) solid var(--rule); }
+}
+
+/* N1 · Standline — the board's column, given a gate to stand in the gap (spec §3, §5-N1). */
+.knowledge-page { container: knowledge / inline-size; display: grid; gap: var(--sp-13); min-width: 0; }
+.lanes { display: grid; grid-template-columns: minmax(0, 1fr) var(--sp-14) minmax(0, 1fr) var(--sp-14) minmax(0, 1fr) var(--sp-14) minmax(0, 1fr);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius); background: var(--raised); overflow: hidden; box-shadow: var(--shadow-card); }
+.lane { display: grid; align-content: start; gap: var(--sp-5); padding: var(--sp-8) 0 0; min-width: 0; }
+.lane-h { display: grid; gap: var(--sp-3); padding: 0 var(--sp-8) var(--sp-6); }
+.lane-h .t { display: flex; align-items: baseline; gap: var(--sp-6); font: var(--fw-strong) var(--fs-ui)/var(--lh-tiny) var(--sans); color: var(--ink); }
+.lane-h .t .c { font: var(--fw-regular) var(--fs-tiny)/var(--lh-ui) var(--mono); color: var(--faint); }
+.lane-h .moves { font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+.lane-rows { border-top: var(--rule-w) solid var(--rule); }
+/* A lane's rows are a house DataList (§9.2): inside the board's own raised surface it draws no second one. */
+.lane-rows .dlist { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.lane-rows .drow { padding-inline: var(--sp-8); }
+.lane-foot { padding: var(--sp-4) var(--sp-8) var(--sp-7); border-top: var(--rule-w) solid var(--rule); }
+.lane-foot .btn { height: var(--h-ctl-sm); font-size: var(--fs-tiny); padding-inline: var(--sp-5); }
+.lane-empty { padding: var(--sp-7) var(--sp-8) var(--sp-9); }
+.gate { background: var(--sunken); border-inline: var(--rule-w) solid var(--rule); display: grid; place-items: center; padding: var(--sp-8) 0; }
+.gate .g { writing-mode: vertical-rl; rotate: 180deg; display: flex; align-items: center; gap: var(--sp-4); }
+.gate .g span { font: var(--fw-medium) var(--fs-micro)/var(--lh-ui) var(--sans); color: var(--mute); letter-spacing: var(--ls-av); white-space: nowrap; }
+.lanes-list { display: none; }
+@container knowledge (max-width: 820px) {
+  .lanes { display: none; }
+  .lanes-list { display: grid; gap: var(--sp-9); }
+}
+.lane-l { display: grid; gap: var(--sp-4); }
+.lane-l .lane-h { padding: 0; }
+.lane-l .lane-rows { border: var(--rule-w) solid var(--rule); border-radius: var(--radius-sm); overflow: hidden; }
+
+/* N5 · Checks are the house's field rows (FieldTable), each value a StatusMark in its own word: no CSS of their own. */
+
+/* The entry's page: the article and its aside, folding by the frame's width (spec §4.2). */
+.entry-cols { display: grid; grid-template-columns: minmax(0, 1fr) var(--w-inspector); gap: var(--sp-12); align-items: start; min-width: 0; }
+.entry-aside { display: grid; gap: var(--sp-11); min-width: 0; border-inline-start: var(--rule-w) solid var(--rule); padding-inline-start: var(--sp-11); }
+@container knowledge (max-width: 1080px) {
+  .entry-cols { grid-template-columns: minmax(0, 1fr); }
+  .entry-aside { border-inline-start: 0; padding-inline-start: 0; border-top: var(--rule-w) solid var(--rule); padding-top: var(--sp-10); }
+}
+
+/* A field row is the house's (FieldRow): its staged treatment, the struck old value and the mark are the house's own. */
+.entry-faces { display: flex; }
+.kind-chips { margin-bottom: var(--sp-8); }
+
+/* The prepared change's card (R-32, R-49): a block that sits in the page, with the tray's own anatomy. */
+.pbrand { padding: 0; }
+.pbrand, .publ { background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+.pbrand .op { border-top: 0; padding: 0; }
+.pbrand .op .chg { display: flex; gap: var(--sp-4); align-items: baseline; flex-wrap: wrap; font-size: var(--fs-tiny); }
+.pbrand .op .chg .k { color: var(--mute); }
+.pbrand .op .chg .was { color: var(--faint); font-family: var(--mono); }
+.pbrand .op .chg .new { font-family: var(--mono); }
+.pbrand .kn-row { justify-content: space-between; }
+.stack { display: grid; gap: var(--sp-11); min-width: 0; }
+.contents { display: contents; }
+
+/* The public face's reading column (§4.2, K-8): the page as the commons shows it, in the frame. */
+.public-face { display: grid; gap: var(--sp-10); max-width: var(--w-content); }
+.public-face .lead { font-size: var(--fs-sub); line-height: var(--lh-prose); color: var(--mute); max-width: var(--w-prose); margin: 0; }
+.public-face .pf-title { font: var(--fw-regular) var(--fs-page)/var(--lh-d-sec) var(--display); letter-spacing: var(--ls-title); margin: 0; }
+.public-face .prose { max-width: var(--w-prose); }
+.prose h3 { margin: 0 0 var(--sp-4); }
+.prose p { margin: 0; white-space: pre-wrap; }
+.face-block { margin-bottom: var(--sp-9); }
+.face-meta { display: grid; gap: var(--sp-6); }
+
+/* N3 · The prepared publication (§4.3, §5-N3): a plan, a payload, and a key the app does not hold. */
+.publ { padding: 0; overflow: hidden; }
+.publ-head { padding: var(--sp-9) var(--sp-10); display: grid; gap: var(--sp-8); }
+.publ-title { display: flex; align-items: flex-start; gap: var(--sp-8); flex-wrap: wrap; }
+.publ-title .kn-row { align-items: baseline; }
+.publ-calls { display: grid; gap: var(--sp-3); }
+.publ-call { display: grid; grid-template-columns: var(--sp-11) minmax(0, 1fr) auto; gap: var(--sp-6); align-items: baseline;
+  padding: var(--sp-3) 0; border-top: var(--rule-w) solid var(--rule); }
+.publ-call .to { font-family: var(--mono); font-size: var(--fs-micro); color: var(--mute); overflow-wrap: anywhere; }
+@media (max-width: 620px) { .publ-call { grid-template-columns: var(--sp-11) minmax(0, 1fr); } .publ-call .to { grid-column: 2 / -1; } }
+.publ-sum { background: var(--sunken); border-radius: var(--radius-sm); padding: var(--sp-7) var(--sp-8); font-size: var(--fs-meta); }
+.publ-foot { display: flex; gap: var(--sp-6); align-items: center; flex-wrap: wrap; background: var(--sunken);
+  border-top: var(--rule-w) solid var(--rule); padding: var(--sp-7) var(--sp-10); }
+.publ-foot .say { flex: 1; min-width: 0; display: flex; gap: var(--sp-6); align-items: center; }
+.publ-refusal { padding: 0 var(--sp-10) var(--sp-9); }
+.publ-report { margin-top: var(--sp-5); overflow-x: auto; }
+
+/* The run's confirmation: the exact argv the nonce stands for, then the choice. */
+.run-confirm { display: grid; gap: var(--sp-6); margin-top: var(--sp-7); }
+

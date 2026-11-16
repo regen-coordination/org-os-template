@@ -12,5 +12,8 @@ export function loadKmsConfig(dir = '.', { packagesDir } = {}) {
   // target: "" is a valid value (the instance dir itself), so only reject a truly-absent target
   if (cfg.target === undefined) throw new Error('kms.yaml: missing "target"');
   const packs = loadExtensions(cfg, packagesDir ? { packagesDir } : {});
-  return { render: {}, peers: {}, connectors: [], publish: {}, extensions: [], ...cfg, packs };
+  // render.fonts defaults to 'house' (the vendored fonts); an explicit 'system' is kept.
+  const render = { ...(cfg.render || {}) };
+  if (render.fonts === undefined) render.fonts = 'house';
+  return { peers: {}, connectors: [], publish: {}, extensions: [], ...cfg, render, packs };
 }

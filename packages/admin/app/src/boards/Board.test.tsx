@@ -83,9 +83,9 @@ describe('BoardPage', () => {
     renderAt(<BoardPage id="f" />, '/b/f')
     await screen.findByText('echo OK')
     expect(screen.getByRole('region', { name: 'Typo' }).textContent).toBe(
-      'Block “typo” cannot be read: "sorce" is not part of a block (id, type, title, source, view, text, place); Arrange can change its settings, or npm run validate:data names the fix.')
+      'Block “typo” cannot be read: "sorce" is not part of a block (id, type, title, source, view, text, place); Arrange can change its settings, or the repository’s data check names the fix.')
     expect(screen.getByRole('region', { name: 'Cond' }).textContent).toBe(
-      'Block “cond” cannot be read: where.status: "nott" is not a condition (not, in, before, after, has); Arrange can change its settings, or npm run validate:data names the fix.')
+      'Block “cond” cannot be read: where.status: "nott" is not a condition (not, in, before, after, has); Arrange can change its settings, or the repository’s data check names the fix.')
     expect(screen.getByRole('region', { name: 'Key' }).textContent).toContain('"knd" is not part of a source (kind, section, where, sort, limit)')
     for (const name of ['Typo', 'Cond', 'Key']) expect(screen.getByRole('region', { name }).querySelector('.note-error')).not.toBeNull()
   })

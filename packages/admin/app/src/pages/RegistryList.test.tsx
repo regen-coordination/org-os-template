@@ -42,7 +42,8 @@ describe('RegistryList', () => {
     expect(screen.queryByRole('link', { name: 'New' })).toBeNull()
   })
 
-  it('shows a document registry as its YAML, read-only', async () => {
+  // DAO-OS L6 Task 19: a document is edited whole in the source editor; it no longer says it has no path in the Hub
+  it('shows a document registry as its YAML, and links to the source editor that edits it whole', async () => {
     fetchRoutes({ ...baseRoutes(),
       'GET /api/registries/finances': { name: 'finances', kind: 'document', schemaVersion: '2.0', document: { treasury: { chain: 'optimism' } } },
       'GET /api/schemas/finances': { properties: {} },
@@ -52,8 +53,9 @@ describe('RegistryList', () => {
     expect(well.textContent).toBe('treasury:\n  chain: optimism\n')
     expect(well.className).toBe('mono-well') // C9: the YAML well (C8's), not 0.6's .yaml
     expect(screen.queryByRole('link', { name: 'New' })).toBeNull()
-    // F-L3-3: a document has no path in the Hub yet, and says so (the editors table)
-    expect(screen.getByRole('note').textContent).toBe('Read only here: a change to this file has no path in the Hub yet.')
+    // F-L3-3: a document's path through the Hub is the source editor (the editors table)
+    expect(screen.getByRole('link', { name: 'Edit in the source editor' }).getAttribute('href')).toBe('/files/data/finances.yaml')
+    expect(screen.queryByText(/no path in the Hub yet/)).toBeNull()
   })
 
   it('says no such thing over a collection the Hub edits', async () => {
@@ -103,6 +105,40 @@ describe('AllRecords', () => {
     expect(payroll.getAttribute('href')).toBe('/all/payroll')
     expect(payroll.querySelector('.drow-s')!.textContent).toBe('collection · 4 entries')
     expect(list.textContent).not.toMatch(/data\/|\.yaml/)
+  })
+})
+
+// Walk M15, M17: /all/<registry> named data/<registry>.yaml for a collection the store keeps; /b/meetings titled its
+// columns by their raw keys ("duration_minutes").
+describe('where a registry is read from, and its column titles (walk M15, M17)', () => {
+  it('a collection the store keeps names no data file: not in the head, the empty line, nor a row', async () => {
+    fetchRoutes({ ...baseRoutes(),
+      'GET /api/registries/payroll': { name: 'payroll', kind: 'collection', schemaVersion: null, file: null, entries: [{ id: 'p-1', name: 'One' }, { name: 'No id' }] },
+      'GET /api/schemas/payroll': { 'x-order': ['id', 'name'], properties: {} } })
+    renderAt(<RegistryList registry="payroll" title="payroll" />, '/all/payroll')
+    await screen.findByRole('table', { name: 'payroll' })
+    expect(document.body.innerHTML).not.toMatch(/data\/payroll\.yaml/)
+    expect(screen.getByText(/kept in the private store/)).toBeTruthy()
+  })
+
+  it('a custom collection names the file it is read from', async () => {
+    fetchRoutes({ ...baseRoutes(),
+      'GET /api/registries/circles': { name: 'circles', kind: 'collection', schemaVersion: null, file: 'data/collections/circles.yaml', entries: [] },
+      'GET /api/schemas/circles': { 'x-order': ['id', 'name'], properties: {} } })
+    renderAt(<RegistryList registry="circles" title="Circles" />, '/all/circles')
+    expect(await screen.findByText('No entries in data/collections/circles.yaml yet.')).toBeTruthy()
+    expect(document.body.innerHTML).not.toMatch(/data\/circles\.yaml/)
+  })
+
+  it('titles the columns as the schema names its fields', async () => {
+    fetchRoutes({ ...baseRoutes(),
+      'GET /api/registries/meetings': { name: 'meetings', kind: 'collection', schemaVersion: '2.0', entries: [{ id: 'm-1', title: 'Kick-off', duration_minutes: 30 }] },
+      'GET /api/schemas/meetings': { 'x-order': ['id', 'title', 'duration_minutes'], properties: { title: { title: 'Title' }, duration_minutes: { title: 'Length' } } } })
+    renderAt(<RegistryList registry="meetings" title="Meetings" />)
+    const table = await screen.findByRole('table', { name: 'Meetings' })
+    const heads = [...table.querySelectorAll('th')].map(th => th.textContent ?? '')
+    expect(heads.some(h => h.includes('Length'))).toBe(true)
+    expect(heads.some(h => h.includes('duration_minutes'))).toBe(false)
   })
 })
 

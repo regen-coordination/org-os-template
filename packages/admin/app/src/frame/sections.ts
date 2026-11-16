@@ -23,7 +23,8 @@ export const INSTANCE_LINKS: readonly { label: string; href: string }[] = [
   { label: 'Crew', href: '/b/crew' },
   { label: 'Fleet', href: '/b/fleet' },
   { label: 'Modules', href: '/b/modules' },
-  { label: 'Sources', href: '/b/sources' },
+  // L6 carries K11 (PF-R79): told apart from the Hub's Sources page (`SOURCES_LINK`), which Workspace lists.
+  { label: 'Sources board', href: '/b/sources' },
   { label: 'Activity', href: '/activity' },
   { label: 'All records', href: '/all' },
   { label: 'Boards', href: '/boards' },
@@ -36,6 +37,12 @@ export const WORKSPACE_ORDER: readonly string[] = ['meetings', 'tasks', 'project
 /** A Workspace collection or an Instance board, as the sidebar lists it; `empty`, a collection with nothing in it the
  *  viewer may see (its dashed dot, design pass 2026-11-04). */
 export interface SideLink { id: string; label: string; href: string; empty?: boolean }
+
+/** DAO-OS L6 Task 19 (spec §15): the Sources page, listed under Workspace after its collections for a viewer the members'
+ *  side admits. The source editor (`/files/…`) is Workspace's too, under Sources in the path. */
+export const SOURCES_LINK: SideLink = { id: 'sources', label: 'Sources', href: '/sources' }
+
+export const FILES_HREF = '/files'
 
 /** The counts the sidebar shows: each of what the viewer may see (rule 7). */
 export interface HouseCounts { needs: number; proposals: number; systems: number; changes: number }
@@ -56,7 +63,7 @@ export interface OrgMark { name: string; mark: string | null }
 export interface Identity { hatName: string; address: string | null; hatId: string | null; hats: string[]; roles?: string[] }
 
 /** What the counts are read from: the lists as the server gives them, filtered here by `visible` (the viewer's
- *  eyes, §6.3) — so a preview as Public counts only what the door would show. Needs you's count is its items
+ *  eyes, §6.3) — so a preview as Public counts only what the portal would show. Needs you's count is its items
  *  (`needsFrom`, E-34), so the sidebar, the list and the map agree. Staged changes are the member's own writes: while
  *  previewing (`canWrite` false) there are none to count, as the tray is hidden. */
 export function houseCounts<R extends { kind: string }, P, N>(
@@ -94,6 +101,7 @@ export function sectionOf(path: string, collections: readonly SideLink[] = []): 
   const record = /^\/r\/([^/]+)\/[^/]+$/.exec(p)
   if (record) return recordSection(safeDecode(record[1]!))
   if (under(p, '/governance')) return 'proposals'
+  if (under(p, FILES_HREF)) return 'workspace' // DAO-OS L6 Task 19: the source editor is under Sources
   if (collections.some(c => under(p, c.href))) return 'workspace'
   const found = HOUSE_SECTIONS.filter(s => s.href !== '/' && under(p, s.href))
   return found[0]?.id ?? null

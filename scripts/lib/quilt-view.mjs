@@ -65,7 +65,7 @@ export function syncLedger(instances, now) {
 export const PKG_DETAIL = {
   "toolkit-framework": [" 167/167 ✓ "],
   "org-os-kms": [" 44/44 ✓ "],
-  "org-os-federation-map": [" the torch·d3 "],
+  "org-os-federation-map": [" zero-dep map "],
   operations: [" bcn·dao "],
   "regen-agents": [" bcn·dao "],
   webapps: [" bcn·dao "],

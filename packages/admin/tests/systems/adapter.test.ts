@@ -117,3 +117,59 @@ systems:
     expect(g.nodes[0]!.source).toMatchObject({ entityId: '42' })
   })
 })
+
+// Whole-platform walk I1, I14 (review G3): a composed Test DAO beside the org's deployed Safe and tree.
+const WALK = `schema_version: "2.0"
+systems:
+  - id: "test-dao-safe"
+    kind: "safe"
+    name: "Test DAO Safe"
+    chain: "eip155:11155111"
+    driver: "quiet"
+    section: "organization/treasury"
+    deployment: { status: "composed", owners: ["eip155:11155111:0x00000000000000000000000000000000000000a1"], threshold: 1, salt: "1" }
+  - id: "test-dao-roles"
+    kind: "hats-tree"
+    name: "Test DAO roles"
+    chain: "eip155:11155111"
+    driver: "quiet"
+    deployment: { status: "composed", top: { details: "Test DAO", image: "", worn_by: "test-dao-safe" } }
+  - id: "hats-main"
+    kind: "hats-tree"
+    name: "Hats"
+    chain: "eip155:42220"
+    address: "13"
+    driver: "quiet"
+  - id: "treasury-safe"
+    kind: "safe"
+    name: "Treasury"
+    chain: "eip155:42220"
+    address: "0x967c04deCA1e3a0DA6ac08E2D1bb3c7A70B0cb60"
+    driver: "quiet"
+    section: "organization/treasury"
+`
+const governance = (membership: string) => writeFileSync(join(repo, 'data', 'governance.yaml'),
+  `schema_version: "2.0"\ngovernance:\n  model: "consensus"\n${membership}  roles:\n    member: { all: true }\n`)
+
+describe('the systems adapter marks the membership tree (walk I1)', () => {
+  it('the tree governance.membership.tree names carries `membership`; a composed tree never does', async () => {
+    governance('  membership: { tree: hats-main }\n')
+    const g = await read(WALK)
+    const fact = (id: string) => g.nodes.find(n => n.id === `system:${id}`)!.facts.membership
+    expect(fact('hats-main')).toBe(true)
+    expect(fact('test-dao-roles')).toBeUndefined()
+    expect(fact('treasury-safe')).toBeUndefined()
+  })
+
+  it('with no tree named, the only deployed tree is the membership tree (lib/rules.mjs membershipTree)', async () => {
+    governance('')
+    const g = await read(WALK)
+    expect(g.nodes.filter(n => n.facts.membership === true).map(n => n.id)).toEqual(['system:hats-main'])
+  })
+
+  it('a composed System reads as composed: no driver is asked', async () => {
+    governance('')
+    const g = await read(WALK)
+    expect(g.nodes.find(n => n.id === 'system:test-dao-safe')!.facts.driver).toMatchObject({ ok: true, readAt: null, facts: { composed: true } })
+  })
+})

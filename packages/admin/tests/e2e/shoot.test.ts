@@ -27,7 +27,7 @@ describe('the screen harness', () => {
   })
 
   it('keeps one record list, light only, and finds a group’s records in it', () => {
-    expect(RECORD).toEqual(['tokens-1440', 'controls-1440', 'atoms-1440', 'frame-1440', 'frame-390', 'tray-1440', 'rows-1440', 'needs-1440', 'views-1440', 'gov-1440', 'gov-roles-1440', 'map-1440', 'map-390', 'map-compose-1440', 'work-1440', 'lib-1440', 'door-1440'])
+    expect(RECORD).toEqual(['tokens-1440', 'controls-1440', 'atoms-1440', 'frame-1440', 'frame-390', 'tray-1440', 'rows-1440', 'needs-1440', 'views-1440', 'gov-1440', 'gov-roles-1440', 'map-1440', 'map-390', 'map-compose-1440', 'work-1440', 'lib-1440', 'portal-1440'])
     expect(recordsFor('tokens')).toEqual(['tokens-1440'])
     expect(recordsFor('frame')).toEqual(['frame-1440', 'frame-390'])
     expect(recordsFor('rows')).toEqual(['rows-1440'])
@@ -38,7 +38,7 @@ describe('the screen harness', () => {
     expect(recordsFor('map')).toEqual(['map-1440', 'map-390'])
     expect(recordsFor('map-compose')).toEqual(['map-compose-1440'])
     expect(recordsFor('work')).toEqual(['work-1440'])
-    expect(recordsFor('door')).toEqual(['door-1440'])
+    expect(recordsFor('portal')).toEqual(['portal-1440'])
     expect(recordsFor('blocks')).toEqual([])
     expect(recordsFor(null)).toEqual(RECORD)
   })

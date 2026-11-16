@@ -153,3 +153,29 @@ export const MENTIONABLES: Mentionable[] = [
   { kind: 'role', id: 'treasury', label: 'Treasurer', count: 2, canSee: false },
   { kind: 'page', id: 'page:grants-draft', label: 'Grants draft', canSee: false },
 ]
+
+// --- DAO-OS L6 Task 16: pages as the Hub serves them (GET /api/pages, GET /api/pages/:id; spec §16). A members' root
+// page with a subpage kept at the Ops hat, a public root page, and a page whose parent is missing (shown at the root).
+// Placeholder people only; ids are `<slug>-<4 hex>` as git pages' are.
+export interface FixturePageNode { id: string; title: string; parent: string | null; order: number; visibility: string; stale?: 'missing-parent' }
+export const PAGE_NODES: readonly FixturePageNode[] = [
+  { id: 'handbook-1a2b', title: 'Handbook', parent: null, order: 1000, visibility: 'members' },
+  { id: 'treasury-3c4d', title: 'How the treasury is run', parent: 'handbook-1a2b', order: 1000, visibility: 'hat:ops' },
+  { id: 'welcome-5e6f', title: 'Welcome', parent: null, order: 2000, visibility: 'public' },
+  { id: 'orphan-7a8b', title: 'Old notes', parent: null, order: 3000, visibility: 'members', stale: 'missing-parent' },
+]
+
+/** GET /api/pages/:id for one of PAGE_NODES: its body, last edit and how the viewer's saves go. */
+export function pageReadOf(id: string, over: { markdown?: string; mode?: 'direct' | 'approval' | 'none'; visibility?: string; backlinks?: FixturePageNode[] } = {}) {
+  const n = PAGE_NODES.find(p => p.id === id)!
+  return {
+    page: {
+      id: n.id, title: n.title, parent: n.parent, path: `pages/${n.id}.md`, visibility: over.visibility ?? n.visibility,
+      markdown: over.markdown ?? 'The treasury is one Safe at the same address on seven chains.\n',
+      edited: { at: new Date(FIXED_NOW.getTime() - 4 * MIN).toISOString(), by: 'ops-lead' }, ...(n.stale ? { stale: n.stale } : {}),
+    },
+    write: { mode: over.mode ?? 'direct', rule: null },
+    backlinks: over.backlinks ?? [],
+  }
+}
+// --- end L6 Task 16

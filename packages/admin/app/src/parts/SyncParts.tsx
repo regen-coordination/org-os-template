@@ -36,7 +36,8 @@ export function Refusal({ children }: { children: string }) {
 /** Sync's and Share's refusal (0.6's name). */
 export const SyncRefusal = Refusal
 
-/** After a ratify that changed what `.well-known/` is generated from: a line, no button (regeneration is not an operation here). */
+/** After a ratify that changed what `.well-known/` is generated from: a line, no button (regeneration is not an operation
+ *  here). In words, no command (walk I7, D4); the server answers it to maintainers only. */
 export function GeneratedBehind() {
-  return <p className="problem"><Mark level="warn">Generated files are behind the data: run npm run generate:schemas and commit .well-known/.</Mark></p>
+  return <p className="problem"><Mark level="warn">Generated files are behind the data: regenerate them from the records and commit them.</Mark></p>
 }

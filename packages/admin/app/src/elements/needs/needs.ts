@@ -2,10 +2,12 @@ import type { ProposalView, Resource } from '../../api.ts'
 import { recordHref } from '../../hrefs.ts'
 import { driverOf, safeHref } from '../../systems/DriverView.tsx'
 import { ageText } from '../../time.ts'
-import { chainsDisagreeing, emptyHats, firstGoodChain, list, num, pendingSignatures, readNote, record, signaturesNotRead, str, systemFacts, type ChainRead } from '../rows/systemState.ts'
+import { chainsDisagreeing, emptyHats, firstGoodChain, isComposedRead, list, num, pendingSignatures, readNote, record, signaturesNotRead, str, systemFacts, type ChainRead } from '../rows/systemState.ts'
 
 /** What a need is about (§9.4): each draws its own glyph on the tile. */
 export type NeedKind = 'proposal' | 'signature' | 'empty-hat' | 'failed-read' | 'chains-disagree' | 'overdue'
+  // DAO-OS L6 Task 18 (§8.3): a mention of the member, from the Hub's notifications (workspace/mentionNeeds.ts)
+  | 'mention'
 
 /** One Needs you item (§9.4): what waits, where it opens, the meta line's parts (id, route or chains, meter,
  *  context), its deadline, and the map nodes it concerns (G-7 ids: `system:<id>`, a hat's ref), so attention on the
@@ -99,11 +101,12 @@ function disagreement(chains: ChainRead[], base: ChainRead | undefined): string 
 }
 
 /** A System's needs: a failed read (and nothing else from a read that failed), signatures waiting, chains that
- *  disagree, hats with no wearer. Each opens the System's page, but a signature opens the Safe app. */
+ *  disagree, hats with no wearer. Each opens the System's page, but a signature opens the Safe app. A composed System is
+ *  a plan, read by nothing: it raises none (walk I2). */
 function systemNeeds(r: Resource, proposals: ProposalView[], now: Date): NeedItem[] {
   const read = driverOf(r)
   const f = systemFacts(r)
-  if (f.kind === 'link' || read === null) return []
+  if (f.kind === 'link' || read === null || isComposedRead(r)) return []
   const page = recordHref(r.id)
   const base = { href: page, nodes: [r.id], facts: r.facts }
   if (!read.ok) {
@@ -164,8 +167,16 @@ function registryNeed(r: Resource): NeedItem[] {
   }]
 }
 
+/** A commons peer or connector the knowledge adapter could not read (`knowledge:peer:<id>`, alert, "last good read …")
+ *  as a failed read, opening the commons, whose Peers section names it: the knowledge board's Needs you said it, so
+ *  Needs you says it too (walk M11). An entry awaiting review stays the commons' own queue. */
+function peerNeed(r: Resource): NeedItem[] {
+  if (r.kind !== 'knowledge' || !r.id.startsWith('knowledge:peer:') || !r.attention) return []
+  return [{ id: `failed-read:${r.id}`, kind: 'failed-read', title: r.name, href: '/c/knowledge', context: r.attention.text, nodes: [], facts: r.facts }]
+}
+
 /** Needs you's items (§9.4) from what the Hub reads: the Systems' Resources (each with its driver's read), the
- *  registries that could not be read, and the open proposals (`needsYou`, `evaluation`), for `actor` (null: no member,
+ *  registries and commons peers that could not be read, and the open proposals (`needsYou`, `evaluation`), for `actor` (null: no member,
  *  so nothing they approved). Proposals first, then each System's, then each unread registry, in the order given;
  *  `orderNeeds` orders them. A signature need is listed for every member until L5 knows who signs (brief B3). */
 export function needsFrom(resources: Resource[], proposals: ProposalView[], actor: string | null, now: Date): NeedItem[] {
@@ -176,7 +187,8 @@ export function needsFrom(resources: Resource[], proposals: ProposalView[], acto
   })
   const fromSystems = resources.filter(r => r.kind === 'system').flatMap(r => systemNeeds(r, proposals, now))
   const fromRegistries = resources.flatMap(registryNeed)
-  return [...fromProposals, ...fromSystems, ...fromRegistries]
+  const fromPeers = resources.flatMap(peerNeed)
+  return [...fromProposals, ...fromSystems, ...fromRegistries, ...fromPeers]
 }
 
 /** Which of the four bands an item falls in (§9.4): overdue, waiting on you, failed reads, waiting on others. A

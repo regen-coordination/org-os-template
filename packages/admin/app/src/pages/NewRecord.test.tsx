@@ -51,7 +51,7 @@ describe('NewRecord', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'New project' })).toBeTruthy()
     const head = container.querySelector('header.rh')!
     expect(head.querySelector('.rh-id')!.textContent).toBe('new')
-    expect(head.querySelector('.from')!.textContent).toBe('from data/projects.yaml')
+    expect(head.querySelector('.from')!.textContent).toBe('from the repository')
     const details = await screen.findByRole('group', { name: 'Details' })
     expect(fieldsOf(details)).toEqual(['Title', 'Status', 'Lead', 'Started'])
     // one primary on the page, Save to changes, after the governance line
@@ -103,6 +103,18 @@ describe('NewRecord', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Site v4' } })
     await waitFor(() => expect(screen.queryByText(/already has an entry/)).toBeNull())
     expect((screen.getByRole('button', { name: 'Save to changes' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('checks the id while the change also holds a page edit, which names no record (platform full: L6 file ops)', async () => {
+    routes([], { ...entries([{ id: 'site-v3', title: 'Site v3' }]), 'GET /api/changes': changeView({ ops: [
+      { op: 'file', path: 'pages/handbook-1a2b.md', text: '---\nid: handbook-1a2b\n---\nThe handbook.\n', base: 'b0' },
+      { op: 'create', record: 'projects:draft-a', value: { id: 'draft-a' }, base: null, before: null },
+    ] as never }) })
+    at('/new/projects')
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Draft A' } })
+    expect(await screen.findByText('projects already has an entry "draft-a".')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Handbook 1a2b' } })
+    await waitFor(() => expect(screen.queryByText(/already has an entry/)).toBeNull())
   })
 
   it('Esc goes back to the section', async () => {

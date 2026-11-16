@@ -11,6 +11,7 @@ import { Nonces, TOO_MANY } from './nonces.ts'
 import { clearedCookie, createSession, endSession, sessionCookie, sessionFromCookie, sessionToken, type Session } from './sessions.ts'
 import { personOf, viewerOf } from '../request.ts'
 import { endPersonSession } from './person.ts'
+import { personName } from './names.ts'
 import { clearedSessionCookie } from '../../lib/session-token.mjs'
 import type { SignInConfig } from './config.ts'
 
@@ -61,9 +62,9 @@ export function mountSession(app: Hono, d: SessionDeps): void {
   const config = d.hosted ? d.config : undefined
   /** The `__Host-` cookie: only with the hosted binding (L5's hosted mode alone keeps the plain name, Secure). */
   const hostCookie = config !== undefined
-  /** `portal` in `GET /api/session` (§5.2): the portal's origin, or null; answered only with the hosted binding. `door`,
-   *  its name until 0.6.2, says the same until org-os 0.7. */
-  const portalField = config ? { portal: config.portalOrigin, door: config.portalOrigin } : {}
+  /** `portal` in `GET /api/session` (§5.2): the portal's origin, or null; answered only with the hosted binding. (`door`,
+   *  its name until 0.6.2, is gone in 0.7.) */
+  const portalField = config ? { portal: config.portalOrigin } : {}
 
   // Only the API carries sessions (the WebSocket upgrade reads its own, in serve.ts). A store that fails to answer is
   // no session, never a 500 for every route after it.
@@ -102,6 +103,11 @@ export function mountSession(app: Hono, d: SessionDeps): void {
     instanceWrites: d.instanceWrites ?? 'on',
   } : {}
 
+  /** The person's own name, told to them alone: read as their own viewer may read the members file (Rule 4, T2c minor 2;
+   *  T2d finding 4: the request's actor carries the name any member may read, since others see it). `viewerOf` is the
+   *  session's viewer, narrowed by a `?as=` preview, never wider. */
+  const nameOfPerson = (c: Context, person: { id: string; name: string }): string => personName(d.repo, person, viewerOf(c), true)
+
   app.get('/api/session', c => {
     const tree = d.store ? d.membership.tree() : null
     const p = personOf(c)
@@ -109,7 +115,7 @@ export function mountSession(app: Hono, d: SessionDeps): void {
       const { person, claims } = p
       return c.json({
         mode, signedIn: true, via: 'email', actor: person.id,
-        person: { id: person.id, name: person.name, roles: person.roles, nodes: person.nodes },
+        person: { id: person.id, name: nameOfPerson(c, person), roles: person.roles, nodes: person.nodes },
         viewer: viewerOf(c).kind, expiresAt: new Date(claims.exp * 1000).toISOString(),
         signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
       })

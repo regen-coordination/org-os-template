@@ -1,4 +1,4 @@
-import type { VisibilitySource } from '../viewAs/visibility.ts'
+import { canonicalHat, unnamedHat, type VisibilitySource } from '../viewAs/visibility.ts'
 
 /** The fields of an entry its viewer is not admitted to, as the gate marks them (R-L5-14.5, L5 spec §11.5):
  *  `restricted: { <field>: "<level that keeps them out>" }`, with no value. Only string levels are read; an entry
@@ -9,13 +9,13 @@ export function restrictedOf(entry: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(r).filter((e): e is [string, string] => typeof e[1] === 'string'))
 }
 
-/** What a restricted field reads "<name> only" with (E-60): a hat (`hat:<ref>`) by its name in the source's tree, else
- *  its raw id; a role (`role:<id>`, an org with no tree) by the tree's name for it, else its id; members "Members". The
+/** What a restricted field reads "<name> only" with (E-60): a hat (`hat:<ref>`, in any case) by its name in the source's
+ *  tree, else its pretty id (walk M18); a role (`role:<id>`, an org with no tree) by the tree's name for it, else its id; members "Members". The
  *  source is the house's `useVisibilitySource()`: L5 Task 20 swaps the source, never this mapping (C9's People reuse
  *  it, E-70). */
 export function restrictedHat(level: string, source: VisibilitySource): string {
-  const named = (hat: string) => source.hats().find(h => h.hat === hat)?.name
-  if (level.startsWith('hat:')) { const id = level.slice('hat:'.length); return named(id) ?? id }
+  const named = (hat: string) => source.hats().find(h => canonicalHat(h.hat) === canonicalHat(hat))?.name
+  if (level.startsWith('hat:')) { const id = level.slice('hat:'.length); return named(id) ?? unnamedHat(id) }
   if (level.startsWith('role:')) return named(level) ?? level.slice('role:'.length)
   if (level === 'members') return 'Members'
   return level

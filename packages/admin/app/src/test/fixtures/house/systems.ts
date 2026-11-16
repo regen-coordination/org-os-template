@@ -34,7 +34,9 @@ const VERSION = '1.3.0'
 const SOURCE_NOTE = "the deployed contract's source is not verified on the explorer; the platform reads it by the 68cd18d interface"
 
 /** One entry of data/systems.yaml, as the adapter passes it on. */
-interface Entry { id: string; kind: string; name: string; chain?: string; address?: string; url?: string; section?: string }
+interface Entry { id: string; kind: string; name: string; chain?: string; address?: string; url?: string; section?: string
+  /** The org's membership tree, which the adapter marks (lib/rules.mjs `membershipTree`: here the only tree). */
+  membership?: true }
 
 /** A System as the systems adapter makes it: `system:<id>`, its kind as the status, the entry's facts and the read. */
 function system(e: Entry, driver: DriverRead & { state: ReadingState }, attention: Attention | null): Resource {
@@ -43,7 +45,7 @@ function system(e: Entry, driver: DriverRead & { state: ReadingState }, attentio
     status: e.kind, attention, changed: null,
     facts: {
       kind: e.kind, chain: e.chain ?? null, address: e.address ?? null, ...(e.url ? { url: e.url } : {}),
-      section: e.section ?? null, embeddable: false, notes: null, driver,
+      section: e.section ?? null, embeddable: false, notes: null, driver, ...(e.membership ? { membership: true } : {}),
     },
     source: { path: 'data/systems.yaml', editable: true, registry: 'systems', entityId: e.id },
   }
@@ -167,7 +169,7 @@ const ROLES_SECTIONS: DriverSection[] = [
 ]
 
 export const ROLES = system(
-  { id: 'roles', kind: 'hats-tree', name: 'Roles', chain: CELO, address: '13', section: 'organization/roles' },
+  { id: 'roles', kind: 'hats-tree', name: 'Roles', chain: CELO, address: '13', section: 'organization/roles', membership: true },
   {
     ok: true, state: 'fresh', readAt: minutesBefore(4),
     facts: { chain: CELO, tree: 13, ref: treeRef(CELO, 13), topHat: hatRef(CELO, TOP), block: 31204118, hats: ROLE_HATS },

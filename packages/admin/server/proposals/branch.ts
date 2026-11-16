@@ -15,15 +15,20 @@ import { commitMessage } from '../changes/records.ts'
 import { addWorktree, removeWorktree, moveProposalBranch, resolveRev, showFile, repoStatus, messageOf, treeDiffNames, GitExit, type GitIdent } from '../git.ts'
 import { stateDir } from '../state.ts'
 import { entriesFromText } from '../registry.ts'
+import { governanceRecord } from '../changes/canonical.ts'
 import { rebaseOp, isStale } from '../changes/merge.ts'
 import { named } from '../changes/stage.ts'
 import { parseRecord } from '../changes/records.ts'
+import { registriesOf, registryDef, registryFile, registryFileOf } from '../registries.ts'
 import { updateEntry, resolveTrunk, type LedgerOptions, type LedgerWho } from './ledger.ts'
 import { revOf, type Proposal, type LedgerEvent } from '../../lib/proposals.mjs'
+import { canonRecords, kindOfFile } from '../../lib/workspace/knowledge.mjs'
 import { gitOpsOf, isPlaceholder } from '../../lib/ops.mjs'
 import { RESTRICTED_SUBJECT } from '../private/ops.ts'
 import { Levels, raisedTouched } from '../visibility/gate.ts'
-import type { Op, StageOp } from '../changes/types.ts'
+import type { Op, RecordStaged, StageOp } from '../changes/types.ts'
+import { blobId } from '../workspace/files.ts'
+import { LANDING, refuseOutsideOpened } from './opened.ts'
 
 /** What a build needs of a proposal: its id, its author (the commit's `Org-Actor`) and its ops as the ledger stores them,
  *  a private placeholder among them (L5 §9.6: it changes no file; the store applies it at ratify). */
@@ -131,10 +136,10 @@ export async function buildBranch(repo: string, proposal: BranchProposal, fromRe
   // 2. the ops against the records as `from` holds them (a private placeholder names no record)
   const git = gitOpsOf(proposal.ops) as (StageOp & { base: string | null })[]
   const held = proposal.ops.length - git.length
-  const stale = staleOps(path, git.map(op => ({ ...op, before: null }) as Op))
+  const stale = staleOps(path, git.map(op => (op.op === 'file' ? op : ({ ...op, before: null }) as Op)))
   if (stale.length > 0) {
     await removeWorktree(repo, path)
-    const records = stale.map(i => git[i]!.record)
+    const records = stale.map(i => { const op = git[i]!; return op.op === 'file' ? op.path : op.record })
     throw new Refusal(409, { code: 'STALE', records, error:
       `Cannot build proposal/${id}: ${stale.length === 1 ? 'one op was' : `${stale.length} ops were`} staged against a record that has changed on the trunk since (${records.join(', ')}). ` +
       `Nothing was built. Keep the proposal's change or take the trunk's, then build again.` })
@@ -218,16 +223,46 @@ export async function trunkMovedUnder(repo: string, proposal: { base?: unknown; 
   if (base === null) return true
   const at = await resolveRev(repo, tip)
   if (at === null || at === base) return false
-  const files = new Set(gitOpsOf(proposal.ops).map(op => `data/${parseRecord(String(op.record)).registry}.yaml`))
+  // A record op's file is its registry's own (L6 §7.1): a custom collection's is data/collections/<id>.yaml.
+  const files = new Set(gitOpsOf(proposal.ops).map(op => {
+    if (op.op === 'file') return op.path
+    const { registry, id } = parseRecord(String(op.record), registriesOf(repo))
+    return registryFile(repo, registry, id) // knowledge's: its kind's file (Task 10)
+  }))
   return (await treeDiffNames(repo, base, at)).some(path => files.has(path))
 }
 
 /** The record as the trunk commit `rev` holds it, or null when it is not there. */
 export async function recordAt(repo: string, rev: string, record: string): Promise<Record<string, unknown> | null> {
-  const { registry, id } = parseRecord(record)
+  const { registry, id } = parseRecord(record, registriesOf(repo))
+  const def = registryDef(registry, repo)
+  const rel = registryFileOf(def, id)
   let text: string
-  try { text = await showFile(repo, rev, `data/${registry}.yaml`) } catch { return null }
-  return entriesFromText(text, registry).find(e => named(e, id)) ?? null
+  try { text = await showFile(repo, rev, rel) } catch { return null }
+  if (registry === 'governance') return governanceRecord(text)
+  // A knowledge record is read from its kind's file, as the change engine reads it (Task 10).
+  const kind = kindOfFile(rel)
+  const entries = def.filesGlob !== undefined ? (kind === null ? [] : canonRecords(text, kind) as Record<string, unknown>[]) : entriesFromText(text, def)
+  return entries.find(e => named(e, id)) ?? null
+}
+
+/** A proposal's git ops as they land on the trunk commit `rev` (PF-R4): each record op with the record it lands on as its
+ *  `before`, so its classes are judged against the trunk, not against what it was staged against; and whether any is stale
+ *  there (a record op whose record changed since its base, a file op whose blob did), which the build refuses first. */
+export async function landingOps(repo: string, rev: string, ops: readonly unknown[]): Promise<{ ops: StageOp[]; stale: boolean }> {
+  const out: StageOp[] = []
+  let stale = false
+  for (const op of gitOpsOf(ops as Proposal['ops']) as LedgerOp[]) {
+    if (op.op === 'file') {
+      if ((await resolveRev(repo, `${rev}:${op.path}`)) !== op.base) stale = true
+      out.push(op)
+      continue
+    }
+    const current = await recordAt(repo, rev, op.record)
+    if (isStale({ ...op, before: null } as RecordStaged, current)) stale = true
+    out.push({ ...op, before: current } as unknown as StageOp)
+  }
+  return { ops: out, stale }
 }
 
 /** The ops after the author's choice, against the trunk at `from`. The record as it was when the ops were staged is
@@ -237,8 +272,15 @@ async function chosenOps(repo: string, proposal: Proposal, from: string, choose:
   const was = typeof proposal.base === 'string' && proposal.base !== '' ? await resolveRev(repo, proposal.base) : null
   const out: LedgerOp[] = []
   for (const op of gitOpsOf(proposal.ops) as LedgerOp[]) {
+    // A file op (L6 §11.2): Keep mine restages its text on the file as the trunk holds it; Take theirs drops it.
+    if (op.op === 'file') {
+      const blob = await resolveRev(repo, `${from}:${op.path}`)
+      if (blob === op.base) out.push(op)
+      else if (choose === 'mine' && blobId(op.text ?? '') !== blob && !(op.text === null && blob === null)) out.push({ ...op, base: blob })
+      continue
+    }
     const current = await recordAt(repo, from, op.record)
-    if (isStale({ ...op, before: null } as Op, current)) {
+    if (isStale({ ...op, before: null } as RecordStaged, current)) {
       // Keep mine on an update would make a create from the changed fields alone: a record that is not the one the author saw.
       if (choose === 'mine' && op.op === 'update' && current === null) {
         throw new Refusal(409, { code: 'RECORD_DELETED', records: [op.record], error:
@@ -253,7 +295,7 @@ async function chosenOps(repo: string, proposal: Proposal, from: string, choose:
       }
     }
     const before = choose === 'theirs' && was !== null ? await recordAt(repo, was, op.record) : null
-    const kept = rebaseOp({ ...op, before } as Op, current, choose)
+    const kept = rebaseOp({ ...op, before } as RecordStaged, current, choose)
     if (kept === null) continue
     const { before: _before, ...rest } = kept
     out.push(rest as LedgerOp)
@@ -277,9 +319,17 @@ export async function replayBranch(repo: string, proposal: Proposal, fromRev: st
   const from = await resolveRev(repo, fromRev)
   if (from === null) throw new Error(`"${fromRev}" names no commit, so no branch can be built on it.`)
   const build = (ops: LedgerOp[]) => buildBranch(repo, { id: proposal.id, author: proposal.author, ops }, from, { change: opts.change, ident: who.ident })
+  // PF-R4: the ops as they will land, judged against the trunk they land on, before anything is built or written. Stale ops
+  // are left to the build, which refuses them (STALE) until the author chooses; what the choice leaves is judged then.
+  const held = ((proposal.ops as unknown[]).filter(isPlaceholder) as { class?: unknown }[]).map(p => String(p.class))
+  const judge = async (ops: LedgerOp[]) => {
+    const landing = await landingOps(repo, from, ops)
+    if (!landing.stale) refuseOutsideOpened(repo, proposal, landing.ops, held, { not: 'Not replayed', instead: LANDING })
+  }
   let ops = proposal.ops as LedgerOp[]
   let built: BuildResult
   try {
+    await judge(ops)
     built = await build(ops)
   } catch (err) {
     if (!(err instanceof Refusal) || err.body.code !== 'STALE' || opts.choose === undefined) throw err
@@ -288,6 +338,7 @@ export async function replayBranch(repo: string, proposal: Proposal, fromRev: st
       throw new Refusal(409, { code: 'NOTHING_LEFT', error:
         `Nothing of this proposal is left once the trunk's changes stand: every field it sets was changed there too. Withdraw it, or write a new one. Nothing was changed.` })
     }
+    await judge(ops)
     built = await build(ops)
   }
   const base = from // the whole sha: a short one can be ambiguous, and Take theirs reads the record at it

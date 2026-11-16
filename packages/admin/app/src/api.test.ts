@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { api, ApiError } from './api.ts'
+import { api, ApiError, onUnauthorized, setPreviewAs } from './api.ts'
 import { fetchRoutes } from './test/fetchRoutes.ts'
 import { refuse } from './test/data.ts'
 
@@ -25,6 +25,20 @@ describe('api', () => {
     await api.plan('role.seat', 'role:platform', { brief: 'b', title: 't' })
     expect(calls[0]!.body).toEqual({ resource: 'role:platform', params: { brief: 'b', title: 't' } })
     await expect(api.runJob({ nonce: 'n' })).rejects.toThrow(/already used or has expired/)
+  })
+
+  it('asks the deploy plan, and posts a read-back with the steps run (DAO-OS L7 Tasks 11, 12)', async () => {
+    const ran = [{ step: 'tree:top', system: 'test-dao-roles', predicts: [{ kind: 'hat', value: 'eip155:11155111:0x' + '0'.repeat(64) }] }]
+    const { calls } = fetchRoutes({
+      'GET /api/deploy': { chain: 'eip155:11155111', composed: [], steps: [], readAt: '', problems: [] },
+      'POST /api/deploy/read-back': new Response(JSON.stringify({ code: 'MISMATCH', error: 'Not staged.', readBack: { systems: [] } }), { status: 409 }),
+    })
+    await api.getDeploy()
+    const err = await api.readBackDeploy(ran).catch((e: unknown) => e)
+    await api.readBackDeploy().catch(() => {})
+    expect(calls.map(c => [c.method, c.path, c.body])).toEqual([['GET', '/api/deploy', undefined], ['POST', '/api/deploy/read-back', { ran }], ['POST', '/api/deploy/read-back', {}]])
+    expect((err as ApiError).code).toBe('MISMATCH')
+    expect((err as ApiError).body.readBack).toEqual({ systems: [] })
   })
 
   it('stages ops as JSON, and a 422 carries each error with its record', async () => {
@@ -177,6 +191,13 @@ describe('api: a refused read said to the session (coordinator ruling L9-O1)', (
     expect((await refusedRead({ ...IN, hats: [] }))!.message).toBe('You are signed in, but you wear no hat in this DAO now.')
   })
 
+  it('an emailed-link person with no Role is told they have no Role here yet (T2c minor 5); one with a Role hears SIGN_IN', async () => {
+    const person = (roles: string[]) => ({ mode: 'hosted', signedIn: true, via: 'email', actor: 'example-org:person:p', viewer: roles.length ? 'member' : 'public',
+      expiresAt: '2026-10-31T10:00:00.000Z', person: { id: 'example-org:person:p', name: 'P', roles, nodes: [] } })
+    expect((await refusedRead(person([])))!.message).toBe('You are signed in, but you have no Role here yet.')
+    expect((await refusedRead(person(['steward'])))!.message).toBe(SIGN_IN)
+  })
+
   it('signed out, the SIGN_IN sentence stands', async () => {
     const err = await refusedRead({ mode: 'hosted', signIn: { chainId: 'eip155:42220', tree: 'eip155:42220:13' }, signedIn: false })
     expect(err!.message).toBe(SIGN_IN)
@@ -191,5 +212,40 @@ describe('api: a refused read said to the session (coordinator ruling L9-O1)', (
     fetchRoutes({ 'GET /api/session': { ...IN, hats: [] }, 'GET /api/changes': refuse(401, { error: 'Sign in to change anything here.' }) })
     await api.session()
     await expect(api.changes()).rejects.toThrow('Sign in to change anything here.')
+  })
+})
+
+// The walk review's G1: while a preview runs, every read names the viewer it is for (`?as=`), and the server answers that
+// viewer; what the View as control itself reads (the session, the tree's hats) is read as you, and writes never carry it.
+describe('View as at the server: ?as on every read while previewing', () => {
+  it('adds ?as (or &as) to every GET while previewing, never to a write, the session, the actor or the visibility source; none after', async () => {
+    const { calls } = fetchRoutes({
+      'GET /api/registries': [], 'GET /api/operations': [], 'GET /api/session': { mode: 'local', signIn: null, signedIn: false }, 'GET /api/actor': {},
+      'GET /api/visibility': {}, 'POST /api/changes/ops': {},
+    })
+    setPreviewAs('hat:eip155:42220:0x0000000d0002')
+    try {
+      await api.registries()
+      await api.operations('person:a')
+      await api.session()
+      await api.actor()
+      await api.visibility()
+      await api.stage([{ op: 'update', record: 'projects:p1', set: { status: 'develop' } }])
+    } finally { setPreviewAs(null) }
+    await api.registries()
+    expect(calls.map(c => `${c.method} ${c.path}`)).toEqual([
+      'GET /api/registries?as=hat%3Aeip155%3A42220%3A0x0000000d0002',
+      'GET /api/operations?resource=person%3Aa&as=hat%3Aeip155%3A42220%3A0x0000000d0002',
+      'GET /api/session', 'GET /api/actor', 'GET /api/visibility', 'POST /api/changes/ops', 'GET /api/registries',
+    ])
+  })
+
+  it('a preview read the server refuses as the public does (401 SIGN_IN) sends nobody to sign in', async () => {
+    fetchRoutes({ 'GET /api/collections': refuse(401, { error: 'Sign in to see this: it is for members only.', code: 'SIGN_IN' }) })
+    const told: string[] = []
+    const stop = onUnauthorized(path => told.push(path))
+    setPreviewAs('public')
+    try { await expect(api.collections()).rejects.toThrow('Sign in to see this') } finally { setPreviewAs(null); stop() }
+    expect(told).toEqual([])
   })
 })

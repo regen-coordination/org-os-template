@@ -30,7 +30,7 @@ describe('the boards page', () => {
     routes()
     renderAt(<Boards />, '/boards')
     expect((await screen.findByRole('heading', { level: 1, name: 'Boards' }))).toBeTruthy()
-    expect(document.querySelector('.rh-about')!.textContent).toBe('Ways of looking at the org’s records. Built-in boards come with the framework; yours are kept in data/boards.yaml.')
+    expect(document.querySelector('.rh-about')!.textContent).toBe('Ways of looking at the org’s records. Built-in boards come with the framework; yours are kept in the repository.')
     expect(screen.getByRole('searchbox', { name: 'Search boards' })).toBeTruthy()
     const add = await screen.findByRole('button', { name: 'New board' })
     expect(add.className).toMatch(/\bprimary\b/)
@@ -61,9 +61,19 @@ describe('the boards page', () => {
     await waitFor(() => expect(projects.querySelector('.brow-n')?.textContent).toBe('2'))
     const funding = rowOf(list, 'Funding')
     expect(funding.querySelector('.drow-end')!.textContent).toBe('empty')
-    const setUp = within(list).getByRole('link', { name: 'Set up Funding' })
+    const setUp = within(list).getByRole('link', { name: 'Set up Funding board' })
     expect(setUp.getAttribute('href')).toBe('/b/funding')
     expect(funding.contains(setUp)).toBe(false)
+  })
+
+  // walk I15, D1: a board is never named as another page is (Meetings is /c/meetings, Knowledge /c/knowledge, Sources /sources)
+  it('names each section board "<word> board": Meetings board, Knowledge board, Projects board', async () => {
+    routes()
+    renderAt(<Boards />, '/boards')
+    const list = await screen.findByRole('list', { name: 'Section boards' })
+    const titles = within(list).getAllByRole('link').map(a => a.querySelector('.drow-t')?.textContent).filter(Boolean)
+    expect(titles).toEqual(expect.arrayContaining(['Projects board', 'Meetings board', 'Knowledge board']))
+    expect(titles.every(t => t!.endsWith(' board') && !t!.endsWith(' board board'))).toBe(true)
   })
 
   it('folds the system sections under show all', async () => {
@@ -114,12 +124,12 @@ describe('the boards page', () => {
     renderAt(<Boards />, '/boards')
     const list = await screen.findByRole('list', { name: 'Section boards' })
     await waitFor(() => expect(rowOf(list, 'Projects').querySelector('.brow-n')).not.toBeNull())
-    fireEvent.click(within(list).getByRole('button', { name: 'Copy to yours: Projects' }))
-    expect(await screen.findByText('A copy of Projects is in your changes. Apply it to make it yours.')).toBeTruthy()
+    fireEvent.click(within(list).getByRole('button', { name: 'Copy to yours: Projects board' }))
+    expect(await screen.findByText('A copy of Projects board is in your changes. Apply it to make it yours.')).toBeTruthy()
     const post = calls.find(c => c.method === 'POST')!.body as { ops: { op: string; record: string; value: { id: string; blocks: unknown[] } }[] }
     expect(post.ops).toHaveLength(1)
     expect(post.ops[0]).toMatchObject({ op: 'create', record: 'boards:projects', value: { id: 'projects', name: 'Projects', layout: 'flow' } })
-    await waitFor(() => expect(within(list).queryByRole('button', { name: 'Copy to yours: Projects' })).toBeNull())
+    await waitFor(() => expect(within(list).queryByRole('button', { name: 'Copy to yours: Projects board' })).toBeNull())
   })
 
   it('Search boards keeps the boards whose name matches, folded ones included', async () => {
@@ -128,7 +138,7 @@ describe('the boards page', () => {
     await screen.findByRole('list', { name: 'Section boards' })
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search boards' }), { target: { value: 'crew' } })
     const list = screen.getByRole('list', { name: 'Section boards' })
-    expect(within(list).getAllByRole('link').filter(l => l.matches('.drow')).map(l => l.querySelector('.drow-t')!.textContent)).toEqual(['Crew'])
+    expect(within(list).getAllByRole('link').filter(l => l.matches('.drow')).map(l => l.querySelector('.drow-t')!.textContent)).toEqual(['Crew board'])
     expect(screen.queryByRole('list', { name: 'Your boards' })).toBeNull()
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search boards' }), { target: { value: 'nothing like it' } })
     expect(screen.getByText('No board is called “nothing like it”.')).toBeTruthy()
@@ -155,7 +165,7 @@ describe('the New board sheet', () => {
     expect(within(sheet).getByRole('group', { name: 'Start from' }).textContent).toBe('BlankCopy a built-in') // no recipe source: DP-20
     fireEvent.change(within(sheet).getByLabelText('Name'), { target: { value: 'Council – Q4' } })
     expect(within(sheet).getByText('council-q4')).toBeTruthy()
-    expect(sheet.querySelector('.dialog-note')!.textContent).toBe('Saved to data/boards.yaml as a staged change')
+    expect(sheet.querySelector('.dialog-note')!.textContent).toBe('Saved as a staged change')
   })
 
   it('refuses a name whose id another board has, or a staged one', async () => {

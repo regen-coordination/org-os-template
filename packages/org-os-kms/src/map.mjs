@@ -21,6 +21,8 @@ export function buildMap({ dir = '.', surface = 'web', now = new Date().toISOStr
     id: fed.identity.name, name: fed.identity.name, type: fed.identity.type || null,
     emoji: fed.identity.emoji || null, url: fed.hub || null,
   };
+  const kb = readJson(join(dir, 'data', 'kb', 'index.json'));
+  if (kb && typeof kb.total === 'number') self.counts = { entries: kb.total };
   const nodes = [], edges = [], seen = new Map(); // id → node
   const edgeKeys = new Set();
   const addEdge = (from, to, kind) => {
@@ -42,11 +44,19 @@ export function buildMap({ dir = '.', surface = 'web', now = new Date().toISOStr
       const projects = readJson(join(localAbs, '.well-known', 'projects.json'));
       if (Array.isArray(projects?.projects)) counts.projects = projects.projects.length;
     }
-    addNode({
+    const node = {
       id, kind: 'instance', name: entry.name || id, type: entry.type || null, ring: 1,
       trust: entry.trust || null, live, url: entry.url || null, repo: entry.repo || null,
       counts, last_seen: live ? now : null,
-    });
+    };
+    if (entry.repo || entry.local_path) {
+      // the last read of this instance's own federation manifest (written by `federate frontier`). A failed attempt
+      // and its error are the steward's (spec §4 rule 1, §5.2; R-39): the web surface carries when and from where only.
+      const snap = readJson(join(dir, 'data', 'federation', 'frontier', `${id}.json`)) || {};
+      node.frontier = { fetched_at: snap.fetched_at ?? null, source: snap.source ?? null };
+      if (surface === 'vault') Object.assign(node.frontier, { last_attempt_at: snap.last_attempt_at ?? null, last_error: snap.last_error ?? null });
+    }
+    addNode(node);
     addEdge(self.id, id, edgeKind);
   };
   for (const p of fed.peers || []) instance(p, 'federation');
@@ -62,7 +72,6 @@ export function buildMap({ dir = '.', surface = 'web', now = new Date().toISOStr
   }
 
   // ── ring 3: sources from data/source-systems.yaml + KB index (optional) ─────
-  const kb = readJson(join(dir, 'data', 'kb', 'index.json'));
   for (const s of firstArray(readYaml(join(dir, 'data', 'source-systems.yaml')))) {
     const id = s.id || s.title;
     if (!id) continue;
@@ -70,7 +79,8 @@ export function buildMap({ dir = '.', surface = 'web', now = new Date().toISOStr
     if (kb && typeof kb.total === 'number') counts.objects = kb.total;
     addNode({ id, kind: 'source', name: s.title || id, type: null, ring: 3,
       ecosystem: s.ecosystem || null, url: s.url || null, counts,
-      portal: (surface === 'vault' ? s.portal_vault : s.portal_web) || null });
+      portal: (surface === 'vault' ? s.portal_vault : s.portal_web) || null,
+      ...(s.curates ? { curates: String(s.curates) } : {}) });
     addEdge(id, self.id, 'provenance');
   }
 

@@ -3,7 +3,7 @@
 // The one place reads are judged (L5 spec §9.5). Every route that answers items passes them through `gateItems` or
 // `gateRecord`; every WebSocket message through `gateEvent`. A thing's level is its full level (lib/visibility.mjs
 // `fullLevel`, on the policy `readConfig` reads through `readFullPolicy`), and a record is admitted before any of its
-// fields is (R-L5-2.2). What the public is given stands on L8's `publicView`, so the door, `.well-known` and these routes
+// fields is (R-L5-2.2). What the public is given stands on L8's `publicView`, so the portal, `.well-known` and these routes
 // cannot disagree about what is public (§9.5, `publicProjection`).
 //
 // Two readings this file makes that the spec leaves open (R-L5-13.2, R-L5-13.3):
@@ -19,7 +19,7 @@
 
 import type { MiddlewareHandler } from 'hono'
 import { listRegistriesCached, readRegistryOrEmptyCached, type Entity } from '../registry.ts'
-import { REGISTRIES } from '../registries.ts'
+import { registriesOf, registryFile } from '../registries.ts'
 import { readLedger } from '../proposals/ledger.ts'
 import { listViews, type ProposalView } from '../proposals/view.ts'
 import { readResources } from '../resources/index.ts'
@@ -31,8 +31,10 @@ import { actorOf, viewerOf } from '../request.ts'
 import { readConfig, type VisibilityPolicy } from './config.ts'
 import { admits, formatLevel, fullLevel, isPublic, publicView, type ParsedLevel, type Viewer } from '../../lib/visibility.mjs'
 import { MAINTAINER } from '../../lib/rules.mjs'
-import { memberFields, NO_PRIVATE, privateCollections, privateEntries, type PrivateReads } from '../private/reads.ts'
+import { levelOfToken, memberFields, NO_PRIVATE, privateCollections, privateEntries, type PrivateReads } from '../private/reads.ts'
 import type { PrivateField } from '../private/store.ts'
+import { pageEntries, pageLevel, type PageEntry } from '../../lib/workspace/pages.mjs'
+import { gitPages } from '../workspace/files.ts'
 
 export const PUBLIC: ParsedLevel = Object.freeze({ level: 'public' })
 export const MEMBERS: ParsedLevel = Object.freeze({ level: 'members' })
@@ -45,6 +47,8 @@ export const MAINTAINERS: ParsedLevel = Object.freeze({ level: 'role', role: MAI
  *  included, as 0.6 showed them Home). Unknown: maintainers'. */
 export const attentionLevel = (hosted: boolean | undefined): ParsedLevel => (hosted === false ? MEMBERS : MAINTAINERS)
 export const PUBLIC_VIEWER: Viewer = Object.freeze({ kind: 'public' })
+/** A level that admits nobody (no hat ref, so nobody wears it or a hat above it): what is not there (DAO-OS L6 §8.5). */
+export const NOBODY: ParsedLevel = Object.freeze({ level: 'hat', hat: '' })
 
 /** §9.5: the members' side, asked by the public (hosted, no session, or past the grace of §5.2). */
 export const MEMBERS_ONLY = 'Sign in to see this: it is for members only.'
@@ -85,9 +89,20 @@ export function gateRecord(viewer: Viewer, registry: string, record: unknown, co
 
 /** A server event as `viewer` may hear it, or null. `ids` are filtered (null when none is left); a message naming a
  *  `registry` is heard when its level admits the viewer; any other message is members' (§9.5: the public hears only
- *  events naming public items). `levelOf` answers a registry name or a resource id. */
-export function gateEvent<M extends { type: string; registry?: string; ids?: string[] }>(viewer: Viewer, msg: M,
+ *  events naming public items). `levelOf` answers a registry name or a resource id.
+ *  DAO-OS L6 §8.5 (Task 9): a message naming a `target` (`page:<id>`, `record:<registry>:<id>`: presence, conversation) is
+ *  heard by a member admitted to it, never by the public, whatever the target's level (§8.4: presence is never public;
+ *  conversation is the members' side). PR7-R45: a conversation message's `written` (the floor of what changed: its written
+ *  level and those of the comments above it) admits them too, each; it is not sent. */
+export function gateEvent<M extends { type: string; registry?: string; ids?: string[]; target?: string; written?: string[] }>(viewer: Viewer, msg: M,
   levelOf: (key: string) => ParsedLevel): M | null {
+  if (typeof msg.target === 'string') {
+    if (viewer.kind !== 'member' || !admits(levelOf(msg.target), viewer)) return null
+    if (msg.written === undefined) return msg
+    if (!Array.isArray(msg.written) || !msg.written.every(w => typeof w === 'string' && admits(levelOfToken(w), viewer))) return null
+    const { written: _floor, ...heard } = msg
+    return heard as M
+  }
   if (Array.isArray(msg.ids)) {
     const ids = msg.ids.filter(id => admits(levelOf(id), viewer))
     return ids.length > 0 ? { ...msg, ids } : null
@@ -154,6 +169,8 @@ export function recordRef(record: unknown): { registry: string; id: string } {
  *  writes, the fields it sets (each judged on the record it would leave). */
 function publicOp(config: VisibilityPolicy, op: unknown): unknown {
   if (!isObj(op)) return op
+  // DAO-OS L6 §11.2: a file op's whole text holds the members' side of its file, so the public is given its path alone.
+  if (op.op === 'file') { const { text: _text, ...rest } = op; return rest }
   const { registry } = recordRef(op.record)
   const out: Record<string, unknown> = { ...op }
   if (isObj(op.before)) out.before = publicView(config, registry, op.before)
@@ -165,7 +182,10 @@ function publicOp(config: VisibilityPolicy, op: unknown): unknown {
   return out
 }
 
-const COLLECTIONS = new Set(REGISTRIES.filter(r => r.kind === 'collection').map(r => r.name))
+/** The collections of the instance at `repo` (DAO-OS L6 §7.1): its registries' and its custom collections' (ruling R-2b). */
+const collectionsOf = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).filter(r => r.kind === 'collection').map(r => r.name))
+/** The collections spread over files (`filesGlob`: knowledge, L6 §7.5), whose records the commons shows, not the house. */
+const spreadOf = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).filter(r => r.filesGlob !== undefined).map(r => r.name))
 
 /** A proposal's `touched` (L9 Ruling T12-1): the strictest level its ops ever touched, `public` or `members` (any level
  *  that is not public reads as members' here, as `Levels.proposal` gives it). Written when it is opened, raised by every
@@ -196,16 +216,18 @@ function touchedPublic(entry: Record<string, unknown>): boolean {
  *  repository's read cache (L9 §7.6): a file that has not changed since the last request is not parsed again. */
 export class Levels {
   private readonly entries = new Map<string, Entity[]>()
+  private readonly collections: ReadonlySet<string>
+  private readonly spread: ReadonlySet<string>
   /** `attention`: the level of the server's own attention items (`attentionLevel`). `priv`: the private store's reads
    *  (none: a read that holds only what git holds, as the public projection). */
   constructor(readonly repo: string, readonly config: VisibilityPolicy = readConfig(repo), private readonly attention: ParsedLevel = MAINTAINERS,
-    readonly priv: PrivateReads = NO_PRIVATE) {}
+    readonly priv: PrivateReads = NO_PRIVATE) { this.collections = collectionsOf(repo); this.spread = spreadOf(repo) }
 
   /** A collection's records; [] for one that cannot be read (its records then read as members: nothing is public). */
   records(registry: string): Entity[] {
     let got = this.entries.get(registry)
     if (!got) {
-      try { got = COLLECTIONS.has(registry) ? readRegistryOrEmptyCached(this.repo, registry).entries ?? [] : [] } catch { got = [] }
+      try { got = this.collections.has(registry) ? readRegistryOrEmptyCached(this.repo, registry).entries ?? [] : [] } catch { got = [] }
       this.entries.set(registry, got)
     }
     return got
@@ -241,7 +263,10 @@ export class Levels {
   private opPublic(op: unknown): boolean {
     if (!isObj(op) || op.op === 'private') return false
     const { registry, id } = recordRef(op.record)
-    if (!COLLECTIONS.has(registry)) return false
+    if (!this.collections.has(registry)) return false
+    // PF-R6 (invisible means absent): a knowledge op is never public by itself; the canon is published by the commons,
+    // through kms's gate, and a proposal touching it is the members'.
+    if (this.spread.has(registry)) return false
     const current = this.records(registry).find(e => String(e.id) === id) ?? null
     const before = isObj(op.before) ? op.before : null
     const after = isObj(op.value) ? op.value : isObj(op.set) ? { ...(before ?? current ?? {}), ...op.set } : null
@@ -260,6 +285,40 @@ export class Levels {
     const found = all.find(e => String(e.id) === src.entityId)
     return found ? this.record(src.registry, found) : MEMBERS
   }
+
+  // ── DAO-OS L6 §4.2 (Task 7): pages ──────────────────────────────────────────────────────────────────
+  private pageMap: Map<string, PageEntry> | null = null
+
+  /** Every page, by id: git's `pages/<id>.md` and the store's private pages (`collection: 'pages'`), read once. */
+  pages(): ReadonlyMap<string, PageEntry> {
+    this.pageMap ??= pageEntries(gitPages(this.repo), this.priv.records('pages'))
+    return this.pageMap
+  }
+
+  /** A page's level (lib/workspace/pages.mjs `pageLevel`: its own, else its parent's, else `collections.pages.default`,
+   *  else members), or null when no page has that id. */
+  page(id: string): ParsedLevel | null {
+    const pages = this.pages()
+    return pages.has(id) ? pageLevel(id, pages, this.config) : null
+  }
+  // ── end DAO-OS L6 Task 7 ───────────────────────────────────────────────────────────────────────────
+
+  // ── DAO-OS L6 §8.2 (Task 9): what a comment, a mention or presence is on ─────────────────────────────
+
+  /** The level of a conversation target as it is now: `page:<id>` a page's (`page`), `record:<registry>:<id>` a git record's
+   *  (`record`) or a private record's own (the store's, as `privateRecordView` reads it). Null when there is no such thing
+   *  here (deleted, never there, or kept by a store that cannot be read): nothing on it is shown to anyone. */
+  target(target: string): ParsedLevel | null {
+    if (target.startsWith('page:')) return this.page(target.slice('page:'.length))
+    const m = /^record:([^:]+):(.+)$/.exec(target)
+    if (!m) return null
+    const [, registry, id] = m as unknown as [string, string, string]
+    const found = this.collections.has(registry) ? this.records(registry).find(e => String(e.id) === id) : undefined
+    if (found) return this.record(registry, found)
+    const kept = this.priv.records(registry).find(r => r.id === id)
+    return kept ? levelOfToken(kept.visibility) : null
+  }
+  // ── end DAO-OS L6 Task 9 ───────────────────────────────────────────────────────────────────────────
 
   /** A resource's record as the public may see it, when it is drawn from one. */
   publicRecord(node: Resource): Record<string, unknown> | null {
@@ -299,9 +358,31 @@ function publicResource(node: Gated<Resource>, record: Record<string, unknown> |
   return out
 }
 
-/** The graph as `viewer` may see it: never a node, a count or an edge for what they may not see (§9.5). */
-export function gateGraph(viewer: Viewer, graph: Graph, levels: Levels): { nodes: Gated<Resource>[]; edges: Edge[] } {
+/** The fields of a System that say where the chain holds it (what the read-back writes and the plan predicts): kept from
+ *  a viewer, every reading of that System is (the gaps review's I-4; deploy/private-flip.ts `keptFrom`). */
+export const CHAIN_FIELDS = ['address', 'signer_gate', 'hats', 'deployment', 'space', 'url', 'ens'] as const
+const EVERY_CHAIN_FIELD: ReadonlySet<string> = new Set(CHAIN_FIELDS)
+/** Every chain field of every System kept (walk fix wave 4): what `gateGraph` judges a System by when told nothing else. */
+const NO_CHAIN = (): ReadonlySet<string> => EVERY_CHAIN_FIELD
+
+/** A System's Resource as a member from whom some of its chain fields (`kept`) are kept is shown it (walk fix wave 4,
+ *  Rule 4; PF-R256): no driver read (what it found on the chain, `composed` among it), no attention drawn from that read,
+ *  and no fact of a kept field. Any other Resource, or a System none of whose chain fields is kept, as it is. */
+function withoutChainRead<R extends Resource>(node: R, chain: (system: string) => ReadonlySet<string>): R {
+  if (node.kind !== 'system') return node
+  const kept = chain(node.source?.entityId ?? node.id.replace(/^system:/, ''))
+  if (kept.size === 0) return node
+  const facts = Object.fromEntries(Object.entries(node.facts).filter(([k]) => k !== 'driver' && !kept.has(k)))
+  return { ...node, facts, attention: null }
+}
+
+/** The graph as `viewer` may see it: never a node, a count or an edge for what they may not see (§9.5). `chain`: the
+ *  chain fields of each System kept from them (deploy/private-flip.ts `chainKept`, the one filter); absent, every System's
+ *  reading is kept (walk fix wave 4). */
+export function gateGraph(viewer: Viewer, graph: Graph, levels: Levels, chain: (system: string) => ReadonlySet<string> = NO_CHAIN): { nodes: Gated<Resource>[]; edges: Edge[] } {
   let nodes = gateItems(viewer, graph.nodes, n => levels.resource(n))
+  // the public is given only what its public record holds (`publicResource`), never a driver read nor attention
+  if (viewer.kind === 'member') nodes = nodes.map(n => withoutChainRead(n, chain))
   const records = new Map<string, Record<string, unknown> | null>()
   if (viewer.kind === 'public') {
     nodes = nodes.map(n => {
@@ -359,14 +440,21 @@ export function gateRegistryEntries(viewer: Viewer, registry: string, levels: Le
   return member ? [...git, ...privateEntries(viewer, registry, levels.priv, levels.config)] : git
 }
 
+/** The file a registry is read from, when it is not `data/<name>.yaml` (a custom collection's `data/collections/<id>.yaml`):
+ *  `{ file }`, else nothing, so a page never names a file the registry is not in (walk M15). */
+function fileUnlessPlain(repo: string, name: string): { file?: string } {
+  try { const file = registryFile(repo, name); return file === `data/${name}.yaml` ? {} : { file } } catch { return {} }
+}
+
 /** GET /api/registries/:name for `viewer`: what `readRegistryOrEmpty` answers (through the read cache), its entries or
  *  its document gated. A document they may not see reads as an empty one, as a missing file does. */
 export function gateRegistry(viewer: Viewer, repo: string, name: string, levels = new Levels(repo)) {
   // A private collection this member is admitted to; for anyone else its name is no registry, as an unknown one.
+  // `file: null`: the store keeps it, so no file is named for it (walk M15).
   if (privateCollections(viewer, levels.priv).some(c => c.id === name)) {
-    return { name, kind: 'collection' as const, schemaVersion: null, entries: privateEntries(viewer, name, levels.priv, levels.config) }
+    return { name, kind: 'collection' as const, schemaVersion: null, file: null, entries: privateEntries(viewer, name, levels.priv, levels.config) }
   }
-  const read = readRegistryOrEmptyCached(repo, name)
+  const read = { ...readRegistryOrEmptyCached(repo, name), ...fileUnlessPlain(repo, name) }
   if (read.kind === 'document') {
     const doc = read.document ?? {}
     // An empty document (no file) has nothing to gate, nor a level to carry.
@@ -444,17 +532,23 @@ export class EventLevels {
   private readonly resources = new Map<string, ParsedLevel>()
   /** The ids of the graph noted last. */
   private last = new Set<string>()
-  constructor(private readonly repo: string, private readonly attention: ParsedLevel = MAINTAINERS) {}
+  /** `priv`: the private store's reads, for a target kept there (DAO-OS L6 §8.5); none, such a target is heard by nobody. */
+  constructor(private readonly repo: string, private readonly attention: ParsedLevel = MAINTAINERS, private readonly priv: PrivateReads = NO_PRIVATE) {}
 
   /** What the public sees of every registry now: the baseline the first change is told apart from. */
-  start(): void { for (const r of REGISTRIES) this.publicText.set(r.name, this.publicOf(r.name)) }
+  start(): void { for (const r of registriesOf(this.repo)) this.publicText.set(r.name, this.publicOf(r.name)) }
 
   private publicOf(registry: string): string | null {
     try { return JSON.stringify(gateRegistry(PUBLIC_VIEWER, this.repo, registry)) } catch { return null }
   }
 
   /** The level of each key `msg` names (a registry, or resource ids). Call it once per event. */
-  levelsFor(msg: { registry?: string; ids?: string[] }): (key: string) => ParsedLevel {
+  levelsFor(msg: { registry?: string; ids?: string[]; target?: string }): (key: string) => ParsedLevel {
+    // DAO-OS L6 §8.5 (Task 9): a target's level now; one that is not there (deleted, or the store down) admits nobody.
+    if (typeof msg.target === 'string') {
+      const level = new Levels(this.repo, readConfig(this.repo), this.attention, this.priv).target(msg.target) ?? NOBODY
+      return () => level
+    }
     if (typeof msg.registry === 'string') {
       const now = this.publicOf(msg.registry)
       const was = this.publicText.get(msg.registry) ?? null
@@ -493,7 +587,7 @@ export interface PublicProjection {
 }
 
 /**
- * The gate's answer for the public viewer (§9.5), for L9's door build and L8: exactly what a public viewer gets from GET
+ * The gate's answer for the public viewer (§9.5), for L9's portal build and L8: exactly what a public viewer gets from GET
  * /api/registries/:name (each collection GET /api/registries lists), GET /api/resources and GET /api/proposals. Async:
  * the resources and the proposals' evaluation are read as the routes read them. `graph` and `now` are the server's when
  * it asks; the default reads the repository's graph without a server.
@@ -535,6 +629,8 @@ export const PUBLIC_READS: readonly string[] = [
   '/api/governance',
   '/api/proposals',
   '/api/proposals/:id',
+  '/api/pages', // DAO-OS L6 §4.7: public pages only (server/workspace/pages.ts)
+  '/api/pages/:id',
 ]
 
 const asPattern = (path: string) => new RegExp(`^${path.split('/').map(s => {

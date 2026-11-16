@@ -37,6 +37,12 @@ describe('the top bar (§5.5)', () => {
     expect(bell.querySelector('.tb-dot')).not.toBeNull()
   })
 
+  it('opens Needs you, where the mentions are rows (DAO-OS L6 Task 18 fix round 1)', () => {
+    const { loc } = renderAt(<ViewAsProvider><TopBar unread /></ViewAsProvider>, '/')
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications' }))
+    expect(loc.history.at(-1)).toBe('/needs')
+  })
+
   it('the rail toggle is outside a frame a plain ghost button (no Shell: nothing to fold)', () => {
     renderAt(<ViewAsProvider><TopBar /></ViewAsProvider>, '/')
     expect(screen.getByRole('button', { name: 'Collapse sidebar' }).className).toContain('ghost')
@@ -52,13 +58,12 @@ describe('the org switcher (§5.2 item 1)', () => {
     expect(org.querySelector('img')).toBeNull()
   })
 
-  it('its menu holds Public door ↗ and Appearance: System, Light, Dark', () => {
+  it('its menu holds Appearance: System, Light, Dark, and no Portal without a portal origin (D-5; portalLink.test.tsx)', () => {
     renderAt(<OrgSwitcher org={{ name: 'Example DAO', mark: null }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Example DAO' }))
     const menu = screen.getByRole('menu', { name: 'Example DAO' })
-    const door = within(menu).getByRole('menuitem', { name: /^Public door/ })
-    expect(door.getAttribute('href')).toBe('/door')
-    expect(door.getAttribute('target')).toBe('_blank')
+    expect(within(menu).queryByRole('menuitem', { name: /^Portal/ })).toBeNull()
+    expect(menu.querySelector('[role="separator"]')).toBeNull()
     const appearance = within(menu).getByRole('group', { name: 'Appearance' })
     expect(within(appearance).getAllByRole('menuitemradio').map(r => r.textContent)).toEqual(['System', 'Light', 'Dark'])
     expect(within(appearance).getByRole('menuitemradio', { name: 'System' }).getAttribute('aria-checked')).toBe('true')

@@ -153,7 +153,7 @@ export function useEditor(o: { registry: string | null; entityId: string; latest
       } catch (err) {
         // A cancel during the save has already closed the editor: REFUSED is then refused by the
         // machine and the errors stay unseen, as before.
-        if (m.send('REFUSED')) setErrors(refusalErrors(err, ops[0]!.record))
+        if (m.send('REFUSED')) setErrors(refusalErrors(err, (ops[0] as { record?: string }).record ?? ''))
         return null
       }
     },

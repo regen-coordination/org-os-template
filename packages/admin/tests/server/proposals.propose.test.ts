@@ -170,14 +170,15 @@ describe('POST /api/proposals refuses, in words, and writes nothing', () => {
     await stageOps([MEMBER])
     const b = await refused(await open(), 409)
     expect(b.code).toBe('NO_RULE')
-    expect(b.error).toBe('No rule in data/governance.yaml covers the class members; nobody can propose it until a rule does. Nothing was written.')
+    expect(b.error).toBe('No rule of this org covers members changes yet, so nobody can propose one until a rule does. Nothing was written.')
     await expectUntouched({ commits: commits(), ops: 1 })
   })
 
   it('a stale op (409), naming the count', async () => {
     setup()
     await stageOps([PROJECT])
-    writeFileSync(join(repo, 'data', 'projects.yaml'), PROJECTS.replace('Node Onboarding Program', 'Renamed on the trunk'))
+    // The field the op sets, changed on the trunk (the walk's G6: another field's change is no conflict).
+    writeFileSync(join(repo, 'data', 'projects.yaml'), PROJECTS.replace('status: "execute"', 'status: "archive"'))
     git(repo, 'commit -qam "the trunk changes the record"')
     const b = await refused(await open(), 409)
     expect(b).toMatchObject({ code: 'STALE', stale: [0] })

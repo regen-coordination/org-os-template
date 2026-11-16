@@ -78,3 +78,85 @@ test('ecosystems: node added, sources tagged + edged', () => {
   assert.equal(m.nodes.find((n) => n.id === 'koi-network').ecosystem, 'regen-commons');
   assert.ok(m.edges.some((e) => e.from === 'regen-commons' && e.to === 'koi-network' && e.kind === 'provenance'));
 });
+
+// ── the house fixture: frontier reads are carried on ring-1 instances ─────────
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { NOW as HOUSE_NOW } from './fixtures/map/house/now.mjs';
+
+const HOUSE = join(FIX, 'house');
+const byId = (m, id) => m.nodes.find((n) => n.id === id);
+
+test('house: a failed read is carried on the node (vault)', () => {
+  const m = buildMap({ dir: HOUSE, surface: 'vault', now: HOUSE_NOW });
+  assert.equal(byId(m, 'watershed-network').frontier.last_error, 'HTTP 404');
+  assert.equal(byId(m, 'watershed-network').frontier.fetched_at, '2026-10-26T12:00:00Z');
+});
+
+test('house: an instance with an address but no snapshot has an all-null frontier (vault)', () => {
+  const m = buildMap({ dir: HOUSE, surface: 'vault', now: HOUSE_NOW });
+  assert.deepEqual(byId(m, 'market-garden').frontier,
+    { fetched_at: null, source: null, last_attempt_at: null, last_error: null });
+});
+
+test('house: no address → no frontier key; knowledge peers never carry one', () => {
+  const m = buildMap({ dir: HOUSE, now: HOUSE_NOW });
+  assert.ok(!('frontier' in byId(m, 'lowland-guild')));
+  assert.ok(!('frontier' in byId(m, 'open-seed-library')));
+});
+
+test('house: frontier.fetched_at equals the snapshot\'s', () => {
+  const m = buildMap({ dir: HOUSE, now: HOUSE_NOW });
+  const snap = JSON.parse(readFileSync(join(HOUSE, 'data', 'federation', 'frontier', 'hillside-coop.json'), 'utf8'));
+  assert.equal(byId(m, 'hillside-coop').frontier.fetched_at, snap.fetched_at);
+  assert.equal(byId(m, 'hillside-coop').frontier.source, 'local');
+  assert.equal(byId(m, 'hillside-coop').live, true);
+});
+
+test('an old snapshot without the new fields reads as last_attempt_at: null, last_error: null', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-map-'));
+  cpSync(HOUSE, dir, { recursive: true });
+  writeFileSync(join(dir, 'data', 'federation', 'frontier', 'youth-circle.json'),
+    JSON.stringify({ fetched_at: '2026-10-17T12:00:00Z', source: 'local', peers: [] }));
+  const m = buildMap({ dir, surface: 'vault', now: HOUSE_NOW });
+  assert.deepEqual(byId(m, 'youth-circle').frontier,
+    { fetched_at: '2026-10-17T12:00:00Z', source: 'local', last_attempt_at: null, last_error: null });
+});
+
+// R-39: "couldn't read" is the steward's (spec §4 rule 1, §5.2) — the public map.json carries when the frontier was
+// read and from where, never the last failed attempt or its error.
+test('web map.json: frontier is { fetched_at, source } only; the vault keeps last_error and last_attempt_at', () => {
+  const web = buildMap({ dir: HOUSE, surface: 'web', now: HOUSE_NOW });
+  const vault = buildMap({ dir: HOUSE, surface: 'vault', now: HOUSE_NOW });
+  for (const n of web.nodes.filter((x) => x.frontier)) assert.deepEqual(Object.keys(n.frontier).sort(), ['fetched_at', 'source'], n.id);
+  assert.deepEqual(byId(web, 'watershed-network').frontier, { fetched_at: '2026-10-26T12:00:00Z', source: byId(vault, 'watershed-network').frontier.source });
+  assert.deepEqual(byId(web, 'market-garden').frontier, { fetched_at: null, source: null });
+  assert.doesNotMatch(JSON.stringify(web), /HTTP 404|last_error|last_attempt_at/);
+  assert.equal(byId(vault, 'watershed-network').frontier.last_error, 'HTTP 404');
+  assert.ok('last_attempt_at' in byId(vault, 'watershed-network').frontier);
+  assert.deepEqual(buildMap({ dir: HOUSE, now: HOUSE_NOW }), web, 'web is the default surface');
+});
+
+test('full fixture: ring-1 instances with an address carry a frontier; child-os from its snapshot', () => {
+  const m = buildMap({ dir: join(FIX, 'full'), now: NOW });
+  assert.equal(byId(m, 'child-os').frontier.fetched_at !== undefined, true);
+  assert.ok(!('frontier' in byId(m, 'koi-network')));
+});
+
+test('house: self carries the KB total as counts.entries; sources carry curates when given', () => {
+  const m = buildMap({ dir: HOUSE, now: HOUSE_NOW });
+  assert.deepEqual(m.self.counts, { entries: 142 });
+  assert.equal(byId(m, 'field-notes-archive').curates, 'field notes');
+  assert.equal(byId(m, 'seed-registry').curates, 'seed records');
+  assert.equal(byId(m, 'open-data-portal').curates, 'public datasets');
+});
+
+test('house: no KB index → no self.counts; no curates → no key', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-house-'));
+  cpSync(HOUSE, dir, { recursive: true });
+  writeFileSync(join(dir, 'data', 'kb', 'index.json'), '{}');
+  writeFileSync(join(dir, 'data', 'source-systems.yaml'), '- id: s1\n  title: "S1"\n');
+  const m = buildMap({ dir, now: HOUSE_NOW });
+  assert.equal('counts' in m.self, false);
+  assert.equal('curates' in byId(m, 's1'), false);
+});

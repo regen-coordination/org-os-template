@@ -9,6 +9,7 @@ import { makeFixtureRepo, removeFixtureRepo } from '../fixtures.ts'
 import { createApp } from '../../server/app.ts'
 import { mountWizards } from '../../server/wizards/routes.ts'
 import { stateDir } from '../../server/state.ts'
+import { withRequest } from '../../server/request.ts'
 
 let repo: string
 let home: string
@@ -50,7 +51,10 @@ describe('the draft', () => {
     expect(await none.json()).toBeNull()
     const saved = await (await send('PUT', '/api/wizards/claim-handle/draft', draft)).json()
     expect(saved).toMatchObject({ index: 0, answers: { who: 'ana' }, saved: expect.any(String) })
-    const file = join(stateDir(repo), 'wizards', 'claim-handle-1.json')
+    // one file per wizard and actor (review M3): `<wizard>.<the actor, file-safe>-1.json`
+    const [name] = readdirSync(join(stateDir(repo), 'wizards'))
+    expect(name).toMatch(/^claim-handle\.[A-Za-z0-9._-]+-1\.json$/)
+    const file = join(stateDir(repo), 'wizards', name!)
     expect(existsSync(file)).toBe(true)
     expect(file.startsWith(repo)).toBe(false)
     expect(await (await send('GET', '/api/wizards/claim-handle/draft')).json()).toEqual(saved)
@@ -83,3 +87,30 @@ describe('the draft', () => {
     expect(existsSync(join(stateDir(repo), 'wizards'))).toBe(false)
   })
 })
+
+describe('a draft is the actor’s own (L7 Tasks 19/17 review, M3)', () => {
+  const draft = { index: 1, answers: { who: 'ana' } }
+  const setEmail = (email: string) => execFileSync('git', ['-C', repo, 'config', 'user.email', email])
+
+  it('is never offered to another actor, and another actor’s draft is kept apart', async () => {
+    await send('PUT', '/api/wizards/claim-handle/draft', draft)
+    setEmail('someone-else@example.invalid')
+    expect(await (await send('GET', '/api/wizards/claim-handle/draft')).json()).toBeNull()
+    await send('PUT', '/api/wizards/claim-handle/draft', { index: 0, answers: { who: 'other' } })
+    expect(readdirSync(join(stateDir(repo), 'wizards'))).toHaveLength(2)
+    expect((await send('DELETE', '/api/wizards/claim-handle/draft')).status).toBe(200)
+    expect(readdirSync(join(stateDir(repo), 'wizards'))).toHaveLength(1)
+  })
+
+  it('with no actor (hosted, no session) there is none to read and none is written', async () => {
+    const hosted = createApp(repo, a => mountWizards(a, { repo }), { request: withRequest({ repo, hosted: true, membership: null }) })
+    // the hosted read gate answers first (sign in); past it, no actor reads no draft
+    const res = await hosted.request('/api/wizards/claim-handle/draft')
+    const body = await res.json()
+    expect(res.status === 401 ? body.code : body).toBe(res.status === 401 ? 'SIGN_IN' : null)
+    const put = await hosted.request('/api/wizards/claim-handle/draft', { method: 'PUT', body: JSON.stringify(draft), headers: { 'content-type': 'application/json' } })
+    expect(put.status).toBe(401)
+    expect(existsSync(join(stateDir(repo), 'wizards'))).toBe(false)
+  })
+})
+

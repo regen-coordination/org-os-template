@@ -7,7 +7,7 @@ import { Button } from '../design/Button.tsx'
 import { NoteBlock } from '../design/Note.tsx'
 import { announce } from '../parts/live.tsx'
 import { useSlotOpen } from '../parts/panels.tsx'
-import { useCanWrite, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
+import { useCanConverse, useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
 import { HouseEdge, edgeGeometry, edgeId, labelAlong, labelFits, labelSize, relationSentence, selectedPath, type Box, type HouseEdgeData } from './HouseEdge.tsx'
 import { HouseNode, statesFor, type MapNodeData, type NodeState } from './HouseNode.tsx'
 import { LAYOUT, layoutMap, type MapLayout, type MapLink, type Placed } from './layers.ts'
@@ -21,8 +21,8 @@ export type { ValueFlow } from './valueFlow.ts'
 export interface HouseMapProps {
   items: MapNodeData[]
   links: MapLink[]
-  /** The members' map, or the door's: read-only, its nodes links, nothing that needs or was staged by a member. */
-  variant: 'members' | 'door'
+  /** The members' map, or the portal's: read-only, its nodes links, nothing that needs or was staged by a member. */
+  variant: 'members' | 'portal'
   selected?: string | null
   /** A click on a node. `act.move` starts its move mode, when this viewer may move it (for the inspector's Move). */
   onSelect?(id: string, act?: NodeActs): void
@@ -117,7 +117,7 @@ function useFlowRun(flow: ValueFlow | null | undefined, box: RefObject<HTMLEleme
 }
 
 interface NodeData extends Record<string, unknown> {
-  node: MapNodeData; big: boolean; variant: 'members' | 'door'; tabIndex: number; describedBy?: string; onFocus(id: string): void
+  node: MapNodeData; big: boolean; variant: 'members' | 'portal'; tabIndex: number; describedBy?: string; onFocus(id: string): void
 }
 
 function FlowNode({ data }: NodeProps<Node<NodeData>>) {
@@ -177,8 +177,9 @@ function MapView(p: HouseMapProps) {
   const counted = placed.filter(n => n.layer !== 'linked').length
   const label = p.label ?? `${counted} ${counted === 1 ? 'System' : 'Systems'}, as a map`
   // a node is moved only on a map that keeps its layout, by a viewer who may write it (never while previewing, C-23)
-  const canWrite = useCanWrite()
-  const movable = kept !== undefined && p.onMove !== undefined && members && canWrite
+  // (the positions are a map's layout or this browser's: no instance write, so also while the Hub's writes are off, R2b M-2)
+  const canMove = useCanConverse()
+  const movable = kept !== undefined && p.onMove !== undefined && members && canMove
   // Move mode (C6 fix I-1): a node picked up by `m` or the inspector's Move, carried by the arrows or the nudge
   // buttons a step at a time, put down with Enter or Done (kept through onMove), put back with Escape or Cancel.
   const [moving, setMoving] = useState<{ id: string; from: { x: number; y: number }; at: { x: number; y: number } } | null>(null)
@@ -220,7 +221,7 @@ function MapView(p: HouseMapProps) {
 
   // Roving focus: the node Tab lands on is the one focus last stood on, else the selected one, else the main Safe.
   const [focused, setFocused] = useState<string | null>(null)
-  // On the door only a node with a page is a link to land on.
+  // On the portal only a node with a page is a link to land on.
   const reachable = members ? placed : placed.filter(n => byId.get(n.id)?.href)
   const can = (id: string | null | undefined) => (id && reachable.some(n => n.id === id) ? id : null)
   const stop = can(focused) ?? can(selected) ?? can(layout.mainSafe) ?? reachable[0]?.id ?? null
@@ -251,7 +252,7 @@ function MapView(p: HouseMapProps) {
     const fits = labelFits(g.length, labelAlong(g, labelSize(k.label)))
     return {
       id: edgeId(k), source: k.from, target: k.to, type: 'house', focusable: false, selectable: false,
-      data: { d: g.d, label: fits ? k.label : null, labelX: g.x, labelY: g.y, on, dim: path !== null && !on && dir === null, flow: dir && phase ? { dir, phase } : null },
+      data: { d: g.d, label: fits ? k.label : null, labelX: g.x, labelY: g.y, on, dim: path !== null && !on, flow: dir && phase ? { dir, phase } : null },
     }
   })
 
@@ -400,6 +401,9 @@ function MapView(p: HouseMapProps) {
               deleteKeyCode={null} selectionKeyCode={null} multiSelectionKeyCode={null} panActivationKeyCode={null} zoomActivationKeyCode={null}
               disableKeyboardA11y minZoom={ZOOM.min} maxZoom={ZOOM.max} zoomOnScroll={false} zoomOnDoubleClick={false} panOnScroll={false}
               preventScrolling={false} proOptions={{ hideAttribution: true }}
+              // walk M16: the first draw's fit (the effect below) can run before the canvas can pan and zoom, and then does
+              // nothing; once it is ready it fits again, so a narrow screen never opens with its nodes cut off
+              onInit={fit}
               onNodeClick={(e, n) => {
                 if (!members) return
                 if ((e.target as Element).closest('.hnode-dot')) p.onInspect?.(n.id, actsOf(n.id))

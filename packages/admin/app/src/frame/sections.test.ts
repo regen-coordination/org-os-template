@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { HOUSE_SECTIONS, INSTANCE_LINKS, countText, houseCounts, sectionOf } from './sections.ts'
+import { HOUSE_SECTIONS, INSTANCE_LINKS, SOURCES_LINK, countText, houseCounts, sectionOf } from './sections.ts'
 import { FIXTURE_SOURCE, canSee, type Viewer } from '../viewAs/visibility.ts'
 
 const eyes = (viewer: Viewer) => <T,>(items: T[]) => items.filter(i => canSee(viewer, FIXTURE_SOURCE.visibilityOf(i), FIXTURE_SOURCE))
@@ -14,7 +14,8 @@ describe('the house sections (§5.2)', () => {
   })
 
   it('the Instance group holds 0.6’s org-os boards (C-8)', () => {
-    expect(INSTANCE_LINKS.map(l => l.label)).toEqual(['Crew', 'Fleet', 'Modules', 'Sources', 'Activity', 'All records', 'Boards'])
+    // L6 carries K11: 0.6's Sources board is told apart from the Hub's Sources page (PF-R79).
+    expect(INSTANCE_LINKS.map(l => l.label)).toEqual(['Crew', 'Fleet', 'Modules', 'Sources board', 'Activity', 'All records', 'Boards'])
   })
 
   it('knows which section a path is in: Home’s board, the Proposals tabs, a Workspace collection', () => {
@@ -26,6 +27,10 @@ describe('the house sections (§5.2)', () => {
     expect(sectionOf('/b/treasury?select=x')).toBe('treasury')
     expect(sectionOf('/library/board%3Aonboarding')).toBe('library')
     expect(sectionOf('/activity')).toBeNull()
+    // DAO-OS L6 Task 19: Sources is Workspace's (listed under it), and so is the source editor
+    expect(sectionOf('/sources', [SOURCES_LINK])).toBe('workspace')
+    expect(sectionOf('/files/data/governance.yaml')).toBe('workspace')
+    expect(sectionOf('/files')).toBe('workspace')
   })
 
   it('places a record page in the section of its kind (E-64): a System in Systems, a proposal in Proposals, a collection’s record in Workspace', () => {

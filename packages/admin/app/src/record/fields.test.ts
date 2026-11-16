@@ -12,6 +12,16 @@ describe('orderedKeys', () => {
   it('offers every schema property while editing', () => {
     expect(orderedKeys(schema, { id: 'p1' }, true)).toEqual(['id', 'title', 'status', 'tags', 'lead'])
   })
+  // DAO-OS L7 Task 17: a System's record page draws the fields of its kind; one of another kind only when it holds it.
+  it('leaves out a field of another kind (`x-kinds`) the entry does not hold, reading and editing', () => {
+    const sys: JsonSchema = { 'x-order': ['id', 'kind', 'hats', 'signer_gate', 'position'], properties: { id: { type: 'string' }, kind: { type: 'string' },
+      hats: { type: 'array', 'x-kinds': ['hats-tree'] }, signer_gate: { type: 'object', 'x-kinds': ['safe'] }, position: { type: 'object', 'x-kinds': [] } } }
+    expect(orderedKeys(sys, { id: 's', kind: 'safe' }, false)).toEqual(['id', 'kind', 'signer_gate'])
+    expect(orderedKeys(sys, { id: 's', kind: 'safe' }, true)).toEqual(['id', 'kind', 'signer_gate'])
+    expect(orderedKeys(sys, { id: 't', kind: 'hats-tree', position: { x: 1, y: 2 } }, false)).toEqual(['id', 'kind', 'hats', 'position'])
+    // with no kind (a new record's form), every field is offered
+    expect(orderedKeys(sys, {}, true)).toEqual(['id', 'kind', 'hats', 'signer_gate', 'position'])
+  })
   it('never draws a field named __proto__', () => {
     expect(orderedKeys(schema, JSON.parse('{"id":"a","__proto__":{"x":1}}') as Record<string, unknown>, false)).not.toContain('__proto__')
   })

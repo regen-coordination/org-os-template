@@ -8,7 +8,7 @@ import {
   checkProposals, eventPermission,
 } from '../../lib/proposals.mjs'
 import { sha256Hex } from '../../lib/sha256.mjs'
-import { resolveRoles } from '../../lib/rules.mjs'
+import { resolveRoles, WORKSPACE_SUGGEST } from '../../lib/rules.mjs'
 import { classOf, CHANGE_CLASSES } from '../../lib/change-classes.mjs'
 
 // Synthetic: members ana, bruno, carla (plan: global constraints).
@@ -196,6 +196,15 @@ describe('checkProposals', () => {
     ['a system event from a system the instance does not hold', [proposal({ events: [ev({ by: 'system:nope', kind: 'system' })] })], /event e-a-01: no system "nope"/],
   ])('refuses %s', (_name, entries, pattern) => {
     expect(messages(entries as never, { systems: [{ id: 'treasury-safe' }] }).join('\n')).toMatch(pattern as RegExp)
+  })
+  // DAO-OS L6 R-L6-SUGGEST-2 (Task 16c, review S5): the one built-in rule is held exactly as built, and by a suggestion only.
+  it('refuses workspace/suggest shaped other than as built', () => {
+    const found = messages([proposal({ suggested: true, rules: [{ ...WORKSPACE_SUGGEST, self_approve: true }] })])
+    expect(found.join('\n')).toMatch(/rule "workspace\/suggest" is built in, and this proposal holds another rule by its name/)
+  })
+  it('refuses workspace/suggest on a proposal not marked suggested', () => {
+    const found = messages([proposal({ rules: [WORKSPACE_SUGGEST] })])
+    expect(found.join('\n')).toMatch(/rule "workspace\/suggest" decides a suggested edit only, and this proposal is not marked suggested/)
   })
   it('names the proposal and the field in each problem, as an error', () => {
     const [p] = checkProposals([proposal({ events: [ev({ kind: 'object' })] })] as never, ctx() as never)

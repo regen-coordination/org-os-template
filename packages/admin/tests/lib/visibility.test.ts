@@ -4,8 +4,9 @@ import { REGISTRIES } from '../../lib/registries.mjs'
 import { validateEntry } from '../../lib/data-validate.mjs'
 import {
   parseLevel, formatLevel, hatsAbove, admits, narrowerOrEqual, gitAllows, fullLevel, restrictedFields, contactLevel,
-  checkVisibilityPolicy, COLLECTION_IN_GIT, readFullPolicy,
+  checkVisibilityPolicy, COLLECTION_IN_GIT, readFullPolicy, stricterOf, DEPLOYED_SYSTEM_REQUIRES, requiredInGit,
 } from '../../lib/visibility.mjs'
+import { readFileSync } from 'node:fs'
 import { topHatId, childHatId, hatRef } from '../../lib/hats.mjs'
 
 const pol = (doc: unknown) => readPolicy({ visibility: doc }).policy
@@ -470,6 +471,29 @@ describe('L5 levels: checkVisibilityPolicy (§9.2)', () => {
     }
   })
 
+  // PF-R227 (operator, 2026-11-07: refuse): the schema requires these of a deployed System, and the change engine and the
+  // Hub read them from git, so a policy keeping one above members is refused, with a sentence.
+  it('a field the schema requires of a deployed System (systems.address) kept above members is an error, in a plain sentence', () => {
+    expect(requiredInGit('address')).toBe('A deployed System must keep its address in the repository, so address cannot be kept above members: give it members or public.')
+    expect(errors({ collections: { systems: { fields: { address: 'role:ops' } } } })).toEqual([
+      { level: 'error', path: 'visibility.collections.systems.fields.address', message: requiredInGit('address') },
+    ])
+    for (const field of DEPLOYED_SYSTEM_REQUIRES) {
+      expect(errors({ collections: { systems: { fields: { [field]: `hat:${OPS}` } } } }), field)
+        .toContainEqual({ level: 'error', path: `visibility.collections.systems.fields.${field}`, message: requiredInGit(field) })
+    }
+    // At members or public git holds it; a field the schema does not require may be kept; another collection's address too.
+    expect(errors({ collections: { systems: { default: 'public', fields: { address: 'members', chain: 'public', notes: 'role:ops', hats: 'role:ops' } } } })).toEqual([])
+    expect(errors({ collections: { members: { fields: { address: 'role:ops' } } } })).toEqual([])
+  })
+
+  it('DEPLOYED_SYSTEM_REQUIRES is what schemas/systems.schema.json requires of a deployed System (its required, and every kind branch\'s)', () => {
+    const schema = JSON.parse(readFileSync(new URL('../../schemas/systems.schema.json', import.meta.url), 'utf8'))
+    const required = new Set<string>(schema.required)
+    for (const branch of schema.allOf ?? []) for (const f of branch.then?.required ?? []) required.add(f)
+    expect([...DEPLOYED_SYSTEM_REQUIRES].sort()).toEqual([...required].sort())
+  })
+
   it('a collection that is no registry is a warning', () => {
     expect(checkVisibilityPolicy({ collections: { sytems: { default: 'public' } } }, CTX)).toEqual([
       { level: 'warn', path: 'visibility.collections.sytems', message: 'no registry is called sytems' },
@@ -487,5 +511,18 @@ describe('L5: the visibility schema', () => {
     expect(errs({ defaults: { contact: 'public' } }).length).toBeGreaterThan(0)
     expect(errs({ collections: { members: { default: 'public', fields: { name: 'members', email: `hat:${OPS}`, notes: 'role:ops', id: 'public' } } } })).toEqual([])
     expect(errs({ collections: { members: { level: `hat:${OPS}` } } }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('stricterOf (DAO-OS L6 Task 11 review I-4)', () => {
+  it('takes the narrower level per field and default, members over public, a field one side declares, and after\'s of two unordered', () => {
+    const before = readFullPolicy({ visibility: { collections: { tasks: { default: 'public', fields: { budget: `hat:${COUNCIL}`, notes: `hat:${OPS}` } } }, defaults: { contact: `hat:${OPS}` } } }).policy
+    const after = readFullPolicy({ visibility: { collections: { tasks: { default: 'members', fields: { budget: `hat:${OPS}`, notes: 'role:ops', status: `hat:${OPS}` } }, pages: { default: 'public' } }, defaults: { contact: `hat:${COUNCIL}` } } }).policy
+    const both = stricterOf(before, after)
+    // Council is above Ops, so hat:Council admits fewer: it is the narrower.
+    expect(both.collections.tasks).toEqual({ default: 'members', fields: { budget: `hat:${COUNCIL}`, notes: 'role:ops', status: `hat:${OPS}` } })
+    expect(both.collections.pages).toEqual({ default: 'public', fields: {} })
+    expect(both.defaults).toEqual({ contact: `hat:${COUNCIL}` })
+    expect(restrictedFields(both, 'tasks')).toEqual({ budget: { level: 'hat', hat: COUNCIL }, notes: { level: 'role', role: 'ops' }, status: { level: 'hat', hat: OPS } })
   })
 })

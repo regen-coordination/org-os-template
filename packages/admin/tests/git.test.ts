@@ -29,10 +29,12 @@ describe('commitDataPaths', () => {
     expect(status).toContain('untracked.txt') // untouched
     expect(status).not.toContain('members.yaml')
   })
-  it('refuses paths outside data/', async () => {
-    await expect(commitDataPaths(repo, ['federation.yaml'], 'x')).rejects.toThrowError(/outside data\//i)
-    await expect(commitDataPaths(repo, ['data/../federation.yaml'], 'x')).rejects.toThrowError(/outside data\//i)
-    await expect(commitDataPaths(repo, ['/etc/passwd'], 'x')).rejects.toThrowError(/outside data\//i)
+  // DAO-OS L6 §11.3 (replaces "refuses paths outside data/"): federation.yaml is on the allow-list now; a path that climbs,
+  // an absolute one and one on no list are refused.
+  it('refuses a path that climbs, an absolute path and a path on no list', async () => {
+    await expect(commitDataPaths(repo, ['data/../federation.yaml'], 'x')).rejects.toThrowError(/guardrail: refusing to write/)
+    await expect(commitDataPaths(repo, ['/etc/passwd'], 'x')).rejects.toThrowError(/guardrail: refusing to write/)
+    await expect(commitDataPaths(repo, ['untracked.txt'], 'x')).rejects.toThrowError(/guardrail: refusing to write/)
   })
 })
 

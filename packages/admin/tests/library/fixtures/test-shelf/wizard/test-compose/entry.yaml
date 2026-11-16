@@ -1,0 +1,12 @@
+id: wizard:test-compose
+shelf: wizard
+title: Compose a test council
+summary: Asks for a name and the signers, then adds the test council template with those answers.
+version: 1.0.0
+source: test-shelf
+standing: stated
+as_of: 2026-10-30
+tags:
+  maturity: field-informed
+related: [template:test-council]
+wizard: wizard.yaml

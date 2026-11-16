@@ -2,6 +2,7 @@ import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type Mou
 import { Button } from '../design/Button.tsx'
 import { Kbd } from '../design/Kbd.tsx'
 import { closeDialog, useSlot } from '../parts/panels.tsx'
+import { usePortalOrigin } from '../session/session.ts'
 import { OPEN_KEYMAP } from './useHouseKeys.ts'
 
 /** The key map's rows: §5.8's table, one row a key (or its alternatives, each a list of key caps). */
@@ -15,7 +16,7 @@ export const KEY_ROWS: readonly { does: string; keys: readonly (readonly string[
   { does: 'Workspace', keys: [['g', 'w']] },
   { does: 'Library', keys: [['g', 'l']] },
   { does: 'Changes', keys: [['g', 'c']] },
-  { does: 'Public door, in a new tab', keys: [['g', 'd']] },
+  { does: 'Portal, in a new tab', keys: [['g', 'd']] },
   { does: 'Palette', keys: [['⌘', 'K'], ['Ctrl', 'K']] },
   { does: 'Fold or unfold the sidebar', keys: [['⌘', '\\'], ['[']] },
   { does: 'Next or previous row', keys: [['j', 'k'], ['↓', '↑']] },
@@ -27,9 +28,13 @@ export const KEY_ROWS: readonly { does: string; keys: readonly (readonly string[
   { does: 'Comment on this page', keys: [['c']] },
 ]
 
+/** The portal's row: listed only when the Hub has a portal origin (D-5). */
+const PORTAL_ROW = 'Portal, in a new tab'
+
 /** The key map's head and table (§5.8), as the dialog draws it and as /parts draws it in place. A table: each row
- *  what it does, then its keys; alternatives are parted by a faint slash (read "or"). `close` ends the head. */
-export function KeyTable({ headingId, close }: { headingId: string; close?: ReactNode }) {
+ *  what it does, then its keys; alternatives are parted by a faint slash (read "or"). `close` ends the head. Without
+ *  `portal` (a Hub with no portal origin, D-5) the portal's row is left out; /parts draws the whole table. */
+export function KeyTable({ headingId, close, portal = true }: { headingId: string; close?: ReactNode; portal?: boolean }) {
   return (
     <>
       <div className="keymap-h">
@@ -42,7 +47,7 @@ export function KeyTable({ headingId, close }: { headingId: string; close?: Reac
       <table className="keymap" role="table">
         <thead className="sr-only" role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Does</th><th scope="col" role="columnheader">Keys</th></tr></thead>
         <tbody role="rowgroup">
-          {KEY_ROWS.map(r => (
+          {KEY_ROWS.filter(r => portal || r.does !== PORTAL_ROW).map(r => (
             <tr key={r.does} role="row">
               <th scope="row" role="rowheader">{r.does}</th>
               <td role="cell">
@@ -69,6 +74,7 @@ export function KeyMap() {
   const opener = useRef<Element | null>(null)
   const ref = useRef<HTMLDialogElement>(null)
   const headingId = useId()
+  const portal = usePortalOrigin() !== null
   useSlot('overlay', 'keymap', open, () => setOpen(false), () => (opener.current instanceof HTMLElement ? opener.current : null),
     () => closeDialog(ref.current)) // closed before focus goes back: while modal, the opener is inert
   useEffect(() => {
@@ -88,7 +94,7 @@ export function KeyMap() {
     <dialog ref={ref} className="pal-dialog" aria-labelledby={headingId} aria-modal="true"
       onCancel={e => { e.preventDefault(); setOpen(false) }} onMouseDown={scrim}>
       <div className="pal keymap-pop">
-        <KeyTable headingId={headingId} close={<Button variant="ghost" icon="x" iconOnly label="Close" small onClick={() => setOpen(false)} />} />
+        <KeyTable headingId={headingId} portal={portal} close={<Button variant="ghost" icon="x" iconOnly label="Close" small onClick={() => setOpen(false)} />} />
       </div>
     </dialog>
   )

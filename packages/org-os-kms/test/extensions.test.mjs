@@ -193,11 +193,11 @@ function surfaceInstance(extra = {}) {
   return inst;
 }
 
-test('static surface: extensions.yaml is written for an instance with packs, and federateCheck accepts it', () => {
+test('static surface: extensions.yaml is written for an instance with packs, and federateCheck accepts it', async () => {
   const p = pkgs(); makePack(p, 'pack-a');
   const inst = surfaceInstance({ extensions: ['pack-a'] });
   const config = loadKmsConfig(inst, { packagesDir: p });
-  const { files } = writeStaticSurface({ dir: inst, items: [], manifest: { objects: {} }, config });
+  const { files } = await writeStaticSurface({ dir: inst, items: [], manifest: { objects: {} }, config });
   assert.ok(files.includes('.well-known/extensions.yaml'));
   const path = join(inst, 'public', '.well-known', 'extensions.yaml');
   const doc = yaml.load(readFileSync(path, 'utf8'));
@@ -209,14 +209,14 @@ test('static surface: extensions.yaml is written for an instance with packs, and
   assert.ok(ctx['@context'].widget, 'its own pack vocabulary is in its context');
 });
 
-test('static surface: an instance without packs writes no extensions.yaml — even if another instance registered one in this process', () => {
+test('static surface: an instance without packs writes no extensions.yaml — even if another instance registered one in this process', async () => {
   const p = pkgs(); makePack(p, 'pack-a');
   loadExtensions({ extensions: ['pack-a'] }, { packagesDir: p }); // some other instance, same process
   const inst = surfaceInstance();
   const stale = join(inst, 'public', '.well-known', 'extensions.yaml');
   mkdirSync(join(inst, 'public', '.well-known'), { recursive: true }); writeFileSync(stale, 'entities: {}\n'); // left by an earlier run with packs
   const config = loadKmsConfig(inst);
-  const { files } = writeStaticSurface({ dir: inst, items: [], manifest: { objects: {} }, config });
+  const { files } = await writeStaticSurface({ dir: inst, items: [], manifest: { objects: {} }, config });
   assert.deepEqual(files.sort(), ['.well-known/knowledge.json', 'api/context.jsonld', 'api/index.json']);
   assert.ok(!existsSync(stale), 'a stale public extensions.yaml is dropped when the instance has no packs');
   assert.ok(existsSync(join(inst, 'public', '.well-known', 'knowledge.json')));

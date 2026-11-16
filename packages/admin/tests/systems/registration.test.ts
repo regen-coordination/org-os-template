@@ -48,8 +48,8 @@ describe('the daouri-registration driver', () => {
     expect(selector('daoURI()')).toBe(DAO_URI_SELECTOR)
   })
 
-  it('is registered last, with the hats-tree hosts, and prepares nothing', () => {
-    expect(DRIVERS[DRIVERS.length - 1]).toBe(daoUriRegistration)
+  it('is registered before repo, with the hats-tree hosts, and prepares nothing', () => {
+    expect(DRIVERS[DRIVERS.length - 2]).toBe(daoUriRegistration)
     expect(daoUriRegistration.name).toBe('daouri-registration')
     expect(daoUriRegistration.hosts).toEqual(hatsTree.hosts)
     for (const k of ['actions', 'outcome', 'prepare', 'prepareAction', 'checkRef'] as const) expect(daoUriRegistration[k]).toBeUndefined()
@@ -102,10 +102,20 @@ describe('the systems schema: daouri-registration and grant_pool', () => {
   const errors = (e: unknown) => validateEntry('systems', e).filter(p => p.level === 'error')
   const POOL = { id: 'pool', kind: 'gardens-pool', name: 'Pool', chain: CELO, address: ADDRESS }
 
-  it('accepts the kind, requires chain and address, and does not warn', () => {
+  // L7 Task 14 (L7-D13): an address, or an ENS name whose daouri text record holds the daoURI.
+  it('accepts the kind, requires chain and an address (or an ENS name), and does not warn', () => {
     const e = { id: 'reg', kind: 'daouri-registration', name: 'Registration', chain: CELO, address: ADDRESS }
     expect(validateEntry('systems', e)).toEqual([])
-    expect(errors({ id: 'reg', kind: 'daouri-registration', name: 'R' }).map(p => p.path).sort()).toEqual(['address', 'chain'])
+    expect(errors({ id: 'reg', kind: 'daouri-registration', name: 'R' }).map(p => p.path).sort()).toEqual(['', 'address', 'chain', 'ens'])
+  })
+
+  // fix M-4 (Tasks 13/14 review): one of them, never both, composed or deployed
+  it('refuses a registration naming both an address and an ENS name; either alone passes', () => {
+    const both = { id: 'reg', kind: 'daouri-registration', name: 'R', chain: 'eip155:11155111', address: ADDRESS, ens: 'test-dao.eth' }
+    expect(errors(both).length).toBeGreaterThan(0)
+    expect(errors({ ...both, deployment: { status: 'composed' } }).length).toBeGreaterThan(0)
+    expect(errors({ ...both, address: undefined })).toEqual([])
+    expect(errors({ ...both, ens: undefined })).toEqual([])
   })
 
   it('refuses a mechanism DAOIP-5 does not list, and passes grant_pool: false', () => {

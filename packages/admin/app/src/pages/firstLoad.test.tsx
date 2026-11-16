@@ -26,7 +26,7 @@ const hang = () => vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() =
 const PAGES: { name: string; at: string; ui: () => ReactElement; h1: string | RegExp }[] = [
   { name: 'Home', at: '/b/home', ui: () => <BoardPage id="home" />, h1: 'Reading what waits on you…' },
   { name: 'Treasury', at: '/b/treasury', ui: () => <BoardPage id="treasury" />, h1: 'Treasury' },
-  { name: 'a collection', at: '/b/meetings', ui: () => <BoardPage id="meetings" />, h1: 'Meetings' },
+  { name: 'a collection', at: '/b/meetings', ui: () => <BoardPage id="meetings" />, h1: 'Meetings board' }, // walk I15, D1
   { name: 'a record', at: '/r/project/proj-001', ui: () => <RecordPage kind="project" id="proj-001" />, h1: 'proj-001' },
   { name: 'a proposal', at: '/governance/proposals/p-1', ui: () => <ProposalPage id="p-1" />, h1: 'p-1' },
   { name: 'New', at: '/new/projects', ui: () => <NewRecord registry="projects" />, h1: /^New / },

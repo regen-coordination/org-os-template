@@ -200,6 +200,22 @@ systems:
   })
 })
 
+describe('validateRepo: a policy keeping what a deployed System requires (PF-R227)', () => {
+  it('an existing data/visibility.yaml that keeps systems.address above members is reported, with the sentence, not thrown on', () => {
+    const dir = instance({
+      'governance.yaml': 'schema_version: "2.0"\ngovernance:\n  model: "solo-maintainer"\n  roles:\n    ops: { members: [] }\n  decisions: []\n',
+      'systems.yaml': 'schema_version: "2.0"\nsystems:\n  - { id: side-safe, kind: safe, name: Side Safe, chain: "eip155:11155111" }\n',
+      'visibility.yaml': 'visibility:\n  collections:\n    systems:\n      fields: { address: "role:ops" }\n',
+    })
+    let ps: Problem[] = []
+    expect(() => { ps = validateRepo(dir) }).not.toThrow()
+    expect(errorsOf(ps)).toContainEqual(expect.objectContaining({
+      file: 'data/visibility.yaml', path: 'visibility.collections.systems.fields.address',
+      message: 'A deployed System must keep its address in the repository, so address cannot be kept above members: give it members or public.',
+    }))
+  })
+})
+
 describe('validateRepo on this repository', () => {
   it('finds no error in the framework\'s own data/ (CI runs validate:data on it)', () => {
     expect(errorsOf(validateRepo(REAL_REPO))).toEqual([])

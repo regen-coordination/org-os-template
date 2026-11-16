@@ -7,7 +7,7 @@
 // the same functions.
 
 import { isMap } from './yaml-util.mjs'
-import { checkGovernance, mayPropose } from './rules.mjs'
+import { checkGovernance, isWorkspaceSuggest, mayPropose, WORKSPACE_SUGGEST } from './rules.mjs'
 import { parseRecord } from './ops.mjs'
 import { judgedOps } from './receipts.mjs'
 import { sha256Hex } from './sha256.mjs'
@@ -279,6 +279,8 @@ export function eventPermission(kind, ctx) {
  * @property {Record<string, unknown>[] | null} [systems] the entries of data/systems.yaml
  * @property {readonly string[] | null} [classes] the change classes
  * @property {(registry: string) => string} [classOf] the class of a registry's records
+ * @property {readonly import('./registries.mjs').RegistryDef[]} [defs] the registry list ops' records are read against: the
+ *   instance's own, with its custom collections (DAO-OS L6 §7.1, ruling R-2b); absent, the built-in list
  */
 
 /** What a ledger written by an address must carry (DAO-OS L5 spec §7.2): the hat it was read wearing. */
@@ -328,9 +330,17 @@ export function checkProposals(entries, ctx = {}) {
 
     // The rules it was opened under, against the rule shape.
     if (!Array.isArray(entry.rules) || entry.rules.length === 0) bad('rules', 'this proposal holds no rules: it records the rules it was opened under')
-    else if (ctx.governance) {
-      const found = checkGovernance({ roles: ctx.governance.roles, rules: entry.rules }, { members: ctx.members ?? null, systems: ctx.systems ?? null, classes: ctx.classes ?? null })
-      for (const p of found) if (p.level === 'error' && !p.path.startsWith('roles')) bad(p.path, p.message)
+    else {
+      // DAO-OS L6 R-L6-SUGGEST-2: the built-in workspace/suggest is held as it stands, by a suggestion only, and is no
+      // written rule to check against the rule shape.
+      const builtIn = entry.rules.filter(r => isMap(r) && r.id === WORKSPACE_SUGGEST.id)
+      for (const r of builtIn) if (!isWorkspaceSuggest(r)) bad('rules', `rule "${WORKSPACE_SUGGEST.id}" is built in, and this proposal holds another rule by its name`)
+      if (builtIn.length > 0 && entry.suggested !== true) bad('rules', `rule "${WORKSPACE_SUGGEST.id}" decides a suggested edit only, and this proposal is not marked suggested`)
+      const written = entry.rules.filter(r => !builtIn.includes(r))
+      if (ctx.governance && written.length > 0) {
+        const found = checkGovernance({ roles: ctx.governance.roles, rules: written }, { members: ctx.members ?? null, systems: ctx.systems ?? null, classes: ctx.classes ?? null })
+        for (const p of found) if (p.level === 'error' && !p.path.startsWith('roles')) bad(p.path, p.message)
+      }
     }
 
     // The classes must cover the ops it is judged by: a library receipt rides along (L1-C5).
@@ -339,7 +349,7 @@ export function checkProposals(entries, ctx = {}) {
       const classes = Array.isArray(entry.classes) ? entry.classes : []
       for (const op of judgedOps(ops.filter(op => isMap(op) && typeof op.record === 'string'))) {
         try {
-          const cls = ctx.classOf(parseRecord(op.record).registry)
+          const cls = ctx.classOf(parseRecord(op.record, ctx.defs).registry)
           if (!classes.includes(cls)) bad('classes', `op on ${op.record} is class ${cls}, which \`classes\` does not list`)
         } catch (err) { bad('ops', `op on ${op.record}: ${err instanceof Error ? err.message : String(err)}`) }
       }

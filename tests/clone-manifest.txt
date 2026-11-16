@@ -166,6 +166,8 @@ scripts/install-hooks.mjs
 scripts/lib/abi.mjs
 scripts/lib/caip.mjs
 scripts/lib/clone-excludes.mjs
+scripts/lib/compose.mjs
+scripts/lib/deployments.mjs
 scripts/lib/discover-skills.mjs
 scripts/lib/hat-readings.mjs
 scripts/lib/hats.mjs
@@ -191,6 +193,7 @@ scripts/lib/test-failures.mjs
 scripts/lib/visibility.mjs
 scripts/lib/yaml-util.mjs
 scripts/lint-knowledge.mjs
+scripts/memory.mjs
 scripts/migrate.mjs
 scripts/migrations/v0.5-to-v0.6-canonical-records.mjs
 scripts/migrations/v0.5-to-v0.6-governance-rules.mjs

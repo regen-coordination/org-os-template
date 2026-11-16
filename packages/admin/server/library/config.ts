@@ -4,9 +4,12 @@ import type { InstallOp, LibraryEntry } from './types.ts'
 
 /** What an entry asks the person for, written into its `installs` (quoted in YAML): `"${config.<name>}"`, in a record
  *  id and in any string of `value` or `set`. A string that is exactly one becomes the supplied value, with its type; a
- *  string that holds one is interpolated. */
-const PLACEHOLDER = /\$\{config\.([a-z_][a-z0-9_]*)\}/g
-const EXACT = /^\$\{config\.([a-z_][a-z0-9_]*)\}$/
+ *  string that holds one is interpolated. Names are config property names, camelCase or snake_case (L7 §5.1). Only
+ *  `${config.…}` is resolved here: `${hat.…}` and `${system.…}` stay text until read-back (L7-D8). */
+const PLACEHOLDER = /\$\{config\.([A-Za-z_][A-Za-z0-9_]*)\}/g
+const EXACT = /^\$\{config\.([A-Za-z_][A-Za-z0-9_]*)\}$/
+/** Anything that starts like a config placeholder: `${config.` up to its closing brace, or to the end of the string. */
+const STARTED = /\$\{config\.[^}]*\}?/g
 
 const isMapping = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const opsOf = (e: LibraryEntry): InstallOp[] => (e.builtin ? [] : e.installs ?? [])
@@ -27,12 +30,28 @@ export function placeholdersOf(e: LibraryEntry): string[] {
   return [...names]
 }
 
+/** The first `${config.…}` in an entry's installs that is not `${config.<name>}` with a name of its config's
+ *  properties, as written; null when every one is. */
+export function strayPlaceholder(e: LibraryEntry): string | null {
+  const declared = new Set(Object.keys(e.config?.properties ?? {}))
+  for (const op of opsOf(e)) {
+    for (const s of [op.record, ...strings(op.value), ...strings(op.set)]) {
+      for (const m of s.matchAll(STARTED)) {
+        const name = EXACT.exec(m[0])?.[1]
+        if (name === undefined || !declared.has(name)) return m[0]
+      }
+    }
+  }
+  return null
+}
+
 /** A copy of `v` with every placeholder `known` holds put in. One it does not hold is kept as written (lenient) or
  *  left out: an exact one drops its key (null in a list), an interpolated one reads as empty. */
 function fill(v: unknown, known: Record<string, unknown>, lenient: boolean): unknown {
   if (typeof v === 'string') {
     const exact = EXACT.exec(v)
-    if (exact) return exact[1]! in known ? known[exact[1]!] : lenient ? v : undefined
+    // An object or a list is copied at each use, so two records never share one value (L1 minor).
+    if (exact) return exact[1]! in known ? structuredClone(known[exact[1]!]) : lenient ? v : undefined
     return v.replace(PLACEHOLDER, (whole, name: string) => (name in known ? String(known[name]) : lenient ? whole : ''))
   }
   if (Array.isArray(v)) return v.map(x => fill(x, known, lenient) ?? null)

@@ -6,23 +6,27 @@
 // op (`{ op: 'private', ref: 'stg-<seq>', class }`), and a direct apply writes it inside one store transaction around
 // the git commit: begin, apply, commit to git, commit the transaction; a failed git commit rolls the store back.
 
-import { REGISTRIES } from '../registries.ts'
+import { REGISTRIES, registriesOf, registryFileOf } from '../registries.ts'
 import { classOf } from '../../lib/change-classes.mjs'
+import { customFileOf } from '../../lib/registries.mjs'
 import { StageError } from '../../lib/ops.mjs'
 import { admits, CONTACT_FIELDS, contactLevel, formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, restrictedFields, type ParsedLevel, type Viewer, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { baseOf, sameValue } from '../changes/canonical.ts'
+import { canonicalJson } from '../../lib/proposals.mjs'
+import { sha256Hex } from '../../lib/sha256.mjs'
 import { currentOf } from '../changes/stage.ts'
 import { Refusal, StageRefusal } from '../changes/apply.ts'
 import { readConfig } from '../visibility/config.ts'
-import type { Change, PrivatePlaceholder, RecordError, StageOp } from '../changes/types.ts'
-import { StoreUnavailable, type PrivateField, type PrivateRecord, type PrivateStore, type PrivateWriter } from './store.ts'
+import type { Change, PrivatePlaceholder, RecordError, RecordOp, StageOp } from '../changes/types.ts'
+import { StoreUnavailable, WRITTEN_UNFILLED, type PrivateField, type PrivateRecord, type PrivateStore, type PrivateWriter } from './store.ts'
+import { readableRows } from '../workspace/written.ts'
 
 /** One write to private data, as `applyPrivate` makes it: a whole record (a private collection's, or a git
  *  collection's record kept private) or one restricted field of a git record. Resolved at apply time from the staged ops
  *  (`resolvePrivate`), never staged itself. */
 export type PrivateOp =
   | { op: 'put-record'; record: PrivateRecord }
-  | { op: 'delete-record'; collection: string; id: string }
+  | { op: 'delete-record'; collection: string; id: string; moved?: true }
   | { op: 'put-field'; field: PrivateField }
   | { op: 'delete-field'; registry: string; record: string; field: string }
 
@@ -38,6 +42,35 @@ export type StagedPrivateOp =
   | { op: 'put-field'; field: PrivateField }
   | { op: 'delete-field'; registry: string; record: string; field: string; visibility?: string }
   | { op: 'clear-fields'; registry: string; record: string }
+  | MoveToGit
+
+/** DAO-OS L6 §12 (Task 11, I3): a private record of a git collection, or a private page, moved into the repository at
+ *  `level`. Staged alone (`MOVE_ALONE`); a publication (`privateWidens`); applied by `server/workspace/move.ts`, never by
+ *  `resolvePrivate`. `digest` (`moveDigest`) pins the record as it was when the move was staged: a move publishes exactly
+ *  what was staged and proposed, and one whose record changed since is refused (`MOVE_CHANGED`; at ratify PRIVATE_STALE).
+ *  It is kept in the store only (the staged row, the pending row its placeholder's digest covers), never in git. */
+export type MoveToGit = { op: 'move-to-git'; collection: string; id: string; level: 'members' | 'public'; digest: string }
+export const isMove = (op: { op: string }): op is MoveToGit => op.op === 'move-to-git'
+
+/** The digest of a private record's content as a move publishes it (Task 11 review I-1): its level and its body (a
+ *  record's fields; a page's front matter and markdown), as canonical JSON. */
+export const moveDigest = (record: { visibility: string; body: Record<string, unknown> }): string =>
+  `sha256:${sha256Hex(canonicalJson({ visibility: record.visibility, body: record.body }))}`
+
+/** A staged op as its stager or an admitted viewer is shown it: a move without its digest (the store's check, not theirs). */
+export function shownOp(op: StagedPrivateOp): StagedPrivateOp {
+  if (!isMove(op)) return op
+  const { digest: _d, ...shown } = op
+  return shown as StagedPrivateOp
+}
+
+/** §12's refusal at stage for a private collection's record. */
+export const PRIVATE_COLLECTION_STAYS = 'Records of a private collection stay in the private store: copy it into a collection in the repository instead. Nothing was staged.'
+/** Rule 8's words for a move, to a viewer admitted to it (§12). */
+export const MOVES = (label: string, level: string) => `Moves ${label} into the repository, readable by ${level}.`
+/** Ruling R-L6-T11-1: a move is an op of its own, never composed with another change to the same record. */
+export const MOVE_ALONE = (record: string) =>
+  `${record} moves into the repository as it is: stage its other changes on their own, before or after the move. Nothing was staged.`
 
 export type { PrivatePlaceholder }
 
@@ -57,6 +90,9 @@ export { CONTACT_FIELDS }
 /** Said when a server was made with no private store at all (a script, a test of the git side). */
 export const NO_STORE = 'This server has no private store open, so nothing private can be read or written here.'
 export const noStore: PrivateAccess = () => { throw new StoreUnavailable(NO_STORE) }
+/** Whether `why` (a `reach`'s) says there is no store at all here (`noStore`), not one configured that cannot be reached:
+ *  a judgment then reads git alone, while one configured but down is the store's 503 (the walk review's G2). */
+export const isNoStore = (why: unknown): boolean => why instanceof StoreUnavailable && why.message === NO_STORE
 
 /** Said, and raised as the store's attention (§10.1), when the store fails after it opened (a damaged file, a full
  *  disk): what the store said goes to the server's log, never into an answer. */
@@ -103,6 +139,9 @@ function storeRead<T>(store: PrivateStore, fn: () => T): T {
 }
 
 const KNOWN = new Set(REGISTRIES.map(r => r.name))
+/** The names git knows in the instance at `repo` (L6 §7.1, ruling R-2b): its registries and its custom collections. A name
+ *  git knows is never a private collection (R-L5-14.5). */
+export const gitNames = (repo: string): ReadonlySet<string> => new Set(registriesOf(repo).map(d => d.name))
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 /** A value that is there: a field written as null holds nothing. */
 const held = (v: unknown) => v !== undefined && v !== null
@@ -125,16 +164,25 @@ function strictToken(v: unknown): string | null {
 const isMarker = (v: unknown) => isObj(v) && Object.values(v).every(t => typeof t === 'string')
 
 /** Which registry or collection a private op is about. */
-function registryOf(op: PrivateOp | StagedPrivateOp): string {
+export function registryOf(op: PrivateOp | StagedPrivateOp): string {
   if (op.op === 'put-record') return op.record.collection
   if (op.op === 'put-field') return op.field.registry
   return 'collection' in op ? op.collection : op.registry
 }
 
-/** The class a private op is judged under: its registry's or private collection's (§10.3; a private collection falls to
- *  the `*` row). */
+/** The class a private op is judged under: its registry's or private collection's (§10.3), read off the file it would
+ *  have in git (L6 ruling P-5): a registry's own file; a private page's `pages/<id>.md`; a private collection's
+ *  `data/collections/<id>.yaml`, as a custom collection's. */
 export function privateClass(op: PrivateOp | StagedPrivateOp): string {
-  return String(classOf({ registry: registryOf(op) }))
+  return String(classOf({ path: privateFileOf(op) }))
+}
+
+/** The file a private op's record or field would have in git (L6 ruling P-5): what its class and its targets are read off. */
+export function privateFileOf(op: PrivateOp | StagedPrivateOp): string {
+  const name = registryOf(op)
+  if (name === 'pages') return `pages/${op.op === 'put-record' ? op.record.id : 'id' in op ? op.id : 'page'}.md`
+  const def = REGISTRIES.find(d => d.name === name)
+  return def ? registryFileOf(def) : customFileOf(name)
 }
 
 /**
@@ -143,6 +191,7 @@ export function privateClass(op: PrivateOp | StagedPrivateOp): string {
  * `publication` and is proposed, never applied directly (409 `WIDENS`). A create widens nothing (it had no readers).
  */
 export function privateWidens(store: PrivateStore, op: StagedPrivateOp): boolean {
+  if (op.op === 'move-to-git') return true // §12: moving a private record into git is a publication
   if ((op.op !== 'update-record' && op.op !== 'replace-record') || op.visibility === undefined) return false
   const stored = storeRead(store, () => store.record(op.collection, op.id))
   return stored !== null && !narrowerOrEqual(levelOf(op.visibility), levelOf(stored.visibility))
@@ -163,28 +212,35 @@ function targetOf(op: StagedPrivateOp): string {
   return `r:${op.collection}/${op.id}`
 }
 
-export interface Split { git: StageOp | null; private: StagedPrivateOp[] }
-/** Who is staging (§9.4), and the git record as it is now (for contact details). */
-export interface SplitContext { viewer: Viewer; current?: Record<string, unknown> | null }
+export interface Split { git: RecordOp | null; private: StagedPrivateOp[] }
+/** Who is staging (§9.4), and the git record as it is now (for contact details). `known`: the names git knows
+ *  (`gitNames(repo)`: a custom collection's records split as a registry's); absent, the built-in registries. */
+export interface SplitContext { viewer: Viewer; current?: Record<string, unknown> | null; known?: ReadonlySet<string> }
 
-/** I3 (R-L5-16.8): moving a private record into git is §9.7's third widening, not built yet; the words promise no path. */
-const widens = (record: string, token: string) =>
-  `${record} is private; making it ${token} would move it into the repository, where more people read it. ` +
-  'Moving a private record into the repository is a publication that cannot be proposed here yet, so it stays private. Nothing was staged.'
 const narrowsFirst = (record: string, token: string) =>
   `${record} would be ${token}, stricter than members, and the repository holds nothing stricter: narrow it with its visibility control instead, which takes it out of the repository at once.`
 const notAdmittedTo = (what: string, token: string) =>
   `${what} would be kept at ${token}, which you are not admitted to, so you cannot write it here.`
 
 /** A whole-record op on a private record, as typed: nothing of the store's record is read here (it is merged at apply
- *  time), so staging says nothing about what the record holds, or whether it is there. */
-function recordDelta(op: StageOp, collection: string, id: string, level: string, viewer: Viewer): Split {
+ *  time), so staging says nothing about what the record holds, or whether it is there. A `visibility` git allows moves the
+ *  record into the repository (L6 §12): an update that sets nothing else is the staged op `move-to-git`; with anything
+ *  beside it, `MOVE_ALONE`; a private collection's record stays (`PRIVATE_COLLECTION_STAYS`). */
+function recordDelta(op: RecordOp, collection: string, id: string, level: string, viewer: Viewer, privateCollection = false,
+  stored: PrivateRecord | null = null): Split {
   if (op.op === 'delete') return { git: null, private: [{ op: 'delete-record', collection, id }] }
   const typed = op.op === 'update' ? op.set : op.value
   const entries = Object.entries(typed).filter(([k, v]) => !(k === 'restricted' && isMarker(v)) && k !== 'visibility')
   const said = typed.visibility
   const token = said === undefined || said === null ? null : String(said)
-  if (token !== null && gitAllows(fullLevel(null, '', { visibility: token }))) throw new StageError('visibility', widens(op.record, token))
+  // A token that is no level is not a move: it is refused below as a level nobody is admitted to.
+  const asked = token === null ? null : parseLevel(token)
+  if (asked !== null && gitAllows(asked)) {
+    if (privateCollection) throw new StageError('visibility', PRIVATE_COLLECTION_STAYS)
+    if (op.op !== 'update' || entries.length > 0) throw new StageError('visibility', MOVE_ALONE(op.record))
+    if (!stored) throw new StageError('', noRecord(collection, id))
+    return { git: null, private: [{ op: 'move-to-git', collection, id, level: asked.level as 'members' | 'public', digest: moveDigest(stored) }] }
+  }
   if (token !== null && !admits(levelOf(token), viewer)) throw new StageError('visibility', notAdmittedTo(op.record, token))
   const value = Object.fromEntries(entries)
   if (op.op === 'update') return { git: null, private: [{ op: 'update-record', collection, id, set: value, ...(token ? { visibility: token } : {}) }] }
@@ -202,19 +258,30 @@ function recordDelta(op: StageOp, collection: string, id: string, level: string,
  * it at. `store` null: it cannot be reached (the policy alone decides; a private part is then the caller's to refuse).
  * Throws a `StageError` for what cannot be staged.
  */
-export function splitOp(op: StageOp, config: VisibilityPolicy, store: PrivateStore | null, ctx: SplitContext): Split {
+export function splitOp(op: RecordOp, config: VisibilityPolicy, store: PrivateStore | null, ctx: SplitContext): Split {
   const { viewer } = ctx
   const { registry, id } = ref(op.record)
   if (registry === '' || id === '' || viewer.kind === 'public') return { git: op, private: [] }
-  if (!KNOWN.has(registry)) {
+  // DAO-OS L6 §12: a private page (a record of `pages` in the store) this viewer may read takes one op through the tray,
+  // its move into the repository; anything else on `pages` is staging's to answer, as before.
+  if (registry === 'pages' && store) {
+    const page = storeRead(store, () => store.record('pages', id))
+    const written = op.op === 'update' ? op.set : op.op === 'delete' ? {} : op.value
+    const asked = typeof written.visibility === 'string' ? parseLevel(written.visibility) : null
+    if (page && admits(levelOf(page.visibility), viewer) && asked !== null && gitAllows(asked)) {
+      return recordDelta(op, registry, id, page.visibility, viewer, false, page)
+    }
+    return { git: op, private: [] }
+  }
+  if (!(ctx.known ?? KNOWN).has(registry)) {
     const collection = store ? storeRead(store, () => store.collections()).find(c => c.id === registry) : undefined
     // One this viewer may not read is answered as an unknown registry: staging says it names none.
     if (!collection || !admits(levelOf(collection.visibility), viewer)) return { git: op, private: [] }
-    return recordDelta(op, registry, id, collection.visibility, viewer)
+    return recordDelta(op, registry, id, collection.visibility, viewer, true)
   }
   // A record of a git collection kept private, when this viewer may read it; otherwise git's answer stands.
   const kept = store ? storeRead(store, () => store.record(registry, id)) : null
-  if (kept && admits(levelOf(kept.visibility), viewer)) return recordDelta(op, registry, id, kept.visibility, viewer)
+  if (kept && admits(levelOf(kept.visibility), viewer)) return recordDelta(op, registry, id, kept.visibility, viewer, false, kept)
   if (op.op === 'delete') return { git: op, private: [] } // its restricted fields go with it at apply (`clear-fields`)
   const written = op.op === 'update' ? op.set : op.value
   const strict = strictToken(written.visibility)
@@ -258,17 +325,23 @@ export function splitOp(op: StageOp, config: VisibilityPolicy, store: PrivateSto
 
 /** Every op split, against the store `access` reaches and the policy as it is now, for `viewer`. A split that cannot be
  *  staged is a 422 `{ errors }`; a private part while the store cannot be reached is the store's 503. */
-export function splitOps(repo: string, ops: StageOp[], access: PrivateAccess, viewer: Viewer): { git: StageOp[]; private: StagedPrivateOp[]; store: PrivateStore | null } {
+export function splitOps(repo: string, ops: RecordOp[], access: PrivateAccess, viewer: Viewer): { git: RecordOp[]; private: StagedPrivateOp[]; store: PrivateStore | null; why: unknown } {
   const config = readConfig(repo)
   const { store, why } = reach(access)
-  const git: StageOp[] = []
+  const git: RecordOp[] = []
   const priv: StagedPrivateOp[] = []
   const errors: RecordError[] = []
+  const known = gitNames(repo)
   for (const op of ops) {
     let current: Record<string, unknown> | null = null
     try { current = currentOf(repo, op.record) } catch { /* a record git does not hold, or one staging refuses */ }
     try {
-      const split = splitOp(op, config, store, { viewer, current })
+      const split = splitOp(op, config, store, { viewer, current, known })
+      // DAO-OS L6 §12: a move is checked against the repository and the tree before it is staged (move.ts).
+      for (const m of split.private.filter(isMove)) {
+        if (!moveCheck) throw new StageError('visibility', `${op.record} cannot be checked for a move into the repository here, so it is not staged. Nothing was staged.`)
+        moveCheck(repo, store!, m, viewer, config)
+      }
       if (split.git) git.push(split.git)
       priv.push(...split.private)
     } catch (err) {
@@ -278,8 +351,17 @@ export function splitOps(repo: string, ops: StageOp[], access: PrivateAccess, vi
   }
   if (errors.length > 0) throw new StageRefusal(errors)
   if (priv.length > 0 && !store) throw unavailable(why)
-  return { git, private: priv, store }
+  return { git, private: priv, store, why }
 }
+
+/** How a move is checked at stage (L6 §12: an id git holds, a page's parent, its links): registered by
+ *  server/workspace/move.ts, which this module does not import (the page tree imports this module). Throws a StageError. */
+export type MoveCheck = (repo: string, store: PrivateStore, move: MoveToGit, viewer: Viewer, policy: VisibilityPolicy) => void
+// `var` without an initializer: move.ts may register before this module's body has run (an import cycle through the
+// page tree), and evaluating this line must not reset what it registered.
+// eslint-disable-next-line no-var
+var moveCheck: MoveCheck | undefined
+export function registerMoveCheck(check: MoveCheck): void { moveCheck = check }
 
 // ── staging ─────────────────────────────────────────────────────────────────────────────────────────
 
@@ -297,6 +379,11 @@ export function composeStaged(e: StagedPrivateOp, n: StagedPrivateOp): StagedPri
   if (n.op === 'put-field' || n.op === 'delete-field' || n.op === 'clear-fields') return n
   if (e.op === 'put-field' || e.op === 'delete-field' || e.op === 'clear-fields') return n
   const name = recordName(n)
+  // A move is an op of its own (R-L6-T11-1): a later move replaces it; anything else beside it is refused.
+  if (e.op === 'move-to-git' || n.op === 'move-to-git') {
+    if (e.op === 'move-to-git' && n.op === 'move-to-git') return n
+    throw new StageError('visibility', MOVE_ALONE(name))
+  }
   if (e.op === 'delete-record') {
     if (n.op !== 'create-record') throw new StageError('', `${name} is staged to be deleted: take that op out of the change first.`)
     return { op: 'replace-record', collection: n.collection, id: n.id, value: n.value, visibility: n.visibility }
@@ -385,7 +472,7 @@ export function stagedView(access: PrivateAccess, change: Change | null): (p: Pr
     asUnavailable(err, store)
     return () => null
   }
-  return p => rows.get(seqOf(p)) ?? null
+  return p => { const op = rows.get(seqOf(p)); return op ? shownOp(op) : null }
 }
 
 /** A discarded change's staged private ops go with it. A store that cannot be reached keeps them: nothing reads them
@@ -412,11 +499,12 @@ export async function discardStaged(access: PrivateAccess, change: Change | null
  * `viewer` null: the ops are a decided proposal's (Task 15, R-L5-15.3), judged at Propose for their proposer and decided
  * under the org's rules; nobody's admission is asked again, only whether the store still holds what they change.
  */
-export function resolvePrivate(store: PrivateStore, ops: StagedPrivateOp[], viewer: Viewer | null): PrivateOp[] {
+export function resolvePrivate(store: PrivateStore, ops: StagedPrivateOp[], viewer: Viewer | null, known: ReadonlySet<string> = KNOWN): PrivateOp[] {
   const out: PrivateOp[] = []
   const conflict = (error: string, code: string) => new Refusal(409, { code, error })
   const admitted = (token: string) => viewer === null || admits(levelOf(token), viewer)
   for (const op of ops) {
+    if (op.op === 'move-to-git') throw new Error('A move into the repository is applied by server/workspace/move.ts, never resolved here.')
     if (op.op === 'clear-fields') {
       for (const f of storeRead(store, () => store.fields(op.registry, op.record))) out.push({ op: 'delete-field', registry: op.registry, record: op.record, field: f.field })
       continue
@@ -436,7 +524,7 @@ export function resolvePrivate(store: PrivateStore, ops: StagedPrivateOp[], view
     const { collection, id } = op
     // A private collection this viewer may no longer read (or that is gone) is answered as one that never was: before
     // anything of its records is read.
-    if (!KNOWN.has(collection)) {
+    if (!known.has(collection)) {
       const listed = storeRead(store, () => store.collections()).find(c => c.id === collection)
       if (!listed || !admitted(listed.visibility)) throw conflict(noCollection(collection), 'NO_COLLECTION')
     }
@@ -458,6 +546,93 @@ export function resolvePrivate(store: PrivateStore, ops: StagedPrivateOp[], view
   return out
 }
 
+// ── a move into the repository: the store's side (L6 §12) ───────────────────────────────────────────
+
+/** A private record's body as a move splits it (§12): what the repository takes (`value`, with its id first and no
+ *  `visibility`), and the fields the policy still restricts, kept in the store as `fields` rows of the git record. A
+ *  contact detail is kept at `defaults.contact` unless the policy gives the field a level; with neither, the move is
+ *  refused (`NO_CONTACT_LEVEL`), as a write of it is. Throws a StageError. */
+export function moveSplit(policy: VisibilityPolicy, collection: string, id: string, body: Record<string, unknown>):
+  { value: Record<string, unknown>; fields: PrivateField[] } {
+  const restricted = restrictedFields(policy, collection)
+  const declared = policy.collections?.[collection]?.fields ?? {}
+  const contact = contactLevel(policy)
+  const keep: [string, unknown][] = [['id', id]]
+  const fields: PrivateField[] = []
+  for (const [field, value] of Object.entries(body)) {
+    if (field === 'id' || field === 'visibility' || (field === 'restricted' && isMarker(value))) continue
+    let level: ParsedLevel | null = Object.hasOwn(restricted, field) ? restricted[field]! : null
+    const contactField = Object.hasOwn(CONTACT_FIELDS, collection) && CONTACT_FIELDS[collection]!.includes(field)
+    if (level === null && contactField && !Object.hasOwn(declared, field) && held(value)) {
+      if (!contact) throw new StageError(field, NO_CONTACT_LEVEL)
+      level = contact
+    }
+    if (level === null) { keep.push([field, value]); continue }
+    if (held(value)) fields.push({ registry: collection, record: id, field, visibility: formatLevel(level), value })
+  }
+  return { value: Object.fromEntries(keep), fields }
+}
+
+/** L6 carries K5: what an edit of a private record or page is told while an open proposal holds its move into the
+ *  repository (the move's digest pins it, so the edit would leave the move stale, PRIVATE_STALE at ratify). Said to a
+ *  writer admitted to it, who also reads the proposal's private part. */
+export const MOVE_PROPOSED = (what: 'page' | 'record', proposal: string) =>
+  `A move of this ${what} into the repository is proposed in ${proposal}: an edit now would leave the move stale. ` +
+  'Decide or withdraw the proposal first. Nothing was written.'
+
+/** The open proposal whose private part holds a move of `collection`'s `id` into the repository (its `pending` row: a
+ *  proposal's rows go when it is decided or withdrawn), or null. A store that cannot be read is its 503. */
+export function heldMove(store: PrivateStore, collection: string, id: string): string | null {
+  for (const row of storeRead(store, () => store.pending())) {
+    if (row.ops.some(o => isObj(o) && o.op === 'move-to-git' && o.collection === collection && o.id === id)) return row.proposal
+  }
+  return null
+}
+
+/** Refuses (422 `{ errors }`, MOVE_PROPOSED) the ops that would edit a record or page an open proposal moves into the
+ *  repository (L6 carries K5): an update, replace or delete of it. A move itself is judged by its own stage. */
+export function refuseHeldByMove(store: PrivateStore | null, ops: readonly StagedPrivateOp[]): void {
+  if (!store) return
+  const errors: RecordError[] = []
+  for (const op of ops) {
+    if (op.op !== 'update-record' && op.op !== 'replace-record' && op.op !== 'delete-record') continue
+    const proposal = heldMove(store, op.collection, op.id)
+    if (proposal !== null) errors.push({ record: recordName(op), field: '', message: MOVE_PROPOSED(op.collection === 'pages' ? 'page' : 'record', proposal) })
+  }
+  if (errors.length > 0) throw new StageRefusal(errors)
+}
+
+/** One move as it was planned (move.ts `planMoves`): the store's record as it was read, and the fields that stay. */
+export interface MovedPart { collection: string; id: string; visibility: string; body: Record<string, unknown>; fields: PrivateField[] }
+
+/** Said when the record a move was staged on changed since (its digest, Task 11 review I-1), or changed or went while
+ *  the move was being made. */
+export const MOVE_CHANGED = (record: string) =>
+  `${record} changed since this move was staged; stage the move again. Nothing was written.`
+
+/** The store's writes of planned moves (§12), inside the caller's transaction: each record still as it was planned, and
+ *  still with no comment written while private (R-L6-T11-3, checked again here: Task 11 review M-3) that `viewer` may read
+ *  (PR7-R45, as `planMove`; null, a decided proposal's: every comment), else 409 `PRIVATE_CONFLICT`; its restricted fields
+ *  put as `fields` rows, then the record deleted. */
+export function movedWrites(store: PrivateStore, moved: readonly MovedPart[], viewer: Viewer | null = null): PrivateOp[] {
+  const out: PrivateOp[] = []
+  for (const m of moved) {
+    const kept = storeRead(store, () => store.record(m.collection, m.id))
+    const target = m.collection === 'pages' ? `page:${m.id}` : `record:${m.collection}:${m.id}`
+    const comments = storeRead(store, () => store.comments(target))
+    // T2e I2: a comment not filled yet (written before the floor) holds the move, whoever moves it.
+    const holding = viewer === null || !kept ? comments
+      : [...readableRows(comments, viewer, levelOf(kept.visibility)), ...comments.filter(c => c.writtenLevel === WRITTEN_UNFILLED)]
+    const talked = holding.some(c => c.deleted === null)
+    if (!kept || kept.visibility !== m.visibility || !sameValue(kept.body, m.body) || talked) {
+      throw new Refusal(409, { code: 'PRIVATE_CONFLICT', error: MOVE_CHANGED(`${m.collection}:${m.id}`) })
+    }
+    for (const field of m.fields) out.push({ op: 'put-field', field })
+    out.push({ op: 'delete-record', collection: m.collection, id: m.id, moved: true })
+  }
+  return out
+}
+
 /** `ops` written through `w`, an open transaction (`within`), each with its history row (by, change, and the decision row
  *  of a ratify). A failure of the store is its 503. */
 export function applyPrivate(w: PrivateWriter, ops: PrivateOp[], by: string, change: string | null, store: PrivateStore | null = null,
@@ -465,19 +640,20 @@ export function applyPrivate(w: PrivateWriter, ops: PrivateOp[], by: string, cha
   try {
     for (const op of ops) {
       if (op.op === 'put-record') w.putRecord(op.record, by, change, decision)
-      else if (op.op === 'delete-record') w.deleteRecord(op.collection, op.id, by, change, decision)
+      else if (op.op === 'delete-record') w.deleteRecord(op.collection, op.id, by, change, decision, op.moved !== true)
       else if (op.op === 'put-field') w.putField(op.field, by, change, decision)
       else w.deleteField(op.registry, op.record, op.field, by, change, decision)
     }
   } catch (err) { throw unavailable(err, store) }
 }
 
-/** The `clear-fields` op of each git record `ops` delete: its restricted fields go with it. */
-export function clearsOf(ops: readonly StageOp[]): StagedPrivateOp[] {
+/** The `clear-fields` op of each git record `ops` delete: its restricted fields go with it. `known`: the names git knows
+ *  (`gitNames(repo)`, a custom collection's records too); absent, the built-in registries. */
+export function clearsOf(ops: readonly StageOp[], known: ReadonlySet<string> = KNOWN): StagedPrivateOp[] {
   return ops.flatMap(op => {
-    if (op.op !== 'delete') return []
+    if (op.op !== 'delete') return [] // a file op (L6 §11.2) clears nothing: it is no record's delete
     const { registry, id } = ref(op.record)
-    return KNOWN.has(registry) && id !== '' ? [{ op: 'clear-fields' as const, registry, record: id }] : []
+    return known.has(registry) && id !== '' ? [{ op: 'clear-fields' as const, registry, record: id }] : []
   })
 }
 
@@ -489,10 +665,13 @@ export function clearsOf(ops: readonly StageOp[]): StagedPrivateOp[] {
  * part is in git, its private part was not written.
  */
 export async function withPrivate<T extends { commit: string | null }>(store: PrivateStore, ops: StagedPrivateOp[], viewer: Viewer, by: string,
-  change: string, staged: boolean, git: () => Promise<T>): Promise<T> {
+  change: string, staged: boolean, git: () => Promise<T>, known: ReadonlySet<string> = KNOWN, moved: readonly MovedPart[] = []): Promise<T> {
+  refuseHeldByMove(store, ops) // L6 carries K5: an edit staged before a move of its record was proposed
   return aroundGit(store, {
     before: w => {
-      applyPrivate(w, resolvePrivate(store, ops, viewer), by, change, store)
+      applyPrivate(w, resolvePrivate(store, ops, viewer, known), by, change, store)
+      // DAO-OS L6 §12: the records the commit moves into git leave the store in the same transaction.
+      applyPrivate(w, movedWrites(store, moved, viewer), by, change, store)
       if (staged) { try { w.deleteStaged(change) } catch (err) { throw unavailable(err, store) } }
     },
     git,

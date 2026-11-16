@@ -11,6 +11,7 @@ import { gitOpsOf, isPlaceholder } from './ops.mjs'
 import { canonicalJson, revOf } from './proposals.mjs'
 import { formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, readFullPolicy } from './visibility.mjs'
 import { isMap } from './yaml-util.mjs'
+import { descendantsOf, labelledLinks, pageEntries, pageLevel, splitPage, STRICT_LABEL } from './workspace/pages.mjs'
 
 /** The named rule a narrowing commits under (§9.7), in `Org-Rule`. */
 export const NARROW_RULE = 'visibility/narrow'
@@ -21,6 +22,11 @@ export const LEAVES_GIT = "It leaves the repository from now on. Its earlier ver
 
 /** A "narrowing" that lets someone read what they could not before (§9.7, §13: 409). */
 export const WIDENS = 'This makes it readable by more people, so it is proposed, not applied.'
+
+/** DAO-OS L6 §4.4 (Task 7): the confirmation of a page that leaves the repository with its subpages: their count, then
+ *  LEAVES_GIT's account of the history. With none, LEAVES_GIT itself. @param {number} n */
+export const PAGE_LEAVES_GIT = n => (n === 0 ? LEAVES_GIT
+  : `It and its ${n} ${n === 1 ? 'subpage' : 'subpages'} leave the repository from now on. ${LEAVES_GIT.replace(/^It leaves the repository from now on\. /, '')}`)
 
 /** The member list and its identity links stay in git (R-L5-16.9): the rules count them (§7, §8.1). */
 export const ROSTER = "The member list and its identity links are what the rules count, so a member's record and members.handles stay in the repository: " +
@@ -133,6 +139,7 @@ export const referrersInWords = refs =>
  * @typedef {{ kind: 'record', registry: string, id: string, level: string }
  *   | { kind: 'field', collection: string, field: string, level: string }
  *   | { kind: 'collection', collection: string, level: string }
+ *   | { kind: 'page', id: string, level: string }
  *   | { kind: 'store' }} NarrowTarget
  */
 
@@ -141,6 +148,7 @@ export const referrersInWords = refs =>
  *  @param {NarrowTarget} t @returns {string} */
 export function narrowSubject(t) {
   if (t.kind === 'store') return STORE_ONLY_SUBJECT
+  if (t.kind === 'page') return `visibility: narrow page ${t.id} to ${t.level}` // DAO-OS L6 §4.4
   if (t.kind === 'record') return `visibility: narrow ${t.registry}:${t.id} to ${t.level}`
   if (t.kind === 'field') return `visibility: narrow ${t.field} of ${t.collection} to ${t.level}`
   return `visibility: narrow ${t.collection} to ${t.level}`
@@ -150,7 +158,9 @@ export function narrowSubject(t) {
 export function parseNarrowSubject(subject) {
   const s = subject.trim()
   if (s === STORE_ONLY_SUBJECT) return { kind: 'store' }
-  let m = /^visibility: narrow (\S+) of ([^\s:]+) to (\S+)$/.exec(s)
+  let m = /^visibility: narrow page ([a-z0-9-]+) to (\S+)$/.exec(s) // DAO-OS L6 §4.4
+  if (m) return { kind: 'page', id: m[1], level: m[2] }
+  m = /^visibility: narrow (\S+) of ([^\s:]+) to (\S+)$/.exec(s)
   if (m) return { kind: 'field', field: m[1], collection: m[2], level: m[3] }
   m = /^visibility: narrow ([^\s:]+):(\S+) to (\S+)$/.exec(s)
   if (m) return { kind: 'record', registry: m[1], id: m[2], level: m[3] }
@@ -282,6 +292,10 @@ export function ledgerSubstitutedProblem(was, now, takes, cls) {
  * @property {(registry: string) => string} classOf a registry's class
  * @property {(registry: string, id: string) => Referrer[]} referred what names a record at the parent: other entries'
  *   references, and data/governance.yaml (`governanceNamesOf`)
+ * @property {(path: string) => { was: string | null, now: string | null }} [text] a file's text at the parent and in the
+ *   commit (null where it is absent): a page is read as a page, not as YAML (DAO-OS L6 §4.4)
+ * @property {() => { id: string, text: string }[]} [pagesWas] every git page at the parent (`pages/<id>.md`)
+ * @property {() => { id: string, text: string }[]} [pagesNow] every git page in the commit
  */
 
 const VISIBILITY_FILE = 'data/visibility.yaml'
@@ -318,6 +332,7 @@ export function narrowCommitProblem(c) {
   /** @type {string[]} */
   const allowed = []
   const fileOf = (/** @type {string} */ registry) => `data/${registry}.yaml`
+  if (t.kind === 'page') return pageNarrowProblem(c, t.id, t.level, level, strict, pa, pb)
   const deleted = c.files.find(f => c.doc(f).now === null)
   if (deleted) return `it deletes ${deleted}`
   const ledger = (/** @type {Takes} */ takes, /** @type {string} */ registry) => {
@@ -393,6 +408,78 @@ export function narrowCommitProblem(c) {
   if (why !== null) return why
   const outside = c.files.filter(f => !allowed.includes(f))
   return outside.length > 0 ? `it changes ${outside.join(', ')}, which narrowing ${c.subject.replace(/^visibility: narrow /, '')} does not` : null
+}
+
+// ── DAO-OS L6 §4.4 (Task 7): a page narrowed ───────────────────────────────────────────────────────────────────
+
+/** A page's front matter and body without its `visibility`, to compare the rest. @param {string} text */
+const withoutVisibility = text => { const { front, body } = splitPage(text); const { visibility: _v, ...rest } = front; return { rest, body } }
+
+/** A private page's placeholder class: `workspace`, the class of `pages/<id>.md` (L6 ruling P-5; a literal here, as this
+ *  module reads no file). */
+const PAGE_CLASS = 'workspace'
+
+/** The ops a proposal entry holds, its own and its revise events', for the leftover check. @param {unknown} p */
+const opsHeld = p => (isMap(p) ? [...(Array.isArray(p.ops) ? p.ops : []),
+  ...(Array.isArray(p.events) ? p.events.flatMap(e => (isMap(e) && Array.isArray(e.ops) ? e.ops : [])) : [])] : [])
+
+/**
+ * Why a commit under `Org-Rule: visibility/narrow` that says it narrows page `id` is not exactly that narrowing (DAO-OS L6
+ * §4.4), or null. Read from the parent's git pages (lib/workspace/pages.mjs `pageLevel`, `descendantsOf`): the level is
+ * within the page's level there. Stricter than members, the page and every git subpage leave git, deleted; data/proposals.yaml
+ * changes only by holding the proposals' file ops on them as placeholders (R-L5-10.7, as for a record), and none is left
+ * holding their text; nothing else changes. To members, pages/<id>.md has `visibility: members` and is otherwise as it was,
+ * and a subpage that said `visibility: public` itself has it taken off (nothing in it stays wider), nothing else changed.
+ * Either way, no git page left in the commit names one of them by its title while looser than it (controller ruling R-7a).
+ * @param {NarrowCommit} c @param {string} id @param {string} token @param {ReturnType<typeof parseLevel>} level
+ * @param {boolean} strict @param {ReturnType<typeof policyOf>} pa @param {ReturnType<typeof policyOf>} pb
+ * @returns {string | null}
+ */
+function pageNarrowProblem(c, id, token, level, strict, pa, pb) {
+  if (!c.text || !c.pagesWas) return 'it narrows a page, and this reading cannot read pages'
+  const byId = pageEntries(c.pagesWas(), [])
+  const path = `pages/${id}.md`
+  if (!byId.has(id)) return `${path} held no page to narrow`
+  const cur = pageLevel(id, byId, pa)
+  if (!within(token, cur)) return `page ${id} was ${formatLevel(cur)}, and ${token} is not within it`
+  if (!same(pa, pb)) return `it changes ${VISIBILITY_FILE}, which narrowing a page does not`
+  const ids = [id, ...descendantsOf(id, byId)]
+  const tree = ids.map(d => `pages/${d}.md`)
+  const now = pageEntries(c.pagesNow ? c.pagesNow() : [], [])
+  const named = (/** @type {(d: string) => ReturnType<typeof pageLevel>} */ levelOf) => {
+    const left = labelledLinks(now, new Set(ids), levelOf, pb)
+    return left.length > 0 ? `${left.map(d => `pages/${d}.md`).join(', ')} still ${left.length === 1 ? 'names' : 'name'} page ${id} or a subpage by its title, which a narrowing leaves to ${STRICT_LABEL} only` : null
+  }
+  if (strict) {
+    const kept = tree.filter(f => c.text?.(f).now !== null)
+    if (kept.length > 0) return `it leaves ${kept.join(', ')} in the repository, which leave it with page ${id}`
+    const takes = (/** @type {Record<string, unknown>} */ op) => (op.op === 'file' && typeof op.path === 'string' && tree.includes(op.path) ? { keep: null } : null)
+    if (c.files.includes(LEDGER_FILE)) {
+      const d = c.doc(LEDGER_FILE)
+      const why = ledgerSubstitutedProblem(c.records(d.was, 'proposals'), c.records(d.now, 'proposals'), takes, PAGE_CLASS)
+      if (why !== null) return why
+    }
+    const ledgerNow = c.files.includes(LEDGER_FILE) ? c.doc(LEDGER_FILE).now : c.doc(LEDGER_FILE).was
+    const holding = c.records(ledgerNow, 'proposals').filter(p => opsHeld(p).some(op => isMap(op) && takes(op) !== null))
+    if (holding.length > 0) return `data/proposals.yaml still holds the text of ${tree.filter(f => holding.some(p => opsHeld(p).some(op => isMap(op) && op.path === f))).join(', ')} (proposal ${holding.map(p => String(p.id)).join(', ')})`
+    const outside = c.files.filter(f => !tree.includes(f) && f !== LEDGER_FILE)
+    if (outside.length > 0) return `it changes ${outside.join(', ')}, which narrowing page ${id} does not`
+    return named(() => /** @type {any} */ (level))
+  }
+  for (const f of c.files) {
+    const at = tree.indexOf(f)
+    const { was, now: n } = c.text(f)
+    if (at < 0 || was === null || n === null) return `it changes ${f}, which narrowing page ${id} to ${formatLevel(/** @type {any} */ (level))} does not`
+    const a = withoutVisibility(was)
+    const b = withoutVisibility(n)
+    if (!same(a, b)) return `it changes ${f} otherwise than in its visibility`
+    const v = splitPage(n).front.visibility
+    if (f === path ? v !== token : (splitPage(was).front.visibility !== 'public' || v !== undefined)) {
+      return f === path ? `${f} does not say visibility: ${token}` : `it changes the visibility of ${f}, which it only takes off where it said public`
+    }
+  }
+  if (!c.files.includes(path)) return `it does not change ${path}`
+  return named(d => pageLevel(d, now, pb))
 }
 
 /** The policy of a data/visibility.yaml document (null: none). @param {unknown} doc */

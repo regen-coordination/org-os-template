@@ -38,7 +38,7 @@ export function restrictedView<V extends ProposalView>(view: V): V {
  * A proposal as this viewer is shown it (§6.3, E-50, rule 8), or null when it is not shown at all.
  * - You: as the server gave it (the server already judged you).
  * - A preview reads `resources` (absent while they are not read: nothing is shown, failing closed).
- * - Public (L4-R13, the door's view): shown only when the store's record of it is a record Public sees, and every record
+ * - Public (L4-R13, the portal's view): shown only when the store's record of it is a record Public sees, and every record
  *   its ops touch is found in the resources (by change key) and seen. A missing record, a governance document op or a
  *   create fails closed; a placeholder (a restricted view, or `private` ops) is never public (R-L5-13.2).
  * - Members or a hat: every proposal the store's own record allows is listed, as a member is listed it (R-L5-15.8): in

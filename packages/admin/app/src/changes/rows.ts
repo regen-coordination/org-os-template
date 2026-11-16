@@ -18,6 +18,8 @@ export interface TrayRow {
  *  on the trunk now. A create is one line naming the new record; a delete one line naming what goes. */
 export function opFields(op: Op, cur: Record<string, unknown> | null = null): { field: string; was: unknown; now: unknown; current: unknown }[] {
   let fields: { field: string; was: unknown; now: unknown; current: unknown }[]
+  // A governed file edited whole (L6 §11.2): one line naming the file; Compare shows the text.
+  if (op.op === 'file') return [{ field: op.text === null ? '(file deleted)' : '(whole file)', was: undefined, now: op.text === null ? undefined : op.path, current: undefined }]
   if (op.op === 'update') {
     fields = Object.entries(op.set).map(([f, v]) => ({ field: f, was: op.before?.[f], now: v, current: cur?.[f] }))
   } else if (op.op === 'replace') {
@@ -37,20 +39,56 @@ export function trayRows(view: ChangeView): TrayRow[] {
   return view.ops.flatMap((op, n) => {
     const stale = view.stale.includes(n)
     const fields = opFields(op, view.current[n] ?? null)
-    return fields.map((f, i) => ({ n, record: op.record, op: op.op, stale, ...f, first: i === 0, alone: fields.length === 1 }))
+    return fields.map((f, i) => ({ n, record: opRecord(op), op: op.op, stale, ...f, first: i === 0, alone: fields.length === 1 }))
   })
 }
 
-/** The record an op is about, by the name its entry carries, else its key (`<registry>:<id>`). */
+/** What an op is about as the tray keys it: its record (`<registry>:<id>`), or a file op's path (L6 §11.2). */
+export const opRecord = (op: Op): string => (op.op === 'file' ? op.path : op.record)
+
+/** The record an op is about, by the name its entry carries, else its key (`<registry>:<id>`); a file op by its path. */
 export function recordName(op: Op): string {
+  if (op.op === 'file') return op.path
   const entry = op.op === 'create' || op.op === 'replace' ? op.value : op.before
   return entryName(op.before) ?? entryName(entry) ?? op.record
 }
 
 /** The kind an op's record draws its tile with: the entry's own `kind` (a System's safe, a hat), else its registry. */
 export function opKind(op: Op): string {
+  if (op.op === 'file') return 'file'
   const entry = op.before ?? (op.op === 'create' || op.op === 'replace' ? op.value : null)
   return typeof entry?.kind === 'string' ? entry.kind : op.record.slice(0, Math.max(0, op.record.indexOf(':')))
+}
+
+/** A private entry of a change (L5 R-L5-14.2): its op as typed, read back from the store for the one who staged it; null when
+ *  the store could not be read. */
+export type PrivateEntryView = NonNullable<ChangeView['private']>[number]
+
+/** The staged entries a change holds: its git ops and its private part (L6 Task 21, PF-R111: a move into the repository is a
+ *  change with a private part only, and it is still a change). */
+export const heldCount = (view: Pick<ChangeView, 'ops' | 'private'>): number => view.ops.length + (view.private?.length ?? 0)
+
+/** A private entry as the tray says it, in the place of a git op's record and fields: what it touches and what it does. The
+ *  stager typed it, so it is shown to them; a value is never drawn, only the fields' names. */
+export function privateSummary(op: PrivateEntryView['op']): { record: string; what: string } {
+  if (op === null) return { record: 'A private change', what: 'the private store could not be read' }
+  switch (op.op) {
+    case 'move-to-git': return { record: `${op.collection}:${op.id}`, what: `moved into the repository, at ${op.level}` }
+    case 'create-record': return { record: `${op.collection}:${op.id}`, what: 'new record, kept in the private store' }
+    case 'update-record': return { record: `${op.collection}:${op.id}`, what: Object.keys(op.set).join(', ') || 'updated' }
+    case 'replace-record': return { record: `${op.collection}:${op.id}`, what: 'replaced' }
+    case 'delete-record': return { record: `${op.collection}:${op.id}`, what: 'deleted' }
+    case 'put-field': return { record: `${op.field.registry}:${op.field.record}`, what: `${op.field.field}, kept at ${op.field.visibility}` }
+    case 'delete-field': return { record: `${op.registry}:${op.record}`, what: `${op.field} removed` }
+    case 'clear-fields': return { record: `${op.registry}:${op.record}`, what: 'its restricted fields cleared' }
+  }
+}
+
+/** A private entry in a line (§5.6 collapsed), as `opSummary` says a git op. */
+export function privateLine(op: PrivateEntryView['op']): string {
+  if (op === null) return 'A private change (the private store could not be read)'
+  const s = privateSummary(op)
+  return `${s.record} · ${s.what}`
 }
 
 /** The fields an op touches, as words: what its × names ("Remove op: threshold on Treasury"). */
@@ -62,7 +100,7 @@ export function opFieldWords(op: Op): string {
 export function opSummary(op: Op): string {
   const fields = opFields(op)
   const one = fields.length === 1 ? fields[0]! : null
-  const what = op.op === 'create' ? 'new record' : op.op === 'delete' ? 'deleted'
+  const what = op.op === 'file' ? (op.text === null ? 'deleted' : 'edited whole') : op.op === 'create' ? 'new record' : op.op === 'delete' ? 'deleted'
     : one ? `${one.field}: ${fmt(one.now)}` : fields.map(f => f.field).join(', ')
   return `${recordName(op)} · ${what}`
 }
@@ -79,14 +117,20 @@ export function ruleWords(rule: ChangeView['rule']): string {
   return rule.direct ? `Saves directly · ${rule.sentence}` : rule.sentence
 }
 
-/** "1 staged change", "3 staged changes": the tray's count, and what the live region says when it moves. */
+/** "1 staged op", "3 staged ops": the tray's count, and what the live region says when it moves. The same word as the
+ *  expanded head ("2 ops · 1 record") and the stale line count it by (walk M1, PF-R260). */
 export function stagedWords(n: number): string {
-  return `${n} staged change${n === 1 ? '' : 's'}`
+  return `${n} staged op${n === 1 ? '' : 's'}`
 }
 
 /** "1 op changed on the trunk — choose what stands": the stale tray's line (§5.6). */
 export function staleWords(n: number): string {
   return `${n} op${n === 1 ? '' : 's'} changed on the trunk — choose what stands`
+}
+
+/** The Propose panel's line when some ops are stale (the walk's G6): they are not proposed, and stay. */
+export function staleStays(n: number): string {
+  return `${n === 1 ? 'One op changed' : `${n} ops changed`} on the trunk, so ${n === 1 ? 'it is' : 'they are'} not proposed: ${n === 1 ? 'it stays' : 'they stay'} in your tray. The rest is proposed.`
 }
 
 /** A value in the diff: '—' for nothing, lists in brackets, objects as JSON. */

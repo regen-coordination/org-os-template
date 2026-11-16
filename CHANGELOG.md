@@ -8,6 +8,160 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.7.0] — 2026-11-11
+
+**0.7 adds the workspace to the house:** pages, collections, tasks, imports and conversation, beside
+the records, rules and proposals 0.6 brought. It also adds the knowledge commons' pages (kms-admin,
+local only) and compose and deploy (DAO-OS L7): a DAO composed as records, its deployment prepared
+step by step, and what the chain holds read back. The house never signs. 0.7 has breaking changes:
+read **Upgrading from 0.6** below before you sync.
+
+### Added
+
+- **The workspace** (`packages/admin`, DAO-OS L6). The org's working surface, in the house's
+  words. What members (or the public) read is in git; what is stricter is kept in the private store,
+  down to one field, one title or one comment. Every read goes through the visibility gate.
+  - **Pages** (`pages/<id>.md`, `/p/<id>`): a tree of pages written in the Hub's Markdown dialect
+    through editing sessions (one commit per session), three-way merges and Compare, Suggest (a
+    page edit as a proposal), attachments, and Record a meeting (a meeting and its notes page).
+  - **Collections**: `tasks` and `meetings`, the org's own collections (`data/collections.yaml`,
+    `data/collections/<id>.yaml`) and private ones, each with Table, Board, Calendar, List and Map
+    views, saved views, and inline edits batched into one commit.
+  - **Conversation**: comments on a page or a record, replies, mentions and notifications, in the
+    private store, never in git; presence (in memory only); Turn into a task.
+  - **Imports**: `npm run import -- notion|fileverse <folder> [--map <file>] [--apply]`, a Notion
+    export or a Fileverse pull, mapped first, applied as one commit with a receipt in
+    `data/imports.yaml` that names no private item.
+  - **Sources and the source editor**: `/sources` says where everything the Hub shows comes from;
+    `/files/<path>` edits a governed file whole, staged into a change.
+  - **Council memory** (`npm run memory`) and **moving a private thing into the repository** by a
+    publication decision.
+- **The knowledge commons' pages (kms-admin)**: `/c/knowledge`, its setup and its entry pages,
+  read through `packages/org-os-kms`. An edit to the canon (`data/kb/`) is prepared, then applied in
+  one commit under the org's rules. Local only in 0.7 (see *Upgrading*).
+- **Compose and deploy** (DAO-OS L7). Compose a DAO (a template wizard) and `/compose`, a canvas over
+  the org's composed Systems: a Safe, a Hats tree and its hats, a signer gate, a Snapshot space and
+  an ERC-4824 registration, kept in `data/systems.yaml` with `deployment.status: composed` and
+  decided like any change. `/deploy` prepares the deployment step by step, and **Read back** stages
+  what the chain holds as live Systems, in one ordinary change. The Hub reads, plans and stages; a
+  signer signs in the Safe app or their own wallet. Built for Sepolia, tested against a fake node; the
+  proof on a fork of a test DAO follows in its own release.
+- **Library receipts' `modified`** (L7-D11): an add that changes a record the org already had lists
+  it, and a removal gives back the version it replaced.
+- **The `workspace` change class** in `schemas/change-classes.json`: pages, tasks, meetings,
+  collections, imports, `data/kb/`, `memory/`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/` and
+  `docs/agent-plans/`. With no rule naming it, a workspace write is direct (`workspace/direct`).
+- **`e2e:hosted`**: a walk of a hosted, read-only Hub signed in by emailed links, as a staging Hub
+  runs, beside the workspace and compose walks in `e2e`.
+- **Example DAO is the one sample org.** The fixtures 0.7 adds (the workspace, compose, library,
+  knowledge, kms and federation map) use it and synthetic addresses, as 0.6's do.
+
+### Fixed
+
+The first two are in 0.6.1 and 0.6.2's hosting; 0.7 fixes them, and no 0.6 patch carries the fix.
+
+- **A hosted Hub's `/sign-in` offers the emailed link.** 0.6.1 built the email form but never put it
+  on the page, so a member of a hosted Hub could not ask for a link from the Hub. It now offers
+  what `GET /api/session`'s `methods` says. A local Hub's `/sign-in` stays the wallet's.
+- **Signing in by emailed link no longer breaks the Hub's frame.** The sidebar and the read-only band
+  read the wallet's hats from a session that has none, and threw for anyone signed in by email.
+  Such a person now reads as their member name, with their Roles. A person with no Role is told
+  "You are signed in, but you have no Role here yet."
+- **A read-only Hub says Read only.** While instance writes are off, a workspace page draws no save
+  state and its meta line says Read only (it read "Saved · direct"), and presence never says editing.
+
+### Changed
+
+- **The portal link appears only with a portal origin**: in the sidebar, the org switcher, the
+  setup checklist, `g d` and ⌘K, when `GET /api/session` answers an https `portal`, and it points
+  there. A local Hub, or a hosted one with no portal origin, shows none. The house's own `/portal`
+  page (the sample page) and its words say portal; `/door` still lands on it, and a hosted Hub still
+  sends both to the portal origin.
+- **A read-only Hub still writes conversation and per-member state**: see *Upgrading*.
+- **The private store is at schema 3**: see *Upgrading*.
+- **Member mentions are labelled by who may read them**: see *Upgrading*.
+- **An emailed-link person's name** is said to others only as the members file's visibility allows,
+  else as their member id; their own session still tells them their name.
+
+### Removed
+
+- **`ORG_OS_DOOR_ORIGIN`, `ORG_OS_DOOR_DIR` and `ORG_OS_DOOR_EVERY`**, deprecated in 0.6.2, are no
+  longer read. A Hub with one still set stops at start with a sentence naming its new name
+  (`ORG_OS_PORTAL_ORIGIN`, `ORG_OS_PORTAL_DIR`, `ORG_OS_PORTAL_EVERY`), and `hub check` says the
+  same.
+- **`door` in `GET /api/session`**, deprecated in 0.6.2: read `portal`.
+
+### Upgrading from 0.6
+
+Sync, then `npm ci --prefix packages/admin` (the editor brings new dependencies), then
+`npm run validate:data`. **Back up the private store before 0.7 first starts** (below).
+
+**Breaking changes**
+
+- **A policy that keeps a required System field above members now fails validation** (PF-R279). A
+  deployed System must keep `id`, `kind`, `name`, `chain`, `address` and `url` in the repository,
+  so `data/visibility.yaml` may not set `systems.fields.<field>` to a hat or a role level:
+  `validate:data` reports "A deployed System must keep its <field> in the repository, so <field>
+  cannot be kept above members: give it members or public.", and every writer of the policy refuses
+  it (422 `REQUIRED_IN_GIT` for a narrowing). It holds with no System deployed yet. Widen the field
+  to members or public. A System kept whole as a private record is not affected.
+- **The door's old setting names are not read** (above). Rename them before you start a 0.7 Hub.
+- **Meetings, memory and plans move to the `workspace` class.** `data/meetings.yaml`, `memory/**`,
+  `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**` and `docs/agent-plans/**` were `records` (or no
+  class); they are `workspace` now, and an org's `all` rule does not reach the workspace. With no
+  rule naming `workspace` (or one of its targets, such as `workspace:meetings`), their writes are
+  direct. Name one in `data/governance.yaml` to keep them decided.
+
+**The private store (schema 3).** The store moves to schema 3 the first time a 0.7 Hub opens it. It
+gains the workspace's tables; `comments`, `mentions` and `notifications` gain `written_level`, and
+`mentions` gain `created`. **There is no rollback to 0.6 without a backup**: run
+`npm run house:backup` (or copy the store's folder, `.org-os/private/` by default, with the Hub
+stopped) before the first start.
+
+**The conversation keeps the level it was written at.** Every comment, reply, mention and notification
+records its target's level when written, and is read only by someone admitted to that level and to
+the target's level now. When a page is widened, in the Hub or outside it, its earlier talk stays
+with those who could read it before. At the first 0.7 start, existing rows are given their target's
+level at that moment, so **start 0.7 before you widen anything**: a page widened or made again
+outside the Hub before then keeps its old talk at the wider level.
+
+**What a read-only Hub still writes** (`HOUSE_INSTANCE_WRITES=off`). Comments (post, resolve,
+reopen, delete), notifications read, read marks, a collection's view state and presence: the private
+store's conversation and per-member state. Everything else the workspace writes is refused 403
+`INSTANCE_READ_ONLY`, even where its target is the private store: pages and editing sessions,
+collections and saved views, records, meetings, Council memory, the knowledge commons, the deploy
+read-back, and a comment's **Turn into a task**, which writes a task.
+
+**Member mentions.** A member mention (`[@Name](hub:member/<id>)`) is written with the name the
+text's loosest reader may read (the public's in a public text, any member's otherwise), else the
+member's id, and read back as the name the viewer may read. A write that mentions a member is refused
+503 `MEMBERS_UNREADABLE` while `data/members.yaml` is there but cannot be read. A reference-style
+member link (or one over lines, or with a title) is refused 422: write it inline. Text written
+outside the Hub with such a link is shown as a sentence saying so, not as its body.
+
+**The portal link** shows only when the Hub is hosted with an https `ORG_OS_PORTAL_ORIGIN`.
+
+**kms-admin is local only.** The hosted image does not carry `packages/org-os-kms`, so the knowledge
+commons' pages work on a member's own Hub, not on a hosted one.
+
+**Wizard drafts from a local 0.6 Hub are left behind.** 0.7 keeps each member's draft under their own
+name, so a draft a local 0.6 Hub saved (`<wizard id>-1.json` in its state folder) is not offered
+again. Finish or restart that wizard; the old file can be deleted. A hosted 0.6.1/0.6.2 draft is
+still offered to its member.
+
+### Notes
+
+- **Design and history.** What 0.7 adds is described in `packages/admin/README.md` and
+  `docs/DATA-MODEL.md`. How 0.7 was built, and where its process records went:
+  `docs/superpowers/history/org-os-0.7.md`.
+- **New and changed schemas** (`packages/admin/schemas/`): `collections`, `tasks` and `imports` are
+  new. `systems` gains the composed and deployed keys (`deployment`, `ens`, `hats`, `signer_gate`,
+  `relates`, `role`, `position`, `order`; `docs/DATA-MODEL.md`); `meetings` gains `notes` (its notes
+  page); `proposals` gains `suggested` and a `file` op; `library` gains `modified`, and `created` may
+  be empty when `modified` is not.
+- **Clones** gain `scripts/memory.mjs`, `scripts/lib/compose.mjs` and `scripts/lib/deployments.mjs`.
+- **CI.** The admin suite is about 8,030 tests. The `Validate` job's limit stays 30 minutes.
+
 ## [0.6.2] — 2026-11-08
 
 **0.6.2 names the hosted Hub's public site the portal.** The site 0.6.1 called the door is the
@@ -490,7 +644,8 @@ Incubation. See git history for granular changes. Notable milestones:
 - `a2feec4` — egregore, koi, opal integrations landed.
 - `12ef2f9` — 4 Regen agents + knowledge initiation plan.
 
-[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/regen-coordination/org-os-template/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/regen-coordination/org-os-template/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/regen-coordination/org-os-template/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/regen-coordination/org-os-template/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/regen-coordination/org-os-template/compare/v0.5.0...v0.6.0

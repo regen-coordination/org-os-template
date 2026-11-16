@@ -107,6 +107,21 @@ export function useSessionView(): SessionView | null {
   return useQuery({ queryKey: SESSION_KEY, queryFn: api.session, retry: false, staleTime: 30_000 }).data ?? null
 }
 
+/** D-5 (platform 0.7): the portal's origin, when the Hub has one: hosted with ORG_OS_PORTAL_ORIGIN, so GET /api/session
+ *  answers `portal` (an https origin, as the server's settings take it). Null on a local Hub, a hosted one without it, or
+ *  while the session is read. */
+export function portalOriginOf(session: SessionView | null): string | null {
+  const p = session?.portal
+  return typeof p === 'string' && /^https:\/\/[^/\s?#]+$/.test(p) ? p : null
+}
+
+/** The portal's origin (portalOriginOf, from the session read once for the whole Hub). Every Portal link — the sidebar's
+ *  foot, the org switcher, the phone's More sheet, ⌘K, the setup checklist, `g d` and its key map row, the sign-in card —
+ *  is drawn only with it, and goes there. A local Hub draws none: /portal is its sample page. */
+export function usePortalOrigin(): string | null {
+  return portalOriginOf(useSessionView())
+}
+
 /** Is `path` the sign-in page? */
 export const isSignInPath = (path: string) => path === '/sign-in' || path.startsWith('/sign-in?')
 

@@ -1,5 +1,5 @@
 import { isAlias, isMap, isScalar, isSeq, parseDocument, type Document, type YAMLMap } from 'yaml'
-import { registryDef, resolveTopKey } from './registries.ts'
+import { registryDef, resolveTopKey, type RegistryDef } from './registries.ts'
 
 /**
  * The last check before a registry file is written: does the new text hold
@@ -141,11 +141,18 @@ function fieldDiff(a: YAMLMap, aDoc: Document, b: YAMLMap, bDoc: Document, only?
   return null
 }
 
-function entryDiff(a: unknown, aDoc: Document, b: unknown, bDoc: Document, index: number): string | null {
+function entryDiff(a: unknown, aDoc: Document, b: unknown, bDoc: Document, named: string): string | null {
   if (exact(a, aDoc) === exact(b, bDoc)) return null
   const detail = isMap(a) && isMap(b) ? fieldDiff(a, aDoc, b, bDoc) : null
-  return `${label(a, index)}, ${detail ?? 'which would not read the same'}`
+  return `${named}, ${detail ?? 'which would not read the same'}`
 }
+
+/** One entry of a registry file: its key in a map-shaped file (L6 §7.1), null in a list; and its node. */
+interface Held { key: string | null; node: unknown }
+
+/** A map entry's fields without `id`: the key is its id (L6 §7.1). */
+const withoutId = (entity: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(entity).filter(([key]) => key !== 'id'))
 
 /** Why a text cannot be written: `what` names the first thing that would
  *  differ; `digits` says whether that is a number too long to be kept (so that
@@ -157,12 +164,14 @@ export interface Unintended { what: string; digits: boolean }
  * `edit` what was asked for. Returns null when `text` is exactly `src` with
  * that edit, or what would differ.
  */
-export function whyNot(src: string, text: string, name: string, edit: Edit): Unintended | null {
+export function whyNot(src: string, text: string, registry: string | RegistryDef, edit: Edit): Unintended | null {
   const other = (what: string): Unintended => ({ what, digits: false })
   try {
     const before = parseDocument(src); const after = parseDocument(text)
     if (after.errors.length > 0) return other(`the result would not be valid YAML (${after.errors[0]!.message.split('\n')[0]})`)
-    const topKey = resolveTopKey(k => after.has(k), registryDef(name))
+    const def = typeof registry === 'string' ? registryDef(registry) : registry
+    const keyed = def.shape === 'map'
+    const topKey = resolveTopKey(k => after.has(k), def)
     const top = (doc: Document) => (isMap(doc.contents) ? doc.contents.items : [])
     const others = (doc: Document) => top(doc).filter(p => keyOf(p) !== topKey)
 
@@ -177,8 +186,16 @@ export function whyNot(src: string, text: string, name: string, edit: Edit): Uni
       }
     }
 
-    const list = (doc: Document) => { const node = doc.get(topKey, true); return isSeq(node) ? node.items : [] }
+    // A map-shaped file's entries are its pairs, each named by its key; a list's, its items.
+    const list = (doc: Document): Held[] => {
+      const node = doc.get(topKey, true)
+      if (keyed) return isMap(node) ? node.items.map(p => ({ key: keyOf(p), node: p.value })) : []
+      return isSeq(node) ? node.items.map(item => ({ key: null, node: item })) : []
+    }
+    const named = (held: Held | undefined, index: number) =>
+      (held?.key !== null && held?.key !== undefined ? `entry "${held.key}"` : label(held?.node, index))
     const was = list(before); const now = list(after)
+    const entity = keyed && edit.kind !== 'delete' ? withoutId(edit.entity) : edit.kind === 'delete' ? {} : edit.entity
     const untouched = was.map((item, index) => ({ item, index })).filter(e => edit.kind === 'create' || e.index !== edit.index)
     const expected = untouched.length + (edit.kind === 'delete' ? 0 : 1)
     if (now.length !== expected) return other(`the list would hold ${now.length} entries where ${expected} are expected`)
@@ -186,33 +203,39 @@ export function whyNot(src: string, text: string, name: string, edit: Edit): Uni
     // Every entry except the one edited reads exactly as before.
     for (const [position, { item, index }] of untouched.entries()) {
       const at = edit.kind === 'update' && index > edit.index ? position + 1 : position
-      const diff = entryDiff(item, before, now[at], after, index)
-      if (diff) return { what: diff, digits: digitsLost(item, before, now[at], after) }
+      if (item.key !== (now[at]?.key ?? null)) return other(`${named(item, index)}, which would not read the same`)
+      const diff = entryDiff(item.node, before, now[at]?.node, after, named(item, index))
+      if (diff) return { what: diff, digits: digitsLost(item.node, before, now[at]?.node, after) }
     }
     if (edit.kind === 'delete') return null
 
     // The edited entry holds what was asked for; fields the edit left alone read exactly as before.
     const index = edit.kind === 'update' ? edit.index : now.length - 1
-    const written = now[index]
-    if (!isMap(written)) return other(`${label(written, index)} would not be written as an entry`)
-    const got = written.toJS(after) as Record<string, unknown>
-    const same = (key: string) => JSON.stringify(got[key]) === JSON.stringify(edit.entity[key])
-    for (const key of new Set([...Object.keys(edit.entity), ...Object.keys(got)])) {
+    const held = now[index]
+    const written = held?.node
+    const where = named(held, index)
+    if (!isMap(written)) return other(`${where} would not be written as an entry`)
+    // In a map, the entry's key is its id: it is the id that was sent, and the id is no field of it.
+    if (keyed && held!.key !== String(edit.entity.id)) return other(`${where} would not be written under the id that was sent`)
+    const got = (keyed ? withoutId(written.toJS(after) as Record<string, unknown>) : written.toJS(after)) as Record<string, unknown>
+    const same = (key: string) => JSON.stringify(got[key]) === JSON.stringify(entity[key])
+    for (const key of new Set([...Object.keys(entity), ...Object.keys(got)])) {
       // Own keys only: `'toString' in got` is true of every object.
-      if (!Object.hasOwn(got, key)) return other(`${label(written, index)}, field "${key}" would be missing`)
-      if (!Object.hasOwn(edit.entity, key)) return other(`${label(written, index)}, field "${key}" would be left in`)
-      if (!same(key)) return other(`${label(written, index)}, field "${key}" would not hold the value that was sent`)
+      if (!Object.hasOwn(got, key)) return other(`${where}, field "${key}" would be missing`)
+      if (!Object.hasOwn(entity, key)) return other(`${where}, field "${key}" would be left in`)
+      if (!same(key)) return other(`${where}, field "${key}" would not hold the value that was sent`)
     }
-    if (edit.kind === 'update' && isMap(was[index])) {
-      const current = (was[index] as YAMLMap).toJS(before) as Record<string, unknown>
-      const kept = (key: string) => Object.hasOwn(current, key) && JSON.stringify(current[key]) === JSON.stringify(edit.entity[key])
-      const diff = fieldDiff(was[index] as YAMLMap, before, written, after, kept)
-      if (diff) return { what: `${label(written, index)}, ${diff}`, digits: digitsLost(was[index], before, written, after) }
+    const old = was[index]?.node
+    if (edit.kind === 'update' && isMap(old)) {
+      const current = (old as YAMLMap).toJS(before) as Record<string, unknown>
+      const kept = (key: string) => Object.hasOwn(current, key) && JSON.stringify(current[key]) === JSON.stringify(entity[key])
+      const diff = fieldDiff(old as YAMLMap, before, written, after, kept)
+      if (diff) return { what: `${where}, ${diff}`, digits: digitsLost(old, before, written, after) }
       // Fields the edit replaced: no number in them was rounded on the way through JSON.
-      for (const key of Object.keys(edit.entity)) {
+      for (const key of Object.keys(entity)) {
         if (kept(key)) continue
-        const lost = roundedAway(written.get(key, true), after, literals((was[index] as YAMLMap).get(key, true), before))
-        if (lost) return { what: `${label(written, index)}, field "${key}": ${lost}`, digits: true }
+        const lost = roundedAway(written.get(key, true), after, literals((old as YAMLMap).get(key, true), before))
+        if (lost) return { what: `${where}, field "${key}": ${lost}`, digits: true }
       }
     }
     return null
@@ -222,6 +245,6 @@ export function whyNot(src: string, text: string, name: string, edit: Edit): Uni
 }
 
 /** `whyNot` as a phrase alone, or null. */
-export function unintendedChange(src: string, text: string, name: string, edit: Edit): string | null {
-  return whyNot(src, text, name, edit)?.what ?? null
+export function unintendedChange(src: string, text: string, registry: string | RegistryDef, edit: Edit): string | null {
+  return whyNot(src, text, registry, edit)?.what ?? null
 }

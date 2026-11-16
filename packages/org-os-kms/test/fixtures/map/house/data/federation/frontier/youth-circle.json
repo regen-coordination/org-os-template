@@ -1,0 +1,7 @@
+{
+  "fetched_at": "2026-10-17T12:00:00Z",
+  "source": "local",
+  "peers": [{ "id": "Pantry Network", "name": "Pantry Network", "repo": null, "url": null, "type": "Network" }],
+  "last_attempt_at": "2026-10-17T12:00:00Z",
+  "last_error": null
+}

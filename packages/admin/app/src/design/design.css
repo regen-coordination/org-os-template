@@ -9,8 +9,10 @@
 @import './css/needs.css';
 @import './css/views.css';
 @import './css/workspace.css';
+@import './css/pages.css';
 @import './css/governance.css';
 @import './css/map.css';
 @import './css/library.css';
-@import './css/door.css';
+@import './css/knowledge.css';
+@import './css/portal.css';
 @import './css/utilities.css';

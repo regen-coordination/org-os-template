@@ -126,8 +126,11 @@ test('a governed commit with no Org-Proposal trailer is a warning locally, with 
   assert.ok(finding.includes('Propose the change'), finding);
 });
 
-test('M-3 (P2-R33): a hand commit of class governance cannot be proposed yet, and the finding says so and names the way out instead of "Propose the change"', () => {
-  // records go by approval; a change to the rules needs it too: no op can carry one until P2b.
+// DAO-OS L6 §11.2 (replaces the two M-3 / P2-R33 tests "a hand commit of class governance cannot be proposed yet…" and
+// "a records file no op can reach…"): every governed file has a path now, the file op, so a hand commit of
+// data/governance.yaml, IDENTITY.md, data/finances.yaml or data/horizon.yaml gets "Propose the change"; only what is
+// generated from the records (.well-known/) still cannot be proposed.
+test('L6 §11.2: a hand commit of class governance or identity, or of a records file no record op names, can be proposed now: the finding says so', () => {
   const root = repo();
   const strictRules = RULES.replace('applies_to: [members, governance, identity, systems, treasury, operations, publication]', 'applies_to: [members, systems, treasury, operations, publication]')
     .replace('applies_to: [records]', 'applies_to: [records, governance, identity]');
@@ -138,29 +141,35 @@ test('M-3 (P2-R33): a hand commit of class governance cannot be proposed yet, an
   const finding = lines(r.stdout).find((l) => l.startsWith('⚠'));
   assert.ok(finding?.includes(`${sha} "describe the model"`), r.stdout);
   assert.ok(finding.includes('governance: rule "records" needs 1 approval from the maintainer, so it cannot be applied alone.'), finding);
-  assert.ok(finding.endsWith('it has no Org-Proposal trailer, and no proposal can carry a change of class governance (data/governance.yaml) until P2b. ' +
-    'The finding stays while the commit is among the last 500; to clear CI, give the CI command a --range that starts after it (spec §6).'), finding);
-  assert.ok(!finding.includes('Propose the change'), finding);
-  // A revert is itself a hand commit of the same class, so the sentence does not offer one.
-  assert.ok(!/revert/i.test(finding), finding);
-  // The same for identity; severity is unchanged: an error under --strict.
+  assert.ok(finding.endsWith('it has no Org-Proposal trailer. Propose the change, or ask a maintainer to revert it.'), finding);
+  assert.ok(!finding.includes('until P2b'), finding);
+  // The same for identity, and for records files the record ops never named.
   const id = repo();
-  commit(id, { 'data/members.yaml': MEMBERS, 'data/governance.yaml': strictRules, 'IDENTITY.md': '# Org\n' }, 'start');
+  commit(id, { 'data/members.yaml': MEMBERS, 'data/governance.yaml': strictRules, 'IDENTITY.md': '# Org\n', 'data/finances.yaml': 'finances:\n  currency: EUR\n', 'data/horizon.yaml': 'horizon: []\n' }, 'start');
   commit(id, { 'IDENTITY.md': '# Org, renamed\n' }, 'rename the org');
-  const strict = run([id, '--strict']);
-  assert.equal(strict.status, 1, strict.stdout);
-  assert.match(strict.stdout, /✗ [0-9a-f]+ "rename the org".*no proposal can carry a change of class identity \(IDENTITY\.md\) until P2b\. The finding stays while the commit is among the last 500;/m);
+  commit(id, { 'data/finances.yaml': 'finances:\n  currency: BRL\n' }, 'change the currency');
+  commit(id, { 'data/horizon.yaml': 'horizon: [next-year]\n' }, 'look ahead');
+  const out = lines(run([id]).stdout).filter((l) => l.startsWith('⚠'));
+  for (const subject of ['rename the org', 'change the currency', 'look ahead']) {
+    const f = out.find((l) => l.includes(`"${subject}"`));
+    assert.ok(f, `${subject}: ${out.join('\n')}`);
+    assert.ok(f.includes('Propose the change'), f);
+    assert.ok(!f.includes('until P2b') && !f.includes('no proposal can carry'), f);
+  }
 });
 
-test('M-3: a records file no op can reach (a document registry such as data/finances.yaml) gets the not-proposable sentence too, naming the file', () => {
+test('L6 §11.2: .well-known/ is generated from the records, so a hand commit of it still cannot be proposed, and the finding says why', () => {
   const root = repo();
-  commit(root, { 'data/members.yaml': MEMBERS, 'data/governance.yaml': RULES, 'data/finances.yaml': 'finances:\n  currency: EUR\n' }, 'start');
-  const sha = commit(root, { 'data/finances.yaml': 'finances:\n  currency: BRL\n' }, 'change the currency');
-  const r = run([root]);
-  const finding = lines(r.stdout).find((l) => l.startsWith('⚠'));
-  assert.ok(finding?.includes(`${sha} "change the currency"`), r.stdout);
-  assert.ok(finding.includes('records: rule "records" needs 1 approval from the maintainer, so it cannot be applied alone.'), finding);
-  assert.ok(finding.includes('no proposal can carry a change of class records (data/finances.yaml) until P2b.'), finding);
+  const strictRules = RULES.replace('applies_to: [members, governance, identity, systems, treasury, operations, publication]', 'applies_to: [members, governance, systems, treasury, operations, publication]')
+    .replace('applies_to: [records]', 'applies_to: [records, identity]');
+  commit(root, { 'data/members.yaml': MEMBERS, 'data/governance.yaml': strictRules, '.well-known/dao.json': '{}\n' }, 'start');
+  const sha = commit(root, { '.well-known/dao.json': '{ "name": "x" }\n' }, 'edit the generated file');
+  const strict = run([root, '--strict']);
+  assert.equal(strict.status, 1, strict.stdout);
+  const finding = lines(strict.stdout).find((l) => l.includes(`${sha} "edit the generated file"`));
+  assert.ok(finding, strict.stdout);
+  assert.ok(finding.includes('no proposal can carry a change of class identity (.well-known/dao.json): .well-known/ is generated from the records (npm run generate:schemas). ' +
+    'The finding stays while the commit is among the last 500;'), finding);
   assert.ok(!finding.includes('Propose the change'), finding);
 });
 

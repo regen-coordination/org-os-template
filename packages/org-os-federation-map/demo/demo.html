@@ -1,7 +1,604 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>federation-map demo</title>
-<style>body{background:#06080c;margin:0;padding:24px;max-width:960px;margin-inline:auto}</style>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>federation-map demo</title>
+<!-- The house tokens, from kms beside this package; fonts: system (no font files). Open ?surface=web for the public copy. -->
+<link rel="stylesheet" href="../../org-os-kms/src/house/house-tokens.css">
+<style>
+  body { margin: 0; background: var(--paper); color: var(--ink); font: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--sans); }
+  main { max-width: 1320px; margin-inline: auto; padding: var(--sp-12) var(--sp-10); display: grid; gap: var(--sp-12); }
+  .bar { display: flex; align-items: center; gap: var(--sp-8); flex-wrap: wrap; }
+  .bar h1 { margin: 0; flex: 1; min-width: 0; font: var(--fw-strong) var(--fs-body)/1.3 var(--sans); }
+  .bar h1 span { display: block; font-weight: var(--fw-regular); font-size: var(--fs-tiny); color: var(--mute); }
+  .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--wash); border-radius: 9px; }
+  button { font: var(--fw-medium) var(--fs-tiny)/1 var(--sans); color: var(--mute); background: transparent; border: 0; cursor: pointer; }
+  .seg button { height: 26px; padding: 0 var(--sp-7); border-radius: var(--radius-ctl); display: inline-flex; gap: var(--sp-4); align-items: center; }
+  .seg button[aria-pressed="true"] { background: var(--raised); color: var(--ink); box-shadow: var(--shadow-card); }
+  .icon { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--rule-strong); border-radius: var(--radius-ctl); background: var(--raised); }
+  button:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: 2px; }
+  svg.i { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  h2 { margin: 0 0 var(--sp-6); font: var(--fw-medium) var(--fs-tiny)/1 var(--mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--faint); }
+  .mini { max-width: 360px; }
+</style>
 </head><body>
-<federation-map src="./map.json"></federation-map>
-<script type="module">import "../src/index.mjs";</script>
+<main>
+  <header class="bar">
+    <h1>Example DAO Commons<span>Federation map · demo</span></h1>
+    <span class="seg" role="group" aria-label="View">
+      <button type="button" data-fm-view="list" aria-controls="map" aria-pressed="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>List</button>
+      <button type="button" data-fm-view="map" aria-controls="map" aria-pressed="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M11 7.2 6.2 16.8M13 7.2l4.8 9.6"/></svg>Map</button>
+    </span>
+    <button class="icon" type="button" data-fm-fit aria-controls="map" aria-label="Fit to view"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </header>
+  <federation-map id="map" data-surface="vault"><script type="application/json">
+{
+  "version": "1",
+  "generated_at": "2026-10-29T12:00:00Z",
+  "self": {
+    "id": "Example DAO Commons",
+    "name": "Example DAO Commons",
+    "type": "Hub",
+    "emoji": null,
+    "url": null,
+    "counts": {
+      "entries": 142
+    }
+  },
+  "nodes": [
+    {
+      "id": "hillside-coop",
+      "kind": "instance",
+      "name": "Hillside Coop",
+      "type": "Coop",
+      "ring": 1,
+      "trust": "full",
+      "live": true,
+      "url": null,
+      "repo": "example/hillside-coop",
+      "counts": {
+        "members": 3,
+        "projects": 2
+      },
+      "last_seen": "2026-10-29T12:00:00Z",
+      "frontier": {
+        "fetched_at": "2026-10-29T10:00:00Z",
+        "source": "local",
+        "last_attempt_at": "2026-10-29T10:00:00Z",
+        "last_error": null
+      }
+    },
+    {
+      "id": "lowland-guild",
+      "kind": "instance",
+      "name": "Lowland Guild",
+      "type": "Guild",
+      "ring": 1,
+      "trust": "observer",
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {},
+      "last_seen": null
+    },
+    {
+      "id": "watershed-network",
+      "kind": "instance",
+      "name": "Watershed Network",
+      "type": "Network",
+      "ring": 1,
+      "trust": "full",
+      "live": false,
+      "url": null,
+      "repo": "example/watershed-network",
+      "counts": {},
+      "last_seen": null,
+      "frontier": {
+        "fetched_at": "2026-10-26T12:00:00Z",
+        "source": "https://raw.githubusercontent.com/example/watershed-network/HEAD/federation.yaml",
+        "last_attempt_at": "2026-10-29T11:00:00Z",
+        "last_error": "HTTP 404"
+      }
+    },
+    {
+      "id": "youth-circle",
+      "kind": "instance",
+      "name": "Youth Circle",
+      "type": "LocalNode",
+      "ring": 1,
+      "trust": "full",
+      "live": true,
+      "url": null,
+      "repo": "example/youth-circle",
+      "counts": {
+        "members": 2
+      },
+      "last_seen": "2026-10-29T12:00:00Z",
+      "frontier": {
+        "fetched_at": "2026-10-17T12:00:00Z",
+        "source": "local",
+        "last_attempt_at": "2026-10-17T12:00:00Z",
+        "last_error": null
+      }
+    },
+    {
+      "id": "market-garden",
+      "kind": "instance",
+      "name": "Market Garden",
+      "type": "LocalNode",
+      "ring": 1,
+      "trust": "observer",
+      "live": false,
+      "url": null,
+      "repo": "example/market-garden",
+      "counts": {},
+      "last_seen": null,
+      "frontier": {
+        "fetched_at": null,
+        "source": null,
+        "last_attempt_at": null,
+        "last_error": null
+      }
+    },
+    {
+      "id": "open-seed-library",
+      "kind": "instance",
+      "name": "open-seed-library",
+      "type": null,
+      "ring": 1,
+      "trust": null,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {},
+      "last_seen": null
+    },
+    {
+      "id": "field-notes-archive",
+      "kind": "source",
+      "name": "Field notes archive",
+      "type": null,
+      "ring": 3,
+      "ecosystem": "watershed-commons",
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "field notes"
+    },
+    {
+      "id": "seed-registry",
+      "kind": "source",
+      "name": "Seed registry",
+      "type": null,
+      "ring": 3,
+      "ecosystem": "watershed-commons",
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "seed records"
+    },
+    {
+      "id": "open-data-portal",
+      "kind": "source",
+      "name": "Open data portal",
+      "type": null,
+      "ring": 3,
+      "ecosystem": null,
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "public datasets"
+    },
+    {
+      "id": "watershed-commons",
+      "kind": "ecosystem",
+      "name": "Watershed Commons",
+      "type": null,
+      "ring": 3,
+      "url": null,
+      "counts": {}
+    },
+    {
+      "id": "Valley Commons",
+      "kind": "frontier",
+      "name": "Valley Commons",
+      "type": "Commons",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    },
+    {
+      "id": "Delta Alliance",
+      "kind": "frontier",
+      "name": "Delta Alliance",
+      "type": "Alliance",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    },
+    {
+      "id": "Pantry Network",
+      "kind": "frontier",
+      "name": "Pantry Network",
+      "type": "Network",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    }
+  ],
+  "edges": [
+    {
+      "from": "Example DAO Commons",
+      "to": "hillside-coop",
+      "kind": "federation"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "lowland-guild",
+      "kind": "federation"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "watershed-network",
+      "kind": "upstream"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "youth-circle",
+      "kind": "downstream"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "market-garden",
+      "kind": "downstream"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "open-seed-library",
+      "kind": "knowledge"
+    },
+    {
+      "from": "field-notes-archive",
+      "to": "Example DAO Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "seed-registry",
+      "to": "Example DAO Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "open-data-portal",
+      "to": "Example DAO Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "watershed-commons",
+      "to": "field-notes-archive",
+      "kind": "provenance"
+    },
+    {
+      "from": "watershed-commons",
+      "to": "seed-registry",
+      "kind": "provenance"
+    },
+    {
+      "from": "hillside-coop",
+      "to": "Valley Commons",
+      "kind": "frontier"
+    },
+    {
+      "from": "watershed-network",
+      "to": "Delta Alliance",
+      "kind": "frontier"
+    },
+    {
+      "from": "youth-circle",
+      "to": "Pantry Network",
+      "kind": "frontier"
+    }
+  ]
+}
+  </script></federation-map>
+  <section class="mini" aria-labelledby="mini-h">
+    <h2 id="mini-h">The small map</h2>
+    <federation-map mode="mini" href="#map"><script type="application/json">
+{
+  "version": "1",
+  "generated_at": "2026-10-29T12:00:00Z",
+  "self": {
+    "id": "Example DAO Commons",
+    "name": "Example DAO Commons",
+    "type": "Hub",
+    "emoji": null,
+    "url": null,
+    "counts": {
+      "entries": 142
+    }
+  },
+  "nodes": [
+    {
+      "id": "hillside-coop",
+      "kind": "instance",
+      "name": "Hillside Coop",
+      "type": "Coop",
+      "ring": 1,
+      "trust": "full",
+      "live": true,
+      "url": null,
+      "repo": "example/hillside-coop",
+      "counts": {
+        "members": 3,
+        "projects": 2
+      },
+      "last_seen": "2026-10-29T12:00:00Z",
+      "frontier": {
+        "fetched_at": "2026-10-29T10:00:00Z",
+        "source": "local",
+        "last_attempt_at": "2026-10-29T10:00:00Z",
+        "last_error": null
+      }
+    },
+    {
+      "id": "lowland-guild",
+      "kind": "instance",
+      "name": "Lowland Guild",
+      "type": "Guild",
+      "ring": 1,
+      "trust": "observer",
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {},
+      "last_seen": null
+    },
+    {
+      "id": "watershed-network",
+      "kind": "instance",
+      "name": "Watershed Network",
+      "type": "Network",
+      "ring": 1,
+      "trust": "full",
+      "live": false,
+      "url": null,
+      "repo": "example/watershed-network",
+      "counts": {},
+      "last_seen": null,
+      "frontier": {
+        "fetched_at": "2026-10-26T12:00:00Z",
+        "source": "https://raw.githubusercontent.com/example/watershed-network/HEAD/federation.yaml",
+        "last_attempt_at": "2026-10-29T11:00:00Z",
+        "last_error": "HTTP 404"
+      }
+    },
+    {
+      "id": "youth-circle",
+      "kind": "instance",
+      "name": "Youth Circle",
+      "type": "LocalNode",
+      "ring": 1,
+      "trust": "full",
+      "live": true,
+      "url": null,
+      "repo": "example/youth-circle",
+      "counts": {
+        "members": 2
+      },
+      "last_seen": "2026-10-29T12:00:00Z",
+      "frontier": {
+        "fetched_at": "2026-10-17T12:00:00Z",
+        "source": "local",
+        "last_attempt_at": "2026-10-17T12:00:00Z",
+        "last_error": null
+      }
+    },
+    {
+      "id": "market-garden",
+      "kind": "instance",
+      "name": "Market Garden",
+      "type": "LocalNode",
+      "ring": 1,
+      "trust": "observer",
+      "live": false,
+      "url": null,
+      "repo": "example/market-garden",
+      "counts": {},
+      "last_seen": null,
+      "frontier": {
+        "fetched_at": null,
+        "source": null,
+        "last_attempt_at": null,
+        "last_error": null
+      }
+    },
+    {
+      "id": "open-seed-library",
+      "kind": "instance",
+      "name": "open-seed-library",
+      "type": null,
+      "ring": 1,
+      "trust": null,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {},
+      "last_seen": null
+    },
+    {
+      "id": "field-notes-archive",
+      "kind": "source",
+      "name": "Field notes archive",
+      "type": null,
+      "ring": 3,
+      "ecosystem": "watershed-commons",
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "field notes"
+    },
+    {
+      "id": "seed-registry",
+      "kind": "source",
+      "name": "Seed registry",
+      "type": null,
+      "ring": 3,
+      "ecosystem": "watershed-commons",
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "seed records"
+    },
+    {
+      "id": "open-data-portal",
+      "kind": "source",
+      "name": "Open data portal",
+      "type": null,
+      "ring": 3,
+      "ecosystem": null,
+      "url": null,
+      "counts": {
+        "objects": 142
+      },
+      "portal": null,
+      "curates": "public datasets"
+    },
+    {
+      "id": "watershed-commons",
+      "kind": "ecosystem",
+      "name": "Watershed Commons",
+      "type": null,
+      "ring": 3,
+      "url": null,
+      "counts": {}
+    },
+    {
+      "id": "Valley Commons",
+      "kind": "frontier",
+      "name": "Valley Commons",
+      "type": "Commons",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    },
+    {
+      "id": "Delta Alliance",
+      "kind": "frontier",
+      "name": "Delta Alliance",
+      "type": "Alliance",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    },
+    {
+      "id": "Pantry Network",
+      "kind": "frontier",
+      "name": "Pantry Network",
+      "type": "Network",
+      "ring": 2,
+      "live": false,
+      "url": null,
+      "repo": null,
+      "counts": {}
+    }
+  ],
+  "edges": [
+    {
+      "from": "Example DAO Commons",
+      "to": "hillside-coop",
+      "kind": "federation"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "lowland-guild",
+      "kind": "federation"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "watershed-network",
+      "kind": "upstream"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "youth-circle",
+      "kind": "downstream"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "market-garden",
+      "kind": "downstream"
+    },
+    {
+      "from": "Example DAO Commons",
+      "to": "open-seed-library",
+      "kind": "knowledge"
+    },
+    {
+      "from": "field-notes-archive",
+      "to": "Example DAO Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "seed-registry",
+      "to": "Example DAO Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "open-data-portal",
+      "to": "Example DAO Commons",
+      "kind": "provenance"
+    },
+    {
+      "from": "watershed-commons",
+      "to": "field-notes-archive",
+      "kind": "provenance"
+    },
+    {
+      "from": "watershed-commons",
+      "to": "seed-registry",
+      "kind": "provenance"
+    },
+    {
+      "from": "hillside-coop",
+      "to": "Valley Commons",
+      "kind": "frontier"
+    },
+    {
+      "from": "watershed-network",
+      "to": "Delta Alliance",
+      "kind": "frontier"
+    },
+    {
+      "from": "youth-circle",
+      "to": "Pantry Network",
+      "kind": "frontier"
+    }
+  ]
+}
+    </script></federation-map>
+  </section>
+</main>
+<script>
+  if (new URLSearchParams(location.search).get('surface') === 'web') document.getElementById('map').removeAttribute('data-surface');
+</script>
+<script src="../dist/federation-map.iife.js"></script>
 </body></html>

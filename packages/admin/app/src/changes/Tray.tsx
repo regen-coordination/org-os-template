@@ -4,8 +4,8 @@ import { Link, useLocation } from 'wouter'
 import { api, type ChangeView, type StageError } from '../api.ts'
 import { useActor } from '../actor.ts'
 import { useChanges } from './useChanges.ts'
-import { applyOutcome, fmt, opSummary, recordName, ruleWords, stagedWords, staleWords, trayRows, trunkNow, type ApplyOutcome, type TrayAction } from './rows.ts'
-import { TrayOp } from './TrayOp.tsx'
+import { applyOutcome, fmt, heldCount, opRecord, opSummary, privateLine, privateSummary, recordName, ruleWords, stagedWords, staleWords, trayRows, trunkNow, type ApplyOutcome, type TrayAction } from './rows.ts'
+import { TrayOp, TrayPrivateOp } from './TrayOp.tsx'
 import { Button } from '../design/Button.tsx'
 import { ConfirmDialog } from '../design/ConfirmDialog.tsx'
 import { Empty } from '../design/Empty.tsx'
@@ -13,7 +13,7 @@ import { Scroll } from '../design/Scroll.tsx'
 import { Spinner } from '../design/Spinner.tsx'
 import { useFrame } from '../design/Shell.tsx'
 import { countText } from '../frame/sections.ts'
-import { OPEN_CHANGES } from '../keys/useHouseKeys.ts'
+import { OPEN_CHANGES, OPEN_PROPOSE } from '../keys/useHouseKeys.ts'
 import { useMachine } from '../machines.ts'
 import { tray } from '../machines/tray.ts'
 import { announce } from '../parts/live.tsx'
@@ -30,7 +30,7 @@ const DOING: Record<TrayAction | 'update', string> = {
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 /** The collapsed tray (§5.6): the moss count square (clay "!" when an op is stale, the reading ring while busy),
- *  "N staged changes" over a one-line `line` (the last op and its rule; the stale sentence; the rule while busy),
+ *  "N staged ops" over a one-line `line` (the last op and its rule; the stale sentence; the rule while busy),
  *  then Review and the `primary`. Stale, Review is the only action and is primary; busy, there are none. On a
  *  phone it is the card: the count and "N staged" are a link to /changes (Review is a tap on the card), then the
  *  primary only; busy, the ring and the word alone. The bar takes focus (tabIndex -1) while a busy action has
@@ -63,12 +63,14 @@ export function TrayPanel({ view, primary, busy = false, notice = null, rowError
 }) {
   const headingId = useId()
   const [diff, setDiff] = useState(false)
-  const records = new Set(view.ops.map(o => o.record)).size
+  // L6 Task 21 (PF-R111): the private part counts, and is listed after the git ops, as typed.
+  const priv = view.private ?? []
+  const records = new Set([...view.ops.map(opRecord), ...priv.map(e => privateSummary(e.op).record)]).size
   return (
     <div className="trayx" role="group" aria-labelledby={headingId}>
       <div className="trayx-h">
         <h2 id={headingId} ref={headingRef} tabIndex={-1}>Your change</h2>
-        <span className="trayx-n">{plural(view.ops.length, 'op')} · {plural(records, 'record')}</span>
+        <span className="trayx-n">{plural(heldCount(view), 'op')} · {plural(records, 'record')}</span>
         <Button variant="ghost" small ref={discardRef} disabled={busy} onClick={onDiscard}>Discard all</Button>
       </div>
       {notice}
@@ -76,11 +78,12 @@ export function TrayPanel({ view, primary, busy = false, notice = null, rowError
       <div className="trayx-body">
         <ul className="trayx-ops" aria-label="Staged ops">
           {view.ops.map((op, n) => (
-            <TrayOp key={`${n}:${op.record}`} op={op} record={recordName(op)} busy={busy}
+            <TrayOp key={`${n}:${opRecord(op)}`} op={op} record={recordName(op)} busy={busy}
               stale={view.stale.includes(n) ? { trunk: trunkNow(op, view.current[n] ?? null) } : undefined}
-              errors={rowErrors.filter(e => e.record === op.record)}
+              errors={rowErrors.filter(e => e.record === opRecord(op))}
               onRemove={() => onRemove?.(n)} onKeepMine={() => onRebase?.(n, 'mine')} onTakeTheirs={() => onRebase?.(n, 'theirs')} />
           ))}
+          {priv.map(e => <TrayPrivateOp key={e.ref} entry={e} />)}
         </ul>
         {diff && (
           <div className="trayx-diff">
@@ -161,11 +164,11 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
   const view = ch.view
   const rows = view ? trayRows(view) : []
   const stale = view?.stale.length ?? 0
-  const canApply = known && !!view && view.ops.length > 0 && view.rule.direct && stale === 0
+  const canApply = known && !!view && heldCount(view) > 0 && view.rule.direct && stale === 0
   // Which primary action the change gets (spec 3.14): Update proposal when it revises one, Apply when this
   // actor may decide alone, Propose when a proposal may be opened, else Apply held with the rule's sentence.
   const revises = view?.revises
-  const canPropose = known && !!view && view.ops.length > 0 && !view.rule.direct && view.rule.proposable === true
+  const canPropose = known && !!view && heldCount(view) > 0 && !view.rule.direct && view.rule.proposable === true
   const reread = () => void qc.invalidateQueries({ queryKey: ['changes'] })
 
   /** Opens the panel: on a phone the page /changes; here the bottom slot, handing focus back on close to `opener`
@@ -209,7 +212,7 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
 
   // An old refusal belongs to the change it was about: once that change is empty, forget it. (Only
   // then: a change event while an action is pending must not clear the outcome it is about to show.)
-  const opCount = view?.ops.length ?? null
+  const opCount = view ? heldCount(view) : null
   const { can, send } = t // stable across renders (ruling 11): safe as effect dependencies, unlike `t` itself
   // The panel goes with the change, and with the tray itself (a preview, leaving for /changes): an open bottom slot
   // left behind would take the next Escape (M-1).
@@ -291,8 +294,8 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
   const rebase = (n: number, keep: 'mine' | 'theirs') => act('rebase', () => ch.rebase(n, keep))
 
   // ⌘K's Apply changes / Discard changes and `g c` land here, so their outcome shows in one place.
-  const latest = useRef({ apply, discard, expand, canApply, has: false, live: false, page })
-  latest.current = { apply, discard, expand, canApply, has: (opCount ?? 0) > 0, live: known && canWrite, page }
+  const latest = useRef({ apply, discard, expand, propose, canApply, canPropose, has: false, live: false, page })
+  latest.current = { apply, discard, expand, propose, canApply, canPropose, has: (opCount ?? 0) > 0, live: known && canWrite, page }
   useEffect(() => {
     const onApply = () => { if (latest.current.live && latest.current.canApply) void latest.current.apply() }
     const onDiscard = () => { if (latest.current.live && latest.current.has) latest.current.discard() }
@@ -303,13 +306,24 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
       const at = document.activeElement
       l.expand(at instanceof HTMLElement ? at : null)
     }
+    // The compose canvas's Propose (DAO-OS L7 Task 17): the Propose panel when the change may be proposed; else the
+    // tray, which says what the change takes (Apply, or the rule's sentence). Nothing staged: nothing to propose.
+    const onPropose = () => {
+      const l = latest.current
+      if (!l.live || !l.has) return
+      const at = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      if (l.canPropose && at) l.propose(at)
+      else l.expand(at)
+    }
     window.addEventListener('apply-changes', onApply)
     window.addEventListener('discard-changes', onDiscard)
     window.addEventListener(OPEN_CHANGES, onOpen)
+    window.addEventListener(OPEN_PROPOSE, onPropose)
     return () => {
       window.removeEventListener('apply-changes', onApply)
       window.removeEventListener('discard-changes', onDiscard)
       window.removeEventListener(OPEN_CHANGES, onOpen)
+      window.removeEventListener(OPEN_PROPOSE, onPropose)
     }
   }, [])
   useEffect(() => {
@@ -345,7 +359,7 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
     // (E-58), not a bare paragraph beside the tray's two live regions (C11's sweep; fix wave B3).
     return <section className="tray" aria-label="Changes"><Refusal>{`Could not read your staged changes: ${ch.error}`}</Refusal></section>
   }
-  if (view.ops.length === 0) return page ? <Empty>Nothing is staged.</Empty> : null
+  if (heldCount(view) === 0) return page ? <Empty>Nothing is staged.</Empty> : null
 
   const ids = { rule: `${uid}-rule`, stale: `${uid}-stale`, xrule: `${uid}-xrule`, xstale: `${uid}-xstale` }
   /** The primary action, in the bar or in the panel's foot: held while stale (described by the stale sentence) or,
@@ -354,11 +368,15 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
     const why = stale > 0 ? (where === 'bar' ? ids.stale : ids.xstale) : undefined
     const ref = where === 'bar' ? barPrimary : undefined
     if (revises) return <Button primary ref={ref} disabled={busy || stale > 0} describedby={why} onClick={() => void update()}>Update proposal</Button>
-    if (canPropose) return <Button primary ref={ref} disabled={busy || stale > 0} describedby={why} onClick={e => propose(e.currentTarget)}>Propose</Button>
+    // The walk's I5 (G6): a stale op does not hold the rest; Propose proposes them and the stale op stays in the tray. Update
+    // proposal replaces the proposal's ops with the change whole, so it waits for every stale op to be settled.
+    if (canPropose) return <Button primary ref={ref} disabled={busy || stale >= heldCount(view)} describedby={why} onClick={e => propose(e.currentTarget)}>Propose</Button>
     return <Button primary ref={ref} disabled={busy || !canApply} describedby={why ?? (view.rule.direct ? undefined : where === 'bar' ? ids.rule : ids.xrule)}
       onClick={() => void apply()}>Apply</Button>
   }
-  const last = view.ops[view.ops.length - 1]!
+  // The bar's line: the last git op, else the last private entry (a change may hold only a private part, PF-R111).
+  const last = view.ops.at(-1)
+  const lastLine = last ? opSummary(last) : privateLine((view.private ?? []).at(-1)?.op ?? null)
   const notice = failure && (
     <div className="tray-why" role="alert">
       {[failure.message, ...failure.lines].map((line, i) => <p key={i} className="err">{line}</p>)}
@@ -373,9 +391,9 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
     <section ref={section} className={page ? 'tray tray-page' : 'tray'} aria-label="Changes" aria-busy={busy || undefined}>
       {!expanded && notice}
       {!page && (
-        <TrayBar barRef={bar} reviewRef={reviewRef} count={view.ops.length} stale={stale} busy={busy ? doing : null} phone={phone}
+        <TrayBar barRef={bar} reviewRef={reviewRef} count={heldCount(view)} stale={stale} busy={busy ? doing : null} phone={phone}
           staleId={ids.stale} primary={primary('bar')} onReview={() => expand(reviewRef.current)}
-          line={busy ? ruleWords(view.rule) : <>{opSummary(last)} · <span id={ids.rule}>{ruleWords(view.rule)}</span></>} />
+          line={busy ? ruleWords(view.rule) : <>{lastLine} · <span id={ids.rule}>{ruleWords(view.rule)}</span></>} />
       )}
       {page && <div className="tray-in">{panel}</div>}
       {!page && expanded && (
@@ -386,7 +404,7 @@ export default function Tray({ appliedMs = 4000, page = false }: { appliedMs?: n
         </dialog>
       )}
       {asking && (
-        <ConfirmDialog ref={ask} title={`Discard ${plural(view.ops.length, 'staged op')}?`} cancel="Keep them" confirm="Discard"
+        <ConfirmDialog ref={ask} title={`Discard ${plural(heldCount(view), 'staged op')}?`} cancel="Keep them" confirm="Discard"
           body="They exist only in your change. Nothing on the trunk is touched." onCancel={() => setAsking(false)}
           onConfirm={() => { setAsking(false); void act('discard', ch.discard) }} />
       )}

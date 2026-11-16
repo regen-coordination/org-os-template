@@ -5,20 +5,19 @@ import { CHANGE_CLASSES, classOf, governedClassOf } from '../../lib/change-class
 const TABLE = JSON.parse(readFileSync(new URL('../../../../schemas/change-classes.json', import.meta.url), 'utf8'))
 
 describe('schemas/change-classes.json', () => {
-  it('is F1 spec §3.7, row for row, with L5 §9.7\'s publication class', () => {
-    expect(TABLE).toEqual({
-      classes: ['records', 'members', 'governance', 'identity', 'systems', 'treasury', 'operations', 'publication'],
-      map: [
-        { registry: 'members', class: 'members' },
-        { registry: 'governance', class: 'governance' },
-        { registry: 'systems', class: 'systems' },
-        { path: 'IDENTITY.md', class: 'identity' },
-        { path: 'federation.yaml', class: 'identity' },
-        { path: '.well-known/**', class: 'identity' },
-        { registry: 'visibility', class: 'publication' },
-        { registry: '*', class: 'records' },
-      ],
-    })
+  // DAO-OS L6 §3.1 adds the class workspace and its rows before `*`; tests/lib/workspace-class.test.ts pins them row for row.
+  it('is F1 spec §3.7, row for row, with L5 §9.7\'s publication class and L6 §3.1\'s workspace', () => {
+    expect(TABLE.classes).toEqual(['records', 'members', 'governance', 'identity', 'systems', 'treasury', 'operations', 'publication', 'workspace'])
+    expect(TABLE.map.filter((r: { class: string }) => r.class !== 'workspace')).toEqual([
+      { registry: 'members', class: 'members' },
+      { registry: 'governance', class: 'governance' },
+      { registry: 'systems', class: 'systems' },
+      { path: 'IDENTITY.md', class: 'identity' },
+      { path: 'federation.yaml', class: 'identity' },
+      { path: '.well-known/**', class: 'identity' },
+      { registry: 'visibility', class: 'publication' },
+      { registry: '*', class: 'records' },
+    ])
   })
   it('CHANGE_CLASSES is its class list', () => expect(CHANGE_CLASSES).toEqual(TABLE.classes))
 })
@@ -36,7 +35,7 @@ describe('classOf', () => {
   it('classes a board as records (P4 §5.1)', () => expect(classOf({ registry: 'boards' })).toBe('records'))
   it.each([
     ['members', 'members'], ['governance', 'governance'], ['systems', 'systems'],
-    ['projects', 'records'], ['funding-opportunities', 'records'], ['knowledge-gaps', 'records'], ['meetings', 'records'],
+    ['projects', 'records'], ['funding-opportunities', 'records'], ['knowledge-gaps', 'records'], ['meetings', 'workspace'],
   ])('registry %s is %s', (registry, cls) => expect(classOf({ registry })).toBe(cls))
 
   it.each([
@@ -68,7 +67,7 @@ describe('governedClassOf (F2 spec §3.8): the files a rule can govern', () => {
     ['data/crm.yaml', 'records'], ['data/some-new-registry.yml', 'records'],
   ])('%s is governed as %s', (path, cls) => expect(governedClassOf(path)).toBe(cls))
 
-  it.each(['README.md', 'scripts/doctor.mjs', 'docs/IDENTITY.md', 'memory/2026-10-18.md',
+  it.each(['README.md', 'scripts/doctor.mjs', 'docs/IDENTITY.md', 'knowledge/x.md',
     'data/proposals.yaml', 'data/nested/projects.yaml', 'data/projects.yaml.bak', 'site/src/index.astro'])('%s is not governed', path => {
     expect(governedClassOf(path)).toBeNull()
   })

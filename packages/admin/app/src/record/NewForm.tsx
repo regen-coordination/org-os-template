@@ -27,7 +27,7 @@ export function useTaken(registry: string, entries: readonly Value[]): ReadonlyS
   const { view } = useChanges()
   return useMemo(() => {
     const ids = new Set(entries.map(e => String(e.id)))
-    for (const op of view?.ops ?? []) { const k = splitChangeKey(op.record); if (k.registry === registry) ids.add(k.id) }
+    for (const op of view?.ops ?? []) { if (op.op === 'file') continue; const k = splitChangeKey(op.record); if (k.registry === registry) ids.add(k.id) }
     return ids
   }, [entries, view, registry])
 }

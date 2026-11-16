@@ -9,6 +9,10 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { isMap } from './yaml-util.mjs'
 
+// A shelf wizard's answers and its result are read by the client too (the template runner), so they live in a file
+// with no node imports; they are part of this module's interface as before.
+export { readField, resultOf } from './wizard-answers.mjs'
+
 /** The folder the wizards are in. A function, so that a page which only checks a definition (the client's
  *  tests) can import this file where `import.meta.url` is not a file address. */
 export const wizardsDir = () => fileURLToPath(new URL('../wizards', import.meta.url))
@@ -23,7 +27,8 @@ export const wizardsDir = () => fileURLToPath(new URL('../wizards', import.meta.
  * @property {WizardField[]} [fields]  the step's inputs
  *
  * @typedef {{ value: string, label: string, help?: string, later?: boolean }} WizardDoor
- * @typedef {{ id: string, label: string, kind: 'text' | 'email' | 'choice', required?: boolean, help?: string, options?: { value: string, label: string, help?: string }[] }} WizardField
+ * @typedef {{ id: string, label: string, kind: 'text' | 'email' | 'choice' | 'addresses' | 'count', required?: boolean, help?: string, options?: { value: string, label: string, help?: string }[] }} WizardField
+ *   `addresses`: one 0x or CAIP-10 address per line, read as a list; `count`: a whole number, 1 or more (L7 §7.1).
  *
  * @typedef {object} WizardDef
  * @property {string} id
@@ -33,7 +38,14 @@ export const wizardsDir = () => fileURLToPath(new URL('../wizards', import.meta.
  * @property {WizardStep[]} steps
  * @property {{ title: string, ask: string, writes: string }} review  always the last screen before any write
  * @property {{ title: string, body: string }} done
+ * @property {{ add: string, config: Record<string, string> }} [result]  a shelf wizard's end (L7 §7.1): the library
+ *   entry to add, and its config, each value "${field.<id>}", the answer to a field of a step
  */
+
+/** The field kinds a wizard may ask with. */
+const KINDS = ['text', 'email', 'choice', 'addresses', 'count']
+const FIELD_REF = /^\$\{field\.([^}]*)\}$/
+const ENTRY_ID = /^[a-z]+:[a-z0-9][a-z0-9-]*$/
 
 const text = (/** @type {unknown} */ v) => typeof v === 'string' && v.trim() !== ''
 
@@ -68,7 +80,7 @@ export function validateWizard(def) {
             if (!isMap(f) || !text(f.id) || !text(f.label)) { out.push(`A field of step ${name} needs an id and a label.`); continue }
             if (ids.has(f.id)) out.push(`Field "${f.id}" of step ${name} is used twice.`)
             ids.add(f.id)
-            if (!['text', 'email', 'choice'].includes(/** @type {string} */ (f.kind))) out.push(`Field "${f.id}" of step ${name} has a kind that is not text, email or choice.`)
+            if (!KINDS.includes(/** @type {string} */ (f.kind))) out.push(`Field "${f.id}" of step ${name} has a kind that is not text, email, choice, addresses or count.`)
             if (f.kind === 'choice' && (!Array.isArray(f.options) || f.options.length === 0 || f.options.some(o => !isMap(o) || !text(o.value) || !text(o.label)))) {
               out.push(`Field "${f.id}" of step ${name} is a choice and needs options, each with a value and a label.`)
             }
@@ -83,7 +95,38 @@ export function validateWizard(def) {
     if (!text(def.review.writes)) out.push('The review does not say what it writes (a "writes" sentence).')
   }
   if (!isMap(def.done) || !text(def.done.title) || !text(def.done.body)) out.push('The wizard\'s done needs a title and a body.')
+  if (def.result !== undefined) out.push(...resultFaults(def))
   return out
+}
+
+/** What is wrong with a wizard's `result`, one sentence each.
+ *  @param {Record<string, any>} def @returns {string[]} */
+function resultFaults(def) {
+  const r = def.result
+  if (!isMap(r) || !isMap(r.config)) return ['The wizard\'s result needs add (a library entry) and config (a mapping).']
+  const out = []
+  if (typeof r.add !== 'string' || !ENTRY_ID.test(r.add)) out.push(`The result's add is "${String(r.add)}"; it names a library entry, <shelf>:<slug>.`)
+  const fields = new Set((Array.isArray(def.steps) ? def.steps : []).flatMap(st => (isMap(st) && Array.isArray(st.fields) ? st.fields : []))
+    .flatMap(f => (isMap(f) && typeof f.id === 'string' ? [f.id] : [])))
+  for (const [key, value] of Object.entries(r.config)) {
+    const ref = typeof value === 'string' ? FIELD_REF.exec(value) : null
+    if (!ref) out.push(`The result's config.${key} is "${String(value)}"; each value is "\${field.<id>}", a field of a step.`)
+    else if (!fields.has(ref[1])) out.push(`The result's config.${key} names the field "${ref[1]}", which no step asks for.`)
+  }
+  return out
+}
+
+/** One wizard file (a shelf wizard's), read and checked: the definition, or what is wrong with it, one sentence each,
+ *  prefixed with `shown` (how the file is named to a person).
+ *  @param {string} path @param {string} shown
+ *  @returns {{ def: WizardDef | null, problems: string[] }} */
+export function readWizardFile(path, shown) {
+  let def
+  try { def = parse(readFileSync(path, 'utf8')) } catch (err) {
+    return { def: null, problems: [`${shown}: not valid YAML (${String(err instanceof Error ? err.message : err).split('\n')[0]})`] }
+  }
+  const faults = validateWizard(def)
+  return faults.length > 0 ? { def: null, problems: faults.map(f => `${shown}: ${f}`) } : { def: /** @type {WizardDef} */ (def), problems: [] }
 }
 
 /** Every wizard in the platform's wizards/ folder, and what is wrong with the ones that are not usable.

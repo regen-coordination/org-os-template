@@ -11,7 +11,7 @@ const rank = (n: LayoutNode) => (n.attention?.level === 'alert' ? 0 : n.attentio
 /** Columns by kind. The first column reads by attention, then name; each later column is pulled
  *  towards the rows of its neighbours already placed, which uncrosses most lines without a
  *  layout library (spec §12.7). Positions the operator dragged win, for cards still on the board. */
-export function layoutBoard(nodes: LayoutNode[], edges: { from: string; to: string }[], portals: { id: string }[], saved: Positions): Positions {
+export function layoutBoard(nodes: LayoutNode[], edges: { from: string; to: string }[], links: { id: string }[], saved: Positions): Positions {
   const kinds = [...new Set(nodes.map(n => n.kind))].sort((a, b) => order(a) - order(b))
   const near = new Map<string, string[]>()
   const link = (a: string, b: string) => { const l = near.get(a) ?? []; l.push(b); near.set(a, l) }
@@ -27,7 +27,7 @@ export function layoutBoard(nodes: LayoutNode[], edges: { from: string; to: stri
     const placed = col === 0 ? column : [...column].sort((a, b) => { const pa = pull(a), pb = pull(b); return pa === pb ? 0 : pa - pb })
     placed.forEach((n, i) => { row.set(n.id, i); out[n.id] = { x: col * COL_W, y: i * ROW_H } })
   })
-  portals.forEach((p, i) => { out[p.id] = { x: kinds.length * COL_W, y: i * ROW_H } })
+  links.forEach((p, i) => { out[p.id] = { x: kinds.length * COL_W, y: i * ROW_H } })
   for (const [id, pos] of Object.entries(saved)) if (id in out) out[id] = pos
   return out
 }

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import Tray from './Tray.tsx'
+import { FILE_KEEP_MINE_WHY } from './TrayOp.tsx'
 import Changes from '../pages/Changes.tsx'
 import { Shell } from '../design/Shell.tsx'
 import { usePanel } from '../parts/panels.tsx'
@@ -63,7 +64,7 @@ describe('Tray', () => {
     fetchRoutes(baseRoutes({ 'GET /api/changes': three() }))
     renderAt(<Tray />)
     const t = await tray()
-    expect(within(t).getByText('2 staged changes')).toBeTruthy()
+    expect(within(t).getByText('2 staged ops')).toBeTruthy()
     expect(t.querySelector('.tray-line')!.textContent).toBe('funding-opportunities:fundacion-x · status: submitted · Saves directly · you alone (solo maintainer)')
     const { panel } = await review()
     expect(within(panel).getByText('2 ops · 2 records')).toBeTruthy()
@@ -152,7 +153,7 @@ describe('Tray', () => {
     const t = await tray()
     fireEvent.click(within(t).getByRole('button', { name: 'Apply' }))
     expect((await within(t).findByText('Not applied: git refused the commit (index.lock). Nothing was changed.')).className).toContain('err')
-    expect(within(t).getByText('2 staged changes')).toBeTruthy()
+    expect(within(t).getByText('2 staged ops')).toBeTruthy()
   })
 
   it('on a 409 with no code, shows the error as written, keeps every op, and does not re-read (C7)', async () => {
@@ -163,7 +164,7 @@ describe('Tray', () => {
     const before = reads(calls)
     fireEvent.click(within(t).getByRole('button', { name: 'Apply' }))
     expect((await within(t).findByText(sentence)).className).toContain('err')
-    expect(within(t).getByText('2 staged changes')).toBeTruthy()
+    expect(within(t).getByText('2 staged ops')).toBeTruthy()
     expect(reads(calls)).toBe(before)
   })
 
@@ -261,6 +262,21 @@ describe('Tray', () => {
     expect(within(stale).getByText('trunk now: won')).toBeTruthy()
     fireEvent.click(within(stale).getByRole('button', { name: 'Take theirs' }))
     await waitFor(() => expect(calls.find(c => c.path === '/api/changes/ops/1/rebase')?.body).toEqual({ keep: 'theirs' }))
+  })
+
+  it('a stale file op offers Take theirs and the editor, never a blind Keep mine, and says why (T19 review M3, PF-R84)', async () => {
+    const file = changeView({ ops: [{ op: 'file', path: 'memory/notes.md', text: 'mine\n', base: 'b1' }], stale: [0], current: [null],
+      rule: { direct: true, sentence: 'you alone (solo maintainer)', source: 'implied by model: solo-maintainer' } })
+    const { calls } = fetchRoutes(baseRoutes({ 'GET /api/changes': file, 'POST /api/changes/ops/0/rebase': changeView() }))
+    renderAt(<Tray />)
+    const { panel } = await review()
+    const stale = ops(panel)[0]!
+    expect(stale.className).toContain('stale')
+    expect(within(stale).queryByRole('button', { name: 'Keep mine' })).toBeNull()
+    expect(within(stale).getByText(FILE_KEEP_MINE_WHY)).toBeTruthy()
+    expect(within(stale).getByRole('link', { name: 'Open the editor' }).getAttribute('href')).toBe('/files/memory/notes.md')
+    fireEvent.click(within(stale).getByRole('button', { name: 'Take theirs' }))
+    await waitFor(() => expect(calls.find(c => c.path === '/api/changes/ops/0/rebase')?.body).toEqual({ keep: 'theirs' }))
   })
 
   it('asks before Discard all, naming what goes, and discards on yes', async () => {
@@ -441,21 +457,21 @@ describe('the docked tray (§5.6, C-6)', () => {
     const t = await tray()
     const count = t.querySelector('.tray-cnt')!
     expect([count.textContent, count.classList.contains('attn')]).toEqual(['2', false])
-    expect(within(t).getByText('2 staged changes').tagName).toBe('B')
+    expect(within(t).getByText('2 staged ops').tagName).toBe('B')
     expect(t.querySelector('.tray-line')!.textContent).toBe('Treasury signer · wearers: 8 · Saves directly · the steward decides alone')
     const buttons = within(t).getAllByRole('button')
     expect(buttons.map(b => [b.textContent, b.className.includes('primary')])).toEqual([['Review', false], ['Apply', true]])
   })
 
-  it('collapsed: one op is "1 staged change"; Propose when the rule needs more than the author', async () => {
+  it('collapsed: one op is "1 staged op"; Propose when the rule needs more than the author', async () => {
     fetchRoutes(baseRoutes({ 'GET /api/changes': trayView({ ops: [THRESHOLD] }) }))
     const a = renderAt(<Tray />)
-    expect(within(await tray()).getByText('1 staged change')).toBeTruthy()
+    expect(within(await tray()).getByText('1 staged op')).toBeTruthy()
     a.unmount()
     fetchRoutes(baseRoutes({ 'GET /api/changes': trayView({ ops: [THRESHOLD, NOTE, WEARERS] }) }))
     renderAt(<Tray />)
     const t = await tray()
-    expect(within(t).getByText('3 staged changes')).toBeTruthy()
+    expect(within(t).getByText('3 staged ops')).toBeTruthy()
     expect(t.querySelector('.tray-line')!.textContent).toBe('Treasury signer · wearers: 8 · Council consent decides this · 4 of 8')
     expect(within(t).getAllByRole('button').map(b => b.textContent)).toEqual(['Review', 'Propose'])
   })
@@ -567,13 +583,13 @@ describe('the docked tray (§5.6, C-6)', () => {
     expect(document.activeElement).toBe(button)
   })
 
-  it('says a count that moves through the polite live region ("2 staged changes")', async () => {
+  it('says a count that moves through the polite live region ("2 staged ops")', async () => {
     fetchRoutes(baseRoutes({ 'GET /api/changes': trayView({ ops: [THRESHOLD] }) }))
     const { qc } = renderAt(<Tray />)
     await tray()
     expect(screen.getByTestId('live').textContent).toBe('')
     act(() => { qc.setQueryData(['changes'], trayView({ ops: [THRESHOLD, WEARERS] })) })
-    await waitFor(() => expect(screen.getByTestId('live').textContent).toBe('2 staged changes'))
+    await waitFor(() => expect(screen.getByTestId('live').textContent).toBe('2 staged ops'))
     expect(screen.getByTestId('live').getAttribute('aria-live')).toBe('polite')
   })
 
@@ -582,7 +598,7 @@ describe('the docked tray (§5.6, C-6)', () => {
     const { loc } = renderAt(<Shell title="Fixture Org" nav={null} width={390} foot={<Tray />}><h1>Page</h1></Shell>)
     const t = await tray()
     expect(t.querySelector('.tray-cnt')!.textContent).toBe('2')
-    const card = within(t).getByRole('link', { name: 'Review 2 staged changes' })
+    const card = within(t).getByRole('link', { name: 'Review 2 staged ops' })
     expect(card.textContent).toBe('2 staged')
     expect(within(t).getAllByRole('button').map(b => b.textContent)).toEqual(['Apply'])
     expect(t.querySelector('.tray-line')).toBeNull()

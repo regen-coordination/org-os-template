@@ -59,7 +59,7 @@ PRAGMA user_version = 1;
 `
 
 describe('schema 2 (Lane 3 Task 2)', () => {
-  it('a schema 1 file opens as schema 2 and keeps its rows', async () => {
+  it('a schema 1 file opens as schema 3 and keeps its rows', async () => {
     const r = repo(), dir = temp('private-v1-')
     const raw = new DatabaseSync(join(dir, 'house.db'))
     raw.exec('PRAGMA journal_mode = WAL')
@@ -69,7 +69,7 @@ describe('schema 2 (Lane 3 Task 2)', () => {
       INSERT INTO sessions VALUES ('h1', 'eip155:42220:0x00000000000000000000000000000000000000a1', '2026-10-29T11:00:00.000Z', '2026-10-30T11:00:00.000Z');`)
     raw.close()
 
-    expect(SCHEMA_VERSION).toBe(2)
+    expect(SCHEMA_VERSION).toBe(3) // schema 3 holds these tables and the workspace's
     const s = await opened(r, dir)
     expect(s.record('grievances', 'g-1')?.body).toEqual({ note: 'kept' })
     expect(s.history()).toHaveLength(1)
@@ -83,7 +83,7 @@ describe('schema 2 (Lane 3 Task 2)', () => {
     const db = new DatabaseSync(join(dir, 'house.db'), { readOnly: true })
     try {
       const columns = (t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map(c => c.name)
-      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 })
+      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 3 })
       expect(columns('roles')).toEqual(['person_id', 'name', 'roles', 'nodes'])
       expect(columns('email_keys')).toEqual(['email_key', 'person_id'])
       expect(columns('roles_meta')).toEqual(['k', 'v'])
@@ -91,11 +91,11 @@ describe('schema 2 (Lane 3 Task 2)', () => {
     } finally { db.close() }
   })
 
-  it('a fresh store is made at schema 2', async () => {
+  it('a fresh store is made at schema 3', async () => {
     const s = await opened()
     s.close()
     const db = new DatabaseSync(s.file, { readOnly: true })
-    try { expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 }) } finally { db.close() }
+    try { expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 3 }) } finally { db.close() }
   })
 })
 

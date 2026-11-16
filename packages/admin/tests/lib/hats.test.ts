@@ -47,8 +47,16 @@ describe('hats', () => {
   it('publishes the v1 address and the signatures', () => {
     expect(HATS_V1).toBe('0x3bc1A0Ad72417f2d411118085256fC53CBdDd137')
     expect(HATS_SIGNATURES.mintHat).toBe('mintHat(uint256,address)')
-    expect(Object.keys(HATS_SIGNATURES)).toHaveLength(9)
+    // DAO-OS L7 Task 8 replaces "9 signatures" on purpose: batchMintHats, batchCreateHats and lastTopHatId make 12.
+    expect(Object.keys(HATS_SIGNATURES)).toHaveLength(12)
     expect(VIEW_HAT_TYPES).toHaveLength(9)
+  })
+  it('converts each hat id of a uint256[] position (batchMintHats)', () => {
+    const A1 = '0x00000000000000000000000000000000000000a1', A2 = '0x00000000000000000000000000000000000000a2'
+    const full = '0x00000021' + '0001' + '0003' + Z(48)
+    const want = encodeCall('batchMintHats(uint256[],address[])', [[BigInt(full), BigInt(full)], [A1, A2]])
+    expect(hatsCall('eip155:42220', 'batchMintHats', [['0x00000021.0001.0003', 'eip155:42220:' + full], [A1, A2]], 'b').data).toBe(want)
+    expect(() => hatsCall('eip155:42220', 'batchMintHats', [['eip155:1:' + full], [A1]], 'b')).toThrow('eip155:1')
   })
   it('builds Hats calls to the v1 contract', () => {
     const c = hatsCall('eip155:42220', 'mintHat', [childHatId(topHatId(13), 1), '0x00000000000000000000000000000000000000a1'], 'mint')

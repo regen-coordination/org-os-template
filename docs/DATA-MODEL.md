@@ -470,9 +470,9 @@ leaves the originals as they are).
 schema_version: "1.0"
 systems:
   - id: "treasury-safe"        # required, unique
-    kind: "safe"               # required; known: safe | gardens-pool | snapshot-space | hats-tree | docs | database | repo | kms-connector | link
+    kind: "safe"               # required; known: safe | gardens-community | gardens-pool | snapshot-space | hats-tree | daouri-registration | docs | database | repo | kms-connector | link
     name: "Treasury"           # required
-    chain: "eip155:42220"      # CAIP-2; on-chain kinds (safe, gardens-pool, hats-tree) need chain and address
+    chain: "eip155:42220"      # CAIP-2; on-chain kinds (safe, gardens-community, gardens-pool, hats-tree) need chain and address, unless composed
     address: "0x..."           # a 0x address for safe and gardens-pool; the tree id for hats-tree
     driver: "safe"             # which platform driver reads it; absent = a framed link
     section: "organization/treasury"
@@ -485,6 +485,59 @@ systems:
 ```
 
 An unknown `kind` is kept, with a warning, so that a module can add one.
+
+A `daouri-registration` (L8) is the org's ERC-4824 registration, named by one of `address` (a registration contract)
+or `ens` (L7-D13: a Sepolia ENS name, lower case, ending in `.eth`, whose `daouri` text record holds the daoURI), never
+both; once it is not composed it also needs `chain`. A registration by `ens` is read through the ENS Universal Resolver
+on Sepolia and is not listed in `contracts.json` (it is a text record of a name, not a contract).
+
+A `snapshot-space` needs `url`, composed or not; `space` is its id on the hub, an ENS name, when the url does not say
+it.
+
+**Composed and deployed Systems (DAO-OS L7).** A System is *composed* when `deployment.status` is `composed`: a plan,
+not yet on a chain. While composed, `chain` and `address` are not required, the System is never read by a driver, is
+never the membership tree and is not published in `contracts.json`. The org's Hub prepares its deployment (`GET
+/api/deploy`); once the chain holds it, a *read-back* stages it live, in one ordinary change decided by the org's rules:
+`deployment.status: deployed` with the day of the read-back, and the address the chain gave. A deployed System is never
+written back to `composed` (the change engine refuses it, 422 on `deployment.status`), and the fields the chain holds of
+it are not written by hand (L7 gap B1, `lib/chain-held.mjs`): `kind`, `driver`, `chain`, `address`, `deployment` but its
+`on_deploy`, a Safe's `chains` and `signer_gate`, a tree's `hats` (a hat's `role` aside; its `wearers` may be dropped),
+a space's `space` and `url`, a registration's `ens`. A change to one is refused on every write path, 422 on that field:
+"<field> of a deployed System is what the chain holds: change it on the chain, then read it back.", whether git or the
+private store keeps it. The read-back's own writes pass. Its other fields (`name`, `description`, `notes`, `relates`,
+`roles`, `role`, `position`, `order`, …) are edited like any record's. A System with no `deployment` (registered by
+hand) is not judged by this rule. The keys L7 adds, all optional:
+
+| Key | Meaning |
+|---|---|
+| `deployment` | `{ status, owners?, threshold?, salt?, top?, network?, settings?, on_deploy?, read_back? }`, below. |
+| `ens` | A `daouri-registration`'s ENS name (above). |
+| `hats` | A Hats tree's hats: `{ key, details, admin (top or a key), max_supply, mutable, wearers, role, image, hat }`; `key` starts with a lower-case letter, then lower case, digits and hyphens. Composed, `hat` is null. |
+| `signer_gate` | A Safe's Hats Signer Gate: `{ hats: [<tree id>/<hat key>], threshold: { type: absolute \| proportional, min, target }, claimable_for, address }`; `address` is written by the read-back. |
+| `relates` | `[{ to: <System id, system:<id>, a hat ref, or <tree id>/<hat key>>, label: signs \| elects \| appoints \| includes \| holds \| admin \| pool }]`: only what the chain cannot give. A composed space's `elects` names the hat whose wearers vote. |
+| `role` | `decides` or `acts`. |
+| `position` | `{ x, y }` (numbers, 0 or more): the compose canvas's own. |
+| `order` | Deployment order (integer, 0 or more); 0 = never deployed. |
+
+`deployment`, field by field:
+
+| Field | Meaning |
+|---|---|
+| `status` | `composed` (a plan) or `deployed` (read back from the chain). |
+| `owners` | A Safe's owners, CAIP-10 on its chain (`eip155:11155111:0x…`). A DAO template's add writes them so, checksummed; a bare 0x address is read on the composition's chain, and anything else is refused. |
+| `threshold` | A Safe: how many owners sign (1 up to the owners). |
+| `salt` | A Safe: the `saltNonce`, decimal text; with the owners and threshold it fixes the Safe's address before it exists. |
+| `top` | A Hats tree: `{ details, image, worn_by: <the Safe that wears the top hat>, hat? }`. `hat` is the top hat's ref (`eip155:<chain>:0x` and 64 hex digits), written by the read-back as soon as the top hat is minted, while the rest of the tree is still composed. |
+| `network` | A Snapshot space: the CAIP-2 chain it votes on (`eip155:11155111`); kept when the space is deployed, and it decides which Snapshot hub reads it (the testnet hub for Sepolia). |
+| `settings` | A Snapshot space's settings: `name`, `symbol`, `strategies` (an `erc1155-balance-of` strategy counts a hat: `${hat.<tree>/<key>}`, or the space's `elects`), `voting`, `filters`. |
+| `on_deploy` | A Safe: `{ roles?, rules? }`, the governance the DAO takes once it is deployed (L7-D8); `${hat.<tree>/<key>}` and `${system.<id>.address}` stay text until then. The read-back adds it to `data/governance.yaml` when every composed Safe and tree is deployed, and drops it from the Safe. It is not what the chain holds: on a deployed Safe it is edited by hand, and becomes governance at the next read-back that finds the composition whole, judged under the governance rule that covers the actor reading back. |
+| `read_back` | The day (`YYYY-MM-DD`, UTC) the read-back found the System deployed. |
+
+Hats wearers (`hats[].wearers`) are CAIP-10 accounts on the tree's chain, written as the owners are. A deployed tree's
+`address` is its tree id; its hats keep `{ key, hat, role }` (P9), and their `wearers` only until the Safe's signer gate
+has registered its signers, after which the chain says who wears them. The read-back also writes the map's `roles` for
+a deployed tree, by hat ref. A deployed Safe keeps `deployment: { status: deployed, read_back }`; a deployed space
+`{ status: deployed, read_back, network }`.
 
 ### 16. boards.yaml — Boards (Optional, 0.6)
 
@@ -619,7 +672,14 @@ installed:
   4. `decision` is added: `{ rule, change }` for a change applied directly, `{ proposal }` for one ratified;
   5. `created` holds `{ record, base }`, the SHA-256 of each record's canonical YAML as created, which is how a
      removal tells a record edited since the add; `adopted` is dropped, since nothing adopts in L1.
-- `modified` (a list of the same `{ record, base }` shape) is reserved for L7's entries that change existing records.
+- **Modified (L7-D11).** An add that changes a record the org already has (a rule set's `update governance:governance`)
+  lists it in `modified: [{ record, base, after }]`: `base` is the record's hash before the add, `after` its hash as the
+  add left it (sealed like `created[].base`; `null` only while staged). Removal gives the record back as the version
+  whose hash is `base`, read from the file's git history (for `governance.yaml`, its `roles:` and `rules:` blocks only;
+  a block the file did not state then is taken out), and asks first when the record's hash is no longer `after`.
+  `created` may then be empty; a receipt always names at least one record in one of the two.
+- **Templates (L7-D9).** A receipt whose created Systems include one that is `deployment.status: deployed` is not
+  removed by the library: "Its Systems are deployed. Remove each System as its own change; the chain keeps them."
 
 ---
 

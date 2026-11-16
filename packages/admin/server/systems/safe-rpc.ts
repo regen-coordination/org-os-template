@@ -18,7 +18,8 @@ export const MODULES_PAGE = 10
 
 export interface SafeOnChainRead {
   chain: string; address: string; owners: string[]; threshold: number; nonce: number; version: string
-  /** null: not known (an older Safe without getModulesPaginated); then also named in `unknown`. */
+  /** null: not known (an older Safe without getModulesPaginated, or more modules than the one page read); then also
+   *  named in `unknown`. */
   modules: string[] | null
   /** null: none set, or not known when `unknown` names it (an older Safe without getStorageAt). */
   guard: string | null; fallbackHandler: string | null; singleton: string | null; block: number
@@ -44,7 +45,11 @@ const VIEWS = [
   { name: 'getStorageAt(singleton)', field: 'singleton', data: encodeCall('getStorageAt(uint256,uint256)', [0n, 1n]), types: ['bytes'] },
 ] as const
 
-type RpcAnswer = { id?: unknown; result?: unknown; error?: { message?: unknown } }
+type RpcAnswer = { id?: unknown; result?: unknown; error?: { code?: unknown; message?: unknown } }
+
+/** Whether a JSON-RPC error is the call reverting (the contract's own answer: code 3, or "execution reverted"), not the
+ *  node failing to answer it (a rate limit inside a batch, an internal error). Anything else is the node's. */
+const reverted = (e: { code?: unknown; message?: unknown }): boolean => e.code === 3 || (typeof e.message === 'string' && /revert/i.test(e.message))
 
 /** The address in one storage word (`getStorageAt(slot, 1)`'s 32 bytes); null for zero. Throws for a word that is not 32
  *  bytes (the caller reads that as not known). */
@@ -57,8 +62,8 @@ function slotAddress(word: unknown): string | null {
 /**
  * The Safe at `address` on `chain`, read from the chain: owners, threshold, nonce, version, modules (the first page),
  * guard, fallback handler and singleton, at one block. No code at the address is `ok: false` "no Safe at this address on
- * <chain>"; a contract that does not answer a Safe's views is `ok: false` too. A node that cannot be reached or gives no
- * answer throws. Reads only; nothing is signed or sent.
+ * <chain>"; a contract that does not answer a Safe's views is `ok: false` too. A node that cannot be reached, gives no
+ * answer, or answers a view with an error that is not a revert throws. Reads only; nothing is signed or sent.
  */
 export async function readSafeOnChain(ctx: DriverContext, chain: string, address: string): Promise<SafeOnChainRead | NotASafe> {
   const name = chainInfo(chain)?.name ?? chain
@@ -85,10 +90,12 @@ export async function readSafeOnChain(ctx: DriverContext, chain: string, address
   const block = Number(BigInt(result(0, 'the block number')))
   if (/^0x0*$/.test(result(1, 'the code at the address'))) return { ok: false, error: `no Safe at this address on ${name}`, missing: true }
 
-  /** One view's decoded answer; null when it reverted or its answer cannot be read. */
+  /** One view's decoded answer; null when it reverted or its answer cannot be read. A node error is not a revert: it
+   *  fails the read, naming the host only (never "not known", never "not a Safe"). */
   const decoded: (unknown[] | null)[] = VIEWS.map((view, i) => {
     const a = byId.get(i + 2)
     if (!a) throw new Error(`${host} gave no answer for ${view.name}`)
+    if (a.error && !reverted(a.error)) throw new Error(`${host} answered an error for ${view.name}`)
     if (a.error || typeof a.result !== 'string' || a.result === '0x') return null
     try { return decodeResult([...view.types], a.result) } catch { return null }
   })
@@ -103,7 +110,12 @@ export async function readSafeOnChain(ctx: DriverContext, chain: string, address
     unknown.push(field)
     return null
   }
-  const modules = optional(4, 'modules', a => (a[0] as string[]).map(m => addressOf(m)))
+  // One page is read: a list that goes on past it (the page's `next` is not the sentinel) is not known, never taken
+  // for the whole list (fix M5).
+  const modules = optional(4, 'modules', a => {
+    if (String(a[1]).toLowerCase() !== SENTINEL_MODULES) throw new Error('more modules than one page')
+    return (a[0] as string[]).map(m => addressOf(m))
+  })
   const guard = optional(5, 'guard', a => slotAddress(a[0]))
   const fallbackHandler = optional(6, 'fallbackHandler', a => slotAddress(a[0]))
   const singleton = optional(7, 'singleton', a => slotAddress(a[0]))

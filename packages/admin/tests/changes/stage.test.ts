@@ -118,13 +118,14 @@ describe('stage', () => {
 
   it('an outside edit marks the op stale; the view shows the entry as it is now', () => {
     const { ops } = stage(repo, [], [{ op: 'update', record: 'projects:proj-001', set: { status: 'develop' } }])
-    writeFileSync(projects(), readFileSync(projects(), 'utf8').replace('title: "Node Onboarding Program"', 'title: "Edited elsewhere"'))
+    // The field the op sets, edited elsewhere (the walk's G6: another field's edit is no conflict).
+    writeFileSync(projects(), readFileSync(projects(), 'utf8').replace('status: "execute"', 'status: "archive"'))
     git(repo, 'commit -qam outside')
     expect(staleOps(repo, ops)).toEqual([0])
     const view = changeView(repo, ACTOR, { id: 'chg_x', actor: 'steward-a', created: 't0', updated: 't1', ops }, NO_PRIVATE)
     expect(view).toMatchObject({ id: 'chg_x', actor: 'steward-a', stale: [0], classes: ['records'], rule: SOLO_RULE })
     expect(view.state).toBe('stale')
-    expect(view.current[0]).toMatchObject({ title: 'Edited elsewhere' })
+    expect(view.current[0]).toMatchObject({ status: 'archive' })
   })
 
   it('an actor git cannot match is shown as git writes it', () => {

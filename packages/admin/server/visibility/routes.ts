@@ -10,14 +10,15 @@ import { HttpError } from '../errors.ts'
 import { readRegistryOrEmpty } from '../registry.ts'
 import { knownActorOf, readerOf, viewerOf, withRequest, type RequestDeps } from '../request.ts'
 import { noStore, reach, type PrivateAccess } from '../private/ops.ts'
-import { levelOfToken } from '../private/reads.ts'
+import { levelOfToken, strictPrivateReads } from '../private/reads.ts'
 import { REGISTRIES } from '../registries.ts'
 import { mayWrite, readRuleContext } from '../governance/effective.ts'
-import { narrow, readNarrowBody } from './narrow.ts'
-import type { Membership } from '../session/membership.ts'
+import { collectionTargets, narrow, readNarrowBody } from './narrow.ts'
+import { hatDetailsName, type Membership } from '../session/membership.ts'
+import { chainKept } from '../deploy/private-flip.ts'
 import type { SystemReader } from '../systems/reader.ts'
 import { readConfig, type VisibilityPolicy } from './config.ts'
-import { isObj, MEMBERS_ONLY, PUBLIC_VIEWER } from './gate.ts'
+import { isObj, Levels, MEMBERS_ONLY, PUBLIC_VIEWER } from './gate.ts'
 import { admits, hatsAbove, parseLevel, type Viewer } from '../../lib/visibility.mjs'
 import { hatRef, inTree, parseHatRef, parseTreeRef } from '../../lib/hats.mjs'
 
@@ -54,24 +55,45 @@ export interface VisibilityDeps {
 /** The tree's hats: read from the tree when it answers (it is the reader's cache, read at most every few minutes), else
  *  the hats the house knows of — the roles' hats, the hats the viewer wears and the hats data/visibility.yaml names —
  *  that lie in the tree. */
-async function treeHats(d: VisibilityDeps, viewer: Extract<Viewer, { kind: 'member' }>, config: VisibilityPolicy): Promise<string[]> {
+async function treeHats(d: VisibilityDeps, viewer: Extract<Viewer, { kind: 'member' }>, config: VisibilityPolicy): Promise<{ hats: string[]; details: Map<string, string> }> {
+  const details = new Map<string, string>()
   const tree = d.membership?.tree()
   const ref = tree ? parseTreeRef(tree.ref) : null
-  if (!tree || !ref) return []
+  if (!tree || !ref) return { hats: [], details }
   const canon = (h: unknown) => { const p = parseHatRef(h); return p && p.chain === ref.chain && inTree(p.hatId, ref.treeId) ? hatRef(p.chain, p.hatId) : null }
   let read: string[] = []
   try {
     const got = d.systems ? await d.systems.read(tree.system) : null
     const hats = got?.ok && Array.isArray(got.facts.hats) ? got.facts.hats : []
     read = hats.map(h => canon(isObj(h) ? h.id : null)).filter((h): h is string => h !== null)
+    // the names the read holds, for a member who may read the tree (Rule 4; walk M18)
+    if (readsTree(d, viewer, config, tree.system)) {
+      for (const h of hats) {
+        const id = canon(isObj(h) ? h.id : null)
+        const name = isObj(h) ? hatDetailsName(h.details) : null
+        if (id && name && !details.has(id)) details.set(id, name)
+      }
+    }
   } catch { read = [] }
-  if (read.length > 0) return [...new Set(read)]
+  if (read.length > 0) return { hats: [...new Set(read)], details }
   const known: unknown[] = [...viewer.hats]
   const roles = readGovernanceRoles(d.repo)
   for (const def of Object.values(roles)) if (isObj(def)) known.push(def.hat)
   const tokens = [...Object.values(config.defaults), ...Object.values(config.collections).flatMap(c => Object.values(c.fields))]
   for (const t of tokens) if (typeof t === 'string' && t.startsWith('hat:')) known.push(t.slice(4))
-  return [...new Set(known.map(canon).filter((h): h is string => h !== null))].sort()
+  return { hats: [...new Set(known.map(canon).filter((h): h is string => h !== null))].sort(), details }
+}
+
+/** Whether `viewer` may read the membership tree as its read holds it (Rule 4: a hat's name from the read is shown only
+ *  where the tree is): its record admits them, and none of the fields that say what the chain holds of it (its address,
+ *  its hats, … `keptFrom`, the store's levels read strictly) is kept from them. A store that cannot answer: no. */
+function readsTree(d: VisibilityDeps, viewer: Viewer, config: VisibilityPolicy, system: Record<string, unknown>): boolean {
+  try {
+    const lv = new Levels(d.repo, config, undefined, strictPrivateReads(d.privateStore ?? noStore))
+    const id = String(system.id)
+    if (lv.priv.records('systems').some(r => r.id === id)) return false
+    return admits(lv.record('systems', system), viewer) && chainKept(d.repo, config, d.privateStore ?? noStore, viewer)(id).size === 0
+  } catch { return false }
 }
 
 const GIT_COLLECTIONS = REGISTRIES.filter(r => r.kind === 'collection' && !r.ledger).map(r => r.name)
@@ -85,7 +107,8 @@ function writableBy(d: VisibilityDeps, c: Context, viewer: Viewer): string[] {
     const { store } = reach(d.privateStore ?? noStore)
     kept = store ? store.collections().filter(k => admits(levelOfToken(k.visibility), viewer)).map(k => k.id) : []
   } catch { kept = [] }
-  return [...GIT_COLLECTIONS, ...kept].filter(r => mayWrite(ctx, r) === true)
+  // DAO-OS L6 (merge M1): a workspace collection at its targets, as narrow.ts judges it (`collectionTargets`).
+  return [...GIT_COLLECTIONS, ...kept].filter(r => mayWrite(ctx, r, collectionTargets(d.repo, r)) === true)
 }
 
 /** data/governance.yaml's roles; {} when it cannot be read. */
@@ -102,8 +125,8 @@ export function mountVisibility(app: Hono, d: VisibilityDeps): void {
     // The public is refused before any route (gate.ts publicReads); said again here so the route holds on its own.
     if (viewer.kind === 'public') throw new HttpError(401, MEMBERS_ONLY, 'SIGN_IN')
     const config = readConfig(d.repo)
-    const hats = await treeHats(d, viewer, config)
-    const tree = hats.map(hat => ({ hat, name: d.membership?.hatName(hat) ?? hat, above: hatsAbove(hat) }))
+    const { hats, details } = await treeHats(d, viewer, config)
+    const tree = hats.map(hat => ({ hat, name: d.membership?.hatName(hat, details) ?? hat, above: hatsAbove(hat) }))
     const mine = hats.filter(h => admits(parseLevel(`hat:${h}`)!, viewer)).map(h => `hat:${h}`)
     const answer: VisibilityAnswer = {
       tree, worn: viewer.hats, levels: ['public', 'members', ...mine, ...viewer.roles.map(r => `role:${r}`)], config,

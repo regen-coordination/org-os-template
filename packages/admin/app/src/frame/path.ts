@@ -1,4 +1,4 @@
-import { SECTIONS } from '../sections.ts'
+import { SECTIONS, placeOf } from '../sections.ts'
 import { safeDecode } from '../hrefs.ts'
 import { HOUSE_SECTIONS, INSTANCE_LINKS } from './sections.ts'
 import { GROUPS } from '../parts/groups/list.ts'
@@ -14,7 +14,16 @@ const PLACES: Place[] = [
   ...HOUSE_SECTIONS.filter(s => s.id !== 'home').map(s => ({ href: s.href, label: s.label })),
   { href: '/governance/decisions', label: 'Decisions', parent: PROPOSALS },
   { href: '/governance/rules', label: 'Rules', parent: PROPOSALS },
-  ...SECTIONS.filter(d => d.group === 'organization' && d.id !== 'treasury').map(d => ({ href: d.route, label: d.label, parent: WORKSPACE })),
+  ...SECTIONS.filter(d => d.group === 'organization' && d.id !== 'treasury').map(d => ({ href: placeOf(d), label: d.label, parent: WORKSPACE })),
+  // walk I15, D1: a section whose word opens another page keeps its board, named "<word> board"
+  ...SECTIONS.filter(d => d.group === 'organization' && d.place !== undefined).map(d => ({ href: d.route, label: `${d.label} board`, parent: WORKSPACE })),
+  // DAO-OS L6 Task 19: Sources under Workspace, and the source editor's files under Sources
+  { href: '/sources', label: 'Sources', parent: WORKSPACE },
+  { href: '/files', label: 'Files', parent: '/sources' },
+  // DAO-OS L7 Task 17: the compose canvas, under Systems
+  { href: '/compose', label: 'Compose', parent: '/systems' },
+  // DAO-OS L7 Task 18: the deployment's steps, under Systems beside Compose
+  { href: '/deploy', label: 'Deploy', parent: '/systems' },
   ...INSTANCE_LINKS.filter(l => !HOUSE_SECTIONS.some(s => s.href === l.href)),
   { href: '/parts', label: 'Parts' },
   ...GROUPS.map(g => ({ href: `/parts/${g.id}`, label: g.label, parent: '/parts' })),
@@ -53,7 +62,7 @@ export function pathOf(location: string, names: Record<string, string>): Crumb[]
     const kind = safeDecode(record[1]!)
     const id = safeDecode(record[2]!)
     const home = SECTIONS.find(d => (d.kinds.includes(kind) || d.registry === kind) && d.id !== 'treasury' && d.group === 'organization')
-    const place = kind === 'system' ? PLACES.find(p => p.href === '/systems') : home && PLACES.find(p => p.href === home.route)
+    const place = kind === 'system' ? PLACES.find(p => p.href === '/systems') : home && PLACES.find(p => p.href === placeOf(home))
     return [...(place ? chain(place) : []), { label: names[`${kind}:${id}`] ?? id, href: path }]
   }
   const proposal = /^\/governance\/proposals\/([^/]+)$/.exec(path)
@@ -69,5 +78,7 @@ export function pathOf(location: string, names: Record<string, string>): Crumb[]
   }
   const rest = path.slice(place.href.length).split('/').filter(Boolean)
   let href = place.href
-  return [...chain(place), ...rest.map(seg => { href = `${href}/${seg}`; return { label: name(seg), href } })]
+  // DAO-OS L6 Task 19: a folder of the source editor's path is opened at its path with a trailing slash (the path field)
+  const folder = (i: number) => (place.href === '/files' && i < rest.length - 1 ? '/' : '')
+  return [...chain(place), ...rest.map((seg, i) => { href = `${href}/${seg}`; return { label: name(seg), href: `${href}${folder(i)}` } })]
 }

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { entityChanges } from '../changed.ts'
+import { displayNames } from '../../session/names.ts'
 import { lostRegistryCard } from '../graph.ts'
 import { readLedger } from '../../proposals/ledger.ts'
 import { proposalContext } from '../../proposals/events.ts'
@@ -48,7 +49,7 @@ export const proposals: Adapter = {
     if (read.entries.length === 0) return { nodes: [], edges: [] }
     const now = ctx.now()
     const vc = viewContext(ctx.repo, ANYONE, now)
-    const changes = await entityChanges(ctx.repo, 'proposals')
+    const changes = await entityChanges(ctx.repo, 'proposals', displayNames(ctx.repo, ctx.membership ?? null))
     const nodes: Resource[] = []
     const edges: Edge[] = []
     for (const entry of read.entries) {
@@ -78,7 +79,7 @@ export const proposals: Adapter = {
       nodes.push(node)
       edges.push({ from: node.id, to: `person:${entry.author}`, kind: 'proposed-by' })
       for (const op of gitOpsOf(entry.ops ?? [])) {
-        const to = resourceOf(String(op.record))
+        const to = op.op === 'file' ? null : resourceOf(String(op.record))
         if (to) edges.push({ from: node.id, to, kind: 'touches' })
       }
     }

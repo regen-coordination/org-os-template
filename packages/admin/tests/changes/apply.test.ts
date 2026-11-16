@@ -8,7 +8,7 @@ import { applyOps, Refusal, StageRefusal, Referred } from '../../server/changes/
 import { HttpError } from '../../server/errors.ts'
 import { actorTrailer, resolveActor } from '../../server/actor.ts'
 import { parseTrailers } from '../../lib/trailers.mjs'
-import type { RecordError, StageOp } from '../../server/changes/types.ts'
+import type { RecordError, RecordOp, StageOp } from '../../server/changes/types.ts'
 
 /** The whole-change backstop (step 5) cannot be reached by ops that pass step 3, so one test makes
  *  validateChange answer errors when it is judged against the texts about to be written. Every
@@ -187,7 +187,7 @@ describe('applyOps', () => {
   describe('an id is never changed by an update or a replace', () => {
     const ID_FIXED = "an entry's id cannot be changed here; create a new entry and delete this one"
     const ana = { name: 'Ana Silva', role: 'Contributor', layer: 'contributor', status: 'active', joined: '2025-02-01' }
-    const refused = async (op: StageOp) => {
+    const refused = async (op: RecordOp) => {
       const err = await applyOps(repo, [op], opts()).catch(e => e)
       expect(err).toBeInstanceOf(StageRefusal)
       expect(err.errors).toEqual([{ record: op.record, field: 'id', message: ID_FIXED }])

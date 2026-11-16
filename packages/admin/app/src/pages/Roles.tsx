@@ -9,7 +9,7 @@ import { PageHead } from '../design/PageHead.tsx'
 import { Note, NoteBlock } from '../design/Note.tsx'
 import { roleTreeFrom, type RoleNode } from '../elements/governance/roles.ts'
 import { RoleTree } from '../elements/governance/RoleTree.tsx'
-import { systemKind } from '../elements/rows/systemState.ts'
+import { isComposedRead, systemKind } from '../elements/rows/systemState.ts'
 import { derivedLinks } from '../map/fromRecords.ts'
 import { useNow } from '../time.ts'
 import { useViewer, useVisibilitySource } from '../viewAs/ViewAs.tsx'
@@ -36,7 +36,15 @@ export function rolesOf(tree: Resource, resources: Resource[]): RoleNode[] {
   return walk(roleTreeFrom(read))
 }
 
-/** Roles (§9.7, section `/roles`): the Hats tree's role tree — the first hats-tree System the viewer may see, with
+/** The tree Roles draws, among the Systems the viewer may see: the membership tree (the systems adapter marks it
+ *  `membership`, from lib/rules.mjs `membershipTree`, which honours governance.membership.tree), else the first deployed
+ *  hats-tree; never a composed one, which is a plan and not the org's (whole-platform walk I1). */
+export function rolesTree(systems: Resource[]): Resource | null {
+  const trees = systems.filter(r => r.kind === 'system' && systemKind(r) === 'hats-tree' && !isComposedRead(r))
+  return trees.find(r => r.facts.membership === true) ?? trees[0] ?? null
+}
+
+/** Roles (§9.7, section `/roles`): the Hats tree's role tree — the membership tree the viewer may see (`rolesTree`), with
  *  what each hat does from the reads. The tree is not drawn for a viewer who may not see that System (E-39): a
  *  RoleNode carries no facts, so the gate is here. With no tree, "No Hats tree yet." and the way to add one. The
  *  head carries the from mark: the tree's own read (E-47). Enter opens the tree's record, Space inspects it. */
@@ -48,7 +56,7 @@ export default function Roles() {
   const [, navigate] = useLocation()
   const now = useNow(false)
   const all = resources.data ?? []
-  const tree = useMemo(() => visible(all.filter(r => r.kind === 'system' && systemKind(r) === 'hats-tree'))[0] ?? null, [resources.data, viewer, source])
+  const tree = useMemo(() => rolesTree(visible(all.filter(r => r.kind === 'system'))), [resources.data, viewer, source])
   const nodes = useMemo(() => (tree ? rolesOf(tree, all) : []), [tree, resources.data])
   const read = tree ? driverOf(tree) : null
   return (

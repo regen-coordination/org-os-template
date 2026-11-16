@@ -20,6 +20,10 @@ export const HATS_SIGNATURES = {
   isWearerOfHat: 'isWearerOfHat(address,uint256)',
   isAdminOfHat: 'isAdminOfHat(address,uint256)',
   isEligible: 'isEligible(address,uint256)',
+  // DAO-OS L7 (Q67 phase 2, the compose deploy): as Hats.sol @ cccb71a declares them.
+  batchMintHats: 'batchMintHats(uint256[],address[])',
+  batchCreateHats: 'batchCreateHats(uint256[],string[],uint32[],address[],address[],bool[],string[])',
+  lastTopHatId: 'lastTopHatId()',
 }
 
 export const VIEW_HAT_TYPES = ['string', 'uint32', 'uint32', 'address', 'address', 'string', 'uint16', 'bool', 'bool']
@@ -159,17 +163,18 @@ export function inTree(hatId, treeId) {
   return t !== null && bigOf(hatId) >> 224n === BigInt(t)
 }
 
-/** A call to the Hats v1 contract, prepared and never sent. Only the signature's uint256 positions are converted:
- * there a hat id in any form normalHatId reads, or a hat ref of this call's chain, becomes the number it is.
- * Every other position passes through untouched.
+/** A call to the Hats v1 contract, prepared and never sent. Only the signature's uint256 and uint256[] positions are
+ * converted: there a hat id in any form normalHatId reads, or a hat ref of this call's chain, becomes the number it is
+ * (each element of a uint256[]). Every other position passes through untouched.
  * @param {string} chain @param {keyof typeof HATS_SIGNATURES} name @param {unknown[]} args @param {string} summary
  * @returns {HatsCall} */
 export function hatsCall(chain, name, args, summary) {
   const signature = HATS_SIGNATURES[name]
   if (!signature) throw new Error(`${String(name)} is not a Hats call`)
   const types = signature.slice(signature.indexOf('(') + 1, -1).split(',')
-  const converted = args.map((a, i) => {
-    if (types[i] !== 'uint256' || typeof a !== 'string') return a
+  /** @param {unknown} a */
+  const number = (a) => {
+    if (typeof a !== 'string') return a
     const ref = parseHatRef(a)
     if (ref) {
       if (ref.chain !== chain) throw new Error(`the hat ${a} is on ${ref.chain}, but this call is on ${chain}`)
@@ -178,6 +183,7 @@ export function hatsCall(chain, name, args, summary) {
     const id = normalHatId(a)
     if (id === null) throw new Error(`${a} is not a hat id (full hex, 0x00000001.0002 form, decimal or a hat ref)`)
     return BigInt(id)
-  })
+  }
+  const converted = args.map((a, i) => (types[i] === 'uint256' ? number(a) : types[i] === 'uint256[]' && Array.isArray(a) ? a.map(number) : a))
   return { chain, to: caip10(chain, HATS_V1), value: '0', data: encodeCall(signature, converted), operation: 0, summary }
 }

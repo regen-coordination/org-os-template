@@ -7,11 +7,13 @@ import { ViewAsControl } from '../viewAs/ViewAs.tsx'
 import { pathOf } from './path.ts'
 
 /** Notifications (§5.5): the comment glyph, with a moss dot when unread mentions exist. Conversation is L6;
- *  in L4 the dot is drawn from fixtures and the button opens nothing yet. */
+ *  in L4 the dot is drawn from fixtures. DAO-OS L6 Task 18 fix round 1: it opens Needs you, where the mentions are rows. */
 function Notifications({ unread }: { unread: boolean }) {
   const id = useId()
+  const [, navigate] = useLocation()
   return (
-    <button type="button" className="btn ghost icon tb-bell" aria-label="Notifications" aria-describedby={unread ? id : undefined}>
+    <button type="button" className="btn ghost icon tb-bell" aria-label="Notifications" aria-describedby={unread ? id : undefined}
+      onClick={() => navigate('/needs')}>
       <Icon name="comment" size="sm" />
       {unread && <><span className="tb-dot" aria-hidden="true" /><span id={id} className="sr-only">Unread mentions</span></>}
     </button>

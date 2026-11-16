@@ -51,6 +51,14 @@ describe('monogram (§7.12)', () => {
     expect(monogram('ops-lead-two')).toBe('OL')
     expect(monogram('ops_lead')).toBe('OL')
   })
+  it('of a hat and a short address, takes the hat: the same two letters wherever that person is drawn (walk M13)', () => {
+    expect(monogram('Council · 0x00C0…0C01')).toBe('CO')
+    expect(monogram('Ops Lead')).toBe('OL')
+  })
+  it('a presence stack draws the letters of who someone is, not of their handle', () => {
+    render(<Presence people={[{ handle: '0x00C0…0C01', role: 'Council · 0x00C0…0C01' }]} />)
+    expect(document.querySelector('.av')!.textContent).toBe('CO')
+  })
 })
 
 describe('Presence (§7.12)', () => {

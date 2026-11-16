@@ -362,7 +362,7 @@ describe('the house skin (spec §3)', () => {
     const NEW = ('pop sunken wash-strong rule-strong on-accent attn-soft map-dot shadow-raise scrim display soft fs-greet fs-page fs-amount '
       + 'fs-d-hero fs-d-sec fs-d-card fs-d-lead fs-d-body fs-d-fig fs-d-fact lh-row lh-prose lh-d-hero lh-d-sec lh-d-lead ls-eyebrow ls-display '
       + 'ls-d-sec fw-display sp-16 sp-17 sp-18 radius-xs radius-sm radius-pop radius-lg radius-plate dur-1 dur-press dur-2 dur-3 dur-flow '
-      + 'press-scale w-rail w-content w-prose w-door w-node-min h-topbar h-row h-row-1 h-tray h-bottombar h-ctl h-ctl-touch h-input h-chip '
+      + 'press-scale w-rail w-content w-prose w-portal w-node-min h-topbar h-row h-row-1 h-tray h-bottombar h-ctl h-ctl-touch h-input h-chip '
       + 'h-addr o-dim ic-xs ic-sm ic ic-lg icon-stroke').split(' ')
     for (const id of ['house', 'bare']) expect(NEW.filter(n => !names(lightOf(id)).includes(n)), id).toEqual([])
     expect(pick(declarations(lightOf('house')), ['ic-xs', 'ic-sm', 'ic', 'ic-lg', 'icon-stroke'])).toEqual({ 'ic-xs': '13px', 'ic-sm': '14px', ic: '16px', 'ic-lg': '20px', 'icon-stroke': '1.5' })

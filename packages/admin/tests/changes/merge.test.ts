@@ -146,6 +146,14 @@ describe('stale ops, and the two ways back', () => {
     expect(rebaseOp(staged, null, 'theirs')).toBeNull()
     expect(rebaseOp(staged, null, 'mine')).toEqual({ op: 'create', record: R, value: { ...P, status: 'develop', title: 'Mine' }, base: null, before: null })
   })
+
+  // L7 meets L6 (the platform merge): a custom collection's record (L6 §7.3) is in no built-in registry list; kept as
+  // mine when it is gone, its update is read as the engine projects it, and nothing is refused for its registry.
+  it("a custom collection's update kept as mine over a deleted record becomes its create", () => {
+    const before = { id: 'ana', role: 'guest' }
+    const staged = { op: 'update' as const, record: 'contacts:ana', set: { role: 'steward' }, base: baseOf(before), before }
+    expect(rebaseOp(staged, null, 'mine')).toEqual({ op: 'create', record: 'contacts:ana', value: { id: 'ana', role: 'steward' }, base: null, before: null })
+  })
   it('a stale create: theirs drops it, mine makes it a replace', () => {
     const create = { op: 'create' as const, record: 'projects:p2', value: { id: 'p2', title: 'Mine' }, base: null, before: null }
     expect(rebaseOp(create, { id: 'p2' }, 'theirs')).toBeNull()

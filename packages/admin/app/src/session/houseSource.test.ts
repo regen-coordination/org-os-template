@@ -11,6 +11,9 @@ import { baseRoutes, changeView, resource } from '../test/data.ts'
 import { ViewAsProvider, useViewer } from '../viewAs/ViewAs.tsx'
 import { FIXTURE_SOURCE, canSee } from '../viewAs/visibility.ts'
 import { houseSource } from './houseSource.ts'
+import { restrictedHat } from '../record/restricted.ts'
+import { FieldsRead } from '../record/SchemaFields.tsx'
+import type { JsonSchema } from '../api.ts'
 
 // L5 spec §11.2: the Hub's VisibilitySource from GET /api/visibility. Placeholder tree eip155:42220:13: Top, Council and
 // Ops under it, Stewards under Council.
@@ -44,9 +47,28 @@ describe('houseSource (L5 spec §11.2)', () => {
   it('hat:<ref> gets the tree\'s name; role:ops reads as a hat named ops', () => {
     expect(src.visibilityOf({ visibility: `hat:${OPS}` })).toEqual({ level: 'hat', hat: OPS, name: 'Ops' })
     expect(src.visibilityOf({ visibility: 'role:ops' })).toEqual({ level: 'hat', hat: 'role:ops', name: 'ops' })
-    // A hat the tree does not list is named by its ref.
+    // A hat the tree does not list is named by its pretty id, never its whole ref (walk M18).
     const other = hat('0003')
-    expect(src.visibilityOf({ visibility: `hat:${other}` })).toEqual({ level: 'hat', hat: other, name: other })
+    expect(src.visibilityOf({ visibility: `hat:${other}` })).toEqual({ level: 'hat', hat: other, name: '0x0000000d.0003' })
+  })
+
+  // Whole-platform walk M18 (review G14): a token is canonicalised (parseHatRef) before it is named, so a level written with
+  // its hex in another case reads by the tree's name, as the chip and the restricted field do.
+  it('a hat token in any case reads by the tree’s name, and its hats above are the tree’s', () => {
+    const upper = OPS.replace('0x0000000d', '0x0000000D')
+    expect(upper).not.toBe(OPS)
+    expect(src.visibilityOf({ visibility: `hat:${upper}` })).toEqual({ level: 'hat', hat: OPS, name: 'Ops' })
+    expect(src.hatsAbove(upper)).toEqual([TOP])
+    expect(restrictedHat(`hat:${upper}`, src)).toBe('Ops')
+    expect(restrictedHat(`hat:${hat('0003')}`, src)).toBe('0x0000000d.0003')
+  })
+
+  it('a record’s visibility field reads as its level, by the tree’s name, never as the raw token', () => {
+    const schema = { type: 'object', properties: { title: { type: 'string' }, visibility: { type: 'string' } } } as JsonSchema
+    renderAt(createElement(ViewAsProvider, { source: src, children: null }, createElement(FieldsRead, { registry: 'tasks', schema, value: { title: 'Review the payroll', visibility: `hat:${OPS}` }, was: {}, names: new Map() })), '/r/task/t-payroll')
+    const table = screen.getByRole('group', { name: 'Fields' })
+    expect(table.textContent).toContain('Hat: Ops')
+    expect(table.textContent).not.toContain('eip155')
   })
 
   it('hatsAbove and hats() follow the tree\'s order', () => {
@@ -92,10 +114,11 @@ describe('previewing as Public on the real source (the L4c "Public preview" case
       'GET /api/proposals': [],
     })
     renderAt(createElement(ViewAsProvider, { source: houseSource(VIEW), children: [createElement(Nav, { key: 'nav' }), createElement(PreviewPublic, { key: 'p' })] }))
-    const house = () => screen.getByRole('navigation', { name: 'Hub' })
+    const house = () => screen.getByRole('navigation', { name: 'Hub' }) // L4c C6 names the nav "Hub" (the words: Hub)
     expect(await within(house()).findByRole('link', { name: 'Systems, 2' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'preview' }))
-    expect(within(house()).getByRole('link', { name: 'Systems, 1' })).toBeTruthy()
+    // the walk review's G1: a preview reads every answer again, for the previewed viewer, before it counts
+    expect(await within(house()).findByRole('link', { name: 'Systems, 1' })).toBeTruthy()
   })
 })
 

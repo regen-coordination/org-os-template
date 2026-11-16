@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { makeFixtureRepo, removeFixtureRepo } from '../fixtures.ts'
 import { CATALOGUE, opById, needsConfirm, commandArgv, safeId, type Planned, type InProcess } from '../../server/operations/catalogue.ts'
 import { HttpError } from '../../server/errors.ts'
@@ -10,7 +11,7 @@ let repo: string
 beforeEach(() => {
   repo = makeFixtureRepo()
   for (const dir of ['scripts', 'memory/crew', 'packages/org-os-kms/src']) mkdirSync(join(repo, dir), { recursive: true })
-  for (const file of ['scripts/crew.mjs', 'scripts/doctor.mjs', 'scripts/analyze-instances.mjs', 'packages/org-os-kms/src/cli.mjs', 'present.md']) writeFileSync(join(repo, file), '')
+  for (const file of ['scripts/crew.mjs', 'scripts/doctor.mjs', 'scripts/analyze-instances.mjs', 'packages/org-os-kms/src/cli.mjs', 'packages/org-os-kms/src/framework.mjs', 'present.md']) writeFileSync(join(repo, file), '')
   writeFileSync(join(repo, 'data', 'instances.yaml'), 'instances: []\n')
   writeFileSync(join(repo, 'package.json'), JSON.stringify({ scripts: { 'buzz:doctor': 'node x' } }))
   writeFileSync(join(repo, 'memory', 'crew', 's1.md'), '---\nid: s1\n---\n## Report\nAll done.\n')
@@ -26,7 +27,7 @@ describe('the catalogue', () => {
   it('has unique ids, and asks for confirmation exactly for what changes or reaches out', () => {
     expect(new Set(CATALOGUE.map(o => o.id)).size).toBe(CATALOGUE.length)
     expect(CATALOGUE.filter(needsConfirm).map(o => o.id).sort()).toEqual([
-      'connector.ingest', 'fetch', 'instance.analyze', 'module.command-check', 'module.doctor', 'role.seat', 'seat.nudge', 'seat.release', 'share',
+      'connector.ingest', 'fetch', 'instance.analyze', 'knowledge.publish', 'module.command-check', 'module.doctor', 'role.seat', 'seat.nudge', 'seat.release', 'share',
     ])
     for (const op of CATALOGUE) expect(['records', 'modules', 'crew', 'fleet', 'sources']).toContain(op.refreshes)
   })
@@ -140,6 +141,18 @@ describe('the catalogue', () => {
     expect(plan('connector.ingest', res('connector:example-commons', 'connector', { target: 'knowledge/' }))).toEqual({
       cmd: process.execPath, args: [cli, 'ingest', '--connector', 'example-commons', '--dir', repo], writes: ['knowledge/', 'data/kms-cursors.json'] })
     expect(plan('connector.ingest', res('connector:x', 'connector', { target: '.' })).writes).toEqual(['.'])
+  })
+
+  it('runs the kms the commons is read from: the sibling one when the repository carries none (walk I11)', () => {
+    const bare = makeFixtureRepo()
+    const sibling = fileURLToPath(new URL('../../../org-os-kms/src/cli.mjs', import.meta.url))
+    try {
+      const r = res('knowledge:commons', 'knowledge')
+      expect(opById('knowledge.publish')!.unavailable(r, bare)).toBeNull()
+      expect((opById('knowledge.publish')!.plan(r, {}, bare) as Planned).args[0]).toBe(sibling)
+      expect(opById('connector.ingest')!.unavailable(res('connector:x', 'connector'), bare)).toBeNull()
+      expect((opById('connector.ingest')!.plan(res('connector:x', 'connector', { target: '.' }), {}, bare) as Planned).args[0]).toBe(sibling)
+    } finally { removeFixtureRepo(bare) }
   })
 
   it('says crew is missing in words', () => {

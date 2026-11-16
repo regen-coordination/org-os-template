@@ -5,7 +5,7 @@
 // log), or a block that is a focusable, labelled region a keyboard reader can scroll. Then, at those widths: the More
 // sheet open, a record in edit, the Changes tray's card above the bottom bar (its tap opens /changes), and the Propose
 // panel open over /changes. At 700, every collection and board (`/all/*`, `/b/*`). At 390 with `dir="rtl"`: `/`,
-// `/systems`, `/b/treasury`, the proposal and `/door` (the map reads the direction when it mounts; dir is set before
+// `/systems`, `/b/treasury`, the proposal and `/portal` (the map reads the direction when it mounts; dir is set before
 // the page loads). At 1440 with the root's text at 200 %: `/`, `/systems` and a record, with no sideways scroll and no
 // text clipped by its box. In forced colours, on the same three, the focus ring is drawn in `Highlight`; those shots
 // and the 200 % ones are stored in app/e2e/reflow/ (git-ignored) for the operator. Fails naming the page, the width and
@@ -148,7 +148,7 @@ try {
     for (const field of ['Title', 'Summary']) await page.getByLabel(field, { exact: true }).fill(`${field} changed in the reflow walk, to make a line that wraps at a phone's width`)
     await page.getByRole('button', { name: 'Save to changes' }).click()
     const tray = page.getByRole('region', { name: 'Changes' })
-    const card = tray.getByRole('link', { name: /^Review \d+ staged change/ })
+    const card = tray.getByRole('link', { name: /^Review \d+ staged op/ })
     await card.waitFor()
     const box = await tray.boundingBox(), bar = await page.locator('.bbar').boundingBox()
     if (!box || !bar || box.y + box.height > bar.y + 1) problems.push(`at ${width}px the tray's card is not above the bottom bar (card ${JSON.stringify(box)}, bar ${JSON.stringify(bar)})`)
@@ -186,7 +186,7 @@ try {
     // set once the document is parsed and before the app's module runs, so the map reads it when it mounts
     await ctx.addInitScript(() => { document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') document.documentElement.setAttribute('dir', 'rtl') }) })
     const page = await ctx.newPage()
-    for (const path of ['/', '/systems', '/b/treasury', proposal, '/door']) {
+    for (const path of ['/', '/systems', '/b/treasury', proposal, '/portal']) {
       await visit(page, path)
       const dir = await page.evaluate(() => getComputedStyle(document.body).direction)
       if (dir !== 'rtl') problems.push(`${path} (rtl) at 390px: the body's direction is ${dir}`)

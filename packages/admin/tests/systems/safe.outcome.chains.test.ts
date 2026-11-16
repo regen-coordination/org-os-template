@@ -71,6 +71,8 @@ describe('executed, success not known yet (§11.1)', () => {
     expect(r).toEqual({
       ok: true, outcome: 'pending', executed: true, confirmations: 2, required: 2,
       detail: 'executed on 2026-10-30T11:00:00Z; the Safe does not say yet whether it succeeded',
+      // the transaction as the service describes it, once its hash is checked (L7 gap B2)
+      tx: { to: '0x00000000000000000000000000000000000a11ce', operation: 0, data: null },
     })
   })
 

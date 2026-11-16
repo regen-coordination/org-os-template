@@ -117,18 +117,18 @@ describe('a placeholder the config does not declare is refused when the shelf is
   it('on the framework shelf', () => {
     const dir = tmp(LIBRARY_DIR, 'library-')
     edit(join(dir, 'system/safe/entry.yaml'), 'name: "${config.name}"', 'name: "${config.nope}"')
-    expect(() => loadEntries(dir)).toThrow(`${dir}/system/safe/entry.yaml: its installs name config.nope, which its config does not declare.`)
+    expect(() => loadEntries(dir)).toThrow('system:safe: "${config.nope}" names no property of config.')
   })
 
   it('on a registered shelf, which leaves out only that entry', () => {
     const dir = tmp(FIXTURE, 'shelf-')
     edit(join(dir, 'system/test-link/entry.yaml'), 'url: "${config.url}"', 'url: "${config.nope}"')
     const shelf = loadShelf(dir, new Set())
-    expect(shelf.entries.map(e => e.id)).toEqual(['board:test-desk'])
-    expect(shelf.problems).toEqual([{ shelf: 'test-shelf', sentence: `${dir}/system/test-link/entry.yaml: its installs name config.nope, which its config does not declare.` }])
+    expect(shelf.entries.map(e => e.id)).toEqual(['board:test-desk', 'template:test-council', 'wizard:test-compose'])
+    expect(shelf.problems).toEqual([{ shelf: 'test-shelf', sentence: 'system:test-link: "${config.nope}" names no property of config.' }])
   })
 
   it('serves the test shelf\'s placeholder entry when it is sound', () => {
-    expect(loadShelf(FIXTURE, new Set()).entries.map(e => e.id)).toEqual(['board:test-desk', 'system:test-link'])
+    expect(loadShelf(FIXTURE, new Set()).entries.map(e => e.id)).toEqual(['board:test-desk', 'system:test-link', 'template:test-council', 'wizard:test-compose'])
   })
 })

@@ -95,3 +95,18 @@ describe('EventLog', () => {
   })
 })
 
+describe('who wrote each event: the one display name (walk fix wave 4, G9: W2, M13)', () => {
+  const A1 = 'eip155:42220:0x00C0000000000000000000000000000000000C01'
+  const events = [
+    { id: 'n-a', at: eventFixtures[0]!.at, by: 'ana', kind: 'comment', rev: REV, text: 'Looks right.' },
+    { id: 'n-b', at: eventFixtures[0]!.at, by: A1, kind: 'approve', rev: REV },
+  ] as never
+  it('says the name the view gives, never a CAIP-10 id, and draws the monogram from it', () => {
+    renderAt(<EventLog events={events} rev={REV} now={PROPOSAL_NOW} names={{ ana: 'Steward B', [A1]: 'Council · 0x00C0…0C01' }} />)
+    expect(item('n-a').textContent).toContain('Steward B commented')
+    expect(item('n-b').textContent).toContain('Council · 0x00C0…0C01 approved')
+    expect(item('n-b').textContent).not.toContain('eip155')
+    expect(item('n-a').querySelector('.av')!.textContent).toBe('SB')
+    expect(item('n-b').querySelector('.av')!.textContent).toBe('CO')
+  })
+})

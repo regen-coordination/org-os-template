@@ -57,7 +57,7 @@ describe('seatLinks', () => {
 })
 
 describe('boardView', () => {
-  it('keeps one board, and gathers its crossings into one portal', () => {
+  it('keeps one board, and gathers its crossings into one link to the other map', () => {
     const g = assemble([
       { adapter: ad('records'), result: { nodes: [r('project:p1', 'project', 'organization', {}, 'Onboarding')], edges: [] } },
       { adapter: ad('crew', 'systems'), result: { nodes: [r('seat:s1', 'seat', 'systems', { brief: 'onboarding work' }), r('seat:s2', 'seat', 'systems', { brief: 'more onboarding' })], edges: [] } },
@@ -68,5 +68,29 @@ describe('boardView', () => {
     expect(sys.portals).toEqual([{ id: 'portal:organization', toBoard: 'organization', targets: ['project:p1'],
       text: '2 here link to 1 on Organization' }])
     expect(boardView(g, 'organization').portals[0]).toMatchObject({ toBoard: 'systems', targets: ['seat:s1', 'seat:s2'] })
+  })
+})
+
+describe('boardView: the Systems map takes every System (walk I14)', () => {
+  it('a Safe the organization board holds is on the Systems map too, with its edges among what is there', () => {
+    const g = assemble([
+      { adapter: ad('records'), result: { nodes: [r('person:org', 'person', 'organization')], edges: [] } },
+      { adapter: ad('systems', 'systems'), result: { nodes: [
+        r('system:test-dao-safe', 'system', 'organization', { kind: 'safe', section: 'organization/treasury' }),
+        r('system:treasury-safe', 'system', 'organization', { kind: 'safe', section: 'organization/treasury' }),
+        r('system:hats', 'system', 'systems', { kind: 'hats-tree' }),
+      ], edges: [
+        { from: 'system:treasury-safe', to: 'person:org', kind: 'held-by' },
+        { from: 'system:hats', to: 'system:treasury-safe', kind: 'depends-on' },
+      ] } },
+    ])
+    const sys = boardView(g, 'systems')
+    expect(sys.nodes.map(n => n.id)).toEqual(['system:test-dao-safe', 'system:treasury-safe', 'system:hats'])
+    expect(sys.edges).toEqual([{ from: 'system:hats', to: 'system:treasury-safe', kind: 'depends-on' }])
+    expect(sys.portals).toEqual([{ id: 'portal:organization', toBoard: 'organization', targets: ['person:org'], text: '1 here link to 1 on Organization' }])
+    // the Organization map keeps its Safes as it had them
+    const org = boardView(g, 'organization')
+    expect(org.nodes.map(n => n.id)).toEqual(['person:org', 'system:test-dao-safe', 'system:treasury-safe'])
+    expect(org.edges).toEqual([{ from: 'system:treasury-safe', to: 'person:org', kind: 'held-by' }])
   })
 })

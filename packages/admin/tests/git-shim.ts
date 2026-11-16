@@ -41,18 +41,44 @@ exit 128
 /** Runs `fn` with a `git` first on PATH that writes its arguments to a marker file, one line per
  *  start, and then passes them to the real git. `started()` reads that file: it is how a test sees
  *  that a process began (simple-git does not go through any property of `child_process` a spy could
- *  watch). Only this process (one test file) sees the changed PATH. */
-export async function withGitTrace<T>(fn: (started: () => string[]) => Promise<T>): Promise<T> {
+ *  watch). `slow`: a command whose argument line holds it waits a second before git runs (how a test
+ *  makes a read land after a write). Only this process (one test file) sees the changed PATH. */
+export async function withGitTrace<T>(fn: (started: () => string[]) => Promise<T>, slow?: string): Promise<T> {
   const real = execSync('command -v git', { shell: '/bin/sh' }).toString().trim()
   const dir = mkdtempSync(join(tmpdir(), 'git-trace-'))
   const marker = join(dir, 'started')
   writeFileSync(join(dir, 'git'), `#!/bin/sh
 echo "$*" >> "${marker}"
+${slow === undefined ? '' : `case "$*" in *'${slow.replace(/'/g, '')}'*) sleep 1 ;; esac`}
 exec "${real}" "$@"
 `, { mode: 0o755 })
   const path = process.env.PATH
   process.env.PATH = `${dir}:${path ?? ''}`
   try { return await fn(() => (existsSync(marker) ? readFileSync(marker, 'utf8').split('\n').filter(l => l !== '') : [])) } finally {
+    process.env.PATH = path
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+/** Runs `fn` with a `git` first on PATH that fails `sub` (exit 128, in git's own words) and passes every other command to
+ *  the real git: how a test sees a read that git could not make, as opposed to a file a revision does not hold. Only this
+ *  process (one test file) sees the changed PATH. */
+export async function withFailingSubcommand<T>(sub: string, fn: () => Promise<T>): Promise<T> {
+  const real = execSync('command -v git', { shell: '/bin/sh' }).toString().trim()
+  const dir = mkdtempSync(join(tmpdir(), 'git-fail-'))
+  writeFileSync(join(dir, 'git'), `#!/bin/sh
+sub= skip=
+for arg in "$@"; do
+  if [ -n "$skip" ]; then skip=; continue; fi
+  case "$arg" in -c|-C) skip=1 ;; -*) ;; *) sub=$arg; break ;; esac
+done
+[ "$sub" = "${sub}" ] || exec "${real}" "$@"
+echo "fatal: unable to read the object store (test)" >&2
+exit 128
+`, { mode: 0o755 })
+  const path = process.env.PATH
+  process.env.PATH = `${dir}:${path ?? ''}`
+  try { return await fn() } finally {
     process.env.PATH = path
     rmSync(dir, { recursive: true, force: true })
   }

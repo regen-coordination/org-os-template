@@ -72,10 +72,12 @@ describe('backup and restore (L5 spec §10.4, Q3)', () => {
     const s = await filled(r, from)
     const made = await backup(s, { dir: backups, keyFile: key, now: NOW })
     expect(made.file).toBe(join(backups, 'house-20261029T120000Z.db.enc'))
-    expect(made.counts).toEqual({ applied: 1, collections: 1, email_keys: 0, fields: 1, history: 2, pending: 1, records: 1, roles: 0, roles_meta: 0, sessions: 1, sign_in_links: 0, staged: 1 })
+    // Lane 3 Task 2 and DAO-OS L6 §8.1: both lines' tables are counted too (empty here).
+    expect(made.counts).toEqual({ applied: 1, collections: 1, email_keys: 0, fields: 1, history: 2, pending: 1, records: 1, roles: 0, roles_meta: 0, sessions: 1, sign_in_links: 0, staged: 1,
+      comments: 0, drafts: 0, mentions: 0, notifications: 0, reads: 0, view_state: 0 })
     expect(statSync(made.file).mode & 0o777).toBe(0o600)
     const line = JSON.parse(readFileSync(join(backups, 'manifest.jsonl'), 'utf8').trim()) as Record<string, unknown>
-    expect(line).toEqual({ file: 'house-20261029T120000Z.db.enc', at: NOW.toISOString(), sha256: made.sha256, version: 2, counts: made.counts })
+    expect(line).toEqual({ file: 'house-20261029T120000Z.db.enc', at: NOW.toISOString(), sha256: made.sha256, version: 3, counts: made.counts })
 
     const before = dump(s.file)
     closeAll()
@@ -113,7 +115,7 @@ describe('backup and restore (L5 spec §10.4, Q3)', () => {
     // and nothing in clear is left beside it, in the backup folder or the store's own
     expect(readdirSync(backups).sort()).toEqual(['house-20261029T120000Z.db.enc', 'manifest.jsonl'])
     expect(readdirSync(dir).filter(f => !f.startsWith('house.db'))).toEqual([])
-    expect(verifyBackup(made.file, key, { dir })).toEqual({ ok: true, version: 2, counts: made.counts })
+    expect(verifyBackup(made.file, key, { dir })).toEqual({ ok: true, version: 3, counts: made.counts })
   })
 
   it('a wrong key: "This backup cannot be read with that key."', async () => {
@@ -220,7 +222,7 @@ describe('backup and restore (L5 spec §10.4, Q3)', () => {
     const made = await backup(await filled(r, dir), { dir: backups, keyFile: key, now: NOW })
     const manifest = join(backups, 'manifest.jsonl')
     writeFileSync(manifest, readFileSync(manifest, 'utf8').replace(made.sha256, '0'.repeat(64)))
-    expect(verifyBackup(made.file, key, { dir })).toMatchObject({ ok: true, version: 2 })
+    expect(verifyBackup(made.file, key, { dir })).toMatchObject({ ok: true, version: 3 })
   })
 
   it('restore leaves alone a restoring file it did not make', async () => {
@@ -303,9 +305,10 @@ describe('the commands (npm run house:backup, house:backup:key, house:restore)',
     vi.stubEnv('ORG_OS_BACKUP_KEY_FILE', key)
     expect(await main(['backup'], io)).toBe(0)
     const made = readdirSync(backups).find(f => f.endsWith('.db.enc'))!
-    expect(out.pop()).toMatch(new RegExp(`^Backed up to ${join(backups, made)}\\nsha256 [0-9a-f]{64}\\nrows: applied 1, collections 1, email_keys 0, fields 1, history 2, pending 1, records 1, roles 0, roles_meta 0, sessions 1, sign_in_links 0, staged 1$`))
+    // Schema 2's tables are counted (and named in order) too.
+    expect(out.pop()).toMatch(new RegExp(`^Backed up to ${join(backups, made)}\\nsha256 [0-9a-f]{64}\\nrows: applied 1, collections 1, comments 0, drafts 0, email_keys 0, fields 1, history 2, mentions 0, notifications 0, pending 1, reads 0, records 1, roles 0, roles_meta 0, sessions 1, sign_in_links 0, staged 1, view_state 0$`))
     expect(await main(['backup', '--verify', join(backups, made)], io)).toBe(0)
-    expect(out.pop()).toBe(`${join(backups, made)} can be restored: schema 2; rows: applied 1, collections 1, email_keys 0, fields 1, history 2, pending 1, records 1, roles 0, roles_meta 0, sessions 1, sign_in_links 0, staged 1.`)
+    expect(out.pop()).toBe(`${join(backups, made)} can be restored: schema 3; rows: applied 1, collections 1, comments 0, drafts 0, email_keys 0, fields 1, history 2, mentions 0, notifications 0, pending 1, reads 0, records 1, roles 0, roles_meta 0, sessions 1, sign_in_links 0, staged 1, view_state 0.`)
     expect(await main(['restore', join(backups, made)], io)).toBe(0)
     expect(out.pop()).toMatch(/^Restored .*house\.db; the file it replaced is kept as .*house\.db\.before-restore-\d{8}T\d{6}Z\.$/)
     expect(err).toEqual([])
@@ -377,7 +380,7 @@ describe('the server (startServer): one private store, and its backups on a sche
     for (let i = 0; i < 200 && !existsSync(join(backups, 'manifest.jsonl')); i++) await new Promise(res => setTimeout(res, 25))
     const files = readdirSync(backups).filter(f => f.endsWith('.db.enc'))
     expect(files.length).toBeGreaterThanOrEqual(1)
-    expect(verifyBackup(join(backups, files[0]!), key, { dir })).toMatchObject({ ok: true, version: 2 })
+    expect(verifyBackup(join(backups, files[0]!), key, { dir })).toMatchObject({ ok: true, version: 3 })
   })
 
   it('an interval longer than a timer can wait is attention, not a backup every millisecond', async () => {

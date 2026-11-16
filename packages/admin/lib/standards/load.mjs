@@ -7,6 +7,7 @@
 // `load`, the server the `yaml` package's `parse`), so an instance's vendored copy runs without admin's dependencies.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { isComposed } from '../compose.mjs'
 import { REGISTRIES, resolveTopKey } from '../registries.mjs'
 import { readPolicy, effectiveLevel } from '../visibility.mjs'
 
@@ -147,7 +148,7 @@ export function loadStandardsInput(root, { parseYaml }) {
 
   // ── 0.6 contract fallbacks (spec §5.5) and the registration contract (spec §6) ──
   const systems = /** @type {Record<string, unknown>[]} */ ([...(/** @type {unknown[]} */ (records.systems))])
-  const onChain = systems.some(s => isObj(s) && ON_CHAIN.has(String(s.kind)) && s.address !== undefined && s.address !== null && s.address !== '')
+  const onChain = systems.some(s => isObj(s) && !isComposed(s) && ON_CHAIN.has(String(s.kind)) && s.address !== undefined && s.address !== null && s.address !== '')
   if (!onChain) {
     /** @param {Record<string, unknown>} from @param {string} where @param {unknown} chain @param {'public' | 'members'} visibility */
     const take = (from, where, chain, visibility) => {

@@ -50,7 +50,8 @@ async function serve(o: Parameters<typeof startServer>[0]): Promise<Running> {
 /** Everything a write could move: every ref, HEAD, the index and the working tree. */
 const snapshot = (repo: string) => [git(repo, 'for-each-ref'), git(repo, 'rev-parse HEAD'), git(repo, 'status --porcelain'), git(repo, 'ls-files -s')].join('\n--\n')
 /** A route's path with its parameters filled in. */
-const concrete = (path: string) => path.replace(':name', 'projects').replace(':board', 'organization').replace(':op', 'validate').replace(':n', '0').replace(/:id/g, 'x')
+const concrete = (path: string) => path.replace(':name', 'projects').replace(':board', 'organization').replace(':op', 'validate').replace(':n', '0')
+  .replace(':sid', 's-x').replace(':collection', 'tasks').replace(':view', 'all').replace(':type', 'concept').replace(':slug', 'x').replace(/:id/g, 'x')
 async function send(server: Running, w: Pick<InstanceWrite, 'method' | 'path'>) {
   const res = await fetch(`http://localhost:${server.port}${concrete(w.path)}`, {
     method: w.method, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'x', ops: [], title: 'T' }),
@@ -153,6 +154,55 @@ describe('the route table while writes are off (Lane 3 Task 11)', () => {
     expect(git(repo, 'rev-parse HEAD')).not.toBe(head)
     expect(await (await fetch(`http://localhost:${server.port}/api/status`)).json()).not.toHaveProperty('instanceWrites')
   })
+})
+
+// R2 (plan D-6): the 29 write routes the workspace (L6), kms-admin and deploy (L7) add. Refused while off: everything
+// that writes records, pages, collections, meetings, knowledge, memory, the deploy's read-back or an editing session, and
+// a comment's Turn into a task. Allowed while off: the private store's conversation and per-member state, and presence.
+// Pinned here as ruled, so a class changed in the table is a change of this list too.
+const D6_REFUSED = [
+  'POST /api/collections', 'PUT /api/collections/:id', 'DELETE /api/collections/:id', 'PUT /api/collections/:id/views/:view',
+  'POST /api/pages', 'POST /api/pages/:id/move', 'DELETE /api/pages/:id', 'POST /api/pages/:id/assets', 'POST /api/meetings',
+  'POST /api/pages/:id/sessions', 'PUT /api/sessions/:sid', 'POST /api/sessions/:sid/close', 'POST /api/sessions/:sid/resolve',
+  'POST /api/sessions/:sid/suggest', 'POST /api/workspace/records', 'POST /api/memory', 'POST /api/deploy/read-back',
+  'POST /api/knowledge/dry-read', 'POST /api/knowledge/entry/:type/:slug/prepare', 'POST /api/knowledge/entry/:type/:slug/apply',
+  'POST /api/comments/:id/task',
+] as const
+const D6_ALLOWED = [
+  'POST /api/comments', 'POST /api/comments/:id/resolve', 'POST /api/comments/:id/reopen', 'DELETE /api/comments/:id',
+  'POST /api/notifications/read', 'POST /api/reads', 'PUT /api/view-state/:collection', 'POST /api/presence',
+] as const
+const route = (r: string) => { const [method, path] = r.split(' ') as [InstanceWrite['method'], string]; return { method, path } }
+
+describe('the workspace\'s write routes and the switch (R2, plan D-6)', () => {
+  it('names 29 routes, each in the table with its class', () => {
+    expect(D6_REFUSED.length + D6_ALLOWED.length).toBe(29)
+    const cls = (r: string) => INSTANCE_WRITES.find(e => `${e.method} ${e.path}` === r)?.class
+    expect(D6_REFUSED.map(r => [r, cls(r)])).toEqual(D6_REFUSED.map(r => [r, 'instance']))
+    expect(D6_ALLOWED.map(r => [r, cls(r)])).toEqual(D6_ALLOWED.map(r => [r, 'conversation']))
+  })
+
+  it('while off each refused route answers 403 INSTANCE_READ_ONLY and the instance is unchanged; the allowed ones reach their route', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const repo = makeFixtureRepo(); cleanup.push(() => removeFixtureRepo(repo))
+    const server = await serve({ repo, port: 0, fetch: noNetwork, instanceWrites: 'off' })
+    const before = snapshot(repo)
+    for (const r of D6_REFUSED) {
+      expect([r, await send(server, route(r))]).toEqual([r, { status: 403, body: { error: READ_ONLY, code: 'INSTANCE_READ_ONLY' } }])
+    }
+    for (const r of D6_ALLOWED) expect([r, (await send(server, route(r))).body.code]).not.toEqual([r, 'INSTANCE_READ_ONLY'])
+    expect(snapshot(repo)).toBe(before)
+  }, 60_000)
+
+  it('while on no route of the 29 is refused by the switch (any other answer is the route\'s own)', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const repo = makeFixtureRepo(); cleanup.push(() => removeFixtureRepo(repo))
+    const server = await serve({ repo, port: 0, fetch: noNetwork, instanceWrites: 'on' })
+    for (const r of [...D6_REFUSED, ...D6_ALLOWED]) {
+      const res = await send(server, route(r))
+      expect([r, res.status !== 403 || res.body.code !== 'INSTANCE_READ_ONLY']).toEqual([r, true])
+    }
+  }, 60_000)
 })
 
 describe('the start and the page visit while writes are off (Lane 3 Task 11)', () => {

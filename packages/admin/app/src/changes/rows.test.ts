@@ -57,7 +57,7 @@ describe('the docked tray’s words (§5.6)', () => {
 
   it('counts, says the stale line, and says the rule: the server’s sentence, a direct one after “Saves directly”', () => {
     expect([stagedWords(1), stagedWords(3), staleWords(1), staleWords(2)]).toEqual(
-      ['1 staged change', '3 staged changes', '1 op changed on the trunk — choose what stands', '2 ops changed on the trunk — choose what stands'])
+      ['1 staged op', '3 staged ops', '1 op changed on the trunk — choose what stands', '2 ops changed on the trunk — choose what stands'])
     expect(ruleWords({ direct: true, sentence: 'the maintainer decides alone', source: 's' })).toBe('Saves directly · the maintainer decides alone')
     expect(ruleWords({ direct: false, sentence: 'Council consent decides this · 4 of 8', source: 's' })).toBe('Council consent decides this · 4 of 8')
   })
@@ -130,5 +130,28 @@ describe('applyOutcome (contract: refusals clients branch on by code)', () => {
   it("gives anything else in the server's words", () => {
     expect(applyOutcome(new ApiError(503, [], 'Not applied: git refused the commit (index.lock). Nothing was changed.')).message).toBe('Not applied: git refused the commit (index.lock). Nothing was changed.')
     expect(applyOutcome(new Error('Failed to fetch')).message).toBe('Failed to fetch')
+  })
+})
+
+describe('a file op in the tray (DAO-OS L6 §11.2)', () => {
+  const edit = { op: 'file' as const, path: 'data/governance.yaml', text: 'governance: {}\n', base: 'b' }
+  const gone = { op: 'file' as const, path: 'data/horizon.yaml', text: null, base: 'b' }
+  it('is one row, keyed and named by its path', () => {
+    const rows = trayRows(changeView({ ops: [edit, gone], stale: [1], current: [null, null] }))
+    expect(rows.map(r => [r.record, r.op, r.field, r.stale])).toEqual([
+      ['data/governance.yaml', 'file', '(whole file)', false], ['data/horizon.yaml', 'file', '(file deleted)', true],
+    ])
+    expect(recordName(edit)).toBe('data/governance.yaml')
+    expect(opKind(edit)).toBe('file')
+    expect(opSummary(edit)).toBe('data/governance.yaml · edited whole')
+    expect(opSummary(gone)).toBe('data/horizon.yaml · deleted')
+  })
+})
+
+describe('one word for one count (walk M1)', () => {
+  it('the collapsed tray counts ops, as the expanded head and the stale line do', () => {
+    // the head says "2 ops · 1 record" (Tray.tsx), the stale line "1 op changed on the trunk": the collapsed tray agrees
+    expect(stagedWords(2)).toBe('2 staged ops')
+    expect(stagedWords(2)).not.toMatch(/change/)
   })
 })

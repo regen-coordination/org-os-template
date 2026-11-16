@@ -32,4 +32,4 @@ export const EXPANDED = STALE
 
 /** Sign-in (§11.4), the other half of the tray's section: Example DAO's members, its Hats tree #13, and a member who
  *  wears two hats at a generated address (§17). Fixture values. */
-export const SIGNIN = { org: 'Example DAO', tree: '#13', hats: ['Council steward', 'Treasury signer'], address: fakeAddress(41), doorHref: '/door' }
+export const SIGNIN = { org: 'Example DAO', tree: '#13', hats: ['Council steward', 'Treasury signer'], address: fakeAddress(41), portalHref: 'https://portal.example.test' }

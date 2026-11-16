@@ -104,6 +104,29 @@ describe('palette', () => {
     expect(labels).toEqual(['Home', 'Activity', 'Library', 'Projects', 'Rules', 'Decisions', 'Proposals', 'Organization map', 'Systems map', 'All records'])
   })
 
+  // walk I15, D1: the Meetings section is the collection, as the sidebar opens it
+  it('jumps to Meetings at /c/meetings', () => {
+    const list = places([], [{ name: 'meetings', kind: 'collection', count: 2 }], new Map())
+    expect(list.filter(p => p.label === 'Meetings').map(p => p.href)).toEqual(['/c/meetings'])
+  })
+
+  // L6 carries K11 (Task 19, PF-R79): the Hub's Sources page, for a viewer the members' side admits; 0.6's board of the
+  // same name is told apart as the sidebar tells it ("Sources board").
+  it('lists the Sources page for the members\' side, and 0.6\'s Sources board by the sidebar\'s name', () => {
+    const resources = [res('project:p', 'project', 'organization', 'P'), res('source:s', 'source', 'systems', 'S')]
+    const members = places(resources, [], new Map(), { sources: true })
+    expect(members.map(p => [p.label, p.href])).toEqual(expect.arrayContaining([['Sources', '/sources'], ['Sources board', '/b/sources']]))
+    expect(members.filter(p => p.label === 'Sources')).toHaveLength(1)
+    expect(places(resources, [], new Map()).map(p => p.href)).not.toContain('/sources')
+  })
+
+  // DAO-OS L7 Task 18: the deployment's steps, for a member who reads a composed System (Palette.tsx decides `deploy`)
+  it('lists Deploy only when asked to, as a page', () => {
+    const resources = [res('project:p', 'project', 'organization', 'P')]
+    expect(places(resources, [], new Map(), { deploy: true }).filter(p => p.href === '/deploy')).toEqual([{ label: 'Deploy', href: '/deploy', detail: 'page' }])
+    expect(places(resources, [], new Map()).map(p => p.href)).not.toContain('/deploy')
+  })
+
   it('knows when the page is a record', () => {
     expect(recordContext('/r/person/github%3Asteward-a')).toEqual({ kind: 'person', id: 'github:steward-a' })
     expect(recordContext('/projects')).toBeNull()

@@ -6,10 +6,11 @@
 /** How a governed file is changed here. */
 export type EditPath =
   | 'record'      // the record editor: field rows, plus the whole-entry source editor on the record page
+  | 'page'        // the page editor (DAO-OS L6 §10): a page edited in place, one commit per editing session
   | 'board'       // arrange and block settings, plus the record page's source editor
   | 'own-routes'  // its own routes, by design
   | 'generated'   // generated, never edited
-  | 'none-yet'    // the source editor is L6's: no path in the Hub yet
+  | 'source'      // the source editor (DAO-OS L6 Task 19, `/files/<path>`): the file edited whole, staged as one file op
 
 export interface GovernedFile {
   /** A registry's name (`members`), a path (`IDENTITY.md`) or a path pattern (`.well-known/**`, `data/*.yaml`). */
@@ -23,13 +24,16 @@ export interface GovernedFile {
 }
 
 const RECORD_HOW = 'The record editor: field rows, and the whole-entry source editor on the record page.'
-const NONE_YET = 'Read only here. The source editor comes with L6; until then a change to it has no path in the Hub.'
+const SOURCE_HOW = 'The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied.'
 
 /** The registries edited record by record. */
 export const RECORD_REGISTRIES = [
   'members', 'projects', 'meetings', 'ideas', 'funding-opportunities', 'relationships', 'sources', 'events', 'channels',
-  'assets', 'knowledge-gaps', 'systems',
+  'assets', 'knowledge-gaps', 'systems', 'tasks',
 ] as const
+
+/** The workspace's agent layer (DAO-OS L6 §16): written by the agents' own tools, read in the Hub. */
+const AGENT_LAYER = ['memory/**', 'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/**', 'docs/agent-plans/**'] as const
 
 /** The table, in the order the README lists it. */
 export const GOVERNED_FILES: readonly GovernedFile[] = [
@@ -40,23 +44,31 @@ export const GOVERNED_FILES: readonly GovernedFile[] = [
     how: 'Its own routes, by design: propose, approve, ratify and the rest write it, never an edit.' },
   { target: 'library', kind: 'registry', path: 'own-routes', what: 'data/library.yaml, the library’s receipts',
     how: 'Its own routes, by design: the library’s Add and Remove.' },
+  { target: 'data/kb/**', kind: 'path', path: 'own-routes', what: 'data/kb/, the knowledge commons’ canon',
+    how: 'Its own routes: the commons’ entry page prepares an edit and applies it in one commit, under the org’s rules.' },
+  { target: 'pages/**', kind: 'path', path: 'page', what: 'pages/, the workspace’s pages',
+    how: 'The page editor: a page is written in place, one commit per editing session; Suggest makes the edit a proposal.' },
+  { target: 'data/collections/**', kind: 'path', path: 'record', what: 'data/collections/, the records of the org’s own collections',
+    how: 'The collection’s views and the record editor.' },
   { target: '.well-known/**', kind: 'path', path: 'generated', what: 'the published files under .well-known/',
     how: 'Generated from the data files, never edited (L8’s builder).' },
-  { target: 'finances', kind: 'registry', path: 'none-yet', what: 'data/finances.yaml', how: NONE_YET },
-  { target: 'governance', kind: 'registry', path: 'none-yet', what: 'data/governance.yaml, the rules',
-    how: `${NONE_YET} It is never staged today (R-L5-11.7): a later edit path must run the governance check (§7.6).` },
-  { target: 'knowledge-manifest', kind: 'registry', path: 'none-yet', what: 'data/knowledge-manifest.yaml', how: NONE_YET },
-  { target: 'visibility', kind: 'registry', path: 'none-yet', what: 'data/visibility.yaml, what is public',
-    how: `${NONE_YET} Narrowing a record has its own route (L5); widening one is a publication, decided as a proposal.` },
-  { target: 'data/*.yaml', kind: 'path', path: 'none-yet',
+  { target: 'finances', kind: 'registry', path: 'source', what: 'data/finances.yaml', how: SOURCE_HOW },
+  { target: 'governance', kind: 'registry', path: 'source', what: 'data/governance.yaml, the rules',
+    how: `${SOURCE_HOW} The governance check (§7.6) runs on it, so a text that would lock the org out is refused; the Rules page reads it. Its \`roles\` and \`rules\` are also a record of the change engine, \`governance:governance\` (see Governance below): a rule set's add writes them that way.` },
+  { target: 'knowledge-manifest', kind: 'registry', path: 'source', what: 'data/knowledge-manifest.yaml', how: SOURCE_HOW },
+  { target: 'visibility', kind: 'registry', path: 'source', what: 'data/visibility.yaml, what is public',
+    how: `${SOURCE_HOW} Narrowing a record has its own route (L5); a text that widens what is public is a publication.` },
+  { target: 'data/*.yaml', kind: 'path', path: 'source',
     what: 'an instance’s own data files outside the registry list, such as data/horizon.yaml and data/access-grants.yaml',
-    how: `${NONE_YET} Rules govern each as a record of the org.` },
-  { target: 'IDENTITY.md', kind: 'path', path: 'none-yet', what: 'IDENTITY.md', how: NONE_YET },
-  { target: 'federation.yaml', kind: 'path', path: 'none-yet', what: 'federation.yaml', how: NONE_YET },
+    how: `${SOURCE_HOW} Rules govern each as a record of the org.` },
+  { target: 'collections', kind: 'registry', path: 'source', what: 'data/collections.yaml, the collections and their saved views',
+    how: `${SOURCE_HOW} New collection and Save view on the Workspace write their definitions through their own routes.` },
+  { target: 'data/imports.yaml', kind: 'path', path: 'source', what: 'data/imports.yaml, the imports’ record', how: SOURCE_HOW },
+  ...AGENT_LAYER.map((t): GovernedFile => ({ target: t, kind: 'path', path: 'source', what: t,
+    how: `${SOURCE_HOW} The agents’ own tools commit it too.` })),
+  { target: 'IDENTITY.md', kind: 'path', path: 'source', what: 'IDENTITY.md', how: SOURCE_HOW },
+  { target: 'federation.yaml', kind: 'path', path: 'source', what: 'federation.yaml', how: SOURCE_HOW },
 ]
-
-/** What a registry page says of a file with no path in the Hub yet (a document registry, F-L3-3). */
-export const READ_ONLY_HERE = 'Read only here: a change to this file has no path in the Hub yet.'
 
 const matches = (pattern: string, path: string) =>
   pattern.endsWith('/**') ? path.startsWith(pattern.slice(0, -2)) : pattern === 'data/*.yaml' ? /^data\/[^/]+\.ya?ml$/.test(path) : pattern === path
@@ -64,7 +76,11 @@ const matches = (pattern: string, path: string) =>
 /** The table's row for a registry, or for a file by its path (`data/<registry>.yaml` is its registry's row). Null for a
  *  file that is not governed (a script, a note). */
 export function editorOf(target: { registry: string } | { path: string }): GovernedFile | null {
-  if ('registry' in target) return GOVERNED_FILES.find(f => f.kind === 'registry' && f.target === target.registry) ?? null
+  // A registry whose row is by its file's path (data/imports.yaml) is found there.
+  if ('registry' in target) {
+    return GOVERNED_FILES.find(f => f.kind === 'registry' && f.target === target.registry)
+      ?? GOVERNED_FILES.find(f => f.kind === 'path' && f.target === `data/${target.registry}.yaml`) ?? null
+  }
   const path = target.path.replace(/^\.\//, '')
   const registry = /^data\/([^/]+)\.ya?ml$/.exec(path)?.[1]
   const own = registry === undefined ? null : editorOf({ registry })
@@ -76,11 +92,13 @@ export function editorOf(target: { registry: string } | { path: string }): Gover
  *  or `*`, the files outside the registry list). Empty when every governed file has its row. */
 export function leftOut(registries: readonly string[], classRows: readonly { registry?: string; path?: string }[]): string[] {
   const has = (kind: GovernedFile['kind'], target: string) => GOVERNED_FILES.some(f => f.kind === kind && f.target === target)
-  const out = registries.filter(r => !has('registry', r)).map(r => `registry ${r}`)
+  // A registry whose row is by its file's path (data/imports.yaml) has its row.
+  const hasRegistry = (r: string) => has('registry', r) || has('path', `data/${r}.yaml`)
+  const out = registries.filter(r => !hasRegistry(r)).map(r => `registry ${r}`)
   for (const row of classRows) {
     if (row.path !== undefined && !has('path', row.path)) out.push(`path ${row.path}`)
     if (row.registry === '*' && !has('path', 'data/*.yaml')) out.push('the files outside the registry list (data/*.yaml)')
-    else if (row.registry !== undefined && row.registry !== '*' && !has('registry', row.registry)) out.push(`registry ${row.registry}`)
+    else if (row.registry !== undefined && row.registry !== '*' && !hasRegistry(row.registry)) out.push(`registry ${row.registry}`)
   }
   return [...new Set(out)]
 }

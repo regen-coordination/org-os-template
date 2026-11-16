@@ -11,11 +11,22 @@ import { PageHeading } from '../../design/PageHeading.tsx'
  *  where it was read from (E-1, Q70); the title in the display face, Fraunces 32 (§3.3, C-4); then the prose, Geist
  *  16/1.65, its headings Sans 600 (H2 20, H3 16), its links underlined in --edge. The children are the page's blocks:
  *  paragraphs, headings, lists and the pieces below. Drawing only: the editor engine and persistence are L6's. */
-export function PageBody({ meta, title, from, now, children }: { meta: string; title: string; from?: From; now?: Date; children: ReactNode }) {
+export function PageBody({ meta, title, from, now, children, editTitle }: {
+  meta: string; title: string; from?: From; now?: Date; children: ReactNode
+  /** L6 (Task 16): the title is written in place — plain text, one line; Enter goes on to the body. The h1 keeps the
+   *  text it was drawn with while the member types (the caller passes the title it opened with). */
+  editTitle?: { onInput(title: string): void; onEnter(): void }
+}) {
   return (
     <article className="ed-body">
       <div className="ed-meta">{meta}{from && <>{' · '}<FromMark from={from} now={now ?? new Date()} /></>}</div>
-      <PageHeading className="display ed-title">{title}</PageHeading>
+      {editTitle
+        ? (
+          <h1 className="display ed-title" contentEditable="plaintext-only" suppressContentEditableWarning spellCheck
+            onInput={e => editTitle.onInput((e.currentTarget.textContent ?? '').replace(/\s+/g, ' ').trim())}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); editTitle.onEnter() } }}>{title}</h1>
+        )
+        : <PageHeading className="display ed-title">{title}</PageHeading>}
       <div className="ed-prose">{children}</div>
     </article>
   )

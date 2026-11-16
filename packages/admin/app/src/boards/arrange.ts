@@ -1,6 +1,6 @@
 // packages/admin/app/src/boards/arrange.ts
 import { CANVAS_MIN, GRID_COLUMNS, MIN_SPAN } from '../../../lib/board-query.mjs'
-import type { BlockEntry, BoardDef, BoardRead, CanvasPlace, ChangeView, GridPlace, Layout, StageOp } from '../api.ts'
+import type { BlockEntry, BoardDef, BoardRead, CanvasPlace, ChangeView, GridPlace, Layout, RecordOp } from '../api.ts'
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 const gridOf = (x: BlockEntry): GridPlace => ({ col: 1, span: GRID_COLUMNS, row: 1, ...(x.place as Partial<GridPlace> | undefined) })
@@ -120,9 +120,9 @@ export function changeSummary(base: BoardDef, draft: BoardDef): string[] {
 
 /** The one op Done stages (contract "P4c produces"). A board already in your change, or one the instance's
  *  file holds, is updated, so the change keeps one op for it. A built-in, or a board new to both, is created. */
-export function stageOpFor(base: BoardRead | null, draft: BoardDef, change: ChangeView | null): StageOp {
+export function stageOpFor(base: BoardRead | null, draft: BoardDef, change: ChangeView | null): RecordOp {
   const record = `boards:${draft.id}`
-  const inChange = change?.ops.some(o => o.record === record) ?? false
+  const inChange = change?.ops.some(o => o.op !== 'file' && o.record === record) ?? false
   if (inChange || base?.origin === 'instance') return { op: 'update', record, set: { name: draft.name, layout: draft.layout, blocks: draft.blocks } }
   return { op: 'create', record, value: { id: draft.id, name: draft.name, audience: draft.audience, layout: draft.layout, blocks: draft.blocks } }
 }

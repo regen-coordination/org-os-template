@@ -125,7 +125,7 @@ export function describePublicPreview(name: string, source: VisibilitySource): v
       nothingOfTheMembers()
       rerender(<ViewAsProvider source={source} initial={{ as: 'public' }}><Nav /><Governance part="rules" /><Tray /></ViewAsProvider>)
       expect(await screen.findByText('Previewing as Public, the rules in force are not shown.')).toBeTruthy()
-      expect(screen.queryByRole('button', { name: 'Show governance.yaml' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Show the rules as written' })).toBeNull()
       nothingOfTheMembers()
     })
 

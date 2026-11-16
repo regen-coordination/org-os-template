@@ -6,7 +6,7 @@ import { useLocation } from 'wouter'
 import { Shell } from '../design/Shell.tsx'
 import { useRouteFocus } from '../frame/useRouteFocus.ts'
 import { renderAt } from '../test/render.tsx'
-import { KeyMap } from './KeyMap.tsx'
+import { KEY_ROWS, KeyMap } from './KeyMap.tsx'
 import { HouseKeys, OPEN_NEW_BOARD } from './useHouseKeys.ts'
 import { useViewToggle } from './useViewToggle.ts'
 
@@ -29,8 +29,9 @@ const press = (key: string, over: Record<string, unknown> = {}, at: Element = do
   fireEvent.keyDown(at, { key, ...over })
 
 describe('the key map (§5.8)', () => {
-  // 19 rows: the design pass's `n`, New board on Boards (DP-18), joined §5.8's 18
-  it('is a dialog titled "Keys" with the table of §5.8 (19 rows), opened by ? and closed by Esc', () => {
+  // 19 rows: the design pass's `n`, New board on Boards (DP-18), joined §5.8's 18; the portal's row only with a portal
+  // origin (D-5), so 18 here, where no session answers (portalLink.test.tsx draws the row with one)
+  it('is a dialog titled "Keys" with the table of §5.8 (18 rows without a portal origin), opened by ? and closed by Esc', () => {
     house()
     const opener = screen.getByRole('button', { name: 'In the sidebar' })
     opener.focus()
@@ -38,9 +39,11 @@ describe('the key map (§5.8)', () => {
     const dialog = screen.getByRole('dialog', { name: 'Keys' })
     const table = within(dialog).getByRole('table')
     const rows = within(table).getAllByRole('row').filter(r => r.parentElement?.tagName === 'TBODY')
-    expect(rows.length).toBe(19)
+    expect(rows.length).toBe(18)
     const does = rows.map(r => within(r).getByRole('rowheader').textContent)
-    expect(does.slice(0, 10)).toEqual(['Home', 'Needs you', 'Proposals', 'Systems', 'Roles', 'Treasury', 'Workspace', 'Library', 'Changes', 'Public door, in a new tab'])
+    expect(does.slice(0, 10)).toEqual(['Home', 'Needs you', 'Proposals', 'Systems', 'Roles', 'Treasury', 'Workspace', 'Library', 'Changes', 'Palette'])
+    expect(KEY_ROWS).toHaveLength(19)
+    expect(KEY_ROWS[9]!.does).toBe('Portal, in a new tab')
     expect(does).toEqual(expect.arrayContaining(['Palette', 'Fold or unfold the sidebar', 'Next or previous row', 'List · Map', 'Open the row', 'Preview in the inspector', 'Close the top panel']))
     const keysOf = (name: string) => [...rows.find(r => within(r).getByRole('rowheader').textContent === name)!.querySelectorAll('kbd')].map(k => k.textContent)
     expect(keysOf('Treasury')).toEqual(['g', 't'])
@@ -89,7 +92,7 @@ describe('the house keys', () => {
     expect(loc.history).toEqual(['/'])
   })
 
-  it('g c asks the tray to open; g d opens the public door in a new tab', () => {
+  it('g c asks the tray to open; g d, with no portal origin, does nothing (D-5; portalLink.test.tsx opens it with one)', () => {
     house()
     const asked = vi.fn()
     window.addEventListener('house:open-changes', asked)
@@ -98,7 +101,7 @@ describe('the house keys', () => {
     window.removeEventListener('house:open-changes', asked)
     const opened = vi.spyOn(window, 'open').mockImplementation(() => null)
     press('g'); press('d')
-    expect(opened).toHaveBeenCalledWith('/door', '_blank', 'noopener,noreferrer')
+    expect(opened).not.toHaveBeenCalled()
   })
 
   it('n asks the page for its New (Boards listens), and typed in a field it is typing', () => {

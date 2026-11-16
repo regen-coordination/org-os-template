@@ -1,5 +1,7 @@
 import type { SystemReader } from '../systems/reader.ts'
 import type { RefreshState } from '../hosted/refresh.ts'
+import type { Membership } from '../session/membership.ts'
+import type { PrivateAccess } from '../private/ops.ts'
 
 /** The two canvases. A resource lives on exactly one. */
 export type Board = 'organization' | 'systems'
@@ -8,6 +10,7 @@ export type Kind =
   | 'project' | 'person' | 'funding' | 'partner' | 'idea' | 'knowledge-gaps'
   | 'module' | 'role' | 'seat' | 'instance' | 'source' | 'channel' | 'connector' | 'system'
   | 'proposal'
+  | 'knowledge'   // the commons: only what waits on a person (adapter `knowledge`)
   | 'absent'
 
 export type EdgeKind =
@@ -37,8 +40,10 @@ export interface Resource {
 export interface Edge { from: string; to: string; kind: EdgeKind; crosses?: boolean }
 export interface Graph { nodes: Resource[]; edges: Edge[] }
 
-export interface Portal { id: string; toBoard: Board; text: string; targets: string[] }
-export interface BoardView { board: Board; nodes: Resource[]; edges: Edge[]; portals: Portal[] }
+/** Where a map's edges leave for the other map: one link node on the canvas (0.6, §14.2). The wire keeps its 0.6
+ *  names, `portals` and the id `portal:<board>` (a saved layout may hold that id; PF-R119). */
+export interface BoardLink { id: string; toBoard: Board; text: string; targets: string[] }
+export interface BoardView { board: Board; nodes: Resource[]; edges: Edge[]; portals: BoardLink[] }
 
 export const BOARD_OF: Record<Exclude<Kind, 'absent'>, Board> = {
   project: 'organization', person: 'organization', funding: 'organization', partner: 'organization',
@@ -47,6 +52,7 @@ export const BOARD_OF: Record<Exclude<Kind, 'absent'>, Board> = {
   source: 'systems', channel: 'systems', connector: 'systems',
   system: 'systems', // the default: the systems adapter places each entry by its section
   proposal: 'organization',
+  knowledge: 'organization',
 }
 
 /** An adapter either reads its source or says, in one sentence, why there is nothing to read. A source
@@ -67,6 +73,13 @@ export interface AdapterContext {
   systems?: SystemReader
   /** A read-only hosted Hub's refresh from its remote (C1, C2), shown on the Sources page. Absent: no refresh runs. */
   refresh?: () => RefreshState | null
+  /** Membership from the Hats tree, so history names a CAIP-10 actor by the hat they wear (session/names.ts). Absent:
+   *  by their short address. */
+  membership?: Membership | null
+  /** The one private store (walk fix wave 5): a System's chain fields it keeps are laid over git's entry for its read, so
+   *  the read is made from where the System is; the gate keeps that read from a viewer not admitted to them (PF-R256).
+   *  Absent: git's entries alone. */
+  privateStore?: PrivateAccess
 }
 
 export interface Adapter {

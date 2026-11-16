@@ -34,7 +34,7 @@ export function NewBoardSheet({ boards, org, onDone, dialogRef }:
   const [busy, setBusy] = useState(false)
   const uid = useId()
   const id = slug(name)
-  const staged = new Set((ch.view?.ops ?? []).filter(o => o.record.startsWith('boards:')).map(o => o.record.slice('boards:'.length)))
+  const staged = new Set((ch.view?.ops ?? []).flatMap(o => (o.op !== 'file' && o.record.startsWith('boards:') ? [o.record.slice('boards:'.length)] : [])))
   const taken = id !== '' && (boards.some(b => b.id === id) || staged.has(id))
   const source = from === 'copy' ? builtins.find(b => b.id === copyOf) : undefined
   const ready = id !== '' && !taken && (from === 'blank' || source !== undefined)
@@ -56,7 +56,7 @@ export function NewBoardSheet({ boards, org, onDone, dialogRef }:
 
   return (
     <ConfirmDialog ref={dialogRef} wide title="New board" confirm="Create board" disabled={!ready} busy={busy ? 'Creating…' : undefined}
-      onCancel={onDone} onConfirm={() => void create()} note={<>Saved to <code>data/boards.yaml</code> as a staged change</>}
+      onCancel={onDone} onConfirm={() => void create()} note={<>Saved as a staged change</>}
       body={
         <form className="nb" aria-label="New board" onSubmit={e => { e.preventDefault(); void create() }}>
           <p className="nb-l">A board shows records from any section, arranged the way you choose. It’s saved as a staged change, so you can still change your mind.</p>

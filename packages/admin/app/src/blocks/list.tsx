@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
-import { api, type Board, type JobRecord, type Resource, type StageOp } from '../api.ts'
+import { api, type Board, type JobRecord, type RecordOp, type Resource } from '../api.ts'
 import { useResources, useSystemEntries, useSystemsRead } from '../queries.ts'
 import { REGISTRY_OF_KIND } from '../kinds.ts'
 import { unaddressable } from '../record/addressing.ts'
@@ -130,10 +130,14 @@ export function readRecord(r: Resource, field: string): unknown {
  *  its restricted state ("Ops only") and never as a value the record may still carry in `facts` or `status` — the
  *  resources route gates whole records, not fields (server/visibility/gate.ts `gateGraph`), so a filter on the value
  *  would reveal it by the rows it leaves. */
-export function seenRecord(restricted: (r: Resource) => Record<string, string>, hatOf: (level: string) => string) {
-  return (r: Resource, field: string): unknown => {
-    const level = field === 'needs' ? undefined : restricted(r)[field]
-    return level !== undefined ? `${hatOf(level)} only` : readRecord(r, field)
+export function seenRecord(restricted: (r: Resource) => Record<string, string>, hatOf: (level: string) => string): (r: Resource, field: string) => unknown
+/** DAO-OS L6 Task 17: the same reading over any row — a collection's entries (GET /api/registries/:name) — with its own
+ *  `read`; every field may be restricted there (no derived `needs`). */
+export function seenRecord<T>(restricted: (r: T) => Record<string, string>, hatOf: (level: string) => string, read: (r: T, field: string) => unknown): (r: T, field: string) => unknown
+export function seenRecord<T>(restricted: (r: T) => Record<string, string>, hatOf: (level: string) => string, read?: (r: T, field: string) => unknown) {
+  return (r: T, field: string): unknown => {
+    const level = read === undefined && field === 'needs' ? undefined : restricted(r)[field]
+    return level !== undefined ? `${hatOf(level)} only` : read ? read(r, field) : readRecord(r as Resource, field)
   }
 }
 
@@ -223,7 +227,7 @@ function RecordsBody({ cfg, data, ctx }: { cfg: BlockCfg; data: unknown; ctx: Bl
         edit: r => (editableRecord(r) && keptStatus(r) === undefined ? statusOf(r) : null) }
     : c))
   const stage = async (r: Resource, value: string) => {
-    const ops: StageOp[] = [{ op: 'update', record: changeKeyOf(r)!, set: { status: value } }]
+    const ops: RecordOp[] = [{ op: 'update', record: changeKeyOf(r)!, set: { status: value } }]
     setSaving(s => new Set(s).add(r.id))
     try {
       await ctx.stage(ops)
@@ -294,7 +298,7 @@ function SectionFoot({ cfg }: { cfg: BlockCfg; ctx: BlockCtx }) {
     <>
       {lost > 0 && backing && (
         <p className="problem"><Mark level="warn">
-          {lost} entr{lost === 1 ? 'y' : 'ies'} in data/{backing}.yaml cannot be addressed (no id, or an id another entry shares), so {lost === 1 ? 'it is' : 'they are'} read-only.{' '}
+          {lost} entr{lost === 1 ? 'y' : 'ies'} in this list cannot be addressed (no id, or an id another entry shares), so {lost === 1 ? 'it is' : 'they are'} read-only.{' '}
           <Link href={`/all/${encodeURIComponent(backing)}`}>see the file's list →</Link>
         </Mark></p>
       )}

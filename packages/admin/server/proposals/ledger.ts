@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import { parseDocument, isSeq, type YAMLMap, type YAMLSeq } from 'yaml'
 import { Refusal, guardFiles } from '../changes/apply.ts'
 import { HttpError } from '../errors.ts'
-import { registryDef, resolveTopKey } from '../registries.ts'
+import { registriesOf, registryDef, registryFile, resolveTopKey } from '../registries.ts'
 import { readRegistry, createdText, updatedText, collectionSeq, findEntity, entriesFromText } from '../registry.ts'
 import { whyNot } from '../verify.ts'
 import { spliceAppendFlow, flowText } from '../splice.ts'
@@ -246,7 +246,9 @@ function refuseIfInvalid(repo: string, text: string, id: string): void {
   const ctx = readRuleContext(repo, { unknown: '' })
   const systems = existsSync(join(repo, 'data', 'systems.yaml')) ? (readRegistry(repo, 'systems').entries ?? null) : []
   for (const p of checkProposals(entries, {
-    members: ctx.members ?? null, governance: ctx.governance, systems, classes: CHANGE_CLASSES, classOf: registry => classOf({ registry }),
+    members: ctx.members ?? null, governance: ctx.governance, systems, classes: CHANGE_CLASSES,
+    // A record's class is its registry's file's (L6 ruling P-5): a custom collection's is data/collections/<id>.yaml.
+    classOf: registry => classOf({ path: registryFile(repo, registry) }), defs: registriesOf(repo),
   })) if (p.id === id) errors.push({ field: p.path, message: p.message })
   if (mine) {
     for (const p of validateEntry(NAME, mine)) if (p.level === 'error') errors.push({ field: p.path, message: p.message })

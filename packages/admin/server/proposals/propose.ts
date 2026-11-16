@@ -7,23 +7,30 @@
 
 import { HttpError } from '../errors.ts'
 import { commitIdent, type Actor } from '../actor.ts'
-import { Refusal, StageRefusal } from '../changes/apply.ts'
+import { Refusal, StageRefusal, narrowedHereErrors } from '../changes/apply.ts'
 import { refuseOthersLink } from '../visibility/widen.ts'
 import { readConfig } from '../visibility/config.ts'
 import { Levels } from '../visibility/gate.ts'
 import { refuseNarrowed } from '../private/guard.ts'
-import { changeClasses, staleOps, validateChange } from '../changes/stage.ts'
+import { changeClasses, knowledgeOpErrors, staleOps, targetsOf, validateChange } from '../changes/stage.ts'
+import { registriesOf } from '../registries.ts'
 import type { Change, Op } from '../changes/types.ts'
-import { effectiveRule, readRuleContext } from '../governance/effective.ts'
+import { withoutBefore } from '../workspace/files.ts'
+import { effectiveRule, noRuleCovers, readRuleContext } from '../governance/effective.ts'
 import { sealReceipts } from '../library/seal.ts'
 import { FETCH_FRESH_MS, lastFetch, resolveRev } from '../git.ts'
 import { buildBranch, buildFailureWords, type BranchProposal, type BuildOptions, type BuildResult } from './branch.ts'
 import { actObservations, bookOf, createEntry, readLedger, resolveTrunk, type LedgerOptions } from './ledger.ts'
 import { proposalId, revOf, methodOf, type Proposal } from '../../lib/proposals.mjs'
-import { effectiveRules, mayPropose, rulesForClasses, validTrunkName, type Rule } from '../../lib/rules.mjs'
+import { WORKSPACE_DIRECT, WORKSPACE_SUGGEST, SUGGEST_WEARERS_PARTIAL, SUGGEST_WEARERS_UNREAD, effectiveRules, maintainerHat, mayPropose, rulesForTargets, suggestDecidable, validTrunkName, type Rule } from '../../lib/rules.mjs'
+import type { HatObservation } from '../../lib/hat-readings.mjs'
+import type { HatWearers } from '../session/membership.ts'
 import type { Viewer } from '../../lib/visibility.mjs'
-import { aroundGit, privateClasses, resolvePrivate, STORE_FAILED, type StagedPrivateOp } from '../private/ops.ts'
+import { aroundGit, privateClasses, STORE_FAILED, type StagedPrivateOp } from '../private/ops.ts'
 import { pendingPart } from '../private/proposals.ts'
+import { privateTargetsOf } from '../private/targets.ts'
+import { refuseCouncilProposed } from '../workspace/memory.ts'
+import { judgePrivate, moveTargets, planMoves } from '../workspace/move.ts'
 import type { PrivateStore } from '../private/store.ts'
 
 /** How old the last fetch may be before Propose asks for a Sync first (spec §3.12). */
@@ -39,6 +46,16 @@ export interface ProposeInput {
 export interface ProposeDeps extends LedgerOptions {
   /** Builds `proposal/<id>`; tests pass one that fails. Default: `buildBranch`. */
   build?: (repo: string, proposal: BranchProposal, from: string, opts: BuildOptions) => Promise<BuildResult>
+  /** DAO-OS L6 R-L6-SUGGEST-2: the change comes from Suggest (POST /api/sessions/:sid/suggest), a proposal its author chose
+   *  instead of saving. A change they may apply alone is then proposed, not refused DIRECT: under the rule that raises
+   *  its target when there is one, else under WORKSPACE_SUGGEST. The entry is marked `suggested: true`. Never read from a
+   *  request body. */
+  suggested?: boolean
+  /** Who wears a hat now (`hatWearersReadOf`, through the app's Membership): a suggestion's `maintainer` role, when it is
+   *  sourced from a hat, is judged by the org's wearers of it, as Ratify judges its deciders — never by the suggester's own
+   *  reading (fix round 1, review S1). Absent, or answering a refusal: the wearers are not known, and a suggestion that
+   *  role decides is refused with SUGGEST_WEARERS_UNREAD, never with NO_SUGGEST_DECIDERS. */
+  wearers?: HatWearers
 }
 
 /** A change's private part as Propose (or Revise) carries it (L5 spec §9.6, §10.3): the store, the staged ops read back from
@@ -100,10 +117,20 @@ export async function propose(repo: string, actor: Extract<Actor, { id: string }
   const now = (deps.now ?? (() => new Date()))()
   const ops: Op[] = change.ops
   if (ops.length === 0 && !priv?.ops.length) throw new Refusal(400, { code: 'EMPTY', error: 'Nothing is staged: the change holds no ops to propose.' })
+  // Council memory is written at once or not at all (R-L6-T15-2, Task 15 review I-1).
+  if (priv) refuseCouncilProposed(priv.ops)
   // A git op writing a field narrowed since it was staged is told what to do (R-L5-16.10).
   refuseNarrowed(ops, readConfig(repo), 'Not proposed')
+  // A value typed beside a narrowing of its field in the same change is refused as Apply refuses it (PF-R15, L6 carries K1),
+  // so it never sits in a ledger op.
+  const narrowedHere = narrowedHereErrors(repo, ops, 'Not proposed')
+  if (narrowedHere.length > 0) throw new StageRefusal(narrowedHere)
   // A wallet link is widened only by its own person (L5 §9.7).
   refuseOthersLink(repo, ops, actor.id)
+  // A knowledge op on a canon kms reads differently from the house is not proposed either (PF-R2): its classes would be
+  // judged on a reading kms does not share.
+  const canon = knowledgeOpErrors(ops, registriesOf(repo), repo, 'Nothing was written.')
+  if (canon.length > 0) throw new StageRefusal(canon)
 
   // 1. which rules (spec §3.4 step 1), then whether a proposal is needed at all (step 2)
   const ctx = readRuleContext(repo, actor)
@@ -113,22 +140,60 @@ export async function propose(repo: string, actor: Extract<Actor, { id: string }
   // Its git ops' classes, then its private part's (L5 §10.3: the rule judged is the class of the registry or private collection).
   // A private record's widening (R-L5-16.8) is read from the store's op as staged now, beside the placeholders' flags.
   const classes = [...new Set([...changeClasses(change, repo), ...(priv ? privateClasses(priv.store, priv.ops) : [])])]
+  // Where each op is judged (L6 §3.2): a workspace op at its targets. workspace/direct is no written rule, so a proposal
+  // never holds it: what it covers rides along under the rules the rest is decided by.
+  // A move into git (L6 §12) is judged where it lands as well (R-L6-T11-4); one that cannot be planned is refused at step 3.
+  let landing: string[][] = []
+  if (priv) { try { landing = moveTargets(repo, planMoves(repo, priv.store, priv.ops, readConfig(repo), priv.viewer)) } catch { landing = [] } }
+  // The private part at its own targets, read from the store's ops as they stand now (Task 15 review I-1).
+  const targets = [...targetsOf(change, repo), ...(priv ? privateTargetsOf(repo, priv.store, priv.ops) : []), ...landing]
   // The book holds the actor's reading and the act's own (L5 spec §7.3): a proposer under a role sourced from a hat.
-  const book = bookOf(ctx.governance, ctx.members ?? [{ id: actor.id, kind: actor.kind }], null, [...actObservations(null, deps.as), ...(ctx.observations ?? [])])
+  const members = ctx.members ?? [{ id: actor.id, kind: actor.kind }]
+  const observed: HatObservation[] = [...actObservations(null, deps.as), ...(ctx.observations ?? [])]
+  let book = bookOf(ctx.governance, members, null, observed)
   const rules: Rule[] = []
-  for (const { class: cls, rule } of rulesForClasses(effectiveRules(ctx.governance).rules, classes)) {
+  for (const { targets: [cls], rule } of rulesForTargets(effectiveRules(ctx.governance).rules, targets)) {
     if (rule === null) {
-      throw refuse(409, 'NO_RULE', `No rule in data/governance.yaml covers the class ${cls}; nobody can propose it until a rule does. Nothing was written.`)
+      throw refuse(409, 'NO_RULE', `${noRuleCovers(cls)} Nothing was written.`)
     }
-    if (!rules.some(r => r.id === rule.id)) rules.push(rule)
+    if (rule !== WORKSPACE_DIRECT && !rules.some(r => r.id === rule.id)) rules.push(rule)
   }
   for (const rule of rules) {
     const may = mayPropose(rule, actor.id, book)
     if (may !== true) throw new Refusal(403, { reason: may, error: may })
   }
-  if (effectiveRule(ctx, classes).direct) {
-    throw refuse(409, 'DIRECT', `You may apply this change yourself under ${rules.map(r => `rule "${r.id}"`).join(' and ')}, so no proposal was opened. Use Apply.`)
+  const judged = effectiveRule(ctx, classes, targets)
+  if (judged.direct && !deps.suggested) {
+    const under = [...rules.map(r => r.id), ...(rules.length === 0 ? [WORKSPACE_DIRECT.id] : [])]
+    throw refuse(409, 'DIRECT', `You may apply this change yourself under ${under.map(id => `rule "${id}"`).join(' and ')}, so no proposal was opened. Use Apply.`)
   }
+  // A suggestion of what workspace/direct covers (R-L6-SUGGEST-2): decided by the org's maintainers under the built-in
+  // rule, never by its author alone; refused in words when nobody else would decide it. A `maintainer` role sourced from a
+  // hat is worn by whoever wears it, which one actor's reading cannot say (fix round 1, review S1): its wearers are read as
+  // Ratify reads its deciders, and a read that fails is not the claim that nobody decides it.
+  if (judged.direct && rules.length === 0) {
+    const hat = maintainerHat(book)
+    let partial = false
+    if (hat !== undefined) {
+      const worn = await deps.wearers?.(hat)
+      if (worn === undefined || !worn.ok) {
+        throw new Refusal(502, { code: 'HATS_UNREADABLE', error: SUGGEST_WEARERS_UNREAD })
+      }
+      book = bookOf(ctx.governance, members, null, [
+        ...observed,
+        ...worn.accounts.map(account => ({ hat, account, wears: true, block: worn.block, at: worn.readAt })),
+      ])
+      partial = !worn.complete
+    }
+    const decidable = suggestDecidable(book, actor.id)
+    // A list not read whole names some wearers, not all (fix round 2, review I3): another wearer on it decides, and with
+    // none on it who would is not known, which is never "nobody" nor "only you".
+    if (decidable !== true && partial) throw new Refusal(502, { code: 'HATS_UNREADABLE', error: SUGGEST_WEARERS_PARTIAL })
+    if (decidable !== true) throw refuse(409, 'NO_DECIDERS', decidable)
+    rules.push(WORKSPACE_SUGGEST as Rule)
+  }
+  // A workspace write the actor may not make (L6 §3.2, `mayWriteWorkspace`) has no rule to be proposed under.
+  if (rules.length === 0) throw new Refusal(403, { reason: judged.sentence, error: judged.sentence })
 
   // 3. the change as it stands (spec §3.4 step 3: after the rules and the direct answer, so a member who may not propose, or a change that applies alone, is told that first)
   const stale = staleOps(repo, ops)
@@ -141,7 +206,8 @@ export async function propose(repo: string, actor: Extract<Actor, { id: string }
   if (errors.length > 0) throw new StageRefusal(errors)
   // The private part, judged now for the one who proposes it, against the store as it is (its writes are discarded: the
   // ops are applied when the proposal is ratified).
-  if (priv) resolvePrivate(priv.store, priv.ops, priv.viewer)
+  // A move is planned as its apply will plan it (L6 §12): refused 409 `MOVE` in its own words.
+  if (priv) judgePrivate(repo, priv.store, priv.ops, priv.viewer, readConfig(repo))
 
   // 4. the trunk, and the last fetch
   const trunk = await resolveTrunk(repo, deps.startBranch)
@@ -157,7 +223,7 @@ export async function propose(repo: string, actor: Extract<Actor, { id: string }
   if (from === null) throw new HttpError(409, 'This repository has no commit yet, so there is no trunk to propose on.')
   const id = proposalId(now, readLedger(repo).entries)
   // A library receipt is proposed sealed: its author, today, and this proposal (the decision row is found by it).
-  const sealed = sealReceipts(ops.map(({ before: _before, ...op }) => op), { by: actor.id, at: now.toISOString().slice(0, 10), decision: { proposal: id } })
+  const sealed = sealReceipts(ops, { by: actor.id, at: now.toISOString().slice(0, 10), decision: { proposal: id } }).map(withoutBefore)
   // The private part: a placeholder per op after the git ops, its real op in `pending` (§9.6).
   const part = priv ? pendingPart(id, priv.ops) : null
   const ledgerOps = [...sealed, ...(part?.placeholders ?? [])]
@@ -172,6 +238,8 @@ export async function propose(repo: string, actor: Extract<Actor, { id: string }
     opened: seconds(now),
     // The reading it was opened on, for an author under a role sourced from a hat or at an address (L5 spec §7.2).
     ...(deps.as ? { opened_as: deps.as } : {}),
+    // A proposal made by Suggest (R-L6-SUGGEST-2): what decides it may be the built-in workspace/suggest.
+    ...(deps.suggested ? { suggested: true } : {}),
     rev: revOf(ledgerOps),
     base: from,
     branch: `proposal/${id}`,

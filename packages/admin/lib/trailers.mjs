@@ -5,7 +5,9 @@
 // `Key: value` per line. `git interpret-trailers --parse` reads them back, and so
 // does the activity trail (P3). F1 writes Org-Actor and Org-Rule; P1 adds
 // Org-Change, P2 Org-Proposal and Org-Decision, DAO-OS L5 Org-Hat (§6.4: the hats a
-// direct apply under a hat-sourced role acted under, `<hat ref> @<block>`, comma-separated).
+// direct apply under a hat-sourced role acted under, `<hat ref> @<block>`, comma-separated),
+// DAO-OS L6 Org-Moved (§12: the private records and pages a ratify merge moves into git,
+// `<collection>:<id>`, comma-separated, a page as `pages:<id>`).
 
 export const TRAILER = Object.freeze({
   actor: 'Org-Actor',
@@ -14,6 +16,7 @@ export const TRAILER = Object.freeze({
   hat: 'Org-Hat',
   proposal: 'Org-Proposal',
   decision: 'Org-Decision',
+  moved: 'Org-Moved',
 })
 
 /** The identity the house authors and commits a signed-in actor's writes with (DAO-OS L5 spec §6.4), passed through
@@ -21,7 +24,7 @@ export const TRAILER = Object.freeze({
  *  so the validators read it without importing the server: a commit by this email is judged by its Org-Actor. */
 export const HOUSE_IDENT = Object.freeze({ name: 'org-os house', email: 'house@org-os.invalid' })
 
-/** @typedef {{ actor?: string, change?: string, rule?: string, hat?: string, proposal?: string, decision?: string }} TrailerValues */
+/** @typedef {{ actor?: string, change?: string, rule?: string, hat?: string, proposal?: string, decision?: string, moved?: string }} TrailerValues */
 
 /** @type {(keyof typeof TRAILER)[]} */
 const ORDER = /** @type {any} */ (Object.keys(TRAILER))

@@ -42,7 +42,7 @@ describe('loadLibrary', () => {
   it("serves a registered shelf after the framework's, and previews its entry", async () => {
     shelfCopy(); register('shelves/test-shelf')
     const lib = loadLibrary(repo)
-    expect(lib.entries.map(e => e.id)).toEqual([...frameworkIds(), 'board:test-desk', 'system:test-link'])
+    expect(lib.entries.map(e => e.id)).toEqual([...frameworkIds(), 'board:test-desk', 'system:test-link', 'template:test-council', 'wizard:test-compose'])
     expect(lib.sources).toEqual(['framework', 'test-shelf'])
     expect(lib.problems).toEqual([])
     const app = createApp(repo)
@@ -92,7 +92,7 @@ describe('a registered shelf that cannot be served (Review Focus 3)', () => {
   })
   it('an entry whose source is not the shelf is left out', async () => {
     const dir = shelfCopy(); edit(join(dir, 'board/test-desk/entry.yaml'), 'source: test-shelf', 'source: framework'); register('shelves/test-shelf')
-    await expectServed([{ shelf: 'test-shelf', sentence: 'test-shelf: board:test-desk says it comes from framework, but it is on the test-shelf shelf.' }], ['system:test-link'])
+    await expectServed([{ shelf: 'test-shelf', sentence: 'test-shelf: board:test-desk says it comes from framework, but it is on the test-shelf shelf.' }], ['system:test-link', 'template:test-council', 'wizard:test-compose'])
   })
   it('an entry that reuses a framework id is left out, and the framework copy wins', async () => {
     const dir = shelfCopy()
@@ -106,7 +106,7 @@ describe('a registered shelf that cannot be served (Review Focus 3)', () => {
   })
   it('two shelves with one name: the second is left out', async () => {
     shelfCopy(); shelfCopy('shelves/again'); register('shelves/test-shelf', 'shelves/again')
-    await expectServed([{ shelf: 'shelves/again', sentence: 'Two shelves are named test-shelf; the second, shelves/again, is left out.' }], ['board:test-desk', 'system:test-link'])
+    await expectServed([{ shelf: 'shelves/again', sentence: 'Two shelves are named test-shelf; the second, shelves/again, is left out.' }], ['board:test-desk', 'system:test-link', 'template:test-council', 'wizard:test-compose'])
   })
   it('library.shelves that is not a list of { path } is one problem', async () => {
     federation('library:\n  shelves: nonsense\n')

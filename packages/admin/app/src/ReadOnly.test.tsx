@@ -85,4 +85,28 @@ describe('ReadOnlyNotice', () => {
     renderAt(<ReadOnlyNotice />)
     await waitFor(() => expect(band()?.querySelector('.band-t')?.textContent).toBe(said))
   })
+  // T2c (closing review, minor 5): an emailed-link person with no Role is told so in a band of the same meaning as NO_HAT,
+  // plainly; one with a Role reads no band.
+  const PERSON = { mode: 'hosted', signedIn: true, via: 'email', actor: 'example-org:person:example-visitor', viewer: 'public', expiresAt: '2026-10-31T10:00:00.000Z' }
+  const PERSON_ACTOR = { id: 'example-org:person:example-visitor', name: 'V. Visitor', kind: 'person', via: 'email', roles: [], nodes: [] }
+
+  it('an emailed-link person with no Role reads that they have no Role here yet', async () => {
+    fetchRoutes({
+      'GET /api/session': { ...PERSON, person: { id: PERSON.actor, name: 'V. Visitor', roles: [], nodes: [] } },
+      'GET /api/actor': PERSON_ACTOR,
+    })
+    renderAt(<ReadOnlyNotice />)
+    await waitFor(() => expect(band()?.querySelector('.band-t')?.textContent).toBe('You are signed in, but you have no Role here yet.'))
+  })
+
+  it('an emailed-link person with a Role reads no band', async () => {
+    fetchRoutes({
+      'GET /api/session': { ...PERSON, viewer: 'member', person: { id: PERSON.actor, name: 'V. Visitor', roles: ['steward'], nodes: [] } },
+      'GET /api/actor': { ...PERSON_ACTOR, roles: ['steward'] },
+    })
+    const { container, qc } = renderAt(<ReadOnlyNotice />)
+    await waitFor(() => expect(qc.getQueryData(['actor'])).toBeTruthy())
+    await waitFor(() => expect(qc.getQueryData(['session'])).toBeTruthy())
+    expect(container.textContent).toBe('')
+  })
 })

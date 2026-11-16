@@ -23,18 +23,19 @@ import { configuredEmail } from './git.ts'
 import { Refusal } from './changes/apply.ts'
 import { effectiveRule, readRuleContext } from './governance/effective.ts'
 import { readRegistryOrEmptyCached } from './registry.ts'
-import { shortAddress } from './systems/safe.ts'
-import { accountOn, actUnreadable, readsAsPublic, TREE_UNREADABLE, type Membership } from './session/membership.ts'
+import { accountOn, actUnreadable, readsAsPublic, TREE_UNREADABLE, type HatWearers, type Membership } from './session/membership.ts'
 import { sessionFromCookie, type Session } from './session/sessions.ts'
 import { endPersonSession, needsReissue, personActor, readPersonCookie, reissue, viewerRoles, type PersonCookie } from './session/person.ts'
 import type { SignInConfig } from './session/config.ts'
 import type { RolesPerson } from './private/store.ts'
+import { addressName } from './session/address-name.ts'
+import { personName } from './session/names.ts'
 import type { PrivateStore } from './private/store.ts'
 import type { HostedConfig } from './hosted/config.ts'
 import { actorIdOf, walletsOf, type HatAct } from '../lib/hat-readings.mjs'
-import { parseCaip10 } from '../lib/caip.mjs'
 import { resolveRoles, rolesOf } from '../lib/rules.mjs'
-import type { Viewer } from '../lib/visibility.mjs'
+import { hatRef, parseHatRef } from '../lib/hats.mjs'
+import { admits, type Viewer } from '../lib/visibility.mjs'
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -115,6 +116,14 @@ export function withRequest(d: RequestDeps): MiddlewareHandler {
     } else {
       who = await byGit(d.repo, d.membership, act, email)
     }
+    // View as, at the server (the walk review's G1): a read may name the viewer it is previewed for. Only the viewer is
+    // swapped, never the actor, and only to what both may read: a preview never widens (asViewer).
+    const as = act ? undefined : c.req.query('as')
+    if (as !== undefined) {
+      const narrowed = asViewer(d.repo, who.viewer, as)
+      if (!narrowed) return c.json({ error: AS_SHAPE, code: 'AS' }, 400)
+      who = { ...who, viewer: narrowed }
+    }
     repos.set(c, d.repo)
     memberships.set(c, d.membership)
     persons.set(c, person)
@@ -139,6 +148,32 @@ export function withRequest(d: RequestDeps): MiddlewareHandler {
 /** The I5 cookie the request carried, as the request middleware read it (null: none, or one that does not verify). */
 export function personOf(c: Context): PersonCookie | null {
   return persons.get(c) ?? null
+}
+
+/** Said when `?as` names no viewer. */
+export const AS_SHAPE = 'as must be public, members or hat:<hat ref>: the viewer a preview is read for.'
+
+/**
+ * The viewer a read previewed `?as=<as>` is answered for (the walk review's G1): what `as` and the real viewer `real` may
+ * both read, so a preview never shows more than the person asking may read. `public`: the public. `members`: a member
+ * wearing no hat, holding only the roles every member holds (those of the real viewer's that are `all: true`).
+ * `hat:<ref>`: a wearer of that hat, holding only the roles every member holds and those sourced from that hat, each of
+ * them the real viewer's: the hat when the real viewer wears it or one above it, and the hats they wear below it (one that
+ * does not parse is worn by nobody). The real public reads as the public whatever is asked. Null: `as` names no viewer.
+ */
+export function asViewer(repo: string, real: Viewer, as: string): Viewer | null {
+  if (as !== 'public' && as !== 'members' && !as.startsWith('hat:')) return null
+  if (as === 'public' || real.kind === 'public') return { kind: 'public' }
+  const rc = readRuleContext(repo, { unknown: '' })
+  const roles = [...resolveRoles(rc.governance, rc.members ?? []).roles.values()]
+  const all = new Set(roles.filter(r => r.all).map(r => r.id))
+  const parsed = as === 'members' ? null : parseHatRef(as.slice('hat:'.length))
+  const hat = parsed ? hatRef(parsed.chain, parsed.hatId) : null
+  if (hat === null) return { kind: 'member', id: real.id, hats: [], roles: real.roles.filter(r => all.has(r)) }
+  const wearer: Viewer = { kind: 'member', id: real.id, hats: [hat], roles: [] }
+  const hats = [...(admits({ level: 'hat', hat }, real) ? [hat] : []), ...real.hats.filter(h => admits({ level: 'hat', hat: h }, wearer))]
+  const ofHat = new Set(roles.filter(r => r.hat === hat).map(r => r.id))
+  return { kind: 'member', id: real.id, hats: [...new Set(hats)], roles: real.roles.filter(r => all.has(r) || ofHat.has(r)) }
 }
 
 /** The repository the middleware ran for; it throws when it did not run, so a route mounted before it is found at once. */
@@ -182,6 +217,14 @@ export function wearerReadOf(c: Context): ((account: string) => ReturnType<Membe
   repoOf(c)
   const m = memberships.get(c) ?? null
   return m ? account => m.forAct(account) : null
+}
+
+/** Reads a hat's wearers now through the request's Membership (`wearersOf`), for a suggestion's `maintainer` role when it is
+ *  sourced from a hat (R-L6-SUGGEST-2, fix round 1, review S1); null when the server reads no hats. */
+export function hatWearersReadOf(c: Context): HatWearers | null {
+  repoOf(c)
+  const m = memberships.get(c) ?? null
+  return m ? hat => m.wearersOf(hat) : null
 }
 
 // ── an act under a hat (§7.2) ───────────────────────────────────────────────────────────────────────
@@ -269,20 +312,14 @@ async function signedIn(repo: string, m: Membership, session: Session, act: bool
 /** The person's actor and viewer: with no Role, the public's view (Review Focus 2); otherwise a member whose roles are
  *  their Roles and the governance roles the members list gives their id (a steward listed in a role's `members` holds it). */
 function personWho(repo: string, p: RolesPerson): { actor: PersonActor; viewer: Viewer } {
-  const actor = personActor(p)
-  if (p.roles.length === 0) return { actor, viewer: { kind: 'public' } }
-  return { actor, viewer: { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, actor, null)) } }
+  const viewer: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, personActor(p), null)) }
+  // Their name is read as anyone who sees the actor may read the members file (Rule 4; T2d, the T2c review's finding 4):
+  // presence and the comment it sends fall back to it for everyone on the page. With no Role, as the public may; with one,
+  // as any member may (no hat, no role); a name that read does not say is their id when the members file holds it, never the
+  // Roles table's (T2e I1). Only GET /api/session reads it as their own viewer may, for them alone.
+  const seenBy: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: '', hats: [], roles: [] }
+  return { actor: personActor({ ...p, name: personName(repo, p, seenBy) }), viewer }
 }
-
-/** A CAIP-10 actor's name (§6.3): the name of the lowest hat worn and the short address ("Council · 0x0000…00A1"). The
- *  hat is named by its role id, written as a name (Task 7, R-L5-21.3): its first letter capital, `-` and `_` as spaces. */
-function addressName(m: Membership, account: string, hats: string[]): string {
-  const address = parseCaip10(account)?.address ?? account
-  const lowest = lowestHat(hats)
-  return lowest ? `${asName(m.hatName(lowest))} · ${shortAddress(address)}` : shortAddress(address)
-}
-const asName = (id: string) => (/^[a-z]/.test(id) ? `${id[0]!.toUpperCase()}${id.slice(1).replace(/[-_]+/g, ' ')}` : id)
-
 
 // ── git's identity, locally (§6.2) ──────────────────────────────────────────────────────────────────
 

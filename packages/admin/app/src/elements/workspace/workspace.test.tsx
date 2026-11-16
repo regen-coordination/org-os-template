@@ -14,10 +14,11 @@ import { SelectionToolbar } from './SelectionToolbar.tsx'
 import { SlashMenu } from './SlashMenu.tsx'
 import { CommentThread, type Comment } from './CommentThread.tsx'
 import { Composer } from './Composer.tsx'
-import { MentionPicker } from './MentionPicker.tsx'
+import { CANNOT_READ_TALK, MentionPicker } from './MentionPicker.tsx'
 import { mentionables } from './mentions.ts'
 import { COMMENTS, ME, MENTIONABLES, PAGE } from '../../test/fixtures/house/workspace.ts'
 import { FIXED_NOW } from '../../test/fixtures/parts.ts'
+import { clientWith } from '../../test/writesOff.ts'
 
 const as = (viewer: Viewer, ui: ReactElement) => renderAt(<ViewAsProvider initial={viewer}>{ui}</ViewAsProvider>)
 const MEMBERS = { level: 'members' } as const
@@ -152,7 +153,7 @@ describe('PageBody (§10.1, E-14, §18-2)', () => {
     expect(h1.classList.contains('display')).toBe(true)
     expect(h1.classList.contains('ed-title')).toBe(true)
     const meta = document.querySelector('.ed-meta')!
-    expect(meta.textContent).toBe('Edited 4 min ago by Ops lead · Workspace write · saves directly · 3 backlinks · from knowledge/treasury/how-the-treasury-is-run.md · read 4 min ago')
+    expect(meta.textContent).toBe('Edited 4 min ago by Ops lead · Workspace write · saves directly · 3 backlinks · from the repository · read 4 min ago')
     expect(document.querySelector('.ed-prose h2')!.textContent).toBe('What it holds')
     expect(document.querySelector('.ed-prose h3')!.textContent).toBe('On Celo')
   })
@@ -385,6 +386,25 @@ describe('CommentThread (§10.3, E-15, E-16)', () => {
   })
 })
 
+// R2 (plan D-6): a read-only Hub still writes its private store's conversation, so with the Hub's writes off the thread
+// keeps its composer, Reply, Resolve and Reopen; only Turn into a task, which writes a task, is not drawn. On, all are.
+describe('CommentThread while the Hub\'s writes are off', () => {
+  const thread = () => (
+    <CommentThread comments={COMMENTS} visibility={HAT_OPS} me={ME} now={FIXED_NOW} form="panel"
+      onSend={noop} onRetry={noop} onDiscard={noop} onResolve={noop} onTask={noop} />
+  )
+  for (const off of [true, false]) {
+    it(off ? 'off: the composer, Reply and Resolve stay; Turn into a task is not drawn' : 'on: Reply, Resolve and Turn into a task, and the composer', () => {
+      renderAt(thread(), '/', { queryClient: clientWith(off) })
+      const first = screen.getByRole('article', { name: 'Steward B, 2 h ago' })
+      const acts = first.querySelector(':scope > .cmt-main > .cmt-f')!
+      expect([...acts.querySelectorAll('button')].map(b => b.textContent)).toEqual(off ? ['Reply', 'Resolve'] : ['Reply', 'Resolve', 'Turn into a task'])
+      expect(screen.queryAllByRole('button', { name: 'Turn into a task' }).length > 0).toBe(!off)
+      expect(screen.getByRole('textbox', { name: /comment/i })).toBeTruthy()
+    })
+  }
+})
+
 describe('Composer (§10.3)', () => {
   it('a monogram and a box: the hint “Only people who can see this page are offered.”, and Comment', () => {
     renderAt(<Composer me={ME} onSend={noop} />)
@@ -441,6 +461,13 @@ describe('MentionPicker (§10.4, C-21)', () => {
     expect(onPick).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('option', { name: /Ops lead/ }))
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: 'ops-lead' }))
+  })
+
+  it('R4c 6: a comment\'s picker says the member can’t read this conversation (the target, or a reply\'s talk above it)', () => {
+    renderAt(<MentionPicker items={mentionables(MENTIONABLES, '')} onPick={noop} cannot={CANNOT_READ_TALK} />)
+    const off = screen.getByRole('option', { name: /Treasury steward/ })
+    expect(off.textContent).toContain('can’t read this conversation')
+    expect(off.textContent).not.toContain('can’t see this page')
   })
 
   it('records and pages the author may not see are never offered', () => {

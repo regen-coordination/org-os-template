@@ -10,7 +10,8 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, join, relative, sep } from 'node:path'
-import { REGISTRIES } from '../registries.ts'
+import { REGISTRIES, registriesOf, registryFileOf, type RegistryDef } from '../registries.ts'
+import { customFileOf } from '../../lib/registries.mjs'
 import { entriesFromText } from '../registry.ts'
 import { defaultLinkLevel, formatLevel, restrictedFields, WALLET_LINK, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { Refusal } from '../changes/apply.ts'
@@ -21,6 +22,19 @@ export interface GitFile { path: string; text: string }
 export interface GitSafetyProblem { path: string; record: string; field: string; message: string }
 
 const COLLECTIONS = new Set(REGISTRIES.filter(r => r.kind === 'collection').map(r => r.name))
+
+/** The collection whose records `path` holds, as git reads it (DAO-OS L6 §7.1, ruling R-2b): a registry's file
+ *  (`data/<name>.yaml`, or `.yml`), a custom collection's own (`data/collections/<id>.yaml`), and, for a file under
+ *  data/collections/ that data/collections.yaml does not define (yet), the list under its own id, as a custom collection's
+ *  would be: nothing stricter than members enters git through a file no definition names either. Null for any other file. */
+function collectionAt(repo: string, path: string): RegistryDef | null {
+  const own = registriesOf(repo).find(d => d.kind === 'collection' && registryFileOf(d) === path)
+  if (own) return own
+  const name = /^data\/([^/]+)\.ya?ml$/.exec(path)?.[1]
+  if (name !== undefined) return COLLECTIONS.has(name) ? REGISTRIES.find(r => r.name === name)! : null
+  const id = /^data\/collections\/([^/]+)\.ya?ml$/.exec(path)?.[1]
+  return id === undefined ? null : { name: id, topKey: id, kind: 'collection', file: customFileOf(id), custom: true }
+}
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const held = (v: unknown) => v !== undefined && v !== null
 const STRICT = /^\s*(hat|role)\s*:/i
@@ -49,10 +63,11 @@ export function gitSafetyProblems(repo: string, files: readonly GitFile[], confi
   const kept = link ? linksHeld(repo) : new Set<string>()
   for (const file of files) {
     const path = (isAbsolute(file.path) ? relative(repo, file.path) : file.path).split(sep).join('/')
-    const name = /^data\/([^/]+)\.ya?ml$/.exec(path)?.[1]
-    if (!name || !COLLECTIONS.has(name)) continue
-    const entries = entriesFromText(file.text, name)
-    if (name === 'proposals') { out.push(...ledgerProblems(path, entries, config, link ? { level: formatLevel(link), kept } : null)); continue }
+    const def = collectionAt(repo, path)
+    if (!def) continue
+    const name = def.name
+    const entries = entriesFromText(file.text, def)
+    if (name === 'proposals') { out.push(...ledgerProblems(repo, path, entries, config, link ? { level: formatLevel(link), kept } : null)); continue }
     const restricted = restrictedFields(config, name)
     entries.forEach((entry, i) => {
       if (!isObj(entry)) return
@@ -77,7 +92,7 @@ export function gitSafetyProblems(repo: string, files: readonly GitFile[], confi
 /** A proposal's ops, open or closed, hold private data only as placeholders (§9.6, §10.5; as validate:data reads it since
  *  the Task 10 fix round), and so do the ops each of its `revise` events recorded (final review MF-2): an event's op is
  *  named by the event's id, so what an appended event adds never shifts what an earlier one holds. */
-function ledgerProblems(path: string, entries: Record<string, unknown>[], config: VisibilityPolicy, link: { level: string; kept: Set<string> } | null): GitSafetyProblem[] {
+function ledgerProblems(repo: string, path: string, entries: Record<string, unknown>[], config: VisibilityPolicy, link: { level: string; kept: Set<string> } | null): GitSafetyProblem[] {
   const out: GitSafetyProblem[] = []
   entries.forEach((p, i) => {
     if (!isObj(p)) return
@@ -90,6 +105,13 @@ function ledgerProblems(path: string, entries: Record<string, unknown>[], config
     }
     for (const { ops, of } of lists) {
       ops.forEach((op: unknown, n: number) => {
+        // DAO-OS L6 §11.2: a file op holds its file's whole text, which is judged as that file's would be.
+        if (isObj(op) && op.op === 'file' && typeof op.path === 'string' && typeof op.text === 'string') {
+          for (const p of gitSafetyProblems(repo, [{ path: op.path, text: op.text }], config)) {
+            out.push({ path, record: proposal, field: p.field, message: `${path} would hold op ${n + 1} of ${of}, a whole ${op.path} whose ${p.field} of ${p.record} git may not hold; it belongs in the private store` })
+          }
+          return
+        }
         if (!isObj(op) || op.op === 'private' || typeof op.record !== 'string') return
         const registry = op.record.slice(0, Math.max(0, op.record.indexOf(':')))
         const written = isObj(op.set) ? op.set : isObj(op.value) ? op.value : {}

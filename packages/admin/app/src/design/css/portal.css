@@ -1,0 +1,153 @@
+/* The portal (§12; the element gallery's section 13, drawn there before the rename from "door"). Its own voice (§4): Fraunces for heads, leads and figures, Geist
+   for body and meta, Mono for addresses; generous space. The portal is a page outside the frame, so its one breakpoint,
+   900px, is the viewport's (CC-15's exemption). Every length is a token. */
+
+.portal-page { background: var(--paper); color: var(--ink); min-height: 100dvh; }
+.portal { max-inline-size: var(--w-portal); margin-inline: auto; padding-inline: var(--sp-13); }
+.portal-notice { margin: 0; padding: var(--sp-7) var(--sp-13); background: var(--wash); color: var(--mute); font-size: var(--fs-meta);
+  line-height: var(--lh-body); text-align: center; text-wrap: pretty; }
+.portal-eyebrow { margin: 0; font: var(--fw-medium) var(--fs-micro)/var(--lh-label) var(--mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--faint); overflow-wrap: anywhere; }
+
+/* 1. The top: the wordmark, the sections, Members; Menu under 900 */
+.portal-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-10); min-block-size: var(--h-portal-top); }
+.portal-mark { display: inline-flex; align-items: center; gap: var(--sp-7); min-width: 0; }
+.portal-seal { display: grid; place-items: center; flex: none; inline-size: var(--w-portal-seal); block-size: var(--w-portal-seal);
+  border-radius: var(--radius-portal-seal); background: var(--solid); color: var(--on-solid); overflow: hidden; }
+.portal-seal img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.portal-name { font: var(--fw-medium) var(--fs-d-mark)/var(--lh-ui) var(--display); font-variation-settings: "SOFT" var(--soft);
+  letter-spacing: var(--ls-title); overflow-wrap: anywhere; }
+.portal-nav { display: flex; align-items: center; gap: var(--sp-12); font-size: var(--fs-meta); color: var(--mute); }
+.portal-nav-a { color: inherit; text-decoration: none; white-space: nowrap; }
+.portal-nav-a:focus-visible, .portal-sheet-a:focus-visible, .portal-row a:focus-visible, .portal-foot a:focus-visible { outline: var(--focus-w) solid var(--focus); outline-offset: var(--focus-w); }
+.portal-menu { display: none; position: relative; }
+.portal-menu > summary { list-style: none; cursor: pointer; }
+.portal-menu > summary::-webkit-details-marker { display: none; }
+.portal-sheet { position: absolute; inset-inline-end: 0; inset-block-start: calc(100% + var(--sp-4)); z-index: 30; display: grid; gap: var(--sp-1);
+  min-inline-size: var(--w-portal-label); padding: var(--sp-6); background: var(--pop); border: var(--rule-w) solid var(--rule);
+  border-radius: var(--radius); box-shadow: var(--shadow-raise); }
+.portal-sheet-a { display: flex; align-items: center; block-size: var(--h-ctl-touch); padding-inline: var(--sp-8); border-radius: var(--radius-sm);
+  color: var(--ink); font-size: var(--fs-body); text-decoration: none; }
+@media (hover: hover) {
+  .portal-nav-a:hover, .portal-foot a:hover { color: var(--ink); }
+  .portal-sheet-a:hover { background: var(--wash); }
+  .portal-row-w a:hover { text-decoration: underline; }
+}
+
+/* 2. The hero: two columns 1.25 : 1, bottom-aligned; the H1 with one moss phrase; the facts, figure over label */
+.portal-hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sp-14); align-items: end;
+  padding-block: var(--sp-16) var(--sp-14); }
+.portal-h1 { margin: var(--sp-10) 0 0; font: var(--fw-display) var(--fs-d-hero)/var(--lh-d-hero) var(--display); font-variation-settings: "SOFT" var(--soft-hero);
+  letter-spacing: var(--ls-display); text-wrap: balance; overflow-wrap: anywhere; }
+.portal-h1 em { font-style: italic; color: var(--accent); }
+.portal-desc { margin: 0; max-inline-size: var(--w-portal-desc); color: var(--mute); font-size: var(--fs-d-body); line-height: var(--lh-d-body); text-wrap: pretty; }
+.portal-facts { display: flex; flex-wrap: wrap; gap: var(--sp-13); margin: var(--sp-12) 0 0; padding: 0; list-style: none; }
+.portal-fact { display: grid; gap: var(--sp-4); min-width: 0; }
+.portal-fact-f { font: var(--fw-regular) var(--fs-d-fact)/var(--lh-ui) var(--display); font-variation-settings: "SOFT" var(--soft); font-variant-numeric: lining-nums; }
+.portal-fact-l { color: var(--mute); font-size: var(--fs-tiny); line-height: var(--lh-tiny); }
+
+/* 3. The map plate */
+.portal-plate { background: var(--raised); border: var(--rule-w) solid var(--rule); border-radius: var(--radius-plate); box-shadow: var(--shadow-raise); overflow: hidden; }
+.portal-plate-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--sp-6) var(--sp-10); padding: var(--sp-12) var(--sp-12) 0; }
+.portal-plate-t { margin: 0; font: var(--fw-regular) var(--fs-d-card)/var(--lh-title) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-title); }
+.portal-plate .hmap-canvas { border: 0; border-radius: 0; background-color: transparent; }
+/* the map before it lays itself out (on the server, without script): its nodes as a still list of the same links */
+.portal-map-still { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin: 0; padding: var(--sp-12); list-style: none; }
+.portal-map-still > li { min-width: 0; }
+
+/* 4. The numbered sections: the sticky label column, the lead, the section's elements */
+.portal-sec { display: grid; grid-template-columns: var(--w-portal-label) minmax(0, 1fr); gap: var(--sp-14); padding-block: var(--sp-17) var(--sp-15);
+  border-block-start: var(--rule-w) solid var(--rule); }
+.portal-plate + .portal-sec { border-block-start: 0; }
+.portal-sec-l { align-self: start; position: sticky; inset-block-start: var(--sp-12); min-width: 0; }
+.portal-sec-no { margin: 0; font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--mono); letter-spacing: var(--ls-name); color: var(--faint); }
+.portal-sec-t { margin: var(--sp-6) 0 0; font: var(--fw-display) var(--fs-d-sec)/var(--lh-d-sec) var(--display); font-variation-settings: "SOFT" var(--soft-sec);
+  letter-spacing: var(--ls-d-sec); overflow-wrap: anywhere; }
+.portal-sec-c { min-width: 0; }
+.portal-lead { margin: 0 0 var(--sp-13); max-inline-size: var(--w-portal-lead); font: var(--fw-regular) var(--fs-d-lead)/var(--lh-d-lead) var(--display);
+  font-variation-settings: "SOFT" var(--soft); text-wrap: pretty; }
+
+/* 01 the hats, flat, indented by level; never a wearer */
+.portal-hats { margin: 0; padding: 0; list-style: none; border-block-start: var(--rule-w) solid var(--rule); }
+.portal-hat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-10); align-items: baseline; padding-block: var(--sp-9);
+  border-block-end: var(--rule-w) solid var(--rule); }
+.portal-hat-n { font: var(--fw-regular) var(--fs-d-hat)/var(--lh-d-row) var(--display); font-variation-settings: "SOFT" var(--soft); overflow-wrap: anywhere; }
+.portal-hat[data-level="1"] .portal-hat-n { padding-inline-start: var(--sp-12); }
+.portal-hat[data-level="2"] .portal-hat-n { padding-inline-start: var(--sp-14); }
+.portal-hat[data-level="3"] .portal-hat-n { padding-inline-start: var(--sp-16); }
+.portal-hat-l { color: var(--mute); font-size: var(--fs-meta); text-align: end; }
+
+/* 02 and 03: the pool cards and the treasury's two panels */
+.portal-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-10); }
+.portal-card { display: grid; gap: var(--sp-10); align-content: start; min-width: 0; padding: var(--sp-12); background: var(--raised);
+  border: var(--rule-w) solid var(--rule); border-radius: var(--radius-portal-card); }
+.portal-card-t { margin: 0; font: var(--fw-regular) var(--fs-d-card)/var(--lh-title) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-title);
+  overflow-wrap: anywhere; }
+.portal-card-p { margin: 0; color: var(--mute); font-size: var(--fs-meta); line-height: var(--lh-body); }
+.portal-fig { margin: 0; }
+.portal-fig .amt { display: inline-flex; align-items: baseline; gap: var(--sp-5); }
+.portal-fig .amt-v { font: var(--fw-display) var(--fs-d-fig)/var(--lh-ui) var(--display); font-variation-settings: "SOFT" var(--soft); letter-spacing: var(--ls-display);
+  font-variant-numeric: lining-nums; }
+.portal-fig .amt-u { font: var(--fw-regular) var(--fs-tiny)/var(--lh-ui) var(--mono); color: var(--mute); }
+.portal-pool-r { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-6) var(--sp-8); color: var(--mute); font-size: var(--fs-meta); }
+.portal-pool-p { min-width: 0; }
+.portal-note { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6); margin: var(--sp-10) 0 0; max-inline-size: var(--w-prose);
+  color: var(--mute); font-size: var(--fs-meta); line-height: var(--lh-body); }
+.portal-dots { display: flex; flex-wrap: wrap; gap: var(--sp-5); }
+.portal-dot { inline-size: var(--w-portal-dot); block-size: var(--w-portal-dot); border-radius: var(--radius-chip); border: var(--w-portal-dot-ring) solid var(--accent); }
+.portal-dot.is-on { background: var(--accent); }
+.portal-card .addr-full { max-inline-size: 100%; }
+.portal-age { margin: 0; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
+
+/* 04 and 05: the ledgers */
+.portal-ledger { margin: 0; padding: 0; list-style: none; border-block-start: var(--rule-w) solid var(--rule); }
+.portal-row { display: grid; grid-template-columns: var(--w-portal-id) minmax(0, 1fr) auto; gap: var(--sp-11); align-items: baseline;
+  padding: var(--sp-11) var(--sp-4); border-block-end: var(--rule-w) solid var(--rule); }
+.portal-row-w { grid-template-columns: minmax(0, 1fr) auto; }
+.portal-row-id { font: var(--fw-regular) var(--fs-tiny)/var(--lh-tiny) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--faint); }
+.portal-row-m { display: grid; gap: var(--sp-3); min-width: 0; }
+.portal-row-t { font: var(--fw-regular) var(--fs-d-row)/var(--lh-d-row) var(--display); font-variation-settings: "SOFT" var(--soft); color: var(--ink);
+  text-decoration: none; overflow-wrap: anywhere; }
+.portal-row-s { color: var(--mute); font-size: var(--fs-meta); }
+.portal-pill { display: inline-flex; align-items: center; block-size: var(--h-chip); padding-inline: var(--sp-6); border: var(--rule-w) solid var(--rule-strong);
+  border-radius: var(--radius-chip); font: var(--fw-medium) var(--fs-tiny)/var(--lh-ui) var(--sans); color: var(--mute); white-space: nowrap; }
+.portal-pill.is-done { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+/* What is not public, in its place: a lock and "Members only", nothing more (§6.3) */
+.portal-mo { display: inline-flex; align-items: center; gap: var(--sp-5); margin: 0; padding: var(--sp-6) var(--sp-8); border: var(--rule-w) dashed var(--rule-strong);
+  border-radius: var(--radius-sm); color: var(--mute); font-size: var(--fs-meta); }
+
+/* 5. The foot */
+.portal-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-6) var(--sp-10); margin-block-start: var(--sp-15);
+  padding-block: var(--sp-13) var(--sp-14); border-block-start: var(--rule-w) solid var(--rule); color: var(--mute); font-size: var(--fs-tiny); }
+.portal-foot-p { margin: 0; min-width: 0; }
+.portal-foot a { color: inherit; }
+.portal-uri { font-family: var(--mono); overflow-wrap: anywhere; }
+
+/* 44px on a coarse pointer (§13), after the rules they enlarge */
+@media (pointer: coarse) {
+  .portal-nav-a, .portal-foot a, .portal-row-w a { display: inline-flex; align-items: center; min-block-size: var(--h-ctl-touch); }
+  .portal-menu > summary, .portal-members { min-block-size: var(--h-ctl-touch); min-inline-size: var(--h-ctl-touch); }
+}
+
+/* Under 900px of the viewport: one column, the label above its lead, the sections fold into Menu; Members stays */
+@media (max-width: 899px) {
+  .portal { padding-inline: var(--sp-10); }
+  .portal-notice { padding-inline: var(--sp-10); }
+  .portal-nav-a { display: none; }
+  .portal-menu { display: block; }
+  .portal-hero { grid-template-columns: minmax(0, 1fr); gap: var(--sp-11); padding-block: var(--sp-13); }
+  .portal-facts { gap: var(--sp-11); }
+  .portal-plate-h { padding: var(--sp-10) var(--sp-10) 0; }
+  .portal-sec { grid-template-columns: minmax(0, 1fr); gap: var(--sp-10); padding-block: var(--sp-15) var(--sp-13); }
+  .portal-sec-l { position: static; }
+  .portal-lead { margin-block-end: var(--sp-11); }
+  .portal-cards { grid-template-columns: minmax(0, 1fr); }
+  .portal-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .portal-row-id { grid-column: 1 / -1; }
+}
+
+/* /parts/portal: the portal in a box of its own, and a portal's sections listed */
+.pg-portal { border: var(--rule-w) solid var(--rule); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-raise); }
+.pg-portal .portal-page { min-height: 0; }
+.pg-portal-secs { display: grid; gap: var(--sp-6); margin: 0; padding: 0; list-style: none; }

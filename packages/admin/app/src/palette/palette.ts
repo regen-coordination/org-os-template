@@ -3,8 +3,8 @@ import { kindLabel, splitId } from '../kinds.ts'
 import { opHref, recordHref, safeDecode } from '../hrefs.ts'
 import { SKINS } from '../design/skins/index.ts'
 import { kindIcon, type IconName } from '../design/Icon.tsx'
-import { HOUSE_SECTIONS, sectionOf, type HouseSection, type SectionId } from '../frame/sections.ts'
-import { SECTIONS, sectionCount, type SystemEntries } from '../sections.ts'
+import { HOUSE_SECTIONS, INSTANCE_LINKS, SOURCES_LINK, sectionOf, type HouseSection, type SectionId } from '../frame/sections.ts'
+import { SECTIONS, placeOf, sectionCount, type SystemEntries } from '../sections.ts'
 
 export type ActionId = 'edit' | 'apply' | 'discard' | 'theme' | 'map' | 'view-public' | 'exit-preview' | `skin:${string}`
 
@@ -21,6 +21,8 @@ export const GROUPS: readonly { id: PaletteGroup; label: string }[] = [
 export interface PaletteItem {
   key: string; group: PaletteGroup; label: string; detail: string; keys?: string; icon?: IconName; hint?: string; where?: string
   go?: string; inspect?: string; action?: ActionId
+  /** An address outside the Hub, opened in a new tab (the portal, D-5). */
+  open?: string
 }
 export interface Place { label: string; href: string; detail: string }
 
@@ -33,15 +35,24 @@ export interface PaletteContext {
   /** What the viewer can make, in order: *New <kind>* for each section they can add to, then *New board* (design
    *  pass 2026-11-04). Writes: the caller passes none while previewing (C-23). */
   adds?: readonly { label: string; go: string }[]
+  /** The portal's origin, when the Hub has one (D-5: `usePortalOrigin`): Jump to lists Portal, opened there in a new
+   *  tab, with its `g d`. Null or absent: no Portal. */
+  portal?: string | null
 }
 
-/** Every page of the menu: Home, Activity, the sections that have records, Governance, the maps, All records. */
-export function places(resources: Resource[], registries: RegistrySummary[], systems: SystemEntries): Place[] {
+/** Every page of the menu: Home, Activity, the sections that have records, Governance, the maps, All records. With
+ *  `sources` (a viewer the members' side admits, as the sidebar lists it; L6 carries K11), the Hub's Sources page; a
+ *  0.6 board is named as the sidebar's Instance group names it ("Sources board", PF-R79). With `deploy` (a member, not
+ *  previewing, who reads a composed System: DAO-OS L7 Task 18), the deployment's steps. */
+export function places(resources: Resource[], registries: RegistrySummary[], systems: SystemEntries, opts: { sources?: boolean; deploy?: boolean } = {}): Place[] {
+  const instance = new Map(INSTANCE_LINKS.map(l => [l.href, l.label]))
   return [
     { label: 'Home', href: '/b/home', detail: 'page' },
     { label: 'Activity', href: '/activity', detail: 'page' },
     { label: 'Library', href: '/library', detail: 'page' },
-    ...SECTIONS.filter(d => sectionCount(d, resources, registries, systems) > 0).map(d => ({ label: d.label, href: d.route, detail: 'section' })),
+    ...(opts.sources ? [{ label: SOURCES_LINK.label, href: SOURCES_LINK.href, detail: 'page' }] : []),
+    ...(opts.deploy ? [{ label: 'Deploy', href: '/deploy', detail: 'page' }] : []),
+    ...SECTIONS.filter(d => sectionCount(d, resources, registries, systems) > 0).map(d => ({ label: instance.get(d.route) ?? d.label, href: placeOf(d), detail: 'section' })),
     { label: 'Rules', href: '/governance/rules', detail: 'governance' },
     { label: 'Decisions', href: '/governance/decisions', detail: 'governance' },
     { label: 'Proposals', href: '/governance/proposals', detail: 'governance' },
@@ -86,6 +97,7 @@ export function paletteItems(resources: Resource[], placeList: Place[], ops: Ope
   const pages = placeList.filter(p => p.detail !== 'map' && !named.has(p.label))
   return [
     ...HOUSE_SECTIONS.map(sectionItem),
+    ...(ctx.portal ? [{ key: 'portal', group: 'jump', label: 'Portal', detail: 'opens in a new tab', keys: 'g d', icon: 'globe', open: ctx.portal } satisfies PaletteItem] : []),
     ...pages.map((p): PaletteItem => ({ key: `p:${p.href}`, group: 'jump', label: p.label, detail: p.detail, icon: placeIcon(p), go: p.href, where: p.href })),
     ...resources.filter(r => r.kind !== 'absent').map((r): PaletteItem => ({
       key: `r:${r.id}`, group: 'records', label: r.name, detail: `${kindLabel(r.kind)} · ${splitId(r.id).id}`, icon: kindIcon(r.kind),

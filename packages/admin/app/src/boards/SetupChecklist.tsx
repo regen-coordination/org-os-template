@@ -12,9 +12,11 @@ import { useRegistries, useResources, useStatus, useSystemsRead } from '../queri
 import { SECTIONS, sectionCount } from '../sections.ts'
 import { recall, remember } from '../storage.ts'
 import { useCanWrite } from '../viewAs/ViewAs.tsx'
+import { usePortalOrigin } from '../session/session.ts'
 
-/** One thing to set up: done, or where to go to do it. */
-export interface SetupItem { id: string; label: string; done: boolean; href: string; act: 'Add' | 'Connect' | 'Open' }
+/** One thing to set up: done, or where to go to do it; `href` null: nowhere to go from here (the portal, with no portal
+ *  origin: D-5). */
+export interface SetupItem { id: string; label: string; done: boolean; href: string | null; act: 'Add' | 'Connect' | 'Open' }
 
 /** What setting up the org reads (spec 2026-11-04 §1b): its name, each section's count, its rules and its proposals. */
 export interface SetupState { org: string | null; counts: Partial<Record<string, number>>; rules: number; proposals: number }
@@ -23,11 +25,12 @@ const has = (n: number | undefined) => (n ?? 0) > 0
 
 /** The checklist, in the mockup's order: the same emptiness the sidebar's dots show. Each open item goes to its New,
  *  stepped (`newRecordHref` with `steps`: spec §1b, Option B), the treasury to New on systems, the rules and the
- *  proposals to their pages. */
-export function setupItems(s: SetupState): SetupItem[] {
+ *  proposals to their pages. Name and portal opens the portal, in a new tab, only when the Hub has a portal origin
+ *  (`portal`, D-5); without one it is counted (the org's name) and opens nothing. */
+export function setupItems(s: SetupState, portal: string | null = null): SetupItem[] {
   const add = (id: string, label: string, registry: string): SetupItem => ({ id, label, done: has(s.counts[id]), href: newRecordHref(registry, { steps: true }), act: 'Add' })
   return [
-    { id: 'door', label: 'Name and door', done: s.org !== null && s.org !== '', href: '/door', act: 'Open' },
+    { id: 'portal', label: 'Name and portal', done: s.org !== null && s.org !== '', href: portal, act: 'Open' },
     add('people', 'People', 'members'),
     { id: 'roles', label: 'Roles and who decides', done: s.rules > 0, href: '/governance/rules', act: 'Open' },
     add('projects', 'Projects', 'projects'),
@@ -53,6 +56,7 @@ export function SetupChecklist() {
   const systems = useSystemsRead()
   const governance = useQuery({ queryKey: ['governance'], queryFn: api.governance })
   const proposals = useQuery({ queryKey: ['proposals'], queryFn: api.proposals })
+  const portal = usePortalOrigin()
   const who = actor && 'id' in actor ? actor.id : null
   const key = `${HIDDEN}${who ?? ''}`
   const [hidden, setHidden] = useState<string | null>(null)
@@ -62,7 +66,7 @@ export function SetupChecklist() {
   if (!status.data || !resources.data || !registries.data || !governance.data || !proposals.data || systems.pending) return null
   const counts = Object.fromEntries(SECTIONS.map(d => [d.id, sectionCount(d, resources.data, registries.data, systems.entries)]))
   // the treasury is counted from data/systems.yaml's entries: when that read failed it cannot be said, so it is not drawn (I-2)
-  const items = setupItems({ org: status.data.org, counts, rules: governance.data.rules.length, proposals: proposals.data.length })
+  const items = setupItems({ org: status.data.org, counts, rules: governance.data.rules.length, proposals: proposals.data.length }, portal)
     .filter(i => i.id !== 'treasury' || systems.error === null)
   const done = items.filter(i => i.done).length
   if (done === items.length) return null
@@ -88,9 +92,11 @@ export function SetupChecklist() {
             <span className="setup-l">{i.label}</span>
             {i.done
               ? <span className="sr-only">, done</span>
-              : i.href === '/door'
-                ? <a className="setup-a" href={i.href} target="_blank" rel="noopener noreferrer">{i.act}<span className="sr-only">: {i.label} (opens in a new tab)</span></a>
-                : <Link className="setup-a" href={i.href}>{i.act}<span className="sr-only">: {i.label}</span></Link>}
+              : i.href === null
+                ? null
+                : i.id === 'portal'
+                  ? <a className="setup-a" href={i.href} target="_blank" rel="noopener noreferrer">{i.act}<span className="sr-only">: {i.label} (opens in a new tab)</span></a>
+                  : <Link className="setup-a" href={i.href}>{i.act}<span className="sr-only">: {i.label}</span></Link>}
           </li>
         ))}
       </ul>

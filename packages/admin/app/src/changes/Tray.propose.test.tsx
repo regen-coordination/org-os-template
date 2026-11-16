@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { OPEN_CHANGES } from '../keys/useHouseKeys.ts'
+import { OPEN_CHANGES, OPEN_PROPOSE } from '../keys/useHouseKeys.ts'
 import Tray from './Tray.tsx'
-import ProposePanel from './ProposePanel.tsx'
+import ProposePanel, { summarize } from './ProposePanel.tsx'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
 import { baseRoutes, changeView, refuse } from '../test/data.ts'
 import type { ChangeView } from '../api.ts'
+import { staleStays } from './rows.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -59,6 +60,31 @@ describe('Tray: Propose', () => {
     expect((within(panel).getByRole('button', { name: 'Propose' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('one stale op does not hold Propose for the rest: the panel says it stays in the tray, and the title is the rest\'s (walk G6)', async () => {
+    const tags = { op: 'update' as const, record: 'projects:seed-swap', set: { tags: ['season-two'] }, base: 'k', before: { tags: [] } }
+    const two = needsProposal({ ops: [op, tags], stale: [0], current: [{ stage: 'execute' }, { tags: [] }] })
+    fetchRoutes(baseRoutes({ 'GET /api/changes': two }))
+    mount()
+    const t = await tray()
+    fireEvent.click(within(t).getByRole('button', { name: 'Review' }))
+    const foot = within(within(t).getByRole('group', { name: 'Your change' })).getByRole('button', { name: 'Propose' }) as HTMLButtonElement
+    expect(foot.disabled).toBe(false)
+    fireEvent.click(foot)
+    const panel = await screen.findByRole('complementary', { name: 'Propose' })
+    expect(within(panel).getByText(staleStays(1))).toBeTruthy()
+    expect((within(panel).getByLabelText('Title') as HTMLInputElement).value).toBe('Update projects:seed-swap')
+  })
+
+  it('Update proposal, which sends the change whole, waits while any op is stale (walk G6)', async () => {
+    const tags = { op: 'update' as const, record: 'projects:seed-swap', set: { tags: ['season-two'] }, base: 'k', before: { tags: [] } }
+    fetchRoutes(baseRoutes({ 'GET /api/changes': needsProposal({ ops: [op, tags], stale: [0], current: [{ stage: 'execute' }, { tags: [] }], revises: 'p-1' } as Partial<ChangeView>) }))
+    mount()
+    const t = await tray()
+    fireEvent.click(within(t).getByRole('button', { name: 'Review' }))
+    const foot = within(within(t).getByRole('group', { name: 'Your change' })).getByRole('button', { name: 'Update proposal' }) as HTMLButtonElement
+    expect(foot.disabled).toBe(true)
+  })
+
   it('shows Update proposal for a change that revises, and sends the ops without `before`, then clears the change', async () => {
     const revising = needsProposal({ revises: 'p-2026-10-26-001' } as Partial<ChangeView>)
     const { calls } = fetchRoutes(baseRoutes({
@@ -94,6 +120,25 @@ describe('Tray: Propose', () => {
     fireEvent.click(within(await tray()).getByRole('button', { name: 'Update proposal' }))
     expect(await screen.findByText('Not revised: these are the ops proposal p-1 already holds.')).toBeTruthy()
     expect(calls.some(c => c.method === 'DELETE')).toBe(false)
+  })
+})
+
+describe('Tray: house:open-propose (DAO-OS L7 Task 17, the compose canvas’s Propose)', () => {
+  it('opens the Propose panel when the change may be proposed', async () => {
+    fetchRoutes(baseRoutes({ 'GET /api/changes': needsProposal() }))
+    mount()
+    await tray()
+    act(() => { window.dispatchEvent(new Event(OPEN_PROPOSE)) })
+    expect(await screen.findByRole('complementary', { name: 'Propose' })).toBeTruthy()
+  })
+
+  it('opens the tray instead when the change is applied, not proposed, so its Apply and rule are seen', async () => {
+    fetchRoutes(baseRoutes({ 'GET /api/changes': changeView({ ops: [op], classes: ['records'] }) }))
+    mount()
+    const t = await tray()
+    act(() => { window.dispatchEvent(new Event(OPEN_PROPOSE)) })
+    expect(await within(t).findByRole('group', { name: 'Your change' })).toBeTruthy()
+    expect(screen.queryByRole('complementary', { name: 'Propose' })).toBeNull()
   })
 })
 
@@ -330,5 +375,66 @@ describe('Expanding the tray beside a proposal being written (L4a final review I
     expect((within(still).getByLabelText('Title') as HTMLInputElement).value).toBe('Move the garden seat to develop')
     expect(within(t).queryByRole('group', { name: 'Your change' })).toBeNull()
     expect(document.activeElement).toBe(within(still).getByLabelText('Title'))
+  })
+})
+
+// L6 Task 21 (the acceptance walk, PF-R111): a move into the repository staged from a record's or a private page's control
+// is a change with a private part only (`ops: []`, `private: [...]`). The tray counts it, lists it as typed (to the one who
+// staged it), and offers Propose or Apply for it; Propose's suggested title names no private record, since the title is
+// written to git at once.
+describe('Tray: a change holding only a private part', () => {
+  const MOVE = { ref: 'stg-1', class: 'workspace', op: { op: 'move-to-git' as const, collection: 'tasks', id: 't-secret', level: 'members' as const, digest: 'sha256:held' } }
+  const PUBLISH = 'Rule "publish" needs 1 approval from the council, so it cannot be applied alone. Propose it instead.'
+  const onlyPrivate = (over: Partial<ChangeView> = {}) => changeView({
+    ops: [], classes: ['workspace', 'publication'], private: [MOVE],
+    rule: { direct: false, proposable: true, sentence: PUBLISH, source: 'data/governance.yaml rules: publish' }, ...over,
+  })
+
+  it('is counted and listed, and offers Propose; the suggested title names no private record', async () => {
+    fetchRoutes(baseRoutes({ 'GET /api/changes': onlyPrivate() }))
+    mount()
+    const t = await tray()
+    expect(within(t).getByText('1 staged op')).toBeTruthy()
+    expect(t.querySelector('.tray-line')!.textContent).toBe(`tasks:t-secret · moved into the repository, at members · ${PUBLISH}`)
+    fireEvent.click(within(t).getByRole('button', { name: 'Review' }))
+    const panel = within(t).getByRole('group', { name: 'Your change' })
+    const rows = within(within(panel).getByRole('list', { name: 'Staged ops' })).getAllByRole('listitem')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.textContent).toContain('tasks:t-secret')
+    expect(rows[0]!.textContent).toContain('moved into the repository, at members')
+    expect(within(panel).getByText('1 op · 1 record')).toBeTruthy()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Propose' }))
+    const form = await screen.findByRole('complementary', { name: 'Propose' })
+    const title = (within(form).getByLabelText('Title') as HTMLInputElement).value
+    expect(title).toBe('A change to a restricted collection')
+    expect(title).not.toContain('t-secret')
+  })
+
+  it('offers Apply when the rule lets its author decide alone', async () => {
+    fetchRoutes(baseRoutes({ 'GET /api/changes': onlyPrivate({ rule: { direct: true, sentence: 'you alone (solo maintainer)', source: 'implied by model: solo-maintainer' } }) }))
+    mount()
+    const t = await tray()
+    expect((within(t).getByRole('button', { name: 'Apply' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('a private entry the store could not read back is still counted, and said as such', async () => {
+    fetchRoutes(baseRoutes({ 'GET /api/changes': onlyPrivate({ private: [{ ...MOVE, op: null }] }) }))
+    mount()
+    const t = await tray()
+    expect(within(t).getByText('1 staged op')).toBeTruthy()
+    expect(t.querySelector('.tray-line')!.textContent).toContain('A private change (the private store could not be read)')
+  })
+})
+
+describe('the suggested title (walk M6)', () => {
+  const widen = [{ op: 'file', path: 'pages/atlas-0001.md', text: '---\nvisibility: public\n---\n', base: 'h1' }] as unknown as ChangeView['ops']
+  it('a page made public, with a private record moved into the repository: says it publishes, names nothing private', () => {
+    const title = summarize(widen, { classes: ['publication', 'workspace'], restricted: true })
+    expect(title).toBe('Publish pages/atlas-0001.md, and a change to a restricted collection')
+    expect(title).not.toMatch(/t-payroll|tasks/)
+  })
+  it('an edit that publishes nothing still reads "Edit"; without a private part, nothing is added', () => {
+    expect(summarize(widen, { classes: ['workspace'] })).toBe('Edit pages/atlas-0001.md')
+    expect(summarize(widen)).toBe('Edit pages/atlas-0001.md')
   })
 })

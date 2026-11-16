@@ -3,7 +3,7 @@ import type { PreparedStep } from '../../../../server/systems/driver.ts'
 import { driverOf, safeHref } from '../../systems/DriverView.tsx'
 import { list, num, record, str } from '../rows/systemState.ts'
 import { caip10, nativeUnit, unitsToDecimal } from '../atoms/chain.ts'
-import { NONCE_MOVED } from '../../../../lib/safe-tx.mjs'
+import { NONCE_MOVED, NOT_SEEN } from '../../../../lib/safe-tx.mjs'
 
 /** Where a prepared transaction stands (§9.6's table). `replaced`: another transaction took its nonce (the reading's
  *  NONCE_MOVED mismatch); `stale`: it was prepared for an earlier revision (L7 §11.3). The table's last row, a failed
@@ -58,7 +58,8 @@ function safeOn(safe: { facts?: Record<string, unknown> } | undefined, chain: st
   const there = list(own.chains).find(c => c.chain === chain)
   const account = str(there?.account)
   const address = account?.split(':').at(-1) ?? str(own.address) ?? str(facts.address) ?? ''
-  const threshold = num(there?.threshold) ?? num(own.threshold) ?? 0
+  // a deploy step's Safe (L7 Task 18) is given the threshold its step carries in `facts` (M-4)
+  const threshold = num(there?.threshold) ?? num(own.threshold) ?? num(facts.threshold) ?? 0
   const row = read?.sections.find(s => s.title === 'Chains')?.rows.find(r => account !== null && (r.refs ?? []).includes(account))
   return { threshold, address, home: safeHref(row?.href) ?? safeHref(read?.open?.url) }
 }
@@ -82,7 +83,8 @@ function bySignatures(signed: number, of: number): PreparedState {
 
 /** The cards L2's prepare reply makes (CC-9): one per step a Safe signs, each a Safe transaction on its chain,
  *  unsigned, its call from `step.call` (summary, to, value). The threshold comes from the Safe's Resource when given
- *  (`safe` may be the Resource itself), else it is not known (0). */
+ *  (`safe` may be the Resource itself), else from `facts.threshold` (on /deploy, the threshold the server says the step
+ *  carries: L7 Task 18 review M-4), else it is not known (0). */
 export function preparedFromSteps(steps: PreparedStep[], safe: { name: string; facts?: Record<string, unknown> }): PreparedView[] {
   return steps.flatMap(step => {
     if (step.safe === null) return []
@@ -165,6 +167,10 @@ export function preparedFromProposal(view: ProposalView, safe?: Resource): Prepa
       state = String(text ?? '').includes(NONCE_MOVED) ? 'replaced' : 'mismatch'
       outcome = { readAt, differs: [sentence(String(text ?? ''))] }
     }
+    // Fix I-1: a mismatch the Safe service has not seen is never recorded; the view's attention names it, and the card
+    // says it (not Unsigned, not a failed read), with that it is not recorded yet.
+    const unseen = !stale && state !== 'executed' && typeof view.attention?.mismatch === 'string' ? view.attention.mismatch : null
+    if (unseen !== null) { state = 'mismatch'; outcome = { readAt, differs: [sentence(unseen), NOT_SEEN] } }
     // Prepared for an earlier revision: stale, unless it was executed on chain meanwhile (that stays what it is).
     if (stale && state !== 'executed') state = 'stale'
     const from = on.address ? caip10(step.chain, on.address) : ''
@@ -177,7 +183,7 @@ export function preparedFromProposal(view: ProposalView, safe?: Resource): Prepa
       openHref: txHref(on.home, step.id),
       ...(outcome ? { outcome } : {}),
       ...(rev ? { rev } : {}),
-      ...(view.attention ? { readFailed: true, ...(reading?.at ? { failedAge: String(reading.at) } : {}) } : {}),
+      ...(view.attention && unseen === null ? { readFailed: true, ...(reading?.at ? { failedAge: String(reading.at) } : {}) } : {}),
     }
     return tx
   })

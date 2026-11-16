@@ -38,6 +38,9 @@ export interface CalendarViewProps<T> {
   row?(e: T): ReactNode
   /** A day opened: Enter on its cell, or its "+N more". */
   onOpenDay(date: string): void
+  /** Read from the wall clock (a page's today): shown on today's month, the view is `data-volatile`, so a route shot masks
+   *  it (the day and the month move between two runs). */
+  volatile?: boolean
   /** The month turned, by its buttons or the keys. */
   onMonth?(year: number, month: number): void
   /** The agenda with nothing in the month, in the collection's own words (E-7). */
@@ -103,7 +106,7 @@ export function CalendarView<T>(p: CalendarViewProps<T>) {
   const agenda = [...byDay.keys()].filter(d => { const m = monthOf(d); return m.year === year && m.month === month }).sort()
 
   return (
-    <div className="cal">
+    <div className="cal" data-volatile={p.volatile && year === monthOf(p.today).year && month === monthOf(p.today).month ? '' : undefined}>
       <div className="cal-h">
         <h3 className="cal-t" id={titleId}>{title}</h3>
         <span className="cal-nav">

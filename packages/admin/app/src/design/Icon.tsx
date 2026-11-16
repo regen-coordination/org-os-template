@@ -13,6 +13,8 @@ export type IconName = 'home'|'needs'|'proposal'|'systems'|'roles'|'safe'|'works
   |'members'|'hat'|'lock'|'eye'|'more'|'plus'|'minus'|'filter'|'sort'|'calendar'|'table'|'board'|'list'|'map'
   |'sprout'|'pool'|'ballot'|'wallet'|'link'|'clock'|'alert'|'comment'|'at'|'sun'|'moon'|'sidebar'|'pen'|'key'
   |'grip'|'bold'|'italic'|'heading'|'fit'|'info'|'refresh'|'dashed-circle'|'seal'|'menu'|'layers'|'file'|'people'|'pencil'|'doc'
+  // the knowledge kinds (KI §4-7): one glyph per schema, drawn by the house (design/glyphs.ts)
+  |'book'|'branch'|'quote'|'sliders'|'hammer'|'route'|'db'|'signal'|'stream'|'pin'
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' // 13 · 14 · 16 · 20 (tokens --ic-*)
 
 type Glyph = ComponentType<SVGProps<SVGSVGElement>>

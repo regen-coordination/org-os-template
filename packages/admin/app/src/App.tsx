@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Redirect, Route, Switch, useLocation } from 'wouter'
+import { Redirect, Route, Switch, useLocation, useSearch } from 'wouter'
 import { Shell, useFrame } from './design/Shell.tsx'
 import Nav, { HouseBottom } from './Nav.tsx'
 import ReadOnlyNotice from './ReadOnly.tsx'
@@ -15,6 +15,9 @@ import NotFound from './pages/NotFound.tsx'
 import Boards from './pages/Boards.tsx'
 import Activity from './pages/Activity.tsx'
 import Library from './pages/Library.tsx'
+import Commons from './pages/Commons.tsx'
+import Entry from './pages/Entry.tsx'
+import CommonsSetup from './pages/CommonsSetup.tsx'
 import RegistryList from './pages/RegistryList.tsx'
 import AllRecords from './pages/AllRecords.tsx'
 import RecordPage from './pages/Record.tsx'
@@ -29,6 +32,15 @@ import Needs from './pages/Needs.tsx'
 import Systems from './pages/Systems.tsx'
 import Roles from './pages/Roles.tsx'
 import Workspace from './pages/Workspace.tsx'
+import PagePage from './workspace/PagePage.tsx' // DAO-OS L6 Task 16: /p/:id
+import CollectionPage from './workspace/CollectionPage.tsx' // DAO-OS L6 Task 17: /c/:collection, /c/:collection/:view
+import { pageThread } from './workspace/ConversationThread.tsx' // DAO-OS L6 Task 18: a page's comment thread
+import { useMentionNeeds } from './workspace/mentionNeeds.ts' // DAO-OS L6 Task 18: the top bar's unread mentions
+import SourcesPage from './workspace/SourcesPage.tsx' // DAO-OS L6 Task 19: /sources
+import FilePage from './workspace/FilePage.tsx' // DAO-OS L6 Task 19: /files/*, the source editor
+import { filesPathOf } from './workspace/files.ts'
+import { useQuery } from '@tanstack/react-query' // DAO-OS L6 Task 16: a page's title in the path
+import { api } from './api.ts'
 import Tray from './changes/Tray.tsx'
 import ProposePanel from './changes/ProposePanel.tsx'
 import { sectionById } from './sections.ts'
@@ -36,6 +48,8 @@ import { safeDecode } from './hrefs.ts'
 import { sectionBoardId } from '../../lib/board-query.mjs'
 import PartsPage, { PartsGroupPage } from './parts/PartsPage.tsx'
 import WizardPage from './wizards/WizardPage.tsx'
+import Compose from './pages/Compose.tsx'
+import Deploy from './pages/Deploy.tsx'
 import Palette from './palette/Palette.tsx'
 import { KeyMap } from './keys/KeyMap.tsx'
 import { HouseKeys } from './keys/useHouseKeys.ts'
@@ -51,9 +65,9 @@ import { useEntryOfResources } from './blocks/entries.ts'
 import { shownName } from './record/restricted.ts'
 import { useRouteFocus } from './frame/useRouteFocus.ts'
 import { useBoards } from './boards/queries.ts'
-import { DoorPage } from './door/DoorPage.tsx'
+import { PortalPage } from './portal/PortalPage.tsx'
 import SignInLinkPage from './pages/SignInLinkPage.tsx'
-import { DOOR_PUBLIC } from './test/fixtures/house/door.ts'
+import { PORTAL_PUBLIC } from './test/fixtures/house/portal.ts'
 import { FIXED_NOW } from './test/fixtures/parts.ts'
 
 /** The right slot: the proposal panel while proposing, block settings while arranging, else the inspector (contract: one panel per slot). A
@@ -101,10 +115,32 @@ function HouseTop() {
   const named = visible(resources).filter(r => r.id === at)
   const entries = useEntryOfResources(named)
   if (!entries.pending) for (const r of named) names[r.id] = shownName(r, entries.entryOf(r), source)
+  // --- DAO-OS L6 Task 16: a page is named by its title (/p/:id), read only while one is open
+  const pages = useQuery({ queryKey: ['pages'], queryFn: api.pages, retry: false, enabled: location.startsWith('/p/') }).data ?? []
+  for (const p of pages) names[p.id] = p.title || p.id
+  // --- end L6 Task 16
+  // --- DAO-OS L6 Task 17: a collection is named by its name (/c/:collection), its view by the collection's and its own
+  const collections = useQuery({ queryKey: ['collections'], queryFn: api.collections, retry: false, enabled: location.startsWith('/c/') }).data?.collections ?? []
+  const atCollection = /^\/c\/([^/?#]+)(?:\/([^/?#]+))?/.exec(location)
+  // /c/knowledge/* are the commons' own pages (kms-admin), not a collection's views: the path names them by their places
+  if (atCollection && atCollection[1] !== 'knowledge') {
+    const id = safeDecode(atCollection[1]!)
+    const def = collections.find(d => d.id === id)
+    const name = def?.name ?? ({ tasks: 'Tasks', meetings: 'Meetings' } as Record<string, string>)[id] ?? id
+    names[id] = name
+    if (atCollection[2]) { const v = safeDecode(atCollection[2]); names[v] = `${name} · ${def?.views?.find(x => x.id === v)?.name ?? v.charAt(0).toUpperCase() + v.slice(1)}` }
+  }
+  // --- end L6 Task 17
+  // a wizard is named by its title (/wizards/:id), from the read its page makes (walk M14: the path said its id)
+  const atWizard = /^\/wizards\/([^/?#]+)/.exec(location)
+  const wizardId = atWizard ? safeDecode(atWizard[1]!) : ''
+  const wizard = useQuery({ queryKey: ['wizard', wizardId], queryFn: () => api.wizard(wizardId), retry: false, enabled: wizardId !== '' }).data
+  if (wizard && wizardId !== '') names[wizardId] = wizard.title
   const orgName = org?.name ?? 'org-os'
   const page = pathOf(location, names).at(-1)?.label ?? orgName
   useRouteFocus(page, orgName)
-  return mode === 'phone' ? <PhoneBar org={org ?? { name: orgName, mark: null }} title={page} /> : <TopBar names={names} />
+  const unread = useViewer().visible(useMentionNeeds(new Date())).length > 0 // DAO-OS L6 Task 18: unread mentions wait (§8.3), as previewed
+  return mode === 'phone' ? <PhoneBar org={org ?? { name: orgName, mark: null }} title={page} /> : <TopBar names={names} unread={unread} />
 }
 
 /** The Changes tray docked under every page but /changes, which draws it whole (the two would be one change twice). */
@@ -113,20 +149,22 @@ function Dock() {
   return location === '/changes' ? null : <Tray />
 }
 
-/** The public door at /door, outside the frame: no sidebar, no tray, nothing that needs a member (§12). Here it is
- *  drawn from fixtures and says so; L9 builds the real door from the org's public records. */
-function DoorRoute() {
-  useEffect(() => { document.title = DOOR_PUBLIC.org.name }, [])
-  // /door is outside the Hub's frame (which mounts the page's live region in PanelProvider), so it carries its own:
-  // the door's Copy says "Copied 0x…" to someone (4.1.3, B4). The two are never mounted at once.
+/** The portal at /portal, outside the frame: no sidebar, no tray, nothing that needs a member (§12). Here it is
+ *  drawn from fixtures and says so: a Hub with a portal origin (hosted, ORG_OS_PORTAL_ORIGIN) sends /portal and /door to
+ *  the real portal, built from the org's public records (server/portal/), before the app is served, and links to it
+ *  (D-5); one without (a local Hub) has only this sample page, and links to it nowhere. */
+function PortalRoute() {
+  useEffect(() => { document.title = PORTAL_PUBLIC.org.name }, [])
+  // /portal is outside the Hub's frame (which mounts the page's live region in PanelProvider), so it carries its own:
+  // the portal's Copy says "Copied 0x…" to someone (4.1.3, B4). The two are never mounted at once.
   return <>
-    <DoorPage model={DOOR_PUBLIC} now={FIXED_NOW}
-      notice="Sample values: this door is drawn from fixtures. The real one is built from the org’s public records." />
+    <PortalPage model={PORTAL_PUBLIC} now={FIXED_NOW}
+      notice="Sample values: this portal is drawn from fixtures. The real one is built from the org’s public records." />
     <LiveRegion />
   </>
 }
 
-/** /sign-in/link (Lane 3 Task 10): the emailed link's page, drawn alone like the door — before sign-in nothing of the
+/** /sign-in/link (Lane 3 Task 10): the emailed link's page, drawn alone like the portal — before sign-in nothing of the
  *  frame would read. */
 function SignInLinkRoute() {
   const org = useStatus().data?.org ?? 'org-os'
@@ -134,10 +172,16 @@ function SignInLinkRoute() {
   return <SignInLinkPage org={org} />
 }
 
-/** /door is the public door, drawn alone, and so is /sign-in/link; every other route is the Hub, in its frame. */
+/** The portal's old address (it was "the public door" until 2026-11-05, PF-R118): /door, and anything under it. */
+const OLD_PORTAL = /^\/door(?=\/|$)/
+
+/** /portal is the portal, drawn alone, and so is /sign-in/link; /door lands on /portal in place of itself, its query
+ *  kept, so an old link still lands; every other route is the Hub, in its frame. */
 export default function App() {
   const [location] = useLocation()
-  return location === '/door' ? <DoorRoute /> : location === '/sign-in/link' ? <SignInLinkRoute /> : <HubApp />
+  const search = useSearch()
+  if (OLD_PORTAL.test(location)) return <Redirect to={location.replace(OLD_PORTAL, '/portal') + (search ? `?${search}` : '')} replace />
+  return location === '/portal' ? <PortalRoute /> : location === '/sign-in/link' ? <SignInLinkRoute /> : <HubApp />
 }
 
 function HubApp() {
@@ -159,6 +203,10 @@ function HubApp() {
           <Route path="/"><ToBoard id="home" /></Route>
           <Route path="/activity" component={Activity} />
           <Route path="/library"><Library /></Route>
+          {/* The commons (spec §2): L6's collection route, so the workspace lane can absorb it. */}
+          <Route path="/c/knowledge" component={Commons} />
+          <Route path="/c/knowledge/setup" component={CommonsSetup} />
+          <Route path="/c/knowledge/:type/:slug">{p => <Entry key={`${p.type}/${p.slug}`} type={decodeURIComponent(p.type)} slug={decodeURIComponent(p.slug)} />}</Route>
           <Route path="/library/:id">{p => <Library id={safeDecode(p.id)} />}</Route>
           <Route path="/boards" component={Boards} />
           <Route path="/b/:id">{p => <BoardPage key={p.id} id={safeDecode(p.id)} />}</Route>
@@ -179,8 +227,18 @@ function HubApp() {
           {/* The Hub's own sections (L4-R22, E-33): before /:section, which would send /systems to a board */}
           <Route path="/needs" component={Needs} />
           <Route path="/systems" component={Systems} />
+          <Route path="/compose" component={Compose} />{/* DAO-OS L7 Task 17 */}
+          <Route path="/deploy" component={Deploy} />{/* DAO-OS L7 Task 18 */}
           <Route path="/roles" component={Roles} />
           <Route path="/workspace"><Workspace /></Route>
+          <Route path="/p/:id">{p => <PagePage key={p.id} id={safeDecode(p.id)} thread={pageThread} />}</Route>{/* DAO-OS L6 Task 16; its thread, Task 18 */}
+          {/* DAO-OS L6 Task 17: a collection and its views */}
+          <Route path="/c/:collection">{p => <CollectionPage key={p.collection} collection={safeDecode(p.collection)} />}</Route>
+          <Route path="/c/:collection/:view">{p => <CollectionPage key={p.collection} collection={safeDecode(p.collection)} view={safeDecode(p.view)} />}</Route>
+          {/* DAO-OS L6 Task 19: the Sources page and the source editor, before /:section (which sent /sources to /b/sources) */}
+          <Route path="/sources" component={SourcesPage} />
+          <Route path="/files"><FilePage path="" /></Route>
+          <Route path="/files/*">{p => <FilePage path={filesPathOf(p['*'])} />}</Route>
           <Route path="/:section">{p => (sectionById(p.section) ? <ToBoard id={sectionBoardId(p.section)} /> : <NotFound />)}</Route>
           <Route><NotFound /></Route>
         </Switch>

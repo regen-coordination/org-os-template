@@ -6,7 +6,7 @@
 - **Lane:** L4 of `dao-os/docs/superpowers/specs/2026-10-29-dao-os-house-architecture-design.md`
   (the *house spec*). Its §5 is binding here; this document fixes what §5 leaves to design.
 - **Language:** `dao-os/CONTEXT.md` is binding. Its words are used exactly as defined there
-  (house, public door, members' side, member, System, kind, view, map, workspace write, conversation,
+  (house, portal, members' side, member, System, kind, view, map, workspace write, conversation,
   visibility, publication, element, element set, skin).
 - **Builds on:** org-os 0.6 `feat/platform-v2` (`packages/admin`): its skin mechanism
   (`app/src/design/skins/`, `css.test.ts`, `skins.test.ts`, `contrast.test.ts`), its parts (P4 §4),
@@ -37,8 +37,8 @@ in every state from fixtures and exposes the props/events the owning lane will w
 | Compose wizard content, the compose canvas's writes, prepared deployments, the DAO shelf | L7 | Compose canvas element (placing, connecting, selecting, invalid edge, deployment order, not-deployed nodes) on fixtures; wizard steps element (exists in 0.6, redrawn) |
 | Drivers' reads (multi-chain Safe, Hats, Snapshot, Gardens) | L2 | Every reading state drawn from fixture `DriverRead`s; chain-disagreement attention |
 | Library add/remove and receipts | L1 | Library entry card and preview, with *Added*, *Not added*, *Needs*, *Built in*, id-taken and edited-since-add states |
-| Static public door build and hosting | L9 | The public door's layout and elements as client routes rendering only `public` fixture records |
-| EIP-4824 / DAOIP-5 output | L8 | daoURI line in the door footer, `DAOIP-5` fact on grant pools |
+| Static portal build and hosting | L9 | The portal's layout and elements as client routes rendering only `public` fixture records |
+| EIP-4824 / DAOIP-5 output | L8 | daoURI line in the portal footer, `DAOIP-5` fact on grant pools |
 
 L4 changes no server contract. Where 0.6 already has the data (proposals, changes, systems reads,
 library preview, wizards, boards), the redrawn pages use it as they do today.
@@ -47,11 +47,11 @@ library preview, wizards, boards), the redrawn pages use it as they do today.
 
 | From *Quiet precision* (the frame) | From *Living structure* (map, type, palette) |
 |---|---|
-| Left sidebar of sections with counts, search field, foot with Public door and identity | Fraunces + Geist + Geist Mono; mono eyebrows |
+| Left sidebar of sections with counts, search field, foot with Portal and identity | Fraunces + Geist + Geist Mono; mono eyebrows |
 | Home: dated line, **Needs you** first (tile, title, meta with meter, trailing action), Systems table, Recently | Warm paper neutrals, moss and clay; dotted map canvas |
 | Hairline lists inside raised surfaces; quiet chips; kbd hints | The DAO map: layered nodes, labelled edges, attention dot with ring, caption under the map, flow along edges |
-| Proposal page: header, body, prepared-transaction card with "the house never signs", path timeline in an aside | Public door: big Fraunces hero with an italic moss phrase, facts row, map plate, numbered editorial sections, pools as cards, decisions ledger |
-| Changes tray with Review / Propose | Signer dots on the door's treasury panel |
+| Proposal page: header, body, prepared-transaction card with "the house never signs", path timeline in an aside | Portal: big Fraunces hero with an italic moss phrase, facts row, map plate, numbered editorial sections, pools as cards, decisions ledger |
+| Changes tray with Review / Propose | Signer dots on the portal's treasury panel |
 
 **Dropped from the prototypes, on purpose:** per-kind hues on the map (Q12: moss and clay are the only
 colours — kinds are told by glyph); coloured chain dots (house spec §5: neutral chips); the floating
@@ -86,7 +86,7 @@ Names in **bold** are new tokens; the rest keep their 0.6 names and meaning.
 | `--paper` | `#f4f2ec` | `#121412` | page, sidebar |
 | `--raised` | `#fdfcf9` | `#1a1d1b` | surfaces: lists, cards, nodes, inputs, tray |
 | **`--pop`** | `#fdfcf9` | `#1f2321` | menus, palette, sheets, popovers (dark lightens with height) |
-| **`--sunken`** | `#efede6` | `#0e100f` | wells (payload, "this screen writes"), map canvas, board columns, group rows, door totals |
+| **`--sunken`** | `#efede6` | `#0e100f` | wells (payload, "this screen writes"), map canvas, board columns, group rows, portal totals |
 | `--wash` | `#ebe8e0` | `#232725` | hover fill, address chip, mention, kind tile, current nav item |
 | **`--wash-strong`** | `#e2ded4` | `#2c312e` | address chip hover, avatar fill. **Ink text only** on it |
 | `--rule` | `#e2dfd6` | `#2b2f2c` | hairlines (decoration; never the only edge of a control) |
@@ -177,7 +177,7 @@ Families (all OFL; **the build self-hosts the three variable WOFF2 files**, no t
 ```
 
 `font-optical-sizing: auto` everywhere (no hard-coded `opsz`). Fraunces carries
-`font-variation-settings: "SOFT" var(--soft)` with `--soft: 50` (80 on the door hero, 60 on door
+`font-variation-settings: "SOFT" var(--soft)` with `--soft: 50` (80 on the portal hero, 60 on portal
 section heads). Root `-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale`.
 Sizes are `rem` (root 16px).
 
@@ -197,13 +197,13 @@ Sizes are `rem` (root 16px).
 | `--fs-greet` | 1.75rem (28) | 1.15 | Display 400 | −.015em | Home's line ("Three things wait on you.") |
 | `--fs-page` | 2rem (32) | 1.15 | Display 400 | −.02em | a workspace page's title in the editor |
 | `--fs-amount` | 2rem (32) | 1 | Display 350, lining tabular | −.02em | a large amount on the members' side (treasury) |
-| `--fs-d-hero` | clamp(2.5rem, 1.25rem + 4.2vw, 4.75rem) (40→76) | `--lh-d-hero` 1.02 | Display 350, SOFT 80 | `--ls-display` −.025em | door hero |
-| `--fs-d-sec` | clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem) (28→36) | `--lh-d-sec` 1.1 | Display 350, SOFT 60 | `--ls-d-sec` −.02em | door section heads |
-| `--fs-d-card` | 1.5rem (24) | 1.2 | Display 400 | −.01em | door card titles, map plate title |
-| `--fs-d-lead` | clamp(1.1875rem, 1.05rem + .5vw, 1.375rem) (19→22) | `--lh-d-lead` 1.45 | Display 400 | 0 | door section lead, max 34em |
-| `--fs-d-body` | 1.0625rem (17) | 1.6 | Sans 400 | 0 | door body, max 68ch |
-| `--fs-d-fig` | clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem) (36→44) | 1 | Display 350, lining | −.02em | door pool figures |
-| `--fs-d-fact` | 1.625rem (26) | 1 | Display 400, lining | 0 | door hero facts |
+| `--fs-d-hero` | clamp(2.5rem, 1.25rem + 4.2vw, 4.75rem) (40→76) | `--lh-d-hero` 1.02 | Display 350, SOFT 80 | `--ls-display` −.025em | portal hero |
+| `--fs-d-sec` | clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem) (28→36) | `--lh-d-sec` 1.1 | Display 350, SOFT 60 | `--ls-d-sec` −.02em | portal section heads |
+| `--fs-d-card` | 1.5rem (24) | 1.2 | Display 400 | −.01em | portal card titles, map plate title |
+| `--fs-d-lead` | clamp(1.1875rem, 1.05rem + .5vw, 1.375rem) (19→22) | `--lh-d-lead` 1.45 | Display 400 | 0 | portal section lead, max 34em |
+| `--fs-d-body` | 1.0625rem (17) | 1.6 | Sans 400 | 0 | portal body, max 68ch |
+| `--fs-d-fig` | clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem) (36→44) | 1 | Display 350, lining | −.02em | portal pool figures |
+| `--fs-d-fact` | 1.625rem (26) | 1 | Display 400, lining | 0 | portal hero facts |
 
 Weights: `--fw-regular 400`, `--fw-medium 500`, `--fw-strong 600`, `--fw-display 350` (Fraunces only, and
 only at 28px and up). Nothing under 18px is lighter than 400.
@@ -222,9 +222,9 @@ members' side is Geist.
 ### 3.4 Space
 
 `--sp-1 … --sp-18` = 1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32, 40, 56, **72, 96, 128** px (16–18 new,
-door rhythm only). Rules: the gap between groups is at least twice the gap within one; one step per
+portal rhythm only). Rules: the gap between groups is at least twice the gap within one; one step per
 nesting level; the page gutter is `--sp-13` (32) on desktop, `--sp-10` (16) under 760px; sections on
-Home are `--sp-14` (40) apart; door sections `--sp-17` (96) above, `--sp-15` (56) below.
+Home are `--sp-14` (40) apart; portal sections `--sp-17` (96) above, `--sp-15` (56) below.
 
 The board canvas geometry stays in code (`boards/layout.ts`); the README's warning about `--sp-11` and
 card widths holds. `house` changes `--sp-11` from 16 to 20: L4 checks `/b/*` canvas boards for touching
@@ -235,13 +235,13 @@ cards in its screenshot tests and, if needed, reads the gap from the token (the 
 `--radius-xs 4` (kbd, mention), **`--radius-sm 6`** (address chip, kind tile), `--radius-ctl 7` (buttons,
 segments), `--radius-input 7`, `--radius 10` (surfaces, map nodes, cards), **`--radius-pop 12`** (menus;
 items inside are 8 with 4 padding, so outer = inner + padding), **`--radius-lg 16`** (map box, editor,
-canvas), **`--radius-plate 22`** (door map plate), `--radius-chip 999px`, `--radius-step 50%`.
+canvas), **`--radius-plate 22`** (portal map plate), `--radius-chip 999px`, `--radius-step 50%`.
 
 ### 3.6 Depth
 
 Four levels, never more on one screen: **flat** (hairline only: rows inside a surface), **card**
 (`--raised` + `--rule` border + `--shadow-card`: lists, panels), **raise** (`--shadow-raise`: map nodes,
-the house frame on the door, a lifted board card), **pop** (`--pop` + `--shadow-pop`: menus, palette,
+the house frame on the portal, a lifted board card), **pop** (`--pop` + `--shadow-pop`: menus, palette,
 sheets, tooltips). In dark, height also lightens the surface (`--raised` → `--pop`).
 
 ### 3.7 Motion
@@ -268,7 +268,7 @@ sheets, tooltips). In dark, height also lightens the surface (`--raised` → `--
 ### 3.8 Structure
 
 `--w-nav 240`, **`--w-rail 56`**, `--w-inspector 360`, `--w-palette 640`, **`--w-content 1040`** (page
-column max), **`--w-prose 68ch`**, **`--w-door 1120`**, `--w-node 200` (max), **`--w-node-min 148`**,
+column max), **`--w-prose 68ch`**, **`--w-portal 1120`**, `--w-node 200` (max), **`--w-node-min 148`**,
 `--w-kcol 280`; **`--h-topbar 52`**, **`--h-row 56`** (two-line row), **`--h-row-1 40`** (table row),
 **`--h-tray 56`**, **`--h-bottombar 60`** (+ safe area), **`--h-ctl 32`**, **`--h-ctl-touch 44`**,
 **`--h-input 36`**, **`--h-chip 22`**, **`--h-addr 24`**. Opacity: `--o-disabled .45`, **`--o-dim .38`**.
@@ -276,7 +276,7 @@ column max), **`--w-prose 68ch`**, **`--w-door 1120`**, `--w-node 200` (max), **
 Breakpoints (the content's, not devices'): the frame reads its own width — **≥1100** sidebar
 expanded, **760–1099** rail, **<760** phone. Elements use container queries on their own width:
 rows drop columns <760, table→cards <600, board→grouped list <600, calendar→agenda <600, map→three
-columns <680, wizard rail→top line <560, door→one column <900, prepared-transaction card stacks <520,
+columns <680, wizard rail→top line <560, portal→one column <900, prepared-transaction card stacks <520,
 field rows stack <420.
 
 ### 3.9 Icons
@@ -290,9 +290,9 @@ safe → vault, hats-tree/hat → hat, snapshot-space → ballot box, gardens-co
 gardens-pool → pool, link → link, wallet → wallet, proposal → pull-request (two nodes and a return
 arrow), page → file, meeting → people, task → check. Under `dir="rtl"` only arrows and chevrons mirror.
 
-## 4. The two doors' voices
+## 4. The two voices: the members' side and the portal
 
-| | Members' side | Public door |
+| | Members' side | Portal |
 |---|---|---|
 | Type | Geist; Fraunces only per §3.3 | Fraunces for heads, leads, figures; Geist for body and meta; Mono for addresses |
 | Density | dense but airy: 56px rows, 40px between sections | generous: 96px between sections, 68ch body, 34em leads |
@@ -318,7 +318,7 @@ centred, max `--w-content`, gutter `--sp-13`.
 
 From the top:
 1. **Org switcher** — the org's mark (from the org's records; a neutral seal when none) on `--solid`,
-   the name in Sans 600, an up-down chevron. Opens a menu: the org's public door ↗, switch org (if
+   the name in Sans 600, an up-down chevron. Opens a menu: the org's portal ↗, switch org (if
    the server hosts several), Appearance (System / Light / Dark).
 2. **Search or jump** — a field-shaped button (`--raised`, `--rule-strong`) with ⌘K kbd; opens the palette.
 3. **Sections**, in house-spec order, 32px rows, icon + label + trailing count:
@@ -330,7 +330,7 @@ From the top:
    It shows when Workspace or a child is current, or when the member pinned it open.
 5. **Instance** group (collapsed by default, only when non-empty): the 0.6 org-os boards that are not
    DAO sections — Crew, Fleet, Modules, Sources, Activity, All records, Boards (call C-8).
-6. **Foot**: Public door ↗ (opens the door in a new tab); the signed-in identity: hat glyph in a 24px
+6. **Foot**: Portal ↗ (opens the portal in a new tab); the signed-in identity: hat glyph in a 24px
    `--wash` circle, the hat's name (Sans 500 13), the short address and hat id (Mono 11, faint). It
    opens a menu: hats worn, copy address, *View as…*, sign out.
 
@@ -352,7 +352,7 @@ the hat glyph alone. Expanding from the rail on 760–1099 overlays the expanded
   `viewport-fit=cover`): five equal items, 20px icon over an 11px label — **Home, Needs you (clay badge
   with count, `--on-accent` text), Proposals, Workspace, More**. Current item ink, others mute.
 - **More** opens a bottom sheet (`--pop`, 16px top corners, grab handle, scrim): Systems, Roles,
-  Treasury, Library, Changes, Public door, View as…, then the identity. 44px rows, 16px labels.
+  Treasury, Library, Changes, Portal, View as…, then the identity. 44px rows, 16px labels.
   It is a modal dialog: focus moves in, Esc or a drag down closes, focus returns to More.
 - The tray becomes a floating card above the bottom bar (§5.6).
 
@@ -414,7 +414,7 @@ textarea or editor has focus.
 | `g h` | Home | `g w` | Workspace |
 | `g n` | Needs you | `g l` | Library |
 | `g p` | Proposals | `g c` | Changes |
-| `g s` | Systems | `g d` | the public door (new tab) |
+| `g s` | Systems | `g d` | the portal (new tab) |
 | `g r` | Roles | ⌘K / Ctrl-K | palette |
 | `g t` | Treasury | ⌘\ or `[` | fold / unfold the sidebar |
 | `j` / `k`, ↓ / ↑ | next / previous row in any list | `v` | List · Map |
@@ -502,7 +502,7 @@ a word; the shape is `aria-hidden`, the word is the accessible text.
    counted. No placeholder, no gap.
 2. **A restricted field of a visible record** (rule 3): the label keeps a lock glyph; the value reads
    "<hat> only" in faint ("Ops only"). Schema is not secret; the value is.
-3. **"Members only" slot** (rule 6): on the public door, wherever a public page embeds something
+3. **"Members only" slot** (rule 6): on the portal, wherever a public page embeds something
    non-public — a dashed `--rule-strong` box, lock glyph, "Members only", faint, no title, no kind, no
    count. On the members' side, an embed in a page the reader may not see renders the same slot
    reading "Not visible to you" (call C-20, see §18).
@@ -562,7 +562,7 @@ per §6.2. Inline actions are underlined ink links.
 
 - Anatomy: 24px, `--wash`, radius 6, Mono 12.5 ink, **`0x` + first 4 … last 4** in checksummed case
   (`0x6AFF…343a`), copy glyph 13 faint. Named variant: the name (ENS or the System's own) in Sans 500
-  12 instead of hex. Full variant (record pages, door treasury): the whole address, `overflow-wrap: anywhere`.
+  12 instead of hex. Full variant (record pages, portal treasury): the whole address, `overflow-wrap: anywhere`.
 - **Click copies the plain `0x` address** (what a signer pastes). The CAIP-10 id
   (`eip155:42220:0x…`) is the chip's `title` and tooltip, and **Copy CAIP-10** is in the chip's
   context menu (right-click / long-press / Shift+F10) (call C-9).
@@ -646,7 +646,7 @@ Attention tile: `--attn-soft` + clay glyph. Moss tile (`--accent-soft`): a done/
 ### 8.1 Where it appears
 
 Every collection and the Systems list has **List · Map** (`v`). Systems' map is the DAO map. The public
-door leads with it (read-only, public records only). Every record page carries a small map (§8.6). The
+portal leads with it (read-only, public records only). Every record page carries a small map (§8.6). The
 compose canvas is the map, editable (§8.7).
 
 ### 8.2 Layout rule
@@ -662,7 +662,7 @@ algorithm fits.
    one most edges point at) is centred and drawn **big**.
 4. **Layer 3 — what treasuries feed**: grant pools, Gardens communities, other Safes they administer.
 5. **Linked** Systems (`link` kind, not read) sit in a dashed group to the start side of layers 2–3,
-   labelled "Linked" (members' side) / "Also on" (door).
+   labelled "Linked" (members' side) / "Also on" (portal).
 - Within a layer, order follows edges to minimise crossings; ties break by name. Gap between layers
   64px (52 on phone), between columns 16px. Edges leave a node's bottom centre and enter the next
   node's top centre as a vertical cubic; same-layer edges run side to side as straight lines.
@@ -675,7 +675,7 @@ algorithm fits.
 
 ### 8.3 Node anatomy
 
-`<button>` (or `<a>` on the door), `--raised`, 1px `--rule-strong`, radius 10, `--shadow-raise`,
+`<button>` (or `<a>` on the portal), `--raised`, 1px `--rule-strong`, radius 10, `--shadow-raise`,
 padding 10 12, width 148–200:
 - line 1: kind glyph 14 mute + name (Sans 500 13 ink, truncate);
 - line 2: one line of facts in Mono 11 mute (`hat 13.1 · 8 wear it`, `4 of 8 · 7 chains`,
@@ -813,7 +813,7 @@ transaction. Prepare again.") · **not needed** (dashed ring, "No transaction ne
 changes records only"). Each step's second line holds its meter, date, actor-as-hat, or reference
 (`DECISIONS.md#dr-2026-010` in Mono). The signed step always says "signers sign in the Safe app, never
 here". An `<ol>` with each step's state in its text.
-**Compact** form for rows and the door: 10px dots joined by 14px lines + one phrase ("Signing · 2 of 4").
+**Compact** form for rows and the portal: 10px dots joined by 14px lines + one phrase ("Signing · 2 of 4").
 
 ### 9.6 Prepared-transaction card
 
@@ -977,12 +977,15 @@ sentence "You’ll sign a message to prove you hold an address. Nothing is sent 
 spent. Your role is the hat you wear in tree #13.", a full-width 40px primary **Sign in with Ethereum**,
 hint "EIP-4361 · read-only for anyone without a hat". States: **waiting** (spinner, "Waiting for your
 wallet to sign…", Cancel) · **signed in** (hat disc, hats worn, short address · N hats) · **not a member**
-("This address wears no hat in Example DAO’s tree. You can still read the public door.", Read the public
-door) · **refused / failed** (clay note, Try again). The words "connect wallet" and "login" never appear.
+("This address wears no hat in Example DAO’s tree. You can still read the portal.", Read the portal; both
+only when the Hub has a portal origin) · **refused / failed** (clay note, Try again). The words "connect wallet" and "login" never appear.
 
-## 12. The public door
+## 12. The portal
 
-Built from *public* records only (rule 6). Container `--w-door` 1120, gutter 32 (16 under 900).
+The org's public site, at `/portal` ("the Example DAO portal"). It was called the public door until 2026-11-05;
+`/door` still lands here (PF-R118).
+
+Built from *public* records only (rule 6). Container `--w-portal` 1120, gutter 32 (16 under 900).
 
 1. **Top** (76px): wordmark — the org's mark (from its records) on a 26px `--solid` rounded square +
    the name in Fraunces 500 19; nav in Sans 13 mute (*Who holds what · What we fund · Treasury ·
@@ -995,8 +998,8 @@ Built from *public* records only (rule 6). Container `--w-door` 1120, gutter 32 
    computed from records.
 3. **The map plate**: `--raised`, radius 22, `--shadow-raise`, head "How the DAO is arranged" (Fraunces
    24) and "Read from its own records · 4 min ago" (eyebrow), the DAO map (§8; nodes are links to the
-   door's record pages; no attention dots — attention is members' business; staged and draft states
-   never appear on the door).
+   portal's record pages; no attention dots — attention is members' business; staged and draft states
+   never appear on the portal).
 4. **Numbered sections**: a 240px label column (number in Mono 12 faint, the section name in
    `--fs-d-sec`, sticky at 24px) and the content column: a **lead** in Fraunces (`--fs-d-lead`, 34em),
    then the section's elements. Sections, in order, each present only if it has public content:
@@ -1015,7 +1018,7 @@ Built from *public* records only (rule 6). Container `--w-door` 1120, gutter 32 
 5. **Foot**: "Also on Snapshot · Karma GAP · Gitcoin" (link Systems), the daoURI in Mono with
    "EIP-4824", "A DAO-OS house".
 
-Door copy is the org's: section names may be renamed per org; the defaults above are DAO-OS's. The door
+Portal copy is the org's: section names may be renamed per org; the defaults above are DAO-OS's. The portal
 has light and dark, following the reader's system setting, with no toggle in the bar (call C-29).
 
 ## 13. Responsive and accessibility rules (whole house)
@@ -1131,8 +1134,8 @@ address chip, chain chip, amount, read age (a component, not just text), visibil
 "members only" slot, mention, presence, meter, attention item, proposal timeline, prepared-transaction
 card (0.6 has its data, not the element), role tree, fund flow, compose canvas, collection view header
 with filter chips, calendar view, page editor chrome, comment thread, mention picker, sign-in card,
-view-as control and band, bottom bar, More sheet, rail, key map dialog, the public door's elements
-(top, hero, facts, map plate, numbered section, pool card, signer dots, ledger, door foot).
+view-as control and band, bottom bar, More sheet, rail, key map dialog, the portal's elements
+(top, hero, facts, map plate, numbered section, pool card, signer dots, ledger, portal foot).
 
 ### 14.4 0.6 tests L4 deliberately replaces (to say in its report)
 
@@ -1162,7 +1165,7 @@ view-as control and band, bottom bar, More sheet, rail, key map dialog, the publ
 | C-2 | **Primary buttons are ink**, not moss. Moss never fills a button; it fills only the staged-count square and node tags. |
 | C-3 | **Destructive actions are ink with a confirmation**, never red/clay — clay means "needs you", not "danger". |
 | C-4 | **Fraunces on the members' side only** for Home's line, a page title, a large amount, the map's central Safe and the sign-in title. Record and section titles are Geist 600 24. |
-| C-5 | **Amounts are Geist Mono** wherever copyable; the door's big figures are Fraunces (rounded), with the exact Mono value on the record page. |
+| C-5 | **Amounts are Geist Mono** wherever copyable; the portal's big figures are Fraunces (rounded), with the exact Mono value on the record page. |
 | C-6 | **The tray docks** under the page (not a floating pill that covers rows); on phone it floats above the bottom bar as a card. |
 | C-7 | **Bottom bar**: Home, Needs you, Proposals, Workspace, More. |
 | C-8 | **Sidebar**: Workspace expands into its collections; 0.6's org-os boards (Crew, Fleet, Modules, Sources, Activity, All records, Boards) live in a collapsed **Instance** group, shown only when non-empty. |
@@ -1177,7 +1180,7 @@ view-as control and band, bottom bar, More sheet, rail, key map dialog, the publ
 | C-17 | **The map stays a map at 390** (three columns), with List one key/tap away. |
 | C-18 | **Calendar weeks start Monday**; under 600px every view has a narrow form (cards, grouped list, agenda) — no sideways scrolling anywhere. |
 | C-19 | **Kinds are told by glyph, never hue** (Living structure's per-kind colours dropped, per Q12). |
-| C-20 | **A non-visible embed inside a page** shows a titleless "Not visible to you" slot on the members' side, mirroring rule 6's "members only" on the door (see §18-2). |
+| C-20 | **A non-visible embed inside a page** shows a titleless "Not visible to you" slot on the members' side, mirroring rule 6's "members only" on the portal (see §18-2). |
 | C-21 | **Mention picker** lists members who cannot see the page as disabled ("can’t see this page") rather than hiding them. |
 | C-22 | **Presence is monograms** from handles — no pictures, no identicons. |
 | C-23 | **View as** is a solid ink band across the main column; write controls are hidden (not disabled) while previewing; Esc does not exit it. |
@@ -1186,10 +1189,10 @@ view-as control and band, bottom bar, More sheet, rail, key map dialog, the publ
 | C-26 | **Phone inputs are 16px**; touch targets 44px. |
 | C-27 | **Icons: Lucide** at 1.5px stroke, plus house-drawn hat, Safe and grant-pool glyphs. |
 | C-28 | **Dates**: "29 Oct", 24-hour times, relative ages under 24h, ISO in `title`. |
-| C-29 | **The door follows the reader's light/dark setting**, with no toggle in its bar. |
+| C-29 | **The portal follows the reader's light/dark setting**, with no toggle in its bar. |
 | C-30 | **Dark mode**: no pure black; surfaces lighten with height (`--raised` → `--pop`); moss and clay lifted to pastel so they keep AA. |
 | C-31 | **Fund flow** widths are relative within one unit; a mixed-unit window draws equal widths and labels each amount. |
-| C-32 | **The door shows no attention, staged or draft states** on its map — those are members' business. |
+| C-32 | **The portal shows no attention, staged or draft states** on its map — those are members' business. |
 
 ## 17. Fixtures
 
@@ -1204,19 +1207,19 @@ person's name (house spec §14).
 
 1. **The look itself**: approve the gallery (or name what is wrong) before L4's plan is written.
 2. **Rule 7 inside pages (C-20)**: on the members' side, should an embed the reader may not see leave a
-   titleless "Not visible to you" slot (reveals that *something* is there, as rule 6 does on the door),
+   titleless "Not visible to you" slot (reveals that *something* is there, as rule 6 does on the portal),
    or vanish entirely (strict absence; surrounding prose may then read oddly)?
 3. **Mention picker (C-21)**: show members who cannot see the page as disabled (tells the author who
    cannot see it), or hide them?
-4. **The org's mark on the door and in the sidebar**: use the DAO's own logo from its records (Example DAO's
-   mark, locally, during the pilot), or a neutral seal until the Council has seen the door?
+4. **The org's mark on the portal and in the sidebar**: use the DAO's own logo from its records (Example DAO's
+   mark, locally, during the pilot), or a neutral seal until the Council has seen the portal?
 5. **Instance group (C-8)**: keep org-os's operational boards (Crew, Fleet, Modules…) in a DAO house at
    all, or hide them in the DAO-OS distribution?
 
 **Answered by the operator, 2026-10-29 (Q32–Q36):**
 1. **The look is approved** ("this is beautiful! finally").
 2. **Members' side: content the reader may not see vanishes entirely** (strict rule 7). The public
-   door keeps its "Members only" slot (spec §11 rule 6).
+   portal keeps its "Members only" slot (spec §11 rule 6).
 3. **Mention picker:** members who cannot see the page are shown **disabled, with "can't see this
    page"**.
 4. **A neutral seal** in the framework, the distribution, fixtures and screenshots. A DAO's own mark

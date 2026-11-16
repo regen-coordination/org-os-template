@@ -114,7 +114,7 @@ describe('the bottom bar (§5.4, C-7)', () => {
 })
 
 describe('the More sheet (§5.4)', () => {
-  it('is a modal dialog (showModal) listing Systems, Roles, Treasury, Library, Changes, Public door, View as…, then the identity', () => {
+  it('is a modal dialog (showModal) listing Systems, Roles, Treasury, Library, Changes, View as… (no Portal without a portal origin, D-5), then the identity', () => {
     renderAt(bar())
     expect(more().getAttribute('aria-haspopup')).toBe('dialog')
     openMore()
@@ -123,10 +123,10 @@ describe('the More sheet (§5.4)', () => {
     expect(proto.showModal).toHaveBeenCalledTimes(1)
     expect(more().getAttribute('aria-expanded')).toBe('true')
     const rows = [...sheet.querySelectorAll('.sheet-a')].map(r => r.querySelector('.sheet-l')!.textContent)
-    expect(rows).toEqual(['Systems', 'Roles', 'Treasury', 'Library', 'Changes', 'Public door', 'View as…'])
+    expect(rows).toEqual(['Systems', 'Roles', 'Treasury', 'Library', 'Changes', 'View as…'])
     expect(within(sheet).getByRole('link', { name: 'Systems, 9' }).getAttribute('href')).toBe('/systems')
     expect(within(sheet).getByRole('link', { name: 'Changes, 1' }).querySelector('.n')!.className).toBe('n accent')
-    expect(within(sheet).getByRole('link', { name: /^Public door/ }).getAttribute('target')).toBe('_blank')
+    expect(within(sheet).queryByRole('link', { name: /^Portal/ })).toBeNull()
     expect(within(sheet).getByRole('button', { name: 'View as…, you' })).toBeTruthy()
     // each row's words apart, in the order its name says them (2.5.3)
     expect(within(sheet).getByRole('link', { name: 'Systems, 9' }).textContent).toBe('Systems 9')

@@ -6,6 +6,7 @@ import { Tooltip } from '../design/Tooltip.tsx'
 import { OPEN_CHANGES } from '../keys/useHouseKeys.ts'
 import { useFrame } from '../design/Shell.tsx'
 import { Identity } from './Identity.tsx'
+import { usePortalOrigin } from '../session/session.ts'
 import { OrgSwitcher } from './OrgSwitcher.tsx'
 import { HOUSE_SECTIONS, countText, isCurrent, sectionOf, type HouseCounts, type Identity as Who, type OrgMark, type SideLink as Place } from './sections.ts'
 
@@ -74,7 +75,7 @@ const openTray = (e: MouseEvent<HTMLAnchorElement>) => {
 /** The sidebar (§5.2): the org switcher, Search or jump, the nine sections in a `nav` named Hub with their
  *  counts (of what the viewer may see: the caller counts with `visible`, rule 7), Workspace's collections under it
  *  while Workspace or one of them is current (or pinned open), the Instance group when it has anything, then the
- *  foot — Public door ↗ and the signed-in identity. On the rail (§5.3) it is icons alone. */
+ *  foot — Portal ↗ (only when the Hub has a portal origin, and to it: D-5) and the signed-in identity. On the rail (§5.3) it is icons alone. */
 export function Sidebar({ org, counts, identity, collections = [], pinWorkspace = false, instance = [] }: {
   org: OrgMark; counts: HouseCounts; identity: Who; collections?: Place[]; pinWorkspace?: boolean; instance?: Place[]
 }) {
@@ -84,6 +85,7 @@ export function Sidebar({ org, counts, identity, collections = [], pinWorkspace 
   const at = sectionOf(path, collections)
   const child = collections.find(c => isCurrent(path, c.href))
   const showChildren = !rail && collections.length > 0 && (at === 'workspace' || pinWorkspace)
+  const portal = usePortalOrigin()
   return (
     <div className={rail ? 'side side-rail' : 'side'}>
       <OrgSwitcher org={org} />
@@ -105,9 +107,9 @@ export function Sidebar({ org, counts, identity, collections = [], pinWorkspace 
         {!rail && instance.length > 0 && <InstanceGroup links={instance} path={path} />}
       </nav>
       <div className="side-foot">
-        {!rail && (
-          <a className="side-a" href="/door" target="_blank" rel="noopener noreferrer">
-            <Icon name="globe" /><span className="side-l">Public door</span><span className="sr-only"> (opens in a new tab)</span>
+        {!rail && portal !== null && (
+          <a className="side-a" href={portal} target="_blank" rel="noopener noreferrer">
+            <Icon name="globe" /><span className="side-l">Portal</span><span className="sr-only"> (opens in a new tab)</span>
             <Icon name="external" size="xs" />
           </a>
         )}

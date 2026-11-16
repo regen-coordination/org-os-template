@@ -19,6 +19,9 @@ export interface DriverContext {
    *  Only reads go out: a JSON-RPC request or batch whose every method is in READ_RPC_METHODS, or a GraphQL query with no mutation or
    *  subscription. Anything else is refused before a request is made. Absent only in contexts 0.6 tests build by hand. */
   postJson?: (url: string, body: unknown) => Promise<unknown>
+  /** GET a URL on one of the driver's hosts and return its body as text: the same address checks as `fetchJson`, no
+   *  redirect, and a body over 512 KiB is refused ("too large to read (over 512 KiB)"). Absent in contexts built by hand. */
+  fetchText?: (url: string) => Promise<string>
   /** The RPC URL for a chain: the one configured (ORG_OS_RPC), else the public host in CHAINS, else null. */
   rpcUrl?: (chain: string) => string | null
   now: () => Date
@@ -59,6 +62,10 @@ export interface SystemRef {
   /** The other chains' Safe transactions of the same change, one attach for all of them (each names its chain). The
    *  outcome is executed only when every one is. Absent: one transaction, as in 0.6. */
   also?: { chain: string; id: string; payload: SystemRef['payload'] }[]
+  /** PF-R205 (PF-R201's gap): an add-role signed by the via Safe the rules wait on carries its hats-role ref here, so a
+   *  check reads the tree beside the Safe transaction and a hat made under the admin since prepare reads as a mismatch
+   *  before anyone executes. Absent: the Safe's reading alone. */
+  watch?: ForeignRef
 }
 /** What a proposal attaches for a system that is not a Safe: the system, the outside id and what that id is expected to show.
  *  `payload.kind` says which driver reads it. */
@@ -68,6 +75,8 @@ export interface ForeignRef {
     | { kind: 'snapshot-proposal'; choice: string /* the label of the choice that must pass */ }
     | { kind: 'hats-wearer'; wearer: string /* CAIP-10 */ }
     | { kind: 'hats-hat'; details: string /* the details the proposal prepared */; existing?: true /* a hat that already exists: its details are being changed */ }
+    /** A new hat and its first wearers (DAO-OS L7 §10.2, Q67): executed once the hat reads these details and every one wears it. */
+    | { kind: 'hats-role'; details: string; wearers: string[] /* CAIP-10 */ }
     | { kind: 'gardens-proposal' }
 }
 /** What a proposal attaches and an outcome is read for: a Safe transaction, or a ref of another system. */
@@ -95,7 +104,18 @@ export type OutcomeReading =
        *  so the evaluator, which reads the outcome only, does not change (L2-R5); a card reads it as executed, never ready. */
       executed?: true
       /** Each chain's own reading, when the attach spans several chains (L7 §11.2). */
-      chains?: ChainReading[] }
+      chains?: ChainReading[]
+      /** A hats-role reading only: whether a hat exists at the new hat's id (L7 Task 18 review M-2). Beside a Safe
+       *  transaction that is not executed, any hat there is another's. Never recorded. */
+      exists?: boolean
+      /** A hats-role reading only, where the hat exists: whether it is its admin's newest child (the admin's lastHatId is
+       *  its index), so the one an add-role's createHat made if no other came after (the gaps review's M-2). Never
+       *  recorded. */
+      newest?: boolean
+      /** A Safe reading of one transaction only: the transaction as the Safe Transaction Service describes it, once its
+       *  hash was checked against the attached one (L7 gap B2: an add-role attached without its watch is decoded from
+       *  it at check). Never recorded or answered: the check takes it out. */
+      tx?: { to: string; operation: number; data: string | null } }
   | { ok: false; error: string }
 
 /** The transaction a treasury proposal asks for: what a signer will put in the Safe. */
@@ -158,7 +178,7 @@ export interface Driver {
 
 /** The one network call a driver can cause. `globalThis.fetch` is one; tests pass fakes. */
 export type FetchLike = (url: string, init: { method: 'GET' | 'POST'; headers: Record<string, string>; body?: string; redirect: 'error' | 'manual'; signal: AbortSignal }) =>
-  Promise<{ ok: boolean; status: number; headers?: { get(name: string): string | null }; json(): Promise<unknown> }>
+  Promise<{ ok: boolean; status: number; headers?: { get(name: string): string | null }; json(): Promise<unknown>; text?(): Promise<string> }>
 
 /** The URL checks both doors share: https, no other port, no login in the address, and a host the driver declared
  *  (`hosts` is what is allowed: the declared hosts, plus configured RPC hosts for an RPC-reading driver). */
@@ -176,11 +196,11 @@ function checkedUrl(driver: Pick<Driver, 'name' | 'hosts'>, allowed: readonly st
 /** Send one request and parse its JSON answer; the failures a person reads. A GET names the host and the path (the
  *  declared hosts are fixed public ones); a POST names the host only, never a path or query, because a configured RPC
  *  URL (ORG_OS_RPC) may carry a key there. */
-async function exchange(fetch: FetchLike | undefined, signal: AbortSignal, u: URL, method: 'GET' | 'POST', body?: string): Promise<unknown> {
+async function exchange(fetch: FetchLike | undefined, signal: AbortSignal, u: URL, method: 'GET' | 'POST', body?: string, as: 'json' | 'text' = 'json'): Promise<unknown> {
   // A driver that keeps going after the time limit never issues another request.
   signal.throwIfAborted()
   if (!fetch) throw new Error('this reader was given no network access')
-  const headers: Record<string, string> = body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' }
+  const headers: Record<string, string> = as === 'text' ? { accept: 'text/plain, */*' } : body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' }
   let res: Awaited<ReturnType<FetchLike>>
   try {
     res = await fetch(u.href, body === undefined ? { method, headers, redirect: 'error', signal } : { method, headers, body, redirect: 'error', signal })
@@ -192,6 +212,14 @@ async function exchange(fetch: FetchLike | undefined, signal: AbortSignal, u: UR
   }
   const what = method === 'GET' ? ` for ${u.pathname}` : ''
   if (!res.ok) throw new UpstreamHttpError(`${u.host} answered ${res.status}${what}`, res.status, retryAfterMs(res.headers?.get('retry-after')))
+  if (as === 'text') {
+    const length = Number(res.headers?.get('content-length'))
+    if (Number.isFinite(length) && length > MAX_TEXT_BYTES) throw new Error(TOO_LARGE)
+    if (!res.text) throw new Error(`${u.host} could not be read as text${what}`)
+    const text = await res.text()
+    if (Buffer.byteLength(text, 'utf8') > MAX_TEXT_BYTES) throw new Error(TOO_LARGE)
+    return text
+  }
   try { return await res.json() } catch { throw new Error(`${u.host} did not answer JSON${what}`) }
 
   /** A library's own message with the address, the path and the query taken out (a POST's), the host left. */
@@ -206,6 +234,15 @@ async function exchange(fetch: FetchLike | undefined, signal: AbortSignal, u: UR
  *  answer cannot send it anywhere else. */
 export function guardedFetch(driver: Pick<Driver, 'name' | 'hosts'>, fetch: FetchLike | undefined, signal: AbortSignal): (url: string) => Promise<unknown> {
   return async (url: string) => exchange(fetch, signal, checkedUrl(driver, driver.hosts, url), 'GET')
+}
+
+/** The most a text read takes in (512 KiB), and the sentence for more. */
+export const MAX_TEXT_BYTES = 512 * 1024
+export const TOO_LARGE = 'too large to read (over 512 KiB)'
+
+/** GET for a driver that reads files: the same checks as `guardedFetch`, and the body comes back as text, at most 512 KiB. */
+export function guardedText(driver: Pick<Driver, 'name' | 'hosts'>, fetch: FetchLike | undefined, signal: AbortSignal): (url: string) => Promise<string> {
+  return async (url: string) => (await exchange(fetch, signal, checkedUrl(driver, driver.hosts, url), 'GET', undefined, 'text')) as string
 }
 
 /** JSON-RPC methods that only read. */

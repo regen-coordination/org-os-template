@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type VisibilityView } from '../api.ts'
-import { FIXTURE_SOURCE, type Visibility, type VisibilitySource } from '../viewAs/visibility.ts'
+import { FIXTURE_SOURCE, canonicalHat, unnamedHat, type Visibility, type VisibilitySource } from '../viewAs/visibility.ts'
 
 /** The Hub's real visibility source (L5 spec §11.2), built from `GET /api/visibility`. L4a's elements read it through
  *  `ViewAsProvider`; nothing in `viewAs/` is redrawn. `FIXTURE_SOURCE` stays for tests and /parts. */
@@ -22,23 +22,25 @@ function tokenOf(item: unknown): string | null {
 const roleHat = (id: string) => ({ hat: `role:${id}`, name: id })
 
 export function houseSource(v: VisibilityView): VisibilitySource {
-  const names = new Map(v.tree.map(h => [h.hat, h.name]))
-  const above = new Map(v.tree.map(h => [h.hat, h.above]))
+  // keyed by the canonical ref, so a token in another case is named as the tree names it (walk M18)
+  const names = new Map(v.tree.map(h => [canonicalHat(h.hat), h.name]))
+  const above = new Map(v.tree.map(h => [canonicalHat(h.hat), h.above]))
   // Without a tree, the third level is a governance role (§5.4): the ones this member holds are what they may give.
   const roles = v.tree.length > 0 ? [] : v.levels.filter(l => l.startsWith('role:')).map(l => roleHat(l.slice('role:'.length)))
   return {
-    /** `public`, `members`, `hat:<ref>` (named from the tree), `role:<id>` (a hat named by the role); none is members. */
+    /** `public`, `members`, `hat:<ref>` (canonical, named from the tree, else by its pretty id), `role:<id>` (a hat named
+     *  by the role); none is members. */
     visibilityOf(item) {
       const t = tokenOf(item)
       if (t === 'public') return PUBLIC
       if (t !== null && t.startsWith('hat:') && t.length > 'hat:'.length) {
-        const hat = t.slice('hat:'.length)
-        return { level: 'hat', hat, name: names.get(hat) ?? hat }
+        const hat = canonicalHat(t.slice('hat:'.length))
+        return { level: 'hat', hat, name: names.get(hat) ?? unnamedHat(hat) }
       }
       if (t !== null && t.startsWith('role:') && t.length > 'role:'.length) return { level: 'hat', ...roleHat(t.slice('role:'.length)) }
       return MEMBERS
     },
-    hatsAbove: hat => [...(above.get(hat) ?? [])],
+    hatsAbove: hat => [...(above.get(canonicalHat(hat)) ?? [])],
     hats: () => (v.tree.length > 0 ? v.tree.map(({ hat, name }) => ({ hat, name })) : roles),
     worn: () => [...v.worn, ...roles.map(r => r.hat)],
   }
