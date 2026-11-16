@@ -57,7 +57,7 @@ function NavGroupBlock({ label, children }: { label: string | null; children: Re
   if (label === null) return <>{children}</>
   return (
     <div className="side-group" role="group" aria-labelledby={id}>
-      <div className="side-h side-gl" id={id}>{label}</div>
+      <div className="side-h" id={id}>{label}</div>
       {children}
     </div>
   )
