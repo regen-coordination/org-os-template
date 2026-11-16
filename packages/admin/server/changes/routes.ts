@@ -7,7 +7,7 @@ import { ChangeStore, newChangeId } from './store.ts'
 import { stage, staleOps, changeView, changeClasses, classesOf, currentOf, targetsOf, targetsOfOps, validateChange } from './stage.ts'
 import { rebaseOp } from './merge.ts'
 import { fileBase, heldFileErrors, isFileOp, isRecordOp, keptPageErrors, rebaseFileOp } from '../workspace/files.ts'
-import { fileReader } from '../workspace/reads.ts'
+import { fileReader, unreadPaths, unreadRefusal } from '../workspace/reads.ts'
 import { commitMessage } from './records.ts'
 import { applyOps, commitEmpty, Refusal, Referred, StageRefusal } from './apply.ts'
 import { sealReceipts } from '../library/seal.ts'
@@ -220,7 +220,11 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
   app.get('/api/changes', c => {
     const actor = readerOf(c)
     const change = isKnown(actor) ? store.load(actor.id) : null
-    return c.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))
+    const view = changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change))
+    // 0.7.1 D6 fix round 1 (M2): whether a file the asker may not read moved on the trunk is not said, even of their own op.
+    const may = fileReader(c, repo)
+    const unread = (i: number) => { const op = view.ops[i]; return op !== undefined && isFileOp(op) && !may(op.path) }
+    return c.json(may.all ? view : { ...view, stale: view.stale.filter(i => !unread(i)) })
   })
 
   app.post('/api/changes/ops', async c => {
@@ -351,6 +355,10 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       // always throws: no ops is the empty state, and the machine refuses Apply there
       if (!change || (change.ops.length === 0 && placeholders.length === 0)) checkApply([], [], null)
       refuseRevising(change)
+      // 0.7.1 D6 fix round 1 (I1): a tray holding a file op on a path the asker may not read (staged at the machine, or before
+      // 0.7.1) is not applied, in the words of a path no rule governs, before anything is read for writing.
+      const unread = unreadPaths(change!.ops, fileReader(c, repo))
+      if (unread.length > 0) return Response.json({ errors: unreadRefusal(unread).errors }, { status: 422 })
       // The private part, read back from the store's staged table (L5 §10.3); a store that cannot be reached is its 503.
       const { store: reached, why } = reach(privateStore)
       if (placeholders.length > 0 && !reached) throw unavailable(why)

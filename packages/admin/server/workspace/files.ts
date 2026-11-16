@@ -31,7 +31,7 @@ import { placeInRepo, privateDir } from '../private/paths.ts'
 import { gitSafetyProblems } from '../private/guard.ts'
 import { readConfig } from '../visibility/config.ts'
 import { HttpError } from '../errors.ts'
-import { fileReader, samplePath } from './reads.ts'
+import { fileReader, mayReadWhole, samplePath, type FileReader } from './reads.ts'
 import type { FileOp, Op, RecordError, RecordOp, StageOp } from '../changes/types.ts'
 
 /** The most a file op's text may hold (L6 spec, constants): 1 MiB. */
@@ -550,7 +550,7 @@ export interface FileView { path: string; text: string | null; base: string | nu
  *  rule governs or this service does not hold (`isHeld`), 403 for a file holding a value data/visibility.yaml restricts (named by nothing: no value, no field).
  *  `may` (0.7.1, D6; server/workspace/reads.ts): a path the viewer may not read (the agent layer, read by its deciders) is
  *  answered exactly as one no rule governs, before anything about the file is read, so nothing says whether it exists. */
-export async function readFileView(repo: string, path: string, may: (path: string) => boolean = () => true): Promise<FileView> {
+export async function readFileView(repo: string, path: string, may: FileReader = () => true): Promise<FileView> {
   const editor = editorFor(path)
   const cls = governedClassOf(path)
   const ungoverned = () => new HttpError(404, `${path || 'That path'} is not a governed file, so it has no editor here.`)
@@ -567,7 +567,9 @@ export async function readFileView(repo: string, path: string, may: (path: strin
     if (read) { try { entriesFromText(text, def) } catch { read = false } }
     if (!read) throw new HttpError(403, UNREADABLE(path))
   }
-  if (text !== null && gitSafetyProblems(repo, [{ path, text }], readConfig(repo)).length > 0) {
+  // 0.7.1 D6 fix round 1 (C2): the ledger, while it holds a file op on a path the viewer may not read, is refused whole in
+  // the same words: its text is never filtered, so the base the source editor stages against still matches the file.
+  if (text !== null && (gitSafetyProblems(repo, [{ path, text }], readConfig(repo)).length > 0 || !mayReadWhole(repo, may, path))) {
     throw new HttpError(403, `${path} holds values that not every member may read, so it is not served whole here.`)
   }
   return { path, text, base: text === null ? null : blobId(text), class: cls ?? '', editor }
@@ -579,7 +581,7 @@ export async function readFileView(repo: string, path: string, may: (path: strin
 export function mountFiles(app: Hono, { repo }: { repo: string }): void {
   app.get('/api/editors', c => {
     const may = fileReader(c, repo)
-    return c.json(EDITORS.map(row => ({ ...row, readable: may(samplePath(row.pattern)) })))
+    return c.json(EDITORS.map(row => ({ ...row, readable: mayReadWhole(repo, may, samplePath(row.pattern)) })))
   })
   app.get('/api/files', async c => {
     const path = c.req.query('path') ?? ''

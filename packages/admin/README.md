@@ -426,9 +426,13 @@ checked when staged and again when applied. A generated file is shown, never sav
 The agent layer (`memory/**`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**`, `docs/agent-plans/**`) is read, by a viewer
 signed in to the Hub (SIWE or an emailed link), only when they decide under the workspace rule that governs it: the
 members of its `decide.by` role or, with no workspace rule written, of the org's own `maintainer` role (the implied
-maintainer, every person, does not count). Anyone else is answered `404` in the words of a path that is not there, is
-shown no link to it, cannot stage a `file` op on it, and reads a proposal without that file's text or diff. The person at
-the machine (the Hub's git identity) reads it as before (0.7.1).
+maintainer, every person, does not count; a written rule with no deciding role is read by nobody). Anyone else is
+answered `404` in the words of a path that is not there and is shown no link to it. They cannot stage, revise, load or
+apply a `file` op on it. They read a proposal, the ledger as a registry and a revision's ops with each such op withheld
+(`{ "op": "file", "withheld": true }`) and without that file's diff, and its staleness is not said to them. While the
+ledger holds such an op, `data/proposals.yaml` is not served to them whole. Crew's seats, recorded in `memory/crew/`, are
+not on their map. The person at the machine (the Hub's git identity) reads all of it as before, except through
+`GET /api/registries/proposals`, which judges the viewer alone (0.7.1).
 
 | Route | Does |
 |---|---|

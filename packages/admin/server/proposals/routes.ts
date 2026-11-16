@@ -44,7 +44,7 @@ import { gitOpsOf } from '../../lib/ops.mjs'
 import { readConfig } from '../visibility/config.ts'
 import { noStore, reach, stagedPrivate, stagedView, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { closingDropsPending, placeholdersOf, shownTo } from '../private/proposals.ts'
-import { fileReader, readableView } from '../workspace/reads.ts'
+import { fileReader, readableView, unreadPaths, unreadRefusal } from '../workspace/reads.ts'
 import type { ProposedPrivate } from './propose.ts'
 import { workspaceOf } from '../workspace/routes.ts'
 import { NO_SESSION } from '../workspace/sessions.ts'
@@ -305,6 +305,10 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
   }))
   app.post('/api/proposals/:id/revise', async c => {
     const ops = readReviseOps(await jsonBody(c))
+    // 0.7.1 D6 fix round 1 (I1): staging's check, before anything is judged stale or written: a file op on a path the asker
+    // may not read is refused as on a path no rule governs, so neither the answer nor the write tells them of the file.
+    const unread = unreadPaths(ops, fileReader(c, repo))
+    if (unread.length > 0) return Response.json({ errors: unreadRefusal(unread).errors }, { status: 422 })
     return answer(async () => {
       const as = await actOn(c, c.req.param('id'), 'revise')
       return withLock(async () => {
@@ -328,7 +332,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
     return answer(() => withLock(async () => {
       const actor = knownActorOf(c)
       // A proposal's private part goes into the tray with its git ops, for an author admitted to it (R-L5-15.4).
-      const change = await loadForRevision(repo, actor, c.req.param('id'), changes, { now: deps.now }, { access: privateStore, viewer: viewerOf(c) })
+      const change = await loadForRevision(repo, actor, c.req.param('id'), changes, { now: deps.now }, { access: privateStore, viewer: viewerOf(c) }, fileReader(c, repo))
       notify?.({ type: 'changes' })
       // The tray's own answer: the change as GET /api/changes gives it, marked revises.
       return Response.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))

@@ -11,6 +11,7 @@ import { attentionLevel, gateGraph, Levels } from '../visibility/gate.ts'
 import { readConfig } from '../visibility/config.ts'
 import { noStore, type PrivateAccess } from '../private/ops.ts'
 import { chainKept } from '../deploy/private-flip.ts'
+import { fileReader } from '../workspace/reads.ts'
 
 /** `hosted`: the server's mode, which says who its own attention is for (visibility/gate.ts `attentionLevel`).
  *  `privateStore`: the one private store, whose levels say which of a System's chain fields are kept from whom (walk fix
@@ -19,7 +20,8 @@ export function mountResources(app: Hono, store: ResourceStore, repo: string, op
   /** The graph as the one who asks may see it (L5 spec §9.5): never a node, a count or an edge for what they may not. */
   const seen = async (c: Context) => {
     const config = readConfig(repo), viewer = viewerOf(c)
-    return gateGraph(viewer, await store.graph(), new Levels(repo, config, attentionLevel(opts.hosted)), chainKept(repo, config, opts.privateStore ?? noStore, viewer))
+    // 0.7.1 D6: the agent layer's cards as this request may read them (the person at the machine reads them all).
+    return gateGraph(viewer, await store.graph(), new Levels(repo, config, attentionLevel(opts.hosted)), chainKept(repo, config, opts.privateStore ?? noStore, viewer), fileReader(c, repo))
   }
 
   app.get('/api/resources', async c => {

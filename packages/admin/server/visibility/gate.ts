@@ -21,6 +21,7 @@ import type { MiddlewareHandler } from 'hono'
 import { listRegistriesCached, readRegistryOrEmptyCached, type Entity } from '../registry.ts'
 import { registriesOf, registryFile } from '../registries.ts'
 import { readLedger } from '../proposals/ledger.ts'
+import { readableEntry, readsDeciders, viewerReader, type FileReader } from '../workspace/reads.ts'
 import { listViews, type ProposalView } from '../proposals/view.ts'
 import { readResources } from '../resources/index.ts'
 import { orgName } from '../resources/util.ts'
@@ -379,8 +380,11 @@ function withoutChainRead<R extends Resource>(node: R, chain: (system: string) =
 /** The graph as `viewer` may see it: never a node, a count or an edge for what they may not see (§9.5). `chain`: the
  *  chain fields of each System kept from them (deploy/private-flip.ts `chainKept`, the one filter); absent, every System's
  *  reading is kept (walk fix wave 4). */
-export function gateGraph(viewer: Viewer, graph: Graph, levels: Levels, chain: (system: string) => ReadonlySet<string> = NO_CHAIN): { nodes: Gated<Resource>[]; edges: Edge[] } {
-  let nodes = gateItems(viewer, graph.nodes, n => levels.resource(n))
+export function gateGraph(viewer: Viewer, graph: Graph, levels: Levels, chain: (system: string) => ReadonlySet<string> = NO_CHAIN,
+  may: FileReader = viewerReader(levels.repo, viewer)): { nodes: Gated<Resource>[]; edges: Edge[] } {
+  // 0.7.1 D6 fix round 1 (I2, M1): a card whose record is in the agent layer (crew's seats, memory/crew/<id>.md) is kept
+  // from one who may not read it, with its edges; a proposal stale only there is not said stale to them.
+  let nodes = gateItems(viewer, graph.nodes.flatMap(n => agentLayerCard(n, may)), n => levels.resource(n))
   // the public is given only what its public record holds (`publicResource`), never a driver read nor attention
   if (viewer.kind === 'member') nodes = nodes.map(n => withoutChainRead(n, chain))
   const records = new Map<string, Record<string, unknown> | null>()
@@ -399,6 +403,24 @@ export function gateGraph(viewer: Viewer, graph: Graph, levels: Levels, chain: (
     return names(records.get(e.from) ?? null, b.source?.entityId) || names(records.get(e.to) ?? null, a.source?.entityId)
   })
   return { nodes, edges }
+}
+
+/** A resource as `may` lets it be seen (0.7.1 D6 fix round 1): none when its source is a path of the agent layer they may
+ *  not read (I2); a proposal's card without the stale positions of the agent layer's file ops they may not read, and with
+ *  the attention it would have without them (M1: the proposals adapter says both in `agentStale` and `agentAttention`,
+ *  which no one is given). */
+function agentLayerCard(n: Resource, may: FileReader): Resource[] {
+  const path = n.source?.path
+  if (typeof path === 'string' && readsDeciders(path) && !may(path)) return []
+  const facts = n.facts as Record<string, unknown> | undefined
+  if (!facts || (!('agentStale' in facts) && !('agentAttention' in facts))) return [n]
+  const { agentStale, agentAttention, ...rest } = facts
+  const marks = Array.isArray(agentStale) ? agentStale.filter((m): m is { at: number; path: string } => isObj(m) && typeof m.at === 'number' && typeof m.path === 'string') : []
+  const unread = marks.filter(m => !may(m.path)).map(m => m.at)
+  if (unread.length === 0) return [{ ...n, facts: rest }]
+  const stale = Array.isArray(rest.stale) ? rest.stale.filter(i => !unread.includes(i as number)) : rest.stale
+  const attention = unread.length === marks.length && agentAttention !== undefined ? agentAttention as Resource['attention'] : n.attention
+  return [{ ...n, facts: { ...rest, stale }, attention }]
 }
 
 // ── registries ──────────────────────────────────────────────────────────────────────────────────────
@@ -436,8 +458,13 @@ export function gateRegistryEntries(viewer: Viewer, registry: string, levels: Le
     const g = gateRecord(viewer, registry, e, levels.config, levels.record(registry, e), fields)
     return g ? [g] : []
   })
+  // 0.7.1 D6 fix round 1 (C1): the ledger's entries without the agent layer's file ops, their text or base, in its ops or
+  // any event's, for a viewer who may not read them. The viewer alone is known here, so the person at the machine is
+  // judged as a signed-in viewer would be (PR7-R98): the proposal pages are theirs to read it on.
+  const may = registry === 'proposals' ? viewerReader(levels.repo, viewer) : null
+  const read = may ? git.map(e => readableEntry(e, may)) : git
   // A member also reads the records of this collection kept private (§9.2), those they are admitted to.
-  return member ? [...git, ...privateEntries(viewer, registry, levels.priv, levels.config)] : git
+  return member ? [...read, ...privateEntries(viewer, registry, levels.priv, levels.config)] : read
 }
 
 /** The file a registry is read from, when it is not `data/<name>.yaml` (a custom collection's `data/collections/<id>.yaml`):
