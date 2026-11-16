@@ -10,6 +10,7 @@ import { gitOpsOf, isPlaceholder, parseRecord } from '../../../lib/ops.mjs'
 import { REGISTRY_OF_KIND } from '../../../lib/registries.mjs'
 import { inWords } from '../../../lib/evaluate.mjs'
 import type { Adapter, Attention, Edge, Resource } from '../types.ts'
+import { staleAttention } from '../attention.ts'
 import { RESTRICTED_SUBJECT } from '../../private/ops.ts'
 import { readsDeciders } from '../../../lib/workspace/editors.mjs'
 
@@ -61,14 +62,14 @@ export const proposals: Adapter = {
         if (entry.state !== 'open') return null
         const closes = evaluation.closesAt === null ? null : Date.parse(evaluation.closesAt) - now.getTime()
         const missing = evaluation.missing || 'ready to ratify'
-        if (staleCount > 0) return { level: 'alert', text: `stale: ${staleCount === 1 ? '1 op was' : `${staleCount} ops were`} staged against a record that has changed` }
+        if (staleCount > 0) return staleAttention(staleCount)
         if (closes !== null && closes <= DAY_MS) return { level: 'alert', text: `closes in ${inWords(Math.max(closes, 0))}: ${missing}` }
         return { level: 'warn', text: `open: ${missing}` }
       }
       const attention = attentionWith(stale.length)
-      // 0.7.1 D6 fix round 1 (M1): the stale ops that are file ops on the agent layer, and the attention without them. The map
-      // is drawn once for every viewer, so the gate (visibility/gate.ts `agentLayerCard`) gives one who may not read those
-      // files the card without them, and no one these two facts.
+      // 0.7.1 D6 fix round 1 (M1): the stale ops that are file ops on the agent layer, and the attention with none stale. The
+      // map is drawn once for every viewer, so the gate (visibility/gate.ts `agentLayerCard`) gives one who may not read some
+      // of those files the card without them, its attention rebuilt from the stale ops left, and no one these two facts.
       const git = gitOpsOf(entry.ops ?? [])
       const agentStale = stale.flatMap(i => {
         const op = git[i] as { op?: unknown; path?: unknown } | undefined
@@ -83,7 +84,7 @@ export const proposals: Adapter = {
         facts: {
           author: entry.author, opened: entry.opened, classes: entry.classes ?? [], rules: (entry.rules ?? []).map(r => r.id),
           evaluation: evaluation.state, missing: evaluation.missing, closesAt: evaluation.closesAt, stale, ops: entry.ops.length,
-          ...(agentStale.length > 0 ? { agentStale, agentAttention: attentionWith(stale.length - agentStale.length) } : {}),
+          ...(agentStale.length > 0 ? { agentStale, agentAttention: attentionWith(0) } : {}),
         },
         source: { path: REL, editable: false, registry: 'proposals', entityId: id },
       }

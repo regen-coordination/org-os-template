@@ -340,6 +340,12 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
   })
   app.post('/api/proposals/:id/replay', async c => {
     const choose = readChoice(await jsonBody(c))
+    // 0.7.1 D6 fix round 2: what load asks, before anything runs: a proposal holding a file op on a path the asker may not
+    // read is not replayed by them (its STALE refusal names the path; Keep mine's restage says whether their text is the
+    // file's), in the words of a path no rule governs.
+    const held = readLedger(repo).entries.find(e => String(e.id) === c.req.param('id'))
+    const unread = held ? unreadPaths(gitOpsOf(held.ops ?? []), fileReader(c, repo)) : []
+    if (unread.length > 0) return Response.json({ errors: unreadRefusal(unread).errors }, { status: 422 })
     return answer(async () => {
       const as = await actOn(c, c.req.param('id'), 'replay')
       return withLock(async () => {

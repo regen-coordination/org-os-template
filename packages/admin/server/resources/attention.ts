@@ -66,3 +66,9 @@ export function connectorAttention(lastOk: string | null, now: Date): Attention 
   const days = Math.floor((now.getTime() - new Date(lastOk).getTime()) / DAY)
   return days > 14 ? { level: 'warn', text: `last ingest ${plural(days, 'day')} ago` } : null
 }
+
+/** A proposal's card when `count` of its ops are stale (the proposals adapter; the gate rebuilds it from the stale ops a
+ *  viewer may read, 0.7.1 D6). */
+export function staleAttention(count: number): Attention {
+  return { level: 'alert', text: `stale: ${count === 1 ? '1 op was' : `${count} ops were`} staged against a record that has changed` }
+}

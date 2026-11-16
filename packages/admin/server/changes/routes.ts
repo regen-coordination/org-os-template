@@ -1,6 +1,6 @@
 import type { Context, Hono } from 'hono'
 import { HttpError } from '../errors.ts'
-import { isKnown, actorTrailer, commitIdent, type KnownActor } from '../actor.ts'
+import { isKnown, actorTrailer, commitIdent, type Actor, type KnownActor } from '../actor.ts'
 import { actorOf, knownActorOf, readerOf, requireReading, viewerOf } from '../request.ts'
 import { effectiveRule, hatsActedUnder, readRuleContext, ruleHats, ruleIds } from '../governance/effective.ts'
 import { ChangeStore, newChangeId } from './store.ts'
@@ -207,12 +207,21 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
     if (n < 0 || n >= ops.length) throw new HttpError(404, `No op ${raw} in this change: it holds ${ops.length}, numbered from 0.`)
     return n
   }
-  const saveAndAnswer = (actor: KnownActor, change: Change, ops: Op[]): Response => {
+  /** The tray as the asker may read it (0.7.1 D6, M2 and fix round 2): whether a file they may not read moved on the trunk is
+   *  not said, even of their own op, in GET /api/changes and in every write's answer alike. */
+  const trayView = (c: Context, actor: Actor, change: Change | null): Response => {
+    const view = changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change))
+    const may = fileReader(c, repo)
+    if (may.all) return Response.json(view)
+    const unread = (i: number) => { const op = view.ops[i]; return op !== undefined && isFileOp(op) && !may(op.path) }
+    return Response.json({ ...view, stale: view.stale.filter(i => !unread(i)) })
+  }
+  const saveAndAnswer = (c: Context, actor: KnownActor, change: Change, ops: Op[]): Response => {
     const next: Change = { ...change, ops, updated: new Date().toISOString() }
     store.save(next)
     notify({ type: 'changes' })
     const kept = ops.length > 0 || (next.private?.length ?? 0) > 0
-    return Response.json(changeView(repo, actor, kept ? next : null, stagedView(privateStore, kept ? next : null), changePrivateTargets(repo, privateStore, kept ? next : null)))
+    return trayView(c, actor, kept ? next : null)
   }
 
   app.get('/api/actor', c => c.json(actorOf(c)))
@@ -220,11 +229,7 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
   app.get('/api/changes', c => {
     const actor = readerOf(c)
     const change = isKnown(actor) ? store.load(actor.id) : null
-    const view = changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change))
-    // 0.7.1 D6 fix round 1 (M2): whether a file the asker may not read moved on the trunk is not said, even of their own op.
-    const may = fileReader(c, repo)
-    const unread = (i: number) => { const op = view.ops[i]; return op !== undefined && isFileOp(op) && !may(op.path) }
-    return c.json(may.all ? view : { ...view, stale: view.stale.filter(i => !unread(i)) })
+    return trayView(c, actor, change)
   })
 
   app.post('/api/changes/ops', async c => {
@@ -277,7 +282,7 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       refuseHeldByMove(split.store, split.private)
       const placeholders = split.private.length > 0 ? await stagePrivate(split.store!, change, actor.id, split.private) : change.private
       const { private: _was, ...rest } = change
-      return saveAndAnswer(actor, { ...rest, ...(placeholders?.length ? { private: placeholders } : {}) }, ops)
+      return saveAndAnswer(c, actor, { ...rest, ...(placeholders?.length ? { private: placeholders } : {}) }, ops)
     }))
   })
 
@@ -305,7 +310,7 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
     // What is left must still stand on its own: a create other ops refer to cannot be taken out.
     const errors = rest.length > 0 ? validateChange(repo, rest) : []
     if (errors.length > 0) return Response.json({ errors }, { status: 422 })
-    return saveAndAnswer(actor, change!, rest)
+    return saveAndAnswer(c, actor, change!, rest)
   })))
 
   app.post('/api/changes/ops/:n/rebase', async c => {
@@ -324,8 +329,8 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
         return Response.json({ errors: await heldFileErrors(repo, [op], () => false) }, { status: 422 })
       }
       const rebased = isFileOp(op) ? await rebaseFileOp(repo, op, keep) : rebaseOp(op, currentOf(repo, op.record), keep)
-      if (rebased === ops[n]) return Response.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))
-      return saveAndAnswer(actor, change!, rebased ? ops.map((o, i) => (i === n ? rebased : o)) : ops.filter((_, i) => i !== n))
+      if (rebased === ops[n]) return trayView(c, actor, change)
+      return saveAndAnswer(c, actor, change!, rebased ? ops.map((o, i) => (i === n ? rebased : o)) : ops.filter((_, i) => i !== n))
     }))
   })
 

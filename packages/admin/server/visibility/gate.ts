@@ -24,6 +24,7 @@ import { readLedger } from '../proposals/ledger.ts'
 import { readableEntry, readsDeciders, viewerReader, type FileReader } from '../workspace/reads.ts'
 import { listViews, type ProposalView } from '../proposals/view.ts'
 import { readResources } from '../resources/index.ts'
+import { staleAttention } from '../resources/attention.ts'
 import { orgName } from '../resources/util.ts'
 import type { Edge, Graph, Resource } from '../resources/types.ts'
 import type { GovernanceView, StageOp } from '../changes/types.ts'
@@ -419,7 +420,9 @@ function agentLayerCard(n: Resource, may: FileReader): Resource[] {
   const unread = marks.filter(m => !may(m.path)).map(m => m.at)
   if (unread.length === 0) return [{ ...n, facts: rest }]
   const stale = Array.isArray(rest.stale) ? rest.stale.filter(i => !unread.includes(i as number)) : rest.stale
-  const attention = unread.length === marks.length && agentAttention !== undefined ? agentAttention as Resource['attention'] : n.attention
+  // Fix round 2: rebuilt from what is left, whether some of the card's agent-layer ops are read or none.
+  const left = Array.isArray(stale) ? stale.length : 0
+  const attention = left > 0 ? staleAttention(left) : agentAttention !== undefined ? agentAttention as Resource['attention'] : n.attention
   return [{ ...n, facts: { ...rest, stale }, attention }]
 }
 
