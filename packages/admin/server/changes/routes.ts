@@ -7,6 +7,7 @@ import { ChangeStore, newChangeId } from './store.ts'
 import { stage, staleOps, changeView, changeClasses, classesOf, currentOf, targetsOf, targetsOfOps, validateChange } from './stage.ts'
 import { rebaseOp } from './merge.ts'
 import { fileBase, heldFileErrors, isFileOp, isRecordOp, keptPageErrors, rebaseFileOp } from '../workspace/files.ts'
+import { fileReader } from '../workspace/reads.ts'
 import { commitMessage } from './records.ts'
 import { applyOps, commitEmpty, Refusal, Referred, StageRefusal } from './apply.ts'
 import { sealReceipts } from '../library/seal.ts'
@@ -256,7 +257,8 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       }
       const git = [...split.git, ...files]
       // A file op's path, checked whole before it is staged (T19 review I1, PF-R83): git's half of the check is async.
-      const held = await heldFileErrors(repo, files)
+      // 0.7.1 D6: and one the stager may read (server/workspace/reads.ts), refused as one no rule governs.
+      const held = await heldFileErrors(repo, files, fileReader(c, repo))
       if (held.length > 0) return Response.json({ errors: held }, { status: 422 })
       // A page the private store keeps is never written back into git by a file op (Task 20 review C1, PF-R95).
       const kept = keptPageErrors(repo, reach(privateStore).store, incoming, 'Nothing was staged.')
@@ -312,6 +314,11 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       const ops = change?.ops ?? []
       const n = opIndex(c.req.param('n'), ops)
       const op = ops[n]!
+      // 0.7.1 D6 (PR7-R94): Keep mine merges the file as it is now into the op, so it is refused on a path the asker may not
+      // read (a tray that holds one from before 0.7.1), in the words of a path no rule governs; Take theirs drops it.
+      if (isFileOp(op) && keep === 'mine' && !fileReader(c, repo)(op.path)) {
+        return Response.json({ errors: await heldFileErrors(repo, [op], () => false) }, { status: 422 })
+      }
       const rebased = isFileOp(op) ? await rebaseFileOp(repo, op, keep) : rebaseOp(op, currentOf(repo, op.record), keep)
       if (rebased === ops[n]) return Response.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))
       return saveAndAnswer(actor, change!, rebased ? ops.map((o, i) => (i === n ? rebased : o)) : ops.filter((_, i) => i !== n))

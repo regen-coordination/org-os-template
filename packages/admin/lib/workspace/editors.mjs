@@ -8,14 +8,19 @@
 // `generated` none by hand (`.well-known/` is generated from the records); `ledger` the proposal routes only; `ratify`
 // written by ratify only. Pure and import-free of the server, so the client and the root scripts can read it.
 //
-//   EDITORS          → the table: { pattern, class, editor } (class as schemas/change-classes.json gives it; null: none)
-//   editorFor(path)  → the editor of a path, or null for a path no rule governs
+// `read: 'deciders'` (0.7.1, D6; ruling PR7-R91): the workspace's agent layer (memory, MEMORY.md, HEARTBEAT.md, the plans)
+// is read, on a Hub that signs people in, only by those who decide under the workspace rule that governs it
+// (server/workspace/reads.ts). A row without it is read by every member, as git holds nothing stricter than members.
+//
+//   EDITORS             → the table: { pattern, class, editor, read? } (class as schemas/change-classes.json gives it; null: none)
+//   editorFor(path)     → the editor of a path, or null for a path no rule governs
+//   readsDeciders(path) → whether a path is read by its deciders only (its row's `read`)
 
 /** @typedef {'record' | 'page' | 'rules+source' | 'visibility+source' | 'collections+source' | 'source' | 'board' | 'library' | 'knowledge' | 'generated' | 'ledger' | 'ratify'} EditorKind */
-/** @typedef {{ pattern: string, class: string | null, editor: EditorKind }} EditorRow */
+/** @typedef {{ pattern: string, class: string | null, editor: EditorKind, read?: 'deciders' }} EditorRow */
 
-/** @param {string} pattern @param {string | null} cls @param {EditorKind} editor @returns {EditorRow} */
-const row = (pattern, cls, editor) => Object.freeze({ pattern, class: cls, editor })
+/** @param {string} pattern @param {string | null} cls @param {EditorKind} editor @param {'deciders'} [read] @returns {EditorRow} */
+const row = (pattern, cls, editor, read) => Object.freeze(read === undefined ? { pattern, class: cls, editor } : { pattern, class: cls, editor, read })
 
 /** The record editor's registries of class `records` (spec §11.1, second row). */
 const RECORDS = ['projects', 'ideas', 'funding-opportunities', 'relationships', 'sources', 'events', 'channels', 'assets', 'knowledge-gaps']
@@ -43,11 +48,12 @@ export const EDITORS = Object.freeze([
   row('IDENTITY.md', 'identity', 'source'),
   row('federation.yaml', 'identity', 'source'),
   row('pages/**', 'workspace', 'page'),
-  row('memory/**', 'workspace', 'source'),
-  row('MEMORY.md', 'workspace', 'source'),
-  row('HEARTBEAT.md', 'workspace', 'source'),
-  row('docs/plans/**', 'workspace', 'source'),
-  row('docs/agent-plans/**', 'workspace', 'source'),
+  // The agent layer: read by its deciders only (PR7-R91).
+  row('memory/**', 'workspace', 'source', 'deciders'),
+  row('MEMORY.md', 'workspace', 'source', 'deciders'),
+  row('HEARTBEAT.md', 'workspace', 'source', 'deciders'),
+  row('docs/plans/**', 'workspace', 'source', 'deciders'),
+  row('docs/agent-plans/**', 'workspace', 'source', 'deciders'),
   // Any other data file an instance keeps (horizon.yaml, access-grants.yaml, council.yaml, …): the `*` row's records.
   row('data/*.yaml', 'records', 'source'),
   row('data/*.yml', 'records', 'source'),
@@ -87,6 +93,12 @@ export function editorRowFor(path) {
  *  @param {string} path @returns {EditorKind | null} */
 export function editorFor(path) {
   return editorRowFor(path)?.editor ?? null
+}
+
+/** Whether `path` is read by the deciders of its workspace rule only (its row's `read`, PR7-R91).
+ *  @param {string} path @returns {boolean} */
+export function readsDeciders(path) {
+  return editorRowFor(path)?.read === 'deciders'
 }
 
 // ── the files no `file` op writes (§11.2; PF-R1), in the words the server refuses one with ─────────────────────────────

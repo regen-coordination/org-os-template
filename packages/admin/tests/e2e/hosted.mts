@@ -18,7 +18,8 @@
 //     Portal link points at the portal origin; pages, collections, the imports and Sources read; no write control is
 //     drawn on any route the walk opens, and nothing says an edit saves; a write sent straight to the API answers 403
 //     with the read-only sentence, and nothing is committed;
-//   - the network member signs in the same way: they read the members' side but not the steward's page or Circles;
+//   - the network member signs in the same way: they read the members' side but not the steward's page or Circles, nor a
+//     memory day (0.7.1 D6), which is drawn and answered as a path that is not there, while the steward reads it;
 //     presence: each sees the other on the page; comments: the steward comments, the member replies, the steward
 //     resolves, each seen by the other;
 //   - the visitor with no Role signs in: the "no Role here yet" band, and nothing restricted appears.
@@ -74,14 +75,19 @@ members:
   - { id: "${MEMBER.id}", name: "${MEMBER.name}", kind: person }
 `
 /** The stewards' role, named here so a level of role:steward is one the records may name; the Roles table's `steward`
- *  is the same word, so the steward reads at it either way. */
+ *  is the same word, so the steward reads at it either way. The org's own `maintainer` role (the git identity and the
+ *  steward) is who reads the agent layer, as no workspace rule is written (0.7.1 D6, PR7-R91). */
 const GOVERNANCE = `schema_version: "2.0"
 governance:
   model: "solo-maintainer"
   roles:
     steward: { members: ["${STEWARD.id}"] }
+    maintainer: { members: [steward-a, "${STEWARD.id}"] }
   decisions: []
 `
+/** A memory day of the agent layer (0.7.1 D6): read by the maintainers, answered to anyone else as a path that is not there. */
+const DAY = { path: 'memory/2026-11-01.md', text: 'Synthetic council note: the shortlist is read by the maintainers alone.' }
+const NOT_THERE = (path: string) => `${path} is not a governed file, so it has no editor here.`
 const VISIBILITY = `visibility:
   defaults: { contact: "role:steward" }
   collections:
@@ -134,7 +140,9 @@ const MENTION = `[@${MEMBER.name}](hub:member/${MEMBER.id})`
 const MENTION_AS_PUBLIC = `[@${MEMBER.id}](hub:member/${MEMBER.id})`
 writeFileSync(join(repo, 'pages', `${PUBLIC_PAGE.id}.md`), page(PUBLIC_PAGE.id, PUBLIC_PAGE.title, 'public', `How Example DAO works, in the open. Ask ${MENTION}.\n`))
 writeFileSync(join(repo, 'pages', `${MEMBERS_PAGE.id}.md`), page(MEMBERS_PAGE.id, MEMBERS_PAGE.title, null, 'Members read this guide.\n'))
-git('add', '-A'); git('commit', '-qm', 'e2e: Example DAO, its pages, tasks and policy')
+mkdirSync(join(repo, 'memory'))
+writeFileSync(join(repo, DAY.path), `# 1 Nov\n\n${DAY.text}\n`)
+git('add', '-A'); git('commit', '-qm', 'e2e: Example DAO, its pages, tasks, memory and policy')
 
 async function runImport(args: string[]): Promise<string[]> {
   const out: string[] = []
@@ -422,6 +430,10 @@ try {
   if (rows.filter(r => /Import/.test(r)).length < 2) fail(`Sources lists fewer than two imports: ${rows.join(' | ')}`)
   for (const path of ['/', '/registries', '/registries/projects', '/c/notion-docs', '/library', '/governance']) await readOnly(ps, path, STEWARD.name)
   log('the steward reads pages (public, members, the private page), tasks and its board, meetings, the imports and Sources; no write control on any of them')
+  // 0.7.1 D6: the steward is a maintainer, so the agent layer opens in the source editor, read only.
+  await readOnly(ps, `/files/${DAY.path}`, STEWARD.name)
+  await ps.locator('pre.mono-well').getByText(DAY.text).waitFor()
+  log(`the steward, a maintainer, reads ${DAY.path} in the source editor`)
   at = 'a write through the API'
   await refusedWrite(ps, 'POST', '/api/registries/projects', { id: 'p-x', title: 'X' })
   await refusedWrite(ps, 'POST', '/api/pages', { title: 'A new page', parent: null })
@@ -438,6 +450,23 @@ try {
     await noneOf(pm, STEWARDS_ONLY, MEMBER.name, path)
   }
   log('the network member reads the members\' side, never the steward\'s page or Circles')
+  // 0.7.1 D6: a memory day is not theirs to read; it is drawn, and answered, exactly as a path that is not there.
+  at = 'the agent layer'
+  const drawnAt = async (path: string) => {
+    await pm.goto(`${HUB}/files/${path}`)
+    await pm.getByText(NOT_THERE(path)).first().waitFor({ timeout: 15_000 })
+    await noneOf(pm, [DAY.text], MEMBER.name, `/files/${path}`)
+    return (await pm.locator('main').innerHTML()).replaceAll(path, '<path>')
+  }
+  const dayDrawn = await drawnAt(DAY.path)
+  if (dayDrawn !== await drawnAt('notes/2026-11-01.md')) fail(`${DAY.path} is drawn to ${MEMBER.name} otherwise than a path that is not there`)
+  const [dayRead, noneRead] = await pm.evaluate(paths => Promise.all(paths.map(async path => {
+    const r = await fetch(`/api/files?path=${encodeURIComponent(path)}`)
+    return { status: r.status, text: await r.text() }
+  })), [DAY.path, 'notes/2026-11-01.md'])
+  if (dayRead!.status !== 404 || dayRead!.text !== JSON.stringify({ error: NOT_THERE(DAY.path) })) fail(`GET /api/files answers ${MEMBER.name} ${dayRead!.status} ${dayRead!.text.slice(0, 200)}`)
+  if (noneRead!.status !== 404 || noneRead!.text.replaceAll('notes/2026-11-01.md', DAY.path) !== dayRead!.text) fail('a memory day and a path that is not there are answered differently')
+  log(`the network member opening /files/${DAY.path} sees the page of a path that is not there, and its API answers 404 in the same words`)
   at = 'presence'
   await ps.goto(`${HUB}/p/${MEMBERS_PAGE.id}`)
   await settle(ps)

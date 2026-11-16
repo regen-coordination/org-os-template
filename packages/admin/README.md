@@ -319,7 +319,7 @@ A document registry's page links to the source editor (`/files/<path>`), where i
 | data/visibility.yaml, what is public | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. Narrowing a record has its own route (L5); a text that widens what is public is a publication. |
 | an instance’s own data files outside the registry list, such as data/horizon.yaml and data/access-grants.yaml | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. Rules govern each as a record of the org. |
 | data/collections.yaml, the collections and their saved views | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. New collection and Save view on the Workspace write their definitions through their own routes. |
-| memory/**; MEMORY.md; HEARTBEAT.md; docs/plans/**; docs/agent-plans/** | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. The agents’ own tools commit it too. |
+| memory/**; MEMORY.md; HEARTBEAT.md; docs/plans/**; docs/agent-plans/** | The source editor (/files/<path>): the file edited whole, staged into your change, checked when staged and again when applied. The agents’ own tools commit it too. A viewer signed in to the Hub reads it only when they decide under its workspace rule (0.7.1). |
 
 ## The workspace
 
@@ -423,16 +423,24 @@ Notion · exported 12 Aug", "from data/tasks.yaml", "from <owner>/<repo>").
 The source editor, `/files/<path>`, opens a governed file whole in a Mono well; Save stages a `file` op into your change,
 checked when staged and again when applied. A generated file is shown, never saved.
 
+The agent layer (`memory/**`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**`, `docs/agent-plans/**`) is read, by a viewer
+signed in to the Hub (SIWE or an emailed link), only when they decide under the workspace rule that governs it: the
+members of its `decide.by` role or, with no workspace rule written, of the org's own `maintainer` role (the implied
+maintainer, every person, does not count). Anyone else is answered `404` in the words of a path that is not there, is
+shown no link to it, cannot stage a `file` op on it, and reads a proposal without that file's text or diff. The person at
+the machine (the Hub's git identity) reads it as before (0.7.1).
+
 | Route | Does |
 |---|---|
 | `GET /api/sources` | the sources, each with what it supplies and its read |
-| `GET /api/editors` | the table of what edits each governed file |
+| `GET /api/editors` | the table of what edits each governed file, each row with whether the viewer may read its files (`readable`) |
 | `GET /api/files?path=` | a governed file as the source editor opens it, its editor and its base |
 
 ### Council memory
 
-The agent layer's memory is split by who may read it. Org memory is `memory/<date>.md`, in the repository, read by every
-member. Council memory is a record of the private collection `council-memory`, at a hat or a role, written through the
+The agent layer's memory is split by who may read it. Org memory is `memory/<date>.md`, in the repository: read by every
+member at the machine, and on a Hub that signs people in by those who decide under the agent layer's workspace rule
+(0.7.1, above). Council memory is a record of the private collection `council-memory`, at a hat or a role, written through the
 Hub so the gate applies:
 
     npm run memory -- add --level <members | hat:<hat ref> | role:<role id>> --date <YYYY-MM-DD> --title <t> (--file <md> | -)

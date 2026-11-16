@@ -1,7 +1,7 @@
 // DAO-OS L6 Task 19: the source editor's addresses and words (spec §11, §15). Every governed file has a path (F-L3-3):
 // `/files/<path>` opens a file whole; each row of the editor table (GET /api/editors) links to the editor it names.
 // Pure: no React, no fetch.
-import { wholeFileRefusal } from '../../../lib/workspace/editors.mjs'
+import { editorRowFor, readsDeciders, wholeFileRefusal } from '../../../lib/workspace/editors.mjs'
 import { safeDecode } from '../hrefs.ts'
 
 export { wholeFileRefusal }
@@ -74,6 +74,22 @@ export function editorHref(row: { pattern: string; editor: string }): string {
     case 'ratify': return '/governance/decisions'
     default: return filesHref(openable(row.pattern))
   }
+}
+
+/** 0.7.1 (D6): a row of GET /api/editors as the viewer reads it. `readable: false` (the agent layer, for one who does not
+ *  decide it) draws no link: the source editor would answer it as a path that is not there. A row without it (an older
+ *  server) is readable. */
+export function editorLink(row: { pattern: string; editor: string; readable?: boolean }): string | undefined {
+  return row.readable === false ? undefined : editorHref(row)
+}
+
+/** Whether the viewer may open `path` in the source editor, by the editor rows GET /api/editors answered them (`rows`;
+ *  undefined until it has). A path of no gated row (lib/workspace/editors.mjs `readsDeciders`) needs no answer; one of a
+ *  gated row is readable only when its row says so. */
+export function readableIn(rows: readonly { pattern: string; readable?: boolean }[] | undefined, path: string): boolean {
+  if (!readsDeciders(path)) return true
+  const pattern = editorRowFor(path)?.pattern
+  return rows?.find(r => r.pattern === pattern)?.readable === true
 }
 
 /** The editor of its own a file has beside the source editor, or in its place (the file page links to it): null for

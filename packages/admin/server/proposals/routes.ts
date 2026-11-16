@@ -44,6 +44,7 @@ import { gitOpsOf } from '../../lib/ops.mjs'
 import { readConfig } from '../visibility/config.ts'
 import { noStore, reach, stagedPrivate, stagedView, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { closingDropsPending, placeholdersOf, shownTo } from '../private/proposals.ts'
+import { fileReader, readableView } from '../workspace/reads.ts'
 import type { ProposedPrivate } from './propose.ts'
 import { workspaceOf } from '../workspace/routes.ts'
 import { NO_SESSION } from '../workspace/sessions.ts'
@@ -175,6 +176,8 @@ export function readCloseOutcome(body: unknown): CloseOutcome {
 export function mountProposals(app: Hono, { repo, withLock, notify, systems, privateStore = noStore, membership = null, ...deps }: ProposalRoutesDeps): void {
   /** Who each actor is, for `viewer` (one read of the members per answer). */
   const named = <V extends object>(view: V, viewer: Viewer): V => withNames(view, viewer, viewer.kind === 'member' ? displayNames(repo, membership, { viewer }) : null)
+  /** The view without what the asker may not read of the agent layer (0.7.1 D6, server/workspace/reads.ts). */
+  const readable = <V extends object>(c: Context, view: V): V => readableView(view, fileReader(c, repo))
   const changes = new ChangeStore(repo)
   const clock = () => (deps.now ?? (() => new Date()))()
   /** When a page visit last read each attach (view.ts): at most once per the reader's window. */
@@ -184,7 +187,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
   /** Every proposal route answers the proposal as the actor sees it now (a ProposalView: `branchState` is the build
    *  state, `branch` the ledger's name for the branch), with what the write said beside it. */
   const answerView = async (c: Context, id: string, extra: Record<string, unknown>, status = 200): Promise<Response> => {
-    const view: ProposalView = named(shownTo(await viewById(repo, id, readerOf(c), clock()), viewerOf(c), privateStore, readConfig(repo)), viewerOf(c))
+    const view: ProposalView = readable(c, named(shownTo(await viewById(repo, id, readerOf(c), clock()), viewerOf(c), privateStore, readConfig(repo)), viewerOf(c)))
     return Response.json({ ...view, ...extra }, { status })
   }
   /** A change's private part as Propose or Update proposal carries it (L5 §9.6): its staged ops read back from the store,
@@ -276,7 +279,8 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
   app.get('/api/proposals', c => answer(async () => {
     const viewer = viewerOf(c)
     const display = viewer.kind === 'member' ? displayNames(repo, membership, { viewer }) : null
-    return Response.json(gateProposals(viewer, await listViews(repo, readerOf(c), clock()), new Levels(repo)).map(v => withNames(shownTo(v, viewer, privateStore, readConfig(repo)), viewer, display)))
+    const may = fileReader(c, repo)
+    return Response.json(gateProposals(viewer, await listViews(repo, readerOf(c), clock()), new Levels(repo)).map(v => readableView(withNames(shownTo(v, viewer, privateStore, readConfig(repo)), viewer, display), may)))
   }))
   app.get('/api/proposals/:id', c => answer(async () => {
     const id = c.req.param('id')
@@ -293,11 +297,11 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
         const record = currentOf(repo, String(op.record))
         return record === null ? null : gateRecord(viewer, registry, record, levels.config)
       })
-      return Response.json({ ...view, diff: null, note: PUBLIC_NO_DIFF, current })
+      return Response.json(readable(c, { ...view, diff: null, note: PUBLIC_NO_DIFF, current }))
     }
     const { build, startBranch } = deps
     const detail = await detailView(repo, id, readerOf(c), { withLock, now: clock(), build, startBranch, systems, visits, failedBuilds, hosted: deps.hosted, readOnly: deps.readOnly })
-    return Response.json({ ...named(shownTo(detail, viewer, privateStore, readConfig(repo)), viewer), visibility: formatLevel(level ?? MEMBERS) })
+    return Response.json({ ...readable(c, named(shownTo(detail, viewer, privateStore, readConfig(repo)), viewer)), visibility: formatLevel(level ?? MEMBERS) })
   }))
   app.post('/api/proposals/:id/revise', async c => {
     const ops = readReviseOps(await jsonBody(c))

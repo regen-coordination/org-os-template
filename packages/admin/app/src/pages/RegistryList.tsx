@@ -15,6 +15,7 @@ import { TableView, type Column } from '../elements/views/TableView.tsx'
 import { useCanWrite } from '../viewAs/ViewAs.tsx'
 import { editorOf } from '../editors.ts'
 import { filesHref } from '../workspace/files.ts' // DAO-OS L6 Task 19: the source editor
+import { useFileReadable } from '../workspace/useReadable.ts'
 import { Skeleton } from '../design/Skeleton.tsx'
 import type { SectionDef } from '../sections.ts'
 import { SectionPlate, brokenFileOf } from '../blocks/plate.tsx'
@@ -50,6 +51,8 @@ export default function RegistryList({ registry, title, empty, section, bare = f
   // Where it is read from (walk M15): the server names a file that is not data/<name>.yaml (a custom collection's), and
   // null for a collection the store keeps; until it has answered, no file is named.
   const file: string | null = reg.data ? (reg.data.file !== undefined ? reg.data.file : `data/${registry}.yaml`) : null
+  // 0.7.1 D6: the source editor is linked only for a file the viewer may read.
+  const readableDoc = useFileReadable(file ?? `data/${registry}.yaml`)
   const where = file ?? (reg.data ? STORE_KEPT : null)
   const head = where === null ? [] : [where]
   const failed = reg.error ?? schema.error
@@ -67,7 +70,7 @@ export default function RegistryList({ registry, title, empty, section, bare = f
             previewing (C-23) */}
         {!bare && (
           <PageHead title={title} meta={[docFile, 'document']}>
-            {canWrite && editorOf({ registry })?.path === 'source' && <ButtonLink href={filesHref(docFile)}>{EDIT_SOURCE}</ButtonLink>}
+            {canWrite && readableDoc && editorOf({ registry })?.path === 'source' && <ButtonLink href={filesHref(docFile)}>{EDIT_SOURCE}</ButtonLink>}
           </PageHead>
         )}
         <Section label="Source" note={docFile}><pre className="mono-well" aria-label={docFile}>{stringify(reg.data.document ?? {})}</pre></Section>

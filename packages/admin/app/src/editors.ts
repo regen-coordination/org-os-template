@@ -65,7 +65,7 @@ export const GOVERNED_FILES: readonly GovernedFile[] = [
     how: `${SOURCE_HOW} New collection and Save view on the Workspace write their definitions through their own routes.` },
   { target: 'data/imports.yaml', kind: 'path', path: 'source', what: 'data/imports.yaml, the imports’ record', how: SOURCE_HOW },
   ...AGENT_LAYER.map((t): GovernedFile => ({ target: t, kind: 'path', path: 'source', what: t,
-    how: `${SOURCE_HOW} The agents’ own tools commit it too.` })),
+    how: `${SOURCE_HOW} The agents’ own tools commit it too. A viewer signed in to the Hub reads it only when they decide under its workspace rule (0.7.1).` })),
   { target: 'IDENTITY.md', kind: 'path', path: 'source', what: 'IDENTITY.md', how: SOURCE_HOW },
   { target: 'federation.yaml', kind: 'path', path: 'source', what: 'federation.yaml', how: SOURCE_HOW },
 ]
