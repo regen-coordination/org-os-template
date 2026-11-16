@@ -427,12 +427,12 @@ The agent layer (`memory/**`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**`, `doc
 signed in to the Hub (SIWE or an emailed link), only when they decide under the workspace rule that governs it: the
 members of its `decide.by` role or, with no workspace rule written, of the org's own `maintainer` role (the implied
 maintainer, every person, does not count; a written rule with no deciding role is read by nobody). Anyone else is
-answered `404` in the words of a path that is not there and is shown no link to it. They cannot stage, revise, replay, load or
-apply a `file` op on it. They read a proposal, the ledger as a registry and a revision's ops with each such op withheld
-(`{ "op": "file", "withheld": true }`) and without that file's diff, and its staleness is not said to them. While the
-ledger holds such an op, `data/proposals.yaml` is not served to them whole. Crew's seats, recorded in `memory/crew/`, are
-not on their map. The person at the machine (the Hub's git identity) reads all of it as before, except through
-`GET /api/registries/proposals`, which judges the viewer alone (0.7.1).
+answered `404` in the words of a path that is not there and is shown no link to it. They cannot stage, revise, replay,
+load or apply a `file` op on it. They read a proposal, the ledger as a registry and a revision's ops with each such op
+withheld (`{ "op": "file", "withheld": true }`) and without that file's diff, and its staleness is not said to them.
+While the ledger holds such an op, `data/proposals.yaml` is not served to them whole. Crew's seats, recorded in
+`memory/crew/`, are not on their map. The person at the machine (the Hub's git identity) reads all of it as before,
+except through `GET /api/registries/proposals`, which judges the viewer alone (0.7.1).
 
 | Route | Does |
 |---|---|
