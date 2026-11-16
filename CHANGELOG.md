@@ -8,6 +8,20 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## 0.7.1 (unreleased)
+
+### Security
+
+- **The agent layer is no longer served to every signed-in member** (`packages/admin`). On a 0.7.0 Hub that signs
+  people in, anyone with a Role could open `memory/**`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**` and
+  `docs/agent-plans/**` in the source editor (`GET /api/files`), and read them in a proposal's text and diff. Now only
+  those who decide under the workspace rule that governs those files read them: the members of the rule's deciding role,
+  or, where the org has written no workspace rule, of its own `maintainer` role. Anyone else is answered exactly as for a
+  file that is not there, is shown no link to it, cannot stage an edit to it, and sees a proposal without that file's text
+  or diff (the rest of the proposal is unchanged). The person at the machine reads these files as before. An org that
+  writes no workspace rule and defines no `maintainer` role should name one in `data/governance.yaml`: until it does,
+  nobody signed in to its hosted Hub reads these files.
+
 ## [0.7.0] — 2026-11-11
 
 **0.7 adds the workspace to the house:** pages, collections, tasks, imports and conversation, beside
