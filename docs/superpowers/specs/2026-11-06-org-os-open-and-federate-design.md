@@ -376,3 +376,14 @@ These bind over the sections above where they differ.
   with no `join.decision` is read as `open-with-approval`. With no `join` block, a hub is `closed`. The
   operator's choice of `open-with-approval` (§11.2) is offered as the recommended policy. Each hub's
   council sets its own.
+- **R18. An invite token never reaches git, a public issue or a log.** The node keeps it outside its
+  repository and joins it into the request only when sending. The github transport refuses an invited
+  request, because an issue is public and whoever reads it first could use the token. Such a request goes
+  as a file, through a private channel. The hub's record keeps the matched invite's id, never the token.
+- **R19. A hub whose rules let the importer change its identity alone decides a request itself.** There,
+  opening a proposal is refused (the change is direct), so the request is held. The operator accepts it,
+  in one commit carrying `Org-Decision: request <id>`, or refuses it with a reason. Everywhere else,
+  `open-with-approval` opens an outside proposal (R15).
+- **R20. A network step only reaches the network.** Polling fetches requests into an inbox outside the
+  repository. Receiving them is the operator's own write, under their rules. A reply's receipt is also
+  kept outside the repository. No in-process network step commits anything, because it acts for no one.
