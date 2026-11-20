@@ -7,6 +7,7 @@ How an org-os-kms instance pulls knowledge from other sources (`ingest`) and pub
 ```bash
 org-os-kms ingest  [--connector <name>] [--dry] [--dir <instance>]
 org-os-kms publish [--apply] [--dry]            [--dir <instance>]
+org-os-kms claims reconcile [--dry]             [--dir <instance>]
 ```
 
 - `ingest` pulls the connectors declared in `kms.yaml` under `connectors:` (each entry: `name`, `config`, and optionally a seed `cursor`; see "Cursor write-back" in section 10). It is a CLI verb only: it is **not** bound to `close` (or `initialize`), so nothing runs it automatically.
@@ -61,6 +62,15 @@ The closed audit list (read in this build, 2026-11-20):
 | `federate.contribute` | Reads the peer card only; `records` come from the caller, and the result is a draft, never applied. |
 | `frontier.mjs`, `map.mjs`, `render-map-html.mjs` | Read `federation.yaml`, peer snapshots, `data/source-systems.yaml` and the index counts; no object fields. |
 | A target instance's own generators over `data/*.yaml` | Not read here (outside this build). Before a target adopts the pack: `git -C <instance> ls-files data/needs.yaml`, `git remote -v`, and grep its generators for reads of `data/`. |
+
+### Claims: publishing on a node's behalf, and stepping aside (off by default)
+
+A **claim** is an ordinary object with claim fields (`claim_for`, `claim_status`, `claim_node_did`, `claim_checked_on`, `consent_atproto`, `superseded_by`), published from the instance's own account so a node appears before it has one. Nothing is published about a node without its yes **by name**:
+
+- **The floor** (`src/claims.mjs`, `claimFloor`). A claim publishes only if `publish.claims` is exactly `true`, `claim_status` is `claimed`, `claim_for` is set, `consent_atproto` is a real date, and `publish.claim_publisher` names who publishes (for example `ReFi DAO`). It is applied four times, none of them widenable by an instance gate: the `publish` op withholds (`report.withheld.claims`), `planPublish` fails closed (`claim floor: …`; its `publishClaims` defaults to off), and `export` (`selectForPublication`) rejects it before anything is written to a public plane (`floorRejected`).
+- **The record** carries `claim_for` (the subject: the node), `claim_status`, `claim_node_did`, `claim_checked_on` and `publisher` (the configured publisher). `consent_atproto` and `superseded_by` stay home. Refs are still scrubbed by value, so a claim that names a private object does not carry it. A claim of a pack type whose lexicon is shared is cut by that lexicon, so the marks are only present where the lexicon has the properties.
+- **Supersede** (`claims reconcile [--dry]`, a CLI verb bound to no lifecycle event). When an ingested record of the same schema is the node's own (its `sourceUri` DID is the claim's `claim_node_did`, or its `url` is the claim's `claim_for`, normalised: lowercase host, no `www.`, no trailing slash), **every** claim of that schema for that node is set `claim_status: superseded`, `maturity: held`, `superseded_by: <the node's record>`. The node's record is never written; a record retracted at origin (`held`) does not count. Idempotent. The next `publish` removes the claim through the manifest delete, from the collection the manifest recorded (the shared one for a shared type).
+- **The mass-delete guard still applies** (section 2): superseding the last published claim refuses the apply, and the report says that the record it would delete is a superseded claim. There is no bypass; the operator withdraws the last record by hand.
 
 ## 4. `.well-known` allowlist
 

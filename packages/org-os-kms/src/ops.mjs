@@ -25,6 +25,7 @@ import { loadSharedLexicons, cutToPublicFields } from './pack-publish.mjs';
 import { scrubUnpublishedRefs } from './visibility.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
+import { reconcileClaims } from './claims.mjs';
 
 export const OPS = {
   // write:true here = CRITICAL/fail-hard: if kms.yaml can't load, no downstream op can run.
@@ -95,7 +96,7 @@ export const OPS = {
     const all = adapter.list(target);
     const sel = await selectPublic({ dir, config, all });
     const candidates = sel.candidates;
-    if (sel.withheld?.undeclared || sel.withheld?.visibility) report.withheld = { ...(sel.withheld.undeclared ? { undeclared: sel.withheld.undeclared } : {}), ...(sel.withheld.visibility ? { visibility: sel.withheld.visibility } : {}) };
+    if (sel.withheld?.undeclared || sel.withheld?.visibility || sel.withheld?.claims) report.withheld = { ...(sel.withheld.undeclared ? { undeclared: sel.withheld.undeclared } : {}), ...(sel.withheld.visibility ? { visibility: sel.withheld.visibility } : {}), ...(sel.withheld.claims ? { claims: sel.withheld.claims } : {}) };
     if (sel.gated) {
       const by_reason = {}; for (const r of sel.rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
       report.gate = { passed: candidates.length, rejected: sel.rejected.length, by_reason };
@@ -119,7 +120,7 @@ export const OPS = {
       // objects on disk are not rewritten.
       const records = items.map((it) => (it.object.type ? it : { ...it, object: { type: it.schema, ...it.object } }));
       const shared = await loadSharedLexicons(config.packs);
-      const plan = planPublish({ items: records, all, manifest, did: at.did, authority: at.nsid_authority, shared });
+      const plan = planPublish({ items: records, all, manifest, did: at.did, authority: at.nsid_authority, shared, publishClaims: config.publish?.claims === true, claimPublisher: config.publish?.claim_publisher });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length, ...(plan.orphans.length ? { orphans: plan.orphans.length } : {}) };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
@@ -137,7 +138,11 @@ export const OPS = {
       }
       else if (items.length === 0 && plan.delete.length > 0) {
         // Never let an unattended apply (close + publish.apply:true) turn an empty/misconfigured selection into a mass delete.
-        return { ok: false, report: { ...report, atproto: { status: 'failed', reason: 'refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)', deleted: 0, wouldDelete: plan.delete.length } } };
+        // A superseded claim is the usual way to get here (src/claims.mjs): say so, so the operator knows it is not a misconfiguration.
+        const gone = new Set(all.filter((it) => it.object.claim_status === 'superseded').map((it) => it.object.id));
+        const claimsGone = plan.delete.filter((d) => gone.has(d.id)).length;
+        const why = claimsGone ? `; ${claimsGone} of the ${plan.delete.length} ${claimsGone === 1 ? 'is a superseded claim' : 'are superseded claims'} (the node now speaks for itself). This guard has no bypass: withdraw the last published record by hand once you are sure` : '';
+        return { ok: false, report: { ...report, atproto: { status: 'failed', reason: `refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)${why}`, deleted: 0, wouldDelete: plan.delete.length } } };
       } else {
         let applied; let client;
         try {
@@ -243,6 +248,10 @@ export const OPS = {
     }
     return { ok: true, report };
   } },
+
+  // claims.reconcile: CLI verb only (`org-os-kms claims reconcile`), bound to no lifecycle event. Supersedes ReFi DAO's claim of a node
+  // once the node's own record has been ingested; the next `publish` then removes the claim. --dry changes nothing.
+  'claims.reconcile': { kind: 'exec', write: true, run: (ctx) => reconcileClaims({ dir: ctx.dir || '.', config: ctx.config, dry: ctx.flags?.dry === true }) },
 
   // skill directives — judgment ops the agent runs; the executor collects them.
   'csis-review': { kind: 'skill', skill: 'csis-review' },

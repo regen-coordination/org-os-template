@@ -3,6 +3,7 @@
 import { getAdapter, isPublishable, PUBLISHABLE_TYPES } from '../framework.mjs';
 import { ensureIds } from '../identity.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
+import { claimFloor } from '../claims.mjs';
 
 /**
  * `types` — the publish-eligible type list of the COMMONS being exported to, from
@@ -11,9 +12,10 @@ import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
  * (territorial-unit, data-stream) would then be floor-rejected here no matter what the commons
  * opted into, and the rejection would be silent — a reviewed, gate-passed unit simply never
  * appearing in the published store. Which types a commons publishes is ITS kms.yaml's call, so it
- * must be threaded in, not assumed.
+ * must be threaded in, not assumed. `config` is that commons' kms.yaml: the claims floor (src/claims.mjs) reads publish.claims and
+ * publish.claim_publisher from it, and an omitted config refuses every claim (fail closed).
  */
-export function selectForPublication({ root, verdicts, uuid, types = PUBLISHABLE_TYPES }) {
+export function selectForPublication({ root, verdicts, uuid, types = PUBLISHABLE_TYPES, config = {} }) {
   const listing = getAdapter('repo-data').list(root);
   const selected = []; const floorRejected = [];
   for (const it of listing) {
@@ -31,6 +33,9 @@ export function selectForPublication({ root, verdicts, uuid, types = PUBLISHABLE
     // loadCommonsPolicy before this runs; a type with no rule passes, so core types and ungated packs are unchanged.
     const floor = visibilityFloor(it.object, it.schema);
     if (!floor.ok) { floorRejected.push({ key, reason: floor.reason }); continue; }
+    // A claim about a node leaves the canon only with the node's consent date, publish.claims on and a publisher to name.
+    const claim = claimFloor(it.object, config);
+    if (!claim.ok) { floorRejected.push({ key, reason: claim.reason }); continue; }
     selected.push({ key, ...it });
   }
   const { minted, items: ided } = ensureIds({ adapter: 'repo-data', target: root, items: selected, write: true, mintGeo: false, ...(uuid ? { uuid } : {}) });

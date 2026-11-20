@@ -5,6 +5,7 @@ import { rewriteRefs, resolverFrom } from '../refs.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { packPublishRules } from '../pack-publish.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
+import { isClaim, claimFloor, claimView, CLAIM_RECORD_FIELDS } from '../claims.mjs';
 
 function stable(v) {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
@@ -18,7 +19,8 @@ export function contentHash(record) { return createHash('sha256').update(stable(
  * toRecord(object), validated against `doc`, and the collection is doc.id, not nsidFor(schema, authority). A toRecord
  * that returns null leaves the object canon-only. Core types are unchanged.
  */
-export function planPublish({ items: given, all = given, manifest, did, authority, shared = {} }) {
+export function planPublish({ items: given, all = given, manifest, did, authority, shared = {}, publishClaims = false, claimPublisher }) {
+  const claimConfig = { publish: { claims: publishClaims, claim_publisher: claimPublisher } };
   // Fail closed: whoever called, a public record's refs never name an object outside `given` (spec 6.3). `all` is the whole canon when known.
   const items = scrubUnpublishedRefs(given, all);
   const lexicons = fw.generateAll({ authority });
@@ -40,6 +42,13 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
       const floor = visibilityFloor(object, schema);
       if (!floor.ok) { plan.errors.push({ slug, errors: [floor.reason] }); continue; }
       source = Object.fromEntries(Object.entries(source).filter(([k]) => rules.public_fields.includes(k)));
+    }
+    // A claim (src/claims.mjs) is checked again here, fail closed, whatever called: publishClaims is off unless the caller says so.
+    if (isClaim(object)) {
+      const cf = claimFloor(object, claimConfig);
+      if (!cf.ok) { plan.errors.push({ slug, errors: [cf.reason] }); continue; }
+      const marked = claimView(source, claimPublisher);
+      source = rules ? { ...source, ...Object.fromEntries(CLAIM_RECORD_FIELDS.filter((k) => marked[k] !== undefined).map((k) => [k, marked[k]])) } : marked;
     }
     const record = sharedEntry ? sharedEntry.toRecord(source) : fw.toRecord(source, collection);
     if (record === null) continue; // no home in the shared lexicon: stays canon-only (and is deleted below if it was published)
