@@ -173,3 +173,11 @@ test('F5: without options the cap is 50 requests: one count, then 49 backlink ca
   assert.equal(DEFAULT_MAX_REQUESTS, 50); assert.equal(calls.length, 50); assert.equal(out.requests, 50);
   assert.match(out.error, /request cap \(50\) reached/); assert.deepEqual(out.subjects, {});
 });
+
+// ---- F6: the path allowlist is own-keys only ----
+test('F6: raw("__proto__") and other inherited names are refused as not allowed, not as a TypeError', async () => {
+  const f = fakeFetch(); const c = createConstellationClient({ fetchImpl: f });
+  for (const p of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) await assert.rejects(c.raw(p, {}), (e) => e instanceof ConstellationError && /not allowed/.test(e.message), p);
+  assert.equal(f.calls.length, 0);
+});
+

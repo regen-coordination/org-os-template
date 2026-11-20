@@ -32,7 +32,7 @@ export class ConstellationError extends Error {
 export function createConstellationClient({ base = CONSTELLATION_BASE, fetchImpl = globalThis.fetch, timeoutMs } = {}) {
   const deadline = timeoutOf(timeoutMs);
   async function raw(path, params = {}) {
-    const allowed = ALLOWED_LINK_PARAMS[path];
+    const allowed = Object.hasOwn(ALLOWED_LINK_PARAMS, path) ? ALLOWED_LINK_PARAMS[path] : undefined;   // own keys only: '__proto__' is not a path
     if (!allowed) throw new ConstellationError(`constellation: path ${path} is not allowed (read-only client)`);
     const url = new URL(path, base || CONSTELLATION_BASE);
     for (const [key, value] of Object.entries(params)) {
