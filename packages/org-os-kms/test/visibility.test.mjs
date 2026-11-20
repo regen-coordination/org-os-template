@@ -9,7 +9,7 @@ import * as fw from '../src/framework.mjs';
 import { OPS } from '../src/ops.mjs';
 import { resetRegistryBindings } from '../src/bind.mjs';
 import { loadKmsConfig } from '../src/config.mjs';
-import { visibilityFloor, publishRequires } from '../src/visibility.mjs';
+import { visibilityFloor, publishRequires, scrubUnpublishedRefs } from '../src/visibility.mjs';
 import { planPublish } from '../src/atproto/publish.mjs';
 import { loadSharedLexicons } from '../src/pack-publish.mjs';
 
@@ -54,4 +54,43 @@ test('an instance gate that returns { ok: true } for everything does not widen i
   assert.equal(res.ok, true, JSON.stringify(res.report));
   assert.deepEqual(log, [`${AUTH}.resource`]);
   assert.equal(res.report.withheld.visibility, 1);
+});
+
+// ── scrubUnpublishedRefs (spec 6.3: a public record never names an object that is not itself public) ──
+const it = (schema, slug, object = {}) => ({ schema, ref: `data/kb/${schema}.yaml#${slug}`, object: { title: slug, type: schema, ...object } });
+const A = 'at://did:plc:other/xyz.example.kb.resource/abc';
+
+test('scrub: drops slug, id and type:slug refs to an unselected local object from related and every ref array; keeps the rest', () => {
+  const pubNeed = it('need', 'p-need', { id: 'id-p' });
+  const m = it('need', 'm-need', { id: 'id-m' });
+  const r = it('resource', 'r', { related: ['m-need', 'need:m-need', 'id-m', 'p-need', 'need:p-need', 'id-p', A, 'nowhere'],
+    related_concepts: ['m-need'], related_options: ['id-m', 'p-need'], related_resources: ['need:m-need'], source_traditions: ['m-need', 'nowhere'] });
+  const out = scrubUnpublishedRefs([r, pubNeed], [r, pubNeed, m]);
+  assert.deepEqual(out[0].object.related, ['p-need', 'need:p-need', 'id-p', A, 'nowhere']);
+  assert.deepEqual(out[0].object.related_concepts, []);
+  assert.deepEqual(out[0].object.related_options, ['p-need']);
+  assert.deepEqual(out[0].object.related_resources, []);
+  assert.deepEqual(out[0].object.source_traditions, ['nowhere']);
+  assert.deepEqual(r.object.related.slice(0, 2), ['m-need', 'need:m-need'], 'the input is not mutated');
+  assert.equal(out[1], pubNeed, 'an item with nothing to scrub is returned as is');
+});
+
+test('scrub: a bare slug that names a selected AND an unselected object is ambiguous and dropped; the typed form of the selected one stays', () => {
+  const pr = it('resource', 'dup'); const hidden = it('need', 'dup'); const r = it('resource', 'r', { related: ['dup', 'resource:dup', 'need:dup'] });
+  assert.deepEqual(scrubUnpublishedRefs([r, pr], [r, pr, hidden])[0].object.related, ['resource:dup']);
+});
+
+test('scrub: with no `all` there is nothing known to hide, so nothing is dropped', () => {
+  const r = it('resource', 'r', { related: ['whatever'] });
+  assert.deepEqual(scrubUnpublishedRefs([r])[0].object.related, ['whatever']);
+});
+
+test('planPublish scrubs again, whatever the caller did: a record built from unscrubbed items carries no hidden slug', () => {
+  loadKmsConfig(instance());
+  const m = { schema: 'need', object: { ...need('matching-only'), id: 'id-m' }, ref: 'data/kb/need.yaml#m-need' };
+  const r = { schema: 'resource', object: { id: 'id-r', title: 'R', type: 'resource', public_use: 'ok-with-caveat', related: ['m-need', 'nowhere'], related_concepts: ['need:m-need'] }, ref: 'data/kb/resource.yaml#r' };
+  const plan = planPublish({ items: [r], all: [r, m], manifest: { version: 1, objects: {} }, did: 'did:plc:me', authority: AUTH });
+  assert.equal(plan.ok, true, JSON.stringify(plan.errors));
+  assert.equal(JSON.stringify(plan.create).includes('m-need'), false);
+  assert.deepEqual(plan.create[0].record.related, ['nowhere']);
 });

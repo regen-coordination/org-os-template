@@ -22,10 +22,10 @@ beforeEach(() => { fw.resetPacks(); resetRegistryBindings(); });
 const matching = { title: `Need ${SENTINEL}`, type: 'need', category: 'Tools and tech', text: `wants ${SENTINEL}`, contact_route: `${SENTINEL}@example.org`, intro_wanted: true, public_use: 'ok-with-caveat', visibility: 'matching-only' };
 const pub = { title: 'A public need', type: 'need', category: 'Land and place', text: 'a plain public text', contact_route: 'PUBLIC-NEED-CONTACT', intro_wanted: true, public_use: 'ok-with-caveat', visibility: 'public' };
 
-function instance(entries) {
+function instance(entries, resource = { title: 'A resource', type: 'resource', public_use: 'ok-with-caveat' }) {
   const dir = mkdtempSync(join(tmpdir(), 'egress-')); // no git, no remote
   mkdirSync(join(dir, 'data', 'kb'), { recursive: true });
-  writeFileSync(join(dir, 'data', 'kb', 'resource.yaml'), yaml.dump({ entries: { r: { title: 'A resource', type: 'resource', public_use: 'ok-with-caveat' } } }));
+  writeFileSync(join(dir, 'data', 'kb', 'resource.yaml'), yaml.dump({ entries: { r: resource } }));
   writeFileSync(join(dir, 'data', 'kb', 'need.yaml'), yaml.dump({ entries }));
   writeFileSync(join(dir, 'federation.yaml'), yaml.dump({ identity: { name: 'egress-os', type: 'PersonalNode' }, peers: [] }));
   writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', extensions: ['org-os-needs-offers'],
@@ -119,6 +119,20 @@ test('the export verb: matching-only and private needs never reach the commons; 
   assert.equal(out[join('data', 'kb', 'need.yaml')].includes('A public need'), true, 'the public need was not exported: the floor is simply off');
 });
 
+test('the export verb: a public resource whose related names a matching-only or private need carries no such slug into the commons', () => {
+  const base = { maturity: 'reviewed', source_lineage: 'repos/ReFi-Barcelona/notes/x.md', public_use: 'ok-with-caveat' };
+  const root = makeCanon({
+    need: { 'm-need': { ...base, type: 'need', title: 'M', visibility: 'matching-only' }, 'x-need': { ...base, type: 'need', title: 'X', visibility: 'private' } },
+    resource: { r: { ...base, type: 'resource', title: 'A resource', related: ['m-need', 'need:m-need', 'x-need'], related_concepts: ['x-need'] } },
+  });
+  const outDir = makeCommons(undefined, undefined, { extensions: ['org-os-needs-offers'], types_opt_in: ['need'] });
+  let n = 0;
+  exportCommons({ root, outDir, uuid: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` });
+  const all = JSON.stringify(readTree(outDir)); // the files written to the commons; the CLI report names rejected keys by design
+  assert.equal(all.includes('A resource'), true, 'the resource was not exported');
+  for (const slug of ['m-need', 'x-need']) assert.equal(all.includes(slug), false, `the export carries ${slug}`);
+});
+
 test('apply is refused while a shared lexicon is the placeholder example.commons.*: no client, no putRecord, no deleteRecord; plan mode still works', async () => {
   const dir = instance({ 'p-need': pub }); const puts = []; const dels = []; let created = 0;
   const createClient = (...a) => { created++; return clientFor(puts, dels)(...a); };
@@ -146,4 +160,34 @@ test('index.json (render.site) counts a gated type only when it passes the floor
   assert.equal(a.need, 1); assert.deepEqual([a.need, a.total], [b.need, b.total]); assert.deepEqual([a.need, a.total], [c.need, c.total]);
   assert.equal(a.total, 2, 'the public need and the resource'); // the private canon index keeps its own, honest counts
   assert.equal(counts('public', 'private').need, 2, 'a node that becomes public is counted: it is public');
+});
+
+// Spec 6.3: "never on a public page, never on atproto". A public record's `related` (and every ref field) must not name a
+// matching-only or private object of the canon: not as a slug, an id or a type:slug.
+test('a public resource whose related names a matching-only and a private need leaks neither slug anywhere outside the canon', async () => {
+  const resource = { title: 'A resource', type: 'resource', public_use: 'ok-with-caveat',
+    related: ['m-need', 'need:m-need', 'x-need', 'p-need', 'at://did:plc:other/xyz.example.kb.resource/abc', 'no-such-object'],
+    related_concepts: ['x-need', 'p-need'] };
+  const dir = instance({ 'm-need': matching, 'x-need': { ...matching, title: 'other', visibility: 'private' }, 'p-need': pub }, resource);
+  const puts = []; const dels = []; const config = loadKmsConfig(dir);
+  const res = await publish(dir, puts, dels);
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  OPS['index.rebuild'].run({ dir, config });
+  assert.equal(OPS['render.site'].run({ dir, config }).ok, true);
+  assert.equal(OPS.bridge.run({ dir, config }).ok, true);
+  buildMap({ dir });
+  const rec = puts.find((o) => o.record.title === 'A resource');
+  assert.ok(rec, 'the resource was not published');
+  for (const slug of ['m-need', 'x-need']) {
+    assert.equal(JSON.stringify(puts).includes(slug), false, `a putRecord payload carries ${slug}`);
+    const hit = filesWith(dir, slug);
+    assert.deepEqual(hit, ['data/kb/need.yaml', 'data/kb/resource.yaml'], `${slug} reached ${hit}`);
+  }
+  // What stays: a selected object, an at:// URI, and a ref that resolves to nothing local.
+  assert.deepEqual(rec.record.related, ['p-need', 'at://did:plc:other/xyz.example.kb.resource/abc', 'no-such-object'], 'the payload keeps only what is public, a foreign at:// and a dangling ref');
+  const api = JSON.parse(readFileSync(join(dir, 'public', 'api', 'resource.json'), 'utf8'));
+  assert.deepEqual(api.items[0].related, ['p-need', 'at://did:plc:other/xyz.example.kb.resource/abc', 'no-such-object']);
+  assert.deepEqual(api.items[0].related_concepts, ['p-need']);
+  const rows = yaml.load(readFileSync(join(dir, 'data', 'resources.yaml'), 'utf8')).resources;
+  assert.deepEqual(rows[0].related, ['p-need', 'at://did:plc:other/xyz.example.kb.resource/abc', 'no-such-object']);
 });

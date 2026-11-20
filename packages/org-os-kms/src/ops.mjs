@@ -22,6 +22,7 @@ import { planeRole, regatePublicPlane } from './planes/role.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { selectPublic } from './gate.mjs';
 import { loadSharedLexicons, cutToPublicFields } from './pack-publish.mjs';
+import { scrubUnpublishedRefs } from './visibility.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
 
@@ -107,7 +108,8 @@ export const OPS = {
     const { minted, items: identified } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget, mintGeo: Boolean(config.geo?.space) });
     report.minted = minted.length;
     // A visibility-gated type leaves the instance cut to its declared public_fields (ensureIds re-reads the canon, so it is cut after).
-    const items = identified.map((it) => ({ ...it, object: cutToPublicFields(it.schema, it.object) }));
+    // …and its refs are scrubbed of every object that is not itself selected (spec 6.3): the AT plan, the static API and the pages all read `items`.
+    const items = scrubUnpublishedRefs(identified.map((it) => ({ ...it, object: cutToPublicFields(it.schema, it.object) })), all);
 
     const manifest = readManifest(dir);
     let next = manifest;
@@ -117,7 +119,7 @@ export const OPS = {
       // objects on disk are not rewritten.
       const records = items.map((it) => (it.object.type ? it : { ...it, object: { type: it.schema, ...it.object } }));
       const shared = await loadSharedLexicons(config.packs);
-      const plan = planPublish({ items: records, manifest, did: at.did, authority: at.nsid_authority, shared });
+      const plan = planPublish({ items: records, all, manifest, did: at.did, authority: at.nsid_authority, shared });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;

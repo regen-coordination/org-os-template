@@ -12,7 +12,7 @@ import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
 import { registryBindings } from './bind.mjs';
 import { cutToPublicFields } from './pack-publish.mjs';
-import { visibilityFloor } from './visibility.mjs';
+import { visibilityFloor, scrubUnpublishedRefs } from './visibility.mjs';
 import { atomicWrite } from './atomic-write.mjs';
 
 // Upsert many objects into one registry file: read once, upsert each by id, write once.
@@ -60,10 +60,10 @@ export function bridge(ctx) {
   const { dir, config } = ctx;
   const items = fw.getAdapter(config.adapter).list(join(dir, config.target));
   const report = { bridged: [], docs: [], withheld: [], skipped: [], errors: [] };
-  const byRegistry = new Map(); // registryPath -> [objects]
+  const byRegistry = new Map(); // registryPath -> [{ schema, object, ref }]
   const bindings = registryBindings();
 
-  for (const { schema, object } of items) {
+  for (const { schema, object, ref } of items) {
     const registry = bindings[schema];
     if (!registry) { if (!report.skipped.includes(schema)) report.skipped.push(schema); continue; }
     if (registry.endsWith('/')) {
@@ -85,8 +85,12 @@ export function bridge(ctx) {
       if (!row) { report.withheld.push({ schema, title: object.title, reason: floor.ok ? 'undeclared' : 'visibility' }); continue; }
     }
     if (!byRegistry.has(registry)) byRegistry.set(registry, []);
-    byRegistry.get(registry).push(row);
+    byRegistry.get(registry).push({ schema, object: row, ref, registry });
   }
+  // A row's refs never name an object that did not itself become a row (spec 6.3): data/*.yaml are tracked and read by generators.
+  const written = scrubUnpublishedRefs([...byRegistry.values()].flat(), items);
+  byRegistry.clear();
+  for (const it of written) { if (!byRegistry.has(it.registry)) byRegistry.set(it.registry, []); byRegistry.get(it.registry).push(it.object); }
 
   for (const [registry, objects] of byRegistry) {
     try {

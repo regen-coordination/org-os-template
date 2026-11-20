@@ -2,7 +2,7 @@
 // passes. No grc20Id (no Geo space).
 import { getAdapter, isPublishable, PUBLISHABLE_TYPES } from '../framework.mjs';
 import { ensureIds } from '../identity.mjs';
-import { visibilityFloor } from '../visibility.mjs';
+import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
 
 /**
  * `types` — the publish-eligible type list of the COMMONS being exported to, from
@@ -33,7 +33,9 @@ export function selectForPublication({ root, verdicts, uuid, types = PUBLISHABLE
     if (!floor.ok) { floorRejected.push({ key, reason: floor.reason }); continue; }
     selected.push({ key, ...it });
   }
-  const { minted, items } = ensureIds({ adapter: 'repo-data', target: root, items: selected, write: true, mintGeo: false, ...(uuid ? { uuid } : {}) });
+  const { minted, items: ided } = ensureIds({ adapter: 'repo-data', target: root, items: selected, write: true, mintGeo: false, ...(uuid ? { uuid } : {}) });
+  // The commons drops `related` today; should a ref field ever be kept, it never names a canon object that was not selected (spec 6.3).
+  const items = scrubUnpublishedRefs(ided, listing);
   return {
     selected: items.map((it, i) => ({ key: selected[i].key, ...it })),
     minted: minted.length,

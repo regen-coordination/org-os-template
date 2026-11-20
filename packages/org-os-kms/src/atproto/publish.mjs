@@ -4,7 +4,7 @@ import * as fw from '../framework.mjs';
 import { rewriteRefs, resolverFrom } from '../refs.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { packPublishRules } from '../pack-publish.mjs';
-import { visibilityFloor } from '../visibility.mjs';
+import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
 
 function stable(v) {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
@@ -18,7 +18,9 @@ export function contentHash(record) { return createHash('sha256').update(stable(
  * toRecord(object), validated against `doc`, and the collection is doc.id, not nsidFor(schema, authority). A toRecord
  * that returns null leaves the object canon-only. Core types are unchanged.
  */
-export function planPublish({ items, manifest, did, authority, shared = {} }) {
+export function planPublish({ items: given, all = given, manifest, did, authority, shared = {} }) {
+  // Fail closed: whoever called, a public record's refs never name an object outside `given` (spec 6.3). `all` is the whole canon when known.
+  const items = scrubUnpublishedRefs(given, all);
   const lexicons = fw.generateAll({ authority });
   const resolve = resolverFrom(manifest);
   const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], previous: manifest.objects };
