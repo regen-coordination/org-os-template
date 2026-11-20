@@ -14,6 +14,7 @@ import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { planeRole } from './planes/role.mjs';
 import { publicEntryFor } from './planes/public-fields.mjs';
+import { packPublishRules } from './pack-publish.mjs';
 
 const present = (v) => v !== undefined && v !== null && v !== '';
 
@@ -56,6 +57,27 @@ export function withoutHomeFields(object) {
   return out;
 }
 
+/** The marks that make a record a claim to anyone who reads it: without all three it looks like the node's own record. */
+export const CLAIM_IDENTITY_MARKS = ['claim_for', 'claim_status', 'publisher'];
+
+/** → the claim marks a shared lexicon doc does not declare (empty = it carries them). */
+export function missingClaimMarks(doc) {
+  const props = doc?.defs?.main?.record?.properties ?? {};
+  return CLAIM_IDENTITY_MARKS.filter((k) => !(k in props));
+}
+
+/**
+ * A visibility-gated pack type is cut to its declared public_fields before it is planned, and that cut would drop the claim fields
+ * with the rest, so a claim would reach the plan, the static API and the pages as a plain object. Put back what makes it a claim
+ * (the marks and the consent date the floor re-checks); the allow-list cut (claimView) then decides what is shown.
+ */
+export function carryClaim(original, cut) {
+  if (!cut || !isClaim(original)) return cut;
+  const out = { ...cut };
+  for (const k of [...CLAIM_RECORD_FIELDS, 'consent_atproto']) if (original[k] !== undefined) out[k] = original[k];
+  return out;
+}
+
 /** What a claim shows of itself, besides its marks (CLAIM_RECORD_FIELDS) and what its schema declares public. */
 export const CLAIM_CONTENT_FIELDS = ['id', 'title', 'type', 'public_use', 'url', 'description'];
 
@@ -70,7 +92,7 @@ export const CLAIM_CONTENT_FIELDS = ['id', 'title', 'type', 'public_use', 'url',
 export function claimView(object, publisher, schema = object?.type) {
   const home = withoutHomeFields(object);
   const declared = publicEntryFor(schema, home);
-  const keep = new Set([...CLAIM_CONTENT_FIELDS, ...CLAIM_RECORD_FIELDS]);
+  const keep = new Set([...CLAIM_CONTENT_FIELDS, ...CLAIM_RECORD_FIELDS, ...(packPublishRules(schema)?.public_fields ?? [])]);
   const out = {};
   for (const [k, v] of Object.entries(home)) {
     if (k in declared) out[k] = day(declared[k]);

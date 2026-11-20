@@ -5,7 +5,7 @@ import { rewriteRefs, resolverFrom } from '../refs.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { packPublishRules } from '../pack-publish.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
-import { isClaim, claimFloor, claimView, CLAIM_RECORD_FIELDS } from '../claims.mjs';
+import { isClaim, claimFloor, claimView, missingClaimMarks, CLAIM_RECORD_FIELDS, CLAIM_IDENTITY_MARKS } from '../claims.mjs';
 
 function stable(v) {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
@@ -25,7 +25,7 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
   const items = scrubUnpublishedRefs(given, all);
   const lexicons = fw.generateAll({ authority });
   const resolve = resolverFrom(manifest);
-  const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], orphans: [], previous: manifest.objects };
+  const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], orphans: [], withheld: [], previous: manifest.objects };
   const seen = new Set();
   for (const { schema, object, ref } of items) {
     const sharedEntry = shared[schema] ?? null;
@@ -47,10 +47,21 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
     if (isClaim(object)) {
       const cf = claimFloor(object, claimConfig);
       if (!cf.ok) { plan.errors.push({ slug, errors: [cf.reason] }); continue; }
+      // A shared lexicon is somebody else's schema. A claim put there without claim marks would read as the node's own record, so it is
+      // withheld (fail closed, not an error: the rest of the plan is unaffected) until the lexicon carries the marks. Because it is not
+      // `seen`, a copy published earlier is deleted below.
+      if (sharedEntry) {
+        const missing = missingClaimMarks(sharedEntry.doc);
+        if (missing.length) { plan.withheld.push({ id: object.id, slug, type: schema, reason: `claim withheld: the shared lexicon ${sharedEntry.doc.id} has no claim marks (${missing.join(', ')}), so a claim there would read as the node's own record` }); continue; }
+      }
       const marked = claimView(source, claimPublisher, schema);
       source = rules ? { ...source, ...Object.fromEntries(CLAIM_RECORD_FIELDS.filter((k) => marked[k] !== undefined).map((k) => [k, marked[k]])) } : marked;
     }
     const record = sharedEntry ? sharedEntry.toRecord(source) : fw.toRecord(source, collection);
+    if (isClaim(object) && record !== null && sharedEntry) {
+      const dropped = CLAIM_IDENTITY_MARKS.filter((k) => record[k] === undefined);
+      if (dropped.length) { plan.withheld.push({ id: object.id, slug, type: schema, reason: `claim withheld: the shared lexicon ${sharedEntry.doc.id} maps a claim to a record without ${dropped.join(', ')}, so it would read as the node's own record` }); continue; }
+    }
     if (record === null) continue; // no home in the shared lexicon: stays canon-only (and is deleted below if it was published)
     const v = fw.validateRecord(record, sharedEntry ? sharedEntry.doc : lexicons[collection]);
     if (!v.ok) { plan.errors.push({ slug, errors: v.errors }); continue; }

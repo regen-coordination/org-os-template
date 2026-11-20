@@ -25,7 +25,7 @@ import { loadSharedLexicons, cutToPublicFields } from './pack-publish.mjs';
 import { scrubUnpublishedRefs } from './visibility.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
-import { reconcileClaims } from './claims.mjs';
+import { reconcileClaims, carryClaim } from './claims.mjs';
 import { exportUpdateDrafts } from './certified/update.mjs';
 
 export const OPS = {
@@ -111,7 +111,7 @@ export const OPS = {
     report.minted = minted.length;
     // A visibility-gated type leaves the instance cut to its declared public_fields (ensureIds re-reads the canon, so it is cut after).
     // …and its refs are scrubbed of every object that is not itself selected (spec 6.3): the AT plan, the static API and the pages all read `items`.
-    const items = scrubUnpublishedRefs(identified.map((it) => ({ ...it, object: cutToPublicFields(it.schema, it.object) })), all);
+    const items = scrubUnpublishedRefs(identified.map((it) => ({ ...it, object: carryClaim(it.object, cutToPublicFields(it.schema, it.object)) })), all);
 
     const manifest = readManifest(dir);
     let next = manifest;
@@ -123,6 +123,8 @@ export const OPS = {
       const shared = await loadSharedLexicons(config.packs);
       const plan = planPublish({ items: records, all, manifest, did: at.did, authority: at.nsid_authority, shared, publishClaims: config.publish?.claims === true, claimPublisher: config.publish?.claim_publisher });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
+      // A claim whose shared lexicon has no claim marks is withheld by the plan (src/atproto/publish.mjs): counted with the floor's claims, and named.
+      if (plan.withheld.length) report.withheld = { ...(report.withheld ?? {}), claims: (report.withheld?.claims ?? 0) + plan.withheld.length, claim_details: plan.withheld.map(({ slug, type, reason }) => ({ slug, type, reason })) };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length, ...(plan.orphans.length ? { orphans: plan.orphans.length } : {}) };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
       // an invalid one is reported (status 'invalid', ok:false) and nothing of it is written.
