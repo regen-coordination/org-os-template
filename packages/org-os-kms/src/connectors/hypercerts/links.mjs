@@ -93,6 +93,6 @@ export async function enrichWithBacklinks(client, subjects, { maxRequests = DEFA
       if (stopped) break;
       out.subjects[subject] = { counts, backlinks };
     }
-  } catch (e) { out.error = e.message; }
+  } catch (e) { out.error = e?.message ?? String(e); }
   return out;
 }

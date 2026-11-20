@@ -181,3 +181,11 @@ test('F6: raw("__proto__") and other inherited names are refused as not allowed,
   assert.equal(f.calls.length, 0);
 });
 
+
+// ---- F7: a rejection that is not an Error does not break "never throws" ----
+test('F7: enrichWithBacklinks never throws, even when the client rejects with null or a string', async () => {
+  for (const reason of [null, undefined, 'plain string', 42]) {
+    const out = await enrichWithBacklinks({ countLinks: () => Promise.reject(reason), getBacklinks: async () => ({}) }, [ACT1]);
+    assert.equal(typeof out.error, 'string'); assert.equal(out.error, String(reason)); assert.deepEqual(out.subjects, {});
+  }
+});
