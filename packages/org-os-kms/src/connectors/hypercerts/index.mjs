@@ -1,5 +1,5 @@
 // packages/org-os-kms/src/connectors/hypercerts/index.mjs — pull from Hypercerts / Certified (api.hypercerts.dev), read-only.
-// kms.yaml: connectors: [{ name: hypercerts, config: { follows_of: <DID>, dids: [<DID>…] } }]
+// kms.yaml: connectors: [{ name: hypercerts, config: { follows_of: <DID>, dids: [<DID>…], constellation?: { enabled: true, base? } } }]
 //
 // Scope: the accounts `follows_of` follows on Certified plus `dids`; with neither the run refuses (never the whole directory).
 // Cursor (data/kms-cursors.json): { seen: { organization: [AT-URI…], activity: […], attachment: […] } } — the URIs kept
@@ -10,12 +10,13 @@
 import { createHypercertsClient, DEFAULT_BASE } from './client.mjs';
 import { resolveScope } from './scope.mjs';
 import { mapRecord, isTestTitle } from './map.mjs';
+import { createConstellationClient, enrichWithBacklinks } from './links.mjs';
 
 const COLLECTIONS = ['organization', 'activity', 'attachment'];
 const didOfUri = (uri) => String(uri).split('/')[2];
 const orgName = (rec) => rec.profile?.displayName ?? rec.value?.legalName;
 
-export function createHypercertsConnector({ createClient = createHypercertsClient } = {}) {
+export function createHypercertsConnector({ createClient = createHypercertsClient, createLinks = (cfg) => createConstellationClient({ base: cfg.base }) } = {}) {
   return {
     name: 'hypercerts', protocol: 'Hypercerts / Certified public XRPC API (read-only)', capabilities: { ingest: true, subscribe: false, publish: false },
     describe(config = {}) {
@@ -73,7 +74,15 @@ export function createHypercertsConnector({ createClient = createHypercertsClien
         for (const rec of kept[collection]) records.push({ kind: collection, rec, activityTitles });
       }
       if (held.size) errors.push({ collection: 'attachment', error: `held ${held.size} attachment(s) this run: the activity listing failed, so it could not be checked whether they are about a test activity (none stored or retracted)` });
-      return { records, cursor: { seen }, retracted, errors };
+      const result = { records, cursor: { seen }, retracted, errors };
+      // Optional enrichment (links.mjs): only with `constellation.enabled === true`. It reads, after everything above is
+      // decided, and can change nothing above: a failure lands in `enrichment` only, and its answers never feed `retracted`.
+      if (config.constellation?.enabled === true) {
+        const subjects = ['activity', 'organization'].flatMap((c) => (kept[c] || []).map((r) => r.uri));
+        const { subjects: found, requests, error } = await enrichWithBacklinks(createLinks(config.constellation), subjects);
+        result.enrichment = { constellation: { subjects: found, requests, ...(error ? { error } : {}) } };
+      }
+      return result;
     },
     map(record) { return mapRecord(record); },
   };
