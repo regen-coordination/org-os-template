@@ -97,7 +97,7 @@ connectors:
     config:
       follows_of: did:plc:...        # the accounts this DID follows on Certified are in scope
       dids: [did:plc:..., did:web:...] # plus these; a DID, never a handle or an AT-URI
-      # base: https://api.hypercerts.dev   (default; the only host it talks to)
+      # base: https://api.hypercerts.dev   (the default host; `base` is free config, so point it only at a Hypercerts API you trust)
 ```
 
 - **Read-only, no login.** GET requests to the public Hypercerts API (`api.hypercerts.dev`, `GET /xrpc/<NSID>`), no PDS, labeler or firehose. The client refuses to send a query parameter the contract does not list (the live server answers an unknown one with a stack trace) and never copies a response body into an error.
@@ -105,6 +105,8 @@ connectors:
 - **What is read, per scoped DID:** organizations (`app.certified.actor.getOrganizations`), activities (`org.hypercerts.claim.listActivities`, `authors`), attachments (`org.hypercerts.context.listAttachments`, `authors`). The followed accounts come from `app.certified.graph.listActorFollowing`.
 - **What it maps:** organization → `organization`; activity → `implementation-record` (`source_position: self-report`); attachment `evidence` / `report` / `audit` → `claim-evidence`; attachment `update` → `signal` (the update text and its languages go in `notes`). Galleries, photos, audio, comments, funding receipts and anything else are **not** mapped; no donor or wallet field is ever read.
 - **What it skips:** organizations and activities with no title or a title naming a test, QA, e2e or demo run; attachments whose own title says so or whose activity is such a test. Certified's `likely-test` label is **not** used: the public API has no label operation (65 operations checked, 2026-11-20) and the labeler is a separate host, so v1 filters on titles only.
+- **A title edit can hold a record.** The filter reads the title on every run. If the origin later edits a title already pulled so that it names a test or a demo (or blanks it), the record leaves the kept set, counts as vanished, and is set `held` like a retraction (section 10) even though nothing was retracted at the origin. The review note then says `retracted at origin`; read the origin before believing it.
+- **A failed activity listing holds attachments, it does not guess.** Whether an attachment is about a test activity is known only from the activity listing. When that listing fails, an attachment is kept only if every activity it is about was kept by the last good listing; the others are held for that run (not stored, not retracted, cursor unchanged) and `errors` carries one `attachment` entry saying how many.
 - **Candidates land `raw` and `not-public-yet`** like every pulled record (section 10), and a `source-system` card for the API is stored `internal-only`.
 - **Cursor** (`data/kms-cursors.json`, key `hypercerts`): `{ seen: { organization: [AT-URI…], activity: […], attachment: […] } }`, the URIs kept by the last good listing of each collection.
 - **Retraction** (an origin record that vanished sets `held`, section 10) is worked out per collection, only for a collection that listed successfully, and only over DIDs still in scope. Two cases that must not retract: **unfollowing an account** (its records stay, its URIs leave `seen`) and **a listing that failed half-way** (the cursor for that collection is left as it was and `errors` names it).
