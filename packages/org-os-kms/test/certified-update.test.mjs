@@ -166,3 +166,16 @@ test('the op is registered and bound to no lifecycle event; the verb routes `cer
   assert.equal(res.ok, true); assert.equal(res.report.written.length, 1);
   assert.match((await dispatch(['certified', 'nope', '--dir', dir])).error, /unknown subcommand/);
 });
+
+// F5 (seat-7 fixes): the consent date is a real date here too (the same isDate as the claim floor).
+test('a signal whose consent_atproto is 2026-02-31 is not eligible (not a calendar date)', async () => {
+  const dir = instance({ signals: { impossible: signal({ consent_atproto: '2026-02-31' }), fine: signal({ title: 'Fine', consent_atproto: '2026-02-28' }) } });
+  const res = await exportUpdateDrafts({ dir, config: loadKmsConfig(dir), now: NOW, deps: { createClient: noLogin } });
+  assert.deepEqual(files(dir), ['fine.json']); assert.match(res.report.skipped[0].reason, /consent/);
+});
+
+test('the golden fixture names no real account: its subject DID is a placeholder', () => {
+  const raw = readFileSync(join(here, 'fixtures', 'certified', 'feed-post.json'), 'utf8');
+  assert.ok(!raw.includes('5djz5xbrofohabl25g6y7tst'), 'the author\'s DID is not in the fixture');
+  assert.match(golden.subjects[0].uri, /^at:\/\/did:plc:a{24}\//);
+});

@@ -23,10 +23,19 @@ export function isClaim(object) {
   return Boolean(object) && typeof object === 'object' && ['claim_for', 'claim_status', 'claim_node_did'].some((k) => present(object[k]));
 }
 
-/** A real calendar date: a YAML date (a Date) or a `YYYY-MM-DD…` string. `yes`, `someday` and the empty value are not dates. */
-function isDate(v) {
+/**
+ * A real calendar date: a YAML date (a Date) or a `YYYY-MM-DD` string, optionally followed by a time. `yes`, `someday`, the empty
+ * value and an impossible day (2026-02-31, 2025-02-29) are not dates: Date.parse rolls 2026-02-31 over to 3 March, so the day is
+ * checked against the month. (An UNQUOTED 2026-02-31 in YAML is rolled over by the parser itself before this sees it; quote dates.)
+ */
+export function isDate(v) {
   if (v instanceof Date) return !Number.isNaN(v.getTime());
-  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) && !Number.isNaN(Date.parse(v));
+  if (typeof v !== 'string') return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?![\d])/.exec(v);
+  if (!m || Number.isNaN(Date.parse(v))) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const check = new Date(Date.UTC(y, mo - 1, d));
+  return check.getUTCFullYear() === y && check.getUTCMonth() === mo - 1 && check.getUTCDate() === d;
 }
 
 /**
@@ -38,7 +47,7 @@ export function claimFloor(object, config = {}) {
   if (!isClaim(object)) return { ok: true };
   if (config.publish?.claims !== true) return { ok: false, reason: 'claim floor: publish.claims is not on, so nothing is published on a node\'s behalf' };
   if (object.claim_status !== 'claimed') return { ok: false, reason: `claim floor: claim_status is ${object.claim_status ?? 'missing'}, only a claim in status "claimed" is published` };
-  if (!present(object.claim_for)) return { ok: false, reason: 'claim floor: a claim must say what it is for (claim_for)' };
+  if (typeof object.claim_for !== 'string' || !object.claim_for.trim()) return { ok: false, reason: 'claim floor: a claim must say what it is for (claim_for)' };
   if (!isDate(object.consent_atproto)) return { ok: false, reason: 'claim floor: no consent_atproto date, so the node has not said yes by name to publishing about it' };
   const p = config.publish?.claim_publisher;
   if (typeof p !== 'string' || !p.trim()) return { ok: false, reason: 'claim floor: publish.claim_publisher is not set, so a claim would not name who publishes it' };

@@ -6,12 +6,11 @@ import * as fw from '../framework.mjs';
 import { loadKmsConfig } from '../config.mjs';
 import { atomicWrite } from '../atomic-write.mjs';
 import { slugFromRef } from '../manifest.mjs';
-import { isClaim } from '../claims.mjs';
+import { isClaim, isDate } from '../claims.mjs';
 import { textToLeaflet } from './leaflet.mjs';
 
 const COLLECTION = 'org.hypercerts.context.attachment';
 const present = (v) => v !== undefined && v !== null && v !== '';
-const isDate = (v) => (v instanceof Date ? !Number.isNaN(v.getTime()) : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) && !Number.isNaN(Date.parse(v)));
 
 /**
  * signal: a kms `signal` object. The report text is `signal.update_text`, a plain field on the node's own signals: NOT `notes`, which

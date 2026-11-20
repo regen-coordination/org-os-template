@@ -1,5 +1,5 @@
 {
-  "_provenance": "One public Certified feed post (org.hypercerts.context.attachment, contentType update), read 2026-11-20 from GET https://api.hypercerts.dev/xrpc/org.hypercerts.context.listAttachments (no parameters, generic User-Agent). Hand-trimmed to two blocks; the author, indexer fields and AT-URI of the post itself are dropped. The golden SHAPE for buildUpdateRecord, not data.",
+  "_provenance": "One public Certified feed post (org.hypercerts.context.attachment, contentType update), read 2026-11-20 from GET https://api.hypercerts.dev/xrpc/org.hypercerts.context.listAttachments (no parameters, generic User-Agent). Hand-trimmed to two blocks; the author, indexer fields and AT-URI of the post itself are dropped, and the DID inside subjects[0].uri is replaced by a placeholder (did:plc:aaaa…) so no real account is named here. The golden SHAPE for buildUpdateRecord, not data.",
   "record": {
     "$type": "org.hypercerts.context.attachment",
     "contentType": "update",
@@ -27,7 +27,7 @@
       {
         "$type": "com.atproto.repo.strongRef",
         "cid": "bafyreias3kj6vrv3n5ron53qr2jkbfye6yejqrr2yn3ccsncaqkxb3bsoy",
-        "uri": "at://did:plc:5djz5xbrofohabl25g6y7tst/org.hypercerts.claim.activity/3my2gkrimvs2y"
+        "uri": "at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/org.hypercerts.claim.activity/3my2gkrimvs2y"
       }
     ],
     "title": "Introducing Our Research: Listening to the Sounds of Forest Recovery"

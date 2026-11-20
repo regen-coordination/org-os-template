@@ -11,7 +11,7 @@ import * as fw from '../src/framework.mjs';
 import { OPS } from '../src/ops.mjs';
 import { resetRegistryBindings } from '../src/bind.mjs';
 import { loadKmsConfig } from '../src/config.mjs';
-import { claimFloor, reconcileClaims, normalizeUrl } from '../src/claims.mjs';
+import { claimFloor, reconcileClaims, normalizeUrl, isDate } from '../src/claims.mjs';
 import { planPublish } from '../src/atproto/publish.mjs';
 import { dispatch } from '../src/cli.mjs';
 
@@ -311,4 +311,26 @@ test('reconcile: with no DID known a url match still supersedes, and the report 
   const dir2 = instance({ entries: { 'node-a': claimOrg({ claim_node_did: NODE_DID }), 'node-a-own': own() } });
   const r2 = await reconcileClaims({ dir: dir2, config: loadKmsConfig(dir2) });
   assert.equal(r2.report.superseded[0].matched, 'did'); assert.equal(r2.report.urlOnly, 0); assert.equal(r2.report.note, undefined);
+});
+
+// ---- F5 (seat-7 fixes): a date is a real calendar date; a claim_for is not just spaces ----
+
+test('isDate: impossible calendar dates are refused, real ones (leap day, a datetime) are not', () => {
+  for (const bad of ['2026-02-31', '2026-13-01', '2026-00-10', '2026-04-31', '2025-02-29', '2026-11-00', '2026-11-19T25:00:00Z', 'yes', '', null, undefined, 20261119]) assert.equal(isDate(bad), false, String(bad));
+  for (const good of ['2026-02-28', '2024-02-29', '2026-11-19', '2026-11-19T10:30:00Z', new Date('2026-11-19')]) assert.equal(isDate(good), true, String(good));
+  assert.equal(isDate(new Date('nope')), false);
+});
+
+test('claimFloor: a consent date of 2026-02-31 is not a date', () => {
+  const r = claimFloor(claimOrg({ consent_atproto: '2026-02-31' }), { publish: { claims: true, claim_publisher: 'ReFi DAO' } });
+  assert.equal(r.ok, false); assert.match(r.reason, /consent_atproto/);
+});
+
+test('claimFloor: a claim_for of only whitespace says nothing about what the claim is for', () => {
+  const cfg = { publish: { claims: true, claim_publisher: 'ReFi DAO' } };
+  for (const blank of ['   ', '\t\n', ' ']) {
+    const r = claimFloor(claimOrg({ claim_for: blank }), cfg);
+    assert.equal(r.ok, false, JSON.stringify(blank)); assert.match(r.reason, /claim_for/);
+  }
+  assert.equal(claimFloor(claimOrg({ claim_for: 42 }), cfg).ok, false, 'a claim_for that is not text');
 });
