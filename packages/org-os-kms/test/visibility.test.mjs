@@ -220,3 +220,19 @@ test('scrub N6: Need:Priv-Offer (the wrong type, mixed case) for a private offer
   assert.equal('parent' in o, false);
   assert.equal(stats.total, 6);
 });
+
+// ── Polish N7: a refusal caused by the scrub says so ──
+test('planPublish N7: a required field removed by the scrub is refused with the cause named, never the value; a field that was never there is not blamed on the scrub', async () => {
+  const config = loadKmsConfig(instance());
+  const shared = await loadSharedLexicons(config.packs); const base = { manifest: { version: 1, objects: {} }, did: 'did:plc:me', authority: AUTH, shared };
+  const m = { schema: 'need', object: { ...need('matching-only'), id: 'id-m' }, ref: 'data/kb/need.yaml#m-need' };
+  const eaten = { schema: 'need', object: { ...need('public'), id: 'id-p', text: 'm-need' }, ref: 'data/kb/need.yaml#p-need' };
+  const plan = planPublish({ ...base, items: [eaten], all: [eaten, m] });
+  assert.equal(plan.ok, false);
+  const msgs = plan.errors.flatMap((e) => e.errors);
+  assert.ok(msgs.includes('missing required field: text (removed: matched a non-public object)'), JSON.stringify(msgs));
+  assert.equal(JSON.stringify(plan.errors).includes('m-need'), false, 'the value that matched is never named');
+  const never = { schema: 'need', object: { ...need('public'), id: 'id-q', text: undefined }, ref: 'data/kb/need.yaml#q-need' };
+  const plan2 = planPublish({ ...base, items: [never], all: [never, m] });
+  assert.deepEqual(plan2.errors.flatMap((e) => e.errors), ['missing required field: text']);
+});

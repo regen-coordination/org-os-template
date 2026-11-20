@@ -21,6 +21,7 @@ export function contentHash(record) { return createHash('sha256').update(stable(
 export function planPublish({ items: given, all = given, manifest, did, authority, shared = {} }) {
   // Fail closed: whoever called, a public record's refs never name an object outside `given` (spec 6.3). `all` is the whole canon when known.
   const items = scrubUnpublishedRefs(given, all);
+  const original = new Map(given.map((g) => [g.ref, g.object]));
   const lexicons = fw.generateAll({ authority });
   const resolve = resolverFrom(manifest);
   const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], orphans: [], previous: manifest.objects };
@@ -44,7 +45,12 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
     const record = sharedEntry ? sharedEntry.toRecord(source) : fw.toRecord(source, collection);
     if (record === null) continue; // no home in the shared lexicon: stays canon-only (and is deleted below if it was published)
     const v = fw.validateRecord(record, sharedEntry ? sharedEntry.doc : lexicons[collection]);
-    if (!v.ok) { plan.errors.push({ slug, errors: v.errors }); continue; }
+    if (!v.ok) {
+      // A required field the scrub removed is named as such (never its value), so the author knows it was not forgotten.
+      const was = original.get(ref);
+      const removed = (e) => { const f = /^missing required field: (.+)$/.exec(e)?.[1]; return f && was && was[f] !== undefined && was[f] !== null && (object[f] === undefined || object[f] === null) ? `${e} (removed: matched a non-public object)` : e; };
+      plan.errors.push({ slug, errors: v.errors.map(removed) }); continue;
+    }
     const id = object.id; seen.add(id);
     const hash = contentHash(record);
     const prev = manifest.objects[id];
