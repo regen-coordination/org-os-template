@@ -6,7 +6,7 @@ import * as fw from '../framework.mjs';
 import { loadKmsConfig } from '../config.mjs';
 import { atomicWrite } from '../atomic-write.mjs';
 import { slugFromRef } from '../manifest.mjs';
-import { isClaim, isDate } from '../claims.mjs';
+import { isClaim, isDate, claimFloor } from '../claims.mjs';
 import { textToLeaflet } from './leaflet.mjs';
 
 const COLLECTION = 'org.hypercerts.context.attachment';
@@ -68,6 +68,9 @@ export async function exportUpdateDrafts({ dir = '.', config, outDir, now } = {}
     if (present(object.sourceUri)) { report.ignored.ingested++; continue; }
     const v = eligibility(object);
     if (!v.eligible) { report.skipped.push({ id: slug, reason: v.reason }); continue; }
+    // A claim about a node is drafted only when it clears the same floor as publish (publish.claims on, a publisher, still claimed, a claim_for): a
+    // superseded claim is a node that now speaks for itself, and the draft is the one place update_text, which a claim's cut drops everywhere else, is carried.
+    if (isClaim(object)) { const floor = claimFloor(object, cfg, schema); if (!floor.ok) { report.skipped.push({ id: slug, reason: floor.reason }); continue; } }
     const subject = { uri: object.certified_subject, ...(present(object.certified_subject_cid) ? { cid: object.certified_subject_cid } : {}) };
     const record = buildUpdateRecord(object, { subject, createdAt });
     const file = join(out, `${slug}.json`);

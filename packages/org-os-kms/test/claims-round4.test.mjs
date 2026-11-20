@@ -38,3 +38,37 @@ for (const claims of [true, false]) {
     for (const n of ['Pat Quill', 'Sam Rivera', 'Alex Moreau', 'Claim Source']) assert.ok(!text.includes(n), n);
   });
 }
+
+// ---- sweep: the certified update drafts (certified/update.mjs) follow the claim floor ----
+import { exportUpdateDrafts } from '../src/certified/update.mjs';
+import { readdirSync, existsSync } from 'node:fs';
+import { loadKmsConfig } from '../src/config.mjs';
+
+const SUBJECT = 'at://did:plc:nodeaaaaaaaaaaaaaaaaaaaa/org.hypercerts.claim.activity/3abc';
+const sig = (extra) => ({ title: 'A claimed update', type: 'signal', signal_type: 'implementation', public_use: 'ok-with-caveat', update_text: 'The node planted seedlings.', certified_subject: SUBJECT,
+  claim_for: 'https://node-a.example', claim_status: 'claimed', consent_atproto: '2026-11-19', ...extra });
+function certInstance(signals, publish = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-claim-r4c-'));
+  mkdirSync(join(dir, 'data', 'kb'), { recursive: true });
+  writeFileSync(join(dir, 'data', 'kb', 'signal.yaml'), yaml.dump({ entries: signals }));
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', publish: { certified_drafts: true, ...publish } }));
+  return dir;
+}
+const drafted = (dir) => { const d = join(dir, 'renders', 'certified-updates'); return existsSync(d) ? readdirSync(d).sort() : []; };
+
+test('sweep certified drafts: a claimed signal is drafted only when it clears the claim floor (publish.claims on, a publisher, still claimed)', async () => {
+  const dir = certInstance({ ok: sig(), superseded: sig({ title: 'Superseded', claim_status: 'superseded', superseded_by: 'at://did:plc:n/x/y' }), 'no-claim-for': sig({ title: 'No target', claim_for: '' }) }, { claims: true, claim_publisher: 'ReFi DAO' });
+  const res = await exportUpdateDrafts({ dir, config: loadKmsConfig(dir), now: '2026-11-20T12:00:00.000Z' });
+  assert.deepEqual(drafted(dir), ['ok.json']);
+  const why = Object.fromEntries(res.report.skipped.map((s) => [s.id, s.reason]));
+  assert.match(why.superseded, /claim floor/); assert.match(why['no-claim-for'], /claim floor/);
+});
+
+test('sweep certified drafts: with publish.claims off, or no publisher, a consented claim is not drafted either', async () => {
+  for (const publish of [{ claim_publisher: 'ReFi DAO' }, { claims: true }]) {
+    const dir = certInstance({ ok: sig() }, publish);
+    const res = await exportUpdateDrafts({ dir, config: loadKmsConfig(dir), now: '2026-11-20T12:00:00.000Z' });
+    assert.deepEqual(drafted(dir), [], JSON.stringify(publish));
+    assert.match(res.report.skipped[0].reason, /claim floor/);
+  }
+});
