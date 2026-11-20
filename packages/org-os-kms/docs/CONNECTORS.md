@@ -89,6 +89,27 @@ connectors:
 - Because there is no per-record diff, `runConnector` flags **every** re-pulled record `review_needs: 'updated at origin'` even if its content is unchanged.
 - A locally `reviewed` object that has `ai_assisted: true` can never receive origin updates: the update is rejected by the AI-assisted is not human-reviewed invariant and reported under `invalid`.
 
+## 8a. Pulling from Hypercerts and Certified (`hypercerts` connector)
+
+```yaml
+connectors:
+  - name: hypercerts
+    config:
+      follows_of: did:plc:...        # the accounts this DID follows on Certified are in scope
+      dids: [did:plc:..., did:web:...] # plus these; a DID, never a handle or an AT-URI
+      # base: https://api.hypercerts.dev   (default; the only host it talks to)
+```
+
+- **Read-only, no login.** GET requests to the public Hypercerts API (`api.hypercerts.dev`, `GET /xrpc/<NSID>`), no PDS, labeler or firehose. The client refuses to send a query parameter the contract does not list (the live server answers an unknown one with a stack trace) and never copies a response body into an error.
+- **It refuses to run unscoped.** The scope is `follows_of`'s follows plus `dids`. With neither, or with a `follows_of` that follows nobody and no `dids`, the connector throws (`ingest` reports it `failed`) instead of reading the whole directory (about 9,600 candidates on 2026-11-18, almost all unrelated). A commons account that follows nobody on Certified needs `dids` until it does.
+- **What is read, per scoped DID:** organizations (`app.certified.actor.getOrganizations`), activities (`org.hypercerts.claim.listActivities`, `authors`), attachments (`org.hypercerts.context.listAttachments`, `authors`). The followed accounts come from `app.certified.graph.listActorFollowing`.
+- **What it maps:** organization → `organization`; activity → `implementation-record` (`source_position: self-report`); attachment `evidence` / `report` / `audit` → `claim-evidence`; attachment `update` → `signal` (the update text and its languages go in `notes`). Galleries, photos, audio, comments, funding receipts and anything else are **not** mapped; no donor or wallet field is ever read.
+- **What it skips:** organizations and activities with no title or a title naming a test, QA, e2e or demo run; attachments whose own title says so or whose activity is such a test. Certified's `likely-test` label is **not** used: the public API has no label operation (65 operations checked, 2026-11-20) and the labeler is a separate host, so v1 filters on titles only.
+- **Candidates land `raw` and `not-public-yet`** like every pulled record (section 10), and a `source-system` card for the API is stored `internal-only`.
+- **Cursor** (`data/kms-cursors.json`, key `hypercerts`): `{ seen: { organization: [AT-URI…], activity: […], attachment: […] } }`, the URIs kept by the last good listing of each collection.
+- **Retraction** (an origin record that vanished sets `held`, section 10) is worked out per collection, only for a collection that listed successfully, and only over DIDs still in scope. Two cases that must not retract: **unfollowing an account** (its records stay, its URIs leave `seen`) and **a listing that failed half-way** (the cursor for that collection is left as it was and `errors` names it).
+- **Dry run:** `org-os-kms ingest --connector hypercerts --dry --dir <instance>` stores nothing and writes no cursor. Read `failed`, `errors`, `invalid` and `collided`, not just the exit code.
+
 ## 9. Ids
 
 - `id` (UUIDv4) is the AT Proto record key (`rkey`) and the key of the publish manifest (`data/kms-published.json`). It is minted at first non-dry publish, and **only for objects that passed every gate**, and only when a publication target exists (section 2); never on `--dry`. The instance-registry bridge (`bridge`) matches an existing `data/<registry>.yaml` row by the object's `id` **or** its title slug, so a row bridged before the id was minted migrates from slug to id in place instead of being duplicated. The `id` is a field on the object in the source yaml, so git holds it.
