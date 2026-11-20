@@ -52,7 +52,7 @@ The closed audit list (read in this build, 2026-11-20):
 | Path | Verdict |
 |---|---|
 | `registry-bridge.mjs` | Upserted every bound object into `data/needs.yaml` / `data/offers.yaml`, tracked files that generators read. **Changed:** a gated type is skipped unless it clears its floor, and a row carries only `public_fields`. Applied to every instance, because the per-instance answers (tracked? remote? read by a generator?) for Brasil Regenerativo and `refi-dao-os` were not read in this build; the stricter default is safe for all. |
-| `render.site` (`renderSiteData`) | Copies `data/kb/index.json`: counts by type and maturity, no titles or fields. A matching-only need is counted there (existence, not content). |
+| `render.site` (`renderSiteData`) | Writes the index (counts by type and maturity, no titles or fields) to the site data path. **Changed:** a gated type is counted only when the object passes the floor, so a node moving between matching-only and private moves no count; the private canon's own `data/kb/index.json` is unchanged. |
 | `static/surface.mjs`, `pages/` | Take only the selected items; gated types are cut to `public_fields` before them (a public need's `contact_route` does not reach `api/need.json` or a page). |
 | `planes/export-commons.mjs`, `planes/select-for-publication.mjs` | Writes `data/kb/<type>.yaml` into the commons, the public plane. **Changed:** `selectForPublication` applies the visibility floor after the commons' policy registers the pack rules; a failing object is listed in `floorRejected`, never written. Test: the export case in `test/matching-only-egress.test.mjs`. |
 | `federate.contribute` | Reads the peer card only; `records` come from the caller, and the result is a draft, never applied. |

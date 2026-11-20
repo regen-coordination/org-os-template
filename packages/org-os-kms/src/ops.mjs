@@ -51,7 +51,7 @@ export const OPS = {
   } },
 
   'render.site': { kind: 'exec', write: false, run: (ctx) => {
-    return renderSiteData({ dir: ctx.dir, target: ctx.config.target,
+    return renderSiteData({ dir: ctx.dir, target: ctx.config.target, adapter: ctx.config.adapter,
       outPath: (ctx.config.render && ctx.config.render.site_data) || 'src/data/kms-index.json' });
   } },
 

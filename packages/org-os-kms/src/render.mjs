@@ -4,6 +4,9 @@
 // framework's derived index.json to a site-consumable path; it never hand-authors the index.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { getAdapter, deriveIndex } from './framework.mjs';
+import { publishRequirements } from './pack-publish.mjs';
+import { visibilityFloor } from './visibility.mjs';
 
 export function renderDashboardSection(index = {}) {
   const total = index.total ?? 0;
@@ -19,13 +22,19 @@ export function renderDashboardSection(index = {}) {
   return lines.join('\n');
 }
 
-export function renderSiteData({ dir, target, outPath }) {
+export function renderSiteData({ dir, target, outPath, adapter = 'repo-data' }) {
   // Read from <dir>/<target>/data/kb/index.json (where the adapter wrote the KB, resolved the
   // framework's way: join(dir, target)); write under `dir` (the instance root). In production
   // dir='.'/target='.' so this is unchanged, but --dir <path> is now honored.
   const src = join(dir, target, 'data', 'kb', 'index.json');
   if (!existsSync(src)) return { ok: false, report: 'no data/kb/index.json — run index.rebuild first' };
-  const data = JSON.parse(readFileSync(src, 'utf8'));
+  let data = JSON.parse(readFileSync(src, 'utf8'));
+  // The published copy counts a visibility-gated type only when the object passes its floor, so a node moving between
+  // matching-only and private moves no count (the private canon's own index.json stays honest). Without a gated pack the file is copied unchanged.
+  if (Object.keys(publishRequirements()).length) {
+    const items = getAdapter(adapter).list(join(dir, target)).filter(({ schema, object }) => visibilityFloor(object, schema).ok);
+    data = { ...deriveIndex(items, 'data/kb/ (public floor applied)'), generated_from: data.generated_from };
+  }
   const out = join(dir, outPath);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(data, null, 2));

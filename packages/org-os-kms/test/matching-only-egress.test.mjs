@@ -131,3 +131,19 @@ test('apply is refused while a shared lexicon is the placeholder example.commons
   const planned = await OPS.publish.run({ dir, flags: {}, deps: { createClient, env } });
   assert.equal(planned.ok, true, JSON.stringify(planned.report)); assert.equal(planned.report.atproto.status, 'planned'); assert.equal(planned.report.atproto.created, 2); // the public need and the resource
 });
+
+test('index.json (render.site) counts a gated type only when it passes the floor: a node moving between matching-only and private moves no count', () => {
+  const counts = (m, x) => {
+    fw.resetPacks(); resetRegistryBindings();
+    const dir = instance({ 'p-need': pub, 'm-need': { ...matching, visibility: m }, 'x-need': { ...matching, title: 'other', visibility: x } });
+    const config = loadKmsConfig(dir);
+    OPS['index.rebuild'].run({ dir, config });
+    assert.equal(OPS['render.site'].run({ dir, config }).ok, true);
+    const idx = JSON.parse(readFileSync(join(dir, 'src', 'data', 'kms-index.json'), 'utf8'));
+    return { need: idx.by_type.need, total: idx.total, text: JSON.stringify(idx) };
+  };
+  const a = counts('matching-only', 'private'); const b = counts('private', 'matching-only'); const c = counts('private', 'private');
+  assert.equal(a.need, 1); assert.deepEqual([a.need, a.total], [b.need, b.total]); assert.deepEqual([a.need, a.total], [c.need, c.total]);
+  assert.equal(a.total, 2, 'the public need and the resource'); // the private canon index keeps its own, honest counts
+  assert.equal(counts('public', 'private').need, 2, 'a node that becomes public is counted: it is public');
+});
