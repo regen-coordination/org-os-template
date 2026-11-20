@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createConstellationClient, enrichWithBacklinks, CONSTELLATION_BASE, LINKS_USER_AGENT, ALLOWED_LINK_PARAMS, DEFAULT_TIMEOUT_MS } from '../src/connectors/hypercerts/links.mjs';
+import { createConstellationClient, enrichWithBacklinks, CONSTELLATION_BASE, LINKS_USER_AGENT, ALLOWED_LINK_PARAMS, DEFAULT_TIMEOUT_MS, DEFAULT_MAX_REQUESTS, ConstellationError } from '../src/connectors/hypercerts/links.mjs';
 import { createHypercertsConnector } from '../src/connectors/hypercerts/index.mjs';
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/hypercerts/${n}.json`, import.meta.url), 'utf8'));
@@ -163,4 +163,13 @@ test('F1 connector: a hung Constellation falls back to the plain reads and says 
     const { enrichment, ...rest } = on;
     assert.deepEqual(rest, off); assert.match(enrichment.constellation.error, /timed out/);
   } finally { restore(); }
+});
+
+// ---- F5: the default request cap is 50 ----
+test('F5: without options the cap is 50 requests: one count, then 49 backlink calls, then it says so', async () => {
+  const paths = Object.fromEntries(Array.from({ length: 80 }, (_, i) => [`.p${i}[].uri`, 1]));
+  const calls = []; const client = { countLinks: async () => { calls.push('count'); return { 'a.b.c': paths }; }, getBacklinks: async () => { calls.push('back'); return { total: 0, records: [] }; } };
+  const out = await enrichWithBacklinks(client, [ACT1, ORG]);
+  assert.equal(DEFAULT_MAX_REQUESTS, 50); assert.equal(calls.length, 50); assert.equal(out.requests, 50);
+  assert.match(out.error, /request cap \(50\) reached/); assert.deepEqual(out.subjects, {});
 });
