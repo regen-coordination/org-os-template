@@ -66,9 +66,10 @@ export function scrubUnpublishedRefs(items, all = items, stats = null) {
   const add = (key, ref) => { if (typeof key !== 'string' || !key.trim()) return; const k = norm(key); if (!index.has(k)) index.set(k, new Set()); index.get(k).add(ref); };
   for (const it of [...all, ...items]) {
     const slug = slugOf(it.ref);
-    add(slug, it.ref); add(`${it.schema}:${slug}`, it.ref); add(it.object?.id, it.ref);
+    add(slug, it.ref); add(`${it.schema}:${slug}`, it.ref); add(it.object?.id == null ? null : String(it.object.id), it.ref); // a YAML-number id (id: 424242) is an id too
   }
   const leaks = (entry) => {
+    if (typeof entry === 'number') entry = String(entry); // related: [424242] names the object whose id is 424242
     if (typeof entry !== 'string' || entry.trim().startsWith('at://')) return false;
     const hits = index.get(norm(entry));
     return Boolean(hits) && [...hits].some((ref) => !selected.has(ref));
@@ -76,7 +77,7 @@ export function scrubUnpublishedRefs(items, all = items, stats = null) {
   // → the value without any leaking string or key, or DROP when the value itself is one. Unchanged values come back as the same reference.
   const DROP = Symbol('drop');
   const clean = (v, c, keep) => {
-    if (typeof v === 'string') { if (keep?.(v) || !leaks(v)) return v; c.n++; return DROP; }
+    if (typeof v === 'string' || typeof v === 'number') { if (keep?.(v) || !leaks(v)) return v; c.n++; return DROP; }
     if (Array.isArray(v)) {
       const kept = v.map((x) => clean(x, c, keep)).filter((x) => x !== DROP);
       return kept.length === v.length && kept.every((x, i) => x === v[i]) ? v : kept;

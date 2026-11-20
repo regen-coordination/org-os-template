@@ -182,3 +182,15 @@ test('planPublish scrubs again, whatever the caller did: a record built from uns
   assert.equal(JSON.stringify(plan.create).includes('m-need'), false);
   assert.deepEqual(plan.create[0].record.related, ['nowhere']);
 });
+
+// ── Polish N4: a YAML-number id is still an id ──
+test('scrub N4: a private object with a YAML-number id is indexed, so related: [424242] and \'424242\' do not publish; a null id is ignored', () => {
+  const m = it('need', 'm-need', { id: 424242 }); const nul = it('need', 'n-need', { id: null });
+  const r = it('resource', 'r', { related: [424242, '424242', 'nowhere', 7], parent: 424242, nested: { cites: [424242, 7] } });
+  const stats = {};
+  const o = scrubUnpublishedRefs([r], [r, m, nul], stats)[0].object;
+  assert.deepEqual(o.related, ['nowhere', 7]);
+  assert.equal('parent' in o, false);
+  assert.deepEqual(o.nested, { cites: [7] });
+  assert.equal(stats.total, 4);
+});
