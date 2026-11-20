@@ -50,7 +50,8 @@ export function createHypercertsConnector({ createClient = createHypercertsClien
       const knownGood = new Set(previous.activity);
       const activityUnknown = !listed.activity;
       const held = new Set();
-      const aboutUnchecked = (r) => activityUnknown && (r.value?.subjects || []).some((s) => s?.uri && !knownGood.has(s.uri));
+      // Fail closed: a subject entry with no readable uri (missing, null, a plain string) cannot be checked, so it holds.
+      const aboutUnchecked = (r) => activityUnknown && (r.value?.subjects || []).some((s) => typeof s?.uri !== 'string' || !knownGood.has(s.uri));
       const keep = {
         organization: (r) => !isTestTitle(orgName(r)),
         activity: (r) => !isTestTitle(r.value?.title),

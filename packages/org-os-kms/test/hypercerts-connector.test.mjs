@@ -183,3 +183,24 @@ test('F1: a hung activities listing fails that collection only: nothing retracte
   assert.deepEqual(out.retracted, []); assert.deepEqual(out.cursor.seen.activity, first.cursor.seen.activity);
   assert.ok(out.errors.some((e) => e.collection === 'activity' && /timed out/.test(e.error)));
 });
+
+// ---- F3: under a failed activity listing, a subject entry that cannot be read fails closed (held) ----
+test('F3: a failed activity listing holds an attachment with a subject entry that has no uri, or is a plain string', async () => {
+  const att = (rk, subjects) => ({ ...ATTS[0], uri: `at://${A}/org.hypercerts.context.attachment/${rk}`, value: { ...ATTS[0].value, title: 'Spring update', subjects } });
+  const GOOD = uriOf('3a1');
+  const NO_URI = att('f3a', [{ cid: 'x' }]);
+  const STRING = att('f3b', [`at://${A}/org.hypercerts.claim.activity/3a2`]);                  // a plain string, not { uri }
+  const MIXED = att('f3c', [{ uri: GOOD }, {}]);                                              // one readable subject, one not
+  const NULLISH = att('f3d', [null]);
+  const OK = att('f3e', [{ uri: GOOD }]);                                                     // control: known good, still kept
+  const state = newState({ attachments: [NO_URI, STRING, MIXED, NULLISH, OK] }); const c = mk(state);
+  const first = await c.pull({ dids: [A] }, { cursor: null });
+  assert.equal(first.records.filter((r) => r.kind === 'attachment').length, 5, 'a healthy listing is unchanged');
+  state.failActivities = true;
+  const second = await c.pull({ dids: [A] }, { cursor: first.cursor });
+  const kept = second.records.filter((r) => r.kind === 'attachment').map((r) => r.rec.uri);
+  assert.deepEqual(kept, [OK.uri]);
+  assert.match(second.errors.find((e) => e.collection === 'attachment').error, /held 4 attachment/);
+  assert.deepEqual(second.retracted, []);
+  for (const held of [NO_URI, STRING, MIXED, NULLISH]) assert.ok(second.cursor.seen.attachment.includes(held.uri), held.uri);
+});
