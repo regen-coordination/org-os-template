@@ -39,12 +39,35 @@ export function isDate(v) {
 }
 
 /**
+ * The core schemas a claim may be made of: the ones that describe a NODE or a thing it offers, and hold no person as a required
+ * field. A claim's cut keeps the schema's required fields (claimView, so it can validate), so a schema whose required fields
+ * name a person would carry that person into a record about a node: contribution-record.contributor, relationship-record.subject
+ * and .object, source-system.steward, deployment.power_structure and .accountability, claim-evidence.claim,
+ * implementation-record.source_position. Those are never claimable. A type of a visibility-gated pack (a pack that declares its
+ * own publish_requires and public_fields) is claimable too: the pack cut it to its declared fields before the claim marks go on.
+ * Anything else is withheld, with a reason, on every path (the floor below is the one place that decides).
+ */
+export const CLAIMABLE_SCHEMAS = new Set(['organization', 'signal', 'encyclopedia-entry', 'resource', 'option-entry', 'track']);
+
+/** → true when a claim of this schema may leave: a node-shaped core schema, or a type of a visibility-gated pack. */
+export function claimSchemaAllowed(schema) {
+  return typeof schema === 'string' && (CLAIMABLE_SCHEMAS.has(schema) || packPublishRules(schema) !== null);
+}
+
+/** The reason a claim of this schema is withheld (null when the schema is claimable). */
+export function claimSchemaReason(schema) {
+  return claimSchemaAllowed(schema) ? null : `${schema ?? 'an unknown schema'} is not a node-shaped schema (${[...CLAIMABLE_SCHEMAS].join(', ')}, or a visibility-gated pack type), and its required fields can name a person`;
+}
+
+/**
  * → { ok } or { ok: false, reason }. An object with no claim field is not affected. A claim is publishable only if
- * publish.claims is exactly true, it is still `claimed`, it says what it is for, the node's consent date is a date, and a
+ * the schema is claimable (CLAIMABLE_SCHEMAS), publish.claims is exactly true, it is still `claimed`, it says what it is for, the node's consent date is a date, and a
  * publisher is configured to be named. Checked in the op (selectPublic) and again in planPublish; no instance gate can widen it.
  */
-export function claimFloor(object, config = {}) {
+export function claimFloor(object, config = {}, schema = object?.type) {
   if (!isClaim(object)) return { ok: true };
+  const bad = claimSchemaReason(schema);
+  if (bad) return { ok: false, reason: `claim floor: ${bad}` };
   if (config.publish?.claims !== true) return { ok: false, reason: 'claim floor: publish.claims is not on, so nothing is published on a node\'s behalf' };
   if (object.claim_status !== 'claimed') return { ok: false, reason: `claim floor: claim_status is ${object.claim_status ?? 'missing'}, only a claim in status "claimed" is published` };
   if (typeof object.claim_for !== 'string' || !object.claim_for.trim()) return { ok: false, reason: 'claim floor: a claim must say what it is for (claim_for)' };

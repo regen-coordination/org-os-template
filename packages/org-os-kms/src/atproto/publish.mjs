@@ -5,7 +5,7 @@ import { rewriteRefs, resolverFrom } from '../refs.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { packPublishRules } from '../pack-publish.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
-import { isClaim, claimFloor, claimView, missingClaimMarks, CLAIM_RECORD_FIELDS, CLAIM_IDENTITY_MARKS } from '../claims.mjs';
+import { isClaim, claimFloor, claimSchemaReason, claimView, missingClaimMarks, CLAIM_RECORD_FIELDS, CLAIM_IDENTITY_MARKS } from '../claims.mjs';
 
 function stable(v) {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
@@ -45,7 +45,10 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
     }
     // A claim (src/claims.mjs) is checked again here, fail closed, whatever called: publishClaims is off unless the caller says so.
     if (isClaim(object)) {
-      const cf = claimFloor(object, claimConfig);
+      // A schema that may not be claimed (its required fields can name a person) is withheld, not an error: the rest of the plan goes ahead.
+      const bad = claimSchemaReason(schema);
+      if (bad) { plan.withheld.push({ id: object.id, slug, type: schema, reason: `claim withheld: ${bad}` }); continue; }
+      const cf = claimFloor(object, claimConfig, schema);
       if (!cf.ok) { plan.errors.push({ slug, errors: [cf.reason] }); continue; }
       // A shared lexicon is somebody else's schema. A claim put there without claim marks would read as the node's own record, so it is
       // withheld (fail closed, not an error: the rest of the plan is unaffected) until the lexicon carries the marks. Because it is not

@@ -69,7 +69,7 @@ export function bridge(ctx) {
     if (!registry) { if (!report.skipped.includes(schema)) report.skipped.push(schema); continue; }
     // A claim about a node (src/claims.mjs) is written nowhere without the node's consent date, publish.claims on and a publisher:
     // data/*.yaml are tracked and a markdown page under src/content/docs/kb/ is the public site. Same floor as publish.
-    const claim = claimFloor(object, config);
+    const claim = claimFloor(object, config, schema);
     if (!claim.ok) { report.withheld.push({ schema, title: object.title, reason: claim.reason }); continue; }
     if (registry.endsWith('/')) {
       const reason = withholdReason(object);

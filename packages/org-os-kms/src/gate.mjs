@@ -49,7 +49,7 @@ export async function selectPublic({ dir, config, all }) {
   // The visibility floor sits right after the framework floor and BEFORE the instance gate, which can only narrow it.
   const visible = declaredOnly.filter(({ schema, object }) => visibilityFloor(object, schema).ok);
   // The claims floor (src/claims.mjs) sits beside it: a claim about a node is published only with the node's consent date and publish.claims on.
-  const floor = visible.filter(({ object }) => claimFloor(object, config).ok);
+  const floor = visible.filter(({ schema, object }) => claimFloor(object, config, schema).ok);
   const withheld = { undeclared: eligible.length - declaredOnly.length, visibility: declaredOnly.length - visible.length, claims: visible.length - floor.length };
   const gate = await loadInstanceGate(dir, config);
   if (!gate) return { candidates: floor, rejected: [], gated: false, withheld };

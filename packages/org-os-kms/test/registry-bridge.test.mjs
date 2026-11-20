@@ -170,20 +170,20 @@ function seedClaims(extra = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-claim-'));
   fw.getAdapter('repo-data').store(dir, [
     { schema: 'signal', object: { id: 'sg1', title: 'Signal Claim', public_use: 'ok-with-caveat', ...claimFields, contact_email: 'a@b.example', ...extra } },
-    { schema: 'source-system', object: { id: 'ss1', title: 'Source Claim', type: 'wiki', steward: 'S', return_path: 'PRs', ...claimFields, ...extra } },
+    { schema: 'resource', object: { id: 'rs1', title: 'Resource Claim', type: 'resource', public_use: 'ok-with-caveat', ...claimFields, ...extra } }, // round 3: source-system is not claimable (its steward is a person)
     { schema: 'encyclopedia-entry', object: { id: 'en1', title: 'Entry Claim', body: 'B.', public_use: 'ok-with-caveat', ...claimFields, ...extra } },
   ]);
   return dir;
 }
 
-test('bridge: an unconsented claim of type signal, source-system or encyclopedia-entry writes no row and no page, and is counted as withheld', () => {
+test('bridge: an unconsented claim of type signal, resource or encyclopedia-entry writes no row and no page, and is counted as withheld', () => {
   const dir = seedClaims({ consent_atproto: undefined });
   const out = bridge({ dir, config: CLAIM_ON });
   assert.equal(out.ok, true, JSON.stringify(out.report));
   assert.ok(!existsSync(join(dir, 'data/signals.yaml')), 'no signals row');
-  assert.ok(!existsSync(join(dir, 'data/source-systems.yaml')), 'no source-systems row');
+  assert.ok(!existsSync(join(dir, 'data/resources.yaml')), 'no resources row');
   assert.ok(!existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')), 'no public page');
-  assert.deepEqual(out.report.withheld.map((w) => w.schema).sort(), ['encyclopedia-entry', 'signal', 'source-system']);
+  assert.deepEqual(out.report.withheld.map((w) => w.schema).sort(), ['encyclopedia-entry', 'resource', 'signal']);
   assert.ok(out.report.withheld.every((w) => /consent_atproto/.test(w.reason)), JSON.stringify(out.report.withheld));
 });
 
