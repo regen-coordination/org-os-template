@@ -120,14 +120,11 @@ export function claimView(object, publisher, schema = object?.type) {
     if (k in declared) out[k] = day(declared[k]);
     else if (keep.has(k)) out[k] = day(v);
   }
-  // A person's name can ride in provenance.authorship (the operator's free hand) and in source_lineage, which is free text with no
-  // structure ("Interview with ..."): a claim is about a node, never about a person, so neither leaves. provenance.origin and
-  // .transformation (a source label and a closed list) stay.
+  // A claim is about a node, never about a person. Two free-text places can name one: source_lineage ("Interview with ...") and
+  // provenance (origin is a free string, authorship the operator's free hand). Neither leaves. provenance is optional on every
+  // schema, and it requires `origin`, so keeping part of it would not validate: the whole object goes.
   delete out.source_lineage;
-  if (out.provenance && typeof out.provenance === 'object') {
-    const { authorship: _a, ...rest } = out.provenance;
-    if (Object.keys(rest).length) out.provenance = rest; else delete out.provenance;
-  }
+  delete out.provenance;
   if (publisher !== undefined) out.publisher = publisher;
   return out;
 }

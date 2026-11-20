@@ -103,22 +103,22 @@ test('C standard.site: a claim already published as a document is deleted (not k
 import { writeStaticSurface } from '../src/static/surface.mjs';
 import { buildCommons } from '../src/pages/model.mjs';
 
-const NAMED = { provenance: { origin: 'the node\'s own site', transformation: 'summarized', authorship: 'Pat Quill' }, source_lineage: 'Interview with Pat Quill, 2026-11-18' };
+const NAMED = { provenance: { origin: 'Interview with Pat Quill', transformation: 'summarized', authorship: 'Pat Quill' }, source_lineage: 'Interview with Pat Quill, 2026-11-18' };
 const dConfig = { instance: 't', publish: { base_url: 'https://t.example', pages: false, claims: true, claim_publisher: 'ReFi DAO' }, atproto: { did: 'did:plc:me', nsid_authority: 'xyz.example.kb' } };
 
-test('D claimView drops provenance.authorship and the free-text source_lineage, and keeps the rest of provenance', () => {
+test('D claimView drops the whole provenance object (origin is a free string that can name a person) and the free-text source_lineage', () => {
   const v = claimView(claimOf('organization', NAMED), 'ReFi DAO', 'organization');
   assert.ok(!JSON.stringify(v).includes('Pat Quill'), JSON.stringify(v));
-  assert.equal(v.provenance.authorship, undefined); assert.equal(v.source_lineage, undefined);
-  assert.equal(v.provenance.origin, 'the node\'s own site'); assert.equal(v.provenance.transformation, 'summarized');
+  assert.equal(v.provenance, undefined); assert.equal(v.source_lineage, undefined);
 });
 
-test('D a claim whose provenance holds only authorship carries no provenance at all', () => {
-  const v = claimView(claimOf('organization', { provenance: { authorship: 'Pat Quill' } }), 'ReFi DAO', 'organization');
+test('D a name in provenance.origin is dropped too (round 3, F1): a claim carries no provenance at all', () => {
+  const v = claimView(claimOf('organization', { provenance: { origin: 'Interview with Pat Quill', transformation: 'summarized' } }), 'ReFi DAO', 'organization');
   assert.equal(v.provenance, undefined);
+  assert.ok(!JSON.stringify(v).includes('Pat Quill'));
 });
 
-test('D a name in provenance.authorship reaches no surface of a claim: record, static API, page model', async () => {
+test('D a name in provenance (origin or authorship) reaches no surface of a claim: record, static API, page model', async () => {
   const object = claimOf('organization', NAMED);
   const p = plan([it('organization', object)]);
   assert.equal(p.ok, true, JSON.stringify(p.errors));
