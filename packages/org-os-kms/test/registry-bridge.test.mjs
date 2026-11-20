@@ -202,3 +202,26 @@ test('bridge: a consented claim with the floor met is bridged (the floor is not 
   assert.equal(out.report.withheld.length, 0, JSON.stringify(out.report.withheld));
   assert.ok(existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')));
 });
+
+// Round 2, fix A: a CONSENTED claim is cut to its allow-list (claimView) before a row or a page is written. data/*.yaml are tracked
+// and the markdown page is the public site: a contact, who raised the claim, notes, an unknown field, the consent date and
+// superseded_by stay home.
+test('bridge: a consented claim writes its allow-list into the row and the page, never the contact, claimed_by, notes, an unknown field, the consent date or superseded_by', () => {
+  const home = { contact_email: 'pat@node-a.example', contact_name: 'Pat Quill', claimed_by: 'Operator Sam', notes: 'private note', internal_ref: 'zzz-internal', superseded_by: 'at://did:plc:x/y/z' };
+  const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-claim-cut-'));
+  fw.getAdapter('repo-data').store(dir, [
+    { schema: 'signal', object: { id: 'sg1', title: 'Signal Claim', signal_type: 'content', public_use: 'ok-with-caveat', ...claimFields, ...home } },
+    { schema: 'encyclopedia-entry', object: { id: 'en1', title: 'Entry Claim', type: 'encyclopedia-entry', page_type: 'concept', summary: 'What the node does.', body: 'Operator-only body.', public_use: 'ok-with-caveat', ...claimFields, ...home } },
+  ]);
+  const out = bridge({ dir, config: CLAIM_ON });
+  assert.equal(out.ok, true, JSON.stringify(out.report));
+  assert.equal(out.report.withheld.length, 0, JSON.stringify(out.report.withheld));
+  const row = readFileSync(join(dir, 'data/signals.yaml'), 'utf8');
+  const page = readFileSync(join(dir, 'src/content/docs/kb/entry-claim.md'), 'utf8');
+  for (const [where, text] of [['signal row', row], ['encyclopedia page', page]]) {
+    for (const v of ['pat@node-a.example', 'Pat Quill', 'Operator Sam', 'private note', 'zzz-internal', '2026-11-19', 'at://did:plc:x/y/z']) assert.ok(!text.includes(v), `${where} carries ${v}:\n${text}`);
+    for (const k of ['contact_email', 'contact_name', 'claimed_by', 'notes', 'consent_atproto', 'superseded_by']) assert.ok(!text.includes(`${k}:`), `${where} carries ${k}`);
+    assert.ok(text.includes('claim_for: https://node-a.example') && text.includes('claim_status: claimed') && text.includes('publisher: ReFi DAO'), `${where} lost its claim marks:\n${text}`);
+  }
+  assert.ok(page.includes('summary: What the node does.') && !page.includes('Operator-only body.'), 'declared content stays, the undeclared body does not');
+});

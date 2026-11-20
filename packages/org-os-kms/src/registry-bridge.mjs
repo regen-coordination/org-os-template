@@ -14,7 +14,7 @@ import { registryBindings } from './bind.mjs';
 import { cutToPublicFields } from './pack-publish.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from './visibility.mjs';
 import { atomicWrite } from './atomic-write.mjs';
-import { claimFloor } from './claims.mjs';
+import { isClaim, claimFloor, claimView, carryClaim } from './claims.mjs';
 
 // Upsert many objects into one registry file: read once, upsert each by id, write once.
 function upsertRegistryMany(absPath, stem, objects) {
@@ -76,7 +76,7 @@ export function bridge(ctx) {
       if (reason) { report.withheld.push({ schema, title: object.title, reason }); continue; }
       try {
         const slug = fw.slugify(object.title || 'untitled');
-        report.docs.push(writeMarkdownDoc(join(dir, registry, `${slug}.md`), object).doc);
+        report.docs.push(writeMarkdownDoc(join(dir, registry, `${slug}.md`), isClaim(object) ? claimView(object, config.publish?.claim_publisher, schema) : object).doc);
       } catch (e) { report.errors.push(`${schema}: ${e.message}`); }
       continue;
     }
@@ -86,9 +86,12 @@ export function bridge(ctx) {
     let row = object;
     if (cutToPublicFields(schema, object) !== object) {
       const floor = visibilityFloor(object, schema);
-      row = floor.ok ? cutToPublicFields(schema, object) : null;
+      row = floor.ok ? carryClaim(object, cutToPublicFields(schema, object)) : null;
       if (!row) { report.withheld.push({ schema, title: object.title, reason: floor.ok ? 'undeclared' : 'visibility' }); continue; }
     }
+    // A consented claim is ReFi DAO's record about a node: cut to its allow-list, never the whole object (contact, claimed_by,
+    // notes, the consent date and superseded_by stay home). Same cut as the record, the static API and the pages.
+    if (isClaim(object)) row = claimView(row, config.publish?.claim_publisher, schema);
     if (!byRegistry.has(registry)) byRegistry.set(registry, []);
     byRegistry.get(registry).push({ schema, object: row, ref, registry });
   }
