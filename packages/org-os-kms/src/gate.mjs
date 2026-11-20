@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { slugFromRef } from './manifest.mjs';
 import * as fw from './framework.mjs';
+import { packPublishRules } from './pack-publish.mjs';
 
 export async function loadInstanceGate(dir, config) {
   const rel = config.publish?.gate;
@@ -34,13 +35,18 @@ export function applyGate(gate, items, ctx) {
 /**
  * What may be public, from the whole canon `all`: the framework floor (publishableTypes/isPublishable), then the
  * instance gate, which can only narrow. The one place both `publish` and the steward's preview decide it.
- * → { candidates, rejected, gated } (gated: an instance gate ran; candidates are what passed)
+ * A type of a visibility-gated pack that declares no publish_requires / public_fields is withheld here (counted in
+ * `withheld.undeclared`), so one undeclared type never fails the whole plan; planPublish refuses it independently.
+ * → { candidates, rejected, gated, withheld } (gated: an instance gate ran; candidates are what passed)
  */
 export async function selectPublic({ dir, config, all }) {
   const types = fw.publishableTypes(config);
-  const floor = all.filter(({ schema, object }) => fw.isPublishable(object, { schema, types }));
+  const eligible = all.filter(({ schema, object }) => fw.isPublishable(object, { schema, types }));
+  const declared = (schema) => { const r = packPublishRules(schema); return !r || Boolean(r.publish_requires && r.public_fields); };
+  const floor = eligible.filter(({ schema }) => declared(schema));
+  const withheld = { undeclared: eligible.length - floor.length };
   const gate = await loadInstanceGate(dir, config);
-  if (!gate) return { candidates: floor, rejected: [], gated: false };
+  if (!gate) return { candidates: floor, rejected: [], gated: false, withheld };
   const { passed, rejected } = applyGate(gate, floor, buildGateContext(all));
-  return { candidates: passed, rejected, gated: true };
+  return { candidates: passed, rejected, gated: true, withheld };
 }

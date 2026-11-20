@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import * as fw from '../framework.mjs';
 import { rewriteRefs, resolverFrom } from '../refs.mjs';
 import { slugFromRef } from '../manifest.mjs';
+import { packPublishRules } from '../pack-publish.mjs';
 
 function stable(v) {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
@@ -19,7 +20,16 @@ export function planPublish({ items, manifest, did, authority }) {
   for (const { schema, object, ref } of items) {
     const collection = fw.nsidFor(schema, authority);
     const slug = slugFromRef(ref);
-    const record = fw.toRecord(rewriteRefs(object, resolve, schema), collection);
+    // A type of a visibility-gated pack must declare both a floor and a field whitelist, or it is refused (fail closed);
+    // when declared, the object is cut to the whitelist BEFORE toRecord, which would otherwise keep every non-private key.
+    let source = rewriteRefs(object, resolve, schema);
+    const rules = packPublishRules(schema);
+    if (rules) {
+      const missing = ['publish_requires', 'public_fields'].filter((k) => !rules[k]);
+      if (missing.length) { plan.errors.push({ slug, errors: [`pack ${rules.pack} is visibility-gated: type ${schema} declares no ${missing.join(' and no ')}`] }); continue; }
+      source = Object.fromEntries(Object.entries(source).filter(([k]) => rules.public_fields.includes(k)));
+    }
+    const record = fw.toRecord(source, collection);
     const v = fw.validateRecord(record, lexicons[collection]);
     if (!v.ok) { plan.errors.push({ slug, errors: v.errors }); continue; }
     const id = object.id; seen.add(id);

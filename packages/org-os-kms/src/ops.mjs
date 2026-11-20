@@ -93,6 +93,7 @@ export const OPS = {
     const all = adapter.list(target);
     const sel = await selectPublic({ dir, config, all });
     const candidates = sel.candidates;
+    if (sel.withheld?.undeclared) report.withheld = { undeclared: sel.withheld.undeclared };
     if (sel.gated) {
       const by_reason = {}; for (const r of sel.rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
       report.gate = { passed: candidates.length, rejected: sel.rejected.length, by_reason };

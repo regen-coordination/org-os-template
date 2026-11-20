@@ -1,0 +1,9 @@
+{
+  "name": "@org-os/needs-offers",
+  "version": "0.1.0",
+  "description": "org-os-kms extension pack — needs and offers: what a node needs from, and can offer to, the network, with a required visibility level. Opt in with kms.yaml `extensions: [org-os-needs-offers]`.",
+  "type": "module",
+  "scripts": { "test": "node --test" },
+  "license": "MIT",
+  "keywords": ["org-os", "org-os-kms", "extension-pack", "needs", "offers"]
+}

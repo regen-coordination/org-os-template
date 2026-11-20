@@ -1,0 +1,4 @@
+# What this pack contributes to an org-os instance that opts in. Bound here so needs and offers never fall to data/misc.yaml.
+registry_bindings:
+  need: data/needs.yaml
+  offer: data/offers.yaml
