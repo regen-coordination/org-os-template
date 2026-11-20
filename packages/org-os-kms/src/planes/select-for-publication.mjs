@@ -3,7 +3,7 @@
 import { getAdapter, isPublishable, PUBLISHABLE_TYPES } from '../framework.mjs';
 import { ensureIds } from '../identity.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from '../visibility.mjs';
-import { claimFloor } from '../claims.mjs';
+import { isClaim } from '../claims.mjs';
 
 /**
  * `types` — the publish-eligible type list of the COMMONS being exported to, from
@@ -12,8 +12,7 @@ import { claimFloor } from '../claims.mjs';
  * (territorial-unit, data-stream) would then be floor-rejected here no matter what the commons
  * opted into, and the rejection would be silent — a reviewed, gate-passed unit simply never
  * appearing in the published store. Which types a commons publishes is ITS kms.yaml's call, so it
- * must be threaded in, not assumed. `config` is that commons' kms.yaml: the claims floor (src/claims.mjs) reads publish.claims and
- * publish.claim_publisher from it, and an omitted config refuses every claim (fail closed).
+ * must be threaded in, not assumed. `config` is that commons' kms.yaml, kept for callers; a claim is refused whatever it says (see below).
  */
 export function selectForPublication({ root, verdicts, uuid, types = PUBLISHABLE_TYPES, config = {} }) {
   const listing = getAdapter('repo-data').list(root);
@@ -33,9 +32,11 @@ export function selectForPublication({ root, verdicts, uuid, types = PUBLISHABLE
     // loadCommonsPolicy before this runs; a type with no rule passes, so core types and ungated packs are unchanged.
     const floor = visibilityFloor(it.object, it.schema);
     if (!floor.ok) { floorRejected.push({ key, reason: floor.reason }); continue; }
-    // A claim about a node leaves the canon only with the node's consent date, publish.claims on and a publisher to name.
-    const claim = claimFloor(it.object, config);
-    if (!claim.ok) { floorRejected.push({ key, reason: claim.reason }); continue; }
+    // A claim about a node never leaves through the export. The field policy (public-fields.mjs) drops claim_for, claim_status,
+    // claim_node_did and publisher, so an exported claim would reach the public plane looking like the node's OWN record; and the
+    // consent date stays home, so the plane's own publish could not re-check the claim floor. A claim is published from the
+    // canon's own account (`publish`, with publish.claims on), where the floor and the claim marks both hold.
+    if (isClaim(it.object)) { floorRejected.push({ key, reason: 'claims are not exported: a claim is published from the canon\'s own account (publish.claims), never through the export' }); continue; }
     selected.push({ key, ...it });
   }
   const { minted, items: ided } = ensureIds({ adapter: 'repo-data', target: root, items: selected, write: true, mintGeo: false, ...(uuid ? { uuid } : {}) });

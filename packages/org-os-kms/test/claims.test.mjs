@@ -259,18 +259,18 @@ test('verb: `claims reconcile --dry --dir` routes to the op; an unknown subcomma
 
 // ---- the export door ----
 
-test('export (selectForPublication) closes the side door: a claim leaves the canon only with consent, publish.claims on and a publisher', async () => {
+test('export (selectForPublication) refuses every claim, consented or not: the export policy strips the claim marks, so a claim would arrive looking like the node\'s own record', async () => {
   const { selectForPublication } = await import('../src/planes/select-for-publication.mjs');
   const dir = instance({ entries: { ok: claimOrg({ title: 'With consent' }), 'no-consent': claimOrg({ title: 'No consent', consent_atproto: undefined }),
+    half: { title: 'Half a claim', type: 'organization', public_use: 'ok-with-caveat', claim_node_did: NODE_DID },
     plain: { title: 'Plain', type: 'organization', public_use: 'ok-with-caveat' } } });
-  const verdicts = new Map(['ok', 'no-consent', 'plain'].map((s) => [`organization:${s}`, { ok: true }]));
+  const verdicts = new Map(['ok', 'no-consent', 'half', 'plain'].map((s) => [`organization:${s}`, { ok: true }]));
   const on = { publish: { claims: true, claim_publisher: 'ReFi DAO' } };
-  const sel = selectForPublication({ root: dir, verdicts, config: on });
-  assert.deepEqual(sel.selected.map((s) => s.key).sort(), ['organization:ok', 'organization:plain']);
-  assert.match(sel.floorRejected.find((r) => r.key === 'organization:no-consent').reason, /consent_atproto/);
-  for (const config of [undefined, {}, { publish: { claims: false } }]) {
-    const off = selectForPublication({ root: dir, verdicts, config });
-    assert.deepEqual(off.selected.map((s) => s.key), ['organization:plain'], `claims off: ${JSON.stringify(config)}`);
+  for (const config of [on, undefined, {}, { publish: { claims: false } }]) {
+    const sel = selectForPublication({ root: dir, verdicts, config });
+    assert.deepEqual(sel.selected.map((s) => s.key), ['organization:plain'], JSON.stringify(config));
+    assert.deepEqual(sel.floorRejected.map((r) => r.key).sort(), ['organization:half', 'organization:no-consent', 'organization:ok']);
+    for (const r of sel.floorRejected) assert.match(r.reason, /claims are not exported/);
   }
 });
 
