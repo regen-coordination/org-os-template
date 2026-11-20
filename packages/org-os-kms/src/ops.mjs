@@ -121,7 +121,7 @@ export const OPS = {
       const shared = await loadSharedLexicons(config.packs);
       const plan = planPublish({ items: records, all, manifest, did: at.did, authority: at.nsid_authority, shared });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
-      const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length };
+      const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length, ...(plan.orphans.length ? { orphans: plan.orphans.length } : {}) };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
       // an invalid one is reported (status 'invalid', ok:false) and nothing of it is written.
       const ss = at.standard_site?.enabled === true ? planStandardSite({ items: records, entryPlan: plan, manifest, did: at.did, authority: at.nsid_authority, config }) : null;

@@ -23,7 +23,7 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
   const items = scrubUnpublishedRefs(given, all);
   const lexicons = fw.generateAll({ authority });
   const resolve = resolverFrom(manifest);
-  const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], previous: manifest.objects };
+  const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], orphans: [], previous: manifest.objects };
   const seen = new Set();
   for (const { schema, object, ref } of items) {
     const sharedEntry = shared[schema] ?? null;
@@ -60,7 +60,12 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
     else if (prev.hash === hash) plan.skip.push(id); else plan.update.push({ ...op, swapRecord: prev.cid });
   }
   for (const [id, prev] of Object.entries(manifest.objects)) if (!seen.has(id)) plan.delete.push({ id, slug: prev.slug, type: prev.type, collection: prev.collection ?? fw.nsidFor(prev.type, authority), rkey: prev.rkey });
-  return plan.errors.length ? { ...plan, ok: false, create: [], update: [], delete: [], skip: [] } : plan;
+  // Stale copies an earlier run could not delete (manifest.orphans): retried every run, including after their object was withdrawn.
+  // One whose collection+rkey now names a record this run writes or keeps is live again: it is dropped, never deleted.
+  const live = new Set([...plan.create, ...plan.update].map((o) => `${o.collection}/${o.rkey}`));
+  for (const id of plan.skip) { const m = manifest.objects[id]; if (m) live.add(`${m.collection ?? fw.nsidFor(m.type, authority)}/${m.rkey}`); }
+  plan.orphans = (manifest.orphans ?? []).filter((o) => !live.has(`${o.collection}/${o.rkey}`));
+  return plan.errors.length ? { ...plan, ok: false, create: [], update: [], delete: [], skip: [], orphans: [] } : plan;
 }
 
 export async function applyPublish(plan, { client, did, now = () => new Date().toISOString() }) {
@@ -68,6 +73,7 @@ export async function applyPublish(plan, { client, did, now = () => new Date().t
   const manifest = { version: 1, objects: {} };
   for (const id of plan.skip) manifest.objects[id] = plan.previous[id];
   const out = { applied: { created: 0, updated: 0, deleted: 0 }, failures: [], manifest };
+  const orphans = [];
   for (const [kind, ops] of [['created', plan.create], ['updated', plan.update]]) {
     for (const op of ops) {
       try {
@@ -82,10 +88,16 @@ export async function applyPublish(plan, { client, did, now = () => new Date().t
     if (op.moved && out.failures.some((f) => f.id === op.id)) continue;
     try { await client.deleteRecord({ repo: did, collection: op.collection, rkey: op.rkey }); out.applied.deleted++; }
     catch (e) {
-      // A moved record's NEW copy is already tracked; restoring the old entry would lose it. Report where the stale copy is.
-      if (op.moved) out.failures.push({ id: op.id, error: `the record was created in its new collection, but the old copy in ${op.collection} could not be deleted: ${e.message}` });
+      // A moved record's NEW copy is already tracked; restoring the old entry would lose it. The stale copy is kept on
+      // manifest.orphans and its delete is retried on every later run, so it is reported now and not forgotten.
+      if (op.moved) { out.failures.push({ id: op.id, error: `the record was created in its new collection, but the old copy in ${op.collection} could not be deleted: ${e.message}` }); orphans.push({ id: op.id, collection: op.collection, rkey: op.rkey }); }
       else { out.failures.push({ id: op.id, error: e.message }); manifest.objects[op.id] = plan.previous[op.id]; }
     }
   }
+  for (const o of plan.orphans ?? []) {
+    try { await client.deleteRecord({ repo: did, collection: o.collection, rkey: o.rkey }); out.applied.orphansDeleted = (out.applied.orphansDeleted ?? 0) + 1; }
+    catch (e) { out.failures.push({ id: o.id, error: `the stale copy in ${o.collection} could not be deleted (it will be retried): ${e.message}` }); orphans.push(o); }
+  }
+  if (orphans.length) manifest.orphans = orphans;
   return out;
 }
