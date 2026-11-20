@@ -128,6 +128,29 @@ test('a failed listing retracts nothing, and keeps the previous cursor for that 
   assert.ok(second.records.some((r) => r.kind === 'attachment'), 'the other collections still ran');
 });
 
+test('a failed activity listing does not let attachments about a test activity through', async () => {
+  const att = (rk, subject) => ({ ...ATTS[0], uri: `at://${A}/org.hypercerts.context.attachment/${rk}`, value: { ...ATTS[0].value, title: 'Spring update', subjects: [{ uri: subject }] } });
+  const ABOUT_TEST = att('5t', uriOf('3a2'));                            // about the test-titled activity
+  const ABOUT_GOOD = att('5g', uriOf('3a1'));                            // about an activity the last good listing kept
+  const ABOUT_NEW = att('5n', `at://${A}/org.hypercerts.claim.activity/3zz`);   // about an activity nobody has titled yet
+  const state = newState({ attachments: [ABOUT_TEST, ABOUT_GOOD, ABOUT_NEW] }); const c = mk(state);
+  const first = await c.pull({ dids: [A] }, { cursor: null });
+  assert.deepEqual(first.records.filter((r) => r.kind === 'attachment').map((r) => r.rec.uri).sort(), [ABOUT_GOOD.uri, ABOUT_NEW.uri].sort());
+  state.failActivities = true;
+  const second = await c.pull({ dids: [A] }, { cursor: first.cursor });
+  const kept = second.records.filter((r) => r.kind === 'attachment').map((r) => r.rec.uri);
+  assert.ok(!kept.includes(ABOUT_TEST.uri), 'attachment about a test activity was kept');
+  assert.ok(kept.includes(ABOUT_GOOD.uri), 'attachment about a known good activity is still kept');
+  assert.ok(!kept.includes(ABOUT_NEW.uri), 'attachment about an activity that cannot be checked is held');
+  // the hold is said in words, not silent
+  const note = second.errors.find((e) => e.collection === 'attachment');
+  assert.ok(note, JSON.stringify(second.errors));
+  assert.match(note.error, /held 2 attachment/); assert.match(note.error, /activity listing failed/);
+  // a hold is not a retraction, and the held attachment stays in the cursor
+  assert.deepEqual(second.retracted, []);
+  assert.ok(second.cursor.seen.attachment.includes(ABOUT_NEW.uri));
+});
+
 test('refuses with no scope; ingest.pull reports the connector failed (fail-soft) with that message', async () => {
   const c = mk(newState());
   await assert.rejects(c.pull({}, { cursor: null }), /needs follows_of or dids/);

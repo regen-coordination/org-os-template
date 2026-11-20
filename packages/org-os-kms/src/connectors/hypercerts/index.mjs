@@ -42,13 +42,21 @@ export function createHypercertsConnector({ createClient = createHypercertsClien
 
       // Filters: test-titled and untitled organizations and activities; attachments about a test-titled activity,
       // or carrying a test title of their own. An attachment with no title is kept (updates often have none).
+      // When the activity listing failed, the titles are unknown, so an attachment is kept only if every activity it
+      // is about was kept by the last good listing (`previous.activity`); otherwise it is HELD for this run: not
+      // stored, not retracted, left in the cursor as it was, and said in `errors`.
       const testActivities = new Set((listed.activity || []).filter((r) => isTestTitle(r.value?.title)).map((r) => r.uri));
+      const knownGood = new Set(previous.activity);
+      const activityUnknown = !listed.activity;
+      const held = new Set();
+      const aboutUnchecked = (r) => activityUnknown && (r.value?.subjects || []).some((s) => s?.uri && !knownGood.has(s.uri));
       const keep = {
         organization: (r) => !isTestTitle(orgName(r)),
         activity: (r) => !isTestTitle(r.value?.title),
         attachment: (r) => {
           const t = r.value?.title;
           if (typeof t === 'string' && t.trim() && isTestTitle(t)) return false;
+          if (aboutUnchecked(r)) { held.add(r.uri); return false; }
           return !(r.value?.subjects || []).some((s) => testActivities.has(s?.uri));
         },
       };
@@ -60,10 +68,11 @@ export function createHypercertsConnector({ createClient = createHypercertsClien
       for (const collection of COLLECTIONS) {
         if (!kept[collection]) { seen[collection] = previous[collection]; continue; }     // failed listing: nothing retracted, cursor unchanged
         const now = new Set(kept[collection].map((r) => r.uri));
-        seen[collection] = [...now];
-        for (const uri of previous[collection]) if (!now.has(uri) && inScope.has(didOfUri(uri))) retracted.push(uri);
+        seen[collection] = [...now, ...[...held].filter((u) => collection === 'attachment' && previous.attachment.includes(u) && !now.has(u))];
+        for (const uri of previous[collection]) if (!now.has(uri) && !held.has(uri) && inScope.has(didOfUri(uri))) retracted.push(uri);
         for (const rec of kept[collection]) records.push({ kind: collection, rec, activityTitles });
       }
+      if (held.size) errors.push({ collection: 'attachment', error: `held ${held.size} attachment(s) this run: the activity listing failed, so it could not be checked whether they are about a test activity (none stored or retracted)` });
       return { records, cursor: { seen }, retracted, errors };
     },
     map(record) { return mapRecord(record); },
