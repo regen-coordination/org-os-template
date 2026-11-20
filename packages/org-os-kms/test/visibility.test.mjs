@@ -50,7 +50,7 @@ test('planPublish fails closed for a matching-only item even when called directl
 test('an instance gate that returns { ok: true } for everything does not widen it', async () => {
   const dir = instance({ gate: true }); const log = [];
   const client = () => ({ async login() {}, async putRecord(op) { log.push(op.collection); return { uri: `at://x/${op.collection}/${op.rkey}`, cid: 'c' }; }, async deleteRecord() {} });
-  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: client, env: { ATPROTO_APP_PASSWORD: 'pw' } } });
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: client, env: { ATPROTO_APP_PASSWORD: 'pw' }, allowPlaceholderLexicons: true } });
   assert.equal(res.ok, true, JSON.stringify(res.report));
   assert.deepEqual(log, [`${AUTH}.resource`]);
   assert.equal(res.report.withheld.visibility, 1);

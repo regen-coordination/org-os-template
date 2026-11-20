@@ -116,7 +116,8 @@ export const OPS = {
       // object carries no `type` of its own — the record still must. Defaulted for the record only: the
       // objects on disk are not rewritten.
       const records = items.map((it) => (it.object.type ? it : { ...it, object: { type: it.schema, ...it.object } }));
-      const plan = planPublish({ items: records, manifest, did: at.did, authority: at.nsid_authority, shared: await loadSharedLexicons(config.packs) });
+      const shared = await loadSharedLexicons(config.packs);
+      const plan = planPublish({ items: records, manifest, did: at.did, authority: at.nsid_authority, shared });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
@@ -127,6 +128,11 @@ export const OPS = {
       const password = deps.env.ATPROTO_APP_PASSWORD;
       if (!password) report.atproto = { status: 'not-configured', reason: 'ATPROTO_APP_PASSWORD not set', ...counts };
       else if (dry || !apply) report.atproto = { status: 'planned', ...counts };
+      else if (!deps.allowPlaceholderLexicons && Object.values(shared).some((e) => String(e.doc?.id).startsWith('example.'))) {
+        // The shipped shared lexicons are placeholders (example.commons.*): they are never written to a live account. Plan mode is unaffected.
+        const ids = [...new Set(Object.values(shared).map((e) => e.doc.id).filter((id) => id.startsWith('example.')))].sort();
+        return { ok: false, report: { ...report, atproto: { status: 'failed', reason: `refusing to apply: ${ids.join(', ')} ${ids.length > 1 ? 'are' : 'is a'} placeholder lexicon${ids.length > 1 ? 's' : ''} (example.*), never written to a live account. Replace the pack's shared lexicon with the agreed one first.`, ...counts } } };
+      }
       else if (items.length === 0 && plan.delete.length > 0) {
         // Never let an unattended apply (close + publish.apply:true) turn an empty/misconfigured selection into a mass delete.
         return { ok: false, report: { ...report, atproto: { status: 'failed', reason: 'refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)', deleted: 0, wouldDelete: plan.delete.length } } };

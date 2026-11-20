@@ -37,7 +37,7 @@ const clientFor = (puts, dels) => () => ({ async login() {}, async putRecord(op)
 const env = { ATPROTO_APP_PASSWORD: 'pw' };
 const walk = (root, rel = '') => readdirSync(join(root, rel), { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(root, join(rel, e.name)) : [join(rel, e.name)]);
 const filesWith = (dir, needle) => walk(dir).filter((f) => readFileSync(join(dir, f), 'utf8').includes(needle)).sort();
-const publish = (dir, puts, dels) => OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: clientFor(puts, dels), env } });
+const publish = (dir, puts, dels) => OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: clientFor(puts, dels), env, allowPlaceholderLexicons: true } });
 
 test('the sentinel reaches no record, no output file and no map: it stays in the private canon', async () => {
   const dir = instance({ 'm-need': matching, 'p-need': pub }); const puts = []; const dels = [];
@@ -117,4 +117,17 @@ test('the export verb: matching-only and private needs never reach the commons; 
   const all = JSON.stringify(out) + JSON.stringify(r);
   for (const leak of [SENTINEL, 'PRIVATE-NEED-TITLE', 'PUBLIC-NEED-CONTACT', 'contact_route']) assert.equal(all.includes(leak), false, `the export leaked ${leak}`);
   assert.equal(out[join('data', 'kb', 'need.yaml')].includes('A public need'), true, 'the public need was not exported: the floor is simply off');
+});
+
+test('apply is refused while a shared lexicon is the placeholder example.commons.*: no client, no putRecord, no deleteRecord; plan mode still works', async () => {
+  const dir = instance({ 'p-need': pub }); const puts = []; const dels = []; let created = 0;
+  const createClient = (...a) => { created++; return clientFor(puts, dels)(...a); };
+  const refused = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient, env } });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.report.atproto.status, 'failed');
+  assert.match(refused.report.atproto.reason, /example\.commons\.need/); assert.match(refused.report.atproto.reason, /placeholder/);
+  assert.equal(created, 0, 'a client was created for a placeholder lexicon'); assert.deepEqual([puts, dels], [[], []]);
+  fw.resetPacks(); resetRegistryBindings();
+  const planned = await OPS.publish.run({ dir, flags: {}, deps: { createClient, env } });
+  assert.equal(planned.ok, true, JSON.stringify(planned.report)); assert.equal(planned.report.atproto.status, 'planned'); assert.equal(planned.report.atproto.created, 2); // the public need and the resource
 });
