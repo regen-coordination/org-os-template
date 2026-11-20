@@ -85,6 +85,46 @@ test('scrub: with no `all` there is nothing known to hide, so nothing is dropped
   assert.deepEqual(scrubUnpublishedRefs([r])[0].object.related, ['whatever']);
 });
 
+test('scrub BY VALUE: an unlisted field (superseded_by, supersedes, parent, see_also, a nested object) loses a non-public slug, id or type:slug', () => {
+  const pubNeed = it('need', 'p-need', { id: 'id-p' });
+  const m = it('need', 'm-need', { id: 'id-m' });
+  const r = it('resource', 'r', {
+    superseded_by: 'm-need', supersedes: ['need:m-need', 'p-need'], parent: 'id-m', see_also: ['m-need', A, 'nowhere'], kept_scalar: 'p-need',
+    nested: { cites: ['id-m', 'p-need'], deeper: [{ about: 'need:m-need', label: 'x' }, ['m-need', 'nowhere']], solo: 'm-need' },
+  });
+  const o = scrubUnpublishedRefs([r, pubNeed], [r, pubNeed, m])[0].object;
+  assert.equal('superseded_by' in o, false, 'a scalar naming a non-public object is dropped, key and all');
+  assert.deepEqual(o.supersedes, ['p-need']);
+  assert.equal('parent' in o, false);
+  assert.deepEqual(o.see_also, [A, 'nowhere']);
+  assert.equal(o.kept_scalar, 'p-need', 'a scalar naming a public object stays');
+  assert.deepEqual(o.nested, { cites: ['p-need'], deeper: [{ label: 'x' }, ['nowhere']] });
+  assert.equal(JSON.stringify(r.object).includes('"m-need"'), true, 'the input is not mutated');
+});
+
+test('scrub BY VALUE: free text is out of scope (only exact equality is removed)', () => {
+  const m = it('need', 'm-need'); const r = it('resource', 'r', { notes: 'see m-need for more', related: ['m-need'] });
+  const o = scrubUnpublishedRefs([r], [r, m])[0].object;
+  assert.equal(o.notes, 'see m-need for more'); assert.deepEqual(o.related, []);
+});
+
+test('scrub BY VALUE: the item\'s own id, slug, type and title are never touched, even when they equal a hidden object\'s slug', () => {
+  const hidden = { ...it('need', 'dup', { id: 'dup' }) };
+  const r = { schema: 'resource', ref: 'data/kb/resource.yaml#r', object: { id: 'dup', slug: 'dup', type: 'dup', title: 'dup', related: ['dup'], parent: 'dup' } };
+  const o = scrubUnpublishedRefs([r], [r, hidden])[0].object;
+  assert.deepEqual([o.id, o.slug, o.type, o.title], ['dup', 'dup', 'dup', 'dup']);
+  assert.deepEqual(o.related, []); assert.equal('parent' in o, false, 'a non-identity field with the same value is still scrubbed');
+});
+
+test('scrub BY VALUE: a field whose schema declares an enum or an axis keeps its value, even when it equals a hidden slug (the collision case)', () => {
+  // option-entry.category is `enum: [governance, …]`; `maturity` is an axis-backed K1 field. A private object slugged like either must not eat the value.
+  const hidden = it('need', 'governance'); const hiddenM = it('need', 'reviewed');
+  const r = { schema: 'option-entry', ref: 'data/kb/option-entry.yaml#o', object: { title: 'o', type: 'option-entry', category: 'governance', maturity: 'reviewed', see_also: ['governance'], parent: 'reviewed' } };
+  const o = scrubUnpublishedRefs([r], [r, hidden, hiddenM])[0].object;
+  assert.equal(o.category, 'governance'); assert.equal(o.maturity, 'reviewed');
+  assert.deepEqual(o.see_also, []); assert.equal('parent' in o, false, 'the same value in an undeclared field is a ref and goes');
+});
+
 test('planPublish scrubs again, whatever the caller did: a record built from unscrubbed items carries no hidden slug', () => {
   loadKmsConfig(instance());
   const m = { schema: 'need', object: { ...need('matching-only'), id: 'id-m' }, ref: 'data/kb/need.yaml#m-need' };

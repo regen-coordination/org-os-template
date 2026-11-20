@@ -191,3 +191,36 @@ test('a public resource whose related names a matching-only and a private need l
   const rows = yaml.load(readFileSync(join(dir, 'data', 'resources.yaml'), 'utf8')).resources;
   assert.deepEqual(rows[0].related, ['p-need', 'at://did:plc:other/xyz.example.kb.resource/abc', 'no-such-object']);
 });
+
+// Round 3: the scrub is by VALUE. A field nobody listed (superseded_by, supersedes, parent, see_also, a nested object) reaches toRecord,
+// the pages, the static api and the registry row exactly like `related` does, so an exact slug, id or type:slug of a non-public need
+// is removed wherever it sits. Free text ("see m-need") is not parsed; it is out of scope and not asserted here.
+test('an unlisted field naming a matching-only or private need (slug, id, type:slug) reaches no file outside the canon and no putRecord payload', async () => {
+  const resource = { title: 'A resource', type: 'resource', public_use: 'ok-with-caveat',
+    superseded_by: 'm-need', supersedes: ['need:x-need', 'p-need', 'idx-777'], parent: 'idm-777', see_also: ['x-need', 'at://did:plc:other/xyz.example.kb.resource/abc', 'no-such-object'],
+    lineage: { from: ['need:m-need', 'p-need'], note: { about: 'idx-777', keep: 'p-need' }, solo: 'x-need' } };
+  const dir = instance({ 'm-need': { ...matching, id: 'idm-777' }, 'x-need': { ...matching, title: 'other', visibility: 'private', id: 'idx-777' }, 'p-need': pub }, resource);
+  const puts = []; const dels = []; const config = loadKmsConfig(dir);
+  const res = await publish(dir, puts, dels);
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  OPS['index.rebuild'].run({ dir, config });
+  assert.equal(OPS['render.site'].run({ dir, config }).ok, true);
+  assert.equal(OPS.bridge.run({ dir, config }).ok, true);
+  buildMap({ dir });
+  const rec = puts.find((o) => o.record.title === 'A resource');
+  assert.ok(rec, 'the resource was not published');
+  for (const needle of ['m-need', 'x-need', 'idm-777', 'idx-777']) {
+    assert.equal(JSON.stringify(puts).includes(needle), false, `a putRecord payload carries ${needle}`);
+    const hit = filesWith(dir, needle);
+    assert.equal(hit.every((f) => f === 'data/kb/need.yaml' || f === 'data/kb/resource.yaml'), true, `${needle} reached ${hit}`);
+  }
+  // What stays: the public need, a foreign at:// URI, a dangling ref.
+  assert.equal(rec.record.superseded_by, undefined); assert.equal(rec.record.parent, undefined);
+  assert.deepEqual(rec.record.supersedes, ['p-need']);
+  assert.deepEqual(rec.record.see_also, ['at://did:plc:other/xyz.example.kb.resource/abc', 'no-such-object']);
+  assert.deepEqual(rec.record.lineage, { from: ['p-need'], note: { keep: 'p-need' } });
+  const api = JSON.parse(readFileSync(join(dir, 'public', 'api', 'resource.json'), 'utf8'));
+  assert.equal(api.items[0].superseded_by, undefined); assert.deepEqual(api.items[0].supersedes, ['p-need']);
+  const rows = yaml.load(readFileSync(join(dir, 'data', 'resources.yaml'), 'utf8')).resources;
+  for (const needle of ['m-need', 'x-need', 'idm-777', 'idx-777']) assert.equal(JSON.stringify(rows).includes(needle), false, `a registry row carries ${needle}`);
+});
