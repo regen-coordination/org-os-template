@@ -11,6 +11,8 @@ import { OPS } from '../src/ops.mjs';
 import { resetRegistryBindings } from '../src/bind.mjs';
 import { loadKmsConfig } from '../src/config.mjs';
 import { buildMap } from '../src/map.mjs';
+import { exportCommons } from '../src/planes/export-commons.mjs';
+import { makeCanon, makeCommons, readTree } from './planes/helpers.mjs';
 
 const AUTH = 'xyz.example.kb';
 const SENTINEL = 'SENTINEL-MATCHING-ONLY-7f3a';
@@ -98,4 +100,21 @@ test('a need removed from the canon is deleted from the shared collection', asyn
   const { dels, res } = await downgrade((e) => { delete e['p-need']; });
   assert.equal(res.report.atproto.deleted, 1);
   assert.deepEqual(dels.map((d) => d.collection), [SHARED]);
+});
+
+test('the export verb: matching-only and private needs never reach the commons; the public one does', () => {
+  const lineage = 'repos/ReFi-Barcelona/notes/x.md';
+  const base = { maturity: 'reviewed', source_lineage: lineage, public_use: 'ok-with-caveat', type: 'need' };
+  const root = makeCanon({ need: {
+    'm-need': { ...base, title: `Need ${SENTINEL}`, text: `wants ${SENTINEL}`, contact_route: `${SENTINEL}@example.org`, visibility: 'matching-only' },
+    'x-need': { ...base, title: 'PRIVATE-NEED-TITLE', visibility: 'private' },
+    'p-need': { ...base, title: 'A public need', text: 'a plain public text', contact_route: 'PUBLIC-NEED-CONTACT', visibility: 'public' },
+  } });
+  const outDir = makeCommons(undefined, undefined, { extensions: ['org-os-needs-offers'], types_opt_in: ['need'] });
+  let n = 0;
+  const r = exportCommons({ root, outDir, uuid: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` });
+  const out = readTree(outDir);
+  const all = JSON.stringify(out) + JSON.stringify(r);
+  for (const leak of [SENTINEL, 'PRIVATE-NEED-TITLE', 'PUBLIC-NEED-CONTACT', 'contact_route']) assert.equal(all.includes(leak), false, `the export leaked ${leak}`);
+  assert.equal(out[join('data', 'kb', 'need.yaml')].includes('A public need'), true, 'the public need was not exported: the floor is simply off');
 });

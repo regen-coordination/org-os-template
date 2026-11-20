@@ -2,6 +2,7 @@
 // passes. No grc20Id (no Geo space).
 import { getAdapter, isPublishable, PUBLISHABLE_TYPES } from '../framework.mjs';
 import { ensureIds } from '../identity.mjs';
+import { visibilityFloor } from '../visibility.mjs';
 
 /**
  * `types` — the publish-eligible type list of the COMMONS being exported to, from
@@ -26,6 +27,10 @@ export function selectForPublication({ root, verdicts, uuid, types = PUBLISHABLE
         : `type ${it.schema} is not publish-eligible here (see the commons' kms.yaml publish.types_opt_in)`;
       floorRejected.push({ key, reason }); continue;
     }
+    // The visibility floor of a gated pack (a matching-only need is never public). Rules are registered by the caller's
+    // loadCommonsPolicy before this runs; a type with no rule passes, so core types and ungated packs are unchanged.
+    const floor = visibilityFloor(it.object, it.schema);
+    if (!floor.ok) { floorRejected.push({ key, reason: floor.reason }); continue; }
     selected.push({ key, ...it });
   }
   const { minted, items } = ensureIds({ adapter: 'repo-data', target: root, items: selected, write: true, mintGeo: false, ...(uuid ? { uuid } : {}) });
