@@ -12,13 +12,19 @@ function stable(v) {
 }
 export function contentHash(record) { return createHash('sha256').update(stable(record)).digest('hex'); }
 
-export function planPublish({ items, manifest, did, authority }) {
+/**
+ * `shared` ({ [schema]: { doc, toRecord } }, from loadSharedLexicons) puts a schema in a shared lexicon: the record is
+ * toRecord(object), validated against `doc`, and the collection is doc.id, not nsidFor(schema, authority). A toRecord
+ * that returns null leaves the object canon-only. Core types are unchanged.
+ */
+export function planPublish({ items, manifest, did, authority, shared = {} }) {
   const lexicons = fw.generateAll({ authority });
   const resolve = resolverFrom(manifest);
   const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], previous: manifest.objects };
   const seen = new Set();
   for (const { schema, object, ref } of items) {
-    const collection = fw.nsidFor(schema, authority);
+    const sharedEntry = shared[schema] ?? null;
+    const collection = sharedEntry ? sharedEntry.doc.id : fw.nsidFor(schema, authority);
     const slug = slugFromRef(ref);
     // A type of a visibility-gated pack must declare both a floor and a field whitelist, or it is refused (fail closed);
     // when declared, the object is cut to the whitelist BEFORE toRecord, which would otherwise keep every non-private key.
@@ -29,8 +35,9 @@ export function planPublish({ items, manifest, did, authority }) {
       if (missing.length) { plan.errors.push({ slug, errors: [`pack ${rules.pack} is visibility-gated: type ${schema} declares no ${missing.join(' and no ')}`] }); continue; }
       source = Object.fromEntries(Object.entries(source).filter(([k]) => rules.public_fields.includes(k)));
     }
-    const record = fw.toRecord(source, collection);
-    const v = fw.validateRecord(record, lexicons[collection]);
+    const record = sharedEntry ? sharedEntry.toRecord(source) : fw.toRecord(source, collection);
+    if (record === null) continue; // no home in the shared lexicon: stays canon-only (and is deleted below if it was published)
+    const v = fw.validateRecord(record, sharedEntry ? sharedEntry.doc : lexicons[collection]);
     if (!v.ok) { plan.errors.push({ slug, errors: v.errors }); continue; }
     const id = object.id; seen.add(id);
     const hash = contentHash(record);
@@ -38,7 +45,7 @@ export function planPublish({ items, manifest, did, authority }) {
     const op = { id, slug, type: schema, collection, rkey: id, record, hash };
     if (!prev) plan.create.push(op); else if (prev.hash === hash) plan.skip.push(id); else plan.update.push({ ...op, swapRecord: prev.cid });
   }
-  for (const [id, prev] of Object.entries(manifest.objects)) if (!seen.has(id)) plan.delete.push({ id, slug: prev.slug, type: prev.type, collection: fw.nsidFor(prev.type, authority), rkey: prev.rkey });
+  for (const [id, prev] of Object.entries(manifest.objects)) if (!seen.has(id)) plan.delete.push({ id, slug: prev.slug, type: prev.type, collection: prev.collection ?? fw.nsidFor(prev.type, authority), rkey: prev.rkey });
   return plan.errors.length ? { ...plan, ok: false, create: [], update: [], delete: [], skip: [] } : plan;
 }
 
@@ -51,7 +58,7 @@ export async function applyPublish(plan, { client, did, now = () => new Date().t
     for (const op of ops) {
       try {
         const { uri, cid } = await client.putRecord({ repo: did, collection: op.collection, rkey: op.rkey, record: op.record, swapRecord: op.swapRecord });
-        manifest.objects[op.id] = { slug: op.slug, type: op.type, rkey: op.rkey, atUri: uri, cid, hash: op.hash, publishedAt: now() };
+        manifest.objects[op.id] = { slug: op.slug, type: op.type, rkey: op.rkey, collection: op.collection, atUri: uri, cid, hash: op.hash, publishedAt: now() };
         out.applied[kind]++;
       } catch (e) { out.failures.push({ id: op.id, error: e.message }); if (kind === 'updated') manifest.objects[op.id] = plan.previous[op.id]; }
     }

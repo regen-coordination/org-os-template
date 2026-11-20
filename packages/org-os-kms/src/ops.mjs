@@ -21,6 +21,7 @@ import { planStandardSite, applyStandardSite, wellKnownPath } from './atproto/st
 import { planeRole, regatePublicPlane } from './planes/role.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { selectPublic } from './gate.mjs';
+import { loadSharedLexicons } from './pack-publish.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
 
@@ -113,7 +114,7 @@ export const OPS = {
       // object carries no `type` of its own — the record still must. Defaulted for the record only: the
       // objects on disk are not rewritten.
       const records = items.map((it) => (it.object.type ? it : { ...it, object: { type: it.schema, ...it.object } }));
-      const plan = planPublish({ items: records, manifest, did: at.did, authority: at.nsid_authority });
+      const plan = planPublish({ items: records, manifest, did: at.did, authority: at.nsid_authority, shared: await loadSharedLexicons(config.packs) });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;

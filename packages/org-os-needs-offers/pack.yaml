@@ -18,3 +18,8 @@ publish_requires:
 public_fields:
   need: [id, title, type, public_use, maturity, subject, category, text, when, status, visibility]
   offer: [id, title, type, public_use, maturity, subject, category, text, terms, status, visibility]
+# shared_lexicon: types published in a shared lexicon instead of the instance's own namespace (kms plan Task 6).
+# example.commons.* is a PLACEHOLDER and is never applied to a live account; Step 6 replaces it with the agreed files.
+shared_lexicon:
+  need: lexicons/example.commons.need.json
+  offer: lexicons/example.commons.offer.json
