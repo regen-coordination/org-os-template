@@ -85,3 +85,37 @@ test('planPublish cuts a need to the pack public_fields: contact_route and intro
   assert.equal('contact_route' in rec, false); assert.equal('intro_wanted' in rec, false);
   assert.equal(JSON.stringify(plan).includes('MATCHING-ONLY-CONTACT'), false);
 });
+
+// A namespace swap (kms plan Task 6 Step 6): the same id, published in an old collection, now maps to another one.
+test('a published need whose collection changed is created in the new collection and deleted from the old one, never updated with swapRecord', async () => {
+  const s = await shared(); const puts = []; const dels = [];
+  const prev = { slug: 'n1', type: 'need', rkey: 'n1', collection: 'old.commons.need', atUri: 'at://did:plc:me/old.commons.need/n1', cid: 'old-cid', hash: 'same-or-not' };
+  const plan = planPublish({ items: [item(need)], manifest: { version: 1, objects: { n1: prev } }, did: 'did:plc:me', authority: AUTH, shared: s });
+  assert.equal(plan.ok, true, JSON.stringify(plan.errors));
+  assert.deepEqual(plan.update, [], 'a collection change is not an update');
+  assert.equal(plan.create.length, 1); assert.equal(plan.create[0].collection, 'example.commons.need'); assert.equal(plan.create[0].swapRecord, undefined);
+  assert.deepEqual(plan.delete.map((d) => [d.id, d.collection, d.rkey]), [['n1', 'old.commons.need', 'n1']]);
+  const client = { async putRecord(op) { puts.push([op.collection, op.swapRecord]); return { uri: `at://x/${op.collection}/${op.rkey}`, cid: 'new-cid' }; }, async deleteRecord(op) { dels.push(op.collection); } };
+  const { manifest, applied } = await applyPublish(plan, { client, did: 'did:plc:me' });
+  assert.deepEqual(puts, [['example.commons.need', undefined]]); assert.deepEqual(dels, ['old.commons.need']);
+  assert.equal(manifest.objects.n1.collection, 'example.commons.need'); assert.equal(manifest.objects.n1.cid, 'new-cid', 'the manifest tracks the new record');
+});
+
+test('a collection change whose old record cannot be deleted keeps the manifest on the NEW record and reports the failure', async () => {
+  const s = await shared();
+  const prev = { slug: 'n1', type: 'need', rkey: 'n1', collection: 'old.commons.need', atUri: 'at://x/old.commons.need/n1', cid: 'old-cid', hash: 'h' };
+  const plan = planPublish({ items: [item(need)], manifest: { version: 1, objects: { n1: prev } }, did: 'did:plc:me', authority: AUTH, shared: s });
+  const client = { async putRecord(op) { return { uri: `at://x/${op.collection}/${op.rkey}`, cid: 'new-cid' }; }, async deleteRecord() { throw new Error('boom'); } };
+  const { manifest, failures } = await applyPublish(plan, { client, did: 'did:plc:me' });
+  assert.equal(manifest.objects.n1.collection, 'example.commons.need');
+  assert.equal(failures.length, 1); assert.match(failures[0].error, /old\.commons\.need/);
+});
+
+test('a collection change whose create fails does not delete the old record, and the manifest keeps tracking it', async () => {
+  const s = await shared(); const dels = [];
+  const prev = { slug: 'n1', type: 'need', rkey: 'n1', collection: 'old.commons.need', atUri: 'at://x/old.commons.need/n1', cid: 'old-cid', hash: 'h' };
+  const plan = planPublish({ items: [item(need)], manifest: { version: 1, objects: { n1: prev } }, did: 'did:plc:me', authority: AUTH, shared: s });
+  const client = { async putRecord() { throw new Error('nope'); }, async deleteRecord(op) { dels.push(op.collection); } };
+  const { manifest, failures } = await applyPublish(plan, { client, did: 'did:plc:me' });
+  assert.deepEqual(dels, []); assert.equal(failures.length, 1); assert.deepEqual(manifest.objects.n1, prev);
+});

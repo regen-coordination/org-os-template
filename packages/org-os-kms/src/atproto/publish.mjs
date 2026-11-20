@@ -47,7 +47,15 @@ export function planPublish({ items, manifest, did, authority, shared = {} }) {
     const hash = contentHash(record);
     const prev = manifest.objects[id];
     const op = { id, slug, type: schema, collection, rkey: id, record, hash };
-    if (!prev) plan.create.push(op); else if (prev.hash === hash) plan.skip.push(id); else plan.update.push({ ...op, swapRecord: prev.cid });
+    const prevCollection = prev ? (prev.collection ?? fw.nsidFor(prev.type, authority)) : null;
+    if (!prev) plan.create.push(op);
+    else if (prevCollection !== collection) {
+      // The collection changed (a namespace swap): swapRecord names a record in the OLD collection, so it cannot be an update.
+      // Create in the new collection; delete the old record. `moved` tells applyPublish the manifest now belongs to the new one.
+      plan.create.push(op);
+      plan.delete.push({ id, slug: prev.slug, type: prev.type, collection: prevCollection, rkey: prev.rkey, moved: true });
+    }
+    else if (prev.hash === hash) plan.skip.push(id); else plan.update.push({ ...op, swapRecord: prev.cid });
   }
   for (const [id, prev] of Object.entries(manifest.objects)) if (!seen.has(id)) plan.delete.push({ id, slug: prev.slug, type: prev.type, collection: prev.collection ?? fw.nsidFor(prev.type, authority), rkey: prev.rkey });
   return plan.errors.length ? { ...plan, ok: false, create: [], update: [], delete: [], skip: [] } : plan;
@@ -64,12 +72,18 @@ export async function applyPublish(plan, { client, did, now = () => new Date().t
         const { uri, cid } = await client.putRecord({ repo: did, collection: op.collection, rkey: op.rkey, record: op.record, swapRecord: op.swapRecord });
         manifest.objects[op.id] = { slug: op.slug, type: op.type, rkey: op.rkey, collection: op.collection, atUri: uri, cid, hash: op.hash, publishedAt: now() };
         out.applied[kind]++;
-      } catch (e) { out.failures.push({ id: op.id, error: e.message }); if (kind === 'updated') manifest.objects[op.id] = plan.previous[op.id]; }
+      } catch (e) { out.failures.push({ id: op.id, error: e.message }); if (kind === 'updated' || plan.previous[op.id]) manifest.objects[op.id] = plan.previous[op.id]; }
     }
   }
   for (const op of plan.delete) {
+    // A moved record is deleted from its old collection only once its new copy exists.
+    if (op.moved && out.failures.some((f) => f.id === op.id)) continue;
     try { await client.deleteRecord({ repo: did, collection: op.collection, rkey: op.rkey }); out.applied.deleted++; }
-    catch (e) { out.failures.push({ id: op.id, error: e.message }); manifest.objects[op.id] = plan.previous[op.id]; }
+    catch (e) {
+      // A moved record's NEW copy is already tracked; restoring the old entry would lose it. Report where the stale copy is.
+      if (op.moved) out.failures.push({ id: op.id, error: `the record was created in its new collection, but the old copy in ${op.collection} could not be deleted: ${e.message}` });
+      else { out.failures.push({ id: op.id, error: e.message }); manifest.objects[op.id] = plan.previous[op.id]; }
+    }
   }
   return out;
 }
