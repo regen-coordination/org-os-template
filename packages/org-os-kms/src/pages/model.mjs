@@ -42,7 +42,7 @@ export function buildCommons({ items, allItems = items, manifest, config = {}, k
   // ── pass 1: one entry per item, without relations ───────────────────────────
   const entries = pool.map((it) => {
     const { schema, ref } = it;
-    const o = publicViewOf(it.object);
+    const o = publicViewOf(it.object, { schema, publisher: config.publish?.claim_publisher });
     const slug = slugFromRef(ref);
     const id = String(o.id ?? slug);
     const settings = config.atproto?.standard_site;
@@ -144,7 +144,7 @@ export function buildCommons({ items, allItems = items, manifest, config = {}, k
     e.neighbours = { items: near.slice(0, NEIGHBOURS_MAX), more: Math.max(0, near.length - NEIGHBOURS_MAX) };
     const lin = e._o.source_system ?? e._o.source_lineage;
     const src = lin ? pool.find((i) => i.schema === 'source-system' && (slugFromRef(i.ref) === lin || i.object.title === lin || i.object.url === lin)) : null;
-    e.cite = src ? (asText(publicViewOf(src.object).how_to_credit) || null) : null;
+    e.cite = src ? (asText(publicViewOf(src.object, { schema: src.schema }).how_to_credit) || null) : null;
     const lab = e._lab;
     const row = (l, v) => (v ? [[l, v]] : []);
     e.about = [...row(lab('kind'), e.kindLabel), ...row(lab('page_type'), e.pageType ? kindLabel(e.pageType) : null), ...row(lab('maturity'), e.mark?.word ?? e.maturity),

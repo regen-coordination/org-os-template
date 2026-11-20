@@ -128,7 +128,8 @@ test('scrub by value holds for a claim record: a claim naming a private object d
   const claim = puts(log).map((p) => p[3]).find((r) => r.claim_for);
   assert.ok(claim, 'the claim was published');
   assert.ok(!JSON.stringify(claim).includes('secret-resource'), JSON.stringify(claim));
-  assert.ok(JSON.stringify(claim).includes('open-resource'));
+  // F6: a claim is cut to an allow-list, which has no relation fields, so even the public ref is not carried.
+  assert.ok(!('related_resources' in claim) && !('parent' in claim), JSON.stringify(claim));
 });
 
 // ---- reconcile ----

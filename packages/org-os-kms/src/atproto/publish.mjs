@@ -47,7 +47,7 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
     if (isClaim(object)) {
       const cf = claimFloor(object, claimConfig);
       if (!cf.ok) { plan.errors.push({ slug, errors: [cf.reason] }); continue; }
-      const marked = claimView(source, claimPublisher);
+      const marked = claimView(source, claimPublisher, schema);
       source = rules ? { ...source, ...Object.fromEntries(CLAIM_RECORD_FIELDS.filter((k) => marked[k] !== undefined).map((k) => [k, marked[k]])) } : marked;
     }
     const record = sharedEntry ? sharedEntry.toRecord(source) : fw.toRecord(source, collection);

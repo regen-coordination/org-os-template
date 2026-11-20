@@ -33,7 +33,7 @@ export async function writeStaticSurface({ dir, outDir = 'public', items, allIte
   const bySchema = new Map();
   for (const { schema, object } of items) {
     const m = manifest.objects[object.id];
-    const entry = { ...publicViewOf(object), '@context': CONTEXT, ...(m ? { atUri: m.atUri, cid: m.cid } : {}) }; // @context last: an object's own can never override the absolute URL
+    const entry = { ...publicViewOf(object, { schema, publisher: config.publish?.claim_publisher }), '@context': CONTEXT, ...(m ? { atUri: m.atUri, cid: m.cid } : {}) }; // @context last: an object's own can never override the absolute URL
     if (!bySchema.has(schema)) bySchema.set(schema, []);
     bySchema.get(schema).push(entry);
   }

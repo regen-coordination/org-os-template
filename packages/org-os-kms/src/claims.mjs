@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
 import { planeRole } from './planes/role.mjs';
+import { publicEntryFor } from './planes/public-fields.mjs';
 
 const present = (v) => v !== undefined && v !== null && v !== '';
 
@@ -55,17 +56,33 @@ export function withoutHomeFields(object) {
   return out;
 }
 
-/** What a claim looks like as a record source: consent date and superseded_by stay home, dates are plain strings, publisher is stamped. */
-export function claimView(object, publisher) {
+/** What a claim shows of itself, besides its marks (CLAIM_RECORD_FIELDS) and what its schema declares public. */
+export const CLAIM_CONTENT_FIELDS = ['id', 'title', 'type', 'public_use', 'url', 'description'];
+
+/**
+ * What a claim looks like as a record source, the static API entry and the page: a CUT, not a copy. A claim is ReFi DAO's record
+ * about a node, and the operator keeps things beside it (a contact, who raised it, notes) that must never leave. It carries an
+ * allow-list: CLAIM_CONTENT_FIELDS, the claim marks, `publisher` (stamped), and what the commons field policy
+ * (planes/public-fields.mjs, publicEntryFor) declares public for the schema. The consent date and superseded_by stay home
+ * (withoutHomeFields); dates are plain strings. A visibility-gated pack type is already cut to its own declared public_fields
+ * before this (planPublish), and only its claim marks are added back.
+ */
+export function claimView(object, publisher, schema = object?.type) {
+  const home = withoutHomeFields(object);
+  const declared = publicEntryFor(schema, home);
+  const keep = new Set([...CLAIM_CONTENT_FIELDS, ...CLAIM_RECORD_FIELDS]);
   const out = {};
-  for (const [k, v] of Object.entries(withoutHomeFields(object))) out[k] = day(v);
-  out.publisher = publisher;
+  for (const [k, v] of Object.entries(home)) {
+    if (k in declared) out[k] = day(declared[k]);
+    else if (keep.has(k)) out[k] = day(v);
+  }
+  if (publisher !== undefined) out.publisher = publisher;
   return out;
 }
 
-/** An object as the static API, the pages and standard.site show it: the framework's public view, and for a claim without its home-only fields. */
-export function publicViewOf(object) {
-  return fw.publicView(isClaim(object) ? withoutHomeFields(object) : object);
+/** An object as the static API, the pages and standard.site show it: the framework's public view; for a claim, its allow-list cut (claimView). */
+export function publicViewOf(object, { schema, publisher } = {}) {
+  return fw.publicView(isClaim(object) ? claimView(object, publisher, schema ?? object.type) : object);
 }
 
 // ---- reconcile ----

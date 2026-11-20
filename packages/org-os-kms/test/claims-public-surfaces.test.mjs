@@ -48,3 +48,40 @@ test('a plain object is unchanged by the claim view on every surface', async () 
   const plain = { id: 'claim-1', type: 'organization', title: 'Plain', public_use: 'ok-with-caveat', consent_atproto: CONSENT };
   assert.equal((await staticJson(plain)).consent_atproto, CONSENT, 'not a claim: the static API is as it was');
 });
+
+// ---- F6: a claim is cut to an allow-list, whatever else sits on the object ----
+// Allowed: id, title, type, public_use, url, description, the claim marks (claim_for, claim_status, claim_node_did,
+// claim_checked_on), publisher, and the fields the commons field policy (src/planes/public-fields.mjs) declares public for the
+// schema (for a visibility-gated pack type, its declared public_fields). Everything else stays home.
+const KEPT = { org_type: 'cooperative', legal_form: 'SCCL' };
+const HOME = ['contact_email', 'contact_name', 'claimed_by', 'notes', 'consent_atproto', 'superseded_by', 'internal_ref'];
+const plan = (object) => planPublish({ items: [item(object)], manifest, did: 'did:plc:me', authority: 'xyz.example.kb', publishClaims: true, claimPublisher: 'ReFi DAO' });
+const text = (o) => JSON.stringify(o);
+
+test('F6 record: a claim carries its allow-list and nothing else (no contact, no claimed_by, no consent, no unknown field)', () => {
+  const p = plan(claim({ ...KEPT, internal_ref: 'zzz-internal' }));
+  assert.equal(p.ok, true, text(p.errors));
+  const rec = p.create[0].record;
+  for (const k of HOME) assert.equal(rec[k], undefined, k);
+  for (const v of [CONTACT_MAIL, CONTACT_NAME, 'Operator Sam', CONSENT, 'zzz-internal']) assert.ok(!text(rec).includes(v), v);
+  assert.equal(rec.title, 'Node A'); assert.equal(rec.claim_for, 'https://node-a.example'); assert.equal(rec.claim_status, 'claimed');
+  assert.equal(rec.publisher, 'ReFi DAO'); assert.equal(rec.claim_checked_on, '2026-11-18'); assert.equal(rec.claim_node_did, 'did:plc:nodeaaaaaaaaaaaaaaaaaaaa');
+  assert.equal(rec.org_type, 'cooperative', 'a declared public content field of the schema is kept');
+});
+
+test('F6 static API: the same allow-list, with the publisher stamped', async () => {
+  const j = await staticJson(claim({ ...KEPT, internal_ref: 'zzz-internal' }));
+  for (const k of HOME) assert.equal(j[k], undefined, k);
+  assert.equal(j.publisher, 'ReFi DAO'); assert.equal(j.org_type, 'cooperative'); assert.equal(j.claim_for, 'https://node-a.example');
+});
+
+test('F6 pages: the page model carries no contact, claimed_by or unknown field, and keeps the declared content', () => {
+  const s = text(model(claim({ ...KEPT, internal_ref: 'zzz-internal' })));
+  for (const v of [CONTACT_MAIL, CONTACT_NAME, 'Operator Sam', CONSENT, 'zzz-internal', 'private note']) assert.ok(!s.includes(v), v);
+  assert.ok(s.includes('cooperative') && s.includes('A cooperative that farms oats.'));
+});
+
+test('F6: a plain (non-claim) object is not cut by the claim allow-list', async () => {
+  const j = await staticJson({ id: 'claim-1', type: 'organization', title: 'Plain', public_use: 'ok-with-caveat', internal_ref: 'kept-as-before' });
+  assert.equal(j.internal_ref, 'kept-as-before');
+});

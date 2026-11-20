@@ -60,7 +60,7 @@ const asText = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' 
 // One entry → its plan-time document record. `publishedAt`, `updatedAt` and the strongRef's cid are stamped at apply.
 export function toDocument({ schema, object, ref }, { did, authority, publicationUri, settings = {} }) {
   const slug = slugFromRef(ref);
-  const o = publicViewOf(object);
+  const o = publicViewOf(object, { schema });
   if (typeof o.title !== 'string' || !o.title.trim()) return { skipped: 'no title: a document needs one' };
   const errors = []; let warning;
   const map = { ...(FIELD_MAP[schema] || {}), ...(settings.fields?.[schema] || {}) };
