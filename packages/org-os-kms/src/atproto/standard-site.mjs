@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import * as fw from '../framework.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { contentHash } from './publish.mjs';
-import { publicViewOf } from '../claims.mjs';
+import { publicViewOf, isClaim } from '../claims.mjs';
 
 export const PUBLICATION = 'site.standard.publication';
 export const DOCUMENT = 'site.standard.document';
@@ -138,6 +138,9 @@ export function planStandardSite({ items, entryPlan, manifest, did, authority, c
   const seen = new Set();
   for (const item of items) {
     const id = item.object.id; const slug = slugFromRef(item.ref);
+    // A site.standard.document has no claim marks (claim_for, claim_status, publisher): a claim's document would read as the
+    // instance's own page about itself. Withheld with a reason, like an entry with no title; a document published earlier is deleted below.
+    if (isClaim(item.object)) { plan.withheld.push({ id, slug, reason: 'claim withheld: a site.standard.document carries no claim marks, so it would read as the instance\'s own page' }); continue; }
     const { record, errors, warning, skipped } = toDocument(item, { did, authority, publicationUri, settings });
     if (skipped) { plan.withheld.push({ id, slug, reason: skipped }); continue; }
     if (errors.length) { plan.errors.push({ slug, errors }); continue; }

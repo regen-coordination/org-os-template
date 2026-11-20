@@ -76,3 +76,25 @@ test('B op: one consented signal claim no longer fails the whole publish', async
   const sig = JSON.parse(readFileSync(join(dir, 'public', 'api', 'signal.json'), 'utf8')).items[0];
   assert.equal(sig.signal_type, 'content'); assert.equal(sig.contact_email, undefined);
 });
+
+// ---- C: a site.standard.document carries no claim marks, so a claim's document would read as the instance's own ----
+import { planStandardSite } from '../src/atproto/standard-site.mjs';
+
+test('C standard.site: a claim is withheld with a reason; an ordinary entry beside it still gets its document', () => {
+  const ssConfig = { atproto: { standard_site: { enabled: true, title: 'T', url: 'https://t.example', paths: { default: '/k/{slug}' } } }, publish: { base_url: 'https://t.example' } };
+  const items = [it('organization', claimOf('organization')), it('organization', { id: 'plain', type: 'organization', title: 'Plain', public_use: 'ok-with-caveat' })];
+  const entryPlan = { create: [], update: [] };
+  const ss = planStandardSite({ items, entryPlan, manifest, did: 'did:plc:me', authority: 'xyz.example.kb', config: ssConfig });
+  assert.equal(ss.ok, true, JSON.stringify(ss.errors));
+  assert.deepEqual(ss.create.map((o) => o.id), ['plain']);
+  assert.equal(ss.withheld.length, 1);
+  assert.equal(ss.withheld[0].id, 'claim-organization');
+  assert.match(ss.withheld[0].reason, /claim/);
+});
+
+test('C standard.site: a claim already published as a document is deleted (not kept) once it is withheld', () => {
+  const ssConfig = { atproto: { standard_site: { enabled: true, title: 'T', url: 'https://t.example' } }, publish: { base_url: 'https://t.example' } };
+  const m = { version: 1, objects: {}, standardSite: { publication: null, documents: { 'claim-organization': { slug: 'claim-organization', rkey: 'abc', cid: 'c' } } } };
+  const ss = planStandardSite({ items: [it('organization', claimOf('organization'))], entryPlan: { create: [], update: [] }, manifest: m, did: 'did:plc:me', authority: 'xyz.example.kb', config: ssConfig });
+  assert.deepEqual(ss.delete.map((o) => o.id), ['claim-organization']);
+});
