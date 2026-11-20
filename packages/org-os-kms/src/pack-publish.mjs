@@ -53,3 +53,16 @@ export async function loadSharedLexicons(packs = []) {
   }
   return out;
 }
+
+/** { [type]: publish_requires } for every visibility-gated type that declares one. */
+export function publishRequirements() {
+  return Object.fromEntries([...gated].filter(([, r]) => r.publish_requires).map(([t, r]) => [t, r.publish_requires]));
+}
+
+/** The object cut to its type's declared `public_fields`; unchanged for a type with no gated-pack rules, null if gated but undeclared. */
+export function cutToPublicFields(schema, object) {
+  const rules = gated.get(schema);
+  if (!rules) return object;
+  if (!rules.public_fields) return null;
+  return Object.fromEntries(Object.entries(object).filter(([k]) => rules.public_fields.includes(k)));
+}

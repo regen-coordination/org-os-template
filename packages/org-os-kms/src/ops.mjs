@@ -21,7 +21,7 @@ import { planStandardSite, applyStandardSite, wellKnownPath } from './atproto/st
 import { planeRole, regatePublicPlane } from './planes/role.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { selectPublic } from './gate.mjs';
-import { loadSharedLexicons } from './pack-publish.mjs';
+import { loadSharedLexicons, cutToPublicFields } from './pack-publish.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
 
@@ -94,7 +94,7 @@ export const OPS = {
     const all = adapter.list(target);
     const sel = await selectPublic({ dir, config, all });
     const candidates = sel.candidates;
-    if (sel.withheld?.undeclared) report.withheld = { undeclared: sel.withheld.undeclared };
+    if (sel.withheld?.undeclared || sel.withheld?.visibility) report.withheld = { ...(sel.withheld.undeclared ? { undeclared: sel.withheld.undeclared } : {}), ...(sel.withheld.visibility ? { visibility: sel.withheld.visibility } : {}) };
     if (sel.gated) {
       const by_reason = {}; for (const r of sel.rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
       report.gate = { passed: candidates.length, rejected: sel.rejected.length, by_reason };
@@ -104,8 +104,10 @@ export const OPS = {
     // (in-memory ids, report.minted) is unchanged.
     const at = config.atproto;
     const hasTarget = Boolean(at?.did && at?.pds && at?.nsid_authority) || config.publish?.static !== false;
-    const { minted, items } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget, mintGeo: Boolean(config.geo?.space) });
+    const { minted, items: identified } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget, mintGeo: Boolean(config.geo?.space) });
     report.minted = minted.length;
+    // A visibility-gated type leaves the instance cut to its declared public_fields (ensureIds re-reads the canon, so it is cut after).
+    const items = identified.map((it) => ({ ...it, object: cutToPublicFields(it.schema, it.object) }));
 
     const manifest = readManifest(dir);
     let next = manifest;

@@ -4,6 +4,7 @@ import * as fw from '../framework.mjs';
 import { rewriteRefs, resolverFrom } from '../refs.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { packPublishRules } from '../pack-publish.mjs';
+import { visibilityFloor } from '../visibility.mjs';
 
 function stable(v) {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
@@ -33,6 +34,9 @@ export function planPublish({ items, manifest, did, authority, shared = {} }) {
     if (rules) {
       const missing = ['publish_requires', 'public_fields'].filter((k) => !rules[k]);
       if (missing.length) { plan.errors.push({ slug, errors: [`pack ${rules.pack} is visibility-gated: type ${schema} declares no ${missing.join(' and no ')}`] }); continue; }
+      // Fail closed even when a caller skipped the op's filter or an instance gate said yes: the floor is checked again here.
+      const floor = visibilityFloor(object, schema);
+      if (!floor.ok) { plan.errors.push({ slug, errors: [floor.reason] }); continue; }
       source = Object.fromEntries(Object.entries(source).filter(([k]) => rules.public_fields.includes(k)));
     }
     const record = sharedEntry ? sharedEntry.toRecord(source) : fw.toRecord(source, collection);

@@ -43,6 +43,21 @@ and `provenance.surfaced_by`. That list is the `PRIVATE_FIELDS` constant; read i
 
 Separately, the publication gate: only these types publish by default (`claim-evidence`, `concept-lineage`, `encyclopedia-entry`, `implementation-record`, `option-entry`, `organization`, `relationship-record`, `resource`, `signal`, `track`), `source-system` and `public-use-boundary` are opt-in via `publish.types_opt_in`, `person` is never publishable, and an object needs `public_use` of `ok-with-caveat`, `source-linked-unreviewed`, `reviewed-for-explanation` or `reviewed-for-guidance`, and its `maturity` must not be `held` (no other maturity is part of the floor). An optional instance gate (`publish.gate`) can only narrow this.
 
+### Matching-only: a floor that no gate widens, and the egress audit
+
+A type of a visibility-gated pack (`org-os-needs-offers`) is published only when its object holds every `publish_requires` value (`visibility: public`); an object without the field is refused. The floor is applied three times: the `publish` op withholds (`report.withheld.visibility`), `planPublish` fails closed (`visibility floor: …`) whatever called it, and the registry bridge skips the object. An instance gate runs after the floor and can only narrow it. A published record is cut to `public_fields` (and, in a shared lexicon, to that lexicon's properties). The test is `test/matching-only-egress.test.mjs`: a sentinel in `title`, `text` and `contact_route` of a matching-only need must appear only in the private canon.
+
+The closed audit list (read in this build, 2026-11-20):
+
+| Path | Verdict |
+|---|---|
+| `registry-bridge.mjs` | Upserted every bound object into `data/needs.yaml` / `data/offers.yaml`, tracked files that generators read. **Changed:** a gated type is skipped unless it clears its floor, and a row carries only `public_fields`. Applied to every instance, because the per-instance answers (tracked? remote? read by a generator?) for Brasil Regenerativo and `refi-dao-os` were not read in this build; the stricter default is safe for all. |
+| `render.site` (`renderSiteData`) | Copies `data/kb/index.json`: counts by type and maturity, no titles or fields. A matching-only need is counted there (existence, not content). |
+| `static/surface.mjs`, `pages/` | Take only the selected items; gated types are cut to `public_fields` before them (a public need's `contact_route` does not reach `api/need.json` or a page). |
+| `federate.contribute` | Reads the peer card only; `records` come from the caller, and the result is a draft, never applied. |
+| `frontier.mjs`, `map.mjs`, `render-map-html.mjs` | Read `federation.yaml`, peer snapshots, `data/source-systems.yaml` and the index counts; no object fields. |
+| A target instance's own generators over `data/*.yaml` | Not read here (outside this build). Before a target adopts the pack: `git -C <instance> ls-files data/needs.yaml`, `git remote -v`, and grep its generators for reads of `data/`. |
+
 ## 4. `.well-known` allowlist
 
 Only two files are written under `<static_dir>/.well-known/` — three for an instance with extension packs (§13): `dao.json` (copied from the instance root `.well-known/` if present) and `knowledge.json` (generated: the root file if any is merged with `did`, `geo`, `exchange.published_domains`/`subscribed_domains` and source cards). `exchange.subscribed_domains` is **empty unless `publish.disclose_subscriptions: true`** in `kms.yaml`: listing the peer DIDs and `static-json` base URLs discloses who this instance reads, so it is opt-in. `meetings.json`, `members.json`, `activities.json` and any other root `.well-known` file are never copied. An instance whose `kms.yaml` declares `extensions` also gets `extensions.yaml`: its merged Layer-B entity set (type names, `maps_to_core` and each entity's `description` — no instance data), which is the file a peer hands to `federate check`. An instance without packs does not get it.
@@ -148,6 +163,10 @@ packages/<pack>/
   extension-entities.yaml   # { entities: { <type>: { maps_to_core } } }
   connectors/index.mjs      # optional: export const CONNECTORS = { <name>: <connector> }
   profile/profile.yaml      # optional: registry_bindings: { <schema>: data/<file>.yaml }
+  # a visibility-gated pack (visibility_gated: true in pack.yaml) also DECLARES, per type, as data that core enforces:
+  #   publish_requires: { <type>: { <field>: <value> } }   # the floor, src/visibility.mjs
+  #   public_fields:    { <type>: [<field>, …] }           # the only keys that may leave the instance
+  #   shared_lexicon:   { <type>: lexicons/<nsid>.json }   # publish in a shared lexicon, mapped by src/shared-map.mjs
 ```
 
 - **Loaded at config load**, before any op (`loadKmsConfig` → `loadExtensions`). A pack that is missing, fails its `requires`, or collides with anything throws with the pack named; no op runs against a half-loaded instance. (The failure is raised from `loadKmsConfig`, so the lifecycle stops and the CLI exits 1; packs registered before the failing one remain in the process registry until `resetPacks()`.)
@@ -157,7 +176,7 @@ packages/<pack>/
 - **Lexicons** for pack types are generated under the instance's own `nsid_authority` (`<authority>.territorialUnit`).
 - **The `atproto` connector lists pack collections** once a pack is loaded, so two instances with the same pack exchange its records through the usual untrusted path. A peer **without** the pack never requests those collections; downgrading an unknown type to its `maps_to_core` on ingest is not implemented.
 - **Visibility-gated packs (kms >= 0.2.0, opt-in per pack).** A pack with `visibility_gated: true` in `pack.yaml` must declare, per type, `publish_requires` and `public_fields`. Until it does, `publish` withholds the type (`report.withheld.undeclared`) and `planPublish` refuses it. When declared, the object is cut to `public_fields` before it becomes a record, because the projection alone keeps every key it does not know. A pack that does not set the key is unchanged. A pack that needs these keys states `requires: { kms: ">=0.2.0" }`, and an older kms refuses to load it.
-- **A pack cannot** change a core schema, `frontmatter`, the axes or the relationships; add a Layer-A type; supply invariants or gates; touch `PRIVATE_FIELDS`; or depend on another pack.
+- **A pack cannot** change a core schema, `frontmatter`, the axes or the relationships; add a Layer-A type; supply invariants or gates; touch `PRIVATE_FIELDS`; or depend on another pack. That stays true for a visibility-gated pack: **the floor lives in core** (`src/visibility.mjs`); the pack only declares the data it enforces (`publish_requires`, `public_fields`, `shared_lexicon`). `shared_lexicon` also runs the pack's `src/shared-map.mjs`, executed like a connector.
 - Pack registration is per-process state. The CLI runs one instance per process; a host that walks several instances in one process should call `resetPacks()` **and `resetRegistryBindings()`** between them.
 - **A pack's `connectors/index.mjs` is executed.** `ingest` dynamically imports the entry module of every declared pack, whether or not a connector from it is configured. Everything else a pack ships (`pack.yaml`, `extension-entities.yaml`, `profile/profile.yaml`) is read as data. Vendor packs with the same care as `org-os-kms` itself.
 

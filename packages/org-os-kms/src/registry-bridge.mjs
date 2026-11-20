@@ -11,6 +11,8 @@ import { join } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
 import { registryBindings } from './bind.mjs';
+import { cutToPublicFields } from './pack-publish.mjs';
+import { visibilityFloor } from './visibility.mjs';
 import { atomicWrite } from './atomic-write.mjs';
 
 // Upsert many objects into one registry file: read once, upsert each by id, write once.
@@ -73,8 +75,17 @@ export function bridge(ctx) {
       } catch (e) { report.errors.push(`${schema}: ${e.message}`); }
       continue;
     }
+    // A type of a visibility-gated pack never reaches a registry row unless it clears its floor, and then only as its
+    // declared public_fields: data/*.yaml are tracked and read by generators, so a canon-only field (contact_route,
+    // intro_wanted) must not be written there (docs/CONNECTORS.md §3).
+    let row = object;
+    if (cutToPublicFields(schema, object) !== object) {
+      const floor = visibilityFloor(object, schema);
+      row = floor.ok ? cutToPublicFields(schema, object) : null;
+      if (!row) { report.withheld.push({ schema, title: object.title, reason: floor.ok ? 'undeclared' : 'visibility' }); continue; }
+    }
     if (!byRegistry.has(registry)) byRegistry.set(registry, []);
-    byRegistry.get(registry).push(object);
+    byRegistry.get(registry).push(row);
   }
 
   for (const [registry, objects] of byRegistry) {
