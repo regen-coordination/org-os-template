@@ -58,29 +58,37 @@ export function claimView(object, publisher) {
 
 // ---- reconcile ----
 
-/** Lowercase host, no `www.`, no scheme, no query or trailing slash. */
+/**
+ * Lowercase host, no `www.`, no scheme, no trailing slash, no fragment. The port (unless it is the scheme's default) and the
+ * query STAY: `?id=1` and `?id=2` are two pages and `:8443` is another site. The fragment goes because the browser reads it and
+ * never sends it, so `#a` and `#b` are the same document on the server.
+ */
 export function normalizeUrl(u) {
   if (typeof u !== 'string' || !u.trim()) return null;
   const s = u.trim();
   try {
     const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`);
-    return `${url.hostname.toLowerCase().replace(/^www\./, '')}${url.pathname.replace(/\/+$/, '')}`;
-  } catch { return s.toLowerCase().replace(/\/+$/, ''); }
+    return `${url.hostname.toLowerCase().replace(/^www\./, '')}${url.port ? `:${url.port}` : ''}${url.pathname.replace(/\/+$/, '')}${url.search}`;
+  } catch { return s.toLowerCase().replace(/#.*$/, '').replace(/\/+$/, ''); }
 }
 const didOf = (uri) => (typeof uri === 'string' ? /^at:\/\/(did:[^/]+)\//.exec(uri)?.[1] ?? null : null);
 
 /**
- * When an ingested record of the SAME schema is the node's own (its sourceUri DID is the claim's claim_node_did, or its url
- * is the claim's claim_for), EVERY claim of that schema for that node is superseded: claim_status superseded, superseded_by the
- * node's record, maturity held. The next `publish` then drops it (the floor refuses `held`; the plan deletes it from the
- * instance's repo through the manifest). Per-record matching lost: it is fuzzy, and once the node speaks for itself we stop
- * speaking for it. A record retracted at origin (held) is not the node speaking. Idempotent. The node's record is never written.
- * → { ok, report: { dry, superseded: [{ ref, by }], unmatched } }
+ * When an ingested record of the SAME schema is the node's own, EVERY claim of that schema for that node is superseded:
+ * claim_status superseded, superseded_by the node's record, maturity held. The next `publish` then drops it (the floor refuses
+ * `held`; the plan deletes it from the instance's repo through the manifest). Per-record matching lost: it is fuzzy, and once the
+ * node speaks for itself we stop speaking for it. A record retracted at origin (held) is not the node speaking. Idempotent. The
+ * node's record is never written.
+ * "The node's own" means its author is the node: when the claim carries claim_node_did, the record's sourceUri DID must be it, and
+ * a url is never enough (a directory can list a node's url under its own DID). Only a claim with NO DID known falls back to the
+ * normalised url (query and port kept), and that match is reported as `matched: 'url'`, counted in `urlOnly` and named in `note`:
+ * a url says where a page lives, not who wrote the record.
+ * → { ok, report: { dry, superseded: [{ ref, by, matched: 'did' | 'url' }], unmatched, urlOnly, note? } }
  */
 export async function reconcileClaims({ dir = '.', config, dry = false } = {}) {
   const cfg = config || loadKmsConfig(dir);
   if (planeRole(cfg) === 'public') {
-    return { ok: false, report: { dry, superseded: [], unmatched: 0, error: 'this instance is a public plane: it receives only what its canon exports. Reconcile claims in the canon.' } };
+    return { ok: false, report: { dry, superseded: [], unmatched: 0, urlOnly: 0, error: 'this instance is a public plane: it receives only what its canon exports. Reconcile claims in the canon.' } };
   }
   const adapter = fw.getAdapter(cfg.adapter);
   const target = join(dir, cfg.target);
@@ -92,25 +100,27 @@ export async function reconcileClaims({ dir = '.', config, dry = false } = {}) {
     if (!bySchema.has(it.schema)) bySchema.set(it.schema, []);
     bySchema.get(it.schema).push(it.object);
   }
-  // Pass 1: which nodes have spoken for themselves, by DID or by normalised url. Pass 2: every claim for those nodes, same schema.
-  const spoken = new Map(); // `${schema}|did:<did>` / `${schema}|url:<url>` -> the node's record sourceUri
-  for (const c of open) {
+  // A claim is matched one way only: by its node's DID when it has one, else by url. Pass 1 finds which nodes have spoken for
+  // themselves, pass 2 supersedes every claim of the schema for those nodes.
+  const keyOf = (c) => {
     const did = c.object.claim_node_did; const url = normalizeUrl(c.object.claim_for);
-    for (const o of bySchema.get(c.schema) ?? []) {
-      const hit = (did && didOf(o.sourceUri) === did) || (url && normalizeUrl(o.url) === url);
-      if (!hit) continue;
-      if (did) spoken.set(`${c.schema}|did:${did}`, o.sourceUri);
-      if (url) spoken.set(`${c.schema}|url:${url}`, o.sourceUri);
-      break;
-    }
+    if (present(did)) return { key: `${c.schema}|did:${did}`, matched: 'did', hit: (o) => didOf(o.sourceUri) === did };
+    if (url) return { key: `${c.schema}|url:${url}`, matched: 'url', hit: (o) => normalizeUrl(o.url) === url };
+    return null;
+  };
+  const spoken = new Map(); // key -> the node's record sourceUri
+  for (const c of open) {
+    const k = keyOf(c); if (!k || spoken.has(k.key)) continue;
+    const o = (bySchema.get(c.schema) ?? []).find(k.hit);
+    if (o) spoken.set(k.key, o.sourceUri);
   }
   const superseded = []; let unmatched = 0;
   for (const c of open) {
-    const did = c.object.claim_node_did; const url = normalizeUrl(c.object.claim_for);
-    const by = (did && spoken.get(`${c.schema}|did:${did}`)) || (url && spoken.get(`${c.schema}|url:${url}`)) || null;
+    const k = keyOf(c); const by = k && spoken.get(k.key);
     if (!by) { unmatched++; continue; }
-    superseded.push({ ref: c.ref, by });
+    superseded.push({ ref: c.ref, by, matched: k.matched });
     if (!dry) adapter.update(target, c.ref, { claim_status: 'superseded', superseded_by: by, maturity: 'held', review_needs: `superseded by the node's own record ${by}` });
   }
-  return { ok: true, report: { dry, superseded, unmatched } };
+  const urlOnly = superseded.filter((s) => s.matched === 'url').length;
+  return { ok: true, report: { dry, superseded, unmatched, urlOnly, ...(urlOnly ? { note: `${urlOnly} of ${superseded.length} ${urlOnly === 1 ? 'claim was' : 'claims were'} superseded on a url-only match: the claim has no claim_node_did, so the record's author was not checked. Set claim_node_did to match by DID.` } : {}) } };
 }

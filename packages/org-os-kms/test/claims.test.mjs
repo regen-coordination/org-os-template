@@ -11,7 +11,7 @@ import * as fw from '../src/framework.mjs';
 import { OPS } from '../src/ops.mjs';
 import { resetRegistryBindings } from '../src/bind.mjs';
 import { loadKmsConfig } from '../src/config.mjs';
-import { claimFloor, reconcileClaims } from '../src/claims.mjs';
+import { claimFloor, reconcileClaims, normalizeUrl } from '../src/claims.mjs';
 import { planPublish } from '../src/atproto/publish.mjs';
 import { dispatch } from '../src/cli.mjs';
 
@@ -272,4 +272,42 @@ test('export (selectForPublication) closes the side door: a claim leaves the can
     const off = selectForPublication({ root: dir, verdicts, config });
     assert.deepEqual(off.selected.map((s) => s.key), ['organization:plain'], `claims off: ${JSON.stringify(config)}`);
   }
+});
+
+// ---- F4 (seat-7 fixes): reconcile must not withdraw a claim on a fuzzy match ----
+
+test('normalizeUrl keeps the query and a non-default port; the fragment and a default port are dropped', () => {
+  assert.notEqual(normalizeUrl('https://x.example/p?id=1'), normalizeUrl('https://x.example/p?id=2'));
+  assert.notEqual(normalizeUrl('https://x.example:8443/p'), normalizeUrl('https://x.example/p'));
+  // A fragment is read by the browser and never sent to the server: #a and #b are the same document, so they match.
+  assert.equal(normalizeUrl('https://x.example/p#a'), normalizeUrl('https://x.example/p#b'));
+  assert.equal(normalizeUrl('https://x.example:443/p'), normalizeUrl('https://x.example/p'));
+  assert.equal(normalizeUrl('https://WWW.X.example/p/'), normalizeUrl('x.example/p'));
+});
+
+test('reconcile: with claim_node_did set the DID must match; a directory listing the node\'s url withdraws nothing', async () => {
+  const dir = instance({ entries: { 'node-a': claimOrg({ claim_node_did: NODE_DID }),
+    'directory-listing': own({ title: 'Listed by a directory', sourceUri: `at://${OTHER_DID}/app.certified.actor.organization/listing`, url: 'https://node-a.example' }) } });
+  const res = await reconcileClaims({ dir, config: loadKmsConfig(dir) });
+  assert.equal(res.report.superseded.length, 0); assert.equal(res.report.unmatched, 1);
+  assert.equal(read(dir)['node-a'].claim_status, 'claimed');
+});
+
+test('reconcile: a url match keeps the query: ?id=1 is not ?id=2', async () => {
+  const dir = instance({ entries: { 'node-a': claimOrg({ claim_for: 'https://node-a.example/p?id=1' }), 'other': own({ url: 'https://node-a.example/p?id=2' }) } });
+  assert.equal((await reconcileClaims({ dir, config: loadKmsConfig(dir) })).report.superseded.length, 0);
+  const dir2 = instance({ entries: { 'node-a': claimOrg({ claim_for: 'https://node-a.example:8443' }), 'other': own({ url: 'https://node-a.example' }) } });
+  assert.equal((await reconcileClaims({ dir: dir2, config: loadKmsConfig(dir2) })).report.superseded.length, 0, 'a different port is a different site');
+});
+
+test('reconcile: with no DID known a url match still supersedes, and the report says plainly it was url-only', async () => {
+  const dir = instance({ entries: { 'node-a': claimOrg(), 'node-a-own': own() } });
+  const res = await reconcileClaims({ dir, config: loadKmsConfig(dir) });
+  assert.equal(res.report.superseded.length, 1);
+  assert.equal(res.report.superseded[0].matched, 'url');
+  assert.equal(res.report.urlOnly, 1);
+  assert.match(res.report.note, /url-only/);
+  const dir2 = instance({ entries: { 'node-a': claimOrg({ claim_node_did: NODE_DID }), 'node-a-own': own() } });
+  const r2 = await reconcileClaims({ dir: dir2, config: loadKmsConfig(dir2) });
+  assert.equal(r2.report.superseded[0].matched, 'did'); assert.equal(r2.report.urlOnly, 0); assert.equal(r2.report.note, undefined);
 });
