@@ -3,7 +3,7 @@
 // Thin zero-dep CLI. dispatch(argv, {dry}) is unit-testable: with dry:true it only parses +
 // routes; without it, it executes. Framework-style hand-rolled --flag value parsing.
 import { runLifecycle } from './executor.mjs';
-import { bridge } from './registry-bridge.mjs';
+import { bridgeAsync } from './registry-bridge.mjs';
 import { renderDashboardSection, renderSiteData } from './render.mjs';
 import { addPeer, checkPeers, contribute } from './federate.mjs';
 import { promote } from './promote.mjs';
@@ -48,7 +48,7 @@ export function dispatch(argv, opts = {}) {
   const dir = flags.dir || '.';
   switch (verb) {
     case 'lifecycle': return runLifecycle(args[0], { dir });
-    case 'bridge':    return bridge({ dir, config: loadKmsConfig(dir) });
+    case 'bridge':    return bridgeAsync({ dir, config: loadKmsConfig(dir) });
     case 'render': {
       if (args[0] === 'map') {
         if (args[1] === 'html') {

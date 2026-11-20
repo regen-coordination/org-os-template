@@ -11,10 +11,12 @@ import { join } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
 import { registryBindings } from './bind.mjs';
-import { cutToPublicFields } from './pack-publish.mjs';
+import { cutToPublicFields, loadSharedLexicons, sharedLexiconSchemas } from './pack-publish.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from './visibility.mjs';
 import { atomicWrite } from './atomic-write.mjs';
 import { isClaim, claimFloor, claimView, carryClaim } from './claims.mjs';
+import { planPublish } from './atproto/publish.mjs';
+import { slugFromRef } from './manifest.mjs';
 
 // Upsert many objects into one registry file: read once, upsert each by id, write once.
 function upsertRegistryMany(absPath, stem, objects) {
@@ -57,12 +59,35 @@ function withholdReason(obj) {
   return null;
 }
 
+/**
+ * The claims the AT plan would withhold (a shared lexicon without claim marks, a record that does not validate): the same decision the
+ * static API and the pages follow (ops.mjs, surfaceItems). The plan is pure, so it is asked here, for the claims that clear the floor and
+ * have a registry, exactly as publish asks it. With no AT account configured there is no plan and nothing is withheld by it.
+ * → Map of `${schema}|${slug}` -> reason.
+ */
+function planWithheldClaims({ items, bindings, config, shared }) {
+  const at = config.atproto;
+  const out = new Map();
+  if (!(at?.did && at?.pds && at?.nsid_authority)) return out;
+  const claims = items.filter(({ schema, object }) => isClaim(object) && bindings[schema] && claimFloor(object, config, schema).ok);
+  if (!claims.length) return out;
+  const planItems = claims.map(({ schema, object, ref }) => {
+    const slug = slugFromRef(ref);
+    const cut = carryClaim(object, cutToPublicFields(schema, object));
+    return { schema, ref, object: { type: schema, id: slug, ...cut } };
+  });
+  const plan = planPublish({ items: planItems, all: items, manifest: { version: 1, objects: {} }, did: at.did, authority: at.nsid_authority, shared, publishClaims: config.publish?.claims === true, claimPublisher: config.publish?.claim_publisher });
+  for (const w of plan.withheld) out.set(`${w.type}|${w.slug}`, w.reason);
+  return out;
+}
+
 export function bridge(ctx) {
   const { dir, config } = ctx;
   const items = fw.getAdapter(config.adapter).list(join(dir, config.target));
   const report = { bridged: [], docs: [], withheld: [], skipped: [], errors: [] };
   const byRegistry = new Map(); // registryPath -> [{ schema, object, ref }]
   const bindings = registryBindings();
+  const planWithheld = planWithheldClaims({ items, bindings, config, shared: ctx.shared ?? {} });
 
   for (const { schema, object, ref } of items) {
     const registry = bindings[schema];
@@ -71,6 +96,8 @@ export function bridge(ctx) {
     // data/*.yaml are tracked and a markdown page under src/content/docs/kb/ is the public site. Same floor as publish.
     const claim = claimFloor(object, config, schema);
     if (!claim.ok) { report.withheld.push({ schema, title: object.title, reason: claim.reason }); continue; }
+    const byPlan = isClaim(object) ? planWithheld.get(`${schema}|${slugFromRef(ref)}`) : undefined;
+    if (byPlan) { report.withheld.push({ schema, title: object.title, reason: byPlan }); continue; }
     if (registry.endsWith('/')) {
       const reason = withholdReason(object);
       if (reason) { report.withheld.push({ schema, title: object.title, reason }); continue; }
@@ -107,4 +134,19 @@ export function bridge(ctx) {
     } catch (e) { report.errors.push(`${registry}: ${e.message}`); }
   }
   return { ok: report.errors.length === 0, report };
+}
+
+/**
+ * True when the AT plan's withhold decision for a claim needs a shared lexicon: the canon holds a claim of a schema that lives in one.
+ * Only then must the bridge be run through bridgeAsync; every other canon bridges synchronously, as before.
+ */
+export function bridgeNeedsSharedLexicons({ dir, config }) {
+  const shared = sharedLexiconSchemas(config?.packs ?? []);
+  if (!shared.size || !(config.atproto?.did && config.atproto?.pds && config.atproto?.nsid_authority)) return false;
+  return fw.getAdapter(config.adapter).list(join(dir, config.target)).some(({ schema, object }) => shared.has(schema) && isClaim(object));
+}
+
+/** `bridge`, with the loaded packs' shared lexicons, which the AT plan's withhold decision needs. */
+export async function bridgeAsync(ctx) {
+  return bridge({ ...ctx, shared: await loadSharedLexicons(ctx.config?.packs ?? []) });
 }

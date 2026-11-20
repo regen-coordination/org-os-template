@@ -123,3 +123,49 @@ test('F2 bridge: a contribution-record claim (and a relationship-record one, whi
   for (const f of allFiles(dir).filter((f) => !f.includes(`${join(dir, 'data', 'kb')}`))) for (const n of NAMES) assert.ok(!readFileSync(f, 'utf8').includes(n), `${n} in ${f}`);
   assert.ok(text.length > 0);
 });
+
+// ---- F3: the bridge follows the same withhold decision as the AT plan, the static API and the pages ----
+import { bridgeAsync } from '../src/registry-bridge.mjs';
+import { loadKmsConfig } from '../src/config.mjs';
+
+const claimNeed = { title: 'Node A needs tools', type: 'need', category: 'Tools and tech', text: 'a plain public text', contact_route: 'PUBLIC', intro_wanted: true,
+  public_use: 'ok-with-caveat', visibility: 'public', claim_for: 'https://node-a.example', claim_status: 'claimed', consent_atproto: '2026-11-19' };
+function needInstance({ atproto = true } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'claims-r3-need-'));
+  mkdirSync(join(dir, 'data', 'kb'), { recursive: true });
+  writeFileSync(join(dir, 'data', 'kb', 'need.yaml'), yaml.dump({ entries: { 'node-a-need': claimNeed, 'plain-need': { ...claimNeed, title: 'A plain need', claim_for: undefined, claim_status: undefined, consent_atproto: undefined } } }));
+  writeFileSync(join(dir, 'federation.yaml'), yaml.dump({ identity: { name: 'claims-os', type: 'PersonalNode' }, peers: [] }));
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.', extensions: ['org-os-needs-offers'],
+    publish: { base_url: 'https://t.example', types_opt_in: ['need'], claims: true, claim_publisher: 'ReFi DAO' },
+    ...(atproto ? { atproto: { did: 'did:plc:me', handle: 'x.test', pds: 'https://pds.test', nsid_authority: 'xyz.example.kb' } } : {}) }));
+  return dir;
+}
+const needTitles = (dir) => (existsSync(join(dir, 'data', 'needs.yaml')) ? (yaml.load(readFileSync(join(dir, 'data', 'needs.yaml'), 'utf8')).needs ?? []).map((r) => r.title) : []);
+
+test('F3 the bridge withholds a claim the AT plan withholds (a shared lexicon without claim marks): no row in data/needs.yaml, the reason is named, the plain need is bridged', async () => {
+  const dir = needInstance();
+  const out = await bridgeAsync({ dir, config: loadKmsConfig(dir) });
+  assert.equal(out.ok, true, JSON.stringify(out.report));
+  assert.deepEqual(needTitles(dir), ['A plain need']);
+  const w = out.report.withheld.find((x) => x.title === 'Node A needs tools');
+  assert.ok(w, JSON.stringify(out.report));
+  assert.match(w.reason, /example\.commons\.need.*no claim marks/);
+});
+
+test('F3 the same instance through publish: the AT plan, the static API and the bridge all leave the claim out', async () => {
+  const dir = needInstance(); const puts = [];
+  const client = () => ({ async login() {}, async putRecord(op) { puts.push(op); return { uri: `at://did:plc:me/${op.collection}/${op.rkey}`, cid: 'c' }; }, async deleteRecord() {} });
+  const res = await OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: client, env: { ATPROTO_APP_PASSWORD: 'pw' }, allowPlaceholderLexicons: true } });
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  await OPS.bridge.run({ dir, config: loadKmsConfig(dir) });
+  const publicText = [JSON.stringify(puts), ...allFiles(join(dir, 'public')).map((f) => readFileSync(f, 'utf8')), ...(existsSync(join(dir, 'data', 'needs.yaml')) ? [readFileSync(join(dir, 'data', 'needs.yaml'), 'utf8')] : [])].join('\n');
+  assert.ok(!publicText.includes('Node A needs tools'));
+  assert.ok(publicText.includes('A plain need'));
+});
+
+test('F3 with no AT account configured there is no plan to follow: a consented claim whose floor holds is bridged as before', async () => {
+  const dir = needInstance({ atproto: false });
+  const out = await bridgeAsync({ dir, config: loadKmsConfig(dir) });
+  assert.equal(out.ok, true, JSON.stringify(out.report));
+  assert.deepEqual(needTitles(dir).sort(), ['A plain need', 'Node A needs tools']);
+});

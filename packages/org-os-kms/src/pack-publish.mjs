@@ -54,6 +54,11 @@ export async function loadSharedLexicons(packs = []) {
   return out;
 }
 
+/** The schemas that live in a loaded pack's shared lexicon (reading the lexicon itself needs the async loader above). */
+export function sharedLexiconSchemas(packs = []) {
+  return new Set(packs.flatMap((p) => (p.manifest?.visibility_gated === true && p.manifest.shared_lexicon ? Object.keys(p.manifest.shared_lexicon) : [])));
+}
+
 /** { [type]: publish_requires } for every visibility-gated type that declares one. */
 export function publishRequirements() {
   return Object.fromEntries([...gated].filter(([, r]) => r.publish_requires).map(([t, r]) => [t, r.publish_requires]));

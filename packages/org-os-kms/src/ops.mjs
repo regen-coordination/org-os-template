@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
-import { bridge } from './registry-bridge.mjs';
+import { bridge, bridgeAsync, bridgeNeedsSharedLexicons } from './registry-bridge.mjs';
 import { readCursors, writeCursors, cursorKeys } from './cursors.mjs';
 import { recordRead } from './reads.mjs';
 import { renderDashboardSection, renderSiteData } from './render.mjs';
@@ -58,7 +58,9 @@ export const OPS = {
       outPath: (ctx.config.render && ctx.config.render.site_data) || 'src/data/kms-index.json' });
   } },
 
-  'bridge': { kind: 'exec', write: true, run: (ctx) => bridge(ctx) },
+  // Synchronous, unless the canon holds a claim of a shared-lexicon type: only then does the AT plan's withhold decision need the
+  // async lexicon loader. (The executor and the CLI await whatever an op returns.)
+  'bridge': { kind: 'exec', write: true, run: (ctx) => (ctx.config && bridgeNeedsSharedLexicons({ dir: ctx.dir, config: ctx.config }) ? bridgeAsync(ctx) : bridge(ctx)) },
 
   'federate.check': { kind: 'exec', write: false, run: (ctx) => checkPeers(ctx) },
 
