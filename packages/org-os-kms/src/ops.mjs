@@ -25,7 +25,7 @@ import { loadSharedLexicons, cutToPublicFields } from './pack-publish.mjs';
 import { scrubUnpublishedRefs } from './visibility.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
-import { reconcileClaims, carryClaim } from './claims.mjs';
+import { reconcileClaims, carryClaim, isClaim } from './claims.mjs';
 import { exportUpdateDrafts } from './certified/update.mjs';
 
 export const OPS = {
@@ -115,6 +115,7 @@ export const OPS = {
 
     const manifest = readManifest(dir);
     let next = manifest;
+    let surfaceItems = items; // what the static API and the pages show: less any claim the AT plan withholds (below)
     if (at?.did && at?.pds && at?.nsid_authority) {
       // In a store whose file name IS the type (repo-data; what `export` writes into a public plane), an
       // object carries no `type` of its own — the record still must. Defaulted for the record only: the
@@ -124,6 +125,9 @@ export const OPS = {
       const plan = planPublish({ items: records, all, manifest, did: at.did, authority: at.nsid_authority, shared, publishClaims: config.publish?.claims === true, claimPublisher: config.publish?.claim_publisher });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
       // A claim whose shared lexicon has no claim marks is withheld by the plan (src/atproto/publish.mjs): counted with the floor's claims, and named.
+      // A claim the plan withheld (a shared lexicon without claim marks, a record that does not validate) is withheld everywhere: the
+      // static API and the pages must not list a claim the open network does not carry, cut and marked but with no atUri.
+      if (plan.withheld.length) { const out = new Set(plan.withheld.map((w) => w.id)); surfaceItems = items.filter((it) => !(isClaim(it.object) && out.has(it.object.id))); }
       if (plan.withheld.length) report.withheld = { ...(report.withheld ?? {}), claims: (report.withheld?.claims ?? 0) + plan.withheld.length, claim_details: plan.withheld.map(({ slug, type, reason }) => ({ slug, type, reason })) };
       const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length, ...(plan.orphans.length ? { orphans: plan.orphans.length } : {}) };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
@@ -175,7 +179,7 @@ export const OPS = {
     }
     if (config.publish?.static === false) report.static = 'disabled';
     else if (!dry) {
-      try { report.static = await writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items, allItems: all, manifest: next, config }); }
+      try { report.static = await writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items: surfaceItems, allItems: all, manifest: next, config }); }
       catch (e) { report.static = { status: 'failed', error: e.message }; }
       // The publication's verification file (standard.site: /.well-known/site.standard.publication returns the record's AT-URI).
       const pubUri = at?.standard_site?.enabled === true && next.standardSite?.publication?.atUri;

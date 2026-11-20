@@ -135,3 +135,24 @@ test('D an object that is not a claim keeps its provenance and source_lineage as
   assert.equal(p.ok, true);
   assert.ok(JSON.stringify(p.create[0].record).includes('Pat Quill'), 'unchanged: the cut is for claims only');
 });
+
+// ---- E: what the AT plan withholds, the static API and the pages withhold too ----
+const claimRow = (extra) => ({ type: 'x', public_use: 'ok-with-caveat', claim_status: 'claimed', consent_atproto: '2026-11-19', ...extra });
+
+test('E op: a claim the AT plan withholds is not in the static API or the pages either; the claim it publishes is', async () => {
+  const dir = instance({
+    signal: { bad: claimRow({ title: 'Signal No Type', type: 'signal', claim_for: 'https://node-a.example' }) }, // no signal_type: the plan withholds it
+    organization: { good: claimRow({ title: 'Org Good', type: 'organization', claim_for: 'https://node-b.example' }) },
+  }, { pages: true });
+  const log = [];
+  const res = await run(dir, log);
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  assert.equal(res.report.atproto.created, 1);
+  assert.equal(res.report.withheld.claim_details.length, 1);
+  const api = join(dir, 'public', 'api');
+  assert.ok(!existsSync(join(api, 'signal.json')), 'the withheld claim has no static API listing');
+  assert.ok(existsSync(join(api, 'organization.json')));
+  const everything = res.report.static.files.map((f) => readFileSync(join(dir, 'public', f), 'utf8')).join('\n');
+  assert.ok(!everything.includes('Signal No Type'), 'no page, index or API entry names the withheld claim');
+  assert.ok(everything.includes('Org Good'), 'the published claim is still shown');
+});
