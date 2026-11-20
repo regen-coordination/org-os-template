@@ -1,0 +1,78 @@
+// packages/org-os-kms/test/claims-round2.test.mjs — seat-7 fixes, round 2: what a consented claim does end to end (B, C, D, E).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { planPublish } from '../src/atproto/publish.mjs';
+import { claimView } from '../src/claims.mjs';
+
+const claimOf = (schema, extra = {}) => ({ id: `claim-${schema}`, type: schema, title: `Node ${schema}`, public_use: 'ok-with-caveat', claim_for: 'https://node-a.example', claim_status: 'claimed',
+  claim_checked_on: '2026-11-18', consent_atproto: '2026-11-19', contact_email: 'pat@node-a.example', ...extra });
+const it = (schema, object) => ({ schema, ref: `data/kb/${schema}.yaml#${object.id}`, object });
+const manifest = { version: 1, objects: {} };
+const plan = (items) => planPublish({ items, manifest, did: 'did:plc:me', authority: 'xyz.example.kb', publishClaims: true, claimPublisher: 'ReFi DAO' });
+
+// ---- B: the cut keeps the schema's required fields; a claim that still fails validation is withheld, never a plan error ----
+test('B claimView keeps the schema-required fields (signal_type for a signal) and still cuts the contact', () => {
+  const v = claimView(claimOf('signal', { signal_type: 'content' }), 'ReFi DAO', 'signal');
+  assert.equal(v.signal_type, 'content'); assert.equal(v.contact_email, undefined);
+});
+
+test('B end to end: a consented signal claim is published, and the rest of the plan is not an error', () => {
+  const p = plan([it('signal', claimOf('signal', { signal_type: 'content' })), it('organization', claimOf('organization'))]);
+  assert.equal(p.ok, true, JSON.stringify(p.errors));
+  const sig = p.create.find((o) => o.type === 'signal');
+  assert.ok(sig, 'the signal claim is created');
+  assert.equal(sig.record.signal_type, 'content'); assert.equal(sig.record.publisher, 'ReFi DAO'); assert.equal(sig.record.contact_email, undefined);
+  assert.equal(p.create.length, 2);
+});
+
+test('B a claim that still fails validation is a per-claim withheld with its reason; the rest is published and the plan is ok', () => {
+  const p = plan([it('signal', claimOf('signal')), it('organization', claimOf('organization'))]); // no signal_type: the signal schema requires it
+  assert.equal(p.ok, true, JSON.stringify(p.errors));
+  assert.deepEqual(p.errors, []);
+  assert.deepEqual(p.create.map((o) => o.type), ['organization']);
+  assert.equal(p.withheld.length, 1);
+  assert.equal(p.withheld[0].type, 'signal');
+  assert.match(p.withheld[0].reason, /signal_type/);
+});
+
+test('B a non-claim that fails validation is still a plan error (only a claim is withheld)', () => {
+  const p = plan([it('signal', { id: 's1', type: 'signal', title: 'Plain signal', public_use: 'ok-with-caveat' })]);
+  assert.equal(p.ok, false);
+});
+
+// ---- the whole publish op, fake client: consented claims of four schemas, with contact fields and provenance.authorship ----
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import yaml from 'js-yaml';
+import { OPS } from '../src/ops.mjs';
+
+const fake = (log) => () => ({
+  async login() { return { did: 'did:plc:me' }; },
+  async putRecord(op) { log.push(['put', op.collection, op.rkey, op.record]); return { uri: `at://did:plc:me/${op.collection}/${op.rkey}`, cid: 'cid1' }; },
+  async deleteRecord(op) { log.push(['del', op.rkey]); },
+});
+function instance(entries, { standard = false, pages = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-claim-op-'));
+  mkdirSync(join(dir, 'data', 'kb'), { recursive: true });
+  for (const [schema, rows] of Object.entries(entries)) writeFileSync(join(dir, 'data', 'kb', `${schema}.yaml`), yaml.dump({ entries: rows }));
+  writeFileSync(join(dir, 'kms.yaml'), yaml.dump({ instance: 't', adapter: 'repo-data', target: '.',
+    publish: { base_url: 'https://t.example', claims: true, claim_publisher: 'ReFi DAO', pages, types_opt_in: ['signal'] },
+    atproto: { did: 'did:plc:me', handle: 'kc.test', pds: 'https://pds.test', nsid_authority: 'xyz.example.kb', ...(standard ? { standard_site: { enabled: true, title: 'T', url: 'https://t.example', paths: { default: '/k/{slug}' } } } : {}) } }));
+  return dir;
+}
+const run = (dir, log) => OPS.publish.run({ dir, flags: { apply: true }, deps: { createClient: fake(log), env: { ATPROTO_APP_PASSWORD: 'pw' } } });
+
+test('B op: one consented signal claim no longer fails the whole publish', async () => {
+  const dir = instance({
+    signal: { s1: { title: 'Signal Claim', type: 'signal', signal_type: 'content', public_use: 'ok-with-caveat', claim_for: 'https://node-a.example', claim_status: 'claimed', consent_atproto: '2026-11-19', contact_email: 'pat@node-a.example' } },
+    organization: { o1: { title: 'Org Claim', type: 'organization', public_use: 'ok-with-caveat', claim_for: 'https://node-b.example', claim_status: 'claimed', consent_atproto: '2026-11-19', contact_email: 'sam@node-b.example' } },
+  });
+  const log = [];
+  const res = await run(dir, log);
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  assert.equal(res.report.atproto.created, 2);
+  for (const [, , , rec] of log.filter((l) => l[0] === 'put')) assert.ok(!JSON.stringify(rec).includes('@'), JSON.stringify(rec));
+  const sig = JSON.parse(readFileSync(join(dir, 'public', 'api', 'signal.json'), 'utf8')).items[0];
+  assert.equal(sig.signal_type, 'content'); assert.equal(sig.contact_email, undefined);
+});

@@ -225,3 +225,11 @@ test('bridge: a consented claim writes its allow-list into the row and the page,
   }
   assert.ok(page.includes('summary: What the node does.') && !page.includes('Operator-only body.'), 'declared content stays, the undeclared body does not');
 });
+
+test('bridge: a consented signal claim keeps its schema-required signal_type in the row', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-claim-req-'));
+  fw.getAdapter('repo-data').store(dir, [{ schema: 'signal', object: { id: 'sg1', title: 'Signal Claim', signal_type: 'content', public_use: 'ok-with-caveat', ...claimFields, contact_email: 'a@b.example' } }]);
+  assert.equal(bridge({ dir, config: CLAIM_ON }).ok, true);
+  const rows = yaml.load(readFileSync(join(dir, 'data/signals.yaml'), 'utf8')).signals;
+  assert.equal(rows[0].signal_type, 'content'); assert.equal(rows[0].contact_email, undefined);
+});

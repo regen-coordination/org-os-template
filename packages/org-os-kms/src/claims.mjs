@@ -91,9 +91,22 @@ export function carryClaim(original, cut) {
 export const CLAIM_CONTENT_FIELDS = ['id', 'title', 'type', 'public_use', 'url', 'description'];
 
 /**
+ * The fields a schema REQUIRES, with `extends` followed (the same set the framework's validateObject and the generated lexicon enforce),
+ * less anything the framework holds private. A claim cut that dropped them could not validate: one consented signal claim lost its
+ * signal_type and failed the whole plan.
+ */
+function requiredFieldsOf(schemaName, seen = new Set()) {
+  if (typeof schemaName !== 'string' || seen.has(schemaName)) return [];
+  seen.add(schemaName);
+  let schema;
+  try { schema = fw.loadSchema(schemaName); } catch { return []; }
+  return [...requiredFieldsOf(schema?.extends, seen), ...(Array.isArray(schema?.required) ? schema.required : [])].filter((k) => !fw.PRIVATE_FIELDS.includes(k));
+}
+
+/**
  * What a claim looks like as a record source, the static API entry and the page: a CUT, not a copy. A claim is ReFi DAO's record
  * about a node, and the operator keeps things beside it (a contact, who raised it, notes) that must never leave. It carries an
- * allow-list: CLAIM_CONTENT_FIELDS, the claim marks, `publisher` (stamped), and what the commons field policy
+ * allow-list: CLAIM_CONTENT_FIELDS, the claim marks, `publisher` (stamped), the fields the schema requires, and what the commons field policy
  * (planes/public-fields.mjs, publicEntryFor) declares public for the schema. The consent date and superseded_by stay home
  * (withoutHomeFields); dates are plain strings. A visibility-gated pack type is already cut to its own declared public_fields
  * before this (planPublish), and only its claim marks are added back.
@@ -101,7 +114,7 @@ export const CLAIM_CONTENT_FIELDS = ['id', 'title', 'type', 'public_use', 'url',
 export function claimView(object, publisher, schema = object?.type) {
   const home = withoutHomeFields(object);
   const declared = publicEntryFor(schema, home);
-  const keep = new Set([...CLAIM_CONTENT_FIELDS, ...CLAIM_RECORD_FIELDS, ...(packPublishRules(schema)?.public_fields ?? [])]);
+  const keep = new Set([...CLAIM_CONTENT_FIELDS, ...CLAIM_RECORD_FIELDS, ...requiredFieldsOf(schema), ...(packPublishRules(schema)?.public_fields ?? [])]);
   const out = {};
   for (const [k, v] of Object.entries(home)) {
     if (k in declared) out[k] = day(declared[k]);

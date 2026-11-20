@@ -64,6 +64,9 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
     }
     if (record === null) continue; // no home in the shared lexicon: stays canon-only (and is deleted below if it was published)
     const v = fw.validateRecord(record, sharedEntry ? sharedEntry.doc : lexicons[collection]);
+    // A claim that does not validate is withheld on its own, with the reason, and the rest of the plan goes ahead: one node's claim
+    // must never fail the whole publish. Because it is not `seen`, a copy published earlier is deleted below.
+    if (!v.ok && isClaim(object)) { plan.withheld.push({ id: object.id, slug, type: schema, reason: `claim withheld: it does not validate (${v.errors.join('; ')})` }); continue; }
     if (!v.ok) { plan.errors.push({ slug, errors: v.errors }); continue; }
     const id = object.id; seen.add(id);
     const hash = contentHash(record);
