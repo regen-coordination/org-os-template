@@ -128,7 +128,8 @@ export function loadCandidates(workOrdersDir, id) {
  *  - declared schema exists + object validates against it
  *  - mechanical invariants hold (checkInvariants)
  *  - born-rules for KB-content schemas (those carrying `maturity`):
- *    ai_assisted === true, maturity === 'raw', provenance.origin present
+ *    ai_assisted === true (or false with provenance.authorship 'human-authored'),
+ *    maturity === 'raw', provenance.origin present
  * Then stamps lineage (work_order id + source_lineage) — provenance is
  * structural, not trusted from the agent. ATOMIC: any invalid candidate →
  * nothing moves, order keeps status, error_notes = the retry instructions.
@@ -162,7 +163,16 @@ export function acceptWorkOrder({ workOrdersDir, id }) {
     const inv = checkInvariants(c.object);
     if (!inv.ok) errors.push(...inv.violations.map(where));
     if ('maturity' in schemaFields(c.schema)) { // KB-content schema → born-rules
-      if (c.object.ai_assisted !== true) errors.push(where('agent-produced objects must set ai_assisted: true'));
+      // ai_assisted records who wrote the words. Agent-drafted text is ai_assisted: true. Text a person wrote in
+      // the source (e.g. a glossary definition carried verbatim) may be ai_assisted: false, but only when the
+      // candidate declares it — provenance.authorship: human-authored — so the claim is explicit and auditable.
+      if (c.object.ai_assisted === false) {
+        if (c.object.provenance?.authorship !== 'human-authored') {
+          errors.push(where('ai_assisted: false requires provenance.authorship: human-authored'));
+        }
+      } else if (c.object.ai_assisted !== true) {
+        errors.push(where('candidates must set ai_assisted: true (agent-drafted) or false with provenance.authorship: human-authored'));
+      }
       if (c.object.maturity !== 'raw') errors.push(where('maturity must be "raw" at accept — promotion is review-promote\'s job'));
       if (!c.object.provenance?.origin) errors.push(where('provenance.origin is required (Principle 1)'));
     }
