@@ -115,3 +115,13 @@ test('F1: the request carries an abort signal, and the default timeout is about 
   assert.ok(signal instanceof AbortSignal);
   assert.equal(DEFAULT_TIMEOUT_MS, 10_000);
 });
+
+// ---- polish 2: an inherited key is not an operation ----
+test('polish 2: call() refuses inherited keys as an operation and sends no request', async () => {
+  for (const op of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf']) {
+    let sent = 0;
+    await assert.rejects(call(async () => { sent++; return { ok: true, status: 200, async json() { return {}; } }; }, 'https://api.hypercerts.dev', op, {}),
+      (e) => e.name === 'HypercertsError' && /not allowed/.test(e.message), op);
+    assert.equal(sent, 0, `${op}: no request`);
+  }
+});

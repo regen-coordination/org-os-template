@@ -46,7 +46,7 @@ export class HypercertsError extends Error {
 
 /** The one request path: allowlist check, GET, error mapping. Returns the parsed JSON body. */
 export async function call(fetchImpl, base, op, params = {}, { timeoutMs } = {}) {
-  const allowed = ALLOWED_PARAMS[op];
+  const allowed = Object.hasOwn(ALLOWED_PARAMS, op) ? ALLOWED_PARAMS[op] : undefined;   // own keys only: '__proto__' is not an operation
   if (!allowed) throw new HypercertsError(`hypercerts: operation ${op} is not allowed (read-only client)`);
   const url = new URL(`/xrpc/${op}`, base);
   for (const [key, value] of Object.entries(params)) {
