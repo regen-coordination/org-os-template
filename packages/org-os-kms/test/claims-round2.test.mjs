@@ -98,3 +98,40 @@ test('C standard.site: a claim already published as a document is deleted (not k
   const ss = planStandardSite({ items: [it('organization', claimOf('organization'))], entryPlan: { create: [], update: [] }, manifest: m, did: 'did:plc:me', authority: 'xyz.example.kb', config: ssConfig });
   assert.deepEqual(ss.delete.map((o) => o.id), ['claim-organization']);
 });
+
+// ---- D: a person's name can reach a claim through provenance.authorship or the free text of source_lineage ----
+import { writeStaticSurface } from '../src/static/surface.mjs';
+import { buildCommons } from '../src/pages/model.mjs';
+
+const NAMED = { provenance: { origin: 'the node\'s own site', transformation: 'summarized', authorship: 'Pat Quill' }, source_lineage: 'Interview with Pat Quill, 2026-11-18' };
+const dConfig = { instance: 't', publish: { base_url: 'https://t.example', pages: false, claims: true, claim_publisher: 'ReFi DAO' }, atproto: { did: 'did:plc:me', nsid_authority: 'xyz.example.kb' } };
+
+test('D claimView drops provenance.authorship and the free-text source_lineage, and keeps the rest of provenance', () => {
+  const v = claimView(claimOf('organization', NAMED), 'ReFi DAO', 'organization');
+  assert.ok(!JSON.stringify(v).includes('Pat Quill'), JSON.stringify(v));
+  assert.equal(v.provenance.authorship, undefined); assert.equal(v.source_lineage, undefined);
+  assert.equal(v.provenance.origin, 'the node\'s own site'); assert.equal(v.provenance.transformation, 'summarized');
+});
+
+test('D a claim whose provenance holds only authorship carries no provenance at all', () => {
+  const v = claimView(claimOf('organization', { provenance: { authorship: 'Pat Quill' } }), 'ReFi DAO', 'organization');
+  assert.equal(v.provenance, undefined);
+});
+
+test('D a name in provenance.authorship reaches no surface of a claim: record, static API, page model', async () => {
+  const object = claimOf('organization', NAMED);
+  const p = plan([it('organization', object)]);
+  assert.equal(p.ok, true, JSON.stringify(p.errors));
+  assert.ok(!JSON.stringify(p.create[0].record).includes('Pat Quill'));
+  const dir = mkdtempSync(join(tmpdir(), 'kms-claim-d-')); mkdirSync(join(dir, '.well-known'));
+  await writeStaticSurface({ dir, items: [it('organization', object)], manifest, config: dConfig });
+  assert.ok(!readFileSync(join(dir, 'public', 'api', 'organization', 'claim-organization.json'), 'utf8').includes('Pat Quill'));
+  assert.ok(!JSON.stringify(buildCommons({ items: [it('organization', object)], manifest, config: dConfig, now: '2026-11-20T00:00:00Z', mode: 'public' })).includes('Pat Quill'));
+});
+
+test('D an object that is not a claim keeps its provenance and source_lineage as before', () => {
+  const plain = { id: 'p', type: 'organization', title: 'Plain', public_use: 'ok-with-caveat', ...NAMED };
+  const p = plan([it('organization', plain)]);
+  assert.equal(p.ok, true);
+  assert.ok(JSON.stringify(p.create[0].record).includes('Pat Quill'), 'unchanged: the cut is for claims only');
+});

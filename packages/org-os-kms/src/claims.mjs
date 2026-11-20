@@ -120,6 +120,14 @@ export function claimView(object, publisher, schema = object?.type) {
     if (k in declared) out[k] = day(declared[k]);
     else if (keep.has(k)) out[k] = day(v);
   }
+  // A person's name can ride in provenance.authorship (the operator's free hand) and in source_lineage, which is free text with no
+  // structure ("Interview with ..."): a claim is about a node, never about a person, so neither leaves. provenance.origin and
+  // .transformation (a source label and a closed list) stay.
+  delete out.source_lineage;
+  if (out.provenance && typeof out.provenance === 'object') {
+    const { authorship: _a, ...rest } = out.provenance;
+    if (Object.keys(rest).length) out.provenance = rest; else delete out.provenance;
+  }
   if (publisher !== undefined) out.publisher = publisher;
   return out;
 }
