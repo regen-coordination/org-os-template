@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { getAdapter, deriveIndex } from './framework.mjs';
 import { publishRequirements } from './pack-publish.mjs';
-import { visibilityFloor } from './visibility.mjs';
+import { visibilityFloor, scrubUnpublishedRefs } from './visibility.mjs';
 
 export function renderDashboardSection(index = {}) {
   const total = index.total ?? 0;
@@ -32,7 +32,11 @@ export function renderSiteData({ dir, target, outPath, adapter = 'repo-data' }) 
   // The published copy counts a visibility-gated type only when the object passes its floor, so a node moving between
   // matching-only and private moves no count (the private canon's own index.json stays honest). Without a gated pack the file is copied unchanged.
   if (Object.keys(publishRequirements()).length) {
-    const items = getAdapter(adapter).list(join(dir, target)).filter(({ schema, object }) => visibilityFloor(object, schema).ok);
+    const all = getAdapter(adapter).list(join(dir, target));
+    const passing = all.filter(({ schema, object }) => visibilityFloor(object, schema).ok);
+    // …and scrubbed like every other public output (spec 6.3): deriveIndex tallies maturity, public_use and lifecycle_state, so a
+    // value there that equals a non-public object's slug would otherwise publish it as a count key.
+    const items = scrubUnpublishedRefs(passing, all);
     data = { ...deriveIndex(items, 'data/kb/ (public floor applied)'), generated_from: data.generated_from };
   }
   const out = join(dir, outPath);
