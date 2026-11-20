@@ -72,3 +72,16 @@ test('a need whose category has no home in the lexicon stays canon-only, and is 
   const before = { version: 1, objects: { n1: { slug: 'n1', type: 'need', rkey: 'n1', collection: 'example.commons.need', atUri: 'at://x/example.commons.need/n1', cid: 'c', hash: 'h' } } };
   assert.equal(planPublish({ items: [item(other)], manifest: before, did: 'did:plc:me', authority: AUTH, shared: s }).delete[0].collection, 'example.commons.need');
 });
+
+// The pack's own public_fields whitelist, tested directly. With no shared lexicon the record comes from fw.toRecord, which keeps
+// every non-private key, so only planPublish's whitelist cuts a matching-only field here.
+test('planPublish cuts a need to the pack public_fields: contact_route and intro_wanted never reach a record', async () => {
+  await shared(); // loads the pack (its publish rules and the need schema) into the registry
+  const withContact = { ...need, contact_route: 'MATCHING-ONLY-CONTACT', intro_wanted: true };
+  const plan = planPublish({ items: [item(withContact)], manifest: empty, did: 'did:plc:me', authority: AUTH });
+  assert.equal(plan.ok, true, JSON.stringify(plan.errors));
+  const rec = plan.create[0].record;
+  assert.equal(rec.title, 'Need');
+  assert.equal('contact_route' in rec, false); assert.equal('intro_wanted' in rec, false);
+  assert.equal(JSON.stringify(plan).includes('MATCHING-ONLY-CONTACT'), false);
+});
