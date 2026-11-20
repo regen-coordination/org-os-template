@@ -171,3 +171,15 @@ test('never calls a write: the client the connector uses exposes list/get method
   assert.ok(factory.calls.every(([m]) => /^(list|get)/.test(m)));
   assert.deepEqual(c.capabilities, { ingest: true, subscribe: false, publish: false });
 });
+
+// ---- F1: a hung activity listing is a listing failure, under the existing half-failed-listing rules ----
+test('F1: a hung activities listing fails that collection only: nothing retracted, cursor unchanged', { timeout: 3000 }, async () => {
+  const { createHypercertsClient } = await import('../src/connectors/hypercerts/client.mjs');
+  const real = { listFollowing: async () => [], listAttachments: async () => [], getOrganizations: async () => [], listActivities: async () => ACTS.filter((r) => didOf(r) === A) };
+  const first = await createHypercertsConnector({ createClient: () => real }).pull({ dids: [A] }, { cursor: null });
+  const hangClient = createHypercertsClient({ fetchImpl: () => new Promise(() => {}), timeoutMs: 25 });
+  const c = createHypercertsConnector({ createClient: (cfg) => ({ ...real, listActivities: () => hangClient.listActivities({ authors: [A] }) }) });
+  const out = await c.pull({ dids: [A], timeoutMs: 25 }, { cursor: first.cursor });
+  assert.deepEqual(out.retracted, []); assert.deepEqual(out.cursor.seen.activity, first.cursor.seen.activity);
+  assert.ok(out.errors.some((e) => e.collection === 'activity' && /timed out/.test(e.error)));
+});

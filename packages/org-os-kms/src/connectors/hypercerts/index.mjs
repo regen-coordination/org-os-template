@@ -16,7 +16,7 @@ const COLLECTIONS = ['organization', 'activity', 'attachment'];
 const didOfUri = (uri) => String(uri).split('/')[2];
 const orgName = (rec) => rec.profile?.displayName ?? rec.value?.legalName;
 
-export function createHypercertsConnector({ createClient = createHypercertsClient, createLinks = (cfg) => createConstellationClient({ base: cfg.base }) } = {}) {
+export function createHypercertsConnector({ createClient = createHypercertsClient, createLinks = (cfg) => createConstellationClient({ base: cfg.base, timeoutMs: cfg.timeoutMs }) } = {}) {
   return {
     name: 'hypercerts', protocol: 'Hypercerts / Certified public XRPC API (read-only)', capabilities: { ingest: true, subscribe: false, publish: false },
     describe(config = {}) {
@@ -24,7 +24,7 @@ export function createHypercertsConnector({ createClient = createHypercertsClien
       return { title: 'Hypercerts / Certified (api.hypercerts.dev)', type: 'dataset', steward: 'external', return_path: base, endpoint: base };
     },
     async pull(config = {}, { cursor } = {}) {
-      const client = createClient({ base: config.base });
+      const client = createClient({ base: config.base, timeoutMs: config.timeoutMs });
       const scope = await resolveScope(config, client);          // throws when unscoped: the run fails, nothing is read
       const inScope = new Set(scope);
       const previous = { organization: [], activity: [], attachment: [], ...(cursor?.seen || {}) };

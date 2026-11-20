@@ -24,6 +24,8 @@
 // An unknown query parameter makes the live server answer with a Lua stack trace (verified 2026-11-13), so `call`
 // refuses to send any key not in ALLOWED_PARAMS and never copies a response body into an error.
 
+import { withTimeout, timeoutOf, RequestTimeout, DEFAULT_TIMEOUT_MS } from './timeout.mjs';
+export { DEFAULT_TIMEOUT_MS };
 export const DEFAULT_BASE = 'https://api.hypercerts.dev';
 export const USER_AGENT = 'org-os-kms (read-only)';
 const MAX_PAGES = 1000;
@@ -43,7 +45,7 @@ export class HypercertsError extends Error {
 }
 
 /** The one request path: allowlist check, GET, error mapping. Returns the parsed JSON body. */
-export async function call(fetchImpl, base, op, params = {}) {
+export async function call(fetchImpl, base, op, params = {}, { timeoutMs } = {}) {
   const allowed = ALLOWED_PARAMS[op];
   if (!allowed) throw new HypercertsError(`hypercerts: operation ${op} is not allowed (read-only client)`);
   const url = new URL(`/xrpc/${op}`, base);
@@ -52,12 +54,19 @@ export async function call(fetchImpl, base, op, params = {}) {
     if (value === undefined || value === null) continue;
     for (const v of Array.isArray(value) ? value : [value]) url.searchParams.append(key, String(v));
   }
-  let res;
-  try { res = await fetchImpl(url, { method: 'GET', headers: { accept: 'application/json', 'user-agent': USER_AGENT } }); }
-  catch (e) { throw new HypercertsError(`hypercerts: ${op} could not be reached (${e.code || e.name || 'network error'})`); }
-  if (!res.ok) throw new HypercertsError(`hypercerts: ${op} answered HTTP ${res.status}`, res.status);
-  try { return await res.json(); }
-  catch { throw new HypercertsError(`hypercerts: ${op} answered something that is not JSON`, res.status); }
+  try {
+    return await withTimeout(timeoutOf(timeoutMs), async (signal) => {
+      let res;
+      try { res = await fetchImpl(url, { method: 'GET', headers: { accept: 'application/json', 'user-agent': USER_AGENT }, signal }); }
+      catch (e) { throw new HypercertsError(`hypercerts: ${op} could not be reached (${e?.code || e?.name || 'network error'})`); }
+      if (!res.ok) throw new HypercertsError(`hypercerts: ${op} answered HTTP ${res.status}`, res.status);
+      try { return await res.json(); }
+      catch { throw new HypercertsError(`hypercerts: ${op} answered something that is not JSON`, res.status); }
+    });
+  } catch (e) {
+    if (e instanceof RequestTimeout) throw new HypercertsError(`hypercerts: ${op} ${e.message}`);
+    throw e;
+  }
 }
 
 const view = (v) => ({ uri: v.uri, cid: v.cid, did: v.did, value: v.record });
@@ -67,13 +76,13 @@ const orgRecord = (actor) => {
 };
 const chunks = (list, n) => { const out = []; for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n)); return out; };
 
-export function createHypercertsClient({ base = DEFAULT_BASE, fetchImpl = globalThis.fetch, pageSize = 100 } = {}) {
+export function createHypercertsClient({ base = DEFAULT_BASE, fetchImpl = globalThis.fetch, pageSize = 100, timeoutMs } = {}) {
   const limit = Math.min(Math.max(1, pageSize | 0), 100);
 
   async function listAll(op, params, key, pick) {
     const out = []; let cursor; const seen = new Set();
     for (let page = 0; page < MAX_PAGES; page++) {
-      const body = await call(fetchImpl, base, op, { ...params, limit, ...(cursor ? { cursor } : {}) });
+      const body = await call(fetchImpl, base, op, { ...params, limit, ...(cursor ? { cursor } : {}) }, { timeoutMs });
       if (!body || !Array.isArray(body[key])) throw new HypercertsError(`hypercerts: ${op} sent an unexpected response (no "${key}" list)`);
       for (const item of body[key]) { const r = pick(item); if (r) out.push(r); }
       if (!body.cursor) return out;
@@ -104,7 +113,7 @@ export function createHypercertsClient({ base = DEFAULT_BASE, fetchImpl = global
     async getOrganizations(dids) {
       const out = [];
       for (const group of chunks([...new Set(dids)], MAX_DIDS)) {
-        const body = await call(fetchImpl, base, 'app.certified.actor.getOrganizations', { actors: group });
+        const body = await call(fetchImpl, base, 'app.certified.actor.getOrganizations', { actors: group }, { timeoutMs });
         if (!body || !Array.isArray(body.organizations)) throw new HypercertsError('hypercerts: app.certified.actor.getOrganizations sent an unexpected response (no "organizations" list)');
         for (const r of body.organizations) { const o = orgRecord(r.organization); if (o) out.push(o); }
       }

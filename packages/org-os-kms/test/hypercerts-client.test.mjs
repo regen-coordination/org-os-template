@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHypercertsClient, call, ALLOWED_PARAMS, HypercertsError } from '../src/connectors/hypercerts/client.mjs';
+import { createHypercertsClient, call, ALLOWED_PARAMS, HypercertsError, DEFAULT_TIMEOUT_MS } from '../src/connectors/hypercerts/client.mjs';
 
 const fx = (name) => JSON.parse(readFileSync(new URL(`./fixtures/hypercerts/${name}.json`, import.meta.url), 'utf8'));
 const A = 'did:plc:fakeaaaaaaaaaaaaaaaaaaaa'; const B = 'did:plc:fakebbbbbbbbbbbbbbbbbbbb';
@@ -100,4 +100,18 @@ test('refuses a response that is not the shape the contract promises', async () 
 test('stops a cursor that does not move', async () => {
   const fetchImpl = async () => ({ ok: true, status: 200, async json() { return { activities: [], cursor: 'same' }; } });
   await assert.rejects(createHypercertsClient({ fetchImpl }).listActivities(), /cursor/);
+});
+
+// ---- F1: a per-request timeout ----
+test('F1: a request that never settles is cut off after timeoutMs, as a HypercertsError', { timeout: 3000 }, async () => {
+  const hang = () => new Promise(() => {});
+  await assert.rejects(createHypercertsClient({ fetchImpl: hang, timeoutMs: 25 }).listActivities(), (e) => e.name === 'HypercertsError' && /timed out after 25 ms/.test(e.message));
+  await assert.rejects(call(hang, 'https://api.hypercerts.dev', 'org.hypercerts.claim.listActivities', {}, { timeoutMs: 25 }), /timed out/);
+});
+
+test('F1: the request carries an abort signal, and the default timeout is about 10 s', { timeout: 3000 }, async () => {
+  let signal; const fetchImpl = async (u, init) => { signal = init.signal; return { ok: true, status: 200, async json() { return { activities: [] }; } }; };
+  await createHypercertsClient({ fetchImpl }).listActivities();
+  assert.ok(signal instanceof AbortSignal);
+  assert.equal(DEFAULT_TIMEOUT_MS, 10_000);
 });

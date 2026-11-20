@@ -16,6 +16,8 @@
 // Like the Hypercerts client: an allowlist of paths and keys, GET only, a generic user agent, and a response body is
 // never copied into an error.
 
+import { withTimeout, timeoutOf, RequestTimeout, DEFAULT_TIMEOUT_MS } from './timeout.mjs';
+export { DEFAULT_TIMEOUT_MS };
 export const CONSTELLATION_BASE = 'https://constellation.microcosm.blue';
 export const LINKS_USER_AGENT = 'org-os-kms (read-only)';
 export const DEFAULT_MAX_REQUESTS = 50;
@@ -27,7 +29,8 @@ export class ConstellationError extends Error {
   constructor(message, status = 0) { super(message); this.name = 'ConstellationError'; this.status = status; }
 }
 
-export function createConstellationClient({ base = CONSTELLATION_BASE, fetchImpl = globalThis.fetch } = {}) {
+export function createConstellationClient({ base = CONSTELLATION_BASE, fetchImpl = globalThis.fetch, timeoutMs } = {}) {
+  const deadline = timeoutOf(timeoutMs);
   async function raw(path, params = {}) {
     const allowed = ALLOWED_LINK_PARAMS[path];
     if (!allowed) throw new ConstellationError(`constellation: path ${path} is not allowed (read-only client)`);
@@ -36,12 +39,19 @@ export function createConstellationClient({ base = CONSTELLATION_BASE, fetchImpl
       if (!allowed.includes(key)) throw new ConstellationError(`constellation: parameter "${key}" is not allowed on ${path} (allowed: ${allowed.join(', ')})`);
       if (value !== undefined && value !== null) url.searchParams.append(key, String(value));
     }
-    let res;
-    try { res = await fetchImpl(url, { method: 'GET', headers: { accept: 'application/json', 'user-agent': LINKS_USER_AGENT } }); }
-    catch (e) { throw new ConstellationError(`constellation: ${path} could not be reached (${e.code || e.name || 'network error'})`); }
-    if (!res.ok) throw new ConstellationError(`constellation: ${path} answered HTTP ${res.status}`, res.status);
-    try { return await res.json(); }
-    catch { throw new ConstellationError(`constellation: ${path} answered something that is not JSON`, res.status); }
+    try {
+      return await withTimeout(deadline, async (signal) => {
+        let res;
+        try { res = await fetchImpl(url, { method: 'GET', headers: { accept: 'application/json', 'user-agent': LINKS_USER_AGENT }, signal }); }
+        catch (e) { throw new ConstellationError(`constellation: ${path} could not be reached (${e?.code || e?.name || 'network error'})`); }
+        if (!res.ok) throw new ConstellationError(`constellation: ${path} answered HTTP ${res.status}`, res.status);
+        try { return await res.json(); }
+        catch { throw new ConstellationError(`constellation: ${path} answered something that is not JSON`, res.status); }
+      });
+    } catch (e) {
+      if (e instanceof RequestTimeout) throw new ConstellationError(`constellation: ${path} ${e.message}`);
+      throw e;
+    }
   }
   return {
     raw,

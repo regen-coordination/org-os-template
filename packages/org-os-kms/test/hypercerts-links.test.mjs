@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createConstellationClient, enrichWithBacklinks, CONSTELLATION_BASE, LINKS_USER_AGENT, ALLOWED_LINK_PARAMS } from '../src/connectors/hypercerts/links.mjs';
+import { createConstellationClient, enrichWithBacklinks, CONSTELLATION_BASE, LINKS_USER_AGENT, ALLOWED_LINK_PARAMS, DEFAULT_TIMEOUT_MS } from '../src/connectors/hypercerts/links.mjs';
 import { createHypercertsConnector } from '../src/connectors/hypercerts/index.mjs';
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/hypercerts/${n}.json`, import.meta.url), 'utf8'));
@@ -137,4 +137,30 @@ test('connector: a Constellation base other than the default is passed through (
   await c.pull({ dids: [A], constellation: { enabled: true } }, { cursor: null });
   await c.pull({ dids: [A], constellation: { enabled: true, base: 'https://c.example.test' } }, { cursor: null });
   assert.deepEqual(seen, [undefined, 'https://c.example.test']);
+});
+
+// ---- F1: a per-request timeout (a hung server must not stall the pull) ----
+const hang = () => { const f = () => new Promise(() => {}); f.calls = 0; return f; };   // never settles, ignores the abort signal
+
+test('F1 client: a request that never settles is cut off after timeoutMs and says so', { timeout: 3000 }, async () => {
+  const c = createConstellationClient({ fetchImpl: hang(), timeoutMs: 25 });
+  await assert.rejects(c.countLinks(ACT1), (e) => e.name === 'ConstellationError' && /timed out after 25 ms/.test(e.message));
+});
+
+test('F1 client: the request carries an abort signal, and the default timeout is about 10 s', { timeout: 3000 }, async () => {
+  let signal; const c = createConstellationClient({ fetchImpl: async (u, init) => { signal = init.signal; return json(COUNT); } });
+  await c.countLinks(ACT1);
+  assert.ok(signal instanceof AbortSignal);
+  assert.equal(DEFAULT_TIMEOUT_MS, 10_000);
+});
+
+test('F1 connector: a hung Constellation falls back to the plain reads and says so only in the enrichment', { timeout: 3000 }, async () => {
+  const restore = guardGlobalFetch();
+  try {
+    const off = await mkConn(fakeFetch()).pull({ dids: [A] }, { cursor: null });
+    const c = createHypercertsConnector({ createClient: stubClient, createLinks: (cfg) => createConstellationClient({ base: cfg.base, fetchImpl: hang(), timeoutMs: cfg.timeoutMs }) });
+    const on = await c.pull({ dids: [A], constellation: { enabled: true, timeoutMs: 25 } }, { cursor: null });
+    const { enrichment, ...rest } = on;
+    assert.deepEqual(rest, off); assert.match(enrichment.constellation.error, /timed out/);
+  } finally { restore(); }
 });
