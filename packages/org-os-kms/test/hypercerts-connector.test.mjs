@@ -204,3 +204,33 @@ test('F3: a failed activity listing holds an attachment with a subject entry tha
   assert.deepEqual(second.retracted, []);
   for (const held of [NO_URI, STRING, MIXED, NULLISH]) assert.ok(second.cursor.seen.attachment.includes(held.uri), held.uri);
 });
+
+// ---- polish 1: `subjects` that is not an array is unchecked, never a TypeError out of pull ----
+// Rule chosen: a present non-array (string, object, number) cannot be read, so it is treated as unchecked. Under a
+// failed activity listing it is HELD (fail closed, like an unreadable entry). On a healthy listing it is kept, by the
+// same rule as an empty subject list: there is no readable subject to be about a test activity. (A missing or null
+// `subjects` stays what it was: an empty list.)
+const oddSubjects = () => {
+  const att = (rk, subjects) => ({ ...ATTS[0], uri: `at://${A}/org.hypercerts.context.attachment/${rk}`, value: { ...ATTS[0].value, title: 'Spring update', subjects } });
+  return [att('p1a', `at://${A}/org.hypercerts.claim.activity/3a2`), att('p1b', { uri: uriOf('3a1') }), att('p1c', 7), att('p1d', true)];
+};
+test('polish 1: a healthy listing keeps an attachment whose subjects is not an array, like an empty list', async () => {
+  const odd = oddSubjects();
+  const empty = { ...ATTS[0], uri: `at://${A}/org.hypercerts.context.attachment/p1e`, value: { ...ATTS[0].value, title: 'Spring update', subjects: [] } };
+  const out = await mk(newState({ attachments: [...odd, empty] })).pull({ dids: [A] }, { cursor: null });   // must not throw
+  const kept = out.records.filter((r) => r.kind === 'attachment').map((r) => r.rec.uri);
+  for (const r of [...odd, empty]) assert.ok(kept.includes(r.uri), r.uri);
+  assert.deepEqual(out.errors, []);
+});
+test('polish 1: a failed activity listing holds an attachment whose subjects is not an array, and pull does not throw', async () => {
+  const odd = oddSubjects();
+  const state = newState({ attachments: odd }); const c = mk(state);
+  const first = await c.pull({ dids: [A] }, { cursor: null });
+  state.failActivities = true;
+  const second = await c.pull({ dids: [A] }, { cursor: first.cursor });
+  assert.deepEqual(second.records.filter((r) => r.kind === 'attachment'), []);
+  assert.match(second.errors.find((e) => e.collection === 'attachment').error, /held 4 attachment/);
+  assert.deepEqual(second.retracted, []);
+  for (const r of odd) assert.ok(second.cursor.seen.attachment.includes(r.uri), r.uri);
+  assert.ok(second.errors.some((e) => e.collection === 'activity'));
+});

@@ -51,7 +51,11 @@ export function createHypercertsConnector({ createClient = createHypercertsClien
       const activityUnknown = !listed.activity;
       const held = new Set();
       // Fail closed: a subject entry with no readable uri (missing, null, a plain string) cannot be checked, so it holds.
-      const aboutUnchecked = (r) => activityUnknown && (r.value?.subjects || []).some((s) => typeof s?.uri !== 'string' || !knownGood.has(s.uri));
+      // A `subjects` that is present but not an array (string, object, number) cannot be read at all: it holds too, and on a
+      // healthy listing it has no readable subject, so it is kept like an empty list. Missing or null is an empty list.
+      const subjectsOf = (r) => { const s = r.value?.subjects; return Array.isArray(s) ? s : []; };
+      const subjectsUnreadable = (r) => { const s = r.value?.subjects; return s != null && !Array.isArray(s); };
+      const aboutUnchecked = (r) => activityUnknown && (subjectsUnreadable(r) || subjectsOf(r).some((s) => typeof s?.uri !== 'string' || !knownGood.has(s.uri)));
       const keep = {
         organization: (r) => !isTestTitle(orgName(r)),
         activity: (r) => !isTestTitle(r.value?.title),
@@ -59,7 +63,7 @@ export function createHypercertsConnector({ createClient = createHypercertsClien
           const t = r.value?.title;
           if (typeof t === 'string' && t.trim() && isTestTitle(t)) return false;
           if (aboutUnchecked(r)) { held.add(r.uri); return false; }
-          return !(r.value?.subjects || []).some((s) => testActivities.has(s?.uri));
+          return !subjectsOf(r).some((s) => testActivities.has(s?.uri));
         },
       };
       const kept = {};
