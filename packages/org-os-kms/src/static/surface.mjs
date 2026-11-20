@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync, rmSyn
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from '../framework.mjs';
+import { publicViewOf } from '../claims.mjs';
 import { removePublicPages } from '../pages/owned.mjs';
 import { loadDrawing } from '../drawing.mjs';
 import { readReads } from '../reads.mjs';
@@ -32,7 +33,7 @@ export async function writeStaticSurface({ dir, outDir = 'public', items, allIte
   const bySchema = new Map();
   for (const { schema, object } of items) {
     const m = manifest.objects[object.id];
-    const entry = { ...fw.publicView(object), '@context': CONTEXT, ...(m ? { atUri: m.atUri, cid: m.cid } : {}) }; // @context last: an object's own can never override the absolute URL
+    const entry = { ...publicViewOf(object), '@context': CONTEXT, ...(m ? { atUri: m.atUri, cid: m.cid } : {}) }; // @context last: an object's own can never override the absolute URL
     if (!bySchema.has(schema)) bySchema.set(schema, []);
     bySchema.get(schema).push(entry);
   }

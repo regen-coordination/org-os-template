@@ -48,12 +48,24 @@ const HOME_ONLY = ['consent_atproto', 'superseded_by'];
 /** The claim fields a record carries even when its type declares a public_fields whitelist. */
 export const CLAIM_RECORD_FIELDS = ['claim_for', 'claim_status', 'claim_node_did', 'claim_checked_on', 'publisher'];
 
+/** The object without the evidence a claim keeps at home (the node's consent date, the superseded_by pointer). The one place that list lives. */
+export function withoutHomeFields(object) {
+  const out = {};
+  for (const [k, v] of Object.entries(object)) if (!HOME_ONLY.includes(k)) out[k] = v;
+  return out;
+}
+
 /** What a claim looks like as a record source: consent date and superseded_by stay home, dates are plain strings, publisher is stamped. */
 export function claimView(object, publisher) {
   const out = {};
-  for (const [k, v] of Object.entries(object)) if (!HOME_ONLY.includes(k)) out[k] = day(v);
+  for (const [k, v] of Object.entries(withoutHomeFields(object))) out[k] = day(v);
   out.publisher = publisher;
   return out;
+}
+
+/** An object as the static API, the pages and standard.site show it: the framework's public view, and for a claim without its home-only fields. */
+export function publicViewOf(object) {
+  return fw.publicView(isClaim(object) ? withoutHomeFields(object) : object);
 }
 
 // ---- reconcile ----

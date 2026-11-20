@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import * as fw from '../framework.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { contentHash } from './publish.mjs';
+import { publicViewOf } from '../claims.mjs';
 
 export const PUBLICATION = 'site.standard.publication';
 export const DOCUMENT = 'site.standard.document';
@@ -59,7 +60,7 @@ const asText = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' 
 // One entry → its plan-time document record. `publishedAt`, `updatedAt` and the strongRef's cid are stamped at apply.
 export function toDocument({ schema, object, ref }, { did, authority, publicationUri, settings = {} }) {
   const slug = slugFromRef(ref);
-  const o = fw.publicView(object);
+  const o = publicViewOf(object);
   if (typeof o.title !== 'string' || !o.title.trim()) return { skipped: 'no title: a document needs one' };
   const errors = []; let warning;
   const map = { ...(FIELD_MAP[schema] || {}), ...(settings.fields?.[schema] || {}) };
