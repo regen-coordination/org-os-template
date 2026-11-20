@@ -234,3 +234,31 @@ test('polish 1: a failed activity listing holds an attachment whose subjects is 
   for (const r of odd) assert.ok(second.cursor.seen.attachment.includes(r.uri), r.uri);
   assert.ok(second.errors.some((e) => e.collection === 'activity'));
 });
+
+// ---- polish 4: the DEFAULT wiring carries timeoutMs (createClient in index.mjs, and the default createLinks) ----
+// No injected client or links factory: globalThis.fetch is replaced (and restored) by a fake, so nothing leaves the process.
+// Drop `timeoutMs` from either default and the request falls back to the 10 s default, so these tests run out of their 3 s.
+const withFetch = async (fake, body) => { const real = globalThis.fetch; globalThis.fetch = fake; try { return await body(); } finally { globalThis.fetch = real; } };
+const json = (body) => ({ ok: true, status: 200, async json() { return body; } });
+const hang = () => new Promise(() => {});                                        // ignores the abort signal, like a stuck socket
+test('polish 4: the default client is built with timeoutMs: a hung Hypercerts host ends every listing in 25 ms', { timeout: 3000 }, async () => {
+  const urls = [];
+  const out = await withFetch((url) => { urls.push(String(url)); return hang(); }, () => createHypercertsConnector().pull({ dids: [A], timeoutMs: 25 }, { cursor: null }));
+  assert.ok(urls.length >= 3 && urls.every((u) => u.startsWith('https://api.hypercerts.dev/')), urls.join(' '));
+  assert.deepEqual(out.errors.map((e) => e.collection).sort(), ['activity', 'attachment', 'organization']);
+  assert.ok(out.errors.every((e) => /timed out after 25 ms/.test(e.error)), JSON.stringify(out.errors));
+});
+test('polish 4: the default createLinks carries timeoutMs: a hung Constellation host fails the enrichment in 25 ms, the pull stands', { timeout: 3000 }, async () => {
+  const fake = (url) => {
+    const u = new URL(url);
+    if (u.hostname === 'constellation.microcosm.blue') return hang();
+    const op = u.pathname.replace('/xrpc/', '');
+    if (op === 'org.hypercerts.claim.listActivities') return json({ activities: fx('activities').pages.flatMap((p) => p.activities) });
+    if (op === 'org.hypercerts.context.listAttachments') return json({ attachments: [] });
+    if (op === 'app.certified.actor.getOrganizations') return json({ organizations: [] });
+    throw new Error(`unexpected request ${url}`);
+  };
+  const out = await withFetch(fake, () => createHypercertsConnector().pull({ dids: [A], timeoutMs: 25, constellation: { enabled: true, timeoutMs: 25 } }, { cursor: null }));
+  assert.ok(out.records.some((r) => r.kind === 'activity'), 'the pull itself is unaffected');
+  assert.match(out.enrichment.constellation.error, /timed out after 25 ms/);
+});
