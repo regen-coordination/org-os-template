@@ -160,3 +160,45 @@ test('registry rows are unaffected: a not-public-yet resource still bridges into
   const doc = yaml.load(readFileSync(join(dir, 'data/resources.yaml'), 'utf8'));
   assert.ok(doc[Object.keys(doc).find((k) => Array.isArray(doc[k]))].some((e) => e.id === 'r9'));
 });
+
+// F1 (seat-7 fixes): the bridge writes tracked data/*.yaml and, for encyclopedia-entry, a page under the public site.
+// A claim about a node therefore needs the same claim floor here as at publish: consent date, publish.claims on, a publisher.
+const claimFields = { claim_for: 'https://node-a.example', claim_status: 'claimed', consent_atproto: '2026-11-19' };
+const CLAIM_ON = { adapter: 'repo-data', target: '.', publish: { claims: true, claim_publisher: 'ReFi DAO' } };
+const CLAIM_OFF = { adapter: 'repo-data', target: '.' };
+function seedClaims(extra = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-claim-'));
+  fw.getAdapter('repo-data').store(dir, [
+    { schema: 'signal', object: { id: 'sg1', title: 'Signal Claim', public_use: 'ok-with-caveat', ...claimFields, contact_email: 'a@b.example', ...extra } },
+    { schema: 'source-system', object: { id: 'ss1', title: 'Source Claim', type: 'wiki', steward: 'S', return_path: 'PRs', ...claimFields, ...extra } },
+    { schema: 'encyclopedia-entry', object: { id: 'en1', title: 'Entry Claim', body: 'B.', public_use: 'ok-with-caveat', ...claimFields, ...extra } },
+  ]);
+  return dir;
+}
+
+test('bridge: an unconsented claim of type signal, source-system or encyclopedia-entry writes no row and no page, and is counted as withheld', () => {
+  const dir = seedClaims({ consent_atproto: undefined });
+  const out = bridge({ dir, config: CLAIM_ON });
+  assert.equal(out.ok, true, JSON.stringify(out.report));
+  assert.ok(!existsSync(join(dir, 'data/signals.yaml')), 'no signals row');
+  assert.ok(!existsSync(join(dir, 'data/source-systems.yaml')), 'no source-systems row');
+  assert.ok(!existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')), 'no public page');
+  assert.deepEqual(out.report.withheld.map((w) => w.schema).sort(), ['encyclopedia-entry', 'signal', 'source-system']);
+  assert.ok(out.report.withheld.every((w) => /consent_atproto/.test(w.reason)), JSON.stringify(out.report.withheld));
+});
+
+test('bridge: a claim is withheld while publish.claims is off, even with consent', () => {
+  const dir = seedClaims();
+  const out = bridge({ dir, config: CLAIM_OFF });
+  assert.ok(!existsSync(join(dir, 'data/signals.yaml')));
+  assert.ok(!existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')));
+  assert.equal(out.report.withheld.length, 3);
+  assert.ok(out.report.withheld.every((w) => /publish\.claims/.test(w.reason)));
+});
+
+test('bridge: a consented claim with the floor met is bridged (the floor is not a blanket ban)', () => {
+  const dir = seedClaims();
+  const out = bridge({ dir, config: CLAIM_ON });
+  assert.equal(out.report.withheld.length, 0, JSON.stringify(out.report.withheld));
+  assert.ok(existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')));
+});

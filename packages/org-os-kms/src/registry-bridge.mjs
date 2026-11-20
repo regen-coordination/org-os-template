@@ -14,6 +14,7 @@ import { registryBindings } from './bind.mjs';
 import { cutToPublicFields } from './pack-publish.mjs';
 import { visibilityFloor, scrubUnpublishedRefs } from './visibility.mjs';
 import { atomicWrite } from './atomic-write.mjs';
+import { claimFloor } from './claims.mjs';
 
 // Upsert many objects into one registry file: read once, upsert each by id, write once.
 function upsertRegistryMany(absPath, stem, objects) {
@@ -66,6 +67,10 @@ export function bridge(ctx) {
   for (const { schema, object, ref } of items) {
     const registry = bindings[schema];
     if (!registry) { if (!report.skipped.includes(schema)) report.skipped.push(schema); continue; }
+    // A claim about a node (src/claims.mjs) is written nowhere without the node's consent date, publish.claims on and a publisher:
+    // data/*.yaml are tracked and a markdown page under src/content/docs/kb/ is the public site. Same floor as publish.
+    const claim = claimFloor(object, config);
+    if (!claim.ok) { report.withheld.push({ schema, title: object.title, reason: claim.reason }); continue; }
     if (registry.endsWith('/')) {
       const reason = withholdReason(object);
       if (reason) { report.withheld.push({ schema, title: object.title, reason }); continue; }
