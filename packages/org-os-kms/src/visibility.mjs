@@ -24,7 +24,8 @@ export function visibilityFloor(object, schema = object?.type) {
 }
 
 /**
- * The fields of the item's own identity: never scrubbed, whatever they hold. They name the object itself, which is selected.
+ * The fields of the item's own identity. Their KEYS are never scrubbed; their VALUES are exempt only while they equal the item's
+ * own slug (the one it is filed under) or its type. `slug: priv-offer` on a public resource is a ref, and goes.
  */
 const IDENTITY_FIELDS = new Set(['id', 'slug', 'type', 'title']);
 /**
@@ -52,7 +53,7 @@ const norm = (s) => s.trim().toLowerCase(); // both sides of every comparison: '
  * is removed from its array, or its key is dropped when it is a scalar. An object KEY that equals one is dropped too, with its
  * value, at every depth. Kept: at:// URIs (foreign, already public), strings that resolve to nothing local, and strings that
  * resolve to a selected object. A bare slug that also names an unselected object is ambiguous, and an ambiguous value is dropped
- * (fail closed). Exempt, so a value is never mistaken for a ref: the item's own id, slug, type and title (keys and values), and a
+ * (fail closed). Exempt, so a value is never mistaken for a ref: the keys id, slug, type and title, and their values ONLY while they equal the item's own slug or type, and a
  * top-level field its schema declares an enum or axis for, but ONLY while its value is in that list (link_status: active survives
  * a private slug `active`; link_status: m-need does not). A dropped required field is left to the record validation to refuse,
  * loudly, in planPublish. Out of scope: free text (`notes: 'see x-need'`) is not parsed.
@@ -101,12 +102,12 @@ export function scrubUnpublishedRefs(items, all = items, stats = null) {
     if (!object || typeof object !== 'object') return it;
     const vocab = closedVocabularies(it.schema);
     const c = { n: 0 };
+    const own = new Set([norm(slugOf(it.ref)), norm(String(it.schema ?? ''))]); // what the item may call itself: the slug it is filed under, and its type
+    const ownValue = (v) => typeof v === 'string' && own.has(norm(v));
     let next = object;
     for (const [k, v] of Object.entries(object)) {
-      if (IDENTITY_FIELDS.has(k) || vocab.has(k)) { // the key is the schema's own; a vocabulary field is checked by value below
-        if (IDENTITY_FIELDS.has(k)) continue;
-      } else if (leaks(k)) { if (next === object) next = { ...object }; delete next[k]; c.n++; continue; }
-      const r = clean(v, c, vocab.get(k));
+      if (!IDENTITY_FIELDS.has(k) && !vocab.has(k) && leaks(k)) { if (next === object) next = { ...object }; delete next[k]; c.n++; continue; } // the identity keys are the schema's own
+      const r = clean(v, c, IDENTITY_FIELDS.has(k) ? ownValue : vocab.get(k));
       if (r === v) continue;
       if (next === object) next = { ...object };
       if (r === DROP) delete next[k]; else next[k] = r;

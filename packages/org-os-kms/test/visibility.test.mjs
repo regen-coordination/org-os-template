@@ -108,9 +108,9 @@ test('scrub BY VALUE: free text is out of scope (only exact equality is removed)
   assert.equal(o.notes, 'see m-need for more'); assert.deepEqual(o.related, []);
 });
 
-test('scrub BY VALUE: the item\'s own id, slug, type and title are never touched, even when they equal a hidden object\'s slug', () => {
+test('scrub BY VALUE: the item\'s own id, slug, type and title are never touched while they equal the slug it is filed under, even when a hidden object has that slug', () => {
   const hidden = { ...it('need', 'dup', { id: 'dup' }) };
-  const r = { schema: 'resource', ref: 'data/kb/resource.yaml#r', object: { id: 'dup', slug: 'dup', type: 'dup', title: 'dup', related: ['dup'], parent: 'dup' } };
+  const r = { schema: 'resource', ref: 'data/kb/resource.yaml#dup', object: { id: 'dup', slug: 'dup', type: 'dup', title: 'dup', related: ['dup'], parent: 'dup' } };
   const o = scrubUnpublishedRefs([r], [r, hidden])[0].object;
   assert.deepEqual([o.id, o.slug, o.type, o.title], ['dup', 'dup', 'dup', 'dup']);
   assert.deepEqual(o.related, []); assert.equal('parent' in o, false, 'a non-identity field with the same value is still scrubbed');
@@ -193,4 +193,19 @@ test('scrub N4: a private object with a YAML-number id is indexed, so related: [
   assert.equal('parent' in o, false);
   assert.deepEqual(o.nested, { cites: [7] });
   assert.equal(stats.total, 4);
+});
+
+// ── Polish N5: the identity exemption holds only for the item's OWN identity ──
+test('scrub N5: id, slug, type or title naming ANOTHER (private) object is scrubbed; the item\'s own slug, id, title and type stay', () => {
+  const hidden = it('offer', 'priv-offer', { id: 'id-priv' });
+  const own = { schema: 'resource', ref: 'data/kb/resource.yaml#r', object: { id: 'r-id', slug: 'r', type: 'resource', title: 'Own Title' } };
+  const o1 = scrubUnpublishedRefs([own], [own, hidden]);
+  assert.equal(o1[0], own, 'an item whose identity fields hold only its own values is returned as is');
+  const bad = { schema: 'resource', ref: 'data/kb/resource.yaml#r', object: { id: 'id-priv', slug: 'priv-offer', type: 'offer:priv-offer', title: 'priv-offer' } };
+  const stats = {};
+  const o = scrubUnpublishedRefs([bad], [bad, hidden], stats)[0].object;
+  assert.deepEqual(Object.keys(o), [], 'every identity field that names the private object is dropped');
+  assert.equal(stats.total, 4);
+  const titled = { schema: 'resource', ref: 'data/kb/resource.yaml#r', object: { title: 'priv-offer', slug: 'priv-offer-x' } };
+  assert.equal('title' in scrubUnpublishedRefs([titled], [titled, hidden])[0].object, false, 'a title that is another object\'s slug is a value, and goes');
 });
