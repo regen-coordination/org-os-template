@@ -1,0 +1,35 @@
+{
+  "_provenance": "One public Certified feed post (org.hypercerts.context.attachment, contentType update), read 2026-11-20 from GET https://api.hypercerts.dev/xrpc/org.hypercerts.context.listAttachments (no parameters, generic User-Agent). Hand-trimmed to two blocks; the author, indexer fields and AT-URI of the post itself are dropped. The golden SHAPE for buildUpdateRecord, not data.",
+  "record": {
+    "$type": "org.hypercerts.context.attachment",
+    "contentType": "update",
+    "createdAt": "2026-11-19T11:47:28.140Z",
+    "description": {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "How can the sounds of a forest help us understand its ecological recovery?"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Forests on small islands support diverse biological communities, yet monitoring their ecological recovery presents unique challenges. Understanding how biodiversity responds to changing habitat conditions is an important part of developing effective conservation approaches."
+          }
+        }
+      ]
+    },
+    "subjects": [
+      {
+        "$type": "com.atproto.repo.strongRef",
+        "cid": "bafyreias3kj6vrv3n5ron53qr2jkbfye6yejqrr2yn3ccsncaqkxb3bsoy",
+        "uri": "at://did:plc:5djz5xbrofohabl25g6y7tst/org.hypercerts.claim.activity/3my2gkrimvs2y"
+      }
+    ],
+    "title": "Introducing Our Research: Listening to the Sounds of Forest Recovery"
+  }
+}

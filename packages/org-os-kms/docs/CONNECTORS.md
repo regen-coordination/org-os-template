@@ -8,6 +8,7 @@ How an org-os-kms instance pulls knowledge from other sources (`ingest`) and pub
 org-os-kms ingest  [--connector <name>] [--dry] [--dir <instance>]
 org-os-kms publish [--apply] [--dry]            [--dir <instance>]
 org-os-kms claims reconcile [--dry]             [--dir <instance>]
+org-os-kms certified draft                      [--dir <instance>]
 ```
 
 - `ingest` pulls the connectors declared in `kms.yaml` under `connectors:` (each entry: `name`, `config`, and optionally a seed `cursor`; see "Cursor write-back" in section 10). It is a CLI verb only: it is **not** bound to `close` (or `initialize`), so nothing runs it automatically.
@@ -71,6 +72,14 @@ A **claim** is an ordinary object with claim fields (`claim_for`, `claim_status`
 - **The record** carries `claim_for` (the subject: the node), `claim_status`, `claim_node_did`, `claim_checked_on` and `publisher` (the configured publisher). `consent_atproto` and `superseded_by` stay home. Refs are still scrubbed by value, so a claim that names a private object does not carry it. A claim of a pack type whose lexicon is shared is cut by that lexicon, so the marks are only present where the lexicon has the properties.
 - **Supersede** (`claims reconcile [--dry]`, a CLI verb bound to no lifecycle event). When an ingested record of the same schema is the node's own (its `sourceUri` DID is the claim's `claim_node_did`, or its `url` is the claim's `claim_for`, normalised: lowercase host, no `www.`, no trailing slash), **every** claim of that schema for that node is set `claim_status: superseded`, `maturity: held`, `superseded_by: <the node's record>`. The node's record is never written; a record retracted at origin (`held`) does not count. Idempotent. The next `publish` removes the claim through the manifest delete, from the collection the manifest recorded (the shared one for a shared type).
 - **The mass-delete guard still applies** (section 2): superseding the last published claim refuses the apply, and the report says that the record it would delete is a superseded claim. There is no bypass; the operator withdraws the last record by hand.
+
+### A node's update into the Certified feed, as a draft file (off by default)
+
+`certified draft` (a CLI verb bound to no lifecycle event; needs `publish.certified_drafts: true`) builds, for each of the instance's own `signal` objects of type `implementation`, the exact `org.hypercerts.context.attachment` record (`contentType: update`, a Leaflet body, `subjects` a strongRef) and writes it as `renders/certified-updates/<slug>.json` for **the node's own session** to put into its own repository. The bundle never holds a node's credentials: the command takes no client, never logs in, and puts nothing anywhere. The file says what is still missing (`needs: ['certified_subject_cid']` when the signal carries no `certified_subject_cid`).
+
+- **The text is `signal.update_text`**, never `notes`: `notes` is private and is where ingested Certified text is kept, so an ingested record is never exported (it has a `sourceUri`; it is counted under `report.ignored.ingested`).
+- **Eligible:** `public_use` publishable and not held, `certified_subject` an AT-URI of the node's activity, collection or profile, `update_text` set, and either the node's `consent_atproto` date or the node's own authorship (`publisher: node`, not a claim). Anything else is listed under `report.skipped` with the reason.
+- **The record is built from named fields only** (title, text, subject, languages), so no other field of the signal can reach the file. Test: `test/certified-update.test.mjs`, with the shape of a real public post as the golden fixture.
 
 ## 4. `.well-known` allowlist
 

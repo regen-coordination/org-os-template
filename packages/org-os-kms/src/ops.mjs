@@ -26,6 +26,7 @@ import { scrubUnpublishedRefs } from './visibility.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
 import { reconcileClaims } from './claims.mjs';
+import { exportUpdateDrafts } from './certified/update.mjs';
 
 export const OPS = {
   // write:true here = CRITICAL/fail-hard: if kms.yaml can't load, no downstream op can run.
@@ -252,6 +253,10 @@ export const OPS = {
   // claims.reconcile: CLI verb only (`org-os-kms claims reconcile`), bound to no lifecycle event. Supersedes ReFi DAO's claim of a node
   // once the node's own record has been ingested; the next `publish` then removes the claim. --dry changes nothing.
   'claims.reconcile': { kind: 'exec', write: true, run: (ctx) => reconcileClaims({ dir: ctx.dir || '.', config: ctx.config, dry: ctx.flags?.dry === true }) },
+
+  // certified.draft: CLI verb only, bound to no lifecycle event. Writes a node's update as a Certified feed record to renders/certified-updates/
+  // for the node's own session to put. It takes no client and never logs in; off unless publish.certified_drafts is true.
+  'certified.draft': { kind: 'exec', write: false, run: (ctx) => exportUpdateDrafts({ dir: ctx.dir || '.', config: ctx.config, now: ctx.now }) },
 
   // skill directives — judgment ops the agent runs; the executor collects them.
   'csis-review': { kind: 'skill', skill: 'csis-review' },

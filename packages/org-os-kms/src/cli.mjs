@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, join, dirname as pathDirname } from 'node:path';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init', 'publish', 'ingest', 'export', 'validate', 'claims']);
+const VERBS = new Set(['lifecycle', 'bridge', 'render', 'federate', 'promote', 'init', 'publish', 'ingest', 'export', 'validate', 'claims', 'certified']);
 
 function parseFlags(argv) {
   const args = [], flags = {};
@@ -89,6 +89,10 @@ export function dispatch(argv, opts = {}) {
       if (args[0] === 'reconcile') return OPS['claims.reconcile'].run({ dir, flags: { dry: flags.dry === true } });
       return { error: `claims: unknown subcommand ${args[0]}` };
     }
+    case 'certified': {
+      if (args[0] === 'draft') return OPS['certified.draft'].run({ dir });
+      return { error: `certified: unknown subcommand ${args[0]}` };
+    }
     case 'ingest':    return OPS['ingest.pull'].run({ dir, flags: { dry: flags.dry === true, connector: flags.connector } });
     // The two planes: `export` projects the canon (dir) through the publication gate into the public plane
     // named by kms.yaml planes.public; `validate` re-gates what is published there against the live canon.
@@ -100,7 +104,7 @@ export function dispatch(argv, opts = {}) {
 // Process exit code for a verb's result. `{error}` (unknown verb / bad subcommand) always fails; `publish` and
 // `ingest` also fail on `{ok:false}` (operator errors, failed publish, refused mass delete). Other verbs keep
 // their existing behaviour: some (e.g. render) return fail-soft `ok:false` deliberately.
-const FAIL_ON_NOT_OK = new Set(['publish', 'ingest', 'validate', 'claims']);
+const FAIL_ON_NOT_OK = new Set(['publish', 'ingest', 'validate', 'claims', 'certified']);
 export function exitCodeFor(verb, result) {
   if (result && result.error) return 1;
   if (FAIL_ON_NOT_OK.has(verb) && result && result.ok === false) return 1;
