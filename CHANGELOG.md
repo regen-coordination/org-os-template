@@ -8,7 +8,26 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
-## 0.7.1 (unreleased)
+## [0.7.1] — 2026-11-20
+
+**0.7.1 lets an instance make the house its own without forking it, and keeps the agent layer to those who decide.**
+An instance without the new files sees 0.7.0 unchanged.
+
+### Added
+
+- **Instance seams for the house** (`packages/admin`, #27). Each reads a file the instance keeps:
+  - `house/skin.css` is layered over the house's styles, and `house/themes/*` are offered in Appearance (a chosen
+    theme survives a reload; "Toggle dark" returns to the instance's own look).
+  - A shared sites bar: the lockup, a site switcher and the theme control, as the instance's sibling sites draw it.
+  - The instance's images under `house/`, served at `/instance-assets/:name`; its mark reaches the org seal. The bar,
+    themes and sidebar are answered at `/api/instance/*`.
+  - `house/nav.yaml` groups the sidebar, each item drawn for the Roles it names (`audience`); sections it doesn't name
+    stay under a collapsed More, and `hidden` keeps a slot without drawing it. The phone's More sheet draws the same
+    groups.
+  - Meetings, events, tasks and knowledge-store organizations read as records; a meeting's `short_title` names it in
+    lists.
+  - `open_decisions` in `data/governance.yaml`, beside `decisions`: the Decisions page lists them as "Open decisions",
+    ahead of the decided ones, and "Decided" counts only the decided.
 
 ### Security
 
