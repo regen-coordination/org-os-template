@@ -209,3 +209,14 @@ test('scrub N5: id, slug, type or title naming ANOTHER (private) object is scrub
   const titled = { schema: 'resource', ref: 'data/kb/resource.yaml#r', object: { title: 'priv-offer', slug: 'priv-offer-x' } };
   assert.equal('title' in scrubUnpublishedRefs([titled], [titled, hidden])[0].object, false, 'a title that is another object\'s slug is a value, and goes');
 });
+
+// ── Polish N6: a mistyped type prefix still finds the slug ──
+test('scrub N6: Need:Priv-Offer (the wrong type, mixed case) for a private offer is dropped like offer:priv-offer; a real typed ref to a public object stays', () => {
+  const hidden = it('offer', 'priv-offer'); const pub = it('resource', 'dup'); const hiddenDup = it('need', 'dup');
+  const r = it('resource', 'r', { related: ['Need:Priv-Offer', 'offer:priv-offer', 'thing:priv-offer', ' x : priv-offer', 'resource:dup', 'offer:dup', 'https://example.org/a:priv-offer', 'foo:bar'], parent: 'Need:Priv-Offer' });
+  const stats = {};
+  const o = scrubUnpublishedRefs([r, pub], [r, pub, hidden, hiddenDup], stats)[0].object;
+  assert.deepEqual(o.related, ['resource:dup', 'https://example.org/a:priv-offer', 'foo:bar']);
+  assert.equal('parent' in o, false);
+  assert.equal(stats.total, 6);
+});

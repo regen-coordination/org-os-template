@@ -51,7 +51,7 @@ const norm = (s) => s.trim().toLowerCase(); // both sides of every comparison: '
  * object, one nobody listed) may carry a ref. For each selected item, at any depth, a string that equals (trimmed, case-folded)
  * the slug, id or type:slug of a local object of `all` that is NOT in `items` (matching-only, private, undeclared, gate-rejected)
  * is removed from its array, or its key is dropped when it is a scalar. An object KEY that equals one is dropped too, with its
- * value, at every depth. Kept: at:// URIs (foreign, already public), strings that resolve to nothing local, and strings that
+ * value, at every depth. A typed ref whose own lookup finds nothing (a mistyped prefix) is looked up again as the bare slug after its first colon. Kept: at:// URIs (foreign, already public), strings that resolve to nothing local, and strings that
  * resolve to a selected object. A bare slug that also names an unselected object is ambiguous, and an ambiguous value is dropped
  * (fail closed). Exempt, so a value is never mistaken for a ref: the keys id, slug, type and title, and their values ONLY while they equal the item's own slug or type, and a
  * top-level field its schema declares an enum or axis for, but ONLY while its value is in that list (link_status: active survives
@@ -72,7 +72,9 @@ export function scrubUnpublishedRefs(items, all = items, stats = null) {
   const leaks = (entry) => {
     if (typeof entry === 'number') entry = String(entry); // related: [424242] names the object whose id is 424242
     if (typeof entry !== 'string' || entry.trim().startsWith('at://')) return false;
-    const hits = index.get(norm(entry));
+    const full = norm(entry);
+    // A typed ref whose prefix names no object (Need:Priv-Offer for a private OFFER) is looked up again as the bare slug after the first colon.
+    const hits = index.get(full) ?? (full.includes(':') ? index.get(norm(full.slice(full.indexOf(':') + 1))) : undefined);
     return Boolean(hits) && [...hits].some((ref) => !selected.has(ref));
   };
   // → the value without any leaking string or key, or DROP when the value itself is one. Unchanged values come back as the same reference.
