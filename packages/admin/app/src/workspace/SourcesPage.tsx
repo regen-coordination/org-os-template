@@ -17,7 +17,7 @@ import { DataRow } from '../elements/rows/DataRow.tsx'
 import { ListView } from '../elements/views/ListView.tsx'
 import { useNow } from '../time.ts'
 import { useViewer } from '../viewAs/ViewAs.tsx'
-import { editorHref, editorWords } from './files.ts'
+import { editorLink, editorWords } from './files.ts'
 
 export const SOURCES_ABOUT = 'Where what the Hub shows comes from: this instance, each System it reads, and each import.'
 export const EDITORS_LABEL = 'Where each governed file is edited'
@@ -50,7 +50,8 @@ function SourceRow({ source: s, now }: { source: Source; now: Date }) {
 
 function EditorRow({ row }: { row: EditorRowView }) {
   const second = [editorWords(row.editor), row.class ? `class ${row.class}` : 'no class: by design'].join(' · ')
-  return <DataRow kind="file" icon="file" title={row.pattern} second={second} href={editorHref(row)} marks={[]} />
+  // 0.7.1 D6: a row the viewer may not read (the agent layer, for one who does not decide it) links nowhere.
+  return <DataRow kind="file" icon="file" title={row.pattern} second={second} href={editorLink(row)} marks={[]} />
 }
 
 export default function SourcesPage() {

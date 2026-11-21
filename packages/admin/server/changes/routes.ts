@@ -1,12 +1,13 @@
 import type { Context, Hono } from 'hono'
 import { HttpError } from '../errors.ts'
-import { isKnown, actorTrailer, commitIdent, type KnownActor } from '../actor.ts'
+import { isKnown, actorTrailer, commitIdent, type Actor, type KnownActor } from '../actor.ts'
 import { actorOf, knownActorOf, readerOf, requireReading, viewerOf } from '../request.ts'
 import { effectiveRule, hatsActedUnder, readRuleContext, ruleHats, ruleIds } from '../governance/effective.ts'
 import { ChangeStore, newChangeId } from './store.ts'
 import { stage, staleOps, changeView, changeClasses, classesOf, currentOf, targetsOf, targetsOfOps, validateChange } from './stage.ts'
 import { rebaseOp } from './merge.ts'
 import { fileBase, heldFileErrors, isFileOp, isRecordOp, keptPageErrors, rebaseFileOp } from '../workspace/files.ts'
+import { fileReader, unreadPaths, unreadRefusal } from '../workspace/reads.ts'
 import { commitMessage } from './records.ts'
 import { applyOps, commitEmpty, Refusal, Referred, StageRefusal } from './apply.ts'
 import { sealReceipts } from '../library/seal.ts'
@@ -206,12 +207,21 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
     if (n < 0 || n >= ops.length) throw new HttpError(404, `No op ${raw} in this change: it holds ${ops.length}, numbered from 0.`)
     return n
   }
-  const saveAndAnswer = (actor: KnownActor, change: Change, ops: Op[]): Response => {
+  /** The tray as the asker may read it (0.7.1 D6, M2 and fix round 2): whether a file they may not read moved on the trunk is
+   *  not said, even of their own op, in GET /api/changes and in every write's answer alike. */
+  const trayView = (c: Context, actor: Actor, change: Change | null): Response => {
+    const view = changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change))
+    const may = fileReader(c, repo)
+    if (may.all) return Response.json(view)
+    const unread = (i: number) => { const op = view.ops[i]; return op !== undefined && isFileOp(op) && !may(op.path) }
+    return Response.json({ ...view, stale: view.stale.filter(i => !unread(i)) })
+  }
+  const saveAndAnswer = (c: Context, actor: KnownActor, change: Change, ops: Op[]): Response => {
     const next: Change = { ...change, ops, updated: new Date().toISOString() }
     store.save(next)
     notify({ type: 'changes' })
     const kept = ops.length > 0 || (next.private?.length ?? 0) > 0
-    return Response.json(changeView(repo, actor, kept ? next : null, stagedView(privateStore, kept ? next : null), changePrivateTargets(repo, privateStore, kept ? next : null)))
+    return trayView(c, actor, kept ? next : null)
   }
 
   app.get('/api/actor', c => c.json(actorOf(c)))
@@ -219,7 +229,7 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
   app.get('/api/changes', c => {
     const actor = readerOf(c)
     const change = isKnown(actor) ? store.load(actor.id) : null
-    return c.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))
+    return trayView(c, actor, change)
   })
 
   app.post('/api/changes/ops', async c => {
@@ -256,7 +266,8 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       }
       const git = [...split.git, ...files]
       // A file op's path, checked whole before it is staged (T19 review I1, PF-R83): git's half of the check is async.
-      const held = await heldFileErrors(repo, files)
+      // 0.7.1 D6: and one the stager may read (server/workspace/reads.ts), refused as one no rule governs.
+      const held = await heldFileErrors(repo, files, fileReader(c, repo))
       if (held.length > 0) return Response.json({ errors: held }, { status: 422 })
       // A page the private store keeps is never written back into git by a file op (Task 20 review C1, PF-R95).
       const kept = keptPageErrors(repo, reach(privateStore).store, incoming, 'Nothing was staged.')
@@ -271,7 +282,7 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       refuseHeldByMove(split.store, split.private)
       const placeholders = split.private.length > 0 ? await stagePrivate(split.store!, change, actor.id, split.private) : change.private
       const { private: _was, ...rest } = change
-      return saveAndAnswer(actor, { ...rest, ...(placeholders?.length ? { private: placeholders } : {}) }, ops)
+      return saveAndAnswer(c, actor, { ...rest, ...(placeholders?.length ? { private: placeholders } : {}) }, ops)
     }))
   })
 
@@ -299,7 +310,7 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
     // What is left must still stand on its own: a create other ops refer to cannot be taken out.
     const errors = rest.length > 0 ? validateChange(repo, rest) : []
     if (errors.length > 0) return Response.json({ errors }, { status: 422 })
-    return saveAndAnswer(actor, change!, rest)
+    return saveAndAnswer(c, actor, change!, rest)
   })))
 
   app.post('/api/changes/ops/:n/rebase', async c => {
@@ -312,9 +323,14 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       const ops = change?.ops ?? []
       const n = opIndex(c.req.param('n'), ops)
       const op = ops[n]!
+      // 0.7.1 D6 (PR7-R94): Keep mine merges the file as it is now into the op, so it is refused on a path the asker may not
+      // read (a tray that holds one from before 0.7.1), in the words of a path no rule governs; Take theirs drops it.
+      if (isFileOp(op) && keep === 'mine' && !fileReader(c, repo)(op.path)) {
+        return Response.json({ errors: await heldFileErrors(repo, [op], () => false) }, { status: 422 })
+      }
       const rebased = isFileOp(op) ? await rebaseFileOp(repo, op, keep) : rebaseOp(op, currentOf(repo, op.record), keep)
-      if (rebased === ops[n]) return Response.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))
-      return saveAndAnswer(actor, change!, rebased ? ops.map((o, i) => (i === n ? rebased : o)) : ops.filter((_, i) => i !== n))
+      if (rebased === ops[n]) return trayView(c, actor, change)
+      return saveAndAnswer(c, actor, change!, rebased ? ops.map((o, i) => (i === n ? rebased : o)) : ops.filter((_, i) => i !== n))
     }))
   })
 
@@ -344,6 +360,10 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       // always throws: no ops is the empty state, and the machine refuses Apply there
       if (!change || (change.ops.length === 0 && placeholders.length === 0)) checkApply([], [], null)
       refuseRevising(change)
+      // 0.7.1 D6 fix round 1 (I1): a tray holding a file op on a path the asker may not read (staged at the machine, or before
+      // 0.7.1) is not applied, in the words of a path no rule governs, before anything is read for writing.
+      const unread = unreadPaths(change!.ops, fileReader(c, repo))
+      if (unread.length > 0) return Response.json({ errors: unreadRefusal(unread).errors }, { status: 422 })
       // The private part, read back from the store's staged table (L5 §10.3); a store that cannot be reached is its 503.
       const { store: reached, why } = reach(privateStore)
       if (placeholders.length > 0 && !reached) throw unavailable(why)

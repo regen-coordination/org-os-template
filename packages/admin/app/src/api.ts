@@ -31,8 +31,9 @@ import type { Source } from '../../server/workspace/sources.ts'
 import type { FileView } from '../../server/workspace/files.ts'
 import type { From } from './elements/atoms/from.ts'
 export type { Source, FileView }
-/** One row of GET /api/editors (§11.1): a pattern, the class a rule governs it by (null: none), and its editor. */
-export interface EditorRowView { pattern: string; class: string | null; editor: string }
+/** One row of GET /api/editors (§11.1): a pattern, the class a rule governs it by (null: none), and its editor; `read`
+ *  'deciders' for the agent layer, and whether the viewer may read the row's files (`readable`, 0.7.1 D6). */
+export interface EditorRowView { pattern: string; class: string | null; editor: string; read?: 'deciders'; readable?: boolean }
 /** GET /api/registries/:name?from=1: the collection's from mark and each record's (`fromMark`), beside the record's own
  *  `from` (an import's mark, data). Only the marks are read from it: the record itself is read without them. */
 export interface RegistryMarks { fromMark?: From; entries?: { id?: unknown; fromMark?: From }[] }

@@ -27,6 +27,7 @@ import { guardFetched, type ProposeDeps, type ProposedPrivate } from './propose.
 import { machineContext } from './events.ts'
 import { canonicalJson, methodOf, revOf, type Proposal } from '../../lib/proposals.mjs'
 import { gitOpsOf } from '../../lib/ops.mjs'
+import { unreadPaths, unreadRefusal, type FileReader } from '../workspace/reads.ts'
 import type { Viewer } from '../../lib/visibility.mjs'
 import { aroundGit, noStore, privateClasses as privateClassesOf, reach, stagePrivate, STORE_FAILED, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { isMove, judgePrivate, planMoves } from '../workspace/move.ts'
@@ -250,10 +251,13 @@ export const TRAY_HOLDS = (id: string, n: number): string =>
  * what the trunk changed. Nothing is written to the repository: the change lives in the admin state directory.
  */
 export async function loadForRevision(repo: string, actor: KnownActor, id: string, store: ChangeStore, deps: Pick<ProposeDeps, 'now'> = {},
-  priv?: { access: PrivateAccess; viewer: Viewer }): Promise<Change> {
+  priv?: { access: PrivateAccess; viewer: Viewer }, may: FileReader = Object.assign(() => true, { all: true as const })): Promise<Change> {
   const now = (deps.now ?? (() => new Date()))()
   const entry = entryOf(repo, id)
   permitted(repo, actor, entry, now, 'REVISE')
+  // 0.7.1 D6 fix round 1 (I1): a file op on a path the author may not read never comes back into their tray with its text.
+  const unread = unreadPaths(gitOpsOf(entry.ops), may)
+  if (unread.length > 0) throw unreadRefusal(unread)
   const held = store.load(actor.id)
   // A tray holds something when it holds a git op or a private one (L5 Task 14: its private part beside its ops).
   const holds = held ? held.ops.length + (held.private?.length ?? 0) : 0

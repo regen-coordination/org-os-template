@@ -315,9 +315,9 @@ describe('nothing stricter than members enters git through a proposal of a file 
 })
 
 describe('GET /api/editors and GET /api/files (L6 §16)', () => {
-  it('answers the §11.1 table', async () => {
+  it('answers the §11.1 table, each row readable by the person at the machine (0.7.1 D6)', async () => {
     setup()
-    expect(await (await app.request('/api/editors')).json()).toEqual(JSON.parse(JSON.stringify(EDITORS)))
+    expect(await (await app.request('/api/editors')).json()).toEqual(JSON.parse(JSON.stringify(EDITORS.map(r => ({ ...r, readable: true })))))
   })
   it('answers a governed file with its text, base, class and editor', async () => {
     setup()
