@@ -224,3 +224,55 @@ test('an unlisted field naming a matching-only or private need (slug, id, type:s
   const rows = yaml.load(readFileSync(join(dir, 'data', 'resources.yaml'), 'utf8')).resources;
   for (const needle of ['m-need', 'x-need', 'idm-777', 'idx-777']) assert.equal(JSON.stringify(rows).includes(needle), false, `a registry row carries ${needle}`);
 });
+
+// Round 4: the same leak by the variants the scrub missed in round 3: a closed-vocabulary field carrying a private slug or id (outside its
+// enum / axis list), whitespace, a newline, upper case, and the slug as an object KEY at the top level and nested. The drop is counted in the report.
+test('round 4: vocabulary fields outside their list, padded / newlined / upper-cased slugs and slug KEYS reach no output outside the canon; the report counts the drop', async () => {
+  const resource = { title: 'A resource', type: 'resource', public_use: 'ok-with-caveat',
+    link_status: 'm-need', maturity: 'm-need', lifecycle_state: 'idx-777',
+    related: [' m-need ', 'm-need\n', 'M-NEED', 'p-need'], see_also: ['\tNeed:X-Need '],
+    'm-need': 'anything', nested: { 'x-need': 1, keep: 'p-need', deeper: [{ 'M-NEED': true, ok: 1 }] } };
+  const dir = instance({ 'm-need': matching, 'x-need': { ...matching, title: 'other', visibility: 'private', id: 'idx-777' }, 'p-need': pub }, resource);
+  const kmsFile = join(dir, 'kms.yaml'); const kmsDoc = yaml.load(readFileSync(kmsFile, 'utf8')); kmsDoc.publish.pages = true; writeFileSync(kmsFile, yaml.dump(kmsDoc)); // the pages are written beside the API
+  const puts = []; const dels = []; const config = loadKmsConfig(dir);
+  const res = await publish(dir, puts, dels);
+  assert.equal(res.ok, true, JSON.stringify(res.report));
+  OPS['index.rebuild'].run({ dir, config });
+  assert.equal(OPS['render.site'].run({ dir, config }).ok, true);
+  assert.equal(OPS.bridge.run({ dir, config }).ok, true);
+  buildMap({ dir });
+  const rec = puts.find((o) => o.record.title === 'A resource');
+  assert.ok(rec, 'the resource was not published');
+  const lower = (x) => String(x).toLowerCase();
+  const filesWithCI = (needle) => walk(dir).filter((f) => lower(readFileSync(join(dir, f), 'utf8')).includes(needle)).sort();
+  for (const needle of ['m-need', 'x-need', 'idx-777']) {
+    assert.equal(lower(JSON.stringify(puts)).includes(needle), false, `a putRecord payload carries ${needle}`);
+    const hit = filesWithCI(needle);
+    // The canon (data/kb/*.yaml) and its own private index (data/kb/index.json, which tallies the canon honestly) may name them; nothing else.
+    assert.equal(hit.every((f) => ['data/kb/need.yaml', 'data/kb/resource.yaml', 'data/kb/index.json'].includes(f)), true, `${needle} reached ${hit}`);
+  }
+  const pages = walk(dir).filter((f) => f.startsWith(join('public', 'k')) && f.endsWith('.html'));
+  assert.ok(pages.length > 0, 'no page was rendered'); // the page HTML is in the walk above
+  for (const k of ['link_status', 'maturity', 'lifecycle_state']) assert.equal(rec.record[k], undefined, `${k} survived outside its vocabulary`);
+  assert.deepEqual(rec.record.related, ['p-need']); assert.deepEqual(rec.record.see_also, []);
+  assert.deepEqual(rec.record.nested, { keep: 'p-need', deeper: [{ ok: 1 }] });
+  const rows = yaml.load(readFileSync(join(dir, 'data', 'resources.yaml'), 'utf8')).resources;
+  for (const needle of ['m-need', 'x-need', 'idx-777']) assert.equal(lower(JSON.stringify(rows)).includes(needle), false, `a registry row carries ${needle}`);
+  // 3 vocabulary values + 3 related + 1 see_also + the top-level key + nested key + deeper key = 10; counted, never named.
+  assert.equal(res.report.scrubbed.total, 10);
+  assert.deepEqual(res.report.scrubbed.items.map((x) => x.count), [10]);
+  assert.equal(lower(JSON.stringify(res.report.scrubbed)).includes('m-need'), false, 'the report names no removed value');
+});
+
+test('round 4: the export verb: the seven variants (vocabulary field outside its list, id, padded, newlined, upper-cased, key, nested key) carry no private slug into the commons', () => {
+  const base = { maturity: 'reviewed', source_lineage: 'repos/ReFi-Barcelona/notes/x.md', public_use: 'ok-with-caveat' };
+  const root = makeCanon({
+    need: { 'm-need': { ...base, type: 'need', title: 'M', visibility: 'matching-only' }, 'x-need': { ...base, type: 'need', title: 'X', visibility: 'private', id: 'idx-777' } },
+    resource: { r: { ...base, type: 'resource', title: 'A resource', link_status: 'm-need', lifecycle_state: 'idx-777', related: [' m-need ', 'm-need\n', 'M-NEED'], 'm-need': 'anything', nested: { 'x-need': 1 } } },
+  });
+  const outDir = makeCommons(undefined, undefined, { extensions: ['org-os-needs-offers'], types_opt_in: ['need'] });
+  let n = 0; exportCommons({ root, outDir, uuid: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` });
+  const all = JSON.stringify(readTree(outDir)).toLowerCase();
+  assert.equal(all.includes('a resource'), true);
+  for (const s of ['m-need', 'x-need', 'idx-777']) assert.equal(all.includes(s), false, `export carries ${s}`);
+});

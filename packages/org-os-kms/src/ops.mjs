@@ -113,7 +113,10 @@ export const OPS = {
     report.minted = minted.length;
     // A visibility-gated type leaves the instance cut to its declared public_fields (ensureIds re-reads the canon, so it is cut after).
     // …and its refs are scrubbed of every object that is not itself selected (spec 6.3): the AT plan, the static API and the pages all read `items`.
-    const items = scrubUnpublishedRefs(identified.map((it) => ({ ...it, object: carryClaim(it.object, cutToPublicFields(it.schema, it.object)) })), all);
+    const scrub = {};
+    const items = scrubUnpublishedRefs(identified.map((it) => ({ ...it, object: carryClaim(it.object, cutToPublicFields(it.schema, it.object)) })), all, scrub);
+    // An author learns that a value or key was dropped because it equals a non-public object's slug or id (an ordinary word can collide): a count per item, never the value.
+    if (scrub.total) report.scrubbed = { total: scrub.total, items: scrub.items, note: 'values or keys equal to the slug or id of an object that is not public were left out of the public record; rename the object or the value if the word was ordinary' };
 
     const manifest = readManifest(dir);
     let next = manifest;

@@ -23,6 +23,7 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
   const claimConfig = { publish: { claims: publishClaims, claim_publisher: claimPublisher } };
   // Fail closed: whoever called, a public record's refs never name an object outside `given` (spec 6.3). `all` is the whole canon when known.
   const items = scrubUnpublishedRefs(given, all);
+  const original = new Map(given.map((g) => [g.ref, g.object]));
   const lexicons = fw.generateAll({ authority });
   const resolve = resolverFrom(manifest);
   const plan = { ok: true, errors: [], create: [], update: [], delete: [], skip: [], orphans: [], withheld: [], previous: manifest.objects };
@@ -67,10 +68,16 @@ export function planPublish({ items: given, all = given, manifest, did, authorit
     }
     if (record === null) continue; // no home in the shared lexicon: stays canon-only (and is deleted below if it was published)
     const v = fw.validateRecord(record, sharedEntry ? sharedEntry.doc : lexicons[collection]);
-    // A claim that does not validate is withheld on its own, with the reason, and the rest of the plan goes ahead: one node's claim
-    // must never fail the whole publish. Because it is not `seen`, a copy published earlier is deleted below.
-    if (!v.ok && isClaim(object)) { plan.withheld.push({ id: object.id, slug, type: schema, reason: `claim withheld: it does not validate (${v.errors.join('; ')})` }); continue; }
-    if (!v.ok) { plan.errors.push({ slug, errors: v.errors }); continue; }
+    if (!v.ok) {
+      // A required field the scrub removed is named as such (never its value), so the author knows it was not forgotten.
+      const was = original.get(ref);
+      const removed = (e) => { const f = /^missing required field: (.+)$/.exec(e)?.[1]; return f && was && was[f] !== undefined && was[f] !== null && (object[f] === undefined || object[f] === null) ? `${e} (removed: matched a non-public object)` : e; };
+      const errors = v.errors.map(removed);
+      // A claim that does not validate is withheld on its own, with the reason, and the rest of the plan goes ahead: one node's claim
+      // must never fail the whole publish. Because it is not `seen`, a copy published earlier is deleted below.
+      if (isClaim(object)) { plan.withheld.push({ id: object.id, slug, type: schema, reason: `claim withheld: it does not validate (${errors.join('; ')})` }); continue; }
+      plan.errors.push({ slug, errors }); continue;
+    }
     const id = object.id; seen.add(id);
     const hash = contentHash(record);
     const prev = manifest.objects[id];

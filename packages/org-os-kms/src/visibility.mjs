@@ -4,7 +4,7 @@
 // No instance gate can widen it: it runs before the gate, and planPublish checks again after.
 import { basename, extname } from 'node:path';
 import { packPublishRules, publishRequirements } from './pack-publish.mjs';
-import { schemaFields } from './framework.mjs';
+import { schemaFields, isValid } from './framework.mjs';
 
 /** Every declared requirement, by type: { need: { visibility: 'public' }, … }. */
 export function publishRequires() { return publishRequirements(); }
@@ -24,74 +24,100 @@ export function visibilityFloor(object, schema = object?.type) {
 }
 
 /**
- * The fields of the item's own identity: never scrubbed, whatever they hold. They name the object itself, which is selected.
+ * The fields of the item's own identity. Their KEYS are never scrubbed; their VALUES are exempt only while they equal the item's
+ * own slug (the one it is filed under) or its type. `slug: priv-offer` on a public resource is a ref, and goes.
  */
 const IDENTITY_FIELDS = new Set(['id', 'slug', 'type', 'title']);
-/** The top-level fields a schema declares a closed vocabulary for (`enum` or an `axis`): a category or maturity is a value, not a ref. */
-function closedVocabularyFields(schema) {
+/**
+ * The top-level fields a schema declares a closed vocabulary for (`enum` or an `axis`) → { field: (value) => is it IN the vocabulary }.
+ * A value inside the list is a category or a maturity, not a ref; a value outside it is not exempt, whatever the field.
+ */
+function closedVocabularies(schema) {
   try {
-    return new Set(Object.entries(schemaFields(schema) || {}).filter(([, def]) => def && (def.enum || def.axis)).map(([k]) => k));
-  } catch { return new Set(); } // a schema that is not registered declares nothing
+    const out = new Map();
+    for (const [k, def] of Object.entries(schemaFields(schema) || {})) {
+      if (def?.enum) out.set(k, (v) => def.enum.includes(v));
+      else if (def?.axis) out.set(k, (v) => isValid(def.axis, v));
+    }
+    return out;
+  } catch { return new Map(); } // a schema that is not registered declares nothing
 }
 const slugOf = (ref) => { const i = ref.lastIndexOf('#'); return i >= 0 ? ref.slice(i + 1) : basename(ref, extname(ref)); };
+const norm = (s) => s.trim().toLowerCase(); // both sides of every comparison: ' M-Need\n' is m-need
 
 /**
  * Spec 6.3: a public record never names an object that is not itself public. Scrubbed BY VALUE, not by field name: toRecord
  * passes every non-private key and the pages print every extra field, so any field (superseded_by, parent, see_also, a nested
- * object, one nobody listed) may carry a ref. For each selected item, at any depth, a string that exactly equals the slug, id
- * or type:slug of a local object of `all` that is NOT in `items` (matching-only, private, undeclared, gate-rejected) is removed
- * from its array, or its key is dropped when it is a scalar. Kept: at:// URIs (foreign, already public), strings that resolve to
- * nothing local, and strings that resolve to a selected object. A bare slug that also names an unselected object is ambiguous,
- * and an ambiguous value is dropped (fail closed). Exempt, so a value is never mistaken for a ref: the item's own id, slug, type
- * and title, and every top-level field its schema declares an enum or axis for (a category that equals some private slug survives).
- * Out of scope: free text (`notes: 'see x-need'`) is not parsed; only exact equality is removed. Pure; `items` and `all` are
- * { schema, object, ref } lists; returns new items.
+ * object, one nobody listed) may carry a ref. For each selected item, at any depth, a string that equals (trimmed, case-folded)
+ * the slug, id or type:slug of a local object of `all` that is NOT in `items` (matching-only, private, undeclared, gate-rejected)
+ * is removed from its array, or its key is dropped when it is a scalar. An object KEY that equals one is dropped too, with its
+ * value, at every depth. A typed ref whose own lookup finds nothing (a mistyped prefix) is looked up again as the bare slug after its first colon. Kept: at:// URIs (foreign, already public), strings that resolve to nothing local, and strings that
+ * resolve to a selected object. A bare slug that also names an unselected object is ambiguous, and an ambiguous value is dropped
+ * (fail closed). Exempt, so a value is never mistaken for a ref: the keys id, slug, type and title, and their values ONLY while they equal the item's own slug or type, and a
+ * top-level field its schema declares an enum or axis for, but ONLY while its value is in that list (link_status: active survives
+ * a private slug `active`; link_status: m-need does not). A dropped required field is left to the record validation to refuse,
+ * loudly, in planPublish. Out of scope: free text (`notes: 'see x-need'`) is not parsed.
+ * The drop is counted, never named: each returned item that lost something carries `scrubbed: <count of values and keys removed>`,
+ * and the optional `stats` object receives { total, items: [{ ref, count }] }, so the publish report can tell an author that an
+ * ordinary word collided with a private slug. Pure but for `stats`; `items` and `all` are { schema, object, ref } lists.
  */
-export function scrubUnpublishedRefs(items, all = items) {
+export function scrubUnpublishedRefs(items, all = items, stats = null) {
   const selected = new Set(items.map((it) => it.ref));
-  const index = new Map(); // key -> [{ ref }]
-  const add = (key, ref) => { if (typeof key !== 'string' || !key) return; if (!index.has(key)) index.set(key, new Set()); index.get(key).add(ref); };
+  const index = new Map(); // normalised key -> Set(ref)
+  const add = (key, ref) => { if (typeof key !== 'string' || !key.trim()) return; const k = norm(key); if (!index.has(k)) index.set(k, new Set()); index.get(k).add(ref); };
   for (const it of [...all, ...items]) {
     const slug = slugOf(it.ref);
-    add(slug, it.ref); add(`${it.schema}:${slug}`, it.ref); add(it.object?.id, it.ref);
+    add(slug, it.ref); add(`${it.schema}:${slug}`, it.ref); add(it.object?.id == null ? null : String(it.object.id), it.ref); // a YAML-number id (id: 424242) is an id too
   }
   const leaks = (entry) => {
-    if (typeof entry !== 'string' || entry.startsWith('at://')) return false;
-    const hits = index.get(entry);
+    if (typeof entry === 'number') entry = String(entry); // related: [424242] names the object whose id is 424242
+    if (typeof entry !== 'string' || entry.trim().startsWith('at://')) return false;
+    const full = norm(entry);
+    // A typed ref whose prefix names no object (Need:Priv-Offer for a private OFFER) is looked up again as the bare slug after the first colon.
+    const hits = index.get(full) ?? (full.includes(':') ? index.get(norm(full.slice(full.indexOf(':') + 1))) : undefined);
     return Boolean(hits) && [...hits].some((ref) => !selected.has(ref));
   };
-  // → the value without any leaking string, or DROP when the value itself is one. Unchanged values come back as the same reference.
+  // → the value without any leaking string or key, or DROP when the value itself is one. Unchanged values come back as the same reference.
   const DROP = Symbol('drop');
-  const clean = (v) => {
-    if (typeof v === 'string') return leaks(v) ? DROP : v;
+  const clean = (v, c, keep) => {
+    if (typeof v === 'string' || typeof v === 'number') { if (keep?.(v) || !leaks(v)) return v; c.n++; return DROP; }
     if (Array.isArray(v)) {
-      const kept = v.map(clean).filter((x) => x !== DROP);
+      const kept = v.map((x) => clean(x, c, keep)).filter((x) => x !== DROP);
       return kept.length === v.length && kept.every((x, i) => x === v[i]) ? v : kept;
     }
     if (v && typeof v === 'object') {
       let out = v;
       for (const [k, x] of Object.entries(v)) {
-        const c = clean(x);
-        if (c === x) continue;
+        if (leaks(k)) { if (out === v) out = { ...v }; delete out[k]; c.n++; continue; }
+        const r = clean(x, c, keep);
+        if (r === x) continue;
         if (out === v) out = { ...v };
-        if (c === DROP) delete out[k]; else out[k] = c;
+        if (r === DROP) delete out[k]; else out[k] = r;
       }
       return out;
     }
     return v;
   };
-  return items.map((it) => {
+  const counted = [];
+  const result = items.map((it) => {
     const object = it.object;
     if (!object || typeof object !== 'object') return it;
-    const exempt = closedVocabularyFields(it.schema);
+    const vocab = closedVocabularies(it.schema);
+    const c = { n: 0 };
+    const own = new Set([norm(slugOf(it.ref)), norm(String(it.schema ?? ''))]); // what the item may call itself: the slug it is filed under, and its type
+    const ownValue = (v) => typeof v === 'string' && own.has(norm(v));
     let next = object;
     for (const [k, v] of Object.entries(object)) {
-      if (IDENTITY_FIELDS.has(k) || exempt.has(k)) continue;
-      const c = clean(v);
-      if (c === v) continue;
+      if (!IDENTITY_FIELDS.has(k) && !vocab.has(k) && leaks(k)) { if (next === object) next = { ...object }; delete next[k]; c.n++; continue; } // the identity keys are the schema's own
+      const r = clean(v, c, IDENTITY_FIELDS.has(k) ? ownValue : vocab.get(k));
+      if (r === v) continue;
       if (next === object) next = { ...object };
-      if (c === DROP) delete next[k]; else next[k] = c;
+      if (r === DROP) delete next[k]; else next[k] = r;
     }
-    return next === object ? it : { ...it, object: next };
+    if (c.n === 0) return it;
+    counted.push({ ref: it.ref, count: c.n });
+    return { ...it, object: next, scrubbed: c.n };
   });
+  if (stats) { stats.total = counted.reduce((n, x) => n + x.count, 0); stats.items = counted; }
+  return result;
 }
