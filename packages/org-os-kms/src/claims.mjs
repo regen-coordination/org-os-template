@@ -43,11 +43,13 @@ export function isDate(v) {
  * field. A claim's cut keeps the schema's required fields (claimView, so it can validate), so a schema whose required fields
  * name a person would carry that person into a record about a node: contribution-record.contributor, relationship-record.subject
  * and .object, source-system.steward, deployment.power_structure and .accountability, claim-evidence.claim,
- * implementation-record.source_position. Those are never claimable. A type of a visibility-gated pack (a pack that declares its
+ * implementation-record.source_position, track.audience (a required free string). Those are never claimable. `track` left the list in round 4
+ * (fail closed). It is a one-word change to put it back — add 'track' to CLAIMABLE_SCHEMAS below and the track.audience line to the test in
+ * claims-round3.test.mjs — and the operator's to make, once an audience is known never to name a person. A type of a visibility-gated pack (a pack that declares its
  * own publish_requires and public_fields) is claimable too: the pack cut it to its declared fields before the claim marks go on.
  * Anything else is withheld, with a reason, on every path (the floor below is the one place that decides).
  */
-export const CLAIMABLE_SCHEMAS = new Set(['organization', 'signal', 'encyclopedia-entry', 'resource', 'option-entry', 'track']);
+export const CLAIMABLE_SCHEMAS = new Set(['organization', 'signal', 'encyclopedia-entry', 'resource', 'option-entry']);
 
 /** → true when a claim of this schema may leave: a node-shaped core schema, or a type of a visibility-gated pack. */
 export function claimSchemaAllowed(schema) {

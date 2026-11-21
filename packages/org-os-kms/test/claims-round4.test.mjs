@@ -72,3 +72,20 @@ test('sweep certified drafts: with publish.claims off, or no publisher, a consen
     assert.match(res.report.skipped[0].reason, /claim floor/);
   }
 });
+
+// ---- F-track: track is not claimable (audience is a required free string that can name a person) ----
+import { claimFloor, CLAIMABLE_SCHEMAS, claimSchemaReason } from '../src/claims.mjs';
+import { planPublish } from '../src/atproto/publish.mjs';
+
+test('track is not a claimable schema: the floor refuses it with a reason naming it, and a track claim with a person in audience is withheld by the plan', () => {
+  assert.equal(CLAIMABLE_SCHEMAS.has('track'), false);
+  const claim = { id: 'c-track', type: 'track', title: 'A track', audience: 'Pat Quill', public_use: 'ok-with-caveat', claim_for: 'https://node-a.example', claim_status: 'claimed', consent_atproto: '2026-11-19' };
+  const f = claimFloor(claim, { publish: { claims: true, claim_publisher: 'ReFi DAO' } }, 'track');
+  assert.equal(f.ok, false); assert.match(f.reason, /track/); assert.match(f.reason, /person/);
+  assert.match(claimSchemaReason('track'), /track/);
+  const p = planPublish({ items: [{ schema: 'track', ref: 'data/kb/track.yaml#c-track', object: claim }], manifest: { version: 1, objects: {} }, did: 'did:plc:me', authority: 'xyz.example.kb', publishClaims: true, claimPublisher: 'ReFi DAO' });
+  assert.equal(p.ok, true, JSON.stringify(p.errors));
+  assert.deepEqual(p.create, []);
+  assert.deepEqual(p.withheld.map((w) => w.type), ['track']);
+  assert.ok(!JSON.stringify(p).includes('Pat Quill'));
+});

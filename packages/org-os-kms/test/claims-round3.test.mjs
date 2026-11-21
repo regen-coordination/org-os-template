@@ -30,14 +30,14 @@ const NAMES = ['Pat Quill', 'Sam Rivera'];
 
 // ---- F2: only a node-shaped schema may be claimed ----
 test('F2 claimFloor: the allow-list schemas pass, a person-bearing schema is refused with a reason naming it', () => {
-  for (const s of ['organization', 'signal', 'encyclopedia-entry', 'resource', 'option-entry', 'track']) {
+  for (const s of ['organization', 'signal', 'encyclopedia-entry', 'resource', 'option-entry']) {
     assert.equal(claimFloor({ ...CLAIMS.organization, type: s }, CFG, s).ok, true, s);
   }
-  for (const s of ['relationship-record', 'contribution-record', 'source-system', 'deployment', 'claim-evidence', 'implementation-record']) {
+  for (const s of ['relationship-record', 'contribution-record', 'source-system', 'deployment', 'claim-evidence', 'implementation-record', 'track']) { // track: audience is a required free string that can name a person (round 4)
     const r = claimFloor({ ...CLAIMS.organization, type: s }, CFG, s);
     assert.equal(r.ok, false, s); assert.match(r.reason, new RegExp(s)); assert.match(r.reason, /person/);
   }
-  assert.deepEqual([...CLAIMABLE_SCHEMAS].sort(), ['encyclopedia-entry', 'option-entry', 'organization', 'resource', 'signal', 'track']);
+  assert.deepEqual([...CLAIMABLE_SCHEMAS].sort(), ['encyclopedia-entry', 'option-entry', 'organization', 'resource', 'signal']);
 });
 
 test('F2 claimFloor: an object that is not a claim is unaffected, whatever its schema', () => {
