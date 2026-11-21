@@ -28,10 +28,10 @@ const good = { name: 'good', protocol: 't', capabilities: { ingest: true }, desc
 const stub = { ...good, name: 'stub', pull: async () => { throw new NOT_IMPLEMENTED('stub'); } };
 const broken = { ...good, name: 'broken', pull: async () => { throw new Error('boom'); } };
 
-test('registry: atproto + static-json; getConnector throws on unknown', () => {
-  assert.deepEqual(Object.keys(CONNECTORS).sort(), ['atproto', 'static-json']);
+test('registry: atproto + hypercerts + static-json; getConnector throws on unknown', () => {
+  assert.deepEqual(Object.keys(CONNECTORS).sort(), ['atproto', 'hypercerts', 'static-json']);
   assert.equal(getConnector('atproto').name, 'atproto');
-  assert.throws(() => getConnector('nope'), /unknown connector: nope \(available: atproto, static-json\)/);
+  assert.throws(() => getConnector('nope'), /unknown connector: nope \(available: atproto, hypercerts, static-json\)/);
 });
 
 test('ingest.pull registered as a write op and NOT bound to close (CLI verb only)', () => {

@@ -1,0 +1,69 @@
+{
+  "pages": [
+    {
+      "following": [
+        {
+          "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+          "profile": {
+            "cid": "bafyreifakepAlpha Cooperative",
+            "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+            "indexedAt": "2026-11-20T10:00:00+00:00",
+            "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/app.certified.actor.profile/self",
+            "record": {
+              "$type": "app.certified.actor.profile",
+              "createdAt": "2026-06-01T09:55:58.407Z",
+              "displayName": "Alpha Cooperative",
+              "website": "https://example.org/alphacooperative"
+            }
+          },
+          "organization": null,
+          "follow": {
+            "cid": "bafyreifakeff1",
+            "did": "did:plc:fakefollowerrrrrrrrrrrr",
+            "indexedAt": "2026-11-15T10:00:00+00:00",
+            "uri": "at://did:plc:fakefollowerrrrrrrrrrrr/app.certified.graph.follow/f1",
+            "record": {
+              "$type": "app.certified.graph.follow",
+              "createdAt": "2026-11-15T10:00:00.000Z",
+              "subject": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ],
+      "totalCount": 2,
+      "cursor": "cur-f1"
+    },
+    {
+      "following": [
+        {
+          "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+          "profile": {
+            "cid": "bafyreifakepBravo Collective",
+            "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+            "indexedAt": "2026-11-20T10:00:00+00:00",
+            "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/app.certified.actor.profile/self",
+            "record": {
+              "$type": "app.certified.actor.profile",
+              "createdAt": "2026-06-01T09:55:58.407Z",
+              "displayName": "Bravo Collective",
+              "website": "https://example.org/bravocollective"
+            }
+          },
+          "organization": null,
+          "follow": {
+            "cid": "bafyreifakeff2",
+            "did": "did:plc:fakefollowerrrrrrrrrrrr",
+            "indexedAt": "2026-11-15T10:00:00+00:00",
+            "uri": "at://did:plc:fakefollowerrrrrrrrrrrr/app.certified.graph.follow/f2",
+            "record": {
+              "$type": "app.certified.graph.follow",
+              "createdAt": "2026-11-15T10:00:00.000Z",
+              "subject": "did:plc:fakebbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        }
+      ],
+      "totalCount": 2
+    }
+  ]
+}

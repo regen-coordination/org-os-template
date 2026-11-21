@@ -2,8 +2,9 @@
 // kms.yaml `connectors: [{ name, config, cursor? }]` names one of these; `ingest.pull` resolves it here (`cursor` only seeds data/kms-cursors.json).
 import { atprotoConnector } from '../atproto/connector.mjs';
 import { staticJsonConnector } from './static-json/index.mjs';
+import { hypercertsConnector } from './hypercerts/index.mjs';
 
-export const CONNECTORS = { atproto: atprotoConnector, 'static-json': staticJsonConnector };
+export const CONNECTORS = { atproto: atprotoConnector, hypercerts: hypercertsConnector, 'static-json': staticJsonConnector };
 
 export function getConnector(name, registry = CONNECTORS) {
   const c = registry[name];
