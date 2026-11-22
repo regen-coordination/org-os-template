@@ -31,6 +31,7 @@ import { placeInRepo, privateDir } from '../private/paths.ts'
 import { gitSafetyProblems } from '../private/guard.ts'
 import { readConfig } from '../visibility/config.ts'
 import { HttpError } from '../errors.ts'
+import { fileReader, mayReadWhole, samplePath, type FileReader } from './reads.ts'
 import type { FileOp, Op, RecordError, RecordOp, StageOp } from '../changes/types.ts'
 
 /** The most a file op's text may hold (L6 spec, constants): 1 MiB. */
@@ -307,11 +308,14 @@ export async function isHeld(repo: string, path: string): Promise<boolean> {
 /** Each file op's path checked whole (`filePathErrors`, then git's half of `isHeld`): what the stage route asks before it
  *  stages and apply asks before it writes, so a file op on an ignored, untracked or linked path is refused early, in the
  *  ungoverned sentence, and nothing is written. */
-export async function heldFileErrors(repo: string, ops: readonly FileOp[]): Promise<RecordError[]> {
+export async function heldFileErrors(repo: string, ops: readonly FileOp[], may: (path: string) => boolean = () => true): Promise<RecordError[]> {
   const out: RecordError[] = []
   for (const op of ops) {
     const path = filePathErrors(repo, op)
     if (path.length > 0) { out.push(...path); continue }
+    // 0.7.1 D6 (PR7-R94): a path the stager may not read is one they may not write whole either, refused in the same words
+    // as a path no rule governs, so a staged op (and Keep mine's merge over the file) never carries its text to them.
+    if (!may(op.path)) { out.push({ record: op.path, field: 'path', message: NOT_GOVERNED(op.path) }); continue }
     if (!(await gitHolds(repo, op.path))) out.push({ record: op.path, field: 'path', message: NOT_GOVERNED(op.path) })
   }
   return out
@@ -543,12 +547,15 @@ export const UNREADABLE = (path: string): string =>
 export interface FileView { path: string; text: string | null; base: string | null; class: string; editor: string }
 
 /** The file at `path` for a member, or the HttpError that says why not: 400 for a path that is not plain, 404 for one no
- *  rule governs or this service does not hold (`isHeld`), 403 for a file holding a value data/visibility.yaml restricts (named by nothing: no value, no field). */
-export async function readFileView(repo: string, path: string): Promise<FileView> {
+ *  rule governs or this service does not hold (`isHeld`), 403 for a file holding a value data/visibility.yaml restricts (named by nothing: no value, no field).
+ *  `may` (0.7.1, D6; server/workspace/reads.ts): a path the viewer may not read (the agent layer, read by its deciders) is
+ *  answered exactly as one no rule governs, before anything about the file is read, so nothing says whether it exists. */
+export async function readFileView(repo: string, path: string, may: FileReader = () => true): Promise<FileView> {
   const editor = editorFor(path)
   const cls = governedClassOf(path)
   const ungoverned = () => new HttpError(404, `${path || 'That path'} is not a governed file, so it has no editor here.`)
   if (editor === null || (cls === null && editor !== 'ledger' && editor !== 'ratify')) throw ungoverned()
+  if (!may(path)) throw ungoverned()
   // T19 review I1 (PF-R83): an ignored, untracked or linked path, or the store's place, is answered as an ungoverned one.
   if (!(await isHeld(repo, path))) throw ungoverned()
   const text = fileText(repo, path)
@@ -560,20 +567,27 @@ export async function readFileView(repo: string, path: string): Promise<FileView
     if (read) { try { entriesFromText(text, def) } catch { read = false } }
     if (!read) throw new HttpError(403, UNREADABLE(path))
   }
-  if (text !== null && gitSafetyProblems(repo, [{ path, text }], readConfig(repo)).length > 0) {
+  // 0.7.1 D6 fix round 1 (C2): the ledger, while it holds a file op on a path the viewer may not read, is refused whole in
+  // the same words: its text is never filtered, so the base the source editor stages against still matches the file.
+  if (text !== null && (gitSafetyProblems(repo, [{ path, text }], readConfig(repo)).length > 0 || !mayReadWhole(repo, may, path))) {
     throw new HttpError(403, `${path} holds values that not every member may read, so it is not served whole here.`)
   }
   return { path, text, base: text === null ? null : blobId(text), class: cls ?? '', editor }
 }
 
-/** GET /api/editors and GET /api/files?path= (L6 §16). Both are members' reads: the public is refused before any route. */
+/** GET /api/editors and GET /api/files?path= (L6 §16). Both are members' reads: the public is refused before any route.
+ *  Each editor row says whether the viewer may read its files (`readable`, 0.7.1 D6): false for the agent layer's rows
+ *  when they do not decide under its rule, so the client draws no link to a file it would be answered 404 for. */
 export function mountFiles(app: Hono, { repo }: { repo: string }): void {
-  app.get('/api/editors', c => c.json(EDITORS))
+  app.get('/api/editors', c => {
+    const may = fileReader(c, repo)
+    return c.json(EDITORS.map(row => ({ ...row, readable: mayReadWhole(repo, may, samplePath(row.pattern)) })))
+  })
   app.get('/api/files', async c => {
     const path = c.req.query('path') ?? ''
     if (path === '' || path.startsWith('/') || path.split('/').some(s => s === '..' || s === '.' || s === '')) {
       throw new HttpError(400, 'GET /api/files takes ?path=<a path relative to the repository>, for example data/governance.yaml.')
     }
-    return c.json(await readFileView(repo, path))
+    return c.json(await readFileView(repo, path, fileReader(c, repo)))
   })
 }

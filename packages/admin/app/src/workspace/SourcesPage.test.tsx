@@ -119,6 +119,20 @@ describe('/sources — where the Hub’s things come from', () => {
     expect(text(rows[EDITORS.findIndex(r => r.pattern === 'data/proposals.yaml')]!, '.drow-s')).toBe('The proposal routes · no class: by design')
   })
 
+  it('a row the viewer may not read draws no link to the source editor (0.7.1 D6): the agent layer, for one who does not decide it', async () => {
+    const deciders = new Set(['memory/**', 'MEMORY.md', 'HEARTBEAT.md', 'docs/plans/**', 'docs/agent-plans/**'])
+    routes({ 'GET /api/editors': EDITORS.map(r => ({ ...r, readable: !deciders.has(r.pattern) })) })
+    draw()
+    const rows = rowsOf(await list(EDITORS_LABEL))
+    expect(rows).toHaveLength(EDITORS.length)
+    rows.forEach((li, i) => {
+      const pattern = EDITORS[i]!.pattern
+      expect([pattern, within(li).queryByRole('link') !== null]).toEqual([pattern, !deciders.has(pattern)])
+    })
+    expect(document.querySelector('a[href^="/files/memory"]')).toBeNull()
+    expect(document.querySelector('a[href="/files/IDENTITY.md"]')).not.toBeNull()
+  })
+
   it('previewing as Public, nothing of Sources is drawn', async () => {
     routes()
     draw({ as: 'public' })

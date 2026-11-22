@@ -143,6 +143,24 @@ describe('/files/* — the source editor', () => {
     expect(calls.some(c => c.path.startsWith('/api/files'))).toBe(false)
   })
 
+  it('a file of the agent layer the viewer may not read draws exactly the page of a path that is not there (0.7.1 D6)', async () => {
+    // The server answers both 404 in the same words (server/workspace/reads.ts): the page draws the sentence alone.
+    const gone = (path: string) => refuse(404, { error: `${path} is not a governed file, so it has no editor here.` })
+    fetchRoutes({ ...baseRoutes(), 'GET /api/files?path=memory%2F2026-11-01.md': gone('memory/2026-11-01.md'), 'GET /api/files?path=notes%2F2026-11-01.md': gone('notes/2026-11-01.md') })
+    const drawn = async (path: string) => {
+      const { container, unmount } = draw(`/files/${path}`)
+      await screen.findByText(`${path} is not a governed file, so it has no editor here.`)
+      expect(screen.getByRole('heading', { level: 1, name: '2026-11-01.md' })).toBeTruthy()
+      expect(screen.queryByRole('group', { name: 'File' })).toBeNull()
+      expect(screen.queryByRole('textbox')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Save to changes' })).toBeNull()
+      const html = container.innerHTML.replaceAll(path, '<path>')
+      unmount()
+      return html
+    }
+    expect(await drawn('memory/2026-11-01.md')).toBe(await drawn('notes/2026-11-01.md'))
+  })
+
   it('a file the server will not serve is its sentence alone: no text, no class, no Save', async () => {
     const kept = 'data/horizon.yaml holds values that not every member may read, so it is not served whole here.'
     fetchRoutes({ ...baseRoutes(), 'GET /api/files?path=data%2Fhorizon.yaml': refuse(403, { error: kept }) })

@@ -10,7 +10,9 @@ import { gitOpsOf, isPlaceholder, parseRecord } from '../../../lib/ops.mjs'
 import { REGISTRY_OF_KIND } from '../../../lib/registries.mjs'
 import { inWords } from '../../../lib/evaluate.mjs'
 import type { Adapter, Attention, Edge, Resource } from '../types.ts'
+import { staleAttention } from '../attention.ts'
 import { RESTRICTED_SUBJECT } from '../../private/ops.ts'
+import { readsDeciders } from '../../../lib/workspace/editors.mjs'
 
 // The proposals ledger as resources (0.6 P2 spec §3.14 "As resources"): one resource of kind `proposal` per entry, on
 // the Organization map, with an edge `touches` to each record its ops name and `proposed-by` to its author. While open
@@ -56,14 +58,23 @@ export const proposals: Adapter = {
       const id = String(entry.id)
       const { book, known } = judge(vc, entry)
       const { state, evaluation, stale } = proposalContext(ctx.repo, entry, now, book, known)
-      let attention: Attention | null = null
-      if (entry.state === 'open') {
+      const attentionWith = (staleCount: number): Attention | null => {
+        if (entry.state !== 'open') return null
         const closes = evaluation.closesAt === null ? null : Date.parse(evaluation.closesAt) - now.getTime()
         const missing = evaluation.missing || 'ready to ratify'
-        if (stale.length > 0) attention = { level: 'alert', text: `stale: ${stale.length === 1 ? '1 op was' : `${stale.length} ops were`} staged against a record that has changed` }
-        else if (closes !== null && closes <= DAY_MS) attention = { level: 'alert', text: `closes in ${inWords(Math.max(closes, 0))}: ${missing}` }
-        else attention = { level: 'warn', text: `open: ${missing}` }
+        if (staleCount > 0) return staleAttention(staleCount)
+        if (closes !== null && closes <= DAY_MS) return { level: 'alert', text: `closes in ${inWords(Math.max(closes, 0))}: ${missing}` }
+        return { level: 'warn', text: `open: ${missing}` }
       }
+      const attention = attentionWith(stale.length)
+      // 0.7.1 D6 fix round 1 (M1): the stale ops that are file ops on the agent layer, and the attention with none stale. The
+      // map is drawn once for every viewer, so the gate (visibility/gate.ts `agentLayerCard`) gives one who may not read some
+      // of those files the card without them, its attention rebuilt from the stale ops left, and no one these two facts.
+      const git = gitOpsOf(entry.ops ?? [])
+      const agentStale = stale.flatMap(i => {
+        const op = git[i] as { op?: unknown; path?: unknown } | undefined
+        return op?.op === 'file' && typeof op.path === 'string' && readsDeciders(op.path) ? [{ at: i, path: op.path }] : []
+      })
       const restricted = (entry.ops ?? []).some(isPlaceholder)
       const node: Resource = {
         // A proposal on private data is named on the map by what rule 8 lets every member read (L5 §9.5): the map is drawn
@@ -73,6 +84,7 @@ export const proposals: Adapter = {
         facts: {
           author: entry.author, opened: entry.opened, classes: entry.classes ?? [], rules: (entry.rules ?? []).map(r => r.id),
           evaluation: evaluation.state, missing: evaluation.missing, closesAt: evaluation.closesAt, stale, ops: entry.ops.length,
+          ...(agentStale.length > 0 ? { agentStale, agentAttention: attentionWith(0) } : {}),
         },
         source: { path: REL, editable: false, registry: 'proposals', entityId: id },
       }

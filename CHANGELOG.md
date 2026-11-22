@@ -8,6 +8,40 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.7.1] — 2026-11-20
+
+**0.7.1 lets an instance make the house its own without forking it, and keeps the agent layer to those who decide.**
+An instance without the new files sees 0.7.0 unchanged.
+
+### Added
+
+- **Instance seams for the house** (`packages/admin`, #27). Each reads a file the instance keeps:
+  - `house/skin.css` is layered over the house's styles, and `house/themes/*` are offered in Appearance (a chosen
+    theme survives a reload; "Toggle dark" returns to the instance's own look).
+  - A shared sites bar: the lockup, a site switcher and the theme control, as the instance's sibling sites draw it.
+  - The instance's images under `house/`, served at `/instance-assets/:name`; its mark reaches the org seal. The bar,
+    themes and sidebar are answered at `/api/instance/*`.
+  - `house/nav.yaml` groups the sidebar, each item drawn for the Roles it names (`audience`); sections it doesn't name
+    stay under a collapsed More, and `hidden` keeps a slot without drawing it. The phone's More sheet draws the same
+    groups.
+  - Meetings, events, tasks and knowledge-store organizations read as records; a meeting's `short_title` names it in
+    lists.
+  - `open_decisions` in `data/governance.yaml`, beside `decisions`: the Decisions page lists them as "Open decisions",
+    ahead of the decided ones, and "Decided" counts only the decided.
+
+### Security
+
+- **The agent layer is no longer served to every signed-in member** (`packages/admin`). On a 0.7.0 Hub that signs
+  people in, anyone with a Role could open `memory/**`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**` and
+  `docs/agent-plans/**` in the source editor (`GET /api/files`), and read them in a proposal's text and diff. Now only
+  those who decide under the workspace rule that governs those files read them: the members of the rule's deciding
+  role, or, where the org has written no workspace rule, of its own `maintainer` role. Anyone else is answered exactly
+  as for a file that is not there and is shown no link to it. They cannot stage, revise, replay, load or apply an edit
+  to it. They see proposals, the ledger and its revisions without that file's text, path or diff (the rest of each
+  proposal is unchanged), and crew's seats recorded in `memory/crew/` are not on their map. The person at the machine
+  reads these files as before. An org that writes no workspace rule and defines no `maintainer` role should name one
+  in `data/governance.yaml`: until it does, nobody signed in to its hosted Hub reads these files.
+
 ## [0.7.0] — 2026-11-11
 
 **0.7 adds the workspace to the house:** pages, collections, tasks, imports and conversation, beside
