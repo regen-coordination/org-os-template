@@ -17,8 +17,13 @@ own machine: a hosted Hub is one instance and refuses to start it.
 - **Create a new one.** Answer the questions about your org. The launcher runs `clone:framework` into a new or empty
   folder, which gives the instance its genesis commit.
 - **Adopt a repo.** For a repo you already have that is not an org-os instance. See "Adopt" below.
-- **Join a network.** Shown as "Comes with federation." It needs the request record and the invite format, which
-  arrive with federation (spec §13 R9). Until then it is shown but not available yet.
+- **Join a network.** Paste a hub's address or the invite link it sent you, and choose **Look it up**. The launcher
+  reads the hub's `federation.json` and says how it takes requests. Then open the instance that will ask, or create or
+  adopt one to join. Its admin opens on the Federation page with the hub and the network filled in. Nothing is sent
+  yet: you answer the hub's asks and send the request there, and the hub decides under its own rules. The launcher
+  never sends an invite's token anywhere: it hands it to the Federation page in the address, and the admin keeps it
+  outside git. See
+  [Joining a network](FEDERATION.md#joining-a-network).
 
 ## What the launcher writes
 
