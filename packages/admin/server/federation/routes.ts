@@ -15,6 +15,7 @@ import { fileBase, fileText } from '../workspace/files.ts'
 import { ChangeStore } from '../changes/store.ts'
 import type { FileOp } from '../changes/types.ts'
 import { runCommand } from '../resources/run.ts'
+import { governanceView } from '../governance/read.ts'
 import { JOIN_POLICIES, readFederation } from '../../lib/federation/read.mjs'
 import { isPublicUrl } from '../../lib/federation/peers.mjs'
 import { buildRequest, parseRequest, requestText } from '../../lib/federation/request.mjs'
@@ -229,6 +230,12 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     const edit = joinEditOf(await body(c))
     return withLock(async () => {
       const actor = knownActorOf(c)
+      // A standing decision switches on acceptance on arrival (intake's `open`): it must be one this instance has decided,
+      // in the Decided list's ratified group (a superseded one aside), never a free word.
+      if (edit.policy === 'open' && typeof edit.decision === 'string') {
+        const decided = governanceView(repo).decisions.some(d => d.id === edit.decision && d.group === 'ratified' && d.status.toLowerCase() !== 'superseded')
+        if (!decided) throw new HttpError(400, `"${edit.decision}" isn't a decision this instance has decided. Pick one from the Decided list.`)
+      }
       const { text, base } = fedNow(repo, actor.id)
       const next = joinText(text, edit)
       if (next === text) throw new HttpError(409, 'federation.yaml already says this, so nothing was changed.')

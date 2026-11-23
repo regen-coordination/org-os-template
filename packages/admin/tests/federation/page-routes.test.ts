@@ -144,3 +144,32 @@ describe('the card facts the page draws from', () => {
     expect(byName).toEqual({ 'Valley Hub': true, 'Hidden Grove': false, 'Folder Friend': false })
   })
 })
+
+describe('review fixes, round 1', () => {
+  beforeEach(() => setup(null))
+
+  it('I1: a policy-only edit leaves an ask with a comma byte for byte', () => {
+    const ask = '  asks: ["Who are you, and why do you want to join?"]'
+    const text = `${FED}join:\n  policy: open-with-approval\n${ask}\n`
+    const next = joinText(text, { policy: 'invite' })
+    expect(next.split('\n')).toContain(ask)
+    expect(parse(next).join).toEqual({ policy: 'invite', asks: ['Who are you, and why do you want to join?'] })
+  })
+
+  it('M3: open takes only a decision this instance has decided', async () => {
+    write('data/governance.yaml', ['schema_version: "2.0"', 'governance:', '  model: "solo-maintainer"', '  decisions:',
+      '    - { id: D-7, date: "2026-10-01", title: "Open the network", status: approved }',
+      '    - { id: D-8, date: "2026-11-01", title: "Still talking", status: proposed }',
+      '    - { id: D-6, date: "2026-09-01", title: "Old one", status: superseded }', ''].join('\n'))
+    commit('decisions')
+    for (const decision of ['D-8', 'D-6', 'anything at all']) {
+      const r = await post('/api/federation/join', { policy: 'open', decision })
+      expect(r.status).toBe(400)
+      expect(((await r.json()) as { error: string }).error).toBe(`"${decision}" isn't a decision this instance has decided. Pick one from the Decided list.`)
+    }
+    expect(parse(readFileSync(join(repo, 'federation.yaml'), 'utf8')).join).toBeUndefined()
+    const ok = await post('/api/federation/join', { policy: 'open', decision: 'D-7' })
+    expect(ok.status).toBe(200)
+    expect(parse(readFileSync(join(repo, 'federation.yaml'), 'utf8')).join).toEqual({ policy: 'open', decision: 'D-7' })
+  })
+})

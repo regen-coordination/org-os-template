@@ -21,7 +21,7 @@ import { outsideSentence } from '../record/ConfirmBox.tsx'
 import { useCanWrite } from '../viewAs/ViewAs.tsx'
 import { isPublicUrl } from '../../../lib/federation/peers.mjs'
 import {
-  atprotoLine, driftFix, driftOrder, hiddenNetworksLine, keptLine, linkWords, listOf, OPEN_FALLBACK, planCounts, POLICIES,
+  atprotoLine, driftFix, driftOrder, hiddenNetworksLine, keptLine, linesOf, linkWords, listOf, OPEN_FALLBACK, planCounts, POLICIES,
   policySentence, RELATIONS, type Drift, type Sources,
 } from './federationWords.ts'
 
@@ -43,13 +43,12 @@ interface SelfFacts {
 
 const norm = (u: unknown): string => (typeof u === 'string' ? u.trim().replace(/\/+$/, '').toLowerCase() : '')
 const day = (iso: string): string => iso.slice(0, 10)
+/** A sentence from outside, ended: a full stop added when it has no closing mark of its own. */
+const sentenceEnd = (t: string): string => (/[.!?…]$/.test(t.trim()) ? t.trim() : `${t.trim()}.`)
 const message = (err: unknown): string => (err instanceof Error ? err.message : String(err))
 const text = (v: unknown): string => (typeof v === 'string' ? v : '')
 const opNamed = (ops: OperationInfo[] | undefined, id: string, preset?: Record<string, unknown>): OperationInfo | undefined =>
   ops?.find(o => o.id === id && (!preset || Object.entries(preset).every(([k, v]) => o.preset?.[k] === v)))
-
-/** The page's operations that change something outside the repository (the rest only read): their confirm says where. */
-const CHANGES = new Set(['federation.publish-links', 'federation.send', 'federation.reply'])
 
 const STATE_MARK: Record<string, Mark> = { mutual: 'ok', requested: 'open', claimed: 'needs', left: 'closed', 'not-an-instance': 'stale' }
 
@@ -64,7 +63,7 @@ interface Runner {
 
 /** The page's one way to reach the network (R16): `api.plan` answers the operation's own summary and a nonce; nothing
  *  runs until the operator confirms that summary; the job is then followed to its end, and the cards are read again. */
-function useRunner(self: Resource | undefined): Runner {
+function useRunner(self: Resource | undefined, ops: OperationInfo[] | undefined): Runner {
   const qc = useQueryClient()
   const [asking, setAsking] = useState<{ place: string; label: string; plan: PlanReply; outside: string | null; after?: () => void } | null>(null)
   const [planning, setPlanning] = useState<string | null>(null)
@@ -88,7 +87,9 @@ function useRunner(self: Resource | undefined): Runner {
     if (!self || planning !== null) return
     setRefused(null); setPlanning(place)
     api.plan(op, self.id, params)
-      .then(plan => setAsking({ place, label, plan, after, outside: outsideSentence({ id: op, effect: CHANGES.has(op) ? 'changes' : 'reads', network: true }, params) }),
+      // The confirm says where it writes from the operation's own info; one the list doesn't hold is taken as a change, never
+      // understated as a read.
+      .then(plan => setAsking({ place, label, plan, after, outside: outsideSentence(ops?.find(o => o.id === op) ?? { id: op, effect: 'changes', network: true }, params) }),
         (err: unknown) => setRefused({ place, text: message(err) }))
       .finally(() => setPlanning(null))
   }
@@ -149,11 +150,19 @@ const wrote = (out: { staged?: true; commit?: string }, staged: string, committe
  *  every write is staged or committed under the instance's own rules. A private peer, or one without a public https
  *  url, is never named here: it is counted (R3, R24). An invite's link is shown once, in the answer that made it. */
 export default function Federation() {
+  // The launcher's #invite= is read and cleared from the address bar first, whatever the page then draws (loading, an
+  // error, a preview): the token never stays in the URL or in history.
+  const [invite, setInvite] = useState('')
+  useEffect(() => {
+    const token = /^#invite=(.+)$/.exec(window.location.hash)?.[1]
+    if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
+    if (token) { try { setInvite(decodeURIComponent(token)) } catch { setInvite(token) } }
+  }, [])
   const canWrite = useCanWrite()
   const resources = useQuery({ queryKey: ['resources'], queryFn: api.resources })
   const self = resources.data?.find(r => r.kind === 'instance' && r.facts.self === true)
   const ops = useQuery({ queryKey: ['operations', self?.id], queryFn: () => api.operations(self!.id), enabled: !!self })
-  const runner = useRunner(self)
+  const runner = useRunner(self, ops.data)
   const head = <PageHead title="Federation" about="Your networks and links. Nothing here reaches the network or atproto until you confirm it." />
 
   if (resources.isPending) return <>{head}<Skeleton rows={4} shape="row" label="Federation" /></>
@@ -169,7 +178,7 @@ export default function Federation() {
       <Networks facts={facts} peers={peers} ops={ops.data} runner={runner} canWrite={canWrite} />
       <Published facts={facts} peers={peers} ops={ops.data} runner={runner} canWrite={canWrite} />
       <Migration runner={runner} canWrite={canWrite} />
-      {canWrite && <Ask ops={ops.data} runner={runner} />}
+      {canWrite && <Ask ops={ops.data} runner={runner} invited={invite} />}
       <HubSide facts={facts} requests={requests} ops={ops.data} runner={runner} canWrite={canWrite} />
       {runner.dialog}
     </>
@@ -198,9 +207,9 @@ function Networks({ facts, peers, ops, runner, canWrite }: Shared & { facts: Sel
   for (const o of outgoing) add(o.network, o.hub)
   const check = opNamed(ops, 'federation.check-links')
   const hiddenLine = hiddenNetworksLine(hidden)
-  const hosted = (facts.networks ?? []).filter(n => n.role === 'hub' || !n.hub).map(n => n.name)
+  const hosted = (facts.networks ?? []).filter(n => n.role === 'hub').map(n => n.name)
   return (
-    <Section label="Networks" count={rows.length}
+    <Section label="Networks" count={rows.length + hosted.length}
       end={canWrite && check ? <Button small busy={runner.busyAt('networks')} unavailable={check.unavailable ?? undefined}
         onClick={() => runner.start('federation.check-links', {}, 'Check links', 'networks')}>Check links</Button> : undefined}>
       {hosted.length > 0 && <p className="fed-line">{`This instance is the hub of ${hosted.join(', ')}.`}</p>}
@@ -223,7 +232,7 @@ function NetworkRow({ name, hub, peer, out, ops, runner, canWrite }: Shared & { 
   const fileWithInvite = out?.invited === true && out.sent?.transport === 'file'
   const said = !out ? null
     : !out.onTrunk ? 'Not applied yet: apply your change, then send it.'
-    : out.status?.state === 'accepted' ? `Accepted${out.status.reason ? `: ${out.status.reason}` : '.'} Record it, then publish.`
+    : out.status?.state === 'accepted' ? `Accepted${out.status.reason ? `: ${sentenceEnd(out.status.reason)}` : '.'} Record it, then publish.`
     : out.status?.state === 'refused' ? null
     : out.sent ? `Sent (${out.sent.transport}) ${day(out.sent.at)}. Waiting for their answer.`
     : 'Not sent yet.'
@@ -406,7 +415,7 @@ function MigrationItem({ row, did, link, runner, canWrite, onDid, onLink }:
 /** An invite as pasted: the whole link, or only its token. */
 const tokenOf = (v: string): string => { const m = /#invite=([^&\s]+)/.exec(v); return (m ? m[1]! : v).trim() }
 
-function Ask({ ops, runner }: { ops: OperationInfo[] | undefined; runner: Runner }) {
+function Ask({ ops, runner, invited }: { ops: OperationInfo[] | undefined; runner: Runner; invited: string }) {
   const search = useSearch()
   const qc = useQueryClient()
   const [address, setAddress] = useState('')
@@ -417,19 +426,16 @@ function Ask({ ops, runner }: { ops: OperationInfo[] | undefined; runner: Runner
   const [asked, setAsked] = useState<{ id: string; hub: string } | null>(null)
   const { act, busy, shown, reset } = useAct()
 
-  // The launcher's link (Task 14) lands here: ?hub=&network= fill the form, and #invite= fills the invite and is cleared
-  // from the address bar at once. Nothing runs by itself: looking the hub up stays the operator's confirmed step.
+  // The launcher's link (Task 14) lands here: ?hub=&network= fill the form, and the page hands down the #invite= it read
+  // and cleared. Nothing runs by itself: looking the hub up stays the operator's confirmed step.
   useEffect(() => {
     const q = new URLSearchParams(search)
     const hub = q.get('hub')?.trim() ?? ''
     const net = q.get('network')?.trim() ?? ''
-    const hash = window.location.hash
-    const token = /^#invite=(.+)$/.exec(hash)?.[1]
-    if (hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
     if (hub) { setAddress(hub); setLooked(hub) }
     if (net) setNetwork(net)
-    if (token) { try { setInvite(decodeURIComponent(token)) } catch { setInvite(token) } }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (invited) setInvite(invited) }, [invited])
 
   // What the last confirmed look-up left in the cache: a read, never a fetch of the hub.
   const cached = useQuery({ queryKey: ['federation', 'hub', looked], queryFn: () => api.federationHub(looked!), enabled: looked !== null })
@@ -464,7 +470,7 @@ function Ask({ ops, runner }: { ops: OperationInfo[] | undefined; runner: Runner
   return (
     <Section label="Ask to join a network">
       <FieldTable label="Ask to join a network">
-        <FieldRow label="The hub's address" htmlFor="fed-hub" help={hub ? `${hub.name} (${hub.type}). ${policySentence(policy)}` : undefined}>
+        <FieldRow label="The hub's address" htmlFor="fed-hub" help={hub ? `${hub.name}${hub.type ? ` (${hub.type})` : ''}. ${policySentence(policy)}` : undefined}>
           <TextInput common={{ id: 'fed-hub', placeholder: 'https://…' }} prose={false} readOnly={false} value={address}
             onChange={v => { reset(); setAsked(null); setAddress(text(v)) }} />
           {check && <Button small busy={runner.busyAt('ask')} unavailable={address.trim() === '' ? "Type the hub's address first." : check.unavailable ?? undefined} onClick={lookUp}>Look it up</Button>}
@@ -512,7 +518,7 @@ function HubSide({ facts, requests, ops, runner, canWrite }: Shared & { facts: S
   return (
     <>
       {canWrite && <JoinPolicyForm join={facts.join ?? null} />}
-      {canWrite && <Invites networks={(facts.networks ?? []).filter(n => n.role === 'hub' || !n.hub).map(n => n.name)} />}
+      {canWrite && <Invites networks={(facts.networks ?? []).filter(n => n.role === 'hub').map(n => n.name)} />}
       <Requests facts={facts} requests={requests} ops={ops} runner={runner} canWrite={canWrite} />
     </>
   )
@@ -523,13 +529,21 @@ function JoinPolicyForm({ join }: { join: Join | null }) {
   const [policy, setPolicy] = useState<JoinPolicy>(join?.policy ?? 'open-with-approval')
   const [decision, setDecision] = useState(join?.decision ?? '')
   const [types, setTypes] = useState((join?.types ?? []).join(', '))
-  const [asks, setAsks] = useState((join?.asks ?? []).join(', '))
+  // One ask per line: an ask is a sentence and may hold commas.
+  const [asks, setAsks] = useState((join?.asks ?? []).join('\n'))
   const [where, setWhere] = useState(join?.where ?? '')
+  // Only the fields the operator touched are sent: the rest of the join block stays exactly as federation.yaml has it.
+  const [touchedKeys, setTouchedKeys] = useState<Set<'types' | 'asks' | 'where'>>(new Set())
   const { act, busy, shown, reset } = useAct()
-  const decisions = (governance.data?.decisions ?? []).filter(d => d.id)
+  // A standing decision must be one the instance has decided (the Decided tab's ratified group, a superseded one aside).
+  const decisions = (governance.data?.decisions ?? []).filter(d => d.id && d.group === 'ratified' && d.status.toLowerCase() !== 'superseded')
   const stage = () => void act(() => api.federationJoin({
-    policy, ...(policy === 'open' ? { decision: decision || null } : {}), types: listOf(types), asks: listOf(asks), where: where.trim() || null,
+    policy, ...(policy === 'open' ? { decision: decision || null } : {}),
+    ...(touchedKeys.has('types') ? { types: listOf(types) } : {}),
+    ...(touchedKeys.has('asks') ? { asks: linesOf(asks) } : {}),
+    ...(touchedKeys.has('where') ? { where: where.trim() || null } : {}),
   }), o => wrote(o, 'Staged. Review it in Changes.', 'Saved.'))
+  const mark = (k: 'types' | 'asks' | 'where') => setTouchedKeys(t => new Set(t).add(k))
   const touched = (fn: () => void) => { reset(); fn() }
   return (
     <Section label="Join policy">
@@ -546,13 +560,13 @@ function JoinPolicyForm({ join }: { join: Join | null }) {
             </FieldRow>
           )}
           <FieldRow label="Who may ask" htmlFor="fed-types" help="Instance types, separated by commas. Empty means any type.">
-            <TextInput common={{ id: 'fed-types' }} prose={false} readOnly={false} value={types} onChange={v => touched(() => setTypes(text(v)))} />
+            <TextInput common={{ id: 'fed-types' }} prose={false} readOnly={false} value={types} onChange={v => touched(() => { mark('types'); setTypes(text(v)) })} />
           </FieldRow>
-          <FieldRow label="What a request has to say" htmlFor="fed-asks" help="Questions, separated by commas.">
-            <TextInput common={{ id: 'fed-asks' }} prose={false} readOnly={false} value={asks} onChange={v => touched(() => setAsks(text(v)))} />
+          <FieldRow label="What a request has to say" htmlFor="fed-asks" help="One question per line.">
+            <TextInput common={{ id: 'fed-asks' }} prose readOnly={false} value={asks} onChange={v => touched(() => { mark('asks'); setAsks(text(v)) })} />
           </FieldRow>
           <FieldRow label="Where requests go" htmlFor="fed-where" help="A public https address, such as the hub's GitHub repo.">
-            <TextInput common={{ id: 'fed-where', placeholder: 'https://github.com/…' }} prose={false} readOnly={false} value={where} onChange={v => touched(() => setWhere(text(v)))} />
+            <TextInput common={{ id: 'fed-where', placeholder: 'https://github.com/…' }} prose={false} readOnly={false} value={where} onChange={v => touched(() => { mark('where'); setWhere(text(v)) })} />
           </FieldRow>
         </FieldTable>
         <div className="fed-acts">

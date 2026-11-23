@@ -71,7 +71,8 @@ const routes = (over: Record<string, unknown> = {}, self = selfCard()) => baseRo
   'GET /api/operations': OPS(),
   'GET /api/federation/migration': MIGRATION,
   'GET /api/governance': { model: null, description: null, rules: [], problems: [], decisions: [
-    { date: '2026-10-01', id: 'D-7', title: 'Open the network', status: 'decided', group: null, where: 'governance.yaml' },
+    { date: '2026-10-01', id: 'D-7', title: 'Open the network', status: 'approved', group: 'ratified', where: 'governance.yaml' },
+    { date: '2026-11-01', id: 'D-9', title: 'Still being discussed', status: 'proposed', group: 'open', where: 'governance.yaml' },
   ] },
   'GET /api/jobs': [],
   ...over,
@@ -128,6 +129,7 @@ describe('Networks', () => {
     renderAt(<Federation />, '/federation')
     const row = await within(await region('Networks')).findByRole('listitem', { name: 'Mesh' })
     expect(within(row).getByRole('button', { name: 'Record it' })).toBeTruthy()
+    expect(within(row).getByText('Accepted: Welcome. Record it, then publish.')).toBeTruthy()
     const file = within(row).getByRole('link', { name: 'Download the request file' }) as HTMLAnchorElement
     expect(file.getAttribute('href')).toBe(`/api/federation/outgoing/${OUT_ID}/request-file`)
     expect(file.hasAttribute('download')).toBe(true)
@@ -300,6 +302,7 @@ describe('Ask to join a network', () => {
     fireEvent.change(within(ask).getByLabelText("The hub's address"), { target: { value: HUB } })
     fireEvent.click(await within(ask).findByRole('button', { name: 'Look it up' }))
     expect(await screen.findByText(`read ${HUB}: a download, it changes no file`)).toBeTruthy()
+    expect(screen.getByRole('dialog').textContent).not.toMatch(/This writes|This posts|reaches the network and changes/)
     expect(calls.filter(c => c.method === 'POST').map(c => c.body)).toEqual([{ resource: 'instance:fixture-org', params: { address: HUB } }])
   })
 
@@ -378,7 +381,10 @@ describe('taking requests (hub)', () => {
     fireEvent.click(within(pol).getByRole('button', { name: 'Stage' }))
     await within(pol).findByText('Staged. Review it in Changes.')
     expect(calls.filter(c => c.method === 'POST' && c.path === '/api/federation/join').map(c => c.body))
-      .toEqual([{ policy: 'open', decision: null, types: [], asks: [], where: 'https://github.com/mesh/hub' }])
+      .toEqual([{ policy: 'open', decision: null }])
+    // The decision picker lists only what this instance has decided.
+    const picker = within(pol).getByLabelText('The decision that agreed to it') as HTMLSelectElement
+    expect([...picker.options].map(o => o.value)).toEqual(['', 'D-7'])
   })
 
   it('the one-time invite link shows once: in the answer, never again after a reload', async () => {
@@ -453,3 +459,50 @@ describe('a refusal is said, and nothing is sent', () => {
   })
 })
 
+describe('review fixes, round 1', () => {
+  it('I1: staging a policy change leaves an ask with a comma byte for byte; a touched ask list is one ask per line', async () => {
+    const ask = 'Who are you, and why do you want to join?'
+    const { calls } = fetchRoutes(routes({ 'GET /api/resources': [HUB_SELF({ join: { ...JOIN('open-with-approval', [ask]) } }), hubCard()],
+      'POST /api/federation/join': { policy: 'invite', staged: true } }))
+    renderAt(<Federation />, '/federation')
+    const pol = await region('Join policy')
+    expect((within(pol).getByLabelText('What a request has to say') as HTMLTextAreaElement).value).toBe(ask)
+    fireEvent.click(within(pol).getByLabelText(/By invite only/))
+    fireEvent.click(within(pol).getByRole('button', { name: 'Stage' }))
+    await within(pol).findByText('Staged. Review it in Changes.')
+    fireEvent.change(within(pol).getByLabelText('What a request has to say'), { target: { value: `${ask}\nYour portal, if any?` } })
+    fireEvent.click(within(pol).getByRole('button', { name: 'Stage' }))
+    await waitFor(() => expect(calls.filter(c => c.path === '/api/federation/join')).toHaveLength(2))
+    expect(calls.filter(c => c.path === '/api/federation/join').map(c => c.body)).toEqual([
+      { policy: 'invite' },
+      { policy: 'invite', asks: [ask, 'Your portal, if any?'] },
+    ])
+  })
+
+  it('M1: hosted networks count, and only role: hub is hosted (the invite picker too)', async () => {
+    fetchRoutes(routes({ 'GET /api/resources': [HUB_SELF({ networks: [{ name: 'Mesh', hub: null, role: 'hub' }, { name: 'Loose', hub: null, role: 'node' }] }), hubCard()] }))
+    renderAt(<Federation />, '/federation')
+    const nets = await region('Networks')
+    expect(nets.querySelector('.sect-n')?.textContent).toBe('1')
+    expect(within(nets).getByText('This instance is the hub of Mesh.')).toBeTruthy()
+    const picker = within(await region('Invites')).getByLabelText('For the network') as HTMLSelectElement
+    expect([...picker.options].map(o => o.value)).toEqual(['', 'Mesh'])
+  })
+
+  it('M2: the invite fragment is cleared even when the page cannot load', async () => {
+    window.history.replaceState(null, '', `/federation#invite=${TOKEN}`)
+    fetchRoutes(routes({ 'GET /api/resources': refuse(500, { error: 'cannot read' }) }))
+    renderAt(<Federation />, '/federation')
+    await screen.findByText('cannot read')
+    expect(window.location.hash).toBe('')
+    expect(window.location.href).not.toContain(TOKEN)
+  })
+
+  it('M7: a hub with no type says no "(null)"', async () => {
+    fetchRoutes(routes({ 'GET /api/federation/hub': { hub: { name: 'Mesh Hub', type: null, url: HUB, networks: ['Mesh'], join: JOIN('open-with-approval') } } }))
+    renderAt(<Federation />, `/federation?hub=${encodeURIComponent(HUB)}&network=Mesh`)
+    const ask = await region('Ask to join a network')
+    expect(await within(ask).findByText('Mesh Hub. Anyone can ask. The hub decides under its own rules.')).toBeTruthy()
+    expect(ask.textContent).not.toContain('(null)')
+  })
+})

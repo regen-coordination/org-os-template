@@ -95,5 +95,8 @@ export const POLICIES: { value: JoinPolicy; label: string; hint?: string }[] = [
 /** R17's fallback, said when `open` is chosen without a decision. */
 export const OPEN_FALLBACK = 'Without a decision, this works as "anyone can ask, the hub decides".'
 
-/** A comma- or line-separated list, trimmed, empties dropped. */
+/** A comma- or line-separated list (instance types, which hold no commas), trimmed, empties dropped. */
 export const listOf = (text: string): string[] => text.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
+
+/** One item per line, trimmed, empties dropped: an ask is a sentence and may hold commas. */
+export const linesOf = (text: string): string[] => text.split('\n').map(s => s.trim()).filter(Boolean)
