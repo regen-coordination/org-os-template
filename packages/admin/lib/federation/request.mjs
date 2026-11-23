@@ -18,11 +18,23 @@ export const REQUEST_SPEC = 'org-os/federation-request/1'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const TOP = ['spec', 'id', 'created', 'from', 'hub', 'network', 'answers', 'invite']
+/** The longest a name, a type or a network may be: they end up in commit subjects, titles and public replies. */
+export const LABEL_MAX = 200
+/** Control and format characters (ESC, NUL, line breaks, RLO and the other bidi marks): never in a name, type or network. */
+const CONTROL = /[\p{Cc}\p{Cf}]/u
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
 const isObj = v => typeof v === 'object' && v !== null && !Array.isArray(v)
 /** @param {unknown} v @returns {v is string} */
 const text = v => typeof v === 'string' && v.trim() !== ''
+/** A one-line label: text, no control or format character, at most LABEL_MAX characters. Its problem, or null.
+ *  @param {unknown} v @param {string} what @returns {string | null} */
+const labelProblem = (v, what) => {
+  if (!text(v)) return `${what} is missing.`
+  if (CONTROL.test(v)) return `${what} holds a control or format character.`
+  if (v.length > LABEL_MAX) return `${what} is longer than ${LABEL_MAX} characters.`
+  return null
+}
 
 /** @param {{ id: string, from: RequestFrom, hub: RequestHub, network: string, answers: Record<string, string>,
  *   invite?: string, now: string | Date }} a @returns {FederationRequest} */
@@ -53,14 +65,14 @@ export function parseRequest(source) {
   if (doc.spec !== REQUEST_SPEC) problems.push(`spec must be ${REQUEST_SPEC}.`)
   if (!text(doc.id) || !UUID.test(doc.id)) problems.push('id must be a UUID.')
   if (!text(doc.created) || Number.isNaN(new Date(doc.created).getTime())) problems.push('created must be a date.')
-  if (!text(doc.network)) problems.push('network is missing.')
+  const net = labelProblem(doc.network, 'network')
+  if (net) problems.push(net)
 
   const from = doc.from
   if (!isObj(from)) problems.push('from is missing.')
   else {
     for (const key of Object.keys(from)) if (!['name', 'type', 'url'].includes(key)) problems.push(`Unknown key "from.${key}".`)
-    if (!text(from.name)) problems.push('from.name is missing.')
-    if (!text(from.type)) problems.push('from.type is missing.')
+    for (const key of ['name', 'type']) { const p = labelProblem(from[key], `from.${key}`); if (p) problems.push(p) }
     if (!isPublicUrl(from.url)) problems.push('from.url must be a public https address.')
   }
   const hub = doc.hub

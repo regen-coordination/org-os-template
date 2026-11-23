@@ -126,6 +126,7 @@ let validateRepo, readGovernance, yamlDocuments, effectiveRules, resolveRoles, r
 let checkProposals, eventPermission, liveEvents, revOf, instant, methodOf, decidersOf, CLOCK_SKEW_MS, ballotsClosed, inWords, parseRecord, REGISTRIES;
 let evaluateAll, projectOp, decisionRowFor, resolveTopKey, mergeLedgers, insertDecisionsMdEntry, receiptsRideAlong;
 let OWNER_CLAIM_RULE, lockedOut, oneHandleAdded;
+let JOIN_RULE, joinCommitProblem;
 let NARROW_RULE, narrowCommitProblem, governanceNamesOf, referrersOf;
 let HOUSE_IDENT, observationsOf, walletsOf, knownIds, membershipTree, parseHatRef, hatRef, parseTreeRef, inTree, parseCaip10, isGitSafetyProblem;
 // DAO-OS L6 §3.5: the workspace's class, targets and implied rule.
@@ -154,6 +155,8 @@ try {
   ({ insertDecisionsMdEntry } = await lib('decision-write.mjs'));
   ({ judgedFiles: receiptsRideAlong } = await lib('receipts.mjs'));
   ({ OWNER_CLAIM_RULE, lockedOut, oneHandleAdded } = await lib('claim.mjs'));
+  // network N2 Task 9: a hub's acts on a join request, under its join policy
+  ({ JOIN_RULE, joinCommitProblem } = await lib('federation/join-rule.mjs'));
   ({ NARROW_RULE, narrowCommitProblem, governanceNamesOf } = await lib('narrow.mjs'));
   // DAO-OS L6 §3.5
   ({ WORKSPACE } = await lib('change-classes.mjs'));
@@ -1223,6 +1226,14 @@ function judgeCommit(c, at, via = null) {
     if (why === null) return;
     findings.push({ unit: 'history', level: strict ? 'error' : 'warn', text: `${who}: its Org-Rule is ${OWNER_CLAIM_RULE}, and ${why}.` });
   }
+  // A hub's act on a join request (network N2 Task 9): accepted here, and judged no further, when it changes the hub's
+  // files alone, records one request, and admits a node only under join.decision or an invite it uses
+  // (lib/federation/join-rule.mjs). Otherwise it is said why, and the commit is judged as any other.
+  if (trailers.rule === JOIN_RULE && c.parents.length === 1) {
+    const why = joinProblem(c, trailers.decision);
+    if (why === null) return;
+    findings.push({ unit: 'history', level: strict ? 'error' : 'warn', text: `${who}: its Org-Rule is ${JOIN_RULE}, and ${why}.` });
+  }
   const book = resolveRoles(read.governance, members);
   // What the commit writes, and whether its change to governance.yaml only adds to `decisions` (a ledger change).
   const ledgerNow = c.files.includes(LEDGER) ? show(c.hash, LEDGER) : at.proposals;
@@ -1403,6 +1414,18 @@ function ownerClaimProblem(c, at) {
   const parent = { address: null, membersText: at.members, governanceText: at.governance, systemsText: at.systems, authors: null, dirty: [] };
   if (!lockedOut(parent)) return 'its parent is not locked out: someone could propose a change to members there, so it needed their say';
   return oneHandleAdded(at.members, show(c.hash, FILES.members));
+}
+
+/** Why a commit carrying `Org-Rule: federation/join` is not a hub's act on a join request, or null when it is: the three
+ *  hub files read at its parent and at the commit, judged by `joinCommitProblem`. */
+function joinProblem(c, decision) {
+  const read = (rev, rel) => documentOf(show(rev, rel));
+  const at = (rev) => ({ fed: read(rev, 'federation.yaml'), requests: read(rev, 'data/federation-requests.yaml'), invites: read(rev, 'data/invites.yaml') });
+  const before = at(c.parents[0]);
+  const after = at(c.hash);
+  const unread = [...Object.entries(before), ...Object.entries(after)].find(([, doc]) => doc === null);
+  if (unread) return `one of the hub's files cannot be read as one YAML mapping (${unread[0]})`;
+  return joinCommitProblem({ files: c.files, decision, before, after });
 }
 
 /**

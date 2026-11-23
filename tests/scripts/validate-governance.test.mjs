@@ -479,3 +479,76 @@ test('an owner\'s claim that touches any other file, or adds two handles, is rej
   assert.equal(t.status, 1, t.stdout + t.stderr);
   assert.match(t.stdout, /its Org-Rule is bootstrap\/owner-claim, and it adds 2 handles, where the owner's claim adds exactly one/);
 });
+
+// ── network N2 Task 9: a hub's acts on a join request, `Org-Rule: federation/join` ──────────────────────
+// Accepted, and judged no further, when the commit changes the hub's files alone, records one request, and admits a
+// node only under join.decision at its parent or an invite it uses. ana proposes identity changes and cannot decide
+// them alone here, so every acceptance below stands on the rule's own check. Placeholders only.
+const JOIN_GOV = `governance:
+  model: consensus
+  roles:
+    maintainer: { members: [ana, bruno] }
+    member: { all: true }
+  rules:
+    - id: identity
+      applies_to: [identity]
+      propose: member
+      decide: { by: maintainer, method: approve, count: 1 }
+`;
+const JOIN_ID = '3f8a2c1e-5b7d-4e9a-8c10-2d6f4a9b7e31';
+const NODE_URL = 'https://mesa-node.example.org';
+const hubFed = (join, peers = []) => `identity: { name: Mesh Hub, type: Network }\nnetworks:\n  - { name: Mesh, role: hub }\njoin: ${JSON.stringify(join)}\npeers: ${JSON.stringify(peers)}\n`;
+const record = (o = {}) => ({ id: JOIN_ID, received: '2026-11-22T10:00:00.000Z', transport: 'file', ref: `file:${JOIN_ID}`,
+  from: { name: 'Mesa Node', type: 'LocalNode', url: NODE_URL }, network: 'Mesh', answers: {}, invite: null, outcome: 'accepted', ...o });
+const requests = (...rs) => `requests:\n${rs.map((r) => `  - ${JSON.stringify(r)}\n`).join('')}`;
+const memberPeer = (decision) => ({ name: 'Mesa Node', url: NODE_URL, type: 'LocalNode', trust: 'read', relationship: 'node', since: '2026-11-22', decision });
+const JOIN_TRAILERS = (decision) => `\n\nOrg-Actor: ana\nOrg-Rule: federation/join${decision ? `\nOrg-Decision: ${decision}` : ''}`;
+
+/** A hub at `join` (and these extra files), then one commit of `files` under federation/join. */
+function hubAct({ join, start = {}, files, decision, subject = 'federation: accept Mesa Node into Mesh' }) {
+  const root = repo();
+  commit(root, { 'data/members.yaml': MEMBERS, 'data/governance.yaml': JOIN_GOV, 'federation.yaml': hubFed(join), ...start }, 'start');
+  commit(root, files, `${subject}${JOIN_TRAILERS(decision)}`);
+  return root;
+}
+
+test('federation/join: an acceptance under join.decision, and a refusal, validate clean', () => {
+  const join = { policy: 'open', decision: 'LD-2026-040' };
+  const ok = hubAct({ join, decision: 'LD-2026-040', files: { 'federation.yaml': hubFed(join, [memberPeer('LD-2026-040')]), 'data/federation-requests.yaml': requests(record({ decision: 'LD-2026-040' })) } });
+  const r = run([ok, '--strict']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const refused = hubAct({ join, subject: 'federation: refuse', files: { 'data/federation-requests.yaml': requests(record({ outcome: 'refused', reason: 'Answer "purpose".' })) } });
+  const f = run([refused, '--strict']);
+  assert.equal(f.status, 0, f.stdout + f.stderr);
+});
+
+test('federation/join: an invite acceptance that uses its invite validates clean', () => {
+  const join = { policy: 'invite' };
+  const invite = { id: 'i-0a1b2c3d', name: 'Mesa Node', type: 'LocalNode', network: 'Mesh', expires: '2099-12-31', token_sha256: 'a'.repeat(64), used_by: null };
+  const root = hubAct({ join, decision: 'invite i-0a1b2c3d', start: { 'data/invites.yaml': `invites:\n  - ${JSON.stringify(invite)}\n` }, files: {
+    'federation.yaml': hubFed(join, [memberPeer('invite i-0a1b2c3d')]),
+    'data/federation-requests.yaml': requests(record({ invite: 'i-0a1b2c3d', decision: 'invite i-0a1b2c3d' })),
+    'data/invites.yaml': `invites:\n  - ${JSON.stringify({ ...invite, used_by: JOIN_ID })}\n`,
+  } });
+  const r = run([root, '--strict']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('federation/join: a smuggled second peer, a decision the parent never made, or another file, is flagged', () => {
+  const join = { policy: 'open', decision: 'LD-2026-040' };
+  const smuggled = hubAct({ join, decision: 'LD-2026-040', files: {
+    'federation.yaml': hubFed(join, [memberPeer('LD-2026-040'), { ...memberPeer('LD-2026-040'), name: 'Smuggled', url: 'https://smuggled.example.org' }]),
+    'data/federation-requests.yaml': requests(record({ decision: 'LD-2026-040' })),
+  } });
+  const s = run([smuggled, '--strict']);
+  assert.equal(s.status, 1, s.stdout + s.stderr);
+  assert.match(s.stdout, /its Org-Rule is federation\/join, and it changes a peer entry other than the requesting instance's/);
+  const made = hubAct({ join, decision: 'LD-2026-099', files: { 'federation.yaml': hubFed(join, [memberPeer('LD-2026-099')]), 'data/federation-requests.yaml': requests(record({ decision: 'LD-2026-099' })) } });
+  const m = run([made, '--strict']);
+  assert.equal(m.status, 1, m.stdout + m.stderr);
+  assert.match(m.stdout, /its Org-Rule is federation\/join, and its Org-Decision \(LD-2026-099\) is neither join\.decision at its parent nor an invite/);
+  const other = hubAct({ join, subject: 'federation: refuse', files: { 'data/federation-requests.yaml': requests(record({ outcome: 'refused', reason: 'no' })), 'data/projects.yaml': PROJECTS(1) } });
+  const o = run([other, '--strict']);
+  assert.equal(o.status, 1, o.stdout + o.stderr);
+  assert.match(o.stdout, /its Org-Rule is federation\/join, and it changes data\/projects\.yaml, where a hub's act on a join request changes only/);
+});

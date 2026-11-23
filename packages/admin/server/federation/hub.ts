@@ -27,7 +27,7 @@ import { guardFiles } from '../changes/apply.ts'
 import { classesOf, targetsOfOps } from '../changes/stage.ts'
 import { newChangeId } from '../changes/store.ts'
 import type { Change, FileOp } from '../changes/types.ts'
-import { effectiveRule, readRuleContext } from '../governance/effective.ts'
+import { effectiveRule, readRuleContext, ruleIds } from '../governance/effective.ts'
 import { propose, type ProposeDeps } from '../proposals/propose.ts'
 import { readLedger } from '../proposals/ledger.ts'
 import { runCommand } from '../resources/run.ts'
@@ -35,6 +35,7 @@ import { DID_PATTERN, readFederation } from '../../lib/federation/read.mjs'
 import { hubPeerOf, parseRequest } from '../../lib/federation/request.mjs'
 import type { FederationRequest } from '../../lib/federation/request.mjs'
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
+import { JOIN_RULE } from '../../lib/federation/join-rule.mjs'
 import type { Invite } from '../../lib/federation/invite.mjs'
 import type { Proposal } from '../../lib/proposals.mjs'
 import type { Resource, Runner } from '../resources/types.ts'
@@ -52,6 +53,10 @@ export const SENTENCES = {
   notHeld: "This request isn't waiting for your decision.",
   noRequest: 'No such request.',
   noWhere: 'Say where this hub takes requests first: join.where in federation.yaml.',
+  noNetwork: 'This hub has no network by that name.',
+  alreadyMember: 'This instance is already a member here.',
+  otherRole: 'This instance is already listed here in another role, which a join request does not change.',
+  notTaking: "This hub isn't taking requests now.",
 } as const
 
 const FED = 'federation.yaml'
@@ -59,6 +64,13 @@ const REQUESTS = 'data/federation-requests.yaml'
 const INVITES = 'data/invites.yaml'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim()
+/** Text from a request as it may appear in a commit subject, a proposal title, a sentence or a reply: control and format
+ *  characters (ESC, NUL, RLO and the other bidi marks) removed, one line, at most 100 characters. parseRequest already
+ *  refuses them in the fields this names; this is the second wall, for every place untrusted text is shown. */
+export function label(s: unknown): string {
+  const clean = oneLine(String(s ?? '').replace(/[\p{Cc}\p{Cf}]/gu, ' '))
+  return clean.length > 100 ? `${clean.slice(0, 99)}…` : clean
+}
 
 // ── the records ────────────────────────────────────────────────────────────────────────────────────
 
@@ -93,12 +105,12 @@ export interface HubRequest {
 }
 
 const acceptedSentence = (r: RequestRecord, proposal?: string): string =>
-  `Accepted ${oneLine(r.from.name)} into ${oneLine(r.network)}${proposal ? ` (proposal ${proposal})` : ''}. ${SENTENCES.publish}`
+  `Accepted ${label(r.from.name)} into ${label(r.network)}${proposal ? ` (proposal ${proposal})` : ''}. ${SENTENCES.publish}`
 
 /** A record and the proposals ledger, read together. */
 export function outcomeOf(record: RequestRecord, proposals: readonly Proposal[]): Omit<HubRequest, 'replied'> {
-  const name = oneLine(record.from.name)
-  const network = oneLine(record.network)
+  const name = label(record.from.name)
+  const network = label(record.network)
   if (record.outcome === 'proposed') {
     const p = proposals.find(x => String(x.id) === record.proposal)
     if (p?.state === 'ratified') {
@@ -123,14 +135,14 @@ export function hubRequests(repo: string): HubRequest[] {
 
 /** What the asker is told: a welcome, or the reason. One line; it goes after `Accepted: ` or `Refused: `. */
 export function replySentence(h: Pick<HubRequest, 'outcome' | 'reason' | 'record'>): string {
-  return h.outcome === 'accepted' ? `Welcome to ${oneLine(h.record.network)}.` : oneLine(h.reason ?? 'Refused.').slice(0, 200)
+  return h.outcome === 'accepted' ? `Welcome to ${label(h.record.network)}.` : oneLine(String(h.reason ?? 'Refused.').replace(/[\p{Cc}\p{Cf}]/gu, ' ')).slice(0, 200)
 }
 
 /** The self card's `facts.toReply`: final outcomes not yet told, whose transport can reply. */
 export function toReplyOf(repo: string): { id: string; from: string; outcome: 'accepted' | 'refused' }[] {
   return hubRequests(repo)
     .filter(h => h.final && h.replied === null && h.record.ref !== null && transportOf(h.record.transport)?.reply !== undefined)
-    .map(h => ({ id: h.record.id, from: oneLine(h.record.from.name), outcome: h.outcome as 'accepted' | 'refused' }))
+    .map(h => ({ id: h.record.id, from: label(h.record.from.name), outcome: h.outcome as 'accepted' | 'refused' }))
 }
 
 // ── what is kept outside git: the inbox and the reply receipts ─────────────────────────────────────
@@ -226,41 +238,54 @@ const fedOp = (repo: string, text: string): FileOp => ({ op: 'file', path: FED, 
 const ruleFor = (repo: string, actor: KnownActor, op: FileOp) => effectiveRule(readRuleContext(repo, actor), classesOf([op], repo), targetsOfOps([op], repo))
 
 /** Receives one request. The caller holds the write lock. A request that can't be read, or was received before, writes
- *  nothing; every other one is recorded in the hub's git under the outcome its join policy gives. */
+ *  nothing; every other one is recorded in the hub's git under the outcome its join policy gives. Every commit names
+ *  `Org-Rule: federation/join` (lib/federation/join-rule.mjs): the hub's policy is the authority, not the importer's rule. */
 export async function receive(repo: string, actor: KnownActor, incoming: { transport: string; ref: string | null; text: string }, now: Date, deps: HubDeps = {}): Promise<Received> {
   const { request, problems } = parseRequest(incoming.text)
-  if (!request) return { ref: incoming.ref, outcome: 'unreadable', sentence: `Not received: ${problems.join(' ')}` }
+  if (!request) return { ref: incoming.ref, outcome: 'unreadable', sentence: `Not received: ${label(problems.join(' '))}` }
   const ref = incoming.ref ?? `file:${request.id}`
-  // Once: by id, by where it came from, and by a proposal already opened for it (its record may not have landed).
-  const proposals = readLedger(repo).entries
-  if (readRecords(repo).some(r => r.id === request.id || r.ref === ref)
-    || proposals.some(p => (p.origin as { request?: unknown } | undefined)?.request === request.id)) {
-    return { ref, outcome: 'already', sentence: SENTENCES.already }
-  }
+  const name = label(request.from.name)
+  const network = label(request.network)
+  const who = actorTrailer(actor)
+  const ident = commitIdent(actor)
+  const opts = { startBranch: deps.startBranch }
+  const trailers = (decision?: string) => ({ actor: who, rule: JOIN_RULE, ...(decision ? { decision } : {}) })
+  const recorded = (record: RequestRecord): HubFile => ({ rel: REQUESTS, text: createdText(ledgerText(repo, REQUESTS, 'federation-requests'), 'federation-requests', record as unknown as Record<string, unknown>) })
+
+  // Once: by id and by where it came from. A proposal already opened for it whose record never landed (its commit failed
+  // after the proposal's) gets that record now, instead of a second proposal.
+  if (readRecords(repo).some(r => r.id === request.id || r.ref === ref)) return { ref, outcome: 'already', sentence: SENTENCES.already }
   const trunk = await readTrunkFederation(repo, deps.startBranch)
   if ('problem' in trunk) throw new HttpError(409, `Not received: ${trunk.problem}`)
   const join = trunk.fed.join
-  const invites = await trunkInvites(repo, trunk.trunk)
-  const policy = intakeOutcome(join, request, invites, now)
-  // A network this hub doesn't list is refused: its acceptance would be published under another network's name.
-  const outcome = policy.kind !== 'refuse' && !trunk.fed.networks.some(n => n.name === request.network)
-    ? { kind: 'refuse' as const, reason: `This hub has no network "${oneLine(request.network)}".` }
-    : policy
-  const name = oneLine(request.from.name)
-  const network = oneLine(request.network)
   const base: RequestRecord = {
     id: request.id, received: now.toISOString(), transport: incoming.transport, ref,
     from: { name: request.from.name, type: request.from.type, url: request.from.url },
     network: request.network, answers: asked(request, join?.asks ?? []), invite: null, outcome: 'refused',
   }
-  const who = actorTrailer(actor)
-  const ident = commitIdent(actor)
-  const opts = { startBranch: deps.startBranch }
-  const recorded = (record: RequestRecord): HubFile => ({ rel: REQUESTS, text: createdText(ledgerText(repo, REQUESTS, 'federation-requests'), 'federation-requests', record as unknown as Record<string, unknown>) })
+  const opened = readLedger(repo).entries.find(p => (p.origin as { request?: unknown } | undefined)?.request === request.id)
+  if (opened) {
+    const proposal = String(opened.id)
+    const { commit } = await writeHubFiles(repo, [recorded({ ...base, outcome: 'proposed', proposal })],
+      `federation: ${name}'s request to join ${network} is proposed as ${proposal}`, trailers(), ident, opts)
+    return { ref, outcome: 'proposed', sentence: `Proposed as ${proposal}: ${name} joins ${network} once it is ratified.`, proposal, commit }
+  }
+
+  const invites = await trunkInvites(repo, trunk.trunk)
+  const policy = intakeOutcome(join, request, invites, now)
+  const listed = trunk.fed.peers.find(p => normUrl(p.url) === normUrl(request.from.url))
+  // What the policy can't see: a network this hub doesn't list (never echoed: it is the asker's text), and an instance
+  // this hub already lists in another role (a request never turns a hub or a peer into a member).
+  const outcome = policy.kind === 'refuse' ? policy
+    : !trunk.fed.networks.some(n => n.name === request.network) ? { kind: 'refuse' as const, reason: SENTENCES.noNetwork }
+    : listed && listed.relationship !== 'node' ? { kind: 'refuse' as const, reason: SENTENCES.otherRole }
+    // Already a member, and nothing admits it again: proposing would propose an unchanged federation.yaml.
+    : listed && listed.decision && policy.kind === 'propose' ? { kind: 'refuse' as const, reason: SENTENCES.alreadyMember }
+    : policy
 
   if (outcome.kind === 'refuse') {
     const { commit } = await writeHubFiles(repo, [recorded({ ...base, outcome: 'refused', reason: outcome.reason })],
-      `federation: refuse ${name}'s request to join ${network}`, { actor: who }, ident, opts)
+      `federation: refuse ${name}'s request to join ${network}`, trailers(), ident, opts)
     return { ref, outcome: 'refused', sentence: `Refused: ${outcome.reason}`, commit }
   }
 
@@ -274,7 +299,7 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
     if (outcome.by === 'invite') {
       files.push({ rel: INVITES, text: updatedText(ledgerText(repo, INVITES, 'invites'), 'invites', outcome.invite.id, { ...outcome.invite, used_by: request.id } as unknown as Record<string, unknown>) })
     }
-    const { commit } = await writeHubFiles(repo, files, `federation: accept ${name} into ${network}`, { actor: who, decision }, ident, opts)
+    const { commit } = await writeHubFiles(repo, files, `federation: accept ${name} into ${network}`, trailers(decision), ident, opts)
     return { ref, outcome: 'accepted', sentence: acceptedSentence(base), commit }
   }
 
@@ -284,7 +309,7 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
   if (ruleFor(repo, actor, op).direct) {
     // The importer may change identity alone, so a proposal would be refused as DIRECT: the operator decides it (R19).
     const { commit } = await writeHubFiles(repo, [recorded({ ...base, outcome: 'held' })],
-      `federation: hold ${name}'s request to join ${network}`, { actor: who }, ident, opts)
+      `federation: hold ${name}'s request to join ${network}`, trailers(), ident, opts)
     return { ref, outcome: 'held', sentence: `Held for you to decide: ${name} asks to join ${network}.`, commit }
   }
   const at = now.toISOString()
@@ -292,41 +317,55 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
   const change: Change = { id: newChangeId(), actor: actor.id, created: at, updated: at, ops: [op] }
   const result = await propose(repo, actor, change, {
     title: `Join request: ${name} → ${network}`,
-    origin: { kind: 'federation-request', request: request.id, from: request.from.name },
+    origin: { kind: 'federation-request', request: request.id, from: name },
   }, { now: () => now, startBranch: deps.startBranch, build: deps.build })
   const proposal = String(result.proposal.id)
+  // No Org-Proposal trailer: that names a ratified proposal; this commit only records the open one.
   const { commit } = await writeHubFiles(repo, [recorded({ ...base, outcome: 'proposed', proposal })],
-    `federation: ${name}'s request to join ${network} is proposed as ${proposal}`, { actor: who, proposal }, ident, opts)
+    `federation: ${name}'s request to join ${network} is proposed as ${proposal}`, trailers(), ident, opts)
   return { ref, outcome: 'proposed', sentence: `Proposed as ${proposal}: ${name} joins ${network} once it is ratified.`, proposal, commit }
 }
 
-/** The operator's decision on a held request: accept (one commit of the peer and the record, the rule re-checked) or
- *  refuse with a reason. The caller holds the write lock. */
+/** The operator's decision on a held request: accept (one commit of the peer and the record) or refuse with a reason. Both
+ *  are the operator's own act under their direct rule, checked again now, and the commit names that rule. Accepting also
+ *  checks that the network is still listed and the hub still takes requests. The caller holds the write lock. */
 export async function decide(repo: string, actor: KnownActor, id: string, choice: { accept: boolean; reason?: string }, deps: HubDeps = {}): Promise<Received> {
   const record = readRecords(repo).find(r => r.id === id)
   if (!record) throw new HttpError(404, SENTENCES.noRequest)
   if (record.outcome !== 'held') throw new HttpError(409, SENTENCES.notHeld)
-  const name = oneLine(record.from.name)
-  const network = oneLine(record.network)
-  const who = actorTrailer(actor)
+  const name = label(record.from.name)
+  const network = label(record.network)
   const ident = commitIdent(actor)
   const opts = { startBranch: deps.startBranch }
   const updated = (next: RequestRecord): HubFile => ({ rel: REQUESTS, text: updatedText(ledgerText(repo, REQUESTS, 'federation-requests'), 'federation-requests', id, next as unknown as Record<string, unknown>) })
+  /** The operator's rule for a change of federation.yaml, now: direct, or refused in its words. */
+  const direct = (op: FileOp, verb: string): string => {
+    const ctx = readRuleContext(repo, actor)
+    const classes = classesOf([op], repo)
+    const targets = targetsOfOps([op], repo)
+    const rule = effectiveRule(ctx, classes, targets)
+    if (!rule.direct) throw new HttpError(409, `Not ${verb}: ${rule.sentence.replace(/\.$/, '')}. Nothing was written.`)
+    return ruleIds(ctx, classes, targets).map(r => `${r}/direct`).join(',')
+  }
   if (!choice.accept) {
-    const reason = oneLine(choice.reason ?? '').slice(0, 200)
+    const reason = label(choice.reason ?? '').slice(0, 200)
     if (reason === '') throw new HttpError(400, SENTENCES.reasonNeeded)
+    const rule = direct(fedOp(repo, fileText(repo, FED) ?? ''), 'refused')
     const { commit } = await writeHubFiles(repo, [updated({ ...record, outcome: 'refused', reason })],
-      `federation: refuse ${name}'s request to join ${network}`, { actor: who }, ident, opts)
+      `federation: refuse ${name}'s request to join ${network}`, { actor: actorTrailer(actor), rule }, ident, opts)
     return { ref: record.ref, outcome: 'refused', sentence: `Refused: ${reason}`, commit }
   }
+  const trunk = await readTrunkFederation(repo, deps.startBranch)
+  if ('problem' in trunk) throw new HttpError(409, `Not accepted: ${trunk.problem}`)
+  if (!trunk.fed.join || trunk.fed.join.policy === 'closed') throw new HttpError(409, `Not accepted: ${SENTENCES.notTaking} Nothing was written.`)
+  if (!trunk.fed.networks.some(n => n.name === record.network)) throw new HttpError(409, `Not accepted: ${SENTENCES.noNetwork} Nothing was written.`)
   const decision = `request ${id}`
   // The peer is built from the record's validated fields, as the request held them when it was received.
   const request = { from: record.from, created: record.received, network: record.network } as FederationRequest
   const text = memberText(fileText(repo, FED) ?? '', request, decision, cachedDid(repo, record.from.url))
-  const rule = ruleFor(repo, actor, fedOp(repo, text))
-  if (!rule.direct) throw new HttpError(409, `Not accepted: ${rule.sentence.replace(/\.$/, '')}. Nothing was written.`)
+  const rule = direct(fedOp(repo, text), 'accepted')
   const { commit } = await writeHubFiles(repo, [{ rel: FED, text }, updated({ ...record, outcome: 'accepted', decision })],
-    `federation: accept ${name} into ${network}`, { actor: who, decision }, ident, opts)
+    `federation: accept ${name} into ${network}`, { actor: actorTrailer(actor), rule, decision }, ident, opts)
   return { ref: record.ref, outcome: 'accepted', sentence: acceptedSentence(record), commit }
 }
 
@@ -416,11 +455,11 @@ export function federationReplyOperation(deps: HubOpsDeps = {}): Operation {
       const sentence = replySentence(h)
       const word = kind === 'accepted' ? 'Accepted' : 'Refused'
       return {
-        summary: `Answer ${oneLine(h.record.from.name)} at ${ref}: "${word}: ${sentence}". It changes no file.`,
+        summary: `Answer ${label(h.record.from.name)} at ${ref}: "${word}: ${sentence}". It changes no file.`,
         inProcess: async (at, signal) => {
           await transport.reply!(ref, { kind, sentence }, { run, repo: at, signal })
           writeReplied(at, id, { at: now().toISOString(), ref })
-          return `Told ${oneLine(h.record.from.name)}: ${word}.\n`
+          return `Told ${label(h.record.from.name)}: ${word}.\n`
         },
       }
     },

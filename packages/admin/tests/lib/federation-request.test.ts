@@ -58,6 +58,19 @@ describe('federation request', () => {
     expect(hubPeerOf(make(), 'request 3f8a', 'not-a-did')).not.toHaveProperty('did')
     expect(hubPeerOf(make(), 'request 3f8a', null)).not.toHaveProperty('did')
   })
+  it('refuses a name, type or network with a control or format character, or longer than 200 characters', () => {
+    const bad = (from: Record<string, string>, network?: string) =>
+      parseRequest(requestText({ ...make(), from: { ...make().from, ...from }, ...(network !== undefined ? { network } : {}) })).problems
+    expect(bad({ name: 'Mesa\u001b[31mVerde' })).toContain('from.name holds a control or format character.')
+    expect(bad({ name: 'Mesa\u202eedreV' })).toContain('from.name holds a control or format character.')
+    expect(bad({ type: 'Local\nNode' })).toContain('from.type holds a control or format character.')
+    expect(bad({}, 'rio\u200fnet')).toContain('network holds a control or format character.')
+    expect(bad({ name: 'x'.repeat(10_000) })).toContain('from.name is longer than 200 characters.')
+    expect(bad({}, 'n'.repeat(201))).toContain('network is longer than 200 characters.')
+    expect(bad({ name: 'x'.repeat(200) })).toEqual([])
+    // a NUL cannot even be carried: whatever the YAML reader makes of it, nothing comes back
+    expect(parseRequest(requestText(make()).replace('Mesa Verde', 'Mesa\u0000Verde')).request).toBeNull()
+  })
   it('the requests ledger schema holds no person field, and refuses an invite that is not an invite id', () => {
     const s = loadSchema('federation-requests') as unknown as { additionalProperties: boolean, properties: Record<string, { pattern?: string }> }
     expect(s.additionalProperties).toBe(false)

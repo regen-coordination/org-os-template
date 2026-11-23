@@ -15,7 +15,7 @@ import type { FileOp } from '../changes/types.ts'
 import { runCommand } from '../resources/run.ts'
 import { readFederation } from '../../lib/federation/read.mjs'
 import { isPublicUrl } from '../../lib/federation/peers.mjs'
-import { buildRequest, requestText } from '../../lib/federation/request.mjs'
+import { buildRequest, parseRequest, requestText } from '../../lib/federation/request.mjs'
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
 import type { Runner } from '../resources/types.ts'
 import { transports } from './transports/index.ts'
@@ -114,6 +114,9 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       }
       const id = randomUUID()
       const request = buildRequest({ id, from: { name: ownName, type: ownType, url: ownUrl }, hub: { name: hub.name, url: hubAddress }, network, answers, now: now() })
+      // What the hub will refuse to read (a name too long, a control character) is said here, before anything is staged.
+      const readable = parseRequest(requestText(request))
+      if (!readable.request) throw new HttpError(400, readable.problems[0])
       // The policy's own checks, early, so the node is told before sending. An invite can't be checked here: the hub does.
       const join = hub.join
       const checkable = join && join.policy === 'invite' ? { ...join, policy: 'open-with-approval' } : join

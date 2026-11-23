@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { makeChangeRepo } from '../changes/fixtures.ts'
 import { removeFixtureRepo } from '../fixtures.ts'
@@ -24,13 +25,14 @@ import { mountProposals } from '../../server/proposals/routes.ts'
 import { readLedger } from '../../server/proposals/ledger.ts'
 import { ChangeStore } from '../../server/changes/store.ts'
 import { writeHubFiles } from '../../server/federation/ledger.ts'
-import { federationPollOperation, federationReplyOperation, hubRequests, inboxPut, listInbox, SENTENCES } from '../../server/federation/hub.ts'
+import { federationPollOperation, federationReplyOperation, hubRequests, inboxPut, label, listInbox, SENTENCES } from '../../server/federation/hub.ts'
 import { remoteCache, wellKnownUrlOf } from '../../server/federation/remote.ts'
 import { atprotoCache, readRepo } from '../../server/federation/atproto/read.ts'
 import { planPublish, publishLinksOperation, type PublishDeps } from '../../server/federation/atproto/publish.ts'
 import { LINK_NSID, PROFILE_NSID } from '../../lib/federation/links.mjs'
 import { buildRequest, hubPeerOf, requestText } from '../../lib/federation/request.mjs'
 import { makeInvite } from '../../lib/federation/invite.mjs'
+import { sha256Hex } from '../../lib/sha256.mjs'
 import { parseTrailers } from '../../lib/trailers.mjs'
 import { validateEntry } from '../../lib/data-validate.mjs'
 import { checkProposals } from '../../lib/proposals.mjs'
@@ -167,6 +169,17 @@ const runJob = async (opId: string, params: Record<string, unknown>) => {
 const fileList = () => git('ls-files').split('\n').filter(Boolean).sort()
 /** Whether any file committed at HEAD holds `s` (git grep exits 1 when nothing matches). */
 const inTree = (s: string): boolean => { try { git('grep', '-l', '-F', s, 'HEAD'); return true } catch { return false } }
+const SCRIPT = fileURLToPath(new URL('../../../../scripts/validate-governance.mjs', import.meta.url))
+/** validate:governance --strict over the commits after `base`: what the hub committed must validate clean. */
+const governance = (base: string) => {
+  const env: Record<string, string | undefined> = { ...process.env, CI: '' }
+  for (const k of ['GIT_DIR', 'GIT_INDEX_FILE', 'GIT_WORK_TREE']) delete env[k]
+  try { return { status: 0, out: execFileSync('node', [SCRIPT, repo, '--strict', '--range', `${base}..HEAD`], { env, stdio: 'pipe' }).toString() } }
+  catch (e) { const x = e as { status: number; stdout: Buffer; stderr: Buffer }; return { status: x.status, out: `${x.stdout}${x.stderr}` } }
+}
+/** No control or format character, one line, at most 100 characters + the sentence around it. */
+const shown = (s: string) => { expect(s).not.toMatch(/[\p{Cc}\p{Cf}]/u) }
+const reject = async (id: string) => { as('bruno'); const r = await post(`/api/proposals/${id}/close`, { outcome: 'rejected', text: 'no' }); as('steward-a'); return r }
 const ownCheck = async () => atprotoCache(repo).put(SELF, await readRepo(SELF, { fetch: net.fetch, lookup: net.lookup, now: NOW }), NOW)
 const issueBody = (text: string) => `Join request from Mesa Node for Mesh.\n\n\`\`\`yaml\n${text}\`\`\`\n`
 
@@ -208,16 +221,92 @@ describe('builds the hub change from fields, never from the file', () => {
 
   it('untrusted text reaches federation.yaml only as the validated fields', async () => {
     setup(null, OPEN('LD-2026-040'))
-    const sneaky = request({ from: { name: 'Mesa\npeers:\n  - evil' }, answers: { purpose: 'peers:\n  - { name: evil }', extra: 'IDENTITY.md' } })
+    const sneaky = request({ from: { name: 'Mesa: {peers: [evil]}' }, answers: { purpose: 'peers:\n  - { name: evil }', extra: 'IDENTITY.md' } })
     const [a] = await importText(requestText(sneaky))
     expect(a.outcome).toBe('accepted')
     expect(peers()).toHaveLength(1)
     expect(Object.keys(peers()[0]).sort()).toEqual(['decision', 'did', 'name', 'relationship', 'since', 'trust', 'type', 'url'])
-    expect(peers()[0].name).toBe('Mesa\npeers:\n  - evil')
+    expect(peers()[0].name).toBe('Mesa: {peers: [evil]}')
     expect(fedText()).not.toContain('{ name: evil }')
     expect(fedText()).not.toContain('IDENTITY.md')
     // the record keeps only the answers to the hub's asks
     expect(records()[0].answers).toEqual({ purpose: 'peers:\n  - { name: evil }' })
+  })
+})
+
+describe('untrusted names are refused at parse, and labelled wherever they are shown', () => {
+  it('ESC, RLO, NUL and a 10k-character name are unreadable, write nothing, and the answer shows none of them', async () => {
+    setup(null, OPEN('LD-2026-040'))
+    const before = head()
+    for (const name of ['Mesa\u001b[2J', 'Mesa\u202egnp.exe', 'x'.repeat(10_000)]) {
+      const [a] = await importText(requestText(request({ from: { name } })))
+      expect(a.outcome).toBe('unreadable')
+      shown(a.sentence)
+      expect(a.sentence.length).toBeLessThan(140)
+    }
+    const [n] = await importText(requestText(request()).replace('Mesa Node', 'Mesa\u0000Node'))
+    expect(n.outcome).toBe('unreadable')
+    expect(head()).toBe(before)
+    expect(records()).toEqual([])
+  })
+
+  it('label strips control and format characters and caps at 100', () => {
+    expect(label('Mesa\u001b[31m\u202eNode\u0000')).toBe('Mesa [31m Node')
+    expect(label('y'.repeat(500))).toHaveLength(100)
+  })
+})
+
+describe('validate:governance accepts the hub\'s commits under federation/join, and nothing more', () => {
+  const invited = () => {
+    const { record } = makeInvite({ name: 'Mesa Node', type: 'LocalNode', network: 'Mesh', expires: '2099-12-31', random: n => Uint8Array.from({ length: n }, (_, i) => (i * 7 + 3) % 256) })
+    return { ...record, token_sha256: sha256Hex(TOKEN) }
+  }
+
+  it('on a two-maintainer hub: a standing-decision acceptance and a refusal validate clean, with Org-Rule federation/join', async () => {
+    setup(TWO, OPEN('LD-2026-040'))
+    const base = head()
+    expect((await importText(requestText(request())))[0].outcome).toBe('accepted')
+    expect(parseTrailers(git('log', '-1', '--format=%B'))).toMatchObject({ actor: 'steward-a', rule: 'federation/join', decision: 'LD-2026-040' })
+    expect((await importText(requestText(request({ id: ID_B, from: { url: OTHER_URL }, answers: {} }))))[0].outcome).toBe('refused')
+    const v = governance(base)
+    expect(v.status, v.out).toBe(0)
+  })
+
+  it('on a two-maintainer hub: an invite acceptance validates clean', async () => {
+    setup(TWO, { policy: 'invite', asks: ['purpose'] })
+    write('data/invites.yaml', `invites:\n  - ${JSON.stringify(invited())}\n`)
+    commit('an invite') // before the range judged
+    const base = head()
+    expect((await importText(requestText(request({ invite: TOKEN }))))[0].outcome).toBe('accepted')
+    const v = governance(base)
+    expect(v.status, v.out).toBe(0)
+  })
+
+  it('a proposed request, its record and the ratify validate clean', async () => {
+    setup(TWO, APPROVAL)
+    const base = head()
+    const [a] = await importText(requestText(request()))
+    clock = new Date(NOW.getTime() + 60_000); as('bruno')
+    await post(`/api/proposals/${a.proposal}/events`, { kind: 'approve' })
+    expect((await post(`/api/proposals/${a.proposal}/ratify`, {})).status).toBe(200)
+    as('steward-a')
+    const v = governance(base)
+    expect(v.status, v.out).toBe(0)
+  })
+
+  it('a second peer smuggled into an acceptance is flagged', async () => {
+    setup(TWO, OPEN('LD-2026-040'))
+    const base = head()
+    await importText(requestText(request()))
+    // a hand commit dressed as the hub's: one record, and two peers
+    const fed = fedText().replace(/^peers:\n/m, `peers:\n  - { name: Smuggled, url: https://smuggled.example.org, trust: read, relationship: node, decision: LD-2026-040 }\n`)
+    write('federation.yaml', fed)
+    const reqs = readFileSync(join(repo, 'data', 'federation-requests.yaml'), 'utf8')
+    write('data/federation-requests.yaml', `${reqs}  - ${JSON.stringify({ ...records()[0], id: ID_B, ref: `file:${ID_B}`, from: { name: 'Other', type: 'LocalNode', url: OTHER_URL } })}\n`)
+    git('add', '-A'); git('commit', '-qm', 'federation: accept Other into Mesh', '-m', 'Org-Actor: steward-a\nOrg-Rule: federation/join\nOrg-Decision: LD-2026-040')
+    const v = governance(base)
+    expect(v.status, v.out).toBe(1)
+    expect(v.out).toMatch(/its Org-Rule is federation\/join, and it changes a peer entry other than the requesting instance's/)
   })
 })
 
@@ -254,7 +343,8 @@ describe('one case per outcome', () => {
   it('a network this hub does not list is refused', async () => {
     setup(null, OPEN('LD-2026-040'))
     const [a] = await importText(requestText(request({ network: 'Elsewhere' })))
-    expect(a).toMatchObject({ outcome: 'refused', sentence: 'Refused: This hub has no network "Elsewhere".' })
+    expect(a).toMatchObject({ outcome: 'refused', sentence: `Refused: ${SENTENCES.noNetwork}` })
+    expect(JSON.stringify(records())).not.toMatch(/reason[^,]*Elsewhere/)
     expect(peers()).toEqual([])
   })
 
@@ -320,6 +410,38 @@ describe('one case per outcome', () => {
     expect(new ChangeStore(repo).load('steward-a')?.ops).toEqual([mine])
   })
 
+  it('an instance listed in another role is refused, never merged into', async () => {
+    setup(null, OPEN('LD-2026-040'))
+    write('federation.yaml', fedText().replace('peers: []', `peers:\n  - { name: Mesa Hub, url: ${NODE_URL}, trust: read, relationship: hub }`)); commit('mesa is our hub')
+    const [a] = await importText(requestText(request()))
+    expect(a).toMatchObject({ outcome: 'refused', sentence: `Refused: ${SENTENCES.otherRole}` })
+    expect(peers()).toEqual([{ name: 'Mesa Hub', url: NODE_URL, trust: 'read', relationship: 'hub' }])
+  })
+
+  it('a member asking again under open-with-approval is told so, and no proposal of an unchanged file opens', async () => {
+    setup(TWO, APPROVAL)
+    write('federation.yaml', fedText().replace('peers: []', `peers:\n  - { name: Mesa Node, url: ${NODE_URL}, trust: read, relationship: node, decision: LD-2026-001 }`)); commit('mesa is a member')
+    const [a] = await importText(requestText(request()))
+    expect(a).toMatchObject({ outcome: 'refused', sentence: `Refused: ${SENTENCES.alreadyMember}` })
+    expect(existsSync(join(repo, 'data', 'proposals.yaml'))).toBe(false)
+  })
+
+  it('a proposal whose record never landed gets its record on the next receive, not a second proposal', async () => {
+    setup(TWO, APPROVAL)
+    writeFileSync(join(repo, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\ngit diff --cached --name-only | grep -q federation-requests && { echo "not now" >&2; exit 1; }\nexit 0\n', { mode: 0o755 })
+    const res = await post('/api/federation/requests/receive', { text: requestText(request()) })
+    expect(res.status).toBe(503)
+    expect(readLedger(repo).entries).toHaveLength(1)
+    expect(records()).toEqual([])
+    writeFileSync(join(repo, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    const [a] = await importText(requestText(request()))
+    expect(a).toMatchObject({ outcome: 'proposed', proposal: readLedger(repo).entries[0].id })
+    expect(readLedger(repo).entries).toHaveLength(1)
+    expect(records()[0]).toMatchObject({ outcome: 'proposed', proposal: readLedger(repo).entries[0].id })
+    const [again] = await importText(requestText(request()))
+    expect(again.outcome).toBe('already')
+  })
+
   it('a rejected or withdrawn proposal is a refused outcome', async () => {
     setup(TWO, APPROVAL)
     const [a] = await importText(requestText(request()))
@@ -361,6 +483,19 @@ describe('a solo hub holds the request for its operator', () => {
     expect(res.status).toBe(200)
     expect(records()[0]).toMatchObject({ outcome: 'refused', reason: 'Not this season.' })
     expect(git('diff', '--name-only', 'HEAD~1', 'HEAD').trim()).toBe('data/federation-requests.yaml')
+  })
+
+  it('accept is refused when the hub stopped taking requests, or no longer lists the network', async () => {
+    setup(null, APPROVAL)
+    await importText(requestText(request()))
+    write('federation.yaml', fedText().replace(/^join: .*$/m, 'join: { policy: closed }')); commit('closed')
+    const closed = await post(`/api/federation/requests/${ID_A}/decide`, { accept: true })
+    expect([closed.status, (await closed.json() as { error: string }).error]).toEqual([409, `Not accepted: ${SENTENCES.notTaking} Nothing was written.`])
+    write('federation.yaml', FED(APPROVAL).replace('{ name: Mesh, role: hub }', '{ name: Other, role: hub }')); commit('another network')
+    const gone = await post(`/api/federation/requests/${ID_A}/decide`, { accept: true })
+    expect([gone.status, (await gone.json() as { error: string }).error]).toEqual([409, `Not accepted: ${SENTENCES.noNetwork} Nothing was written.`])
+    expect(peers()).toEqual([])
+    expect(records()[0].outcome).toBe('held')
   })
 
   it('accept is refused when the rule is no longer direct', async () => {
@@ -546,16 +681,57 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
     expect(after.plan.delete.map(d => d.value)).toEqual([expect.objectContaining({ subject: NODE, relation: 'hasMember' })])
   })
 
+  const otherNode = plcDid('other-node')
+  const otherRequest = () => request({ id: ID_B, from: { name: 'Other', url: OTHER_URL } })
+  const cacheOther = () => remoteCache(repo).put(wellKnownUrlOf(OTHER_URL)!, { spec: 'org-os/federation/1', name: 'Other', did: otherNode }, NOW)
+  /** The plan resolves (there is a member to publish) and names the refused node nowhere. */
+  const planWithout = async () => {
+    const { plan, summary } = await planPublish(repo, pdeps())
+    expect(plan.create.map(c => c.record.subject)).toEqual([otherNode])
+    expect(JSON.stringify({ plan, summary })).not.toContain(NODE)
+    expect(net.writes).toEqual([])
+  }
+
   it('a refused request publishes nothing, ever: its node never appears in a plan', async () => {
-    setup(null, { policy: 'open', asks: ['purpose', 'portal'], decision: 'LD-2026-040' })
+    setup(null, OPEN('LD-2026-040'))
+    cacheOther()
+    await ownCheck()
+    const [a] = await importText(requestText(request({ answers: {} })))
+    expect(a.outcome).toBe('refused')
+    expect((await importText(requestText(otherRequest())))[0].outcome).toBe('accepted')
+    await planWithout()
+  })
+
+  it('a held request the operator refuses never appears in a plan', async () => {
+    setup(null, APPROVAL)
+    cacheOther()
+    await ownCheck()
+    await importText(requestText(request()))
+    await importText(requestText(otherRequest()))
+    expect((await post(`/api/federation/requests/${ID_A}/decide`, { accept: false, reason: 'Not now.' })).status).toBe(200)
+    expect((await post(`/api/federation/requests/${ID_B}/decide`, { accept: true })).status).toBe(200)
+    await planWithout()
+  })
+
+  it('a rejected proposal\'s node never appears in a plan', async () => {
+    // a vote, so a proposal can fail and be rejected
+    setup(TWO.replace('method: approve, count: 1', 'method: vote, window: PT1M, quorum: 1, threshold: 0.5'), APPROVAL)
+    cacheOther()
     await ownCheck()
     const [a] = await importText(requestText(request()))
-    expect(a.outcome).toBe('refused')
-    expect(net.writes).toEqual([])
-    const planned = await planPublish(repo, pdeps()).catch((e: Error) => e)
-    expect(JSON.stringify(planned instanceof Error ? planned.message : planned)).not.toContain(NODE)
-    expect(fileList()).not.toContain('data/proposals.yaml')
-    expect(net.writes).toEqual([])
+    const [b] = await importText(requestText(otherRequest()))
+    clock = new Date(NOW.getTime() + 10_000); as('bruno')
+    expect((await post(`/api/proposals/${a.proposal}/events`, { kind: 'vote', vote: 'no' })).status).toBe(200)
+    expect((await post(`/api/proposals/${b.proposal}/events`, { kind: 'vote', vote: 'yes' })).status).toBe(200)
+    clock = new Date(NOW.getTime() + 90_000)
+    const r = await reject(a.proposal!)
+    expect(r.status, JSON.stringify(await r.clone().json())).toBe(200)
+    expect(hubRequests(repo).find(h => h.record.id === ID_A)).toMatchObject({ outcome: 'refused', final: true })
+    as('bruno')
+    const rb = await post(`/api/proposals/${b.proposal}/ratify`, {})
+    expect(rb.status, JSON.stringify(await rb.clone().json())).toBe(200)
+    as('steward-a')
+    await planWithout()
   })
 })
 
