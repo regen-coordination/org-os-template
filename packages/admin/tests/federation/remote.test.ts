@@ -196,10 +196,12 @@ describe('federation.check-links', () => {
   const op = () => opById('federation.check-links')!
   const self = (): Resource => ({ id: 'instance:fixture-org', kind: 'instance', board: 'systems', name: 'x', status: null, attention: null, changed: null, facts: { self: true }, source: null })
 
-  it('is a confirmed network read, on the self card, with an address param and nothing else', () => {
+  it('is a confirmed network read, on the self card, with an address param (and, since Task 3, a did or a handle)', () => {
     expect(needsConfirm(op())).toBe(true)
     expect(op()).toMatchObject({ kinds: ['instance'], effect: 'reads', network: true, refreshes: 'fleet' })
-    expect(op().params).toEqual({ type: 'object', additionalProperties: false, properties: { address: { type: 'string', maxLength: 2048 } } })
+    expect(op().params).toEqual({ type: 'object', additionalProperties: false, properties: {
+      address: { type: 'string', maxLength: 2048 }, did: { type: 'string', maxLength: 2048 }, handle: { type: 'string', maxLength: 253 },
+    } })
     expect(CATALOGUE.filter(needsConfirm).map(o => o.id)).toContain('federation.check-links')
     expect(op().unavailable(self(), repo)).toBeNull()
     expect(op().unavailable({ ...self(), facts: {} }, repo)).toBe("offered on this instance's own card")

@@ -1,5 +1,5 @@
 import { lookup as dnsLookup } from 'node:dns'
-import { lookup as dnsLookupPromise } from 'node:dns/promises'
+import { lookup as dnsLookupPromise, resolveTxt as dnsResolveTxt } from 'node:dns/promises'
 import { request as httpsRequest, type RequestOptions } from 'node:https'
 import { isIP } from 'node:net'
 import type { FetchLike } from './systems/driver.ts'
@@ -141,4 +141,11 @@ export const networkFetch: FetchLike = async (url, init) => {
 export async function networkLookup(host: string): Promise<string[]> {
   if (process.env.VITEST) throw new Error(`no network in tests: DNS for ${host} (inject a fake lookup)`)
   return (await dnsLookupPromise(host, { all: true })).map(a => a.address)
+}
+
+/** The TXT records of a DNS name (an atproto handle's `_atproto.<handle>`). The third real network call; it refuses under
+ *  a test run for the same reason. */
+export async function networkResolveTxt(name: string): Promise<string[][]> {
+  if (process.env.VITEST) throw new Error(`no network in tests: DNS TXT for ${name} (inject a fake resolveTxt)`)
+  return dnsResolveTxt(name)
 }

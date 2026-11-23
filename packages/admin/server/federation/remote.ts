@@ -165,36 +165,43 @@ export function remoteCache(repo: string) {
   }
 }
 
-/** `federation.check-links`: with `address`, look that one hub up (and fail with the sentence when it is refused); without,
- *  look up every peer that has a url and no folder here. Writes only the cache. Private peers are counted, never named. */
-export async function checkLinks(repo: string, params: Record<string, unknown>, deps: GuardDeps, signal: AbortSignal, now: Date = new Date()): Promise<string> {
+/** What one part of a check did: its lines for the job's output, how many reads it tried and how many succeeded. */
+export interface CheckPart { lines: string[]; attempted: number; read: number }
+
+/** Every peer that has a url and no folder here: its federation.json read and cached. A peer that is private, or whose
+ *  url is not a public https address, is counted and never named. */
+export async function readPeerFiles(repo: string, deps: GuardDeps, signal: AbortSignal, now: Date = new Date()): Promise<CheckPart> {
   const cache = remoteCache(repo)
-  const one = async (address: string, label: string | null): Promise<string | null> => {
-    const url = wellKnownUrlOf(address)
-    const got = await fetchFederationJson(address, deps, signal)
-    if ('problem' in got) return `${label ? `${label}: ` : ''}${got.problem}`
-    cache.put(url as string, got.doc, now)
-    return null
-  }
-  const address = typeof params.address === 'string' && params.address.trim() !== '' ? params.address.trim() : null
-  if (address !== null) {
-    const problem = await one(address, null)
-    if (problem !== null) throw new Error(problem)
-    const doc = cache.get(wellKnownUrlOf(address) as string)?.doc
-    return `Read ${typeof doc?.name === 'string' ? doc.name : address}.\n`
-  }
   const peers = readFederation(readYamlObject(join(repo, 'federation.yaml'))).peers.filter(p => p.url !== null && p.ref === null)
-  // A peer that is private, or whose url is not a public https address, is counted and never named.
   const open = peers.filter(p => !p.private && wellKnownUrlOf(p.url as string) !== null)
   const hidden = peers.length - open.length
   const lines: string[] = []
   let read = 0
   for (const p of open) {
-    const problem = await one(p.url as string, p.name)
-    if (problem === null) { read += 1; lines.push(`${p.name}: read.`) } else lines.push(problem)
+    const url = wellKnownUrlOf(p.url as string) as string
+    const got = await fetchFederationJson(p.url as string, deps, signal)
+    if ('problem' in got) { lines.push(`${p.name}: ${got.problem}`); continue }
+    cache.put(url, got.doc, now)
+    read += 1
+    lines.push(`${p.name}: read.`)
   }
   if (hidden > 0) lines.push(`${hidden} private ${hidden === 1 ? 'peer was' : 'peers were'} not read (private, or without a public https url).`)
-  if (lines.length === 0) return 'No peer has only a url: nothing to look up.\n'
-  if (open.length > 0 && read === 0) throw new Error(lines.join('\n'))
-  return `${lines.join('\n')}\n`
+  return { lines, attempted: open.length, read }
+}
+
+/** `federation.check-links`, its federation.json part: with `address`, look that one hub up (and fail with the sentence
+ *  when it is refused); without, every peer that has a url and no folder here (`readPeerFiles`). Writes only the cache.
+ *  The operation itself runs `checkLinksAndRecords` (atproto/read.ts), which adds the atproto reads. */
+export async function checkLinks(repo: string, params: Record<string, unknown>, deps: GuardDeps, signal: AbortSignal, now: Date = new Date()): Promise<string> {
+  const address = typeof params.address === 'string' && params.address.trim() !== '' ? params.address.trim() : null
+  if (address !== null) {
+    const got = await fetchFederationJson(address, deps, signal)
+    if ('problem' in got) throw new Error(got.problem)
+    remoteCache(repo).put(wellKnownUrlOf(address) as string, got.doc, now)
+    return `Read ${typeof got.doc.name === 'string' ? got.doc.name : address}.\n`
+  }
+  const part = await readPeerFiles(repo, deps, signal, now)
+  if (part.lines.length === 0) return 'No peer has only a url: nothing to look up.\n'
+  if (part.attempted > 0 && part.read === 0) throw new Error(part.lines.join('\n'))
+  return `${part.lines.join('\n')}\n`
 }
