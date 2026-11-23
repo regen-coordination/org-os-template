@@ -19,7 +19,7 @@ import { buildRequest, parseRequest, requestText } from '../../lib/federation/re
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
 import type { Runner } from '../resources/types.ts'
 import { transports } from './transports/index.ts'
-import { decide, drainInbox, hubRequests, receive } from './hub.ts'
+import { decide, drainInbox, receive } from './hub.ts'
 import {
   askedText, cachedHub, clearState, outgoingPath, readState, recordedText, SENTENCES, trunkRequest, UUID, withdrawnText, writeState,
 } from './node.ts'
@@ -171,10 +171,8 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
 
   // ── the hub's side ──
 
-  app.get('/api/federation/requests', c => c.json(hubRequests(repo).map(h => ({
-    id: h.record.id, from: h.record.from, network: h.record.network, transport: h.record.transport, ref: h.record.ref, received: h.record.received,
-    outcome: h.outcome, final: h.final, sentence: h.sentence, replied: h.replied, ...(h.record.proposal ? { proposal: h.record.proposal } : {}),
-  }))))
+  // What the hub received is read from the resources (adapter `federation`, board `federation-requests`), never from a route of
+  // its own: the board is members-only and holds the held ids, the outcome and the received date.
 
   // With `text` (Import): that one request, as a file. Without: every request a poll put in the inbox.
   app.post('/api/federation/requests/receive', async c => {

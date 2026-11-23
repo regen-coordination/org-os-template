@@ -28,7 +28,7 @@ export const MAPS = Object.freeze(['organization', 'systems'])
 export const SECTION_IDS = Object.freeze(['projects', 'people', 'funding', 'partners', 'ideas', 'knowledge', 'meetings',
   'treasury', 'crew', 'modules', 'fleet', 'sources', 'systems'])
 /** The kinds a source may name ("*" is any): app/src/kinds.ts RESOURCE_KINDS (a test keeps the two equal). */
-export const RECORD_KINDS = Object.freeze(['person', 'project', 'idea', 'funding', 'partner', 'meeting', 'event', 'organization', 'task', 'knowledge-gaps', 'proposal',
+export const RECORD_KINDS = Object.freeze(['person', 'project', 'idea', 'funding', 'partner', 'meeting', 'event', 'organization', 'task', 'knowledge-gaps', 'proposal', 'federation-request',
   'knowledge', 'role', 'seat', 'module', 'instance', 'connector', 'source', 'channel', 'system'])
 /** The proposals a `proposals` block may read: GET /api/proposals, narrowed. */
 export const PROPOSAL_SOURCES = Object.freeze(['open', 'closed', 'mine', 'needs-me'])

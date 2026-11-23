@@ -9,7 +9,7 @@ import { renderAt } from '../test/render.tsx'
 import { baseRoutes, changeView, refuse } from '../test/data.ts'
 import { ViewAsProvider } from '../viewAs/ViewAs.tsx'
 import { FIXTURE_SOURCE, type Viewer } from '../viewAs/visibility.ts'
-import { CANON_FILE, GENERATED, LEDGER_FILE, RATIFY_FILE, wholeFileRefusal } from '../../../lib/workspace/editors.mjs'
+import { CANON_FILE, GENERATED, LEDGER_FILE, OWN_ROUTES_FILE, RATIFY_FILE, wholeFileRefusal } from '../../../lib/workspace/editors.mjs'
 import Tray from '../changes/Tray.tsx'
 import type { ChangeView, FileView } from '../api.ts'
 import FilePage, { FILE_CHANGED } from './FilePage.tsx'
@@ -87,6 +87,7 @@ describe('/files/* — the source editor', () => {
 
   it.each([
     ['data/proposals.yaml', 'ledger', '', LEDGER_FILE],
+    ['data/invites.yaml', 'own-routes', 'identity', OWN_ROUTES_FILE],
     ['DECISIONS.md', 'ratify', '', RATIFY_FILE],
     ['data/kb/encyclopedia-entry.yaml', 'knowledge', 'workspace', CANON_FILE],
   ])('%s (%s) is refused whole in the server’s words, with no Save (PF-R1 for the canon)', async (path, editor, cls, sentence) => {

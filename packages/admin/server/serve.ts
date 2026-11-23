@@ -488,7 +488,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         }, 200)
       }
       emit = broadcast
-      afterJob = op => { const known = opById(op); if (known) store.invalidateAdapter(known.refreshes); scheduleRefresh() }
+      afterJob = op => { const known = opById(op); if (known) for (const name of [known.refreshes].flat()) store.invalidateAdapter(name); scheduleRefresh() }
       const resourceWatcher = watchPaths(repo, store.watchPaths().filter(p => existsSync(join(repo, p))),
         rel => { if (store.invalidate(rel)) scheduleRefresh() })
       const crewPoll = setInterval(() => {

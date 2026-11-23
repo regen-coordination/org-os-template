@@ -43,6 +43,8 @@ export interface ParamsSchema {
   properties?: Record<string, Record<string, unknown>>; required?: string[]
 }
 
+export type Refreshed = 'records' | 'modules' | 'crew' | 'fleet' | 'sources' | 'federation'
+
 export interface Operation {
   id: string
   kinds: Kind[]
@@ -58,7 +60,7 @@ export interface Operation {
   /** `ctx.startBranch` is the branch the server started on (the trunk when governance names none). A plan may be async. */
   plan: (r: Resource, params: Record<string, unknown>, repo: string, ctx?: { startBranch?: string }) => Planned | InProcess | Promise<Planned | InProcess>
   /** The adapter to read again when a job ends, because what it shows may have changed. */
-  refreshes: 'records' | 'modules' | 'crew' | 'fleet' | 'sources'
+  refreshes: Refreshed | Refreshed[]
 }
 
 /** The server asks for a confirmation (a planned nonce) before anything that changes a file or

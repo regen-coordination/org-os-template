@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { stringify } from 'yaml'
-import { api, type DecisionRow } from '../api.ts'
+import { api, type DecisionRow, type ProposalView } from '../api.ts'
 import { PageHead } from '../design/PageHead.tsx'
 import { Section } from '../design/Section.tsx'
 import { Empty, EmptyWhen } from '../design/Empty.tsx'
@@ -88,6 +88,10 @@ export default function Governance({ part }: { part: string }) {
   const shown = (proposals.data ?? []).flatMap(p => { const v = shownFor(p, resources.data, viewer, sees); return v ? [v] : [] })
   const openOnes = shown.filter(p => p.state === 'open')
   const closedOnes = shown.filter(p => p.state !== 'open')
+  // Network N2 Task 10: an open proposal built from a join request is listed on its own, first, and not again below.
+  const cameFromOutside = (p: ProposalView) => (p as { origin?: { kind?: unknown } }).origin?.kind === 'federation-request'
+  const outsideOnes = openOnes.filter(cameFromOutside)
+  const insideOnes = openOnes.filter(p => !cameFromOutside(p))
   const counted = proposals.data !== undefined
   const v = g.data
   // Previewed as Public, the page shows what the portal would, failing closed (L4-R13, R-L5-13.3): never the problems,
@@ -145,6 +149,12 @@ export default function Governance({ part }: { part: string }) {
       {g.error ? <Note state="error">{g.error.message}</Note> : !v ? <Skeleton rows={4} shape="row" label={TABS.find(t => t.id === tab)!.label} /> : (
       <div className="gov-panel" role="tabpanel" aria-label={TABS.find(t => t.id === tab)!.label} id={`gov-${tab}`}>
         {tab === 'proposals' && (
+          <>
+          {outsideOnes.length > 0 && (
+            <Section label="From outside" count={outsideOnes.length}>
+              <DataList label="Proposals from outside">{outsideOnes.map(p => <ProposalRow key={String(p.id)} view={p} now={now} actor={me} />)}</DataList>
+            </Section>
+          )}
           <Section label="Proposals">
             {proposals.error ? <Note state="error">{proposals.error.message}</Note>
               : !counted ? <DataList label="Open proposals" loading={2}>{null}</DataList>
@@ -152,8 +162,10 @@ export default function Governance({ part }: { part: string }) {
                   ? <Empty>{allDirect
                     ? "None open. Under the rule in force every change applies directly; a proposal opens when a rule asks for someone else's say."
                     : "None open. A proposal opens when a change needs someone else's say under the rules in force."}</Empty>
-                  : <DataList label="Open proposals">{openOnes.map(p => <ProposalRow key={String(p.id)} view={p} now={now} actor={me} />)}</DataList>}
+                  : insideOnes.length === 0 ? <Empty>Nothing else is open.</Empty>
+                    : <DataList label="Open proposals">{insideOnes.map(p => <ProposalRow key={String(p.id)} view={p} now={now} actor={me} />)}</DataList>}
           </Section>
+          </>
         )}
 
         {tab === 'decisions' && (

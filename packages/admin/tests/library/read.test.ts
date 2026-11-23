@@ -20,10 +20,10 @@ describe('the framework shelf (Q6 answered as the design recommends, §4.9)', ()
   const entries = loadEntries()
   const ids = entries.map(e => e.id)
 
-  it('lists the 16 built-in boards as Built in: previewable, not installable', () => {
+  it('lists the 17 built-in boards as Built in: previewable, not installable', () => {
     const builtin = entries.filter(e => e.builtin)
     expect(builtin.map(e => e.id)).toEqual(builtinBoards().map(b => `board:${b.id}`))
-    expect(builtin).toHaveLength(16)
+    expect(builtin).toHaveLength(17)
     for (const e of builtin) { expect(e.shelf).toBe('board'); expect(e.installs ?? []).toEqual([]) }
   })
 

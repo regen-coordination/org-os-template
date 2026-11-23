@@ -127,6 +127,31 @@ describe('Governance', () => {
     expect(await screen.findByText('No decision "ld-2026-034" in DECISIONS.md.')).toBeTruthy()
   })
 
+  it('lists the proposals that came from a join request first, as From outside, and not again below (network N2 Task 10)', async () => {
+    const outside = proposalView({ id: 'p-2026-10-16-001', title: 'Let Mesa Node join Mesh', needsYou: false,
+      origin: { kind: 'federation-request', request: '3f8a2c1e-5b7d-4e9a-8c10-2d6f4a9b7e31', from: 'Mesa Node' } } as Partial<ProposalView>)
+    const inside = proposalView({ id: 'p-2026-10-16-002', title: 'Move the garden seat to the board' })
+    fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view(), 'GET /api/proposals': [inside, outside] })
+    renderAt(<Governance part="proposals" />)
+    const from = await screen.findByRole('region', { name: 'From outside' })
+    expect(within(from).getByText('Let Mesa Node join Mesh')).toBeTruthy()
+    expect(within(from).queryByText('Move the garden seat to the board')).toBeNull()
+    const main = screen.getByRole('region', { name: 'Proposals' })
+    expect(within(main).getByText('Move the garden seat to the board')).toBeTruthy()
+    expect(within(main).queryByText('Let Mesa Node join Mesh')).toBeNull()
+    expect(screen.getAllByText('Let Mesa Node join Mesh')).toHaveLength(1)
+    // From outside comes first
+    const regions = screen.getAllByRole('region').map(r => r.getAttribute('aria-label'))
+    expect(regions.indexOf('From outside')).toBeLessThan(regions.indexOf('Proposals'))
+  })
+
+  it('draws no From outside group when no open proposal came from a request', async () => {
+    fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view(), 'GET /api/proposals': [proposalView({ id: 'p-2026-10-16-003' })] })
+    renderAt(<Governance part="proposals" />)
+    await screen.findByRole('region', { name: 'Proposals' })
+    expect(screen.queryByRole('region', { name: 'From outside' })).toBeNull()
+  })
+
   it('says what will open a proposal, and no longer says it arrives with P2', async () => {
     fetchRoutes({ ...baseRoutes(), 'GET /api/governance': view(), 'GET /api/proposals': [] })
     renderAt(<Governance part="proposals" />)

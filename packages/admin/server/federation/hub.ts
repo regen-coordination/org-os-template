@@ -188,7 +188,7 @@ export function readReplied(repo: string, id: string): { at: string; ref: string
     return typeof v.at === 'string' && typeof v.ref === 'string' ? { at: v.at, ref: v.ref } : null
   } catch { return null }
 }
-const writeReplied = (repo: string, id: string, receipt: { at: string; ref: string }): void => writeAtomic(repliedDir(repo), `${id}.json`, receipt)
+export const writeReplied = (repo: string, id: string, receipt: { at: string; ref: string }): void => writeAtomic(repliedDir(repo), `${id}.json`, receipt)
 
 // ── the hub's edit of federation.yaml ─────────────────────────────────────────────────────────────
 
@@ -429,7 +429,7 @@ export function federationPollOperation(deps: HubOpsDeps = {}): Operation {
   const run = deps.run ?? runCommand
   return {
     id: 'federation.poll', kinds: ['instance'], label: () => 'Check for requests', effect: 'reads', network: true,
-    timeoutMs: 120 * SEC, refreshes: 'fleet',
+    timeoutMs: 120 * SEC, refreshes: ['fleet', 'federation'],
     params: { type: 'object', additionalProperties: false },
     unavailable: (r, repo) => ownCard(r) ?? (whereNow(repo) ? null : SENTENCES.noWhere),
     plan: async (_r, _params, repo, ctx): Promise<InProcess> => {
@@ -463,7 +463,7 @@ export function federationReplyOperation(deps: HubOpsDeps = {}): Operation {
   const now = deps.now ?? (() => new Date())
   return {
     id: 'federation.reply', kinds: ['instance'], label: () => 'Tell them the outcome', effect: 'changes', network: true,
-    timeoutMs: 60 * SEC, refreshes: 'fleet',
+    timeoutMs: 60 * SEC, refreshes: ['fleet', 'federation'],
     params: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: UUID_PARAM } },
     variants: (r): Variant[] => (Array.isArray(r.facts.toReply) ? r.facts.toReply as { id: string; from: string; outcome: string }[] : [])
       .map(t => ({ label: `Tell ${t.from}: ${t.outcome}`, params: { id: t.id }, unavailable: null })),

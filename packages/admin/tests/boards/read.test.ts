@@ -10,7 +10,7 @@ describe('the built-in boards (P4 §5.2)', () => {
   const boards = builtinBoards()
   it('are the home board, one per section and the two maps, in menu order', () => {
     expect(boards.map(b => b.id)).toEqual(BUILTIN_ORDER)
-    expect(BUILTIN_ORDER).toEqual(['home', ...SECTION_IDS.map(sectionBoardId), 'organization', 'systems'])
+    expect(BUILTIN_ORDER).toEqual(['home', ...SECTION_IDS.map(sectionBoardId), 'organization', 'systems', 'federation-requests'])
   })
   it('are each in a file named after its id', () => {
     expect(readdirSync(BUILTIN_DIR).filter(f => f.endsWith('.yaml')).sort()).toEqual(BUILTIN_ORDER.map(id => `${id}.yaml`).sort())
