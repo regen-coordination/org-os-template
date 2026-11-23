@@ -1230,7 +1230,10 @@ function judgeCommit(c, at, via = null) {
   // files alone, records one request, and admits a node only under join.decision or an invite it uses
   // (lib/federation/join-rule.mjs). Otherwise it is said why, and the commit is judged as any other.
   if (trailers.rule === JOIN_RULE && c.parents.length === 1) {
-    const why = joinProblem(c, trailers.decision);
+    // Its actor is a member at the parent, as every other rule asks, before anything else is weighed.
+    const why = actor.id === null ? `${nobodyMade(actor)}, and a hub's act on a join request is a member's`
+      : !members.some((m) => String(m.id) === actor.id) ? `its actor ${actor.id} is no member in data/members.yaml at its parent, and a hub's act on a join request is a member's`
+      : joinProblem(c, trailers.decision);
     if (why === null) return;
     findings.push({ unit: 'history', level: strict ? 'error' : 'warn', text: `${who}: its Org-Rule is ${JOIN_RULE}, and ${why}.` });
   }
@@ -1420,12 +1423,12 @@ function ownerClaimProblem(c, at) {
  *  hub files read at its parent and at the commit, judged by `joinCommitProblem`. */
 function joinProblem(c, decision) {
   const read = (rev, rel) => documentOf(show(rev, rel));
-  const at = (rev) => ({ fed: read(rev, 'federation.yaml'), requests: read(rev, 'data/federation-requests.yaml'), invites: read(rev, 'data/invites.yaml') });
+  const at = (rev) => ({ fed: read(rev, 'federation.yaml'), requests: read(rev, 'data/federation-requests.yaml'), invites: read(rev, 'data/invites.yaml'), proposals: read(rev, LEDGER) });
   const before = at(c.parents[0]);
   const after = at(c.hash);
   const unread = [...Object.entries(before), ...Object.entries(after)].find(([, doc]) => doc === null);
   if (unread) return `one of the hub's files cannot be read as one YAML mapping (${unread[0]})`;
-  return joinCommitProblem({ files: c.files, decision, before, after });
+  return joinCommitProblem({ files: c.files, decision, date: c.date, before, after });
 }
 
 /**

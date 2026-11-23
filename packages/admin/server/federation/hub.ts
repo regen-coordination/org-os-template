@@ -67,9 +67,11 @@ const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim()
 /** Text from a request as it may appear in a commit subject, a proposal title, a sentence or a reply: control and format
  *  characters (ESC, NUL, RLO and the other bidi marks) removed, one line, at most 100 characters. parseRequest already
  *  refuses them in the fields this names; this is the second wall, for every place untrusted text is shown. */
-export function label(s: unknown): string {
-  const clean = oneLine(String(s ?? '').replace(/[\p{Cc}\p{Cf}]/gu, ' '))
-  return clean.length > 100 ? `${clean.slice(0, 99)}…` : clean
+export function label(s: unknown, max = 100): string {
+  const clean = oneLine(String(s ?? '').replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, ' '))
+  // by code points, so a character outside the BMP (an emoji) is never cut in half
+  const points = Array.from(clean)
+  return points.length > max ? `${points.slice(0, max - 1).join('')}…` : clean
 }
 
 // ── the records ────────────────────────────────────────────────────────────────────────────────────
@@ -135,7 +137,7 @@ export function hubRequests(repo: string): HubRequest[] {
 
 /** What the asker is told: a welcome, or the reason. One line; it goes after `Accepted: ` or `Refused: `. */
 export function replySentence(h: Pick<HubRequest, 'outcome' | 'reason' | 'record'>): string {
-  return h.outcome === 'accepted' ? `Welcome to ${label(h.record.network)}.` : oneLine(String(h.reason ?? 'Refused.').replace(/[\p{Cc}\p{Cf}]/gu, ' ')).slice(0, 200)
+  return h.outcome === 'accepted' ? `Welcome to ${label(h.record.network)}.` : label(h.reason ?? 'Refused.', 200)
 }
 
 /** The self card's `facts.toReply`: final outcomes not yet told, whose transport can reply. */
@@ -237,6 +239,22 @@ async function trunkInvites(repo: string, trunk: string): Promise<Invite[]> {
 const fedOp = (repo: string, text: string): FileOp => ({ op: 'file', path: FED, text, base: fileBase(repo, FED) })
 const ruleFor = (repo: string, actor: KnownActor, op: FileOp) => effectiveRule(readRuleContext(repo, actor), classesOf([op], repo), targetsOfOps([op], repo))
 
+/** The record a proposal opened for request `id` stands for, rebuilt from the proposal alone (its staged peer and the
+ *  hub's network), for when its record never landed. Null when the proposal stages no such peer. */
+function recordOfProposal(p: Proposal, id: string, fed: { networks: { name: string; role?: string | null }[] }, base: RequestRecord): RequestRecord | null {
+  const op = (p.ops as { op?: string; path?: string; text?: string | null }[]).find(o => o.op === 'file' && o.path === FED && typeof o.text === 'string')
+  if (!op) return null
+  let doc: unknown
+  try { doc = parse(op.text as string) } catch { return null }
+  const staged = (doc as { peers?: unknown } | null)?.peers
+  const peer = Array.isArray(staged) ? staged.find(x => x && typeof x === 'object' && (x as Record<string, unknown>).decision === `request ${id}`) as Record<string, unknown> | undefined : undefined
+  if (!peer || typeof peer.name !== 'string' || typeof peer.type !== 'string' || typeof peer.url !== 'string') return null
+  const hubs = fed.networks.filter(n => n.role === 'hub')
+  const network = hubs.length === 1 ? hubs[0].name : fed.networks.length === 1 ? fed.networks[0].name : null
+  if (network === null) return null
+  return { ...base, from: { name: peer.name, type: peer.type, url: peer.url }, network, answers: {}, outcome: 'proposed', proposal: String(p.id) }
+}
+
 /** Receives one request. The caller holds the write lock. A request that can't be read, or was received before, writes
  *  nothing; every other one is recorded in the hub's git under the outcome its join policy gives. Every commit names
  *  `Org-Rule: federation/join` (lib/federation/join-rule.mjs): the hub's policy is the authority, not the importer's rule. */
@@ -266,7 +284,11 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
   const opened = readLedger(repo).entries.find(p => (p.origin as { request?: unknown } | undefined)?.request === request.id)
   if (opened) {
     const proposal = String(opened.id)
-    const { commit } = await writeHubFiles(repo, [recorded({ ...base, outcome: 'proposed', proposal })],
+    // The record is the proposal's, not this text's: its asker is the peer the proposal stages (`decision: request <id>`),
+    // and its network the hub's own. What this import says beyond its id and ref is not taken.
+    const missing = recordOfProposal(opened, request.id, trunk.fed, base)
+    if (!missing) throw new HttpError(409, `Not received: proposal ${proposal} is open for this request, but its record can't be rebuilt from it. Record it by hand.`)
+    const { commit } = await writeHubFiles(repo, [recorded(missing)],
       `federation: ${name}'s request to join ${network} is proposed as ${proposal}`, trailers(), ident, opts)
     return { ref, outcome: 'proposed', sentence: `Proposed as ${proposal}: ${name} joins ${network} once it is ratified.`, proposal, commit }
   }
@@ -348,7 +370,7 @@ export async function decide(repo: string, actor: KnownActor, id: string, choice
     return ruleIds(ctx, classes, targets).map(r => `${r}/direct`).join(',')
   }
   if (!choice.accept) {
-    const reason = label(choice.reason ?? '').slice(0, 200)
+    const reason = label(choice.reason ?? '', 200)
     if (reason === '') throw new HttpError(400, SENTENCES.reasonNeeded)
     const rule = direct(fedOp(repo, fileText(repo, FED) ?? ''), 'refused')
     const { commit } = await writeHubFiles(repo, [updated({ ...record, outcome: 'refused', reason })],
@@ -359,6 +381,10 @@ export async function decide(repo: string, actor: KnownActor, id: string, choice
   if ('problem' in trunk) throw new HttpError(409, `Not accepted: ${trunk.problem}`)
   if (!trunk.fed.join || trunk.fed.join.policy === 'closed') throw new HttpError(409, `Not accepted: ${SENTENCES.notTaking} Nothing was written.`)
   if (!trunk.fed.networks.some(n => n.name === record.network)) throw new HttpError(409, `Not accepted: ${SENTENCES.noNetwork} Nothing was written.`)
+  // What may have changed since it was held: the instance listed in another role, or already a member another way.
+  const listed = trunk.fed.peers.find(p => normUrl(p.url) === normUrl(record.from.url))
+  if (listed && listed.relationship !== 'node') throw new HttpError(409, `Not accepted: ${SENTENCES.otherRole} Nothing was written.`)
+  if (listed && listed.decision) throw new HttpError(409, `Not accepted: ${SENTENCES.alreadyMember} Nothing was written.`)
   const decision = `request ${id}`
   // The peer is built from the record's validated fields, as the request held them when it was received.
   const request = { from: record.from, created: record.received, network: record.network } as FederationRequest

@@ -65,6 +65,8 @@ describe('federation request', () => {
     expect(bad({ name: 'Mesa\u202eedreV' })).toContain('from.name holds a control or format character.')
     expect(bad({ type: 'Local\nNode' })).toContain('from.type holds a control or format character.')
     expect(bad({}, 'rio\u200fnet')).toContain('network holds a control or format character.')
+    expect(bad({ name: 'Mesa\u2028Verde' })).toContain('from.name holds a control or format character.')
+    expect(bad({}, 'rio\u2029net')).toContain('network holds a control or format character.')
     expect(bad({ name: 'x'.repeat(10_000) })).toContain('from.name is longer than 200 characters.')
     expect(bad({}, 'n'.repeat(201))).toContain('network is longer than 200 characters.')
     expect(bad({ name: 'x'.repeat(200) })).toEqual([])

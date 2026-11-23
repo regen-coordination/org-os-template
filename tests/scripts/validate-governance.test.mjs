@@ -505,10 +505,10 @@ const memberPeer = (decision) => ({ name: 'Mesa Node', url: NODE_URL, type: 'Loc
 const JOIN_TRAILERS = (decision) => `\n\nOrg-Actor: ana\nOrg-Rule: federation/join${decision ? `\nOrg-Decision: ${decision}` : ''}`;
 
 /** A hub at `join` (and these extra files), then one commit of `files` under federation/join. */
-function hubAct({ join, start = {}, files, decision, subject = 'federation: accept Mesa Node into Mesh' }) {
+function hubAct({ join, start = {}, files, decision, subject = 'federation: accept Mesa Node into Mesh', who }) {
   const root = repo();
   commit(root, { 'data/members.yaml': MEMBERS, 'data/governance.yaml': JOIN_GOV, 'federation.yaml': hubFed(join), ...start }, 'start');
-  commit(root, files, `${subject}${JOIN_TRAILERS(decision)}`);
+  commit(root, files, `${subject}${JOIN_TRAILERS(decision)}`, who);
   return root;
 }
 
@@ -551,4 +551,19 @@ test('federation/join: a smuggled second peer, a decision the parent never made,
   const o = run([other, '--strict']);
   assert.equal(o.status, 1, o.stdout + o.stderr);
   assert.match(o.stdout, /its Org-Rule is federation\/join, and it changes data\/projects\.yaml, where a hub's act on a join request changes only/);
+});
+
+test('federation/join (fix round 2): a peer of another shape, or an act by no member, is flagged', () => {
+  const join = { policy: 'open', decision: 'LD-2026-040' };
+  const laundered = hubAct({ join, decision: 'LD-2026-040', files: {
+    'federation.yaml': hubFed(join, [{ ...memberPeer('anything'), trust: 'full', relationship: 'upstream', write: true }]),
+    'data/federation-requests.yaml': requests(record({ decision: 'LD-2026-040' })),
+  } });
+  const l = run([laundered, '--strict']);
+  assert.equal(l.status, 1, l.stdout + l.stderr);
+  assert.match(l.stdout, /its Org-Rule is federation\/join, and its new peer entry carries write, which a hub's acceptance never writes/);
+  const stranger = hubAct({ join, subject: 'federation: refuse', who: 'stranger@example.org', files: { 'data/federation-requests.yaml': requests(record({ outcome: 'refused', reason: 'no' })) } });
+  const st = run([stranger, '--strict']);
+  assert.equal(st.status, 1, st.stdout + st.stderr);
+  assert.match(st.stdout, /its Org-Rule is federation\/join, and no member of data\/members\.yaml commits with that address, and a hub's act on a join request is a member's/);
 });

@@ -250,9 +250,14 @@ describe('untrusted names are refused at parse, and labelled wherever they are s
     expect(records()).toEqual([])
   })
 
-  it('label strips control and format characters and caps at 100', () => {
+  it('label strips control and format characters and the line separators, caps at 100, and never splits a surrogate pair', () => {
     expect(label('Mesa\u001b[31m\u202eNode\u0000')).toBe('Mesa [31m Node')
+    expect(label('Mesa\u2028Node\u2029')).toBe('Mesa Node')
     expect(label('y'.repeat(500))).toHaveLength(100)
+    const emoji = label('🌱'.repeat(150))
+    expect(Array.from(emoji)).toHaveLength(100)
+    expect(emoji).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/)
+    expect(Array.from(label('z'.repeat(300), 200))).toHaveLength(200)
   })
 })
 
@@ -434,10 +439,13 @@ describe('one case per outcome', () => {
     expect(readLedger(repo).entries).toHaveLength(1)
     expect(records()).toEqual([])
     writeFileSync(join(repo, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
-    const [a] = await importText(requestText(request()))
+    // the same id, now claiming another name and network: the record is rebuilt from the proposal, not from this text
+    const [a] = await importText(requestText(request({ from: { name: 'Someone Else' }, network: 'Elsewhere' })))
     expect(a).toMatchObject({ outcome: 'proposed', proposal: readLedger(repo).entries[0].id })
     expect(readLedger(repo).entries).toHaveLength(1)
-    expect(records()[0]).toMatchObject({ outcome: 'proposed', proposal: readLedger(repo).entries[0].id })
+    expect(records()[0]).toMatchObject({ outcome: 'proposed', proposal: readLedger(repo).entries[0].id, from: { name: 'Mesa Node', url: NODE_URL }, network: 'Mesh', answers: {} })
+    const v = governance(git('rev-list', '--max-parents=0', 'HEAD').trim().split('\n')[0])
+    expect(v.out).not.toContain('federation/join, and')
     const [again] = await importText(requestText(request()))
     expect(again.outcome).toBe('already')
   })
@@ -496,6 +504,25 @@ describe('a solo hub holds the request for its operator', () => {
     expect([gone.status, (await gone.json() as { error: string }).error]).toEqual([409, `Not accepted: ${SENTENCES.noNetwork} Nothing was written.`])
     expect(peers()).toEqual([])
     expect(records()[0].outcome).toBe('held')
+  })
+
+  it('accept is refused when the instance is now listed in another role, or is already a member', async () => {
+    setup(null, APPROVAL)
+    await importText(requestText(request()))
+    write('federation.yaml', fedText().replace('peers: []', `peers:\n  - { name: Mesa, url: ${NODE_URL}, trust: read, relationship: hub }`)); commit('mesa is our hub now')
+    const other = await post(`/api/federation/requests/${ID_A}/decide`, { accept: true })
+    expect([other.status, (await other.json() as { error: string }).error]).toEqual([409, `Not accepted: ${SENTENCES.otherRole} Nothing was written.`])
+    write('federation.yaml', FED(APPROVAL).replace('peers: []', `peers:\n  - { name: Mesa, url: ${NODE_URL}, trust: read, relationship: node, decision: LD-2026-001 }`)); commit('mesa joined another way')
+    const member = await post(`/api/federation/requests/${ID_A}/decide`, { accept: true })
+    expect([member.status, (await member.json() as { error: string }).error]).toEqual([409, `Not accepted: ${SENTENCES.alreadyMember} Nothing was written.`])
+    expect(records()[0].outcome).toBe('held')
+  })
+
+  it('a refusal reason is kept to 200 characters', async () => {
+    setup(null, APPROVAL)
+    await importText(requestText(request()))
+    expect((await post(`/api/federation/requests/${ID_A}/decide`, { accept: false, reason: 'r'.repeat(300) })).status).toBe(200)
+    expect(Array.from(String(records()[0].reason))).toHaveLength(200)
   })
 
   it('accept is refused when the rule is no longer direct', async () => {

@@ -20,8 +20,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const TOP = ['spec', 'id', 'created', 'from', 'hub', 'network', 'answers', 'invite']
 /** The longest a name, a type or a network may be: they end up in commit subjects, titles and public replies. */
 export const LABEL_MAX = 200
-/** Control and format characters (ESC, NUL, line breaks, RLO and the other bidi marks): never in a name, type or network. */
-const CONTROL = /[\p{Cc}\p{Cf}]/u
+/** Control and format characters (ESC, NUL, line breaks, RLO and the other bidi marks) and the line and paragraph
+ *  separators (U+2028, U+2029): never in a name, type or network. */
+const CONTROL = /[\p{Cc}\p{Cf}\u2028\u2029]/u
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
 const isObj = v => typeof v === 'object' && v !== null && !Array.isArray(v)

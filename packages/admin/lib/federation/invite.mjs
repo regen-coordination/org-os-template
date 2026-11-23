@@ -24,7 +24,7 @@ export function makeInvite({ name, type, network, expires, random }) {
 }
 
 /** The end of the expiry: a bare date is good through that whole day.  @param {string} expires @returns {number} */
-const expiryTime = expires => new Date(/^\d{4}-\d{2}-\d{2}$/.test(expires) ? `${expires}T23:59:59.999Z` : expires).getTime()
+export const expiryTime = expires => new Date(/^\d{4}-\d{2}-\d{2}$/.test(expires) ? `${expires}T23:59:59.999Z` : expires).getTime()
 
 /** @param {readonly Invite[]} invites @param {string | undefined} token @param {{ from: { type: string } }} request
  *  @param {string | Date} now @returns {{ invite: Invite } | { problem: string }} */
