@@ -7,9 +7,7 @@ import { readFileSync } from 'node:fs'
 import { stateDir } from '../../state.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import { readFederation } from '../../../lib/federation/read.mjs'
-import { selfAddresses, linkState, addressOf, sameAddress, isPublicUrl } from '../../../lib/federation/peers.mjs'
-import { nodePeerIO } from '../../federation-io.ts'
-import { remoteCache, wellKnownUrlOf } from '../../federation/remote.ts'
+import { linkStatesOf, selfAddressesOf, type PeerLinkState } from '../../federation/link-state.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
 
 /** A clone on this machine, or null: only a folder holding a git repository counts. */
@@ -22,15 +20,26 @@ const clone = (repo: string, ref: string | null): string | null => {
 const LINK_STATUS: Record<string, { status: string; attention: Resource['attention'] }> = {
   mutual: { status: 'mutual', attention: null },
   claimed: { status: 'claimed', attention: { level: 'warn', text: 'Only this side lists the link. Ask them to add this instance.' } },
+  requested: { status: 'requested', attention: null },
+  left: { status: 'left', attention: { level: 'warn', text: 'They no longer list this instance.' } },
   'not-an-instance': { status: 'a repo, not an instance', attention: { level: 'warn', text: 'This is a repo, not an org-os instance. Map it as a System.' } },
   unknown: { status: 'not checked', attention: null },
 }
 
-/** How a link reads on its card. An `unknown` with a path means a folder was looked at: what was found there is said. */
-const shownLink = (link: { state: string; path: string | null; reason: string | null }) => {
-  if (link.state !== 'unknown' || !link.path || !link.reason) return LINK_STATUS[link.state]
-  const text = `${link.reason.charAt(0).toUpperCase()}${link.reason.slice(1)}`.replace(/\.?$/, '.')
-  return { status: "can't read their side", attention: { level: 'warn' as const, text } }
+const UNREAD: PeerLinkState = { relation: null, state: 'unknown', sources: { files: 'unknown', atproto: 'unknown', checked: null },
+  drift: [], reason: "can't read their side from here", path: null, failed: false }
+
+/** How a link reads on its card.
+ *  - A record of ours that federation.yaml no longer allows is the urgent case: its words are the attention.
+ *  - An `unknown` where a folder was looked at, or their records could not be read, says what was found. */
+const shownLink = (link: PeerLinkState) => {
+  const base = LINK_STATUS[link.state] ?? LINK_STATUS.unknown
+  const looked = link.state === 'unknown' && link.reason && (link.path || link.failed)
+  const shown = looked
+    ? { status: "can't read their side", attention: { level: 'warn' as const, text: `${link.reason!.charAt(0).toUpperCase()}${link.reason!.slice(1)}`.replace(/\.?$/, '.') } }
+    : base
+  const urgent = link.drift.find(d => d.urgent)
+  return urgent ? { status: shown.status, attention: { level: 'warn' as const, text: urgent.text } } : shown
 }
 
 /** The peers list readFederation reads: the top-level one, else one nested under `federation:` (the v3 shape). */
@@ -38,15 +47,6 @@ const peersOf = (fed: Record<string, unknown>): unknown => {
   if (fed.peers !== undefined) return fed.peers
   const nested = fed.federation
   return nested && typeof nested === 'object' && !Array.isArray(nested) ? (nested as Record<string, unknown>).peers : undefined
-}
-
-/** The URL column of `git remote -v`, de-duplicated; none when git fails. */
-const remoteUrls = async (ctx: Parameters<Adapter['read']>[0]): Promise<string[]> => {
-  try {
-    const r = await ctx.run('git', ['remote', '-v'], { cwd: ctx.repo, timeoutMs: 5000 })
-    if (r.code !== 0) return []
-    return [...new Set(r.stdout.split('\n').map(l => l.split(/\s+/)[1]).filter(Boolean))]
-  } catch { return [] }
 }
 
 /** What the doctor found when the launcher opened this instance (`doctor.json` in its state folder), as attention; null when it found nothing or was never run. */
@@ -95,38 +95,28 @@ export const fleet: Adapter = {
         })
         edges.push({ from: `instance:${id}`, to: self.id, kind: 'federation' })
       }
-    } else if (Array.isArray(peersOf(fed))) {
-      const self_ = selfAddresses(ctx.repo, await remoteUrls(ctx), nodePeerIO)
-      const parsed = readFederation(fed).peers
-      for (const [i, raw] of (peersOf(fed) as Record<string, unknown>[]).entries()) {
+    } else {
+      // One state per link from every source (N2 Task 4): the local folder, their federation.json as last read and
+      // both sides' atproto records as last read. federation.yaml governs our side; a record that disagrees is drift.
+      const parsedFed = readFederation(fed)
+      const links = linkStatesOf(ctx.repo, parsedFed, await selfAddressesOf(ctx.repo, ctx.run))
+      // Our records no peer accounts for: published, but federation.yaml no longer lists them. The urgent case.
+      self.facts = { ...self.facts, did: links.selfDid, drift: links.unlisted }
+      if (!self.attention && links.unlisted.length > 0) self.attention = { level: 'warn', text: links.unlisted[0].text }
+      const raws = peersOf(fed)
+      for (const [i, raw] of (Array.isArray(raws) ? raws as Record<string, unknown>[] : []).entries()) {
         const ref = str(raw?.repo)
         const id = (ref ? basename(ref).replace(/\.git$/, '') : '') || slug(str(raw?.name) ?? '')
         if (!id || id === selfId) continue // a federation that lists this instance among its peers: its card is the self one
         const local = ref && ref.startsWith('.') ? clone(ctx.repo, ref) : null
-        const peer = parsed.find(p => p.index === i)
-        let link: { state: string; path: string | null; reason: string | null } = peer ? linkState(peer, self_, ctx.repo, nodePeerIO) : { state: 'unknown' as const, path: null, reason: "can't read their side from here" }
-        let checked: string | null = null
-        // A peer with only a url: what its federation.json said when it was last read (N2 Task 2). Their claims, not a fact we hold.
-        if (link.state === 'unknown' && link.path === null && local === null && peer?.url) {
-          const key = wellKnownUrlOf(peer.url)
-          const cached = key ? remoteCache(ctx.repo).get(key) : null
-          if (cached) {
-            // Their claims are read as public urls only: a `repo` or a relative path in a remote file is never a folder here.
-            const lists = readFederation(cached.doc).peers.some(p => {
-              const a = isPublicUrl(p.url) ? addressOf(p.url as string, ctx.repo, nodePeerIO) : null
-              return a !== null && self_.some(s => sameAddress(s, a))
-            })
-            checked = cached.fetched_at
-            link = { state: lists ? 'mutual' : 'claimed', path: null, reason: `checked ${cached.fetched_at}` }
-          }
-        }
+        const link = links.peers.get(i) ?? UNREAD
         const shown = shownLink(link)
         nodes.push({
           id: `instance:${id}`, kind: 'instance', board: 'systems', name: str(raw.name) ?? id,
           status: shown.status, attention: shown.attention,
           changed: local ? await lastCommit(local, '.') : null,
           facts: { type: raw.type ?? null, repo: ref, url: raw.url ?? null, trust: raw.trust ?? null, relationship: raw.relationship ?? null, localPath: local,
-            link: link.state, linkReason: link.reason, checked },
+            link: link.state, linkReason: link.reason, checked: link.sources.checked, relation: link.relation, sources: link.sources, drift: link.drift },
           source: { path: 'federation.yaml', editable: false },
         })
         edges.push({ from: `instance:${id}`, to: self.id, kind: 'federation' })
