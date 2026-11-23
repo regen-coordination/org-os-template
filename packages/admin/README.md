@@ -1132,7 +1132,7 @@ visibility:
 
 - A level is `members`, `role:<Role>` (this table's Roles) or `hat:<hat ref>`. A path takes its own level, else the
   longest folder holding it, else `default`. A token that can't be read admits nobody; `public` is refused. The canon is
-  read as one: list `data/kb/**`, never a path inside it.
+  read as one: list `data/kb/**`, never a path inside it (one written by hand all the same narrows the whole canon, 0.7.3).
 - A member a file is kept from gets that file's records as the public gets them, wherever they are read: the
   registries, the map, comments and mentions, presence, governance, names, the knowledge routes, proposals and the tray.
   Their writes to such a record are refused before it is read.
