@@ -25,6 +25,14 @@ describe('intakeOutcome', () => {
     expect(intakeOutcome(j, req({ answers: { operator: '@a', portal: '  ' } }), [], NOW)).toEqual({ kind: 'refuse', reason: 'Answer "portal".' })
     expect(intakeOutcome(j, req({ answers: { operator: '@a', portal: 'https://x.org' } }), [], NOW)).toEqual({ kind: 'propose' })
   })
+  it('an ask named like an inherited property is read as unanswered, never thrown on', () => {
+    for (const ask of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      const j = join({ asks: [ask] })
+      expect(() => intakeOutcome(j, req({ answers: {} }), [], NOW)).not.toThrow()
+      expect(intakeOutcome(j, req({ answers: {} }), [], NOW)).toEqual({ kind: 'refuse', reason: `Answer "${ask}".` })
+    }
+    expect(intakeOutcome(join({ asks: ['constructor'] }), req({ answers: JSON.parse('{"constructor":"yes"}') }), [], NOW)).toEqual({ kind: 'propose' })
+  })
   it('invite policy: without a match refuses, with one accepts by invite', () => {
     const { record, token } = makeInvite({ name: 'Mesa', type: 'LocalNode', network: 'n', expires: '2026-12-22', random })
     const j = join({ policy: 'invite' })

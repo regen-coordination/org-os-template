@@ -328,6 +328,14 @@ export function checkProposals(entries, ctx = {}) {
     const closedBy = isMap(entry.closed) ? entry.closed : null
     if (closedBy && isAddress(closedBy.by) && !isMap(closedBy.as)) bad('closed', CLOSED_BY_ADDRESS)
 
+    // A change from outside the org (network N2, R13) names the request it was built from, and nothing else.
+    if (entry.origin !== undefined) {
+      const o = entry.origin
+      if (!isMap(o) || o.kind !== 'federation-request' || typeof o.request !== 'string' || typeof o.from !== 'string' || o.from === '') {
+        bad('origin', '`origin` names a join request: { kind: federation-request, request: <its id>, from: <the asking instance> }')
+      }
+    }
+
     // The rules it was opened under, against the rule shape.
     if (!Array.isArray(entry.rules) || entry.rules.length === 0) bad('rules', 'this proposal holds no rules: it records the rules it was opened under')
     else {

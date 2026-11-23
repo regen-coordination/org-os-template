@@ -44,11 +44,19 @@ describe('federation request', () => {
     expect(parseRequest('- a\n- b\n').request).toBeNull()
     expect(parseRequest(': : :\n\t[').request).toBeNull()
   })
-  it('hubPeerOf gives exactly the six fields and the decision', () => {
+  it('hubPeerOf gives exactly the six fields and the decision, and the did when one is known', () => {
     expect(hubPeerOf(make(), 'request 3f8a')).toEqual({
       name: 'Mesa Verde', url: 'https://github.com/mesa-verde/mesa-os', type: 'LocalNode', trust: 'read',
       relationship: 'node', since: '2026-11-22', decision: 'request 3f8a',
     })
+    const did = 'did:plc:abcdefghijklmnopqrstuvwx'
+    expect(hubPeerOf(make(), 'request 3f8a', did)).toEqual({
+      name: 'Mesa Verde', url: 'https://github.com/mesa-verde/mesa-os', type: 'LocalNode', trust: 'read',
+      relationship: 'node', since: '2026-11-22', decision: 'request 3f8a', did,
+    })
+    // a did that isn't one, or none at all, is left out
+    expect(hubPeerOf(make(), 'request 3f8a', 'not-a-did')).not.toHaveProperty('did')
+    expect(hubPeerOf(make(), 'request 3f8a', null)).not.toHaveProperty('did')
   })
   it('the requests ledger schema holds no person field, and refuses an invite that is not an invite id', () => {
     const s = loadSchema('federation-requests') as unknown as { additionalProperties: boolean, properties: Record<string, { pattern?: string }> }

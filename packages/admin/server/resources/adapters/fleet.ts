@@ -10,6 +10,7 @@ import { readFederation } from '../../../lib/federation/read.mjs'
 import { linkStatesOf, selfAddressesOf, type PeerLinkState } from '../../federation/link-state.ts'
 import { publishFacts } from '../../federation/atproto/publish.ts'
 import { listOutgoing } from '../../federation/node.ts'
+import { listInbox, toReplyOf } from '../../federation/hub.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
 
 /** A clone on this machine, or null: only a folder holding a git repository counts. */
@@ -137,6 +138,9 @@ export const fleet: Adapter = {
     // The node's side of asking to join (N2 Task 8): each request this instance asked, whether it is on the trunk yet,
     // where it was sent and what came back, and what the hub's atproto records say (from the cache; never fetched).
     self.facts = { ...self.facts, outgoing: (await listOutgoing(ctx.repo, { startBranch: ctx.startBranch })).map(o => ({ ...o, atproto: { theirs: theirsOf(o.hub) } })) }
+    // The hub's side (N2 Task 9): how many polled requests wait in the inbox to be received, and the final outcomes not yet
+    // told whose way can carry a reply (`federation.reply` draws its variants from them). Both are read without the network.
+    self.facts = { ...self.facts, inbox: listInbox(ctx.repo).length, toReply: toReplyOf(ctx.repo) }
     // No fleet declared still leaves this instance's own card: Sync and Share are its operations (0.6 P2 spec §3.10).
     return { nodes, edges }
   },

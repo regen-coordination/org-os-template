@@ -1,6 +1,8 @@
 // The node's routes (network N2 Task 8): look at a hub's cached answer, ask to join, withdraw, and record an
 // acceptance. Every write is staged in the actor's change (or committed where the rule is direct) through
 // `commitOrStage`, under the repository's write lock. Nothing here reaches the network, and nothing publishes on atproto.
+// The hub's routes (Task 9): receive requests (an imported file, or the inbox a poll filled) and decide a held one. Their
+// writes are the hub's own commits (`writeHubFiles`) or a proposal; nothing reaches the network or atproto here either.
 import { randomUUID } from 'node:crypto'
 import type { Context, Hono } from 'hono'
 import { parseDocument } from 'yaml'
@@ -17,6 +19,7 @@ import { buildRequest, requestText } from '../../lib/federation/request.mjs'
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
 import type { Runner } from '../resources/types.ts'
 import { transports } from './transports/index.ts'
+import { decide, drainInbox, hubRequests, receive } from './hub.ts'
 import {
   askedText, cachedHub, clearState, outgoingPath, readState, recordedText, SENTENCES, trunkRequest, UUID, withdrawnText, writeState,
 } from './node.ts'
@@ -162,6 +165,41 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     clearState(repo, id)
     return c.json({ id, cleared: true })
   }))
+
+  // ── the hub's side ──
+
+  app.get('/api/federation/requests', c => c.json(hubRequests(repo).map(h => ({
+    id: h.record.id, from: h.record.from, network: h.record.network, transport: h.record.transport, ref: h.record.ref, received: h.record.received,
+    outcome: h.outcome, final: h.final, sentence: h.sentence, replied: h.replied, ...(h.record.proposal ? { proposal: h.record.proposal } : {}),
+  }))))
+
+  // With `text` (Import): that one request, as a file. Without: every request a poll put in the inbox.
+  app.post('/api/federation/requests/receive', async c => {
+    let raw: unknown
+    try { raw = await c.req.json() } catch { raw = {} }
+    const text = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>).text : undefined
+    if (text !== undefined && typeof text !== 'string') throw new HttpError(400, 'The request must be text.')
+    return withLock(async () => {
+      const actor = knownActorOf(c)
+      const answers = typeof text === 'string'
+        ? [await receive(repo, actor, { transport: 'file', ref: null, text }, now(), { startBranch: deps.startBranch })]
+        : await drainInbox(repo, actor, now(), { startBranch: deps.startBranch })
+      deps.notify?.({ type: 'changes' })
+      return c.json(answers.map(a => ({ ref: a.ref, outcome: a.outcome, sentence: a.sentence, ...('proposal' in a && a.proposal ? { proposal: a.proposal } : {}) })))
+    })
+  })
+
+  app.post('/api/federation/requests/:id/decide', async c => {
+    const raw = await body(c)
+    if (typeof raw.accept !== 'boolean') throw new HttpError(400, 'Say whether you accept it: accept true or false.')
+    if (raw.reason !== undefined && typeof raw.reason !== 'string') throw new HttpError(400, 'The reason must be text.')
+    return withLock(async () => {
+      const actor = knownActorOf(c)
+      const out = await decide(repo, actor, c.req.param('id'), { accept: raw.accept as boolean, reason: raw.reason as string | undefined }, { startBranch: deps.startBranch })
+      deps.notify?.({ type: 'changes' })
+      return c.json({ id: c.req.param('id'), outcome: out.outcome, sentence: out.sentence, commit: out.commit })
+    })
+  })
 
   app.post('/api/federation/outgoing/:id/record', c => withLock(async () => {
     const actor = knownActorOf(c)

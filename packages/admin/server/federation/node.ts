@@ -197,6 +197,9 @@ function seqIn(doc: Document, key: string): YAMLSeq {
 }
 const mapAt = (seq: YAMLSeq): YAMLMap[] => seq.items.filter(isMap) as YAMLMap[]
 const field = (m: YAMLMap, key: string): unknown => m.get(key)
+/** The one federation.yaml editor's parts (ruling R13), shared with the hub's side (Task 9). */
+export { docOf as federationDoc, seqIn as federationSeq, mapAt as mapsIn, norm as normUrl }
+
 /** A network entry's hub, as a string: `hub: <url>` or `hub: { url }`. */
 const hubField = (m: YAMLMap): string => {
   const h = m.get('hub') ?? m.get('url')

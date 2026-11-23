@@ -7,6 +7,7 @@
 
 import { parse, stringify } from 'yaml'
 import { isPublicUrl } from './peers.mjs'
+import { DID_PATTERN } from './read.mjs'
 
 export const REQUEST_SPEC = 'org-os/federation-request/1'
 
@@ -94,11 +95,14 @@ export function requestText(request) {
   return stringify(ordered)
 }
 
-/** The one `peers` entry a hub adds for an accepted request, built from validated fields only (R13).
- *  @param {FederationRequest} request @param {string} decision where the choice was recorded */
-export function hubPeerOf(request, decision) {
+/** The one `peers` entry a hub adds for an accepted request, built from validated fields only (R13). `did` is the one
+ *  the node's own federation.json carries, as the hub last read it (never from the request); left out when unknown.
+ *  @param {FederationRequest} request @param {string} decision where the choice was recorded
+ *  @param {string | null} [did] */
+export function hubPeerOf(request, decision, did) {
   return {
     name: request.from.name, url: request.from.url, type: request.from.type, trust: 'read', relationship: 'node',
     since: request.created.slice(0, 10), decision,
+    ...(typeof did === 'string' && DID_PATTERN.test(did) ? { did } : {}),
   }
 }

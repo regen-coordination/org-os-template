@@ -27,7 +27,7 @@ describe('the catalogue', () => {
   it('has unique ids, and asks for confirmation exactly for what changes or reaches out', () => {
     expect(new Set(CATALOGUE.map(o => o.id)).size).toBe(CATALOGUE.length)
     expect(CATALOGUE.filter(needsConfirm).map(o => o.id).sort()).toEqual([
-      'connector.ingest', 'federation.check-links', 'federation.publish-links', 'federation.send', 'federation.status', 'fetch', 'instance.analyze', 'knowledge.publish', 'module.command-check', 'module.doctor', 'role.seat', 'seat.nudge', 'seat.release', 'share', 'system.clone',
+      'connector.ingest', 'federation.check-links', 'federation.poll', 'federation.publish-links', 'federation.reply', 'federation.send', 'federation.status', 'fetch', 'instance.analyze', 'knowledge.publish', 'module.command-check', 'module.doctor', 'role.seat', 'seat.nudge', 'seat.release', 'share', 'system.clone',
     ])
     for (const op of CATALOGUE) expect(['records', 'modules', 'crew', 'fleet', 'sources']).toContain(op.refreshes)
   })

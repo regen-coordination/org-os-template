@@ -12,6 +12,7 @@ import { checkLinksAndRecords, lookupTarget } from '../federation/atproto/read.t
 import { networkFetch, networkLookup, networkResolveTxt } from '../net.ts'
 import { publishLinksOperation } from '../federation/atproto/publish.ts'
 import { federationNodeOperations } from '../federation/node.ts'
+import { federationHubOperations } from '../federation/hub.ts'
 import { resolveTrunk } from '../proposals/ledger.ts'
 import { kmsSrc } from '../knowledge/kms.ts'
 import { validTrunkName } from '../../lib/rules.mjs'
@@ -333,6 +334,9 @@ export const CATALOGUE: Operation[] = [
   // N2 Task 8: the node's side of asking to join. Sending and following the answer are confirmed; they write only under
   // stateDir. Neither publishes on atproto: that stays the separate, confirmed `federation.publish-links`.
   ...federationNodeOperations(),
+  // N2 Task 9: the hub's side. Polling fills the inbox and replying keeps a receipt, both under stateDir; receiving and
+  // deciding are actor routes (server/federation/routes.ts). Neither publishes on atproto: `federation.publish-links` does.
+  ...federationHubOperations(),
   {
     id: 'connector.ingest', kinds: ['connector'], label: () => 'Ingest', effect: 'changes', network: true,
     timeoutMs: 600 * SEC, params: NO_PARAMS, refreshes: 'sources',

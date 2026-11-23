@@ -20,7 +20,9 @@ export function intakeOutcome(join, request, invites, now) {
     return { kind: 'refuse', reason: `This network takes ${join.types.join(', ')}.` }
   }
   for (const ask of join.asks) {
-    if ((request.answers[ask] ?? '').trim() === '') return { kind: 'refuse', reason: `Answer "${ask}".` }
+    // Own keys only: an ask named `constructor` or `toString` must not read a function off the prototype.
+    const answer = Object.hasOwn(request.answers, ask) ? request.answers[ask] : undefined
+    if (typeof answer !== 'string' || answer.trim() === '') return { kind: 'refuse', reason: `Answer "${ask}".` }
   }
   if (join.policy === 'invite') {
     const match = inviteMatch(invites, request.invite, request, now)
