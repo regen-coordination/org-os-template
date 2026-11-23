@@ -275,6 +275,9 @@ export function readFilesPolicy(doc) {
  * folder itself included: `data/kb` for `data/kb/**`), else null (`files.default` governs it).
  * @param {FilesPolicy} files @param {string} path @returns {string | null}
  */
+/** The canon's folder (L6 §7.5): the collection `knowledge`, a file per kind. */
+const CANON = 'data/kb'
+
 function fileKey(files, path) {
   if (Object.hasOwn(files.paths, path)) return path
   /** @type {string | null} */
@@ -328,7 +331,9 @@ function fileToken(token) {
  */
 export function fileLevel(files, path) {
   if (files === null || typeof path !== 'string' || !path.startsWith('data/')) return null
-  const key = fileKey(files, path)
+  // 0.7.2 round 3 (review 5): the canon is one collection (`knowledge`) read across its files, so every path in it is read at
+  // the canon's level (`data/kb/**`, else the default); a key inside it is refused by the check and passed over here.
+  const key = fileKey(files, path.startsWith(`${CANON}/`) ? CANON : path)
   return fileToken(key === null ? files.default : files.paths[key])
 }
 
@@ -360,6 +365,7 @@ function checkFiles(top, err, checkStrict) {
   for (const [path, token] of Object.entries(isObj(raw.paths) ? raw.paths : {})) {
     const at = `visibility.files.paths.${path}`
     if (!path.startsWith('data/') || path.includes('..')) { err(at, 'only a path under data/ is governed here'); continue }
+    if (path.startsWith(`${CANON}/`) && path !== `${CANON}/**`) { err(at, `the canon is read as one: list ${CANON}/** instead`); continue }
     level(at, token)
   }
   // A file is read whole: a collection with field levels stays at role:steward, whichever key governs its file — its own

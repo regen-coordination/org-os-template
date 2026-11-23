@@ -14,6 +14,7 @@ import { displayNames } from './session/names.ts'
 import type { Changed } from './resources/types.ts'
 import { noStore, reach, splitOps, type PrivateAccess } from './private/ops.ts'
 import { privateReads } from './private/reads.ts'
+import { fileReader, unreadPaths, unreadRefusal } from './workspace/reads.ts'
 import { hostedWrites } from './hosted/writes.ts'
 import { instanceWrites, type InstanceWrites } from './hosted/instance-writes.ts'
 import { readConfig } from './visibility/config.ts'
@@ -199,8 +200,12 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
    *  tray's Apply: a known actor (403), the file guards (409), the rule (403), validation (422), one
    *  commit with the three trailers (503, and every file put back, if it fails). Its private part (L5 §10.3) is split
    *  off as staging splits it and written to the private store in the same act. */
-  const writeNow = (c: Context, op: RecordOp, message: string) =>
-    withLock(async () => {
+  const writeNow = (c: Context, op: RecordOp, message: string) => {
+    // 0.7.2 round 3 (review 4): a record of a file the writer may not read (the `files` section) is refused before anything
+    // is read for it, in the words of a path no rule governs: no 409 for an id that is there, no 201 for one that is not.
+    const unread = unreadPaths([op], fileReader(c, repo))
+    if (unread.length > 0) throw unreadRefusal(unread)
+    return withLock(async () => {
       const actor = knownActorOf(c)
       try {
         const split = splitOps(repo, [op], privateStore, viewerOf(c))
@@ -214,6 +219,7 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
         throw err // a Referred is the reviewed 409 sentence; the rest are Refusals, 503s, YAML 409s
       }
     })
+  }
 
   app.put('/api/registries/:name/:id', async c => {
     const name = c.req.param('name'); const id = c.req.param('id')

@@ -25,14 +25,14 @@ export const PRESENCE_TTL_MS = 45000
 /** One person on a target, as L4a's `Presence` takes them (§8.4). */
 export interface Present { handle: string; role: string; editing: boolean }
 
-interface Entry extends Present { actor: string; at: number; viewer: Viewer }
+interface Entry extends Present { actor: string; at: number; viewer: Viewer; known: KnownActor }
 
 export interface PresenceDeps {
   /** A target's level now; null when there is no such thing (then nobody is shown on it). */
   level: (target: Target) => ParsedLevel | null
   /** How a person is shown (§8.4: a CAIP-10 actor's handle is their short address, their role the lowest worn hat's name).
    *  Left out: their id and their name. */
-  names?: (actor: KnownActor) => { handle: string; role: string }
+  names?: (actor: KnownActor, viewer?: Viewer) => { handle: string; role: string }
   /** Milliseconds; injectable in tests. */
   now?: () => number
 }
@@ -60,7 +60,7 @@ export class Presence {
     const lapsed = was !== undefined && this.lapsed(was)
     const { handle, role } = this.names(actor)
     here.set(actor.id, {
-      actor: actor.id, handle, role, editing, at: this.now(),
+      actor: actor.id, handle, role, editing, at: this.now(), known: actor,
       viewer: viewer ?? { kind: 'member', id: actor.id, hats: 'hats' in actor ? actor.hats : [], roles: [] },
     })
     if (!was || lapsed || was.editing !== editing || was.handle !== handle || was.role !== role) this.tell(target)
@@ -72,13 +72,21 @@ export class Presence {
     if (viewer.kind !== 'member') return []
     const level = this.level(target)
     if (!level || !admits(level, viewer)) return []
-    return this.admitted(target, level).filter(e => e.actor !== viewer.id).map(shown)
+    return this.admitted(target, level).filter(e => e.actor !== viewer.id).map(e => this.shownTo(e, viewer))
   }
 
-  /** Everyone on `target` whom its level admits now: the event's `people`, sent only to connections admitted to it. */
-  everyone(target: Target): Present[] {
+  /** Everyone on `target` whom its level admits now: the event's `people`, sent only to connections admitted to it.
+   *  `viewer` (0.7.2 round 3): who they are named to (a name the viewer may not read is not said); absent, the generic member. */
+  everyone(target: Target, viewer?: Viewer): Present[] {
     const level = this.level(target)
-    return level ? this.admitted(target, level).map(shown) : []
+    return level ? this.admitted(target, level).map(e => this.shownTo(e, viewer)) : []
+  }
+
+  /** An entry as `viewer` is shown it: its names as they may be told them (0.7.2 round 3: the members file may be kept). */
+  private shownTo(e: Entry, viewer?: Viewer): Present {
+    if (viewer === undefined) return shown(e)
+    const { handle, role } = this.names(e.known, viewer)
+    return { handle, role, editing: e.editing }
   }
 
   /** Drops every lapsed entry, telling `onChange` of each target that lost someone. The server runs it on a timer. */

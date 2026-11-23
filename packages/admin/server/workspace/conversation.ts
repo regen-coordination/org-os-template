@@ -34,7 +34,7 @@ import { displayNames, membersHold, readLabels } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads, strictPrivateReads } from '../private/reads.ts'
-import { mayReadRecordsOf } from './reads.ts'
+import { mayReadRecordsOf, registryFileLevel } from './reads.ts'
 import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, MEMBERS as MEMBERS_LEVEL, NOBODY } from '../visibility/gate.ts'
@@ -167,7 +167,8 @@ class People {
   private readonly byId: Map<string, Record<string, unknown>>
   private readonly governance: Record<string, unknown> | null
   private allRoles: Map<string, Role> | null = null
-  constructor(readonly repo: string, private readonly membership: Membership | null) {
+  /** `store` (0.7.2 round 3): the Roles table, so a member's viewer carries their Roles (`hubRoles`), as a `files` level judges. */
+  constructor(readonly repo: string, private readonly membership: Membership | null, private readonly store?: PrivateStore) {
     const rc = readRuleContext(repo, { unknown: '' })
     this.members = rc.members ?? []
     this.governance = rc.governance
@@ -194,7 +195,9 @@ class People {
     const id = parseCaip10(memberOrAccount) ? String(actorIdOf(memberOrAccount, this.members)) : memberOrAccount
     const r = this.reading(memberOrAccount)
     const roles = rolesOf(resolveRoles(this.governance, this.members, r ? observed(r) : []).roles, id) as string[]
-    return { kind: 'member', id, hats: r?.hats ?? [], roles }
+    let hubRoles: string[] = []
+    try { hubRoles = [...(this.store?.person(id)?.roles ?? [])] } catch { /* the store is down: no Role, so a `role:` file is closed */ }
+    return { kind: 'member', id, hats: r?.hats ?? [], roles, hubRoles }
   }
 
   /** Every role, its holders read from every member's last good reading (a role sourced from a hat holds its wearers). */
@@ -239,13 +242,13 @@ export function namesFor(repo: string, membership: Membership | null, viewer?: V
  *  signed-in CAIP-10 actor is named by the hats their session read. T2e I1 (Rule 4): the actor's own `name` (a wallet
  *  session's and git's identity's read from the members row ungated, an emailed link's from the Roles table) stands in only
  *  for an id the members file does not hold; one it holds (or may, unreadable) is shown as the gate says it, else by id. */
-export function actorNames(repo: string, membership: Membership | null): (actor: KnownActor) => { handle: string; role: string } {
-  return actor => {
+export function actorNames(repo: string, membership: Membership | null): (actor: KnownActor, viewer?: Viewer) => { handle: string; role: string } {
+  return (actor, viewer) => {
     if (actor.via === 'siwe' && actor.id === actor.account) {
       const address = parseCaip10(actor.account)?.address ?? actor.account
       return { handle: shortAddress(address), role: addressName(membership, actor.account, actor.hats) }
     }
-    const names = namesFor(repo, membership)(actor.id)
+    const names = namesFor(repo, membership, viewer)(actor.id)
     if (names.role !== actor.id || membersHold(repo)(actor.id)) return names
     return { handle: actor.id, role: actor.name }
   }
@@ -475,7 +478,7 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const kept = target.startsWith('record:') ? recordOf(target).registry : null
   const q = query.trim().replace(/^@/, '').trim().toLowerCase()
   const matches = (id: string, label: string) => q === '' || id.toLowerCase().startsWith(q) || label.toLowerCase().startsWith(q) || wordsOf(label).some(w => w.startsWith(q))
-  const people = new People(deps.repo, deps.membership)
+  const people = new People(deps.repo, deps.membership, deps.store ?? undefined)
   // `tell`'s test (T2e M4): the target's level now and, for a reply, every level of the comments above it (`floors`).
   const told = (v: Viewer) => admits(level, v) && floors.every(f => mayRead(v, level, f))
     && (kept === null || v.kind !== 'member' || mayReadRecordsOf(deps.repo, v, kept))
@@ -510,6 +513,19 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   // A record is offered only when the author may see it and everyone the target admits may see it and its title (R-9b): its
   // label is its title, which the mention writes into the target's text.
   const records: Mentionable[] = []
+  // 0.7.2 round 3 (review 1): a record is offered only from a file the author may read, and only where every reader of the
+  // target may read that file too: any member, or, on a record of a kept file, a file the `files` section keeps at its level.
+  const anyMember: Viewer = { kind: 'member', id: '', hats: [], roles: [], hubRoles: [] }
+  const fromFile = new Map<string, boolean>()
+  const offeredFrom = (registry: string): boolean => {
+    let ok = fromFile.get(registry)
+    if (ok === undefined) {
+      ok = mayReadRecordsOf(deps.repo, viewer, registry) && (mayReadRecordsOf(deps.repo, anyMember, registry)
+        || (kept !== null && registryFileLevel(deps.repo, kept) === registryFileLevel(deps.repo, registry)))
+      fromFile.set(registry, ok)
+    }
+    return ok
+  }
   const offer = (registry: string, id: string, body: Record<string, unknown>, kept: ParsedLevel[]) => {
     if (!kept.every(l => admits(l, viewer) && narrowerOrEqual(level, l))) return
     const label = titleOf(body, id)
@@ -518,7 +534,7 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const titled = (registry: string, body: Record<string, unknown>) => ['title', 'name'].map(f => fullLevel(levels.config, registry, body, f))
   const git = gitNames(deps.repo)
   for (const def of registriesOf(deps.repo)) {
-    if (def.kind !== 'collection' || def.name === 'members') continue
+    if (def.kind !== 'collection' || def.name === 'members' || !offeredFrom(def.name)) continue
     for (const e of levels.records(def.name)) offer(def.name, String(e.id), e as Record<string, unknown>, [levels.record(def.name, e), ...titled(def.name, e as Record<string, unknown>)])
     for (const r of levels.priv.records(def.name)) offer(def.name, r.id, r.body, [levelOfToken(r.visibility), ...titled(def.name, r.body)])
   }

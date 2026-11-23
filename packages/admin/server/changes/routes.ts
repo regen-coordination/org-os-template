@@ -7,7 +7,7 @@ import { ChangeStore, newChangeId } from './store.ts'
 import { stage, staleOps, changeView, changeClasses, classesOf, currentOf, targetsOf, targetsOfOps, validateChange } from './stage.ts'
 import { rebaseOp } from './merge.ts'
 import { fileBase, heldFileErrors, isFileOp, isRecordOp, keptPageErrors, rebaseFileOp } from '../workspace/files.ts'
-import { fileReader, unreadPaths, unreadRefusal } from '../workspace/reads.ts'
+import { fileReader, readableView, unreadPaths, unreadRefusal, type FileReader } from '../workspace/reads.ts'
 import { commitMessage } from './records.ts'
 import { applyOps, commitEmpty, Refusal, Referred, StageRefusal } from './apply.ts'
 import { sealReceipts } from '../library/seal.ts'
@@ -214,7 +214,10 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
     const may = fileReader(c, repo)
     if (may.all) return Response.json(view)
     const unread = (i: number) => { const op = view.ops[i]; return op !== undefined && isFileOp(op) && !may(op.path) }
-    return Response.json({ ...view, stale: view.stale.filter(i => !unread(i)) })
+    // 0.7.2 round 3 (review 4): an op on a record of a file kept from the asker (staged before it was kept) is shown withheld,
+    // with no `current` and no staleness, as a proposal shows it. A file op stays the asker's own, as 0.7.1 shows it.
+    const records: FileReader = may.records ? Object.assign(() => true, { records: may.records }) : Object.assign(() => true, { all: true as const })
+    return Response.json(readableView({ ...view, stale: view.stale.filter(i => !unread(i)) }, records))
   }
   const saveAndAnswer = (c: Context, actor: KnownActor, change: Change, ops: Op[]): Response => {
     const next: Change = { ...change, ops, updated: new Date().toISOString() }
@@ -332,6 +335,9 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       if (isFileOp(op) && keep === 'mine' && !fileReader(c, repo)(op.path)) {
         return Response.json({ errors: await heldFileErrors(repo, [op], () => false) }, { status: 422 })
       }
+      // 0.7.2 round 3 (review 4): Keep mine reads the record as it is now, so it is refused on a file kept from the asker.
+      const unreadRecord = isRecordOp(op) && keep === 'mine' ? unreadPaths([op], fileReader(c, repo)) : []
+      if (unreadRecord.length > 0) return Response.json({ errors: unreadRefusal(unreadRecord).errors }, { status: 422 })
       const rebased = isFileOp(op) ? await rebaseFileOp(repo, op, keep) : rebaseOp(op, currentOf(repo, op.record), keep)
       if (rebased === ops[n]) return trayView(c, actor, change)
       return saveAndAnswer(c, actor, change!, rebased ? ops.map((o, i) => (i === n ? rebased : o)) : ops.filter((_, i) => i !== n))

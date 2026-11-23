@@ -126,6 +126,16 @@ export function mayReadRecordsOf(repo: string, viewer: Viewer, name: string): bo
   return recordsReadable(repo, fileLevels(repo, viewer), name)
 }
 
+/** 0.7.2 round 3: the `files` level that holds registry `name`'s file, said as text so two can be compared: `open` when there
+ *  is no section, the file is outside it, or no file holds the registry. */
+export function registryFileLevel(repo: string, name: string): string {
+  const files = readFilesConfig(repo)
+  if (files === null) return 'open'
+  let path: string
+  try { path = registryFile(repo, name) } catch { return 'open' }
+  return JSON.stringify(fileLevel(files, path) ?? 'open')
+}
+
 /** The viewers request.ts made for the person at the machine (`byGit`). A `files` level never gates them: they read what
  *  git holds, as fileReader's `all` says. A preview (`?as`) is a new viewer, so it is judged as the viewer it previews. */
 const MACHINE = new WeakSet<object>()

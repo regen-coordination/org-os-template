@@ -12,6 +12,7 @@ import { addOps } from './add.ts'
 import { findReceipt, listReceipts, removalPreview, removeOps } from './remove.ts'
 import { isRecordOp } from '../workspace/files.ts'
 import { changePrivateTargets } from '../private/targets.ts'
+import { fileReader } from '../workspace/reads.ts'
 
 export interface LibraryRoutesDeps {
   repo: string
@@ -82,8 +83,12 @@ export function mountLibrary(app: Hono, { repo, withLock, notify, privateStore =
 
   app.get('/api/library', async c => c.json(await listEntries(repo)))
   // The receipts' routes come before /api/library/:id, which would otherwise take "receipts" for an entry id.
-  app.get('/api/library/receipts', c => c.json(listReceipts(repo)))
+  // 0.7.2 round 3 (review 6): the receipts are data/library.yaml's; one the `files` section keeps it from is answered as
+  // for a route that is not there.
+  const receiptsKept = (c: Context) => { if (!fileReader(c, repo)('data/library.yaml')) throw new HttpError(404, 'Not found.') }
+  app.get('/api/library/receipts', c => { receiptsKept(c); return c.json(listReceipts(repo)) })
   app.get('/api/library/receipts/:id/removal', async c => {
+    receiptsKept(c)
     const { actor, staged } = stagedBy(c)
     return c.json(removalPreview(repo, actor, c.req.param('id'), staged))
   })
