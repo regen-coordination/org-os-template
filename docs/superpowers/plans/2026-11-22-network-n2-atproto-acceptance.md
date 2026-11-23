@@ -34,17 +34,20 @@ Ids and dates below are from the recorded run of 2026-11-23 08:20 UTC.
 1. **Open.** Delta: `POST /api/federation/join {policy: open-with-approval, types: [LocalNode], asks: [why],
    where: https://github.com/delta-hub/join-requests}` → committed under `identity/direct`. Cedar:
    `federation.check-links {address: Delta}` → `Read Delta Hub.`; `GET /api/federation/hub` shows the policy.
-   Delta: `check-links {address: Cedar}` and `{handle: cedar-node.example.org}` →
+   Cedar: `check-links {handle: delta-hub.example.org}`, so Delta's DID is tied to Delta's url both ways before the
+   ask (final review F-I1). Delta: `check-links {address: Cedar}` and `{handle: cedar-node.example.org}` →
    `cedar-node.example.org is did:plc:vlx2pd5uwj5nz4te7d2mfxvh.` (the DID is tied to Cedar's url both ways).
 2. **Ask and send by github.** Cedar: `POST /api/federation/ask` → request `ce1c5385-…`, committed. The peer entry
-   for Delta carries `requested` and Delta's DID. The Send menu lists file and GitHub as ready; hosted, p2p and
+   for Delta carries `requested` and Delta's DID (written only because the lookup tied it). The Send menu lists file and GitHub as ready; hosted, p2p and
    atproto wait. `federation.send {transport: github}` → `Sent as an issue: …/join-requests/issues/1`.
 3. **Receive.** Delta: `federation.poll` → `1 request waiting.`; `POST /api/federation/requests/receive` →
    `held` ("Held for you to decide: Cedar Node asks to join Delta."). **Path taken: held, then accepted by the
    maintainer**, because the maintainer's rule for `identity` is direct.
 4. **Accept and tell.** Delta: `decide {accept: true}` → one commit with `Org-Rule: identity/direct`; the peer entry
-   is `{name, url, type, trust: read, relationship: node, since, decision: request ce1c5385-…, did}`.
-   `federation.reply` → `Told Cedar Node: Accepted.` (the fake issue is closed with an `Accepted:` comment).
+   is `{name, url, type, trust: read, relationship: node, since, decision: request ce1c5385-…}`, with no `did`
+   (final review F-I2: an acceptance never writes one). Delta then sets Cedar's DID through the migration list
+   (`GET` then `POST /api/federation/migration`): one commit under `identity/direct`, no `federation/join`, and no
+   write to the PDS. `federation.reply` → `Told Cedar Node: Accepted.` (the fake issue is closed with an `Accepted:` comment).
 5. **Record.** Cedar: `federation.status` → `Accepted: Welcome to Delta.` (the word once); `POST …/record` → committed; `requested` is gone and
    `decision` is set.
 6. **The hub publishes.** Delta: `check-links`, then `publish-links`. Plan: "Publish 1 link and withdraw 0, and
@@ -71,8 +74,9 @@ Ids and dates below are from the recorded run of 2026-11-23 08:20 UTC.
     by invite. This invite has been used."
     Fern sent a file, so it has no Record step and its peer entry keeps no `decision`. Fern: `check-links` → drift
     `Not published yet.` (its `memberOf` is wanted, mutual by files); `publish-links` → one `memberOf` for Delta.
-    Delta ties Fern's DID before importing, so its entry carries it, and publishes "Publish 1 link and withdraw 0."
-    After a check on both, both cards read `mutual`.
+    Fern tied Delta's DID before asking, as Cedar did. Delta ties Fern's DID before importing; the acceptance (under
+    `Org-Rule: federation/join`) writes no `did`, and Delta adds it through the migration list. Delta then publishes
+    "Publish 1 link and withdraw 0." After a check on both, both cards read `mutual`.
 13. **Leave.** Cedar: `POST …/withdraw` → `leaving: true`, "Leaving Delta. The hub will see the link as left. Then
     publish, so your record is withdrawn.", committed. `check-links`, `publish-links`: "Publish 0 links and withdraw
     1, and update the profile. 1 peer is kept private." Cedar's PDS has no link record left. Delta: `check-links` →
@@ -83,7 +87,9 @@ Ids and dates below are from the recorded run of 2026-11-23 08:20 UTC.
 | Check | Result |
 |---|---|
 | Keys of every record written | link: `$type`, `subject`, `relation`, `network`, `createdAt`; profile: `$type`, `name`, `networks`, `createdAt`. Nothing else, no other collection. |
-| PDS write log (9 writes: sessions, puts, deletes) grepped for 20 needles: the 4 request ids, the 3 answers, the invite id, the token, its SHA-256, the hub's 3 decision texts, the node's recorded decision, the private peer's name, DID, url and host, both app passwords | none found |
+| PDS write log (sessions, puts, deletes) grepped for 21 needles: the 4 request ids, the 3 answers, the invite id, the token, its SHA-256, the hub's 3 decision texts, the node's recorded decision, the private peer's name, DID, url and host, the three app passwords | none found |
+| Every POST to a PDS host | one of `com.atproto.server.createSession`, `com.atproto.repo.putRecord`, `com.atproto.repo.deleteRecord`; nothing else |
+| The app passwords, against the request bodies as sent (before the fake's `***` redaction) | each only in `createSession` to its own account's PDS; in no other request. Every other needle is in no request body either |
 | The private peer | no record; not named in any job log or receipt (job logs say "1 private peer …"); its DID read on atproto, counted only |
 | The invite token | in no tree and no `git log -p --all` of the four instances; in no job log, receipt, gh issue or gh call log; in the PDS write log nowhere. Only in Fern's state folder: `federation/outgoing/<id>.json` and `<id>.request.yaml`, where the asking node keeps it outside git (R18) |
 | `validate-governance.mjs <copy> --strict` | exit 0 on all four ("the rules are well-formed and the history agrees with them") |
@@ -124,9 +130,9 @@ migration section had no rows: every public peer already had a DID and a link.
 
 ## Full suites (one at a time, through the lock)
 
-- Admin `npm test`: 524 files, 8025 passed, 2 skipped, 0 failed (the pilot's 12 steps among them), before the
-  ruling fixes. After them: the pilot, node, github-transport, page-words and new answer tests, 5 files, 83 passed; `tsc` 0 errors.
-- `tsc --noEmit` in packages/admin: 0 errors. The app build (`npm run build`): built.
-- Root `npm test`: 1012 tests, 1011 passed, 1 failed. The failure is the known one from before this task:
+- Admin `npm test`: 525 files, 8027 passed, 2 skipped, 0 failed at the final whole-branch review (head 00038308).
+  After the final review's fixes: 525 files, 8042 passed, 2 skipped, 0 failed (the pilot's 12 steps among them).
+- `tsc --noEmit` in packages/admin: clean. The app build (`npm run build`): built.
+- Root `npm test`, at the review and again after its fixes: 1012 tests, 1011 passed, 1 failed. The failure is the known one from before this task:
   `the clone's path set matches tests/clone-manifest.txt exactly` reports `docs/OPENING.md` as shipped but not in
   the manifest. This task edits OPENING.md but adds no shipped file, so the manifest is unchanged by it.

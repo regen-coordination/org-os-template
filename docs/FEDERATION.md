@@ -57,6 +57,7 @@ identity:
 | `gardens` | string | no | Gardens DAO contract address or status |
 | `onchain_registration` | object | no | On-chain org registration (chain, contract address, enabled flag) |
 | `scope` | string | no | Optional qualifier for what this node is within its type (e.g., `operational-unit`, `bioregion`, `program`) |
+| `did` | string | no | The org's atproto DID: `did:plc:` and 24 base32 characters, or `did:web:` and a host. The account its link records are written from (see [Link records on atproto](#link-records-on-atproto)). Anything else is ignored, with a warning |
 
 The `type` field determines how other nodes interpret this instance. A `Hub` aggregates peers. A `LocalNode` operates within a geographic scope. A `PersonalNode` is a single person's own instance: their practice, portfolio, or garden, federating as a peer rather than representing a collective. A `DAO` or `Cooperative` has governance on-chain. A `Project` is a focused initiative. A `Foundation` is a supporting entity.
 
@@ -114,6 +115,7 @@ join:
 | `types` | list | no | Instance types that may join |
 | `asks` | list | no | What a newcomer is asked to say or show |
 | `where` | string | no | Where to ask, as a public `https://` address (an issue tracker, a form). Anything else is not published |
+| `decision` | string | no | Under `open`: the standing decision that accepts a request on arrival (a decision id from your Decided list). Without one, `open` works as `open-with-approval` |
 
 A `join` with an unknown `policy` is ignored, and `validate:schemas` says so.
 
@@ -140,6 +142,10 @@ peers:
 | `since` | date | no | When the link started |
 | `decision` | string | no | Where the choice to link was recorded (a decision id or a date) |
 | `visibility` | enum | no | `public` (default) or `private`. A `private` peer is never published |
+| `relationship` | string | no | Free-form: what the peer is to this instance (`hub`, `node`, `network-seat`…). Only `node`, on a hub, can make a peer a member (`hasMember`); no other word is mapped to a link |
+| `did` | string | no | The peer's atproto DID (`did:plc:` and 24 base32 characters, or `did:web:` and a host), the `subject` of the record published for it. Set through the migration list, or by **Ask** for the hub when a lookup tied it (see [The migration list](#the-migration-list)). Anything else is ignored, with a warning |
+| `link` | enum | no | The relation the record for this peer states: `memberOf`, `hasMember` or `peerOf`; or `none`, to keep the peer off atproto. Without it the relation is worked out (the hub of one of your `networks` is `memberOf`; on a hub, a `node` with a `decision`, or one mutual by files that names you as its hub, is `hasMember`) |
+| `requested` | string | no | The id of the request you sent this peer, while no decision has come back. **Record it** replaces it with `decision` |
 
 **Trust levels:**
 
@@ -533,19 +539,29 @@ When a request arrives under `open-with-approval`, it goes one of two ways:
 - Otherwise it becomes a proposal under **From outside**, and it is accepted when the proposal is ratified.
 
 Either way, accepting adds one `peers` entry for the node, with `relationship: node` and a `decision`. The hub
-builds that entry from the request's checked fields only. It never applies anything else a request carries.
+builds that entry from the request's checked fields only. It never applies anything else a request carries, and it
+never writes the node's `did`: set it afterwards through the [migration list](#the-migration-list), before
+publishing `hasMember`. A request addressed to another hub is refused.
+
+Every request the hub receives is recorded in its git, in `data/federation-requests.yaml`: who asks (`name`, `type`,
+`url`), the network, the answers to your asks, and, when you refuse one, your reason. If the hub's repository is
+public, so is that record.
 
 ### Asking to join
 
 1. Look the hub up by its address. This reads its `federation.json`.
-2. Answer its asks and choose **Ask**. This stages your own change: the network and the hub's peer entry in
-   `federation.yaml`, with `requested`, and the request itself in `federation/outgoing/<id>.yaml`. Nothing is sent.
-3. Apply your change under your rules. Sending waits until the request is on your trunk.
+2. Answer its asks and choose **Ask**. This writes your own change: the network and the hub's peer entry in
+   `federation.yaml`, with `requested`, and the request itself in `federation/outgoing/<id>.yaml`. It is committed
+   when your rule lets you change `identity` alone, and staged otherwise. Nothing is sent. The hub's `did` goes into
+   its peer entry only when **Check links** has tied it to the hub (see [The migration list](#the-migration-list));
+   otherwise the migration list suggests it later.
+3. If it was staged, apply it under your rules. Sending waits until the request is on your trunk.
 4. Send it. If it went by GitHub, follow the answer, and **Record it** once the hub accepts. This sets the peer's
    `decision`.
 
 A request holds org-level facts only: its id, when it was made, who asks (`name`, `type`, `url`), the hub, the
-network and the answers. It has no field for a person's contact.
+network and the answers. It has no field for a person's contact. It is committed to git on both sides (yours in
+`federation/outgoing/`, the hub's in `data/federation-requests.yaml`), so it is public wherever the repository is.
 
 ### How a request travels
 
@@ -580,8 +596,9 @@ Each side publishes one record in its own atproto repository:
 The pairs are `memberOf` ↔ `hasMember` and `peerOf` ↔ `peerOf`. A link is mutual on atproto when both sides have
 published their record. The link state can say `mutual` before that: it means both sides' statements agree (your
 `federation.yaml`, and their record). If your own record isn't published yet, a drift line says so: `Not published
-yet.` The hub publishes `hasMember` after it accepts; the node publishes `memberOf` after it has
-recorded the acceptance.
+yet.` The hub publishes `hasMember` after it accepts and has set the node's `did`. The node publishes `memberOf`
+after it has recorded the acceptance, or, for a request sent as a file (which has no Record step), once the hub lists
+it and the link is mutual by files.
 
 **Never published:** private peers (`visibility: private`), peers without a public `https` url, requests, answers,
 invites, decision references, notes and contacts. Kept-back peers are counted, never named. If a peer becomes
@@ -602,6 +619,19 @@ link: the last reading stays, with its date.
 
 **The authority** is the network's lexicon domain. Until the network sets one, it is the placeholder
 `example.orgosnetwork`. Nothing under an `example.` authority is written to a live account: publishing refuses it.
+
+### The migration list
+
+The Federation page lists each public peer with the DID and the relation a record for it would carry, from your
+trunk's `federation.yaml` and what the last **Check links** read. Setting a peer's `did` or `link` there is one
+`federation.yaml` edit, an `identity` change under your rules. It publishes nothing by itself; **Publish links** does,
+later.
+
+It is how DIDs get into `federation.yaml`. It writes a DID only when a confirmed **Check links** tied it to that peer:
+a `did:web` for the peer's own host; a handle that is the peer's host and names the DID back; or the peer's
+`federation.json` naming the DID while the DID's own profile names the peer's url. A peer's word alone ties nothing.
+A hub's acceptance never writes the member's DID (a request carries none), so a hub sets it here after accepting.
+**Ask** writes the hub's DID only under the same test.
 
 ### What each link state means
 
