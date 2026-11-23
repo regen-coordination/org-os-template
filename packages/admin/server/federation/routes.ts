@@ -15,7 +15,7 @@ import { fileBase, fileText } from '../workspace/files.ts'
 import { ChangeStore } from '../changes/store.ts'
 import type { FileOp } from '../changes/types.ts'
 import { runCommand } from '../resources/run.ts'
-import { readFederation } from '../../lib/federation/read.mjs'
+import { JOIN_POLICIES, readFederation } from '../../lib/federation/read.mjs'
 import { isPublicUrl } from '../../lib/federation/peers.mjs'
 import { buildRequest, parseRequest, requestText } from '../../lib/federation/request.mjs'
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
@@ -24,7 +24,8 @@ import { transports } from './transports/index.ts'
 import { createInvite, decide, drainInbox, receive } from './hub.ts'
 import { bindingView, migratedText, migrationOf, MIGRATION_SENTENCES, resolveSets } from './migrate.ts'
 import {
-  askedText, cachedHub, clearState, outgoingPath, readState, recordedText, SENTENCES, trunkRequest, UUID, withdrawnText, writeState,
+  askedText, cachedHub, clearState, joinText, outgoingPath, readState, recordedText, savedRequestText, SENTENCES, trunkRequest, UUID,
+  withdrawnText, writeState, type JoinEdit,
 } from './node.ts'
 
 export interface FederationDeps {
@@ -52,6 +53,38 @@ async function body(c: Context): Promise<Record<string, unknown>> {
 }
 
 const fedOp = (text: string, base: string | null): FileOp => ({ op: 'file', path: FED, text, base })
+
+/** One line of the Join policy form: text, no control or format character, at most `max` long. */
+const CONTROL = /[\p{Cc}\p{Cf}\u2028\u2029]/u
+function formLine(v: unknown, what: string, max: number): string {
+  if (typeof v !== 'string' || v.trim() === '' || v.length > max || CONTROL.test(v)) throw new HttpError(400, `${what} must be one line of text, at most ${max} characters.`)
+  return v.trim()
+}
+function formList(v: unknown, what: string): string[] | undefined {
+  if (v === undefined) return undefined
+  if (!Array.isArray(v) || v.length > 20) throw new HttpError(400, `${what} must be a list of at most 20 lines.`)
+  return v.map(x => formLine(x, what, 100))
+}
+
+/** The Join policy form's body, checked; a refusal is a sentence. */
+function joinEditOf(raw: Record<string, unknown>): JoinEdit {
+  if (typeof raw.policy !== 'string' || !JOIN_POLICIES.includes(raw.policy)) throw new HttpError(400, `Choose a policy: ${JOIN_POLICIES.join(', ')}.`)
+  const edit: JoinEdit = { policy: raw.policy }
+  if (raw.decision !== undefined) edit.decision = raw.decision === null || raw.decision === '' ? null : formLine(raw.decision, 'The decision', 200)
+  const types = formList(raw.types, 'Who may ask')
+  if (types) edit.types = types
+  const asks = formList(raw.asks, 'What a request has to say')
+  if (asks) edit.asks = asks
+  if (raw.where !== undefined) {
+    if (raw.where === null || raw.where === '') edit.where = null
+    else {
+      const where = formLine(raw.where, 'Where requests go', 2048)
+      if (!isPublicUrl(where)) throw new HttpError(400, 'Where requests go must be a public https address, such as the hub\'s GitHub repo.')
+      edit.where = where
+    }
+  }
+  return edit
+}
 
 /** federation.yaml as this actor's change would have it: their staged edit of it when there is one (so a second edit builds
  *  on the first and never replaces it), else the working tree. `base` is what the op is staged against. */
@@ -176,6 +209,33 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     clearState(repo, id)
     return c.json({ id, cleared: true })
   }))
+
+  // The saved copy of an invited request a `file` send kept (Task 8): the Federation page offers it as a download, never
+  // as text on the page. It holds the invite, so it is a member's only and is never cached.
+  app.get('/api/federation/outgoing/:id/request-file', c => {
+    knownActorOf(c)
+    const id = c.req.param('id')
+    const text = savedRequestText(repo, id)
+    if (text === null) throw new HttpError(404, 'No saved request file for this request.')
+    return c.body(text, 200, {
+      'content-type': 'text/yaml; charset=utf-8', 'cache-control': 'no-store',
+      'content-disposition': `attachment; filename="join-request-${id.slice(0, 8)}.yaml"`,
+    })
+  })
+
+  // The hub's join policy (Task 13's Join policy form): one federation.yaml edit, class identity, staged in the actor's
+  // change (or committed where their rule is direct). Nothing reaches the network.
+  app.post('/api/federation/join', async c => {
+    const edit = joinEditOf(await body(c))
+    return withLock(async () => {
+      const actor = knownActorOf(c)
+      const { text, base } = fedNow(repo, actor.id)
+      const next = joinText(text, edit)
+      if (next === text) throw new HttpError(409, 'federation.yaml already says this, so nothing was changed.')
+      const out = await commitOrStage(repo, actor, [fedOp(next, base)], `federation: join policy ${edit.policy}`, deps.notify)
+      return c.json({ policy: edit.policy, ...out })
+    })
+  })
 
   // ── migration: existing peers onto atproto (Task 12) ──
 

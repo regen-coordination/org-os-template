@@ -635,3 +635,28 @@ describe('review fixes, round 1', () => {
     expect(SENTENCES.massDelete(3)).toBe('This would remove every published link at once (3). Nothing was written.')
   })
 })
+
+describe('the Federation page reads these facts (Task 13)', () => {
+  it('the plan in counts, the private peers counted, the PDS as last read; never a name', async () => {
+    writeFed([...HUB_PEER, ...QUIET_PEER, '  - name: Folder Friend', '    repo: ../folder-friend'])
+    commit('a private peer and one without a url')
+    // Before any check: no plan, but the kept peers are still counted from the trunk, and no PDS is known.
+    let facts = (await selfCard()).facts
+    expect(facts).toMatchObject({ publishPlan: null, toPublish: null, kept: 2, pds: null, profileWithheld: false, publishBlocked: { step: 5, sentence: SENTENCES.checkFirst } })
+    await check()
+    facts = (await selfCard()).facts
+    expect(facts).toMatchObject({ publishPlan: { create: 1, delete: 0, profile: true }, toPublish: 2, kept: 2, pds: `https://${ONE}`, profileWithheld: false })
+    const said = JSON.stringify({ publishPlan: facts.publishPlan, kept: facts.kept, pds: facts.pds, publishBlocked: facts.publishBlocked })
+    for (const hidden of ['Quiet Cove', QUIET, 'Folder Friend', 'folder-friend']) expect(said).not.toContain(hidden)
+  })
+
+  it('nothing else to publish but an unreadable profile: the card says so, and Publish is unavailable with both sentences', async () => {
+    net.seed(SELF, PROFILE_NSID, 'self', { $type: PROFILE_NSID, networks: 'not a list', displayName: 'Theirs' })
+    await check()
+    await (await planOf()).inProcess(repo, signal())
+    await check()
+    const card = await selfCard()
+    expect(card.facts).toMatchObject({ toPublish: 0, profileWithheld: true, publishPlan: { create: 0, delete: 0, profile: false } })
+    expect(op().unavailable(card, repo)).toBe(`${SENTENCES.nothing} ${SENTENCES.profileUnread}`)
+  })
+})

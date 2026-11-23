@@ -315,6 +315,19 @@ export interface CollectionWrite { id: string; commit?: string; staged?: true; v
 
 export const isKnownActor = (a: Actor): a is Extract<Actor, { id: string }> => 'id' in a
 
+// --- network N2 Task 13: the Federation page's shapes (the routes of server/federation/routes.ts)
+export type JoinPolicy = 'closed' | 'invite' | 'open-with-approval' | 'open'
+export interface FedJoin { policy: JoinPolicy; types: string[]; asks: string[]; where: string | null; decision: string | null }
+export interface FedHub { name: string; type: string; url: string; networks: string[]; join: FedJoin | null }
+export interface FedTransport { id: string; label: string; unavailable: string | null }
+export type FedWrite = { commit?: string; staged?: true }
+export interface FedMigrationRow {
+  index: number; name: string; did: string | null; didSource: 'federation.yaml' | 'their federation.json' | null; didVerified: boolean
+  relation: string | null; relationSource: 'link' | 'derived' | null; publishable: boolean; why: string | null; binding: string | null
+}
+export interface FedReceived { ref: string | null; outcome: string; sentence: string; proposal?: string }
+export interface FedInvite { id: string; link: string; text: string; expires: string; staged?: true; commit?: string }
+
 export const api = {
   status: () => fetchJSON<Status>('/api/status'),
   registries: () => fetchJSON<RegistrySummary[]>('/api/registries'),
@@ -505,4 +518,26 @@ export const api = {
   editors: () => fetchJSON<EditorRowView[]>('/api/editors'),
   file: (path: string) => fetchJSON<FileView>(`/api/files?path=${enc(path)}`),
   // --- end L6 Task 19
+  // --- network N2 Task 13: the Federation page. Reads are the caches and the trunk; nothing here reaches the network:
+  // that is the confirmed operations' (plan, then the job with its nonce).
+  federationHub: (address: string) => fetchJSON<{ hub: FedHub } | { problem: string }>(`/api/federation/hub?address=${enc(address)}`),
+  federationTransports: (hub: string, id?: string) =>
+    fetchJSON<FedTransport[]>(`/api/federation/transports?hub=${enc(hub)}${id ? `&id=${enc(id)}` : ''}`),
+  federationAsk: (body: { hub: string; network: string; answers: Record<string, string>; invite?: string }) =>
+    fetchJSON<{ id: string } & FedWrite>('/api/federation/ask', json('POST', body)),
+  federationWithdraw: (id: string) => fetchJSON<{ id: string; leaving: boolean; text: string } & FedWrite>(`/api/federation/outgoing/${enc(id)}/withdraw`, json('POST', {})),
+  federationClear: (id: string) => fetchJSON<{ id: string; cleared: true }>(`/api/federation/outgoing/${enc(id)}/clear`, json('POST', {})),
+  federationRecord: (id: string) => fetchJSON<{ id: string; text: string } & FedWrite>(`/api/federation/outgoing/${enc(id)}/record`, json('POST', {})),
+  /** The saved copy of an invited request, as a download link: its text holds the invite, so the page never shows it. */
+  federationRequestFile: (id: string) => `/api/federation/outgoing/${enc(id)}/request-file`,
+  federationMigration: () => fetchJSON<{ rows: FedMigrationRow[]; kept: { private: number; noUrl: number } } | { problem: string }>('/api/federation/migration'),
+  federationMigrate: (set: { index: number; did?: string; link?: string }[]) =>
+    fetchJSON<{ set: number[]; notes?: string[] } & FedWrite>('/api/federation/migration', json('POST', { set })),
+  federationReceive: (text?: string) => fetchJSON<FedReceived[]>('/api/federation/requests/receive', json('POST', text === undefined ? {} : { text })),
+  federationDecide: (id: string, accept: boolean, reason?: string) =>
+    fetchJSON<{ id: string; outcome: string; sentence: string; commit?: string }>(`/api/federation/requests/${enc(id)}/decide`, json('POST', { accept, ...(reason !== undefined ? { reason } : {}) })),
+  federationInvite: (body: { name: string; type: string; network: string; days: number }) => fetchJSON<FedInvite>('/api/federation/invites', json('POST', body)),
+  federationJoin: (body: { policy: JoinPolicy; decision?: string | null; types?: string[]; asks?: string[]; where?: string | null }) =>
+    fetchJSON<{ policy: JoinPolicy } & FedWrite>('/api/federation/join', json('POST', body)),
+  // --- end N2 Task 13
 }

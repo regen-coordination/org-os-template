@@ -28,7 +28,8 @@ import { isPublishedPeer } from '../standards/federation.mjs'
  *  `theirDid`: the `did` the peer's own federation.json carried at the last check; `byFiles`: the files readings (R4) */
 /** @typedef {{ index: number, name: string, did: string | null, didSource: 'federation.yaml' | 'their federation.json' | null,
  *   didVerified: boolean, relation: Relation | null, relationSource: 'link' | 'derived' | null, publishable: boolean,
- *   why: string | null }} MigrationRow */
+ *   why: string | null, binding: string | null }} MigrationRow
+ *  `binding`: why the DID isn't tied to the peer yet (`didBinding`'s sentence, `BINDING.lookAgain` among them), else null. */
 
 /** Why a row isn't publishable, one plain sentence each. */
 export const MIGRATION_WHY = Object.freeze({
@@ -152,6 +153,7 @@ export function migrationRows(fed, caches = {}) {
     const theirs = isDid(claimed) ? claimed : null
     const did = peer.did ?? theirs
     const bound = { ...view, theirDid: (/** @type {string} */ u) => (u === peer.url ? theirs : null) }
+    const binding = did === null ? null : didBinding(peer, did, bound)
     const relation = relationOf(peer, fed, { ...where, ...byFiles })
     const wanted = wantedLink(peer, fed, { relation, where, ...byFiles })
     let why = null
@@ -165,11 +167,12 @@ export function migrationRows(fed, caches = {}) {
       name: peer.name,
       did,
       didSource: peer.did ? 'federation.yaml' : theirs ? 'their federation.json' : null,
-      didVerified: did !== null && didBinding(peer, did, bound) === null,
+      didVerified: binding === null && did !== null,
       relation,
       relationSource: peer.link ? 'link' : relation ? 'derived' : null,
       publishable: 'link' in wanted,
       why,
+      binding,
     })
   }
   return { rows, kept }

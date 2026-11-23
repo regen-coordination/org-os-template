@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs'
 import { stateDir } from '../../state.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import { readFederation } from '../../../lib/federation/read.mjs'
+import { isPublishedPeer } from '../../../lib/standards/federation.mjs'
 import { linkStatesOf, selfAddressesOf, type PeerLinkState } from '../../federation/link-state.ts'
 import { publishFacts } from '../../federation/atproto/publish.ts'
 import { listOutgoing } from '../../federation/node.ts'
@@ -111,7 +112,9 @@ export const fleet: Adapter = {
         return (peer && links.peers.get(peer.index)?.sources.atproto) || 'unknown'
       }
       // Our records no peer accounts for: published, but federation.yaml no longer lists them. The urgent case.
-      self.facts = { ...self.facts, did: links.selfDid, drift: links.unlisted }
+      self.facts = { ...self.facts, did: links.selfDid, drift: links.unlisted,
+        // The Federation page's Networks and Join policy (N2 Task 13), as federation.yaml says them now.
+        networks: parsedFed.networks, join: parsedFed.join }
       if (!self.attention && links.unlisted.length > 0) self.attention = { level: 'warn', text: links.unlisted[0].text }
       const raws = peersOf(fed)
       for (const [i, raw] of (Array.isArray(raws) ? raws as Record<string, unknown>[] : []).entries()) {
@@ -126,7 +129,9 @@ export const fleet: Adapter = {
           status: shown.status, attention: shown.attention,
           changed: local ? await lastCommit(local, '.') : null,
           facts: { type: raw.type ?? null, repo: ref, url: raw.url ?? null, trust: raw.trust ?? null, relationship: raw.relationship ?? null, localPath: local,
-            link: link.state, linkReason: link.reason, checked: link.sources.checked, relation: link.relation, sources: link.sources, drift: link.drift },
+            link: link.state, linkReason: link.reason, checked: link.sources.checked, relation: link.relation, sources: link.sources, drift: link.drift,
+            // Public (not `visibility: private`, and a public https url): only such a peer is ever named on the Federation page (R3, R24).
+            public: (() => { const p = parsedFed.peers.find(x => x.index === i); return p ? isPublishedPeer(p) : false })() },
           source: { path: 'federation.yaml', editable: false },
         })
         edges.push({ from: `instance:${id}`, to: self.id, kind: 'federation' })

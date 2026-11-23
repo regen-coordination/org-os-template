@@ -20,6 +20,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { LINK_NSID, PROFILE_NSID, isDid, planLinks } from '../../../lib/federation/links.mjs'
+import { isPublishedPeer } from '../../../lib/standards/federation.mjs'
 import { HttpError } from '../../errors.ts'
 import { kms as loadKms, kmsPresence, type Kms } from '../../knowledge/kms.ts'
 import { networkLookup, isPublicAddress } from '../../net.ts'
@@ -465,6 +466,14 @@ export interface PublishFacts {
   toPublish: number | null
   /** The first refusal of the plan's steps that don't depend on the server's deps, with its step, or null. */
   publishBlocked: { step: number; sentence: string } | null
+  /** The plan's counts, for the Federation page (Task 13), or null when it can't be planned. Counts only, never a name. */
+  publishPlan: { create: number; delete: number; profile: boolean } | null
+  /** The profile record couldn't be read, so the plan leaves it as it is (Task 7's `profileUnread`). */
+  profileWithheld: boolean
+  /** Peers kept off atproto because they are private or have no public https url: counted, never named (R3, R24). */
+  kept: number
+  /** This instance's PDS as the last check read it, or null. */
+  pds: string | null
 }
 
 /** The self card's publish facts, from the trunk and the cache. Never fetches, never throws. */
@@ -473,9 +482,24 @@ export async function publishFacts(repo: string, opts: { run?: Runner; now?: Dat
   const published = r ? { at: r.at, created: r.created.length, deleted: r.deleted.length } : null
   try {
     const p = await prepare(repo, { fetch: noFetch, env: {}, run: opts.run, now: opts.now, startBranch: opts.startBranch }, { live: false, password: false, lexicon: false })
-    return { published, toPublish: countOf(p.plan), publishBlocked: null }
+    return {
+      published, toPublish: countOf(p.plan), publishBlocked: null,
+      publishPlan: { create: p.plan.create.length, delete: p.plan.delete.length, profile: p.plan.profile !== null },
+      profileWithheld: Boolean(p.plan.profileWithheld), kept: p.plan.withheld.private + p.plan.withheld.noUrl, pds: p.reading.pds ?? null,
+    }
   } catch (err) {
-    return { published, toPublish: null, publishBlocked: err instanceof Refused ? { step: err.step, sentence: err.sentence } : null }
+    // The plan stopped early: what it would keep private is still counted from the trunk, and the PDS read from the cache.
+    let kept = 0
+    let pds: string | null = null
+    try {
+      const trunk = await readTrunkFederation(repo, opts.startBranch)
+      if (!('problem' in trunk)) {
+        kept = trunk.fed.peers.filter(peer => !isPublishedPeer(peer)).length
+        const did = trunk.fed.identity.did
+        if (isDid(did)) pds = atprotoCache(repo).get(did)?.reading?.pds ?? null
+      }
+    } catch { /* counted as none */ }
+    return { published, toPublish: null, publishBlocked: err instanceof Refused ? { step: err.step, sentence: err.sentence } : null, publishPlan: null, profileWithheld: false, kept, pds }
   }
 }
 const noFetch: FetchLike = async () => { throw new Error('the self card never fetches') }
@@ -493,7 +517,7 @@ export function publishUnavailable(r: Resource, repo: string, deps: Pick<Publish
   if (!deps.allowPlaceholderLexicons && placeholderCollections()) gates.push({ step: 6, sentence: SENTENCES.placeholder })
   gates.sort((a, b) => a.step - b.step)
   if (gates.length > 0) return gates[0].sentence
-  if (r.facts.toPublish === 0) return SENTENCES.nothing
+  if (r.facts.toPublish === 0) return `${SENTENCES.nothing}${unreadNote(r.facts.profileWithheld === true)}`
   // The card couldn't work the plan out (an unexpected error, not a refusal): never offer a Publish that can't be planned.
   if (typeof r.facts.toPublish !== 'number') return SENTENCES.unplannable
   return null

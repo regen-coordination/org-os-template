@@ -76,6 +76,13 @@ export function writeState(repo: string, id: string, state: OutgoingState): void
 /** The saved copy of a sent file, with the invite in it when there is one: kept outside git, for the operator to pass on. */
 const copyPath = (repo: string, id: string): string => join(stateFolder(repo), `${id}.request.yaml`)
 
+/** The saved copy of an invited request a `file` send kept (mode 0600), or null when there is none. The Federation page
+ *  offers it as a download; its text holds the invite, so it is never printed or logged. */
+export function savedRequestText(repo: string, id: string): string | null {
+  if (!UUID.test(id)) return null
+  try { return readFileSync(copyPath(repo, id), 'utf8') } catch { return null }
+}
+
 // ── the hub, as last looked up ───────────────────────────────────────────────────────────────────────
 
 export interface HubView {
@@ -230,6 +237,29 @@ export function askedText(text: string, a: AskEdit): { text: string; peerAdded: 
     }))
   }
   return { text: doc.toString(STRINGIFY), peerAdded }
+}
+
+/** What the Federation page's Join policy form sets (network N2 Task 13). `decision` is the standing decision `open`
+ *  needs (R17); `null` removes it. Left out, a key keeps what the file has. */
+export interface JoinEdit { policy: string; decision?: string | null; types?: string[]; asks?: string[]; where?: string | null }
+
+/** federation.yaml with its `join` block set from the form, comments kept. A `join` nested under `federation:` is moved
+ *  up first by hand, as every other key is. The decision is set or removed only for `open`; another policy leaves it. */
+export function joinText(text: string, j: JoinEdit): string {
+  const doc = docOf(text)
+  const nested = doc.get('federation')
+  if (doc.get('join') === undefined && isMap(nested) && nested.get('join') !== undefined) {
+    throw new HttpError(409, 'Move "join" to the top level of federation.yaml first: it sits under "federation:".')
+  }
+  let join = doc.get('join')
+  if (!isMap(join)) { join = doc.createNode({}) as YAMLMap; doc.set('join', join) }
+  const m = join as YAMLMap
+  m.set('policy', j.policy)
+  if (j.types !== undefined) { if (j.types.length > 0) m.set('types', doc.createNode(j.types)); else m.delete('types') }
+  if (j.asks !== undefined) { if (j.asks.length > 0) m.set('asks', doc.createNode(j.asks)); else m.delete('asks') }
+  if (j.where !== undefined) { if (j.where) m.set('where', j.where); else m.delete('where') }
+  if (j.policy === 'open' && j.decision !== undefined) { if (j.decision) m.set('decision', j.decision); else m.delete('decision') }
+  return doc.toString(STRINGIFY)
 }
 
 /** The peer entry that carries `requested: <id>`, from the text now, or null. */

@@ -57,11 +57,11 @@ describe('migrationRows', () => {
     const out = migrationRows(readFederation(doc()), caches())
     expect(out.rows).toEqual([
       { index: 0, name: 'Mesh Hub', did: HUB, didSource: 'their federation.json', didVerified: true,
-        relation: 'memberOf', relationSource: 'derived', publishable: false, why: MIGRATION_WHY.noDid },
+        relation: 'memberOf', relationSource: 'derived', publishable: false, why: MIGRATION_WHY.noDid, binding: null },
       { index: 1, name: 'Seat Council', did: SEAT, didSource: 'federation.yaml', didVerified: false,
-        relation: null, relationSource: null, publishable: false, why: MIGRATION_WHY.noRelation },
+        relation: null, relationSource: null, publishable: false, why: MIGRATION_WHY.noRelation, binding: expect.any(String) },
       { index: 4, name: 'Grove Sibling', did: GROVE, didSource: 'federation.yaml', didVerified: true,
-        relation: null, relationSource: null, publishable: false, why: MIGRATION_WHY.noRelation },
+        relation: null, relationSource: null, publishable: false, why: MIGRATION_WHY.noRelation, binding: null },
     ])
   })
 
