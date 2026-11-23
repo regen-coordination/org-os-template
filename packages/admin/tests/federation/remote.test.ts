@@ -47,6 +47,16 @@ describe('isPublicAddress', () => {
     }
     for (const a of ['93.184.216.34', '8.8.8.8', '172.32.0.1', '2606:2800:220:1:248:1893:25c8:1946']) expect(isPublicAddress(a), a).toBe(true)
   })
+  it('judges the v4 address inside NAT64 (64:ff9b::/96, 64:ff9b:1::/48) and 6to4 (2002::/16)', () => {
+    for (const a of ['64:ff9b::a00:1', '64:ff9b::7f00:1', '64:ff9b::10.0.0.1', '64:ff9b:1::a00:1', '64:ff9b:1:0:0:0:a9fe:a9fe', '2002:a00:1::', '2002:7f00:1::', '2002:c0a8:101::1']) {
+      expect(isPublicAddress(a), a).toBe(false)
+    }
+    for (const a of ['64:ff9b::808:808', '64:ff9b:1::808:808', '2002:808:808::1']) expect(isPublicAddress(a), a).toBe(true)
+  })
+  it('refuses 192.0.0.0/24 and TEST-NET-1 192.0.2.0/24, not the rest of 192.0.0.0/16', () => {
+    for (const a of ['192.0.0.1', '192.0.0.170', '192.0.2.1']) expect(isPublicAddress(a), a).toBe(false)
+    for (const a of ['192.0.3.5', '192.0.128.1']) expect(isPublicAddress(a), a).toBe(true)
+  })
 })
 
 describe('guardedJson', () => {

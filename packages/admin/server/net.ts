@@ -8,24 +8,31 @@ import type { FetchLike } from './systems/driver.ts'
 export function isPublicAddress(address: string): boolean {
   const kind = isIP(address)
   if (kind === 4) {
-    const [a, b] = address.split('.').map(Number)
+    const [a, b, c] = address.split('.').map(Number)
     if (a === 0 || a === 10 || a === 127 || a >= 224) return false
     if (a === 100 && b >= 64 && b <= 127) return false
     if (a === 169 && b === 254) return false
     if (a === 172 && b >= 16 && b <= 31) return false
     if (a === 192 && b === 168) return false
-    if (a === 192 && b === 0) return false
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return false // 192.0.0.0/24 IETF protocol assignments, 192.0.2.0/24 TEST-NET-1
     if (a === 198 && (b === 18 || b === 19)) return false
     return true
   }
   if (kind === 6) {
     const groups = expandV6(address)
     if (groups === null) return false
+    const v4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`
     // v4-mapped (::ffff:a.b.c.d) and v4-compatible: judged as the v4 address inside.
     if (groups.slice(0, 5).every(g => g === 0) && (groups[5] === 0xffff || groups[5] === 0)) {
       if (groups.slice(0, 6).every(g => g === 0) && groups[6] === 0 && groups[7] <= 1) return false // :: and ::1
-      return isPublicAddress(`${groups[6] >> 8}.${groups[6] & 255}.${groups[7] >> 8}.${groups[7] & 255}`)
+      return isPublicAddress(v4(groups[6], groups[7]))
     }
+    // NAT64 (64:ff9b::/96 well-known, 64:ff9b:1::/48 local-use, RFC 8215): judged as the v4 address in the last 32 bits.
+    if (groups[0] === 0x64 && groups[1] === 0xff9b && (groups[2] === 1 || groups.slice(2, 6).every(g => g === 0))) {
+      return isPublicAddress(v4(groups[6], groups[7]))
+    }
+    // 6to4 (2002::/16): judged as the v4 address in bits 16–47.
+    if (groups[0] === 0x2002) return isPublicAddress(v4(groups[1], groups[2]))
     if ((groups[0] & 0xfe00) === 0xfc00) return false // fc00::/7 unique-local
     if ((groups[0] & 0xffc0) === 0xfe80) return false // fe80::/10 link-local
     if ((groups[0] & 0xffc0) === 0xfec0) return false // fec0::/10 site-local
