@@ -257,5 +257,54 @@ describe('fleet adapter: one link state from every source', () => {
     remoteCache(repo).put(url, { spec: 'org-os/federation/1', networks: [{ name: 'Mesh', hub: `../${basename(repo)}` }], peers: peersBack })
     expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toEqual({ mutualByFiles: [0], membersByFiles: [] })
   })
+
+  // Review fix round 1, I1: a hub named by a bare folder name only the disk resolves.
+  it('a hub named by a bare folder name: our published record matches, no drift', async () => {
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', `  did: ${SELF}`,
+      'networks:', '  - name: Mesh', `    hub: ${basename(sibling)}`,
+      'peers:', '  - name: Hub', `    repo: ../${basename(sibling)}`, `    url: ${HUB_URL}`, `    did: ${HUB}`, '    decision: accepted', ''].join('\n'))
+    atprotoCache(repo).put(SELF, reading(SELF, [link(SELF, HUB, 'memberOf', 'Mesh')]) as never)
+    const g = (await fleet.read(ctx())) as Graph
+    expect(card(g, `instance:${basename(sibling)}`)).toMatchObject({ facts: expect.objectContaining({ relation: 'memberOf', drift: [] }) })
+  })
+
+  // Review fix round 1, I2: a URL-only hub (their files unknown here), derived and undecided, with our record published.
+  it('an undecided derived link whose files are unknown here keeps its record without the urgent attention', async () => {
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', `  did: ${SELF}`,
+      'networks:', '  - name: Regen Mesh', `    hub: ${HUB_URL}`, 'peers:', '  - name: Mesh Hub', `    url: ${HUB_URL}`, `    did: ${HUB}`, ''].join('\n'))
+    atprotoCache(repo).put(SELF, reading(SELF, [link(SELF, HUB, 'memberOf', 'Regen Mesh')]) as never)
+    const g = (await fleet.read(ctx())) as Graph
+    expect(card(g).facts).toMatchObject({ link: 'unknown', drift: [] })
+    expect(card(g).attention?.text).not.toBe('Published, but federation.yaml no longer lists it.')
+  })
+
+  // Review fix round 1, I3: only origin is this instance; the framework upstream every instance carries is not.
+  it('a peer that lists and names the upstream template as hub does not read as listing this instance', async () => {
+    const TEMPLATE = 'https://github.com/org-os/org-os-template'
+    execSync(`git remote add upstream ${TEMPLATE}`, { cwd: repo })
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', `  did: ${SELF}`, 'join:', '  policy: open', 'peers:',
+      '  - name: Sibling', `    repo: ../${basename(sibling)}`, '    url: https://sibling.example.org', `    did: ${HUB}`, '    relationship: node', ''].join('\n'))
+    writeFileSync(join(sibling, 'federation.yaml'), `networks:\n  - name: Template Mesh\n    hub: ${TEMPLATE}\npeers:\n  - name: Template\n    url: ${TEMPLATE}\n`)
+    const fed = readFederation(parseYaml(readFileSync(join(repo, 'federation.yaml'), 'utf8')))
+    const self = await selfAddressesOf(repo, runCommand)
+    expect(self.some(a => a.kind === 'github' && a.repo === 'org-os-template')).toBe(false)
+    expect(byFiles(repo, fed, self)).toEqual({ mutualByFiles: [], membersByFiles: [] })
+    let g = (await fleet.read(ctx())) as Graph
+    expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'claimed', relation: null })
+    // The same lines naming this instance's origin do count.
+    execSync('git remote add origin https://github.com/acme/fixture-org', { cwd: repo })
+    writeFileSync(join(sibling, 'federation.yaml'), 'networks:\n  - name: Fixture Mesh\n    hub: https://github.com/acme/fixture-org\npeers:\n  - name: Fixture\n    url: https://github.com/acme/fixture-org\n')
+    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toEqual({ mutualByFiles: [0], membersByFiles: [0] })
+    g = (await fleet.read(ctx())) as Graph
+    expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'mutual', relation: 'hasMember' })
+  })
+
+  it('the files rule for hasMember needs this instance to be a hub (refined c3)', async () => {
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', `  did: ${SELF}`, 'peers:',
+      '  - name: Sibling', `    repo: ../${basename(sibling)}`, '    url: https://sibling.example.org', `    did: ${HUB}`, '    relationship: node', ''].join('\n'))
+    writeFileSync(join(sibling, 'federation.yaml'), `networks:\n  - name: Fixture Mesh\n    hub: ../${basename(repo)}\npeers:\n  - name: Fixture Org\n    repo: ../${basename(repo)}\n`)
+    const g = (await fleet.read(ctx())) as Graph
+    expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'mutual', relation: null })
+  })
 })
 

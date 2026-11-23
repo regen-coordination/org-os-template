@@ -2,8 +2,8 @@
 // records their side once they are on atproto, their files otherwise; a disagreement is drift, never a write; a failed
 // read is unknown, never left. Invented names and DIDs only.
 import { describe, it, expect } from 'vitest'
-import { combineLinkState, filesSide, unlistedRecords, DRIFT, LINK_STATES } from '../../lib/federation/state.mjs'
-import { LINK_NSID, PROFILE_NSID } from '../../lib/federation/links.mjs'
+import { combineLinkState, filesSide, unlistedRecords, linkVerdict, DRIFT, LINK_STATES } from '../../lib/federation/state.mjs'
+import { LINK_NSID, PROFILE_NSID, relationOf } from '../../lib/federation/links.mjs'
 import { readFederation } from '../../lib/federation/read.mjs'
 
 const SELF = 'did:plc:selfselfselfselfselfself'
@@ -273,5 +273,60 @@ describe('filesSide', () => {
     expect(filesSide(FILES.unknown, { listsUs: true, fetchedAt: T0 })).toEqual({ side: 'lists-us', checked: T0, reason: `checked ${T0}` })
     // An unknown with a path means a folder was looked at: the remote cache doesn't replace what was found there.
     expect(filesSide({ state: 'unknown', path: '/w/gone', reason: 'no folder at /w/gone' }, { listsUs: true, fetchedAt: T0 }).side).toBe('unknown')
+  })
+})
+
+// Review fix round 1, I1: the record's network is resolved with the same disk as the relation.
+describe('our record is matched with the disk the relation was worked out with', () => {
+  it("a hub named in networks by a form only the disk resolves: the published record is not drift", () => {
+    // `hub-os` is a bare folder name found one folder up (vault style): only the disk resolves it.
+    const io = { resolve: (b: string, r: string) => { const out: string[] = []; for (const p of (r.startsWith('/') ? r : `${b}/${r}`).split('/')) { if (!p || p === '.') continue; if (p === '..') out.pop(); else out.push(p) } return `/${out.join('/')}` },
+      isDir: (a: string) => a === '/vault/hub-os', readFederationAt: () => ({ found: false as const }) }
+    const where = { base: '/vault/me', io }
+    const fed = readFederation({ identity: { did: SELF }, networks: [{ name: 'Mesh', hub: 'hub-os' }], peers: [{ name: 'Hub', repo: '../hub-os', url: HUB_URL, did: HUB, decision: 'accepted' }] })
+    const relation = relationOf(fed.peers[0], fed, where)
+    expect(relation).toBe('memberOf')
+    const published = [rec(SELF, HUB, 'memberOf', 'Mesh')]
+    const got = combineLinkState({ peer: fed.peers[0], relation, selfDid: SELF, files: FILES.lists, ownRecords: published, fed, where } as never)
+    expect(got.drift).toEqual([])
+    expect(combineLinkState({ peer: fed.peers[0], relation, selfDid: SELF, files: FILES.lists, ownRecords: [], fed, where } as never).drift)
+      .toEqual([{ side: 'ours', text: 'Not published yet.' }])
+  })
+})
+
+// Review fix round 1, I2: an unreadable files side never makes our record of a derived link "not allowed".
+describe('an unreadable files side never turns our record urgent', () => {
+  const published = () => [rec(SELF, HUB, 'memberOf', 'Regen Mesh')]
+  it('derived memberOf, no decision, our record published, their files unknown: no urgent drift, no delete', () => {
+    for (const files of [FILES.unknown, { state: 'unknown', path: '/w/mesh-hub', reason: 'no folder at /w/mesh-hub' }]) {
+      const own = published()
+      const got = combine(fedWith(), { files, ownRecords: own })
+      expect(got.drift.filter((d: { urgent?: boolean }) => d.urgent), JSON.stringify(files)).toEqual([])
+      expect(got.drift).toEqual([])
+      const v = linkVerdict({ peer: fedWith().peers[0], fed: fedWith(), relation: 'memberOf', filesSide: 'unknown' })
+      expect(v).toEqual({ wanted: { withheld: 'undecided' }, tolerated: { subject: HUB, relation: 'memberOf', network: 'Regen Mesh' } })
+    }
+  })
+
+  it('their files read and silent: the undecided record is still urgent (a real read, not a failure)', () => {
+    const own = published()
+    expect(combine(fedWith(), { files: FILES.silent, ownRecords: own }).drift)
+      .toEqual([{ side: 'ours', text: 'Published, but federation.yaml no longer lists it.', urgent: true, uri: own[0].uri }])
+  })
+
+  it("a files-derived member (relation null while files are unknown) keeps its record quietly; nothing is wanted from it", () => {
+    const MEMBER = 'did:plc:membermembermembermember'
+    const hub = readFederation({ identity: { did: SELF }, join: { policy: 'open' }, networks: [{ name: 'Regen Mesh', hub: 'https://self.example.org', role: 'hub' }],
+      peers: [{ name: 'Old Member', url: 'https://old.example.org', did: MEMBER, relationship: 'node' }] })
+    const own = [rec(SELF, MEMBER, 'hasMember', 'Regen Mesh')]
+    const got = combineLinkState({ peer: hub.peers[0], relation: null, selfDid: SELF, files: FILES.unknown, ownRecords: own, fed: hub } as never)
+    expect(got.drift).toEqual([])
+    // Not tolerated: a record of another relation, or a private peer's record (federation.yaml decides those).
+    const other = [rec(SELF, MEMBER, 'peerOf')]
+    expect(combineLinkState({ peer: hub.peers[0], relation: null, selfDid: SELF, files: FILES.unknown, ownRecords: other, fed: hub } as never).drift.map((d: { text: string }) => d.text))
+      .toEqual(['Published, but federation.yaml no longer lists it.'])
+    const priv = fedWith({ visibility: 'private' })
+    expect(combine(priv, { files: FILES.unknown, ownRecords: published() }).drift.map((d: { text: string }) => d.text))
+      .toEqual(['Published, but federation.yaml lists it as private.'])
   })
 })

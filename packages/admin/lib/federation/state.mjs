@@ -10,7 +10,7 @@
 // Pure: relative imports only, because the app imports it for the page's words.
 
 import { LINK_STATES } from './peers.mjs'
-import { reciprocal, wantedLink } from './links.mjs'
+import { reciprocal, wantedLink, relationOf } from './links.mjs'
 
 export { LINK_STATES }
 
@@ -64,13 +64,33 @@ function atprotoSide(peer, relation, selfDid, atproto) {
   return { side: lists ? 'lists-us' : 'silent', checked: r.fetchedAt, failedAt: null }
 }
 
+/** What federation.yaml allows this org to publish for one peer:
+ *  - `wanted`: R24's answer with the files as they read now (`filesSide`);
+ *  - `tolerated`: when their files can't be read (`unknown`), the link R24 would want if they still listed this
+ *    instance (and named it as hub). A record of it is kept: an unreadable read never makes it "not allowed", so it is
+ *    neither urgent drift nor a delete (review focus 10). It never makes a link wanted: nothing is published from it.
+ *  `relation` and `where` are the caller's (relationOf with the disk), so the record's network is resolved the same way.
+ *  Task 7's planner matches records against both: create from `wanted`, never delete what `tolerated` matches.
+ *  @param {{ peer: Peer, fed: any, relation: Relation | null, filesSide: string, where?: import('./links.mjs').Where }} input
+ *  @returns {{ wanted: ReturnType<typeof wantedLink>, tolerated: import('./links.mjs').WantedLink | null }} */
+export function linkVerdict({ peer, fed, relation, filesSide: side, where }) {
+  const f = fed ?? { networks: [], join: null }
+  const wanted = wantedLink(peer, f, { relation, mutualByFiles: side === 'lists-us' ? [peer.index] : [], where })
+  if (side !== 'unknown' || 'link' in wanted) return { wanted, tolerated: null }
+  const mine = [peer.index]
+  const asIfListed = relation ?? relationOf(peer, f, { ...where, mutualByFiles: mine, membersByFiles: mine })
+  const hoped = wantedLink(peer, f, { relation: asIfListed, mutualByFiles: mine, where })
+  return { wanted, tolerated: 'link' in hoped ? hoped.link : null }
+}
+
 /** Our side's drift for one peer: our records for its DID that R24 doesn't allow (urgent), then the wanted link when
- *  our record of it is missing. None when our records were never read.
+ *  our record of it is missing. None when our records were never read. A record `tolerated` while their files can't
+ *  be read makes no line.
  *  @param {Peer} peer @param {Relation | null} relation @param {any} fed @param {OwnRecord[] | null | undefined} ownRecords
- *  @param {number[]} mutualByFiles @returns {Drift[]} */
-function ourDrift(peer, relation, fed, ownRecords, mutualByFiles) {
+ *  @param {string} side their files' side @param {import('./links.mjs').Where | undefined} where @returns {Drift[]} */
+function ourDrift(peer, relation, fed, ownRecords, side, where) {
   if (!Array.isArray(ownRecords)) return []
-  const wanted = wantedLink(peer, fed ?? { networks: [], join: null }, { relation, mutualByFiles })
+  const { wanted, tolerated } = linkVerdict({ peer, fed, relation, filesSide: side, where })
   const mine = peer.did ? ownRecords.filter(r => r?.value?.subject === peer.did) : []
   /** @param {LinkRecord} v @param {import('./links.mjs').WantedLink} w */
   const same = (v, w) => v.relation === w.relation && (v.network ?? null) === (w.network ?? null)
@@ -79,6 +99,7 @@ function ourDrift(peer, relation, fed, ownRecords, mutualByFiles) {
   const kept = 'withheld' in wanted && (wanted.withheld === 'private' || wanted.withheld === 'noUrl')
   for (const r of mine) {
     if ('link' in wanted && same(r.value, wanted.link)) continue
+    if (tolerated && same(r.value, tolerated)) continue
     out.push({ side: 'ours', text: kept ? DRIFT.private : DRIFT.unlisted, urgent: true, uri: r.uri })
   }
   if ('link' in wanted && !mine.some(r => same(r.value, wanted.link))) out.push({ side: 'ours', text: DRIFT.notPublished })
@@ -88,11 +109,13 @@ function ourDrift(peer, relation, fed, ownRecords, mutualByFiles) {
 /** The state of one peer's link, from every source.
  *  - `peer`, `relation` (relationOf, worked out with the disk), `selfDid` (identity.did, or null), `fed` (readFederation);
  *  - `files`: peers.mjs linkState (the local folder); `remote`: their federation.json as last read, or null;
- *  - `atproto`: the atproto cache's entry for their DID, or null; `ownRecords`: our link records as last read, or null.
+ *  - `atproto`: the atproto cache's entry for their DID, or null; `ownRecords`: our link records as last read, or null;
+ *  - `where`: the same `{ base, io }` the relation was worked out with, so our record's network resolves the same way.
  *  @param {{ peer: Peer, relation: Relation | null, selfDid: string | null, files: FilesReading | null,
- *   remote?: RemoteReading | null, atproto?: AtprotoEntry | null, ownRecords?: OwnRecord[] | null, fed?: any }} input
+ *   remote?: RemoteReading | null, atproto?: AtprotoEntry | null, ownRecords?: OwnRecord[] | null, fed?: any,
+ *   where?: import('./links.mjs').Where }} input
  *  @returns {{ state: string, sources: Sources, drift: Drift[], reason: string | null }} */
-export function combineLinkState({ peer, relation, selfDid, files, remote = null, atproto = null, ownRecords = null, fed }) {
+export function combineLinkState({ peer, relation, selfDid, files, remote = null, atproto = null, ownRecords = null, fed, where }) {
   const f = filesSide(files, remote)
   const a = atprotoSide(peer, relation, selfDid ?? null, atproto)
   // Their records decide only a public link: we have a DID for them to name, and a relation for them to answer (R13).
@@ -122,11 +145,10 @@ export function combineLinkState({ peer, relation, selfDid, files, remote = null
     : side === 'silent' ? (peer.decision ? 'left' : peer.requested ? 'requested' : 'claimed')
       : side
 
-  const mutualByFiles = f.side === 'lists-us' ? [peer.index] : []
   return {
     state,
     sources: { files: f.side === 'not-an-instance' ? 'silent' : f.side, atproto: a.side, checked: a.checked ?? f.checked ?? null },
-    drift: [...ourDrift(peer, relation, fed, ownRecords, mutualByFiles), ...theirs],
+    drift: [...ourDrift(peer, relation, fed, ownRecords, f.side, where), ...theirs],
     reason,
   }
 }

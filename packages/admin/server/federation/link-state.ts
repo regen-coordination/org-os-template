@@ -17,12 +17,16 @@ import type { Runner } from '../resources/types.ts'
 type Fed = ReturnType<typeof readFederation>
 type Peer = Fed['peers'][number]
 
-/** Every way another instance could point at this one: its folder and each git remote (none when git fails). */
+/** Every way another instance could point at this one: its folder and its `origin` remote (none when git fails).
+ *  Only `origin` is this instance: an `upstream` (the framework template every instance carries) or any other remote
+ *  is someone else's repository, and a peer that lists or names it must never read as listing this one. */
 export async function selfAddressesOf(repo: string, run: Runner): Promise<Address[]> {
   let remotes: string[] = []
   try {
     const r = await run('git', ['remote', '-v'], { cwd: repo, timeoutMs: 5000 })
-    if (r.code === 0) remotes = [...new Set(r.stdout.split('\n').map(l => l.split(/\s+/)[1]).filter(Boolean))]
+    if (r.code === 0) {
+      remotes = [...new Set(r.stdout.split('\n').map(l => l.trim().split(/\s+/)).filter(([name, url]) => name === 'origin' && url).map(([, url]) => url))]
+    }
   } catch { /* no remotes */ }
   return selfAddresses(repo, remotes, nodePeerIO)
 }
@@ -95,10 +99,11 @@ export function linkStatesOf(repo: string, fed: Fed, self: Address[]): { selfDid
   for (const peer of fed.peers) {
     const { files, remote, namesUsAsHub } = filesReadingOf(repo, peer, self)
     const mine = [peer.index]
-    const relation = relationOf(peer, fed, { base: repo, io: nodePeerIO,
+    const where = { base: repo, io: nodePeerIO }
+    const relation = relationOf(peer, fed, { ...where,
       mutualByFiles: filesSide(files, remote).side === 'lists-us' ? mine : [], membersByFiles: namesUsAsHub ? mine : [] })
     const atproto = peer.did ? cache.get(peer.did) : null
-    const combined = combineLinkState({ peer, relation, selfDid, files, remote, atproto, ownRecords: own, fed })
+    const combined = combineLinkState({ peer, relation, selfDid, files, remote, atproto, ownRecords: own, fed, where })
     peers.set(peer.index, { relation, ...combined, path: files.path, failed: !!atproto && !atproto.reading && !!atproto.lastProblem })
   }
   return { selfDid, peers, unlisted: unlistedRecords({ peers: fed.peers, ownRecords: own }) }

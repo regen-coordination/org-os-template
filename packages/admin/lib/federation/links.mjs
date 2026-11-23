@@ -133,14 +133,18 @@ function hubNetworkOf(peer, fed, where = {}) {
   return null
 }
 
+/** Whether this instance says it is a hub: a `join` block, or one of its `networks` with `role: hub`.
+ *  @param {FedLike} fed */
+export const isHub = fed => Boolean(fed.join) || (fed.networks ?? []).some(n => n.role === 'hub')
+
 /** The relation a link record for this peer would state (R24.3), or null:
  *  - an explicit `peer.link` wins, and `none` gives null;
  *  - else a peer that is the hub of one of `fed.networks` (same address) is `memberOf`;
  *  - else a `relationship: node` peer with a `decision`, on an instance with a `join` block, is `hasMember` (a member
  *    ratified through the hub's proposal path carries `decision: request <id>`, R3);
- *  - else an existing member, mutual by files, whose own files name this instance as the hub of one of their networks
- *    is `hasMember` with no decision (R4: memberships from before N2 are published). Their naming this instance as
- *    their hub is what makes it a hub of theirs; the relationship word is not read;
+ *  - else, on an instance that is a hub (a `join` block, or one of its `networks` with `role: hub`), an existing
+ *    member mutual by files whose own files name this instance as the hub of one of their networks is `hasMember`
+ *    with no decision (R4: memberships from before N2 are published). The relationship word is not read;
  *  - else null. Free-form `relationship` values are never mapped.
  *  `where` resolves path refs against the instance folder on the disk; without it only addresses compare by text.
  *  @param {Peer} peer @param {FedLike} fed @param {Where & ByFiles} [where] @returns {Relation | null} */
@@ -148,7 +152,7 @@ export function relationOf(peer, fed, where = {}) {
   if (peer.link) return peer.link === 'none' ? null : /** @type {Relation} */ (peer.link)
   if (hubNetworkOf(peer, fed, where)) return 'memberOf'
   if (peer.relationship === 'node' && peer.decision && fed.join) return 'hasMember'
-  if ((where.mutualByFiles ?? []).includes(peer.index) && (where.membersByFiles ?? []).includes(peer.index)) return 'hasMember'
+  if (isHub(fed) && (where.mutualByFiles ?? []).includes(peer.index) && (where.membersByFiles ?? []).includes(peer.index)) return 'hasMember'
   return null
 }
 

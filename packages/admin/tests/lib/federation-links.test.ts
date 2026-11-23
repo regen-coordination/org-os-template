@@ -136,6 +136,20 @@ describe('relationOf', () => {
     expect(hubToo.peers.map(p => relationOf(p, hubToo, { mutualByFiles: [0, 1], membersByFiles: [0, 1] }))).toEqual(['memberOf', null])
   })
 
+  it('the files rule needs a sign that this instance is a hub: a join block or a network with role: hub (refined c3)', () => {
+    const member = { name: 'Old Member', url: 'https://old.example.org', relationship: 'node' }
+    const both = { mutualByFiles: [0], membersByFiles: [0] }
+    const plain = fedOf({ networks: [{ name: 'Elsewhere', hub: 'https://elsewhere.example.org' }], peers: [member] })
+    expect(relationOf(plain.peers[0], plain, both)).toBeNull()
+    const roleHub = fedOf({ networks: [{ name: 'Fixture Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [member] })
+    expect(relationOf(roleHub.peers[0], roleHub, both)).toBe('hasMember')
+    const joinOnly = fedOf({ join: { policy: 'invite' }, peers: [member] })
+    expect(relationOf(joinOnly.peers[0], joinOnly, both)).toBe('hasMember')
+    // A decision still suffices on its own, as before (with the join block the rule always had).
+    const decided = fedOf({ join: { policy: 'invite' }, peers: [{ ...member, decision: 'x' }] })
+    expect(relationOf(decided.peers[0], decided)).toBe('hasMember')
+  })
+
   it("free-form relationship values are never mapped (relationship: 'network-seat' is null)", () => {
     const fed = fedOf({ join: { policy: 'open' }, peers: [
       { name: 'Seat', url: 'https://seat.example.org', relationship: 'network-seat', decision: 'x' },
