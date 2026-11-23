@@ -70,6 +70,18 @@ describe('httpsFetch response shim', () => {
     expect(res).toMatchObject({ ok: false, status: 302 })
     expect(await guardedJson('https://hub.example.org/x', { fetch, lookup: async () => ['93.184.216.34'] }, { maxBytes: 1000 })).toEqual({ problem: 'Not read: hub.example.org answered 302.' })
   })
+  it('sends a User-Agent unless the caller set one (any case), and the body length', async () => {
+    const lookup = connectLookup(answering('93.184.216.34'))
+    const a = stubRequest({ status: 200 })
+    await httpsFetch(a.request, lookup)('https://api.example.org/x', init())
+    expect(a.seen.options.headers).toMatchObject({ accept: 'application/json', 'user-agent': 'org-os-admin' })
+    expect(a.seen.options.headers).not.toHaveProperty('content-length')
+    const b = stubRequest({ status: 200 })
+    await httpsFetch(b.request, lookup)('https://api.example.org/x', init({ headers: { 'User-Agent': 'mine/1' }, method: 'POST', body: 'héllo' }))
+    expect(b.seen.options.headers['User-Agent']).toBe('mine/1')
+    expect(b.seen.options.headers).not.toHaveProperty('user-agent')
+    expect(b.seen.options.headers['content-length']).toBe('6')
+  })
   it('refuses http, and an aborted signal', async () => {
     const { request } = stubRequest({ status: 200 })
     await expect(httpsFetch(request)('http://hub.example.org/', init())).rejects.toThrow(/only https/)

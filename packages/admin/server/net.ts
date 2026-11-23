@@ -89,7 +89,13 @@ export function httpsFetch(request: typeof httpsRequest = httpsRequest, lookup =
     try { u = new URL(url) } catch { return reject(new TypeError(`${url} is not an address`)) }
     if (u.protocol !== 'https:') return reject(new TypeError('only https is fetched'))
     if (init.signal?.aborted) return reject(new Error('aborted'))
-    const options: RequestOptions = { method: init.method, headers: init.headers, lookup: lookup as RequestOptions['lookup'], signal: init.signal }
+    const payload = (init as { body?: string | Uint8Array }).body
+    // What undici added on its own: a User-Agent (api.github.com answers 403 without one) and the body's length.
+    const headers: Record<string, string> = { ...init.headers }
+    const has = (name: string) => Object.keys(headers).some(k => k.toLowerCase() === name)
+    if (!has('user-agent')) headers['user-agent'] = 'org-os-admin'
+    if (payload !== undefined && !has('content-length')) headers['content-length'] = String(Buffer.byteLength(payload))
+    const options: RequestOptions = { method: init.method, headers, lookup: lookup as RequestOptions['lookup'], signal: init.signal }
     const req = request(u, options, res => {
       const chunks: Buffer[] = []
       let size = 0
@@ -117,7 +123,6 @@ export function httpsFetch(request: typeof httpsRequest = httpsRequest, lookup =
       })
     })
     req.on('error', reject)
-    const payload = (init as { body?: string | Uint8Array }).body
     if (payload !== undefined) req.write(payload)
     req.end()
   })
