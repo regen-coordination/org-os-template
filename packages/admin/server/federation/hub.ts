@@ -11,7 +11,7 @@
 //   (R16, R20, R25). A refused request publishes nothing, ever.
 // - Polling and replying are confirmed network operations. They write only under stateDir (the inbox, the reply
 //   receipts), never in git: an in-process operation has no actor and can't commit (R20).
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from 'yaml'
@@ -28,6 +28,10 @@ import { classesOf, targetsOfOps } from '../changes/stage.ts'
 import { newChangeId } from '../changes/store.ts'
 import type { Change, FileOp } from '../changes/types.ts'
 import { effectiveRule, readRuleContext, ruleIds } from '../governance/effective.ts'
+import { currentEntries } from '../changes/stage.ts'
+import { commitOrStage } from '../workspace/pages.ts'
+import { isPublicUrl } from '../../lib/federation/peers.mjs'
+import { makeInvite } from '../../lib/federation/invite.mjs'
 import { propose, type ProposeDeps } from '../proposals/propose.ts'
 import { readLedger } from '../proposals/ledger.ts'
 import { runCommand } from '../resources/run.ts'
@@ -493,3 +497,44 @@ export function federationReplyOperation(deps: HubOpsDeps = {}): Operation {
 }
 
 export const federationHubOperations = (deps: HubOpsDeps = {}): Operation[] => [federationPollOperation(deps), federationReplyOperation(deps)]
+
+// ── invites: make one, send the link, use it once (Task 11) ─────────────────────────────────────────
+
+export const INVITE_SENTENCES = {
+  copy: "Copy this link now. It won't be shown again.",
+  name: 'Give the invite a name of up to 100 characters, to tell it apart.',
+  type: 'Say what kind of instance this invite is for.',
+  days: 'Days is a whole number from 1 to 90.',
+  noUrl: "Give this instance its public https address in federation.yaml (identity.url) first, so the link can point at it.",
+} as const
+
+/** Make an invite: one staged (or, where the rule is direct, committed) `create` of `invites:<id>`, and the link, which is
+ *  the only place the token ever is. The record holds `token_sha256` and never the token; it is not stored anywhere else,
+ *  not logged and not returned again. The hub's own federation.json address and its networks are read as committed on the
+ *  trunk (R14). The caller holds the write lock. */
+export async function createInvite(repo: string, actor: KnownActor, raw: Record<string, unknown>,
+  deps: { now: Date; notify?: Parameters<typeof commitOrStage>[4]; startBranch?: string; random?: (n: number) => Uint8Array }): Promise<{ id: string; link: string; text: string; expires: string; staged?: true; commit?: string }> {
+  const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+  if (name === '' || name !== label(name, 100) || Array.from(name).length > 100) throw new HttpError(400, INVITE_SENTENCES.name)
+  const type = typeof raw.type === 'string' ? raw.type.trim() : ''
+  if (type === '' || type !== label(type, 60)) throw new HttpError(400, INVITE_SENTENCES.type)
+  const network = typeof raw.network === 'string' ? raw.network.trim() : ''
+  const days = raw.days === undefined ? 30 : raw.days
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) throw new HttpError(400, INVITE_SENTENCES.days)
+  const trunk = await readTrunkFederation(repo, deps.startBranch)
+  if ('problem' in trunk) throw new HttpError(409, trunk.problem)
+  if (!trunk.fed.networks.some(n => n.name === network)) throw new HttpError(400, SENTENCES.noNetwork)
+  const own = trunk.fed.identity.url
+  const wk = typeof own === 'string' && isPublicUrl(own) ? wellKnownUrlOf(own) : null
+  if (!wk) throw new HttpError(400, INVITE_SENTENCES.noUrl)
+  const expires = new Date(deps.now.getTime() + days * 86_400_000).toISOString().slice(0, 10)
+  const random = deps.random ?? ((n: number) => new Uint8Array(randomBytes(n)))
+  const taken = new Set(currentEntries(repo, 'invites').map(e => String(e.id)))
+  let made = makeInvite({ name, type, network, expires, random })
+  for (let i = 0; taken.has(made.record.id) && i < 20; i++) made = makeInvite({ name, type, network, expires, random })
+  if (taken.has(made.record.id)) throw new HttpError(409, 'No free invite id was found. Try again.')
+  const { record, token } = made
+  const out = await commitOrStage(repo, actor, [{ op: 'create', record: `invites:${record.id}`, value: record as unknown as Record<string, unknown> }],
+    `federation: make an invite for ${label(name)}`, deps.notify)
+  return { id: record.id, link: `${wk}#invite=${token}`, text: INVITE_SENTENCES.copy, expires, ...out }
+}

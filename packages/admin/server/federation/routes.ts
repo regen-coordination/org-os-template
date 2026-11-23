@@ -19,7 +19,7 @@ import { buildRequest, parseRequest, requestText } from '../../lib/federation/re
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
 import type { Runner } from '../resources/types.ts'
 import { transports } from './transports/index.ts'
-import { decide, drainInbox, receive } from './hub.ts'
+import { createInvite, decide, drainInbox, receive } from './hub.ts'
 import {
   askedText, cachedHub, clearState, outgoingPath, readState, recordedText, SENTENCES, trunkRequest, UUID, withdrawnText, writeState,
 } from './node.ts'
@@ -35,6 +35,8 @@ export interface FederationDeps {
    *  hub that started without data/federation-requests.yaml has no watcher on it. */
   invalidate?: () => void
   startBranch?: string
+  /** Randomness for invites; tests give a fixed one. */
+  random?: (n: number) => Uint8Array
 }
 
 const FED = 'federation.yaml'
@@ -204,6 +206,18 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       deps.invalidate?.()
       deps.notify?.({ type: 'changes' })
       return c.json({ id: c.req.param('id'), outcome: out.outcome, sentence: out.sentence, commit: out.commit })
+    })
+  })
+
+  // Make an invite (Task 11). The link in the answer is the only place its token ever is: the answer is not cacheable, the
+  // record holds the token's hash, and nothing here logs, stores or echoes the token again.
+  app.post('/api/federation/invites', async c => {
+    const raw = await body(c)
+    return withLock(async () => {
+      const actor = knownActorOf(c)
+      const out = await createInvite(repo, actor, raw, { now: now(), notify: deps.notify, startBranch: deps.startBranch, random: deps.random })
+      deps.invalidate?.()
+      return c.json(out, 201, { 'cache-control': 'no-store' })
     })
   })
 
