@@ -6,7 +6,31 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
-_(Append changes here as they land.)_
+### Added
+
+- **Raw file reads by Role** (`packages/admin`, 0.7.2). An optional `files:` section in `data/visibility.yaml` says who
+  reads which `data/**` file whole:
+  ```yaml
+  visibility:
+    files:
+      default: role:steward             # every data/** path not listed
+      paths:
+        data/projects.yaml: members     # any signed-in member
+        data/kb/**: members             # a folder
+  ```
+  - A level is `members`, `role:<Role>` (the Roles table's: `steward`, `node-lead`, `network-member`) or `hat:<hat ref>`.
+    A path takes its own level, else the longest `data/<folder>/**` holding it, else `default`, so a file added later is
+    held at the default until listed. A token that can't be read admits nobody.
+  - It governs `GET /api/files` and everything that takes its reader: `/api/editors`' `readable`, staging and Keep mine
+    on that path, the ledger read whole (C2), proposal diffs and file ops.
+  - `GET /api/registries`, `/api/registries/:name` (and `…/:id/changed`) and the map (`/api/resources`) give a member
+    the records of a file kept from them as the public is given them: what the collection makes public stays theirs.
+  - The person at the machine reads as before. A `?as` preview is judged as the viewer it previews.
+  - The policy check (`doctor`, a staged edit of `data/visibility.yaml`) refuses `public`, a path outside `data/`, a
+    `role:` that is no Roles-table Role, and a listed file below `role:steward` whose collection has field levels (a
+    file is read whole). `schemas/visibility.schema.json` takes `files`.
+  - **Opt-in:** an instance without a `files:` section sees 0.7.1 unchanged. 0.7.1 refuses the section
+    (`additionalProperties`), so an instance adds it only once its house runs 0.7.2.
 
 ## [0.7.1] — 2026-11-20
 

@@ -23,6 +23,7 @@
 //   readsDeciders(path)         → whether a path is read by its deciders only (re-exported from the editors table)
 //   fileReader(c, repo)         → (path) => whether the request's viewer may read that path (`all`: every path, ungated)
 //   viewerReader(repo, viewer)  → the same for a viewer alone, gating the person at the machine too (PR7-R98)
+//   fileLevels(repo, viewer)    → 0.7.2: the `files` section's answer alone (viewerReader asks it first)
 //   withheldOp(op)              → a file op as one who may not read its path is shown it: `{ op: 'file', withheld: true }`
 //   readableEntry(entry, may)   → a ledger entry with its ops and its events' ops withheld where `may` refuses
 //   mayReadWhole(repo, may, p)  → whether a file is read whole: its path, and the ledger while it holds an unread op (C2)
@@ -44,7 +45,8 @@ import { HttpError } from '../errors.ts'
 // it imports the change engine, which imports this module's importers, and the cycle would leave a class undefined.
 import type {} from '../request.ts'
 import type { Actor } from '../actor.ts'
-import type { Viewer } from '../../lib/visibility.mjs'
+import { admits, fileLevel, type Viewer } from '../../lib/visibility.mjs'
+import { readFilesConfig } from '../visibility/config.ts'
 
 const actorOf = (c: Context): Actor | null => c.get('actor') ?? null
 const viewerOf = (c: Context): Viewer => c.get('viewer') ?? { kind: 'public' }
@@ -98,9 +100,33 @@ export function viewerReader(repo: string, viewer: Viewer): FileReader {
     }
     return decides
   }
+  const files = fileLevels(repo, viewer)
   return path => {
+    if (!files(path)) return false
     if (!readsDeciders(path)) return true
     return decider()(targetsOfPath(path, () => null) ?? ['workspace'])
+  }
+}
+
+/** The viewers request.ts made for the person at the machine (`byGit`). A `files` level never gates them: they read what
+ *  git holds, as fileReader's `all` says. A preview (`?as`) is a new viewer, so it is judged as the viewer it previews. */
+const MACHINE = new WeakSet<object>()
+/** Marks `viewer` as the person at the machine's (request.ts `byGit`), and returns it. */
+export function atTheMachine<V extends Viewer>(viewer: V): V { MACHINE.add(viewer); return viewer }
+
+/**
+ * 0.7.2: whether `viewer` may read a path whole by data/visibility.yaml's `files` section (lib/visibility.mjs `fileLevel`):
+ * every path when the section is absent (opt-in) or does not govern it (outside data/); else when the path's level admits
+ * them (`role:<Role>` against `viewer.roles`, which hold a signed-in person's Roles-table Roles). The section is read once
+ * per reader. It judges a viewer only; who is gated at all is the caller's (fileReader: the person at the machine is not).
+ */
+export function fileLevels(repo: string, viewer: Viewer): (path: string) => boolean {
+  if (MACHINE.has(viewer)) return () => true
+  const files = readFilesConfig(repo)
+  if (files === null) return () => true
+  return path => {
+    const level = fileLevel(files, path)
+    return level === null || admits(level, viewer)
   }
 }
 

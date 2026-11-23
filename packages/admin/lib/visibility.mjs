@@ -240,6 +240,94 @@ export function readFullPolicy(doc) {
   return read
 }
 
+// ---- 0.7.2: raw file reads by Role (`visibility.files`) ----
+// Which signed-in viewers read which data/** file whole (GET /api/files and everything that takes its reader). Opt-in: with
+// no `files` section, every member reads every file, as on 0.7.1. With one, a data/** path takes its own level (an exact
+// path, else the longest `<folder>/**` that holds it), else `files.default`. A level is a token as above; `role:<id>` names
+// a Roles-table Role (FILE_ROLES), held by a person signed in by emailed link. `public` reads as members: a file is a
+// members' read. A token that cannot be read admits nobody, so a typo closes a file and never opens one.
+
+/** The Roles a `files` level may name: the Roles table's (server/private/store.ts ROLES; a test keeps the two equal). */
+export const FILE_ROLES = Object.freeze(['steward', 'node-lead', 'network-member'])
+
+/** @typedef {{ default: unknown, paths: Record<string, unknown> }} FilesPolicy */
+
+/** A level that admits nobody: what a `files` token that cannot be read is read as. @type {ParsedLevel} */
+const NOBODY = Object.freeze({ level: 'role', role: '' })
+
+/**
+ * data/visibility.yaml's parsed document -> its `files` section, or null when it has none (0.7.1's behaviour).
+ * @param {unknown} doc @returns {FilesPolicy | null}
+ */
+export function readFilesPolicy(doc) {
+  const top = isObj(doc) && isObj(doc.visibility) ? doc.visibility : doc
+  if (!isObj(top) || top.files === undefined || top.files === null) return null
+  const raw = top.files
+  if (!isObj(raw)) return { default: undefined, paths: {} }
+  return { default: raw.default, paths: isObj(raw.paths) ? { ...raw.paths } : {} }
+}
+
+/** @param {unknown} token @returns {ParsedLevel} */
+function fileToken(token) {
+  if (token === 'public') return MEMBERS
+  return parseLevel(token) ?? NOBODY
+}
+
+/**
+ * The level a data/** path is read whole at, or null when no `files` section governs it (no section, or a path outside
+ * data/). @param {FilesPolicy | null} files @param {string} path @returns {ParsedLevel | null}
+ */
+export function fileLevel(files, path) {
+  if (files === null || typeof path !== 'string' || !path.startsWith('data/')) return null
+  if (Object.hasOwn(files.paths, path)) return fileToken(files.paths[path])
+  /** @type {string | null} */
+  let best = null
+  for (const key of Object.keys(files.paths)) {
+    if (!key.endsWith('/**')) continue
+    if (path.startsWith(key.slice(0, -2)) && (best === null || key.length > best.length)) best = key
+  }
+  return fileToken(best === null ? files.default : files.paths[best])
+}
+
+/**
+ * The `files` section's own checks (checkVisibilityPolicy): errors for a section that is not a mapping, a level that is
+ * not one (`public` included: a file is a members' read), a `role:` that is no Roles-table Role, a path outside data/, and
+ * a listed path below `role:steward` whose collection has field levels (a file is read whole, so listing it would hand
+ * every field to that Role).
+ * @param {Record<string, unknown>} top
+ * @param {(path: string, message: string) => void} err
+ * @param {(path: string, l: ParsedLevel) => void} checkStrict a hat level's own checks
+ */
+function checkFiles(top, err, checkStrict) {
+  const raw = top.files
+  if (raw === undefined || raw === null) return
+  if (!isObj(raw)) { err('visibility.files', 'not a mapping: give it a default and paths'); return }
+  const fields = isObj(top.collections) ? top.collections : {}
+  /** @param {string} at @param {unknown} token @returns {ParsedLevel | null} */
+  const level = (at, token) => {
+    if (token === 'public') { err(at, 'a file is read by signed-in members only: use members, role:<Role> or hat:<hat ref>'); return null }
+    const l = parseLevel(token)
+    if (!l) { err(at, `${JSON.stringify(token)} is not a level: members, role:<Role> or hat:<hat ref>`); return null }
+    if (l.level === 'role' && !FILE_ROLES.includes(l.role)) { err(at, `no Role is called ${l.role}: ${FILE_ROLES.join(', ')}`); return null }
+    if (l.level === 'hat') checkStrict(at, l)
+    return l
+  }
+  level('visibility.files.default', raw.default)
+  if (raw.paths === undefined || raw.paths === null) return
+  if (!isObj(raw.paths)) { err('visibility.files.paths', 'not a mapping of data/** paths to levels'); return }
+  for (const [path, token] of Object.entries(raw.paths)) {
+    const at = `visibility.files.paths.${path}`
+    if (!path.startsWith('data/') || path.includes('..')) { err(at, 'only a path under data/ is governed here'); continue }
+    const l = level(at, token)
+    if (!l || (l.level === 'role' && l.role === 'steward')) continue
+    const name = /^data\/([a-z0-9][a-z0-9-]*)\.yaml$/.exec(path)?.[1]
+    const col = name === undefined ? undefined : fields[name]
+    if (isObj(col) && isObj(col.fields) && Object.keys(col.fields).length > 0) {
+      err(at, `data/${name}.yaml has field levels, and a file is read whole: keep it at role:steward`)
+    }
+  }
+}
+
 /** @param {ParsedLevel} l @returns {string} the token parseLevel reads back */
 export function formatLevel(l) {
   if (l.level === 'hat') return `hat:${l.hat}`
@@ -486,6 +574,8 @@ export function checkVisibilityPolicy(doc, ctx) {
       }
     }
   }
+
+  checkFiles(top, err, checkStrict)
 
   const defs = top.defaults
   if (isObj(defs)) {

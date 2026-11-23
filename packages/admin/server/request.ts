@@ -25,6 +25,7 @@ import { effectiveRule, readRuleContext } from './governance/effective.ts'
 import { readRegistryOrEmptyCached } from './registry.ts'
 import { accountOn, actUnreadable, readsAsPublic, TREE_UNREADABLE, type HatWearers, type Membership } from './session/membership.ts'
 import { sessionFromCookie, type Session } from './session/sessions.ts'
+import { atTheMachine } from './workspace/reads.ts'
 import { endPersonSession, needsReissue, personActor, readPersonCookie, reissue, viewerRoles, type PersonCookie } from './session/person.ts'
 import type { SignInConfig } from './session/config.ts'
 import type { RolesPerson } from './private/store.ts'
@@ -327,12 +328,12 @@ async function byGit(repo: string, m: Membership | null, act: boolean, email: ()
   let actor: Actor
   try { actor = actorForEmail(repo, await email()) } catch { actor = { unknown: '' } }
   // The person at the machine reads what git holds, as in 0.6, whoever git says they are.
-  if (!isKnown(actor)) return { actor, viewer: { kind: 'member', id: actorTrailer(actor), hats: [], roles: [] } }
+  if (!isKnown(actor)) return { actor, viewer: atTheMachine({ kind: 'member', id: actorTrailer(actor), hats: [], roles: [] }) }
   const wallet = m ? await walletReading(m, membersOf(repo).find(e => String(e.id) === actor.id), act) : null
   const read = wallet?.read ?? null
   // The actor keeps the reading for this request (`walletOf`): a role sourced from a hat they wear holds them (§6.2).
   if (wallet) withWallet(actor, { account: wallet.account, read: read && !read.stale ? { hats: read.hats, block: read.block, readAt: read.readAt } : null })
-  return { actor, viewer: { kind: 'member', id: actor.id, hats: read && !read.stale ? read.hats : [], roles: rolesFor(repo, actor, read) } }
+  return { actor, viewer: atTheMachine({ kind: 'member', id: actor.id, hats: read && !read.stale ? read.hats : [], roles: rolesFor(repo, actor, read) }) }
 }
 
 /** The account of a git member's `handles.wallet` on the tree's chain (the first listed there), and its reading: read now

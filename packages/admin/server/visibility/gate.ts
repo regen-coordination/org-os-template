@@ -21,7 +21,7 @@ import type { MiddlewareHandler } from 'hono'
 import { listRegistriesCached, readRegistryOrEmptyCached, type Entity } from '../registry.ts'
 import { registriesOf, registryFile } from '../registries.ts'
 import { readLedger } from '../proposals/ledger.ts'
-import { readableEntry, readsDeciders, viewerReader, type FileReader } from '../workspace/reads.ts'
+import { fileLevels, readableEntry, readsDeciders, viewerReader, type FileReader } from '../workspace/reads.ts'
 import { listViews, type ProposalView } from '../proposals/view.ts'
 import { readResources } from '../resources/index.ts'
 import { staleAttention } from '../resources/attention.ts'
@@ -382,25 +382,27 @@ function withoutChainRead<R extends Resource>(node: R, chain: (system: string) =
  *  chain fields of each System kept from them (deploy/private-flip.ts `chainKept`, the one filter); absent, every System's
  *  reading is kept (walk fix wave 4). */
 export function gateGraph(viewer: Viewer, graph: Graph, levels: Levels, chain: (system: string) => ReadonlySet<string> = NO_CHAIN,
-  may: FileReader = viewerReader(levels.repo, viewer)): { nodes: Gated<Resource>[]; edges: Edge[] } {
+  may: FileReader = viewerReader(levels.repo, viewer), files: (path: string) => boolean = fileLevels(levels.repo, viewer)): { nodes: Gated<Resource>[]; edges: Edge[] } {
   // 0.7.1 D6 fix round 1 (I2, M1): a card whose record is in the agent layer (crew's seats, memory/crew/<id>.md) is kept
   // from one who may not read it, with its edges; a proposal stale only there is not said stale to them.
-  let nodes = gateItems(viewer, graph.nodes.flatMap(n => agentLayerCard(n, may)), n => levels.resource(n))
-  // the public is given only what its public record holds (`publicResource`), never a driver read nor attention
-  if (viewer.kind === 'member') nodes = nodes.map(n => withoutChainRead(n, chain))
+  const cards = graph.nodes.flatMap(n => agentLayerCard(n, may))
+  // 0.7.2: a member is given a card read from a file the `files` section keeps from them as the public is given it.
+  const asPublic = (n: Resource) => viewer.kind === 'member' && typeof n.source?.path === 'string' && !files(n.source.path)
   const records = new Map<string, Record<string, unknown> | null>()
-  if (viewer.kind === 'public') {
-    nodes = nodes.map(n => {
-      const record = levels.publicRecord(n)
-      records.set(n.id, record)
-      return publicResource(n, record)
-    })
-  }
+  // the public is given only what its public record holds (`publicResource`), never a driver read nor attention
+  const publicly = (list: Resource[]) => gateItems(PUBLIC_VIEWER, list, n => levels.resource(n)).map(n => {
+    const record = levels.publicRecord(n)
+    records.set(n.id, record)
+    return publicResource(n, record)
+  })
+  const nodes = viewer.kind === 'public' ? publicly(cards) : cards.flatMap(n => asPublic(n)
+    ? publicly([n])
+    : gateItems(viewer, [n], c => levels.resource(c)).map(c => withoutChainRead(c, chain)))
   const byId = new Map(nodes.map(n => [n.id, n]))
   const edges = graph.edges.filter(e => {
     const a = byId.get(e.from), b = byId.get(e.to)
     if (!a || !b) return false
-    if (viewer.kind !== 'public') return true
+    if (viewer.kind !== 'public' && !records.has(e.from) && !records.has(e.to)) return true
     return names(records.get(e.from) ?? null, b.source?.entityId) || names(records.get(e.to) ?? null, a.source?.entityId)
   })
   return { nodes, edges }
@@ -432,18 +434,21 @@ type Listed = ReturnType<typeof listRegistriesCached>[number]
 
 /** GET /api/registries for `viewer`: a collection with nothing they may see is absent, and its count is what they may
  *  see; a document is listed when they may see it. */
-export function gateRegistryList(viewer: Viewer, repo: string, levels = new Levels(repo)): Listed[] {
+export function gateRegistryList(viewer: Viewer, repo: string, levels = new Levels(repo),
+  files: (path: string) => boolean = fileLevels(repo, viewer)): Listed[] {
   const out: Listed[] = []
   for (const r of listRegistriesCached(repo)) {
+    // 0.7.2: a collection read from a file the `files` section keeps from this member is listed as the public's.
+    const as = judgedAs(viewer, repo, r.name, files)
     try {
       if (r.kind === 'document') {
-        if (gateRecord(viewer, r.name, readRegistryOrEmptyCached(repo, r.name).document ?? {}, levels.config)) out.push(r)
+        if (gateRecord(as, r.name, readRegistryOrEmptyCached(repo, r.name).document ?? {}, levels.config)) out.push(r)
         continue
       }
-      const count = gateRegistryEntries(viewer, r.name, levels).length
-      if (count > 0 || viewer.kind !== 'public') out.push({ ...r, count })
+      const count = gateRegistryEntries(viewer, r.name, levels, undefined, files).length
+      if (count > 0 || as.kind !== 'public') out.push({ ...r, count })
     } catch {
-      if (viewer.kind !== 'public') out.push(r) // a file that cannot be read: GET /api/registries/:name says why, to members
+      if (as.kind !== 'public') out.push(r) // a file that cannot be read: GET /api/registries/:name says why, to members
     }
   }
   // The private collections this member is admitted to; any other is not named, nor counted (§9.2).
@@ -454,11 +459,14 @@ export function gateRegistryList(viewer: Viewer, repo: string, levels = new Leve
 }
 
 /** A collection's records as `viewer` may see them: `entries`, else the collection's as `levels` read them. */
-export function gateRegistryEntries(viewer: Viewer, registry: string, levels: Levels, entries: readonly Entity[] = levels.records(registry)): Record<string, unknown>[] {
+export function gateRegistryEntries(viewer: Viewer, registry: string, levels: Levels, entries: readonly Entity[] = levels.records(registry),
+  files: (path: string) => boolean = fileLevels(levels.repo, viewer)): Record<string, unknown>[] {
   const member = viewer.kind !== 'public'
+  // 0.7.2: the records in git of a file the `files` section keeps from this member are given to them as to the public.
+  const as = judgedAs(viewer, levels.repo, registry, files)
   const git = entries.flatMap(e => {
-    const fields = member && e.id !== undefined && e.id !== null ? levels.priv.fields(registry, String(e.id)) : []
-    const g = gateRecord(viewer, registry, e, levels.config, levels.record(registry, e), fields)
+    const fields = as.kind !== 'public' && e.id !== undefined && e.id !== null ? levels.priv.fields(registry, String(e.id)) : []
+    const g = gateRecord(as, registry, e, levels.config, levels.record(registry, e), fields)
     return g ? [g] : []
   })
   // 0.7.1 D6 fix round 1 (C1): the ledger's entries without the agent layer's file ops, their text or base, in its ops or
@@ -478,7 +486,8 @@ function fileUnlessPlain(repo: string, name: string): { file?: string } {
 
 /** GET /api/registries/:name for `viewer`: what `readRegistryOrEmpty` answers (through the read cache), its entries or
  *  its document gated. A document they may not see reads as an empty one, as a missing file does. */
-export function gateRegistry(viewer: Viewer, repo: string, name: string, levels = new Levels(repo)) {
+export function gateRegistry(viewer: Viewer, repo: string, name: string, levels = new Levels(repo),
+  files: (path: string) => boolean = fileLevels(repo, viewer)) {
   // A private collection this member is admitted to; for anyone else its name is no registry, as an unknown one.
   // `file: null`: the store keeps it, so no file is named for it (walk M15).
   if (privateCollections(viewer, levels.priv).some(c => c.id === name)) {
@@ -488,9 +497,19 @@ export function gateRegistry(viewer: Viewer, repo: string, name: string, levels 
   if (read.kind === 'document') {
     const doc = read.document ?? {}
     // An empty document (no file) has nothing to gate, nor a level to carry.
-    return { ...read, document: Object.keys(doc).length === 0 ? {} : gateRecord(viewer, name, doc, levels.config) ?? {} }
+    return { ...read, document: Object.keys(doc).length === 0 ? {} : gateRecord(judgedAs(viewer, repo, name, files), name, doc, levels.config) ?? {} }
   }
-  return { ...read, entries: gateRegistryEntries(viewer, name, levels, read.entries ?? []) }
+  return { ...read, entries: gateRegistryEntries(viewer, name, levels, read.entries ?? [], files) }
+}
+
+/** 0.7.2: who a registry read from git is judged as: the public, for a member the `files` section keeps its file from
+ *  (what the collection makes public stays theirs, as everyone's); else the viewer. A name no file holds (a private
+ *  collection, an unknown name) is judged as the viewer. */
+function judgedAs(viewer: Viewer, repo: string, name: string, files: (path: string) => boolean): Viewer {
+  if (viewer.kind !== 'member') return viewer
+  let path: string
+  try { path = registryFile(repo, name) } catch { return viewer }
+  return files(path) ? viewer : PUBLIC_VIEWER
 }
 
 // ── proposals ───────────────────────────────────────────────────────────────────────────────────────
