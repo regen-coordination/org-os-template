@@ -117,13 +117,22 @@ const build = () => {
 
 /** A hub under `governance` (null: no file, the solo default) with this join block, its kms, and the node's
  *  federation.json in the cache of the last lookup (it carries the node's DID). */
-const setup = (governance: string | null, joinBlock: JoinBlock) => {
+/** What a confirmed `federation.check-links` leaves when `did`'s document names `handle` and the handle names it back. */
+const confirm = (did: string, handle: string) => {
+  const cache = atprotoCache(repo)
+  cache.put(did, { did, pds: 'https://pds-two.example.net', handle, profile: null, links: [], skipped: 0, fetchedAt: NOW.toISOString() }, NOW)
+  cache.putHandle(handle, did, NOW)
+}
+
+/** `confirmed`: the node's DID was checked and its handle is its url's host, so acceptance may write it (Task 12). */
+const setup = (governance: string | null, joinBlock: JoinBlock, confirmed = true) => {
   repo = makeChangeRepo(governance)
   write('data/members.yaml', MEMBERS)
   write('federation.yaml', FED(joinBlock))
   write('kms.yaml', ['adapter: repo-data', 'target: "."', 'atproto:', `  did: "${SELF}"`, '  pds: "https://pds-one.example.com"', '  handle: "mesh-hub.example.org"', '  nsid_authority: "org.meshhub"', ''].join('\n'))
   commit('the hub: identity, members, kms')
   remoteCache(repo).put(wellKnownUrlOf(NODE_URL)!, { spec: 'org-os/federation/1', name: 'Mesa Node', type: 'LocalNode', did: NODE }, NOW)
+  if (confirmed) confirm(NODE, 'mesa-node.example.org')
   build()
 }
 
@@ -217,6 +226,24 @@ describe('builds the hub change from fields, never from the file', () => {
     expect(fedText()).toContain("# the hub's federation manifest")
     expect(parseTrailers(git('log', '-1', '--format=%B'))).toMatchObject({ actor: 'steward-a', decision: 'LD-2026-040' })
     expect(git('log', '-1', '--format=%s').trim()).toBe('federation: accept Mesa Node into Mesh')
+  })
+
+  it('the did is written only when a confirmed check tied it to the asker\'s url; a DID its federation.json only claims is not (Task 12)', async () => {
+    setup(null, OPEN('LD-2026-040'))
+    // the asker's federation.json claims the hub's own DID, whose checked handle is the hub's host, not the asker's
+    remoteCache(repo).put(wellKnownUrlOf(NODE_URL)!, { spec: 'org-os/federation/1', name: 'Mesa Node', type: 'LocalNode', did: SELF }, NOW)
+    confirm(SELF, 'mesh-hub.example.org')
+    const [a] = await importText(requestText(request()))
+    expect(a.outcome).toBe('accepted')
+    expect(peers()).toEqual([hubPeerOf(request(), 'LD-2026-040')])
+    expect(peers()[0].did).toBeUndefined()
+  })
+
+  it('a DID its federation.json names but no confirmed check tied to it is not written either (Task 12)', async () => {
+    setup(null, OPEN('LD-2026-040'), false)
+    const [a] = await importText(requestText(request()))
+    expect(a.outcome).toBe('accepted')
+    expect(peers()[0].did).toBeUndefined()
   })
 
   it('untrusted text reaches federation.yaml only as the validated fields', async () => {
@@ -400,7 +427,7 @@ describe('one case per outcome', () => {
     const mine = { op: 'file', path: 'federation.yaml', text: `${fedText()}\n# my own staged note\n`, base: null }
     const now = new Date().toISOString()
     new ChangeStore(repo).save({ id: 'chg_mine', actor: 'steward-a', created: now, updated: now, ops: [mine as never] })
-    remoteCache(repo).put(wellKnownUrlOf(OTHER_URL)!, { spec: 'org-os/federation/1', name: 'Other', did: plcDid('other-node') }, NOW)
+    remoteCache(repo).put(wellKnownUrlOf(OTHER_URL)!, { spec: 'org-os/federation/1', name: 'Other', did: plcDid('other-node') }, NOW); confirm(plcDid('other-node'), 'other-node.example.org')
     inboxPut(repo, { transport: 'github', ref: ISSUE, text: requestText(request()) })
     inboxPut(repo, { transport: 'github', ref: `${WHERE}/issues/13`, text: requestText(request({ id: ID_B, from: { name: 'Other', url: OTHER_URL } })) })
     const answers = await drain()
@@ -666,7 +693,7 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
     as('steward-a')
     // a second request, held then decided, on a solo hub
     write('data/governance.yaml', 'schema_version: "2.0"\ngovernance:\n  model: "solo-maintainer"\n  decisions: []\n'); commit('solo now')
-    remoteCache(repo).put(wellKnownUrlOf(OTHER_URL)!, { spec: 'org-os/federation/1', name: 'Other', did: plcDid('other-node') }, NOW)
+    remoteCache(repo).put(wellKnownUrlOf(OTHER_URL)!, { spec: 'org-os/federation/1', name: 'Other', did: plcDid('other-node') }, NOW); confirm(plcDid('other-node'), 'other-node.example.org')
     await importText(requestText(request({ id: ID_B, from: { name: 'Other', url: OTHER_URL } })))
     expect((await post(`/api/federation/requests/${ID_B}/decide`, { accept: true })).status).toBe(200)
     expect(net.writes).toEqual([])
@@ -710,7 +737,7 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
 
   const otherNode = plcDid('other-node')
   const otherRequest = () => request({ id: ID_B, from: { name: 'Other', url: OTHER_URL } })
-  const cacheOther = () => remoteCache(repo).put(wellKnownUrlOf(OTHER_URL)!, { spec: 'org-os/federation/1', name: 'Other', did: otherNode }, NOW)
+  const cacheOther = () => { remoteCache(repo).put(wellKnownUrlOf(OTHER_URL)!, { spec: 'org-os/federation/1', name: 'Other', did: otherNode }, NOW); confirm(otherNode, 'other-node.example.org') }
   /** The plan resolves (there is a member to publish) and names the refused node nowhere. */
   const planWithout = async () => {
     const { plan, summary } = await planPublish(repo, pdeps())

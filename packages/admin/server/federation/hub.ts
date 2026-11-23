@@ -35,7 +35,7 @@ import { makeInvite } from '../../lib/federation/invite.mjs'
 import { propose, type ProposeDeps } from '../proposals/propose.ts'
 import { readLedger } from '../proposals/ledger.ts'
 import { runCommand } from '../resources/run.ts'
-import { DID_PATTERN, readFederation } from '../../lib/federation/read.mjs'
+import { readFederation } from '../../lib/federation/read.mjs'
 import { hubPeerOf, parseRequest } from '../../lib/federation/request.mjs'
 import type { FederationRequest } from '../../lib/federation/request.mjs'
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
@@ -47,7 +47,8 @@ import type { InProcess, Operation, Variant } from '../operations/catalogue.ts'
 import { writeHubFiles, type HubFile } from './ledger.ts'
 import { readTrunkFederation } from './trunk.ts'
 import { federationDoc, federationSeq, mapsIn, normUrl } from './node.ts'
-import { remoteCache, wellKnownUrlOf } from './remote.ts'
+import { wellKnownUrlOf } from './remote.ts'
+import { verifiedDid } from './migrate.ts'
 import { transportOf, transports } from './transports/index.ts'
 
 export const SENTENCES = {
@@ -196,13 +197,6 @@ export const writeReplied = (repo: string, id: string, receipt: { at: string; re
 
 // ── the hub's edit of federation.yaml ─────────────────────────────────────────────────────────────
 
-/** The node's DID as its own federation.json carried it at the last lookup; null when it was never looked up. Never fetches. */
-export function cachedDid(repo: string, url: string): string | null {
-  const wk = wellKnownUrlOf(url)
-  const doc = wk === null ? null : remoteCache(repo).get(wk)?.doc
-  return doc && typeof doc.did === 'string' && DID_PATTERN.test(doc.did) ? doc.did : null
-}
-
 /** federation.yaml with the node's one peer entry, built from validated fields (`hubPeerOf`). A node that is already a
  *  peer is not listed twice: its entry keeps its earliest `decision` (so a second network's acceptance never erases the
  *  meaning of the first; `relationOf` reads only that there is one) and gains a `did` only where it has none. */
@@ -315,7 +309,9 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
     return { ref, outcome: 'refused', sentence: `Refused: ${outcome.reason}`, commit }
   }
 
-  const did = cachedDid(repo, request.from.url)
+  // The asker's DID only when a confirmed check tied it to its url (Task 12): a DID its federation.json merely names is
+  // left out, and the operator can add it later through the migration list.
+  const did = verifiedDid(repo, request.from.url)
   if (outcome.kind === 'accept') {
     const decision = outcome.by === 'invite' ? `invite ${outcome.invite.id}` : outcome.decision
     const files: HubFile[] = [
@@ -392,7 +388,7 @@ export async function decide(repo: string, actor: KnownActor, id: string, choice
   const decision = `request ${id}`
   // The peer is built from the record's validated fields, as the request held them when it was received.
   const request = { from: record.from, created: record.received, network: record.network } as FederationRequest
-  const text = memberText(fileText(repo, FED) ?? '', request, decision, cachedDid(repo, record.from.url))
+  const text = memberText(fileText(repo, FED) ?? '', request, decision, verifiedDid(repo, record.from.url))
   const rule = direct(fedOp(repo, text), 'accepted')
   const { commit } = await writeHubFiles(repo, [{ rel: FED, text }, updated({ ...record, outcome: 'accepted', decision })],
     `federation: accept ${name} into ${network}`, { actor: actorTrailer(actor), rule, decision }, ident, opts)

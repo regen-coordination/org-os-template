@@ -1,6 +1,8 @@
 // The node's routes (network N2 Task 8): look at a hub's cached answer, ask to join, withdraw, and record an
 // acceptance. Every write is staged in the actor's change (or committed where the rule is direct) through
 // `commitOrStage`, under the repository's write lock. Nothing here reaches the network, and nothing publishes on atproto.
+// Migration (Task 12): list the public peers with the DID and relation a link record would carry, and set `did` and/or
+// `link` on them in one staged federation.yaml edit. It publishes nothing (R28); `federation.publish-links` does, later.
 // The hub's routes (Task 9): receive requests (an imported file, or the inbox a poll filled) and decide a held one. Their
 // writes are the hub's own commits (`writeHubFiles`) or a proposal; nothing reaches the network or atproto here either.
 import { randomUUID } from 'node:crypto'
@@ -20,6 +22,7 @@ import { intakeOutcome } from '../../lib/federation/intake.mjs'
 import type { Runner } from '../resources/types.ts'
 import { transports } from './transports/index.ts'
 import { createInvite, decide, drainInbox, receive } from './hub.ts'
+import { bindingView, migratedText, migrationOf, MIGRATION_SENTENCES, resolveSets } from './migrate.ts'
 import {
   askedText, cachedHub, clearState, outgoingPath, readState, recordedText, SENTENCES, trunkRequest, UUID, withdrawnText, writeState,
 } from './node.ts'
@@ -173,6 +176,32 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     clearState(repo, id)
     return c.json({ id, cleared: true })
   }))
+
+  // ── migration: existing peers onto atproto (Task 12) ──
+
+  // The trunk's peers and the caches only: it never fetches. The page runs `federation.check-links` first.
+  app.get('/api/federation/migration', async c => {
+    const m = await migrationOf(repo, run, deps.startBranch)
+    if ('problem' in m) return c.json({ problem: m.problem })
+    return c.json({ rows: m.rows, kept: m.kept })
+  })
+
+  // One federation.yaml edit, class identity, staged in the actor's change (or committed where their rule is direct).
+  app.post('/api/federation/migration', async c => {
+    const raw = await body(c)
+    return withLock(async () => {
+      const actor = knownActorOf(c)
+      const m = await migrationOf(repo, run, deps.startBranch)
+      if ('problem' in m) throw new HttpError(409, m.problem)
+      const sets = resolveSets(raw.set, m, bindingView(repo))
+      const { text, base } = fedNow(repo, actor.id)
+      const edited = migratedText(text, sets)
+      if (edited.changed === 0) throw new HttpError(409, MIGRATION_SENTENCES.unchanged)
+      const n = sets.length
+      const out = await commitOrStage(repo, actor, [fedOp(edited.text, base)], `federation: bring ${n} ${n === 1 ? 'peer' : 'peers'} onto atproto (DID and link)`, deps.notify)
+      return c.json({ set: sets.map(s => s.peer.index), ...out })
+    })
+  })
 
   // ── the hub's side ──
 

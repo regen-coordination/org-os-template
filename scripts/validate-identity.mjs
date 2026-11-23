@@ -296,10 +296,12 @@ async function checkFederationLinks() {
     },
   };
 
+  // This instance is its folder and its `origin` remote only, as the admin's fleet reads it: an `upstream` (the
+  // framework template) or any other remote is someone else's repository, and a peer listing it doesn't list us.
   let remotes = [];
   const git = spawnSync("git", ["remote", "-v"], { cwd: rootDir, encoding: "utf-8" });
   if (git.status === 0 && git.stdout) {
-    remotes = [...new Set(git.stdout.split("\n").map((l) => l.split(/\s+/)[1]).filter(Boolean))];
+    remotes = [...new Set(git.stdout.split("\n").map((l) => l.trim().split(/\s+/)).filter(([name, url]) => name === "origin" && url).map(([, url]) => url))];
   }
 
   const { peers, problems, networks, join } = mods.readFederation(doc);

@@ -93,3 +93,23 @@ test('a sibling listed by a vault-relative path is found and read (final review 
     assert.doesNotMatch(r.stdout, /no folder at/)
   } finally { rmSync(tmp, { recursive: true, force: true }) }
 })
+
+test('only the origin remote is this instance: a sibling listing the upstream template is one-sided (N2 Task 12)', () => {
+  const { tmp, me } = fixture('peers:\n  - name: other\n    repo: ../other\n')
+  try {
+    const git = (...a) => { const r = spawnSync('git', a, { cwd: me, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr) }
+    git('init', '-q')
+    git('remote', 'add', 'origin', 'https://github.com/me-org/me-node')
+    git('remote', 'add', 'upstream', 'https://github.com/template-org/org-os')
+    mkdirSync(join(tmp, 'other'))
+    const otherLists = url => writeFileSync(join(tmp, 'other', 'federation.yaml'), `identity:\n  name: Other\npeers:\n  - name: them\n    url: ${url}\n`)
+    otherLists('https://github.com/template-org/org-os')
+    const up = run(me)
+    assert.equal(up.status, 0, up.stdout)
+    assert.match(up.stdout, /peer "other": only this side lists the link/)
+    otherLists('https://github.com/me-org/me-node')
+    const origin = run(me)
+    assert.equal(origin.status, 0, origin.stdout)
+    assert.doesNotMatch(origin.stdout, /peer "other"/)
+  } finally { rmSync(tmp, { recursive: true, force: true }) }
+})
