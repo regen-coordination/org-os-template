@@ -9,6 +9,7 @@ import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import { readFederation } from '../../../lib/federation/read.mjs'
 import { linkStatesOf, selfAddressesOf, type PeerLinkState } from '../../federation/link-state.ts'
 import { publishFacts } from '../../federation/atproto/publish.ts'
+import { listOutgoing } from '../../federation/node.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
 
 /** A clone on this machine, or null: only a folder holding a git repository counts. */
@@ -77,6 +78,8 @@ export const fleet: Adapter = {
       facts: { self: true, type: identity.type ?? null, localPath: ctx.repo }, source: { path: 'federation.yaml', editable: false },
     }
     const nodes: Resource[] = [self]
+    // How the atproto cache reads each hub we asked: set where the link states are worked out (below).
+    let theirsOf: (hub: string) => string = () => 'unknown'
     const edges: Edge[] = []
 
     // The framework keeps a registry of its instances; an instance knows only its peers.
@@ -101,6 +104,11 @@ export const fleet: Adapter = {
       // both sides' atproto records as last read. federation.yaml governs our side; a record that disagrees is drift.
       const parsedFed = readFederation(fed)
       const links = linkStatesOf(ctx.repo, parsedFed, await selfAddressesOf(ctx.repo, ctx.run))
+      const norm = (u: string | null) => (u ?? '').trim().replace(/\/+$/, '').toLowerCase()
+      theirsOf = hub => {
+        const peer = parsedFed.peers.find(p => p.url !== null && norm(p.url) === norm(hub))
+        return (peer && links.peers.get(peer.index)?.sources.atproto) || 'unknown'
+      }
       // Our records no peer accounts for: published, but federation.yaml no longer lists them. The urgent case.
       self.facts = { ...self.facts, did: links.selfDid, drift: links.unlisted }
       if (!self.attention && links.unlisted.length > 0) self.attention = { level: 'warn', text: links.unlisted[0].text }
@@ -126,6 +134,9 @@ export const fleet: Adapter = {
     // Publishing this org's own link records (N2 Task 7): the last receipt, what the trunk's plan holds now, and the
     // first refusal of the plan's file-side steps (ruling R11), so Publish is unavailable with its sentence.
     self.facts = { ...self.facts, ...(await publishFacts(ctx.repo, { run: ctx.run, now: ctx.now() })) }
+    // The node's side of asking to join (N2 Task 8): each request this instance asked, whether it is on the trunk yet,
+    // where it was sent and what came back, and what the hub's atproto records say (from the cache; never fetched).
+    self.facts = { ...self.facts, outgoing: (await listOutgoing(ctx.repo)).map(o => ({ ...o, atproto: { theirs: theirsOf(o.hub) } })) }
     // No fleet declared still leaves this instance's own card: Sync and Share are its operations (0.6 P2 spec §3.10).
     return { nodes, edges }
   },

@@ -242,7 +242,8 @@ const firstLine = (text: string): string => text.trim().split('\n')[0] ?? ''
 /** The files the server may write: the records, the pages, the identity files and the agent layer. `<dir>/` is
  *  everything under it. DECISIONS.md is ratify's alone (`{ ratify: true }`). */
 const WRITABLE_FILES = ['IDENTITY.md', 'federation.yaml', 'MEMORY.md', 'HEARTBEAT.md']
-const WRITABLE_DIRS = ['data/', 'pages/', 'memory/', 'docs/plans/', 'docs/agent-plans/']
+// `federation/outgoing/` is the node's own requests to join a network (N2 Task 8); governed as class identity.
+const WRITABLE_DIRS = ['data/', 'pages/', 'memory/', 'docs/plans/', 'docs/agent-plans/', 'federation/outgoing/']
 /** Never written, whatever a list says: git's own, the platform's private state, and what is generated from the records. */
 const NEVER: readonly [string, string][] = [
   ['.git/', "it is git's own"],

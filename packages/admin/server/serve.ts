@@ -33,6 +33,7 @@ import { mountStandards } from './standards/routes.ts'
 import { mountBootstrap } from './bootstrap/routes.ts'
 import { mountWizards } from './wizards/routes.ts'
 import { mountSystemsMap } from './systems/map-routes.ts'
+import { mountFederation } from './federation/routes.ts'
 import { mountKnowledge } from './knowledge/routes.ts'
 import { opById } from './operations/catalogue.ts'
 import { parseRpcConfig } from './systems/chains.ts'
@@ -285,6 +286,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     mountBootstrap(a, { repo, jobs, executor, withLock: ctx.withLock })
     mountWizards(a, { repo, hosted })
     mountSystemsMap(a, { repo, fetch })
+    mountFederation(a, { repo, fetch, withLock: ctx.withLock, notify: msg => emit(msg), startBranch })
     mountKnowledge(a, { repo, jobs, withLock: ctx.withLock })
     mountVisibility(a, { repo, membership, systems: systemReader, withLock: ctx.withLock, privateStore: ctx.privateStore, notify: msg => emit(msg) })
     mountPush(a, { pusher: () => pusher })
