@@ -89,7 +89,7 @@ export default function Governance({ part }: { part: string }) {
   const openOnes = shown.filter(p => p.state === 'open')
   const closedOnes = shown.filter(p => p.state !== 'open')
   // Network N2 Task 10: an open proposal built from a join request is listed on its own, first, and not again below.
-  const cameFromOutside = (p: ProposalView) => (p as { origin?: { kind?: unknown } }).origin?.kind === 'federation-request'
+  const cameFromOutside = (p: ProposalView) => p.origin?.kind === 'federation-request'
   const outsideOnes = openOnes.filter(cameFromOutside)
   const insideOnes = openOnes.filter(p => !cameFromOutside(p))
   const counted = proposals.data !== undefined

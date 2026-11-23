@@ -37,6 +37,8 @@ export type BranchState = 'built' | 'missing'
 /** The entry, its rule snapshot replaced by sentences (each rule as `evaluation.parts` holds it, too), and the rest. */
 export interface ProposalView extends Omit<Proposal, 'rules'> {
   derived: string
+  /** Set on a proposal built from a join request (network N2): where the change came from. */
+  origin?: { kind: 'federation-request'; request: string; from: string }
   evaluation: ReturnType<typeof evaluateAll>
   rules: RuleSummary[]
   /** The positions of the ops whose record changed on the trunk since they were staged. */

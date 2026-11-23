@@ -2,9 +2,10 @@
 // for attention while a request waits on the operator; the built-in board groups them; a members-only read never
 // reaches the public; untrusted answers are capped and stripped wherever they are shown. Fresh temp repos only.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { stringify } from 'yaml'
+import { parse, stringify } from 'yaml'
+import { readPolicy } from '../../lib/visibility.mjs'
 import { makeChangeRepo } from '../changes/fixtures.ts'
 import { removeFixtureRepo } from '../fixtures.ts'
 import { createApp } from '../../server/app.ts'
@@ -17,10 +18,18 @@ import { builtinBoards } from '../../server/boards/read.ts'
 import { writeReplied } from '../../server/federation/hub.ts'
 import { validateBoard } from '../../lib/board-query.mjs'
 import { boardFieldsOf } from '../../lib/data-validate.mjs'
-import { stateDir } from '../../server/state.ts'
+import { execFileSync } from 'node:child_process'
+import { mountFederation } from '../../server/federation/routes.ts'
+import { inboxPut } from '../../server/federation/hub.ts'
+import { refreshedAdapters, type Operation } from '../../server/operations/catalogue.ts'
+import { buildRequest, requestText } from '../../lib/federation/request.mjs'
 import type { AdapterContext, Graph } from '../../server/resources/types.ts'
 
 const ID = (n: number) => `3f8a2c1e-5b7d-4e9a-8c10-2d6f4a9b7e${String(n).padStart(2, '0')}`
+const POLICY_PUBLIC = [
+  'visibility:', '  collections:', '    federation-requests: { default: public }', '    invites: { default: public }', '',
+].join('\n')
+const INVITE = { id: 'i-abcd1234', name: 'For Mesa', type: 'LocalNode', network: 'Mesh', expires: '2027-01-01', token_sha256: 'a'.repeat(64), used_by: null }
 const NOW = new Date('2026-11-22T12:00:00Z')
 
 let repo: string
@@ -121,13 +130,6 @@ describe('the federation adapter', () => {
     expect(shownAnswers(null)).toEqual({})
     expect(shownAnswers(['a'])).toEqual({})
   })
-
-  it('is re-read after a reply (the receipt is outside any watched path)', () => {
-    // the store re-reads an adapter on `invalidateAdapter`, which a finished job calls for what the operation `refreshes`
-    const store = new ResourceStore(ctx(), [federation])
-    expect(() => store.invalidateAdapter('federation')).not.toThrow()
-    rmSync(stateDir(repo), { recursive: true, force: true })
-  })
 })
 
 describe('the requests board', () => {
@@ -173,9 +175,87 @@ describe('members only', () => {
     const list = await (await pub.request('/api/boards')).text()
     expect(list).not.toContain('federation-requests')
     // even when data/visibility.yaml calls the registry public: the resource has no registry, so it is members' only
-    writeFileSync(join(repo, 'data', 'visibility.yaml'), 'schema_version: "2.0"\ndefault: public\nregistries:\n  federation-requests: public\n')
+    writeFileSync(join(repo, 'data', 'visibility.yaml'), POLICY_PUBLIC)
     const again = await (await asPublic().request('/api/resources')).text()
     expect(again).not.toContain('Mesa Secret Node')
     expect(again).not.toContain(ID(1))
+  })
+
+  it('a policy that calls the requests and invites public does not expose them: they are never widened', async () => {
+    putRecords(rec(1, { from: { name: 'Mesa Secret Node', type: 'LocalNode', url: 'https://mesa-secret.example.org' } }))
+    writeFileSync(join(repo, 'data', 'invites.yaml'), stringify({ invites: [INVITE] }))
+    // the fixture is the shape lib/visibility.mjs reads: the policy really parses, and it says public
+    const policy = readPolicy(parse(POLICY_PUBLIC))
+    expect(policy.problems).toEqual([])
+    expect(policy.policy.collections.invites!.default).toBe('public')
+    expect(policy.policy.collections['federation-requests']!.default).toBe('public')
+    writeFileSync(join(repo, 'data', 'visibility.yaml'), POLICY_PUBLIC)
+    const pub = asPublic()
+    for (const path of ['/api/registries/invites', '/api/registries/federation-requests', '/api/registries']) {
+      const text = await (await pub.request(path)).text()
+      for (const word of ['Mesa Secret Node', 'mesa-secret', INVITE.token_sha256, 'i-abcd1234']) expect(text, `${path} ${word}`).not.toContain(word)
+    }
+  })
+})
+
+const REQ_ID = ID(40)
+const asked = (over: { answers?: Record<string, string>; invite?: string } = {}) => buildRequest({
+  id: REQ_ID, from: { name: 'Mesa Node', type: 'LocalNode', url: 'https://mesa-node.example.org' }, hub: { name: 'Mesh Hub', url: 'https://mesh-hub.example.org' },
+  network: 'Mesh', answers: over.answers ?? { purpose: 'we work on soil' }, ...(over.invite ? { invite: over.invite } : {}), now: '2026-11-22T10:00:00.000Z',
+})
+
+describe('the board stays current (fix round 1, I1 and I2)', () => {
+  const hub = () => {
+    // a hub that has neither data/federation-requests.yaml nor data/proposals.yaml: nothing for the resource watcher to watch
+    const r = makeChangeRepo(null)
+    writeFileSync(join(r, 'federation.yaml'), ['identity:', '  name: "Mesh Hub"', '  type: "Network"', '  url: https://mesh-hub.example.org',
+      'networks:', '  - { name: Mesh, role: hub }', 'peers: []', ''].join('\n'))
+    execFileSync('git', ['add', '-A'], { cwd: r }); execFileSync('git', ['commit', '-qm', 'the hub'], { cwd: r })
+    return r
+  }
+  const world = () => {
+    repo = hub()
+    const store = new ResourceStore(ctx())
+    const app = createApp(repo, (a, c) => {
+      mountFederation(a, { repo, withLock: c.withLock, now: () => NOW, startBranch: 'main', invalidate: () => store.invalidateAdapter('federation') })
+      mountResources(a, store, repo)
+    })
+    const cards = async () => (await (await app.request('/api/resources?kind=federation-request')).json()) as { id: string; status: string; facts: Record<string, unknown> }[]
+    return { app, cards }
+  }
+
+  it('the first request a hub records shows on the board without a restart', async () => {
+    const w = world()
+    expect(await w.cards()).toEqual([])
+    const res = await w.app.request('/api/federation/requests/receive', { method: 'POST', body: JSON.stringify({ text: requestText(asked()) }), headers: { 'content-type': 'application/json' } })
+    expect(res.status, await res.clone().text()).toBe(200)
+    expect((await w.cards()).map(c => [c.id, c.status])).toEqual([[`federation-request:${REQ_ID}`, 'refused']])
+  })
+
+  it('afterJob invalidates every adapter an operation refreshes, a list or one', () => {
+    expect(refreshedAdapters({ refreshes: 'fleet' } as Pick<Operation, 'refreshes'>)).toEqual(['fleet'])
+    expect(refreshedAdapters({ refreshes: ['fleet', 'federation'] } as Pick<Operation, 'refreshes'>)).toEqual(['fleet', 'federation'])
+  })
+
+  it('a polled request waiting in the inbox is a `requested` card, members only, capped and stripped, with no invite token', async () => {
+    const w = world()
+    const long = 'y'.repeat(4000)
+    inboxPut(repo, { transport: 'github', ref: 'https://github.com/mesh/hub/issues/9', text: requestText(asked({ answers: { purpose: `soil\u0000\u202e\n${long}` }, invite: 'tok-UNMISTAKABLE-token' })) })
+    inboxPut(repo, { transport: 'github', ref: 'https://github.com/mesh/hub/issues/10', text: 'not a request' })
+    const cards = await w.cards()
+    expect(cards.map(c => c.status)).toEqual(['requested', 'requested'])
+    const card = cards.find(c => c.id === `federation-request:${REQ_ID}`)!
+    expect(card.facts).toMatchObject({ from: 'Mesa Node', network: 'Mesh', outcome: 'requested' })
+    const answers = card.facts.answers as Record<string, string>
+    expect(Array.from(answers.purpose!).length).toBeLessThanOrEqual(200)
+    expect(answers.purpose).not.toMatch(/[\p{Cc}\p{Cf}]/u)
+    expect(JSON.stringify(cards)).not.toContain('UNMISTAKABLE')
+    expect(cards.find(c => c.id !== card.id)!.facts.from).toBe('')
+    // the public sees none of it
+    const store = new ResourceStore(ctx())
+    const pub = createApp(repo, a => mountResources(a, store, repo), { request: withRequest({ repo, hosted: true, membership: null }) })
+    const text = await (await pub.request('/api/resources')).text()
+    expect(text).not.toContain('Mesa Node')
+    expect(text).not.toContain(REQ_ID)
   })
 })

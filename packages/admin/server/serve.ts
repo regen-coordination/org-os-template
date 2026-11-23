@@ -35,7 +35,7 @@ import { mountWizards } from './wizards/routes.ts'
 import { mountSystemsMap } from './systems/map-routes.ts'
 import { mountFederation } from './federation/routes.ts'
 import { mountKnowledge } from './knowledge/routes.ts'
-import { opById } from './operations/catalogue.ts'
+import { opById, refreshedAdapters } from './operations/catalogue.ts'
 import { parseRpcConfig } from './systems/chains.ts'
 import { SystemReader, READ_TTL_MS } from './systems/reader.ts'
 import { FAILED_READ_TTL_MS, type FetchLike } from './systems/driver.ts'
@@ -247,6 +247,9 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   // The socket exists only once the server listens; until then events have nowhere to go.
   let emit: (msg: unknown) => void = () => {}
   let afterJob: (op: string) => void = () => {}
+  // The join requests board is re-read after a request is received or decided: a hub that started without the requests file
+  // has no watcher on it (the watcher is built from the files that exist), so the routes say so themselves.
+  let federationChanged: () => void = () => {}
   // DAO-OS L6 §8.5 (Task 9 fix round 1): a private page written in the store is a `pages-changed` too (members only, no id).
   if (privateStore) privateStore.onRecordsWritten = collections => { if (collections.includes('pages')) emit({ type: 'pages-changed' }) }
   const executor = new LocalExecutor(repo, jobs, {
@@ -286,7 +289,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     mountBootstrap(a, { repo, jobs, executor, withLock: ctx.withLock })
     mountWizards(a, { repo, hosted })
     mountSystemsMap(a, { repo, fetch })
-    mountFederation(a, { repo, fetch, withLock: ctx.withLock, notify: msg => emit(msg), startBranch })
+    mountFederation(a, { repo, fetch, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, invalidate: () => federationChanged() })
     mountKnowledge(a, { repo, jobs, withLock: ctx.withLock })
     mountVisibility(a, { repo, membership, systems: systemReader, withLock: ctx.withLock, privateStore: ctx.privateStore, notify: msg => emit(msg) })
     mountPush(a, { pusher: () => pusher })
@@ -488,7 +491,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         }, 200)
       }
       emit = broadcast
-      afterJob = op => { const known = opById(op); if (known) for (const name of [known.refreshes].flat()) store.invalidateAdapter(name); scheduleRefresh() }
+      federationChanged = () => { store.invalidateAdapter('federation'); scheduleRefresh() }
+      afterJob = op => { const known = opById(op); if (known) for (const name of refreshedAdapters(known)) store.invalidateAdapter(name); scheduleRefresh() }
       const resourceWatcher = watchPaths(repo, store.watchPaths().filter(p => existsSync(join(repo, p))),
         rel => { if (store.invalidate(rel)) scheduleRefresh() })
       const crewPoll = setInterval(() => {

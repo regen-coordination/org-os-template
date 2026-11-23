@@ -31,6 +31,9 @@ export interface FederationDeps {
   run?: Runner
   now?: () => Date
   notify?: (msg: { type: 'changes' }) => void
+  /** Read the join requests board again: a received or decided request changes what the `federation` adapter shows, and a
+   *  hub that started without data/federation-requests.yaml has no watcher on it. */
+  invalidate?: () => void
   startBranch?: string
 }
 
@@ -185,6 +188,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       const answers = typeof text === 'string'
         ? [await receive(repo, actor, { transport: 'file', ref: null, text }, now(), { startBranch: deps.startBranch })]
         : await drainInbox(repo, actor, now(), { startBranch: deps.startBranch })
+      deps.invalidate?.()
       deps.notify?.({ type: 'changes' })
       return c.json(answers.map(a => ({ ref: a.ref, outcome: a.outcome, sentence: a.sentence, ...('proposal' in a && a.proposal ? { proposal: a.proposal } : {}) })))
     })
@@ -197,6 +201,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     return withLock(async () => {
       const actor = knownActorOf(c)
       const out = await decide(repo, actor, c.req.param('id'), { accept: raw.accept as boolean, reason: raw.reason as string | undefined }, { startBranch: deps.startBranch })
+      deps.invalidate?.()
       deps.notify?.({ type: 'changes' })
       return c.json({ id: c.req.param('id'), outcome: out.outcome, sentence: out.sentence, commit: out.commit })
     })

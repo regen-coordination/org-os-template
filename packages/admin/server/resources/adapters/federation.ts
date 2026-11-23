@@ -1,5 +1,6 @@
 import { readLedger } from '../../proposals/ledger.ts'
-import { hubRequests, label, toReplyOf, type HubRequest } from '../../federation/hub.ts'
+import { hubRequests, label, listInbox, toReplyOf, type HubRequest } from '../../federation/hub.ts'
+import { parseRequest } from '../../../lib/federation/request.mjs'
 import type { Adapter, Resource } from '../types.ts'
 
 // The join requests this hub received, as resources (network N2 Task 10): one `federation-request` per record of
@@ -42,9 +43,9 @@ export const federation: Adapter = {
   ...ME,
   // The records and the proposals their outcome comes from.
   watch: [REL, 'data/proposals.yaml'],
+  // (The inbox and the receipts are under stateDir, outside any watcher: poll, reply, receive and decide invalidate this adapter.)
   async read(ctx) {
     const requests = hubRequests(ctx.repo)
-    if (requests.length === 0) return { nodes: [], edges: [] }
     const ledgerIds = new Set(readLedger(ctx.repo).entries.map(p => String(p.id)))
     const toReply = new Set(toReplyOf(ctx.repo).map(r => r.id))
     const nodes: Resource[] = requests.map(h => {
@@ -69,6 +70,24 @@ export const federation: Adapter = {
         source: { path: REL, editable: false },
       } satisfies Resource
     })
+    // Polled and waiting: requests in the inbox (under stateDir) that Receive has not turned into a record yet. They are the
+    // `requested` column. Everything shown is read through the validated request and `label`; the invite token is never drawn.
+    const known = new Set(requests.map(h => h.record.id))
+    for (const item of listInbox(ctx.repo)) {
+      const { request } = parseRequest(item.text)
+      if (request && known.has(request.id)) continue
+      nodes.push({
+        id: `federation-request:${request ? request.id : `inbox-${item.file.replace(/\.json$/, '').slice(0, 12)}`}`, kind: 'federation-request', board: 'organization',
+        name: request ? label(request.from.name) : 'A request that cannot be read', status: 'requested',
+        attention: { level: 'warn', text: request ? 'Receive it.' : 'Receive it, to be told why it cannot be read.' }, changed: null,
+        facts: {
+          from: request ? label(request.from.name) : '', network: request ? label(request.network) : '', transport: label(item.transport, 40), ref: label(item.ref, 200),
+          received: request ? label(request.created, 40) : '', outcome: 'requested', sentence: 'Polled, not received yet.', replied: null,
+          answers: request ? shownAnswers(request.answers) : {},
+        },
+        source: { path: REL, editable: false },
+      } satisfies Resource)
+    }
     return { nodes, edges: [] }
   },
 }

@@ -55,6 +55,7 @@ export const FACT_COLUMNS: Record<string, FactColumn[]> = {
   person: [fact('role'), fact('layer')],
   funding: [fact('deadline'), fact('fit')],
   partner: [fact('type'), fact('since')],
+  'federation-request': [fact('network'), fact('received')],
   proposal: [fact('author'), { label: 'closes', value: r => factText(r.facts.closesAt).slice(0, 10) }],
   idea: [fact('votes'), fact('updated')],
   meeting: [{ label: 'date', value: r => factText(r.facts.date).slice(0, 10) }, { label: 'recording', value: r => (r.facts.recorded ? 'recorded' : '') }],

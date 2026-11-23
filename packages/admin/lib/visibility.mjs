@@ -16,6 +16,10 @@ export const DEFAULT_LEVEL = 'members'
  *  @type {Readonly<Record<string, readonly string[]>>} */
 export const NEVER_PUBLIC = Object.freeze({ members: Object.freeze(['email', 'handles']) })
 
+/** Collections no policy and no record can make public (network N2): the requests a hub received (names, answers) and its
+ *  invites (a token's hash and who used it). Read as members, whatever data/visibility.yaml or a record's own `visibility` says. */
+export const NEVER_WIDENED = Object.freeze(['federation-requests', 'invites'])
+
 const TOKEN = /^(public|members|hat:.+|role:[a-z][a-z0-9_-]*)$/
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
@@ -104,6 +108,7 @@ export function recordVisibilityProblem(record) {
 
 /** @param {VisibilityPolicy | null | undefined} policy @param {string} collection @param {unknown} record @returns {Level} */
 function recordLevel(policy, collection, record) {
+  if (NEVER_WIDENED.includes(collection)) return 'members'
   if (isObj(record) && (record.visibility === 'public' || record.visibility === 'members')) return record.visibility
   if (isObj(record) && record.visibility !== undefined && record.visibility !== null) return 'members'
   const d = policy?.collections?.[collection]?.default
@@ -475,6 +480,7 @@ const stricterLevel = (record, field) => (narrowerOrEqual(record, field) && !nar
  * @returns {ParsedLevel}
  */
 export function fullLevel(policy, collection, record, field) {
+  if (NEVER_WIDENED.includes(collection)) return MEMBERS
   const d = policy?.collections?.[collection]?.default
   /** @type {ParsedLevel} */
   const base = isObj(record) && record.visibility !== undefined && record.visibility !== null

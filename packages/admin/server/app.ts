@@ -30,7 +30,7 @@ import { INSTANCE_NAV_PATH, readInstanceNav } from './instanceNav.ts'
 import { instanceMark } from './instanceAssets.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
-import { LEDGER_SENTENCE } from './changes/stage.ts'
+import { LEDGER_SENTENCE, OWN_ROUTES_SENTENCE } from './changes/stage.ts'
 import type { RecordOp } from './changes/types.ts'
 import type { Membership } from './session/membership.ts'
 
@@ -178,12 +178,14 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
   })
   app.get('/api/schemas/:name', c => c.json(loadSchema(c.req.param('name'))))
 
-  const guardCollection = (name: string) => {
+  const guardCollection = (name: string, writing: 'create' | 'change' = 'change') => {
     if (registryDef(name).kind !== 'collection') {
       throw new Error(`${name} is a document registry (read-only in M1)`)
     }
     // A ledger (proposals) is written only by its own routes: these old routes answer the sentence the tray does.
     if (registryDef(name).ledger) throw new HttpError(403, LEDGER_SENTENCE(name), 'LEDGER')
+    // A create-only registry (invites) is created here, never replaced or deleted: `used_by` is the federation routes' own.
+    if (registryDef(name).createOnly && writing === 'change') throw new HttpError(403, OWN_ROUTES_SENTENCE(name), 'OWN_ROUTES')
   }
 
   /** The body of a write, or a 400 that says what a body must be. */
@@ -243,7 +245,7 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
 
   app.post('/api/registries/:name', async c => {
     const name = c.req.param('name')
-    guardCollection(name)
+    guardCollection(name, 'create')
     const entity = await readEntity(c)
     if (entity.id === undefined || entity.id === null || entity.id === '') {
       return c.json({ errors: [{ field: 'id', message: 'a new entry needs an `id`' }] }, 422)

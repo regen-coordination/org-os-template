@@ -22,7 +22,7 @@ describe('the registry list', () => {
   })
   it('holds federation-requests, a ledger, and invites, a plain collection, both class identity (N2)', () => {
     expect(registryDef('federation-requests')).toEqual({ name: 'federation-requests', topKey: 'requests', kind: 'collection', ledger: true })
-    expect(registryDef('invites')).toEqual({ name: 'invites', topKey: 'invites', kind: 'collection' })
+    expect(registryDef('invites')).toEqual({ name: 'invites', topKey: 'invites', kind: 'collection', createOnly: true })
     for (const registry of ['federation-requests', 'invites']) expect(classOf({ registry })).toBe('identity')
     expect(classOf({ path: 'federation/outgoing/x.yaml' })).toBe('identity')
     expect(classOf({ path: 'data/invites.yaml' })).toBe('identity')

@@ -45,6 +45,9 @@ export interface ParamsSchema {
 
 export type Refreshed = 'records' | 'modules' | 'crew' | 'fleet' | 'sources' | 'federation'
 
+/** The adapters to read again when `op` ends. */
+export const refreshedAdapters = (op: Pick<Operation, 'refreshes'>): Refreshed[] => [op.refreshes].flat()
+
 export interface Operation {
   id: string
   kinds: Kind[]

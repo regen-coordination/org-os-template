@@ -16,6 +16,7 @@ export interface RegistryDef {
   topKey: string      // canonical top-level YAML key (used when creating the block)
   aliases?: string[]  // other keys real instances use for the same block
   kind: RegistryKind
+  createOnly?: boolean // an entry is created, never replaced, updated or deleted by hand (invites)
   ledger?: boolean    // written only by its own routes (P2): the change engine refuses to stage an op on it
   file?: string       // the file it is written in, from the repository's root (default data/<name>.yaml; L6 §7.1)
   shape?: 'list' | 'map' // entries as a list (default), or as a map keyed by id (kms's `entries:`)

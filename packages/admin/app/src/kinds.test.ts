@@ -65,3 +65,11 @@ describe('the proposal kind', () => {
     expect(CARD_FIELDS.proposal!.tile).toEqual(['author', 'closes'])
   })
 })
+
+describe('join request cards (network N2 Task 10)', () => {
+  it('show the network and the received date', () => {
+    const r = { id: 'federation-request:x', kind: 'federation-request', board: 'organization', name: 'Mesa', status: 'requested', attention: null, changed: null,
+      facts: { network: 'Mesh', received: '2026-11-22' }, source: null } as never
+    expect(cardFacts(r, CARD_FIELDS['federation-request']!.row)).toEqual([{ label: 'network', value: 'Mesh' }, { label: 'received', value: '2026-11-22' }])
+  })
+})
