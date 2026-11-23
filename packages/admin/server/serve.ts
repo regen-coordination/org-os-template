@@ -200,7 +200,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   // Membership from the DAO's Hats tree (§5), read through the one reader; sessions live in the one private store.
   const membership = new Membership({ repo, reader: systemReader, now: () => new Date() })
   const resourceCtx: AdapterContext = {
-    repo, now: () => new Date(), run: runCommand, lastOk: (op, id) => jobs.lastOk(op, id),
+    repo, startBranch, now: () => new Date(), run: runCommand, lastOk: (op, id) => jobs.lastOk(op, id),
     // The only reader given the network: drivers reach their declared hosts and nothing else.
     systems: systemReader,
     // The Sources page's row for a read-only Hub's refresh (C1, C2); none while there is no Refresher.

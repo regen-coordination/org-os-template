@@ -133,10 +133,10 @@ export const fleet: Adapter = {
     }
     // Publishing this org's own link records (N2 Task 7): the last receipt, what the trunk's plan holds now, and the
     // first refusal of the plan's file-side steps (ruling R11), so Publish is unavailable with its sentence.
-    self.facts = { ...self.facts, ...(await publishFacts(ctx.repo, { run: ctx.run, now: ctx.now() })) }
+    self.facts = { ...self.facts, ...(await publishFacts(ctx.repo, { run: ctx.run, now: ctx.now(), startBranch: ctx.startBranch })) }
     // The node's side of asking to join (N2 Task 8): each request this instance asked, whether it is on the trunk yet,
     // where it was sent and what came back, and what the hub's atproto records say (from the cache; never fetched).
-    self.facts = { ...self.facts, outgoing: (await listOutgoing(ctx.repo)).map(o => ({ ...o, atproto: { theirs: theirsOf(o.hub) } })) }
+    self.facts = { ...self.facts, outgoing: (await listOutgoing(ctx.repo, { startBranch: ctx.startBranch })).map(o => ({ ...o, atproto: { theirs: theirsOf(o.hub) } })) }
     // No fleet declared still leaves this instance's own card: Sync and Share are its operations (0.6 P2 spec §3.10).
     return { nodes, edges }
   },

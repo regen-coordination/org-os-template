@@ -80,6 +80,8 @@ export interface AdapterContext {
    *  the read is made from where the System is; the gate keeps that read from a viewer not admitted to them (PF-R256).
    *  Absent: git's entries alone. */
   privateStore?: PrivateAccess
+  /** The branch the server started on: where the trunk is read when governance names none. */
+  startBranch?: string
 }
 
 export interface Adapter {

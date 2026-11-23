@@ -8,6 +8,7 @@ import { HttpError } from '../errors.ts'
 import { knownActorOf } from '../request.ts'
 import { commitOrStage } from '../workspace/pages.ts'
 import { fileBase, fileText } from '../workspace/files.ts'
+import { ChangeStore } from '../changes/store.ts'
 import type { FileOp } from '../changes/types.ts'
 import { runCommand } from '../resources/run.ts'
 import { readFederation } from '../../lib/federation/read.mjs'
@@ -17,7 +18,7 @@ import { intakeOutcome } from '../../lib/federation/intake.mjs'
 import type { Runner } from '../resources/types.ts'
 import { transports } from './transports/index.ts'
 import {
-  askedText, cachedHub, outgoingPath, readState, recordedText, SENTENCES, trunkRequest, UUID, withdrawnText, writeState,
+  askedText, cachedHub, clearState, outgoingPath, readState, recordedText, SENTENCES, trunkRequest, UUID, withdrawnText, writeState,
 } from './node.ts'
 
 export interface FederationDeps {
@@ -39,7 +40,15 @@ async function body(c: Context): Promise<Record<string, unknown>> {
   return v as Record<string, unknown>
 }
 
-const fedOp = (repo: string, text: string): FileOp => ({ op: 'file', path: FED, text, base: fileBase(repo, FED) })
+const fedOp = (text: string, base: string | null): FileOp => ({ op: 'file', path: FED, text, base })
+
+/** federation.yaml as this actor's change would have it: their staged edit of it when there is one (so a second edit builds
+ *  on the first and never replaces it), else the working tree. `base` is what the op is staged against. */
+function fedNow(repo: string, actorId: string): { text: string; base: string | null } {
+  const staged = new ChangeStore(repo).load(actorId)?.ops.find(o => o.op === 'file' && o.path === FED) as FileOp | undefined
+  if (staged && staged.text !== null) return { text: staged.text, base: staged.base }
+  return { text: fileText(repo, FED) ?? '', base: fileBase(repo, FED) }
+}
 
 export function mountFederation(app: Hono, deps: FederationDeps): void {
   const { repo, withLock } = deps
@@ -87,8 +96,10 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       if (!got) throw new HttpError(400, SENTENCES.lookFirst)
       const hub = got.hub
       if (!hub.networks.includes(network)) throw new HttpError(400, `"${network}" isn't a network of ${hub.name}.`)
-      const text = fileText(repo, FED) ?? ''
-      const own = readFederation(parseDocument(text).toJS() ?? {})
+      const { text, base } = fedNow(repo, actor.id)
+      const parsed = parseDocument(text)
+      if (parsed.errors.length > 0) throw new HttpError(409, "federation.yaml can't be read as YAML, so nothing was changed. Fix it first.")
+      const own = readFederation(parsed.toJS() ?? {})
       const identity = own.identity
       const ownUrl = [identity.url, identity.daoURI].find(u => typeof u === 'string' && isPublicUrl(u)) as string | undefined
       const ownName = typeof identity.name === 'string' && identity.name.trim() !== '' ? identity.name : null
@@ -107,13 +118,14 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       if (outcome.kind === 'refuse') throw new HttpError(400, outcome.reason)
       if (join?.policy === 'invite' && !invite) throw new HttpError(400, 'This network joins by invite. Add your invite.')
 
+      const edit = askedText(text, { network, hub: hubAddress, hubName: hub.name, did: hub.did, id, since: now().toISOString().slice(0, 10), type: hub.type })
       const ops: FileOp[] = [
-        fedOp(repo, askedText(text, { network, hub: hubAddress, hubName: hub.name, did: hub.did, id, since: now().toISOString().slice(0, 10), type: hub.type })),
+        fedOp(edit.text, base),
         // The invite is never in this file (R18): it is held in the state folder, outside git, and joined in at send time.
         { op: 'file', path: outgoingPath(id), text: requestText(request), base: null },
       ]
       const out = await commitOrStage(repo, actor, ops, `federation: ask to join ${network}`, deps.notify)
-      writeState(repo, id, { network, hub: hubAddress, hubName: hub.name, ...(invite ? { invite } : {}) })
+      writeState(repo, id, { network, hub: hubAddress, hubName: hub.name, peerAdded: edit.peerAdded, ...(invite ? { invite } : {}) })
       return c.json({ id, ...out })
     })
   })
@@ -121,20 +133,30 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
   app.post('/api/federation/outgoing/:id/withdraw', c => withLock(async () => {
     const actor = knownActorOf(c)
     const id = c.req.param('id')
-    const state = readState(repo, id)
-    if (!state) throw new HttpError(404, 'No such request.')
+    // The trunk's request file is what a withdrawal needs; the state folder is a convenience that may be gone.
     const committed = await trunkRequest(repo, id, deps.startBranch)
-    if (!committed) throw new HttpError(409, SENTENCES.notApplied)
-    const text = fileText(repo, FED) ?? ''
-    const edited = withdrawnText(text, committed.request?.hub.url ?? state.hub, committed.request?.network ?? state.network)
+    const state = readState(repo, id)
+    if (!committed?.request) throw new HttpError(state ? 409 : 404, state ? SENTENCES.notApplied : 'No such request.')
+    const network = committed.request.network
+    const { text, base } = fedNow(repo, actor.id)
+    const edited = withdrawnText(text, { id, hub: committed.request.hub.url, network, peerAdded: state?.peerAdded ?? true })
     const ops: FileOp[] = [
-      ...(edited.removed > 0 ? [fedOp(repo, edited.text)] : []),
+      ...(edited.removed > 0 ? [fedOp(edited.text, base)] : []),
       { op: 'file', path: outgoingPath(id), text: null, base: fileBase(repo, outgoingPath(id)) },
     ]
-    const network = committed.request?.network ?? state.network
     const out = await commitOrStage(repo, actor, ops, `federation: withdraw the request to join ${network}`, deps.notify)
-    writeState(repo, id, { ...state, withdrawn: true })
-    return c.json({ id, leaving: edited.decided, text: edited.decided ? SENTENCES.leaving(network) : `Withdrawn: ${network}.`, ...out })
+    writeState(repo, id, { ...(state ?? { network, hub: committed.request.hub.url }), withdrawn: true })
+    return c.json({ id, leaving: edited.leaving, text: edited.leaving ? SENTENCES.leaving(network) : `Withdrawn: ${network}.`, ...out })
+  }))
+
+  // A request only the state folder knows (its staged ask was discarded): forget it. Git is not touched.
+  app.post('/api/federation/outgoing/:id/clear', c => withLock(async () => {
+    knownActorOf(c)
+    const id = c.req.param('id')
+    if (await trunkRequest(repo, id, deps.startBranch)) throw new HttpError(409, 'This request is on your trunk: withdraw it instead.')
+    if (!readState(repo, id)) throw new HttpError(404, 'No such request.')
+    clearState(repo, id)
+    return c.json({ id, cleared: true })
   }))
 
   app.post('/api/federation/outgoing/:id/record', c => withLock(async () => {
@@ -144,9 +166,10 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     if (!state) throw new HttpError(404, 'No such request.')
     if (state.status?.state !== 'accepted') throw new HttpError(409, SENTENCES.notAccepted)
     const decision = (state.status.reason ?? 'Accepted').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Accepted'
-    const edited = recordedText(fileText(repo, FED) ?? '', id, decision)
+    const now_ = fedNow(repo, actor.id)
+    const edited = recordedText(now_.text, id, decision)
     if (edited === null) throw new HttpError(409, SENTENCES.noRequest)
-    const out = await commitOrStage(repo, actor, [fedOp(repo, edited)], `federation: record the acceptance into ${state.network}`, deps.notify)
+    const out = await commitOrStage(repo, actor, [fedOp(edited, now_.base)], `federation: record the acceptance into ${state.network}`, deps.notify)
     return c.json({ id, text: SENTENCES.recorded, ...out })
   }))
 }

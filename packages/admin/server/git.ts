@@ -254,7 +254,7 @@ const NEVER: readonly [string, string][] = [
 /**
  * Throws, before any git runs, unless the server may write `path` (DAO-OS L6 §11.3): a plain path relative to the
  * repository (no `.` or `..` segment, nothing absolute, nothing git could read as a flag) under `data/`, `pages/`,
- * `memory/`, `docs/plans/` or `docs/agent-plans/`, or exactly `IDENTITY.md`, `federation.yaml`, `MEMORY.md` or
+ * `memory/`, `docs/plans/` or `docs/agent-plans/`, `federation/outgoing/`, or exactly `IDENTITY.md`, `federation.yaml`, `MEMORY.md` or
  * `HEARTBEAT.md`; `DECISIONS.md` only with `ratify`. Never `.git/`, `.org-os/` or `.well-known/`. A path git ignores is
  * `commitPaths`' to refuse: it takes git to know.
  */
@@ -269,7 +269,7 @@ export function assertWritablePath(repo: string, path: string, opts: { ratify?: 
   for (const [dir, why] of NEVER) if (path.startsWith(dir)) refuse(why)
   if (path === 'DECISIONS.md') { if (opts.ratify) return; refuse('it is written by ratify only') }
   if (WRITABLE_FILES.includes(path) || WRITABLE_DIRS.some(dir => path.startsWith(dir) && path.length > dir.length)) return
-  refuse('it is not a file the server writes (data/, pages/, IDENTITY.md, federation.yaml and the agent layer)')
+  refuse('it is not a file the server writes (data/, pages/, federation/outgoing/, IDENTITY.md, federation.yaml and the agent layer)')
 }
 
 /** Which of `paths` differ from the last commit, staged or not. A save commits

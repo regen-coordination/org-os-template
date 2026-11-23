@@ -18,7 +18,7 @@ import { JobStore, stateDir, type JobRecord } from '../../server/state.ts'
 import { runCommand } from '../../server/resources/run.ts'
 import { ChangeStore } from '../../server/changes/store.ts'
 import { mountFederation } from '../../server/federation/routes.ts'
-import { federationSendOperation, federationStatusOperation, readState, SENTENCES, outgoingPath } from '../../server/federation/node.ts'
+import { clearState, federationSendOperation, federationStatusOperation, readState, SENTENCES, outgoingPath } from '../../server/federation/node.ts'
 import { remoteCache, wellKnownUrlOf } from '../../server/federation/remote.ts'
 import { registerTransport, transportOf } from '../../server/federation/transports/index.ts'
 import type { Transport } from '../../server/federation/transports/types.ts'
@@ -64,7 +64,7 @@ const write = (rel: string, text: string) => { mkdirSync(join(repo, rel, '..'), 
 const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' }).toString()
 const commit = (msg: string) => { git('add', '-A'); git('commit', '-qm', msg) }
 const HUB_DOC = (join: Record<string, unknown> | null = { policy: 'open-with-approval', asks: ['purpose'], where: HUB_SITE }) => ({
-  spec: 'org-os/federation/1', name: 'Mesh Hub', type: 'Network', did: HUB, networks: [{ name: 'Mesh' }], ...(join ? { join } : {}),
+  spec: 'org-os/federation/1', name: 'Mesh Hub', type: 'Network', did: HUB, networks: [{ name: 'Mesh' }, { name: 'Commons' }], ...(join ? { join } : {}),
 })
 const cacheHub = (doc: Record<string, unknown> = HUB_DOC()) => remoteCache(repo).put(wellKnownUrlOf(HUB_SITE)!, doc, NOW)
 const FED = (more = '') => `# the org's federation manifest\nidentity:\n  name: "Fixture Org"\n  type: "Organization"\n  url: ${OWN_SITE}\n  did: "${SELF}"\n${more}`
@@ -190,7 +190,7 @@ describe('ask', () => {
     setup(CONSENSUS)
     const fresh = await (await app.request(`/api/federation/hub?address=${encodeURIComponent(HUB_SITE)}`)).json() as { hub: { name: string; networks: string[]; join: { asks: string[] } } }
     expect(fresh.hub.name).toBe('Mesh Hub')
-    expect(fresh.hub.networks).toEqual(['Mesh'])
+    expect(fresh.hub.networks).toEqual(['Mesh', 'Commons'])
     expect(fresh.hub.join.asks).toEqual(['purpose'])
     remoteCache(repo).put(wellKnownUrlOf(HUB_SITE)!, HUB_DOC(), new Date(NOW.getTime() - 11 * 60_000))
     expect(await (await app.request(`/api/federation/hub?address=${encodeURIComponent(HUB_SITE)}`)).json()).toEqual({ problem: SENTENCES.lookFirst })
@@ -409,5 +409,98 @@ describe('nothing reaches atproto until the node publishes, and only through the
     expect(after.plan.create).toEqual([])
     expect(after.plan.delete).toHaveLength(1)
     expect(after.plan.delete[0].value).toMatchObject({ subject: HUB, relation: 'memberOf', network: 'Mesh' })
+  })
+})
+
+describe('fix round 1: the trunk lists, edits build on each other, withdrawing undoes only the ask', () => {
+  const fedText = () => readFileSync(join(repo, 'federation.yaml'), 'utf8')
+
+  it('a request on the trunk is listed, sent and withdrawn with the state folder wiped', async () => {
+    setup(null)
+    const id = (await ask()).json.id as string
+    rmSync(join(stateDir(repo), 'federation'), { recursive: true, force: true })
+    expect(await outgoing()).toEqual([expect.objectContaining({ id, network: 'Mesh', hub: HUB_SITE, onTrunk: true, sent: null })])
+    const p = await planSend(id)
+    expect(p.r.status, JSON.stringify(p.json)).toBe(200)
+    const res = await post(`/api/federation/outgoing/${id}/withdraw`)
+    expect(res.status).toBe(200)
+    expect(fedText()).not.toContain('Mesh Hub')
+    expect(existsSync(join(repo, outgoingPath(id)))).toBe(false)
+  })
+
+  it('a second ask in the same change keeps the first; asking the same network twice is refused', async () => {
+    setup(CONSENSUS)
+    const a = await ask()
+    const b = await ask({ network: 'Commons' })
+    expect([a.res.status, b.res.status]).toEqual([200, 200])
+    const ops = stagedOps()
+    expect(ops.filter(o => o.path === 'federation.yaml')).toHaveLength(1)
+    expect(ops.map(o => o.path).sort()).toEqual(['federation.yaml', outgoingPath(a.json.id as string), outgoingPath(b.json.id as string)].sort())
+    const text = ops.find(o => o.path === 'federation.yaml')!.text!
+    expect(text).toContain('name: Mesh')
+    expect(text).toContain('name: Commons')
+    expect(text).toContain(`requested: ${b.json.id}`)
+    const again = await ask({ network: 'Commons' })
+    expect([again.res.status, again.json.error]).toEqual([409, 'You already list "Commons" under this hub.'])
+    expect(stagedOps().filter(o => o.path !== 'federation.yaml')).toHaveLength(2)
+  })
+
+  it('a member of one network asks for a second and withdraws it: the first stays, and it is not leaving', async () => {
+    setup(null)
+    write('federation.yaml', FED(`networks:\n  - name: Mesh\n    hub: ${HUB_SITE}\n    role: node\npeers:\n  - name: Mesh Hub\n    url: ${HUB_SITE}\n    relationship: hub\n    decision: "2026-10-01"\n`))
+    commit('already a member of Mesh')
+    const id = (await ask({ network: 'Commons' })).json.id as string
+    expect(fedText()).toContain('name: Commons')
+    const res = await post(`/api/federation/outgoing/${id}/withdraw`)
+    const body = await res.json() as { leaving: boolean; text: string }
+    expect(body.leaving).toBe(false)
+    expect(body.text).not.toContain('Leaving')
+    const text = fedText()
+    expect(text).toContain('name: Mesh\n')
+    expect(text).not.toContain('Commons')
+    expect(text).toContain('Mesh Hub')
+    expect(text).toContain('decision: "2026-10-01"')
+    expect(text).not.toContain('requested')
+  })
+
+  it('leaving one network keeps the hub while another network of it is listed', async () => {
+    setup(null)
+    write('federation.yaml', FED(`networks:\n  - name: Mesh\n    hub: ${HUB_SITE}\n    role: node\npeers:\n  - name: Mesh Hub\n    url: ${HUB_SITE}\n    relationship: hub\n    decision: "2026-10-01"\n`))
+    commit('already a member of Mesh')
+    const id = (await ask({ network: 'Commons' })).json.id as string
+    writeState(id)
+    expect((await post(`/api/federation/outgoing/${id}/record`)).status).toBe(200)
+    const res = await post(`/api/federation/outgoing/${id}/withdraw`)
+    expect(await res.json()).toMatchObject({ leaving: true })
+    expect(fedText()).toContain('name: Mesh\n')
+    expect(fedText()).toContain('Mesh Hub')
+    expect(fedText()).not.toContain('Commons')
+  })
+
+  it('a federation.yaml that is not YAML is a sentence, not a 500', async () => {
+    setup(CONSENSUS)
+    write('federation.yaml', 'identity: [unclosed\n')
+    cacheHub() // the state folder is named from federation.yaml, so look the hub up again
+    const r = await ask()
+    expect([r.res.status, r.json.error]).toEqual([409, "federation.yaml can't be read as YAML, so nothing was changed. Fix it first."])
+  })
+
+  it("a hub's did that isn't a DID is not staged", async () => {
+    setup(CONSENSUS)
+    cacheHub({ ...HUB_DOC(), did: 'not a did' })
+    await ask()
+    expect(stagedOps()[0].text).not.toContain('not a did')
+  })
+
+  it('a state-only request (its staged ask discarded) is listed as not applied and can be cleared, git untouched', async () => {
+    setup(CONSENSUS)
+    const id = (await ask()).json.id as string
+    new ChangeStore(repo).all().changes.forEach(c => new ChangeStore(repo).clear(c.actor))
+    expect(await outgoing()).toEqual([expect.objectContaining({ id, onTrunk: false })])
+    const res = await post(`/api/federation/outgoing/${id}/clear`)
+    expect(res.status).toBe(200)
+    expect(await outgoing()).toEqual([])
+    expect(git('status', '--porcelain')).toBe('')
+    expect(clearState).toBeTypeOf('function')
   })
 })

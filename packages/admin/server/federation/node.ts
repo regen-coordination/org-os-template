@@ -6,7 +6,7 @@
 // - Sending and following the answer are confirmed network operations (`federation.send`, `federation.status`). They
 //   write only under stateDir. Nothing here publishes on atproto: a node publishes its `memberOf` link only after the
 //   hub accepted and the node recorded it, and only through the separate confirmed `federation.publish-links` (R16, R27).
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseDocument, isMap, isSeq, type Document, type YAMLMap, type YAMLSeq } from 'yaml'
 import { HttpError } from '../errors.ts'
@@ -15,7 +15,7 @@ import { STRINGIFY } from '../splice.ts'
 import { showFile } from '../git.ts'
 import { resolveTrunk } from '../proposals/ledger.ts'
 import { runCommand } from '../resources/run.ts'
-import { readFederation } from '../../lib/federation/read.mjs'
+import { readFederation, DID_PATTERN } from '../../lib/federation/read.mjs'
 import { parseRequest, requestText } from '../../lib/federation/request.mjs'
 import type { FederationRequest } from '../../lib/federation/request.mjs'
 import { wellKnownUrlOf, remoteCache } from './remote.ts'
@@ -51,6 +51,8 @@ export interface OutgoingState {
   status?: { state: Status['state']; reason?: string; at: string }
   /** Staged for removal: the card keeps listing it only while its file is still on the trunk. */
   withdrawn?: true
+  /** The ask created the hub's peer entry (so withdrawing may remove it); false when the peer was already listed. */
+  peerAdded?: boolean
 }
 
 const stateFolder = (repo: string): string => join(stateDir(repo), 'federation', 'outgoing')
@@ -96,7 +98,7 @@ export function cachedHub(repo: string, address: string, now: Date = new Date())
     hub: {
       name: typeof doc.name === 'string' && doc.name !== '' ? doc.name : address,
       type: typeof doc.type === 'string' ? doc.type : null,
-      url: address.trim(), did: typeof doc.did === 'string' ? doc.did : null,
+      url: address.trim(), did: typeof doc.did === 'string' && DID_PATTERN.test(doc.did) ? doc.did : null,
       networks: fed.networks.map(n => n.name), join: fed.join,
     },
   }
@@ -126,27 +128,43 @@ export async function trunkRequest(repo: string, id: string, startBranch?: strin
   } catch { return null }
 }
 
-/** The outgoing requests this instance has asked, from the state folder and the trunk. Never fetches, never throws. */
+/** The ids of `federation/outgoing/*.yaml` as committed on the trunk. */
+export async function trunkIds(repo: string, startBranch?: string): Promise<string[]> {
+  try {
+    const trunk = await resolveTrunk(repo, startBranch)
+    const listing = await showFile(repo, `refs/heads/${trunk}`, 'federation/outgoing')
+    return listing.split('\n').flatMap(l => { const m = /^([0-9a-f-]{36})\.yaml$/i.exec(l.trim()); return m && UUID.test(m[1]) ? [m[1]] : [] })
+  } catch { return [] }
+}
+
+/** The outgoing requests of this instance: every `federation/outgoing/*.yaml` on the trunk, with what the state folder
+ *  holds about each (sent, answered, the invite), plus requests only the state folder knows (staged, not applied: onTrunk
+ *  false). Never fetches, never throws. */
 export async function listOutgoing(repo: string, opts: { startBranch?: string } = {}): Promise<Outgoing[]> {
+  const onTrunk = await trunkIds(repo, opts.startBranch)
   let names: string[] = []
-  try { names = readdirSync(stateFolder(repo)) } catch { return [] }
+  try { names = readdirSync(stateFolder(repo)) } catch { /* none kept */ }
+  const stateIds = names.flatMap(n => { const m = /^([0-9a-f-]{36})\.json$/i.exec(n); return m && UUID.test(m[1]) ? [m[1]] : [] })
   const out: Outgoing[] = []
-  for (const name of names.sort()) {
-    const m = /^([0-9a-f-]{36})\.json$/i.exec(name)
-    if (!m || !UUID.test(m[1])) continue
-    const state = readState(repo, m[1])
-    if (!state) continue
-    const committed = await trunkRequest(repo, m[1], opts.startBranch)
-    if (state.withdrawn && !committed) continue
-    const hub = committed?.request?.hub.url ?? state.hub
-    const hubDoc = cachedHub(repo, hub)
+  for (const id of [...new Set([...onTrunk, ...stateIds])].sort()) {
+    const state = readState(repo, id)
+    const committed = onTrunk.includes(id) ? await trunkRequest(repo, id, opts.startBranch) : null
+    if (!committed && (!state || state.withdrawn)) continue
+    const network = committed?.request?.network ?? state?.network
+    const hub = committed?.request?.hub.url ?? state?.hub
+    if (!network || !hub) continue
     out.push({
-      id: m[1], network: committed?.request?.network ?? state.network, hub, onTrunk: committed !== null,
-      sent: state.sent ?? null, status: state.status ?? null,
-      where: hubDoc?.hub.join?.where ?? null, invited: state.invite !== undefined,
+      id, network, hub, onTrunk: committed !== null,
+      sent: state?.sent ?? null, status: state?.status ?? null,
+      where: cachedHub(repo, hub)?.hub.join?.where ?? null, invited: state?.invite !== undefined,
     })
   }
   return out
+}
+
+/** Forgets what the state folder holds about a request that is not on the trunk (its staged ask was discarded). Git is not touched. */
+export function clearState(repo: string, id: string): void {
+  if (UUID.test(id)) { try { rmSync(stateFile(repo, id), { force: true }); rmSync(copyPath(repo, id), { force: true }) } catch { /* gone */ } }
 }
 
 /** `facts.outgoing` of a self card, as the fleet adapter put it there. */
@@ -156,6 +174,13 @@ export function outgoingOf(r: Resource): (Outgoing & { atproto?: { theirs: strin
 }
 
 // ── federation.yaml, edited with the YAML document API so comments survive ───────────────────────────
+
+/** federation.yaml as a document; text that isn't YAML is a sentence, not a 500. */
+function docOf(text: string): Document {
+  const doc = parseDocument(text)
+  if (doc.errors.length > 0) throw new HttpError(409, "federation.yaml can't be read as YAML, so nothing was changed. Fix it first.")
+  return doc
+}
 
 const norm = (u: unknown): string => (typeof u === 'string' ? u.trim().replace(/\/+$/, '').toLowerCase() : '')
 
@@ -181,29 +206,31 @@ const hubField = (m: YAMLMap): string => {
 export interface AskEdit { network: string; hub: string; hubName: string; did: string | null; id: string; since: string; type: string | null }
 
 /** federation.yaml with the network and the hub's peer entry added (an existing entry is kept, and marked requested). */
-export function askedText(text: string, a: AskEdit): string {
-  const doc = parseDocument(text)
+export function askedText(text: string, a: AskEdit): { text: string; peerAdded: boolean } {
+  const doc = docOf(text)
   const networks = seqIn(doc, 'networks')
   if (!mapAt(networks).some(n => field(n, 'name') === a.network && norm(hubField(n)) === norm(a.hub))) {
     networks.items.push(doc.createNode({ name: a.network, hub: a.hub, role: 'node' }))
   }
   const peers = seqIn(doc, 'peers')
+  let peerAdded = true
   const existing = mapAt(peers).find(p => norm(field(p, 'url')) === norm(a.hub))
   if (existing) {
     existing.set('requested', a.id)
     if (a.did && field(existing, 'did') === undefined) existing.set('did', a.did)
+    peerAdded = false
   } else {
     peers.items.push(doc.createNode({
       name: a.hubName, url: a.hub, ...(a.type ? { type: a.type } : {}), trust: 'read', relationship: 'hub',
       requested: a.id, since: a.since, ...(a.did ? { did: a.did } : {}),
     }))
   }
-  return doc.toString(STRINGIFY)
+  return { text: doc.toString(STRINGIFY), peerAdded }
 }
 
 /** The peer entry that carries `requested: <id>`, from the text now, or null. */
 export function requestedPeer(text: string, id: string): { name: string } | null {
-  const doc = parseDocument(text)
+  const doc = docOf(text)
   const peers = doc.get('peers')
   if (!isSeq(peers)) return null
   const found = mapAt(peers).find(p => field(p, 'requested') === id)
@@ -212,7 +239,7 @@ export function requestedPeer(text: string, id: string): { name: string } | null
 
 /** federation.yaml with the peer's `decision` set and `requested` removed; null when no peer carries that request. */
 export function recordedText(text: string, id: string, decision: string): string | null {
-  const doc = parseDocument(text)
+  const doc = docOf(text)
   const peers = doc.get('peers')
   const found = isSeq(peers) ? mapAt(peers).find(p => field(p, 'requested') === id) : undefined
   if (!found) return null
@@ -221,29 +248,33 @@ export function recordedText(text: string, id: string, decision: string): string
   return doc.toString(STRINGIFY)
 }
 
-/** federation.yaml without the network entry and the hub's peer entry of a request. `decided`: the peer had a
- *  `decision`, which is what makes withdrawing a leaving. */
-export function withdrawnText(text: string, hub: string, network: string): { text: string; removed: number; decided: boolean } {
-  const doc = parseDocument(text)
+/** What withdrawing a request undoes, and only that.
+ *  - Before the acceptance is recorded (a peer still carries `requested: <id>`): the network entry of this request goes,
+ *    and `requested` goes; the peer entry goes too only when the ask created it (`peerAdded`).
+ *  - After (no peer carries it): this is leaving. Only this network's entry goes; the hub's peer entry stays while another
+ *    network of the same hub is listed, and goes only when the ask created it.
+ *  `leaving` is true only for the second case. */
+export function withdrawnText(text: string, a: { id: string; hub: string; network: string; peerAdded: boolean }): { text: string; removed: number; leaving: boolean } {
+  const doc = docOf(text)
   let removed = 0
-  let decided = false
   const networks = doc.get('networks')
   if (isSeq(networks)) {
-    const keep = networks.items.filter(n => !(isMap(n) && n.get('name') === network && norm(hubField(n)) === norm(hub)))
+    const keep = networks.items.filter(n => !(isMap(n) && n.get('name') === a.network && norm(hubField(n)) === norm(a.hub)))
     removed += networks.items.length - keep.length
     networks.items = keep
   }
+  const otherNetwork = isSeq(networks) && networks.items.some(n => isMap(n) && norm(hubField(n)) === norm(a.hub))
   const peers = doc.get('peers')
+  const pending = isSeq(peers) ? mapAt(peers).find(p => p.get('requested') === a.id) : undefined
   if (isSeq(peers)) {
-    const keep = peers.items.filter(p => {
-      const mine = isMap(p) && norm(p.get('url')) === norm(hub) && (p.get('relationship') === 'hub' || p.get('requested') !== undefined || p.get('decision') !== undefined)
-      if (mine && isMap(p) && p.get('decision') !== undefined) decided = true
-      return !mine
-    })
-    removed += peers.items.length - keep.length
-    peers.items = keep
+    const mine = pending ?? mapAt(peers).find(p => norm(p.get('url')) === norm(a.hub))
+    if (mine) {
+      if (pending) mine.delete('requested')
+      if (a.peerAdded && !otherNetwork) { peers.items = peers.items.filter(p => p !== mine); removed += 1 }
+      else if (pending) removed += 1
+    }
   }
-  return { text: doc.toString(STRINGIFY), removed, decided }
+  return { text: doc.toString(STRINGIFY), removed, leaving: pending === undefined && removed > 0 }
 }
 
 // ── the confirmed operations ──────────────────────────────────────────────────────────────────────────
