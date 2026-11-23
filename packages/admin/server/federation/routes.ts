@@ -139,14 +139,14 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     if (!committed?.request) throw new HttpError(state ? 409 : 404, state ? SENTENCES.notApplied : 'No such request.')
     const network = committed.request.network
     const { text, base } = fedNow(repo, actor.id)
-    const edited = withdrawnText(text, { id, hub: committed.request.hub.url, network, peerAdded: state?.peerAdded ?? true })
+    const edited = withdrawnText(text, { id, hub: committed.request.hub.url, network, peerAdded: state?.peerAdded === true })
     const ops: FileOp[] = [
       ...(edited.removed > 0 ? [fedOp(edited.text, base)] : []),
       { op: 'file', path: outgoingPath(id), text: null, base: fileBase(repo, outgoingPath(id)) },
     ]
     const out = await commitOrStage(repo, actor, ops, `federation: withdraw the request to join ${network}`, deps.notify)
     writeState(repo, id, { ...(state ?? { network, hub: committed.request.hub.url }), withdrawn: true })
-    return c.json({ id, leaving: edited.leaving, text: edited.leaving ? SENTENCES.leaving(network) : `Withdrawn: ${network}.`, ...out })
+    return c.json({ id, leaving: edited.leaving, text: (edited.leaving ? SENTENCES.leaving(network) : `Withdrawn: ${network}.`) + (state?.peerAdded === true ? '' : " The hub's peer entry was kept; remove it by hand if you no longer need it."), ...out })
   }))
 
   // A request only the state folder knows (its staged ask was discarded): forget it. Git is not touched.

@@ -424,7 +424,10 @@ describe('fix round 1: the trunk lists, edits build on each other, withdrawing u
     expect(p.r.status, JSON.stringify(p.json)).toBe(200)
     const res = await post(`/api/federation/outgoing/${id}/withdraw`)
     expect(res.status).toBe(200)
-    expect(fedText()).not.toContain('Mesh Hub')
+    expect(fedText()).toContain('Mesh Hub') // no state: the ask is not known to have created the peer, so it is kept
+    expect(fedText()).not.toContain('requested')
+    expect(fedText()).not.toContain('role: node')
+    expect((await res.json() as { text: string }).text).toContain("The hub's peer entry was kept")
     expect(existsSync(join(repo, outgoingPath(id)))).toBe(false)
   })
 
