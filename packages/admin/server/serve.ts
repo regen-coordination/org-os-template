@@ -35,7 +35,7 @@ import { mountWizards } from './wizards/routes.ts'
 import { mountSystemsMap } from './systems/map-routes.ts'
 import { mountFederation } from './federation/routes.ts'
 import { mountKnowledge } from './knowledge/routes.ts'
-import { opById, refreshedAdapters } from './operations/catalogue.ts'
+import { catalogueWith, opById, refreshedAdapters, type OperationNetwork } from './operations/catalogue.ts'
 import { parseRpcConfig } from './systems/chains.ts'
 import { SystemReader, READ_TTL_MS } from './systems/reader.ts'
 import { FAILED_READ_TTL_MS, type FetchLike } from './systems/driver.ts'
@@ -79,6 +79,10 @@ export interface ServeOptions {
   clockRefreshMs?: number
   /** The fetch outside systems are read with. Tests pass a fake; the default is `networkFetch`. */
   fetch?: FetchLike
+  /** What the atproto operations (`federation.check-links`, `federation.publish-links`) reach the network with (ruling
+   *  R12). Left out, the live network. Only tests and the N2 acceptance pilot pass one, in-process: the command line and
+   *  the environment have no way to set it, so a live server can never lift the placeholder-lexicon guard. */
+  network?: OperationNetwork
   /** Hosted mode (L5 spec §3): `readHosted` reads `--hosted` / `ORG_OS_HOSTED`. The session cookie is then Secure, and
    *  no backup key is attention. */
   hosted?: boolean
@@ -168,7 +172,7 @@ export interface Running {
 /** The API plus the built UI on one port, bound to 127.0.0.1 only. Kept apart
  *  from index.ts (which reads the command line) so tests can start a real
  *  server on a free port and call it over HTTP. */
-export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_REFRESH_MS, fetch = networkFetch, hosted = false, hostedConfig, backupEveryMs, connectionViewerMs = CONNECTION_VIEWER_MS, mailer, instanceWrites: givenWrites }: ServeOptions): Promise<Running> {
+export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_REFRESH_MS, fetch = networkFetch, network, hosted = false, hostedConfig, backupEveryMs, connectionViewerMs = CONNECTION_VIEWER_MS, mailer, instanceWrites: givenWrites }: ServeOptions): Promise<Running> {
   // Read once, before anything listens: the trunk must not follow a later checkout.
   // (A directory that is not a git repository has none; the server still serves what it can.)
   // Hosted, every commit is the Hub's (L9 §5.5): set before any git process starts, which all inherit it.
@@ -247,8 +251,9 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
   // The socket exists only once the server listens; until then events have nowhere to go.
   let emit: (msg: unknown) => void = () => {}
   let afterJob: (op: string) => void = () => {}
-  // The join requests board is re-read after a request is received or decided: a hub that started without the requests file
-  // has no watcher on it (the watcher is built from the files that exist), so the routes say so themselves.
+  // The join requests board and the cards are re-read after a federation route writes: a hub that started without the requests
+  // file has no watcher on it (the watcher is built from the files that exist), and a node's ask is committed after its
+  // federation.yaml is written, so a refresh the watcher set off can read the trunk too early. The routes say so themselves.
   let federationChanged: () => void = () => {}
   // DAO-OS L6 §8.5 (Task 9 fix round 1): a private page written in the store is a `pages-changed` too (members only, no id).
   if (privateStore) privateStore.onRecordsWritten = collections => { if (collections.includes('pages')) emit({ type: 'pages-changed' }) }
@@ -279,7 +284,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     mountSession(a, { repo, store: privateStore, membership, hosted, config, signIn, instanceWrites })
     emailSignIn = mountEmailSignIn(a, { repo, store: privateStore, config: signIn, mailer: signInMailer, ...(config ? { hosted: config } : {}) })
     mountResources(a, store, repo, { hosted, privateStore: ctx.privateStore })
-    mountOperations(a, { repo, store, jobs, executor, plans, startBranch, hosted })
+    mountOperations(a, { repo, store, jobs, executor, plans, startBranch, hosted, ...(network ? { catalogue: catalogueWith(network) } : {}) })
     mountProposals(a, { repo, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, systems: systemReader, hosted, privateStore: ctx.privateStore, readOnly: instanceWrites === 'off', membership })
     // DAO-OS L7 §8–§9 (Tasks 11, 12): the composition's deployment, prepared; read back and staged as live Systems.
     mountDeploy(a, { repo, systems: systemReader, withLock: ctx.withLock, notify: msg => emit(msg), privateStore: ctx.privateStore })
@@ -491,7 +496,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         }, 200)
       }
       emit = broadcast
-      federationChanged = () => { store.invalidateAdapter('federation'); scheduleRefresh() }
+      federationChanged = () => { store.invalidateAdapter('federation'); store.invalidateAdapter('fleet'); scheduleRefresh() }
       afterJob = op => { const known = opById(op); if (known) for (const name of refreshedAdapters(known)) store.invalidateAdapter(name); scheduleRefresh() }
       const resourceWatcher = watchPaths(repo, store.watchPaths().filter(p => existsSync(join(repo, p))),
         rel => { if (store.invalidate(rel)) scheduleRefresh() })

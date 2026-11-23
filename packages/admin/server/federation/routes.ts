@@ -36,8 +36,10 @@ export interface FederationDeps {
   run?: Runner
   now?: () => Date
   notify?: (msg: { type: 'changes' }) => void
-  /** Read the join requests board again: a received or decided request changes what the `federation` adapter shows, and a
-   *  hub that started without data/federation-requests.yaml has no watcher on it. */
+  /** Read the cards and the join requests board again after a write here. A received or decided request changes what the
+   *  `federation` adapter shows, and a hub that started without data/federation-requests.yaml has no watcher on it. A
+   *  node's ask, record or withdrawal lands in a commit after federation.yaml is written: a refresh the file's watcher set
+   *  off can read the trunk before the commit, and the self card would miss the request until the next change. */
   invalidate?: () => void
   startBranch?: string
   /** Randomness for invites; tests give a fixed one. */
@@ -174,6 +176,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       ]
       const out = await commitOrStage(repo, actor, ops, `federation: ask to join ${network}`, deps.notify)
       writeState(repo, id, { network, hub: hubAddress, hubName: hub.name, peerAdded: edit.peerAdded, ...(invite ? { invite } : {}) })
+      deps.invalidate?.()
       return c.json({ id, ...out })
     })
   })
@@ -195,6 +198,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     ]
     const out = await commitOrStage(repo, actor, ops, `federation: withdraw the request to join ${network}`, deps.notify)
     writeState(repo, id, { ...(state ?? { network, hub: committed.request.hub.url }), withdrawn: true })
+    deps.invalidate?.()
     return c.json({ id, leaving: edited.leaving, text: (edited.leaving ? SENTENCES.leaving(network) : `Withdrawn: ${network}.`) + (!state && edited.peerKept ? " The hub's peer entry was kept; remove it by hand if you no longer need it." : ''), ...out })
   }))
 
@@ -208,6 +212,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       throw new HttpError(409, 'This request is staged in a change that is not applied yet: discard that change first.')
     }
     clearState(repo, id)
+    deps.invalidate?.()
     return c.json({ id, cleared: true })
   }))
 
@@ -240,6 +245,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       const next = joinText(text, edit)
       if (next === text) throw new HttpError(409, 'federation.yaml already says this, so nothing was changed.')
       const out = await commitOrStage(repo, actor, [fedOp(next, base)], `federation: join policy ${edit.policy}`, deps.notify)
+      deps.invalidate?.()
       return c.json({ policy: edit.policy, ...out })
     })
   })
@@ -266,6 +272,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       if (edited.changed === 0) throw new HttpError(409, MIGRATION_SENTENCES.unchanged)
       const n = sets.length
       const out = await commitOrStage(repo, actor, [fedOp(edited.text, base)], `federation: bring ${n} ${n === 1 ? 'peer' : 'peers'} onto atproto (DID and link)`, deps.notify)
+      deps.invalidate?.()
       // A DID already in federation.yaml that this edit replaces is said by peer (only public peers reach here).
       const notes = sets.filter(s => s.did !== undefined && s.peer.did !== null && s.peer.did !== s.did)
         .map(s => `${s.peer.name}: ${MIGRATION_SENTENCES.replaces}`)
@@ -331,6 +338,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     const edited = recordedText(now_.text, id, decision)
     if (edited === null) throw new HttpError(409, SENTENCES.noRequest)
     const out = await commitOrStage(repo, actor, [fedOp(edited, now_.base)], `federation: record the acceptance into ${state.network}`, deps.notify)
+    deps.invalidate?.()
     return c.json({ id, text: SENTENCES.recorded, ...out })
   }))
 }

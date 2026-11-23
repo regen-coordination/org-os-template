@@ -17,6 +17,7 @@ import { resolveTrunk } from '../proposals/ledger.ts'
 import { kmsSrc } from '../knowledge/kms.ts'
 import { validTrunkName } from '../../lib/rules.mjs'
 import type { Kind, Resource } from '../resources/types.ts'
+import type { FetchLike } from '../systems/driver.ts'
 
 /** True when the instance's own .gitignore names the mount (or repos/ above it): read from the file, since an adopted repo keeps its own. */
 function mountIgnored(repo: string, mount: string): boolean {
@@ -118,6 +119,49 @@ const unsafeId = (id: string) => `this id cannot be passed to crew safely: "${id
 /** The reason a crew call cannot take this resource's id, or null. */
 const idProblem = (r: Resource): string | null => (safeId(idOf(r.id)) === null ? unsafeId(idOf(r.id)) : null)
 const refuse = (problem: string | null): void => { if (problem !== null) throw new HttpError(409, `Not run: ${problem}.`) }
+
+/** What the two atproto operations reach the network with (ruling R12). A running server uses `LIVE`; the acceptance
+ *  pilot hands `startServer` a fake network in-process, which `catalogueWith` puts in their place. There is no switch, flag
+ *  or environment variable for it: `allowPlaceholderLexicons` reaches the publisher only through this object. */
+export interface OperationNetwork {
+  fetch: FetchLike
+  lookup: (host: string) => Promise<string[]>
+  resolveTxt: (name: string) => Promise<string[][]>
+  /** Lets the publisher write the `example.*` lexicons. Only tests and the acceptance pilot set it. */
+  allowPlaceholderLexicons?: boolean
+  /** Where the publisher reads `ATPROTO_APP_PASSWORD`. Default: the server's own environment. Two servers in one process
+   *  (the pilot) each get their own. */
+  env?: Record<string, string | undefined>
+}
+const LIVE: OperationNetwork = { fetch: networkFetch, lookup: networkLookup, resolveTxt: networkResolveTxt }
+
+/** `federation.check-links`, reading through `net`. */
+const checkLinksOperation = (net: OperationNetwork): Operation => ({
+  // N2 Tasks 2 and 3: read another instance's federation.json, and atproto records. With `address` it looks that one
+  // hub up (the Ask form's "Look it up"); with `did` or `handle`, that one account, checked both ways (migration's
+  // "Look it up"); without, every peer that has a url and no folder here, and every DID federation.yaml lists, this
+  // instance's own included, each from its own PDS. It writes only the caches, under stateDir, outside the
+  // repository, so the executor sees no changed file.
+  id: 'federation.check-links', kinds: ['instance'], label: () => 'Check links', effect: 'reads', network: true,
+  timeoutMs: 120 * SEC,
+  params: { type: 'object', additionalProperties: false, properties: {
+    address: { type: 'string', maxLength: 2048 }, did: { type: 'string', maxLength: 2048 }, handle: { type: 'string', maxLength: 253 },
+  } },
+  refreshes: 'fleet',
+  unavailable: r => (r.facts.self === true ? null : "offered on this instance's own card"),
+  plan: (_r, params) => {
+    const target = lookupTarget(params)
+    if ('problem' in target) throw new HttpError(422, target.problem)
+    const summary = target.kind === 'address' ? `read ${target.value}: a download, it changes no file`
+      : target.kind === 'did' ? `look up ${target.value} on atproto: a download, it changes no file`
+      : target.kind === 'handle' ? `look up ${target.value} on atproto, both ways: a download, it changes no file`
+      : "read the federation.json of each peer that has a url and no folder here, and the atproto records of every DID federation.yaml lists, this instance's own included: a download, it changes no file"
+    return {
+      summary,
+      inProcess: (repo, signal) => checkLinksAndRecords(repo, params, { fetch: net.fetch, lookup: net.lookup, resolveTxt: net.resolveTxt }, signal),
+    }
+  },
+})
 
 export const CATALOGUE: Operation[] = [
   {
@@ -306,36 +350,11 @@ export const CATALOGUE: Operation[] = [
       return { cmd: 'git', args: ['push', '--', 'origin', `refs/heads/${trunk}:refs/heads/${trunk}`], writes: [] }
     },
   },
-  {
-    // N2 Tasks 2 and 3: read another instance's federation.json, and atproto records. With `address` it looks that one
-    // hub up (the Ask form's "Look it up"); with `did` or `handle`, that one account, checked both ways (migration's
-    // "Look it up"); without, every peer that has a url and no folder here, and every DID federation.yaml lists, this
-    // instance's own included, each from its own PDS. It writes only the caches, under stateDir, outside the
-    // repository, so the executor sees no changed file.
-    id: 'federation.check-links', kinds: ['instance'], label: () => 'Check links', effect: 'reads', network: true,
-    timeoutMs: 120 * SEC,
-    params: { type: 'object', additionalProperties: false, properties: {
-      address: { type: 'string', maxLength: 2048 }, did: { type: 'string', maxLength: 2048 }, handle: { type: 'string', maxLength: 253 },
-    } },
-    refreshes: 'fleet',
-    unavailable: r => (r.facts.self === true ? null : "offered on this instance's own card"),
-    plan: (_r, params) => {
-      const target = lookupTarget(params)
-      if ('problem' in target) throw new HttpError(422, target.problem)
-      const summary = target.kind === 'address' ? `read ${target.value}: a download, it changes no file`
-        : target.kind === 'did' ? `look up ${target.value} on atproto: a download, it changes no file`
-        : target.kind === 'handle' ? `look up ${target.value} on atproto, both ways: a download, it changes no file`
-        : "read the federation.json of each peer that has a url and no folder here, and the atproto records of every DID federation.yaml lists, this instance's own included: a download, it changes no file"
-      return {
-        summary,
-        inProcess: (repo, signal) => checkLinksAndRecords(repo, params, { fetch: networkFetch, lookup: networkLookup, resolveTxt: networkResolveTxt }, signal),
-      }
-    },
-  },
+  checkLinksOperation(LIVE),
   // N2 Task 7: publish this org's own link records, planned from federation.yaml on the trunk and written through its
   // kms atproto session. Its plan reads only the cache of the last check; its job re-reads, re-plans and writes the
   // network and a receipt under stateDir, never a file in the repository.
-  publishLinksOperation({ fetch: networkFetch, lookup: networkLookup, env: process.env }),
+  publishLinksOperation({ fetch: LIVE.fetch, lookup: LIVE.lookup, env: process.env }),
   // N2 Task 8: the node's side of asking to join. Sending and following the answer are confirmed; they write only under
   // stateDir. Neither publishes on atproto: that stays the separate, confirmed `federation.publish-links`.
   ...federationNodeOperations(),
@@ -358,3 +377,12 @@ export const CATALOGUE: Operation[] = [
 ]
 
 export const opById = (id: string): Operation | undefined => CATALOGUE.find(o => o.id === id)
+
+/** The catalogue with `net` in place of the live network for the two atproto operations (ruling R12): every other
+ *  operation is the same object. `startServer({ network })` mounts it; nothing else does. */
+export function catalogueWith(net: OperationNetwork): Operation[] {
+  return CATALOGUE.map(op => op.id === 'federation.check-links' ? checkLinksOperation(net)
+    : op.id === 'federation.publish-links'
+      ? publishLinksOperation({ fetch: net.fetch, lookup: net.lookup, env: net.env ?? process.env, ...(net.allowPlaceholderLexicons ? { allowPlaceholderLexicons: true } : {}) })
+      : op)
+}

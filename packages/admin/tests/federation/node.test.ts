@@ -59,6 +59,7 @@ let finished: JobRecord[]
 let plans: Plans
 let issued = 0
 let store: ResourceStore
+let invalidated = 0
 
 const write = (rel: string, text: string) => { mkdirSync(join(repo, rel, '..'), { recursive: true }); writeFileSync(join(repo, rel), text) }
 const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' }).toString()
@@ -86,7 +87,7 @@ const build = () => {
   const counting = Object.assign(Object.create(real), { issue: (p: never) => { issued += 1; return real.issue(p) }, take: (n: unknown) => real.take(n) }) as Plans
   const catalogue = [federationSendOperation({ now: () => NOW }), federationStatusOperation({ now: () => NOW }), publishLinksOperation(pdeps())]
   app = createApp(repo, (a, ctx) => {
-    mountFederation(a, { repo, withLock: ctx.withLock, now: () => NOW })
+    mountFederation(a, { repo, withLock: ctx.withLock, now: () => NOW, invalidate: () => { invalidated += 1 } })
     mountOperations(a, { repo, store, jobs, executor, plans: counting, catalogue })
   })
 }
@@ -303,6 +304,17 @@ describe('send waits for the trunk; withdraw after mutual is leaving', () => {
     applyStaged()
     const res = await post(`/api/federation/outgoing/${id}/withdraw`)
     expect(await res.json()).toMatchObject({ leaving: true, text: 'Leaving Mesh. The hub will see the link as left. Then publish, so your record is withdrawn.' })
+  })
+  it('ask, record and withdraw each have the cards read again: their commit lands after federation.yaml is written', async () => {
+    setup(null)
+    invalidated = 0
+    const id = (await ask()).json.id as string
+    expect(invalidated).toBe(1)
+    writeState(id)
+    expect((await post(`/api/federation/outgoing/${id}/record`)).status).toBe(200)
+    expect(invalidated).toBe(2)
+    expect((await post(`/api/federation/outgoing/${id}/withdraw`)).status).toBe(200)
+    expect(invalidated).toBe(3)
   })
 })
 

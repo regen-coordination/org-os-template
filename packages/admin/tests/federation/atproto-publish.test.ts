@@ -13,7 +13,7 @@ import { atprotoCache, readRepo } from '../../server/federation/atproto/read.ts'
 import {
   publishLinks, planPublish, publishFacts, publishLinksOperation, guardedWriteFetch, receiptPath, publishOutput, SENTENCES, type PublishDeps,
 } from '../../server/federation/atproto/publish.ts'
-import { opById, type InProcess } from '../../server/operations/catalogue.ts'
+import { CATALOGUE, catalogueWith, opById, type InProcess } from '../../server/operations/catalogue.ts'
 import { LocalExecutor } from '../../server/operations/executor.ts'
 import { JobStore, stateDir, type JobRecord } from '../../server/state.ts'
 import { HttpError } from '../../server/errors.ts'
@@ -478,6 +478,37 @@ describe('the receipt and the self card', () => {
     })
     expect(JSON.stringify(receipt)).not.toContain('Mesh Hub')
     expect(await publishFacts(repo, { run: runCommand, now: NOW })).toMatchObject({ toPublish: 0 })
+  })
+})
+
+describe('the acceptance seam (ruling R12)', () => {
+  it('catalogueWith swaps in the given network for the two atproto operations only; the live catalogue never lifts the placeholder guard', async () => {
+    const swapped = catalogueWith({ fetch: net.fetch, lookup: net.lookup, resolveTxt: net.resolveTxt, allowPlaceholderLexicons: true, env: { ATPROTO_APP_PASSWORD: PASSWORD } })
+    expect(swapped.map(o => o.id)).toEqual(CATALOGUE.map(o => o.id))
+    for (const [i, o] of swapped.entries()) {
+      if (o.id !== 'federation.check-links' && o.id !== 'federation.publish-links') expect(o).toBe(CATALOGUE[i])
+    }
+    const checkLinks = swapped.find(o => o.id === 'federation.check-links')!
+    const read = (await checkLinks.plan(await selfCard(), {}, repo)) as InProcess
+    const before = net.requests.length
+    await read.inProcess(repo, signal())
+    expect(net.requests.length).toBeGreaterThan(before)
+    await check() // the reading at this file's clock
+    const publish = swapped.find(o => o.id === 'federation.publish-links')!
+    expect(publish.unavailable(await selfCard(), repo)).toBeNull()
+    expect(((await publish.plan(await selfCard(), {}, repo)) as InProcess).summary).toBe('Publish 1 link and withdraw 0, and update the profile.')
+
+    // The live entry, even with an app password in the environment, refuses the example.* lexicon.
+    const had = process.env.ATPROTO_APP_PASSWORD
+    process.env.ATPROTO_APP_PASSWORD = PASSWORD
+    try {
+      const live = opById('federation.publish-links')!
+      expect(live.unavailable(await selfCard(), repo)).toBe(SENTENCES.placeholder)
+      expect(await refusal(Promise.resolve(live.plan(await selfCard(), {}, repo)))).toBe(`Not published: ${SENTENCES.placeholder}`)
+    } finally { if (had === undefined) delete process.env.ATPROTO_APP_PASSWORD; else process.env.ATPROTO_APP_PASSWORD = had }
+    // Only startServer's `network` option mounts a swapped catalogue; the command line passes none.
+    const cli = readFileSync(join(import.meta.dirname, '..', '..', 'server', 'index.ts'), 'utf8')
+    expect(cli).not.toMatch(/network:|allowPlaceholderLexicons/)
   })
 })
 
