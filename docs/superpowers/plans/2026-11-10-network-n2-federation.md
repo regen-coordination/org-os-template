@@ -1,5 +1,7 @@
 # Network N2 (federation v1: joining a network) Implementation Plan
 
+> **Superseded in part by `2026-11-22-network-n2-atproto.md`** (public links as atproto records, Q8, spec §15 R21–R28): read that plan first; tasks it marks unchanged still run from here.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A node operator asks to join a network from their instance. The request reaches the hub through a pluggable transport. The hub receives it under its `join.policy` and decides it under its own rules. The link then becomes mutual on both sides, with no YAML edited by hand.

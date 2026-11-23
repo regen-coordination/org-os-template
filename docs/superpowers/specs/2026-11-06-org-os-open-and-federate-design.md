@@ -9,6 +9,7 @@
 - **Verified against:** org-os `feat/platform-full-l7` at `edd9b861`, the most complete platform tree. Nothing
   there is merged or pushed.
 - **Revisions after reading the code for the N0 plan (2026-11-06):** see §12.
+- **Public links on atproto (2026-11-22, operator decision Q8):** see §15 (R21–R28), for the N2 atproto plan.
 - **Vocabulary:** binding as in the 0.6 specs and `dao-os/CONTEXT.md`. These terms are used: instance, Hub (the
   product), hub node (the federation role), portal (the Hub's public side, `/portal`), System, proposal, rule,
   operator. "Surface" stays reserved for CLI/KMS/Admin/Conversational and is not used here.
@@ -387,3 +388,75 @@ These bind over the sections above where they differ.
 - **R20. A network step only reaches the network.** Polling fetches requests into an inbox outside the
   repository. Receiving them is the operator's own write, under their rules. A reply's receipt is also
   kept outside the repository. No in-process network step commits anything, because it acts for no one.
+
+## 15. Public links on atproto (2026-11-22, for the N2 atproto plan)
+
+The operator decided on 2026-11-22 (Q8, `lf-work-os/docs/plans/knowledge-network.md`) that a public membership
+link is a record each side publishes, mutual when both have. Invite tokens and non-public requests stay on the
+file and GitHub transports. These rules bind over §6 and §14 where they differ. Plan:
+`docs/superpowers/plans/2026-11-22-network-n2-atproto.md`.
+
+- **R21. Two records, each in its own side's repository.**
+  - `<authority>.link` holds `{ subject: <did>, relation: memberOf | hasMember | peerOf, network?, createdAt }`.
+  - `<authority>.profile` (key `self`) holds `networks: [{ hub: <did>, name }]`.
+
+  The org's DID is `identity.did` in `federation.yaml` (class `identity`), and `federation.json` publishes it. A
+  peer's DID is `peers[].did`. The authority is the network's lexicon domain. Until knowledge-network phase 2
+  sets it, it is the placeholder `example.orgosnetwork`, and nothing under an `example.*` authority is written to a
+  live account, as kms already refuses.
+- **R22. State is still computed, never stored** (§6.1). atproto records are one more source, beside both sides'
+  `federation.yaml` and `federation.json`. The reciprocal pairs are `memberOf` ↔ `hasMember` and `peerOf` ↔
+  `peerOf`. On atproto:
+  - **mutual** means both records exist;
+  - **claimed** means one does;
+  - **left** means our side recorded a decision and their record is gone.
+
+  `requested` never comes from atproto, because requests stay off it.
+- **R23. Precedence** (*my call*).
+  - **Our side:** `federation.yaml`, decided under the org's rules, is the source. The record is published from it
+    and is never read back into it. A record that disagrees is drift: it's shown as needs a look and fixed by a
+    confirmed publish, never automatically.
+  - **Their side:** once they have a profile record, their records decide their side of a public link. Their
+    files become a cross-check, and a disagreement is shown, not used. Without a profile record, their files
+    decide, as in R4.
+  - **A read that fails never moves a link to claimed or left.** That side is unknown, and the last reading stays,
+    with its date.
+- **R24. What is published, exactly.** One link record per peer that:
+  1. passes R3's test (a public https `url`, and not `visibility: private`);
+  2. has a `did`;
+  3. has a relation, either explicit (`peers[].link`) or derived (a network's hub → `memberOf`; a peer the hub
+     accepted from a request → `hasMember`);
+  4. when the relation is derived, is decided (`decision`) or mutual by files.
+
+  An explicit `link` is itself the org's decision to publish, because setting it is an `identity` change. Free-form
+  `relationship` values are never mapped. Never published: private peers, requests, answers, invites, decision
+  references, notes and contacts. Withheld peers are counted, never named, and a record whose peer became private is
+  withdrawn.
+- **R25. Writing goes through the instance's kms atproto session only:** `kms.yaml` `atproto` (`did`, `handle`,
+  `pds`), `ATPROTO_APP_PASSWORD` in the server's environment, and kms's own client, through the one kms bridge.
+  Nothing is written unless all of these hold:
+  - `identity.did` equals `kms.yaml` `atproto.did`;
+  - the DID's document names that PDS;
+  - the plan is built from `federation.yaml` on the trunk.
+
+  Publishing is a `network: true` operation, confirmed every time (R16). It writes nothing in the repository
+  (R20), and its receipt lives outside it. The PDS, read back, is the truth. One run never withdraws every link
+  record. The password is never stored, shown or logged.
+- **R26. Each DID is read from its own PDS.** `did:plc` resolves through the PLC directory, and `did:web` through
+  its host's `did.json`. Both go through `federation.json`'s guards: public addresses only, no redirects, a
+  timeout and a size cap. A record whose URI names another repository is refused. kms's one-PDS connector limit
+  (`packages/org-os-kms/docs/CONNECTORS.md` §7) doesn't apply here. Reads are public XRPC calls inside the
+  confirmed check (R16).
+- **R27. A join on atproto, in order:**
+  1. The request travels by file or GitHub (R11–R18).
+  2. The hub accepts it under its rules.
+  3. Each side publishes its record: the hub its `hasMember`, and the node its `memberOf` once it has recorded
+     the acceptance.
+
+  Nothing is published at ask time, so a request stays non-public. Leaving, or the hub removing a node, is the
+  governed change first, then the record's withdrawal. A public request sent as a record (an `atproto` transport)
+  is registered, and waits for the network index.
+- **R28. Migration publishes nothing by itself.** An existing peer gains `did` and `link` only through a staged
+  `identity` change. The DID comes from the other side's `federation.json`, or from the operator as a DID or a
+  handle, checked both ways (DID document ↔ handle). Private peers aren't listed for migration. Old
+  `federation.yaml` shapes are read as N0 reads them and keep their shape.
