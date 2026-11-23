@@ -36,6 +36,7 @@ const HOST_B = 'https://pds-b.example.net'
 const NODE_DID = plcDid('cedar-node')
 const HUB_DID = plcDid('delta-hub')
 const PRIVATE_DID = plcDid('hollow-grove')
+const FERN_DID = plcDid('fern-node')
 const NODE_URL = 'https://cedar-node.example.org'
 const HUB_URL = 'https://delta-hub.example.org'
 const FERN_URL = 'https://fern-node.example.org'
@@ -44,6 +45,7 @@ const PRIVATE_NAME = 'Hollow Grove'
 const PRIVATE_URL = 'https://hollow-grove.example.org'
 const NODE_PASSWORD = 'cedar-UNMISTAKABLE-app-pass-3307'
 const HUB_PASSWORD = 'delta-UNMISTAKABLE-app-pass-8812'
+const FERN_PASSWORD = 'fern-UNMISTAKABLE-app-pass-6620'
 const NETWORK = 'Delta'
 const WHERE = 'https://github.com/delta-hub/join-requests'
 /** Distinctive, so a grep finds any leak. */
@@ -90,7 +92,7 @@ const CAST = {
   node: { name: 'Cedar Node', type: 'LocalNode', url: NODE_URL, did: NODE_DID, pds: HOST_A, handle: 'cedar-node.example.org',
     peers: ['  - name: ' + PRIVATE_NAME, `    url: ${PRIVATE_URL}`, `    did: "${PRIVATE_DID}"`, '    link: peerOf', '    visibility: private', '    trust: read'] },
   hub: { name: 'Delta Hub', type: 'Network', url: HUB_URL, did: HUB_DID, pds: HOST_B, handle: 'delta-hub.example.org', networks: [`  - { name: ${NETWORK}, role: hub }`] },
-  fern: { name: 'Fern Node', type: 'LocalNode', url: FERN_URL },
+  fern: { name: 'Fern Node', type: 'LocalNode', url: FERN_URL, did: FERN_DID, pds: HOST_A, handle: 'fern-node.example.org' },
   gale: { name: 'Gale Node', type: 'LocalNode', url: GALE_URL },
 } satisfies Record<string, Cast>
 type Who = keyof typeof CAST
@@ -253,7 +255,7 @@ const writeLog = () => JSON.stringify(net.writes)
 beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'n2-acceptance-'))
   net = makeFakeNetwork({ hosts: {
-    [HOST_A]: { accounts: { [NODE_DID]: { handle: 'cedar-node.example.org', password: NODE_PASSWORD } } },
+    [HOST_A]: { accounts: { [NODE_DID]: { handle: 'cedar-node.example.org', password: NODE_PASSWORD }, [FERN_DID]: { handle: 'fern-node.example.org', password: FERN_PASSWORD } } },
     [HOST_B]: { accounts: { [HUB_DID]: { handle: 'delta-hub.example.org', password: HUB_PASSWORD }, [PRIVATE_DID]: { handle: 'hollow-grove.example.org', password: 'unused' } } },
   } })
   // GitHub is a fake gh first on PATH, for every server in this process; it keeps its issues in a file.
@@ -284,7 +286,7 @@ beforeAll(async () => {
       repo, port: 0, fetch: fetchAll,
       // Ruling R12: the fake network in-process, for this server only, with its own app password.
       network: { fetch: fetchAll, lookup: lookupAll, resolveTxt: net.resolveTxt, allowPlaceholderLexicons: true,
-        env: { ATPROTO_APP_PASSWORD: who === 'node' ? NODE_PASSWORD : who === 'hub' ? HUB_PASSWORD : undefined } },
+        env: { ATPROTO_APP_PASSWORD: who === 'node' ? NODE_PASSWORD : who === 'hub' ? HUB_PASSWORD : who === 'fern' ? FERN_PASSWORD : undefined } },
     })
   }
 }, 60_000)
@@ -490,15 +492,43 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
     const text = await file.text()
     expect(text).toContain(`invite: ${TOKEN}`)
 
+    // The hub ties Fern's DID first, as it did Cedar's, so acceptance writes it.
+    await ok('hub', 'federation.check-links', { address: FERN_URL })
+    await ok('hub', 'federation.check-links', { handle: 'fern-node.example.org' })
     const got = await call('hub', 'POST', '/api/federation/requests/receive', { text })
     expect(got.json[0]).toMatchObject({ outcome: 'accepted' })
     const member = (fedOf('hub').peers as Record<string, unknown>[]).find(p => p.url === FERN_URL)!
-    expect(member).toMatchObject({ name: 'Fern Node', relationship: 'node', decision: `invite ${INVITE_ID}` })
+    expect(member).toMatchObject({ name: 'Fern Node', relationship: 'node', decision: `invite ${INVITE_ID}`, did: FERN_DID })
     const invites = parse(readFileSync(join(repos.hub, 'data', 'invites.yaml'), 'utf8')) as { invites: Record<string, unknown>[] }
     expect(invites.invites).toEqual([expect.objectContaining({ id: INVITE_ID, used_by: id, token_sha256: sha256Hex(TOKEN) })])
     // The same invite can't be used twice.
     const again = await call('hub', 'POST', '/api/federation/requests/receive', { text: text.replace(id, '00000000-0000-4000-8000-000000000001') })
     expect(again.json[0]).toMatchObject({ outcome: 'refused' })
+
+    // A file-sent join has no answer to read, so no Record step (controller ruling on Task 15, concern 3): once the hub's
+    // federation.json lists Fern, the link is mutual by files and Fern's memberOf is wanted without a recorded decision (R4).
+    step = '8 fern publishes'
+    await ok('fern', 'federation.check-links')
+    const before = await peerOf('fern', 'Delta Hub')
+    note('fern', 'peer card Delta Hub, no Record step', { link: before.facts.link, sources: before.facts.sources, drift: before.facts.drift })
+    const fernPeer = (fedOf('fern').peers as Record<string, unknown>[]).find(p => p.url === HUB_URL)!
+    expect(fernPeer.decision).toBeUndefined()
+    expect((before.facts.drift as { side: string; text: string }[]).filter(d => d.side === 'ours').map(d => d.text)).toEqual(['Not published yet.'])
+    const fernPub = await ok('fern', 'federation.publish-links')
+    expect(fernPub.summary).toBe('Publish 1 link and withdraw 0, and update the profile.')
+    expect(net.records(FERN_DID, LINK_NSID).map(r => r.value)).toEqual([
+      { $type: LINK_NSID, subject: HUB_DID, relation: 'memberOf', network: NETWORK, createdAt: expect.any(String) },
+    ])
+    // The hub publishes its hasMember for Fern; both read mutual.
+    await ok('hub', 'federation.check-links')
+    expect((await ok('hub', 'federation.publish-links')).summary).toBe('Publish 1 link and withdraw 0.')
+    await ok('fern', 'federation.check-links')
+    await ok('hub', 'federation.check-links')
+    const fernSide = await peerOf('fern', 'Delta Hub')
+    const hubSide = await peerOf('hub', 'Fern Node')
+    note('fern', 'peer card Delta Hub after both published', { link: fernSide.facts.link, drift: fernSide.facts.drift })
+    note('hub', 'peer card Fern Node after both published', { link: hubSide.facts.link, drift: hubSide.facts.drift })
+    expect([fernSide.facts.link, hubSide.facts.link]).toEqual(['mutual', 'mutual'])
   })
 
   it('9. the node leaves under its rule and publishes; the hub, after a check, reads left: they withdrew their record', async () => {
@@ -545,7 +575,7 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
       'decision (hub, accept by request)': `request ${requestId}`, 'decision (hub, accept by invite)': `invite ${INVITE_ID}`, 'decision (hub, refusal)': REFUSAL,
       'decision (node, recorded)': String(parse(git('node', 'show', `HEAD~1:federation.yaml`)).peers.find((p: { url?: string }) => p.url === HUB_URL)?.decision ?? 'missing'),
       'private peer name': PRIVATE_NAME, 'private peer DID': PRIVATE_DID, 'private peer url': PRIVATE_URL, 'private peer host': 'hollow-grove.example.org',
-      'node password': NODE_PASSWORD, 'hub password': HUB_PASSWORD,
+      'node password': NODE_PASSWORD, 'hub password': HUB_PASSWORD, 'fern password': FERN_PASSWORD,
     }
     const found = Object.entries(needles).filter(([, v]) => log.includes(v)).map(([k]) => k)
     note('-', `grep of the PDS write log (${net.writes.length} writes) for ${Object.keys(needles).length} needles`, { needles: Object.keys(needles), found })

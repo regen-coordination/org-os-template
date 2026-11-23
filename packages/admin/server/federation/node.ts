@@ -17,6 +17,7 @@ import { resolveTrunk } from '../proposals/ledger.ts'
 import { runCommand } from '../resources/run.ts'
 import { readFederation, DID_PATTERN } from '../../lib/federation/read.mjs'
 import { parseRequest, requestText } from '../../lib/federation/request.mjs'
+import { answerLine } from '../../lib/federation/answer.mjs'
 import type { FederationRequest } from '../../lib/federation/request.mjs'
 import { wellKnownUrlOf, remoteCache } from './remote.ts'
 import { transportOf, transports } from './transports/index.ts'
@@ -401,8 +402,8 @@ export function federationStatusOperation(deps: NodeOpsDeps = {}): Operation {
           const answer = await transport.status!(sent.ref, { run, repo: at, signal })
           const state = readState(at, id) ?? { network: o.network, hub: o.hub }
           writeState(at, id, { ...state, status: { state: answer.state, ...(answer.reason ? { reason: oneLine(answer.reason) } : {}), at: now().toISOString() } })
-          if (answer.state === 'accepted') return `Accepted${answer.reason ? `: ${oneLine(answer.reason)}` : '.'}\nRecord it, then publish the link once it is on your trunk.\n`
-          if (answer.state === 'refused') return `Refused${answer.reason ? `: ${oneLine(answer.reason)}` : '.'}\n`
+          if (answer.state === 'accepted') return `${answerLine('accepted', oneLine(answer.reason ?? ''))}\nRecord it, then publish the link once it is on your trunk.\n`
+          if (answer.state === 'refused') return `${answerLine('refused', oneLine(answer.reason ?? ''))}\n`
           return 'Still waiting for an answer.\n'
         },
       }

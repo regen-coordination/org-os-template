@@ -541,7 +541,8 @@ builds that entry from the request's checked fields only. It never applies anyth
 2. Answer its asks and choose **Ask**. This stages your own change: the network and the hub's peer entry in
    `federation.yaml`, with `requested`, and the request itself in `federation/outgoing/<id>.yaml`. Nothing is sent.
 3. Apply your change under your rules. Sending waits until the request is on your trunk.
-4. Send it. Then follow the answer, and **Record it** once the hub accepts. This sets the peer's `decision`.
+4. Send it. If it went by GitHub, follow the answer, and **Record it** once the hub accepts. This sets the peer's
+   `decision`.
 
 A request holds org-level facts only: its id, when it was made, who asks (`name`, `type`, `url`), the hub, the
 network and the answers. It has no field for a person's contact.
@@ -555,9 +556,8 @@ network and the answers. It has no field for a person's contact.
 
 Hosted, peer-to-peer and atproto requests are listed but not built yet. A request is never published on atproto.
 
-A request sent as a file has no answer to follow, so **Record it** stays unavailable for it. Until that is
-built, a node that sent a file sends the same request by GitHub as well, or a maintainer records the acceptance
-by hand.
+A request sent as a file, invited or not, has no Record step. Once the hub lists you, the link is mutual by
+files, and your `memberOf` is published without a recorded decision. Run **Check links**, then **Publish links**.
 
 ### Invites
 
@@ -578,7 +578,9 @@ Each side publishes one record in its own atproto repository:
   beside the profile's `name` and `createdAt`.
 
 The pairs are `memberOf` ↔ `hasMember` and `peerOf` ↔ `peerOf`. A link is mutual on atproto when both sides have
-published their record. The hub publishes `hasMember` after it accepts; the node publishes `memberOf` after it has
+published their record. The link state can say `mutual` before that: it means both sides' statements agree (your
+`federation.yaml`, and their record). If your own record isn't published yet, a drift line says so: `Not published
+yet.` The hub publishes `hasMember` after it accepts; the node publishes `memberOf` after it has
 recorded the acceptance.
 
 **Never published:** private peers (`visibility: private`), peers without a public `https` url, requests, answers,
@@ -628,7 +630,9 @@ Running it for real is a separate go, and it needs:
 - the hub council's join policy, decided and written in the hub's `join` block;
 - an atproto account for each org, named in its `kms.yaml` under `atproto`, with its app password in that server's
   environment (`ATPROTO_APP_PASSWORD`);
-- the network's lexicon domain. The placeholder `example.orgosnetwork` is refused on live accounts.
+- the network's lexicon domain. The placeholder `example.orgosnetwork` is refused on live accounts;
+- `networks` and `peers` at the top level of each `federation.yaml`. An instance that nests them under
+  `federation:` is told to move them to the top level, and asking refuses until they are moved.
 
 ---
 

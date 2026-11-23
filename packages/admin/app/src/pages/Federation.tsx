@@ -20,6 +20,7 @@ import JobLog from '../record/JobLog.tsx'
 import { outsideSentence } from '../record/ConfirmBox.tsx'
 import { useCanWrite } from '../viewAs/ViewAs.tsx'
 import { isPublicUrl } from '../../../lib/federation/peers.mjs'
+import { answerLine } from '../../../lib/federation/answer.mjs'
 import {
   atprotoLine, driftFix, driftOrder, hiddenNetworksLine, keptLine, linesOf, linkWords, listOf, OPEN_FALLBACK, planCounts, POLICIES,
   policySentence, RELATIONS, type Drift, type Sources,
@@ -232,7 +233,7 @@ function NetworkRow({ name, hub, peer, out, ops, runner, canWrite }: Shared & { 
   const fileWithInvite = out?.invited === true && out.sent?.transport === 'file'
   const said = !out ? null
     : !out.onTrunk ? 'Not applied yet: apply your change, then send it.'
-    : out.status?.state === 'accepted' ? `Accepted${out.status.reason ? `: ${sentenceEnd(out.status.reason)}` : '.'} Record it, then publish.`
+    : out.status?.state === 'accepted' ? `${sentenceEnd(answerLine('accepted', out.status.reason))} Record it, then publish.`
     : out.status?.state === 'refused' ? null
     : out.sent ? `Sent (${out.sent.transport}) ${day(out.sent.at)}. Waiting for their answer.`
     : 'Not sent yet.'

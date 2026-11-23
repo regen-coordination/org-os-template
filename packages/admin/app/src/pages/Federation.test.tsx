@@ -87,6 +87,9 @@ describe('the words (pure)', () => {
     expect(linkWords('claimed')).toBe('Only this side lists it')
     expect(linkWords('left')).toBe('Left')
     expect(linkWords('mutual', { reason: 'not a local node' })).toBe('Refused: not a local node')
+    // A reason read back from the hub's verdict line keeps its word once.
+    expect(linkWords('mutual', { reason: 'Refused: not a fit.' })).toBe('Refused: not a fit.')
+    expect(linkWords('mutual', { reason: 'Refused:' })).toBe('Refused: no reason given')
     expect(linkWords('unknown')).toBe('Not checked yet')
   })
 

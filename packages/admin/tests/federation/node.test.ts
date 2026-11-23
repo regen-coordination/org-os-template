@@ -151,10 +151,11 @@ const planSend = async (id: string, transport = 'fake') => {
   const r = await post('/api/operations/federation.send/plan', { resource: (await card()).id, params: { id, transport } })
   return { r, json: await r.json() as { nonce?: string; error?: string; summary?: string } }
 }
-const runJob = async (nonce: string) => {
+const runJob = async (nonce: string): Promise<string> => {
   const r = await post('/api/jobs', { nonce })
   const { id } = await r.json() as { id: string }
   await expect.poll(() => finished.find(j => j.id === id)?.status, { interval: 20, timeout: 10_000 }).toBe('ok')
+  return new JobStore(repo).readLog(id)
 }
 
 describe('ask', () => {
@@ -353,7 +354,8 @@ describe('following the answer', () => {
     answer = { state: 'accepted', reason: 'Accepted: welcome to Mesh' }
     const resource = (await card()).id
     const sp = await (await post('/api/operations/federation.status/plan', { resource, params: { id } })).json() as { nonce: string }
-    await runJob(sp.nonce)
+    // The hub's verdict line already says "Accepted": the answer says it once (controller ruling on Task 15, concern 4).
+    expect(await runJob(sp.nonce)).toBe('Accepted: welcome to Mesh\nRecord it, then publish the link once it is on your trunk.\n')
     expect(readState(repo, id)!.status).toMatchObject({ state: 'accepted', reason: 'Accepted: welcome to Mesh' })
 
     const rec = await post(`/api/federation/outgoing/${id}/record`)

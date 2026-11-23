@@ -1,10 +1,11 @@
 // The Federation page's words (network N2 Task 13): pure, so each sentence is tested on its own. Counts only for what is
 // kept private; never a peer's name or DID here.
 import type { JoinPolicy } from '../api.ts'
+import { answerLine, verdictReason } from '../../../lib/federation/answer.mjs'
 
 /** A link's state, as the fleet card carries it (lib/federation/state.mjs), and the outgoing request's answer. */
 export function linkWords(state: string | null, refused?: { reason?: string } | null): string {
-  if (refused) return `Refused: ${refused.reason?.trim() || 'no reason given'}`
+  if (refused) return verdictReason(refused.reason) ? answerLine('refused', refused.reason) : 'Refused: no reason given'
   switch (state) {
     case 'mutual': return 'Part of it'
     case 'requested': return 'Asked, waiting'

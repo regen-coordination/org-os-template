@@ -45,7 +45,7 @@ Ids and dates below are from the recorded run of 2026-11-23 08:20 UTC.
 4. **Accept and tell.** Delta: `decide {accept: true}` → one commit with `Org-Rule: identity/direct`; the peer entry
    is `{name, url, type, trust: read, relationship: node, since, decision: request ce1c5385-…, did}`.
    `federation.reply` → `Told Cedar Node: Accepted.` (the fake issue is closed with an `Accepted:` comment).
-5. **Record.** Cedar: `federation.status` → `Accepted: …`; `POST …/record` → committed; `requested` is gone and
+5. **Record.** Cedar: `federation.status` → `Accepted: Welcome to Delta.` (the word once); `POST …/record` → committed; `requested` is gone and
    `decision` is set.
 6. **The hub publishes.** Delta: `check-links`, then `publish-links`. Plan: "Publish 1 link and withdraw 0, and
    update the profile." The PDS then holds exactly one `hasMember` for Cedar's DID (network Delta) and Delta's
@@ -69,6 +69,10 @@ Ids and dates below are from the recorded run of 2026-11-23 08:20 UTC.
     state folder, without printing it; the saved copy is a `no-store` download. Delta imports it → `accepted`,
     `decision: invite i-0b40f80f`, the invite marked `used_by`. The same token again → "Refused: This network joins
     by invite. This invite has been used."
+    Fern sent a file, so it has no Record step and its peer entry keeps no `decision`. Fern: `check-links` → drift
+    `Not published yet.` (its `memberOf` is wanted, mutual by files); `publish-links` → one `memberOf` for Delta.
+    Delta ties Fern's DID before importing, so its entry carries it, and publishes "Publish 1 link and withdraw 0."
+    After a check on both, both cards read `mutual`.
 13. **Leave.** Cedar: `POST …/withdraw` → `leaving: true`, "Leaving Delta. The hub will see the link as left. Then
     publish, so your record is withdrawn.", committed. `check-links`, `publish-links`: "Publish 0 links and withdraw
     1, and update the profile. 1 peer is kept private." Cedar's PDS has no link record left. Delta: `check-links` →
@@ -94,21 +98,21 @@ Ids and dates below are from the recorded run of 2026-11-23 08:20 UTC.
   so the refresh its watcher sets off could read the trunk too early, and the card missed the new request (Send
   stayed unavailable). The federation routes now ask for the cards to be read again after each write.
 
-## Findings for the operator
+## Findings, with the controller's rulings
 
-1. **`claimed` versus `mutual` after only the hub has published.** The plan's done-when says the node shows
-   `claimed`. The state follows R23 (our side is `federation.yaml`, theirs is their record), so it shows `mutual`
-   with drift `Not published yet.` on our side. R22 says "claimed means one [record] exists". One of the two
-   wordings needs a ruling.
+1. **`mutual` after only the hub has published.** The plan's done-when said `claimed`. Ruled: accepted as built
+   (R23 binds). `mutual` means both sides' statements agree; the drift line `Not published yet.` says the node's own
+   record still needs publishing. The docs say so.
 2. **A failed check is not shown on the card when an earlier reading exists.** The link keeps the last reading and
-   its date, as R23 says, and never moves to `left`. "couldn't check (<date>)" is drawn only when there is no earlier
-   reading. The failure is in the job log only.
-3. **A request sent as a file can't be recorded.** `Record it` needs the answer that `federation.status` reads, and
-   a file has none. The pilot recorded through the github path. The docs say so and give the workaround.
-4. **"Accepted: Accepted: …".** The node's answer line repeats the word, because the hub's comment already starts
-   with it. After recording, the card still says "Record it, then publish."
+   its date and never moves to `left`; the failure is in the job log only. Ruled: deferred to the final review (the
+   card should also say the last check failed).
+3. **A request sent as a file has no Record step.** Ruled: file-sent joins, invited ones included, complete through
+   "mutual by files" (R4). Shown by Fern above; the docs say so.
+4. **"Accepted: Accepted: …".** Fixed: the answer line says the verdict word once (`lib/federation/answer.mjs`, used
+   by the status job, the Federation page's answer line and the refused words). After recording, the card still says
+   "Record it, then publish."
 5. **The real refi-bcn-os nests `networks` under `federation:`.** Asking would refuse with "Move "networks" to the
-   top level of federation.yaml first". Move it before the live pilot.
+   top level of federation.yaml first". The docs' live-pilot list now says to move such keys to the top level.
 
 ## Screenshots
 
@@ -120,7 +124,8 @@ migration section had no rows: every public peer already had a DID and a link.
 
 ## Full suites (one at a time, through the lock)
 
-- Admin `npm test`: 524 files, 8025 passed, 2 skipped, 0 failed (the pilot's 12 steps among them).
+- Admin `npm test`: 524 files, 8025 passed, 2 skipped, 0 failed (the pilot's 12 steps among them), before the
+  ruling fixes. After them: the pilot, node, github-transport, page-words and new answer tests, 5 files, 83 passed; `tsc` 0 errors.
 - `tsc --noEmit` in packages/admin: 0 errors. The app build (`npm run build`): built.
 - Root `npm test`: 1012 tests, 1011 passed, 1 failed. The failure is the known one from before this task:
   `the clone's path set matches tests/clone-manifest.txt exactly` reports `docs/OPENING.md` as shipped but not in
