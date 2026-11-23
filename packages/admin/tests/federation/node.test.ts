@@ -431,21 +431,51 @@ describe('fix round 1: the trunk lists, edits build on each other, withdrawing u
     expect(existsSync(join(repo, outgoingPath(id)))).toBe(false)
   })
 
-  it('a second ask in the same change keeps the first; asking the same network twice is refused', async () => {
+  const OTHER_SITE = 'https://other-hub.example.org'
+  it('asks to two different hubs in one change keep both; a second ask to a hub with one waiting is refused', async () => {
     setup(CONSENSUS)
+    remoteCache(repo).put(wellKnownUrlOf(OTHER_SITE)!, { ...HUB_DOC(), name: 'Other Hub', did: undefined, networks: [{ name: 'Commons' }] }, NOW)
     const a = await ask()
-    const b = await ask({ network: 'Commons' })
+    const b = await ask({ hub: OTHER_SITE, network: 'Commons' })
     expect([a.res.status, b.res.status]).toEqual([200, 200])
     const ops = stagedOps()
     expect(ops.filter(o => o.path === 'federation.yaml')).toHaveLength(1)
     expect(ops.map(o => o.path).sort()).toEqual(['federation.yaml', outgoingPath(a.json.id as string), outgoingPath(b.json.id as string)].sort())
     const text = ops.find(o => o.path === 'federation.yaml')!.text!
-    expect(text).toContain('name: Mesh')
-    expect(text).toContain('name: Commons')
+    expect(text).toContain(`requested: ${a.json.id}`)
     expect(text).toContain(`requested: ${b.json.id}`)
     const again = await ask({ network: 'Commons' })
-    expect([again.res.status, again.json.error]).toEqual([409, 'You already list "Commons" under this hub.'])
+    expect([again.res.status, again.json.error]).toEqual([409, 'You have a request to this hub waiting: withdraw it or wait for the answer.'])
+    const same = await ask()
+    expect(same.res.status).toBe(409)
     expect(stagedOps().filter(o => o.path !== 'federation.yaml')).toHaveLength(2)
+  })
+
+  it('withdrawing a pending request says Withdrawn, never Leaving', async () => {
+    setup(null)
+    const id = (await ask()).json.id as string
+    const body = await (await post(`/api/federation/outgoing/${id}/withdraw`)).json() as { leaving: boolean; text: string }
+    expect(body.leaving).toBe(false)
+    expect(body.text).toMatch(/^Withdrawn: Mesh\./)
+    expect(body.text).not.toContain('Leaving')
+  })
+
+  it('an unreadable request file on the trunk has its own sentence', async () => {
+    setup(null)
+    const id = (await ask()).json.id as string
+    write(outgoingPath(id), 'not: [a request\n')
+    commit('break the request file')
+    const res = await post(`/api/federation/outgoing/${id}/withdraw`)
+    expect(res.status).toBe(409)
+    expect((await res.json() as { error: string }).error).toContain("can't be read, so it can't be withdrawn here")
+  })
+
+  it('clear refuses a request whose ask is staged and not applied', async () => {
+    setup(CONSENSUS)
+    const id = (await ask()).json.id as string
+    const res = await post(`/api/federation/outgoing/${id}/clear`)
+    expect(res.status).toBe(409)
+    expect(readState(repo, id)).not.toBeNull()
   })
 
   it('a member of one network asks for a second and withdraws it: the first stays, and it is not leaving', async () => {

@@ -136,7 +136,8 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     // The trunk's request file is what a withdrawal needs; the state folder is a convenience that may be gone.
     const committed = await trunkRequest(repo, id, deps.startBranch)
     const state = readState(repo, id)
-    if (!committed?.request) throw new HttpError(state ? 409 : 404, state ? SENTENCES.notApplied : 'No such request.')
+    if (!committed) throw new HttpError(state ? 409 : 404, state ? SENTENCES.notApplied : 'No such request.')
+    if (!committed.request) throw new HttpError(409, `The request file on your trunk can't be read, so it can't be withdrawn here. Remove ${outgoingPath(id)} by hand.`)
     const network = committed.request.network
     const { text, base } = fedNow(repo, actor.id)
     const edited = withdrawnText(text, { id, hub: committed.request.hub.url, network, peerAdded: state?.peerAdded === true })
@@ -146,7 +147,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     ]
     const out = await commitOrStage(repo, actor, ops, `federation: withdraw the request to join ${network}`, deps.notify)
     writeState(repo, id, { ...(state ?? { network, hub: committed.request.hub.url }), withdrawn: true })
-    return c.json({ id, leaving: edited.leaving, text: (edited.leaving ? SENTENCES.leaving(network) : `Withdrawn: ${network}.`) + (state?.peerAdded === true ? '' : " The hub's peer entry was kept; remove it by hand if you no longer need it."), ...out })
+    return c.json({ id, leaving: edited.leaving, text: (edited.leaving ? SENTENCES.leaving(network) : `Withdrawn: ${network}.`) + (!state && edited.peerKept ? " The hub's peer entry was kept; remove it by hand if you no longer need it." : ''), ...out })
   }))
 
   // A request only the state folder knows (its staged ask was discarded): forget it. Git is not touched.
@@ -155,6 +156,9 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     const id = c.req.param('id')
     if (await trunkRequest(repo, id, deps.startBranch)) throw new HttpError(409, 'This request is on your trunk: withdraw it instead.')
     if (!readState(repo, id)) throw new HttpError(404, 'No such request.')
+    if (new ChangeStore(repo).all().changes.some(ch => ch.ops.some(o => o.op === 'file' && o.path === outgoingPath(id)))) {
+      throw new HttpError(409, 'This request is staged in a change that is not applied yet: discard that change first.')
+    }
     clearState(repo, id)
     return c.json({ id, cleared: true })
   }))

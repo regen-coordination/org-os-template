@@ -216,6 +216,7 @@ export function askedText(text: string, a: AskEdit): { text: string; peerAdded: 
   let peerAdded = true
   const existing = mapAt(peers).find(p => norm(field(p, 'url')) === norm(a.hub))
   if (existing) {
+    if (field(existing, 'requested') !== undefined) throw new HttpError(409, 'You have a request to this hub waiting: withdraw it or wait for the answer.')
     existing.set('requested', a.id)
     if (a.did && field(existing, 'did') === undefined) existing.set('did', a.did)
     peerAdded = false
@@ -254,7 +255,7 @@ export function recordedText(text: string, id: string, decision: string): string
  *  - After (no peer carries it): this is leaving. Only this network's entry goes; the hub's peer entry stays while another
  *    network of the same hub is listed, and goes only when the ask created it.
  *  `leaving` is true only for the second case. */
-export function withdrawnText(text: string, a: { id: string; hub: string; network: string; peerAdded: boolean }): { text: string; removed: number; leaving: boolean } {
+export function withdrawnText(text: string, a: { id: string; hub: string; network: string; peerAdded: boolean }): { text: string; removed: number; leaving: boolean; peerKept: boolean } {
   const doc = docOf(text)
   let removed = 0
   const networks = doc.get('networks')
@@ -266,6 +267,7 @@ export function withdrawnText(text: string, a: { id: string; hub: string; networ
   const otherNetwork = isSeq(networks) && networks.items.some(n => isMap(n) && norm(hubField(n)) === norm(a.hub))
   const peers = doc.get('peers')
   const pending = isSeq(peers) ? mapAt(peers).find(p => p.get('requested') === a.id) : undefined
+  const decided = isSeq(peers) && mapAt(peers).some(p => norm(p.get('url')) === norm(a.hub) && p.get('decision') !== undefined)
   if (isSeq(peers)) {
     const mine = pending ?? mapAt(peers).find(p => norm(p.get('url')) === norm(a.hub))
     if (mine) {
@@ -274,7 +276,8 @@ export function withdrawnText(text: string, a: { id: string; hub: string; networ
       else if (pending) removed += 1
     }
   }
-  return { text: doc.toString(STRINGIFY), removed, leaving: pending === undefined && removed > 0 }
+  const left = isSeq(doc.get('peers')) && mapAt(doc.get('peers') as YAMLSeq).some(p => norm(p.get('url')) === norm(a.hub))
+  return { text: doc.toString(STRINGIFY), removed, leaving: pending === undefined && decided && removed > 0, peerKept: left }
 }
 
 // ── the confirmed operations ──────────────────────────────────────────────────────────────────────────
