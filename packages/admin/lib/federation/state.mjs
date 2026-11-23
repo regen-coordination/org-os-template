@@ -10,9 +10,11 @@
 // Pure: relative imports only, because the app imports it for the page's words.
 
 import { LINK_STATES } from './peers.mjs'
-import { reciprocal, wantedLink, relationOf } from './links.mjs'
+import { reciprocal, linkVerdict } from './links.mjs'
 
 export { LINK_STATES }
+/** `linkVerdict` lives in links.mjs (Task 7's planner needs it there); it is re-exported here, where Task 4 put it. */
+export { linkVerdict }
 
 /** Every drift line's words. */
 export const DRIFT = Object.freeze({
@@ -62,25 +64,6 @@ function atprotoSide(peer, relation, selfDid, atproto) {
   const want = reciprocal(relation)
   const lists = selfDid !== null && r.links.some(l => l?.value?.subject === selfDid && (want === null || l.value.relation === want))
   return { side: lists ? 'lists-us' : 'silent', checked: r.fetchedAt, failedAt: null }
-}
-
-/** What federation.yaml allows this org to publish for one peer:
- *  - `wanted`: R24's answer with the files as they read now (`filesSide`);
- *  - `tolerated`: when their files can't be read (`unknown`), the link R24 would want if they still listed this
- *    instance (and named it as hub). A record of it is kept: an unreadable read never makes it "not allowed", so it is
- *    neither urgent drift nor a delete (review focus 10). It never makes a link wanted: nothing is published from it.
- *  `relation` and `where` are the caller's (relationOf with the disk), so the record's network is resolved the same way.
- *  Task 7's planner matches records against both: create from `wanted`, never delete what `tolerated` matches.
- *  @param {{ peer: Peer, fed: any, relation: Relation | null, filesSide: string, where?: import('./links.mjs').Where }} input
- *  @returns {{ wanted: ReturnType<typeof wantedLink>, tolerated: import('./links.mjs').WantedLink | null }} */
-export function linkVerdict({ peer, fed, relation, filesSide: side, where }) {
-  const f = fed ?? { networks: [], join: null }
-  const wanted = wantedLink(peer, f, { relation, mutualByFiles: side === 'lists-us' ? [peer.index] : [], where })
-  if (side !== 'unknown' || 'link' in wanted) return { wanted, tolerated: null }
-  const mine = [peer.index]
-  const asIfListed = relation ?? relationOf(peer, f, { ...where, mutualByFiles: mine, membersByFiles: mine })
-  const hoped = wantedLink(peer, f, { relation: asIfListed, mutualByFiles: mine, where })
-  return { wanted, tolerated: 'link' in hoped ? hoped.link : null }
 }
 
 /** Our side's drift for one peer: our records for its DID that R24 doesn't allow (urgent), then the wanted link when

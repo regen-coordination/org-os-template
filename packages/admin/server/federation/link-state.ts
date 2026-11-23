@@ -60,16 +60,21 @@ export function filesReadingOf(repo: string, peer: Peer, self: Address[]): { fil
 
 /** What both sides' files say, as peer indexes (ruling R4): `mutualByFiles`, their files list this instance;
  *  `membersByFiles`, their files name this instance as the hub of one of their networks. Pass both to `relationOf`
- *  and `wantedLink`, so an existing member mutual by files is `hasMember` and published without a decision. */
-export function byFiles(repo: string, fed: Fed, self: Address[]): { mutualByFiles: number[]; membersByFiles: number[] } {
+ *  and `wantedLink`, so an existing member mutual by files is `hasMember` and published without a decision.
+ *  `unreadByFiles`: their files could not be read here (side unknown), so the publish planner keeps a record R24 would
+ *  allow if they still listed this instance (Task 4's `tolerated`, Task 7). */
+export function byFiles(repo: string, fed: Fed, self: Address[]): { mutualByFiles: number[]; membersByFiles: number[]; unreadByFiles: number[] } {
   const mutual: number[] = []
   const members: number[] = []
+  const unread: number[] = []
   for (const p of fed.peers) {
     const { files, remote, namesUsAsHub } = filesReadingOf(repo, p, self)
-    if (filesSide(files, remote).side === 'lists-us') mutual.push(p.index)
+    const side = filesSide(files, remote).side
+    if (side === 'lists-us') mutual.push(p.index)
+    if (side === 'unknown') unread.push(p.index)
     if (namesUsAsHub) members.push(p.index)
   }
-  return { mutualByFiles: mutual, membersByFiles: members }
+  return { mutualByFiles: mutual, membersByFiles: members, unreadByFiles: unread }
 }
 
 /** The indexes of the peers whose files list this instance at the last reading (R24's "mutual by files", ruling R4). */

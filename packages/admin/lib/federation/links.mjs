@@ -2,8 +2,8 @@
 //
 // The link-record contract of network N2 (spec §15, R21–R28): a public membership link is a record each side publishes
 // in its own atproto repository. This file holds the names and the parsers every read goes through (Task 3), and
-// reciprocity, the relation of a peer, R24's wanted test and the record key (Task 4); Task 7 adds the planner of what
-// this org publishes. Pure: relative imports only (no node:* and no npm), because the app imports it for the page's words.
+// reciprocity, the relation of a peer, R24's wanted test and the record key (Task 4); and the planner of what this org
+// publishes (Task 7). Pure: relative imports only (no node:* and no npm), because the app imports it for the page's words.
 //
 // Reading never depends on a record's key: it lists a collection and matches fields. A record another client wrote may
 // carry more keys; they are ignored when read and never written. A record that does not parse is skipped, never thrown.
@@ -206,4 +206,135 @@ export function linkKey(subject, relation, network, hash = sha256Hex) {
   let out = ''
   for (let i = 0; i < bits.length; i += 5) out += BASE32[parseInt(bits.slice(i, i + 5), 2)]
   return out
+}
+
+/** What federation.yaml allows this org to publish for one peer:
+ *  - `wanted`: R24's answer with the files as they read now (`filesSide`);
+ *  - `tolerated`: when their files can't be read (`unknown`), the link R24 would want if they still listed this
+ *    instance (and named it as hub). A record of it is kept: an unreadable read never makes it "not allowed", so it is
+ *    neither urgent drift nor a delete (review focus 10). It never makes a link wanted: nothing is published from it.
+ *  `relation` and `where` are the caller's (relationOf with the disk), so the record's network is resolved the same way.
+ *  The planner below matches records against both: create from `wanted`, never delete what `tolerated` matches.
+ *  (Task 4 wrote it in state.mjs, which re-exports it; it lives here so the planner needs no circular import.)
+ *  @param {{ peer: Peer, fed: any, relation: Relation | null, filesSide: string, where?: Where }} input
+ *  @returns {{ wanted: ReturnType<typeof wantedLink>, tolerated: WantedLink | null }} */
+export function linkVerdict({ peer, fed, relation, filesSide: side, where }) {
+  const f = fed ?? { networks: [], join: null }
+  const wanted = wantedLink(peer, f, { relation, mutualByFiles: side === 'lists-us' ? [peer.index] : [], where })
+  if (side !== 'unknown' || 'link' in wanted) return { wanted, tolerated: null }
+  const mine = [peer.index]
+  const asIfListed = relation ?? relationOf(peer, f, { ...where, mutualByFiles: mine, membersByFiles: mine })
+  const hoped = wantedLink(peer, f, { relation: asIfListed, mutualByFiles: mine, where })
+  return { wanted, tolerated: 'link' in hoped ? hoped.link : null }
+}
+
+/** @typedef {{ uri: string, cid: string, value: LinkRecord }} OwnLink  one of this org's link records, as read back */
+/** @typedef {{ uri: string, cid: string, value: ProfileRecord }} OwnProfile  this org's profile `self`, as read back */
+/** @typedef {ByFiles & { unreadByFiles?: readonly number[] }} FilesReadings  `unreadByFiles`: the peers whose files
+ *  could not be read here (their files side is unknown), so a record R24 would allow if they still listed this
+ *  instance is kept */
+/** @typedef {{ private: number, noUrl: number, noDid: number, noRelation: number, undecided: number }} WithheldCounts */
+/** @typedef {{ wanted: WantedLink[], create: { rkey: string, record: LinkRecord }[], delete: OwnLink[], keep: OwnLink[],
+ *   profile: { record: Record<string, unknown>, swapRecord?: string } | null, withheld: WithheldCounts }} LinkPlan */
+
+/** The match of a record or a wanted link: subject, relation and network, never the record's key.
+ *  @param {{ subject: string, relation: string, network?: string }} l */
+const matchKey = l => `${l.subject}|${l.relation}|${l.network ?? ''}`
+
+/** A record's `createdAt` from a peer's `since`: a date becomes its midnight UTC; a full datetime is kept; anything
+ *  else gives way to `now`.  @param {string | null} since @param {string} now @returns {string} */
+function createdAtOf(since, now) {
+  if (typeof since === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(since) && !Number.isNaN(Date.parse(`${since}T00:00:00.000Z`))) return `${since}T00:00:00.000Z`
+    const asRecord = parseLinkRecord({ $type: LINK_NSID, subject: 'did:plc:x', relation: 'peerOf', createdAt: since })
+    if (asRecord) return since
+  }
+  return now
+}
+
+/** The networks this instance is the hub of: its `role: hub` entries; else, on an instance with a `join` block, its
+ *  only network when no peer is that network's hub.  @param {FedLike} fed @param {Peer[]} peers @param {Where} where */
+function ownNetworks(fed, peers, where) {
+  const networks = fed.networks ?? []
+  const hubs = networks.filter(n => n.role === 'hub')
+  if (hubs.length > 0) return hubs
+  if (!fed.join || networks.length !== 1) return []
+  return peers.some(p => hubNetworkOf(p, fed, where) === networks[0]) ? [] : networks
+}
+
+/** What this org publishes on atproto, from federation.yaml alone (R24, R25). Pure.
+ *  - `wanted`: one link per peer that `wantedLink` passes, with the files readings passed in (R4); each once.
+ *  - `create`: wanted links no own record matches (on subject, relation and network, never the key), keyed by
+ *    `linkKey` and dated by the peer's `since`, else `now`; exactly the five fields.
+ *  - `delete`: own records that are neither wanted nor tolerated (their files unreadable here): a peer made private,
+ *    a peer removed, a record federation.yaml never listed.
+ *  - `keep`: the rest. An unchanged record is never planned again.
+ *  - `profile`: `networks` = each network whose hub has a wanted `memberOf` ({ hub: its DID, name }), and on a hub its
+ *    own network ({ hub: selfDid, name }); every other key of the existing profile is kept as it is. Planned when the
+ *    networks changed, or when there is no profile yet and something is published (a peer reads an org with no profile
+ *    as not on atproto). `swapRecord` is the current profile's cid.
+ *  - `withheld`: counts only; no peer is named anywhere in the plan.
+ *  @param {{ fed: FedLike & { peers: Peer[] }, selfDid: string | null, ownRecords?: OwnLink[] | null,
+ *   ownProfile?: OwnProfile | null, now: string | Date, hash?: (text: string) => string, where?: Where,
+ *   byFiles?: FilesReadings }} input
+ *  @returns {LinkPlan} */
+export function planLinks({ fed, selfDid, ownRecords, ownProfile, now, hash, where = {}, byFiles = {} }) {
+  const at = typeof now === 'string' ? now : now.toISOString()
+  const mutual = byFiles.mutualByFiles ?? []
+  const members = byFiles.membersByFiles ?? []
+  const unread = byFiles.unreadByFiles ?? []
+  const peers = fed.peers ?? []
+  /** @type {WithheldCounts} */
+  const withheld = { private: 0, noUrl: 0, noDid: 0, noRelation: 0, undecided: 0 }
+  /** @type {Map<string, { link: WantedLink, createdAt: string }>} */
+  const wanted = new Map()
+  /** @type {Set<string>} */
+  const tolerated = new Set()
+  for (const peer of peers) {
+    const mine = [peer.index]
+    const side = mutual.includes(peer.index) ? 'lists-us' : unread.includes(peer.index) ? 'unknown' : 'silent'
+    const relation = relationOf(peer, fed, { ...where, mutualByFiles: side === 'lists-us' ? mine : [], membersByFiles: members.includes(peer.index) ? mine : [] })
+    const verdict = linkVerdict({ peer, fed, relation, filesSide: side, where })
+    if ('link' in verdict.wanted) {
+      const key = matchKey(verdict.wanted.link)
+      if (!wanted.has(key)) wanted.set(key, { link: verdict.wanted.link, createdAt: createdAtOf(peer.since, at) })
+    } else {
+      withheld[verdict.wanted.withheld] += 1
+    }
+    if (verdict.tolerated) tolerated.add(matchKey(verdict.tolerated))
+  }
+
+  const own = Array.isArray(ownRecords) ? ownRecords.filter(r => r && r.value) : []
+  const ownKeys = new Set(own.map(r => matchKey(r.value)))
+  /** @type {LinkPlan['create']} */
+  const create = []
+  for (const { link, createdAt } of wanted.values()) {
+    if (ownKeys.has(matchKey(link))) continue
+    /** @type {LinkRecord} */
+    const record = { $type: LINK_NSID, subject: link.subject, relation: link.relation, ...(link.network !== undefined ? { network: link.network } : {}), createdAt }
+    create.push({ rkey: linkKey(link.subject, link.relation, link.network, hash), record })
+  }
+  const allowed = r => wanted.has(matchKey(r.value)) || tolerated.has(matchKey(r.value))
+  const keep = own.filter(allowed)
+  const del = own.filter(r => !allowed(r))
+
+  /** @type {ProfileNetwork[]} */
+  const networks = []
+  const seen = new Set()
+  const add = (/** @type {ProfileNetwork} */ n) => { const k = `${n.hub}|${n.name}`; if (!seen.has(k)) { seen.add(k); networks.push(n) } }
+  for (const { link } of wanted.values()) if (link.relation === 'memberOf' && link.network !== undefined) add({ hub: link.subject, name: link.network })
+  if (selfDid) for (const n of ownNetworks(fed, peers, where)) add({ hub: selfDid, name: n.name })
+  const sameNetworks = (/** @type {ProfileNetwork[]} */ a) => a.length === networks.length && a.every(n => seen.has(`${n.hub}|${n.name}`))
+    && new Set(a.map(n => `${n.hub}|${n.name}`)).size === a.length
+  /** @type {LinkPlan['profile']} */
+  let profile = null
+  if (ownProfile && ownProfile.value) {
+    if (!sameNetworks(ownProfile.value.networks)) {
+      profile = { record: { $type: PROFILE_NSID, ...ownProfile.value.rest, networks }, swapRecord: ownProfile.cid }
+    }
+  } else if (networks.length > 0 || wanted.size > 0) {
+    profile = { record: { $type: PROFILE_NSID, networks } }
+  }
+
+  return { wanted: [...wanted.values()].map(w => w.link), create, delete: del, keep, profile, withheld }
 }

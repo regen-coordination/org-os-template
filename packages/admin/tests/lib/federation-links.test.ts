@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { NETWORK_AUTHORITY, LINK_NSID, PROFILE_NSID, RELATIONS, parseLinkRecord, parseProfileRecord,
-  reciprocal, relationOf, linkKey, networkOf, wantedLink } from '../../lib/federation/links.mjs'
+  reciprocal, relationOf, linkKey, networkOf, wantedLink, planLinks } from '../../lib/federation/links.mjs'
 import { readFederation } from '../../lib/federation/read.mjs'
 
 const SUBJECT = 'did:plc:abcdefghijklmnopqrstuvwx'
@@ -254,6 +254,111 @@ describe('wantedLink: an existing member mutual by files is planned for publishi
   it('private and non-public-url members are never planned, whatever the files say', () => {
     expect(wantedLink(fed.peers[1], fed, both)).toEqual({ withheld: 'private' })
     expect(wantedLink(fed.peers[2], fed, both)).toEqual({ withheld: 'noUrl' })
+  })
+})
+
+describe('planLinks (Task 7): what this org publishes, from federation.yaml, never from its records', () => {
+  const SELF = 'did:plc:selfselfselfselfselfself'
+  const HUB = 'did:plc:hubhubhubhubhubhubhubhub'
+  const PEER = 'did:plc:peerpeerpeerpeerpeerpeer'
+  const QUIET = 'did:plc:quietquietquietquietquie'
+  const STRAY = 'did:plc:straystraystraystraystra'
+  const NOW = '2026-11-22T12:00:00.000Z'
+  const HUB_SITE = 'https://mesh-hub.example.org'
+  const node = (peers: Record<string, unknown>[], more: Record<string, unknown> = {}) =>
+    fedOf({ identity: { name: 'Fixture Org', did: SELF }, networks: [{ name: 'Mesh', hub: HUB_SITE }], peers, ...more })
+  const own = (rkey: string, value: Record<string, unknown>) => ({ uri: `at://${SELF}/${LINK_NSID}/${rkey}`, cid: `cid-${rkey}`, value: { $type: LINK_NSID, createdAt: '2026-01-01T00:00:00.000Z', ...value } })
+  const plan = (fed: ReturnType<typeof node>, o: Record<string, unknown> = {}) => planLinks({ fed, selfDid: SELF, ownRecords: [], ownProfile: null, now: NOW, ...o })
+
+  it('one record per public, decided peer with a did: the five fields, keyed by linkKey, dated by since or now; the rest counted', () => {
+    const fed = node([
+      { name: 'Mesh Hub', url: HUB_SITE, did: HUB, decision: '2026-10-01', since: '2026-10-02' },
+      { name: 'Friendly Peer', url: 'https://friendly.example.org', did: PEER, link: 'peerOf' },
+      { name: 'Quiet Cove', url: 'https://quiet-cove.example.org', did: QUIET, link: 'peerOf', visibility: 'private' },
+      { name: 'Local Sibling', repo: '../sibling', did: PEER, link: 'peerOf' },
+      { name: 'No Did', url: 'https://nodid.example.org', link: 'peerOf' },
+      { name: 'Free Form', url: 'https://free.example.org', did: PEER, relationship: 'network-seat' },
+      { name: 'Undecided Hub', url: HUB_SITE, did: STRAY },
+    ])
+    const p = plan(fed)
+    expect(p.create).toEqual([
+      { rkey: linkKey(HUB, 'memberOf', 'Mesh'), record: { $type: LINK_NSID, subject: HUB, relation: 'memberOf', network: 'Mesh', createdAt: '2026-10-02T00:00:00.000Z' } },
+      { rkey: linkKey(PEER, 'peerOf', undefined), record: { $type: LINK_NSID, subject: PEER, relation: 'peerOf', createdAt: NOW } },
+    ])
+    expect(p.wanted).toHaveLength(2)
+    expect(p.withheld).toEqual({ private: 1, noUrl: 1, noDid: 1, noRelation: 1, undecided: 1 })
+    expect(p.delete).toEqual([])
+    expect(p.keep).toEqual([])
+    // Counts only: no peer's name reaches the plan.
+    for (const name of ['Mesh Hub', 'Friendly', 'Quiet', 'Sibling', 'No Did', 'Free Form', 'Undecided']) expect(JSON.stringify(p)).not.toContain(name)
+    expect(JSON.stringify(p)).not.toContain(QUIET)
+  })
+
+  it('a record matches on subject, relation and network, never its key; one that differs is withdrawn and the right one created', () => {
+    const fed = node([{ name: 'Mesh Hub', url: HUB_SITE, did: HUB, link: 'memberOf' }, { name: 'Friendly Peer', url: 'https://friendly.example.org', did: PEER, link: 'peerOf' }])
+    const kept = own('written-by-another-client', { subject: HUB, relation: 'memberOf', network: 'Mesh' })
+    const wrongNetwork = own('k2', { subject: PEER, relation: 'peerOf', network: 'Mesh' })
+    const p = plan(fed, { ownRecords: [kept, wrongNetwork] })
+    expect(p.keep).toEqual([kept])
+    expect(p.delete).toEqual([wrongNetwork])
+    expect(p.create.map(c => c.record)).toEqual([{ $type: LINK_NSID, subject: PEER, relation: 'peerOf', createdAt: NOW }])
+  })
+
+  it('withdraws a record of a peer that became private, a peer that was removed, and one federation.yaml never listed', () => {
+    const fed = node([{ name: 'Quiet Cove', url: 'https://quiet-cove.example.org', did: QUIET, link: 'peerOf', visibility: 'private' }])
+    const was = own('q', { subject: QUIET, relation: 'peerOf' })
+    const stray = own('s', { subject: STRAY, relation: 'peerOf' })
+    const p = plan(fed, { ownRecords: [was, stray] })
+    expect(p.delete).toEqual([was, stray])
+    expect(p.create).toEqual([])
+    expect(p.withheld.private).toBe(1)
+  })
+
+  it("keeps a record their unreadable files would still allow (tolerated), and never creates one from it", () => {
+    const fed = node([{ name: 'Mesh Hub', url: HUB_SITE, did: HUB }]) // derived memberOf, no decision
+    const rec = own('h', { subject: HUB, relation: 'memberOf', network: 'Mesh' })
+    expect(plan(fed, { ownRecords: [rec], byFiles: { unreadByFiles: [0] } })).toMatchObject({ keep: [rec], delete: [], create: [] })
+    expect(plan(fed, { byFiles: { unreadByFiles: [0] } })).toMatchObject({ keep: [], delete: [], create: [] })
+    // Their files read, and silent: not allowed, withdrawn.
+    expect(plan(fed, { ownRecords: [rec] })).toMatchObject({ keep: [], delete: [rec] })
+    // Their files list this instance: wanted (R4), so it stays.
+    expect(plan(fed, { ownRecords: [rec], byFiles: { mutualByFiles: [0] } })).toMatchObject({ keep: [rec], delete: [], create: [] })
+  })
+
+  it('an existing member mutual by files is hasMember in the hub network (R4)', () => {
+    const fed = fedOf({ identity: { did: SELF }, join: { policy: 'open' }, networks: [{ name: 'Mesh', hub: 'https://self.example.org', role: 'hub' }],
+      peers: [{ name: 'Old Member', url: 'https://old.example.org', did: PEER, relationship: 'node' }] })
+    expect(plan(fed, { byFiles: { mutualByFiles: [0], membersByFiles: [0] } }).create.map(c => c.record))
+      .toEqual([{ $type: LINK_NSID, subject: PEER, relation: 'hasMember', network: 'Mesh', createdAt: NOW }])
+    expect(plan(fed).create).toEqual([])
+  })
+
+  it("the profile: each network whose hub has a wanted memberOf, and a hub's own network; other keys kept; planned only on a change", () => {
+    const member = node([{ name: 'Mesh Hub', url: HUB_SITE, did: HUB, link: 'memberOf' }])
+    const profile = { uri: `at://${SELF}/${PROFILE_NSID}/self`, cid: 'cid-profile', value: { networks: [], rest: { displayName: 'X' } } }
+    expect(plan(member, { ownProfile: profile }).profile).toEqual({
+      record: { $type: PROFILE_NSID, displayName: 'X', networks: [{ hub: HUB, name: 'Mesh' }] }, swapRecord: 'cid-profile',
+    })
+    const same = { ...profile, value: { networks: [{ hub: HUB, name: 'Mesh' }], rest: { displayName: 'X' } } }
+    expect(plan(member, { ownProfile: same }).profile).toBeNull()
+
+    const hub = fedOf({ identity: { did: SELF }, join: { policy: 'open' }, networks: [{ name: 'Home Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [] })
+    expect(plan(hub).profile).toEqual({ record: { $type: PROFILE_NSID, networks: [{ hub: SELF, name: 'Home Mesh' }] } })
+    // A node that is not a hub, with nothing wanted and no profile: nothing to write.
+    expect(plan(node([])).profile).toBeNull()
+    // A member that left: the profile's networks empty out, its other keys stay.
+    const left = { ...profile, value: { networks: [{ hub: HUB, name: 'Mesh' }], rest: { displayName: 'X' } } }
+    expect(plan(node([]), { ownProfile: left }).profile).toEqual({ record: { $type: PROFILE_NSID, displayName: 'X', networks: [] }, swapRecord: 'cid-profile' })
+  })
+
+  it('re-publishing an unchanged record is never planned: the second plan is empty', () => {
+    const fed = node([{ name: 'Mesh Hub', url: HUB_SITE, did: HUB, link: 'memberOf' }, { name: 'Friendly Peer', url: 'https://friendly.example.org', did: PEER, link: 'peerOf' }])
+    const first = plan(fed)
+    const records = first.create.map(c => ({ uri: `at://${SELF}/${LINK_NSID}/${c.rkey}`, cid: `cid-${c.rkey}`, value: c.record }))
+    const profile = { uri: `at://${SELF}/${PROFILE_NSID}/self`, cid: 'c', value: { networks: first.profile!.record.networks, rest: {} } }
+    const second = plan(fed, { ownRecords: records, ownProfile: profile })
+    expect(second).toMatchObject({ create: [], delete: [], profile: null })
+    expect(second.keep).toHaveLength(2)
   })
 })
 

@@ -8,6 +8,7 @@ import { stateDir } from '../../state.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import { readFederation } from '../../../lib/federation/read.mjs'
 import { linkStatesOf, selfAddressesOf, type PeerLinkState } from '../../federation/link-state.ts'
+import { publishFacts } from '../../federation/atproto/publish.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
 
 /** A clone on this machine, or null: only a folder holding a git repository counts. */
@@ -122,6 +123,9 @@ export const fleet: Adapter = {
         edges.push({ from: `instance:${id}`, to: self.id, kind: 'federation' })
       }
     }
+    // Publishing this org's own link records (N2 Task 7): the last receipt, what the trunk's plan holds now, and the
+    // first refusal of the plan's file-side steps (ruling R11), so Publish is unavailable with its sentence.
+    self.facts = { ...self.facts, ...(await publishFacts(ctx.repo, { run: ctx.run, now: ctx.now() })) }
     // No fleet declared still leaves this instance's own card: Sync and Share are its operations (0.6 P2 spec §3.10).
     return { nodes, edges }
   },

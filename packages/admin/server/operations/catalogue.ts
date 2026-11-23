@@ -10,6 +10,7 @@ import { readYamlObject } from '../resources/util.ts'
 import { fetchRemote, validBranchName } from '../git.ts'
 import { checkLinksAndRecords, lookupTarget } from '../federation/atproto/read.ts'
 import { networkFetch, networkLookup, networkResolveTxt } from '../net.ts'
+import { publishLinksOperation } from '../federation/atproto/publish.ts'
 import { resolveTrunk } from '../proposals/ledger.ts'
 import { kmsSrc } from '../knowledge/kms.ts'
 import { validTrunkName } from '../../lib/rules.mjs'
@@ -324,6 +325,10 @@ export const CATALOGUE: Operation[] = [
       }
     },
   },
+  // N2 Task 7: publish this org's own link records, planned from federation.yaml on the trunk and written through its
+  // kms atproto session. Its plan reads only the cache of the last check; its job re-reads, re-plans and writes the
+  // network and a receipt under stateDir, never a file in the repository.
+  publishLinksOperation({ fetch: networkFetch, lookup: networkLookup, env: process.env }),
   {
     id: 'connector.ingest', kinds: ['connector'], label: () => 'Ingest', effect: 'changes', network: true,
     timeoutMs: 600 * SEC, params: NO_PARAMS, refreshes: 'sources',

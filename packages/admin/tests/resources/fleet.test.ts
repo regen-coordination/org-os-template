@@ -233,13 +233,13 @@ describe('fleet adapter: one link state from every source', () => {
     atprotoCache(repo).put(SELF, reading(SELF, []) as never)
     const fed = () => readFederation(parseYaml(readFileSync(join(repo, 'federation.yaml'), 'utf8')))
     const self = await selfAddressesOf(repo, runCommand)
-    expect(byFiles(repo, fed(), self)).toEqual({ mutualByFiles: [0], membersByFiles: [0] })
+    expect(byFiles(repo, fed(), self)).toMatchObject({ mutualByFiles: [0], membersByFiles: [0] })
     let g = (await fleet.read(ctx())) as Graph
     expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'mutual', relation: 'hasMember', drift: [{ side: 'ours', text: 'Not published yet.' }] })
 
     // The same member whose files list this instance but don't name it as hub: no hasMember, nothing to publish.
     writeFileSync(join(sibling, 'federation.yaml'), `networks:\n  - name: Elsewhere\n    hub: https://elsewhere.example.org\n${back}`)
-    expect(byFiles(repo, fed(), self)).toEqual({ mutualByFiles: [0], membersByFiles: [] })
+    expect(byFiles(repo, fed(), self)).toMatchObject({ mutualByFiles: [0], membersByFiles: [] })
     g = (await fleet.read(ctx())) as Graph
     expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'mutual', relation: null, drift: [] })
   })
@@ -253,9 +253,9 @@ describe('fleet adapter: one link state from every source', () => {
     const fed = readFederation(parseYaml(readFileSync(join(repo, 'federation.yaml'), 'utf8')))
     const peersBack = [{ name: 'Fixture Org', url: 'https://github.com/acme/fixture-org' }]
     remoteCache(repo).put(url, { spec: 'org-os/federation/1', networks: [{ name: 'Mesh', hub: 'github.com/acme/fixture-org' }], peers: peersBack })
-    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toEqual({ mutualByFiles: [0], membersByFiles: [0] })
+    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toMatchObject({ mutualByFiles: [0], membersByFiles: [0] })
     remoteCache(repo).put(url, { spec: 'org-os/federation/1', networks: [{ name: 'Mesh', hub: `../${basename(repo)}` }], peers: peersBack })
-    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toEqual({ mutualByFiles: [0], membersByFiles: [] })
+    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toMatchObject({ mutualByFiles: [0], membersByFiles: [] })
   })
 
   // Review fix round 1, I1: a hub named by a bare folder name only the disk resolves.
@@ -288,13 +288,13 @@ describe('fleet adapter: one link state from every source', () => {
     const fed = readFederation(parseYaml(readFileSync(join(repo, 'federation.yaml'), 'utf8')))
     const self = await selfAddressesOf(repo, runCommand)
     expect(self.some(a => a.kind === 'github' && a.repo === 'org-os-template')).toBe(false)
-    expect(byFiles(repo, fed, self)).toEqual({ mutualByFiles: [], membersByFiles: [] })
+    expect(byFiles(repo, fed, self)).toMatchObject({ mutualByFiles: [], membersByFiles: [] })
     let g = (await fleet.read(ctx())) as Graph
     expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'claimed', relation: null })
     // The same lines naming this instance's origin do count.
     execSync('git remote add origin https://github.com/acme/fixture-org', { cwd: repo })
     writeFileSync(join(sibling, 'federation.yaml'), 'networks:\n  - name: Fixture Mesh\n    hub: https://github.com/acme/fixture-org\npeers:\n  - name: Fixture\n    url: https://github.com/acme/fixture-org\n')
-    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toEqual({ mutualByFiles: [0], membersByFiles: [0] })
+    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toMatchObject({ mutualByFiles: [0], membersByFiles: [0] })
     g = (await fleet.read(ctx())) as Graph
     expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'mutual', relation: 'hasMember' })
   })

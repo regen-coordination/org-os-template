@@ -46,16 +46,21 @@ export type Guarded = { json: unknown } | { text: string } | { problem: string }
 
 const kb = (bytes: number): number => Math.max(1, Math.round(bytes / 1024))
 
+/** Whether an address fails the host rules every guarded call shares: https, no login in it, a real host name (no IP
+ *  literal, no localhost or .local/.internal name). The publisher's write guard (atproto/publish.ts) uses it too. */
+export function notPublicHttps(u: URL): boolean {
+  const host = u.hostname.toLowerCase().replace(/\.$/, '')
+  return u.protocol !== 'https:' || u.username !== '' || u.password !== '' || host === '' || isIP(host.replace(/^\[|\]$/g, '')) !== 0
+    || !host.includes('.') || host === 'localhost' || /\.(localhost|local|internal)$/.test(host)
+}
+
 /** GET `url` under the guards above. Never throws: a refusal is `{ problem }`, a sentence a person reads. */
 export async function guardedJson(url: string, deps: GuardDeps, opts: GuardOptions): Promise<Guarded> {
   let u: URL
   try { u = new URL(url) } catch { return { problem: 'Not read: that is not an address.' } }
   const host = u.hostname.toLowerCase().replace(/\.$/, '')
   const label = host === '' ? 'that address' : host
-  if (u.protocol !== 'https:' || u.username !== '' || u.password !== '' || host === '' || isIP(host.replace(/^\[|\]$/g, '')) !== 0
-    || !host.includes('.') || host === 'localhost' || /\.(localhost|local|internal)$/.test(host)) {
-    return { problem: `Not read: ${label} is not a public https address.` }
-  }
+  if (notPublicHttps(u)) return { problem: `Not read: ${label} is not a public https address.` }
   const outer = opts.signal
   if (outer?.aborted) return { problem: 'Not read: it was cancelled.' }
 
