@@ -153,14 +153,83 @@ describe('the launcher page', () => {
     expect(document.body.innerHTML).not.toContain(TOKEN)
   })
 
-  it('the create flow lands ready to ask, with the type preset from the hub', async () => {
-    m.inspectHub.mockResolvedValue(hubAnswer() as never)
-    m.launcherWizard.mockResolvedValue({ id: 'open-instance', steps: [] } as never)
+  const LANDING = { hub: 'https://hub.alder.example', network: 'Alder Network' }
+  const TOKEN2 = 'a b/+=&x'
+  const joinLink = async (tokenText: string, over: Record<string, unknown> = {}) => {
+    const { parse } = await import('yaml')
+    const source = (await import('../../../wizards/open-instance.yaml?raw')).default
+    m.launcherWizard.mockResolvedValue(parse(source) as never)
+    m.inspectHub.mockResolvedValue(hubAnswer({ invite: true, ...over }) as never)
     renderAt(<Launcher />, '/launch')
-    fireEvent.change(await screen.findByLabelText("The hub's address, or an invite link"), { target: { value: 'https://hub.alder.example' } })
+    fireEvent.change(await screen.findByLabelText("The hub's address, or an invite link"), { target: { value: `https://hub.alder.example/.well-known/federation.json#invite=${tokenText}` } })
     fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Create one to join' }))
-    await waitFor(() => expect(m.launcherWizard).toHaveBeenCalled())
+    await screen.findByText(/Your invite link will be used/)
+  }
+  const fillAnswers = async () => {
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Alder Commons' } })
+    fireEvent.change(screen.getByLabelText('One line'), { target: { value: 'Seed keepers.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByLabelText('Your name')
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Steward A' } })
+    fireEvent.change(screen.getByLabelText('Git email'), { target: { value: 'a@alder.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  }
+
+  it('the create flow presets the type, sends the landing without the token, and lands with the encoded fragment', async () => {
+    m.createInstance.mockResolvedValue({ url: 'http://127.0.0.1:4682/federation?hub=x' } as never)
+    await joinLink(TOKEN2, { types: ['LocalNode'] })
+    fireEvent.click(screen.getByRole('button', { name: 'Create one to join' }))
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    expect((screen.getByRole('radio', { name: /Local node/ }) as HTMLInputElement).checked).toBe(true)
+    await fillAnswers()
+    fireEvent.click(await screen.findByRole('button', { name: 'Create it' }))
+    await waitFor(() => expect(m.createInstance).toHaveBeenCalled())
+    const [answers, landing] = m.createInstance.mock.calls[0]!
+    expect(answers).toMatchObject({ type: 'LocalNode' })
+    expect(landing).toEqual(LANDING)
+    expect(JSON.stringify(m.createInstance.mock.calls)).not.toContain('tok')
+    await waitFor(() => expect(assign).toHaveBeenCalledWith(`http://127.0.0.1:4682/federation?hub=x#invite=${encodeURIComponent(TOKEN2)}`))
+  })
+
+  it('the adopt flow sends the landing and lands with the fragment', async () => {
+    m.adoptPlan.mockResolvedValue({ planId: 'p1', add: ['federation.yaml'], kept: [], ignored: [] } as never)
+    m.adoptApply.mockResolvedValue({ url: 'http://127.0.0.1:4683/federation?hub=x', branch: 'org-os/adopt' } as never)
+    await joinLink('tok_abc123', { types: ['LocalNode'] })
+    fireEvent.click(screen.getByRole('button', { name: 'Adopt a repo to join' }))
+    fireEvent.change(await screen.findByLabelText("The repo's folder"), { target: { value: '~/plain' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await fillAnswers()
+    fireEvent.click(await screen.findByRole('button', { name: 'See what it adds' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add them on org-os/adopt' }))
+    await waitFor(() => expect(m.adoptApply).toHaveBeenCalledWith('p1', LANDING))
+    expect(m.adoptPlan.mock.calls[0]![1]).toMatchObject({ type: 'LocalNode' })
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('http://127.0.0.1:4683/federation?hub=x#invite=tok_abc123'))
+    expect(JSON.stringify([m.adoptPlan.mock.calls, m.adoptApply.mock.calls])).not.toContain('tok_abc123')
+  })
+
+  it('a type the framework does not name is not preset', async () => {
+    m.createInstance.mockResolvedValue({ url: 'http://127.0.0.1:4682/' } as never)
+    await joinLink('tok_abc123', { types: ['Weird'] })
+    fireEvent.click(screen.getByRole('button', { name: 'Create one to join' }))
+    await screen.findByRole('heading', { level: 2, name: 'About the organization' })
+    for (const r of screen.getAllByRole('radio', { name: /Cooperative|DAO|node|Project/ })) expect((r as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('pressing Look it up again on the same address keeps the invite; another address drops it', async () => {
+    m.openInstance.mockResolvedValue({ url: 'http://127.0.0.1:4680/federation?hub=x' } as never)
+    await joinLink('tok_abc123')
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    await screen.findByText(/Your invite link will be used/)
+    fireEvent.change(screen.getByLabelText("The folder it's in"), { target: { value: '~/orgs/alder' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('http://127.0.0.1:4680/federation?hub=x#invite=tok_abc123'))
+    fireEvent.change(screen.getByLabelText("The hub's address, or an invite link"), { target: { value: 'https://other.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    await waitFor(() => expect(screen.queryByText(/Your invite link will be used/)).toBeNull())
+    assign.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('http://127.0.0.1:4680/federation?hub=x'))
   })
 
   it('a hub with several networks asks which; a closed hub offers no way in', async () => {

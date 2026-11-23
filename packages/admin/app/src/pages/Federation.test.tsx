@@ -291,6 +291,16 @@ describe('Ask to join a network', () => {
     expect(calls.some(c => c.path.startsWith('/api/operations/') || c.path === '/api/federation/ask' || c.path.includes('federation.publish-links'))).toBe(false)
   })
 
+  it('reads an encoded #invite= from the launcher back to the token, and clears it', async () => {
+    const odd = 'a b/+=&x'
+    window.history.replaceState(null, '', `/federation?hub=${encodeURIComponent(HUB)}&network=Mesh#invite=${encodeURIComponent(odd)}`)
+    fetchRoutes(routes({ 'GET /api/federation/hub': { problem: 'Look it up first.' } }))
+    renderAt(<Federation />, `/federation?hub=${encodeURIComponent(HUB)}&network=Mesh`)
+    const ask = await region('Ask to join a network')
+    await waitFor(() => expect((within(ask).getByLabelText('Invite link') as HTMLInputElement).value).toBe(odd))
+    expect(window.location.hash).toBe('')
+  })
+
   it('Look it up is the confirmed check of that address', async () => {
     const { calls } = fetchRoutes(routes({
       'GET /api/federation/hub': { problem: 'Look it up first.' },

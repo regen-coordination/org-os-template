@@ -67,7 +67,7 @@ export async function inspectHub(pasted: unknown, deps: GuardDeps): Promise<{ hu
 export function landingOf(raw: unknown): string | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined
   const { hub, network } = raw as { hub?: unknown; network?: unknown }
-  if (typeof hub !== 'string' || hub.includes('#') || wellKnownUrlOf(hub) === null) return undefined
+  if (typeof hub !== 'string' || hub.length > 2048 || hub.includes('#') || wellKnownUrlOf(hub) === null) return undefined
   const q = new URLSearchParams({ hub: hub.trim() })
   if (typeof network === 'string' && network.trim() !== '' && network.length <= 200) q.set('network', network.trim())
   return `/federation?${q.toString()}`

@@ -98,6 +98,16 @@ describe('adopting a repo', () => {
     expect(status(dir)).toBe('')
   }, 120_000)
 
+  it('apply lands on the Federation page when the request carries a landing', async () => {
+    const dir = repo()
+    const planned = await post('plan', { path: dir, answers })
+    const { planId } = await planned.json()
+    const r = await post('apply', { planId, landing: { hub: 'https://hub.alder.example', network: 'Alder Network', invite: 'tok_SECRET' } })
+    const body = await r.json()
+    expect(r.status, JSON.stringify(body)).toBe(200)
+    expect(body.url).toBe('http://localhost:4999/federation?hub=https%3A%2F%2Fhub.alder.example&network=Alder+Network')
+  }, 120_000)
+
   it('keeps the scaffold file mode (an executable stays executable)', async () => {
     const dir = repo()
     const plan = await planAdopt(dir, answers, REAL_REPO)

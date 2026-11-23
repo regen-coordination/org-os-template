@@ -7,6 +7,8 @@ import OpenInstance from '../wizards/OpenInstance.tsx'
 import Adopt from './Adopt.tsx'
 import type { WizardDef } from '../api.ts'
 import { policySentence } from '../pages/federationWords.ts'
+import { announce } from '../parts/live.tsx'
+import { ORG_TYPES } from '../../../lib/open-instance.mjs'
 import { cloneInstance, createInstance, inspectHub, launcherWizard, type JoinHub, type Landing, defaultCloneFolder, forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
 
 type Refusal = { message: string; adoptable: boolean; path?: string }
@@ -39,6 +41,10 @@ export default function Launcher() {
   const [joinError, setJoinError] = useState<string | null>(null)
   const [looking, setLooking] = useState(false)
   const inviteToken = useRef('')
+  const inviteFor = useRef('') // the address the token was pasted with: pressing Look it up again on it keeps the invite
+  const createCard = useRef<HTMLElement>(null)
+  const [createFocus, setCreateFocus] = useState(0)
+  useEffect(() => { if (createFocus > 0) createCard.current?.focus() }, [createFocus])
   const adoptCard = useRef<HTMLElement>(null)
   const [adoptFocus, setAdoptFocus] = useState(0)
   // "Adopt it" hands a path over: keyboard focus follows it to the Adopt card.
@@ -52,7 +58,9 @@ export default function Launcher() {
   }, [])
 
   const joining: Landing | undefined = joinHub && joinHub.policy !== 'closed' ? { hub: joinHub.url, ...(joinNetwork ? { network: joinNetwork } : {}) } : undefined
-  const go = (url: string) => window.location.assign(inviteToken.current && joining ? `${url}#invite=${inviteToken.current}` : url)
+  const go = (url: string) => window.location.assign(inviteToken.current && joining ? `${url}#invite=${encodeURIComponent(inviteToken.current)}` : url)
+  // The hub's first type, when it is one the framework names.
+  const presetType = joinHub?.types[0] && ORG_TYPES.some(t => t.value === joinHub.types[0]) ? { type: joinHub.types[0] } : undefined
 
   const lookUp = async (e: FormEvent) => {
     e.preventDefault()
@@ -60,12 +68,15 @@ export default function Launcher() {
     // Split here, in the browser, before anything is sent: only the address goes to the launcher.
     const at = pasted.indexOf('#')
     const token = at >= 0 ? (/^invite=(.+)$/.exec(pasted.slice(at + 1))?.[1] ?? '') : ''
-    setLooking(true); setJoinError(null); setJoinHub(null); inviteToken.current = ''; setJoinHasInvite(false)
+    setLooking(true); setJoinError(null); setJoinHub(null)
+    const stripped = token ? pasted.slice(0, at) : pasted
+    if (!token && stripped.replace(/\/+$/, '') !== inviteFor.current) inviteToken.current = ''
     try {
       const got = await inspectHub(token ? pasted.slice(0, at) : pasted)
-      inviteToken.current = token
+      if (token) { inviteToken.current = token; inviteFor.current = stripped.replace(/\/+$/, '') }
       if (token) setJoinAddress(pasted.slice(0, at)) // the field no longer shows the token
-      setJoinHasInvite(got.invite || token !== '')
+      setJoinHasInvite(inviteToken.current !== '')
+      announce(`${got.hub.name}${got.hub.type ? ` (${got.hub.type})` : ''}. ${policySentence(got.hub.policy)}`)
       setJoinHub(got.hub); setJoinNetwork(got.hub.networks.length === 1 ? got.hub.networks[0]! : '')
     } catch (err) { setJoinError((err as Error).message) } finally { setLooking(false) }
   }
@@ -177,11 +188,11 @@ export default function Launcher() {
           )}
         </section>
 
-        <section className="wiz-writes" aria-labelledby="door-create">
+        <section className="wiz-writes" aria-labelledby="door-create" ref={createCard} tabIndex={-1}>
           <h2 className="wiz-h launcher-door-h" id="door-create">Create a new one</h2>
           {creating
             ? <>
-                <OpenInstance def={creating} run={runCreate} base={state?.base} initial={joinHub?.types[0] ? { type: joinHub.types[0] } : undefined} onClose={() => { setCreating(null); setCreateLog(null) }} />
+                <OpenInstance def={creating} run={runCreate} base={state?.base} initial={presetType} onClose={() => { setCreating(null); setCreateLog(null) }} />
                 {createLog && <pre className="wiz-log" aria-label="What the command printed">{createLog}</pre>}
               </>
             : <div className="wiz-acts"><Button onClick={() => void startCreate()}>Create a new one</Button></div>}
@@ -190,7 +201,7 @@ export default function Launcher() {
         <section className="wiz-writes" aria-labelledby="door-adopt" ref={adoptCard} tabIndex={-1}>
           <h2 className="wiz-h launcher-door-h" id="door-adopt">Adopt a repo</h2>
           {adopting
-            ? <Adopt key={adoptFolder} base={state?.base} initialFolder={adoptFolder} landing={joining} onGo={go} initial={joinHub?.types[0] ? { type: joinHub.types[0] } : undefined} onClose={() => { setAdopting(false); setAdoptFolder('') }} />
+            ? <Adopt key={adoptFolder} base={state?.base} initialFolder={adoptFolder} landing={joining} onGo={go} initial={presetType} onClose={() => { setAdopting(false); setAdoptFolder('') }} />
             : <div className="wiz-acts"><Button onClick={() => setAdopting(true)}>Adopt a repo</Button></div>}
         </section>
 
@@ -199,7 +210,7 @@ export default function Launcher() {
           <form onSubmit={e => void lookUp(e)} className="wiz-field">
             <label htmlFor="launch-join">The hub's address, or an invite link</label>
             <input id="launch-join" className="input" type="text" value={joinAddress} placeholder="https://hub.example"
-              onChange={e => { setJoinAddress(e.target.value); setJoinHub(null); setJoinError(null); inviteToken.current = ''; setJoinHasInvite(false) }} autoComplete="off" spellCheck={false} />
+              onChange={e => { setJoinAddress(e.target.value); setJoinHub(null); setJoinError(null); setJoinHasInvite(false) }} autoComplete="off" spellCheck={false} />
             <div className="wiz-acts">
               <Button type="submit" busy={looking ? 'Looking…' : undefined} disabled={joinAddress.trim() === ''}>Look it up</Button>
             </div>
@@ -222,8 +233,8 @@ export default function Launcher() {
               {joining && <p className="wiz-note">Open, clone, create or adopt an instance in the cards here: it opens on its Federation page, ready to ask.</p>}
               {joining && (
                 <div className="wiz-acts">
-                  <Button onClick={() => void startCreate()}>Create one to join</Button>
-                  <Button onClick={() => setAdopting(true)}>Adopt a repo to join</Button>
+                  <Button onClick={() => void startCreate().then(() => setCreateFocus(n => n + 1))}>Create one to join</Button>
+                  <Button onClick={() => { setAdopting(true); setAdoptFocus(n => n + 1) }}>Adopt a repo to join</Button>
                 </div>
               )}
             </>

@@ -50,9 +50,9 @@ beforeEach(async () => {
 })
 afterEach(async () => { await launcher.close(); rmSync(root, { recursive: true, force: true }) })
 
-const clone = (url: string, folder: string) =>
+const clone = (url: string, folder: string, landing?: unknown) =>
   launcher.app.request(`http://127.0.0.1:${launcher.port}/api/launcher/clone`, {
-    method: 'POST', body: JSON.stringify({ url, folder }),
+    method: 'POST', body: JSON.stringify({ url, folder, ...(landing ? { landing } : {}) }),
     headers: { 'content-type': 'application/json', host: `localhost:${launcher.port}`, origin },
   })
 
@@ -65,6 +65,12 @@ describe('opening from a git address', () => {
     expect((await r.json()).url).toContain('http://localhost:4999')
     expect(fakeStartAdmin).toHaveBeenCalledWith(realpathSync(target))
     expect(vi.mocked(gitWrite.launcherGit).mock.calls[0]!.slice(1)).toEqual(['clone', ['--', url, target]])
+  })
+
+  it('lands on the Federation page when the request carries a landing', async () => {
+    const url = source(root, 'inst', { 'federation.yaml': 'identity: {}\n', 'data/x.yaml': 'a: 1\n' })
+    const r = await clone(url, join(root, 'into', 'inst'), { hub: 'https://hub.alder.example', network: 'Alder Network' })
+    expect((await r.json()).url).toBe('http://localhost:4999/federation?hub=https%3A%2F%2Fhub.alder.example&network=Alder+Network')
   })
 
   it('clones into an empty folder that was already there', async () => {

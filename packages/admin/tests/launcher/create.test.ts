@@ -33,9 +33,9 @@ beforeEach(async () => {
 })
 afterEach(async () => { await launcher.close(); rmSync(root, { recursive: true, force: true }) })
 
-const create = (a: Record<string, unknown>) =>
+const create = (a: Record<string, unknown>, landing?: unknown) =>
   launcher.app.request(`http://127.0.0.1:${launcher.port}/api/launcher/create`, {
-    method: 'POST', body: JSON.stringify({ answers: a }),
+    method: 'POST', body: JSON.stringify({ answers: a, ...(landing ? { landing } : {}) }),
     headers: { 'content-type': 'application/json', host: `localhost:${launcher.port}`, origin: `http://localhost:${launcher.port}` },
   })
 
@@ -58,6 +58,13 @@ describe('creating an instance', () => {
     expect(fakeStartAdmin).toHaveBeenCalledWith(realpathSync(target))
     const args = vi.mocked(scaffoldMod.scaffold).mock.calls[0]!
     expect(args[2]).toEqual({ git: true })
+  }, 120_000)
+
+  it('lands on the Federation page when the request carries a landing (no token in it)', async () => {
+    const r = await create({ ...answers, folder: join(root, 'into', 'joiner') }, { hub: 'https://hub.alder.example', network: 'Alder Network', invite: 'tok_SECRET' })
+    const body = await r.json()
+    expect(r.status, JSON.stringify(body)).toBe(200)
+    expect(body.url).toBe('http://localhost:4999/federation?hub=https%3A%2F%2Fhub.alder.example&network=Alder+Network')
   }, 120_000)
 
   it('never passes --force or --dry to the command', async () => {
