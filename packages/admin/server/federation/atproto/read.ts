@@ -13,6 +13,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { LINK_NSID, PROFILE_NSID, parseLinkRecord, parseProfileRecord, type LinkRecord, type ProfileRecord } from '../../../lib/federation/links.mjs'
 import { readFederation, DID_PATTERN } from '../../../lib/federation/read.mjs'
+import { isPublishedPeer } from '../../../lib/standards/federation.mjs'
 import { readYamlObject } from '../../resources/util.ts'
 import { stateDir } from '../../state.ts'
 import { guardedJson, checkLinks, readPeerFiles, type CheckPart } from '../remote.ts'
@@ -197,13 +198,14 @@ const said = (got: Reading | Problem): string => {
 }
 
 /** Every peer with a `did`, and this instance's `identity.did`: each DID read once, cached, and said by peer name. A
- *  private peer is counted only, its DID and its problem never written in the output. */
+ *  peer that is private, or has no public https url (a sibling folder, say), is still read but only counted: its name,
+ *  its DID and its problem are never written in the output (as `isPublishedPeer` decides for federation.json). */
 async function readEveryRecord(repo: string, deps: ReadDeps, signal: AbortSignal, now: Date): Promise<CheckPart> {
   const fed = readFederation(readYamlObject(join(repo, 'federation.yaml')))
   const selfDid = typeof fed.identity.did === 'string' && DID_PATTERN.test(fed.identity.did) ? fed.identity.did : null
   const targets = [
     ...(selfDid !== null ? [{ label: 'This instance', did: selfDid, private: false }] : []),
-    ...fed.peers.filter(p => p.did !== null).map(p => ({ label: p.name, did: p.did as string, private: p.private })),
+    ...fed.peers.filter(p => p.did !== null).map(p => ({ label: p.name, did: p.did as string, private: !isPublishedPeer(p) })),
   ]
   const cache = atprotoCache(repo)
   const results = new Map<string, Reading | Problem>()
@@ -222,8 +224,9 @@ async function readEveryRecord(repo: string, deps: ReadDeps, signal: AbortSignal
     if (t.private) { if ('problem' in got) privateFailed += 1; else privateRead += 1; continue }
     lines.push(`${t.label} on atproto: ${said(got)}`)
   }
-  if (privateRead > 0) lines.push(`${plural(privateRead, 'private peer was', 'private peers were')} read on atproto.`)
-  if (privateFailed > 0) lines.push(`${plural(privateFailed, 'private peer', 'private peers')} could not be read on atproto.`)
+  const why = '(private, or without a public https url)'
+  if (privateRead > 0) lines.push(`${plural(privateRead, 'private peer was', 'private peers were')} read on atproto ${why}.`)
+  if (privateFailed > 0) lines.push(`${plural(privateFailed, 'private peer', 'private peers')} could not be read on atproto ${why}.`)
   const read = [...results.values()].filter(r => !('problem' in r)).length
   return { lines, attempted: results.size, read }
 }

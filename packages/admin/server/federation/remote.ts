@@ -185,7 +185,7 @@ export async function readPeerFiles(repo: string, deps: GuardDeps, signal: Abort
     read += 1
     lines.push(`${p.name}: read.`)
   }
-  if (hidden > 0) lines.push(`${hidden} private ${hidden === 1 ? 'peer was' : 'peers were'} not read (private, or without a public https url).`)
+  if (hidden > 0) lines.push(`The federation.json of ${hidden} private ${hidden === 1 ? 'peer was' : 'peers was'} not read (private, or without a public https url).`)
   return { lines, attempted: open.length, read }
 }
 

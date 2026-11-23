@@ -244,10 +244,12 @@ describe('federation.check-links reads atproto', () => {
     const out = await checkLinksAndRecords(repo, {}, net, signal(), NOW)
     expect(out).toContain('This instance on atproto: read (1 link, no profile).')
     expect(out).toContain('Mesh Hub on atproto: read (1 link, a profile).')
-    expect(out).toContain('Bob Node on atproto: read (0 links, no profile).')
-    expect(out).toContain('1 private peer was read on atproto.')
-    expect(out).not.toMatch(/Quiet|quiet|pw-/)
+    // Bob Node has a did and only a folder (no public https url): read, never named, counted with the private peer.
+    expect(out).toContain('2 private peers were read on atproto (private, or without a public https url).')
+    expect(out).toContain('The federation.json of 1 private peer was not read (private, or without a public https url).')
+    expect(out).not.toMatch(/Quiet|quiet|pw-|Bob|bob/)
     expect(out).not.toContain(QUIET)
+    expect(out).not.toContain(BOB)
     for (const did of [ALICE, BOB, SELF, QUIET]) expect(atprotoCache(repo).get(did)?.reading?.fetchedAt, did).toBe(NOW.toISOString())
     expect(atprotoCache(repo).get(SELF)?.reading?.pds).toBe(`https://${TWO}`)
     expect(atprotoCache(repo).get(ALICE)?.reading?.pds).toBe(`https://${ONE}`)
@@ -261,9 +263,10 @@ describe('federation.check-links reads atproto', () => {
     net.setDown(ONE) // the hub and the private peer live there
     const out = await checkLinksAndRecords(repo, {}, net, signal(), NOW)
     expect(out).toContain(`Mesh Hub on atproto: Not read: ${ONE} could not be reached.`)
-    expect(out).toContain('1 private peer could not be read on atproto.')
-    expect(out).toContain('Bob Node on atproto: read (0 links, no profile).')
-    expect(out).not.toMatch(/Quiet|quiet/)
+    expect(out).toContain('1 private peer could not be read on atproto (private, or without a public https url).')
+    expect(out).toContain('1 private peer was read on atproto (private, or without a public https url).')
+    expect(out).not.toMatch(/Quiet|quiet|Bob|bob/)
+    expect(atprotoCache(repo).get(BOB)?.reading?.fetchedAt).toBe(NOW.toISOString())
     expect(atprotoCache(repo).get(ALICE)).toMatchObject({ reading: null, lastProblem: { text: `Not read: ${ONE} could not be reached.` } })
   })
 
@@ -275,7 +278,7 @@ describe('federation.check-links reads atproto', () => {
   })
 
   it('fails when nothing at all could be read, with every line', async () => {
-    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', 'peers:', '  - name: Mesh Hub', `    did: "${ALICE}"`, '    repo: ../mesh-hub', ''].join('\n'))
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', 'peers:', '  - name: Mesh Hub', `    did: "${ALICE}"`, '    url: https://hub.example.org', ''].join('\n'))
     const net = network()
     net.setDown('plc.directory')
     await expect(checkLinksAndRecords(repo, {}, net, signal(), NOW)).rejects.toThrow('Mesh Hub on atproto: Not read: plc.directory could not be reached.')

@@ -241,7 +241,7 @@ describe('federation.check-links', () => {
     const out = await checkLinks(repo, {}, { fetch, lookup: PUBLIC }, new AbortController().signal)
     expect(calls.map(c => c.url)).toEqual(['https://far.example.org/.well-known/federation.json'])
     expect(out).toContain('Far Hub')
-    expect(out).toContain('3 private peers were not read')
+    expect(out).toContain('The federation.json of 3 private peers was not read (private, or without a public https url).')
     expect(out).not.toMatch(/Plain Http|plain\.example|Lan Box|hub\.local/)
     expect(out).not.toContain('Quiet One')
     expect(out).not.toContain('quiet.example.org')
