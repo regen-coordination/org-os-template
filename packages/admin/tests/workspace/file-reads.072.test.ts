@@ -143,7 +143,7 @@ describe('registries and the map read from a file a member may not read', () => 
       id, kind, board: 'work', name: entityId, status: null, attention: null, changed: null, facts: {},
       source: { path: `data/${registry}.yaml`, editable: true, registry, entityId },
     } as unknown as Resource)
-    const graph: Graph = { nodes: [card('task:t-1', 'task', 'tasks', 't-1'), card('project:proj-001', 'project', 'projects', 'proj-001')], edges: [{ from: 'project:proj-001', to: 'task:t-1', kind: 'has' } as Graph['edges'][number]] }
+    const graph: Graph = { nodes: [card('task:t-1', 'task', 'tasks', 't-1'), card('project:proj-001', 'project', 'projects', 'proj-001')], edges: [{ from: 'project:proj-001', to: 'task:t-1', kind: 'depends-on' }] }
     const member = gateGraph({ kind: 'member', id: ID.member, hats: [], roles: ['network-member'] }, graph, new Levels(repo))
     expect(member.nodes.map(n => n.id)).toEqual(['project:proj-001'])
     expect(member.edges).toEqual([])
@@ -163,7 +163,7 @@ describe('registries and the map read from a file a member may not read', () => 
     const bodies: string[] = []
     for (const url of urls) {
       const ask = (cookie: string) => Promise.race([
-        call(h.app, url, cookie).then(r => r.text()).catch(() => ''),
+        Promise.resolve(call(h.app, url, cookie)).then((r: Response) => r.text()).catch(() => ''),
         new Promise<string>(resolve => setTimeout(() => resolve(''), 2000)),
       ])
       const seen = await ask(member)
@@ -253,7 +253,7 @@ describe('the hosted server as Railway runs it', () => {
       const seen: string[] = []
       for (const url of urls) {
         const text = await Promise.race([
-          ask(url, {}, member).then(r => r.text()).catch(() => ''),
+          Promise.resolve(ask(url, {}, member)).then((r: Response) => r.text()).catch(() => ''),
           new Promise<string>(resolve => setTimeout(() => resolve(''), 2000)),
         ])
         for (const s of [FIN, TASK, NEW]) if (text.includes(s)) seen.push(`${url} → ${s}`)
