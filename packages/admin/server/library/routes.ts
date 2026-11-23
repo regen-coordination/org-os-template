@@ -12,7 +12,7 @@ import { addOps } from './add.ts'
 import { findReceipt, listReceipts, removalPreview, removeOps } from './remove.ts'
 import { isRecordOp } from '../workspace/files.ts'
 import { changePrivateTargets } from '../private/targets.ts'
-import { fileReader } from '../workspace/reads.ts'
+import { fileReader, readableTray, unreadPaths, unreadRefusal, type FileReader } from '../workspace/reads.ts'
 
 export interface LibraryRoutesDeps {
   repo: string
@@ -73,15 +73,25 @@ export function mountLibrary(app: Hono, { repo, withLock, notify, privateStore =
     const actor = knownActorOf(c)
     const now = new Date().toISOString()
     const change: Change = store.load(actor.id) ?? { id: newChangeId(), actor: actor.id, created: now, updated: now, ops: [] }
-    const { ops, errors } = stage(repo, change.ops, opsFor(change.ops))
+    // 0.7.3: an add or a removal that would stage an op on a record of a file kept from this member is refused before it is
+    // staged or shown, as POST /api/changes/ops refuses one (round 2, I2).
+    const incoming = opsFor(change.ops)
+    const unread = unreadPaths(incoming, fileReader(c, repo))
+    if (unread.length > 0) throw unreadRefusal(unread)
+    const { ops, errors } = stage(repo, change.ops, incoming)
     if (errors.length > 0) return Response.json({ errors }, { status: 422 })
     const next: Change = { ...change, ops, updated: new Date().toISOString() }
     store.save(next)
     notify({ type: 'changes' })
-    return Response.json(changeView(repo, actor, next, stagedView(privateStore, next), changePrivateTargets(repo, privateStore, next)))
+    return Response.json(readableTray(changeView(repo, actor, next, stagedView(privateStore, next), changePrivateTargets(repo, privateStore, next)), fileReader(c, repo)))
   })
 
-  app.get('/api/library', async c => c.json(await listEntries(repo)))
+  // 0.7.3 (review of round 3, I4): what was added and when is data/library.yaml's receipts; one it is kept from is told none.
+  const readsReceipts = (c: Context) => fileReader(c, repo)('data/library.yaml')
+  app.get('/api/library', async c => {
+    const list = await listEntries(repo)
+    return c.json(readsReceipts(c) ? list : { ...list, entries: list.entries.map(e => ({ ...e, added: [] })) })
+  })
   // The receipts' routes come before /api/library/:id, which would otherwise take "receipts" for an entry id.
   // 0.7.2 round 3 (review 6): the receipts are data/library.yaml's; one the `files` section keeps it from is answered as
   // for a route that is not there.
@@ -90,12 +100,16 @@ export function mountLibrary(app: Hono, { repo, withLock, notify, privateStore =
   app.get('/api/library/receipts/:id/removal', async c => {
     receiptsKept(c)
     const { actor, staged } = stagedBy(c)
-    return c.json(removalPreview(repo, actor, c.req.param('id'), staged))
+    return c.json(readablePreview(removalPreview(repo, actor, c.req.param('id'), staged), fileReader(c, repo)))
   })
   app.post('/api/library/receipts/:id/remove', async c => {
     const take = readRemoveBody(await c.req.text())
     const id = c.req.param('id')
-    findReceipt(repo, id) // the 404 comes before the lock and the 403, as Add's does
+    receiptsKept(c)
+    const receipt = findReceipt(repo, id) // the 404 comes before the lock and the 403, as Add's does
+    // 0.7.3: nor is a removal that touches a record of a kept file worked out (its asks would name what was edited there).
+    const unread = unreadPaths([...receipt.created, ...(receipt.modified ?? [])].map(r => ({ op: 'delete', record: r.record })), fileReader(c, repo))
+    if (unread.length > 0) throw unreadRefusal(unread)
     return stageInto(c, staged => removeOps(repo, id, take, staged))
   })
 
@@ -104,11 +118,28 @@ export function mountLibrary(app: Hono, { repo, withLock, notify, privateStore =
     const entry = find(c.req.param('id'))
     // Needs and ids are read through the actor's own change.
     const { actor, staged } = stagedBy(c)
-    return c.json(await previewEntry(repo, entry, actor, staged))
+    const preview = await previewEntry(repo, entry, actor, staged)
+    return c.json(readsReceipts(c) ? preview : { ...preview, receipts: [] })
   })
   app.post('/api/library/:id/add', async c => {
     const config = readAddBody(await c.req.text())
     const entry = find(c.req.param('id'))
     return stageInto(c, staged => addOps(repo, entry, config, staged.filter(isRecordOp)).ops)
   })
+}
+
+/** 0.7.3: a removal's preview as `may` lets it be read: no record of a file kept from the reader, nor a referrer in one, nor
+ *  an ask about one. What the removal would do there is not theirs to know; Remove refuses such a receipt (422). */
+function readablePreview<P extends { records: { record: string; referrers: string[] }[]; asks: string[] }>(p: P, may: FileReader): P {
+  if (may.all) return p
+  const reads = (ref: string): boolean => {
+    // A referrer in governance.yaml is named `governance.yaml:<field>`; any other is `<registry>:<id>`.
+    if (ref.startsWith('governance.yaml:')) return may('data/governance.yaml')
+    return may.records === undefined || may.records(ref)
+  }
+  return {
+    ...p,
+    records: p.records.filter(r => reads(r.record)).map(r => ({ ...r, referrers: r.referrers.filter(reads) })),
+    asks: p.asks.filter(reads),
+  }
 }

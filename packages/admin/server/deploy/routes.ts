@@ -23,6 +23,7 @@ import { registriesOf } from '../registries.ts'
 import { gateRegistryEntries, Levels } from '../visibility/gate.ts'
 import { noStore, reach, refuseHeldByMove, splitOps, stagedPrivate, stagedView, stagePrivate, unavailable, type PrivateAccess, type StagedPrivateOp } from '../private/ops.ts'
 import { privateReads, strictPrivateReads } from '../private/reads.ts'
+import { fileReader, readableTray } from '../workspace/reads.ts'
 import { compositionOf, type Composition } from '../../lib/compose.mjs'
 import type { PseudoDriver, SystemReader } from '../systems/reader.ts'
 import { DEPLOY_DRIVER, NOTHING_COMPOSED, STAGED_ONLY, daoUriOf, deployHooks, isRefusal, prepareDeployment, readDeployment, type DeployRefusal } from './prepare.ts'
@@ -223,7 +224,7 @@ export function mountDeploy(app: Hono, { repo, systems, withLock, notify, privat
         const saved: Change = { ...rest, ...(placeholders?.length ? { private: placeholders } : {}), ops: next, updated: new Date().toISOString() }
         changes.save(saved)
         notify({ type: 'changes' })
-        return c.json({ readBack: shown, staged: ops, change: changeView(repo, actor, saved, stagedView(privateStore, saved), changePrivateTargets(repo, privateStore, saved)),
+        return c.json({ readBack: shown, staged: ops, change: readableTray(changeView(repo, actor, saved, stagedView(privateStore, saved), changePrivateTargets(repo, privateStore, saved)), fileReader(c, repo)),
           ...(note ? { note } : {}) })
       } catch (err) {
         if (err instanceof StageRefusal) return c.json({ errors: err.errors, readBack: shown }, 422)

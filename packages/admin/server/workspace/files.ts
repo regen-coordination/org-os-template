@@ -435,7 +435,9 @@ export function fileOpErrors(repo: string, op: FileOp): RecordError[] {
     if (op.path === 'data/visibility.yaml') {
       const governance = governanceOf(fileText(repo, 'data/governance.yaml'))
       const roles = governance && typeof governance.roles === 'object' && governance.roles !== null ? Object.keys(governance.roles) : []
-      const ctx = { registries: registriesOf(repo).map(d => d.name), roles, tree: membershipTree(governance, entriesNow(repo, 'systems'))?.tree ?? null }
+      const defs = registriesOf(repo)
+      const ctx = { registries: defs.map(d => d.name), roles, tree: membershipTree(governance, entriesNow(repo, 'systems'))?.tree ?? null,
+        files: Object.fromEntries(defs.flatMap(d => (d.file ? [[d.name, d.file]] : []))) }
       const docOf = (text: string | null) => { try { return text === null ? {} : parseDocument(text).toJS() } catch { return {} } }
       const was = new Set(checkVisibilityPolicy(docOf(now), ctx).filter(p => p.level === 'error').map(problemsKey))
       for (const p of checkVisibilityPolicy(docOf(op.text), ctx)) {

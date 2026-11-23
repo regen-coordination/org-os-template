@@ -20,6 +20,7 @@ import type { SystemReader } from '../systems/reader.ts'
 import { readConfig, type VisibilityPolicy } from './config.ts'
 import { isObj, Levels, MEMBERS_ONLY, PUBLIC_VIEWER } from './gate.ts'
 import { admits, hatsAbove, parseLevel, type Viewer } from '../../lib/visibility.mjs'
+import { atTheMachine, isAtTheMachine } from '../workspace/reads.ts'
 import { hatRef, inTree, parseHatRef, parseTreeRef } from '../../lib/hats.mjs'
 
 export interface VisibilityAnswer {
@@ -158,11 +159,15 @@ export function mountVisibility(app: Hono, d: VisibilityDeps): void {
 export function connectionViewer(d: RequestDeps): (cookie: string | undefined) => Promise<Viewer> {
   const probe = new Hono()
   probe.use('*', withRequest(d))
-  probe.get('*', (c: Context) => c.json(viewerOf(c)))
+  // 0.7.3 (review of round 3, I3): whether it is the person at the machine's is said as data, since JSON keeps no mark; this
+  // probe is in-process only, never mounted on the server.
+  probe.get('*', (c: Context) => { const viewer = viewerOf(c); return c.json({ viewer, machine: isAtTheMachine(viewer) }) })
   return async cookie => {
     try {
       const res = await probe.request('http://localhost/api/events', { headers: cookie ? { cookie } : {} })
-      return res.ok ? (await res.json()) as Viewer : PUBLIC_VIEWER
+      if (!res.ok) return PUBLIC_VIEWER
+      const { viewer, machine } = (await res.json()) as { viewer: Viewer; machine: boolean }
+      return machine ? atTheMachine(viewer) : viewer
     } catch { return PUBLIC_VIEWER }
   }
 }

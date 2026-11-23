@@ -34,7 +34,7 @@ import { displayNames, membersHold, readLabels } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads, strictPrivateReads } from '../private/reads.ts'
-import { mayReadRecordsOf, registryFileLevel } from './reads.ts'
+import { fileReader, mayReadRecordsOf, refuseUnreadRegistry, registryFileLevel, type FileReader } from './reads.ts'
 import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, MEMBERS as MEMBERS_LEVEL, NOBODY } from '../visibility/gate.ts'
@@ -729,7 +729,7 @@ function linkOf(t: Target): Record<string, string> {
  * id (`t-<12 hex>`, §4.5), and no commit: no text written at a stricter level reaches git, in the task or its message. With
  * no such level (a hat and a role, neither within the other): 409, naming nothing. The caller holds the write lock.
  */
-export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: KnownActor, deps: ConversationDeps & { notify?: (msg: { type: 'changes' }) => void },
+export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: KnownActor, deps: ConversationDeps & { notify?: (msg: { type: 'changes' }) => void; may?: FileReader },
   floor: readonly (string | null)[] = [row.writtenLevel]):
   Promise<{ task: string; commit: string } | { task: string; staged: true } | { task: string; visibility: string }> {
   if (row.deleted) throw new HttpError(409, DELETED_NO_TASK, 'DELETED')
@@ -747,6 +747,8 @@ export async function turnIntoTask(row: CommentRow, info: TargetInfo, actor: Kno
   const title = plainLine(guarded.body)
   const link = linkOf(row.target as Target)
   if (inGit) {
+    // 0.7.3 (review of round 3, I1): a task in a file kept from the asker is not made, and no id of it is read.
+    if (deps.may) refuseUnreadRegistry(deps.repo, deps.may, 'tasks')
     let taken: Set<string>
     try { taken = new Set(currentEntries(deps.repo, 'tasks').map(e => String(e.id))) } catch { taken = new Set() }
     const base = slugOf(title)
@@ -966,7 +968,7 @@ export function mountConversation(app: Hono, deps: ConversationRoutesDeps): void
       const { row, info, rows } = visibleComment(store, c.req.param('id'), viewer)
       // R4c 2: a second conversion is refused as before; a task the viewer may not read is not named by its refusal.
       if (row.task && !row.deleted && !shownTo(repo, store, viewer).task(row.task)) throw new HttpError(409, TASK_ALREADY_UNNAMED, 'TASKED')
-      const out = await turnIntoTask(row, info, actor, { repo, store, membership, now, notify: msg => deps.notify?.(msg) }, floorOf(row, rows))
+      const out = await turnIntoTask(row, info, actor, { repo, store, membership, now, notify: msg => deps.notify?.(msg), may: fileReader(c, repo) }, floorOf(row, rows))
       // Task 18 fix round 1: the comment keeps the task it became, so everyone admitted sees it and it is not made twice.
       await write(store, { comments: [{ ...row, task: out.task }] })
       notify(row.target as Target, floorOf(row, rows))

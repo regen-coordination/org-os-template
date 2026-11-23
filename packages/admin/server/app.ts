@@ -14,7 +14,7 @@ import { displayNames } from './session/names.ts'
 import type { Changed } from './resources/types.ts'
 import { noStore, reach, splitOps, type PrivateAccess } from './private/ops.ts'
 import { privateReads } from './private/reads.ts'
-import { fileReader, unreadPaths, unreadRefusal } from './workspace/reads.ts'
+import { fileReader, mayReadRecordsOf, unreadPaths, unreadRefusal } from './workspace/reads.ts'
 import { hostedWrites } from './hosted/writes.ts'
 import { instanceWrites, type InstanceWrites } from './hosted/instance-writes.ts'
 import { readConfig } from './visibility/config.ts'
@@ -160,13 +160,16 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
     const answer = gateRegistry(viewer, repo, name, lv)
     // DAO-OS L6 §10 (Task 14): asked with ?from, the collection and each record carry their from mark (`fromMark`); the
     // public is given none.
-    if (c.req.query('from') === undefined || viewer.kind !== 'member') return c.json(answer)
+    // 0.7.3 (M4): nor a member the `files` section keeps the registry's file from, who is given the public's view of it.
+    if (c.req.query('from') === undefined || viewer.kind !== 'member' || !mayReadRecordsOf(repo, viewer, name)) return c.json(answer)
     return c.json(await withFromMarks(answer, name, { repo, store: reach(privateStore).store, viewer, levels: lv, reads: cachedReads(viewer, lv, opts.systems, chainKept(repo, lv.config, privateStore, viewer)) }))
   })
   // Walk M5: the last commit of a record no adapter makes a Resource of (a task, a meeting), named as history names it,
   // for a record the viewer's gated registry holds; any other id is absent (404). Members only (not a public read).
   app.get('/api/registries/:name/:id/changed', async c => {
     const viewer = viewerOf(c), name = c.req.param('name'), id = c.req.param('id')
+    // 0.7.3: a record of a file the `files` section keeps from this member has no history to tell them, as for the public.
+    if (viewer.kind === 'member' && !mayReadRecordsOf(repo, viewer, name)) throw new HttpError(404, `No entry "${id}" in ${name}.`)
     const answer = gateRegistry(viewer, repo, name, levels())
     if (!(answer.entries ?? []).some(e => String((e as { id?: unknown }).id) === id)) throw new HttpError(404, `No entry "${id}" in ${name}.`)
     let changed: Changed | null = null

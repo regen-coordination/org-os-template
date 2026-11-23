@@ -392,7 +392,7 @@ function gitHoldsNothingPrivate(loaded, visibilityDoc, governance, systems, file
   if (visibilityDoc !== null) {
     const roles = isMap(governance?.roles) ? Object.keys(governance.roles) : []
     const tree = membershipTree(governance, systems)?.tree ?? null
-    for (const p of checkVisibilityPolicy(visibilityDoc, { registries: [...REGISTRIES.map(r => r.name), ...[...fileOf.keys()].filter(n => !REGISTRIES.some(r => r.name === n))], roles, tree })) {
+    for (const p of checkVisibilityPolicy(visibilityDoc, { registries: [...REGISTRIES.map(r => r.name), ...[...fileOf.keys()].filter(n => !REGISTRIES.some(r => r.name === n))], roles, tree, files: Object.fromEntries(fileOf) })) {
       out.push({ file: 'data/visibility.yaml', path: p.path, message: p.message, level: p.level })
     }
   }

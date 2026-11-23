@@ -43,6 +43,7 @@ import { readConfig } from '../visibility/config.ts'
 import { gitNames, heldMove, MOVE_PROPOSED, reach, storeAccess, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { narrow } from '../visibility/narrow.ts'
 import { levelOfToken, NO_PRIVATE, privateReads } from '../private/reads.ts'
+import { fileReader, refuseUnreadRegistry } from './reads.ts'
 import type { PrivateRecord, PrivateStore } from '../private/store.ts'
 import { admits, formatLevel, fullLevel, gitAllows, narrowerOrEqual, parseLevel, type ParsedLevel, type Viewer, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { refsOf } from '../../lib/workspace/markdown.mjs'
@@ -828,6 +829,8 @@ export function mountPages(app: Hono, deps: PagesDeps): void {
     const raw = await body(c)
     if (!isObj(raw) || typeof raw.title !== 'string' || raw.title.trim() === '' || typeof raw.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw.date)
       || (raw.type !== undefined && typeof raw.type !== 'string')) throw new HttpError(400, MEETING_BODY)
+    // 0.7.3 (review of round 3, I1): a meeting in a file kept from the asker is not made, and no id of it is read.
+    refuseUnreadRegistry(repo, fileReader(c, repo), 'meetings')
     return withLock(async () => c.json(await recordMeeting(repo, knownActorOf(c), viewerOf(c),
       { title: raw.title as string, date: raw.date as string, ...(raw.type !== undefined ? { type: raw.type as string } : {}) }, writeDeps()), 201))
   })
