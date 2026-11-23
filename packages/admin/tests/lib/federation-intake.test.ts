@@ -6,7 +6,7 @@ const random = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 5 + 
 const NOW = '2026-11-22T10:00:00.000Z'
 const join = (o: Record<string, unknown> = {}) => ({ policy: 'open-with-approval', types: [], asks: [], where: null, decision: null, ...o }) as never
 const req = (o: Record<string, unknown> = {}) => ({
-  from: { name: 'Mesa', type: 'LocalNode', url: 'https://github.com/m/m' }, answers: {}, ...o,
+  from: { name: 'Mesa', type: 'LocalNode', url: 'https://github.com/m/m' }, network: 'rio-net', answers: {}, ...o,
 }) as never
 
 describe('intakeOutcome', () => {
@@ -34,7 +34,7 @@ describe('intakeOutcome', () => {
     expect(intakeOutcome(join({ asks: ['constructor'] }), req({ answers: JSON.parse('{"constructor":"yes"}') }), [], NOW)).toEqual({ kind: 'propose' })
   })
   it('invite policy: without a match refuses, with one accepts by invite', () => {
-    const { record, token } = makeInvite({ name: 'Mesa', type: 'LocalNode', network: 'n', expires: '2026-12-22', random })
+    const { record, token } = makeInvite({ name: 'Mesa', type: 'LocalNode', network: 'rio-net', expires: '2026-12-22', random })
     const j = join({ policy: 'invite' })
     expect(intakeOutcome(j, req(), [record], NOW))
       .toEqual({ kind: 'refuse', reason: "This network joins by invite. This invite doesn't match." })

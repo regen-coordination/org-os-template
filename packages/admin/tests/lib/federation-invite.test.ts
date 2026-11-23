@@ -3,7 +3,7 @@ import { makeInvite, inviteMatch } from '../../lib/federation/invite.mjs'
 import { sha256Hex } from '../../lib/sha256.mjs'
 
 const random = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 7 + 3) % 256)
-const request = (type = 'LocalNode') => ({ from: { type } }) as never
+const request = (type = 'LocalNode', network = 'rio-net') => ({ from: { type }, network }) as never
 const NOW = '2026-11-22T10:00:00.000Z'
 const made = () => makeInvite({ name: 'Mesa Verde', type: 'LocalNode', network: 'rio-net', expires: '2026-12-22', random })
 
@@ -27,6 +27,7 @@ describe('invites', () => {
     expect(inviteMatch([record], token, request(), '2026-12-22T20:00:00.000Z')).toEqual({ invite: record })
     expect(inviteMatch([record], token, request('Cooperative'), NOW)).toEqual({ problem: 'This invite is for a LocalNode.' })
     expect(inviteMatch([record], 'wrong', request(), NOW)).toEqual({ problem: "This invite doesn't match." })
+    expect(inviteMatch([record], token, request('LocalNode', 'another-net'), NOW)).toEqual({ problem: 'This invite is for another network.' })
     expect(inviteMatch([record], undefined, request(), NOW)).toEqual({ problem: "This invite doesn't match." })
   })
 })

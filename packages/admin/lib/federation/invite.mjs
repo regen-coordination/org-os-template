@@ -26,7 +26,7 @@ export function makeInvite({ name, type, network, expires, random }) {
 /** The end of the expiry: a bare date is good through that whole day.  @param {string} expires @returns {number} */
 export const expiryTime = expires => new Date(/^\d{4}-\d{2}-\d{2}$/.test(expires) ? `${expires}T23:59:59.999Z` : expires).getTime()
 
-/** @param {readonly Invite[]} invites @param {string | undefined} token @param {{ from: { type: string } }} request
+/** @param {readonly Invite[]} invites @param {string | undefined} token @param {{ from: { type: string }, network: string }} request
  *  @param {string | Date} now @returns {{ invite: Invite } | { problem: string }} */
 export function inviteMatch(invites, token, request, now) {
   const hash = typeof token === 'string' && token !== '' ? sha256Hex(token) : null
@@ -35,5 +35,6 @@ export function inviteMatch(invites, token, request, now) {
   if (invite.used_by) return { problem: 'This invite has been used.' }
   if (!(new Date(now).getTime() <= expiryTime(invite.expires))) return { problem: 'This invite has expired.' }
   if (invite.type !== request.from.type) return { problem: `This invite is for a ${invite.type}.` }
+  if (invite.network !== request.network) return { problem: 'This invite is for another network.' }
   return { invite }
 }

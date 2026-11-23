@@ -17,11 +17,17 @@
 //     changes);
 //   - federation.yaml changes nothing but the requesting url's one peer entry. A new entry has exactly `hubPeerOf`'s shape
 //     (keys among name, url, type, trust, relationship, since, decision, did; trust read; relationship node; decision the
-//     Org-Decision; name, type and url the record's). An existing entry must already be a node, and only its decision (to
-//     the Org-Decision, where it had none), since and did may change. After the commit the entry holds a decision.
+//     Org-Decision; name, type and url the record's; did, when written, a DID). An existing entry must already be a node,
+//     and only its decision (to the Org-Decision) and did (a DID) may be added, each only where it had none. After the
+//     commit the entry holds a decision;
+//   - an acceptance meets the policy's own asks at the parent: the request's type is among `join.types` (when listed),
+//     and every `join.asks` has a non-empty answer; an invite is also for the record's network;
+//   - the records are a list: every record at the parent stays, in place and unchanged, and one is appended, whose
+//     from has a name, a type and a url.
 // Pure: parsed documents in, a sentence or null out. No node:* import.
 
 import { expiryTime } from './invite.mjs'
+import { DID_PATTERN } from './read.mjs'
 
 export const JOIN_RULE = 'federation/join'
 export const JOIN_FILES = Object.freeze(['federation.yaml', 'data/federation-requests.yaml', 'data/invites.yaml'])
@@ -54,18 +60,18 @@ export function joinCommitProblem({ files, decision, date, before, after }) {
   if (others.length > 0) return `it changes ${others.join(', ')}, where a hub's act on a join request changes only ${JOIN_FILES.join(', ')}`
   if (!files.includes('data/federation-requests.yaml')) return 'it records no join request in data/federation-requests.yaml'
 
-  // exactly one new record; none changed or removed
-  const was = new Map(listOf(before.requests, 'requests').map(r => [String(r.id), r]))
-  const now = listOf(after.requests, 'requests')
-  const nowIds = new Set(now.map(r => String(r.id)))
-  if ([...was.keys()].some(id => !nowIds.has(id))) return 'it removes a join request record'
-  if (now.some(r => was.has(String(r.id)) && !same(was.get(String(r.id)), r))) {
-    return 'it changes a recorded join request, which only the hub operator does, under their own rule'
+  // the records as a list: every one at the parent kept, in place and unchanged (duplicates included), and one appended
+  const was = isObj(before.requests) && Array.isArray(before.requests.requests) ? before.requests.requests : []
+  const now = isObj(after.requests) && Array.isArray(after.requests.requests) ? after.requests.requests : []
+  if (now.length < was.length || was.some((r, i) => !same(r, now[i]))) {
+    return 'it removes or changes a recorded join request, which only the hub operator does, under their own rule'
   }
-  const added = now.filter(r => !was.has(String(r.id)))
-  if (added.length !== 1) return `it adds ${added.length} join request records, where one act records one`
-  const record = added[0]
+  if (now.length !== was.length + 1) return `it adds ${now.length - was.length} join request records, where one act records one`
+  const record = now[now.length - 1]
+  if (!isObj(record)) return 'the record it adds is not a mapping'
+  if (was.some(r => isObj(r) && r.id === record.id)) return `it records the request ${String(record.id)} a second time`
   const recFrom = isObj(record.from) ? record.from : {}
+  if (!['name', 'type', 'url'].every(k => typeof recFrom[k] === 'string' && recFrom[k] !== '')) return "its record's from has no name, type and url"
 
   // anything but a refusal names a network the hub lists (a refusal may say it lists none by that name)
   const networks = isObj(before.fed) && Array.isArray(before.fed.networks) ? before.fed.networks.filter(isObj).map(n => n.name) : []
@@ -93,6 +99,14 @@ export function joinCommitProblem({ files, decision, date, before, after }) {
   const standing = join !== null && join.policy === 'open' && !absent(join.decision) && String(join.decision) === decision
   const inviteId = /^invite (i-[0-9a-f]{8})$/.exec(decision)?.[1]
   if (!standing && inviteId === undefined) return `its Org-Decision (${decision}) is neither join.decision at its parent nor an invite`
+  // what the policy asks, at the parent, as the server's intake asks it (lib/federation/intake.mjs)
+  const types = join !== null && Array.isArray(join.types) ? join.types : []
+  if (types.length > 0 && !types.includes(recFrom.type)) return `the hub takes ${types.join(', ')} at its parent, and the request is from a ${String(recFrom.type)}`
+  const answers = isObj(record.answers) ? record.answers : {}
+  for (const ask of join !== null && Array.isArray(join.asks) ? join.asks : []) {
+    const answer = Object.hasOwn(answers, ask) ? answers[ask] : undefined
+    if (typeof answer !== 'string' || answer.trim() === '') return `its record leaves "${String(ask)}" unanswered, which the hub asks at its parent`
+  }
   if (standing && invitesChanged) return 'it accepts under a standing decision and still changes data/invites.yaml'
   if (!standing) {
     if (join === null || join.policy !== 'invite') return 'it accepts by invite where the hub does not join by invite at its parent'
@@ -101,6 +115,7 @@ export function joinCommitProblem({ files, decision, date, before, after }) {
     const invAfter = listOf(after.invites, 'invites')
     const used = invBefore.find(i => i.id === inviteId)
     if (!used || !absent(used.used_by)) return `the invite ${inviteId} was not unused at its parent`
+    if (used.network !== record.network) return `the invite ${inviteId} is for another network than the record's`
     if (used.type !== recFrom.type) return `the invite ${inviteId} is for the type ${String(used.type)}, and the request's type is ${String(recFrom.type)}`
     const expires = typeof used.expires === 'string' ? expiryTime(used.expires) : NaN
     if (!(new Date(date).getTime() <= expires)) return `the invite ${inviteId} had expired at the commit's date`
@@ -131,17 +146,19 @@ export function joinCommitProblem({ files, decision, date, before, after }) {
     if (peer.trust !== 'read') return `its new peer entry has trust ${String(peer.trust)}, where an acceptance gives read`
     if (peer.relationship !== 'node') return `its new peer entry has relationship ${String(peer.relationship)}, where an acceptance makes a node`
     if (peer.decision !== decision) return `its new peer entry's decision (${String(peer.decision)}) is not its Org-Decision`
+    if (peer.did !== undefined && !(typeof peer.did === 'string' && DID_PATTERN.test(peer.did))) return 'its new peer entry\'s did is not a DID'
     for (const key of ['name', 'type', 'url']) {
       if (peer[key] !== recFrom[key]) return `its new peer entry's ${key} is not the one its record holds`
     }
     return null
   }
-  // an existing entry: already a node; only decision (where it had none), since and did change
+  // an existing entry: already a node; only decision and did change, each only where it had none (the server fills a
+  // missing did on an acceptance, which is the only commit that touches an existing entry here)
   const old = /** @type {Record<string, unknown>} */ (mineBefore[0])
   if (old.relationship !== 'node') return `it gives a decision to the requesting instance's peer entry, whose relationship is ${String(old.relationship ?? 'none')}, not node`
   for (const key of new Set([...Object.keys(old), ...Object.keys(peer)])) {
     if (same(old[key], peer[key])) continue
-    if (key === 'since' || (key === 'did' && absent(old.did))) continue
+    if (key === 'did' && absent(old.did) && typeof peer.did === 'string' && DID_PATTERN.test(peer.did)) continue
     if (key === 'decision' && absent(old.decision) && peer.decision === decision) continue
     return `it changes ${key} on the existing peer entry of the requesting instance`
   }
