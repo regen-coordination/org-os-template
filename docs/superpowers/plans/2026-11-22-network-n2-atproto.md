@@ -29,6 +29,8 @@
 
 ## Decisions for Luiz
 
+**Decided 2026-11-22: all eight as recommended, plus the technical defaults** (the operator: "your recommendations to all"). The live pilot (3) is a separate go once its three conditions hold; ReFi DAO publishes from its Certified organisation account (5).
+
 Answer "as recommended" to take all eight.
 
 **Carried over from the 11-10 plan, restated in light of atproto:**
