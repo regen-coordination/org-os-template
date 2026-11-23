@@ -6,6 +6,13 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
+_(Append changes here as they land.)_
+
+## [0.7.2] — 2026-11-23
+
+**0.7.2 lets an instance say which Roles read which data files, and keeps a kept file's records from those it is kept
+from wherever the house reads them.** An instance without a `files:` section sees 0.7.1 unchanged.
+
 ### Added
 
 - **Raw file reads by Role** (`packages/admin`, 0.7.2). An optional `files:` section in `data/visibility.yaml` says who
@@ -20,7 +27,8 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
   ```
   - A level is `members`, `role:<Role>` (the Roles table's: `steward`, `node-lead`, `network-member`) or `hat:<hat ref>`.
     A path takes its own level, else the longest `data/<folder>/**` holding it, else `default`, so a file added later is
-    held at the default until listed. A token that can't be read admits nobody.
+    held at the default until listed. A token that can't be read admits nobody. The canon is read as one: `data/kb/**`
+    may be listed, a path inside it may not.
   - It governs `GET /api/files` and everything that takes its reader: `/api/editors`' `readable`, staging and Keep mine
     on that path, the ledger read whole (C2), proposal diffs and file ops.
   - `GET /api/registries`, `/api/registries/:name` (and `…/:id/changed`) and the map (`/api/resources`) give a member
@@ -29,7 +37,13 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
     member: no thread, no anchor matched against its text, no notification naming it), `GET /api/governance`, member
     names wherever they are said (`displayNames`), the knowledge routes (the canon is `data/kb/**`), proposals (the
     ledger, and record ops on a kept registry withheld as file ops are), and the staging tray (a record op on a kept
-    registry is refused as a path no rule governs).
+    registry is refused as a path no rule governs, and one staged before the file was kept is shown withheld).
+  - The @ picker (`/api/mentionables`) offers a record only from a file every reader of the target may read. Presence
+    (its route and its WebSocket event) and the map's `changed.by` say a member's name only to a viewer who may read the
+    members file; a presence event on a record of a kept file is not sent to one it is kept from. System actions
+    (`/api/systems/:id/actions`), the library's receipts and the import list on `/api/sources` follow their files.
+  - A write to a record of a kept file (`/api/registries/…`, `/api/workspace/records`, Keep mine in the tray) is refused
+    before the record is read, so its answer says nothing of whether the id is there.
   - `role:` is judged against the viewer's Roles-table Roles (`hubRoles`, set for a person signed in by emailed link),
     never a governance role of the same name. A wallet session holds none, so it reads only `members` and `hat:` paths.
   - Left to the house, as its own configuration, whatever `files` says of their files: `/api/boards`,

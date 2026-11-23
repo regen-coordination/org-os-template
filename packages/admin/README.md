@@ -1117,6 +1117,31 @@ nodes }] }`, as `schemas/roles-doc.schema.json` describes. The Roles are `stewar
 `network-member`. Loading replaces the whole table. The command prints counts only: no name, id or key. A document
 containing an address (anything with `@`) is refused. The org builds the document from its own records.
 
+### Which data files a Role reads: `files:` (0.7.2)
+
+Without it, every member with a Role reads every `data/**` file whole. With it, `data/visibility.yaml` says who does:
+
+```yaml
+visibility:
+  files:
+    default: role:steward             # every data/** path not listed
+    paths:
+      data/projects.yaml: members
+      data/kb/**: members             # a folder
+```
+
+- A level is `members`, `role:<Role>` (this table's Roles) or `hat:<hat ref>`. A path takes its own level, else the
+  longest folder holding it, else `default`. A token that can't be read admits nobody; `public` is refused. The canon is
+  read as one: list `data/kb/**`, never a path inside it.
+- A member a file is kept from gets that file's records as the public gets them, wherever they are read: the
+  registries, the map, comments and mentions, presence, governance, names, the knowledge routes, proposals and the tray.
+  Their writes to such a record are refused before it is read.
+- The person at the machine is never held back by it. A section or file that can't be read closes every data file.
+- Removing the section, or widening a level, is a publication. A key that would open a file with field levels below
+  `role:steward` is refused: a file is read whole.
+- The house's own configuration stays readable to members through `/api/boards`, `/api/collections`,
+  `/api/visibility` and `/api/standards`.
+
 ### The session key: `npm run -s house:session-key`
 
 - `-- new` prints a private Ed25519 JWK on one line and nothing else. Put it in `HOUSE_SESSION_PRIVATE_JWK`.
