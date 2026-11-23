@@ -35,8 +35,8 @@ describe('request transports', () => {
   it('atproto is labelled as a public route', () => {
     expect(transportOf('atproto')!.label).toBe('Publish a request (public)')
   })
-  it('github is a placeholder until its own task', () => {
-    expect(transportOf('github')!.unavailable(null, null)).toBe('Not built yet.')
+  it('github is the real transport', () => {
+    expect(transportOf('github')!.unavailable(null, null)).toBe("This hub doesn't take requests on GitHub.")
   })
   it('a sixth transport is found and listed with no caller change, and removes itself', async () => {
     const fake: Transport = {
