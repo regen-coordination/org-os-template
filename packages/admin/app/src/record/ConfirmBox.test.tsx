@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import ConfirmBox, { quoteArg, commandLine } from './ConfirmBox.tsx'
+import ConfirmBox, { quoteArg, commandLine, outsideSentence } from './ConfirmBox.tsx'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import type { OperationInfo, Resource } from '../api.ts'
 
@@ -121,5 +121,45 @@ describe('ConfirmBox', () => {
     expect(calls.filter(c => c.path === '/api/jobs')).toHaveLength(1)
     await act(async () => { ran() })
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('an in-process plan that reaches the network (R16: confirm what will actually happen)', () => {
+  const self: Resource = { id: 'instance:fixture', kind: 'instance', board: 'systems', name: 'Fixture', status: null, attention: null, changed: null, facts: { self: true }, source: null }
+  const inProcess = (op: string, summary: string) => ({ op, resource: self.id, inProcess: true, cmd: null, args: [], writes: [], timeoutMs: 300000, confirm: true, nonce: 'n9', summary })
+  const netOp = (id: string, label: string, effect: 'reads' | 'changes', preset: Record<string, unknown> | null = null): OperationInfo =>
+    ({ id, label, effect, network: true, confirm: true, preset, unavailable: null, params: { type: 'object' } })
+
+  it('publish-links shows the plan\'s summary and that it writes to atproto, never "reads only" or "writes nothing"', async () => {
+    fetchRoutes({ 'POST /api/operations/federation.publish-links/plan': inProcess('federation.publish-links', 'Publish 1 link and withdraw 1. 1 peer is kept private.') })
+    render(<ConfirmBox op={netOp('federation.publish-links', 'Publish links', 'changes')} resource={self} onDone={() => {}} onCancel={() => {}} />)
+    const dialog = screen.getByRole('dialog', { name: 'Publish links' })
+    expect(await within(dialog).findByText('Publish 1 link and withdraw 1. 1 peer is kept private.')).toBeTruthy()
+    expect(within(dialog).getByText('This writes to atproto.')).toBeTruthy()
+    expect(dialog.textContent).not.toMatch(/reads only|writes nothing/)
+  })
+
+  it('send shows the plan\'s summary and that it sends the request to the hub', async () => {
+    const summary = 'Send as a GitHub issue: your request to join Mesh, to Mesh Hub. It changes no file of yours.'
+    fetchRoutes({ 'POST /api/operations/federation.send/plan': inProcess('federation.send', summary) })
+    render(<ConfirmBox op={netOp('federation.send', 'Send "Mesh": Send as a GitHub issue', 'changes', { id: 'x', transport: 'github' })} resource={self} onDone={() => {}} onCancel={() => {}} />)
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByText(summary)).toBeTruthy()
+    expect(within(dialog).getByText('This posts to GitHub.')).toBeTruthy()
+    expect(dialog.textContent).not.toMatch(/reads only|writes nothing/)
+  })
+
+  it('a send by file says it saves a file; any other change outside the repository says it reaches the network', () => {
+    expect(outsideSentence({ id: 'federation.send', effect: 'changes', network: true }, { transport: 'file' })).toBe('This saves the request as a file for you to send.')
+    expect(outsideSentence({ id: 'federation.reply', effect: 'changes', network: true })).toBe('This answers them where their request came from.')
+    expect(outsideSentence({ id: 'share', effect: 'changes', network: true })).toBe('This reaches the network and changes things outside this repository.')
+    expect(outsideSentence({ id: 'federation.check-links', effect: 'reads', network: true })).toBeNull()
+  })
+
+  it('a genuinely read-only in-process op keeps its words', async () => {
+    fetchRoutes({ 'POST /api/operations/federation.check-links/plan': inProcess('federation.check-links', 'read the federation.json of each peer: a download, it changes no file') })
+    render(<ConfirmBox op={netOp('federation.check-links', 'Check links', 'reads')} resource={self} onDone={() => {}} onCancel={() => {}} />)
+    expect(await screen.findByText('inside the server (reads only)')).toBeTruthy()
+    expect(screen.getByText('writes nothing · timeout 300 s')).toBeTruthy()
   })
 })

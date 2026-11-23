@@ -220,6 +220,8 @@ describe('Published links', () => {
     fireEvent.click(await within(pub).findByRole('button', { name: 'Publish links' }))
     const dialog = await screen.findByRole('dialog', { name: 'Publish links' })
     expect(within(dialog).getByText('Publish 1 link and withdraw 1. 1 peer is kept private.')).toBeTruthy()
+    expect(within(dialog).getByText('This writes to atproto.')).toBeTruthy()
+    expect(dialog.textContent).not.toMatch(/reads only/)
     expect(calls.filter(c => c.method === 'POST').map(c => c.path)).toEqual(['/api/operations/federation.publish-links/plan'])
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/api/jobs')).toBe(true))

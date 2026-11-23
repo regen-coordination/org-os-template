@@ -122,6 +122,12 @@ describe('the saved request file (Task 8\'s invited file send)', () => {
     expect(res.headers.get('content-disposition')).toBe('attachment; filename="join-request-3f8a2c1e.yaml"')
     expect(res.headers.get('cache-control')).toBe('no-store')
     expect(await res.text()).toContain('invite: tok-SECRET')
+    // Path-safe: only a request id reaches the state folder.
+    expect((await app.request(`/api/federation/outgoing/${encodeURIComponent(`../${ID}`)}/request-file`)).status).toBe(404)
+    expect((await app.request(`/api/federation/outgoing/${encodeURIComponent('../../etc/passwd')}/request-file`)).status).toBe(404)
+    // Members only: a git identity no member holds is refused before anything is read.
+    git('config', 'user.email', 'stranger@example.test')
+    expect((await app.request(`/api/federation/outgoing/${ID}/request-file`)).status).toBe(403)
   })
 })
 

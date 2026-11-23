@@ -17,6 +17,7 @@ import { StatusMark, type Mark } from '../design/StatusMark.tsx'
 import { announce } from '../parts/live.tsx'
 import { Refusal } from '../parts/SyncParts.tsx'
 import JobLog from '../record/JobLog.tsx'
+import { outsideSentence } from '../record/ConfirmBox.tsx'
 import { useCanWrite } from '../viewAs/ViewAs.tsx'
 import { isPublicUrl } from '../../../lib/federation/peers.mjs'
 import {
@@ -47,6 +48,9 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '')
 const opNamed = (ops: OperationInfo[] | undefined, id: string, preset?: Record<string, unknown>): OperationInfo | undefined =>
   ops?.find(o => o.id === id && (!preset || Object.entries(preset).every(([k, v]) => o.preset?.[k] === v)))
 
+/** The page's operations that change something outside the repository (the rest only read): their confirm says where. */
+const CHANGES = new Set(['federation.publish-links', 'federation.send', 'federation.reply'])
+
 const STATE_MARK: Record<string, Mark> = { mutual: 'ok', requested: 'open', claimed: 'needs', left: 'closed', 'not-an-instance': 'stale' }
 
 // ── confirmed operations: plan, the operator confirms its words, then the job with the plan's nonce ──────────
@@ -62,7 +66,7 @@ interface Runner {
  *  runs until the operator confirms that summary; the job is then followed to its end, and the cards are read again. */
 function useRunner(self: Resource | undefined): Runner {
   const qc = useQueryClient()
-  const [asking, setAsking] = useState<{ place: string; label: string; plan: PlanReply; after?: () => void } | null>(null)
+  const [asking, setAsking] = useState<{ place: string; label: string; plan: PlanReply; outside: string | null; after?: () => void } | null>(null)
   const [planning, setPlanning] = useState<string | null>(null)
   const [refused, setRefused] = useState<{ place: string; text: string } | null>(null)
   const [job, setJob] = useState<{ place: string; id: string; after?: () => void } | null>(null)
@@ -84,7 +88,8 @@ function useRunner(self: Resource | undefined): Runner {
     if (!self || planning !== null) return
     setRefused(null); setPlanning(place)
     api.plan(op, self.id, params)
-      .then(plan => setAsking({ place, label, plan, after }), (err: unknown) => setRefused({ place, text: message(err) }))
+      .then(plan => setAsking({ place, label, plan, after, outside: outsideSentence({ id: op, effect: CHANGES.has(op) ? 'changes' : 'reads', network: true }, params) }),
+        (err: unknown) => setRefused({ place, text: message(err) }))
       .finally(() => setPlanning(null))
   }
   const confirm = async () => {
@@ -100,7 +105,8 @@ function useRunner(self: Resource | undefined): Runner {
   }
   const dialog = asking && (
     <ConfirmDialog title={asking.label} confirm="Confirm" onCancel={() => setAsking(null)} onConfirm={() => void confirm()}
-      body={<><p>{asking.plan.summary ?? 'It reaches the network and changes no file.'}</p><p className="ops-k">Nothing is sent until you confirm.</p></>} />
+      body={<><p>{asking.plan.summary ?? 'It reaches the network and changes no file.'}</p>{asking.outside && <p>{asking.outside}</p>}
+        <p className="ops-k">Nothing is sent until you confirm.</p></>} />
   )
   return {
     start, dialog,
