@@ -15,6 +15,9 @@ describe('schemas/change-classes.json', () => {
       { path: 'IDENTITY.md', class: 'identity' },
       { path: 'federation.yaml', class: 'identity' },
       { path: '.well-known/**', class: 'identity' },
+      { registry: 'federation-requests', class: 'identity' },
+      { registry: 'invites', class: 'identity' },
+      { path: 'federation/**', class: 'identity' },
       { registry: 'visibility', class: 'publication' },
       { registry: '*', class: 'records' },
     ])

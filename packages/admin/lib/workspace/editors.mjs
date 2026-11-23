@@ -29,6 +29,8 @@ const RECORDS = ['projects', 'ideas', 'funding-opportunities', 'relationships', 
 export const EDITORS = Object.freeze([
   row('.well-known/**', 'identity', 'generated'),
   row('data/proposals.yaml', null, 'ledger'),
+  row('data/federation-requests.yaml', 'identity', 'ledger'),
+  row('data/invites.yaml', 'identity', 'source'),
   row('DECISIONS.md', null, 'ratify'),
   row('data/members.yaml', 'members', 'record'),
   ...RECORDS.map(name => row(`data/${name}.yaml`, 'records', 'record')),
@@ -47,6 +49,7 @@ export const EDITORS = Object.freeze([
   row('data/imports.yaml', 'workspace', 'source'),
   row('IDENTITY.md', 'identity', 'source'),
   row('federation.yaml', 'identity', 'source'),
+  row('federation/**', 'identity', 'source'),
   row('pages/**', 'workspace', 'page'),
   // The agent layer: read by its deciders only (PR7-R91).
   row('memory/**', 'workspace', 'source', 'deciders'),

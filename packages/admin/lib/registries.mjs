@@ -53,6 +53,10 @@ export const REGISTRIES = [
   // written whole by the import command (scripts/import.ts) in its one commit, or by the source editor, never entry by
   // entry. Counts and reasons only, never the name of a private item.
   { name: 'imports', topKey: 'imports', kind: 'document' },
+  // N2 (spec §14 R13, R14, R18): the requests a hub has received, a ledger written only by the federation routes, and
+  // the invites it has made, which hold a token's hash and never the token.
+  { name: 'federation-requests', topKey: 'requests', kind: 'collection', ledger: true },
+  { name: 'invites', topKey: 'invites', kind: 'collection' },
   // 0.6 (P2 spec §3.1): proposals and their events. A ledger: only the proposal routes write it.
   { name: 'proposals', topKey: 'proposals', kind: 'collection', ledger: true },
   // DAO-OS L1 (ruling L1-R1): the library's receipts, one per entry added. Class `records`; written only

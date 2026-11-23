@@ -18,7 +18,14 @@ describe('the registry list', () => {
   })
   it('holds proposals, a ledger collection under `proposals:` (P2 §3.1): only its own routes write it', () => {
     expect(registryDef('proposals')).toEqual({ name: 'proposals', topKey: 'proposals', kind: 'collection', ledger: true })
-    expect(REGISTRIES.filter(r => r.ledger).map(r => r.name)).toEqual(['proposals'])
+    expect(REGISTRIES.filter(r => r.ledger).map(r => r.name)).toEqual(['federation-requests', 'proposals'])
+  })
+  it('holds federation-requests, a ledger, and invites, a plain collection, both class identity (N2)', () => {
+    expect(registryDef('federation-requests')).toEqual({ name: 'federation-requests', topKey: 'requests', kind: 'collection', ledger: true })
+    expect(registryDef('invites')).toEqual({ name: 'invites', topKey: 'invites', kind: 'collection' })
+    for (const registry of ['federation-requests', 'invites']) expect(classOf({ registry })).toBe('identity')
+    expect(classOf({ path: 'federation/outgoing/x.yaml' })).toBe('identity')
+    expect(classOf({ path: 'data/invites.yaml' })).toBe('identity')
   })
   it('holds library, the receipts: a records collection under `installed:` after proposals, not a ledger (DAO-OS L1)', () => {
     expect(registryDef('library')).toEqual({ name: 'library', topKey: 'installed', kind: 'collection' })

@@ -11,7 +11,9 @@ import { readFederation } from './read.mjs'
 /** @typedef {{ resolve(base: string, rel: string): string, isDir(abs: string): boolean,
  *   readFederationAt(abs: string): { found: false } | { found: true, doc: unknown } | { found: true, error: string } }} PeerIO */
 
-export const LINK_STATES = Object.freeze(['mutual', 'claimed', 'not-an-instance', 'unknown'])
+// `requested` and `left` are not computed here: this file reads the local folder only and gives the files reading of
+// the other side. The combiner (Task 4) adds the request record and the atproto records and gives the final state.
+export const LINK_STATES = Object.freeze(['mutual', 'claimed', 'requested', 'left', 'not-an-instance', 'unknown'])
 
 /** @param {string} s */
 const decode = s => { try { return decodeURIComponent(s) } catch { return s } }

@@ -1,4 +1,4 @@
-import { it, expect } from 'vitest'
+import { it, expect, describe } from 'vitest'
 import { readFederation, JOIN_POLICIES } from '../../lib/federation/read.mjs'
 
 it('reads legacy network + hub as a string into one network', () => {
@@ -34,7 +34,7 @@ it("accepts trust read-write (real instances use it) and warns on a value it doe
 })
 it('reads join on a hub node', () => {
   expect(readFederation({ join: { policy: 'open-with-approval', types: ['LocalNode'], asks: ['operator', 'portal'], where: 'https://github.com/ReFiDAO/refi-dao-os' } }).join)
-    .toEqual({ policy: 'open-with-approval', types: ['LocalNode'], asks: ['operator', 'portal'], where: 'https://github.com/ReFiDAO/refi-dao-os' })
+    .toEqual({ policy: 'open-with-approval', types: ['LocalNode'], asks: ['operator', 'portal'], where: 'https://github.com/ReFiDAO/refi-dao-os', decision: null })
 })
 it('drops a join whose policy is unknown, with the four policies named', () => {
   const r = readFederation({ join: { policy: 'maybe' } })
@@ -97,4 +97,43 @@ it('warns on a networks item with no name, 1-based, and skips it', () => {
     'federation.yaml: networks #2 has no name; it is skipped.',
     'federation.yaml: networks #3 has no name; it is skipped.',
   ])
+})
+
+const DIDP = 'did:plc:abcdefghijklmnopqrstuvwx'
+describe('did, link, requested and join.decision', () => {
+  it('reads did and link on a peer, and requested and join.decision', () => {
+    const r = readFederation({
+      identity: { name: 'X', did: DIDP },
+      join: { policy: 'open', decision: 'LD-7' },
+      peers: [{ name: 'A', did: 'did:web:a.example.org', link: 'memberOf', requested: 'r-1' }],
+    })
+    expect(r.identity.did).toBe(DIDP)
+    expect(r.peers[0]).toMatchObject({ did: 'did:web:a.example.org', link: 'memberOf', requested: 'r-1' })
+    expect(r.join?.decision).toBe('LD-7')
+    expect(r.problems).toEqual([])
+  })
+  it('a peer without them reads as before, with nulls', () => {
+    const r = readFederation({ peers: [{ name: 'A' }], join: { policy: 'closed' } })
+    expect(r.peers[0]).toMatchObject({ did: null, link: null, requested: null })
+    expect(r.join?.decision).toBeNull()
+    expect(r.problems).toEqual([])
+  })
+  it.each(['did:key:z6Mk', 'plc:abc', 'https://example.org/did', 5])('a malformed peer did %s is a warning and reads null', did => {
+    const r = readFederation({ peers: [{ name: 'A', did }] })
+    expect(r.peers[0]!.did).toBeNull()
+    expect(r.problems).toHaveLength(1)
+    expect(r.problems[0]!.level).toBe('warn')
+    expect(r.problems[0]!.text).toContain('peer "A"')
+  })
+  it('a malformed identity.did is a warning', () => {
+    const r = readFederation({ identity: { name: 'X', did: 'did:key:z' } })
+    expect(r.problems).toHaveLength(1)
+    expect(r.problems[0]!.text).toContain('identity.did')
+  })
+  it('an unknown link value is a warning and reads null', () => {
+    const r = readFederation({ peers: [{ name: 'A', link: 'friend' }, { name: 'B', link: 'none' }] })
+    expect(r.peers.map(p => p.link)).toEqual([null, 'none'])
+    expect(r.problems).toHaveLength(1)
+    expect(r.problems[0]!.text).toContain('link "friend"')
+  })
 })

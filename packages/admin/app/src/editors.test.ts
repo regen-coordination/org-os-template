@@ -32,7 +32,7 @@ describe('what each governed file is edited with (F-L3-3)', () => {
     const by = (path: string) => GOVERNED_FILES.filter(f => f.path === path).map(f => f.target)
     expect(by('record')).toEqual(['members', 'projects', 'meetings', 'ideas', 'funding-opportunities', 'relationships', 'sources', 'events', 'channels', 'assets', 'knowledge-gaps', 'systems', 'tasks', 'data/collections/**'])
     expect(by('board')).toEqual(['boards'])
-    expect(by('own-routes')).toEqual(['proposals', 'library', 'data/kb/**'])
+    expect(by('own-routes')).toEqual(['proposals', 'library', 'federation-requests', 'invites', 'data/kb/**', 'federation/**'])
     expect(by('page')).toEqual(['pages/**'])
     expect(by('generated')).toEqual(['.well-known/**'])
     // DAO-OS L6 Task 19: the source editor is built; what had no path yet is edited whole there

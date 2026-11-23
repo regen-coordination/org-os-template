@@ -9,10 +9,10 @@ const io = (map: Record<string, R>) => ({
   readFederationAt: (abs: string): R => map[abs] ?? { found: false },
 })
 const peer = (ref: string) => ({ index: 0, name: 'P', ref, url: null, type: null, trust: null, relationship: null,
-  since: null, decision: null, private: false })
+  since: null, decision: null, requested: null, did: null, link: null, private: false })
 
 it('lists the four link states', () => {
-  expect(LINK_STATES).toEqual(['mutual', 'claimed', 'not-an-instance', 'unknown'])
+  expect(LINK_STATES).toEqual(['mutual', 'claimed', 'requested', 'left', 'not-an-instance', 'unknown'])
 })
 it('a bare repos/egregore that is a local folder is a path, not GitHub user "repos"', () => {
   expect(addressOf('repos/egregore', '/w/me', io({ '/w/me/repos/egregore': { found: false } }))).toEqual({ kind: 'path', path: '/w/me/repos/egregore' })
