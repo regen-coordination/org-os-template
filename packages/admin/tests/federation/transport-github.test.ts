@@ -75,12 +75,35 @@ describe('github transport', () => {
   it('status: open, accepted, refused, closed without a verdict', async () => {
     const ref = 'https://github.com/moss/hub/issues/1'
     const st = async (o: unknown) => (await withFakeGh({ 'issue view': { stdout: JSON.stringify(o) } }, run => gh.status!(ref, ctxOf(run)))).result
+    const c = (body: string, authorAssociation = 'MEMBER') => ({ body, authorAssociation })
     expect(await st({ state: 'OPEN', comments: [] })).toEqual({ state: 'waiting' })
-    expect(await st({ state: 'CLOSED', comments: [{ body: 'hi' }, { body: 'Accepted: welcome aboard.\nmore' }] })).toEqual({ state: 'accepted', reason: 'Accepted: welcome aboard.' })
-    expect(await st({ state: 'CLOSED', comments: [{ body: 'Refused: not a fit.' }] })).toEqual({ state: 'refused', reason: 'Refused: not a fit.' })
-    expect(await st({ state: 'CLOSED', comments: [{ body: 'closing' }] })).toEqual({ state: 'waiting' })
+    expect(await st({ state: 'CLOSED', comments: [c('hi'), c('Accepted: welcome aboard.\nmore', 'OWNER')] })).toEqual({ state: 'accepted', reason: 'Accepted: welcome aboard.' })
+    expect(await st({ state: 'CLOSED', comments: [c('Refused: not a fit.', 'COLLABORATOR')] })).toEqual({ state: 'refused', reason: 'Refused: not a fit.' })
+    expect(await st({ state: 'CLOSED', comments: [c('closing')] })).toEqual({ state: 'waiting' })
     const { calls } = await withFakeGh({ 'issue view': { stdout: '{"state":"OPEN","comments":[]}' } }, run => gh.status!(ref, ctxOf(run)))
     expect(calls[0]).toEqual(['issue', 'view', ref, '--json', 'state,comments'])
+  })
+  it('status: only trusted commenters decide', async () => {
+    const ref = 'https://github.com/moss/hub/issues/1'
+    const st = async (o: unknown) => (await withFakeGh({ 'issue view': { stdout: JSON.stringify(o) } }, run => gh.status!(ref, ctxOf(run)))).result
+    const c = (body: string, authorAssociation: string) => ({ body, authorAssociation })
+    expect(await st({ state: 'CLOSED', comments: [c('Accepted: sure.', 'NONE')] })).toEqual({ state: 'waiting' })
+    expect(await st({ state: 'CLOSED', comments: [c('Accepted: sure.', 'CONTRIBUTOR')] })).toEqual({ state: 'waiting' })
+    // the requester closing with their own verdict (they are not the hub's people)
+    expect(await st({ state: 'CLOSED', comments: [c('Accepted: me, myself.', 'NONE')] })).toEqual({ state: 'waiting' })
+    expect(await st({ state: 'CLOSED', comments: [c('Refused: no.', 'MEMBER'), c('Accepted: yes!', 'NONE'), c('Accepted: yes!', 'CONTRIBUTOR')] })).toEqual({ state: 'refused', reason: 'Refused: no.' })
+    expect(await st({ state: 'CLOSED', comments: [c('Acceptedx', 'OWNER')] })).toEqual({ state: 'waiting' })
+    const long = await st({ state: 'CLOSED', comments: [c('Refused: ' + 'y'.repeat(500), 'OWNER')] }) as { reason: string }
+    expect(long.reason).toHaveLength(200)
+  })
+  it('status and reply refuse a malformed ref without calling gh', async () => {
+    for (const bad of ['--web', 'https://evil.example/moss/hub/issues/1', 'https://github.com/moss/hub/pull/1', 'https://github.com/moss/hub/issues/x']) {
+      const { calls } = await withFakeGh({ 'issue view': {}, 'issue close': {} }, async run => {
+        await expect(gh.status!(bad, ctxOf(run))).rejects.toThrow()
+        await expect(gh.reply!(bad, { kind: 'accepted', sentence: 'x' }, ctxOf(run))).rejects.toThrow()
+      })
+      expect(calls).toEqual([])
+    }
   })
   it('reply: closes with the comment', async () => {
     const ref = 'https://github.com/moss/hub/issues/1'

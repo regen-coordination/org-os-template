@@ -17,6 +17,11 @@ function repoOf(where: string | null): string | null {
   return m ? `${m[1]}/${m[2]}` : null
 }
 
+/** An issue URL on GitHub; anything else never reaches gh. */
+const ISSUE_REF = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/\d+$/
+const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
+const BAD_REF = "That isn't a GitHub issue address."
+
 const gh = (ctx: TransportCtx, args: string[]) => ctx.run('gh', args, { cwd: ctx.repo, timeoutMs: TIMEOUT })
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
@@ -80,18 +85,23 @@ export const githubTransport: Transport = {
     return out
   },
   async status(ref, ctx): Promise<Status> {
+    if (!ISSUE_REF.test(ref)) throw new Error(BAD_REF)
     const r = await gh(ctx, ['issue', 'view', ref, '--json', 'state,comments'])
     if (r.code !== 0) throw new Error(`Couldn't read the issue${r.stderr ? `: ${oneLine(r.stderr)}` : '.'}`)
-    let doc: { state?: string; comments?: { body?: string }[] }
+    let doc: { state?: string; comments?: { body?: string; authorAssociation?: string }[] }
     try { doc = JSON.parse(r.stdout) } catch { throw new Error("GitHub's answer couldn't be read.") }
     if (doc.state !== 'CLOSED') return { state: 'waiting' }
-    const last = (doc.comments ?? []).at(-1)?.body ?? ''
-    const first = last.split('\n')[0].trim()
-    if (first.startsWith('Accepted')) return { state: 'accepted', reason: first }
-    if (first.startsWith('Refused')) return { state: 'refused', reason: first }
+    // Only the hub's own people can decide: the last verdict from an OWNER, MEMBER or COLLABORATOR counts, nobody else's comment does.
+    for (const c of [...(doc.comments ?? [])].reverse()) {
+      if (!TRUSTED.has(c?.authorAssociation ?? '') || typeof c.body !== 'string') continue
+      const first = c.body.split('\n')[0].trim()
+      if (/^Accepted\b/.test(first)) return { state: 'accepted', reason: first.slice(0, 200) }
+      if (/^Refused\b/.test(first)) return { state: 'refused', reason: first.slice(0, 200) }
+    }
     return { state: 'waiting' }
   },
   async reply(ref, outcome, ctx) {
+    if (!ISSUE_REF.test(ref)) throw new Error(BAD_REF)
     const word = outcome.kind === 'accepted' ? 'Accepted' : 'Refused'
     const r = await gh(ctx, ['issue', 'close', ref, '--comment', `${word}: ${oneLine(outcome.sentence)}`])
     if (r.code !== 0) throw new Error(`Couldn't answer the issue${r.stderr ? `: ${oneLine(r.stderr)}` : '.'}`)
