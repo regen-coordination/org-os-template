@@ -17,7 +17,9 @@ import { join } from 'node:path'
 import { isPublicUrl } from '../../lib/federation/peers.mjs'
 import { readFederation } from '../../lib/federation/read.mjs'
 import { stateDir } from '../state.ts'
-import { networkLookup } from '../net.ts'
+import { networkLookup, isPublicAddress } from '../net.ts'
+
+export { isPublicAddress }
 import { readYamlObject } from '../resources/util.ts'
 import type { FetchLike } from '../systems/driver.ts'
 
@@ -41,57 +43,6 @@ export interface GuardOptions {
   signal?: AbortSignal
 }
 export type Guarded = { json: unknown } | { text: string } | { problem: string }
-
-/** Whether an IP address (v4 or v6) is one a stranger could reach: not loopback, private, link-local, CGNAT, unique-local, multicast or unspecified. */
-export function isPublicAddress(address: string): boolean {
-  const kind = isIP(address)
-  if (kind === 4) {
-    const [a, b] = address.split('.').map(Number)
-    if (a === 0 || a === 10 || a === 127 || a >= 224) return false
-    if (a === 100 && b >= 64 && b <= 127) return false
-    if (a === 169 && b === 254) return false
-    if (a === 172 && b >= 16 && b <= 31) return false
-    if (a === 192 && b === 168) return false
-    if (a === 192 && b === 0) return false
-    if (a === 198 && (b === 18 || b === 19)) return false
-    return true
-  }
-  if (kind === 6) {
-    const groups = expandV6(address)
-    if (groups === null) return false
-    // v4-mapped (::ffff:a.b.c.d) and v4-compatible: judged as the v4 address inside.
-    if (groups.slice(0, 5).every(g => g === 0) && (groups[5] === 0xffff || groups[5] === 0)) {
-      if (groups.slice(0, 6).every(g => g === 0) && groups[6] === 0 && groups[7] <= 1) return false // :: and ::1
-      return isPublicAddress(`${groups[6] >> 8}.${groups[6] & 255}.${groups[7] >> 8}.${groups[7] & 255}`)
-    }
-    if ((groups[0] & 0xfe00) === 0xfc00) return false // fc00::/7 unique-local
-    if ((groups[0] & 0xffc0) === 0xfe80) return false // fe80::/10 link-local
-    if ((groups[0] & 0xffc0) === 0xfec0) return false // fec0::/10 site-local
-    if ((groups[0] & 0xff00) === 0xff00) return false // multicast
-    return true
-  }
-  return false
-}
-
-/** The eight 16-bit groups of an IPv6 address, or null. */
-function expandV6(address: string): number[] | null {
-  let a = address.split('%')[0].toLowerCase()
-  const tail = /(\d+\.\d+\.\d+\.\d+)$/.exec(a)
-  if (tail) {
-    const p = tail[1].split('.').map(Number)
-    if (p.length !== 4 || p.some(n => !(n >= 0 && n <= 255))) return null
-    a = `${a.slice(0, -tail[1].length)}${((p[0] << 8) | p[1]).toString(16)}:${((p[2] << 8) | p[3]).toString(16)}`
-  }
-  const halves = a.split('::')
-  if (halves.length > 2) return null
-  const head = halves[0] === '' ? [] : halves[0].split(':')
-  const rest = halves.length === 2 ? (halves[1] === '' ? [] : halves[1].split(':')) : []
-  const fill = halves.length === 2 ? 8 - head.length - rest.length : 0
-  if (fill < 0 || (halves.length === 1 && head.length !== 8)) return null
-  const all = [...head, ...Array(fill).fill('0'), ...rest]
-  const out = all.map(g => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN))
-  return out.length === 8 && out.every(n => Number.isFinite(n)) ? out : null
-}
 
 const kb = (bytes: number): number => Math.max(1, Math.round(bytes / 1024))
 
