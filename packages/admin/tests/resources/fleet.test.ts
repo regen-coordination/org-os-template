@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
+import { parse as parseYaml } from 'yaml'
 import { execSync } from 'node:child_process'
 import { makeFixtureRepo, removeFixtureRepo, REAL_REPO } from '../fixtures.ts'
 import { fleet } from '../../server/resources/adapters/fleet.ts'
 import { runCommand } from '../../server/resources/run.ts'
 import type { AdapterContext, Graph } from '../../server/resources/types.ts'
 import { atprotoCache } from '../../server/federation/atproto/read.ts'
-import { mutualByFiles, linkStatesOf, selfAddressesOf } from '../../server/federation/link-state.ts'
+import { mutualByFiles, byFiles, linkStatesOf, selfAddressesOf } from '../../server/federation/link-state.ts'
 import { readFederation } from '../../lib/federation/read.mjs'
 import { LINK_NSID, PROFILE_NSID } from '../../lib/federation/links.mjs'
 
@@ -221,6 +222,40 @@ describe('fleet adapter: one link state from every source', () => {
     const states = linkStatesOf(repo, fed, await selfAddressesOf(repo, runCommand))
     expect(states.selfDid).toBeNull()
     expect([...states.peers.values()].map(s => s.state)).toEqual(['mutual', 'mutual', 'claimed'])
+  })
+
+  it("a hub's existing member with no decision, mutual by files and naming this instance as hub, is hasMember and wanted (R4)", async () => {
+    const MEMBER = 'did:plc:membermembermembermember'
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', `  did: ${SELF}`, 'join:', '  policy: open-with-approval',
+      'peers:', '  - name: Sibling', `    repo: ../${basename(sibling)}`, '    url: https://sibling.example.org', `    did: ${MEMBER}`, '    relationship: node', ''].join('\n'))
+    const back = `peers:\n  - name: Fixture Org\n    repo: ../${basename(repo)}\n`
+    writeFileSync(join(sibling, 'federation.yaml'), `networks:\n  - name: Fixture Mesh\n    hub: ../${basename(repo)}\n${back}`)
+    atprotoCache(repo).put(SELF, reading(SELF, []) as never)
+    const fed = () => readFederation(parseYaml(readFileSync(join(repo, 'federation.yaml'), 'utf8')))
+    const self = await selfAddressesOf(repo, runCommand)
+    expect(byFiles(repo, fed(), self)).toEqual({ mutualByFiles: [0], membersByFiles: [0] })
+    let g = (await fleet.read(ctx())) as Graph
+    expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'mutual', relation: 'hasMember', drift: [{ side: 'ours', text: 'Not published yet.' }] })
+
+    // The same member whose files list this instance but don't name it as hub: no hasMember, nothing to publish.
+    writeFileSync(join(sibling, 'federation.yaml'), `networks:\n  - name: Elsewhere\n    hub: https://elsewhere.example.org\n${back}`)
+    expect(byFiles(repo, fed(), self)).toEqual({ mutualByFiles: [0], membersByFiles: [] })
+    g = (await fleet.read(ctx())) as Graph
+    expect(card(g, `instance:${basename(sibling)}`).facts).toMatchObject({ link: 'mutual', relation: null, drift: [] })
+  })
+
+  it('a remote federation.json names this instance as hub only by a public url', async () => {
+    writeFileSync(join(repo, 'federation.yaml'), ['identity:', '  name: "Fixture Org"', 'join:', '  policy: open', 'peers:',
+      '  - name: Far', '    url: https://far.example.org', ''].join('\n'))
+    execSync('git remote add origin https://github.com/acme/fixture-org', { cwd: repo })
+    const { remoteCache } = await import('../../server/federation/remote.ts')
+    const url = 'https://far.example.org/.well-known/federation.json'
+    const fed = readFederation(parseYaml(readFileSync(join(repo, 'federation.yaml'), 'utf8')))
+    const peersBack = [{ name: 'Fixture Org', url: 'https://github.com/acme/fixture-org' }]
+    remoteCache(repo).put(url, { spec: 'org-os/federation/1', networks: [{ name: 'Mesh', hub: 'github.com/acme/fixture-org' }], peers: peersBack })
+    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toEqual({ mutualByFiles: [0], membersByFiles: [0] })
+    remoteCache(repo).put(url, { spec: 'org-os/federation/1', networks: [{ name: 'Mesh', hub: `../${basename(repo)}` }], peers: peersBack })
+    expect(byFiles(repo, fed, await selfAddressesOf(repo, runCommand))).toEqual({ mutualByFiles: [0], membersByFiles: [] })
   })
 })
 

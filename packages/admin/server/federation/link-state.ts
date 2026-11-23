@@ -3,10 +3,10 @@
 // Every peer's link state from every source (network N2 Task 4): the local folder (peers.mjs linkState), their
 // federation.json as last read (the remote cache) and both sides' atproto records as last read (the atproto cache),
 // combined by the pure lib/federation/state.mjs. Reads the disk and the caches under stateDir only: it never fetches
-// and never writes. The fleet draws the cards from it; publishing (Task 7) and migration (Task 12) take
-// `mutualByFiles` from it, the files reading R24 needs (ruling R4).
+// and never writes. The fleet draws the cards from it; publishing (Task 7) and migration (Task 12) take `byFiles`
+// from it (`mutualByFiles`, `membersByFiles`), the files readings R24 needs (ruling R4).
 import { readFederation } from '../../lib/federation/read.mjs'
-import { linkState, addressOf, sameAddress, isPublicUrl, selfAddresses, type Address } from '../../lib/federation/peers.mjs'
+import { linkState, addressOf, sameAddress, isPublicUrl, publicHref, selfAddresses, type Address } from '../../lib/federation/peers.mjs'
 import { relationOf, isDid, type Relation } from '../../lib/federation/links.mjs'
 import { combineLinkState, filesSide, unlistedRecords, type Drift, type Sources, type FilesReading, type RemoteReading } from '../../lib/federation/state.mjs'
 import { nodePeerIO } from '../federation-io.ts'
@@ -29,26 +29,48 @@ export async function selfAddressesOf(repo: string, run: Runner): Promise<Addres
 
 /** Their files, as this machine can read them: the local folder, and (when no folder was looked at and the peer has a
  *  url) what their federation.json said when it was last read. A remote file's claims are read as public urls only:
- *  a `repo` or a relative path in it is never a folder here. */
-export function filesReadingOf(repo: string, peer: Peer, self: Address[]): { files: FilesReading; remote: RemoteReading | null } {
+ *  a `repo` or a relative path in it is never a folder here. `namesUsAsHub`: the same files name this instance as the
+ *  hub of one of their `networks`. */
+export function filesReadingOf(repo: string, peer: Peer, self: Address[]): { files: FilesReading; remote: RemoteReading | null; namesUsAsHub: boolean } {
+  const isUs = (a: Address | null) => a !== null && self.some(s => sameAddress(s, a))
   const files = linkState(peer, self, repo, nodePeerIO)
-  if (files.state !== 'unknown' || files.path !== null || !peer.url) return { files, remote: null }
+  if (files.path !== null && (files.state === 'mutual' || files.state === 'claimed')) {
+    const theirs = nodePeerIO.readFederationAt(files.path)
+    const doc = theirs.found && 'doc' in theirs ? theirs.doc : null
+    const folder = files.path
+    const namesUsAsHub = readFederation(doc).networks.some(n => n.hub !== null && isUs(addressOf(n.hub, folder, nodePeerIO)))
+    return { files, remote: null, namesUsAsHub }
+  }
+  if (files.state !== 'unknown' || files.path !== null || !peer.url) return { files, remote: null, namesUsAsHub: false }
   const key = wellKnownUrlOf(peer.url)
   const cached = key ? remoteCache(repo).get(key) : null
-  if (!cached) return { files, remote: null }
-  const listsUs = readFederation(cached.doc).peers.some(p => {
-    const a = isPublicUrl(p.url) ? addressOf(p.url as string, repo, nodePeerIO) : null
-    return a !== null && self.some(s => sameAddress(s, a))
+  if (!cached) return { files, remote: null, namesUsAsHub: false }
+  const doc = readFederation(cached.doc)
+  const listsUs = doc.peers.some(p => isUs(isPublicUrl(p.url) ? addressOf(p.url as string, repo, nodePeerIO) : null))
+  const namesUsAsHub = doc.networks.some(n => {
+    const href = publicHref(n.hub)
+    return isUs(href ? addressOf(href, repo, nodePeerIO) : null)
   })
-  return { files, remote: { listsUs, fetchedAt: cached.fetched_at } }
+  return { files, remote: { listsUs, fetchedAt: cached.fetched_at }, namesUsAsHub }
+}
+
+/** What both sides' files say, as peer indexes (ruling R4): `mutualByFiles`, their files list this instance;
+ *  `membersByFiles`, their files name this instance as the hub of one of their networks. Pass both to `relationOf`
+ *  and `wantedLink`, so an existing member mutual by files is `hasMember` and published without a decision. */
+export function byFiles(repo: string, fed: Fed, self: Address[]): { mutualByFiles: number[]; membersByFiles: number[] } {
+  const mutual: number[] = []
+  const members: number[] = []
+  for (const p of fed.peers) {
+    const { files, remote, namesUsAsHub } = filesReadingOf(repo, p, self)
+    if (filesSide(files, remote).side === 'lists-us') mutual.push(p.index)
+    if (namesUsAsHub) members.push(p.index)
+  }
+  return { mutualByFiles: mutual, membersByFiles: members }
 }
 
 /** The indexes of the peers whose files list this instance at the last reading (R24's "mutual by files", ruling R4). */
 export function mutualByFiles(repo: string, fed: Fed, self: Address[]): number[] {
-  return fed.peers.filter(p => {
-    const { files, remote } = filesReadingOf(repo, p, self)
-    return filesSide(files, remote).side === 'lists-us'
-  }).map(p => p.index)
+  return byFiles(repo, fed, self).mutualByFiles
 }
 
 export interface PeerLinkState {
@@ -71,8 +93,10 @@ export function linkStatesOf(repo: string, fed: Fed, self: Address[]): { selfDid
   const own = selfDid ? cache.get(selfDid)?.reading?.links ?? null : null
   const peers = new Map<number, PeerLinkState>()
   for (const peer of fed.peers) {
-    const relation = relationOf(peer, fed, { base: repo, io: nodePeerIO })
-    const { files, remote } = filesReadingOf(repo, peer, self)
+    const { files, remote, namesUsAsHub } = filesReadingOf(repo, peer, self)
+    const mine = [peer.index]
+    const relation = relationOf(peer, fed, { base: repo, io: nodePeerIO,
+      mutualByFiles: filesSide(files, remote).side === 'lists-us' ? mine : [], membersByFiles: namesUsAsHub ? mine : [] })
     const atproto = peer.did ? cache.get(peer.did) : null
     const combined = combineLinkState({ peer, relation, selfDid, files, remote, atproto, ownRecords: own, fed })
     peers.set(peer.index, { relation, ...combined, path: files.path, failed: !!atproto && !atproto.reading && !!atproto.lastProblem })

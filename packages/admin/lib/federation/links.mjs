@@ -30,6 +30,9 @@ export const NETWORK_NAME_MAX = 200
 /** @typedef {import('./read.mjs').Peer} Peer */
 /** @typedef {Pick<ReturnType<typeof import('./read.mjs').readFederation>, 'networks' | 'join'>} FedLike */
 /** @typedef {{ base?: string, io?: import('./peers.mjs').PeerIO }} Where  how a path ref is resolved (the instance folder and the disk) */
+/** @typedef {{ mutualByFiles?: readonly number[], membersByFiles?: readonly number[] }} ByFiles  what both sides' files say, as peer
+ *  indexes computed server-side (R4): `mutualByFiles`, their files list this instance; `membersByFiles`, their files name this
+ *  instance as the hub of one of their `networks` */
 /** @typedef {{ subject: string, relation: Relation, network?: string }} WantedLink */
 /** @typedef {'private' | 'noUrl' | 'noDid' | 'noRelation' | 'undecided'} Withheld */
 /** @typedef {{ networks: ProfileNetwork[], rest: Record<string, unknown> }} ProfileRecord */
@@ -135,13 +138,17 @@ function hubNetworkOf(peer, fed, where = {}) {
  *  - else a peer that is the hub of one of `fed.networks` (same address) is `memberOf`;
  *  - else a `relationship: node` peer with a `decision`, on an instance with a `join` block, is `hasMember` (a member
  *    ratified through the hub's proposal path carries `decision: request <id>`, R3);
+ *  - else an existing member, mutual by files, whose own files name this instance as the hub of one of their networks
+ *    is `hasMember` with no decision (R4: memberships from before N2 are published). Their naming this instance as
+ *    their hub is what makes it a hub of theirs; the relationship word is not read;
  *  - else null. Free-form `relationship` values are never mapped.
  *  `where` resolves path refs against the instance folder on the disk; without it only addresses compare by text.
- *  @param {Peer} peer @param {FedLike} fed @param {Where} [where] @returns {Relation | null} */
+ *  @param {Peer} peer @param {FedLike} fed @param {Where & ByFiles} [where] @returns {Relation | null} */
 export function relationOf(peer, fed, where = {}) {
   if (peer.link) return peer.link === 'none' ? null : /** @type {Relation} */ (peer.link)
   if (hubNetworkOf(peer, fed, where)) return 'memberOf'
   if (peer.relationship === 'node' && peer.decision && fed.join) return 'hasMember'
+  if ((where.mutualByFiles ?? []).includes(peer.index) && (where.membersByFiles ?? []).includes(peer.index)) return 'hasMember'
   return null
 }
 
@@ -164,14 +171,16 @@ export function networkOf(peer, relation, fed, where = {}) {
  *  A peer is published when it is public (R3: a public https `url`, not `visibility: private`), has a `did`, has a
  *  relation, and, when that relation is derived, is decided (`decision`) or mutual by files (`mutualByFiles`: the
  *  indexes of peers whose files list this instance at the last check, computed server-side, R4). An explicit `link` is
- *  itself the decision. `relation`, when given, is used as it is (the caller worked it out with the disk).
+ *  itself the decision. `relation`, when given, is used as it is (the caller worked it out with the disk); otherwise
+ *  it is `relationOf` with the same files readings, so an existing member mutual by files is `hasMember` (R4).
  *  @param {Peer} peer @param {FedLike} fed
- *  @param {{ relation?: Relation | null, mutualByFiles?: readonly number[], where?: Where }} [opts]
+ *  @param {{ relation?: Relation | null, where?: Where } & ByFiles} [opts]
  *  @returns {{ link: WantedLink } | { withheld: Withheld }} */
 export function wantedLink(peer, fed, opts = {}) {
   if (!isPublishedPeer(peer)) return { withheld: peer.private ? 'private' : 'noUrl' }
   if (!peer.did) return { withheld: 'noDid' }
-  const relation = opts.relation !== undefined ? opts.relation : relationOf(peer, fed, opts.where)
+  const relation = opts.relation !== undefined ? opts.relation
+    : relationOf(peer, fed, { ...opts.where, mutualByFiles: opts.mutualByFiles, membersByFiles: opts.membersByFiles })
   if (!relation) return { withheld: 'noRelation' }
   const explicit = peer.link !== null && peer.link !== 'none'
   if (!explicit && !peer.decision && !(opts.mutualByFiles ?? []).includes(peer.index)) return { withheld: 'undecided' }

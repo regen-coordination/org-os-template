@@ -117,6 +117,25 @@ describe('relationOf', () => {
     expect(relationOf(noJoin.peers[0], noJoin)).toBeNull()
   })
 
+  it("a hub's existing member with no decision is hasMember when mutual by files and its files name this instance as hub (R4)", () => {
+    const fed = fedOf({ join: { policy: 'open-with-approval' }, peers: [
+      { name: 'Old Member', url: 'https://old.example.org', did: 'did:plc:oldoldoldoldoldoldoldoldo', relationship: 'node' },
+      { name: 'Old Free-form', url: 'https://free.example.org', did: 'did:plc:freefreefreefreefreefree', relationship: 'local-chapter' },
+    ] })
+    const both = { mutualByFiles: [0, 1], membersByFiles: [0, 1] }
+    expect(fed.peers.map(p => relationOf(p, fed, both))).toEqual(['hasMember', 'hasMember'])
+    // Mutual by files, but their files don't name this instance as hub: no hasMember.
+    expect(relationOf(fed.peers[0], fed, { mutualByFiles: [0], membersByFiles: [] })).toBeNull()
+    // Naming this instance as hub without listing it back is not mutual: no hasMember.
+    expect(relationOf(fed.peers[0], fed, { mutualByFiles: [], membersByFiles: [0] })).toBeNull()
+    expect(relationOf(fed.peers[0], fed)).toBeNull()
+    // Another peer's files do not count for this one.
+    expect(relationOf(fed.peers[0], fed, { mutualByFiles: [1], membersByFiles: [1] })).toBeNull()
+    // An explicit link and the network hub rule still come first.
+    const hubToo = fedOf({ networks: [{ name: 'Regen Mesh', hub: HUB_URL }], peers: [{ name: 'Hub', url: HUB_URL }, { name: 'X', url: 'https://x.example.org', link: 'none' }] })
+    expect(hubToo.peers.map(p => relationOf(p, hubToo, { mutualByFiles: [0, 1], membersByFiles: [0, 1] }))).toEqual(['memberOf', null])
+  })
+
   it("free-form relationship values are never mapped (relationship: 'network-seat' is null)", () => {
     const fed = fedOf({ join: { policy: 'open' }, peers: [
       { name: 'Seat', url: 'https://seat.example.org', relationship: 'network-seat', decision: 'x' },
@@ -197,6 +216,30 @@ describe('wantedLink (R24) and networkOf', () => {
     expect(wantedLink(fed.peers[1], fed, { mutualByFiles: [1] })).toEqual({ link: { subject: HUB_DID, relation: 'memberOf', network: 'Regen Mesh' } })
     // A relation the caller already worked out (with the disk) is used as given.
     expect(wantedLink(fed.peers[0], fed, { relation: 'peerOf' })).toEqual({ withheld: 'noDid' })
+  })
+})
+
+describe('wantedLink: an existing member mutual by files is planned for publishing (R4)', () => {
+  const OLD = 'did:plc:oldoldoldoldoldoldoldoldo'
+  const fed = fedOf({ join: { policy: 'open' }, networks: [{ name: 'Regen Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [
+    { name: 'Old Member', url: 'https://old.example.org', did: OLD, relationship: 'node' },
+    { name: 'Old Private', url: 'https://oldp.example.org', did: OLD, relationship: 'node', visibility: 'private' },
+    { name: 'Old Local', repo: '../old-local', did: OLD, relationship: 'node' },
+  ] })
+  const both = { mutualByFiles: [0, 1, 2], membersByFiles: [0, 1, 2] }
+
+  it('with no decision, both files readings make it a hasMember link in the hub network', () => {
+    expect(wantedLink(fed.peers[0], fed, both)).toEqual({ link: { subject: OLD, relation: 'hasMember', network: 'Regen Mesh' } })
+  })
+
+  it("without their files naming this instance as hub, it is not planned", () => {
+    expect(wantedLink(fed.peers[0], fed, { mutualByFiles: [0], membersByFiles: [] })).toEqual({ withheld: 'noRelation' })
+    expect(wantedLink(fed.peers[0], fed)).toEqual({ withheld: 'noRelation' })
+  })
+
+  it('private and non-public-url members are never planned, whatever the files say', () => {
+    expect(wantedLink(fed.peers[1], fed, both)).toEqual({ withheld: 'private' })
+    expect(wantedLink(fed.peers[2], fed, both)).toEqual({ withheld: 'noUrl' })
   })
 })
 
