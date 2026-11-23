@@ -231,13 +231,16 @@ describe('federation.check-links', () => {
       'identity:', '  name: "Fixture Org"', 'peers:',
       '  - name: Far Hub', '    url: https://far.example.org',
       '  - name: Folder Peer', '    repo: ../folder-peer', '    url: https://folder.example.org',
-      '  - name: Quiet One', '    url: https://quiet.example.org', '    visibility: private', '',
+      '  - name: Quiet One', '    url: https://quiet.example.org', '    visibility: private',
+      '  - name: Plain Http', '    url: http://plain.example.org',
+      '  - name: Lan Box', '    url: https://hub.local', '',
     ].join('\n'))
     const { fetch, calls } = fakeFetch({ body: JSON.stringify(GOOD) })
     const out = await checkLinks(repo, {}, { fetch, lookup: PUBLIC }, new AbortController().signal)
     expect(calls.map(c => c.url)).toEqual(['https://far.example.org/.well-known/federation.json'])
     expect(out).toContain('Far Hub')
-    expect(out).toContain('1 private')
+    expect(out).toContain('3 private peers were not read')
+    expect(out).not.toMatch(/Plain Http|plain\.example|Lan Box|hub\.local/)
     expect(out).not.toContain('Quiet One')
     expect(out).not.toContain('quiet.example.org')
   })
@@ -259,6 +262,12 @@ describe('the fleet reads the cache for a URL-only peer', () => {
     // They list this instance by its address: the fixture's own folder is not public, so give it a remote.
     const { execSync } = await import('node:child_process')
     execSync('git remote add origin https://github.com/acme/fixture-org', { cwd: repo })
+    remoteCache(repo).put('https://far.example.org/.well-known/federation.json', { ...GOOD, peers: [{ name: 'Fixture Org', url: 'https://github.com/acme/fixture-org' }] }, new Date('2026-11-22T11:00:00Z'))
+    g = (await fleet.read(ctx())) as Graph
+    // A remote file's `repo` or relative path is never read as a folder here.
+    remoteCache(repo).put('https://far.example.org/.well-known/federation.json', { ...GOOD, peers: [{ name: 'x', repo: '.' }, { name: 'y', url: '/' }] }, new Date('2026-11-22T12:00:00Z'))
+    g = (await fleet.read(ctx())) as Graph
+    expect(g.nodes.find(n => n.id === 'instance:far-hub')?.facts).toMatchObject({ link: 'claimed' })
     remoteCache(repo).put('https://far.example.org/.well-known/federation.json', { ...GOOD, peers: [{ name: 'Fixture Org', url: 'https://github.com/acme/fixture-org' }] }, new Date('2026-11-22T11:00:00Z'))
     g = (await fleet.read(ctx())) as Graph
     expect(g.nodes.find(n => n.id === 'instance:far-hub')).toMatchObject({ status: 'mutual', facts: expect.objectContaining({ link: 'mutual', linkReason: 'checked 2026-11-22T11:00:00.000Z' }) })

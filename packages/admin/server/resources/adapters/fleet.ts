@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { stateDir } from '../../state.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import { readFederation } from '../../../lib/federation/read.mjs'
-import { selfAddresses, linkState, addressOf, sameAddress } from '../../../lib/federation/peers.mjs'
+import { selfAddresses, linkState, addressOf, sameAddress, isPublicUrl } from '../../../lib/federation/peers.mjs'
 import { nodePeerIO } from '../../federation-io.ts'
 import { remoteCache, wellKnownUrlOf } from '../../federation/remote.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
@@ -111,10 +111,11 @@ export const fleet: Adapter = {
           const key = wellKnownUrlOf(peer.url)
           const cached = key ? remoteCache(ctx.repo).get(key) : null
           if (cached) {
-            const lists = readFederation(cached.doc).peers.some(p => [p.ref, p.url].some(r => {
-              const a = r ? addressOf(r, ctx.repo, nodePeerIO) : null
+            // Their claims are read as public urls only: a `repo` or a relative path in a remote file is never a folder here.
+            const lists = readFederation(cached.doc).peers.some(p => {
+              const a = isPublicUrl(p.url) ? addressOf(p.url as string, ctx.repo, nodePeerIO) : null
               return a !== null && self_.some(s => sameAddress(s, a))
-            }))
+            })
             checked = cached.fetched_at
             link = { state: lists ? 'mutual' : 'claimed', path: null, reason: `checked ${cached.fetched_at}` }
           }

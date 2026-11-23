@@ -233,7 +233,8 @@ export async function checkLinks(repo: string, params: Record<string, unknown>, 
     return `Read ${typeof doc?.name === 'string' ? doc.name : address}.\n`
   }
   const peers = readFederation(readYamlObject(join(repo, 'federation.yaml'))).peers.filter(p => p.url !== null && p.ref === null)
-  const open = peers.filter(p => !p.private)
+  // A peer that is private, or whose url is not a public https address, is counted and never named.
+  const open = peers.filter(p => !p.private && wellKnownUrlOf(p.url as string) !== null)
   const hidden = peers.length - open.length
   const lines: string[] = []
   let read = 0
@@ -241,7 +242,7 @@ export async function checkLinks(repo: string, params: Record<string, unknown>, 
     const problem = await one(p.url as string, p.name)
     if (problem === null) { read += 1; lines.push(`${p.name}: read.`) } else lines.push(problem)
   }
-  if (hidden > 0) lines.push(`${hidden} private ${hidden === 1 ? 'peer was' : 'peers were'} not read.`)
+  if (hidden > 0) lines.push(`${hidden} private ${hidden === 1 ? 'peer was' : 'peers were'} not read (private, or without a public https url).`)
   if (lines.length === 0) return 'No peer has only a url: nothing to look up.\n'
   if (open.length > 0 && read === 0) throw new Error(lines.join('\n'))
   return `${lines.join('\n')}\n`
