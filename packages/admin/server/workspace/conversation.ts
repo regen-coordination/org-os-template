@@ -34,6 +34,7 @@ import { displayNames, membersHold, readLabels } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads, strictPrivateReads } from '../private/reads.ts'
+import { mayReadRecordsOf } from './reads.ts'
 import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, MEMBERS as MEMBERS_LEVEL, NOBODY } from '../visibility/gate.ts'
@@ -123,7 +124,7 @@ const strings = (v: unknown): string[] => (typeof v === 'string' ? [v] : Array.i
 const titleOf = (r: Record<string, unknown>, id: string): string =>
   (typeof r.title === 'string' && r.title !== '' ? r.title : typeof r.name === 'string' && r.name !== '' ? r.name : id)
 
-export function targetInfo(repo: string, target: Target, store: PrivateStore | null): TargetInfo | null {
+export function targetInfo(repo: string, target: Target, store: PrivateStore | null, viewer?: Viewer): TargetInfo | null {
   const levels = levelsOf(repo, store)
   const level = levels.target(target)
   if (!level) return null
@@ -132,6 +133,9 @@ export function targetInfo(repo: string, target: Target, store: PrivateStore | n
     return e ? { level, title: e.title, text: e.markdown } : null
   }
   const { registry, id } = recordOf(target)
+  // 0.7.2 (review C1): asked for `viewer`, a record of a registry whose file the `files` section keeps from them is not
+  // there: no thread, no anchor test against its text, no title in a notification, no one to mention.
+  if (viewer && viewer.kind === 'member' && !mayReadRecordsOf(repo, viewer, registry)) return null
   const git = levels.records(registry).find(e => String(e.id) === id) as Record<string, unknown> | undefined
   const body = git ?? levels.priv.records(registry).find(r => r.id === id)?.body
   return body ? { level, title: titleOf(body, id), text: strings(body).join('\n') } : null
@@ -143,7 +147,7 @@ export function targetInfo(repo: string, target: Target, store: PrivateStore | n
  * L5's words (`why`), and nothing is told by it.
  */
 export function visibleTarget(repo: string, target: Target, store: PrivateStore | null, why: unknown, viewer: Viewer): TargetInfo {
-  const info = targetInfo(repo, target, store)
+  const info = targetInfo(repo, target, store, viewer)
   if (!info) {
     if (!store) throw unavailable(why)
     throw new HttpError(404, NO_TARGET(target))
@@ -464,14 +468,17 @@ const wordsOf = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(B
 export function mentionablesFor(target: Target, query: string, viewer: Viewer, deps: Omit<ConversationDeps, 'store'> & { store: PrivateStore | null },
   floors: readonly (string | null)[] = []): Mentionable[] {
   if (viewer.kind !== 'member') return []
-  const info = targetInfo(deps.repo, target, deps.store)
+  const info = targetInfo(deps.repo, target, deps.store, viewer)
   if (!info || !admits(info.level, viewer)) return []
   const level = info.level
+  // 0.7.2: one the record's file is kept from (the `files` section) would never be told, so they are not offered.
+  const kept = target.startsWith('record:') ? recordOf(target).registry : null
   const q = query.trim().replace(/^@/, '').trim().toLowerCase()
   const matches = (id: string, label: string) => q === '' || id.toLowerCase().startsWith(q) || label.toLowerCase().startsWith(q) || wordsOf(label).some(w => w.startsWith(q))
   const people = new People(deps.repo, deps.membership)
   // `tell`'s test (T2e M4): the target's level now and, for a reply, every level of the comments above it (`floors`).
   const told = (v: Viewer) => admits(level, v) && floors.every(f => mayRead(v, level, f))
+    && (kept === null || v.kind !== 'member' || mayReadRecordsOf(deps.repo, v, kept))
   // T2f 1, R4c2 (PR7-R79; Rule 4): a member is offered by the name the author may read (the gate), else their id (a members
   // file that cannot be read offers ids). Every write rewrites the label at the text's level (`relabelMembers`).
   const display = readLabels(deps.repo, viewer)
@@ -540,7 +547,7 @@ export function notificationsFor(viewer: Viewer, deps: Omit<ConversationDeps, 'n
   const rows = storeRead(deps.store, () => deps.store.notifications(viewer.id))
   const infos = new Map<string, TargetInfo | null>()
   const infoOf = (t: string) => {
-    if (!infos.has(t)) infos.set(t, parseTarget(t) ? targetInfo(deps.repo, t as Target, deps.store) : null)
+    if (!infos.has(t)) infos.set(t, parseTarget(t) ? targetInfo(deps.repo, t as Target, deps.store, viewer) : null)
     return infos.get(t) ?? null
   }
   const readable = new Map<string, Set<string>>()

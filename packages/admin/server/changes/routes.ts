@@ -242,6 +242,10 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
       // Each op split by data/visibility.yaml (L5 §10.3): a split that cannot be staged is a 422, a private part while the
       // store is down its 503, before anything is written.
       // A file op (L6 §11.2) is git's whole: data/visibility.yaml splits records, not files.
+      // 0.7.2: a record op on a registry whose file the stager may not read (the `files` section) is refused before anything
+      // is read for it, in the words of a path no rule governs, so the tray never holds that record (review I2).
+      const unreadRecords = unreadPaths(incoming.filter(isRecordOp), fileReader(c, repo))
+      if (unreadRecords.length > 0) return Response.json({ errors: unreadRefusal(unreadRecords).errors }, { status: 422 })
       const split = splitOps(repo, incoming.filter(isRecordOp), privateStore, viewerOf(c))
       // L7 gap B1 after gap A: what the chain holds of a deployed System is judged the same where the store keeps it (a
       // restricted field, a System kept private whole, its `deployment` held there while the rest is in git: the gaps

@@ -45,7 +45,8 @@ import { HttpError } from '../errors.ts'
 // it imports the change engine, which imports this module's importers, and the cycle would leave a class undefined.
 import type {} from '../request.ts'
 import type { Actor } from '../actor.ts'
-import { admits, fileLevel, type Viewer } from '../../lib/visibility.mjs'
+import { fileAdmits, fileLevel, type Viewer } from '../../lib/visibility.mjs'
+import { registryFile } from '../registries.ts'
 import { readFilesConfig } from '../visibility/config.ts'
 
 const actorOf = (c: Context): Actor | null => c.get('actor') ?? null
@@ -61,8 +62,9 @@ function gated(c: Context): boolean {
   return 'via' in actor && (actor.via === 'siwe' || actor.via === 'email')
 }
 
-/** Whether a viewer may read a path; `all` when they read every path git holds (the person at the machine). */
-export type FileReader = ((path: string) => boolean) & { all?: true }
+/** Whether a viewer may read a path; `all` when they read every path git holds (the person at the machine). `records`
+ *  (0.7.2): whether they may read the records of a record op's registry (`<registry>:<id>`), by its file; absent: all. */
+export type FileReader = ((path: string) => boolean) & { all?: true; records?: (record: string) => boolean }
 
 /** A reader of paths for the request's viewer. The governance is read once, when the first gated path is asked. */
 export function fileReader(c: Context, repo: string): FileReader {
@@ -101,11 +103,27 @@ export function viewerReader(repo: string, viewer: Viewer): FileReader {
     return decides
   }
   const files = fileLevels(repo, viewer)
-  return path => {
+  const read = (path: string) => {
     if (!files(path)) return false
     if (!readsDeciders(path)) return true
     return decider()(targetsOfPath(path, () => null) ?? ['workspace'])
   }
+  return Object.assign(read, { records: (record: string) => recordsReadable(repo, files, record) })
+}
+
+/** Whether the records of `record`'s registry (`<registry>:<id>`, as a record op names one) are read by a viewer `files`
+ *  answers for: by the registry's file. A registry no file holds (unknown, the store's) is not judged here. */
+function recordsReadable(repo: string, files: (path: string) => boolean, record: string): boolean {
+  const at = record.indexOf(':')
+  const name = at < 0 ? record : record.slice(0, at)
+  let path: string
+  try { path = registryFile(repo, name, at < 0 ? undefined : record.slice(at + 1)) } catch { return true }
+  return files(path)
+}
+
+/** 0.7.2: whether `viewer` may read the records of registry `name` from git, by its file (the `files` section). */
+export function mayReadRecordsOf(repo: string, viewer: Viewer, name: string): boolean {
+  return recordsReadable(repo, fileLevels(repo, viewer), name)
 }
 
 /** The viewers request.ts made for the person at the machine (`byGit`). A `files` level never gates them: they read what
@@ -126,7 +144,7 @@ export function fileLevels(repo: string, viewer: Viewer): (path: string) => bool
   if (files === null) return () => true
   return path => {
     const level = fileLevel(files, path)
-    return level === null || admits(level, viewer)
+    return level === null || fileAdmits(level, viewer)
   }
 }
 
@@ -141,12 +159,12 @@ export function withheldOp<T extends { op: string }>(_op: T): T {
 
 /** The ops of a list as `may` lets them be read: each `file` op on a path it refuses, withheld. */
 function readableOps(ops: unknown, may: FileReader): unknown {
-  return Array.isArray(ops) ? ops.map(op => (isFileOn(op) && !may(op.path) ? withheldOp(op) : op)) : ops
+  return Array.isArray(ops) ? ops.map(op => (refused(op, may) ? withheldOp(op as { op: string }) : op)) : ops
 }
 
 /** Whether a list of ops, or any event's, holds a `file` op on a path `may` refuses. */
 function holdsUnread(entry: { ops?: unknown; events?: unknown }, may: FileReader): boolean {
-  const unread = (ops: unknown) => Array.isArray(ops) && ops.some(op => isFileOn(op) && !may(op.path))
+  const unread = (ops: unknown) => Array.isArray(ops) && ops.some(op => refused(op, may))
   return unread(entry.ops) || (Array.isArray(entry.events) && entry.events.some(e => isObj(e) && unread(e.ops)))
 }
 
@@ -186,7 +204,7 @@ export function ledgerHoldsUnread(repo: string, may: FileReader): boolean {
   const walk = (x: unknown): boolean => {
     if (Array.isArray(x)) return x.some(walk)
     if (!isObj(x)) return false
-    if (isFileOn(x) && !may(x.path)) return true
+    if (refused(x, may) && ('op' in x)) return true
     return Object.values(x).some(walk)
   }
   return values.some(walk)
@@ -209,7 +227,7 @@ export function unreadRefusal(paths: readonly string[]): HttpError & { errors: {
 
 /** The paths of `ops`' `file` ops that `may` refuses. */
 export const unreadPaths = (ops: readonly unknown[], may: FileReader): string[] =>
-  may.all ? [] : ops.flatMap(op => (isFileOn(op) && !may(op.path) ? [op.path] : []))
+  may.all ? [] : ops.flatMap(op => (isFileOn(op) && !may(op.path) ? [op.path] : isRecordOp(op) && refused(op, may) ? [op.record] : []))
 
 /** Each path a section of a `git diff` names: its header's, its `---`/`+++` lines', a rename's or a copy's. */
 function pathsOf(section: string): string[] {
@@ -244,6 +262,15 @@ export function diffFor(diff: string, may: FileReader): string {
   }).join('')
 }
 
+/** Whether `may` refuses an op: a file op on a path it refuses, or a record op on a registry whose file it refuses (0.7.2). */
+function refused(op: unknown, may: FileReader): boolean {
+  if (isFileOn(op)) return !may(op.path)
+  return may.records !== undefined && isRecordOp(op) && !may.records(op.record)
+}
+function isRecordOp(op: unknown): op is { op: string; record: string } {
+  return typeof op === 'object' && op !== null && typeof (op as { record?: unknown }).record === 'string'
+}
+
 function isFileOn(op: unknown): op is { op: 'file'; path: string } {
   return typeof op === 'object' && op !== null && (op as { op?: unknown }).op === 'file' && typeof (op as { path?: unknown }).path === 'string'
 }
@@ -260,7 +287,7 @@ export function readableView<V extends object>(view: V, may: FileReader): V {
   const v = view as V & { ops?: unknown; events?: unknown; diff?: unknown; compare?: unknown; current?: unknown; stale?: unknown }
   if (!Array.isArray(v.ops)) return view
   if (!holdsUnread(v, may) && typeof v.diff !== 'string') return view
-  const unread = (op: unknown) => isFileOn(op) && !may(op.path)
+  const unread = (op: unknown) => refused(op, may)
   const git = gitOpsOf(v.ops as unknown[])
   const hidden = (list: unknown) => (Array.isArray(list) ? list.map((x, i) => (unread(git[i]) ? null : x)) : list)
   return {

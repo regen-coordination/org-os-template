@@ -58,5 +58,9 @@ function filesOf(text: string): FilesPolicy | null {
 
 /** The repository's `files` section (0.7.2, raw file reads by Role), through the read cache; null: none, or no file. */
 export function readFilesConfig(repo: string): FilesPolicy | null {
-  try { return readCacheFor(repo).get(join(repo, REL), filesOf) } catch { return null }
+  try { return readCacheFor(repo).get(join(repo, REL), filesOf) } catch (err) {
+    // No file: no section (0.7.1's behaviour). Any other failure to read it (a checkout mid-way, a permission) closes the
+    // files for that request rather than opening them (review I8).
+    return (err as NodeJS.ErrnoException)?.code === 'ENOENT' ? null : CLOSED
+  }
 }

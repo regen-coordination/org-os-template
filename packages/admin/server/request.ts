@@ -313,7 +313,7 @@ async function signedIn(repo: string, m: Membership, session: Session, act: bool
 /** The person's actor and viewer: with no Role, the public's view (Review Focus 2); otherwise a member whose roles are
  *  their Roles and the governance roles the members list gives their id (a steward listed in a role's `members` holds it). */
 function personWho(repo: string, p: RolesPerson): { actor: PersonActor; viewer: Viewer } {
-  const viewer: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, personActor(p), null)) }
+  const viewer: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, personActor(p), null)), hubRoles: [...p.roles] }
   // Their name is read as anyone who sees the actor may read the members file (Rule 4; T2d, the T2c review's finding 4):
   // presence and the comment it sends fall back to it for everyone on the page. With no Role, as the public may; with one,
   // as any member may (no hat, no role); a name that read does not say is their id when the members file holds it, never the

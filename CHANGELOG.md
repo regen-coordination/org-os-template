@@ -25,10 +25,21 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
     on that path, the ledger read whole (C2), proposal diffs and file ops.
   - `GET /api/registries`, `/api/registries/:name` (and `…/:id/changed`) and the map (`/api/resources`) give a member
     the records of a file kept from them as the public is given them: what the collection makes public stays theirs.
+  - The same holds for every other read of such a record: comments and mentions on it (the record is not there for that
+    member: no thread, no anchor matched against its text, no notification naming it), `GET /api/governance`, member
+    names wherever they are said (`displayNames`), the knowledge routes (the canon is `data/kb/**`), proposals (the
+    ledger, and record ops on a kept registry withheld as file ops are), and the staging tray (a record op on a kept
+    registry is refused as a path no rule governs).
+  - `role:` is judged against the viewer's Roles-table Roles (`hubRoles`, set for a person signed in by emailed link),
+    never a governance role of the same name. A wallet session holds none, so it reads only `members` and `hat:` paths.
+  - Left to the house, as its own configuration, whatever `files` says of their files: `/api/boards`,
+    `/api/collections`, `/api/visibility` and `/api/standards`.
   - The person at the machine reads as before. A `?as` preview is judged as the viewer it previews.
   - The policy check (`doctor`, a staged edit of `data/visibility.yaml`) refuses `public`, a path outside `data/`, a
-    `role:` that is no Roles-table Role, and a listed file below `role:steward` whose collection has field levels (a
-    file is read whole). `schemas/visibility.schema.json` takes `files`.
+    `role:` that is no Roles-table Role, an empty section, and any key (a path, a folder, the default) that opens a
+    file with field levels below `role:steward` (a file is read whole). Removing the section or widening a level is a
+    publication (§11.2). A section that can't be read, empty, or a file that can't be read for any reason but its
+    absence closes every data file. `schemas/visibility.schema.json` takes `files`.
   - **Opt-in:** an instance without a `files:` section sees 0.7.1 unchanged. 0.7.1 refuses the section
     (`additionalProperties`), so an instance adds it only once its house runs 0.7.2.
 

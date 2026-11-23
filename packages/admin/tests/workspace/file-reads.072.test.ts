@@ -110,8 +110,8 @@ describe('GET /api/files with a files section', () => {
 
   it('judges a viewer alone the same way (the reader the ledger, diffs and views take)', () => {
     const repo = repoOf(FILES)
-    const member = viewerReader(repo, { kind: 'member', id: ID.member, hats: [], roles: ['network-member'] })
-    const steward = viewerReader(repo, { kind: 'member', id: ID.steward, hats: [], roles: ['network-member', 'steward'] })
+    const member = viewerReader(repo, { kind: 'member', id: ID.member, hats: [], roles: ['network-member'], hubRoles: ['network-member'] })
+    const steward = viewerReader(repo, { kind: 'member', id: ID.steward, hats: [], roles: ['network-member', 'steward'], hubRoles: ['network-member', 'steward'] })
     expect([member('data/finances.yaml'), member('data/projects.yaml'), member('IDENTITY.md')]).toEqual([false, true, true])
     expect(steward('data/finances.yaml')).toBe(true)
   })
@@ -150,7 +150,7 @@ describe('registries and the map read from a file a member may not read', () => 
     // Without the files section's answer the same member is given the card: the section is what keeps it.
     const open = gateGraph({ kind: 'member', id: ID.member, hats: [], roles: ['network-member'] }, graph, new Levels(repo), undefined, undefined, () => true)
     expect(open.nodes.map(n => n.id)).toContain('task:t-1')
-    const steward = gateGraph({ kind: 'member', id: ID.steward, hats: [], roles: ['network-member', 'steward'] }, graph, new Levels(repo))
+    const steward = gateGraph({ kind: 'member', id: ID.steward, hats: [], roles: ['network-member', 'steward'], hubRoles: ['network-member', 'steward'] }, graph, new Levels(repo))
     expect(steward.nodes.map(n => n.id)).toEqual(['task:t-1', 'project:proj-001'])
     expect(steward.edges).toHaveLength(1)
   })
@@ -228,13 +228,15 @@ describe('the hosted server as Railway runs it', () => {
     vi.stubEnv('RESEND_API_KEY', 're_test_synthetic')
     vi.stubEnv('MAIL_FROM', 'hub@example.org')
     const mailer = recordingMailer()
-    const server = await startServer({ repo, port: 0, hosted: true, hostedConfig: { origin: HUB, host: new URL(HUB).host, portalOrigin: null, bind: '127.0.0.1', port: 0, trustProxy: false, portalDir: repo, portalEveryMs: null, push: false } as HostedConfig, mailer,
+    const server = await startServer({ repo, port: 0, hosted: true, hostedConfig: { origin: HUB, host: new URL(HUB).host, portalOrigin: null, bind: '127.0.0.1', port: 0, trustProxy: true, portalDir: repo, portalEveryMs: null, push: false } as HostedConfig, mailer,
       fetch: async () => { throw new Error('no network in this test') } })
     try {
       await server.privateStore!.replaceRoles(DOC)
       // Addressed as the Hub's origin, as Railway's proxy addresses it.
-      const ask = (path: string, init: RequestInit = {}, cookie?: string) => server.app.request(`${HUB}${path}`,
-        { ...init, headers: { host: new URL(HUB).host, 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } })
+      // Each request from its own address (the proxy is trusted), so the hosted rate limits never answer a sweep's request.
+      let n = 0
+      const ask = (path: string, init: RequestInit = {}, cookie?: string) => { n++; return Promise.resolve(server.app.request(`${HUB}${path}`,
+        { ...init, headers: { host: new URL(HUB).host, 'x-real-ip': `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`, 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } })) }
       const cookieOf = async (email: string) => {
         const before = mailer.sent.length
         const sent = await ask('/api/session/email', { method: 'POST', body: JSON.stringify({ email }) })
@@ -251,14 +253,16 @@ describe('the hosted server as Railway runs it', () => {
       const urls = new Set(routes.flatMap(p => ['tasks', 'finances', 'new'].map(name =>
         p.replace(':name', name).replace(':registry', name).replace(':id', 't-1').replace(/:[A-Za-z]+/g, 'x'))))
       const seen: string[] = []
+      const limited: string[] = []
       for (const url of urls) {
         const text = await Promise.race([
-          Promise.resolve(ask(url, {}, member)).then((r: Response) => r.text()).catch(() => ''),
+          Promise.resolve(ask(url, {}, member)).then(async (r: Response) => { if (r.status === 429) limited.push(url); return r.text() }).catch(() => ''),
           new Promise<string>(resolve => setTimeout(() => resolve(''), 2000)),
         ])
         for (const s of [FIN, TASK, NEW]) if (text.includes(s)) seen.push(`${url} → ${s}`)
       }
       expect(routes.length).toBeGreaterThan(50)
+      expect(limited).toEqual([])
       expect(seen).toEqual([])
       expect(await (await ask('/api/registries/tasks', {}, steward)).text()).toContain(TASK)
     } finally {

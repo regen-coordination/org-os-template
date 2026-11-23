@@ -519,7 +519,9 @@ const DERIVED = ['derived', 'evaluation', 'rules', 'stale', 'needsYou', 'can', '
 
 /** Proposal views as `viewer` may see them, each with its level. The public is given each one's public record (no hat
  *  reading, no restricted field) and what the machine derived from it. */
-export function gateProposals<V extends object>(viewer: Viewer, views: readonly V[], levels: Levels): Gated<V>[] {
+export function gateProposals<V extends object>(asked: Viewer, views: readonly V[], levels: Levels): Gated<V>[] {
+  // 0.7.2 (review I3): a member the ledger's file is kept from (the `files` section) is given the proposals as the public is.
+  const viewer = judgedAs(asked, levels.repo, 'proposals', fileLevels(levels.repo, asked))
   const idOf = (v: V) => String((v as { id?: unknown }).id)
   const entries = new Map(readLedger(levels.repo).entries.map(e => [String(e.id), e as Record<string, unknown>]))
   const level = (v: V) => { const e = entries.get(idOf(v)); return e ? levels.proposal(e) : MEMBERS }
