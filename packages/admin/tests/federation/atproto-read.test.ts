@@ -7,7 +7,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeFixtureRepo, removeFixtureRepo } from '../fixtures.ts'
 import { makeFakeNetwork, plcDid, type FakeNetwork } from '../fake-pds.ts'
-import { readRepo, atprotoCache, checkLinksAndRecords, MAX_PAGES, type Reading } from '../../server/federation/atproto/read.ts'
+import { readRepo, atprotoCache, checkLinksAndRecords, MAX_PAGES, ORGANIZATION_NSID, type Reading } from '../../server/federation/atproto/read.ts'
 import { LINK_NSID, PROFILE_NSID } from '../../lib/federation/links.mjs'
 import { stateDir } from '../../server/state.ts'
 import { opById, type InProcess } from '../../server/operations/catalogue.ts'
@@ -329,5 +329,45 @@ describe('federation.check-links reads atproto', () => {
     await expect.poll(() => finished.find(j => j.id === job.id), { interval: 20, timeout: 15_000 }).toBeTruthy()
     expect(finished.find(j => j.id === job.id)).toMatchObject({ status: 'ok', changed: [], surprises: [], sentence: 'Done. No file changed.' })
     expect(execSync('git status --porcelain', { cwd: repo }).toString()).toBe('')
+  })
+})
+
+describe('the Certified organization profile, for a DID under consideration (Task 12, path c)', () => {
+  const org = (urls: unknown) => ({ $type: ORGANIZATION_NSID, name: 'Bob Coop', urls })
+
+  it('readRepo lists it only when asked, keeping urls[].url and nothing else', async () => {
+    const net = network()
+    net.seed(BOB, ORGANIZATION_NSID, 'self', org([{ url: 'https://github.com/bob/bob-os' }, { url: 42 }, 'https://bare.example.org', { url: ' https://bob.example.net ' }]))
+    net.seed(BOB, ORGANIZATION_NSID, 'other', org([{ url: 'https://not-self.example.org' }]))
+    const plain = await readRepo(BOB, { ...net, now: NOW }) as Reading
+    expect(plain.organization).toBeUndefined()
+    expect(net.requests.some(r => r.url.includes(ORGANIZATION_NSID))).toBe(false)
+    const asked = await readRepo(BOB, { ...net, now: NOW, organization: true }) as Reading
+    expect(asked.organization).toEqual({ urls: ['https://github.com/bob/bob-os', 'https://bob.example.net'] })
+    expect(net.requests.filter(r => r.url.includes(`collection=${ORGANIZATION_NSID}`)).map(r => new URL(r.url).host)).toEqual([TWO])
+  })
+
+  it('no self record is null; a forged answer for it refuses the whole reading', async () => {
+    const net = network()
+    expect((await readRepo(ALICE, { ...net, now: NOW, organization: true }) as Reading).organization).toBeNull()
+    // only the organization collection holds a record, so only its listing can carry the forged uri
+    net.seed(BOB, ORGANIZATION_NSID, 'self', org([{ url: 'https://github.com/bob/bob-os' }]))
+    net.misbehave(TWO, { answerFor: ALICE })
+    expect(await readRepo(BOB, { ...net, now: NOW })).not.toHaveProperty('problem')
+    expect(await readRepo(BOB, { ...net, now: NOW, organization: true })).toEqual({ problem: `Not read: ${TWO} answered for another repository.` })
+  })
+
+  it('check-links by did and by handle list it; a later reading that did not list it keeps the last one', async () => {
+    const net = network()
+    net.seed(BOB, ORGANIZATION_NSID, 'self', org([{ url: 'https://github.com/bob/bob-os' }]))
+    await checkLinksAndRecords(repo, { did: BOB }, net, signal(), NOW)
+    expect(atprotoCache(repo).get(BOB)?.reading?.organization).toEqual({ urls: ['https://github.com/bob/bob-os'] })
+    // the bulk check reads the DID without the organization collection: the last listed one is kept
+    atprotoCache(repo).put(BOB, await readRepo(BOB, { ...net, now: LATER }) as Reading, LATER)
+    expect(atprotoCache(repo).get(BOB)?.reading).toMatchObject({ fetchedAt: LATER.toISOString(), organization: { urls: ['https://github.com/bob/bob-os'] } })
+    // a lookup that finds none any more clears it
+    const gone = network()
+    await checkLinksAndRecords(repo, { handle: 'bob.example.net' }, gone, signal(), LATER)
+    expect(atprotoCache(repo).get(BOB)?.reading?.organization).toBeNull()
   })
 })

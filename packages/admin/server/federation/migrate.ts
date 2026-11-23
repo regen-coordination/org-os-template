@@ -18,7 +18,7 @@ import { didBinding, migrationRows, BINDING, type AtprotoView, type MigrationRow
 import { nodePeerIO } from '../federation-io.ts'
 import type { Runner } from '../resources/types.ts'
 import { remoteCache, wellKnownUrlOf } from './remote.ts'
-import { atprotoCache } from './atproto/read.ts'
+import { atprotoCache, type Reading } from './atproto/read.ts'
 import { normalHandle } from './atproto/resolve.ts'
 import { byFiles, selfAddressesOf } from './link-state.ts'
 import { readTrunkFederation, type TrunkFederation } from './trunk.ts'
@@ -47,11 +47,19 @@ export function claimedDid(repo: string, url: string | null): string | null {
   return doc && typeof doc.did === 'string' && DID_PATTERN.test(doc.did) ? doc.did : null
 }
 
+/** The addresses a DID's own profiles name, as its last reading kept them: `example.orgosnetwork.profile` `instance` and
+ *  `homepage`, and the Certified organization profile's `urls[].url`. */
+export function profileNames(r: Reading): string[] {
+  const rest = r.profile?.value.rest ?? {}
+  const own = [rest.instance, rest.homepage].filter((v): v is string => typeof v === 'string')
+  return [...own, ...(r.organization?.urls ?? [])]
+}
+
 /** The atproto cache, as `didBinding` reads it. */
 export function bindingView(repo: string): AtprotoView {
   const cache = atprotoCache(repo)
   return {
-    readingOf: did => { const r = cache.get(did)?.reading; return r ? { handle: r.handle } : null },
+    readingOf: did => { const r = cache.get(did)?.reading; return r ? { handle: r.handle, names: profileNames(r) } : null },
     didOfHandle: h => cache.didOfHandle(h)?.did ?? null,
   }
 }

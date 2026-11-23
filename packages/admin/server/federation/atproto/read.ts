@@ -44,9 +44,23 @@ export interface Reading {
   links: RecordOf<LinkRecord>[]
   /** Records whose value did not parse (links, and a profile `self`). */
   skipped: number
+  /** The Certified organization profile's urls, when this reading listed that collection (`ReadDeps.organization`):
+   *  null when it has no `self` record. Absent when it wasn't listed; the cache then keeps the last one listed. */
+  organization?: { urls: string[] } | null
   fetchedAt: string
 }
-export interface ReadDeps extends ResolveDeps { now?: Date }
+export interface ReadDeps extends ResolveDeps {
+  now?: Date
+  /** Also list `app.certified.actor.organization` (key self): only for a DID a confirmed check looks up by itself, so
+   *  its profile can tie it to a peer's address (Task 12). */
+  organization?: boolean
+}
+
+/** A Certified organization profile, key `self`: its `urls[]` (each `{ url }`) say which addresses the org is. */
+export const ORGANIZATION_NSID = 'app.certified.actor.organization'
+/** The most urls kept from one organization profile, and the longest url kept. */
+const ORG_URLS_MAX = 50
+const ORG_URL_LEN = 2048
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 /** An atproto record key. */
@@ -110,7 +124,26 @@ export async function readRepo(did: string, deps: ReadDeps): Promise<Reading | P
     if (value === null) { skipped += 1; unreadProfile = { uri: self.uri, cid: self.cid } }
     else profile = { uri: self.uri, cid: self.cid, value }
   }
-  return { did, pds: doc.pds, handle: doc.handle, profile, unreadProfile, links: parsed, skipped, fetchedAt: (deps.now ?? new Date()).toISOString() }
+  const reading: Reading = { did, pds: doc.pds, handle: doc.handle, profile, unreadProfile, links: parsed, skipped, fetchedAt: (deps.now ?? new Date()).toISOString() }
+  if (deps.organization) {
+    const orgs = await listAll(doc.pds, did, ORGANIZATION_NSID, deps)
+    if ('problem' in orgs) return orgs
+    const own = orgs.records.find(r => r.uri === `at://${did}/${ORGANIZATION_NSID}/self`)
+    reading.organization = own ? { urls: organizationUrls(own.value) } : null
+  }
+  return reading
+}
+
+/** The `urls[].url` strings of an organization profile's value, capped; anything else in it is ignored. */
+function organizationUrls(value: unknown): string[] {
+  const list = isObj(value) && Array.isArray(value.urls) ? value.urls : []
+  const out: string[] = []
+  for (const e of list) {
+    if (out.length >= ORG_URLS_MAX) break
+    const url = isObj(e) ? e.url : undefined
+    if (typeof url === 'string' && url.trim() !== '' && url.length <= ORG_URL_LEN) out.push(url.trim())
+  }
+  return out
 }
 
 export interface CacheEntry { did: string; reading: Reading | null; lastProblem: { at: string; text: string } | null }
@@ -145,9 +178,13 @@ export function atprotoCache(repo: string) {
     get,
     /** A reading replaces the last one and clears `lastProblem`; a problem is kept beside the last good reading. */
     put(did: string, got: Reading | Problem, now: Date = new Date()): void {
-      const entry: CacheEntry = 'problem' in got
-        ? { did, reading: get(did)?.reading ?? null, lastProblem: { at: now.toISOString(), text: got.problem } }
-        : { did, reading: got, lastProblem: null }
+      const before = get(did)?.reading ?? null
+      // A reading that didn't list the organization profile keeps the last one a confirmed lookup listed.
+      const carried = !('problem' in got) && got.organization === undefined && before?.organization !== undefined
+        ? { ...got, organization: before.organization } : got
+      const entry: CacheEntry = 'problem' in carried
+        ? { did, reading: before, lastProblem: { at: now.toISOString(), text: carried.problem } }
+        : { did, reading: carried, lastProblem: null }
       save(didFile(did), entry)
     },
     /** The PDS and handle of `did`'s last reading, while it is less than 24 hours old; for readers that must not fetch. */
@@ -243,6 +280,8 @@ export async function checkLinksAndRecords(repo: string, params: Record<string, 
   const target = lookupTarget(params)
   if ('problem' in target) throw new Error(target.problem)
   const d: ReadDeps = { ...deps, signal, now }
+  // A DID or a handle looked up by itself is one under consideration: its organization profile is listed too (Task 12).
+  const one: ReadDeps = { ...d, organization: true }
   const cache = atprotoCache(repo)
 
   if (target.kind === 'address') return checkLinks(repo, { address: target.value }, deps, signal, now)
@@ -251,13 +290,13 @@ export async function checkLinksAndRecords(repo: string, params: Record<string, 
     const got = await resolveHandle(target.value, d)
     if ('problem' in got) throw new Error(got.problem)
     cache.putHandle(target.value, got.did, now)
-    const reading = await readRepo(got.did, d)
+    const reading = await readRepo(got.did, one)
     cache.put(got.did, reading, now)
     return `${target.value} is ${got.did}.\nIts records: ${said(reading)}\n`
   }
 
   if (target.kind === 'did') {
-    const reading = await readRepo(target.value, d)
+    const reading = await readRepo(target.value, one)
     cache.put(target.value, reading, now)
     if ('problem' in reading) throw new Error(reading.problem)
     const lines = [`${target.value}: ${said(reading)}`]

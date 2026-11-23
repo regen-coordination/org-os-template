@@ -118,9 +118,10 @@ const build = () => {
 /** A hub under `governance` (null: no file, the solo default) with this join block, its kms, and the node's
  *  federation.json in the cache of the last lookup (it carries the node's DID). */
 /** What a confirmed `federation.check-links` leaves when `did`'s document names `handle` and the handle names it back. */
-const confirm = (did: string, handle: string) => {
+const confirm = (did: string, handle: string, organizationUrls?: string[]) => {
   const cache = atprotoCache(repo)
-  cache.put(did, { did, pds: 'https://pds-two.example.net', handle, profile: null, links: [], skipped: 0, fetchedAt: NOW.toISOString() }, NOW)
+  cache.put(did, { did, pds: 'https://pds-two.example.net', handle, profile: null, links: [], skipped: 0, fetchedAt: NOW.toISOString(),
+    ...(organizationUrls ? { organization: { urls: organizationUrls } } : {}) }, NOW)
   cache.putHandle(handle, did, NOW)
 }
 
@@ -243,6 +244,23 @@ describe('builds the hub change from fields, never from the file', () => {
     setup(null, OPEN('LD-2026-040'), false)
     const [a] = await importText(requestText(request()))
     expect(a.outcome).toBe('accepted')
+    expect(peers()[0].did).toBeUndefined()
+  })
+
+  it('an asker at a github.com url: its DID is written when its own Certified profile lists that exact url (path c)', async () => {
+    const REPO_URL = 'https://github.com/mesa-coop/mesa-os'
+    const at = (urls: string[]) => {
+      setup(null, OPEN('LD-2026-040'), false)
+      remoteCache(repo).put(wellKnownUrlOf(REPO_URL)!, { spec: 'org-os/federation/1', name: 'Mesa Node', type: 'LocalNode', did: NODE }, NOW)
+      confirm(NODE, 'mesa-coop.certified.one', urls)
+    }
+    const asker = request({ from: { url: REPO_URL } })
+    at([REPO_URL])
+    expect((await importText(requestText(asker)))[0].outcome).toBe('accepted')
+    expect(peers()[0].did).toBe(NODE)
+    removeFixtureRepo(repo)
+    at(['https://github.com/other/repo'])
+    expect((await importText(requestText(asker)))[0].outcome).toBe('accepted')
     expect(peers()[0].did).toBeUndefined()
   })
 

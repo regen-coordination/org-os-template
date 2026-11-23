@@ -35,6 +35,9 @@ const HUB = plcDid('mesh-hub')
 const SEAT = plcDid('seat-council')
 const QUIET = plcDid('quiet-sibling')
 const GROVE = plcDid('grove-sibling')
+const COOP = plcDid('fixture-coop')
+const COOP_REPO = 'https://github.com/fixture-coop/fixture-os'
+const ORG_NSID = 'app.certified.actor.organization'
 const HUB_SITE = 'https://mesh-hub.example.org'
 const GROVE_SITE = 'https://grove-sibling.example.org'
 const ORIGIN = 'https://github.com/fixture/fixture-org'
@@ -100,6 +103,7 @@ beforeEach(() => {
       [HUB]: { handle: 'mesh-hub.example.org', password: 'hub-pass' },
       [SEAT]: { handle: 'seat-council.example.org', password: 'seat-pass' },
       [QUIET]: { handle: 'quiet-sibling.example.org', password: 'quiet-pass' },
+      [COOP]: { handle: 'fixture-coop.certified.one', password: 'coop-pass' },
     } },
   } })
 })
@@ -367,5 +371,67 @@ describe('POST /api/federation/migration', () => {
     // every write path so far: none reached a PDS
     expect(net.writes).toEqual([])
     expect(readFileSync(join(repo, 'federation.yaml'), 'utf8')).toContain('link: peerOf')
+  })
+})
+
+describe('a peer at a github.com url, tied by its DID\'s own profile (controller ruling, path c)', () => {
+  /** FED plus the coop, whose instance lives on github.com and whose DID has a Certified handle. */
+  const COOP_FED = `${FED}  - name: Fixture Coop\n    url: ${COOP_REPO}\n    relationship: sibling\n    link: peerOf\n`
+  const COOP_INDEX = 5
+  const organization = (urls: string[]) => net.seed(COOP, ORG_NSID, 'self', { $type: ORG_NSID, name: 'Fixture Coop', urls: urls.map(url => ({ url })) })
+
+  it('its Certified organization profile lists that exact url: verified, and the DID is written', async () => {
+    setup(CONSENSUS, COOP_FED)
+    organization(['https://fixture-coop.example.net', COOP_REPO])
+    await lookUp({ did: COOP })
+    const row = (await rows()).json.rows.find(r => r.index === COOP_INDEX)!
+    expect(row).toMatchObject({ name: 'Fixture Coop', did: null })
+    const { res, json } = await migrate([{ index: COOP_INDEX, did: COOP }])
+    expect(res.status, JSON.stringify(json)).toBe(200)
+    expect((parse(stagedFed()!) as { peers: Record<string, unknown>[] }).peers[COOP_INDEX].did).toBe(COOP)
+    applyStaged()
+    expect((await rows()).json.rows.find(r => r.index === COOP_INDEX)).toMatchObject({ did: COOP, didVerified: true, publishable: true })
+    expect(net.writes).toEqual([])
+  })
+
+  it('by handle too, once the handle was checked', async () => {
+    setup(CONSENSUS, COOP_FED)
+    organization([COOP_REPO])
+    await lookUp({ handle: 'fixture-coop.certified.one' })
+    expect((await migrate([{ index: COOP_INDEX, did: 'fixture-coop.certified.one' }])).res.status).toBe(200)
+  })
+
+  it('its own example.orgosnetwork.profile naming the url as instance ties it as well', async () => {
+    setup(CONSENSUS, COOP_FED)
+    net.seed(COOP, 'example.orgosnetwork.profile', 'self', { $type: 'example.orgosnetwork.profile', name: 'Fixture Coop', networks: [], instance: COOP_REPO })
+    await lookUp({ did: COOP })
+    expect((await migrate([{ index: COOP_INDEX, did: COOP }])).res.status).toBe(200)
+  })
+
+  it('a profile listing only another github.com repo is not verified: github.com is shared', async () => {
+    setup(CONSENSUS, COOP_FED)
+    organization(['https://github.com/other/repo'])
+    await lookUp({ did: COOP })
+    const { res, json } = await migrate([{ index: COOP_INDEX, did: COOP }])
+    expect([res.status, json.error]).toEqual([400, BINDING.otherHost('fixture-coop.certified.one', 'github.com')])
+    expect(stagedFed()).toBeNull()
+  })
+
+  it('a profile naming a different host is not verified', async () => {
+    setup(CONSENSUS, COOP_FED)
+    organization(['https://somewhere-else.example.net'])
+    await lookUp({ did: COOP })
+    expect((await migrate([{ index: COOP_INDEX, did: COOP }])).res.status).toBe(400)
+  })
+
+  it('a DID only the peer\'s federation.json names is still a suggestion', async () => {
+    setup(CONSENSUS, COOP_FED)
+    organization([COOP_REPO])
+    remoteCache(repo).put(wellKnownUrlOf(COOP_REPO)!, { spec: 'org-os/federation/1', name: 'Fixture Coop', did: COOP }, NOW)
+    const row = (await rows()).json.rows.find(r => r.index === COOP_INDEX)!
+    expect(row).toMatchObject({ did: COOP, didSource: 'their federation.json', didVerified: false, publishable: false })
+    const { res, json } = await migrate([{ index: COOP_INDEX, did: COOP }])
+    expect([res.status, json.error]).toEqual([400, 'Look it up first.'])
+    expect(net.requests).toEqual([])
   })
 })
