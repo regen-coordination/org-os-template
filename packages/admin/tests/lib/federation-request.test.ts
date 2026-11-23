@@ -44,19 +44,13 @@ describe('federation request', () => {
     expect(parseRequest('- a\n- b\n').request).toBeNull()
     expect(parseRequest(': : :\n\t[').request).toBeNull()
   })
-  it('hubPeerOf gives exactly the six fields and the decision, and the did when one is known', () => {
+  it('hubPeerOf gives exactly the six fields and the decision, and never a did (final review F-I2)', () => {
     expect(hubPeerOf(make(), 'request 3f8a')).toEqual({
       name: 'Mesa Verde', url: 'https://github.com/mesa-verde/mesa-os', type: 'LocalNode', trust: 'read',
       relationship: 'node', since: '2026-11-22', decision: 'request 3f8a',
     })
-    const did = 'did:plc:abcdefghijklmnopqrstuvwx'
-    expect(hubPeerOf(make(), 'request 3f8a', did)).toEqual({
-      name: 'Mesa Verde', url: 'https://github.com/mesa-verde/mesa-os', type: 'LocalNode', trust: 'read',
-      relationship: 'node', since: '2026-11-22', decision: 'request 3f8a', did,
-    })
-    // a did that isn't one, or none at all, is left out
-    expect(hubPeerOf(make(), 'request 3f8a', 'not-a-did')).not.toHaveProperty('did')
-    expect(hubPeerOf(make(), 'request 3f8a', null)).not.toHaveProperty('did')
+    // a DID reaches federation.yaml only through the migration list: anything passed beside is ignored
+    expect(hubPeerOf(make(), 'request 3f8a', ...(['did:plc:abcdefghijklmnopqrstuvwx'] as unknown as []))).not.toHaveProperty('did')
   })
   it('refuses a name, type or network with a control or format character, or longer than 200 characters', () => {
     const bad = (from: Record<string, string>, network?: string) =>

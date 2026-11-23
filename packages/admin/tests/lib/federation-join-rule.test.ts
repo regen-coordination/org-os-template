@@ -30,13 +30,12 @@ const accept = (newPeer: Record<string, unknown>, o: { join?: Record<string, unk
 }
 
 describe('clean cases stay clean', () => {
-  it('a standing-decision acceptance of hubPeerOf\'s shape, with and without did', () => {
+  it('a standing-decision acceptance of hubPeerOf\'s shape (no did)', () => {
     expect(accept(peer({ decision: 'LD-2026-040' }))).toBeNull()
-    expect(accept(peer({ decision: 'LD-2026-040', did: 'did:plc:abcdefghijklmnopqrstuvwx' }))).toBeNull()
   })
-  it('an existing node peer given the decision it lacked', () => {
+  it('an existing node peer given the decision it lacked, its did kept as it was', () => {
     expect(accept(peer({ decision: 'LD-2026-040' }), { peersBefore: [peer()] })).toBeNull()
-    expect(accept(peer({ decision: 'LD-2026-040', did: 'did:plc:abcdefghijklmnopqrstuvwx' }), { peersBefore: [peer()] })).toBeNull()
+    expect(accept(peer({ decision: 'LD-2026-040', did: 'did:plc:abcdefghijklmnopqrstuvwx' }), { peersBefore: [peer({ did: 'did:plc:abcdefghijklmnopqrstuvwx' })] })).toBeNull()
   })
   it('an existing member that keeps its earlier decision', () => {
     expect(judge({
@@ -136,6 +135,18 @@ describe('fix round 3: what the policy asks, and the rest of the record', () => 
   it('a did that is not one, on a new or an existing entry', () => {
     expect(accept(peer({ decision: 'LD-2026-040', did: 'not-a-did' }))).toMatch(/did/)
     expect(accept(peer({ decision: 'LD-2026-040', did: 'not-a-did' }), { peersBefore: [peer()] })).toMatch(/did/)
+  })
+  it('any did, under the join rule: a DID reaches federation.yaml only through the migration list (final review F-I2)', () => {
+    const DID = 'did:plc:abcdefghijklmnopqrstuvwx'
+    const OTHER = 'did:plc:zyxwvutsrqponmlkjihgfedc'
+    const viaMigration = /migration list/
+    // a new entry carrying one
+    expect(accept(peer({ decision: 'LD-2026-040', did: DID }))).toMatch(viaMigration)
+    // filling a missing one on an existing entry
+    expect(accept(peer({ decision: 'LD-2026-040', did: DID }), { peersBefore: [peer()] })).toMatch(viaMigration)
+    // replacing one, or removing one
+    expect(accept(peer({ decision: 'LD-2026-040', did: OTHER }), { peersBefore: [peer({ did: DID })] })).toMatch(viaMigration)
+    expect(accept(peer({ decision: 'LD-2026-040' }), { peersBefore: [peer({ did: DID })] })).toMatch(viaMigration)
   })
   it('since changed on an existing entry', () => {
     expect(accept(peer({ decision: 'LD-2026-040', since: '2026-11-23' }), { peersBefore: [peer()] })).toMatch(/since/)

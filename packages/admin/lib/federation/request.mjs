@@ -7,7 +7,6 @@
 
 import { parse, stringify } from 'yaml'
 import { isPublicUrl } from './peers.mjs'
-import { DID_PATTERN } from './read.mjs'
 
 export const REQUEST_SPEC = 'org-os/federation-request/1'
 
@@ -22,7 +21,8 @@ const TOP = ['spec', 'id', 'created', 'from', 'hub', 'network', 'answers', 'invi
 export const LABEL_MAX = 200
 /** Control and format characters (ESC, NUL, line breaks, RLO and the other bidi marks) and the line and paragraph
  *  separators (U+2028, U+2029): never in a name, type or network. */
-const CONTROL = /[\p{Cc}\p{Cf}\u2028\u2029]/u
+/** A control or format character, or a line or paragraph separator: refused in a request, stripped from what is shown. */
+export const CONTROL = /[\p{Cc}\p{Cf}\u2028\u2029]/u
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
 const isObj = v => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -108,14 +108,12 @@ export function requestText(request) {
   return stringify(ordered)
 }
 
-/** The one `peers` entry a hub adds for an accepted request, built from validated fields only (R13). `did` is the one
- *  the node's own federation.json carries, as the hub last read it (never from the request); left out when unknown.
- *  @param {FederationRequest} request @param {string} decision where the choice was recorded
- *  @param {string | null} [did] */
-export function hubPeerOf(request, decision, did) {
+/** The one `peers` entry a hub adds for an accepted request, built from validated fields only (R13). It never carries
+ *  a `did`: a DID reaches federation.yaml only through the migration list, with the two-sided binding (final review F-I2).
+ *  @param {FederationRequest} request @param {string} decision where the choice was recorded */
+export function hubPeerOf(request, decision) {
   return {
     name: request.from.name, url: request.from.url, type: request.from.type, trust: 'read', relationship: 'node',
     since: request.created.slice(0, 10), decision,
-    ...(typeof did === 'string' && DID_PATTERN.test(did) ? { did } : {}),
   }
 }

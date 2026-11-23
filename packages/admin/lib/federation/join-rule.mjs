@@ -16,10 +16,11 @@
 //     expired at the commit's date, whose `used_by` this commit sets to the record (nothing else in data/invites.yaml
 //     changes);
 //   - federation.yaml changes nothing but the requesting url's one peer entry. A new entry has exactly `hubPeerOf`'s shape
-//     (keys among name, url, type, trust, relationship, since, decision, did; trust read; relationship node; decision the
-//     Org-Decision; name, type and url the record's; did, when written, a DID). An existing entry must already be a node,
-//     and only its decision (to the Org-Decision) and did (a DID) may be added, each only where it had none. After the
-//     commit the entry holds a decision;
+//     (keys among name, url, type, trust, relationship, since, decision; trust read; relationship node; decision the
+//     Org-Decision; name, type and url the record's). An existing entry must already be a node, and only its decision
+//     (to the Org-Decision) may be added, where it had none. After the commit the entry holds a decision;
+//   - no `did` is written, filled, changed or removed (final review F-I2): an asker never supplies a DID (R13), and a DID
+//     reaches federation.yaml only through the migration list, a governed identity change with the two-sided binding;
 //   - an acceptance meets the policy's own asks at the parent: the request's type is among `join.types` (when listed),
 //     and every `join.asks` has a non-empty answer; an invite is also for the record's network;
 //   - the records are a list: every record at the parent stays, in place and unchanged, and one is appended, whose
@@ -27,12 +28,13 @@
 // Pure: parsed documents in, a sentence or null out. No node:* import.
 
 import { expiryTime } from './invite.mjs'
-import { DID_PATTERN } from './read.mjs'
 
 export const JOIN_RULE = 'federation/join'
 export const JOIN_FILES = Object.freeze(['federation.yaml', 'data/federation-requests.yaml', 'data/invites.yaml'])
 /** The keys `hubPeerOf` writes. */
-const PEER_KEYS = Object.freeze(['name', 'url', 'type', 'trust', 'relationship', 'since', 'decision', 'did'])
+const PEER_KEYS = Object.freeze(['name', 'url', 'type', 'trust', 'relationship', 'since', 'decision'])
+/** Why a `did` never changes under this rule. */
+const NO_DID = 'which the join rule never does: a DID is added through the migration list'
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
 const isObj = v => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -141,24 +143,23 @@ export function joinCommitProblem({ files, decision, date, before, after }) {
 
   if (mineBefore.length === 0) {
     // a new entry: exactly hubPeerOf's shape, from the record
+    if (peer.did !== undefined) return `its new peer entry carries a did, ${NO_DID}`
     const extra = Object.keys(peer).filter(k => !PEER_KEYS.includes(k))
     if (extra.length > 0) return `its new peer entry carries ${extra.join(', ')}, which a hub's acceptance never writes`
     if (peer.trust !== 'read') return `its new peer entry has trust ${String(peer.trust)}, where an acceptance gives read`
     if (peer.relationship !== 'node') return `its new peer entry has relationship ${String(peer.relationship)}, where an acceptance makes a node`
     if (peer.decision !== decision) return `its new peer entry's decision (${String(peer.decision)}) is not its Org-Decision`
-    if (peer.did !== undefined && !(typeof peer.did === 'string' && DID_PATTERN.test(peer.did))) return 'its new peer entry\'s did is not a DID'
     for (const key of ['name', 'type', 'url']) {
       if (peer[key] !== recFrom[key]) return `its new peer entry's ${key} is not the one its record holds`
     }
     return null
   }
-  // an existing entry: already a node; only decision and did change, each only where it had none (the server fills a
-  // missing did on an acceptance, which is the only commit that touches an existing entry here)
+  // an existing entry: already a node; only its decision changes, where it had none
   const old = /** @type {Record<string, unknown>} */ (mineBefore[0])
   if (old.relationship !== 'node') return `it gives a decision to the requesting instance's peer entry, whose relationship is ${String(old.relationship ?? 'none')}, not node`
   for (const key of new Set([...Object.keys(old), ...Object.keys(peer)])) {
     if (same(old[key], peer[key])) continue
-    if (key === 'did' && absent(old.did) && typeof peer.did === 'string' && DID_PATTERN.test(peer.did)) continue
+    if (key === 'did') return `it changes the did on the existing peer entry of the requesting instance, ${NO_DID}`
     if (key === 'decision' && absent(old.decision) && peer.decision === decision) continue
     return `it changes ${key} on the existing peer entry of the requesting instance`
   }

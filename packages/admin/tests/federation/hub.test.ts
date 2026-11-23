@@ -93,8 +93,8 @@ const FED = (joinBlock: JoinBlock, more = '') => [
   'peers: []', more,
 ].join('\n')
 
-const request = (o: { id?: string; from?: Partial<{ name: string; type: string; url: string }>; answers?: Record<string, string>; invite?: string; network?: string } = {}) => buildRequest({
-  id: o.id ?? ID_A, from: { name: 'Mesa Node', type: 'LocalNode', url: NODE_URL, ...o.from }, hub: { name: 'Mesh Hub', url: 'https://mesh-hub.example.org' },
+const request = (o: { id?: string; from?: Partial<{ name: string; type: string; url: string }>; answers?: Record<string, string>; invite?: string; network?: string; hubUrl?: string } = {}) => buildRequest({
+  id: o.id ?? ID_A, from: { name: 'Mesa Node', type: 'LocalNode', url: NODE_URL, ...o.from }, hub: { name: 'Mesh Hub', url: o.hubUrl ?? 'https://mesh-hub.example.org' },
   network: o.network ?? 'Mesh', answers: o.answers ?? { purpose: 'we work on soil' }, ...(o.invite ? { invite: o.invite } : {}), now: '2026-11-22T10:00:00.000Z',
 })
 
@@ -191,6 +191,16 @@ const governance = (base: string) => {
 const shown = (s: string) => { expect(s).not.toMatch(/[\p{Cc}\p{Cf}]/u) }
 const reject = async (id: string) => { as('bruno'); const r = await post(`/api/proposals/${id}/close`, { outcome: 'rejected', text: 'no' }); as('steward-a'); return r }
 const ownCheck = async () => atprotoCache(repo).put(SELF, await readRepo(SELF, { fetch: net.fetch, lookup: net.lookup, now: NOW }), NOW)
+/** The governed identity change that adds a member's DID after its acceptance (final review F-I2): the migration list,
+ *  under the two-sided binding. An acceptance never writes one. On a solo hub it commits. */
+const migrateDid = async (url: string, did: string) => {
+  const index = peers().findIndex(p => p.url === url)
+  expect(index).toBeGreaterThanOrEqual(0)
+  const res = await post('/api/federation/migration', { set: [{ index, did }] })
+  const body = await res.json() as { commit?: string }
+  expect(res.status, JSON.stringify(body)).toBe(200)
+  expect(body.commit, JSON.stringify(body)).toBeTruthy()
+}
 const issueBody = (text: string) => `Join request from Mesa Node for Mesh.\n\n\`\`\`yaml\n${text}\`\`\`\n`
 
 const OPEN = (decision?: string) => ({ policy: 'open', asks: ['purpose'], where: WHERE, ...(decision ? { decision } : {}) })
@@ -211,7 +221,7 @@ describe('builds the hub change from fields, never from the file', () => {
     expect(fedText()).not.toContain('evil')
   })
 
-  it('a valid one adds exactly one peer, built from the validated fields and the cached did, and touches no other file', async () => {
+  it('a valid one adds exactly one peer, built from the validated fields (no did), and touches no other file', async () => {
     setup(null, OPEN('LD-2026-040'))
     const before = parse(fedText()) as Record<string, unknown>
     const [a] = await importText(requestText(request()))
@@ -223,44 +233,33 @@ describe('builds the hub change from fields, never from the file', () => {
     const { peers: p1, ...rest1 } = after
     expect(rest1).toEqual(rest0)
     expect(p0).toEqual([])
-    expect(p1).toEqual([hubPeerOf(request(), 'LD-2026-040', NODE)])
+    expect(p1).toEqual([hubPeerOf(request(), 'LD-2026-040')])
+    expect((p1 as Record<string, unknown>[])[0].did).toBeUndefined()
     expect(fedText()).toContain("# the hub's federation manifest")
     expect(parseTrailers(git('log', '-1', '--format=%B'))).toMatchObject({ actor: 'steward-a', decision: 'LD-2026-040' })
     expect(git('log', '-1', '--format=%s').trim()).toBe('federation: accept Mesa Node into Mesh')
   })
 
-  it('the did is written only when a confirmed check tied it to the asker\'s url; a DID its federation.json only claims is not (Task 12)', async () => {
+  it('no did is written at acceptance, even one a confirmed check tied to the asker\'s url; the migration list adds it (F-I2)', async () => {
     setup(null, OPEN('LD-2026-040'))
-    // the asker's federation.json claims the hub's own DID, whose checked handle is the hub's host, not the asker's
-    remoteCache(repo).put(wellKnownUrlOf(NODE_URL)!, { spec: 'org-os/federation/1', name: 'Mesa Node', type: 'LocalNode', did: SELF }, NOW)
-    confirm(SELF, 'mesh-hub.example.org')
     const [a] = await importText(requestText(request()))
     expect(a.outcome).toBe('accepted')
     expect(peers()).toEqual([hubPeerOf(request(), 'LD-2026-040')])
     expect(peers()[0].did).toBeUndefined()
-  })
-
-  it('a DID its federation.json names but no confirmed check tied to it is not written either (Task 12)', async () => {
-    setup(null, OPEN('LD-2026-040'), false)
-    const [a] = await importText(requestText(request()))
-    expect(a.outcome).toBe('accepted')
-    expect(peers()[0].did).toBeUndefined()
-  })
-
-  it('an asker at a github.com url: its DID is written when its own Certified profile lists that exact url (path c)', async () => {
-    const REPO_URL = 'https://github.com/mesa-coop/mesa-os'
-    const at = (urls: string[]) => {
-      setup(null, OPEN('LD-2026-040'), false)
-      remoteCache(repo).put(wellKnownUrlOf(REPO_URL)!, { spec: 'org-os/federation/1', name: 'Mesa Node', type: 'LocalNode', did: NODE }, NOW)
-      confirm(NODE, 'mesa-coop.certified.one', urls)
-    }
-    const asker = request({ from: { url: REPO_URL } })
-    at([REPO_URL])
-    expect((await importText(requestText(asker)))[0].outcome).toBe('accepted')
+    // the migration list offers the DID the two-sided binding ties to the member, and sets it as its own identity change
+    const listed = await (await app.request('/api/federation/migration')).json() as { rows: { index: number; did: string | null; binding: string | null }[] }
+    expect(listed.rows).toEqual([expect.objectContaining({ index: 0, did: NODE, binding: null })])
+    const base = head()
+    await migrateDid(NODE_URL, NODE)
     expect(peers()[0].did).toBe(NODE)
-    removeFixtureRepo(repo)
-    at(['https://github.com/other/repo'])
-    expect((await importText(requestText(asker)))[0].outcome).toBe('accepted')
+    expect(git('log', '-1', '--format=%B')).not.toContain('Org-Rule: federation/join')
+    expect(governance(base).status, governance(base).out).toBe(0)
+  })
+
+  it('a decided held request and a ratified proposal write no did either (F-I2)', async () => {
+    setup(null, APPROVAL)
+    await importText(requestText(request()))
+    expect((await post(`/api/federation/requests/${ID_A}/decide`, { accept: true })).status).toBe(200)
     expect(peers()[0].did).toBeUndefined()
   })
 
@@ -270,7 +269,7 @@ describe('builds the hub change from fields, never from the file', () => {
     const [a] = await importText(requestText(sneaky))
     expect(a.outcome).toBe('accepted')
     expect(peers()).toHaveLength(1)
-    expect(Object.keys(peers()[0]).sort()).toEqual(['decision', 'did', 'name', 'relationship', 'since', 'trust', 'type', 'url'])
+    expect(Object.keys(peers()[0]).sort()).toEqual(['decision', 'name', 'relationship', 'since', 'trust', 'type', 'url'])
     expect(peers()[0].name).toBe('Mesa: {peers: [evil]}')
     expect(fedText()).not.toContain('{ name: evil }')
     expect(fedText()).not.toContain('IDENTITY.md')
@@ -398,6 +397,22 @@ describe('one case per outcome', () => {
     expect(peers()).toEqual([])
   })
 
+  it('a request addressed to another hub is refused with a sentence, and admits no one (final review)', async () => {
+    setup(null, OPEN('LD-2026-040'))
+    const [a] = await importText(requestText(request({ hubUrl: 'https://other-hub.example.org' })))
+    expect(a).toMatchObject({ outcome: 'refused', sentence: `Refused: ${SENTENCES.notHere}` })
+    expect(records()[0]).toMatchObject({ id: ID_A, outcome: 'refused', reason: SENTENCES.notHere })
+    expect(peers()).toEqual([])
+  })
+
+  it("this hub's url written another way (case, a trailing slash, its federation.json) is this hub", async () => {
+    setup(null, OPEN('LD-2026-040'))
+    const [a] = await importText(requestText(request({ hubUrl: 'https://Mesh-Hub.example.org/' })))
+    expect(a.outcome).toBe('accepted')
+    const [b] = await importText(requestText(request({ id: ID_B, from: { name: 'Other', url: OTHER_URL }, hubUrl: 'https://mesh-hub.example.org/.well-known/federation.json' })))
+    expect(b.outcome).toBe('accepted')
+  })
+
   it('an invite match commits with Org-Decision invite <id>, marks the invite used, and the token is nowhere in the repository', async () => {
     setup(null, { policy: 'invite', asks: ['purpose'] })
     const { record } = makeInvite({ name: 'Mesa Node', type: 'LocalNode', network: 'Mesh', expires: '2099-12-31', random: n => Uint8Array.from({ length: n }, (_, i) => (i * 7 + 3) % 256) })
@@ -424,7 +439,7 @@ describe('one case per outcome', () => {
     expect(entry).toMatchObject({ state: 'open', author: 'steward-a', title: 'Join request: Mesa Node → Mesh', origin: { kind: 'federation-request', request: ID_A, from: 'Mesa Node' } })
     // R3: the staged edit carries the decision a ratify will make true
     const op = (entry.ops as { path?: string; text?: string }[]).find(o => o.path === 'federation.yaml')!
-    expect((parse(op.text!) as { peers: unknown[] }).peers).toEqual([hubPeerOf(request(), `request ${ID_A}`, NODE)])
+    expect((parse(op.text!) as { peers: unknown[] }).peers).toEqual([hubPeerOf(request(), `request ${ID_A}`)])
     expect(records()[0]).toMatchObject({ outcome: 'proposed', proposal: entry.id })
     expect(peers()).toEqual([]) // nothing on the trunk until it is ratified
     expect(hubRequests(repo)[0]).toMatchObject({ outcome: 'proposed', final: false })
@@ -437,7 +452,7 @@ describe('one case per outcome', () => {
     expect(derived).toMatchObject({ outcome: 'accepted', final: true, decision: `request ${ID_A}` })
     expect(derived.sentence).toBe(`Accepted Mesa Node into Mesh (proposal ${entry.id}). Publish the link so it shows as mutual on atproto.`)
     expect(records()[0].outcome).toBe('proposed') // never stored twice
-    expect(peers()).toEqual([hubPeerOf(request(), `request ${ID_A}`, NODE)])
+    expect(peers()).toEqual([hubPeerOf(request(), `request ${ID_A}`)])
   })
 
   it('two requests drained at once each open their own proposal of one peer; the importer\'s own staged edit rides along in neither', async () => {
@@ -523,7 +538,7 @@ describe('a solo hub holds the request for its operator', () => {
     expect(body.sentence).toBe('Accepted Mesa Node into Mesh. Publish the link so it shows as mutual on atproto.')
     expect(parseTrailers(git('log', '-1', '--format=%B'))).toMatchObject({ actor: 'steward-a', decision: `request ${ID_A}` })
     // the peer is built from the record's validated fields; it is a member since the hub received the request
-    expect(peers()).toEqual([{ ...hubPeerOf(request(), `request ${ID_A}`, NODE), since: String(records()[0].received).slice(0, 10) }])
+    expect(peers()).toEqual([{ ...hubPeerOf(request(), `request ${ID_A}`), since: String(records()[0].received).slice(0, 10) }])
     expect(records()[0]).toMatchObject({ outcome: 'accepted', decision: `request ${ID_A}` })
     // decided once
     expect((await post(`/api/federation/requests/${ID_A}/decide`, { accept: true })).status).toBe(409)
@@ -715,6 +730,11 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
     await importText(requestText(request({ id: ID_B, from: { name: 'Other', url: OTHER_URL } })))
     expect((await post(`/api/federation/requests/${ID_B}/decide`, { accept: true })).status).toBe(200)
     expect(net.writes).toEqual([])
+    // no DID came with either acceptance (F-I2): the migration list adds them, and publishes nothing by itself (R28)
+    expect((await planPublish(repo, pdeps())).plan.create).toEqual([])
+    await migrateDid(NODE_URL, NODE)
+    await migrateDid(OTHER_URL, plcDid('other-node'))
+    expect(net.writes).toEqual([])
     // the card counts what there is to publish: both members (and the profile, when its networks change)
     const { plan } = await planPublish(repo, pdeps())
     expect(plan.create.map(c => c.record.subject).sort()).toEqual([NODE, plcDid('other-node')].sort())
@@ -727,6 +747,7 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
     setup(null, OPEN('LD-2026-040'))
     await ownCheck()
     await importText(requestText(request()))
+    await migrateDid(NODE_URL, NODE)
     expect(net.writes).toEqual([])
     const { plan } = await planPublish(repo, pdeps())
     expect(plan.create.map(c => c.record)).toEqual([expect.objectContaining({ subject: NODE, relation: 'hasMember', network: 'Mesh' })])
@@ -771,6 +792,7 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
     const [a] = await importText(requestText(request({ answers: {} })))
     expect(a.outcome).toBe('refused')
     expect((await importText(requestText(otherRequest())))[0].outcome).toBe('accepted')
+    await migrateDid(OTHER_URL, otherNode)
     await planWithout()
   })
 
@@ -782,6 +804,7 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
     await importText(requestText(otherRequest()))
     expect((await post(`/api/federation/requests/${ID_A}/decide`, { accept: false, reason: 'Not now.' })).status).toBe(200)
     expect((await post(`/api/federation/requests/${ID_B}/decide`, { accept: true })).status).toBe(200)
+    await migrateDid(OTHER_URL, otherNode)
     await planWithout()
   })
 
@@ -803,6 +826,9 @@ describe('nothing reaches atproto until the hub publishes, and only through the 
     const rb = await post(`/api/proposals/${b.proposal}/ratify`, {})
     expect(rb.status, JSON.stringify(await rb.clone().json())).toBe(200)
     as('steward-a')
+    // the member's DID, as the migration list's change would add it once ratified (F-I2; here written as that outcome)
+    write('federation.yaml', fedText().replace(`url: ${OTHER_URL}`, `url: ${OTHER_URL}\n    did: ${otherNode}`)); commit('the migration list: Other\'s DID')
+    expect(peers().find(p => p.url === OTHER_URL)?.did).toBe(otherNode)
     await planWithout()
   })
 })

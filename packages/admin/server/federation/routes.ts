@@ -18,12 +18,12 @@ import { runCommand } from '../resources/run.ts'
 import { governanceView } from '../governance/read.ts'
 import { JOIN_POLICIES, readFederation } from '../../lib/federation/read.mjs'
 import { isPublicUrl } from '../../lib/federation/peers.mjs'
-import { buildRequest, parseRequest, requestText } from '../../lib/federation/request.mjs'
+import { buildRequest, CONTROL, parseRequest, requestText } from '../../lib/federation/request.mjs'
 import { intakeOutcome } from '../../lib/federation/intake.mjs'
 import type { Runner } from '../resources/types.ts'
 import { transports } from './transports/index.ts'
 import { createInvite, decide, drainInbox, receive } from './hub.ts'
-import { bindingView, migratedText, migrationOf, MIGRATION_SENTENCES, resolveSets } from './migrate.ts'
+import { bindingView, migratedText, migrationOf, MIGRATION_SENTENCES, resolveSets, verifiedDid } from './migrate.ts'
 import {
   askedText, cachedHub, clearState, joinText, outgoingPath, readState, recordedText, savedRequestText, SENTENCES, trunkRequest, UUID,
   withdrawnText, writeState, type JoinEdit,
@@ -57,8 +57,8 @@ async function body(c: Context): Promise<Record<string, unknown>> {
 
 const fedOp = (text: string, base: string | null): FileOp => ({ op: 'file', path: FED, text, base })
 
-/** One line of the Join policy form: text, no control or format character, at most `max` long. */
-const CONTROL = /[\p{Cc}\p{Cf}\u2028\u2029]/u
+/** One line of the Join policy form: text, no control or format character (`CONTROL`, as parseRequest refuses), at most
+ *  `max` long. */
 function formLine(v: unknown, what: string, max: number): string {
   if (typeof v !== 'string' || v.trim() === '' || v.length > max || CONTROL.test(v)) throw new HttpError(400, `${what} must be one line of text, at most ${max} characters.`)
   return v.trim()
@@ -168,7 +168,11 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
       if (outcome.kind === 'refuse') throw new HttpError(400, outcome.reason)
       if (join?.policy === 'invite' && !invite) throw new HttpError(400, 'This network joins by invite. Add your invite.')
 
-      const edit = askedText(text, { network, hub: hubAddress, hubName: hub.name, did: hub.did, id, since: now().toISOString().slice(0, 10), type: hub.type })
+      // The hub's DID only when a confirmed lookup tied it to the hub's url (did:web, its handle both ways, or the two-sided
+      // profile tie: `verifiedDid`), never on its federation.json's word alone. Without one the migration list suggests
+      // it later (final review F-I1).
+      const did = verifiedDid(repo, hubAddress, now())
+      const edit = askedText(text, { network, hub: hubAddress, hubName: hub.name, did, id, since: now().toISOString().slice(0, 10), type: hub.type })
       const ops: FileOp[] = [
         fedOp(edit.text, base),
         // The invite is never in this file (R18): it is held in the state folder, outside git, and joined in at send time.
@@ -333,7 +337,8 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     const state = readState(repo, id)
     if (!state) throw new HttpError(404, 'No such request.')
     if (state.status?.state !== 'accepted') throw new HttpError(409, SENTENCES.notAccepted)
-    const decision = (state.status.reason ?? 'Accepted').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Accepted'
+    // The hub's words, as one line without a control or format character (the CONTROL that parseRequest refuses).
+    const decision = (state.status.reason ?? 'Accepted').replace(/\s+/g, ' ').replace(new RegExp(CONTROL.source, 'gu'), '').trim().slice(0, 200) || 'Accepted'
     const now_ = fedNow(repo, actor.id)
     const edited = recordedText(now_.text, id, decision)
     if (edited === null) throw new HttpError(409, SENTENCES.noRequest)

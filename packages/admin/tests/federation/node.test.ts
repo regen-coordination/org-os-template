@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { parse as parseYaml } from 'yaml'
 import { makeChangeRepo } from '../changes/fixtures.ts'
 import { removeFixtureRepo } from '../fixtures.ts'
 import { makeFakeNetwork, plcDid, type FakeNetwork } from '../fake-pds.ts'
@@ -96,12 +97,22 @@ const pdeps = (o: Partial<PublishDeps> = {}): PublishDeps => ({
   fetch: net.fetch, lookup: net.lookup, env: { ATPROTO_APP_PASSWORD: PASSWORD }, now: NOW, allowPlaceholderLexicons: true, run: runCommand, ...o,
 })
 
-const setup = (governance: string | null) => {
+/** What a confirmed `federation.check-links` of the hub leaves: its DID's document names `handle`, and the handle names
+ *  the DID back. The hub's handle being its url's host is what ties the DID to the hub (final review F-I1). */
+const confirmHub = (did = HUB, handle = 'mesh-hub.example.org') => {
+  const cache = atprotoCache(repo)
+  cache.put(did, { did, pds: 'https://pds-two.example.net', handle, profile: null, links: [], skipped: 0, fetchedAt: NOW.toISOString() }, NOW)
+  cache.putHandle(handle, did, NOW)
+}
+
+/** `confirmed`: the hub's DID was looked up and tied to its url, so the ask may stage it. */
+const setup = (governance: string | null, confirmed = true) => {
   repo = makeChangeRepo(governance)
   write('federation.yaml', FED())
   write('kms.yaml', ['adapter: repo-data', 'target: "."', 'atproto:', `  did: "${SELF}"`, '  pds: "https://pds-one.example.com"', '  handle: "fixture-org.example.com"', '  nsid_authority: "org.fixture"', ''].join('\n'))
   commit('the org: identity, kms')
   cacheHub()
+  if (confirmed) confirmHub()
   build()
 }
 
@@ -159,7 +170,7 @@ const runJob = async (nonce: string): Promise<string> => {
 }
 
 describe('ask', () => {
-  it('stages exactly two file ops, keeps the comments of federation.yaml, and stages the hub\'s did', async () => {
+  it('stages exactly two file ops, keeps the comments of federation.yaml, and stages the hub\'s did a confirmed lookup tied to it', async () => {
     setup(CONSENSUS)
     const { res, json } = await ask()
     expect(res.status, JSON.stringify(json)).toBe(200)
@@ -306,6 +317,15 @@ describe('send waits for the trunk; withdraw after mutual is leaving', () => {
     const res = await post(`/api/federation/outgoing/${id}/withdraw`)
     expect(await res.json()).toMatchObject({ leaving: true, text: 'Leaving Mesh. The hub will see the link as left. Then publish, so your record is withdrawn.' })
   })
+  it("the recorded decision holds no control or format character from the hub's answer (final review)", async () => {
+    setup(null)
+    const id = (await ask()).json.id as string
+    writeState(id, 'Accepted:\u202e emoclew\u0007 to\u2028Mesh\u200b!')
+    expect((await post(`/api/federation/outgoing/${id}/record`)).status).toBe(200)
+    const fed = parseYaml(readFileSync(join(repo, 'federation.yaml'), 'utf8')) as { peers: { url: string; decision?: string }[] }
+    expect(fed.peers.find(p => p.url === HUB_SITE)?.decision).toBe('Accepted: emoclew to Mesh!')
+  })
+
   it('ask, record and withdraw each have the cards read again: their commit lands after federation.yaml is written', async () => {
     setup(null)
     invalidated = 0
@@ -320,9 +340,9 @@ describe('send waits for the trunk; withdraw after mutual is leaving', () => {
 })
 
 import { writeState as put } from '../../server/federation/node.ts'
-function writeState(id: string) {
+function writeState(id: string, reason = 'Accepted: welcome') {
   const s = readState(repo, id)!
-  put(repo, id, { ...s, sent: { transport: 'fake', ref: 'https://github.com/mesh/hub/issues/7', at: NOW.toISOString() }, status: { state: 'accepted', reason: 'Accepted: welcome', at: NOW.toISOString() } })
+  put(repo, id, { ...s, sent: { transport: 'fake', ref: 'https://github.com/mesh/hub/issues/7', at: NOW.toISOString() }, status: { state: 'accepted', reason, at: NOW.toISOString() } })
 }
 
 describe('following the answer', () => {
@@ -376,7 +396,8 @@ describe('following the answer', () => {
     applyStaged()
     const [o] = await outgoing()
     expect(o).toMatchObject({ id, network: 'Mesh', hub: HUB_SITE, onTrunk: true })
-    expect(o.atproto).toEqual({ theirs: 'unknown' })
+    // the confirmed lookup read the hub's repository and found no link records there yet
+    expect(o.atproto).toEqual({ theirs: 'not-on-atproto' })
   })
 })
 
@@ -530,6 +551,24 @@ describe('fix round 1: the trunk lists, edits build on each other, withdrawing u
     cacheHub() // the state folder is named from federation.yaml, so look the hub up again
     const r = await ask()
     expect([r.res.status, r.json.error]).toEqual([409, "federation.yaml can't be read as YAML, so nothing was changed. Fix it first."])
+  })
+
+  it("the hub's did is staged only when a confirmed lookup tied it to the hub's url; its federation.json's word alone is not (F-I1)", async () => {
+    // never looked up on atproto: the federation.json names a DID, nothing ties it to the hub
+    setup(CONSENSUS, false)
+    expect((await ask()).res.status).toBe(200)
+    expect(stagedOps()[0].text).not.toContain(HUB)
+    removeFixtureRepo(repo)
+    // a DID whose checked handle is another host than the hub's: not staged either
+    setup(CONSENSUS, false)
+    confirmHub(HUB, 'elsewhere.example.net')
+    expect((await ask()).res.status).toBe(200)
+    expect(stagedOps()[0].text).not.toContain(HUB)
+    // after a lookup ties it, the migration list offers it (the trunk lists the hub once the ask is applied)
+    applyStaged()
+    confirmHub()
+    const rows = (await (await app.request('/api/federation/migration')).json() as { rows: { name: string; did: string | null; binding: string | null }[] }).rows
+    expect(rows).toEqual([expect.objectContaining({ name: 'Mesh Hub', did: HUB, binding: null })])
   })
 
   it("a hub's did that isn't a DID is not staged", async () => {

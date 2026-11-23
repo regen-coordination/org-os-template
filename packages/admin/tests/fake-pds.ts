@@ -29,6 +29,9 @@ export interface FakeNetworkOptions {
 export interface FakeWrite { host: string; nsid: string; body: Record<string, unknown> }
 export interface FakeRecord { uri: string; cid: string; value: Record<string, unknown> }
 export interface FakeRequest { method: string; url: string }
+/** A request's body exactly as the caller sent it, before any redaction. Test-only: it carries app passwords, so a test
+ *  checks it and never prints it. */
+export interface FakeRawRequest { method: string; url: string; body: string }
 /** How a host misbehaves: a 302, an answer that never comes, a 300 KB body, or listRecords answers whose records name
  *  another DID's repository. */
 export type Misbehaviour = 'redirect' | 'slow' | 'oversized' | { answerFor: string }
@@ -41,6 +44,8 @@ export interface FakeNetwork {
   writes: FakeWrite[]
   /** Every request, in order. */
   requests: FakeRequest[]
+  /** Every request that carried a body, in order, with that body as sent (passwords unredacted; test-only). */
+  raw: FakeRawRequest[]
   /** The records `did` holds in `collection`, sorted by key. */
   records: (did: string, collection: string) => FakeRecord[]
   /** Puts a record straight into a repository (not a write: it is not logged). Answers its uri and cid. */
@@ -91,6 +96,7 @@ export function makeFakeNetwork(opts: FakeNetworkOptions): FakeNetwork {
   const txt = new Map<string, string[][]>()
   const writes: FakeWrite[] = []
   const requests: FakeRequest[] = []
+  const raw: FakeRawRequest[] = []
 
   const collectionOf = (did: string, collection: string): Map<string, FakeRecord> => {
     let r = repos.get(did)
@@ -210,6 +216,9 @@ export function makeFakeNetwork(opts: FakeNetworkOptions): FakeNetwork {
   const fetch: FetchLike = async (url, init) => {
     const method = (init as { method?: string }).method ?? 'GET'
     requests.push({ method, url })
+    const sentBody = (init as { body?: unknown }).body
+    if (typeof sentBody === 'string') raw.push({ method, url, body: sentBody })
+    else if (sentBody instanceof Uint8Array) raw.push({ method, url, body: Buffer.from(sentBody).toString('utf8') })
     const u = new URL(url)
     const host = u.host
     if (u.protocol !== 'https:') throw new TypeError('only https is fetched')
@@ -259,7 +268,7 @@ export function makeFakeNetwork(opts: FakeNetworkOptions): FakeNetwork {
   }
 
   return {
-    fetch, lookup, resolveTxt, writes, requests,
+    fetch, lookup, resolveTxt, writes, requests, raw,
     records: (did, collection) => sorted(did, collection),
     seed: (did, collection, rkey, value) => { const r = store(did, collection, rkey, value); return { uri: r.uri, cid: r.cid } },
     setDown: (host, isDown = true) => { if (isDown) down.add(host); else down.delete(host) },

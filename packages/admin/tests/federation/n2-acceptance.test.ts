@@ -249,6 +249,21 @@ function filesHolding(dir: string, needle: string, base = dir): string[] {
   return hits
 }
 const writeLog = () => JSON.stringify(net.writes)
+/** The governed identity change that adds a member's DID after its acceptance (final review F-I2): the migration list,
+ *  which writes a DID only where the cache ties it to that peer both ways, and publishes nothing by itself (R28). */
+async function migrateDid(who: Who, url: string, did: string): Promise<void> {
+  const index = (fedOf(who).peers as Record<string, unknown>[]).findIndex(p => p.url === url)
+  const listed = await call(who, 'GET', '/api/federation/migration')
+  expect(listed.json.rows).toEqual(expect.arrayContaining([expect.objectContaining({ index, did, binding: null })]))
+  const writes = net.writes.length
+  const set = await call(who, 'POST', '/api/federation/migration', { set: [{ index, did }] })
+  expect(set.status, JSON.stringify(set.json)).toBe(200)
+  expect(set.json.commit).toMatch(/^[0-9a-f]{7,}$/)
+  expect(git(who, 'log', '-1', '--format=%B')).toMatch(/Org-Rule: identity\/direct/)
+  expect(git(who, 'log', '-1', '--format=%B')).not.toContain('federation/join')
+  expect((fedOf(who).peers as Record<string, unknown>[])[index].did).toBe(did)
+  expect(net.writes.length).toBe(writes)
+}
 
 // ── setting the stage ────────────────────────────────────────────────────────────────────────────────
 
@@ -308,7 +323,7 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
   let requestId = ''
   let issue = ''
 
-  it('1. the hub chooses open-with-approval; the node looks it up; the hub looks the node up and ties its DID', async () => {
+  it('1. the hub chooses open-with-approval; each side looks the other up and ties its DID', async () => {
     step = '1 open'
     const policy = await call('hub', 'POST', '/api/federation/join', { policy: 'open-with-approval', types: ['LocalNode'], asks: ['why'], where: WHERE })
     expect(policy.status).toBe(200)
@@ -318,9 +333,12 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
     await ok('node', 'federation.check-links', { address: HUB_URL })
     const hub = await call('node', 'GET', `/api/federation/hub?address=${encodeURIComponent(HUB_URL)}`)
     expect(hub.json.hub).toMatchObject({ name: 'Delta Hub', type: 'Network', networks: [NETWORK], join: { policy: 'open-with-approval', where: WHERE } })
+    // So that the ask stages the hub's DID, the node ties it first: the hub's federation.json names it, and its handle (the
+    // hub's own host) names it back. Without this the ask stages no DID, and the migration list suggests it later (F-I1).
+    await ok('node', 'federation.check-links', { handle: 'delta-hub.example.org' })
 
-    // So that acceptance writes the node's DID, the hub checks it: the node's federation.json names it, and its handle
-    // (the node's own host) names it back.
+    // So that the migration list can add the node's DID after acceptance, the hub ties it the same way: the node's
+    // federation.json names it, and its handle (the node's own host) names it back.
     await ok('hub', 'federation.check-links', { address: NODE_URL })
     await ok('hub', 'federation.check-links', { handle: 'cedar-node.example.org' })
   })
@@ -358,8 +376,13 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
     const accepted = await call('hub', 'POST', `/api/federation/requests/${requestId}/decide`, { accept: true })
     expect(accepted.json).toMatchObject({ outcome: 'accepted' })
     const member = (fedOf('hub').peers as Record<string, unknown>[]).find(p => p.url === NODE_URL)!
-    expect(member).toMatchObject({ name: 'Cedar Node', type: 'LocalNode', relationship: 'node', decision: `request ${requestId}`, did: NODE_DID })
+    expect(member).toMatchObject({ name: 'Cedar Node', type: 'LocalNode', relationship: 'node', decision: `request ${requestId}` })
+    // An acceptance never writes a DID (F-I2): the hub adds it through the migration list, before publishing hasMember.
+    expect(member.did).toBeUndefined()
     expect(git('hub', 'log', '-1', '--format=%B')).toMatch(/Org-Rule: identity\/direct/)
+    step = '3 migrate'
+    await migrateDid('hub', NODE_URL, NODE_DID)
+    step = '3 accept'
 
     const told = await ok('hub', 'federation.reply', { id: requestId })
     expect(told.log).toBe('Told Cedar Node: Accepted.\n')
@@ -474,6 +497,7 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
     expect(made.json.link).toBe(`${HUB_URL}/.well-known/federation.json#invite=${TOKEN}`)
 
     await ok('fern', 'federation.check-links', { address: HUB_URL })
+    await ok('fern', 'federation.check-links', { handle: 'delta-hub.example.org' })
     const asked = await call('fern', 'POST', '/api/federation/ask', { hub: HUB_URL, network: NETWORK, answers: { why: ANSWERS.fern }, invite: TOKEN })
     expect(asked.status).toBe(200)
     const id = asked.json.id as string
@@ -492,18 +516,22 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
     const text = await file.text()
     expect(text).toContain(`invite: ${TOKEN}`)
 
-    // The hub ties Fern's DID first, as it did Cedar's, so acceptance writes it.
+    // The hub ties Fern's DID first, as it did Cedar's, so the migration list can add it after acceptance.
     await ok('hub', 'federation.check-links', { address: FERN_URL })
     await ok('hub', 'federation.check-links', { handle: 'fern-node.example.org' })
     const got = await call('hub', 'POST', '/api/federation/requests/receive', { text })
     expect(got.json[0]).toMatchObject({ outcome: 'accepted' })
     const member = (fedOf('hub').peers as Record<string, unknown>[]).find(p => p.url === FERN_URL)!
-    expect(member).toMatchObject({ name: 'Fern Node', relationship: 'node', decision: `invite ${INVITE_ID}`, did: FERN_DID })
+    expect(member).toMatchObject({ name: 'Fern Node', relationship: 'node', decision: `invite ${INVITE_ID}` })
+    expect(member.did).toBeUndefined()
+    expect(git('hub', 'log', '-1', '--format=%B')).toContain('Org-Rule: federation/join')
     const invites = parse(readFileSync(join(repos.hub, 'data', 'invites.yaml'), 'utf8')) as { invites: Record<string, unknown>[] }
     expect(invites.invites).toEqual([expect.objectContaining({ id: INVITE_ID, used_by: id, token_sha256: sha256Hex(TOKEN) })])
     // The same invite can't be used twice.
     const again = await call('hub', 'POST', '/api/federation/requests/receive', { text: text.replace(id, '00000000-0000-4000-8000-000000000001') })
     expect(again.json[0]).toMatchObject({ outcome: 'refused' })
+    step = '8 migrate'
+    await migrateDid('hub', FERN_URL, FERN_DID)
 
     // A file-sent join has no answer to read, so no Record step (controller ruling on Task 15, concern 3): once the hub's
     // federation.json lists Fern, the link is mutual by files and Fern's memberOf is wanted without a recorded decision (R4).
@@ -581,6 +609,27 @@ describe('N2 acceptance: a node joins a hub on atproto, on scratch instances, th
     note('-', `grep of the PDS write log (${net.writes.length} writes) for ${Object.keys(needles).length} needles`, { needles: Object.keys(needles), found })
     expect(found).toEqual([])
     expect(needles['decision (node, recorded)']).not.toBe('missing')
+
+    // Every POST to a PDS host is one of the three XRPC methods N2 calls, and nothing else.
+    const pdsHosts = new Set([HOST_A, HOST_B].map(h => new URL(h).host))
+    const posts = net.requests.filter(r => r.method === 'POST' && pdsHosts.has(new URL(r.url).host))
+    const methods = new Set(posts.map(r => new URL(r.url).pathname))
+    note('-', 'every XRPC method POSTed to a PDS host', [...methods].sort())
+    expect(posts.length).toBeGreaterThan(0)
+    for (const r of posts) expect(['/xrpc/com.atproto.server.createSession', '/xrpc/com.atproto.repo.putRecord', '/xrpc/com.atproto.repo.deleteRecord'], r.url).toContain(new URL(r.url).pathname)
+    // The app passwords, against the bodies as sent (before the fake's redaction): each went only to its own account's
+    // PDS, in createSession, and in no other request (not a putRecord or deleteRecord body, not another host).
+    const holders = { [NODE_PASSWORD]: HOST_A, [HUB_PASSWORD]: HOST_B, [FERN_PASSWORD]: HOST_A }
+    expect(net.raw.length).toBeGreaterThan(0)
+    for (const [password, host] of Object.entries(holders)) {
+      const carriers = net.raw.filter(r => r.body.includes(password))
+      expect(carriers.length).toBeGreaterThan(0)
+      for (const r of carriers) expect(`${r.method} ${r.url}`).toBe(`POST ${host}/xrpc/com.atproto.server.createSession`)
+    }
+    // Every other needle is in no request body either, raw or redacted.
+    const rawBodies = net.raw.map(r => r.body).join('\n')
+    const inRaw = Object.entries(needles).filter(([k]) => !k.endsWith('password')).filter(([, v]) => rawBodies.includes(v)).map(([k]) => k)
+    expect(inRaw).toEqual([])
 
     // The private peer: no record, and never named in a job's output, a receipt or a log.
     const jobsAndReceipts = (Object.keys(repos) as Who[]).map(w => filesUnder(join(stateDir(repos[w]), 'jobs')) + filesUnder(join(stateDir(repos[w]), 'federation'), new Set(['atproto', 'remote']))).join('\n')

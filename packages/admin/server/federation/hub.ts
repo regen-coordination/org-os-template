@@ -4,8 +4,9 @@
 //   and what it has received before, and decides under `join` as committed on the trunk. A refusal is recorded; an
 //   acceptance (an invite, or a standing decision) is one commit of the peer and the record; anything else is a proposal
 //   from outside the org (`origin`), or, where the importer may change identity alone, held for the operator.
-// - The hub's change is built from the validated request fields only (`hubPeerOf`, R13), never from the text. The
-//   peer's `did` comes from the node's own federation.json as last looked up, never from the request, and never fetched.
+// - The hub's change is built from the validated request fields only (`hubPeerOf`, R13), never from the text. It never
+//   writes a `did`: the operator adds the member's DID afterwards through the migration list (a governed identity change
+//   with the two-sided binding), before `hasMember` can be published (final review F-I2).
 // - Received requests live in the hub's git, org-level facts only (R13, R27). Nothing here publishes on atproto: after
 //   an acceptance lands on the trunk, publishing `hasMember` is the separate, confirmed `federation.publish-links`
 //   (R16, R20, R25). A refused request publishes nothing, ever.
@@ -30,7 +31,9 @@ import type { Change, FileOp } from '../changes/types.ts'
 import { effectiveRule, readRuleContext, ruleIds } from '../governance/effective.ts'
 import { currentEntries } from '../changes/stage.ts'
 import { commitOrStage } from '../workspace/pages.ts'
-import { isPublicUrl } from '../../lib/federation/peers.mjs'
+import { addressOf, isPublicUrl, sameAddress } from '../../lib/federation/peers.mjs'
+import { nodePeerIO } from '../federation-io.ts'
+import { selfAddressesOf } from './link-state.ts'
 import { makeInvite } from '../../lib/federation/invite.mjs'
 import { propose, type ProposeDeps } from '../proposals/propose.ts'
 import { readLedger } from '../proposals/ledger.ts'
@@ -48,7 +51,6 @@ import { writeHubFiles, type HubFile } from './ledger.ts'
 import { readTrunkFederation } from './trunk.ts'
 import { federationDoc, federationSeq, mapsIn, normUrl } from './node.ts'
 import { wellKnownUrlOf } from './remote.ts'
-import { verifiedDid } from './migrate.ts'
 import { transportOf, transports } from './transports/index.ts'
 
 export const SENTENCES = {
@@ -59,6 +61,7 @@ export const SENTENCES = {
   noRequest: 'No such request.',
   noWhere: 'Say where this hub takes requests first: join.where in federation.yaml.',
   noNetwork: 'This hub has no network by that name.',
+  notHere: 'This request is addressed to another hub.',
   alreadyMember: 'This instance is already a member here.',
   otherRole: 'This instance is already listed here in another role, which a join request does not change.',
   notTaking: "This hub isn't taking requests now.",
@@ -199,22 +202,33 @@ export const writeReplied = (repo: string, id: string, receipt: { at: string; re
 
 /** federation.yaml with the node's one peer entry, built from validated fields (`hubPeerOf`). A node that is already a
  *  peer is not listed twice: its entry keeps its earliest `decision` (so a second network's acceptance never erases the
- *  meaning of the first; `relationOf` reads only that there is one) and gains a `did` only where it has none. */
-export function memberText(text: string, request: FederationRequest, decision: string, did: string | null): string {
+ *  meaning of the first; `relationOf` reads only that there is one). No `did` is written or changed (F-I2). */
+export function memberText(text: string, request: FederationRequest, decision: string): string {
   const doc = federationDoc(text)
   const peers = federationSeq(doc, 'peers')
   const existing = mapsIn(peers).find(p => normUrl(p.get('url')) === normUrl(request.from.url))
   if (existing) {
     if (existing.get('decision') === undefined || existing.get('decision') === null) existing.set('decision', decision)
-    if (did && existing.get('did') === undefined) existing.set('did', did)
   } else {
     if (peers.flow && peers.items.length === 0) peers.flow = false
-    peers.items.push(doc.createNode(hubPeerOf(request, decision, did)))
+    peers.items.push(doc.createNode(hubPeerOf(request, decision)))
   }
   return doc.toString(STRINGIFY)
 }
 
 // ── receiving ─────────────────────────────────────────────────────────────────────────────────────
+
+/** Whether a request's `hub.url` names this instance: its identity.url, or its `origin` remote, however the address is
+ *  written (case, a trailing slash, its `/.well-known/federation.json`). A request addressed to another hub is refused,
+ *  so a request sent to one hub and imported into another admits no one there. */
+async function addressedHere(repo: string, identity: Record<string, unknown>, hubUrl: string): Promise<boolean> {
+  const bare = (u: string) => u.trim().replace(/\/\.well-known\/federation\.json\/?$/i, '')
+  const at = addressOf(bare(hubUrl), repo, nodePeerIO)
+  if (at === null) return false
+  const own = typeof identity.url === 'string' && isPublicUrl(identity.url) ? addressOf(bare(identity.url), repo, nodePeerIO) : null
+  const self = [...(own ? [own] : []), ...(await selfAddressesOf(repo, runCommand)).filter(a => a.kind !== 'path')]
+  return self.some(a => sameAddress(a, at))
+}
 
 export interface Received { ref: string | null; outcome: RequestRecord['outcome'] | 'already' | 'unreadable'; sentence: string; proposal?: string; commit?: string }
 export interface HubDeps { startBranch?: string; build?: ProposeDeps['build'] }
@@ -296,7 +310,9 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
   const listed = trunk.fed.peers.find(p => normUrl(p.url) === normUrl(request.from.url))
   // What the policy can't see: a network this hub doesn't list (never echoed: it is the asker's text), and an instance
   // this hub already lists in another role (a request never turns a hub or a peer into a member).
-  const outcome = policy.kind === 'refuse' ? policy
+  const here = await addressedHere(repo, trunk.fed.identity, request.hub.url)
+  const outcome = !here ? { kind: 'refuse' as const, reason: SENTENCES.notHere }
+    : policy.kind === 'refuse' ? policy
     : !trunk.fed.networks.some(n => n.name === request.network) ? { kind: 'refuse' as const, reason: SENTENCES.noNetwork }
     : listed && listed.relationship !== 'node' ? { kind: 'refuse' as const, reason: SENTENCES.otherRole }
     // Already a member, and nothing admits it again: proposing would propose an unchanged federation.yaml.
@@ -309,13 +325,10 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
     return { ref, outcome: 'refused', sentence: `Refused: ${outcome.reason}`, commit }
   }
 
-  // The asker's DID only when a confirmed check tied it to its url (Task 12): a DID its federation.json merely names is
-  // left out, and the operator can add it later through the migration list.
-  const did = verifiedDid(repo, request.from.url, now)
   if (outcome.kind === 'accept') {
     const decision = outcome.by === 'invite' ? `invite ${outcome.invite.id}` : outcome.decision
     const files: HubFile[] = [
-      { rel: FED, text: memberText(fileText(repo, FED) ?? '', request, decision, did) },
+      { rel: FED, text: memberText(fileText(repo, FED) ?? '', request, decision) },
       recorded({ ...base, outcome: 'accepted', invite: outcome.by === 'invite' ? outcome.invite.id : null, decision }),
     ]
     if (outcome.by === 'invite') {
@@ -327,7 +340,7 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
 
   // Proposed: the edit carries the decision a ratify makes true (R3), so the member is published once it is.
   await guardFiles(repo, [FED])
-  const op = fedOp(repo, memberText(fileText(repo, FED) ?? '', request, `request ${request.id}`, did))
+  const op = fedOp(repo, memberText(fileText(repo, FED) ?? '', request, `request ${request.id}`))
   if (ruleFor(repo, actor, op).direct) {
     // The importer may change identity alone, so a proposal would be refused as DIRECT: the operator decides it (R19).
     const { commit } = await writeHubFiles(repo, [recorded({ ...base, outcome: 'held' })],
@@ -388,7 +401,7 @@ export async function decide(repo: string, actor: KnownActor, id: string, choice
   const decision = `request ${id}`
   // The peer is built from the record's validated fields, as the request held them when it was received.
   const request = { from: record.from, created: record.received, network: record.network } as FederationRequest
-  const text = memberText(fileText(repo, FED) ?? '', request, decision, verifiedDid(repo, record.from.url))
+  const text = memberText(fileText(repo, FED) ?? '', request, decision)
   const rule = direct(fedOp(repo, text), 'accepted')
   const { commit } = await writeHubFiles(repo, [{ rel: FED, text }, updated({ ...record, outcome: 'accepted', decision })],
     `federation: accept ${name} into ${network}`, { actor: actorTrailer(actor), rule, decision }, ident, opts)
