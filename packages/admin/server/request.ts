@@ -25,6 +25,7 @@ import { effectiveRule, readRuleContext } from './governance/effective.ts'
 import { readRegistryOrEmptyCached } from './registry.ts'
 import { accountOn, actUnreadable, readsAsPublic, TREE_UNREADABLE, type HatWearers, type Membership } from './session/membership.ts'
 import { sessionFromCookie, type Session } from './session/sessions.ts'
+import { atTheMachine } from './workspace/reads.ts'
 import { endPersonSession, needsReissue, personActor, readPersonCookie, reissue, viewerRoles, type PersonCookie } from './session/person.ts'
 import type { SignInConfig } from './session/config.ts'
 import type { RolesPerson } from './private/store.ts'
@@ -312,7 +313,7 @@ async function signedIn(repo: string, m: Membership, session: Session, act: bool
 /** The person's actor and viewer: with no Role, the public's view (Review Focus 2); otherwise a member whose roles are
  *  their Roles and the governance roles the members list gives their id (a steward listed in a role's `members` holds it). */
 function personWho(repo: string, p: RolesPerson): { actor: PersonActor; viewer: Viewer } {
-  const viewer: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, personActor(p), null)) }
+  const viewer: Viewer = p.roles.length === 0 ? { kind: 'public' } : { kind: 'member', id: p.id, hats: [], roles: viewerRoles(p, rolesFor(repo, personActor(p), null)), hubRoles: [...p.roles] }
   // Their name is read as anyone who sees the actor may read the members file (Rule 4; T2d, the T2c review's finding 4):
   // presence and the comment it sends fall back to it for everyone on the page. With no Role, as the public may; with one,
   // as any member may (no hat, no role); a name that read does not say is their id when the members file holds it, never the
@@ -327,12 +328,12 @@ async function byGit(repo: string, m: Membership | null, act: boolean, email: ()
   let actor: Actor
   try { actor = actorForEmail(repo, await email()) } catch { actor = { unknown: '' } }
   // The person at the machine reads what git holds, as in 0.6, whoever git says they are.
-  if (!isKnown(actor)) return { actor, viewer: { kind: 'member', id: actorTrailer(actor), hats: [], roles: [] } }
+  if (!isKnown(actor)) return { actor, viewer: atTheMachine({ kind: 'member', id: actorTrailer(actor), hats: [], roles: [] }) }
   const wallet = m ? await walletReading(m, membersOf(repo).find(e => String(e.id) === actor.id), act) : null
   const read = wallet?.read ?? null
   // The actor keeps the reading for this request (`walletOf`): a role sourced from a hat they wear holds them (§6.2).
   if (wallet) withWallet(actor, { account: wallet.account, read: read && !read.stale ? { hats: read.hats, block: read.block, readAt: read.readAt } : null })
-  return { actor, viewer: { kind: 'member', id: actor.id, hats: read && !read.stale ? read.hats : [], roles: rolesFor(repo, actor, read) } }
+  return { actor, viewer: atTheMachine({ kind: 'member', id: actor.id, hats: read && !read.stale ? read.hats : [], roles: rolesFor(repo, actor, read) }) }
 }
 
 /** The account of a git member's `handles.wallet` on the tree's chain (the first listed there), and its reading: read now

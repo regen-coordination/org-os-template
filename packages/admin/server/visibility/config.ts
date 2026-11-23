@@ -7,10 +7,10 @@
 
 import { join } from 'node:path'
 import { parse } from 'yaml'
-import { readFullPolicy, stricterOf, type VisibilityPolicy } from '../../lib/visibility.mjs'
+import { readFilesPolicy, readFullPolicy, stricterOf, type FilesPolicy, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { deepFreeze, readCacheFor } from '../hosted/readCache.ts'
 
-export type { VisibilityPolicy }
+export type { FilesPolicy, VisibilityPolicy }
 
 const REL = join('data', 'visibility.yaml')
 
@@ -42,4 +42,25 @@ export function commitPolicy(repo: string, ops: readonly unknown[]): VisibilityP
   let after: VisibilityPolicy
   try { after = readFullPolicy(parse(edit.text)).policy } catch { return now }
   return stricterOf(now, after)
+}
+
+/** A `files` section that cannot be read: every data/** path at a level that admits nobody (0.7.2). */
+const CLOSED: FilesPolicy = deepFreeze({ default: undefined, paths: {} })
+
+/** The `files` section a text holds, or null when it has none. A text that cannot be read but names a `files` key reads
+ *  as CLOSED, so a broken section closes the files and never opens them; one that names none stays 0.7.1's (opt-in). */
+function filesOf(text: string): FilesPolicy | null {
+  try {
+    const files = readFilesPolicy(parse(text))
+    return files === null ? null : deepFreeze(files)
+  } catch { return /^\s*files\s*:/m.test(text) ? CLOSED : null }
+}
+
+/** The repository's `files` section (0.7.2, raw file reads by Role), through the read cache; null: none, or no file. */
+export function readFilesConfig(repo: string): FilesPolicy | null {
+  try { return readCacheFor(repo).get(join(repo, REL), filesOf) } catch (err) {
+    // No file: no section (0.7.1's behaviour). Any other failure to read it (a checkout mid-way, a permission) closes the
+    // files for that request rather than opening them (review I8).
+    return (err as NodeJS.ErrnoException)?.code === 'ENOENT' ? null : CLOSED
+  }
 }

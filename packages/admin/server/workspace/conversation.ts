@@ -34,6 +34,7 @@ import { displayNames, membersHold, readLabels } from '../session/names.ts'
 import { addressName } from '../session/address-name.ts'
 import { gitNames, reach, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { levelOfToken, NO_PRIVATE, privateReads, strictPrivateReads } from '../private/reads.ts'
+import { mayReadRecordsOf, registryFileLevel } from './reads.ts'
 import { openPrivateStore, type CommentRow, type MentionRow, type PrivateStore, type StoredNotification } from '../private/store.ts'
 import { readConfig } from '../visibility/config.ts'
 import { gateItems, Levels, MAINTAINERS, MEMBERS as MEMBERS_LEVEL, NOBODY } from '../visibility/gate.ts'
@@ -123,7 +124,7 @@ const strings = (v: unknown): string[] => (typeof v === 'string' ? [v] : Array.i
 const titleOf = (r: Record<string, unknown>, id: string): string =>
   (typeof r.title === 'string' && r.title !== '' ? r.title : typeof r.name === 'string' && r.name !== '' ? r.name : id)
 
-export function targetInfo(repo: string, target: Target, store: PrivateStore | null): TargetInfo | null {
+export function targetInfo(repo: string, target: Target, store: PrivateStore | null, viewer?: Viewer): TargetInfo | null {
   const levels = levelsOf(repo, store)
   const level = levels.target(target)
   if (!level) return null
@@ -132,6 +133,9 @@ export function targetInfo(repo: string, target: Target, store: PrivateStore | n
     return e ? { level, title: e.title, text: e.markdown } : null
   }
   const { registry, id } = recordOf(target)
+  // 0.7.2 (review C1): asked for `viewer`, a record of a registry whose file the `files` section keeps from them is not
+  // there: no thread, no anchor test against its text, no title in a notification, no one to mention.
+  if (viewer && viewer.kind === 'member' && !mayReadRecordsOf(repo, viewer, registry)) return null
   const git = levels.records(registry).find(e => String(e.id) === id) as Record<string, unknown> | undefined
   const body = git ?? levels.priv.records(registry).find(r => r.id === id)?.body
   return body ? { level, title: titleOf(body, id), text: strings(body).join('\n') } : null
@@ -143,7 +147,7 @@ export function targetInfo(repo: string, target: Target, store: PrivateStore | n
  * L5's words (`why`), and nothing is told by it.
  */
 export function visibleTarget(repo: string, target: Target, store: PrivateStore | null, why: unknown, viewer: Viewer): TargetInfo {
-  const info = targetInfo(repo, target, store)
+  const info = targetInfo(repo, target, store, viewer)
   if (!info) {
     if (!store) throw unavailable(why)
     throw new HttpError(404, NO_TARGET(target))
@@ -163,7 +167,8 @@ class People {
   private readonly byId: Map<string, Record<string, unknown>>
   private readonly governance: Record<string, unknown> | null
   private allRoles: Map<string, Role> | null = null
-  constructor(readonly repo: string, private readonly membership: Membership | null) {
+  /** `store` (0.7.2 round 3): the Roles table, so a member's viewer carries their Roles (`hubRoles`), as a `files` level judges. */
+  constructor(readonly repo: string, private readonly membership: Membership | null, private readonly store?: PrivateStore) {
     const rc = readRuleContext(repo, { unknown: '' })
     this.members = rc.members ?? []
     this.governance = rc.governance
@@ -190,7 +195,9 @@ class People {
     const id = parseCaip10(memberOrAccount) ? String(actorIdOf(memberOrAccount, this.members)) : memberOrAccount
     const r = this.reading(memberOrAccount)
     const roles = rolesOf(resolveRoles(this.governance, this.members, r ? observed(r) : []).roles, id) as string[]
-    return { kind: 'member', id, hats: r?.hats ?? [], roles }
+    let hubRoles: string[] = []
+    try { hubRoles = [...(this.store?.person(id)?.roles ?? [])] } catch { /* the store is down: no Role, so a `role:` file is closed */ }
+    return { kind: 'member', id, hats: r?.hats ?? [], roles, hubRoles }
   }
 
   /** Every role, its holders read from every member's last good reading (a role sourced from a hat holds its wearers). */
@@ -235,13 +242,13 @@ export function namesFor(repo: string, membership: Membership | null, viewer?: V
  *  signed-in CAIP-10 actor is named by the hats their session read. T2e I1 (Rule 4): the actor's own `name` (a wallet
  *  session's and git's identity's read from the members row ungated, an emailed link's from the Roles table) stands in only
  *  for an id the members file does not hold; one it holds (or may, unreadable) is shown as the gate says it, else by id. */
-export function actorNames(repo: string, membership: Membership | null): (actor: KnownActor) => { handle: string; role: string } {
-  return actor => {
+export function actorNames(repo: string, membership: Membership | null): (actor: KnownActor, viewer?: Viewer) => { handle: string; role: string } {
+  return (actor, viewer) => {
     if (actor.via === 'siwe' && actor.id === actor.account) {
       const address = parseCaip10(actor.account)?.address ?? actor.account
       return { handle: shortAddress(address), role: addressName(membership, actor.account, actor.hats) }
     }
-    const names = namesFor(repo, membership)(actor.id)
+    const names = namesFor(repo, membership, viewer)(actor.id)
     if (names.role !== actor.id || membersHold(repo)(actor.id)) return names
     return { handle: actor.id, role: actor.name }
   }
@@ -464,14 +471,17 @@ const wordsOf = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(B
 export function mentionablesFor(target: Target, query: string, viewer: Viewer, deps: Omit<ConversationDeps, 'store'> & { store: PrivateStore | null },
   floors: readonly (string | null)[] = []): Mentionable[] {
   if (viewer.kind !== 'member') return []
-  const info = targetInfo(deps.repo, target, deps.store)
+  const info = targetInfo(deps.repo, target, deps.store, viewer)
   if (!info || !admits(info.level, viewer)) return []
   const level = info.level
+  // 0.7.2: one the record's file is kept from (the `files` section) would never be told, so they are not offered.
+  const kept = target.startsWith('record:') ? recordOf(target).registry : null
   const q = query.trim().replace(/^@/, '').trim().toLowerCase()
   const matches = (id: string, label: string) => q === '' || id.toLowerCase().startsWith(q) || label.toLowerCase().startsWith(q) || wordsOf(label).some(w => w.startsWith(q))
-  const people = new People(deps.repo, deps.membership)
+  const people = new People(deps.repo, deps.membership, deps.store ?? undefined)
   // `tell`'s test (T2e M4): the target's level now and, for a reply, every level of the comments above it (`floors`).
   const told = (v: Viewer) => admits(level, v) && floors.every(f => mayRead(v, level, f))
+    && (kept === null || v.kind !== 'member' || mayReadRecordsOf(deps.repo, v, kept))
   // T2f 1, R4c2 (PR7-R79; Rule 4): a member is offered by the name the author may read (the gate), else their id (a members
   // file that cannot be read offers ids). Every write rewrites the label at the text's level (`relabelMembers`).
   const display = readLabels(deps.repo, viewer)
@@ -503,6 +513,19 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   // A record is offered only when the author may see it and everyone the target admits may see it and its title (R-9b): its
   // label is its title, which the mention writes into the target's text.
   const records: Mentionable[] = []
+  // 0.7.2 round 3 (review 1): a record is offered only from a file the author may read, and only where every reader of the
+  // target may read that file too: any member, or, on a record of a kept file, a file the `files` section keeps at its level.
+  const anyMember: Viewer = { kind: 'member', id: '', hats: [], roles: [], hubRoles: [] }
+  const fromFile = new Map<string, boolean>()
+  const offeredFrom = (registry: string): boolean => {
+    let ok = fromFile.get(registry)
+    if (ok === undefined) {
+      ok = mayReadRecordsOf(deps.repo, viewer, registry) && (mayReadRecordsOf(deps.repo, anyMember, registry)
+        || (kept !== null && registryFileLevel(deps.repo, kept) === registryFileLevel(deps.repo, registry)))
+      fromFile.set(registry, ok)
+    }
+    return ok
+  }
   const offer = (registry: string, id: string, body: Record<string, unknown>, kept: ParsedLevel[]) => {
     if (!kept.every(l => admits(l, viewer) && narrowerOrEqual(level, l))) return
     const label = titleOf(body, id)
@@ -511,7 +534,7 @@ export function mentionablesFor(target: Target, query: string, viewer: Viewer, d
   const titled = (registry: string, body: Record<string, unknown>) => ['title', 'name'].map(f => fullLevel(levels.config, registry, body, f))
   const git = gitNames(deps.repo)
   for (const def of registriesOf(deps.repo)) {
-    if (def.kind !== 'collection' || def.name === 'members') continue
+    if (def.kind !== 'collection' || def.name === 'members' || !offeredFrom(def.name)) continue
     for (const e of levels.records(def.name)) offer(def.name, String(e.id), e as Record<string, unknown>, [levels.record(def.name, e), ...titled(def.name, e as Record<string, unknown>)])
     for (const r of levels.priv.records(def.name)) offer(def.name, r.id, r.body, [levelOfToken(r.visibility), ...titled(def.name, r.body)])
   }
@@ -540,7 +563,7 @@ export function notificationsFor(viewer: Viewer, deps: Omit<ConversationDeps, 'n
   const rows = storeRead(deps.store, () => deps.store.notifications(viewer.id))
   const infos = new Map<string, TargetInfo | null>()
   const infoOf = (t: string) => {
-    if (!infos.has(t)) infos.set(t, parseTarget(t) ? targetInfo(deps.repo, t as Target, deps.store) : null)
+    if (!infos.has(t)) infos.set(t, parseTarget(t) ? targetInfo(deps.repo, t as Target, deps.store, viewer) : null)
     return infos.get(t) ?? null
   }
   const readable = new Map<string, Set<string>>()

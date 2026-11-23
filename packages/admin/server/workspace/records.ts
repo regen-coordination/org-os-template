@@ -40,6 +40,7 @@ import { privateTargetsOf } from '../private/targets.ts'
 import { guardCouncilMemory } from './memory.ts'
 import type { Viewer } from '../../lib/visibility.mjs'
 import { isFileOp } from './files.ts'
+import { fileReader, unreadPaths, unreadRefusal } from './reads.ts'
 import { newSessionId, ownLock, type Schedule } from './sessions.ts'
 
 /** A batch is flushed after this long without a write (§6). */
@@ -329,6 +330,10 @@ export function mountRecords(app: Hono, repo: string, batches: RecordBatches): v
     try { raw = await c.req.json() } catch { raw = undefined }
     // A record read through the gate carries its level; written back unchanged, that `visibility` is left out (R-L5-13.4).
     const ops = readStageOps(raw, repo).map(op => (isFileOp(op) ? op : withoutEchoOp(repo, op)))
+    // 0.7.2 round 3 (review 4): a record of a file the writer may not read (the `files` section) is refused before anything
+    // is read or staged for it, in the words of a path no rule governs.
+    const unread = unreadPaths(ops.filter(op => !isFileOp(op)), fileReader(c, repo))
+    if (unread.length > 0) throw unreadRefusal(unread)
     return c.json(await batches.write(knownActorOf(c), ops, viewerOf(c)))
   })
 }

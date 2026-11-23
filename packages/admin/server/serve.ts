@@ -54,6 +54,7 @@ import { mountPresence, Presence, PRESENCE_BEAT_MS } from './workspace/presence.
 import { privateReads } from './private/reads.ts'
 import { goneSettled, housekeepAtStart } from './workspace/gone.ts'
 import type { Viewer } from '../lib/visibility.mjs'
+import { mayReadRecordsOf } from './workspace/reads.ts'
 import type { HostedConfig } from './hosted/config.ts'
 import { useHubIdent } from './hosted/ident.ts'
 import { mountPush, Pusher } from './hosted/push.ts'
@@ -435,8 +436,14 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
           const l = listeners.get(client)
           if (!l) continue
           l.sending = l.sending.then(async () => {
-            const out = gateEvent(await viewerOfListener(l), msg, levelOf)
-            if (out && client.readyState === client.OPEN) client.send(JSON.stringify(out))
+            const viewer = await viewerOfListener(l)
+            // 0.7.2 round 3: a message on a record of a file the `files` section keeps from this viewer is not theirs to hear,
+            // and presence names people as this viewer may be told them (the members file may be kept from them).
+            const on = typeof msg.target === 'string' && msg.target.startsWith('record:') ? msg.target.split(':')[1] ?? '' : null
+            if (on !== null && viewer.kind === 'member' && !mayReadRecordsOf(repo, viewer, on)) return
+            const out = gateEvent(viewer, msg, levelOf)
+            const told = out && out.type === 'presence' && typeof out.target === 'string' ? { ...out, people: presence.everyone(out.target as Target, viewer) } : out
+            if (told && client.readyState === client.OPEN) client.send(JSON.stringify(told))
           }).catch(() => { /* a message the gate could not judge is not sent */ })
         }
       }

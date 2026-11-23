@@ -157,7 +157,9 @@ export function publicView(policy, collection, record) {
 
 /** @typedef {{ level: 'public' } | { level: 'members' } | { level: 'hat', hat: string } | { level: 'role', role: string }} ParsedLevel */
 /** Who is reading (§9.4): the public, or a member with the hats they wear (hat refs) and their governance roles.
- *  @typedef {{ kind: 'public' } | { kind: 'member', id: string, hats: string[], roles: string[] }} Viewer */
+ *  `hubRoles` (0.7.2): the Roles-table Roles of a person signed in by emailed link, apart from their governance roles, which
+ *  `roles` also holds; what a `files` level's `role:` is judged against. Absent: none (a wallet session, the machine).
+ *  @typedef {{ kind: 'public' } | { kind: 'member', id: string, hats: string[], roles: string[], hubRoles?: string[] }} Viewer */
 /** @typedef {{ level: 'error' | 'warn', path: string, message: string }} VisibilityProblem */
 
 const ROLE_ID = /^[a-z][a-z0-9_-]*$/
@@ -238,6 +240,147 @@ export function readFullPolicy(doc) {
     for (const [key, token] of Object.entries(top.defaults)) if (meant(token)) read.policy.defaults[key] = /** @type {string} */ (token)
   }
   return read
+}
+
+// ---- 0.7.2: raw file reads by Role (`visibility.files`) ----
+// Which signed-in viewers read which data/** file whole (GET /api/files and everything that takes its reader). Opt-in: with
+// no `files` section, every member reads every file, as on 0.7.1. With one, a data/** path takes its own level (an exact
+// path, else the longest `<folder>/**` that holds it), else `files.default`. A level is a token as above; `role:<id>` names
+// a Roles-table Role (FILE_ROLES), held by a person signed in by emailed link. `public` reads as members: a file is a
+// members' read. A token that cannot be read admits nobody, so a typo closes a file and never opens one.
+
+/** The Roles a `files` level may name: the Roles table's (server/private/store.ts ROLES; a test keeps the two equal). */
+export const FILE_ROLES = Object.freeze(['steward', 'node-lead', 'network-member'])
+
+/** @typedef {{ default: unknown, paths: Record<string, unknown> }} FilesPolicy */
+
+/** A level that admits nobody: what a `files` token that cannot be read is read as. @type {ParsedLevel} */
+const NOBODY = Object.freeze({ level: 'role', role: '' })
+
+/**
+ * data/visibility.yaml's parsed document -> its `files` section, or null when it has none (0.7.1's behaviour).
+ * @param {unknown} doc @returns {FilesPolicy | null}
+ */
+export function readFilesPolicy(doc) {
+  const top = isObj(doc) && isObj(doc.visibility) ? doc.visibility : doc
+  if (!isObj(top) || !Object.hasOwn(top, 'files')) return null
+  const raw = top.files
+  // Present but empty (`files:` with its lines commented out) or not a mapping: closed, never open (review I8).
+  if (!isObj(raw)) return { default: undefined, paths: {} }
+  return { default: raw.default, paths: isObj(raw.paths) ? { ...raw.paths } : {} }
+}
+
+/**
+ * The key of `files.paths` that governs a data/** path: the path itself, else the longest `<folder>/**` holding it (the
+ * folder itself included: `data/kb` for `data/kb/**`), else null (`files.default` governs it).
+ * @param {FilesPolicy} files @param {string} path @returns {string | null}
+ */
+/** The canon's folder (L6 §7.5): the collection `knowledge`, a file per kind. */
+const CANON = 'data/kb'
+
+function fileKey(files, path) {
+  if (Object.hasOwn(files.paths, path)) return path
+  /** @type {string | null} */
+  let best = null
+  for (const key of Object.keys(files.paths)) {
+    if (!key.endsWith('/**')) continue
+    if (`${path}/`.startsWith(key.slice(0, -2)) && (best === null || key.length > best.length)) best = key
+  }
+  return best
+}
+
+/**
+ * Whether a `files` level admits `viewer` (review I5): `role:<Role>` against their Roles-table Roles (`hubRoles`), never a
+ * governance role of the same name; any other level as `admits` judges it.
+ * @param {ParsedLevel} l @param {Viewer} v @returns {boolean}
+ */
+export function fileAdmits(l, v) {
+  if (l.level !== 'role') return admits(l, v)
+  return v.kind === 'member' && ROLE_ID.test(l.role) && (v.hubRoles ?? []).includes(l.role)
+}
+
+/**
+ * Whether the `files` section of `now` lets anyone read a data/** file whole that `was` did not (review I7: §11.2's
+ * publication): a section removed, or any path's level (each listed key, each folder's own path, an unlisted one) that is
+ * not within the one before. A section added never loosens. @param {unknown} wasDoc @param {unknown} nowDoc @returns {boolean}
+ */
+export function filesLoosen(wasDoc, nowDoc) {
+  const was = readFilesPolicy(wasDoc)
+  const now = readFilesPolicy(nowDoc)
+  if (was === null) return false
+  if (now === null) return true
+  const sample = (/** @type {string} */ key) => (key.endsWith('/**') ? `${key.slice(0, -2)}x.yaml` : key)
+  const paths = new Set(['data/\u0000unlisted.yaml', ...[...Object.keys(was.paths), ...Object.keys(now.paths)].map(sample)])
+  for (const path of paths) {
+    const a = fileLevel(was, path), b = fileLevel(now, path)
+    if (a === null || b === null) continue
+    if (!(a.level === 'role' && b.level === 'role' ? a.role === b.role : narrowerOrEqual(b, a))) return true
+  }
+  return false
+}
+
+/** @param {unknown} token @returns {ParsedLevel} */
+function fileToken(token) {
+  if (token === 'public') return MEMBERS
+  return parseLevel(token) ?? NOBODY
+}
+
+/**
+ * The level a data/** path is read whole at, or null when no `files` section governs it (no section, or a path outside
+ * data/). @param {FilesPolicy | null} files @param {string} path @returns {ParsedLevel | null}
+ */
+export function fileLevel(files, path) {
+  if (files === null || typeof path !== 'string' || !path.startsWith('data/')) return null
+  // 0.7.2 round 3 (review 5): the canon is one collection (`knowledge`) read across its files, so every path in it is read at
+  // the canon's level (`data/kb/**`, else the default); a key inside it is refused by the check and passed over here.
+  const key = fileKey(files, path.startsWith(`${CANON}/`) ? CANON : path)
+  return fileToken(key === null ? files.default : files.paths[key])
+}
+
+/**
+ * The `files` section's own checks (checkVisibilityPolicy): errors for a section that is not a mapping, a level that is
+ * not one (`public` included: a file is a members' read), a `role:` that is no Roles-table Role, a path outside data/, and
+ * a listed path below `role:steward` whose collection has field levels (a file is read whole, so listing it would hand
+ * every field to that Role).
+ * @param {Record<string, unknown>} top
+ * @param {(path: string, message: string) => void} err
+ * @param {(path: string, l: ParsedLevel) => void} checkStrict a hat level's own checks
+ */
+function checkFiles(top, err, checkStrict) {
+  if (!Object.hasOwn(top, 'files')) return
+  const raw = top.files
+  if (!isObj(raw)) { err('visibility.files', 'empty or not a mapping, so every data file is closed: give it a default and paths'); return }
+  const fields = isObj(top.collections) ? top.collections : {}
+  /** @param {string} at @param {unknown} token @returns {ParsedLevel | null} */
+  const level = (at, token) => {
+    if (token === 'public') { err(at, 'a file is read by signed-in members only: use members, role:<Role> or hat:<hat ref>'); return null }
+    const l = parseLevel(token)
+    if (!l) { err(at, `${JSON.stringify(token)} is not a level: members, role:<Role> or hat:<hat ref>`); return null }
+    if (l.level === 'role' && !FILE_ROLES.includes(l.role)) { err(at, `no Role is called ${l.role}: ${FILE_ROLES.join(', ')}`); return null }
+    if (l.level === 'hat') checkStrict(at, l)
+    return l
+  }
+  level('visibility.files.default', raw.default)
+  if (raw.paths !== undefined && raw.paths !== null && !isObj(raw.paths)) err('visibility.files.paths', 'not a mapping of data/** paths to levels')
+  for (const [path, token] of Object.entries(isObj(raw.paths) ? raw.paths : {})) {
+    const at = `visibility.files.paths.${path}`
+    if (!path.startsWith('data/') || path.includes('..')) { err(at, 'only a path under data/ is governed here'); continue }
+    if (path.startsWith(`${CANON}/`) && path !== `${CANON}/**`) { err(at, `the canon is read as one: list ${CANON}/** instead`); continue }
+    level(at, token)
+  }
+  // A file is read whole: a collection with field levels stays at role:steward, whichever key governs its file — its own
+  // path, a folder holding it, or the default (review I6).
+  const files = readFilesPolicy(top)
+  if (files === null) return
+  for (const [name, col] of Object.entries(fields)) {
+    if (!isObj(col) || !isObj(col.fields) || Object.keys(col.fields).length === 0) continue
+    const path = `data/${name}.yaml`
+    const key = fileKey(files, path)
+    const token = key === null ? files.default : files.paths[key]
+    const l = parseLevel(token)
+    if (l === null || (l.level === 'role' && l.role === 'steward')) continue
+    err(key === null ? 'visibility.files.default' : `visibility.files.paths.${key}`, `${path} has field levels, and a file is read whole: keep it at role:steward`)
+  }
 }
 
 /** @param {ParsedLevel} l @returns {string} the token parseLevel reads back */
@@ -486,6 +629,8 @@ export function checkVisibilityPolicy(doc, ctx) {
       }
     }
   }
+
+  checkFiles(top, err, checkStrict)
 
   const defs = top.defaults
   if (isObj(defs)) {

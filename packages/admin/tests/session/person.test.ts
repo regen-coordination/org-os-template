@@ -255,7 +255,7 @@ describe('the signed-in person on every request (Lane 3 Task 9)', () => {
     const h = await house()
     const viewerOf = connectionViewer(h.deps)
     const steward = await signIn(h, MAIL.steward)
-    expect(await viewerOf(steward.cookie)).toEqual({ kind: 'member', id: ID.steward, hats: [], roles: ['council', 'maintainer', 'network-member', 'steward'] })
+    expect(await viewerOf(steward.cookie)).toEqual({ kind: 'member', id: ID.steward, hats: [], roles: ['council', 'maintainer', 'network-member', 'steward'], hubRoles: ['network-member', 'steward'] })
     const contributor = await signIn(h, MAIL.contributor)
     expect(await viewerOf(contributor.cookie)).toEqual({ kind: 'public' })
     expect(await viewerOf(undefined)).toEqual({ kind: 'public' })

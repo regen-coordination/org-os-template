@@ -1,12 +1,13 @@
 /** The knowledge routes: the collection, one entry, the peers and the runs. Reads only — the gate preview (T2) and
  *  prepared edits (T3) mount from their own files, so a reader can see that this file writes nothing. */
-import type { Hono } from 'hono'
+import type { Context, Hono } from 'hono'
 import { HttpError } from '../errors.ts'
 import { JobStore, type JobRecord } from '../state.ts'
 import { dryRead, previewEntry, publishPlan } from './gate.ts'
 import { readEntry, readKnowledge } from './read.ts'
 import { applyEdit, prepareEdit, type EditRequest } from './write.ts'
 import { knownActorOf, readerOf } from '../request.ts'
+import { fileReader } from '../workspace/reads.ts'
 import type { RunRow } from './types.ts'
 
 export interface KnowledgeRoutesDeps {
@@ -48,32 +49,43 @@ async function readEdit(c: { req: { json: () => Promise<unknown> } }): Promise<E
 export function mountKnowledge(app: Hono, { repo, jobs, withLock = fn => fn(), now = () => new Date().toISOString() }: KnowledgeRoutesDeps): void {
   const runs = (): RunRow[] => (jobs ? jobs.list(undefined, 50).filter(j => isKnowledgeRun(j.op)).slice(0, 8).map(runRow) : [])
 
+  // 0.7.2 (review I1): the canon is data/kb/**. A viewer the `files` section keeps it from is answered as for a route that
+  // is not there, on every knowledge route, before the canon is read. Each route asks it itself (a catch-all handler would
+  // escape the hosted write classes, L9 §5.4).
+  const canonKept = (c: Context): void => {
+    if (!fileReader(c, repo)('data/kb/x.yaml')) throw new HttpError(404, 'Not found.')
+  }
+  const k = {
+    get: (path: string, h: (c: Context) => Response | Promise<Response>) => app.get(path, c => { canonKept(c); return h(c) }),
+    post: (path: string, h: (c: Context) => Response | Promise<Response>) => app.post(path, c => { canonKept(c); return h(c) }),
+  }
+
   // The canon's slash in `<type>/<slug>` is encoded by the client; Hono decodes each segment.
-  app.get('/api/knowledge/entry/:type/:slug', async c => {
+  k.get('/api/knowledge/entry/:type/:slug', async c => {
     const { type, slug } = c.req.param()
     return c.json(await readEntry(repo, type, slug, { now: now() }))
   })
 
-  app.get('/api/knowledge', async c => c.json(await readKnowledge(repo, { now: now(), runs: runs() })))
+  k.get('/api/knowledge', async c => c.json(await readKnowledge(repo, { now: now(), runs: runs() })))
 
   /* ── the gate, read-only (T2): the app plans and previews; only the CLI writes (K-1) ─────────────────────────── */
 
   // What the commons shows for one entry: the projected face, and the API object beside it (K-5, K-7).
-  app.get('/api/knowledge/entry/:type/:slug/preview', async c => {
+  k.get('/api/knowledge/entry/:type/:slug/preview', async c => {
     const { type, slug } = c.req.param()
     return c.json(await previewEntry(repo, type, slug, { now: now() }))
   })
 
   // The dry read: the selection run in memory. It writes nothing, and says so in its own answer.
-  app.post('/api/knowledge/dry-read', async c => c.json(await dryRead(repo, { now: now() })))
+  k.post('/api/knowledge/dry-read', async c => c.json(await dryRead(repo, { now: now() })))
 
   // The preparation a run would make: joins, leaves, and the command that writes it.
-  app.get('/api/knowledge/plan', async c => c.json(await publishPlan(repo, { now: now() })))
+  k.get('/api/knowledge/plan', async c => c.json(await publishPlan(repo, { now: now() })))
 
   /* ── a prepared edit, and its apply (T3, R-32): the canon's one write ──────────────────────────────────────── */
 
   // Nothing is written here: the answer is the change, and the base it must still match.
-  app.post('/api/knowledge/entry/:type/:slug/prepare', async c => {
+  k.post('/api/knowledge/entry/:type/:slug/prepare', async c => {
     const { type, slug } = c.req.param()
     const edit = await readEdit(c)
     return c.json(await prepareEdit(repo, type, slug, edit, { now: now() }, readerOf(c)))
@@ -81,7 +93,7 @@ export function mountKnowledge(app: Hono, { repo, jobs, withLock = fn => fn(), n
 
   // One file, one commit, the house's trailers, judged by the house's rules. A reader writes nothing: a git identity no
   // member holds is refused 403 with the house's sentence, and a hosted request with no session 401 (knownActorOf).
-  app.post('/api/knowledge/entry/:type/:slug/apply', async c => {
+  k.post('/api/knowledge/entry/:type/:slug/apply', async c => {
     const { type, slug } = c.req.param()
     const edit = await readEdit(c)
     const actor = knownActorOf(c)

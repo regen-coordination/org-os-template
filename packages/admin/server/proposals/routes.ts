@@ -34,6 +34,7 @@ import { detailView, listViews, viewById, type DetailDeps, type ProposalView } f
 import { revise, replay, loadForRevision, CHOICES, type Choice } from './revise.ts'
 import { prepare, prepareAction, readPrepareBody, type ActionSource, type PrepareSource } from './prepare.ts'
 import { readRegistryOrEmpty } from '../registry.ts'
+import { registryFile } from '../registries.ts'
 import { DRIVERS } from '../systems/drivers.ts'
 import { currentOf } from '../changes/stage.ts'
 import { gateProposals, gateRecord, Levels, MEMBERS, PUBLIC_NO_DIFF, proposalLevel, recordRef, withoutEchoOp } from '../visibility/gate.ts'
@@ -374,6 +375,8 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
    *  data/systems.yaml. Reads the file and nothing else. */
   app.get('/api/systems/:id/actions', c => answer(async () => {
     const id = c.req.param('id')
+    // 0.7.2 round 3 (review 6): a viewer data/systems.yaml is kept from (the `files` section) learns no id from this answer.
+    if (!fileReader(c, repo)(registryFile(repo, 'systems'))) throw new HttpError(404, `data/systems.yaml has no system "${id}".`)
     const system = (readRegistryOrEmpty(repo, 'systems').entries ?? []).find(s => isObject(s) && String(s.id) === id)
     if (!system) throw new HttpError(404, `data/systems.yaml has no system "${id}".`)
     const actions = systems?.actionsOf

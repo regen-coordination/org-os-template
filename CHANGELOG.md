@@ -8,6 +8,55 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.7.2] — 2026-11-23
+
+**0.7.2 lets an instance say which Roles read which data files, and keeps a kept file's records from those it is kept
+from wherever the house reads them.** An instance without a `files:` section sees 0.7.1 unchanged.
+
+### Added
+
+- **Raw file reads by Role** (`packages/admin`, 0.7.2). An optional `files:` section in `data/visibility.yaml` says who
+  reads which `data/**` file whole:
+  ```yaml
+  visibility:
+    files:
+      default: role:steward             # every data/** path not listed
+      paths:
+        data/projects.yaml: members     # any signed-in member
+        data/kb/**: members             # a folder
+  ```
+  - A level is `members`, `role:<Role>` (the Roles table's: `steward`, `node-lead`, `network-member`) or `hat:<hat ref>`.
+    A path takes its own level, else the longest `data/<folder>/**` holding it, else `default`, so a file added later is
+    held at the default until listed. A token that can't be read admits nobody. The canon is read as one: `data/kb/**`
+    may be listed, a path inside it may not.
+  - It governs `GET /api/files` and everything that takes its reader: `/api/editors`' `readable`, staging and Keep mine
+    on that path, the ledger read whole (C2), proposal diffs and file ops.
+  - `GET /api/registries`, `/api/registries/:name` (and `…/:id/changed`) and the map (`/api/resources`) give a member
+    the records of a file kept from them as the public is given them: what the collection makes public stays theirs.
+  - The same holds for every other read of such a record: comments and mentions on it (the record is not there for that
+    member: no thread, no anchor matched against its text, no notification naming it), `GET /api/governance`, member
+    names wherever they are said (`displayNames`), the knowledge routes (the canon is `data/kb/**`), proposals (the
+    ledger, and record ops on a kept registry withheld as file ops are), and the staging tray (a record op on a kept
+    registry is refused as a path no rule governs, and one staged before the file was kept is shown withheld).
+  - The @ picker (`/api/mentionables`) offers a record only from a file every reader of the target may read. Presence
+    (its route and its WebSocket event) and the map's `changed.by` say a member's name only to a viewer who may read the
+    members file; a presence event on a record of a kept file is not sent to one it is kept from. System actions
+    (`/api/systems/:id/actions`), the library's receipts and the import list on `/api/sources` follow their files.
+  - A write to a record of a kept file (`/api/registries/…`, `/api/workspace/records`, Keep mine in the tray) is refused
+    before the record is read, so its answer says nothing of whether the id is there.
+  - `role:` is judged against the viewer's Roles-table Roles (`hubRoles`, set for a person signed in by emailed link),
+    never a governance role of the same name. A wallet session holds none, so it reads only `members` and `hat:` paths.
+  - Left to the house, as its own configuration, whatever `files` says of their files: `/api/boards`,
+    `/api/collections`, `/api/visibility` and `/api/standards`.
+  - The person at the machine reads as before. A `?as` preview is judged as the viewer it previews.
+  - The policy check (`doctor`, a staged edit of `data/visibility.yaml`) refuses `public`, a path outside `data/`, a
+    `role:` that is no Roles-table Role, an empty section, and any key (a path, a folder, the default) that opens a
+    file with field levels below `role:steward` (a file is read whole). Removing the section or widening a level is a
+    publication (§11.2). A section that can't be read, empty, or a file that can't be read for any reason but its
+    absence closes every data file. `schemas/visibility.schema.json` takes `files`.
+  - **Opt-in:** an instance without a `files:` section sees 0.7.1 unchanged. 0.7.1 refuses the section
+    (`additionalProperties`), so an instance adds it only once its house runs 0.7.2.
+
 ## [0.7.1] — 2026-11-20
 
 **0.7.1 lets an instance make the house its own without forking it, and keeps the agent layer to those who decide.**

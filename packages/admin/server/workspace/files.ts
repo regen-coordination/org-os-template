@@ -22,7 +22,7 @@ import { readGovernance } from '../../lib/governance-read.mjs'
 import { checkGovernance, membershipTree } from '../../lib/rules.mjs'
 import { PAGE_FILE_NAME } from '../../lib/workspace/pages.mjs'
 import { KNOWLEDGE_FILE } from '../../lib/workspace/knowledge.mjs'
-import { checkVisibilityPolicy, fullLevel, narrowerOrEqual, parseLevel, readFullPolicy, type VisibilityPolicy } from '../../lib/visibility.mjs'
+import { checkVisibilityPolicy, filesLoosen, fullLevel, narrowerOrEqual, parseLevel, readFullPolicy, type VisibilityPolicy } from '../../lib/visibility.mjs'
 import { registriesOf, registryFileOf, REGISTRIES, type RegistryDef } from '../registries.ts'
 import { entriesFromText, type Entity } from '../registry.ts'
 import { validateEntity } from '../schema.ts'
@@ -239,7 +239,14 @@ export function fileLoosens(repo: string, op: StageOp | Op): boolean {
   const was = policyOf(fileText(repo, op.path))
   const now = policyOf(op.text)
   if (was === null || now === null) return now === null ? false : true
-  return policyLoosens(was, now)
+  // 0.7.2 (review I7): the `files` section removed, or a file opened to more Roles, is a publication too.
+  return policyLoosens(was, now) || filesLoosen(docOf(fileText(repo, op.path)), docOf(op.text))
+}
+
+/** A YAML text's document, or null when there is no text or it cannot be read. */
+function docOf(text: string | null): unknown {
+  if (text === null) return null
+  try { return parseDocument(text).toJS() } catch { return null }
 }
 
 /** A file op's class (§11.2): `governedClassOf(path)`, else the class table's own reading of the path. */

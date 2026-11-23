@@ -12,6 +12,7 @@
 // else its pretty id.
 
 import { readRegistryOrEmptyCached } from '../registry.ts'
+import { mayReadRecordsOf } from '../workspace/reads.ts'
 import { HttpError } from '../errors.ts'
 import { accountOn, type Membership } from './membership.ts'
 import { addressName } from './address-name.ts'
@@ -107,7 +108,10 @@ const UNKNOWN = /^unknown <.*>$/
  */
 export function displayNames(repo: string, membership: Membership | null, o: { viewer?: Viewer; details?: ReadonlyMap<string, string> } = {}): (id: string) => string {
   const members = membersRead(repo) ?? []
-  const viewer: Viewer = o.viewer ?? { kind: 'member', id: '', hats: [], roles: [] }
+  const asked: Viewer = o.viewer ?? { kind: 'member', id: '', hats: [], roles: [], hubRoles: [] }
+  // 0.7.2 (review I4): a viewer the members file is kept from (the `files` section) is said names as the public is. With no
+  // viewer (what every member is told alike: the map's `changed.by`, round 3), that is the generic member, who holds no Role.
+  const viewer: Viewer = asked.kind === 'member' && !mayReadRecordsOf(repo, asked, 'members') ? { kind: 'public' } : asked
   let levels: Levels | null = null
   const shown = (m: Record<string, unknown>): Record<string, unknown> | null => {
     levels ??= new Levels(repo)

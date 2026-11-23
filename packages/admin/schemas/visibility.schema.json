@@ -2,7 +2,7 @@
   "$id": "orgos://registry/visibility",
   "type": "object",
   "additionalProperties": false,
-  "x-order": ["collections", "defaults"],
+  "x-order": ["collections", "defaults", "files"],
   "properties": {
     "collections": {
       "type": ["object", "null"],
@@ -28,6 +28,19 @@
         "contact": { "type": "string", "pattern": "^(hat:.+|role:[a-z][a-z0-9_-]*)$" }
       },
       "additionalProperties": { "type": "string", "pattern": "^(public|members|hat:.+|role:[a-z][a-z0-9_-]*)$" }
+    },
+    "files": {
+      "type": ["object", "null"],
+      "description": "org-os 0.7.2, opt-in: who reads which data/** file whole (GET /api/files, and the registries and map cards read from it, which a member who may not read the file is given as the public is). default: the level of every data/** path not listed. paths: a data/** path, or a folder as data/<folder>/**, and its level. A level is members, role:<Role> (steward, node-lead or network-member, the Roles table's) or hat:<hat ref>. With no files section every member reads every file.",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "type": "string", "pattern": "^(members|hat:.+|role:[a-z][a-z0-9_-]*)$" },
+        "paths": {
+          "type": ["object", "null"],
+          "propertyNames": { "pattern": "^data/" },
+          "additionalProperties": { "type": "string", "pattern": "^(members|hat:.+|role:[a-z][a-z0-9_-]*)$" }
+        }
+      }
     }
   }
 }

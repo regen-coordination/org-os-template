@@ -25,7 +25,8 @@ import { registriesOf, registryFile } from '../registries.ts'
 import { lastCommit } from '../resources/changed.ts'
 import { orgName } from '../resources/util.ts'
 import { viewerOf } from '../request.ts'
-import { gateItems, gateRecord, gateRegistry, gateRegistryEntries, gateRegistryList, isObj, Levels, MAINTAINERS } from '../visibility/gate.ts'
+import { gateItems, gateRecord, gateRegistry, gateRegistryEntries, gateRegistryList, isObj, Levels, MAINTAINERS, PUBLIC_VIEWER } from '../visibility/gate.ts'
+import { fileLevels } from './reads.ts'
 import { readConfig } from '../visibility/config.ts'
 import { levelOfToken, NO_PRIVATE, privateCollections, privateReads } from '../private/reads.ts'
 import { noStore, reach, type PrivateAccess } from '../private/ops.ts'
@@ -336,8 +337,11 @@ export async function sourcesFor(repo: string, viewer: Viewer, deps: { reader: S
   // import plan reads it, and admitted as that document would be (its level, then its field's).
   let receipts: unknown[] = []
   try {
-    const listed = parseDocument(readFileSync(join(repo, collectionFile(repo, 'imports') ?? 'data/imports.yaml'), 'utf8')).toJS()?.imports
-    const gated = Array.isArray(listed) ? gateRecord(viewer, 'imports', { imports: listed }, config) : null
+    const file = collectionFile(repo, 'imports') ?? 'data/imports.yaml'
+    const listed = parseDocument(readFileSync(join(repo, file), 'utf8')).toJS()?.imports
+    // 0.7.2 round 3 (review 6): read as the public reads it by a member the `files` section keeps the file from.
+    const as = viewer.kind === 'member' && !fileLevels(repo, viewer)(file) ? PUBLIC_VIEWER : viewer
+    const gated = Array.isArray(listed) ? gateRecord(as, 'imports', { imports: listed }, config) : null
     receipts = gated && Array.isArray(gated.imports) ? gated.imports : []
   } catch { receipts = [] }
   const exports = new Map<string, { id: string; source: string; export: string | null }>()
