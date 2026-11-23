@@ -165,10 +165,10 @@ describe('the launcher', () => {
     expect(left).toContain(realpathSync(repo))
   })
 
-  it('shows join as coming with federation', async () => {
+  it('shows all four doors available', async () => {
     const state = await (await launcher.app.request(`${base}/api/launcher/state`, { headers: { host: `localhost:${launcher.port}` } })).json() as any
-    expect(state.doors.find((d: any) => d.id === 'join')).toEqual({ id: 'join', available: false, note: 'Comes with federation.' })
-    expect(state.doors.filter((d: any) => d.available).map((d: any) => d.id)).toEqual(['open', 'create', 'adopt'])
+    expect(state.doors.find((d: any) => d.id === 'join')).toEqual({ id: 'join', available: true })
+    expect(state.doors.filter((d: any) => d.available).map((d: any) => d.id)).toEqual(['open', 'create', 'adopt', 'join'])
   })
 
   it('answers 404 to an unknown API path', async () => {

@@ -21,7 +21,7 @@ const CHOOSE = 'Choose one.'
  *  there is no intro, start step or draft: it opens at the questions, the review's action is "Create it", which calls
  *  `run`, and Close (or Back from the first question) calls `onClose`. With `fixedFolder` (adopting a repo) the folder is
  *  that repo: the answer is preset, its field is not drawn, and the review's action asks to see what would be added. */
-export default function OpenInstance({ def: given, run, base: folderBase, onClose, fixedFolder }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string; onClose?: () => void; fixedFolder?: string }) {
+export default function OpenInstance({ def: given, run, base: folderBase, onClose, fixedFolder, initial }: { def: WizardDef; run?: (answers: Answers) => Promise<{ error: string } | void>; base?: string; onClose?: () => void; fixedFolder?: string; /** Answers preset by the caller (the launcher's Join door presets the type). */ initial?: Partial<Answers> }) {
   // With `run` (the launcher: no instance behind it) the start step is skipped, no draft is read or kept, and the review
   // creates the instance instead of showing the command.
   const steps = run ? given.steps.filter(s => s.id !== 'start') : given.steps
@@ -32,7 +32,7 @@ export default function OpenInstance({ def: given, run, base: folderBase, onClos
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT', ...(run ? { start: 'open' } : {}), ...(fixedFolder !== undefined ? { folder: fixedFolder } : {}) })
+  const [answers, setAnswers] = useState<Draft>({ language: 'en', license: 'MIT', ...initial, ...(run ? { start: 'open' } : {}), ...(fixedFolder !== undefined ? { folder: fixedFolder } : {}) })
   const [folderTouched, setFolderTouched] = useState(fixedFolder !== undefined)
   const [copied, setCopied] = useState(false)
   const canWrite = useCanWrite()

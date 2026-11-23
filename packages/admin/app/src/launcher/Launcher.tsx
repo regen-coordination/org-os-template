@@ -6,7 +6,8 @@ import { applyTheme, storedTheme } from '../theme.ts'
 import OpenInstance from '../wizards/OpenInstance.tsx'
 import Adopt from './Adopt.tsx'
 import type { WizardDef } from '../api.ts'
-import { cloneInstance, createInstance, launcherWizard, defaultCloneFolder, forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
+import { policySentence } from '../pages/federationWords.ts'
+import { cloneInstance, createInstance, inspectHub, launcherWizard, type JoinHub, type Landing, defaultCloneFolder, forgetRecent, launcherState, openInstance, type LauncherState, type RecentEntry } from './api.ts'
 
 type Refusal = { message: string; adoptable: boolean; path?: string }
 
@@ -28,6 +29,16 @@ export default function Launcher() {
   const [creating, setCreating] = useState<WizardDef | null>(null)
   const [adoptFolder, setAdoptFolder] = useState('')
   const [adopting, setAdopting] = useState(false)
+  // The Join door: the hub as looked up, the network chosen, and the invite token. The token lives only in this ref: it is
+  // never sent to the launcher, stored, logged or put in state that is drawn. It is added to the landing address, in
+  // the browser, as `#invite=`, which the Federation page reads and clears.
+  const [joinAddress, setJoinAddress] = useState('')
+  const [joinHub, setJoinHub] = useState<JoinHub | null>(null)
+  const [joinNetwork, setJoinNetwork] = useState('')
+  const [joinHasInvite, setJoinHasInvite] = useState(false)
+  const [joinError, setJoinError] = useState<string | null>(null)
+  const [looking, setLooking] = useState(false)
+  const inviteToken = useRef('')
   const adoptCard = useRef<HTMLElement>(null)
   const [adoptFocus, setAdoptFocus] = useState(0)
   // "Adopt it" hands a path over: keyboard focus follows it to the Adopt card.
@@ -40,12 +51,31 @@ export default function Launcher() {
     return () => { live = false }
   }, [])
 
+  const joining: Landing | undefined = joinHub && joinHub.policy !== 'closed' ? { hub: joinHub.url, ...(joinNetwork ? { network: joinNetwork } : {}) } : undefined
+  const go = (url: string) => window.location.assign(inviteToken.current && joining ? `${url}#invite=${inviteToken.current}` : url)
+
+  const lookUp = async (e: FormEvent) => {
+    e.preventDefault()
+    const pasted = joinAddress.trim()
+    // Split here, in the browser, before anything is sent: only the address goes to the launcher.
+    const at = pasted.indexOf('#')
+    const token = at >= 0 ? (/^invite=(.+)$/.exec(pasted.slice(at + 1))?.[1] ?? '') : ''
+    setLooking(true); setJoinError(null); setJoinHub(null); inviteToken.current = ''; setJoinHasInvite(false)
+    try {
+      const got = await inspectHub(token ? pasted.slice(0, at) : pasted)
+      inviteToken.current = token
+      if (token) setJoinAddress(pasted.slice(0, at)) // the field no longer shows the token
+      setJoinHasInvite(got.invite || token !== '')
+      setJoinHub(got.hub); setJoinNetwork(got.hub.networks.length === 1 ? got.hub.networks[0]! : '')
+    } catch (err) { setJoinError((err as Error).message) } finally { setLooking(false) }
+  }
+
   const open = async (e: FormEvent) => {
     e.preventDefault()
     setOpening(true); setRefusal(null)
     try {
-      const { url } = await openInstance(folder.trim())
-      window.location.assign(url)
+      const { url } = await (joining ? openInstance(folder.trim(), joining) : openInstance(folder.trim()))
+      go(url)
     } catch (err) {
       const x = err as Error & { adoptable?: boolean; path?: string }
       setRefusal({ message: x.message, adoptable: x.adoptable === true, path: x.path })
@@ -61,8 +91,8 @@ export default function Launcher() {
     e.preventDefault()
     setCloning(true); setRefusal(null)
     try {
-      const { url } = await cloneInstance(gitUrl.trim(), cloneFolder.trim())
-      window.location.assign(url)
+      const { url } = await (joining ? cloneInstance(gitUrl.trim(), cloneFolder.trim(), joining) : cloneInstance(gitUrl.trim(), cloneFolder.trim()))
+      go(url)
     } catch (err) {
       const x = err as Error & { adoptable?: boolean; path?: string }
       setRefusal({ message: x.message, adoptable: x.adoptable === true, path: x.path })
@@ -77,8 +107,8 @@ export default function Launcher() {
   const runCreate = async (answers: Parameters<typeof createInstance>[0]): Promise<{ error: string } | void> => {
     setCreateLog(null)
     try {
-      const { url } = await createInstance(answers)
-      window.location.assign(url)
+      const { url } = await (joining ? createInstance(answers, joining) : createInstance(answers))
+      go(url)
     } catch (err) {
       const x = err as Error & { log?: string }
       setCreateLog(x.log ?? null)
@@ -151,7 +181,7 @@ export default function Launcher() {
           <h2 className="wiz-h launcher-door-h" id="door-create">Create a new one</h2>
           {creating
             ? <>
-                <OpenInstance def={creating} run={runCreate} base={state?.base} onClose={() => { setCreating(null); setCreateLog(null) }} />
+                <OpenInstance def={creating} run={runCreate} base={state?.base} initial={joinHub?.types[0] ? { type: joinHub.types[0] } : undefined} onClose={() => { setCreating(null); setCreateLog(null) }} />
                 {createLog && <pre className="wiz-log" aria-label="What the command printed">{createLog}</pre>}
               </>
             : <div className="wiz-acts"><Button onClick={() => void startCreate()}>Create a new one</Button></div>}
@@ -160,14 +190,44 @@ export default function Launcher() {
         <section className="wiz-writes" aria-labelledby="door-adopt" ref={adoptCard} tabIndex={-1}>
           <h2 className="wiz-h launcher-door-h" id="door-adopt">Adopt a repo</h2>
           {adopting
-            ? <Adopt key={adoptFolder} base={state?.base} initialFolder={adoptFolder} onClose={() => { setAdopting(false); setAdoptFolder('') }} />
+            ? <Adopt key={adoptFolder} base={state?.base} initialFolder={adoptFolder} landing={joining} onGo={go} initial={joinHub?.types[0] ? { type: joinHub.types[0] } : undefined} onClose={() => { setAdopting(false); setAdoptFolder('') }} />
             : <div className="wiz-acts"><Button onClick={() => setAdopting(true)}>Adopt a repo</Button></div>}
         </section>
 
         <section className="wiz-writes" aria-labelledby="door-join">
           <h2 className="wiz-h launcher-door-h" id="door-join">Join a network</h2>
-          <p className="wiz-note">{door('join')?.note ?? 'Comes with federation.'}</p>
-          <div className="wiz-acts"><Button disabled={true}>Join a network</Button></div>
+          <form onSubmit={e => void lookUp(e)} className="wiz-field">
+            <label htmlFor="launch-join">The hub's address, or an invite link</label>
+            <input id="launch-join" className="input" type="text" value={joinAddress} placeholder="https://hub.example"
+              onChange={e => { setJoinAddress(e.target.value); setJoinHub(null); setJoinError(null); inviteToken.current = ''; setJoinHasInvite(false) }} autoComplete="off" spellCheck={false} />
+            <div className="wiz-acts">
+              <Button type="submit" busy={looking ? 'Looking…' : undefined} disabled={joinAddress.trim() === ''}>Look it up</Button>
+            </div>
+          </form>
+          {joinError && <Note state="error">{joinError}</Note>}
+          {joinHub && (
+            <>
+              <p className="wiz-note">
+                {joinHub.name}{joinHub.type ? ` (${joinHub.type})` : ''}. {policySentence(joinHub.policy)}{joinHasInvite ? ' Your invite link will be used.' : ''}
+              </p>
+              {joinHub.networks.length > 1 && (
+                <div className="wiz-field">
+                  <label htmlFor="launch-join-network">Which network</label>
+                  <select id="launch-join-network" className="input" value={joinNetwork} onChange={e => setJoinNetwork(e.target.value)}>
+                    <option value="">Choose one</option>
+                    {joinHub.networks.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+              )}
+              {joining && <p className="wiz-note">Open, clone, create or adopt an instance in the cards here: it opens on its Federation page, ready to ask.</p>}
+              {joining && (
+                <div className="wiz-acts">
+                  <Button onClick={() => void startCreate()}>Create one to join</Button>
+                  <Button onClick={() => setAdopting(true)}>Adopt a repo to join</Button>
+                </div>
+              )}
+            </>
+          )}
         </section>
       </div>
     </main>

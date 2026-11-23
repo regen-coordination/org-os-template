@@ -30,13 +30,19 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
 }
 
 export const launcherState = () => call<LauncherState>('GET', '/api/launcher/state')
-export const openInstance = (path: string) => call<{ url: string }>('POST', '/api/launcher/open', { path })
+/** Where an opened instance should land to start asking to join: the hub and network, never the invite. */
+export type Landing = { hub: string; network?: string }
+export type JoinHub = { name: string; type: string | null; url: string; network: string | null; networks: string[]; policy: 'invite' | 'open-with-approval' | 'open' | 'closed'; types: string[]; asks: string[] }
+/** The Join door's look-up. `address` may be an invite link: the launcher splits the token off and answers only whether one was there. */
+export const inspectHub = (address: string) => call<{ hub: JoinHub; invite: boolean }>('POST', '/api/launcher/join/inspect', { address })
+
+export const openInstance = (path: string, landing?: Landing) => call<{ url: string }>('POST', '/api/launcher/open', { path, ...(landing ? { landing } : {}) })
 export const forgetRecent = (path: string) => call<{ recent: RecentEntry[] }>('DELETE', '/api/launcher/recent', { path })
-export const cloneInstance = (url: string, folder: string) => call<{ url: string }>('POST', '/api/launcher/clone', { url, folder })
+export const cloneInstance = (url: string, folder: string, landing?: Landing) => call<{ url: string }>('POST', '/api/launcher/clone', { url, folder, ...(landing ? { landing } : {}) })
 
 export const launcherWizard = () => call<import('../../../lib/wizards.mjs').WizardDef>('GET', '/api/launcher/wizard')
 /** Creates the instance the answers describe and answers where it opened; throws Error(body.error), with the command's log on `log`. */
-export const createInstance = (answers: Answers) => call<{ url: string }>('POST', '/api/launcher/create', { answers })
+export const createInstance = (answers: Answers, landing?: Landing) => call<{ url: string }>('POST', '/api/launcher/create', { answers, ...(landing ? { landing } : {}) })
 
 /** What adopting would do: the org-os files the repo lacks (`add`), the ones it already has (`kept`) and the ones its
  *  .gitignore leaves out (`ignored`). Writes nothing
@@ -44,7 +50,7 @@ export const createInstance = (answers: Answers) => call<{ url: string }>('POST'
 export type AdoptPlanAnswer = { planId: string; add: string[]; kept: string[]; ignored: string[] }
 export const adoptPlan = (path: string, answers: Answers) => call<AdoptPlanAnswer>('POST', '/api/launcher/adopt/plan', { path, answers })
 /** Adds the plan's files on the branch org-os/adopt and answers where the instance opened. */
-export const adoptApply = (planId: string) => call<{ url: string; branch: string }>('POST', '/api/launcher/adopt/apply', { planId })
+export const adoptApply = (planId: string, landing?: Landing) => call<{ url: string; branch: string }>('POST', '/api/launcher/adopt/apply', { planId, ...(landing ? { landing } : {}) })
 
 /** The default folder for a clone: the repo's name, inside `base`. */
 export function defaultCloneFolder(url: string, base: string): string {

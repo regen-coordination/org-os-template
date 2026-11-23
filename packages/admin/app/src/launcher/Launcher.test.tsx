@@ -8,7 +8,7 @@ import * as api from './api.ts'
 
 vi.mock('./api.ts', async orig => ({
   ...(await orig<typeof import('./api.ts')>()),
-  launcherState: vi.fn(), launcherWizard: vi.fn(), createInstance: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn(), cloneInstance: vi.fn(), adoptPlan: vi.fn(), adoptApply: vi.fn(),
+  launcherState: vi.fn(), inspectHub: vi.fn(), launcherWizard: vi.fn(), createInstance: vi.fn(), openInstance: vi.fn(), forgetRecent: vi.fn(), cloneInstance: vi.fn(), adoptPlan: vi.fn(), adoptApply: vi.fn(),
 }))
 const m = vi.mocked(api)
 
@@ -20,7 +20,7 @@ const state = (over: Record<string, unknown> = {}) => ({
   ],
   doors: [
     { id: 'open', available: true }, { id: 'create', available: true }, { id: 'adopt', available: true },
-    { id: 'join', available: false, note: 'Comes with federation.' },
+    { id: 'join', available: true },
   ],
   ...over,
 })
@@ -119,11 +119,69 @@ describe('the launcher page', () => {
     expect(screen.getByRole('button', { name: 'Adopt it' })).toBeTruthy()
   })
 
-  it('Join is disabled and says why', async () => {
+  const TOKEN = 'tok_SECRET_0123456789abcdef'
+  const hubAnswer = (over: Record<string, unknown> = {}) => ({
+    invite: false,
+    hub: { name: 'Alder Hub', type: 'LocalNode', url: 'https://hub.alder.example', network: 'Alder Network', networks: ['Alder Network'], policy: 'invite', types: ['PersonalNode', 'LocalNode'], asks: [], ...over },
+  })
+
+  it('Join is available: a plain hub address is looked up and the hub sentence shows', async () => {
+    m.inspectHub.mockResolvedValue(hubAnswer() as never)
     renderAt(<Launcher />, '/launch')
-    expect(await screen.findByText('Comes with federation.')).toBeTruthy()
-    const join = screen.getByRole('button', { name: 'Join a network' }) as HTMLButtonElement
-    expect(join.disabled).toBe(true)
+    fireEvent.change(await screen.findByLabelText("The hub's address, or an invite link"), { target: { value: 'https://hub.alder.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    expect(await screen.findByText(/Alder Hub \(LocalNode\)\. This network joins by invite\./)).toBeTruthy()
+    expect(m.inspectHub).toHaveBeenCalledWith('https://hub.alder.example')
+    expect(screen.getByRole('button', { name: 'Create one to join' })).toBeTruthy()
+  })
+
+  it('a pasted invite link: the token never reaches the api, and opening hands it over in the URL fragment only', async () => {
+    m.inspectHub.mockResolvedValue(hubAnswer({ invite: true }) as never)
+    m.openInstance.mockResolvedValue({ url: 'http://127.0.0.1:4680/federation?hub=https%3A%2F%2Fhub.alder.example&network=Alder+Network' } as never)
+    renderAt(<Launcher />, '/launch')
+    fireEvent.change(await screen.findByLabelText("The hub's address, or an invite link"), { target: { value: `https://hub.alder.example/.well-known/federation.json#invite=${TOKEN}` } })
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    await screen.findByText(/Your invite link will be used/)
+    expect(m.inspectHub).toHaveBeenCalledWith('https://hub.alder.example/.well-known/federation.json')
+    fireEvent.change(screen.getByLabelText("The folder it's in"), { target: { value: '~/orgs/alder' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    await waitFor(() => expect(m.openInstance).toHaveBeenCalledWith('~/orgs/alder', { hub: 'https://hub.alder.example', network: 'Alder Network' }))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith(`http://127.0.0.1:4680/federation?hub=https%3A%2F%2Fhub.alder.example&network=Alder+Network#invite=${TOKEN}`))
+    // nothing the api saw carries the token
+    const seen = JSON.stringify([m.inspectHub.mock.calls, m.openInstance.mock.calls])
+    expect(seen).not.toContain(TOKEN)
+    expect(document.body.innerHTML).not.toContain(TOKEN)
+  })
+
+  it('the create flow lands ready to ask, with the type preset from the hub', async () => {
+    m.inspectHub.mockResolvedValue(hubAnswer() as never)
+    m.launcherWizard.mockResolvedValue({ id: 'open-instance', steps: [] } as never)
+    renderAt(<Launcher />, '/launch')
+    fireEvent.change(await screen.findByLabelText("The hub's address, or an invite link"), { target: { value: 'https://hub.alder.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Create one to join' }))
+    await waitFor(() => expect(m.launcherWizard).toHaveBeenCalled())
+  })
+
+  it('a hub with several networks asks which; a closed hub offers no way in', async () => {
+    m.inspectHub.mockResolvedValue(hubAnswer({ networks: ['A', 'B'], network: 'A' }) as never)
+    renderAt(<Launcher />, '/launch')
+    fireEvent.change(await screen.findByLabelText("The hub's address, or an invite link"), { target: { value: 'https://hub.alder.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    const pick = await screen.findByLabelText('Which network') as HTMLSelectElement
+    expect(pick.value).toBe('')
+    m.inspectHub.mockResolvedValue(hubAnswer({ policy: 'closed' }) as never)
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    expect(await screen.findByText(/This network isn't taking requests\./)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Create one to join' })).toBeNull()
+  })
+
+  it('a refused look-up says why in a plain sentence', async () => {
+    m.inspectHub.mockRejectedValue(new Error("That isn't a public https address. Paste the hub's address, or the invite link it gave you."))
+    renderAt(<Launcher />, '/launch')
+    fireEvent.change(await screen.findByLabelText("The hub's address, or an invite link"), { target: { value: 'nonsense' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Look it up' }))
+    expect(await screen.findByText(/isn't a public https address/)).toBeTruthy()
   })
 
   it('/launch is drawn alone: no request goes outside /api/launcher/', async () => {

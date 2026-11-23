@@ -17,6 +17,9 @@ import { AdoptError, adoptProblem, applyAdopt, planAdopt, removeScratch, type Ad
 import { loadWizards } from '../lib/wizards.mjs'
 import { orgProblem, youProblem, type Answers } from '../lib/open-instance.mjs'
 import { defaultAssess, defaultStartAdmin } from './children.ts'
+import { inspectHub, landingOf } from './join.ts'
+import { networkFetch } from '../server/net.ts'
+import type { FetchLike } from '../server/systems/driver.ts'
 
 import { readableHost } from '../server/serve.ts'
 export { readHosted } from '../server/serve.ts'
@@ -37,6 +40,9 @@ export interface LauncherOptions {
   hosted?: boolean
   startAdmin?: StartAdmin
   assess?: Assess
+  /** The Join door's one read (the hub's federation.json), and the host look-up under it. Tests inject both. */
+  fetch?: FetchLike
+  lookup?: (host: string) => Promise<string[]>
 }
 
 /** How long an adopt plan is held before it expires and its scratch folder is removed. */
@@ -52,7 +58,7 @@ function liveName(path: string): string | null {
   } catch { return null }
 }
 
-export async function startLauncher(opts: LauncherOptions): Promise<{ port: number; app: Hono; openFlow: (repo: string) => Promise<{ url: string }>; close: () => Promise<void> }> {
+export async function startLauncher(opts: LauncherOptions): Promise<{ port: number; app: Hono; openFlow: (repo: string, landing?: string) => Promise<{ url: string }>; close: () => Promise<void> }> {
   if (opts.hosted) throw new Error(HOSTED_SENTENCE)
   const defaultStart = opts.startAdmin ? null : defaultStartAdmin(opts.frameworkDir)
   const startAdmin: StartAdmin = opts.startAdmin ?? defaultStart!
@@ -62,7 +68,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
   const starting = new Map<string, Promise<AdminChild>>()
 
   /** Tasks 4–6 reuse this: the doctor looks, its findings are saved, the instance is remembered, its admin is started. */
-  async function openFlow(repo: string): Promise<{ url: string }> {
+  async function openFlow(repo: string, landing = '/systems/map?first=1'): Promise<{ url: string }> {
     if (!isInstance(repo)) throw new Error(`${repo} is not an org-os instance, so it cannot be opened.`)
     const summary = await assess(repo)
     const dir = stateDir(repo)
@@ -81,7 +87,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       const started = child
       void child.exited.then(() => { if (children.get(repo) === started) children.delete(repo) })
     }
-    return { url: `${child.url}/systems/map?first=1` }
+    return { url: `${child.url}${landing}` }
   }
 
   const app = new Hono()
@@ -121,7 +127,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       recent,
       doors: [
         { id: 'open', available: true }, { id: 'create', available: true }, { id: 'adopt', available: true },
-        { id: 'join', available: false, note: 'Comes with federation.' },
+        { id: 'join', available: true },
       ],
     })
   })
@@ -133,7 +139,21 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     } catch { return null }
   }
 
+  /** The landing a request asks for (the Join door): from its `landing` field, which never carries an invite. */
+  const landingIn = async (c: { req: { json: () => Promise<unknown> } }): Promise<string | undefined> => {
+    try { return landingOf((await c.req.json() as { landing?: unknown })?.landing) } catch { return undefined }
+  }
+
+  app.post('/api/launcher/join/inspect', async c => {
+    let address: unknown
+    try { address = (await c.req.json() as { address?: unknown })?.address } catch { /* answered below */ }
+    const got = await inspectHub(address, { fetch: opts.fetch ?? networkFetch, lookup: opts.lookup })
+    if ('error' in got) return c.json({ error: got.error }, got.status as 400 | 502)
+    return c.json(got)
+  })
+
   app.post('/api/launcher/open', async c => {
+    const landing = await landingIn(c)
     const given = await bodyPath(c)
     if (!given) return c.json({ error: 'Say which folder.' }, 400)
     const typed = resolveFolder(given, base())
@@ -145,7 +165,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       const pid = runningServer(path)
       if (pid !== null) return c.json({ error: `This instance is already open in another window (process ${pid}). Use that window, or stop it first.` }, 409)
     }
-    try { return c.json(await openFlow(path)) } catch (err) {
+    try { return c.json(await openFlow(path, landing)) } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
     }
   })
@@ -192,7 +212,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     }
     const path = realpathSync(abs)
     if (!isInstance(path)) return c.json({ error: `${path} is not an org-os instance yet.`, adoptable: true, path }, 409)
-    try { return c.json(await openFlow(path)) } catch (err) {
+    try { return c.json(await openFlow(path, await landingIn(c))) } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
     }
   })
@@ -216,7 +236,7 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
       result = { code: 1, log: err instanceof Error ? err.message : String(err) }
     }
     if (result.code !== 0) return c.json({ error: 'The framework could not create the instance. Whatever it made is left in the folder.', log: result.log }, 500)
-    try { return c.json(await openFlow(realpathSync(abs))) } catch (err) {
+    try { return c.json(await openFlow(realpathSync(abs), await landingIn(c))) } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)
     }
   })
@@ -265,12 +285,13 @@ export async function startLauncher(opts: LauncherOptions): Promise<{ port: numb
     try { const b = await c.req.json() as { planId?: unknown }; id = typeof b?.planId === 'string' ? b.planId : '' } catch { /* answered below */ }
     // Taken out before any await: a plan is applied at most once.
     const plan = id ? dropPlan(id) : undefined
+    const landing = await landingIn(c)
     if (!plan) return c.json({ error: 'This plan has expired or was already used. Start the adoption again.' }, 410)
     let applied
     try { applied = await applyAdopt(plan) } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, err instanceof AdoptError ? err.status : 500)
     }
-    try { return c.json({ ...(await openFlow(plan.dir)), branch: applied.branch }) } catch (err) {
+    try { return c.json({ ...(await openFlow(plan.dir, landing)), branch: applied.branch }) } catch (err) {
       return c.json({ error: `The files were added on ${applied.branch}, but the instance could not be opened: ${err instanceof Error ? err.message : String(err)}` }, 500)
     }
   })

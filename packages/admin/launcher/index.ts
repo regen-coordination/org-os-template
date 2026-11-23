@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { networkFetch } from '../server/net.ts'
 import { readHosted, startLauncher, HOSTED_SENTENCE } from './serve.ts'
 
 function arg(flag: string, fallback: string): string {
@@ -17,7 +18,7 @@ const frameworkDir = fileURLToPath(new URL('../../..', import.meta.url))
 const appDist = fileURLToPath(new URL('../app/dist', import.meta.url))
 if (!existsSync(appDist)) console.warn('app/dist missing — run `npm run build` for the UI (API still available)')
 
-const running = await startLauncher({ port, frameworkDir, appDist })
+const running = await startLauncher({ port, frameworkDir, appDist, fetch: networkFetch })
 console.log(`org-os → http://localhost:${running.port}/launch`)
 
 // Closing stops the admins it started. A second signal is the operator insisting: leave at once.
