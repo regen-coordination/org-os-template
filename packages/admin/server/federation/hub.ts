@@ -311,7 +311,7 @@ export async function receive(repo: string, actor: KnownActor, incoming: { trans
 
   // The asker's DID only when a confirmed check tied it to its url (Task 12): a DID its federation.json merely names is
   // left out, and the operator can add it later through the migration list.
-  const did = verifiedDid(repo, request.from.url)
+  const did = verifiedDid(repo, request.from.url, now)
   if (outcome.kind === 'accept') {
     const decision = outcome.by === 'invite' ? `invite ${outcome.invite.id}` : outcome.decision
     const files: HubFile[] = [

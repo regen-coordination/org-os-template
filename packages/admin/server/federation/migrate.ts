@@ -35,6 +35,7 @@ export const MIGRATION_SENTENCES = {
   badLink: `link must be one of ${LINK_RELATIONS.join(', ')}.`,
   notDidOrHandle: (v: string) => `"${v.slice(0, 100)}" is not a DID or a handle.`,
   unchanged: 'Nothing to change: those peers already say so.',
+  replaces: 'Replaces the did set by hand.',
   noPeers: "federation.yaml here has no peers list, so nothing was changed.",
   differs: (name: string) => `federation.yaml here no longer matches the trunk at "${name}", so nothing was changed. Apply or discard that change first.`,
 }
@@ -47,40 +48,45 @@ export function claimedDid(repo: string, url: string | null): string | null {
   return doc && typeof doc.did === 'string' && DID_PATTERN.test(doc.did) ? doc.did : null
 }
 
-/** The addresses a DID's own profiles name, as its last reading kept them: `example.orgosnetwork.profile` `instance` and
- *  `homepage`, and the Certified organization profile's `urls[].url`. */
-export function profileNames(r: Reading): string[] {
+/** The addresses a DID's own profiles name, each with the date it was read: `example.orgosnetwork.profile` `instance` and
+ *  `homepage` (read with the reading), and the Certified organization profile's `urls[].url` (read when a confirmed
+ *  lookup listed it, `readAt`; a listing kept from before that date has none and counts as stale). */
+export function profileNames(r: Reading): { url: string; at: string | null }[] {
   const rest = r.profile?.value.rest ?? {}
-  const own = [rest.instance, rest.homepage].filter((v): v is string => typeof v === 'string')
-  return [...own, ...(r.organization?.urls ?? [])]
+  const own = [rest.instance, rest.homepage].filter((v): v is string => typeof v === 'string').map(url => ({ url, at: r.fetchedAt }))
+  const org = r.organization ? r.organization.urls.map(url => ({ url, at: typeof r.organization?.readAt === 'string' ? r.organization.readAt : null })) : []
+  return [...own, ...org]
 }
 
-/** The atproto cache, as `didBinding` reads it. */
-export function bindingView(repo: string): AtprotoView {
+/** The caches, as `didBinding` reads them: the atproto readings and checked handles, and each peer url's federation.json
+ *  `did` as the last confirmed read left it. `now` dates a profile listing against the TTL. */
+export function bindingView(repo: string, now: Date = new Date()): AtprotoView {
   const cache = atprotoCache(repo)
   return {
     readingOf: did => { const r = cache.get(did)?.reading; return r ? { handle: r.handle, names: profileNames(r) } : null },
     didOfHandle: h => cache.didOfHandle(h)?.did ?? null,
+    theirDid: url => claimedDid(repo, url),
+    now,
   }
 }
 
 /** The DID a peer's federation.json names, when the atproto cache ties it to that peer's url (`didBinding`); else null.
  *  What the hub writes into an accepted member's entry (Task 9), so an asker can't have a DID it doesn't hold written. */
-export function verifiedDid(repo: string, url: string): string | null {
+export function verifiedDid(repo: string, url: string, now: Date = new Date()): string | null {
   const did = claimedDid(repo, url)
-  return did !== null && didBinding({ url }, did, bindingView(repo)) === null ? did : null
+  return did !== null && didBinding({ url }, did, bindingView(repo, now)) === null ? did : null
 }
 
 export interface Migration { rows: MigrationRow[]; kept: { private: number; noUrl: number }; fed: Fed }
 
 /** The migration list from the trunk's federation.yaml and the caches; never fetches. */
-export async function migrationOf(repo: string, run: Runner, startBranch?: string): Promise<Migration | { problem: string }> {
+export async function migrationOf(repo: string, run: Runner, startBranch?: string, now: Date = new Date()): Promise<Migration | { problem: string }> {
   const t = await readTrunkFederation(repo, startBranch)
   if ('problem' in t) return t
   const files = byFiles(repo, t.fed, await selfAddressesOf(repo, run))
   const { rows, kept } = migrationRows(t.fed, {
     theirDid: p => claimedDid(repo, p.url),
-    atproto: bindingView(repo),
+    atproto: bindingView(repo, now),
     byFiles: files,
     where: { base: repo, io: nodePeerIO },
   })

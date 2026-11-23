@@ -181,7 +181,7 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
 
   // The trunk's peers and the caches only: it never fetches. The page runs `federation.check-links` first.
   app.get('/api/federation/migration', async c => {
-    const m = await migrationOf(repo, run, deps.startBranch)
+    const m = await migrationOf(repo, run, deps.startBranch, now())
     if ('problem' in m) return c.json({ problem: m.problem })
     return c.json({ rows: m.rows, kept: m.kept })
   })
@@ -191,15 +191,18 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     const raw = await body(c)
     return withLock(async () => {
       const actor = knownActorOf(c)
-      const m = await migrationOf(repo, run, deps.startBranch)
+      const m = await migrationOf(repo, run, deps.startBranch, now())
       if ('problem' in m) throw new HttpError(409, m.problem)
-      const sets = resolveSets(raw.set, m, bindingView(repo))
+      const sets = resolveSets(raw.set, m, bindingView(repo, now()))
       const { text, base } = fedNow(repo, actor.id)
       const edited = migratedText(text, sets)
       if (edited.changed === 0) throw new HttpError(409, MIGRATION_SENTENCES.unchanged)
       const n = sets.length
       const out = await commitOrStage(repo, actor, [fedOp(edited.text, base)], `federation: bring ${n} ${n === 1 ? 'peer' : 'peers'} onto atproto (DID and link)`, deps.notify)
-      return c.json({ set: sets.map(s => s.peer.index), ...out })
+      // A DID already in federation.yaml that this edit replaces is said by peer (only public peers reach here).
+      const notes = sets.filter(s => s.did !== undefined && s.peer.did !== null && s.peer.did !== s.did)
+        .map(s => `${s.peer.name}: ${MIGRATION_SENTENCES.replaces}`)
+      return c.json({ set: sets.map(s => s.peer.index), ...(notes.length > 0 ? { notes } : {}), ...out })
     })
   })
 

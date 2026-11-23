@@ -16,10 +16,13 @@ import { isPublishedPeer } from '../standards/federation.mjs'
 /** @typedef {import('./read.mjs').Peer} Peer */
 /** @typedef {import('./links.mjs').Relation} Relation */
 /** @typedef {import('./links.mjs').Where} Where */
-/** @typedef {{ readingOf: (did: string) => { handle: string | null, names?: string[] } | null, didOfHandle: (handle: string) => string | null }} AtprotoView
- *  what confirmed checks left in the atproto cache: a DID's last reading (the handle its document claims, and `names`, the
+/** @typedef {{ url: string, at: string | null }} ProfileName  an address a DID's own profile names, and when it was read */
+/** @typedef {{ readingOf: (did: string) => { handle: string | null, names?: ProfileName[] } | null,
+ *   didOfHandle: (handle: string) => string | null, theirDid?: (url: string) => string | null, now?: Date }} AtprotoView
+ *  what confirmed checks left in the caches: a DID's last reading (the handle its document claims, and `names`, the
  *  addresses its own profiles name: `example.orgosnetwork.profile` `instance`/`homepage`, `app.certified.actor.organization`
- *  `urls[].url`), and a handle's DID, kept only after it was checked both ways (Task 3, R7) */
+ *  `urls[].url`), a handle's DID, kept only after it was checked both ways (Task 3, R7), and `theirDid`, the `did` a
+ *  peer url's own federation.json carried at the last confirmed read. `now` dates a profile listing against the TTL. */
 /** @typedef {{ theirDid?: (peer: Peer) => string | null, atproto?: AtprotoView,
  *   byFiles?: { mutualByFiles?: readonly number[], membersByFiles?: readonly number[] }, where?: Where }} MigrationCaches
  *  `theirDid`: the `did` the peer's own federation.json carried at the last check; `byFiles`: the files readings (R4) */
@@ -40,15 +43,26 @@ export const BINDING = Object.freeze({
   lookFirst: 'Look it up first.',
   notDid: 'That is not a did:plc or did:web identifier.',
   noUrl: "This peer has no public https address, so no DID can be tied to it.",
-  noHandle: "Its DID document names no handle, and its profile doesn't name this peer's address, so it can't be tied to it.",
+  noHandle: "Its DID document names no handle, and this peer's federation.json and the DID's profile don't name each other, so it can't be tied to it.",
   /** @param {string} handle */
-  notBothWays: handle => `Its handle ${handle} doesn't name it back yet, and its profile doesn't name this peer's address, so it can't be written. Look it up first.`,
+  notBothWays: handle => `Its handle ${handle} doesn't name it back yet, and this peer's federation.json and the DID's profile don't name each other, so it can't be written. Look it up first.`,
   /** @param {string} handle @param {string} host */
-  otherHost: (handle, host) => `Its handle is ${handle}, not ${host}, and its profile doesn't name this peer's address, so it isn't this peer's DID.`,
+  otherHost: (handle, host) => `Its handle is ${handle}, not ${host}, and this peer's federation.json and the DID's profile don't name each other, so it isn't this peer's DID.`,
+  lookAgain: "The profile that ties this DID to this peer was read more than a day ago. Look it up again.",
 })
 
-/** Hosts many orgs share: an address on one names an org only as the exact url, never by its host. */
-export const SHARED_HOSTS = Object.freeze(['github.com', 'gitlab.com', 'codeberg.org', 'bsky.social', 'certified.one'])
+/** How long a profile listing ties a DID to a peer: the DID-document TTL (atproto/read.ts DID_DOC_TTL_MS), 24 hours. */
+export const PROFILE_TTL_MS = 24 * 3600_000
+
+/** Hosts many orgs share: an address on one, or on any subdomain of one, names an org only as the exact url, never by
+ *  its host. */
+export const SHARED_HOSTS = Object.freeze([
+  'github.com', 'github.io', 'gitlab.com', 'gitlab.io', 'codeberg.org', 'bitbucket.org', 'gitea.com', 'sr.ht',
+  'google.com', 'opencollective.com', 'huggingface.co', 'bsky.social', 'certified.one',
+])
+
+/** Whether a (bare) host is a shared host or under one.  @param {string} host */
+export const isSharedHost = host => SHARED_HOSTS.some(s => host === s || host.endsWith(`.${s}`))
 
 /** A host without a leading `www.` and a trailing dot, lowercased.  @param {string} h */
 const bareHost = h => h.toLowerCase().replace(/\.$/, '').replace(/^www\./, '')
@@ -57,7 +71,7 @@ const bareHost = h => h.toLowerCase().replace(/\.$/, '').replace(/^www\./, '')
 const normUrl = (/** @type {string} */ u) => u.trim().replace(/\/+$/, '').toLowerCase()
 
 /** Whether an address a DID's own profile names is this peer's url: the same url (normUrl), or a public https url on the
- *  same host, unless that host is a shared one (SHARED_HOSTS), where only the exact url counts.
+ *  same host, unless that host is a shared one or under one (SHARED_HOSTS), where only the exact url counts.
  *  @param {unknown} name @param {string} url */
 export function namesPeer(name, url) {
   if (typeof name !== 'string' || name.trim() === '') return false
@@ -66,22 +80,23 @@ export function namesPeer(name, url) {
   if (!isPublicUrl(href)) return false
   const theirs = bareHost(new URL(href).hostname)
   const ours = bareHost(new URL(url).hostname)
-  return theirs === ours && !SHARED_HOSTS.includes(ours)
+  return theirs === ours && !isSharedHost(ours)
 }
 
 /** Whether `did` is this peer's, by what confirmed checks cached (null), or the sentence saying why not. Tied means:
  *  the DID was read (a confirmed check resolved it), and one of
  *  - it is `did:web:<host>` for the peer url's own host (that host serves the document);
- *  - its own repository, read in a confirmed check, holds a profile naming the peer (`namesPeer`): the org says from
- *    its own account which address it is, as atproto and Certified profiles are meant for;
+ *  - both sides name each other: the peer url's own federation.json (`theirDid`, from a confirmed read) names this DID,
+ *    and the DID's own profile, read in a confirmed check less than a day ago, names the peer's url (`namesPeer`; the
+ *    same-host allowance only on top of that agreement). Either side alone is a claim anyone could make;
  *  - the handle its document claims was checked both ways (the handle names the DID, the DID names the handle) and is
  *    the peer url's host (a leading `www.` aside).
- *  A DID the peer's federation.json names is only a claim from one side, so it never ties on its own.
  *  @param {{ url: string | null, name?: string }} peer @param {string} did @param {AtprotoView} view @returns {string | null} */
 export function didBinding(peer, did, view) {
   if (!isDid(did)) return BINDING.notDid
   if (!isPublicUrl(peer.url)) return BINDING.noUrl
-  const url = new URL(/** @type {string} */ (peer.url))
+  const href = /** @type {string} */ (peer.url)
+  const url = new URL(href)
   const reading = view.readingOf(did)
   if (!reading) return BINDING.lookFirst
   if (did.startsWith('did:web:')) {
@@ -90,12 +105,23 @@ export function didBinding(peer, did, view) {
     try { host = id.includes(':') ? null : decodeURIComponent(id).toLowerCase() } catch { host = null }
     if (host !== null && host === url.host.toLowerCase()) return null
   }
-  if ((reading.names ?? []).some(n => namesPeer(n, /** @type {string} */ (peer.url)))) return null
+  let stale = false
+  if (view.theirDid?.(href) === did) {
+    const now = (view.now ?? new Date()).getTime()
+    const naming = (reading.names ?? []).filter(n => namesPeer(n.url, href))
+    const fresh = (/** @type {ProfileName} */ n) => {
+      const age = n.at === null ? NaN : now - Date.parse(n.at)
+      return Number.isFinite(age) && age >= 0 && age < PROFILE_TTL_MS
+    }
+    if (naming.some(fresh)) return null
+    stale = naming.length > 0
+  }
   const handle = typeof reading.handle === 'string' && reading.handle !== '' ? reading.handle.toLowerCase() : null
-  if (handle === null) return BINDING.noHandle
-  if (view.didOfHandle(handle) !== did) return BINDING.notBothWays(handle)
-  if (bareHost(handle) !== bareHost(url.hostname)) return BINDING.otherHost(handle, url.hostname.toLowerCase())
-  return null
+  const byHandle = handle === null ? BINDING.noHandle
+    : view.didOfHandle(handle) !== did ? BINDING.notBothWays(handle)
+    : bareHost(handle) !== bareHost(url.hostname) ? BINDING.otherHost(handle, url.hostname.toLowerCase())
+    : null
+  return byHandle !== null && stale ? BINDING.lookAgain : byHandle
 }
 
 /** The migration list (pure): one row per peer that `isPublishedPeer` passes, by peer index; every other peer is left
@@ -122,9 +148,10 @@ export function migrationRows(fed, caches = {}) {
       else kept.noUrl += 1
       continue
     }
-    const claimed = peer.did ? null : caches.theirDid?.(peer) ?? null
+    const claimed = caches.theirDid?.(peer) ?? null
     const theirs = isDid(claimed) ? claimed : null
     const did = peer.did ?? theirs
+    const bound = { ...view, theirDid: (/** @type {string} */ u) => (u === peer.url ? theirs : null) }
     const relation = relationOf(peer, fed, { ...where, ...byFiles })
     const wanted = wantedLink(peer, fed, { relation, where, ...byFiles })
     let why = null
@@ -138,7 +165,7 @@ export function migrationRows(fed, caches = {}) {
       name: peer.name,
       did,
       didSource: peer.did ? 'federation.yaml' : theirs ? 'their federation.json' : null,
-      didVerified: did !== null && didBinding(peer, did, view) === null,
+      didVerified: did !== null && didBinding(peer, did, bound) === null,
       relation,
       relationSource: peer.link ? 'link' : relation ? 'derived' : null,
       publishable: 'link' in wanted,

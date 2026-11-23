@@ -46,7 +46,7 @@ export interface Reading {
   skipped: number
   /** The Certified organization profile's urls, when this reading listed that collection (`ReadDeps.organization`):
    *  null when it has no `self` record. Absent when it wasn't listed; the cache then keeps the last one listed. */
-  organization?: { urls: string[] } | null
+  organization?: { urls: string[]; readAt: string } | null
   fetchedAt: string
 }
 export interface ReadDeps extends ResolveDeps {
@@ -129,7 +129,7 @@ export async function readRepo(did: string, deps: ReadDeps): Promise<Reading | P
     const orgs = await listAll(doc.pds, did, ORGANIZATION_NSID, deps)
     if ('problem' in orgs) return orgs
     const own = orgs.records.find(r => r.uri === `at://${did}/${ORGANIZATION_NSID}/self`)
-    reading.organization = own ? { urls: organizationUrls(own.value) } : null
+    reading.organization = own ? { urls: organizationUrls(own.value), readAt: reading.fetchedAt } : null
   }
   return reading
 }
@@ -179,7 +179,8 @@ export function atprotoCache(repo: string) {
     /** A reading replaces the last one and clears `lastProblem`; a problem is kept beside the last good reading. */
     put(did: string, got: Reading | Problem, now: Date = new Date()): void {
       const before = get(did)?.reading ?? null
-      // A reading that didn't list the organization profile keeps the last one a confirmed lookup listed.
+      // A reading that didn't list the organization profile keeps the last one a confirmed lookup listed, with the date it
+      // was really read (`readAt`), never this reading's: binding refuses a listing older than the DID-document TTL.
       const carried = !('problem' in got) && got.organization === undefined && before?.organization !== undefined
         ? { ...got, organization: before.organization } : got
       const entry: CacheEntry = 'problem' in carried

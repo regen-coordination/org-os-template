@@ -121,7 +121,7 @@ const build = () => {
 const confirm = (did: string, handle: string, organizationUrls?: string[]) => {
   const cache = atprotoCache(repo)
   cache.put(did, { did, pds: 'https://pds-two.example.net', handle, profile: null, links: [], skipped: 0, fetchedAt: NOW.toISOString(),
-    ...(organizationUrls ? { organization: { urls: organizationUrls } } : {}) }, NOW)
+    ...(organizationUrls ? { organization: { urls: organizationUrls, readAt: NOW.toISOString() } } : {}) }, NOW)
   cache.putHandle(handle, did, NOW)
 }
 

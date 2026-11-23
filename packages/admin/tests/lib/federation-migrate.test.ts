@@ -3,7 +3,7 @@
 // Pure: every reading is passed in.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { migrationRows, didBinding, namesPeer, MIGRATION_WHY, BINDING, SHARED_HOSTS } from '../../lib/federation/migrate.mjs'
+import { migrationRows, didBinding, namesPeer, isSharedHost, MIGRATION_WHY, BINDING, SHARED_HOSTS, PROFILE_TTL_MS } from '../../lib/federation/migrate.mjs'
 import { planLinks } from '../../lib/federation/links.mjs'
 import { readFederation } from '../../lib/federation/read.mjs'
 
@@ -170,33 +170,71 @@ describe('didBinding: a DID is written for a peer only when the cache ties it to
   })
 })
 
-describe('didBinding: the DID\'s own profile names the peer (the atproto and Certified way)', () => {
+describe('didBinding: both sides name each other, the peer\'s federation.json and the DID\'s own profile', () => {
   const REPO = 'https://github.com/fixture-coop/fixture-os'
   const CERT = 'did:plc:certcertcertcertcertcert'
-  const viewNaming = (names: string[], handle = 'fixture-coop.certified.one') => ({
-    readingOf: (d: string) => (d === CERT ? { handle, names } : null),
-    didOfHandle: (h: string) => (h === handle ? CERT : null),
-  })
+  const NOW = new Date('2026-11-23T12:00:00.000Z')
+  const READ = '2026-11-23T11:00:00.000Z'
+  /** The DID's profile names `names` (read at `at`); the peer url's federation.json names `theirs`. */
+  const view = (names: string[], o: { theirs?: string | null; at?: string | null; handle?: string } = {}) => {
+    const handle = o.handle ?? 'fixture-coop.certified.one'
+    const at = o.at === undefined ? READ : o.at
+    return {
+      readingOf: (d: string) => (d === CERT ? { handle, names: names.map(url => ({ url, at })) } : null),
+      didOfHandle: (h: string) => (h === handle ? CERT : null),
+      theirDid: () => (o.theirs === undefined ? CERT : o.theirs),
+      now: NOW,
+    }
+  }
   const peer = { name: 'Fixture OS', url: REPO }
-  it('a github.com peer whose DID\'s profile lists that exact url is tied', () => {
-    expect(didBinding(peer, CERT, viewNaming([REPO]))).toBeNull()
-    expect(didBinding(peer, CERT, viewNaming(['https://GitHub.com/fixture-coop/fixture-os/']))).toBeNull()
+
+  it('the real member case: their federation.json names the DID and its Certified profile lists the exact repo url', () => {
+    expect(didBinding(peer, CERT, view([REPO]))).toBeNull()
+    expect(didBinding(peer, CERT, view(['https://GitHub.com/fixture-coop/fixture-os/']))).toBeNull()
   })
-  it('one that lists only another repo on github.com is not: github.com is shared', () => {
-    expect(didBinding(peer, CERT, viewNaming(['https://github.com/other/repo']))).toBe(BINDING.otherHost('fixture-coop.certified.one', 'github.com'))
+  it('the attack: the DID\'s profile lists the url, but their federation.json names another DID, or none', () => {
+    expect(didBinding(peer, CERT, view([REPO], { theirs: 'did:plc:otherotherotherotherothe' }))).toBe(BINDING.otherHost('fixture-coop.certified.one', 'github.com'))
+    expect(didBinding(peer, CERT, view([REPO], { theirs: null }))).not.toBeNull()
+    const acme = { name: 'Acme', url: 'https://acme.example.org' }
+    expect(didBinding(acme, CERT, view(['https://acme.example.org'], { theirs: null }))).not.toBeNull()
   })
-  it('a profile naming a different host is not', () => {
-    expect(didBinding({ name: 'Acme', url: 'https://acme.example.org' }, CERT, viewNaming(['https://other.example.org']))).not.toBeNull()
+  it('their federation.json naming the DID is not enough without the profile naming them back', () => {
+    expect(didBinding(peer, CERT, view([]))).not.toBeNull()
+    expect(didBinding(peer, CERT, view(['https://github.com/other/repo']))).toBe(BINDING.otherHost('fixture-coop.certified.one', 'github.com'))
   })
-  it('a profile naming another page on the peer\'s own (unshared) host is', () => {
-    expect(didBinding({ name: 'Acme', url: 'https://acme.example.org' }, CERT, viewNaming(['https://www.acme.example.org/about']))).toBeNull()
+  it('a profile naming a different host is not; another page on the peer\'s own unshared host is, with both sides agreeing', () => {
+    const acme = { name: 'Acme', url: 'https://acme.example.org' }
+    expect(didBinding(acme, CERT, view(['https://other.example.org']))).not.toBeNull()
+    expect(didBinding(acme, CERT, view(['https://www.acme.example.org/about']))).toBeNull()
   })
-  it('a DID never read, or read with no profile naming it, is not, however its federation.json names it', () => {
-    expect(didBinding(peer, 'did:plc:nevernevernevernevernever', viewNaming([REPO]))).toBe(BINDING.lookFirst)
-    expect(didBinding(peer, CERT, viewNaming([]))).not.toBeNull()
+  it('subdomains of shared hosts are shared: gist.github.com matches only its exact url', () => {
+    const gist = { name: 'Gist', url: 'https://gist.github.com/fixture-coop/abc123' }
+    expect(didBinding(gist, CERT, view(['https://gist.github.com/fixture-coop/abc123']))).toBeNull()
+    expect(didBinding(gist, CERT, view(['https://gist.github.com/someone/else']))).not.toBeNull()
+    expect(isSharedHost('gist.github.com')).toBe(true)
+    for (const h of ['bitbucket.org', 'gitea.com', 'git.sr.ht', 'sites.google.com', 'opencollective.com', 'huggingface.co', 'acme.github.io']) expect(isSharedHost(h), h).toBe(true)
+    expect(isSharedHost('acme.example.org')).toBe(false)
+    expect(isSharedHost('notgithub.com')).toBe(false)
+  })
+  it('a profile read more than a day ago no longer ties it: Look it up again.', () => {
+    expect(BINDING.lookAgain).toContain('Look it up again.')
+    expect(PROFILE_TTL_MS).toBe(24 * 3600_000)
+    expect(didBinding(peer, CERT, view([REPO], { at: '2026-11-22T11:59:00.000Z' }))).toBe(BINDING.lookAgain)
+    expect(didBinding(peer, CERT, view([REPO], { at: null }))).toBe(BINDING.lookAgain)
+    expect(didBinding(peer, CERT, view([REPO], { at: '2026-11-22T12:01:00.000Z' }))).toBeNull()
+  })
+  it('a DID never read is Look it up first., however both files name it', () => {
+    expect(didBinding(peer, 'did:plc:nevernevernevernevernever', view([REPO]))).toBe(BINDING.lookFirst)
+  })
+  it('migrationRows passes each row its own federation.json DID, so a DID in federation.yaml is checked the same way', () => {
+    const fed = readFederation({ peers: [{ name: 'Fixture OS', url: REPO, did: CERT }] })
+    const v = view([REPO])
+    const yes = migrationRows(fed, { atproto: v, theirDid: () => CERT }).rows[0]
+    expect(yes).toMatchObject({ did: CERT, didSource: 'federation.yaml', didVerified: true })
+    const no = migrationRows(fed, { atproto: v, theirDid: () => null }).rows[0]
+    expect(no.didVerified).toBe(false)
   })
   it('namesPeer: shared hosts match only the exact url', () => {
-    expect(SHARED_HOSTS).toEqual(['github.com', 'gitlab.com', 'codeberg.org', 'bsky.social', 'certified.one'])
     for (const host of SHARED_HOSTS) {
       expect(namesPeer(`https://${host}/a/b`, `https://${host}/a/b`)).toBe(true)
       expect(namesPeer(`https://${host}/a/c`, `https://${host}/a/b`)).toBe(false)

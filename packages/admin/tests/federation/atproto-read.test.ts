@@ -343,7 +343,7 @@ describe('the Certified organization profile, for a DID under consideration (Tas
     expect(plain.organization).toBeUndefined()
     expect(net.requests.some(r => r.url.includes(ORGANIZATION_NSID))).toBe(false)
     const asked = await readRepo(BOB, { ...net, now: NOW, organization: true }) as Reading
-    expect(asked.organization).toEqual({ urls: ['https://github.com/bob/bob-os', 'https://bob.example.net'] })
+    expect(asked.organization).toEqual({ urls: ['https://github.com/bob/bob-os', 'https://bob.example.net'], readAt: NOW.toISOString() })
     expect(net.requests.filter(r => r.url.includes(`collection=${ORGANIZATION_NSID}`)).map(r => new URL(r.url).host)).toEqual([TWO])
   })
 
@@ -361,10 +361,11 @@ describe('the Certified organization profile, for a DID under consideration (Tas
     const net = network()
     net.seed(BOB, ORGANIZATION_NSID, 'self', org([{ url: 'https://github.com/bob/bob-os' }]))
     await checkLinksAndRecords(repo, { did: BOB }, net, signal(), NOW)
-    expect(atprotoCache(repo).get(BOB)?.reading?.organization).toEqual({ urls: ['https://github.com/bob/bob-os'] })
-    // the bulk check reads the DID without the organization collection: the last listed one is kept
+    expect(atprotoCache(repo).get(BOB)?.reading?.organization).toEqual({ urls: ['https://github.com/bob/bob-os'], readAt: NOW.toISOString() })
+    // the bulk check reads the DID without the organization collection: the last listed one is kept, with the date it
+    // was really read, never the new reading's
     atprotoCache(repo).put(BOB, await readRepo(BOB, { ...net, now: LATER }) as Reading, LATER)
-    expect(atprotoCache(repo).get(BOB)?.reading).toMatchObject({ fetchedAt: LATER.toISOString(), organization: { urls: ['https://github.com/bob/bob-os'] } })
+    expect(atprotoCache(repo).get(BOB)?.reading).toMatchObject({ fetchedAt: LATER.toISOString(), organization: { urls: ['https://github.com/bob/bob-os'], readAt: NOW.toISOString() } })
     // a lookup that finds none any more clears it
     const gone = network()
     await checkLinksAndRecords(repo, { handle: 'bob.example.net' }, gone, signal(), LATER)
