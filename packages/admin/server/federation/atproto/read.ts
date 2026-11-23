@@ -38,6 +38,9 @@ export interface Reading {
   pds: string
   handle: string | null
   profile: RecordOf<ProfileRecord> | null
+  /** A profile `self` is there but did not parse (another client's shape, say): its uri and cid. It is never written
+   *  over blind (Task 7). Absent in readings cached before it existed. */
+  unreadProfile?: { uri: string; cid: string } | null
   links: RecordOf<LinkRecord>[]
   /** Records whose value did not parse (links, and a profile `self`). */
   skipped: number
@@ -100,13 +103,14 @@ export async function readRepo(did: string, deps: ReadDeps): Promise<Reading | P
     else parsed.push({ uri: r.uri, cid: r.cid, value })
   }
   let profile: RecordOf<ProfileRecord> | null = null
+  let unreadProfile: { uri: string; cid: string } | null = null
   const self = profiles.records.find(r => r.uri === `at://${did}/${PROFILE_NSID}/self`)
   if (self) {
     const value = parseProfileRecord(self.value)
-    if (value === null) skipped += 1
+    if (value === null) { skipped += 1; unreadProfile = { uri: self.uri, cid: self.cid } }
     else profile = { uri: self.uri, cid: self.cid, value }
   }
-  return { did, pds: doc.pds, handle: doc.handle, profile, links: parsed, skipped, fetchedAt: (deps.now ?? new Date()).toISOString() }
+  return { did, pds: doc.pds, handle: doc.handle, profile, unreadProfile, links: parsed, skipped, fetchedAt: (deps.now ?? new Date()).toISOString() }
 }
 
 export interface CacheEntry { did: string; reading: Reading | null; lastProblem: { at: string; text: string } | null }

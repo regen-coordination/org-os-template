@@ -235,7 +235,7 @@ export function linkVerdict({ peer, fed, relation, filesSide: side, where }) {
  *  instance is kept */
 /** @typedef {{ private: number, noUrl: number, noDid: number, noRelation: number, undecided: number }} WithheldCounts */
 /** @typedef {{ wanted: WantedLink[], create: { rkey: string, record: LinkRecord }[], delete: OwnLink[], keep: OwnLink[],
- *   profile: { record: Record<string, unknown>, swapRecord?: string } | null, withheld: WithheldCounts }} LinkPlan */
+ *   profile: { record: Record<string, unknown>, swapRecord?: string } | null, profileWithheld: boolean, withheld: WithheldCounts }} LinkPlan */
 
 /** The match of a record or a wanted link: subject, relation and network, never the record's key.
  *  @param {{ subject: string, relation: string, network?: string }} l */
@@ -274,12 +274,14 @@ function ownNetworks(fed, peers, where) {
  *    networks changed, or when there is no profile yet and something is published (a peer reads an org with no profile
  *    as not on atproto). `swapRecord` is the current profile's cid. A new profile also carries `name` and `createdAt`
  *    (the drafted lexicon requires them); an existing one is never given keys it didn't have, other than `networks`.
+ *  - `profileWithheld`: `profileUnread` was given (a `self` record is there but didn't parse), so no profile is
+ *    planned at all: a record that couldn't be read is never written over blind.
  *  - `withheld`: counts only; no peer is named anywhere in the plan.
  *  @param {{ fed: FedLike & { peers: Peer[] }, selfDid: string | null, ownRecords?: OwnLink[] | null,
- *   ownProfile?: OwnProfile | null, now: string | Date, hash?: (text: string) => string, where?: Where,
+ *   ownProfile?: OwnProfile | null, profileUnread?: boolean, now: string | Date, hash?: (text: string) => string, where?: Where,
  *   byFiles?: FilesReadings }} input
  *  @returns {LinkPlan} */
-export function planLinks({ fed, selfDid, ownRecords, ownProfile, now, hash, where = {}, byFiles = {} }) {
+export function planLinks({ fed, selfDid, ownRecords, ownProfile, profileUnread = false, now, hash, where = {}, byFiles = {} }) {
   const at = typeof now === 'string' ? now : now.toISOString()
   const mutual = byFiles.mutualByFiles ?? []
   const members = byFiles.membersByFiles ?? []
@@ -329,7 +331,9 @@ export function planLinks({ fed, selfDid, ownRecords, ownProfile, now, hash, whe
     && new Set(a.map(n => `${n.hub}|${n.name}`)).size === a.length
   /** @type {LinkPlan['profile']} */
   let profile = null
-  if (ownProfile && ownProfile.value) {
+  if (profileUnread) {
+    // A profile `self` is there but didn't parse: it is never written over blind. The plan says it was left as it is.
+  } else if (ownProfile && ownProfile.value) {
     if (!sameNetworks(ownProfile.value.networks)) {
       profile = { record: { $type: PROFILE_NSID, ...ownProfile.value.rest, networks }, swapRecord: ownProfile.cid }
     }
@@ -342,5 +346,5 @@ export function planLinks({ fed, selfDid, ownRecords, ownProfile, now, hash, whe
     profile = { record: { $type: PROFILE_NSID, name, networks, createdAt: at } }
   }
 
-  return { wanted: [...wanted.values()].map(w => w.link), create, delete: del, keep, profile, withheld }
+  return { wanted: [...wanted.values()].map(w => w.link), create, delete: del, keep, profile, profileWithheld: Boolean(profileUnread), withheld }
 }

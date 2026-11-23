@@ -353,6 +353,15 @@ describe('planLinks (Task 7): what this org publishes, from federation.yaml, nev
     expect(plan(node([]), { ownProfile: left }).profile).toEqual({ record: { $type: PROFILE_NSID, displayName: 'X', networks: [] }, swapRecord: 'cid-profile' })
   })
 
+  it('a profile self that is there but did not parse is never planned over, and the plan says so', () => {
+    const member = node([{ name: 'Mesh Hub', url: HUB_SITE, did: HUB, link: 'memberOf' }])
+    const p = plan(member, { profileUnread: true })
+    expect(p.profile).toBeNull()
+    expect(p.profileWithheld).toBe(true)
+    expect(p.create).toHaveLength(1) // the links still go
+    expect(plan(member).profileWithheld).toBe(false)
+  })
+
   it('re-publishing an unchanged record is never planned: the second plan is empty', () => {
     const fed = node([{ name: 'Mesh Hub', url: HUB_SITE, did: HUB, link: 'memberOf' }, { name: 'Friendly Peer', url: 'https://friendly.example.org', did: PEER, link: 'peerOf' }])
     const first = plan(fed)

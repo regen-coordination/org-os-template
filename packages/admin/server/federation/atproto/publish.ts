@@ -35,6 +35,8 @@ import type { FetchLike } from '../../systems/driver.ts'
 import type { Resource, Runner } from '../../resources/types.ts'
 import type { InProcess, Operation } from '../../operations/catalogue.ts'
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
 /** Every refusal and failure, word for word. */
 export const SENTENCES = Object.freeze({
   noDid: "Set this instance's DID first (identity.did).",
@@ -43,12 +45,20 @@ export const SENTENCES = Object.freeze({
   pdsMismatch: "This DID's PDS isn't the one kms.yaml names.",
   privatePds: "This instance's PDS isn't on a public address, so nothing is written to it: a PDS on a private network is refused.",
   placeholder: "The network's lexicon isn't set yet (example.*), so nothing is written to a live account.",
-  massDelete: 'Not withdrawn: this would remove every published link. Withdraw them one at a time.',
+  /** R25, ruling R2 (no override exists, and there is no per-record withdraw). */
+  massDelete: (n: number) => `This would remove every published link at once (${n}). Nothing was written.`,
   checkFirst: 'Check the links first.',
   staleSelf: "The last check of this instance's records failed. Check the links again.",
   swap: 'Your profile changed elsewhere. Check again, then publish.',
   nothing: 'Nothing to publish.',
   cancelled: 'Not published: it was cancelled.',
+  /** A cancel after some writes went through: counts only. */
+  cancelledAfter: (created: number, deleted: number, profile: boolean) =>
+    `Cancelled after some writes went through: ${plural(created, 'link', 'links')} published, ${deleted} withdrawn${profile ? ', the profile updated' : ''}. Check the links to see the rest.`,
+  profileUnread: "Your profile record couldn't be read, so it was left as it is.",
+  loginMismatch: "The app password signs in to another account than this instance's DID, so nothing was written.",
+  recordChanged: 'This record changed elsewhere, so it was left. Check again, then publish.',
+  unplannable: "Publishing can't be planned here right now. Check the links, then try again.",
 })
 
 /** What one write answer may weigh: 256 KB. */
@@ -79,10 +89,17 @@ export interface PublishDeps {
 /** The writes a plan holds, by identity: the create keys, the delete uris, and the profile's networks (null: none). */
 export interface Confirmed { create: string[]; delete: string[]; profile: string | null }
 
-export interface Failure { action: 'create' | 'delete' | 'profile'; uri: string; error: string }
+/** `uri` is null for a record another client keyed (its key could name a peer): such a record is counted, never printed. */
+export interface Failure { action: 'create' | 'delete' | 'profile'; uri: string | null; error: string }
 export type Withheld = { private: number; noUrl: number; noDid: number; noRelation: number; undecided: number }
-export interface PublishResult { applied: { created: number; deleted: number; profile: boolean }; failures: Failure[]; withheld: Withheld }
-export interface Receipt { at: string; did: string; created: string[]; deleted: string[]; profileCid: string | null }
+export interface PublishResult { applied: { created: number; deleted: number; profile: boolean }; failures: Failure[]; withheld: Withheld; profileWithheld: boolean }
+/** `created`/`deleted`: uris whose key is ours (`linkKey`'s shape, or `self`); `otherDeleted`: records another client
+ *  keyed that were withdrawn, counted only. */
+export interface Receipt { at: string; did: string; created: string[]; deleted: string[]; otherDeleted: number; profileCid: string | null }
+
+/** A record key this publisher writes: `linkKey`'s 16 base32 characters, or the profile's `self`. Another key could have
+ *  been chosen by another client, and could name a peer, so it is never printed or kept in the receipt. */
+export const isOwnKey = (uri: string): boolean => /\/([a-z2-7]{16}|self)$/.test(uri)
 
 type Plan = ReturnType<typeof planLinks>
 type Account = { did: unknown; pds: unknown; handle: unknown }
@@ -111,7 +128,8 @@ export function readReceipt(repo: string): Receipt | null {
     const v = JSON.parse(readFileSync(receiptPath(repo), 'utf8')) as Record<string, unknown>
     const strings = (x: unknown): x is string[] => Array.isArray(x) && x.every(s => typeof s === 'string')
     if (typeof v.at !== 'string' || typeof v.did !== 'string' || !strings(v.created) || !strings(v.deleted)) return null
-    return { at: v.at, did: v.did, created: v.created, deleted: v.deleted, profileCid: typeof v.profileCid === 'string' ? v.profileCid : null }
+    return { at: v.at, did: v.did, created: v.created, deleted: v.deleted, otherDeleted: typeof v.otherDeleted === 'number' ? v.otherDeleted : 0,
+      profileCid: typeof v.profileCid === 'string' ? v.profileCid : null }
   } catch { return null }
 }
 
@@ -160,7 +178,7 @@ export function guardedWriteFetch(fetch: FetchLike, opts: { lookup?: (host: stri
       let addresses: string[]
       try { addresses = await run((opts.lookup ?? networkLookup)(host)) } catch (err) {
         if (ac.signal.aborted) throw interrupted()
-        if (noNetwork(err)) throw err
+        if (noNetwork(err)) throw new Error((opts.scrub ?? String)(message(err)))
         throw new Error(`Not published: ${host} could not be found.`)
       }
       if (addresses.length === 0) throw new Error(`Not published: ${host} could not be found.`)
@@ -174,7 +192,7 @@ export function guardedWriteFetch(fetch: FetchLike, opts: { lookup?: (host: stri
         }))
       } catch (err) {
         if (ac.signal.aborted) throw interrupted()
-        if (noNetwork(err)) throw err
+        if (noNetwork(err)) throw new Error((opts.scrub ?? String)(message(err)))
         throw new Error(`Not published: ${host} could not be reached.`)
       }
       if (res.status >= 300 && res.status < 400) throw new Error(`Not published: ${host} answered with a redirect, which is never followed.`)
@@ -267,11 +285,11 @@ async function prepare(repo: string, deps: PublishDeps, mode: Mode): Promise<Pre
   // 8. The plan, from the trunk's federation.yaml and what both sides' files say (R4, Task 4's contract).
   const self = await selfAddressesOf(repo, deps.run ?? runCommand)
   const plan = planLinks({
-    fed, selfDid: did, ownRecords: reading!.links, ownProfile: reading!.profile, now,
+    fed, selfDid: did, ownRecords: reading!.links, ownProfile: reading!.profile, profileUnread: Boolean(reading!.unreadProfile), now,
     where: { base: repo, io: nodePeerIO }, byFiles: byFiles(repo, fed, self),
   })
   // 9. Never every record in one run (R25, ruling R2).
-  if (plan.wanted.length === 0 && plan.delete.length >= 2) throw new Refused(9, SENTENCES.massDelete)
+  if (plan.wanted.length === 0 && plan.delete.length >= 2) throw new Refused(9, SENTENCES.massDelete(plan.delete.length))
   return { did, account, api, reading: reading!, plan }
 }
 
@@ -282,22 +300,23 @@ async function requirePublicPds(pds: string, deps: PublishDeps): Promise<void> {
   if (notPublicHttps(u)) throw new Refused(5, SENTENCES.privatePds)
   let addresses: string[]
   try { addresses = await (deps.lookup ?? networkLookup)(u.hostname.toLowerCase().replace(/\.$/, '')) } catch (err) {
-    if (noNetwork(err)) throw err
+    if (noNetwork(err)) throw new Error(scrubber(deps.env.ATPROTO_APP_PASSWORD)(message(err)))
     throw new Refused(5, `Not published: ${u.hostname} could not be found.`)
   }
   if (addresses.length === 0 || !addresses.every(isPublicAddress)) throw new Refused(5, SENTENCES.privatePds)
 }
 
 const countOf = (plan: Plan): number => plan.create.length + plan.delete.length + (plan.profile ? 1 : 0)
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const keptPrivate = (w: Withheld): string => {
   const k = w.private + w.noUrl
   return k > 0 ? ` ${plural(k, 'peer is', 'peers are')} kept private.` : ''
 }
 
+const unreadNote = (withheld: boolean): string => (withheld ? ` ${SENTENCES.profileUnread}` : '')
+
 /** The plan in one sentence: counts only, never a name. */
 export function planSentence(plan: Plan): string {
-  return `Publish ${plural(plan.create.length, 'link', 'links')} and withdraw ${plan.delete.length}${plan.profile ? ', and update the profile' : ''}.${keptPrivate(plan.withheld)}`
+  return `Publish ${plural(plan.create.length, 'link', 'links')} and withdraw ${plan.delete.length}${plan.profile ? ', and update the profile' : ''}.${keptPrivate(plan.withheld)}${unreadNote(plan.profileWithheld)}`
 }
 
 /** The writes of a plan by identity, for the job to compare against what it plans fresh. */
@@ -333,7 +352,7 @@ export async function planPublish(repo: string, deps: PublishDeps): Promise<{ su
     if (err instanceof Refused) throw new HttpError(409, `Not published: ${err.sentence}`)
     throw err
   }
-  if (countOf(prepared.plan) === 0) throw new HttpError(409, `Not published: ${SENTENCES.nothing}`)
+  if (countOf(prepared.plan) === 0) throw new HttpError(409, `Not published: ${SENTENCES.nothing}${unreadNote(prepared.plan.profileWithheld)}`)
   return { summary: planSentence(prepared.plan), plan: prepared.plan }
 }
 
@@ -352,16 +371,30 @@ export async function publishLinks(repo: string, deps: PublishDeps): Promise<Pub
       if (changed !== null) throw new Refused(10, changed)
     }
     const applied = { created: 0, deleted: 0, profile: false }
-    if (countOf(plan) === 0) return { applied, failures: [], withheld: plan.withheld }
+    if (countOf(plan) === 0) return { applied, failures: [], withheld: plan.withheld, profileWithheld: plan.profileWithheld }
 
     const now = deps.now ?? new Date()
-    const fetchImpl = guardedWriteFetch(deps.fetch, { lookup: deps.lookup, signal: deps.signal, scrub })
+    const guarded = guardedWriteFetch(deps.fetch, { lookup: deps.lookup, signal: deps.signal, scrub })
+    // kms's deleteRecord sends no swapRecord, and kms is not changed (R10): the fetch handed to it adds the cid each
+    // planned delete was read at, so a record changed since the read is left, never deleted blind.
+    const deleteSwaps = new Map(plan.delete.map(d => [d.uri.slice(d.uri.lastIndexOf('/') + 1), d.cid]))
+    const fetchImpl = (url: string, init: KmsInit = {}) => {
+      if (url.endsWith('/xrpc/com.atproto.repo.deleteRecord') && typeof init.body === 'string') {
+        const body = JSON.parse(init.body) as Record<string, unknown>
+        const cid = body.collection === LINK_NSID && typeof body.rkey === 'string' ? deleteSwaps.get(body.rkey) : undefined
+        if (cid !== undefined && body.swapRecord === undefined) return guarded(url, { ...init, body: JSON.stringify({ ...body, swapRecord: cid }) })
+      }
+      return guarded(url, init)
+    }
     const client = api.createClient({ pds: String(account.pds), fetchImpl })
-    await client.login({ identifier: typeof account.handle === 'string' && account.handle !== '' ? account.handle : did, password })
+    const session = await client.login({ identifier: typeof account.handle === 'string' && account.handle !== '' ? account.handle : did, password })
+    if (session?.did !== did) throw new Refused(11, SENTENCES.loginMismatch)
 
     const failures: Failure[] = []
     const created: string[] = []
     const deleted: string[] = []
+    let otherDeleted = 0
+    const shown = (uri: string): string | null => (isOwnKey(uri) ? uri : null)
     let profileCid: string | null = reading.profile?.cid ?? null
     const uriOf = (collection: string, rkey: string) => `at://${did}/${collection}/${rkey}`
     const stop = () => deps.signal?.aborted === true
@@ -372,15 +405,19 @@ export async function publishLinks(repo: string, deps: PublishDeps): Promise<Pub
       try {
         const r = await client.putRecord({ repo: did, collection: LINK_NSID, rkey: c.rkey, record: c.record })
         created.push(typeof r?.uri === 'string' ? r.uri : uri)
-      } catch (err) { failures.push({ action: 'create', uri, error: scrub(message(err)) }) }
+      } catch (err) { failures.push({ action: 'create', uri: shown(uri), error: scrub(message(err)) }) }
     }
     for (const d of plan.delete) {
       if (stop()) break
       const rkey = d.uri.slice(d.uri.lastIndexOf('/') + 1)
       try {
         await client.deleteRecord({ repo: did, collection: LINK_NSID, rkey })
-        deleted.push(d.uri)
-      } catch (err) { failures.push({ action: 'delete', uri: d.uri, error: scrub(message(err)) }) }
+        if (isOwnKey(d.uri)) deleted.push(d.uri)
+        else otherDeleted += 1
+      } catch (err) {
+        const swap = (err as { error?: unknown })?.error === 'InvalidSwap'
+        failures.push({ action: 'delete', uri: shown(d.uri), error: swap ? SENTENCES.recordChanged : scrub(message(err)) })
+      }
     }
     if (plan.profile && !stop()) {
       const uri = uriOf(PROFILE_NSID, 'self')
@@ -394,14 +431,16 @@ export async function publishLinks(repo: string, deps: PublishDeps): Promise<Pub
       }
     }
     applied.created = created.length
-    applied.deleted = deleted.length
-    writeReceipt(repo, { at: now.toISOString(), did, created, deleted, profileCid })
+    applied.deleted = deleted.length + otherDeleted
+    writeReceipt(repo, { at: now.toISOString(), did, created, deleted, otherDeleted, profileCid })
     // The cache is what the page and the next plan read: read the records back after writing.
     atprotoCache(repo).put(did, await readRepo(did, { fetch: deps.fetch, lookup: deps.lookup, signal: deps.signal, now }), now)
-    if (stop()) throw new Error(SENTENCES.cancelled)
-    return { applied, failures, withheld: plan.withheld }
+    if (stop()) {
+      throw new Error(applied.created + applied.deleted > 0 || applied.profile
+        ? SENTENCES.cancelledAfter(applied.created, applied.deleted, applied.profile) : SENTENCES.cancelled)
+    }
+    return { applied, failures, withheld: plan.withheld, profileWithheld: plan.profileWithheld }
   } catch (err) {
-    if (noNetwork(err)) throw err
     throw new Error(scrub(err instanceof Refused ? err.sentence : message(err)))
   }
 }
@@ -411,8 +450,9 @@ export function publishOutput(result: PublishResult): string {
   const { created, deleted, profile } = result.applied
   const head = created + deleted === 0 && !profile && result.failures.length === 0 ? SENTENCES.nothing
     : `Published ${plural(created, 'link', 'links')} and withdrew ${deleted}${profile ? ', and updated the profile' : ''}.`
-  const text = `${head}${keptPrivate(result.withheld)}`
-  if (result.failures.length > 0) throw new Error([text, ...result.failures.map(f => `Not done (${f.action}) ${f.uri}: ${f.error}`)].join('\n'))
+  const text = `${head}${keptPrivate(result.withheld)}${unreadNote(result.profileWithheld)}`
+  const where = (f: Failure) => f.uri ?? 'a record another client keyed'
+  if (result.failures.length > 0) throw new Error([text, ...result.failures.map(f => `Not done (${f.action}) ${where(f)}: ${f.error}`)].join('\n'))
   return `${text}\n`
 }
 
@@ -454,6 +494,8 @@ export function publishUnavailable(r: Resource, repo: string, deps: Pick<Publish
   gates.sort((a, b) => a.step - b.step)
   if (gates.length > 0) return gates[0].sentence
   if (r.facts.toPublish === 0) return SENTENCES.nothing
+  // The card couldn't work the plan out (an unexpected error, not a refusal): never offer a Publish that can't be planned.
+  if (typeof r.facts.toPublish !== 'number') return SENTENCES.unplannable
   return null
 }
 

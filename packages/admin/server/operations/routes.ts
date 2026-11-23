@@ -60,7 +60,7 @@ export function mountOperations(app: Hono, deps: OperationDeps): void {
       })
     }
     const why = op.unavailable(resource, deps.repo)
-    if (why) throw new HttpError(409, `Not run: ${why}.`)
+    if (why) throw new HttpError(409, `Not run: ${why.replace(/\.+$/, '')}.`)
     return { op, resource, params, planned: await op.plan(resource, params, deps.repo, { startBranch: deps.startBranch }) }
   }
 

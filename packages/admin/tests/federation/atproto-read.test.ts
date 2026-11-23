@@ -50,7 +50,7 @@ describe('readRepo', () => {
 
     const alice = await readRepo(ALICE, { ...net, now: NOW }) as Reading
     expect(alice).toEqual({
-      did: ALICE, pds: `https://${ONE}`, handle: 'alice.example.org', fetchedAt: NOW.toISOString(), skipped: 0,
+      did: ALICE, pds: `https://${ONE}`, handle: 'alice.example.org', fetchedAt: NOW.toISOString(), skipped: 0, unreadProfile: null,
       links: [{ uri: a.uri, cid: a.cid, value: link(BOB, 'hasMember', { network: 'Regen Mesh' }) }],
       profile: { uri: `at://${ALICE}/${PROFILE_NSID}/self`, cid: expect.any(String), value: { networks: [{ hub: ALICE, name: 'Regen Mesh' }], rest: { name: 'X', createdAt: '2026-11-20T10:00:00.000Z' } } },
     })
@@ -79,8 +79,9 @@ describe('readRepo', () => {
 
   it('an invalid profile self is skipped and counted: no profile', async () => {
     const net = network()
-    net.seed(ALICE, PROFILE_NSID, 'self', { $type: PROFILE_NSID, networks: 'Regen Mesh' })
-    expect(await readRepo(ALICE, net)).toMatchObject({ profile: null, skipped: 1 })
+    const seeded = net.seed(ALICE, PROFILE_NSID, 'self', { $type: PROFILE_NSID, networks: 'Regen Mesh' })
+    // It is there, though: its uri and cid are kept, so nothing writes over it blind (Task 7).
+    expect(await readRepo(ALICE, net)).toMatchObject({ profile: null, skipped: 1, unreadProfile: { uri: seeded.uri, cid: seeded.cid } })
   })
 
   it(`stops after ${MAX_PAGES} pages: a reading it cannot finish is refused, never partial`, async () => {

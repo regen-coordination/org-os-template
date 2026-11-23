@@ -11,7 +11,7 @@ import { makeFakeNetwork, plcDid, type FakeNetwork } from '../fake-pds.ts'
 import { LINK_NSID, PROFILE_NSID, linkKey } from '../../lib/federation/links.mjs'
 import { atprotoCache, readRepo } from '../../server/federation/atproto/read.ts'
 import {
-  publishLinks, planPublish, publishFacts, publishLinksOperation, guardedWriteFetch, receiptPath, SENTENCES, type PublishDeps,
+  publishLinks, planPublish, publishFacts, publishLinksOperation, guardedWriteFetch, receiptPath, publishOutput, SENTENCES, type PublishDeps,
 } from '../../server/federation/atproto/publish.ts'
 import { opById, type InProcess } from '../../server/operations/catalogue.ts'
 import { LocalExecutor } from '../../server/operations/executor.ts'
@@ -124,6 +124,9 @@ describe('the plan follows federation.yaml on the trunk, never the records', () 
     expect((await planOf()).summary).toBe('Publish 0 links and withdraw 1.')
     const after = await publishLinks(repo, deps())
     expect(after.applied).toEqual({ created: 0, deleted: 1, profile: false })
+    // Another client's key could name a peer: the receipt counts it and never keeps its uri (review M8).
+    expect(JSON.parse(readFileSync(receiptPath(repo), 'utf8'))).toMatchObject({ deleted: [], otherDeleted: 1 })
+    expect(readFileSync(receiptPath(repo), 'utf8')).not.toContain('stray1')
     expect(net.records(SELF, LINK_NSID).map(r => r.uri)).not.toContain(stray.uri)
     expect(readFileSync(join(repo, 'federation.yaml'), 'utf8')).toBe(before)
     expect(git('status', '--porcelain')).toBe('')
@@ -307,8 +310,8 @@ describe('never deletes every record in one run', () => {
     seedLink('a', HUB, 'memberOf', 'Mesh')
     seedLink('b', FRIEND, 'peerOf')
     await check()
-    expect(await refusal(planOf())).toBe(`Not published: ${SENTENCES.massDelete}`)
-    expect(await refusal(publishLinks(repo, deps()))).toBe(SENTENCES.massDelete)
+    expect(await refusal(planOf())).toBe(`Not published: ${SENTENCES.massDelete(2)}`)
+    expect(await refusal(publishLinks(repo, deps()))).toBe(SENTENCES.massDelete(2))
     expect(linkWrites()).toEqual([])
     expect(net.records(SELF, LINK_NSID)).toHaveLength(2)
 
@@ -415,7 +418,7 @@ describe('the job writes only what was confirmed (R16)', () => {
     const leave = await op({ fetch: lone.fetch, lookup: lone.lookup }).plan(await selfCard(), {}, repo) as InProcess
     expect(leave.summary).toBe('Publish 0 links and withdraw 1.')
     lone.seed(SELF, LINK_NSID, 'k9', { $type: LINK_NSID, subject: STRAY, relation: 'peerOf', createdAt: '2026-01-01T00:00:00.000Z' })
-    expect(await leave.inProcess(repo, signal()).then(() => 'ran', (e: Error) => e.message)).toBe(SENTENCES.massDelete)
+    expect(await leave.inProcess(repo, signal()).then(() => 'ran', (e: Error) => e.message)).toBe(SENTENCES.massDelete(2))
     expect(lone.writes).toEqual([])
   })
 })
@@ -470,7 +473,7 @@ describe('the receipt and the self card', () => {
     await publishLinks(repo, deps())
     const receipt = JSON.parse(readFileSync(receiptPath(repo), 'utf8'))
     expect(receipt).toEqual({
-      at: NOW.toISOString(), did: SELF, created: [`at://${SELF}/${LINK_NSID}/${linkKey(HUB, 'memberOf', 'Mesh')}`], deleted: [],
+      at: NOW.toISOString(), did: SELF, created: [`at://${SELF}/${LINK_NSID}/${linkKey(HUB, 'memberOf', 'Mesh')}`], deleted: [], otherDeleted: 0,
       profileCid: net.records(SELF, PROFILE_NSID)[0].cid,
     })
     expect(JSON.stringify(receipt)).not.toContain('Mesh Hub')
@@ -551,5 +554,84 @@ describe('the guarded fetch kms writes through (R9)', () => {
 
   it('the default lookup refuses under a test run', async () => {
     await expect(kmsCall(guardedWriteFetch(net.fetch, {}))).rejects.toThrow(/no network in tests/)
+  })
+})
+
+describe('review fixes, round 1', () => {
+  it('I1: a profile self that is there but does not parse is never written over, and the plan and the job say so', async () => {
+    const theirs = { $type: PROFILE_NSID, networks: 'not a list', displayName: 'Theirs' }
+    const before = net.seed(SELF, PROFILE_NSID, 'self', theirs)
+    await check()
+    const planned = await planOf()
+    expect(planned.summary).toBe(`Publish 1 link and withdraw 0. ${SENTENCES.profileUnread}`)
+    expect(await planned.inProcess(repo, signal())).toBe(`Published 1 link and withdrew 0. ${SENTENCES.profileUnread}\n`)
+    expect(net.writes.filter(w => w.body.collection === PROFILE_NSID)).toEqual([])
+    expect(net.records(SELF, PROFILE_NSID)).toEqual([{ uri: before.uri, cid: before.cid, value: theirs }])
+    expect(linksOn().map(l => l.subject)).toEqual([HUB])
+    // Nothing else to do: the plan still says why the profile wasn't touched.
+    expect(await refusal(planOf())).toBe(`Not published: ${SENTENCES.nothing} ${SENTENCES.profileUnread}`)
+  })
+
+  it('M1: an error the guard rethrows is scrubbed too', async () => {
+    const leaky: FetchLike = async (url, init) => {
+      if (url.endsWith('/xrpc/com.atproto.server.createSession')) throw new Error(`no network in tests: ${PASSWORD}`)
+      return net.fetch(url, init)
+    }
+    const said = await refusal(publishLinks(repo, deps({ fetch: leaky })))
+    expect(said).toContain('no network in tests')
+    expect(said).not.toContain(PASSWORD)
+    // The guard on its own scrubs what it rethrows, too.
+    const scrub = (t: string) => t.split(PASSWORD).join('***')
+    const direct = await refusal(guardedWriteFetch(leaky, { lookup: net.lookup, scrub })(`https://${ONE}/xrpc/com.atproto.server.createSession`, { method: 'POST' }))
+    expect(direct).toBe('no network in tests: ***')
+  })
+
+  it('M5: a card whose plan could not be worked out offers no Publish', async () => {
+    const card = { ...(await selfCard()), facts: { self: true, toPublish: null, publishBlocked: null } }
+    expect(op().unavailable(card, repo)).toBe(SENTENCES.unplannable)
+  })
+
+  it('M6: a cancel after some writes went through says how many', async () => {
+    writeFed([...HUB_PEER, '  - name: Friendly Peer', `    did: "${FRIEND}"`, '    url: https://friendly.example.org', '    link: peerOf'])
+    commit('two links')
+    const ac = new AbortController()
+    // The first write goes through; the operator cancels as the second starts.
+    let puts = 0
+    const cancelling: FetchLike = async (url, init) => {
+      if (url.endsWith('com.atproto.repo.putRecord') && ++puts === 2) { ac.abort(); throw new Error('aborted') }
+      return net.fetch(url, init)
+    }
+    expect(await refusal(publishLinks(repo, deps({ fetch: cancelling, signal: ac.signal })))).toBe(SENTENCES.cancelledAfter(1, 0, false))
+    expect(net.records(SELF, LINK_NSID)).toHaveLength(1)
+    expect(SENTENCES.cancelledAfter(1, 0, false)).toBe('Cancelled after some writes went through: 1 link published, 0 withdrawn. Check the links to see the rest.')
+  })
+
+  it('M7: a session for another DID writes nothing; a delete carries the cid it was read at, and a changed record is left', async () => {
+    const other: FetchLike = async (url, init) => {
+      const res = await net.fetch(url, init)
+      if (!url.endsWith('/xrpc/com.atproto.server.createSession') || !res.ok) return res
+      const text = JSON.stringify({ ...(await res.json() as object), did: STRAY })
+      return { ...res, text: async () => text, json: async () => JSON.parse(text) }
+    }
+    expect(await refusal(publishLinks(repo, deps({ fetch: other })))).toBe(SENTENCES.loginMismatch)
+    expect(linkWrites()).toEqual([])
+
+    const stray = seedLink('k1', STRAY, 'peerOf')
+    const racing: FetchLike = async (url, init) => {
+      if (url.endsWith('com.atproto.repo.deleteRecord')) {
+        expect(JSON.parse(String((init as { body?: string }).body))).toMatchObject({ rkey: 'k1', swapRecord: stray.cid })
+        seedLink('k1', STRAY, 'peerOf', 'Changed elsewhere')
+      }
+      return net.fetch(url, init)
+    }
+    const got = await publishLinks(repo, deps({ fetch: racing }))
+    // M8 too: the record's key is another client's, so the failure counts it and prints no uri.
+    expect(got.failures).toEqual([{ action: 'delete', uri: null, error: SENTENCES.recordChanged }])
+    expect(net.records(SELF, LINK_NSID).map(r => r.value.network)).toContain('Changed elsewhere')
+    expect(() => publishOutput(got)).toThrow(`Not done (delete) a record another client keyed: ${SENTENCES.recordChanged}`)
+  })
+
+  it('M2: the mass-delete sentence is truthful, with no override', () => {
+    expect(SENTENCES.massDelete(3)).toBe('This would remove every published link at once (3). Nothing was written.')
   })
 })
