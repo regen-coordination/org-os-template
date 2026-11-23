@@ -342,8 +342,10 @@ describe('planLinks (Task 7): what this org publishes, from federation.yaml, nev
     const same = { ...profile, value: { networks: [{ hub: HUB, name: 'Mesh' }], rest: { displayName: 'X' } } }
     expect(plan(member, { ownProfile: same }).profile).toBeNull()
 
-    const hub = fedOf({ identity: { did: SELF }, join: { policy: 'open' }, networks: [{ name: 'Home Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [] })
-    expect(plan(hub).profile).toEqual({ record: { $type: PROFILE_NSID, networks: [{ hub: SELF, name: 'Home Mesh' }] } })
+    const hub = fedOf({ identity: { name: 'Home Hub', did: SELF }, join: { policy: 'open' }, networks: [{ name: 'Home Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [] })
+    // A new profile: the lexicon's required name and createdAt, and nothing else.
+    expect(plan(hub).profile).toEqual({ record: { $type: PROFILE_NSID, name: 'Home Hub', networks: [{ hub: SELF, name: 'Home Mesh' }], createdAt: NOW } })
+    expect(plan(fedOf({ ...hub, identity: { slug: 'home-hub', did: SELF }, networks: [{ name: 'Home Mesh', role: 'hub' }] })).profile?.record.name).toBe('home-hub')
     // A node that is not a hub, with nothing wanted and no profile: nothing to write.
     expect(plan(node([])).profile).toBeNull()
     // A member that left: the profile's networks empty out, its other keys stay.

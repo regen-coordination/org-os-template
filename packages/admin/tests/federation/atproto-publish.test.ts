@@ -115,7 +115,7 @@ describe('the plan follows federation.yaml on the trunk, never the records', () 
     expect(done.applied).toEqual({ created: 1, deleted: 0, profile: true })
     expect(linksOn()).toEqual([{ $type: LINK_NSID, subject: HUB, relation: 'memberOf', network: 'Mesh', createdAt: NOW.toISOString() }])
     expect(net.records(SELF, LINK_NSID)[0].uri).toBe(`at://${SELF}/${LINK_NSID}/${linkKey(HUB, 'memberOf', 'Mesh')}`)
-    expect(net.records(SELF, PROFILE_NSID)[0].value).toEqual({ $type: PROFILE_NSID, networks: [{ hub: HUB, name: 'Mesh' }] })
+    expect(net.records(SELF, PROFILE_NSID)[0].value).toEqual({ $type: PROFILE_NSID, name: 'Fixture Org', networks: [{ hub: HUB, name: 'Mesh' }], createdAt: NOW.toISOString() })
 
     // An extra record on the PDS that federation.yaml doesn't list is planned for delete; the records never edit the file.
     const before = readFileSync(join(repo, 'federation.yaml'), 'utf8')
@@ -344,8 +344,9 @@ describe('publishes only the five fields', () => {
         for (const k of Object.keys(record)) expect(['$type', 'subject', 'relation', 'network', 'createdAt'], k).toContain(k)
         for (const k of ['$type', 'subject', 'relation', 'createdAt']) expect(record).toHaveProperty(k)
       } else {
+        // An update: $type, networks and the keys already on the profile; never name or createdAt added.
         expect(w.body.collection).toBe(PROFILE_NSID)
-        for (const k of Object.keys(record)) expect(['$type', 'networks', 'displayName', 'description'], k).toContain(k)
+        expect(Object.keys(record).sort()).toEqual(['$type', 'description', 'displayName', 'networks'])
       }
     }
     expect(puts.find(w => (w.body.record as { subject?: string }).subject === HUB)!.body.record).toMatchObject({ createdAt: '2026-11-02T00:00:00.000Z' })
@@ -353,6 +354,69 @@ describe('publishes only the five fields', () => {
     for (const leak of ['req-7f3a91', 'inv-2c2c', 'tok-55aa', 'dec-9931', 'standing decision', 'tuesday', 'we grow seeds', 'request ', '2026-11-01']) {
       expect(log, leak).not.toContain(leak)
     }
+  })
+})
+
+describe('a new profile', () => {
+  it('carries exactly $type, name, networks and createdAt (the drafted lexicon requires name and createdAt)', async () => {
+    await publishLinks(repo, deps())
+    const puts = net.writes.filter(w => w.nsid === 'com.atproto.repo.putRecord' && w.body.collection === PROFILE_NSID)
+    expect(puts).toHaveLength(1)
+    expect(Object.keys(puts[0].body.record as object).sort()).toEqual(['$type', 'createdAt', 'name', 'networks'])
+    expect(puts[0].body.record).toEqual({ $type: PROFILE_NSID, name: 'Fixture Org', networks: [{ hub: HUB, name: 'Mesh' }], createdAt: NOW.toISOString() })
+    expect(puts[0].body).not.toHaveProperty('swapRecord')
+  })
+})
+
+describe('the job writes only what was confirmed (R16)', () => {
+  it('when atproto changed between the plan and the job, nothing is written and the sentence says what changed', async () => {
+    await check()
+    const planned = await planOf()
+    expect(planned.summary).toBe('Publish 1 link and withdraw 0, and update the profile.')
+    // Another client adds a record we don't list, after the operator confirmed.
+    seedLink('k1ate', STRAY, 'peerOf')
+    const said = await planned.inProcess(repo, signal()).then(() => 'no refusal', (e: Error) => e.message)
+    expect(said).toBe("Not published: what's on atproto changed since you confirmed (links to withdraw: 0 → 1). Nothing was written. Check the plan again, then publish.")
+    expect(net.writes).toEqual([]) // not even a session
+    expect(linksOn().map(l => l.subject)).toEqual([STRAY])
+    // Confirmed again, it goes.
+    await check()
+    await (await planOf()).inProcess(repo, signal())
+    expect(linksOn().map(l => l.subject)).toEqual([HUB])
+  })
+
+  it('the same number of writes, but other ones, is a change too; and the mass-delete guard still holds', async () => {
+    writeFed(['  - name: Friendly Peer', `    did: "${FRIEND}"`, '    url: https://friendly.example.org', '    link: peerOf'])
+    commit('one peer')
+    seedLink('k1', FRIEND, 'peerOf')
+    seedLink('k2', STRAY, 'peerOf')
+    net.seed(SELF, PROFILE_NSID, 'self', { $type: PROFILE_NSID, networks: [] })
+    await check()
+    expect((await planOf()).summary).toBe('Publish 0 links and withdraw 1.')
+    // k2 is withdrawn elsewhere and another stray appears: still one to withdraw, but not the confirmed one.
+    const other = makeFakeNetwork({ hosts: { [`https://${ONE}`]: { accounts: { [SELF]: { handle: 'fixture-org.example.com', password: PASSWORD } } } } })
+    other.seed(SELF, LINK_NSID, 'k1', { $type: LINK_NSID, subject: FRIEND, relation: 'peerOf', createdAt: '2026-01-01T00:00:00.000Z' })
+    other.seed(SELF, LINK_NSID, 'k3', { $type: LINK_NSID, subject: HUB, relation: 'peerOf', createdAt: '2026-01-01T00:00:00.000Z' })
+    other.seed(SELF, PROFILE_NSID, 'self', { $type: PROFILE_NSID, networks: [] })
+    // The plan read the cache (k2 to withdraw); the job reads the PDS as it is now (k3 to withdraw).
+    const swapped = await op({ fetch: other.fetch, lookup: other.lookup }).plan(await selfCard(), {}, repo) as InProcess
+    expect(swapped.summary).toBe('Publish 0 links and withdraw 1.')
+    const said = await swapped.inProcess(repo, signal()).then(() => 'ran', (e: Error) => e.message)
+    expect(said).toBe("Not published: what's on atproto changed since you confirmed (links to withdraw: 1, but not the same ones). Nothing was written. Check the plan again, then publish.")
+    expect(other.writes).toEqual([])
+    expect(other.records(SELF, LINK_NSID)).toHaveLength(2)
+
+    // Mass delete: the trunk lists nobody; one record was confirmed for withdrawal, then a second appeared.
+    writeFed([])
+    commit('nobody')
+    const lone = makeFakeNetwork({ hosts: { [`https://${ONE}`]: { accounts: { [SELF]: { handle: 'fixture-org.example.com', password: PASSWORD } } } } })
+    lone.seed(SELF, LINK_NSID, 'k1', { $type: LINK_NSID, subject: FRIEND, relation: 'peerOf', createdAt: '2026-01-01T00:00:00.000Z' })
+    atprotoCache(repo).put(SELF, await readRepo(SELF, { fetch: lone.fetch, lookup: lone.lookup, now: NOW }), NOW)
+    const leave = await op({ fetch: lone.fetch, lookup: lone.lookup }).plan(await selfCard(), {}, repo) as InProcess
+    expect(leave.summary).toBe('Publish 0 links and withdraw 1.')
+    lone.seed(SELF, LINK_NSID, 'k9', { $type: LINK_NSID, subject: STRAY, relation: 'peerOf', createdAt: '2026-01-01T00:00:00.000Z' })
+    expect(await leave.inProcess(repo, signal()).then(() => 'ran', (e: Error) => e.message)).toBe(SENTENCES.massDelete)
+    expect(lone.writes).toEqual([])
   })
 })
 

@@ -72,7 +72,12 @@ export interface PublishDeps {
   startBranch?: string
   /** Runs `git remote -v` for this instance's own addresses (the files readings). Default: `runCommand`. */
   run?: Runner
+  /** What the operator confirmed (the plan's writes, `confirmedOf`): the job writes only when its fresh plan is the same. */
+  confirmed?: Confirmed
 }
+
+/** The writes a plan holds, by identity: the create keys, the delete uris, and the profile's networks (null: none). */
+export interface Confirmed { create: string[]; delete: string[]; profile: string | null }
 
 export interface Failure { action: 'create' | 'delete' | 'profile'; uri: string; error: string }
 export type Withheld = { private: number; noUrl: number; noDid: number; noRelation: number; undecided: number }
@@ -295,6 +300,31 @@ export function planSentence(plan: Plan): string {
   return `Publish ${plural(plan.create.length, 'link', 'links')} and withdraw ${plan.delete.length}${plan.profile ? ', and update the profile' : ''}.${keptPrivate(plan.withheld)}`
 }
 
+/** The writes of a plan by identity, for the job to compare against what it plans fresh. */
+export function confirmedOf(plan: Plan): Confirmed {
+  return {
+    create: plan.create.map(c => c.rkey).sort(),
+    delete: plan.delete.map(d => d.uri).sort(),
+    profile: plan.profile ? JSON.stringify((plan.profile.record as { networks?: unknown }).networks ?? []) : null,
+  }
+}
+
+/** What differs between what the operator confirmed and what the job would write now, in words; null when nothing. */
+export function changedSince(confirmed: Confirmed, now: Confirmed): string | null {
+  const parts: string[] = []
+  const list = (label: string, a: string[], b: string[]) => {
+    if (a.length === b.length && a.every((x, i) => x === b[i])) return
+    parts.push(a.length === b.length ? `${label}: ${b.length}, but not the same ones` : `${label}: ${a.length} → ${b.length}`)
+  }
+  list('links to publish', confirmed.create, now.create)
+  list('links to withdraw', confirmed.delete, now.delete)
+  if (confirmed.profile !== now.profile) {
+    parts.push(confirmed.profile === null ? 'profile update: no → yes' : now.profile === null ? 'profile update: yes → no' : 'profile update: other networks')
+  }
+  return parts.length === 0 ? null
+    : `Not published: what's on atproto changed since you confirmed (${parts.join('; ')}). Nothing was written. Check the plan again, then publish.`
+}
+
 /** `federation.publish-links`'s plan: steps 1–9 from the cache, never a fetch (ruling R6). A refusal is a 409 before
  *  any nonce: `Not published: <sentence>`. Nothing to do is one too. */
 export async function planPublish(repo: string, deps: PublishDeps): Promise<{ summary: string; plan: Plan }> {
@@ -307,13 +337,20 @@ export async function planPublish(repo: string, deps: PublishDeps): Promise<{ su
   return { summary: planSentence(prepared.plan), plan: prepared.plan }
 }
 
-/** The in-process body of the confirmed job: steps 1–9 live, then the writes through kms's session, then the receipt.
- *  Failures are per record and never stop the rest; a cancel stops between records. Every error is scrubbed. */
+/** The in-process body of the confirmed job: steps 1–9 live; then, when `deps.confirmed` is given, the fresh plan must
+ *  be the one confirmed (else nothing is written and the sentence says what changed); then the writes through kms's
+ *  session, then the receipt. Failures are per record and never stop the rest; a cancel stops between records. Every
+ *  error is scrubbed. */
 export async function publishLinks(repo: string, deps: PublishDeps): Promise<PublishResult> {
   const password = deps.env.ATPROTO_APP_PASSWORD
   const scrub = scrubber(password)
   try {
     const { did, account, api, reading, plan } = await prepare(repo, deps, { live: true, password: true, lexicon: true })
+    // R16: the operator confirmed what gets written. When the fresh plan differs, nothing is written; they confirm again.
+    if (deps.confirmed) {
+      const changed = changedSince(deps.confirmed, confirmedOf(plan))
+      if (changed !== null) throw new Refused(10, changed)
+    }
     const applied = { created: 0, deleted: 0, profile: false }
     if (countOf(plan) === 0) return { applied, failures: [], withheld: plan.withheld }
 
@@ -428,8 +465,9 @@ export function publishLinksOperation(deps: PublishDeps): Operation {
     unavailable: (r, repo) => publishUnavailable(r, repo, deps),
     plan: async (_r, _p, repo, ctx): Promise<InProcess> => {
       const d: PublishDeps = { ...deps, startBranch: ctx?.startBranch ?? deps.startBranch }
-      const { summary } = await planPublish(repo, d)
-      return { summary, inProcess: async (at, signal) => publishOutput(await publishLinks(at, { ...d, signal })) }
+      const { summary, plan } = await planPublish(repo, d)
+      const confirmed = confirmedOf(plan)
+      return { summary, inProcess: async (at, signal) => publishOutput(await publishLinks(at, { ...d, signal, confirmed })) }
     },
   }
 }

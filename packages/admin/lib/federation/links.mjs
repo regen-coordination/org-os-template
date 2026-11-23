@@ -272,7 +272,8 @@ function ownNetworks(fed, peers, where) {
  *  - `profile`: `networks` = each network whose hub has a wanted `memberOf` ({ hub: its DID, name }), and on a hub its
  *    own network ({ hub: selfDid, name }); every other key of the existing profile is kept as it is. Planned when the
  *    networks changed, or when there is no profile yet and something is published (a peer reads an org with no profile
- *    as not on atproto). `swapRecord` is the current profile's cid.
+ *    as not on atproto). `swapRecord` is the current profile's cid. A new profile also carries `name` and `createdAt`
+ *    (the drafted lexicon requires them); an existing one is never given keys it didn't have, other than `networks`.
  *  - `withheld`: counts only; no peer is named anywhere in the plan.
  *  @param {{ fed: FedLike & { peers: Peer[] }, selfDid: string | null, ownRecords?: OwnLink[] | null,
  *   ownProfile?: OwnProfile | null, now: string | Date, hash?: (text: string) => string, where?: Where,
@@ -333,7 +334,12 @@ export function planLinks({ fed, selfDid, ownRecords, ownProfile, now, hash, whe
       profile = { record: { $type: PROFILE_NSID, ...ownProfile.value.rest, networks }, swapRecord: ownProfile.cid }
     }
   } else if (networks.length > 0 || wanted.size > 0) {
-    profile = { record: { $type: PROFILE_NSID, networks } }
+    // A new profile carries what the drafted lexicon requires: `name` (identity.name, else the slug, else the DID) and
+    // `createdAt`. An existing one is never given them: it keeps its own keys plus `networks`.
+    const identity = /** @type {Record<string, unknown>} */ ((/** @type {any} */ (fed)).identity ?? {})
+    const str = (/** @type {unknown} */ v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null)
+    const name = (str(identity.name) ?? str(identity.slug) ?? selfDid ?? '').slice(0, NETWORK_NAME_MAX)
+    profile = { record: { $type: PROFILE_NSID, name, networks, createdAt: at } }
   }
 
   return { wanted: [...wanted.values()].map(w => w.link), create, delete: del, keep, profile, withheld }
