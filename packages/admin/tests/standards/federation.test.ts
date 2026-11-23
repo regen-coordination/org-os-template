@@ -29,6 +29,42 @@ describe('federation.json', () => {
     expect(out.withheld).toContainEqual({ collection: 'peers', records: 2, fields: 0 })
   })
 
+  it('carries identity.did and a published peer\'s did; a private or local-only peer\'s did never appears', () => {
+    const out = buildCore(withFederation({
+      identity: { ...IDENTITY, did: 'did:plc:selfselfselfselfselfself' },
+      peers: [
+        { name: 'Open Peer', url: 'https://example.org/open', did: 'did:plc:openopenopenopenopenopen', link: 'peerOf' },
+        { name: 'quiet-peer', url: 'https://example.org/quiet', did: 'did:plc:quietquietquietquietquiet', visibility: 'private' },
+        { name: 'local-peer', repo: '../local-peer', did: 'did:web:local.example' },
+        { name: 'Bad Did', url: 'https://example.org/bad', did: 'not-a-did' },
+      ],
+    }))
+    const doc = out.files['federation.json'] as any
+    expect(doc.did).toBe('did:plc:selfselfselfselfselfself')
+    expect(doc.peers).toEqual([
+      { name: 'Open Peer', url: 'https://example.org/open', did: 'did:plc:openopenopenopenopenopen' },
+      { name: 'Bad Did', url: 'https://example.org/bad' },
+    ])
+    const text = JSON.stringify(out.files)
+    expect(text).not.toContain('quietquiet')
+    expect(text).not.toContain('did:web:local.example')
+  })
+
+  it('an identity.did that is not a did:plc or did:web is not published', () => {
+    const doc = buildCore(withFederation({ identity: { ...IDENTITY, did: 'https://x.example/me' } })).files['federation.json'] as any
+    expect(doc).not.toHaveProperty('did')
+  })
+
+  it('link is an intent, never published', () => {
+    const out = buildCore(withFederation({
+      identity: IDENTITY,
+      peers: [{ name: 'Open Peer', url: 'https://example.org/open', link: 'memberOf', did: 'did:plc:openopenopenopenopenopen' }],
+    }))
+    const text = JSON.stringify(out.files['federation.json'])
+    expect(text).not.toContain('memberOf')
+    expect(text).not.toContain('"link"')
+  })
+
   it('carries name, type, daoURI and scope; peer type and trust only when set', () => {
     const out = buildCore(withFederation({
       identity: { ...IDENTITY, scope: 'operational-unit' },

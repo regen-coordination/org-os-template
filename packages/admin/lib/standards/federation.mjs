@@ -23,7 +23,7 @@ export function federationDoc(pub) {
   const fed = pub.federation
   return {
     spec: 'org-os/federation/1',
-    ...compact({ name: pub.identity.name, type: pub.identity.type, scope: fed?.scope, daoURI: pub.identity.daoURI }),
+    ...compact({ name: pub.identity.name, type: pub.identity.type, scope: fed?.scope, daoURI: pub.identity.daoURI, did: fed?.did }),
     networks: (fed?.networks ?? []).map(n => compact({ ...n })),
     peers: (fed?.peers ?? []).map(p => compact({ ...p })),
     ...(fed?.join ? { join: compact({ ...fed.join }) } : {}),

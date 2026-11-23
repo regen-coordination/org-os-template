@@ -7,8 +7,9 @@ import { readFileSync } from 'node:fs'
 import { stateDir } from '../../state.ts'
 import { readYamlObject, instanceSlug, slug, str } from '../util.ts'
 import { readFederation } from '../../../lib/federation/read.mjs'
-import { selfAddresses, linkState } from '../../../lib/federation/peers.mjs'
+import { selfAddresses, linkState, addressOf, sameAddress } from '../../../lib/federation/peers.mjs'
 import { nodePeerIO } from '../../federation-io.ts'
+import { remoteCache, wellKnownUrlOf } from '../../federation/remote.ts'
 import type { Adapter, Edge, Resource } from '../types.ts'
 
 /** A clone on this machine, or null: only a folder holding a git repository counts. */
@@ -103,14 +104,28 @@ export const fleet: Adapter = {
         if (!id || id === selfId) continue // a federation that lists this instance among its peers: its card is the self one
         const local = ref && ref.startsWith('.') ? clone(ctx.repo, ref) : null
         const peer = parsed.find(p => p.index === i)
-        const link = peer ? linkState(peer, self_, ctx.repo, nodePeerIO) : { state: 'unknown' as const, path: null, reason: "can't read their side from here" }
+        let link: { state: string; path: string | null; reason: string | null } = peer ? linkState(peer, self_, ctx.repo, nodePeerIO) : { state: 'unknown' as const, path: null, reason: "can't read their side from here" }
+        let checked: string | null = null
+        // A peer with only a url: what its federation.json said when it was last read (N2 Task 2). Their claims, not a fact we hold.
+        if (link.state === 'unknown' && link.path === null && local === null && peer?.url) {
+          const key = wellKnownUrlOf(peer.url)
+          const cached = key ? remoteCache(ctx.repo).get(key) : null
+          if (cached) {
+            const lists = readFederation(cached.doc).peers.some(p => [p.ref, p.url].some(r => {
+              const a = r ? addressOf(r, ctx.repo, nodePeerIO) : null
+              return a !== null && self_.some(s => sameAddress(s, a))
+            }))
+            checked = cached.fetched_at
+            link = { state: lists ? 'mutual' : 'claimed', path: null, reason: `checked ${cached.fetched_at}` }
+          }
+        }
         const shown = shownLink(link)
         nodes.push({
           id: `instance:${id}`, kind: 'instance', board: 'systems', name: str(raw.name) ?? id,
           status: shown.status, attention: shown.attention,
           changed: local ? await lastCommit(local, '.') : null,
           facts: { type: raw.type ?? null, repo: ref, url: raw.url ?? null, trust: raw.trust ?? null, relationship: raw.relationship ?? null, localPath: local,
-            link: link.state, linkReason: link.reason },
+            link: link.state, linkReason: link.reason, checked },
           source: { path: 'federation.yaml', editable: false },
         })
         edges.push({ from: `instance:${id}`, to: self.id, kind: 'federation' })

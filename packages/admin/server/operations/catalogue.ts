@@ -8,6 +8,8 @@ import { failingFileChecks } from '../resources/adapters/modules.ts'
 import { idOf, list, str } from '../resources/util.ts'
 import { readYamlObject } from '../resources/util.ts'
 import { fetchRemote, validBranchName } from '../git.ts'
+import { checkLinks } from '../federation/remote.ts'
+import { networkFetch, networkLookup } from '../net.ts'
 import { resolveTrunk } from '../proposals/ledger.ts'
 import { kmsSrc } from '../knowledge/kms.ts'
 import { validTrunkName } from '../../lib/rules.mjs'
@@ -295,6 +297,22 @@ export const CATALOGUE: Operation[] = [
       if (!(await validBranchName(repo, trunk))) throw new HttpError(409, `Not shared: git does not accept "${trunk}" as a branch name, so it cannot be the trunk. Nothing was pushed.`)
       return { cmd: 'git', args: ['push', '--', 'origin', `refs/heads/${trunk}:refs/heads/${trunk}`], writes: [] }
     },
+  },
+  {
+    // N2 Task 2: read another instance's federation.json. With `address` it looks that one hub up (the Ask form's "Look it
+    // up"); without, every peer that has a url and no folder here. It writes only the cache, under stateDir, outside the
+    // repository, so the executor sees no changed file.
+    id: 'federation.check-links', kinds: ['instance'], label: () => 'Check links', effect: 'reads', network: true,
+    timeoutMs: 120 * SEC,
+    params: { type: 'object', additionalProperties: false, properties: { address: { type: 'string', maxLength: 2048 } } },
+    refreshes: 'fleet',
+    unavailable: r => (r.facts.self === true ? null : "offered on this instance's own card"),
+    plan: (_r, params) => ({
+      summary: typeof params.address === 'string' && params.address.trim() !== ''
+        ? `read ${params.address.trim()}: a download, it changes no file`
+        : "read the federation.json of each peer that has a url and no folder here: a download, it changes no file",
+      inProcess: (repo, signal) => checkLinks(repo, params, { fetch: networkFetch, lookup: networkLookup }, signal),
+    }),
   },
   {
     id: 'connector.ingest', kinds: ['connector'], label: () => 'Ingest', effect: 'changes', network: true,

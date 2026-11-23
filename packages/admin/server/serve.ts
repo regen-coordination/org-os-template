@@ -38,6 +38,7 @@ import { opById } from './operations/catalogue.ts'
 import { parseRpcConfig } from './systems/chains.ts'
 import { SystemReader, READ_TTL_MS } from './systems/reader.ts'
 import { FAILED_READ_TTL_MS, type FetchLike } from './systems/driver.ts'
+import { networkFetch } from './net.ts'
 import { failedReadRetry } from './systems/retry.ts'
 import { Membership } from './session/membership.ts'
 import { mountSession } from './session/routes.ts'
@@ -111,17 +112,10 @@ export const SYSTEMS_REFRESH_MS = READ_TTL_MS
 /** A hosted Hub asks again whether its remote is still private (L9 spec §5.7). */
 export const REMOTE_RECHECK_MS = 60 * 60 * 1000
 
-/** The one real network call. Under a test run (vitest sets VITEST) it refuses, so a test that
- *  forgot to inject a fake fetch fails loudly instead of reaching out (ruling S13). */
 /** The hashes of the built UI's inline scripts, for the hosted CSP (L9 §5.10); none when there is no built UI. */
 function builtPrepaint(appDist: string | undefined): string[] {
   if (!appDist) return []
   try { return prepaintHashes(readFileSync(join(appDist, 'index.html'), 'utf8')) } catch { return [] }
-}
-
-export const networkFetch: FetchLike = async (url, init) => {
-  if (process.env.VITEST) throw new Error(`no network in tests: ${url} (inject a fake fetch)`)
-  return globalThis.fetch(url, init)
 }
 
 /** The HTTP adapter turns away a Host header it cannot make an address of (a user part, upper case) with a bare 400

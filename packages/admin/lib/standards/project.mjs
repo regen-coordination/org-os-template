@@ -14,6 +14,7 @@ import { MECHANISMS, APPLICATION_STATUSES } from './daoip5.mjs'
 import { GENERATOR_MARK_KEY, GENERATOR_MARK } from './dao.mjs'
 import { isPublishedPeer } from './federation.mjs'
 import { publicHref } from '../federation/peers.mjs'
+import { DID_PATTERN } from '../federation/read.mjs'
 
 /** @typedef {import('../visibility.mjs').VisibilityPolicy} VisibilityPolicy */
 /** @typedef {{ level: 'error' | 'warn', file: string, text: string }} Problem */
@@ -49,8 +50,8 @@ import { publicHref } from '../federation/peers.mjs'
  * @property {PublicProposal[]} proposals
  * @property {PublicDecision[]} decisions
  * @property {{ description: string | null, rules: Record<string, unknown>[] } | null} governance null: not public
- * @property {{ scope: string | null, networks: { name: string, hub: string | null, role: string | null }[],
- *   peers: { name: string, url: string, type: string | null, trust: string | null }[],
+ * @property {{ scope: string | null, did?: string | null, networks: { name: string, hub: string | null, role: string | null }[],
+ *   peers: { name: string, url: string, type: string | null, trust: string | null, did?: string | null }[],
  *   join: { policy: string, types: string[], asks: string[], where: string | null } | null } | null} federation exactly what may be
  *   published (null: none read)
  * @property {{ meetings: Record<string, unknown>[], projects: Record<string, unknown>[], finances: Record<string, unknown>,
@@ -542,22 +543,23 @@ export function projectPublic(input) {
   let federation = null
   if (fed) {
     const scope = isObj(fed.identity) && typeof fed.identity.scope === 'string' && fed.identity.scope !== '' ? fed.identity.scope : null
+    const did = isObj(fed.identity) && typeof fed.identity.did === 'string' && DID_PATTERN.test(fed.identity.did) ? fed.identity.did : null
     const networks = (Array.isArray(fed.networks) ? fed.networks : []).map(n => {
       const hub = publicHref(n.hub)
       if (hub === null) withhold(n.hub)
       return { name: n.name, hub, role: n.role }
     })
-    /** @type {{ name: string, url: string, type: string | null, trust: string | null }[]} */
+    /** @type {{ name: string, url: string, type: string | null, trust: string | null, did: string | null }[]} */
     const published = []
     for (const peer of Array.isArray(fed.peers) ? fed.peers : []) {
       withhold([peer.ref, peer.relationship, peer.since, peer.decision])
-      if (isPublishedPeer(peer)) published.push({ name: peer.name, url: /** @type {string} */ (peer.url), type: peer.type, trust: peer.trust })
-      else { withhold([peer.name, peer.url]); count('peers', 'records') }
+      if (isPublishedPeer(peer)) published.push({ name: peer.name, url: /** @type {string} */ (peer.url), type: peer.type, trust: peer.trust, did: peer.did })
+      else { withhold([peer.name, peer.url, peer.did]); count('peers', 'records') }
     }
     const j = fed.join
     const where = j ? publicHref(j.where) : null
     if (j && where === null) withhold(j.where)
-    federation = { scope, networks, peers: published, join: j ? { policy: j.policy, types: j.types, asks: j.asks, where } : null }
+    federation = { scope, did, networks, peers: published, join: j ? { policy: j.policy, types: j.types, asks: j.asks, where } : null }
     // identity (other than what is published) and the read's warnings may name withheld values: never shown
     withhold(fed.problems)
   }
