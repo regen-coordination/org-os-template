@@ -270,14 +270,14 @@ export function readFilesPolicy(doc) {
   return { default: raw.default, paths: isObj(raw.paths) ? { ...raw.paths } : {} }
 }
 
+/** The canon's folder (L6 §7.5): the collection `knowledge`, a file per kind. */
+const CANON = 'data/kb'
+
 /**
  * The key of `files.paths` that governs a data/** path: the path itself, else the longest `<folder>/**` holding it (the
  * folder itself included: `data/kb` for `data/kb/**`), else null (`files.default` governs it).
  * @param {FilesPolicy} files @param {string} path @returns {string | null}
  */
-/** The canon's folder (L6 §7.5): the collection `knowledge`, a file per kind. */
-const CANON = 'data/kb'
-
 function fileKey(files, path) {
   if (Object.hasOwn(files.paths, path)) return path
   /** @type {string | null} */
@@ -332,8 +332,21 @@ function fileToken(token) {
 export function fileLevel(files, path) {
   if (files === null || typeof path !== 'string' || !path.startsWith('data/')) return null
   // 0.7.2 round 3 (review 5): the canon is one collection (`knowledge`) read across its files, so every path in it is read at
-  // the canon's level (`data/kb/**`, else the default); a key inside it is refused by the check and passed over here.
-  const key = fileKey(files, path.startsWith(`${CANON}/`) ? CANON : path)
+  // the canon's level (`data/kb/**`, else the default). A key inside it is refused by the check; one written by hand all
+  // the same narrows the whole canon, never opens it (0.7.3, review of round 3, M-b): the canon reads at the narrowest of
+  // its levels, and at nobody's when two are not ordered.
+  if (path.startsWith(`${CANON}/`)) {
+    const key = fileKey(files, CANON)
+    let level = fileToken(key === null ? files.default : files.paths[key])
+    for (const [inner, token] of Object.entries(files.paths)) {
+      if (!inner.startsWith(`${CANON}/`) || inner === `${CANON}/**`) continue
+      const l = fileToken(token)
+      if (narrowerOrEqual(l, level)) level = l
+      else if (!narrowerOrEqual(level, l)) level = NOBODY
+    }
+    return level
+  }
+  const key = fileKey(files, path)
   return fileToken(key === null ? files.default : files.paths[key])
 }
 
@@ -345,8 +358,10 @@ export function fileLevel(files, path) {
  * @param {Record<string, unknown>} top
  * @param {(path: string, message: string) => void} err
  * @param {(path: string, l: ParsedLevel) => void} checkStrict a hat level's own checks
+ * @param {Readonly<Record<string, string>>} [fileOf] the file each collection is read from, when it is not data/<name>.yaml
+ *   (a custom collection's data/collections/<id>.yaml; 0.7.3)
  */
-function checkFiles(top, err, checkStrict) {
+function checkFiles(top, err, checkStrict, fileOf = {}) {
   if (!Object.hasOwn(top, 'files')) return
   const raw = top.files
   if (!isObj(raw)) { err('visibility.files', 'empty or not a mapping, so every data file is closed: give it a default and paths'); return }
@@ -374,7 +389,7 @@ function checkFiles(top, err, checkStrict) {
   if (files === null) return
   for (const [name, col] of Object.entries(fields)) {
     if (!isObj(col) || !isObj(col.fields) || Object.keys(col.fields).length === 0) continue
-    const path = `data/${name}.yaml`
+    const path = Object.hasOwn(fileOf, name) ? fileOf[name] : `data/${name}.yaml`
     const key = fileKey(files, path)
     const token = key === null ? files.default : files.paths[key]
     const l = parseLevel(token)
@@ -578,7 +593,8 @@ const NO_TREE = 'no membership tree is named, so a hat level admits nobody; use 
  * membership tree; `defaults.contact` that is not a hat or role; a field a deployed System requires kept above members
  * (PF-R227). Warnings: a collection that is no registry; a hat level with no membership tree.
  * @param {unknown} doc
- * @param {{ registries: readonly string[], roles: readonly string[], tree: string | null }} ctx
+ * @param {{ registries: readonly string[], roles: readonly string[], tree: string | null, files?: Readonly<Record<string, string>> }} ctx
+ *   `files`: the file each collection is read from, when it is not data/<name>.yaml (0.7.3)
  * @returns {VisibilityProblem[]}
  */
 export function checkVisibilityPolicy(doc, ctx) {
@@ -630,7 +646,7 @@ export function checkVisibilityPolicy(doc, ctx) {
     }
   }
 
-  checkFiles(top, err, checkStrict)
+  checkFiles(top, err, checkStrict, ctx.files)
 
   const defs = top.defaults
   if (isObj(defs)) {

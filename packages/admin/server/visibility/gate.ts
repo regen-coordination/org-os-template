@@ -113,6 +113,12 @@ export function gateEvent<M extends { type: string; registry?: string; ids?: str
   return admits(MEMBERS, viewer) ? msg : null
 }
 
+/** 0.7.3 (M4): an event's levels for a member some of whose keys are read from a file the `files` section keeps from them
+ *  (`kept`): such a key is heard as the public hears it (its level when that admits the public), else by nobody. */
+export function keptLevels(levelOf: (key: string) => ParsedLevel, kept: (key: string) => boolean): (key: string) => ParsedLevel {
+  return key => { const level = levelOf(key); return kept(key) && !admits(level, PUBLIC_VIEWER) ? NOBODY : level }
+}
+
 /** A public proposal as the public is shown it: each op's records with their public fields only, the ops a revise event
  *  recorded included (they hold what that revision wrote), and none of the hat readings its acts recorded: an event's
  *  `as`, `closed.as`, and a ratify's fresh readings `closed.checked` (rule 9: the link from a member to an address is
@@ -581,6 +587,8 @@ export function gateGovernance(viewer: Viewer, view: GovernanceView, levels: Lev
 export class EventLevels {
   private readonly publicText = new Map<string, string | null>()
   private readonly resources = new Map<string, ParsedLevel>()
+  /** 0.7.3 (M4): the file each resource is read from, so a member the `files` section keeps it from hears of it as the public. */
+  private readonly paths = new Map<string, string>()
   /** The ids of the graph noted last. */
   private last = new Set<string>()
   /** `priv`: the private store's reads, for a target kept there (DAO-OS L6 §8.5); none, such a target is heard by nobody. */
@@ -614,10 +622,17 @@ export class EventLevels {
   noteGraph(graph: Graph): void {
     const levels = new Levels(this.repo, readConfig(this.repo), this.attention)
     const now = new Set<string>()
-    for (const n of graph.nodes) { this.resources.set(n.id, levels.resource(n)); now.add(n.id) }
-    for (const id of this.resources.keys()) if (!now.has(id) && !this.last.has(id)) this.resources.delete(id)
+    for (const n of graph.nodes) {
+      this.resources.set(n.id, levels.resource(n)); now.add(n.id)
+      if (typeof n.source?.path === 'string') this.paths.set(n.id, n.source.path)
+      else this.paths.delete(n.id)
+    }
+    for (const id of this.resources.keys()) if (!now.has(id) && !this.last.has(id)) { this.resources.delete(id); this.paths.delete(id) }
     this.last = now
   }
+
+  /** The file resource `id` is read from, when it is one (0.7.3, M4). */
+  pathOf(id: string): string | undefined { return this.paths.get(id) }
 
   /** How many resources have a level kept (for tests and for a look at memory). */
   get known(): number { return this.resources.size }

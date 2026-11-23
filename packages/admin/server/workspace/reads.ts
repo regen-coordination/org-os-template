@@ -141,6 +141,8 @@ export function registryFileLevel(repo: string, name: string): string {
 const MACHINE = new WeakSet<object>()
 /** Marks `viewer` as the person at the machine's (request.ts `byGit`), and returns it. */
 export function atTheMachine<V extends Viewer>(viewer: V): V { MACHINE.add(viewer); return viewer }
+/** Whether `viewer` is the person at the machine's (0.7.3, review of round 3, I3: so a viewer carried as data keeps it). */
+export function isAtTheMachine(viewer: Viewer): boolean { return MACHINE.has(viewer) }
 
 /**
  * 0.7.2: whether `viewer` may read a path whole by data/visibility.yaml's `files` section (lib/visibility.mjs `fileLevel`):
@@ -292,6 +294,35 @@ function isObj(x: unknown): x is Record<string, unknown> { return typeof x === '
  * loses that file's sections; a `compare` or `current` at that op's position (they count the git ops) is null, and the
  * position leaves `stale` (M1). Everything else is kept.
  */
+/**
+ * 0.7.3 (review of round 3, I2 and M-a): a change view (the tray) as `may` lets its asker read it, for every answer that
+ * carries one: round 3's `trayView`, moved here so Library, deploy and proposals answer alike. A file op stays the asker's
+ * own and only its staleness is not said (0.7.1); an op on a record of a file kept from them is shown withheld (R14); and
+ * `state` says `stale` only when a staleness they may be told is left.
+ */
+export function readableTray<V extends { ops: readonly unknown[]; stale: readonly number[]; state?: string }>(view: V, may: FileReader): V {
+  if (may.all) return view
+  const unreadFile = (i: number) => { const op = view.ops[i]; return op !== undefined && isFileOn(op) && !may(op.path) }
+  const records: FileReader = may.records ? Object.assign(() => true, { records: may.records }) : Object.assign(() => true, { all: true as const })
+  const shown = readableView({ ...view, stale: view.stale.filter(i => !unreadFile(i)) }, records)
+  return shown.state === 'stale' && shown.stale.length === 0 ? { ...shown, state: 'staged' } : shown
+}
+
+/** 0.7.3 (review of round 3, I1): whether `may` lets its asker read registry `name`'s records (its file); the person at the
+ *  machine always. */
+export function readsRecords(may: FileReader, name: string): boolean {
+  return may.all === true || may.records === undefined || may.records(name)
+}
+
+/** 0.7.3 (review of round 3, I1): a write that would make a record in registry `name` is refused, before any id of it is read,
+ *  for an asker its file is kept from: the id it would choose says what is there. */
+export function refuseUnreadRegistry(repo: string, may: FileReader, name: string): void {
+  if (readsRecords(may, name)) return
+  let path: string
+  try { path = registryFile(repo, name) } catch { path = `data/${name}.yaml` }
+  throw unreadRefusal([path])
+}
+
 export function readableView<V extends object>(view: V, may: FileReader): V {
   if (may.all) return view
   const v = view as V & { ops?: unknown; events?: unknown; diff?: unknown; compare?: unknown; current?: unknown; stale?: unknown }

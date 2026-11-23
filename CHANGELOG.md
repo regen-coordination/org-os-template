@@ -8,6 +8,53 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 _(Append changes here as they land.)_
 
+## [0.7.3] — 2026-11-23
+
+**0.7.3 closes what 0.7.2's `files:` section still let a member be told of a file kept from them.** It comes from a
+fresh review of 0.7.2's last round and from the minors both earlier reviews deferred. An instance without a `files:`
+section is unchanged.
+
+### Fixed
+
+- **Writes into a kept file** (`packages/admin`). 0.7.2 said a write to a record of a kept file is refused before the
+  record is read; these paths did not refuse:
+  - `POST /api/meetings` and *Turn into a task* (`POST /api/comments/:id/task`, for a task kept in git) made the record,
+    and the id they chose (`…-2`) said whether one existed. Both now answer 422 before any id is read, alike for an id
+    that exists and one that does not.
+  - Library Add and Remove staged ops on records of kept files, and Remove's answer held the whole record. Both now
+    answer 422 before staging, and Remove refuses before its receipt is worked out.
+- **Every answer that carries the tray withholds alike** (`readableTray`): Library Add and Remove, the deploy read-back
+  and a proposal's Load now answer as `GET /api/changes` does, so a record op on a kept file staged before it was kept
+  shows no `before` or `current`. The tray's `state` no longer says `stale` for a staleness it withholds.
+- **The person at the machine** is never gated by `files` over the WebSocket again: the connection's viewer kept no mark
+  of it, so with a section they stopped hearing presence and comment events on kept records, and saw ids for names.
+- **WebSocket events** (`registry-changed`, `resources-changed`): a registry, or a card read from a file, kept from a
+  member reaches them only as the public would hear it.
+- **`GET /api/registries/:name?from`** gives no from marks, and **`…/:id/changed`** answers 404, to a member the
+  registry's file is kept from.
+- **The library**: `GET /api/library` (`added`) and an entry's preview (`receipts`) list no receipt to a member
+  `data/library.yaml` is kept from; a removal's preview names no record of a kept file, nor its state or referrers.
+- **The canon at run time**: a key written inside `data/kb/` (which the check refuses) used to be passed over, so that
+  file read at the canon's looser level. Now such a key narrows the whole canon, and two levels that are not ordered
+  close it.
+- **The policy check** reads a custom collection's own file (`data/collections/<id>.yaml`) when it refuses a key that
+  would open a collection with field levels whole.
+
+### Tests
+
+- `tests/workspace/file-reads.073*.test.ts`: each fix's test, seen failing first. The review's probes are kept as tests.
+  The sweep now also looks for other members' names after a second person's commit.
+
+### Known, not changed
+
+- The house's own configuration routes (`/api/boards`, `/api/collections`, `/api/visibility`, `/api/standards`) stay
+  the declared exceptions.
+- A kept file's records come as the public gets them, store-kept fields included.
+- A link label typed into a page is its author's text; the @ picker offers no kept record there.
+- *Take theirs* on a withheld record op still reads the kept record (which op is dropped says how it changed), and a
+  typed mention of a Node Lead on a Steward-only record says they were told when they are not. Both need writes on.
+- The map's `changed.by` names everyone as the generic member does, the person at the machine included (R11).
+
 ## [0.7.2] — 2026-11-23
 
 **0.7.2 lets an instance say which Roles read which data files, and keeps a kept file's records from those it is kept

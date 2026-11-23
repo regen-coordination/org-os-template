@@ -7,7 +7,7 @@ import { ChangeStore, newChangeId } from './store.ts'
 import { stage, staleOps, changeView, changeClasses, classesOf, currentOf, targetsOf, targetsOfOps, validateChange } from './stage.ts'
 import { rebaseOp } from './merge.ts'
 import { fileBase, heldFileErrors, isFileOp, isRecordOp, keptPageErrors, rebaseFileOp } from '../workspace/files.ts'
-import { fileReader, readableView, unreadPaths, unreadRefusal, type FileReader } from '../workspace/reads.ts'
+import { fileReader, readableTray, readableView, unreadPaths, unreadRefusal, type FileReader } from '../workspace/reads.ts'
 import { commitMessage } from './records.ts'
 import { applyOps, commitEmpty, Refusal, Referred, StageRefusal } from './apply.ts'
 import { sealReceipts } from '../library/seal.ts'
@@ -211,13 +211,8 @@ export function mountChanges(app: Hono, { repo, withLock, notify, privateStore =
    *  not said, even of their own op, in GET /api/changes and in every write's answer alike. */
   const trayView = (c: Context, actor: Actor, change: Change | null): Response => {
     const view = changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change))
-    const may = fileReader(c, repo)
-    if (may.all) return Response.json(view)
-    const unread = (i: number) => { const op = view.ops[i]; return op !== undefined && isFileOp(op) && !may(op.path) }
-    // 0.7.2 round 3 (review 4): an op on a record of a file kept from the asker (staged before it was kept) is shown withheld,
-    // with no `current` and no staleness, as a proposal shows it. A file op stays the asker's own, as 0.7.1 shows it.
-    const records: FileReader = may.records ? Object.assign(() => true, { records: may.records }) : Object.assign(() => true, { all: true as const })
-    return Response.json(readableView({ ...view, stale: view.stale.filter(i => !unread(i)) }, records))
+    // 0.7.2 round 3 (review 4), shared in 0.7.3: workspace/reads.ts `readableTray`.
+    return Response.json(readableTray(view, fileReader(c, repo)))
   }
   const saveAndAnswer = (c: Context, actor: KnownActor, change: Change, ops: Op[]): Response => {
     const next: Change = { ...change, ops, updated: new Date().toISOString() }

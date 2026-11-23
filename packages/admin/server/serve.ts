@@ -46,7 +46,7 @@ import { logMailer, resendMailer, type Mailer } from './session/mail.ts'
 import { readerOf, withRequest } from './request.ts'
 import { isMaintainer, readRuleContext } from './governance/effective.ts'
 import { checkRemote, RemoteWatch } from './visibility/remote.ts'
-import { attentionLevel, EventLevels, gateEvent, PUBLIC_VIEWER } from './visibility/gate.ts'
+import { attentionLevel, EventLevels, gateEvent, keptLevels, PUBLIC_VIEWER } from './visibility/gate.ts'
 import { connectionViewer, mountVisibility } from './visibility/routes.ts'
 import { workspaceOf } from './workspace/routes.ts'
 import { actorNames, mountConversation, openConversationStore, targetLevel, tellAtCommit, type Target } from './workspace/conversation.ts'
@@ -54,7 +54,8 @@ import { mountPresence, Presence, PRESENCE_BEAT_MS } from './workspace/presence.
 import { privateReads } from './private/reads.ts'
 import { goneSettled, housekeepAtStart } from './workspace/gone.ts'
 import type { Viewer } from '../lib/visibility.mjs'
-import { mayReadRecordsOf } from './workspace/reads.ts'
+import { fileLevels, mayReadRecordsOf } from './workspace/reads.ts'
+import { registryFile } from './registries.ts'
 import type { HostedConfig } from './hosted/config.ts'
 import { useHubIdent } from './hosted/ident.ts'
 import { mountPush, Pusher } from './hosted/push.ts'
@@ -441,7 +442,19 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
             // and presence names people as this viewer may be told them (the members file may be kept from them).
             const on = typeof msg.target === 'string' && msg.target.startsWith('record:') ? msg.target.split(':')[1] ?? '' : null
             if (on !== null && viewer.kind === 'member' && !mayReadRecordsOf(repo, viewer, on)) return
-            const out = gateEvent(viewer, msg, levelOf)
+            // 0.7.3 (M4): a registry or a card read from a file kept from this member is heard as the public hears it.
+            const files = viewer.kind === 'member' ? fileLevels(repo, viewer) : null
+            const kept = (key: string): boolean => {
+              if (files === null) return false
+              if (typeof msg.registry === 'string') {
+                let path: string
+                try { path = registryFile(repo, msg.registry) } catch { return false }
+                return !files(path)
+              }
+              const path = Array.isArray(msg.ids) ? events.pathOf(key) : undefined
+              return path !== undefined && !files(path)
+            }
+            const out = gateEvent(viewer, msg, files === null ? levelOf : keptLevels(levelOf, kept))
             const told = out && out.type === 'presence' && typeof out.target === 'string' ? { ...out, people: presence.everyone(out.target as Target, viewer) } : out
             if (told && client.readyState === client.OPEN) client.send(JSON.stringify(told))
           }).catch(() => { /* a message the gate could not judge is not sent */ })

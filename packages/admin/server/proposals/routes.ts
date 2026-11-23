@@ -45,7 +45,7 @@ import { gitOpsOf } from '../../lib/ops.mjs'
 import { readConfig } from '../visibility/config.ts'
 import { noStore, reach, stagedPrivate, stagedView, unavailable, type PrivateAccess } from '../private/ops.ts'
 import { closingDropsPending, placeholdersOf, shownTo } from '../private/proposals.ts'
-import { fileReader, readableView, unreadPaths, unreadRefusal } from '../workspace/reads.ts'
+import { fileReader, readableTray, readableView, unreadPaths, unreadRefusal } from '../workspace/reads.ts'
 import type { ProposedPrivate } from './propose.ts'
 import { workspaceOf } from '../workspace/routes.ts'
 import { NO_SESSION } from '../workspace/sessions.ts'
@@ -336,7 +336,7 @@ export function mountProposals(app: Hono, { repo, withLock, notify, systems, pri
       const change = await loadForRevision(repo, actor, c.req.param('id'), changes, { now: deps.now }, { access: privateStore, viewer: viewerOf(c) }, fileReader(c, repo))
       notify?.({ type: 'changes' })
       // The tray's own answer: the change as GET /api/changes gives it, marked revises.
-      return Response.json(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)))
+      return Response.json(readableTray(changeView(repo, actor, change, stagedView(privateStore, change), changePrivateTargets(repo, privateStore, change)), fileReader(c, repo)))
     }))
   })
   app.post('/api/proposals/:id/replay', async c => {
