@@ -8,8 +8,19 @@ export const JOIN_POLICIES = Object.freeze(['closed', 'invite', 'open-with-appro
 export const TRUST_LEVELS = Object.freeze(['full', 'read', 'read-write', 'none'])
 /** A peer's `link`: the relation a published link record states, or `none` to keep the peer off atproto (R24). */
 export const LINK_RELATIONS = Object.freeze(['memberOf', 'hasMember', 'peerOf', 'none'])
-/** An atproto DID this module accepts: did:plc or did:web. */
+/** The method prefix of an atproto DID this module accepts: did:plc or did:web. A prefix only; `isDid` is the check. */
 export const DID_PATTERN = /^did:(plc|web):/
+/** A did:plc identifier: 24 base32 characters. */
+const PLC = /^did:plc:[a-z2-7]{24}$/
+/** A did:web identifier: a host (an optional percent-encoded port), then optional `:path` segments. */
+const WEB = /^did:web:[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(%3A[0-9]{1,5})?(:[A-Za-z0-9._~%-]+)*$/
+
+/** The one DID check (final review must-fix 2): a did:plc of 24 base32 characters, or a did:web naming a host, at most
+ *  2048 characters. federation.yaml (identity.did, peers[].did), link records and profiles all go through it.
+ *  @param {unknown} v @returns {v is string} */
+export function isDid(v) {
+  return typeof v === 'string' && v.length <= 2048 && (PLC.test(v) || WEB.test(v))
+}
 
 /** @typedef {{ name: string, hub: string | null, role: string | null }} Network */
 /** @typedef {{ index: number, name: string, ref: string | null, url: string | null, type: string | null,
@@ -46,9 +57,10 @@ export function readFederation(doc) {
   const problems = []
   const warn = (/** @type {string} */ text) => problems.push({ level: 'warn', text })
 
-  const identity = isObj(d.identity) ? d.identity : {}
-  if (identity.did !== undefined && !(typeof identity.did === 'string' && DID_PATTERN.test(identity.did))) {
-    warn('federation.yaml: identity.did is not a did:plc or did:web identifier.')
+  let identity = isObj(d.identity) ? d.identity : {}
+  if (identity.did !== undefined && !isDid(identity.did)) {
+    warn('federation.yaml: identity.did is not a did:plc or did:web identifier; it is ignored.')
+    identity = { ...identity, did: null }
   }
 
   // The framework's v3 shape nests network, hub, networks and peers under `federation:`. They are read from there
@@ -94,7 +106,7 @@ export function readFederation(doc) {
       }
       let did = null
       if (p.did !== undefined) {
-        if (typeof p.did === 'string' && DID_PATTERN.test(p.did)) did = p.did
+        if (isDid(p.did)) did = p.did
         else warn(`federation.yaml: peer "${name}" has a did that is not a did:plc or did:web identifier; it is ignored.`)
       }
       let link = null

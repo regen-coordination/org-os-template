@@ -12,7 +12,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { isMap, isSeq, parse, type YAMLMap, type YAMLSeq } from 'yaml'
 import { HttpError } from '../errors.ts'
 import { STRINGIFY, spliceUpdate } from '../splice.ts'
-import { readFederation, LINK_RELATIONS, DID_PATTERN } from '../../lib/federation/read.mjs'
+import { readFederation, LINK_RELATIONS } from '../../lib/federation/read.mjs'
 import { isDid } from '../../lib/federation/links.mjs'
 import { didBinding, migrationRows, BINDING, type AtprotoView, type MigrationRow } from '../../lib/federation/migrate.mjs'
 import { nodePeerIO } from '../federation-io.ts'
@@ -45,7 +45,7 @@ export const MIGRATION_SENTENCES = {
 export function claimedDid(repo: string, url: string | null): string | null {
   const wk = url ? wellKnownUrlOf(url) : null
   const doc = wk === null ? null : remoteCache(repo).get(wk)?.doc
-  return doc && typeof doc.did === 'string' && DID_PATTERN.test(doc.did) ? doc.did : null
+  return doc && isDid(doc.did) ? doc.did : null
 }
 
 /** The addresses a DID's own profiles name, each with the date it was read: `example.orgosnetwork.profile` `instance` and

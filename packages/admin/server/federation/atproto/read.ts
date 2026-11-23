@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { LINK_NSID, PROFILE_NSID, parseLinkRecord, parseProfileRecord, type LinkRecord, type ProfileRecord } from '../../../lib/federation/links.mjs'
-import { readFederation, DID_PATTERN } from '../../../lib/federation/read.mjs'
+import { readFederation, isDid } from '../../../lib/federation/read.mjs'
 import { isPublishedPeer } from '../../../lib/standards/federation.mjs'
 import { readYamlObject } from '../../resources/util.ts'
 import { stateDir } from '../../state.ts'
@@ -244,7 +244,7 @@ const said = (got: Reading | Problem): string => {
  *  its DID and its problem are never written in the output (as `isPublishedPeer` decides for federation.json). */
 async function readEveryRecord(repo: string, deps: ReadDeps, signal: AbortSignal, now: Date): Promise<CheckPart> {
   const fed = readFederation(readYamlObject(join(repo, 'federation.yaml')))
-  const selfDid = typeof fed.identity.did === 'string' && DID_PATTERN.test(fed.identity.did) ? fed.identity.did : null
+  const selfDid = isDid(fed.identity.did) ? fed.identity.did : null
   const targets = [
     ...(selfDid !== null ? [{ label: 'This instance', did: selfDid, private: false }] : []),
     ...fed.peers.filter(p => p.did !== null).map(p => ({ label: p.name, did: p.did as string, private: !isPublishedPeer(p) })),

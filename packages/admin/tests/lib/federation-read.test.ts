@@ -1,5 +1,6 @@
 import { it, expect, describe } from 'vitest'
 import { readFederation, JOIN_POLICIES } from '../../lib/federation/read.mjs'
+import { isDid } from '../../lib/federation/links.mjs'
 
 it('reads legacy network + hub as a string into one network', () => {
   expect(readFederation({ network: 'regen-coordination', hub: 'https://hub.regencoordination.xyz/' }).networks)
@@ -118,17 +119,29 @@ describe('did, link, requested and join.decision', () => {
     expect(r.join?.decision).toBeNull()
     expect(r.problems).toEqual([])
   })
-  it.each(['did:key:z6Mk', 'plc:abc', 'https://example.org/did', 5])('a malformed peer did %s is a warning and reads null', did => {
+  it.each(['did:key:z6Mk', 'plc:abc', 'https://example.org/did', 5, 'did:plc:', 'did:plc:x', 'did:web:', 'did:web:a b.org'])('a malformed peer did %s is a warning and reads null', did => {
     const r = readFederation({ peers: [{ name: 'A', did }] })
     expect(r.peers[0]!.did).toBeNull()
     expect(r.problems).toHaveLength(1)
     expect(r.problems[0]!.level).toBe('warn')
     expect(r.problems[0]!.text).toContain('peer "A"')
   })
-  it('a malformed identity.did is a warning', () => {
-    const r = readFederation({ identity: { name: 'X', did: 'did:key:z' } })
+  it.each(['did:key:z', 'did:plc:', 'did:plc:x'])('a malformed identity.did %s is a warning and reads null', did => {
+    const r = readFederation({ identity: { name: 'X', did } })
+    expect(r.identity.did).toBeNull()
+    expect(r.identity.name).toBe('X')
     expect(r.problems).toHaveLength(1)
     expect(r.problems[0]!.text).toContain('identity.did')
+  })
+  it('one DID check: readFederation and the link records agree (isDid)', () => {
+    for (const did of ['did:plc:abcdefghijklmnopqrstuvwx', 'did:web:a.example.org', 'did:web:a.example.org%3A8443', 'did:web:a.example.org:people:ana']) {
+      expect(isDid(did), did).toBe(true)
+      expect(readFederation({ peers: [{ name: 'A', did }] }).peers[0]!.did, did).toBe(did)
+    }
+    for (const did of ['did:plc:', 'did:plc:x', 'did:plc:ABCDEFGHIJKLMNOPQRSTUVWX', 'did:web:', 'did:web:a.example.org:', 'did:key:z6Mk']) {
+      expect(isDid(did), did).toBe(false)
+      expect(readFederation({ peers: [{ name: 'A', did }] }).peers[0]!.did, did).toBeNull()
+    }
   })
   it('an unknown link value is a warning and reads null', () => {
     const r = readFederation({ peers: [{ name: 'A', link: 'friend' }, { name: 'B', link: 'none' }] })

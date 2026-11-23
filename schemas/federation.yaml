@@ -45,7 +45,7 @@ identity:
 
   did:
     type: string
-    pattern: "^did:(plc|web):"
+    pattern: "^(did:plc:[a-z2-7]{24}|did:web:[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(%3A[0-9]{1,5})?(:[A-Za-z0-9._~%-]+)*)$"
     description: "The organisation's atproto DID (did:plc or did:web). Published in .well-known/federation.json; the account its public link records are written from"
     required: false
 
@@ -177,7 +177,7 @@ peers:
         description: "The id of the federation request this instance sent to this peer, while no decision has come back"
       did:
         type: string
-        pattern: "^did:(plc|web):"
+        pattern: "^(did:plc:[a-z2-7]{24}|did:web:[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*(%3A[0-9]{1,5})?(:[A-Za-z0-9._~%-]+)*)$"
         description: "The peer's atproto DID (did:plc or did:web)"
       link:
         type: string

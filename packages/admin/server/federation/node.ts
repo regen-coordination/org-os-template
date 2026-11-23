@@ -15,7 +15,7 @@ import { STRINGIFY } from '../splice.ts'
 import { showFile } from '../git.ts'
 import { resolveTrunk } from '../proposals/ledger.ts'
 import { runCommand } from '../resources/run.ts'
-import { readFederation, DID_PATTERN } from '../../lib/federation/read.mjs'
+import { readFederation, isDid } from '../../lib/federation/read.mjs'
 import { parseRequest, requestText } from '../../lib/federation/request.mjs'
 import { answerLine } from '../../lib/federation/answer.mjs'
 import type { FederationRequest } from '../../lib/federation/request.mjs'
@@ -106,7 +106,7 @@ export function cachedHub(repo: string, address: string, now: Date = new Date())
     hub: {
       name: typeof doc.name === 'string' && doc.name !== '' ? doc.name : address,
       type: typeof doc.type === 'string' ? doc.type : null,
-      url: address.trim(), did: typeof doc.did === 'string' && DID_PATTERN.test(doc.did) ? doc.did : null,
+      url: address.trim(), did: isDid(doc.did) ? doc.did : null,
       networks: fed.networks.map(n => n.name), join: fed.join,
     },
   }

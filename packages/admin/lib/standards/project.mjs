@@ -14,7 +14,7 @@ import { MECHANISMS, APPLICATION_STATUSES } from './daoip5.mjs'
 import { GENERATOR_MARK_KEY, GENERATOR_MARK } from './dao.mjs'
 import { isPublishedPeer } from './federation.mjs'
 import { publicHref } from '../federation/peers.mjs'
-import { DID_PATTERN } from '../federation/read.mjs'
+import { isDid } from '../federation/read.mjs'
 
 /** @typedef {import('../visibility.mjs').VisibilityPolicy} VisibilityPolicy */
 /** @typedef {{ level: 'error' | 'warn', file: string, text: string }} Problem */
@@ -543,7 +543,7 @@ export function projectPublic(input) {
   let federation = null
   if (fed) {
     const scope = isObj(fed.identity) && typeof fed.identity.scope === 'string' && fed.identity.scope !== '' ? fed.identity.scope : null
-    const did = isObj(fed.identity) && typeof fed.identity.did === 'string' && DID_PATTERN.test(fed.identity.did) ? fed.identity.did : null
+    const did = isObj(fed.identity) && isDid(fed.identity.did) ? fed.identity.did : null
     const networks = (Array.isArray(fed.networks) ? fed.networks : []).map(n => {
       const hub = publicHref(n.hub)
       if (hub === null) withhold(n.hub)

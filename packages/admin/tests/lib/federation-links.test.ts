@@ -119,11 +119,12 @@ describe('relationOf', () => {
 
   it("a hub's existing member with no decision is hasMember when mutual by files and its files name this instance as hub (R4)", () => {
     const fed = fedOf({ join: { policy: 'open-with-approval' }, peers: [
-      { name: 'Old Member', url: 'https://old.example.org', did: 'did:plc:oldoldoldoldoldoldoldoldo', relationship: 'node' },
+      { name: 'Old Member', url: 'https://old.example.org', did: 'did:plc:oldoldoldoldoldoldoldold', relationship: 'node' },
       { name: 'Old Free-form', url: 'https://free.example.org', did: 'did:plc:freefreefreefreefreefree', relationship: 'local-chapter' },
     ] })
     const both = { mutualByFiles: [0, 1], membersByFiles: [0, 1] }
-    expect(fed.peers.map(p => relationOf(p, fed, both))).toEqual(['hasMember', 'hasMember'])
+    // the files rule needs relationship node (final review): a peer listed in another role never becomes hasMember
+    expect(fed.peers.map(p => relationOf(p, fed, both))).toEqual(['hasMember', null])
     // Mutual by files, but their files don't name this instance as hub: no hasMember.
     expect(relationOf(fed.peers[0], fed, { mutualByFiles: [0], membersByFiles: [] })).toBeNull()
     // Naming this instance as hub without listing it back is not mutual: no hasMember.
@@ -148,6 +149,29 @@ describe('relationOf', () => {
     // A decision still suffices on its own, as before (with the join block the rule always had).
     const decided = fedOf({ join: { policy: 'invite' }, peers: [{ ...member, decision: 'x' }] })
     expect(relationOf(decided.peers[0], decided)).toBe('hasMember')
+  })
+
+  it('a decided member reads hasMember on any hub, a role: hub network without a join block too (final review)', () => {
+    const decided = { name: 'Decided', url: 'https://decided.example.org', relationship: 'node', decision: 'request r-1' }
+    const roleHubOnly = fedOf({ networks: [{ name: 'Fixture Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [decided] })
+    expect(relationOf(roleHubOnly.peers[0], roleHubOnly)).toBe('hasMember')
+    // so its record is wanted, never withdrawn, when the hub's join block is taken away
+    const did = 'did:plc:abcdefghijklmnopqrstuvwx'
+    const withDid = fedOf({ networks: [{ name: 'Fixture Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [{ ...decided, did }] })
+    expect(wantedLink(withDid.peers[0], withDid)).toEqual({ link: { subject: did, relation: 'hasMember', network: 'Fixture Mesh' } })
+    // not a hub at all: no hasMember from a decision
+    const plain = fedOf({ networks: [{ name: 'Elsewhere', hub: 'https://elsewhere.example.org' }], peers: [decided] })
+    expect(relationOf(plain.peers[0], plain)).toBeNull()
+  })
+
+  it('the files rule needs relationship node: a peer in another role, or with none, never becomes hasMember by files (final review)', () => {
+    const both = { mutualByFiles: [0, 1, 2], membersByFiles: [0, 1, 2] }
+    const fed = fedOf({ join: { policy: 'open' }, peers: [
+      { name: 'Seat', url: 'https://seat.example.org', relationship: 'network-seat' },
+      { name: 'Hub word', url: 'https://hubword.example.org', relationship: 'hub' },
+      { name: 'No word', url: 'https://noword.example.org' },
+    ] })
+    expect(fed.peers.map(p => relationOf(p, fed, both))).toEqual([null, null, null])
   })
 
   it("free-form relationship values are never mapped (relationship: 'network-seat' is null)", () => {
@@ -234,7 +258,7 @@ describe('wantedLink (R24) and networkOf', () => {
 })
 
 describe('wantedLink: an existing member mutual by files is planned for publishing (R4)', () => {
-  const OLD = 'did:plc:oldoldoldoldoldoldoldoldo'
+  const OLD = 'did:plc:oldoldoldoldoldoldoldold'
   const fed = fedOf({ join: { policy: 'open' }, networks: [{ name: 'Regen Mesh', hub: 'https://self.example.org', role: 'hub' }], peers: [
     { name: 'Old Member', url: 'https://old.example.org', did: OLD, relationship: 'node' },
     { name: 'Old Private', url: 'https://oldp.example.org', did: OLD, relationship: 'node', visibility: 'private' },

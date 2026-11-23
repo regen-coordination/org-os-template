@@ -139,7 +139,7 @@ describe('didBinding: a DID is written for a peer only when the cache ties it to
     expect(didBinding({ ...peer, url: 'https://www.mesh-hub.example.org/' }, HUB, atproto)).toBeNull()
   })
   it('never looked up: Look it up first.', () => {
-    expect(didBinding(peer, 'did:plc:nevernevernevernevernever', atproto)).toBe(BINDING.lookFirst)
+    expect(didBinding(peer, 'did:plc:nevernevernevernevernevr', atproto)).toBe(BINDING.lookFirst)
     expect(BINDING.lookFirst).toBe('Look it up first.')
   })
   it('a handle its document claims but that was not checked both ways is refused', () => {
@@ -224,7 +224,7 @@ describe('didBinding: both sides name each other, the peer\'s federation.json an
     expect(didBinding(peer, CERT, view([REPO], { at: '2026-11-22T12:01:00.000Z' }))).toBeNull()
   })
   it('a DID never read is Look it up first., however both files name it', () => {
-    expect(didBinding(peer, 'did:plc:nevernevernevernevernever', view([REPO]))).toBe(BINDING.lookFirst)
+    expect(didBinding(peer, 'did:plc:nevernevernevernevernevr', view([REPO]))).toBe(BINDING.lookFirst)
   })
   it('migrationRows passes each row its own federation.json DID, so a DID in federation.yaml is checked the same way', () => {
     const fed = readFederation({ peers: [{ name: 'Fixture OS', url: REPO, did: CERT }] })

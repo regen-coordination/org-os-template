@@ -8,7 +8,7 @@
 // Reading never depends on a record's key: it lists a collection and matches fields. A record another client wrote may
 // carry more keys; they are ignored when read and never written. A record that does not parse is skipped, never thrown.
 
-import { DID_PATTERN } from './read.mjs'
+import { isDid } from './read.mjs'
 import { addressOf, sameAddress } from './peers.mjs'
 import { isPublishedPeer } from '../standards/federation.mjs'
 import { sha256Hex } from '../sha256.mjs'
@@ -40,11 +40,8 @@ export const NETWORK_NAME_MAX = 200
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
 const isObj = v => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-/** A did:plc or did:web identifier, as a record may name one: the method, then DID characters only.
- *  @param {unknown} v @returns {v is string} */
-export function isDid(v) {
-  return typeof v === 'string' && v.length <= 2048 && DID_PATTERN.test(v) && /^did:[a-z]+:[A-Za-z0-9._:%-]+$/.test(v) && !v.endsWith(':')
-}
+/** A did:plc or did:web identifier: the one check, kept in read.mjs so federation.yaml and the records agree. */
+export { isDid }
 
 /** An atproto datetime: RFC 3339 with a time and a zone, that names a real moment.  @param {unknown} v @returns {v is string} */
 function isDatetime(v) {
@@ -140,19 +137,20 @@ export const isHub = fed => Boolean(fed.join) || (fed.networks ?? []).some(n => 
 /** The relation a link record for this peer would state (R24.3), or null:
  *  - an explicit `peer.link` wins, and `none` gives null;
  *  - else a peer that is the hub of one of `fed.networks` (same address) is `memberOf`;
- *  - else a `relationship: node` peer with a `decision`, on an instance with a `join` block, is `hasMember` (a member
- *    ratified through the hub's proposal path carries `decision: request <id>`, R3);
- *  - else, on an instance that is a hub (a `join` block, or one of its `networks` with `role: hub`), an existing
- *    member mutual by files whose own files name this instance as the hub of one of their networks is `hasMember`
- *    with no decision (R4: memberships from before N2 are published). The relationship word is not read;
+ *  - else, on an instance that is a hub (`isHub`: a `join` block, or one of its `networks` with `role: hub`), a
+ *    `relationship: node` peer is `hasMember` when it has a `decision` (a member ratified through the hub's proposal
+ *    path carries `decision: request <id>`, R3), or, with no decision, when it is mutual by files and its own files name
+ *    this instance as the hub of one of their networks (R4: memberships from before N2 are published). A peer listed
+ *    in another role (or with none) never becomes `hasMember` this way;
  *  - else null. Free-form `relationship` values are never mapped.
  *  `where` resolves path refs against the instance folder on the disk; without it only addresses compare by text.
  *  @param {Peer} peer @param {FedLike} fed @param {Where & ByFiles} [where] @returns {Relation | null} */
 export function relationOf(peer, fed, where = {}) {
   if (peer.link) return peer.link === 'none' ? null : /** @type {Relation} */ (peer.link)
   if (hubNetworkOf(peer, fed, where)) return 'memberOf'
-  if (peer.relationship === 'node' && peer.decision && fed.join) return 'hasMember'
-  if (isHub(fed) && (where.mutualByFiles ?? []).includes(peer.index) && (where.membersByFiles ?? []).includes(peer.index)) return 'hasMember'
+  if (peer.relationship !== 'node' || !isHub(fed)) return null
+  if (peer.decision) return 'hasMember'
+  if ((where.mutualByFiles ?? []).includes(peer.index) && (where.membersByFiles ?? []).includes(peer.index)) return 'hasMember'
   return null
 }
 
@@ -246,7 +244,7 @@ const matchKey = l => `${l.subject}|${l.relation}|${l.network ?? ''}`
 function createdAtOf(since, now) {
   if (typeof since === 'string') {
     if (/^\d{4}-\d{2}-\d{2}$/.test(since) && !Number.isNaN(Date.parse(`${since}T00:00:00.000Z`))) return `${since}T00:00:00.000Z`
-    const asRecord = parseLinkRecord({ $type: LINK_NSID, subject: 'did:plc:x', relation: 'peerOf', createdAt: since })
+    const asRecord = parseLinkRecord({ $type: LINK_NSID, subject: 'did:web:example.org', relation: 'peerOf', createdAt: since })
     if (asRecord) return since
   }
   return now
