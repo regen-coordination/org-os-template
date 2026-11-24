@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context, Hono } from 'hono'
 import { parseDocument } from 'yaml'
 import { HttpError } from '../errors.ts'
+import { NETWORK_HOSTED } from '../hosted/writes.ts'
 import { knownActorOf } from '../request.ts'
 import { commitOrStage } from '../workspace/pages.ts'
 import { fileBase, fileText } from '../workspace/files.ts'
@@ -123,6 +124,9 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     const invited = UUID.test(id) && readState(repo, id)?.invite !== undefined
     const request = committed?.request ? (invited ? { ...committed.request, invite: '(held outside git)' } : committed.request) : null
     const rows = []
+    // A hosted Hub runs no command for anyone (Q-L9-4), so no transport's `ready` is asked (the GitHub one runs `gh`), and
+    // the network's writes are off there anyway (NETWORK_HOSTED): every way is unavailable, with that sentence.
+    if (deps.hosted) return c.json(transports().map(t => ({ id: t.id, label: t.label, unavailable: NETWORK_HOSTED })))
     for (const t of transports()) {
       const no = t.unavailable(where, request)
       rows.push({ id: t.id, label: t.label, unavailable: no ?? await t.ready({ run, repo }) })

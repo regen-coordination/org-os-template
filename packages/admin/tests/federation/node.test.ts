@@ -23,6 +23,7 @@ import { clearState, federationSendOperation, federationStatusOperation, readSta
 import { remoteCache, wellKnownUrlOf } from '../../server/federation/remote.ts'
 import { registerTransport, transportOf } from '../../server/federation/transports/index.ts'
 import type { Transport } from '../../server/federation/transports/types.ts'
+import { NETWORK_HOSTED } from '../../server/hosted/writes.ts'
 import { atprotoCache, readRepo } from '../../server/federation/atproto/read.ts'
 import { planPublish, publishLinksOperation, type PublishDeps } from '../../server/federation/atproto/publish.ts'
 import { LINK_NSID } from '../../lib/federation/links.mjs'
@@ -216,6 +217,25 @@ describe('ask', () => {
     expect(rows.find(r => r.id === 'file')!.unavailable).toBeNull()
     expect(rows.find(r => r.id === 'fake')!.unavailable).toBe('Not ready here.')
     expect(rows.find(r => r.id === 'github')!.unavailable).toBe("This hub doesn't take requests on GitHub.")
+  })
+
+  it('hosted, every way is unavailable with the network\'s sentence, and no transport is asked whether it is ready (no gh)', async () => {
+    setup(CONSENSUS)
+    let asked = 0
+    const counting = registerTransport({ ...fake, id: 'counting', label: 'Counts', ready: async () => { asked += 1; return null } })
+    let ran = 0
+    try {
+      app = createApp(repo, (a, ctx) => {
+        mountFederation(a, { repo, withLock: ctx.withLock, now: () => NOW, hosted: true, run: (async () => { ran += 1; throw new Error('no command when hosted') }) as never })
+      })
+      const r = await app.request(`/api/federation/transports?hub=${encodeURIComponent(HUB_SITE)}`)
+      expect(r.status).toBe(200)
+      const rows = await r.json() as { id: string; unavailable: string | null }[]
+      expect(rows.map(x => x.id)).toEqual(expect.arrayContaining(['file', 'github', 'fake', 'counting']))
+      for (const row of rows) expect([row.id, row.unavailable]).toEqual([row.id, NETWORK_HOSTED])
+      expect(asked).toBe(0)
+      expect(ran).toBe(0)
+    } finally { counting() }
   })
 })
 
