@@ -482,7 +482,12 @@ describe('the receipt and the self card', () => {
 })
 
 describe('the acceptance seam (ruling R12)', () => {
+  afterEach(() => vi.useRealTimers())
   it('catalogueWith swaps in the given network for the two atproto operations only; the live catalogue never lifts the placeholder guard', async () => {
+    // catalogueWith takes no clock (the pilot's server runs on the real one), so its publish plan reads the cache at the wall
+    // clock. Date is pinned to this file's NOW: else `check()`'s reading at NOW is past the DID document's TTL (a day) once
+    // the wall clock is a day after NOW, and the plan refuses "Check the links first."
+    vi.useFakeTimers({ toFake: ['Date'], now: NOW })
     const swapped = catalogueWith({ fetch: net.fetch, lookup: net.lookup, resolveTxt: net.resolveTxt, allowPlaceholderLexicons: true, env: { ATPROTO_APP_PASSWORD: PASSWORD } })
     expect(swapped.map(o => o.id)).toEqual(CATALOGUE.map(o => o.id))
     for (const [i, o] of swapped.entries()) {
