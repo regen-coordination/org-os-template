@@ -44,6 +44,11 @@ export interface FederationDeps {
   startBranch?: string
   /** Randomness for invites; tests give a fixed one. */
   random?: (n: number) => Uint8Array
+  /** A hosted Hub (L9): it runs no command for anyone, so no transport is checked, and its write routes are off before
+   *  they run (hosted/writes.ts, NETWORK_HOSTED). */
+  hosted?: boolean
+  /** Writes are off (Lane 3 Task 11, C1). The write routes are refused before they run (hosted/instance-writes.ts). */
+  readOnly?: boolean
 }
 
 const FED = 'federation.yaml'

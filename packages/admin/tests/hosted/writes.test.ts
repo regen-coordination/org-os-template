@@ -17,7 +17,7 @@ import type { FetchLike } from '../../server/systems/driver.ts'
 import { encodeArgs, selector } from '../../lib/abi.mjs'
 import { HATS_SIGNATURES, VIEW_HAT_TYPES, childHatId, hatRef, topHatId } from '../../lib/hats.mjs'
 import {
-  actorKey, hostedWrites, HOSTED_WRITES, HOSTED_OFF, ONE_WRITER, CLAIM_HOSTED, HOSTED_UNLISTED, type HostedWrite,
+  actorKey, hostedWrites, HOSTED_WRITES, HOSTED_OFF, ONE_WRITER, CLAIM_HOSTED, NETWORK_HOSTED, HOSTED_UNLISTED, type HostedWrite,
 } from '../../server/hosted/writes.ts'
 
 const savedEnv = { ...process.env }
@@ -230,6 +230,35 @@ describe('commands, sync and the claim are off when hosted (Q-L9-4)', () => {
 
   it('a write with no session is still refused first, 401 (L5)', async () => {
     expect((await http('POST', '/api/sync', { body: {} })).status).toBe(401)
+  })
+})
+
+describe('the network\'s writes are off when hosted (replay ruling I1)', () => {
+  const NETWORK: [string, unknown][] = [
+    ['/api/federation/ask', { hub: 'https://hub.example.org', network: 'n', answers: {} }],
+    ['/api/federation/outgoing/00000000-0000-4000-8000-000000000000/withdraw', {}],
+    ['/api/federation/outgoing/00000000-0000-4000-8000-000000000000/clear', {}],
+    ['/api/federation/outgoing/00000000-0000-4000-8000-000000000000/record', {}],
+    ['/api/federation/join', { policy: 'open-with-approval' }],
+    ['/api/federation/migration', { set: [] }],
+    ['/api/federation/requests/receive', {}],
+    ['/api/federation/requests/00000000-0000-4000-8000-000000000000/decide', { accept: true }],
+    ['/api/federation/invites', {}],
+  ]
+
+  it('all nine are classified off, NETWORK_HOSTED, with the network\'s own sentence', () => {
+    const fed = HOSTED_WRITES.filter(w => w.path.startsWith('/api/federation/'))
+    expect(fed).toHaveLength(9)
+    for (const w of fed) expect(w).toMatchObject({ method: 'POST', class: 'off', code: 'NETWORK_HOSTED', sentence: NETWORK_HOSTED })
+    expect(NETWORK_HOSTED).toBe('Network requests and invites are made from the organization\'s own Hub on its machine, not a hosted one, for now.')
+  })
+
+  it('each answers 403 NETWORK_HOSTED to a signed-in member before it runs, and the trunk is unchanged', async () => {
+    const before = head()
+    for (const [path, body] of NETWORK) {
+      expect([path, await http('POST', path, { body, cookie: cookies.a1 })]).toEqual([path, { status: 403, json: { error: NETWORK_HOSTED, code: 'NETWORK_HOSTED' } }])
+    }
+    expect(head()).toBe(before)
   })
 })
 

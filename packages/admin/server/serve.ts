@@ -294,7 +294,7 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     mountBootstrap(a, { repo, jobs, executor, withLock: ctx.withLock })
     mountWizards(a, { repo, hosted })
     mountSystemsMap(a, { repo, fetch })
-    mountFederation(a, { repo, fetch, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, invalidate: () => federationChanged() })
+    mountFederation(a, { repo, fetch, withLock: ctx.withLock, notify: msg => emit(msg), startBranch, invalidate: () => federationChanged(), hosted, readOnly: instanceWrites === 'off' })
     mountKnowledge(a, { repo, jobs, withLock: ctx.withLock })
     mountVisibility(a, { repo, membership, systems: systemReader, withLock: ctx.withLock, privateStore: ctx.privateStore, notify: msg => emit(msg) })
     mountPush(a, { pusher: () => pusher })
