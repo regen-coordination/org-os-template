@@ -30,7 +30,7 @@ import { INSTANCE_NAV_PATH, readInstanceNav } from './instanceNav.ts'
 import { instanceMark } from './instanceAssets.ts'
 import { StageRefusal, Refusal } from './changes/apply.ts'
 import { newChangeId } from './changes/store.ts'
-import { LEDGER_SENTENCE, OWN_ROUTES_SENTENCE } from './changes/stage.ts'
+import { ledgerSentence, OWN_ROUTES_SENTENCE } from './changes/stage.ts'
 import type { RecordOp } from './changes/types.ts'
 import type { Membership } from './session/membership.ts'
 
@@ -182,8 +182,9 @@ export function createApp(repo: string, extend?: (app: Hono, ctx: ExtendContext)
     if (registryDef(name).kind !== 'collection') {
       throw new Error(`${name} is a document registry (read-only in M1)`)
     }
-    // A ledger (proposals) is written only by its own routes: these old routes answer the sentence the tray does.
-    if (registryDef(name).ledger) throw new HttpError(403, LEDGER_SENTENCE(name), 'LEDGER')
+    // A ledger (proposals, federation-requests) is written only by its own routes: these old routes answer the sentence the
+    // tray does, each ledger its own.
+    if (registryDef(name).ledger) throw new HttpError(403, ledgerSentence(name), 'LEDGER')
     // A create-only registry (invites) is created here, never replaced or deleted: `used_by` is the federation routes' own.
     if (registryDef(name).createOnly && writing === 'change') throw new HttpError(403, OWN_ROUTES_SENTENCE(name), 'OWN_ROUTES')
   }

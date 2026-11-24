@@ -5,7 +5,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { removeFixtureRepo } from '../fixtures.ts'
 import { makeChangeRepo, git } from './fixtures.ts'
-import { stage } from '../../server/changes/stage.ts'
+import { FEDERATION_REQUESTS_SENTENCE, LEDGER_SENTENCE, stage } from '../../server/changes/stage.ts'
 import { applyOps, StageRefusal } from '../../server/changes/apply.ts'
 import { createApp } from '../../server/app.ts'
 
@@ -69,5 +69,42 @@ describe('the old registry routes', () => {
     const res = await createApp(repo).request('/api/registries/proposals')
     expect(res.status).toBe(200)
     expect((await res.json()).entries).toEqual([])
+  })
+})
+
+// Replay M4: federation-requests is a ledger too, but the federation routes write it, not Propose: its refusal says so.
+describe('federation-requests: its own sentence, never Propose\'s', () => {
+  const REQ = { id: 'req-1', from: 'Valley Node', network: 'Mesh', outcome: 'held' }
+  const OWN = FEDERATION_REQUESTS_SENTENCE('federation-requests')
+  it('the sentence names the Federation page and never Propose', () => {
+    expect(OWN).toBe('federation-requests are written only by the Federation page\'s own routes (receiving a request, Accept and Refuse), not by staging a change here or by hand. Nothing was staged.')
+    expect(OWN).not.toContain('Propose')
+    expect(LEDGER_SENTENCE('proposals')).toMatch(SENTENCE)
+  })
+  it.each([
+    ['create', { op: 'create', record: 'federation-requests:req-1', value: REQ }],
+    ['update', { op: 'update', record: 'federation-requests:req-1', set: { outcome: 'accepted' } }],
+  ])('a staged %s is refused with it', (_name, op) => {
+    const { ops, errors } = stage(repo, [], [op as never])
+    expect(ops).toEqual([])
+    expect(errors.map(e => e.message)).toEqual([OWN])
+  })
+  it('the staging route answers 422 with it', async () => {
+    const res = await createApp(repo).request('/api/changes/ops', json('POST', { ops: [{ op: 'create', record: 'federation-requests:req-1', value: REQ }] }))
+    expect(res.status).toBe(422)
+    const text = JSON.stringify(await res.json())
+    expect(text).toContain(OWN)
+    expect(text).not.toMatch(/Propose/)
+  })
+  it.each([
+    ['POST', '/api/registries/federation-requests', REQ],
+    ['PUT', '/api/registries/federation-requests/req-1', REQ],
+    ['DELETE', '/api/registries/federation-requests/req-1', undefined],
+  ])('%s %s answers 403 LEDGER with it and writes nothing', async (method, path, body) => {
+    const before = git(repo, 'rev-parse HEAD')
+    const res = await createApp(repo).request(path, json(method, body))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: OWN, code: 'LEDGER' })
+    expect(git(repo, 'rev-parse HEAD')).toBe(before)
   })
 })
