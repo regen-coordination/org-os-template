@@ -3,9 +3,10 @@
 // Signing in with a node's account proves control of that account, not that the account is the node's: anyone can
 // create `refi-somewhere.bsky.social`. So an account added through the Hub goes live by itself only when it matches
 // the node:
-//   - domain: its handle is the host of the node's own website (`url`, or `links.web`), without `www.`, or a subdomain
-//     of it; and only when the website sits at the root of its host, so a site on a shared platform's path
-//     (`github.com/…`, `linktr.ee/…`) never matches;
+//   - domain: its handle is exactly the host of the node's own website (`url`, or `links.web`), without `www.`; and
+//     only when the website sits at the root of its host, so a site on a shared platform's path (`github.com/…`,
+//     `linktr.ee/…`) never matches. A subdomain handle (`someone.refi-x.org`) is pending: orgs hand members handles
+//     under their domain, and a person's own account must not go live as the node's (Luiz, 2026-11-24);
 //   - record: the node's Dec 9 network entry already names this DID with a passing check, or one of the node's links is
 //     a `bsky.app` / `certified.app` profile link naming this DID, or a handle that resolves to it.
 // Anything else is pending for a steward. Nothing here throws: a junk address is simply not a match.
@@ -90,11 +91,11 @@ export async function matchesNode(account: Account, org: OrgLinks, known: Known,
   const handle = typeof account?.handle === 'string' ? account.handle.trim().toLowerCase().replace(/\.$/, '') : ''
   if (!did) return NO
 
-  // 1 · Domain: the node's own website, at the root of its host.
+  // 1 · Domain: exactly the node's own website host, at the root of it (a subdomain handle is pending).
   if (handle) {
     for (const address of [org?.url, org?.links?.web]) {
       const host = typeof address === 'string' ? websiteHost(address) : null
-      if (host && (handle === host || handle.endsWith('.' + host))) return { match: true, why: 'domain' }
+      if (host && handle === host) return { match: true, why: 'domain' }
     }
   }
 

@@ -9,8 +9,14 @@ const none = { resolveHandle: async () => null }
 
 test('a handle equal to the website host matches', async () =>
   expect(await matchesNode(acct('refi-somewhere.org'), { url: 'https://refi-somewhere.org/' }, null, none)).toEqual({ match: true, why: 'domain' }))
-test('a subdomain of the website host matches, www. dropped', async () =>
-  expect(await matchesNode(acct('node.refi-somewhere.org'), { url: 'https://www.refi-somewhere.org' }, null, none)).toEqual({ match: true, why: 'domain' }))
+// Luiz, 2026-11-24 (final review point 5): only the exact host goes live. Orgs hand members handles under their domain
+// (someone.refi-x.org), and a person's own account must never go live as the node's; a subdomain handle is pending.
+test('the website host with www. dropped matches', async () =>
+  expect(await matchesNode(acct('refi-somewhere.org'), { url: 'https://www.refi-somewhere.org' }, null, none)).toEqual({ match: true, why: 'domain' }))
+test('a subdomain of the website host does not match by itself (pending for a steward)', async () => {
+  expect((await matchesNode(acct('node.refi-somewhere.org'), { url: 'https://www.refi-somewhere.org' }, null, none)).match).toBe(false)
+  expect((await matchesNode(acct('someone.refi-somewhere.org'), { url: 'https://refi-somewhere.org/' }, null, none)).match).toBe(false)
+})
 test('links.web counts when url is empty', async () =>
   expect((await matchesNode(acct('refi-somewhere.org'), { url: null, links: { web: 'https://refi-somewhere.org' } }, null, none)).match).toBe(true))
 test('a website with a path never matches', async () =>
