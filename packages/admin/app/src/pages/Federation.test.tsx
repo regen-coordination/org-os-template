@@ -3,9 +3,12 @@
 // its confirmed publish, asking to join (node), taking requests (hub), invites and the migration rows. The api is
 // stubbed; nothing here reaches the network, and every network step is a plan the operator confirms.
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import Federation from './Federation.tsx'
-import { atprotoLine, driftFix, keptLine, linkWords, planCounts, policySentence } from './federationWords.ts'
+import { atprotoLine, driftFix, keptLine, linkWords, NETWORK_HOSTED, planCounts, policySentence } from './federationWords.ts'
+import { NETWORK_HOSTED as SERVER_NETWORK_HOSTED } from '../../../server/hosted/writes.ts'
+import { READ_ONLY } from '../viewAs/ViewAs.tsx'
+import { clientWith, statusOf } from '../test/writesOff.ts'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
 import { baseRoutes, refuse } from '../test/data.ts'
@@ -517,5 +520,69 @@ describe('review fixes, round 1', () => {
     const ask = await region('Ask to join a network')
     expect(await within(ask).findByText('Mesh Hub. Anyone can ask. The hub decides under its own rules.')).toBeTruthy()
     expect(ask.textContent).not.toContain('(null)')
+  })
+})
+
+describe('writes off, and a hosted Hub: no write control, and one line says why (replay M2)', () => {
+  const accepted = [{ id: OUT_ID, network: 'Mesh', hub: HUB, onTrunk: true, invited: false, where: null,
+    sent: { transport: 'github', ref: 'mesh/hub#4', at: '2026-11-22T10:00:00.000Z' }, status: { state: 'accepted', reason: 'Welcome', at: '2026-11-22T11:00:00.000Z' }, atproto: { theirs: 'silent' } }]
+  const held = res({ id: 'federation-request:req-1', kind: 'federation-request', board: 'organization', name: 'Valley Node', status: 'under-decision',
+    facts: { from: 'Valley Node', network: 'Mesh', transport: 'file', ref: null, received: '2026-11-22', outcome: 'held', sentence: 'Held for your decision.', replied: null, answers: {} } })
+  // A node of Mesh with an accepted request, and the hub of Commons with a join policy, an inbox and a held request.
+  const both = () => selfCard({ networks: [{ name: 'Mesh', hub: HUB, role: 'node' }, { name: 'Commons', hub: null, role: 'hub' }],
+    join: JOIN('open-with-approval'), outgoing: accepted, inbox: 2, drift: [], kept: 0 })
+  const WRITES = ['Record it', 'Withdraw', 'Ask', 'Stage', 'Make an invite', 'Receive them (2)', 'Accept', 'Refuse', 'Take requests',
+    'Check links', 'Publish links', 'Look it up', 'Check for requests', 'Check the answer']
+  const mount = ({ off, hosted }: { off: boolean; hosted: boolean }) => {
+    const { calls } = fetchRoutes(routes({
+      'GET /api/resources': [both(), hubCard({ link: 'requested' }), held],
+      'GET /api/status': statusOf(off),
+      ...(hosted ? { 'GET /api/session': { mode: 'hosted', signIn: null, signedIn: true, portal: null } } : {}),
+    }))
+    renderAt(<Federation />, '/federation', { queryClient: clientWith(off) })
+    return calls
+  }
+  const noWrites = async (calls: { method: string; path: string }[]) => {
+    const row = await within(await region('Networks')).findByRole('listitem', { name: 'Mesh' })
+    await within(row).findByText('Accepted: Welcome. Record it, then publish.')
+    await within(await region('Requests')).findByRole('listitem', { name: 'Valley Node' })
+    for (const name of WRITES) expect([name, screen.queryAllByRole('button', { name }).length]).toEqual([name, 0])
+    expect(screen.queryAllByRole('textbox')).toEqual([])
+    expect(screen.queryByRole('region', { name: 'Ask to join a network' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Join policy' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Invites' })).toBeNull()
+    expect(screen.queryByLabelText('Import a request')).toBeNull()
+    expect(nonGets(calls)).toEqual([])
+  }
+
+  it('writes off: every write control is hidden, and the read-only sentence says why', async () => {
+    const calls = mount({ off: true, hosted: false })
+    expect(await screen.findByText(READ_ONLY)).toBeTruthy()
+    await noWrites(calls)
+  })
+
+  it('hosted (writes on or off): every write control is hidden, and the network\'s sentence says why', async () => {
+    for (const off of [false, true]) {
+      const calls = mount({ off, hosted: true })
+      expect(await screen.findByText(NETWORK_HOSTED)).toBeTruthy()
+      await noWrites(calls)
+      expect(screen.queryByText(READ_ONLY)).toBeNull()
+      cleanup()
+    }
+  })
+
+  it('local with writes on, the same cards offer the writes and no sentence', async () => {
+    mount({ off: false, hosted: false })
+    const row = await within(await region('Networks')).findByRole('listitem', { name: 'Mesh' })
+    expect(within(row).getByRole('button', { name: 'Record it' })).toBeTruthy()
+    expect(await region('Join policy')).toBeTruthy()
+    expect(await region('Invites')).toBeTruthy()
+    expect(within(await within(await region('Requests')).findByRole('listitem', { name: 'Valley Node' })).getByRole('button', { name: 'Accept' })).toBeTruthy()
+    expect(screen.queryByText(READ_ONLY)).toBeNull()
+    expect(screen.queryByText(NETWORK_HOSTED)).toBeNull()
+  })
+
+  it('the hosted sentence is the server\'s NETWORK_HOSTED, word for word', () => {
+    expect(NETWORK_HOSTED).toBe(SERVER_NETWORK_HOSTED)
   })
 })

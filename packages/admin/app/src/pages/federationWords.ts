@@ -3,6 +3,10 @@
 import type { JoinPolicy } from '../api.ts'
 import { answerLine, verdictReason } from '../../../lib/federation/answer.mjs'
 
+/** Why a hosted Hub offers none of this page's writes: the server's NETWORK_HOSTED (server/hosted/writes.ts), word for
+ *  word (a test holds them together). Hosted federation has had no security review of its own yet (replay ruling I1). */
+export const NETWORK_HOSTED = 'Network requests and invites are made from the organization\'s own Hub on its machine, not a hosted one, for now.'
+
 /** A link's state, as the fleet card carries it (lib/federation/state.mjs), and the outgoing request's answer. */
 export function linkWords(state: string | null, refused?: { reason?: string } | null): string {
   if (refused) return verdictReason(refused.reason) ? answerLine('refused', refused.reason) : 'Refused: no reason given'

@@ -18,11 +18,12 @@ import { announce } from '../parts/live.tsx'
 import { Refusal } from '../parts/SyncParts.tsx'
 import JobLog from '../record/JobLog.tsx'
 import { outsideSentence } from '../record/ConfirmBox.tsx'
-import { useCanWrite } from '../viewAs/ViewAs.tsx'
+import { READ_ONLY, useCanWrite, useWritesOff } from '../viewAs/ViewAs.tsx'
+import { useSessionView } from '../session/session.ts'
 import { isPublicUrl } from '../../../lib/federation/peers.mjs'
 import { answerLine } from '../../../lib/federation/answer.mjs'
 import {
-  atprotoLine, driftFix, driftOrder, hiddenNetworksLine, keptLine, linesOf, linkWords, listOf, OPEN_FALLBACK, planCounts, POLICIES,
+  atprotoLine, driftFix, driftOrder, hiddenNetworksLine, keptLine, linesOf, linkWords, listOf, NETWORK_HOSTED, OPEN_FALLBACK, planCounts, POLICIES,
   policySentence, RELATIONS, type Drift, type Sources,
 } from './federationWords.ts'
 
@@ -159,7 +160,12 @@ export default function Federation() {
     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
     if (token) { try { setInvite(decodeURIComponent(token)) } catch { setInvite(token) } }
   }, [])
-  const canWrite = useCanWrite()
+  // No write is offered while the Hub's writes are off (useCanWrite reads the switch), nor on a hosted Hub, which refuses
+  // every network write (NETWORK_HOSTED, replay ruling I1); either way the page says why, once.
+  const hosted = useSessionView()?.mode === 'hosted'
+  const writesOff = useWritesOff()
+  const canWrite = useCanWrite() && !hosted
+  const why = hosted ? NETWORK_HOSTED : writesOff ? READ_ONLY : null
   const resources = useQuery({ queryKey: ['resources'], queryFn: api.resources })
   const self = resources.data?.find(r => r.kind === 'instance' && r.facts.self === true)
   const ops = useQuery({ queryKey: ['operations', self?.id], queryFn: () => api.operations(self!.id), enabled: !!self })
@@ -176,6 +182,7 @@ export default function Federation() {
   return (
     <>
       {head}
+      {why && <Note state="notYet">{why}</Note>}
       <Networks facts={facts} peers={peers} ops={ops.data} runner={runner} canWrite={canWrite} />
       <Published facts={facts} peers={peers} ops={ops.data} runner={runner} canWrite={canWrite} />
       <Migration runner={runner} canWrite={canWrite} />
