@@ -42,3 +42,29 @@ test('capitals, a trailing dot and a query on a root path still give the host', 
   expect(websiteHost('refi-somewhere.org')).toBe(null)          // no scheme: not a website address
   expect(websiteHost('https://refi-somewhere.org/about')).toBe(null)
 })
+
+// Final review, Important 1: a node whose website is a bare public suffix or a host that hands out subdomains to
+// other people (a handle provider, a hosting platform) must never let a throwaway account match by domain.
+test.each([
+  ['https://www.org/', 'attacker.org'],
+  ['https://www.co.uk/', 'attacker.co.uk'],
+  ['https://co.uk/', 'attacker.co.uk'],
+  ['https://bsky.social', 'attacker.bsky.social'],
+  ['https://certified.one/', 'attacker.certified.one'],
+  ['https://github.io/', 'attacker.github.io'],
+  ['https://netlify.app/', 'attacker.netlify.app'],
+  ['https://invalid/', 'handle.invalid'],
+])('a website at %s never lets %s match by domain', async (url, handle) =>
+  expect((await matchesNode(acct(handle), { url }, null, none)).match).toBe(false))
+test('websiteHost refuses a single label, a bare two-level country suffix, and www. in front of either', () => {
+  for (const s of ['https://invalid/', 'https://co.uk/', 'https://www.com.br/', 'https://bsky.social/']) expect(websiteHost(s)).toBe(null)
+  expect(websiteHost('https://www.org/')).toBe('www.org')   // two labels: www. stays, so only handles under www.org match
+  expect(websiteHost('https://refi-somewhere.co.uk/')).toBe('refi-somewhere.co.uk')
+  expect(websiteHost('https://www.refi.org/')).toBe('refi.org')
+})
+// Final review, the port ruling reversed: a handle is proven on DNS or port 443; whoever runs :8443 may be someone else.
+test('a website on a non-default port never matches', async () => {
+  expect(websiteHost('https://sharedhost.com:8443/')).toBe(null)
+  expect((await matchesNode(acct('sharedhost.com'), { url: 'https://sharedhost.com:8443/' }, null, none)).match).toBe(false)
+  expect(websiteHost('https://refi-somewhere.org:443/')).toBe('refi-somewhere.org')
+})

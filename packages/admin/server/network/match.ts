@@ -9,6 +9,10 @@
 //   - record: the node's Dec 9 network entry already names this DID with a passing check, or one of the node's links is
 //     a `bsky.app` / `certified.app` profile link naming this DID, or a handle that resolves to it.
 // Anything else is pending for a steward. Nothing here throws: a junk address is simply not a match.
+//
+// PRECONDITION: `account.handle` must already have passed the two-way check (the handle resolves to `account.did` and
+// the DID document names the handle back; check-network.mjs `checkEntry`, or its port). A DID document can claim any
+// handle, so an unchecked handle would let anyone "match" any node's domain. The caller (Phase B5) checks first.
 
 export type Account = { did: string; handle: string }
 export type OrgLinks = { url?: string | null; links?: Record<string, string | null | undefined> | null }
@@ -31,17 +35,38 @@ function parseWebAddress(address: unknown): URL | null {
 function bareHost(u: URL): string {
   let host = u.hostname.toLowerCase()
   if (host.endsWith('.')) host = host.slice(0, -1)
-  if (host.startsWith('www.')) host = host.slice(4)
+  if (host.startsWith('www.') && host.split('.').length > 2) host = host.slice(4)
   return host
 }
 
-/** The website's host without `www.`, only when the address is an http(s) website at the root of its host. */
+// Hosts whose subdomains belong to other people: AT Proto handle providers and hosting platforms. A node whose website
+// sits at one of these roots (a placeholder, a typo) must not let `anyone.<host>` match it by domain.
+const SHARED_HOSTS = new Set([
+  'bsky.social', 'bsky.app', 'certified.one', 'certified.app', 'github.io', 'gitlab.io', 'netlify.app', 'vercel.app',
+  'pages.dev', 'workers.dev', 'web.app', 'firebaseapp.com', 'herokuapp.com', 'onrender.com', 'fly.dev', 'railway.app',
+  'wordpress.com', 'blogspot.com', 'substack.com', 'medium.com', 'notion.site', 'super.site', 'carrd.co', 'wixsite.com',
+  'squarespace.com', 'webflow.io', 'framer.website', 'gitbook.io', 'linktr.ee',
+])
+// The common second-level labels of country suffixes (`co.uk`, `com.br`, `org.au`): a bare `<label>.<cc>` is a suffix.
+const SECOND_LEVEL = new Set(['co', 'com', 'org', 'net', 'gov', 'edu', 'ac', 'or', 'ne', 'go', 'gob', 'nom', 'ltd', 'plc'])
+
+/** A host a website can stand on as its own: two labels or more, not a bare country suffix, not a shared host. */
+function ownHost(host: string): boolean {
+  const labels = host.split('.')
+  if (labels.length < 2 || labels.some(l => l === '')) return false
+  if (labels.length === 2 && SECOND_LEVEL.has(labels[0]) && /^[a-z]{2}$/.test(labels[1])) return false
+  return !SHARED_HOSTS.has(host)
+}
+
+/** The website's host without `www.`, only when the address is an http(s) website at the root of its host, on the
+ *  default port, and the host is one a website can own (not a bare suffix, not a host that gives out subdomains). */
 export function websiteHost(address: string): string | null {
   const u = parseWebAddress(address)
   if (!u) return null
   if (u.pathname !== '/' && u.pathname !== '') return null
+  if (u.port !== '') return null
   const host = bareHost(u)
-  return host === '' ? null : host
+  return ownHost(host) ? host : null
 }
 
 /** `<x>` from a `bsky.app/profile/<x>` or `certified.app/profile/<x>` link (a DID or a handle), else null. */
