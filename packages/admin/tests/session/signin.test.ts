@@ -397,8 +397,10 @@ describe('startServer mounts the session routes on its one store (Task 5)', () =
         const res = await fetch(`http://localhost:${server.port}/api/session`)
         // Lane 3 Task 9: the server also says which methods are offered (locally the email method always is; hosted with
         // none of its variables, it is not) and whether the instance is written to (Task 11: off by default when hosted).
+        // B2 (network app spec §5.1): locally the AT Proto sign-in is offered too, as a loopback client; hosted, only with
+        // its key.
         expect(await res.json()).toEqual({
-          mode: hosted ? 'hosted' : 'local', signIn: null, signedIn: false, methods: hosted ? [] : ['email'], instanceWrites: hosted ? 'off' : 'on',
+          mode: hosted ? 'hosted' : 'local', signIn: null, signedIn: false, methods: hosted ? [] : ['email', 'atproto'], instanceWrites: hosted ? 'off' : 'on',
         })
       } finally { await server.close() }
     }

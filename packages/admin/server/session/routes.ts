@@ -47,6 +47,8 @@ export interface SessionDeps {
   /** The emailed-link sign-in (Lane 3 Task 9), as `readSignInConfig` read it: null when it is not offered. Given (even
    *  null), `GET /api/session` also says which methods are offered and whether the instance is written to. */
   signIn?: SignInConfig | null
+  /** The AT Proto sign-in (refi-dao-os network app spec §5.1, B2) is configured: `GET /api/session` offers `atproto`. */
+  atproto?: boolean
   /** `HOUSE_INSTANCE_WRITES` (Lane 3 Task 11), for `GET /api/session`; 'on' until that switch is wired. */
   instanceWrites?: 'on' | 'off'
   now?: () => Date
@@ -99,7 +101,7 @@ export function mountSession(app: Hono, d: SessionDeps): void {
   /** With the email method wired (`signIn` given): the methods offered — `email` when it is configured and the store is
    *  open, `wallet` when a tree is named too — and whether the instance is written to. Without it, L5's answer as it was. */
   const offered = (tree: unknown) => 'signIn' in d ? {
-    methods: [...(d.signIn && d.store ? ['email'] : []), ...(tree ? ['wallet'] : [])],
+    methods: [...(d.signIn && d.store ? ['email'] : []), ...(d.atproto && d.store ? ['atproto'] : []), ...(tree ? ['wallet'] : [])],
     instanceWrites: d.instanceWrites ?? 'on',
   } : {}
 

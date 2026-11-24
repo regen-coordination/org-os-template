@@ -155,6 +155,9 @@ export const INSTANCE_WRITES: readonly InstanceWrite[] = [
   session('DELETE', '/api/session'),
   session('POST', '/api/session/email'),
   session('POST', '/api/session/link'),
+  // The ReFi DAO Network's sign-in with a Bluesky or Certified account (refi-dao-os network app spec §5.1, B2): the OAuth
+  // round-trip's state in the private store, never the instance.
+  session('POST', '/api/session/atproto/start'),
 ]
 
 const READS = new Set(['GET', 'HEAD', 'OPTIONS'])

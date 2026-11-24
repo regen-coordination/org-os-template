@@ -682,6 +682,7 @@ export const PUBLIC_READS: readonly string[] = [
   '/api/health', // { ok } and nothing more (L9 §5.11)
   '/api/status', // the org's name only
   '/api/session',
+  '/api/session/atproto/callback', // where a Bluesky or Certified sign-in comes back, signed out (network app B2)
   '/api/schemas/:name', // not secret
   '/api/registries',
   '/api/registries/:name',

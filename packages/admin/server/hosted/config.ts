@@ -3,6 +3,7 @@
 import { isAbsolute, relative, resolve } from 'node:path'
 import { parseEvery, MAX_EVERY_MS } from '../private/backup.ts'
 import { SIGN_IN_ENV } from '../session/config.ts'
+import { ATPROTO_ENV } from '../session/atproto.ts'
 
 /** The oldest Node the Hub runs on: the private store uses node:sqlite (carry 4). */
 export const NODE_FLOOR = '22.13.0'
@@ -17,6 +18,7 @@ export const HOSTED_ENV = [
   // The writes-off switch (Lane 3 Task 11): read by startServer (hosted/instance-writes.ts), named here for the deploy example.
   'HOUSE_INSTANCE_WRITES',
   ...SIGN_IN_ENV,
+  ...ATPROTO_ENV,
 ] as const
 
 /** The public site's settings were named for the door until 0.6.2, when the door became the portal. 0.6.2 read the old

@@ -69,6 +69,8 @@ export function rateLimits(o: { trustProxy: boolean; now?: () => number }): Midd
   const clock = o.now ? { now: o.now } : {}
   const nonce = new Buckets({ ratePerMin: 10, burst: 5, ...clock })
   const signIn = new Buckets({ ratePerMin: 10, burst: 5, ...clock })
+  // The ReFi DAO Network's sign-in with a Bluesky or Certified account (B2): each start makes the Hub call another server.
+  const atprotoStart = new Buckets({ ratePerMin: 10, burst: 5, ...clock })
   const writes = new Buckets({ ratePerMin: 60, burst: 20, ...clock })
   const reads = new Buckets({ ratePerMin: 300, burst: 100, ...clock })
   return async (c, next) => {
@@ -78,6 +80,7 @@ export function rateLimits(o: { trustProxy: boolean; now?: () => number }): Midd
     let taken
     if (route === '/api/session/nonce') taken = nonce.take(address())
     else if (route === '/api/session') taken = signIn.take(address())
+    else if (route === '/api/session/atproto/start') taken = atprotoStart.take(address())
     else if (READS.has(method)) taken = reads.take(address())
     else {
       const cookie = c.req.header('cookie')
