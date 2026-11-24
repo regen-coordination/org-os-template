@@ -122,6 +122,14 @@ export function mountSession(app: Hono, d: SessionDeps): void {
         signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
       })
     }
+    // A ReFi DAO Network Guest (network app spec §5.1): signed in with their account, holding no Role.
+    if (p?.kind === 'guest') {
+      return c.json({
+        mode, signedIn: true, via: 'atproto', guest: { did: p.guest.did, handle: p.guest.handle }, roles: [],
+        viewer: viewerOf(c).kind, expiresAt: new Date(p.claims.exp * 1000).toISOString(),
+        signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, ...offered(tree), ...portalField,
+      })
+    }
     const s = sessionOf(c)
     if (s) return c.json({ ...signedIn(s), ...offered(tree), ...portalField })
     return c.json({ mode, signIn: tree ? { chainId: tree.chain, tree: tree.ref } : null, signedIn: false, ...offered(tree), ...portalField })

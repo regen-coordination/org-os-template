@@ -80,9 +80,12 @@ export function publicJwks(config: AtprotoConfig): { keys: Record<string, unknow
   return { keys: [{ ...config.publicJwk, alg: 'ES256', use: 'sig' }] }
 }
 
-/** Who completed a round-trip, as the client read it: the account's DID (its handle is read by whoever acts on it,
- *  through the two-way check), and what the round-trip was for. */
-export interface AtprotoIdentity { did: string; scope: string; purpose: Purpose; node: string | null; by: string | null }
+/** Who completed a round-trip, as the client read it: the account's DID, its handle as the two-way check gives it
+ *  (the handle resolves to the DID and the DID document names it back; `handle.invalid` otherwise), and what the
+ *  round-trip was for. */
+export interface AtprotoIdentity { did: string; handle: string; scope: string; purpose: Purpose; node: string | null; by: string | null }
+/** AT Proto's handle for an account whose handle does not check out both ways. */
+export const HANDLE_INVALID = 'handle.invalid'
 export type IdentityHandler = (c: Context, who: AtprotoIdentity) => Promise<Response> | Response
 
 export interface AtprotoDeps {
@@ -187,18 +190,21 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
     }
     const purpose = app.purpose as Purpose
     if (!(PURPOSES as readonly string[]).includes(purpose)) { await stateStore.del(state); return refuse('This sign-in was started for nothing the Hub knows. Start again.') }
-    let did: string, scope: string
+    let did: string, scope: string, handle: string
     try {
-      const { session } = await (await clientOf()).callback(params)
+      const oauth = await clientOf()
+      const { session } = await oauth.callback(params)
       did = session.did
       scope = (await session.getTokenInfo(false)).scope
       // Identity only: nothing is kept, nothing can be written. The tokens are revoked and the session row goes.
       await session.signOut().catch(() => {})
+      // The handle, checked both ways by the client's own resolver (`handle.invalid` when it does not check out).
+      handle = await oauth.identityResolver.resolve(did).then(i => i.handle ?? HANDLE_INVALID, () => HANDLE_INVALID)
     } catch {
       return refuse('The sign-in did not complete (it was cancelled, or the account\'s server refused it). Start again from the Hub.')
     }
     const handler = d.onIdentity?.[purpose]
     if (!handler) return c.text('This part of the Hub is not open yet.', 501)
-    return handler(c, { did, scope, purpose, node: typeof app.node === 'string' ? app.node : null, by: typeof app.by === 'string' ? app.by : null })
+    return handler(c, { did, handle, scope, purpose, node: typeof app.node === 'string' ? app.node : null, by: typeof app.by === 'string' ? app.by : null })
   })
 }

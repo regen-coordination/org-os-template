@@ -8,6 +8,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { Hono } from 'hono'
 import { createApp } from './app.ts'
 import { mountAtproto, readAtprotoConfig, type AtprotoConfig } from './session/atproto.ts'
+import { signInWithAccount } from './network/signin.ts'
 import { personOf as requestPersonOf } from './request.ts'
 import { INSTANCE_SKIN_PATH, readInstanceSkin } from './instanceSkin.ts'
 import { assetHeaders, INSTANCE_ASSETS_PREFIX, readInstanceAsset } from './instanceAssets.ts'
@@ -292,7 +293,12 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
     writeLock = ctx.withLock
     mountSession(a, { repo, store: privateStore, membership, hosted, config, signIn, instanceWrites, atproto: atproto !== null })
     if (privateStore) {
-      mountAtproto(a, { config: atproto, store: privateStore, hosted, personOf: c => { const p = requestPersonOf(c); return p?.kind === 'person' ? p.person.id : null } })
+      mountAtproto(a, {
+        config: atproto, store: privateStore, hosted,
+        personOf: c => { const p = requestPersonOf(c); return p?.kind === 'person' ? p.person.id : null },
+        // B3: a proven account signs in (a linked member, or a Guest) with the shared cookie. B4/B5 add theirs.
+        onIdentity: { 'sign-in': signInWithAccount({ store: privateStore, signIn }) },
+      })
     }
     emailSignIn = mountEmailSignIn(a, { repo, store: privateStore, config: signIn, mailer: signInMailer, ...(config ? { hosted: config } : {}) })
     mountResources(a, store, repo, { hosted, privateStore: ctx.privateStore })
