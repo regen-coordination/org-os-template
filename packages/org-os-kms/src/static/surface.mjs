@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync, rmSyn
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import yaml from 'js-yaml';
 import * as fw from '../framework.mjs';
+import { publicViewOf, claimFloor } from '../claims.mjs';
 import { removePublicPages } from '../pages/owned.mjs';
 import { loadDrawing } from '../drawing.mjs';
 import { readReads } from '../reads.mjs';
@@ -32,7 +33,7 @@ export async function writeStaticSurface({ dir, outDir = 'public', items, allIte
   const bySchema = new Map();
   for (const { schema, object } of items) {
     const m = manifest.objects[object.id];
-    const entry = { ...fw.publicView(object), '@context': CONTEXT, ...(m ? { atUri: m.atUri, cid: m.cid } : {}) }; // @context last: an object's own can never override the absolute URL
+    const entry = { ...publicViewOf(object, { schema, publisher: config.publish?.claim_publisher }), '@context': CONTEXT, ...(m ? { atUri: m.atUri, cid: m.cid } : {}) }; // @context last: an object's own can never override the absolute URL
     if (!bySchema.has(schema)) bySchema.set(schema, []);
     bySchema.get(schema).push(entry);
   }
@@ -54,7 +55,8 @@ export async function writeStaticSurface({ dir, outDir = 'public', items, allIte
   const authority = config.atproto?.nsid_authority;
   // Who this instance reads (peer DIDs / source base_urls) is disclosed only on an explicit `publish.disclose_subscriptions: true`.
   const subscribed = config.publish?.disclose_subscriptions !== true ? [] : (config.connectors || []).flatMap((c) => c.name === 'atproto' ? (c.config?.peers || []) : c.config?.base_url ? [c.config.base_url] : []);
-  const cards = allItems.filter((i) => fw.publishableTypes(config).includes('source-system') && i.schema === 'source-system' && fw.PUBLISHABLE_PUBLIC_USE.includes(i.object.public_use)).map(({ object }) => ({ title: object.title, url: object.url, steward: object.steward }));
+  // allItems is the whole canon: a claim-marked source-system object (an opt-in type) would put its steward, a person, into this file. Same floor as the rest of publish.
+  const cards = allItems.filter((i) => fw.publishableTypes(config).includes('source-system') && i.schema === 'source-system' && fw.PUBLISHABLE_PUBLIC_USE.includes(i.object.public_use) && claimFloor(i.object, config, i.schema).ok).map(({ object }) => ({ title: object.title, url: object.url, steward: object.steward }));
   const sources = [...(km.sources || [])];
   for (const c of cards) if (!sources.some((s) => s.title === c.title)) sources.push(c);
   write('.well-known/knowledge.json', { ...km, did: config.atproto?.did ?? km.did, geo: publicGeo(config.geo ?? km.geo), exchange: { published_domains: authority ? schemas.map((s) => fw.nsidFor(s, authority)) : [], subscribed_domains: subscribed }, sources });

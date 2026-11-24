@@ -1,0 +1,128 @@
+{
+  "pages": [
+    {
+      "activities": [
+        {
+          "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/org.hypercerts.claim.activity/3a1",
+          "cid": "bafyreifakea3a1",
+          "indexedAt": "2026-11-20T10:00:00+00:00",
+          "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+          "author": {
+            "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+            "profile": {
+              "cid": "bafyreifakepAlpha Cooperative",
+              "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+              "indexedAt": "2026-11-20T10:00:00+00:00",
+              "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/app.certified.actor.profile/self",
+              "record": {
+                "$type": "app.certified.actor.profile",
+                "createdAt": "2026-06-01T09:55:58.407Z",
+                "displayName": "Alpha Cooperative",
+                "website": "https://example.org/alphacooperative"
+              }
+            },
+            "organization": null
+          },
+          "record": {
+            "$type": "org.hypercerts.claim.activity",
+            "createdAt": "2026-11-13T10:00:00.000Z",
+            "title": "Community seed library",
+            "shortDescription": "A seed library run by neighbours.",
+            "description": {
+              "$type": "org.hypercerts.defs#descriptionString",
+              "value": "Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. Long text. "
+            }
+          }
+        },
+        {
+          "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/org.hypercerts.claim.activity/3a2",
+          "cid": "bafyreifakea3a2",
+          "indexedAt": "2026-11-20T10:00:00+00:00",
+          "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+          "author": {
+            "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+            "profile": {
+              "cid": "bafyreifakepAlpha Cooperative",
+              "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+              "indexedAt": "2026-11-20T10:00:00+00:00",
+              "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/app.certified.actor.profile/self",
+              "record": {
+                "$type": "app.certified.actor.profile",
+                "createdAt": "2026-06-01T09:55:58.407Z",
+                "displayName": "Alpha Cooperative",
+                "website": "https://example.org/alphacooperative"
+              }
+            },
+            "organization": null
+          },
+          "record": {
+            "$type": "org.hypercerts.claim.activity",
+            "createdAt": "2026-11-13T10:00:00.000Z",
+            "title": "E2E write-through test UPDATED 2026-11-20",
+            "shortDescription": "Automated write-through test — safe to ignore."
+          }
+        }
+      ],
+      "cursor": "cur-a1"
+    },
+    {
+      "activities": [
+        {
+          "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/org.hypercerts.claim.activity/3b1",
+          "cid": "bafyreifakea3b1",
+          "indexedAt": "2026-11-20T10:00:00+00:00",
+          "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+          "author": {
+            "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+            "profile": {
+              "cid": "bafyreifakepBravo Collective",
+              "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+              "indexedAt": "2026-11-20T10:00:00+00:00",
+              "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/app.certified.actor.profile/self",
+              "record": {
+                "$type": "app.certified.actor.profile",
+                "createdAt": "2026-06-01T09:55:58.407Z",
+                "displayName": "Bravo Collective",
+                "website": "https://example.org/bravocollective"
+              }
+            },
+            "organization": null
+          },
+          "record": {
+            "$type": "org.hypercerts.claim.activity",
+            "createdAt": "2026-11-13T10:00:00.000Z",
+            "title": "Bread.lk",
+            "shortDescription": "Bakery cooperative"
+          }
+        },
+        {
+          "uri": "at://did:plc:fakecccccccccccccccccccc/org.hypercerts.claim.activity/3c1",
+          "cid": "bafyreifakea3c1",
+          "indexedAt": "2026-11-20T10:00:00+00:00",
+          "did": "did:plc:fakecccccccccccccccccccc",
+          "author": {
+            "did": "did:plc:fakecccccccccccccccccccc",
+            "profile": {
+              "cid": "bafyreifakepCarol Out Of Scope",
+              "did": "did:plc:fakecccccccccccccccccccc",
+              "indexedAt": "2026-11-20T10:00:00+00:00",
+              "uri": "at://did:plc:fakecccccccccccccccccccc/app.certified.actor.profile/self",
+              "record": {
+                "$type": "app.certified.actor.profile",
+                "createdAt": "2026-06-01T09:55:58.407Z",
+                "displayName": "Carol Out Of Scope",
+                "website": "https://example.org/caroloutofscope"
+              }
+            },
+            "organization": null
+          },
+          "record": {
+            "$type": "org.hypercerts.claim.activity",
+            "createdAt": "2026-11-13T10:00:00.000Z",
+            "title": "Out of scope work"
+          }
+        }
+      ]
+    }
+  ]
+}

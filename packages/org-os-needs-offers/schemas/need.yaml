@@ -1,0 +1,19 @@
+# need — placeholder field list from the drafts plan; redone when the shared lexicon is agreed (kms plan Task 6, Step 6).
+# visibility is REQUIRED and has no default: an object without it is invalid. Only `public` can ever be published
+# (the floor, Task 7). contact_route and intro_wanted are matching-only canon fields and are never in a record.
+id: need
+version: 0.1.0
+extends: frontmatter
+description: Something a node needs from the network. The placeholder field list (kms plan Task 5), replaced by the agreed shared lexicon in Task 6 Step 6.
+required: [title, type, visibility]
+fields:
+  subject: { type: string }
+  category:
+    enum: [Tools and tech, Funding and finance, Governance and legal, Knowledge and research, Communications and media, Events and gathering, Land and place, Education and learning, People and skills, Other]
+  text: { type: string }
+  when: { type: string }   # when it is needed (free text)
+  status: { type: string }
+  visibility:
+    enum: [private, matching-only, public]
+  contact_route: { type: string }   # matching-only; never mapped to a record
+  intro_wanted: { type: boolean }   # matching-only; never mapped to a record

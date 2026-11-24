@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import * as fw from './framework.mjs';
 import { loadKmsConfig } from './config.mjs';
-import { bridge } from './registry-bridge.mjs';
+import { bridge, bridgeAsync, bridgeNeedsSharedLexicons } from './registry-bridge.mjs';
 import { readCursors, writeCursors, cursorKeys } from './cursors.mjs';
 import { recordRead } from './reads.mjs';
 import { renderDashboardSection, renderSiteData } from './render.mjs';
@@ -21,8 +21,12 @@ import { planStandardSite, applyStandardSite, wellKnownPath } from './atproto/st
 import { planeRole, regatePublicPlane } from './planes/role.mjs';
 import { writeStaticSurface } from './static/surface.mjs';
 import { selectPublic } from './gate.mjs';
+import { loadSharedLexicons, cutToPublicFields } from './pack-publish.mjs';
+import { scrubUnpublishedRefs } from './visibility.mjs';
 import { getConnector, mergeConnectors } from './connectors/index.mjs';
 import { loadPackConnectors } from './extensions.mjs';
+import { reconcileClaims, carryClaim, isClaim } from './claims.mjs';
+import { exportUpdateDrafts } from './certified/update.mjs';
 
 export const OPS = {
   // write:true here = CRITICAL/fail-hard: if kms.yaml can't load, no downstream op can run.
@@ -50,11 +54,13 @@ export const OPS = {
   } },
 
   'render.site': { kind: 'exec', write: false, run: (ctx) => {
-    return renderSiteData({ dir: ctx.dir, target: ctx.config.target,
+    return renderSiteData({ dir: ctx.dir, target: ctx.config.target, adapter: ctx.config.adapter,
       outPath: (ctx.config.render && ctx.config.render.site_data) || 'src/data/kms-index.json' });
   } },
 
-  'bridge': { kind: 'exec', write: true, run: (ctx) => bridge(ctx) },
+  // Synchronous, unless the canon holds a claim of a shared-lexicon type: only then does the AT plan's withhold decision need the
+  // async lexicon loader. (The executor and the CLI await whatever an op returns.)
+  'bridge': { kind: 'exec', write: true, run: (ctx) => (ctx.config && bridgeNeedsSharedLexicons({ dir: ctx.dir, config: ctx.config }) ? bridgeAsync(ctx) : bridge(ctx)) },
 
   'federate.check': { kind: 'exec', write: false, run: (ctx) => checkPeers(ctx) },
 
@@ -93,6 +99,7 @@ export const OPS = {
     const all = adapter.list(target);
     const sel = await selectPublic({ dir, config, all });
     const candidates = sel.candidates;
+    if (sel.withheld?.undeclared || sel.withheld?.visibility || sel.withheld?.claims) report.withheld = { ...(sel.withheld.undeclared ? { undeclared: sel.withheld.undeclared } : {}), ...(sel.withheld.visibility ? { visibility: sel.withheld.visibility } : {}), ...(sel.withheld.claims ? { claims: sel.withheld.claims } : {}) };
     if (sel.gated) {
       const by_reason = {}; for (const r of sel.rejected) by_reason[r.reason] = (by_reason[r.reason] || 0) + 1;
       report.gate = { passed: candidates.length, rejected: sel.rejected.length, by_reason };
@@ -102,19 +109,32 @@ export const OPS = {
     // (in-memory ids, report.minted) is unchanged.
     const at = config.atproto;
     const hasTarget = Boolean(at?.did && at?.pds && at?.nsid_authority) || config.publish?.static !== false;
-    const { minted, items } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget, mintGeo: Boolean(config.geo?.space) });
+    const { minted, items: identified } = ensureIds({ adapter: config.adapter, target, items: candidates, write: !dry && hasTarget, mintGeo: Boolean(config.geo?.space) });
     report.minted = minted.length;
+    // A visibility-gated type leaves the instance cut to its declared public_fields (ensureIds re-reads the canon, so it is cut after).
+    // …and its refs are scrubbed of every object that is not itself selected (spec 6.3): the AT plan, the static API and the pages all read `items`.
+    const scrub = {};
+    const items = scrubUnpublishedRefs(identified.map((it) => ({ ...it, object: carryClaim(it.object, cutToPublicFields(it.schema, it.object)) })), all, scrub);
+    // An author learns that a value or key was dropped because it equals a non-public object's slug or id (an ordinary word can collide): a count per item, never the value.
+    if (scrub.total) report.scrubbed = { total: scrub.total, items: scrub.items, note: 'values or keys equal to the slug or id of an object that is not public were left out of the public record; rename the object or the value if the word was ordinary' };
 
     const manifest = readManifest(dir);
     let next = manifest;
+    let surfaceItems = items; // what the static API and the pages show: less any claim the AT plan withholds (below)
     if (at?.did && at?.pds && at?.nsid_authority) {
       // In a store whose file name IS the type (repo-data; what `export` writes into a public plane), an
       // object carries no `type` of its own — the record still must. Defaulted for the record only: the
       // objects on disk are not rewritten.
       const records = items.map((it) => (it.object.type ? it : { ...it, object: { type: it.schema, ...it.object } }));
-      const plan = planPublish({ items: records, manifest, did: at.did, authority: at.nsid_authority });
+      const shared = await loadSharedLexicons(config.packs);
+      const plan = planPublish({ items: records, all, manifest, did: at.did, authority: at.nsid_authority, shared, publishClaims: config.publish?.claims === true, claimPublisher: config.publish?.claim_publisher });
       if (!plan.ok) return { ok: false, report: { ...report, errors: plan.errors } };
-      const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length };
+      // A claim whose shared lexicon has no claim marks is withheld by the plan (src/atproto/publish.mjs): counted with the floor's claims, and named.
+      // A claim the plan withheld (a shared lexicon without claim marks, a record that does not validate) is withheld everywhere: the
+      // static API and the pages must not list a claim the open network does not carry, cut and marked but with no atUri.
+      if (plan.withheld.length) { const out = new Set(plan.withheld.map((w) => w.id)); surfaceItems = items.filter((it) => !(isClaim(it.object) && out.has(it.object.id))); }
+      if (plan.withheld.length) report.withheld = { ...(report.withheld ?? {}), claims: (report.withheld?.claims ?? 0) + plan.withheld.length, claim_details: plan.withheld.map(({ slug, type, reason }) => ({ slug, type, reason })) };
+      const counts = { created: plan.create.length, updated: plan.update.length, deleted: plan.delete.length, skipped: plan.skip.length, ...(plan.orphans.length ? { orphans: plan.orphans.length } : {}) };
       // standard.site (opt-in, docs/CONNECTORS.md §14): each entry also as a site.standard.document. Its plan never blocks the entries;
       // an invalid one is reported (status 'invalid', ok:false) and nothing of it is written.
       const ss = at.standard_site?.enabled === true ? planStandardSite({ items: records, entryPlan: plan, manifest, did: at.did, authority: at.nsid_authority, config }) : null;
@@ -123,9 +143,18 @@ export const OPS = {
       const password = deps.env.ATPROTO_APP_PASSWORD;
       if (!password) report.atproto = { status: 'not-configured', reason: 'ATPROTO_APP_PASSWORD not set', ...counts };
       else if (dry || !apply) report.atproto = { status: 'planned', ...counts };
+      else if (!deps.allowPlaceholderLexicons && Object.values(shared).some((e) => String(e.doc?.id).startsWith('example.'))) {
+        // The shipped shared lexicons are placeholders (example.commons.*): they are never written to a live account. Plan mode is unaffected.
+        const ids = [...new Set(Object.values(shared).map((e) => e.doc.id).filter((id) => id.startsWith('example.')))].sort();
+        return { ok: false, report: { ...report, atproto: { status: 'failed', reason: `refusing to apply: ${ids.join(', ')} ${ids.length > 1 ? 'are' : 'is a'} placeholder lexicon${ids.length > 1 ? 's' : ''} (example.*), never written to a live account. Replace the pack's shared lexicon with the agreed one first.`, ...counts } } };
+      }
       else if (items.length === 0 && plan.delete.length > 0) {
         // Never let an unattended apply (close + publish.apply:true) turn an empty/misconfigured selection into a mass delete.
-        return { ok: false, report: { ...report, atproto: { status: 'failed', reason: 'refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)', deleted: 0, wouldDelete: plan.delete.length } } };
+        // A superseded claim is the usual way to get here (src/claims.mjs): say so, so the operator knows it is not a misconfiguration.
+        const gone = new Set(all.filter((it) => it.object.claim_status === 'superseded').map((it) => it.object.id));
+        const claimsGone = plan.delete.filter((d) => gone.has(d.id)).length;
+        const why = claimsGone ? `; ${claimsGone} of the ${plan.delete.length} ${claimsGone === 1 ? 'is a superseded claim' : 'are superseded claims'} (the node now speaks for itself). This guard has no bypass: withdraw the last published record by hand once you are sure` : '';
+        return { ok: false, report: { ...report, atproto: { status: 'failed', reason: `refusing to delete every published record: no publishable items were selected (check publish.gate, types_opt_in/out, target and public_use)${why}`, deleted: 0, wouldDelete: plan.delete.length } } };
       } else {
         let applied; let client;
         try {
@@ -155,7 +184,7 @@ export const OPS = {
     }
     if (config.publish?.static === false) report.static = 'disabled';
     else if (!dry) {
-      try { report.static = await writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items, allItems: all, manifest: next, config }); }
+      try { report.static = await writeStaticSurface({ dir, outDir: config.publish?.static_dir || 'public', items: surfaceItems, allItems: all, manifest: next, config }); }
       catch (e) { report.static = { status: 'failed', error: e.message }; }
       // The publication's verification file (standard.site: /.well-known/site.standard.publication returns the record's AT-URI).
       const pubUri = at?.standard_site?.enabled === true && next.standardSite?.publication?.atUri;
@@ -231,6 +260,14 @@ export const OPS = {
     }
     return { ok: true, report };
   } },
+
+  // claims.reconcile: CLI verb only (`org-os-kms claims reconcile`), bound to no lifecycle event. Supersedes ReFi DAO's claim of a node
+  // once the node's own record has been ingested; the next `publish` then removes the claim. --dry changes nothing.
+  'claims.reconcile': { kind: 'exec', write: true, run: (ctx) => reconcileClaims({ dir: ctx.dir || '.', config: ctx.config, dry: ctx.flags?.dry === true }) },
+
+  // certified.draft: CLI verb only, bound to no lifecycle event. Writes a node's update as a Certified feed record to renders/certified-updates/
+  // for the node's own session to put. It takes no client and never logs in; off unless publish.certified_drafts is true.
+  'certified.draft': { kind: 'exec', write: false, run: (ctx) => exportUpdateDrafts({ dir: ctx.dir || '.', config: ctx.config, now: ctx.now }) },
 
   // skill directives — judgment ops the agent runs; the executor collects them.
   'csis-review': { kind: 'skill', skill: 'csis-review' },

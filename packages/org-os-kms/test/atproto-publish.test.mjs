@@ -61,3 +61,51 @@ test('applyPublish: per-op calls, per-record failures, new manifest', async () =
 test('contentHash stable across key order', () => {
   assert.equal(contentHash({ a: 1, b: [1, { c: 2, d: 3 }] }), contentHash({ b: [1, { d: 3, c: 2 }], a: 1 }));
 });
+
+// F8: a moved record whose OLD copy could not be deleted stays tracked (manifest.orphans) until it is deleted.
+const OLD = 'old.example.kb.resource';
+const moved = () => ({ version: 1, objects: { 'id-a': { slug: 'a', type: 'resource', rkey: 'id-a', collection: OLD, atUri: `at://${DID}/${OLD}/id-a`, cid: 'old-cid', hash: 'h' } } });
+const okClient = (dels = []) => ({ async putRecord(op) { return { uri: `at://${DID}/${op.collection}/${op.rkey}`, cid: `cid-${op.collection}` }; }, async deleteRecord(op) { dels.push([op.collection, op.rkey]); } });
+const failingDelete = (dels = [], only = null) => ({ ...okClient(), async deleteRecord(op) { dels.push([op.collection, op.rkey]); if (!only || op.collection === only) throw new Error('pds down'); } });
+const run = (items, manifest, client) => applyPublish(planPublish({ items, manifest, did: DID, authority: AUTH }), { client, did: DID });
+
+test('F8: a failed delete of the old collection is tracked on the manifest, not reported once and forgotten', async () => {
+  const first = await run([item('a')], moved(), failingDelete());
+  assert.equal(first.failures.length, 1);
+  assert.deepEqual(first.manifest.orphans, [{ id: 'id-a', collection: OLD, rkey: 'id-a' }]);
+  assert.equal(first.manifest.objects['id-a'].collection, RES, 'the manifest tracks the new record');
+});
+
+test('F8: a later run retries the stale delete, and stops tracking it once it succeeds', async () => {
+  const first = await run([item('a')], moved(), failingDelete());
+  const stillDown = await run([item('a')], first.manifest, failingDelete());
+  assert.deepEqual(stillDown.manifest.orphans, [{ id: 'id-a', collection: OLD, rkey: 'id-a' }], 'a failed retry keeps it');
+  assert.equal(stillDown.failures.length, 1);
+  const dels = [];
+  const healed = await run([item('a')], stillDown.manifest, okClient(dels));
+  assert.deepEqual(dels, [[OLD, 'id-a']]); assert.equal(healed.failures.length, 0);
+  assert.equal(healed.manifest.orphans, undefined, 'nothing left to track');
+  assert.equal(healed.manifest.objects['id-a'].collection, RES, 'the live record is untouched');
+  const again = []; await run([item('a')], healed.manifest, okClient(again));
+  assert.deepEqual(again, [], 'idempotent: a clean manifest deletes nothing');
+});
+
+test('F8: withdrawing the object deletes its stale copy too, and a failure there is still tracked', async () => {
+  const first = await run([item('a'), item('b')], { version: 1, objects: { ...moved().objects } }, failingDelete());
+  const dels = [];
+  const gone = await run([item('b')], first.manifest, failingDelete(dels, OLD));
+  assert.deepEqual(dels.map(([c]) => c).sort(), [OLD, RES].sort(), 'the live copy and the stale one are both deleted');
+  assert.equal(gone.manifest.objects['id-a'], undefined, 'the withdrawn object is no longer tracked as live');
+  const tracked = (gone.manifest.orphans ?? []).map((o) => o.collection).sort();
+  assert.deepEqual(tracked, [OLD], 'the stale copy is still tracked after its object was withdrawn');
+  const dels2 = []; const done = await run([item('b')], gone.manifest, okClient(dels2));
+  assert.deepEqual(dels2, [[OLD, 'id-a']]); assert.equal(done.manifest.orphans, undefined);
+});
+
+test('F8: an object moved back to the old collection is never deleted by its own stale entry', async () => {
+  const first = await run([item('a')], moved(), failingDelete());
+  const manifest = { ...first.manifest, objects: { 'id-a': { ...first.manifest.objects['id-a'], collection: 'new.example.kb.resource', atUri: `at://${DID}/new.example.kb.resource/id-a` } } };
+  const plan = planPublish({ items: [item('a')], manifest, did: DID, authority: 'old.example.kb' });
+  assert.equal(plan.ok, true);
+  assert.deepEqual(plan.orphans, [], 'the stale entry now names the live record: drop it, never delete it');
+});

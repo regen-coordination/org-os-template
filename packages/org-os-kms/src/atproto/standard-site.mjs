@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import * as fw from '../framework.mjs';
 import { slugFromRef } from '../manifest.mjs';
 import { contentHash } from './publish.mjs';
+import { publicViewOf, isClaim } from '../claims.mjs';
 
 export const PUBLICATION = 'site.standard.publication';
 export const DOCUMENT = 'site.standard.document';
@@ -59,7 +60,7 @@ const asText = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' 
 // One entry → its plan-time document record. `publishedAt`, `updatedAt` and the strongRef's cid are stamped at apply.
 export function toDocument({ schema, object, ref }, { did, authority, publicationUri, settings = {} }) {
   const slug = slugFromRef(ref);
-  const o = fw.publicView(object);
+  const o = publicViewOf(object, { schema });
   if (typeof o.title !== 'string' || !o.title.trim()) return { skipped: 'no title: a document needs one' };
   const errors = []; let warning;
   const map = { ...(FIELD_MAP[schema] || {}), ...(settings.fields?.[schema] || {}) };
@@ -137,6 +138,9 @@ export function planStandardSite({ items, entryPlan, manifest, did, authority, c
   const seen = new Set();
   for (const item of items) {
     const id = item.object.id; const slug = slugFromRef(item.ref);
+    // A site.standard.document has no claim marks (claim_for, claim_status, publisher): a claim's document would read as the
+    // instance's own page about itself. Withheld with a reason, like an entry with no title; a document published earlier is deleted below.
+    if (isClaim(item.object)) { plan.withheld.push({ id, slug, reason: 'claim withheld: a site.standard.document carries no claim marks, so it would read as the instance\'s own page' }); continue; }
     const { record, errors, warning, skipped } = toDocument(item, { did, authority, publicationUri, settings });
     if (skipped) { plan.withheld.push({ id, slug, reason: skipped }); continue; }
     if (errors.length) { plan.errors.push({ slug, errors }); continue; }

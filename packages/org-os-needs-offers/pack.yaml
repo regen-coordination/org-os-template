@@ -1,0 +1,25 @@
+# org-os-kms extension pack manifest. The directory name and `name` must match.
+name: org-os-needs-offers
+version: 0.1.0
+requires:
+  framework: ">=0.3.0"
+  kms: ">=0.2.0"
+# Publish-ELIGIBLE types (opt-in). An instance must still list them in kms.yaml publish.types_opt_in.
+types: [need, offer]
+# A gated pack's types cannot be published until they declare publish_requires and public_fields (kms >= 0.2.0).
+visibility_gated: true
+# DATA, not code: the floor itself lives in kms core (src/visibility.mjs); a pack only declares what core enforces.
+# publish_requires: field values an object must hold to be published (enforced from kms plan Task 7).
+publish_requires:
+  need: { visibility: public }
+  offer: { visibility: public }
+# public_fields: the only keys that may reach a record. Leaves out contact_route and intro_wanted; keeps `visibility`
+# because the schema requires it, so the generated lexicon requires it (the floor admits only `public`).
+public_fields:
+  need: [id, title, type, public_use, maturity, subject, category, text, when, status, visibility]
+  offer: [id, title, type, public_use, maturity, subject, category, text, terms, status, visibility]
+# shared_lexicon: types published in a shared lexicon instead of the instance's own namespace (kms plan Task 6).
+# example.commons.* is a PLACEHOLDER and is never applied to a live account; Step 6 replaces it with the agreed files.
+shared_lexicon:
+  need: lexicons/example.commons.need.json
+  offer: lexicons/example.commons.offer.json

@@ -160,3 +160,76 @@ test('registry rows are unaffected: a not-public-yet resource still bridges into
   const doc = yaml.load(readFileSync(join(dir, 'data/resources.yaml'), 'utf8'));
   assert.ok(doc[Object.keys(doc).find((k) => Array.isArray(doc[k]))].some((e) => e.id === 'r9'));
 });
+
+// F1 (seat-7 fixes): the bridge writes tracked data/*.yaml and, for encyclopedia-entry, a page under the public site.
+// A claim about a node therefore needs the same claim floor here as at publish: consent date, publish.claims on, a publisher.
+const claimFields = { claim_for: 'https://node-a.example', claim_status: 'claimed', consent_atproto: '2026-11-19' };
+const CLAIM_ON = { adapter: 'repo-data', target: '.', publish: { claims: true, claim_publisher: 'ReFi DAO' } };
+const CLAIM_OFF = { adapter: 'repo-data', target: '.' };
+function seedClaims(extra = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-claim-'));
+  fw.getAdapter('repo-data').store(dir, [
+    { schema: 'signal', object: { id: 'sg1', title: 'Signal Claim', public_use: 'ok-with-caveat', ...claimFields, contact_email: 'a@b.example', ...extra } },
+    { schema: 'resource', object: { id: 'rs1', title: 'Resource Claim', type: 'resource', public_use: 'ok-with-caveat', ...claimFields, ...extra } }, // round 3: source-system is not claimable (its steward is a person)
+    { schema: 'encyclopedia-entry', object: { id: 'en1', title: 'Entry Claim', body: 'B.', public_use: 'ok-with-caveat', ...claimFields, ...extra } },
+  ]);
+  return dir;
+}
+
+test('bridge: an unconsented claim of type signal, resource or encyclopedia-entry writes no row and no page, and is counted as withheld', () => {
+  const dir = seedClaims({ consent_atproto: undefined });
+  const out = bridge({ dir, config: CLAIM_ON });
+  assert.equal(out.ok, true, JSON.stringify(out.report));
+  assert.ok(!existsSync(join(dir, 'data/signals.yaml')), 'no signals row');
+  assert.ok(!existsSync(join(dir, 'data/resources.yaml')), 'no resources row');
+  assert.ok(!existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')), 'no public page');
+  assert.deepEqual(out.report.withheld.map((w) => w.schema).sort(), ['encyclopedia-entry', 'resource', 'signal']);
+  assert.ok(out.report.withheld.every((w) => /consent_atproto/.test(w.reason)), JSON.stringify(out.report.withheld));
+});
+
+test('bridge: a claim is withheld while publish.claims is off, even with consent', () => {
+  const dir = seedClaims();
+  const out = bridge({ dir, config: CLAIM_OFF });
+  assert.ok(!existsSync(join(dir, 'data/signals.yaml')));
+  assert.ok(!existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')));
+  assert.equal(out.report.withheld.length, 3);
+  assert.ok(out.report.withheld.every((w) => /publish\.claims/.test(w.reason)));
+});
+
+test('bridge: a consented claim with the floor met is bridged (the floor is not a blanket ban)', () => {
+  const dir = seedClaims();
+  const out = bridge({ dir, config: CLAIM_ON });
+  assert.equal(out.report.withheld.length, 0, JSON.stringify(out.report.withheld));
+  assert.ok(existsSync(join(dir, 'src/content/docs/kb/entry-claim.md')));
+});
+
+// Round 2, fix A: a CONSENTED claim is cut to its allow-list (claimView) before a row or a page is written. data/*.yaml are tracked
+// and the markdown page is the public site: a contact, who raised the claim, notes, an unknown field, the consent date and
+// superseded_by stay home.
+test('bridge: a consented claim writes its allow-list into the row and the page, never the contact, claimed_by, notes, an unknown field, the consent date or superseded_by', () => {
+  const home = { contact_email: 'pat@node-a.example', contact_name: 'Pat Quill', claimed_by: 'Operator Sam', notes: 'private note', internal_ref: 'zzz-internal', superseded_by: 'at://did:plc:x/y/z' };
+  const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-claim-cut-'));
+  fw.getAdapter('repo-data').store(dir, [
+    { schema: 'signal', object: { id: 'sg1', title: 'Signal Claim', signal_type: 'content', public_use: 'ok-with-caveat', ...claimFields, ...home } },
+    { schema: 'encyclopedia-entry', object: { id: 'en1', title: 'Entry Claim', type: 'encyclopedia-entry', page_type: 'concept', summary: 'What the node does.', body: 'Operator-only body.', public_use: 'ok-with-caveat', ...claimFields, ...home } },
+  ]);
+  const out = bridge({ dir, config: CLAIM_ON });
+  assert.equal(out.ok, true, JSON.stringify(out.report));
+  assert.equal(out.report.withheld.length, 0, JSON.stringify(out.report.withheld));
+  const row = readFileSync(join(dir, 'data/signals.yaml'), 'utf8');
+  const page = readFileSync(join(dir, 'src/content/docs/kb/entry-claim.md'), 'utf8');
+  for (const [where, text] of [['signal row', row], ['encyclopedia page', page]]) {
+    for (const v of ['pat@node-a.example', 'Pat Quill', 'Operator Sam', 'private note', 'zzz-internal', '2026-11-19', 'at://did:plc:x/y/z']) assert.ok(!text.includes(v), `${where} carries ${v}:\n${text}`);
+    for (const k of ['contact_email', 'contact_name', 'claimed_by', 'notes', 'consent_atproto', 'superseded_by']) assert.ok(!text.includes(`${k}:`), `${where} carries ${k}`);
+    assert.ok(text.includes('claim_for: https://node-a.example') && text.includes('claim_status: claimed') && text.includes('publisher: ReFi DAO'), `${where} lost its claim marks:\n${text}`);
+  }
+  assert.ok(page.includes('summary: What the node does.') && !page.includes('Operator-only body.'), 'declared content stays, the undeclared body does not');
+});
+
+test('bridge: a consented signal claim keeps its schema-required signal_type in the row', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kms-bridge-claim-req-'));
+  fw.getAdapter('repo-data').store(dir, [{ schema: 'signal', object: { id: 'sg1', title: 'Signal Claim', signal_type: 'content', public_use: 'ok-with-caveat', ...claimFields, contact_email: 'a@b.example' } }]);
+  assert.equal(bridge({ dir, config: CLAIM_ON }).ok, true);
+  const rows = yaml.load(readFileSync(join(dir, 'data/signals.yaml'), 'utf8')).signals;
+  assert.equal(rows[0].signal_type, 'content'); assert.equal(rows[0].contact_email, undefined);
+});

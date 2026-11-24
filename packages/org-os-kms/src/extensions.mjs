@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
 import * as fw from './framework.mjs';
 import { registerRegistryBindings } from './bind.mjs';
+import { registerPackPublish } from './pack-publish.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** The directory holding org-os-kms and its siblings (toolkit-framework, packs). */
@@ -57,6 +58,7 @@ export function loadExtensions(config = {}, { packagesDir = PACKAGES_DIR } = {})
     });
     const profile = existsSync(profilePath) ? readYaml(profilePath) : {};
     registerRegistryBindings(name, profile.registry_bindings || {});
+    registerPackPublish(name, manifest);
     packs.push({ name, dir, manifest, profile });
   }
   return packs;

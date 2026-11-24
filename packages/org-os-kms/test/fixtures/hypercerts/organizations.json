@@ -1,0 +1,88 @@
+{
+  "pages": [
+    {
+      "actors": [
+        {
+          "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+          "profile": {
+            "cid": "bafyreifakepAlpha Cooperative",
+            "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+            "indexedAt": "2026-11-20T10:00:00+00:00",
+            "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/app.certified.actor.profile/self",
+            "record": {
+              "$type": "app.certified.actor.profile",
+              "createdAt": "2026-06-01T09:55:58.407Z",
+              "displayName": "Alpha Cooperative",
+              "website": "https://example.org/alphacooperative"
+            }
+          },
+          "organization": {
+            "cid": "bafyreifakeoaaaa",
+            "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+            "indexedAt": "2026-11-20T10:00:00+00:00",
+            "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/app.certified.actor.organization/self",
+            "record": {
+              "$type": "app.certified.actor.organization",
+              "createdAt": "2026-11-12T10:00:00.000Z",
+              "legalName": "Alpha Cooperative SCCL",
+              "organizationType": [
+                "cooperative"
+              ],
+              "urls": [
+                {
+                  "label": "Website",
+                  "url": "https://alpha.example.org/"
+                }
+              ],
+              "longDescription": {
+                "$type": "org.hypercerts.defs#descriptionString",
+                "value": "A fake cooperative for tests."
+              }
+            }
+          },
+          "location": null
+        }
+      ],
+      "cursor": "cur-o1"
+    },
+    {
+      "actors": [
+        {
+          "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+          "profile": {
+            "cid": "bafyreifakepBravo Collective",
+            "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+            "indexedAt": "2026-11-20T10:00:00+00:00",
+            "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/app.certified.actor.profile/self",
+            "record": {
+              "$type": "app.certified.actor.profile",
+              "createdAt": "2026-06-01T09:55:58.407Z",
+              "displayName": "Bravo Collective",
+              "website": "https://example.org/bravocollective"
+            }
+          },
+          "organization": {
+            "cid": "bafyreifakeobbbb",
+            "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+            "indexedAt": "2026-11-20T10:00:00+00:00",
+            "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/app.certified.actor.organization/self",
+            "record": {
+              "$type": "app.certified.actor.organization",
+              "createdAt": "2026-11-12T10:00:00.000Z",
+              "legalName": "Bravo Collective",
+              "organizationType": [
+                "community-group"
+              ],
+              "urls": [
+                {
+                  "url": "https://bravo.example.org"
+                }
+              ]
+            }
+          },
+          "location": null
+        }
+      ]
+    }
+  ]
+}

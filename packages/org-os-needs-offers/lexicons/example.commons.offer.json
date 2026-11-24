@@ -1,0 +1,49 @@
+{
+  "lexicon": 1,
+  "id": "example.commons.offer",
+  "description": "PLACEHOLDER namespace and fields \u2014 never applied to a live account; replaced by the agreed lexicon (kms plan Task 6 Step 6).",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "title",
+          "text"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "knownValues": [
+              "tools-and-tech",
+              "funding-and-finance",
+              "governance-and-legal",
+              "knowledge-and-research",
+              "communications-and-media",
+              "events-and-gathering",
+              "land-and-place",
+              "education-and-learning",
+              "people-and-skills"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "terms": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

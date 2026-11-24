@@ -1,0 +1,136 @@
+{
+  "pages": [
+    {
+      "attachments": [
+        {
+          "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/org.hypercerts.context.attachment/4a1",
+          "cid": "bafyreifaket4a1",
+          "indexedAt": "2026-11-20T10:00:00+00:00",
+          "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+          "author": {
+            "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+            "profile": {
+              "cid": "bafyreifakepAlpha Cooperative",
+              "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+              "indexedAt": "2026-11-20T10:00:00+00:00",
+              "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/app.certified.actor.profile/self",
+              "record": {
+                "$type": "app.certified.actor.profile",
+                "createdAt": "2026-06-01T09:55:58.407Z",
+                "displayName": "Alpha Cooperative",
+                "website": "https://example.org/alphacooperative"
+              }
+            },
+            "organization": null
+          },
+          "record": {
+            "$type": "org.hypercerts.context.attachment",
+            "createdAt": "2026-11-14T10:00:00.000Z",
+            "contentType": "update",
+            "title": "Spring update",
+            "description": {
+              "$type": "pub.leaflet.pages.linearDocument",
+              "blocks": [
+                {
+                  "block": {
+                    "$type": "pub.leaflet.blocks.text",
+                    "plaintext": "First paragraph."
+                  }
+                },
+                {
+                  "block": {
+                    "$type": "pub.leaflet.blocks.text",
+                    "plaintext": "Segundo parágrafo — മലയാളം ടെസ്റ്റ്"
+                  }
+                }
+              ]
+            },
+            "langs": [
+              "ml",
+              "en"
+            ],
+            "subjects": [
+              {
+                "cid": "bafyreifakes",
+                "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/org.hypercerts.claim.activity/3a1"
+              }
+            ]
+          }
+        },
+        {
+          "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/org.hypercerts.context.attachment/4a2",
+          "cid": "bafyreifaket4a2",
+          "indexedAt": "2026-11-20T10:00:00+00:00",
+          "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+          "author": {
+            "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+            "profile": {
+              "cid": "bafyreifakepAlpha Cooperative",
+              "did": "did:plc:fakeaaaaaaaaaaaaaaaaaaaa",
+              "indexedAt": "2026-11-20T10:00:00+00:00",
+              "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/app.certified.actor.profile/self",
+              "record": {
+                "$type": "app.certified.actor.profile",
+                "createdAt": "2026-06-01T09:55:58.407Z",
+                "displayName": "Alpha Cooperative",
+                "website": "https://example.org/alphacooperative"
+              }
+            },
+            "organization": null
+          },
+          "record": {
+            "$type": "org.hypercerts.context.attachment",
+            "createdAt": "2026-11-14T10:00:00.000Z",
+            "contentType": "report",
+            "title": "Annual report",
+            "subjects": [
+              {
+                "cid": "bafyreifakes",
+                "uri": "at://did:plc:fakeaaaaaaaaaaaaaaaaaaaa/org.hypercerts.claim.activity/3a1"
+              }
+            ]
+          }
+        }
+      ],
+      "cursor": "cur-t1"
+    },
+    {
+      "attachments": [
+        {
+          "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/org.hypercerts.context.attachment/4b1",
+          "cid": "bafyreifaket4b1",
+          "indexedAt": "2026-11-20T10:00:00+00:00",
+          "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+          "author": {
+            "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+            "profile": {
+              "cid": "bafyreifakepBravo Collective",
+              "did": "did:plc:fakebbbbbbbbbbbbbbbbbbbb",
+              "indexedAt": "2026-11-20T10:00:00+00:00",
+              "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/app.certified.actor.profile/self",
+              "record": {
+                "$type": "app.certified.actor.profile",
+                "createdAt": "2026-06-01T09:55:58.407Z",
+                "displayName": "Bravo Collective",
+                "website": "https://example.org/bravocollective"
+              }
+            },
+            "organization": null
+          },
+          "record": {
+            "$type": "org.hypercerts.context.attachment",
+            "createdAt": "2026-11-14T10:00:00.000Z",
+            "contentType": "gallery",
+            "title": "Photos",
+            "subjects": [
+              {
+                "cid": "bafyreifakes",
+                "uri": "at://did:plc:fakebbbbbbbbbbbbbbbbbbbb/org.hypercerts.claim.activity/3b1"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

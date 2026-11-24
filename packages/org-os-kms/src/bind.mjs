@@ -6,6 +6,7 @@
 // (Imports the sibling framework package by relative path; the package.json declares the
 //  @regen-commons/toolkit-framework dependency for published/workspace installs.)
 import { listSchemas } from './framework.mjs';
+import { resetPackPublish } from './pack-publish.mjs';
 
 /** Framework schema -> the org-os registry file it populates (instance-side output). */
 export const REGISTRY_BINDINGS = {
@@ -40,7 +41,7 @@ export function registryBindings() {
   return out;
 }
 
-export function resetRegistryBindings() { packBindings.clear(); }
+export function resetRegistryBindings() { packBindings.clear(); resetPackPublish(); }
 
 /** org-os session lifecycle -> ordered framework op-names (resolved by src/ops.mjs). */
 export const LIFECYCLE_BINDINGS = {
