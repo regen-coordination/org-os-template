@@ -12,6 +12,7 @@ import { HttpError } from '../errors.ts'
 import { NETWORK_HOSTED } from '../hosted/writes.ts'
 import { knownActorOf } from '../request.ts'
 import { commitOrStage } from '../workspace/pages.ts'
+import { fileReader, refuseUnreadRegistry } from '../workspace/reads.ts'
 import { fileBase, fileText } from '../workspace/files.ts'
 import { ChangeStore } from '../changes/store.ts'
 import type { FileOp } from '../changes/types.ts'
@@ -304,6 +305,9 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     try { raw = await c.req.json() } catch { raw = {} }
     const text = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>).text : undefined
     if (text !== undefined && typeof text !== 'string') throw new HttpError(400, 'The request must be text.')
+    // 0.7.3: a member the requests file is kept from (data/visibility.yaml `files:`) receives nothing into it; the answers
+    // would name each requester and their outcome.
+    refuseUnreadRegistry(repo, fileReader(c, repo), 'federation-requests')
     return withLock(async () => {
       const actor = knownActorOf(c)
       const answers = typeof text === 'string'
@@ -319,6 +323,8 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
     const raw = await body(c)
     if (typeof raw.accept !== 'boolean') throw new HttpError(400, 'Say whether you accept it: accept true or false.')
     if (raw.reason !== undefined && typeof raw.reason !== 'string') throw new HttpError(400, 'The reason must be text.')
+    // 0.7.3: nor decides a request in it, before any id of it is read.
+    refuseUnreadRegistry(repo, fileReader(c, repo), 'federation-requests')
     return withLock(async () => {
       const actor = knownActorOf(c)
       const out = await decide(repo, actor, c.req.param('id'), { accept: raw.accept as boolean, reason: raw.reason as string | undefined }, { startBranch: deps.startBranch })
@@ -332,6 +338,8 @@ export function mountFederation(app: Hono, deps: FederationDeps): void {
   // record holds the token's hash, and nothing here logs, stores or echoes the token again.
   app.post('/api/federation/invites', async c => {
     const raw = await body(c)
+    // 0.7.3: a member the invites file is kept from makes no invite in it.
+    refuseUnreadRegistry(repo, fileReader(c, repo), 'invites')
     return withLock(async () => {
       const actor = knownActorOf(c)
       const out = await createInvite(repo, actor, raw, { now: now(), notify: deps.notify, startBranch: deps.startBranch, random: deps.random })
