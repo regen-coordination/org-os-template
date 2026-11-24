@@ -16,9 +16,11 @@ import { placeInRepo, privateDir, STORE_FILE } from './paths.ts'
 
 /** 1: L5 §10.2's tables. 2 was written by two lines, each with tables of its own: 0.6.1's the Roles from the records
  *  dump, the email keys and the sign-in links (Lane 3 Task 2); the workspace's comments, mentions, notifications, reads,
- *  view state and drafts (DAO-OS L6 §8.1). 3: both. A store at 1, or at either line's 2, is brought up when it opens:
- *  the tables it lacks are added, every row kept. */
-export const SCHEMA_VERSION = 3
+ *  view state and drafts (DAO-OS L6 §8.1). 3: both. 4: the ReFi DAO Network's (network app spec §5.1–§5.6, B1): Guests,
+ *  member account links, network entries and the AT Proto OAuth client's state and sessions, each in its own table and
+ *  never touched by a roles load. A store at 1, 2 or 3 is brought up when it opens: the tables it lacks are added, every
+ *  row kept. A store at 4 makes an older org-os refuse to open it (rolling back means restoring a backup). */
+export const SCHEMA_VERSION = 4
 
 /** The store cannot be used: its place is not ignored by git, its file cannot be opened, or a newer org-os wrote
  *  it. The git side keeps serving; private reads and writes refuse with this message as attention (§10.1). */
@@ -195,6 +197,40 @@ CREATE TABLE IF NOT EXISTS drafts (session TEXT NOT NULL PRIMARY KEY, target TEX
   opened TEXT NOT NULL, updated TEXT NOT NULL) STRICT;
 `
 
+// Schema 4 (refi-dao-os network app spec §5.1, §5.3, §5.6; plan B1; A5 findings: not `records`, whose history is
+// append-only and whose strings are all kept from public pages). Times ISO 8601; `on_apps` a JSON list. One live entry per
+// node and one per account, held by the database itself. `added_by` is a person id or the node's own DID (§5.7).
+const SCHEMA_4 = `
+CREATE TABLE IF NOT EXISTS network_guests (did TEXT NOT NULL PRIMARY KEY, handle TEXT NOT NULL, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL) STRICT;
+CREATE TABLE IF NOT EXISTS account_links (did TEXT NOT NULL PRIMARY KEY, person_id TEXT NOT NULL, linked TEXT NOT NULL) STRICT;
+CREATE INDEX IF NOT EXISTS account_links_person ON account_links (person_id);
+CREATE TABLE IF NOT EXISTS network_entries (id TEXT NOT NULL PRIMARY KEY, did TEXT NOT NULL, node TEXT NOT NULL, handle TEXT NOT NULL,
+  on_apps TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('live', 'pending', 'removed')), why TEXT CHECK (why IN ('domain', 'record', 'steward')),
+  added TEXT NOT NULL, added_by TEXT NOT NULL, check_state TEXT NOT NULL CHECK (check_state IN ('pass', 'fail')), checked_on TEXT NOT NULL,
+  reason TEXT, channel TEXT) STRICT;
+CREATE UNIQUE INDEX IF NOT EXISTS network_entries_live_node ON network_entries (node) WHERE state = 'live';
+CREATE UNIQUE INDEX IF NOT EXISTS network_entries_live_did ON network_entries (did) WHERE state = 'live';
+CREATE TABLE IF NOT EXISTS oauth_state (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL, expires TEXT NOT NULL) STRICT;
+CREATE TABLE IF NOT EXISTS oauth_sessions (sub TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL) STRICT;
+`
+/** How long an OAuth round-trip's state is kept: one hour, then it is gone (a sign-in left half-way). */
+const OAUTH_STATE_MS = 60 * 60 * 1000
+
+/** A ReFi DAO Network Guest (spec §5.1, Q9): the account's DID and handle, never an e-mail, a name or a wallet. */
+export interface NetworkGuest { did: string; handle: string; firstSeen: string; lastSeen: string }
+/** A member's own network account, linked once from the Hub (§5.3). */
+export interface AccountLink { did: string; personId: string; linked: string }
+export type NetworkEntryState = 'live' | 'pending' | 'removed'
+/** A node's network account (§5.4, §5.6): live (shown), pending (waiting for a steward) or removed. */
+export interface NetworkEntry {
+  id: string; did: string; node: string; handle: string; on: string[]; state: NetworkEntryState
+  why: 'domain' | 'record' | 'steward' | null; added: string; addedBy: string; check: 'pass' | 'fail'; checkedOn: string
+  reason: string | null; channel: string | null
+}
+/** The key-value store the AT Proto OAuth client asks for (its state and its sessions). */
+export interface OAuthKv<V = unknown> { get(key: string): Promise<V | undefined>; set(key: string, value: V): Promise<void>; del(key: string): Promise<void> }
+const ADDRESS = /@|%40|0x[a-fA-F0-9]{40}/
+
 /** What a conversation row written before `written_level` existed holds until the server's start fills it (PR7-R45). */
 export const WRITTEN_UNFILLED = 'unfilled'
 
@@ -252,7 +288,7 @@ export async function openPrivateStore(repo: string, opts: { dir?: string; git?:
     db.exec('PRAGMA busy_timeout = 5000')
     if (version < SCHEMA_VERSION) {
       db.exec('BEGIN IMMEDIATE')
-      try { db.exec(`${SCHEMA}\n${SCHEMA_2}\nPRAGMA user_version = ${SCHEMA_VERSION};`); db.exec('COMMIT') } catch (err) { db.exec('ROLLBACK'); throw err }
+      try { db.exec(`${SCHEMA}\n${SCHEMA_2}\n${SCHEMA_4}\nPRAGMA user_version = ${SCHEMA_VERSION};`); db.exec('COMMIT') } catch (err) { db.exec('ROLLBACK'); throw err }
     }
     // DAO-OS L6 Task 18 fix round 1: a schema-2 store made before a comment kept the task it became gains the column.
     const columnsOf = (t: string) => (db!.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map(c => c.name)
@@ -1167,7 +1203,125 @@ export class PrivateStore {
     // The email keys are private; the Roles' ids and names are not added: the ids are in git, and the stewards' names
     // are public, so the portal must stay free to print them (Lane 3 ruling S2-1).
     for (const k of rows('SELECT email_key FROM email_keys')) take(k.email_key)
+    // The ReFi DAO Network (A5 findings): Guests' and linked accounts, and the accounts of entries not live, are private;
+    // a live entry's node, DID and handle are public (the network site shows them), so they are taken back out even when
+    // another table (a Guest row of the node's own account) holds them too. Left out: an entry's adder (a person id, in
+    // git, or the node's own DID), its reason and channel (a steward's plain words, not identities), and the OAuth
+    // tables (tokens, never page text).
+    for (const g of rows('SELECT did, handle FROM network_guests')) { take(g.did); take(g.handle) }
+    for (const l of rows('SELECT did FROM account_links')) take(l.did)
+    for (const e of rows("SELECT did, handle FROM network_entries WHERE state <> 'live'")) { take(e.did); take(e.handle) }
+    for (const e of rows("SELECT did, node, handle FROM network_entries WHERE state = 'live'")) { out.delete(String(e.did)); out.delete(String(e.node)); out.delete(String(e.handle)) }
     return out
+  }
+
+  // The ReFi DAO Network (schema 4). Not private data's history: a Guest, a link and an entry are kept only while they
+  // hold, and go when unlinked, declined, dropped or withdrawn. Each write is one statement under the write lock.
+
+  /** A Guest seen signing in at `at`: the first sighting is kept, the handle and the last sighting move. */
+  async putGuest(did: string, handle: string, at: Date): Promise<void> {
+    nonEmpty('a Guest\'s DID', did); nonEmpty('a Guest\'s handle', handle)
+    if (!did.startsWith('did:') || ADDRESS.test(did) || ADDRESS.test(handle)) throw new Error('A Guest is kept by their account\'s DID and handle only; nothing was written.')
+    const t = at.toISOString()
+    await this.locked(() => {
+      this.db.prepare(`INSERT INTO network_guests (did, handle, first_seen, last_seen) VALUES (?, ?, ?, ?)
+        ON CONFLICT (did) DO UPDATE SET handle = excluded.handle, last_seen = excluded.last_seen`).run(did, handle, t, t)
+    })
+  }
+
+  guest(did: string): NetworkGuest | null {
+    const r = this.reader.prepare('SELECT did, handle, first_seen, last_seen FROM network_guests WHERE did = ?').get(did) as
+      { did: string; handle: string; first_seen: string; last_seen: string } | undefined
+    return r ? { did: r.did, handle: r.handle, firstSeen: r.first_seen, lastSeen: r.last_seen } : null
+  }
+
+  async deleteGuest(did: string): Promise<void> {
+    await this.locked(() => { this.db.prepare('DELETE FROM network_guests WHERE did = ?').run(did) })
+  }
+
+  /** A member's network account linked to them. A DID already linked to someone (anyone) is refused by the database. */
+  async putAccountLink(l: AccountLink): Promise<void> {
+    nonEmpty('a link\'s DID', l.did); nonEmpty('a link\'s person', l.personId); nonEmpty('a link\'s time', l.linked)
+    await this.locked(() => { this.db.prepare('INSERT INTO account_links (did, person_id, linked) VALUES (?, ?, ?)').run(l.did, l.personId, l.linked) })
+  }
+
+  accountLink(did: string): AccountLink | null {
+    const r = this.reader.prepare('SELECT did, person_id, linked FROM account_links WHERE did = ?').get(did) as { did: string; person_id: string; linked: string } | undefined
+    return r ? { did: r.did, personId: r.person_id, linked: r.linked } : null
+  }
+
+  accountLinksOf(personId: string): AccountLink[] {
+    return (this.reader.prepare('SELECT did, person_id, linked FROM account_links WHERE person_id = ? ORDER BY did').all(personId) as
+      { did: string; person_id: string; linked: string }[]).map(r => ({ did: r.did, personId: r.person_id, linked: r.linked }))
+  }
+
+  async deleteAccountLink(did: string): Promise<void> {
+    await this.locked(() => { this.db.prepare('DELETE FROM account_links WHERE did = ?').run(did) })
+  }
+
+  /** One network entry, new. A second live entry for its node, or for its account, is refused by the database. */
+  async putNetworkEntry(e: NetworkEntry): Promise<void> {
+    for (const k of ['id', 'did', 'node', 'handle', 'added', 'addedBy', 'checkedOn'] as const) nonEmpty(`a network entry's ${k}`, e[k])
+    await this.locked(() => {
+      this.db.prepare(`INSERT INTO network_entries (id, did, node, handle, on_apps, state, why, added, added_by, check_state, checked_on, reason, channel)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(e.id, e.did, e.node, e.handle, JSON.stringify(e.on), e.state, e.why, e.added, e.addedBy,
+        e.check, e.checkedOn, e.reason, e.channel)
+    })
+  }
+
+  /** An entry moved to `state` (a steward's Confirm, Decline or Remove, or a node's withdrawal); `why`, `reason` and
+   *  `channel` set when given. Going live is refused by the database when the node or the account is already live. */
+  async setNetworkEntryState(id: string, state: NetworkEntryState, set: { why?: NetworkEntry['why']; reason?: string; channel?: string } = {}): Promise<void> {
+    await this.locked(() => {
+      const r = this.db.prepare(`UPDATE network_entries SET state = ?, why = COALESCE(?, why), reason = COALESCE(?, reason), channel = COALESCE(?, channel)
+        WHERE id = ?`).run(state, set.why ?? null, set.reason ?? null, set.channel ?? null, id)
+      if (Number(r.changes) !== 1) throw new Error(`There is no network entry ${id}; nothing was changed.`)
+    })
+  }
+
+  /** The network entries, oldest first; only those in `state` when given. */
+  networkEntries(state?: NetworkEntryState): NetworkEntry[] {
+    const rows = (state
+      ? this.reader.prepare('SELECT * FROM network_entries WHERE state = ? ORDER BY added, id').all(state)
+      : this.reader.prepare('SELECT * FROM network_entries ORDER BY added, id').all()) as Record<string, string | null>[]
+    return rows.map(r => ({
+      id: r.id!, did: r.did!, node: r.node!, handle: r.handle!, on: JSON.parse(r.on_apps!) as string[], state: r.state as NetworkEntryState,
+      why: r.why as NetworkEntry['why'], added: r.added!, addedBy: r.added_by!, check: r.check_state as 'pass' | 'fail', checkedOn: r.checked_on!,
+      reason: r.reason, channel: r.channel,
+    }))
+  }
+
+  /** The AT Proto OAuth client's two stores, backed by this file: its state (kept an hour) and its sessions (kept until
+   *  deleted). `now` is the clock the state's expiry reads. */
+  oauthStores(now: () => Date = () => new Date()): { stateStore: OAuthKv<never>; sessionStore: OAuthKv<never> } {
+    const stateStore: OAuthKv<never> = {
+      get: async key => {
+        const r = this.reader.prepare('SELECT value, expires FROM oauth_state WHERE key = ?').get(key) as { value: string; expires: string } | undefined
+        return r && Date.parse(r.expires) > now().getTime() ? JSON.parse(r.value) as never : undefined
+      },
+      set: async (key, value) => {
+        const t = now()
+        await this.locked(() => {
+          this.db.prepare('DELETE FROM oauth_state WHERE expires <= ?').run(t.toISOString())
+          this.db.prepare(`INSERT INTO oauth_state (key, value, expires) VALUES (?, ?, ?)
+            ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires = excluded.expires`).run(key, JSON.stringify(value), new Date(t.getTime() + OAUTH_STATE_MS).toISOString())
+        })
+      },
+      del: async key => { await this.locked(() => { this.db.prepare('DELETE FROM oauth_state WHERE key = ?').run(key) }) },
+    }
+    const sessionStore: OAuthKv<never> = {
+      get: async sub => {
+        const r = this.reader.prepare('SELECT value FROM oauth_sessions WHERE sub = ?').get(sub) as { value: string } | undefined
+        return r ? JSON.parse(r.value) as never : undefined
+      },
+      set: async (sub, value) => {
+        await this.locked(() => {
+          this.db.prepare('INSERT INTO oauth_sessions (sub, value) VALUES (?, ?) ON CONFLICT (sub) DO UPDATE SET value = excluded.value').run(sub, JSON.stringify(value))
+        })
+      },
+      del: async sub => { await this.locked(() => { this.db.prepare('DELETE FROM oauth_sessions WHERE sub = ?').run(sub) }) },
+    }
+    return { stateStore, sessionStore }
   }
 
   /** The session whose token hashes to `tokenHash`, expired or not; null when there is none. */

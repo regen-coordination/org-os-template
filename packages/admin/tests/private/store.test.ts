@@ -150,7 +150,7 @@ describe('the file (spec §10.1, §10.2)', () => {
       expect(columns('roles_meta')).toEqual(['k', 'v'])
       expect(columns('sign_in_links')).toEqual(['token_hash', 'person_id', 'return_to', 'created', 'expires', 'used_at'])
       expect(db.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'wal' })
-      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 3 }) // both lines' schema 2 tables: schema 3
+      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 4 }) // both lines' schema 2 tables: schema 3; the network's: 4
     } finally { db.close() }
   })
 
@@ -166,11 +166,11 @@ describe('the file (spec §10.1, §10.2)', () => {
   it('a newer user_version is refused in words', async () => {
     const r = repo(); const dir = storeDir()
     const db = new DatabaseSync(join(dir, 'house.db'))
-    db.exec('PRAGMA user_version = 4') // this org-os writes schema 3, so 4 is the newer one
+    db.exec('PRAGMA user_version = 5') // this org-os writes schema 4, so 5 is the newer one
     db.close()
     const err = await refusal(openPrivateStore(r, { dir }))
     expect(err).toBeInstanceOf(StoreUnavailable)
-    expect(err.message).toBe('This private store was written by a newer org-os (schema 4); update first.')
+    expect(err.message).toBe('This private store was written by a newer org-os (schema 5); update first.')
   })
 
   it('a corrupt file throws StoreUnavailable with the file named, not the contents', async () => {
