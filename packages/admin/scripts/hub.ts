@@ -15,7 +15,8 @@ import { keyModeRefusal, nodeRefusal, readHostedConfig, type HostedConfig } from
 import { publicKeyRefusal } from '../server/private/crypto.ts'
 import { checkRemote } from '../server/visibility/remote.ts'
 import { cloneInstance } from '../server/git.ts'
-import { networkFetch, startServer } from '../server/serve.ts'
+import { startServer } from '../server/serve.ts'
+import { networkFetch } from '../server/net.ts'
 import type { FetchLike } from '../server/systems/driver.ts'
 import { main as houseBackup } from './house-backup.ts'
 
