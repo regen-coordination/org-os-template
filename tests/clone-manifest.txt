@@ -175,6 +175,7 @@ scripts/lib/federation/read.mjs
 scripts/lib/hat-readings.mjs
 scripts/lib/hats.mjs
 scripts/lib/keccak.mjs
+scripts/lib/lifecycles.mjs
 scripts/lib/members.mjs
 scripts/lib/ops.mjs
 scripts/lib/quilt-compose.mjs
@@ -266,6 +267,7 @@ tests/quilt-view.test.mjs
 tests/render.test.mjs
 tests/repo-paths.test.mjs
 tests/repos-manifest.test.mjs
+tests/scripts/lifecycles.test.mjs
 tests/scripts/migrate.test.mjs
 tests/scripts/migration-canonical-records.test.mjs
 tests/scripts/modules.test.mjs
