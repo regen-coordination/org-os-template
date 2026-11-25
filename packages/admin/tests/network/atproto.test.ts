@@ -43,7 +43,7 @@ async function app(config: AtprotoConfig, s: PrivateStore) {
 }
 
 describe('the configuration', () => {
-  it('names its one variable', () => expect(ATPROTO_ENV).toEqual(['HOUSE_ATPROTO_PRIVATE_JWK']))
+  it('names its variables: the key, and the colour of Certified\'s sign-in page', () => expect(ATPROTO_ENV).toEqual(['HOUSE_ATPROTO_PRIVATE_JWK', 'HOUSE_ATPROTO_BRAND_COLOR']))
 
   it('hosted without the key: not offered, and the server starts', () =>
     expect(readAtprotoConfig({}, { hosted: true, origin: ORIGIN })).toEqual({ config: null }))
@@ -88,6 +88,29 @@ describe('the client metadata and keys', () => {
       response_types: ['code'], token_endpoint_auth_method: 'private_key_jwt', token_endpoint_auth_signing_alg: 'ES256',
       jwks_uri: `${ORIGIN}/oauth/jwks.json`, dpop_bound_access_tokens: true,
     })
+  })
+
+  // Certified's sign-in page (ePDS client metadata, hypercerts-org/ePDS docs/tutorial.md): `epds_handle_login_url` adds a
+  // "Sign in with Atmosphere" button whose typed handle comes to that URL as ?handle=. It lands on a Hub page that only
+  // fills the handle in, never on a start: a round-trip starts by a click on a Hub page (final review of B8).
+  it('Certified\'s page sends a typed Bluesky handle to the Hub\'s /sign-in/atmosphere page; no colour unless set', () => {
+    const m = clientMetadata(hostedConfig()) as Record<string, unknown>
+    expect(m.epds_handle_login_url).toBe(`${ORIGIN}/sign-in/atmosphere`)
+    expect(m).not.toHaveProperty('brand_color')
+  })
+
+  it('HOUSE_ATPROTO_BRAND_COLOR: a #rrggbb colour colours Certified\'s page; anything else is left out', () => {
+    const colour = (v: string) => clientMetadata((readAtprotoConfig({ HOUSE_ATPROTO_PRIVATE_JWK: es256Jwk(), HOUSE_ATPROTO_BRAND_COLOR: v }, { hosted: true, origin: ORIGIN }) as { config: AtprotoConfig }).config) as Record<string, unknown>
+    expect(colour('#325ac2').brand_color).toBe('#325ac2')
+    expect(colour(' #325AC2 ').brand_color).toBe('#325ac2')
+    for (const bad of ['325ac2', '#fff', 'red', '#325ac2;x', 'url(x)', '']) expect(colour(bad)).not.toHaveProperty('brand_color')
+  })
+
+  it('a local (loopback) client carries neither: its metadata is never served', () => {
+    const c = (readAtprotoConfig({ HOUSE_ATPROTO_BRAND_COLOR: '#325ac2' }, { hosted: false, origin: 'http://localhost:4419' }) as { config: AtprotoConfig }).config
+    const m = clientMetadata(c) as Record<string, unknown>
+    expect(m).not.toHaveProperty('brand_color')
+    expect(m).not.toHaveProperty('epds_handle_login_url')
   })
 
   it('the published keys are public: no private part', () => {

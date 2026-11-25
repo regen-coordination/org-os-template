@@ -11,7 +11,7 @@ import { baseRoutes, refuse } from '../test/data.ts'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
 import SignInPage from './SignInPage.tsx'
-import { away } from '../session/accountSignIn.ts'
+import { STARTED_AT, away } from '../session/accountSignIn.ts'
 
 const ADDRESS = fakeAddress(8)
 const ACCOUNT = `eip155:42220:${ADDRESS}`
@@ -288,7 +288,25 @@ describe('the sign-in page: a Bluesky or Certified account (network app B3)', ()
     fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Bluesky or Certified' }))
     await waitFor(() => expect(go).toHaveBeenCalled())
     expect(calls.filter(c => c.method === 'POST')[0]!.body).toEqual({ purpose: 'sign-in', return: 'https://network.example.org/refi-x/' })
+    // Remembered for Certified's "Sign in with Atmosphere", which comes back to /sign-in/atmosphere with a handle.
+    expect(sessionStorage.getItem(STARTED_AT)).toBe(`/sign-in?return=${encodeURIComponent('https://network.example.org/refi-x/')}`)
     go.mockRestore()
+  })
+
+  it('back from Certified\'s page with a Bluesky handle: it is filled in, and nothing starts until a click', async () => {
+    const { calls } = fetchRoutes({ 'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': OFFERED })
+    renderAt(<SignInPage />, '/sign-in?handle=me.bsky.social')
+    expect(((await screen.findByLabelText('Or a Bluesky handle')) as HTMLInputElement).value).toBe('me.bsky.social')
+    expect(calls.filter(c => c.method === 'POST')).toHaveLength(0)
+  })
+
+  it('in App, /sign-in/atmosphere is drawn alone and goes back to the sign-in page with the handle', async () => {
+    sessionStorage.clear()
+    fetchRoutes({ ...baseRoutes({ 'GET /api/session': OFFERED }), 'GET /api/registries': [], 'GET /api/resources': [] })
+    const { loc } = renderAt(<App />, '/sign-in/atmosphere?handle=me.bsky.social')
+    await waitFor(() => expect(loc.history.at(-1)).toBe('/sign-in?handle=me.bsky.social'))
+    expect(((await screen.findByLabelText('Or a Bluesky handle')) as HTMLInputElement).value).toBe('me.bsky.social')
+    expect(screen.queryByRole('navigation')).toBeNull()
   })
 
   it('is not offered when the Hub does not say so', async () => {

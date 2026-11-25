@@ -49,6 +49,15 @@ describe('Bluesky or Certified account (/account-links)', () => {
     expect(calls.filter(c => c.method === 'POST')[1]!.body).toEqual({ purpose: 'link', handle: 'one.bsky.social' })
   })
 
+  it('back from Certified\'s page with a Bluesky handle: it is filled in, and nothing starts until a click', async () => {
+    const { calls } = fetchRoutes({
+      'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': PERSON, 'GET /api/session/atproto/links': { links: [] },
+    })
+    renderAt(<AccountLinks />, '/account-links?handle=one.bsky.social')
+    expect(((await screen.findByLabelText('Or a Bluesky handle')) as HTMLInputElement).value).toBe('one.bsky.social')
+    expect(calls.filter(c => c.method === 'POST')).toHaveLength(0)
+  })
+
   it('says the server\'s sentence when the start is refused', async () => {
     fetchRoutes({
       'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': PERSON,

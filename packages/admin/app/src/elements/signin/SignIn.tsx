@@ -31,6 +31,8 @@ export interface SignInProps {
   /** With `atproto` (refi-dao-os network app B3): sign in with a Bluesky or Certified account. No handle: Certified's
    *  sign-in; a handle: that account's own. The page leaves for it and comes back signed in. */
   onAccount?(handle?: string): void
+  /** A Bluesky handle to fill in (back from Certified's page, ?handle=); nothing starts until a click. */
+  accountHandle?: string
   accountBusy?: boolean
   accountError?: string | null
 }
@@ -49,7 +51,7 @@ const hatCount = (n: number) => `${n} ${n === 1 ? 'hat' : 'hats'}`
  *  only: the wallet and the session are L5's, which pass the state and the two callbacks. When the state changes
  *  after the first draw, focus goes to the new state's action (the body, when it has none) and the new state is said
  *  once through the page's polite region; a failure is said by its own note. */
-export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, onCancel, portalHref = null, methods = ['wallet'], onEmail, emailBusy = false, emailError = null, sent = null, onAccount, accountBusy = false, accountError = null }: SignInProps) {
+export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, onCancel, portalHref = null, methods = ['wallet'], onEmail, emailBusy = false, emailError = null, sent = null, onAccount, accountHandle = '', accountBusy = false, accountError = null }: SignInProps) {
   const byEmail = methods.includes('email')
   const byAccount = methods.includes('atproto') && onAccount !== undefined
   const byWallet = methods.includes('wallet')
@@ -83,7 +85,7 @@ export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, 
         {!sent && byEmail && state === 'idle' && <>
           <EmailForm onEmail={onEmail} busy={emailBusy} />
           {emailError && <Note state="error">{emailError}</Note>}
-          {byAccount && <AccountForm onAccount={onAccount!} busy={accountBusy} />}
+          {byAccount && <AccountForm onAccount={onAccount!} busy={accountBusy} initial={accountHandle} />}
           {byAccount && accountError && <Note state="error">{accountError}</Note>}
           {byWallet && <div className="signin-go"><Button onClick={onSignIn}>Sign in with a wallet</Button></div>}
         </>}
@@ -121,9 +123,9 @@ export function SignIn({ org, state, hats = [], address, tree, error, onSignIn, 
 
 /** A Bluesky or Certified account (network app B3): the one button, which starts at Certified's sign-in, and a labelled
  *  field for a Bluesky handle. Pages say "Bluesky or Certified", never the protocol's name. */
-function AccountForm({ onAccount, busy }: { onAccount: (handle?: string) => void; busy: boolean }) {
+function AccountForm({ onAccount, busy, initial }: { onAccount: (handle?: string) => void; busy: boolean; initial: string }) {
   const id = useId()
-  const [handle, setHandle] = useState('')
+  const [handle, setHandle] = useState(initial)
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!busy && handle.trim() !== '') onAccount(handle)

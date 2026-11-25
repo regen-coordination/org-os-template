@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { useLocation, useSearch } from 'wouter'
 
 // The client half of the sign-in with a Bluesky or Certified account (refi-dao-os network app spec §5.1, §5.3; B3/B4):
 // ask the Hub to start an OAuth round-trip, then leave for the account's own sign-in page, which comes back to the Hub.
@@ -8,6 +9,17 @@ export type AccountPurpose = 'sign-in' | 'link' | 'add-node' | 'withdraw-node'
 /** What else a start carries: the node (add, withdraw) and where to come back (another of the org's sites, judged by I6). */
 export interface AccountStartOptions { node?: string; back?: string | null }
 export interface AccountLink { did: string; handle: string; linked: string }
+
+/** Where the last round-trip started (this tab's session storage): Certified's "Sign in with Atmosphere" sends a typed
+ *  Bluesky handle to /sign-in/atmosphere, which goes back there with the handle filled in (AtmospherePage). */
+export const STARTED_AT = 'hub.account-start'
+
+/** A handle as a page may fill it in from `?handle=`: trimmed, no leading @, at most a handle's length; else ''. The
+ *  server checks it again when a click starts the round-trip. */
+export function handleParam(raw: string | null | undefined): string {
+  const h = (raw ?? '').trim().replace(/^@/, '')
+  return h.length <= 253 ? h : ''
+}
 
 /** How the browser leaves for the account's sign-in page: a full load (another site). An object, so a test can stand in. */
 export const away = { go: (url: string): void => { window.location.assign(url) } }
@@ -44,13 +56,16 @@ export function useAccountStart(purpose: AccountPurpose, o: AccountStartOptions 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const going = useRef(false)
+  const [path] = useLocation()
+  const search = useSearch()
   const start = useCallback((handle?: string) => {
     if (going.current) return
     going.current = true
+    try { sessionStorage.setItem(STARTED_AT, search ? `${path}?${search}` : path) } catch { /* storage off: /sign-in */ }
     setBusy(true); setError(null)
     startAccount(purpose, handle, o).then(url => { away.go(url) }, (err: unknown) => {
       setError(err instanceof Error ? err.message : 'The sign-in could not be started.')
     }).finally(() => { going.current = false; setBusy(false) })
-  }, [purpose, o.node, o.back])
+  }, [purpose, o.node, o.back, path, search])
   return { start, busy, error }
 }

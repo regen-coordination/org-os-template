@@ -37,6 +37,7 @@ import AccountLinks from './pages/AccountLinks.tsx'
 import NetworkAccounts from './pages/NetworkAccounts.tsx'
 import NetworkAccount from './pages/NetworkAccount.tsx'
 import SignOutPage from './pages/SignOutPage.tsx'
+import AtmospherePage from './pages/AtmospherePage.tsx'
 import Workspace from './pages/Workspace.tsx'
 import PagePage from './workspace/PagePage.tsx' // DAO-OS L6 Task 16: /p/:id
 import CollectionPage from './workspace/CollectionPage.tsx' // DAO-OS L6 Task 17: /c/:collection, /c/:collection/:view
@@ -209,7 +210,7 @@ function HubApp() {
   // phone sheet reads the frame's width (frame.css).
   return (
     <ViewAsProvider source={source}><PanelProvider><InspectorProvider><SessionProvider>
-      {location === '/sign-in' ? <SignInPage /> : location === '/sign-out' ? <SignOutPage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: status.data?.mark ?? null }} nav={<Nav />} sites={<SitesBar />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
+      {location === '/sign-in' ? <SignInPage /> : location === '/sign-out' ? <SignOutPage /> : location === '/sign-in/atmosphere' ? <AtmospherePage /> : <Shell title={status.data?.org ?? 'org-os'} org={{ name: status.data?.org ?? 'org-os', mark: status.data?.mark ?? null }} nav={<Nav />} sites={<SitesBar />} top={<><HouseKeys /><HouseTop /><Palette /><KeyMap /></>}
         band={<><ViewAsBand /><ReadOnlyNotice /></>} aside={<RightSlot />} foot={<Dock />} bottom={<HouseBottom />}>
         <Switch>
           <Route path="/"><ToBoard id="home" /></Route>

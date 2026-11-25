@@ -7,7 +7,7 @@ import { Icon } from '../design/Icon.tsx'
 import { Note } from '../design/Note.tsx'
 import { useStatus } from '../queries.ts'
 import { useSessionView } from '../session/session.ts'
-import { accountLinks, unlinkAccount, useAccountStart } from '../session/accountSignIn.ts'
+import { accountLinks, handleParam, unlinkAccount, useAccountStart } from '../session/accountSignIn.ts'
 
 /** Said once a link comes back. */
 export const LINKED = 'Linked. Signing in with this account now signs you in as you, with your Roles.'
@@ -29,7 +29,7 @@ export default function AccountLinks() {
   const [unlinking, setUnlinking] = useState<string | null>(null)
   const [unlinkError, setUnlinkError] = useState<string | null>(null)
   const handleId = useId()
-  const [handle, setHandle] = useState('')
+  const [handle, setHandle] = useState(() => handleParam(new URLSearchParams(search).get('handle')))
 
   useEffect(() => { document.title = `Bluesky or Certified account · ${org}` }, [org])
 

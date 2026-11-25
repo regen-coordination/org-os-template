@@ -5,7 +5,7 @@ import { PageHead } from '../design/PageHead.tsx'
 import { Button } from '../design/Button.tsx'
 import { Note } from '../design/Note.tsx'
 import { useStatus } from '../queries.ts'
-import { useAccountStart } from '../session/accountSignIn.ts'
+import { handleParam, useAccountStart } from '../session/accountSignIn.ts'
 
 // /network-account (refi-dao-os network app spec §5.4, §5.7; final review of B8): a node adds or removes its own account
 // on the ReFi DAO Network from the Hub, by a click here, never from a link alone (a returning account may be approved
@@ -38,7 +38,7 @@ export default function NetworkAccount() {
   const node = useQuery({ queryKey: ['network', 'node', nodeId], queryFn: () => readNode(nodeId), enabled: valid, retry: false })
   const start = useAccountStart(purpose ?? 'add-node', { node: nodeId, back })
   const handleId = useId()
-  const [handle, setHandle] = useState('')
+  const [handle, setHandle] = useState(() => handleParam(q.get('handle')))
   const adding = purpose === 'add-node'
   const title = node.data ? (adding ? `Add ${node.data.title}’s account to the ReFi DAO Network` : `Remove ${node.data.title}’s account from the ReFi DAO Network`) : 'A node’s account'
 

@@ -170,7 +170,7 @@ describe('HOSTED_ENV', () => {
       'ORG_OS_BIND', 'ORG_OS_PORTAL_DIR', 'ORG_OS_PORTAL_EVERY', 'ORG_OS_PORTAL_ORIGIN', 'ORG_OS_HOSTED', 'ORG_OS_PRIVATE_DIR', 'ORG_OS_PUBLIC_ORIGIN',
       'ORG_OS_PUSH', 'ORG_OS_REFRESH_EVERY', 'ORG_OS_REMOTE_PRIVATE', 'ORG_OS_RPC', 'ORG_OS_TRUST_PROXY', 'PORT', 'HOUSE_INSTANCE_WRITES',
       'HOUSE_EMAIL_PEPPER', 'HOUSE_SESSION_PRIVATE_JWK', 'SESSION_COOKIE_NAME', 'SESSION_COOKIE_DOMAIN', 'RESEND_API_KEY', 'MAIL_FROM',
-      'HOUSE_ATPROTO_PRIVATE_JWK', // the ReFi DAO Network's sign-in with a Bluesky or Certified account (B2)
+      'HOUSE_ATPROTO_BRAND_COLOR', 'HOUSE_ATPROTO_PRIVATE_JWK', // the ReFi DAO Network's sign-in with a Bluesky or Certified account (B2)
     ].sort())
     expect(new Set(HOSTED_ENV).size).toBe(HOSTED_ENV.length)
   })

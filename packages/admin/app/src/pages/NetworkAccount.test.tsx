@@ -35,6 +35,16 @@ describe('Add or remove a node\'s account (/network-account)', () => {
     expect(calls.filter(c => c.method === 'POST')[1]!.body).toEqual({ purpose: 'add-node', node: 'refi-x', return: BACK, handle: 'refi-x.bsky.social' })
   })
 
+  it('back from Certified\'s page with the node\'s Bluesky handle: it is filled in, and nothing starts until a click', async () => {
+    const { calls } = fetchRoutes({
+      'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': OUT,
+      'GET /api/network/nodes/refi-x': { id: 'refi-x', title: 'ReFi X', account: null },
+    })
+    renderAt(<NetworkAccount />, '/network-account?purpose=add-node&node=refi-x&handle=refi-x.bsky.social')
+    expect(((await screen.findByLabelText('Or the node’s Bluesky handle')) as HTMLInputElement).value).toBe('refi-x.bsky.social')
+    expect(calls.filter(c => c.method === 'POST')).toHaveLength(0)
+  })
+
   it('remove: names the node and its account; the start is withdraw-node', async () => {
     vi.spyOn(away, 'go').mockImplementation(() => {})
     const { calls } = fetchRoutes({

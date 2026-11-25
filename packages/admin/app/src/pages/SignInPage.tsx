@@ -5,7 +5,7 @@ import { useStatus } from '../queries.ts'
 import { isWalletSession } from '../api.ts'
 import { isSignInPath, usePortalOrigin, useSession } from '../session/session.ts'
 import { signInReturn, useEmailSignIn } from '../session/emailSignIn.ts'
-import { useAccountStart } from '../session/accountSignIn.ts'
+import { handleParam, useAccountStart } from '../session/accountSignIn.ts'
 
 /** Where to go once signed in: `next` when it is a path of this Hub (one leading slash, not the sign-in page), else /. */
 export function nextOf(search: string): string {
@@ -60,7 +60,7 @@ export default function SignInPage() {
         onSignIn={() => { void signIn() }} onCancel={cancel} portalHref={portal}
         {...(offered ? { methods: offered } : {})} onEmail={email.send} emailBusy={email.state === 'sending'} emailError={email.error}
         sent={email.state === 'sent' ? email.sentence : null}
-        onAccount={account.start} accountBusy={account.busy} accountError={account.error} />
+        onAccount={account.start} accountHandle={handleParam(new URLSearchParams(search).get('handle'))} accountBusy={account.busy} accountError={account.error} />
     </main>
   )
 }

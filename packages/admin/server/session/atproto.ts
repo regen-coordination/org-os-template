@@ -16,7 +16,11 @@ import { safeReturn } from '../../lib/return-url.mjs'
 import { normalizeHandle } from '../network/check.ts'
 
 /** Every variable the AT Proto sign-in reads. */
-export const ATPROTO_ENV = ['HOUSE_ATPROTO_PRIVATE_JWK'] as const
+export const ATPROTO_ENV = ['HOUSE_ATPROTO_PRIVATE_JWK', 'HOUSE_ATPROTO_BRAND_COLOR'] as const
+/** The Hub page a Bluesky handle typed on Certified's sign-in page comes to (`?handle=`): it fills the handle in on the
+ *  page the round-trip started from, and starts nothing (app/src/pages/AtmospherePage.tsx). */
+export const ATMOSPHERE_PATH = '/sign-in/atmosphere'
+const BRAND_COLOR = /^#[0-9a-f]{6}$/
 /** Why a round-trip is made (§5.1 sign-in, §5.3 link, §5.4 and §5.7 a node adding or withdrawing its account). */
 export const PURPOSES = ['sign-in', 'link', 'add-node', 'withdraw-node'] as const
 export type Purpose = typeof PURPOSES[number]
@@ -33,7 +37,9 @@ const NODE_ID = /^[a-z0-9][a-z0-9-]{0,99}$/
 const JWK_REFUSAL = 'HOUSE_ATPROTO_PRIVATE_JWK is not an ES256 private key as a JWK (kty EC, crv P-256, d, x and y). Make one with node -e "const {privateKey}=require(\'crypto\').generateKeyPairSync(\'ec\',{namedCurve:\'P-256\'});console.log(JSON.stringify({...privateKey.export({format:\'jwk\'}),kid:\'house-1\'}))".'
 
 export type AtprotoConfig =
-  | { kind: 'confidential'; origin: string; clientId: string; redirectUri: string; privateJwk: JsonWebKey & { kid: string }; publicJwk: JsonWebKey & { kid: string } }
+  | { kind: 'confidential'; origin: string; clientId: string; redirectUri: string; privateJwk: JsonWebKey & { kid: string }; publicJwk: JsonWebKey & { kid: string }
+      /** The colour of Certified's sign-in page (its button and focus ring), `#rrggbb`; unset: Certified's own. */
+      brandColor?: string }
   | { kind: 'loopback'; origin: string; clientId: string; redirectUri: string }
 
 function es256Pair(text: string): { privateJwk: JsonWebKey & { kid: string }; publicJwk: JsonWebKey & { kid: string } } | null {
@@ -64,16 +70,21 @@ export function readAtprotoConfig(env: Record<string, string | undefined>, o: { 
   if (url.protocol !== 'https:') return { refuse: 'HOUSE_ATPROTO_PRIVATE_JWK is set, but the Hub\'s address is not https: a confidential client\'s metadata must be at a public https address.' }
   const pair = es256Pair(text)
   if (!pair) return { refuse: JWK_REFUSAL }
-  return { config: { kind: 'confidential', origin, clientId: `${origin}${METADATA_PATH}`, redirectUri: `${origin}${CALLBACK_PATH}`, ...pair } }
+  const colour = env.HOUSE_ATPROTO_BRAND_COLOR?.trim().toLowerCase()
+  return { config: { kind: 'confidential', origin, clientId: `${origin}${METADATA_PATH}`, redirectUri: `${origin}${CALLBACK_PATH}`, ...pair,
+    ...(colour && BRAND_COLOR.test(colour) ? { brandColor: colour } : {}) } }
 }
 
-/** The client's metadata (served at its client_id when confidential). Identity only: scope exactly `atproto`. */
+/** The client's metadata (served at its client_id when confidential). Identity only: scope exactly `atproto`. Certified's
+ *  sign-in page (ePDS) reads two more fields: `brand_color`, and `epds_handle_login_url`, its "Sign in with Atmosphere"
+ *  button, which sends the typed handle to the Hub's ATMOSPHERE_PATH page. */
 export function clientMetadata(config: AtprotoConfig): Record<string, unknown> {
   const common = { client_id: config.clientId, redirect_uris: [config.redirectUri], scope: 'atproto', grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'], dpop_bound_access_tokens: true }
   if (config.kind === 'loopback') return { ...common, application_type: 'native', token_endpoint_auth_method: 'none' }
   return { ...common, client_name: 'ReFi DAO Hub', client_uri: config.origin, application_type: 'web', token_endpoint_auth_method: 'private_key_jwt',
-    token_endpoint_auth_signing_alg: 'ES256', jwks_uri: `${config.origin}${JWKS_PATH}` }
+    token_endpoint_auth_signing_alg: 'ES256', jwks_uri: `${config.origin}${JWKS_PATH}`,
+    epds_handle_login_url: `${config.origin}${ATMOSPHERE_PATH}`, ...(config.brandColor ? { brand_color: config.brandColor } : {}) }
 }
 
 /** The client's public key set: never the private part. */
