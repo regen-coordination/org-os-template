@@ -29,6 +29,10 @@ export const PENDING_HELD = (node: string) => `Thanks. ${node} already has an ac
   + 'a steward will confirm with your node through a channel already on its page once the current account is removed.'
 /** Kept privately with a pending entry held because its node already has a live account (stewards see it, B6). */
 export const HELD_NOTE = 'the node already has a live account'
+/** A steward's own reasons (Remove, Decline) are kept with this prefix, so the Hub tells them from its own. */
+export const STEWARD_REASON = 'steward: '
+/** Kept with a pending entry for an account a steward removed or declined on this node before (final review, B8). */
+export const STEWARD_HELD_NOTE = 'a steward removed or declined this account on this node before'
 export const NODE_UNKNOWN = 'That node is not on the ReFi DAO Network yet. A new node joins through the Local Node form first. Nothing was added.'
 export const NODE_PERSON = 'This account is linked to a person in this Hub, and a person\'s account is never a node\'s. Sign in with the node\'s own account. Nothing was added.'
 export const NODE_TAKEN = 'This account is already another node\'s account on the ReFi DAO Network, and an account holds one node. Nothing was added.'
@@ -44,9 +48,11 @@ export type Outcome = 'added' | 'already' | 'pending' | 'held' | 'withdrawn' | '
  *  Hub's own sentence. */
 function outcome(c: Context, back: string | null, word: Outcome, text: string, status: 200 | 202 | 400 | 404 | 409 | 422): Response {
   if (back) {
-    const u = new URL(back)
+    // An address on the org's domain, or a Hub path (I6 keeps a path as written): the word goes on either.
+    const path = back.startsWith('/')
+    const u = new URL(back, 'https://hub.invalid')
     u.searchParams.set('network', word)
-    return c.redirect(u.href, 303)
+    return c.redirect(path ? `${u.pathname}${u.search}${u.hash}` : u.href, 303)
   }
   return c.text(text, status)
 }
@@ -125,6 +131,11 @@ export function addNodeAccount(d: EntryDeps): IdentityHandler {
     if (nodeLive) {
       if (!pendingHere) await d.store.putNetworkEntry(entry('pending', null, HELD_NOTE))
       return outcome(c, who.return, 'held', PENDING_HELD(node.title), 202)
+    }
+    // A steward removed or declined this account on this node: it never comes back by itself, even when it matches.
+    if (entries.some(e => e.state === 'removed' && e.node === who.node && e.did === who.did && e.reason?.startsWith(STEWARD_REASON))) {
+      if (!pendingHere) await d.store.putNetworkEntry(entry('pending', null, STEWARD_HELD_NOTE))
+      return outcome(c, who.return, 'pending', PENDING, 202)
     }
     if (!match.match) {
       if (!pendingHere) await d.store.putNetworkEntry(entry('pending', null, null))

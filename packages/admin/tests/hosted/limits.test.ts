@@ -23,7 +23,6 @@ function app(o: { trustProxy?: boolean; now?: () => number } = {}): Hono {
   a.post('/api/session/nonce', c => c.json({ nonce: 'n' }))
   a.post('/api/session', c => c.json({ ok: true }))
   a.post('/api/session/atproto/start', c => c.json({ url: 'https://x.example/' }))
-  a.get('/api/session/atproto/go', c => c.redirect('https://x.example/', 303))
   a.get('/api/proposals/:id', c => c.json({ id: c.req.param('id') }))
   a.put('/api/registries/:name/:id', c => c.json({ ok: true }))
   return a
@@ -85,15 +84,6 @@ describe('rateLimits', () => {
     expect(statuses).toEqual([200, 200, 200, 200, 200, 429])
     expect((await a.request('/api/session/atproto/start', { method: 'POST', headers: from(B) })).status).toBe(200)
     expect((await a.request('/api/session/nonce', { method: 'POST', headers: from(A) })).status).toBe(200)
-  })
-
-  // B8: the network site starts the same round-trip by a link (GET /api/session/atproto/go): the same bucket.
-  it('the link start shares the AT Proto start\'s bucket', async () => {
-    const a = app({ now: () => 0 })
-    for (let i = 0; i < 3; i++) await a.request('/api/session/atproto/start', { method: 'POST', headers: from(A) })
-    const statuses: number[] = []
-    for (let i = 0; i < 3; i++) statuses.push((await a.request('/api/session/atproto/go?purpose=sign-in', { headers: from(A) })).status)
-    expect(statuses).toEqual([303, 303, 429])
   })
 
   it('writes are limited per session, reads per address', async () => {

@@ -8,7 +8,7 @@ import type { AtprotoIdentity } from '../../server/session/atproto.ts'
 import type { CheckResult } from '../../server/network/check.ts'
 import {
   addNodeAccount, withdrawNodeAccount, readNode, readKnown,
-  ADDED, ALREADY, PENDING, PENDING_HELD, NODE_UNKNOWN, NODE_PERSON, NODE_TAKEN, CHECK_FAILED, WITHDRAWN, NOT_ON, HELD_NOTE,
+  ADDED, ALREADY, PENDING, PENDING_HELD, NODE_UNKNOWN, NODE_PERSON, NODE_TAKEN, CHECK_FAILED, WITHDRAWN, NOT_ON, HELD_NOTE, STEWARD_HELD_NOTE,
 } from '../../server/network/entries.ts'
 
 // A node adds or withdraws its own network account (refi-dao-os network app spec §5.4, §5.7; plan task B5). The
@@ -295,5 +295,30 @@ describe('coming back to the network site (B8)', () => {
     const h = await house()
     const res = await addBack(h, 'refi-x', DID_A, 'refi-x.org', 'https://network.example.org/?view=map')
     expect(res.headers.get('location')).toBe('https://network.example.org/?view=map&network=added')
+  })
+})
+
+describe('after the final review', () => {
+  it('a return that is a Hub path gets the word too (no crash after the write)', async () => {
+    const h = await house()
+    const res = await addBack(h, 'refi-x', DID_A, 'refi-x.org', '/network-accounts')
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toBe('/network-accounts?network=added')
+    expect(only(h, 'live')).toHaveLength(1)
+  })
+
+  it('an account a steward removed does not go live again by itself: it waits, with a note; one the node withdrew does', async () => {
+    const h = await house()
+    await h.store.putNetworkEntry({ id: 'ne-s', did: DID_A, node: 'refi-x', handle: 'refi-x.org', on: ['bluesky'], state: 'live', why: 'domain',
+      added: T0.toISOString(), addedBy: DID_A, check: 'pass', checkedOn: '2026-12-18', reason: null, channel: null, decided: null })
+    await h.store.setNetworkEntryState('ne-s', 'removed', { reason: 'steward: the domain lapsed', at: T0.toISOString() })
+    const res = await add(h, 'refi-x', DID_A, 'refi-x.org')
+    expect(res.status).toBe(202)
+    expect(only(h, 'pending')).toMatchObject([{ did: DID_A, node: 'refi-x', reason: STEWARD_HELD_NOTE }])
+    expect(only(h, 'live')).toEqual([])
+    const h2 = await house()
+    await add(h2, 'refi-x', DID_A, 'refi-x.org')
+    await withdraw(h2, 'refi-x', DID_A, 'refi-x.org')
+    expect((await add(h2, 'refi-x', DID_A, 'refi-x.org')).status).toBe(200)
   })
 })

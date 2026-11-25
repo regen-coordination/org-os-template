@@ -166,6 +166,17 @@ describe('a Guest on the Hub', () => {
     expect(await (await call(h, 'GET', '/api/session', cookie)).json()).toMatchObject({ signedIn: false })
   })
 
+  it('signing out from another of the org\'s sites: the Hub says where to go back (I6), and only on the org\'s domain', async () => {
+    const h = await house()
+    const { cookie } = await proven(h, DID_GUEST)
+    const back = 'https://network.example.org/refi-x/'
+    const res = await call(h, 'DELETE', `/api/session?return=${encodeURIComponent(back)}`, cookie)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ next: back })
+    expect(await (await call(h, 'GET', '/api/session', cookie)).json()).toMatchObject({ signedIn: false })
+    expect(await (await call(h, 'DELETE', `/api/session?return=${encodeURIComponent('https://evil.example.com/')}`)).json()).toEqual({ next: `${HUB}/` })
+  })
+
   it('a Guest whose row is gone (they linked their account, or were removed) is signed out', async () => {
     const h = await house()
     const { cookie } = await proven(h, DID_GUEST)

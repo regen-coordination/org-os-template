@@ -30,7 +30,8 @@ export default function SignInPage() {
   const [, navigate] = useLocation()
   const portal = usePortalOrigin()
   const email = useEmailSignIn(signInReturn(search))
-  const account = useAccountStart('sign-in')
+  // Coming from another of the org's sites (the network site): back there (the server judges it by I6).
+  const account = useAccountStart('sign-in', { back: signInReturn(search) })
   // Hosted only (PR7-R68): a local Hub offers email too (its links go to the server's log), but its sign-in stays the
   // wallet's, as in 0.6.
   const offered = session && !session.signedIn && session.mode === 'hosted' && session.methods && session.methods.length > 0 ? session.methods : undefined

@@ -75,13 +75,12 @@ export function rateLimits(o: { trustProxy: boolean; now?: () => number }): Midd
   const reads = new Buckets({ ratePerMin: 300, burst: 100, ...clock })
   return async (c, next) => {
     const method = c.req.method
-    // The sign-in starts by route; the network site's link start (B8) is a GET, held to the same bucket as its POST.
-    const route = method === 'POST' || c.req.path === '/api/session/atproto/go' ? answeringRoute(c) : null
+    const route = method === 'POST' ? answeringRoute(c) : null
     const address = () => `a:${clientAddress(c, o.trustProxy)}`
     let taken
     if (route === '/api/session/nonce') taken = nonce.take(address())
     else if (route === '/api/session') taken = signIn.take(address())
-    else if (route === '/api/session/atproto/start' || route === '/api/session/atproto/go') taken = atprotoStart.take(address())
+    else if (route === '/api/session/atproto/start') taken = atprotoStart.take(address())
     else if (READS.has(method)) taken = reads.take(address())
     else {
       const cookie = c.req.header('cookie')

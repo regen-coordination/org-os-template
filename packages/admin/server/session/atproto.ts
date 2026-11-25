@@ -13,6 +13,7 @@ import type { Context, Hono } from 'hono'
 import { JoseKey, NodeOAuthClient, requestLocalLock } from '@atproto/oauth-client-node'
 import type { PrivateStore } from '../private/store.ts'
 import { safeReturn } from '../../lib/return-url.mjs'
+import { normalizeHandle } from '../network/check.ts'
 
 /** Every variable the AT Proto sign-in reads. */
 export const ATPROTO_ENV = ['HOUSE_ATPROTO_PRIVATE_JWK'] as const
@@ -25,8 +26,6 @@ export const FLOW_COOKIE = 'atproto_flow'
 export const CERTIFIED_ENTRYWAY = 'https://certified.one'
 
 const CALLBACK_PATH = '/api/session/atproto/callback'
-/** B8: the same start by a plain link, for the network site (the Hub answers no other site's script). Never `link`. */
-const GO_PATH = '/api/session/atproto/go'
 const METADATA_PATH = '/oauth/client-metadata.json'
 const JWKS_PATH = '/oauth/jwks.json'
 const FLOW_MS = 60 * 60 * 1000
@@ -137,7 +136,6 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
   if (config === null) {
     const notOffered = (c: Context) => c.json({ error: 'Sign-in with a Bluesky or Certified account is not offered on this Hub.' }, 404)
     app.post('/api/session/atproto/start', notOffered)
-    app.get(GO_PATH, notOffered)
     app.get(CALLBACK_PATH, notOffered)
     return
   }
@@ -170,25 +168,26 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
     },
   }
 
-  /** The start, from a JSON body (POST) or a link's query (GET): the account's sign-in page, and the flow cookie. */
+  /** The start, from a Hub page's click (a JSON POST, so the Origin guard holds; never a link from another site, final
+   *  review of B8): the account's sign-in page, and the flow cookie. */
   type Begun = { url: string; cookie: string } | { status: 400 | 401; error: string }
-  const begin = async (c: Context, f: { purpose?: unknown; node?: unknown; handle?: unknown; return?: unknown }, via: 'post' | 'get'): Promise<Begun> => {
+  const begin = async (c: Context, f: { purpose?: unknown; node?: unknown; handle?: unknown; return?: unknown }): Promise<Begun> => {
     const { purpose, node } = f
     if (typeof purpose !== 'string' || !(PURPOSES as readonly string[]).includes(purpose)) {
       return { status: 400, error: `Send { purpose }: one of ${PURPOSES.join(', ')}.` }
     }
-    if (via === 'get' && purpose === 'link') return { status: 400, error: 'Linking your account starts from your page in the Hub, not from a link.' }
     if ((purpose === 'add-node' || purpose === 'withdraw-node') && (typeof node !== 'string' || !NODE_ID.test(node))) {
       return { status: 400, error: 'Send { node }: the id of the node whose account this is.' }
     }
     const by = d.personOf(c)
     if (purpose === 'link' && !by) return { status: 401, error: 'Sign in with your emailed link first, then link your account from your page in the Hub.' }
-    const given = f.handle
-    if (given !== undefined && (typeof given !== 'string' || given.trim() === '' || given.length > 253)) {
+    // A handle, never an address: the client would follow a URL to any server it names.
+    const given = f.handle === undefined ? undefined : typeof f.handle === 'string' ? normalizeHandle(f.handle) : null
+    if (given === null) {
       return { status: 400, error: 'Send { handle } as the account\'s handle (such as you.bsky.social), or leave it out to sign in with Certified.' }
     }
     const back = typeof f.return === 'string' && f.return !== '' ? safeReturn(f.return, config.origin, d.returnDomain ?? null) : null
-    const input = typeof given === 'string' ? given.trim().replace(/^@/, '') : CERTIFIED_ENTRYWAY
+    const input = given ?? CERTIFIED_ENTRYWAY
     const flow = randomBytes(32).toString('base64url')
     const appState = JSON.stringify({ purpose, node: typeof node === 'string' ? node : null, by, flow: hash(flow), return: back })
     let url: URL
@@ -208,19 +207,10 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
   app.post('/api/session/atproto/start', async c => {
     let body: Record<string, unknown> | null = null
     try { const b: unknown = await c.req.json(); body = b && typeof b === 'object' && !Array.isArray(b) ? b as Record<string, unknown> : null } catch { body = null }
-    const begun = await begin(c, body ?? {}, 'post')
+    const begun = await begin(c, body ?? {})
     if ('error' in begun) return c.json({ error: begun.error }, begun.status)
     c.header('set-cookie', begun.cookie)
     return c.json({ url: begun.url })
-  })
-
-  // B8: the same start by a link (sign-in, add-node, withdraw-node), answered by leaving for the account's sign-in.
-  app.get(GO_PATH, async c => {
-    const q = c.req.query()
-    const begun = await begin(c, { purpose: q.purpose, node: q.node, handle: q.handle, return: q.return }, 'get')
-    if ('error' in begun) return c.text(begun.error, begun.status)
-    c.header('set-cookie', begun.cookie)
-    return c.redirect(begun.url, 303)
   })
 
   app.get(CALLBACK_PATH, async c => {

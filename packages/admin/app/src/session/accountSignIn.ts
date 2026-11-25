@@ -4,7 +4,9 @@ import { useCallback, useRef, useState } from 'react'
 // ask the Hub to start an OAuth round-trip, then leave for the account's own sign-in page, which comes back to the Hub.
 // Pages say "Bluesky or Certified", never "AT Proto".
 
-export type AccountPurpose = 'sign-in' | 'link'
+export type AccountPurpose = 'sign-in' | 'link' | 'add-node' | 'withdraw-node'
+/** What else a start carries: the node (add, withdraw) and where to come back (another of the org's sites, judged by I6). */
+export interface AccountStartOptions { node?: string; back?: string | null }
 export interface AccountLink { did: string; handle: string; linked: string }
 
 /** How the browser leaves for the account's sign-in page: a full load (another site). An object, so a test can stand in. */
@@ -17,10 +19,11 @@ async function answer<T>(res: Response): Promise<T> {
 }
 
 /** `POST /api/session/atproto/start`: the account's sign-in page to go to. No handle: Certified's sign-in. */
-export async function startAccount(purpose: AccountPurpose, handle?: string): Promise<string> {
+export async function startAccount(purpose: AccountPurpose, handle?: string, o: AccountStartOptions = {}): Promise<string> {
   const h = handle?.trim().replace(/^@/, '')
   const res = await fetch('/api/session/atproto/start', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ purpose, ...(h ? { handle: h } : {}) }),
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ purpose, ...(o.node ? { node: o.node } : {}), ...(o.back ? { return: o.back } : {}), ...(h ? { handle: h } : {}) }),
   })
   return (await answer<{ url: string }>(res)).url
 }
@@ -37,7 +40,7 @@ export async function unlinkAccount(did: string): Promise<void> {
 }
 
 /** One start at a time; on success the browser leaves, on refusal the server's sentence. */
-export function useAccountStart(purpose: AccountPurpose): { start(handle?: string): void; busy: boolean; error: string | null } {
+export function useAccountStart(purpose: AccountPurpose, o: AccountStartOptions = {}): { start(handle?: string): void; busy: boolean; error: string | null } {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const going = useRef(false)
@@ -45,9 +48,9 @@ export function useAccountStart(purpose: AccountPurpose): { start(handle?: strin
     if (going.current) return
     going.current = true
     setBusy(true); setError(null)
-    startAccount(purpose, handle).then(url => { away.go(url) }, (err: unknown) => {
+    startAccount(purpose, handle, o).then(url => { away.go(url) }, (err: unknown) => {
       setError(err instanceof Error ? err.message : 'The sign-in could not be started.')
     }).finally(() => { going.current = false; setBusy(false) })
-  }, [purpose])
+  }, [purpose, o.node, o.back])
   return { start, busy, error }
 }

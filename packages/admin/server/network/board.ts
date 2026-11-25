@@ -10,12 +10,14 @@ import type { Context, Hono } from 'hono'
 import type { NetworkEntry, PrivateStore } from '../private/store.ts'
 import { personOf } from '../request.ts'
 import { MEMBERS_ONLY } from '../visibility/gate.ts'
-import { readNode, closeOthers } from './entries.ts'
+import { readNode, closeOthers, STEWARD_REASON } from './entries.ts'
 import { profileTarget } from './match.ts'
 
 export const STEWARD_ROLE = 'steward'
 export const STEWARDS_ONLY = 'Only stewards see and decide the network\'s node accounts.'
 export const PENDING_DAYS = 30
+/** How long the public read names a node whose account came down: two weekly copies (final review, B8). */
+export const REMOVED_PUBLIC_DAYS = 14
 const DAY_MS = 86_400_000
 const REASON_MAX = 500
 const ASK_REASON = 'Send { reason }: a few words on why, kept privately.'
@@ -92,7 +94,7 @@ export function mountNetworkBoard(app: Hono, d: BoardDeps): void {
     if (!reason) return c.json({ error: ASK_REASON }, 400)
     const e = byId(c.req.param('id'), 'live')
     if (!e) return c.json({ error: NOT_FOUND }, 404)
-    await d.store.setNetworkEntryState(e.id, 'removed', { reason, at: now().toISOString() })
+    await d.store.setNetworkEntryState(e.id, 'removed', { reason: `${STEWARD_REASON}${reason}`, at: now().toISOString() })
     return c.body(null, 204)
   })
 
@@ -102,7 +104,7 @@ export function mountNetworkBoard(app: Hono, d: BoardDeps): void {
     if (!reason) return c.json({ error: ASK_REASON }, 400)
     const e = byId(c.req.param('id'), 'pending')
     if (!e) return c.json({ error: NOT_FOUND }, 404)
-    await d.store.setNetworkEntryState(e.id, 'removed', { reason, at: now().toISOString() })
+    await d.store.setNetworkEntryState(e.id, 'removed', { reason: `${STEWARD_REASON}${reason}`, at: now().toISOString() })
     return c.body(null, 204)
   })
 
@@ -138,11 +140,22 @@ export function mountNetworkBoard(app: Hono, d: BoardDeps): void {
   // B7: the public read (C1's public fields only), for the network site. Anyone, signed out included.
   app.get('/api/network', c => {
     const { live, removed } = shown(d.store)
+    // Only recent removals: the weekly copy carries the rest, and a node that came back by the form route must show.
+    const since = new Date(now().getTime() - REMOVED_PUBLIC_DAYS * DAY_MS).toISOString().slice(0, 10)
     return c.json({
       as_of: now().toISOString(),
       entries: live.map(e => ({ node: e.node, did: e.did, handle: e.handle, on: e.on })),
-      removed: [...removed.keys()].map(node => ({ node })),
+      removed: [...removed].filter(([, on]) => on >= since).map(([node]) => ({ node })),
     }, 200, { 'cache-control': 'public, max-age=60' })
+  })
+
+  // The Hub's own add/remove page (final review, B8) names the node and says whether it has an account: public words.
+  app.get('/api/network/nodes/:id', c => {
+    const id = c.req.param('id')
+    const node = readNode(d.repo, id)
+    if (!node) return c.json({ error: 'That node is not on the ReFi DAO Network yet.' }, 404)
+    const live = d.store.networkEntries('live').find(e => e.node === id)
+    return c.json({ id, title: node.title, account: live ? { handle: live.handle } : null }, 200, { 'cache-control': 'public, max-age=60' })
   })
 }
 

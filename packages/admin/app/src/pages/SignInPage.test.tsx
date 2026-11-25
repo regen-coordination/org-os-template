@@ -278,6 +278,19 @@ describe('the sign-in page: a Bluesky or Certified account (network app B3)', ()
     go.mockRestore()
   })
 
+  it('coming from another of the org\'s sites (the network site), the round-trip carries the return address', async () => {
+    const go = vi.spyOn(away, 'go').mockImplementation(() => {})
+    const { calls } = fetchRoutes({
+      'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': OFFERED,
+      'POST /api/session/atproto/start': { url: 'https://auth.example/authorize?y=2' },
+    })
+    renderAt(<SignInPage />, `/sign-in?return=${encodeURIComponent('https://network.example.org/refi-x/')}`)
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Bluesky or Certified' }))
+    await waitFor(() => expect(go).toHaveBeenCalled())
+    expect(calls.filter(c => c.method === 'POST')[0]!.body).toEqual({ purpose: 'sign-in', return: 'https://network.example.org/refi-x/' })
+    go.mockRestore()
+  })
+
   it('is not offered when the Hub does not say so', async () => {
     fetchRoutes({ 'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': { ...OFFERED, methods: ['email'] } })
     renderAt(<SignInPage />, '/sign-in')

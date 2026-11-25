@@ -13,6 +13,7 @@ import { personOf, viewerOf } from '../request.ts'
 import { endPersonSession } from './person.ts'
 import { personName } from './names.ts'
 import { clearedSessionCookie } from '../../lib/session-token.mjs'
+import { safeReturn } from '../../lib/return-url.mjs'
 import type { SignInConfig } from './config.ts'
 
 /** §4.3 step 3's refusal: the signature recovers to another address than the message's. */
@@ -204,6 +205,10 @@ export function mountSession(app: Hono, d: SessionDeps): void {
       const p = personOf(c)
       const cleared = p && d.store ? await endPersonSession(d.store, d.signIn, p.claims) : clearedSessionCookie(d.signIn.cookie)
       c.header('set-cookie', cleared, { append: true })
+      // Signing out from another of the org's sites (the network site, final review of its B8): where to go back, as the
+      // I6 rule judges it, for the Hub's sign-out page to follow.
+      const ret = c.req.query('return')
+      if (ret !== undefined) return c.json({ next: safeReturn(ret, d.signIn.issuer, d.signIn.cookie.domain) })
     }
     return c.body(null, 204)
   })

@@ -180,9 +180,9 @@ describe('the routes', () => {
   })
 })
 
-// B8: the network site (network.refidao.com) starts a round-trip by a plain link, since the Hub answers no other site's
-// script; and the browser comes back to where it started (the I6 return rule: the org's domain over https, or a Hub path).
-describe('starting from the network site, and coming back', () => {
+// B8, after the final review: every round-trip starts from a Hub page by a click (POST, Origin-guarded); a link
+// from another site cannot start one. The browser comes back to where it started (the I6 return rule).
+describe('starting a round-trip, and coming back', () => {
   const NET = 'https://network.example.org/refi-x/'
   async function seamApp(o: { onIdentity?: (who: AtprotoIdentity) => void } = {}) {
     const s = await store()
@@ -196,43 +196,41 @@ describe('starting from the network site, and coming back', () => {
       },
       onIdentity: { 'add-node': (c, who) => { o.onIdentity?.(who); return c.text('ok') } },
     })
-    return { a, s, started }
+    const start = (body: Record<string, unknown>) => a.request('/api/session/atproto/start', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })
+    return { a, s, started, start }
   }
 
-  it('GET go: add-node for a node, with a return on the org\'s domain, leaves for the account\'s sign-in with the flow cookie', async () => {
+  it('there is no GET start: a link from another page cannot start a round-trip', async () => {
     const { a, started } = await seamApp()
-    const r = await a.request(`/api/session/atproto/go?purpose=add-node&node=refi-x&return=${encodeURIComponent(NET)}`)
-    expect(r.status).toBe(303)
-    expect(r.headers.get('location')).toBe('https://auth.example.net/authorize?x=1')
-    expect(r.headers.getSetCookie()[0]).toMatch(new RegExp(`^${FLOW_COOKIE}=[A-Za-z0-9_-]{20,}; `))
-    expect(started).toHaveLength(1)
-    expect(started[0]).toMatchObject({ input: 'https://certified.one', state: { purpose: 'add-node', node: 'refi-x', by: null, return: NET } })
-  })
-
-  it('GET go takes a handle; a return off the org\'s domain is the Hub\'s root (never an open redirect)', async () => {
-    const { a, started } = await seamApp()
-    await a.request(`/api/session/atproto/go?purpose=sign-in&handle=${encodeURIComponent('@x.bsky.social')}&return=${encodeURIComponent('https://evil.example.com/')}`)
-    expect(started[0]).toMatchObject({ input: 'x.bsky.social', state: { purpose: 'sign-in', return: `${ORIGIN}/` } })
-  })
-
-  it('GET go never starts a link (that needs the member\'s own page in the Hub), nor an unknown purpose, nor a node-less add', async () => {
-    const { a, started } = await seamApp()
-    for (const q of ['purpose=link', 'purpose=write-posts', 'purpose=add-node', 'purpose=withdraw-node&node=Bad%20Id']) {
-      expect((await a.request(`/api/session/atproto/go?${q}`)).status, q).toBe(400)
+    for (const q of ['purpose=withdraw-node&node=refi-x', 'purpose=sign-in&handle=x.bsky.social']) {
+      expect((await a.request(`/api/session/atproto/go?${q}`)).status, q).toBe(404)
     }
     expect(started).toEqual([])
   })
 
-  it('POST start keeps a return too', async () => {
-    const { a, started } = await seamApp()
-    await a.request('/api/session/atproto/start', { method: 'POST', body: JSON.stringify({ purpose: 'withdraw-node', node: 'refi-x', return: NET }), headers: { 'content-type': 'application/json' } })
-    expect(started[0]?.state).toMatchObject({ purpose: 'withdraw-node', node: 'refi-x', return: NET })
+  it('a handle must be a handle (an @handle or a profile link is read as one); an address is refused, never followed', async () => {
+    const { start, started } = await seamApp()
+    for (const handle of ['https://evil.example', 'evil.example/path', 'http://x.bsky.social', 'did:plc:aaaaaaaaaaaaaaaaaaaaaaaa', 'not a handle']) {
+      expect((await start({ purpose: 'sign-in', handle })).status, handle).toBe(400)
+    }
+    expect(started).toEqual([])
+    await start({ purpose: 'sign-in', handle: '@X.bsky.social' })
+    await start({ purpose: 'sign-in', handle: 'https://bsky.app/profile/y.bsky.social' })
+    expect(started.map(s => s.input)).toEqual(['x.bsky.social', 'y.bsky.social'])
+  })
+
+  it('the start keeps a return on the org\'s domain; one off it is the Hub\'s root (never an open redirect)', async () => {
+    const { start, started } = await seamApp()
+    await start({ purpose: 'withdraw-node', node: 'refi-x', return: NET })
+    await start({ purpose: 'sign-in', return: 'https://evil.example.com/' })
+    expect(started[0]).toMatchObject({ input: 'https://certified.one', state: { purpose: 'withdraw-node', node: 'refi-x', by: null, return: NET } })
+    expect(started[1]?.state).toMatchObject({ purpose: 'sign-in', return: `${ORIGIN}/` })
   })
 
   it('the callback hands the return on to what the purpose does', async () => {
     let seen: AtprotoIdentity | null = null
-    const { a, s, started } = await seamApp({ onIdentity: who => { seen = who } })
-    const go = await a.request(`/api/session/atproto/go?purpose=add-node&node=refi-x&return=${encodeURIComponent(NET)}`)
+    const { a, s, started, start } = await seamApp({ onIdentity: who => { seen = who } })
+    const go = await start({ purpose: 'add-node', node: 'refi-x', return: NET })
     const flow = /^atproto_flow=([^;]+)/.exec(go.headers.getSetCookie()[0]!)![1]!
     // What the client keeps under the state key it sent to the authorization server (the seam stands in for both).
     await s.oauthStores().stateStore.set('st-1', { appState: JSON.stringify(started[0]!.state) } as never)
@@ -241,8 +239,8 @@ describe('starting from the network site, and coming back', () => {
     expect(seen).toMatchObject({ did: 'did:plc:aaaaaaaaaaaaaaaaaaaaaaaa', handle: 'refi-x.org', purpose: 'add-node', node: 'refi-x', return: NET })
   })
 
-  it('the GET start and the callback are public reads (a signed-out browser lands on both)', () => {
-    expect(PUBLIC_READS).toContain('/api/session/atproto/go')
+  it('the callback is a public read (a signed-out browser lands on it); no GET start is', () => {
     expect(PUBLIC_READS).toContain('/api/session/atproto/callback')
+    expect(PUBLIC_READS).not.toContain('/api/session/atproto/go')
   })
 })

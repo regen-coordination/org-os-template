@@ -159,7 +159,7 @@ describe('Remove', () => {
     const h = await house()
     await h.store.putNetworkEntry(base({}))
     expect((await call(h, 'POST', '/api/network/entries/ne-1/remove', h.steward, { reason: 'the node asked us by email' })).status).toBe(204)
-    expect(h.store.networkEntries()[0]).toMatchObject({ state: 'removed', reason: 'the node asked us by email', decided: T0.toISOString() })
+    expect(h.store.networkEntries()[0]).toMatchObject({ state: 'removed', reason: 'steward: the node asked us by email', decided: T0.toISOString() })
     expect((await list(h)).new).toEqual([])
   })
 
@@ -222,7 +222,7 @@ describe('Decline', () => {
     await h.store.putNetworkEntry(base({ id: 'ne-p', state: 'pending', why: null }))
     expect((await call(h, 'POST', '/api/network/entries/ne-p/decline', h.steward, {})).status).toBe(400)
     expect((await call(h, 'POST', '/api/network/entries/ne-p/decline', h.steward, { reason: 'the node did not know it' })).status).toBe(204)
-    expect(h.store.networkEntries()[0]).toMatchObject({ state: 'removed', why: null, reason: 'the node did not know it' })
+    expect(h.store.networkEntries()[0]).toMatchObject({ state: 'removed', why: null, reason: 'steward: the node did not know it' })
     expect((await list(h)).waiting).toEqual([])
   })
 })
@@ -281,5 +281,27 @@ describe('the public read (B7, contract C1\'s public fields)', () => {
     await h.store.putNetworkEntry(base({ id: 'ne-d', state: 'pending', why: null }))
     await h.store.setNetworkEntryState('ne-d', 'removed', { reason: 'declined', at: T0.toISOString() })
     expect(await (await call(h, 'GET', '/api/network')).json()).toEqual({ as_of: T0.toISOString(), entries: [], removed: [] })
+  })
+})
+
+describe('after the final review: the public read', () => {
+  it('lists a node as removed only for 14 days after its removal (the export keeps every removal, with its date)', async () => {
+    const h = await house()
+    await h.store.putNetworkEntry(base({ id: 'ne-old', node: 'refi-y', handle: 'refi-y.org' }))
+    await h.store.setNetworkEntryState('ne-old', 'removed', { reason: 'withdrawn by the node', at: new Date(T0.getTime() - 15 * 86_400_000).toISOString() })
+    await h.store.putNetworkEntry(base({ id: 'ne-new', did: DID_B, handle: 'refi-x.org' }))
+    await h.store.setNetworkEntryState('ne-new', 'removed', { reason: 'withdrawn by the node', at: new Date(T0.getTime() - 13 * 86_400_000).toISOString() })
+    expect((await (await call(h, 'GET', '/api/network')).json()).removed).toEqual([{ node: 'refi-x' }])
+    expect((await (await call(h, 'GET', '/api/network/export', h.steward)).json()).removed.map((r: { node: string }) => r.node).sort()).toEqual(['refi-x', 'refi-y'])
+  })
+
+  it('a node\'s public card for the Hub\'s add/remove page: its title and live account; not a local node, not found', async () => {
+    const h = await house()
+    await h.store.putNetworkEntry(base({}))
+    const x = await call(h, 'GET', '/api/network/nodes/refi-x')
+    expect(x.status).toBe(200)
+    expect(await x.json()).toEqual({ id: 'refi-x', title: 'ReFi X', account: { handle: 'refi-x.org' } })
+    expect(await (await call(h, 'GET', '/api/network/nodes/refi-y')).json()).toEqual({ id: 'refi-y', title: 'ReFi Y', account: null })
+    expect((await call(h, 'GET', '/api/network/nodes/nope')).status).toBe(404)
   })
 })
