@@ -86,7 +86,7 @@ modules:
   - id: org-os-admin
     name: Admin App
     status: in-dev
-    summary: The local platform over an instance's records — stage a change, then apply it or propose it under the org's own rules.
+    summary: The Hub over an instance's records and workspace, on your own machine or hosted — stage a change, then apply it or propose it under the org's own rules.
     link: /docs/admin-app
   - id: org-os-hermes
     name: Hermes Agent

@@ -398,20 +398,26 @@ is a plan, not something this repository shows: `federation.yaml` still lists `o
 
 ### org-os-admin — Admin App
 
-**What it is.** The local platform for an instance, which 0.6 made the centre of the framework:
-its records, the rules that decide changes to them, proposals, boards, and the outside systems
-it reads.
+**What it is.** The Hub: a web app for an instance, which 0.6 made the centre of the framework.
+It holds the records, the rules that decide changes to them, proposals, boards and the outside
+systems the org reads; 0.6.1 made it hostable for members; 0.7 added the workspace (pages,
+collections, tasks, comments, imports), compose and deploy, the knowledge commons' pages, and the
+Federation page with joining a network on atproto; 0.7.5 added sign-in with a Bluesky or
+Certified account and a network's node accounts.
 
-**How it works.** A Hono server and a React app in `packages/admin/`, run from the framework
-checkout against an instance (`npm run admin -- --repo <instance>`, on `127.0.0.1:4680`).
-Saving a record stages a change; the rules in `data/governance.yaml` decide whether it is applied
-as one commit or proposed and later ratified as a merge. [The admin app](ADMIN-APP.md) describes
-it in full.
+**How it works.** A Hono server and a React app in `packages/admin/`. On your own machine it runs
+from the framework checkout against an instance (`npm run admin -- --repo <instance>`, or the
+launcher, `npm run open`), on `127.0.0.1`. Hosted, it runs from the image in `deploy/hub/`, signs
+members in, and writes nothing to its instance by default. Saving stages a change; the rules in
+`data/governance.yaml` decide whether it is applied as one commit or proposed and later ratified
+as a merge. What is stricter than members stays in a private store outside git.
+[The admin app](ADMIN-APP.md) describes it in full.
 
-**Status.** `in-dev` — not built: editing `data/governance.yaml`, `data/finances.yaml`,
-`data/knowledge-manifest.yaml`, `data/visibility.yaml`, `IDENTITY.md` and `federation.yaml`
-(shown read only), serving on any address but `127.0.0.1`, and regenerating `.well-known/` after
-a change. An instance does not receive the package.
+**Status.** `in-dev` — not built or not yet on: writes from a hosted Hub (refused while known
+write defects are listed), the federation write routes when hosted, the knowledge pages when
+hosted (the image carries no kms), link records on live atproto accounts (tested against a mocked
+server only), and regenerating `.well-known/` after a change. An instance does not receive the
+package.
 
 **Links:** [admin app](ADMIN-APP.md) ·
 [0.6 architecture](superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md) ·
@@ -447,8 +453,9 @@ no federated view of ideas across instances.
 **How it works.** It will read the CRM registries and render who is here, what they hold, and
 what they have contributed — the human-facing counterpart to `org-os-crm`'s data. What exists
 is the `data/members.yaml` registry and the admin app, which lists and edits member records on
-its People board and maps a signed-in wallet to a member (`handles.wallet`); the contribution
-surfaces and the module as a unit are not built.
+its People board and maps a signed-in wallet to a member (`handles.wallet`). Since 0.6.1 the Hub also signs people in by an
+emailed link and gives them Roles (`steward`, `node-lead`, `network-member`), and since 0.7.5 with a Bluesky or
+Certified account; the contribution surfaces and the module as a unit are not built.
 
 **Status.** `planned`.
 
