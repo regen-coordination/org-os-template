@@ -38,9 +38,10 @@ Modules with a manifest in `modules/`.
 Two verbs — `assess` (read-only scorecard) and `sync` (guided repair-then-update) — runnable
 from inside an instance or, more usefully, from the framework against a sibling.
 
-**How it works.** Six checks read one snapshot of the instance and each return
+**How it works.** Seven checks read one snapshot of the instance and each return
 `BLOCKER`/`WARN`/`OK` with a remediation hint: identity coherence and template leakage, lineage
-stamps, cross-scheme version surfaces, machinery integrity, structure, and freshness. The
+stamps, cross-scheme version surfaces, machinery integrity, structure, freshness, and (since 0.7)
+the agent layer, which counts what looks like personal data in the files every member reads. The
 structure check runs the framework's validators as subprocesses: `validate-structure`,
 `validate-identity`, and since 0.6 `validate-data` and `validate-governance`
 (`packages/instance-doctor/src/checks/structure.mjs`). `sync` then runs ten stages — snapshot,
@@ -58,8 +59,8 @@ it. (The maintainer's 2026-08-28 sweep of which instances could run `sync-upstre
 not reproducible from this repository.)
 
 Every check is a pure function over a snapshot and every side effect is injected, which is why
-the suite runs without a network: `tests/instance-doctor/` has 207 test cases (not run for this
-page).
+the suite runs without a network: `tests/instance-doctor/` has 229 test cases, passing in the
+root `npm test` run of 2026-11-25.
 
 **Status.** `pilot` — built. The overlay sync was accepted end to end against one of the
 maintainer's instances, with the nine stages it had then
@@ -242,7 +243,10 @@ state, and stay in lineage with the framework.
 **How it works.** `federation.yaml` declares identity, peers, trust levels, and upstream;
 `.well-known/*.json` publishes the instance to anyone who asks; `npm run analyze:instances`
 reports drift across the network; the federation map renders it as a graph
-(`packages/org-os-federation-map/`; [the map page](FEDERATION-MAP.md) covers it).
+(`packages/org-os-federation-map/`; [the map page](FEDERATION-MAP.md) covers it). Since 0.7.4 an
+instance can ask to join a hub's network from the Hub's Federation page and publish its half of
+the membership link as a record in its own atproto account; that has been tested against a mocked
+atproto server, not run on live accounts ([federation](FEDERATION.md#joining-a-network)).
 
 **Status.** `live` — `federation.yaml` declares 7 downstream entries; `dao-os` (a development
 platform) and `openclaw` (an agent runtime) are marked as not data instances, leaving 5, of
@@ -350,16 +354,17 @@ the only output; there is no command that points the generator at another instan
 **What it is.** A compiled, indexed, linted knowledge commons across the federation.
 
 **How it works.** `packages/toolkit-framework` bound into org-os by `packages/org-os-kms`
-(`@org-os/kms`, a CLI plus a library), with a connector layer for external sources: two
-connectors are registered, `atproto` and `static-json` (`src/connectors/index.mjs`); packs can
-add more. It has a two-plane canon-and-publication gate, extension packs, and a federation map
+(`@org-os/kms`, a CLI plus a library), with a connector layer for external sources: three
+connectors are registered, `atproto`, `static-json` and, since 0.2.0 (org-os 0.7.4), the read-only
+`hypercerts` (`src/connectors/index.mjs`); packs can add more. 0.2.0 also added the matching-only
+floor, claims for a node, Certified update drafts and readable pages, all off by default. It has a two-plane canon-and-publication gate, extension packs, and a federation map
 builder. Its overview, planes and publishing pages are [KMS](KMS.md), [KMS planes](KMS-PLANES.md) and
 [KMS publishing](KMS-PUBLISHING.md), and the map is [FEDERATION-MAP](FEDERATION-MAP.md); extension packs are in
 [extension packs](KMS-EXTENSION-PACKS.md). Of the four connectors the design calls for
 (`geo`, `radicle`, `atproto`, `synthefy`) only `atproto` exists.
 
-**Status.** `in-dev` — the package runs and has a test directory,
-`packages/org-os-kms/test/`; it is used by the maintainer's own instances only.
+**Status.** `in-dev` — the package runs, and its tests (`packages/org-os-kms/test/`, 792, one
+skipped) passed on 2026-11-25; it is used by the maintainer's own instances only.
 
 **Links:** [connector layer design](superpowers/specs/2026-07-19-org-os-kms-connector-layer-design.md)
 
