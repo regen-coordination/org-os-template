@@ -17,7 +17,7 @@ Read this before trusting a field table: it says which script checks what.
 - **`npm run validate:schemas`** (`scripts/validate-identity.mjs`) parses seven `.well-known/*.json` files, compares `IDENTITY.md` with `federation.yaml`, and checks the lineage stamp in `federation.yaml` (`framework_version`, `genesis_commit`, `last_sync_commit`). When `identity.daoURI` is set, it also checks the published standards files against their JSON Schemas (a problem is a warning, an error under `--strict`) and reads the registries to scan `.well-known/` for any value they withhold (a leak always fails). Without a `daoURI` it does not read `data/*.yaml`.
 - **`npm run validate:structure`** (`scripts/validate-structure.mjs`) checks that files exist, and that every entry of `skills-matrix.yaml` and `packages-matrix.yaml` has a valid status. It does not check any other registry's fields. It requires `.well-known/dao.json`, `members.json` and `projects.json` only when `identity.daoURI` is set.
 - **`npm run generate:schemas`** (`scripts/generate-all-schemas.mjs`, which loads the builder in `packages/admin/lib/standards/`) writes `.well-known/` from `federation.yaml`, the registries and the Markdown records in `content/meetings/` and `content/projects/`. It builds nothing without `identity.daoURI`, because every id is built from it; this repository leaves `daoURI` empty, so here it writes nothing. It publishes only what `data/visibility.yaml` makes public. A collection that file does not list is `members`, so an instance with no `visibility.yaml` publishes no records. What it withholds is counted, never written, and a withheld value found in a built file stops every write. Each registry section below names the file it feeds.
-- **The admin app** (`packages/admin`, `npm run admin`) validates an entry with the same module before saving it (`validateEntity` in `packages/admin/server/schema.ts`), and refuses the save on an error or on a reference to an id the target registry does not hold. The JSON Schemas are the only machine-readable definition of the field names, types and enums below; the type, enum and "required" notes in this page come from them. In the older registries only `id` is required, and only in the collections; the 0.6 registries require more (each section says which). Optional fields accept `null`; an enum field must be omitted or hold one of the listed values. Extra fields are allowed, except in `boards`, `proposals` and `library`. The document registries (`finances`, `governance`, `knowledge-manifest` and `visibility`) are read-only in the admin app; `proposals` and `library` are written only by their own routes (proposing and deciding; the library's Add and Remove).
+- **The admin app** (`packages/admin`, `npm run admin`) validates an entry with the same module before saving it (`validateEntity` in `packages/admin/server/schema.ts`), and refuses the save on an error or on a reference to an id the target registry does not hold. The JSON Schemas are the only machine-readable definition of the field names, types and enums below; the type, enum and "required" notes in this page come from them. In the older registries only `id` is required, and only in the collections; the 0.6 registries require more (each section says which). Optional fields accept `null`; an enum field must be omitted or hold one of the listed values. Extra fields are allowed, except in `boards`, `proposals`, `library`, `federation-requests` and `invites`. The document registries (`finances`, `governance`, `knowledge-manifest` and `visibility`) are read-only in the admin app; `proposals` and `library` are written only by their own routes (proposing and deciding; the library's Add and Remove).
 - Everything else, including the example values, is convention.
 
 ## Conventions
@@ -27,7 +27,7 @@ Read this before trusting a field table: it says which script checks what.
 - Dates are ISO 8601 (`YYYY-MM-DD`).
 - Fields that name a kind or a stage (`status`, `type`, `platform`, members' `layer`) are the instance's own vocabulary. Where the tables below list words with `|`, the schema holds a closed list (members' `kind` and `status`, `governance.model`, and a few others); elsewhere the words given are the framework's defaults, and any word is accepted. They are not uniformly lower-case: the projects in this repository use `Discovery` and `Develop`.
 - Files carry a `schema_version` line. The older registries use `"2.0"` (all of this repository's have it except `ecosystems.yaml`); the 0.6 migration writes `systems.yaml` with `"1.0"`, and this page's examples of the other 0.6 registries use `"1.0"` too. Nothing checks it.
-- A record may carry `visibility: public` or `visibility: members`, which decides whether `generate:schemas` and the admin's public view show it (see `visibility.yaml`). `boards`, `proposals` and `library` allow no key their schema does not list, so their records cannot.
+- A record may carry `visibility: public` or `visibility: members`, which decides whether `generate:schemas` and the admin's public view show it (see `visibility.yaml`). `boards`, `proposals`, `library`, `federation-requests` and `invites` allow no key their schema does not list, so their records cannot.
 - The files shipped in `data/` are mostly empty, and the empty ones (`finances`, `meetings`, `events`, `channels`, `assets`, `sources`, `funding-opportunities`, `knowledge-manifest`) end in a commented example entry; open the file to see one.
 
 ## Registries in `data/`
@@ -622,9 +622,92 @@ installed:
 - **Templates (L7-D9).** A receipt whose created Systems include one that is `deployment.status: deployed` is not
   removed by the library: "Its Systems are deployed. Remove each System as its own change; the chain keeps them."
 
+### tasks.yaml: tasks
+
+New in 0.7, not shipped. A list under `tasks`, edited as records in the admin app and shown in the workspace's collection views. Required: `id`; other keys are allowed. Class `workspace` in the rules (with no rule naming it, a write is direct).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | required |
+| `title` | string | |
+| `status` | string | the instance's own words; a board's columns come from its saved view |
+| `owner` | string | a member id, or a CAIP-10 account |
+| `due` | date | |
+| `project` | string | a `projects` id, which must exist (`REFS` in `packages/admin/lib/data-validate.mjs`); `related_project`, an older tasks file's field, is read when `project` is absent |
+| `meeting` | string | a `meetings` id, which must exist |
+| `proposal`, `page` | string | a proposal id, a page id |
+| `priority` | string or number | |
+| `from` | map | where an imported task came from (its source, its id there, when it was exported) |
+
+### collections.yaml: the workspace's collections
+
+New in 0.7, not shipped. A document: a list under `collections`. An entry whose `id` names a registry (`tasks`, `meetings`, `projects`) holds only its name, that registry's saved views and `notes_parent`. Any other entry defines a **custom collection**, whose records are kept in `data/collections/<id>.yaml` under a top-level key equal to the id. A custom collection's id is lower case, letters, digits and hyphens, 2 to 41 characters; `pages`, `knowledge`, `collections` and the registries' names are taken (`isCustomId` in `packages/admin/lib/registries.mjs`). A collection kept stricter than members lives in the private store and is never named in git. Class `workspace`. `validate:data` reads the file through `lib/workspace/collections.mjs`, which checks more than the schema.
+
+```yaml
+collections:
+  - id: "loans"
+    name: "Tool loans"
+    fields:
+      - { id: "tool", type: "text" }
+      - { id: "due", type: "date" }
+      - { id: "borrower", type: "person" }
+    views:
+      - { id: "by-due", name: "By due date", kind: "table", sort: { field: "due", dir: "asc" } }
+```
+
+- **`fields`**: each has an `id` (lower case, digits, `_`) and a `type`: `text`, `longtext`, `number`, `select`, `multiselect`, `date`, `daterange`, `checkbox`, `url`, `person`, `relation` (with `to` and `many`), `page`, `email` or `phone`; `select` takes `options`.
+- **`views`**: each has an `id`, a `name` and a `kind` (`table`, `board`, `calendar`, `list`, `map`), and may set `filters` (`field`, `op`: `is`, `is-not`, `before`, `after`, `contains`; `value`), `sort`, `group`, `columns`, `date` and `board` (`field`, `order`).
+
+### imports.yaml: import receipts
+
+New in 0.7, not shipped. A document: a list under `imports`, one receipt per `npm run import -- <notion|fileverse> <folder> --apply` that wrote anything. It holds counts and reasons only: no title of a private item, no name, no private collection's id. Class `workspace`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | required; `imp_` and hex digits |
+| `source` | `notion` \| `fileverse` | required |
+| `export`, `at`, `by` | string | required: the export's name, when, and who ran it |
+| `created` | map | counts of `pages`, `records`, `collections` |
+| `updated`, `kept` | integer | |
+| `not_carried` | list | `{ what, why }` for what could not land |
+| `blobs` | map | the mark of each git item the import wrote, so a later run updates only what the Hub left as imported |
+
+### federation-requests.yaml: requests a hub received
+
+New in 0.7.4, on a hub only. A list under `requests`, written only by the admin app's federation routes (a request's arrival and the hub's decision), never by an edit. No key outside the schema is allowed, and the file is never widened past members (`visibility.yaml`). Class `identity`. See [Federation: Joining a network](FEDERATION.md#joining-a-network).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | required; a UUID |
+| `received` | string | required; ISO 8601 time |
+| `transport` | `file` \| `github` | required |
+| `ref` | string | the file name or the issue address it came from |
+| `from` | map | required: `name`, `type` and a public `https://` `url` of the asking instance; no person |
+| `network` | string | required |
+| `answers` | map | required: the answers to the hub's asks |
+| `invite` | string | required, may be empty: the id of the invite that matched (`i-` and 8 hex digits), never its token |
+| `outcome` | `refused` \| `accepted` \| `proposed` \| `held` | required |
+| `reason`, `proposal`, `decision` | string | why it was refused; the proposal opened for it; where the acceptance was recorded |
+
+### invites.yaml: a hub's invites
+
+New in 0.7.4, on a hub only. A list under `invites`, written only by the invite routes. No key outside the schema is allowed, and the file is never widened past members. Class `identity`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | required; `i-` and 8 hex digits |
+| `name`, `type`, `network` | string | required: who it is for, the instance type it admits, the network |
+| `expires` | string | required: the last day it works, or an ISO 8601 time (1 to 90 days) |
+| `token_sha256` | string | required: the SHA-256 of the token, in hex. The token itself is never kept |
+| `used_by` | string | required, empty while unused: the id of the request that used it |
+
+### data/kb/: the knowledge canon
+
+kms's store as the instance holds it: one file per kind, `data/kb/<type>.yaml`, each with `entries:`, a map keyed by slug. A record's id is `<type>/<slug>`. Since 0.7 the admin app reads it as the collection `knowledge` (`KNOWLEDGE` in `packages/admin/lib/registries.mjs`), present when the instance has `data/kb/`; an edit is prepared on the commons' entry page and applied in one commit, under class `workspace`. What the entries hold is kms's: see [KMS](KMS.md).
+
 ### visibility.yaml: what is public
 
-New in 0.6 (DAO-OS L8 and L5), not shipped. A document under `visibility` (the key may be left out). It decides which collections, records and fields are public in git, and is read by `generate:schemas`, by `validate:schemas`' leak scan, by `validate:data` and by the admin's public view (`packages/admin/lib/visibility.mjs`). Changing it is class `publication` in the rules; the admin app has no edit path for it.
+New in 0.6 (DAO-OS L8 and L5), not shipped. A document under `visibility` (the key may be left out). It decides which collections, records and fields are public in git, and is read by `generate:schemas`, by `validate:schemas`' leak scan, by `validate:data` and by the admin's public view (`packages/admin/lib/visibility.mjs`). Changing it is class `publication` in the rules. The admin app edits it whole in its source editor (`/files/data/visibility.yaml`), staged and checked like any change; narrowing one record, collection or field has its own route, and a text that widens what is public is a publication.
 
 ```yaml
 schema_version: "1.0"
@@ -640,6 +723,18 @@ visibility:
 - **Records.** A record may set its own `visibility: public` or `members`, which wins over its collection's default. Any other value reads as `members`; a hat or role level written in git is a `validate:data` error, because such a record belongs in the private store, and so does the value of a field restricted to a hat or role.
 - **Never public.** Members' `email` and `handles`, whatever the file says.
 - **`defaults.contact`**: the hat or role that keeps contact details outside git.
+- **`files`** (0.7.2, opt-in): which Roles read which `data/**` file whole, in the admin app and every read it makes of a file's records. Without the section every member reads every data file, as before 0.7.2.
+
+```yaml
+visibility:
+  files:
+    default: role:steward             # every data/** path not listed
+    paths:
+      data/projects.yaml: members     # any signed-in member
+      data/kb/**: members             # a folder
+```
+
+  A level is `members`, `role:<Role>` (the Roles table's: `steward`, `node-lead`, `network-member`) or `hat:<hat ref>`; `public` is refused. A path takes its own level, else the longest `data/<folder>/**` holding it, else `default`, so a file added later is held at the default until listed. The knowledge canon is read as one: list `data/kb/**`, never a path inside it; since 0.7.3 a key written inside `data/kb/` all the same narrows the whole canon, and two levels there that are not ordered close it. A member a file is kept from is given its records as the public is, and their writes to such a record are refused before it is read; the person at the machine is never held back. The policy check (the doctor, and a staged edit of this file) refuses `public`, a path outside `data/`, a `role:` that is no Roles-table Role, an empty section, and any key that opens a file with field levels below `role:steward` (a file is read whole). Removing the section or widening a level is a publication. A section or file that cannot be read closes every data file. `role:` is judged against the Roles a person signed in by emailed link holds, never a governance role of the same name; a wallet session holds none. 0.7.1 refuses the section, so add it only once the Hub runs 0.7.2 or later. Source: CHANGELOG [0.7.2] and [0.7.3]; `schemas/visibility.schema.json` (`packages/admin/schemas/`).
 
 ## Framework-only registries
 
