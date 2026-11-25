@@ -2,7 +2,7 @@
 
 > Framework + standards + orchestration hub.
 
-**Type:** Framework + orchestration hub · **Version:** 0.5.0 · **Status:** active
+**Type:** Framework + orchestration hub · **Version:** 0.7.5 · **Status:** active
 
 **Site:** <https://regen-coordination.github.io/org-os-template/>
 
@@ -15,7 +15,7 @@ git-native workspace where an org's knowledge, data, and operations live as file
 read, act on, and federate.
 
 Clone the framework and configure your org, and it has a brain: identity and values agents
-actually follow, structured data registries, session memory, 35 operational
+actually follow, structured data registries, session memory, 36 operational
 skills, machine-readable schemas, and a federation protocol connecting you to a network of peer
 orgs (single-operator dogfood; external pilot is the open milestone). The config-driven cloning
 engine that does this is shipped and tested — it produced a real instance, bread-coop-os. No
@@ -149,8 +149,8 @@ current drift state.
 | `/skills` | List skills across workspace + user + plugin sources |
 
 
-- **Skills:** 35 total — see `SKILLS.md` and `data/skills-matrix.yaml`
-- **Packages:** 24 total — see `data/packages-matrix.yaml` + `docs/PACKAGE-LIFECYCLE.md`
+- **Skills:** 36 total — see `SKILLS.md` and `data/skills-matrix.yaml`
+- **Packages:** 27 total — see `data/packages-matrix.yaml` + `docs/PACKAGE-LIFECYCLE.md`
 - **Modules:** see [`docs/MODULES.md`](docs/MODULES.md) and `modules/`
 
 ## Documentation
@@ -158,7 +158,7 @@ current drift state.
 
 - [Architecture](docs/ARCHITECTURE.md) — How an instance is put together
 
-- [Modules](docs/MODULES.md) — The v0.5 catalog — what ships, what's planned
+- [Modules](docs/MODULES.md) — The module catalog — what ships, what's planned
 
 - [Federation](docs/FEDERATION.md) — Peers, trust levels, lineage, drift
 

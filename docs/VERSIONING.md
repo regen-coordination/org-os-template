@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-- The framework is on the **`0.x` pre-beta line**. Current: `0.6.0` (tag `v0.6.0`, 2026-11-05); work since then is under `## [Unreleased]` in `CHANGELOG.md`.
+- The framework is on the **`0.x` pre-beta line**. The current version is the `version` in the root `package.json`, and each release is tagged `v<version>`; work since the last release is under `## [Unreleased]` in `CHANGELOG.md`.
 - Framework version = `package.json.version` — this is the **single source of truth**.
 - Four other surfaces mirror it and are machine-checked by `npm run version:check`.
 - `0.minor` = **milestone number**, not a semver minor. `1.0.0` is reserved.
