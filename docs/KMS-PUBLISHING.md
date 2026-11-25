@@ -29,6 +29,9 @@ Where a reader goes next: the two planes and the publication gate are in `docs/K
 | The site HTML tags that point back at the documents | Not built. The manifest holds the AT-URIs; nothing in the package edits a site's HTML. |
 | Publishing lexicon records (`com.atproto.lexicon.schema`) or any DNS record | Not built. The lexicons are generated in memory to validate records; none is sent anywhere. |
 | Resolving a peer's own PDS, or reading from a relay | Not built. The `atproto` connector reads every peer from the one configured PDS. |
+| Readable pages (`publish.pages`, 0.2.0) | Implemented, local files only; off unless `publish.pages: true` (below). |
+| Claims for a node (`publish.claims`, 0.2.0) | Implemented, off unless `publish.claims: true` and `publish.claim_publisher` are set; each claim also needs the node's consent date. Published from this instance's own account, with the same credentials as the PDS writes. See [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md), "Claims". |
+| Certified update drafts (`certified draft`, 0.2.0) | Implemented, off unless `publish.certified_drafts: true`. Writes files for a node's own session to post; sends nothing and takes no credentials. |
 
 If `ATPROTO_APP_PASSWORD` is not set, the atproto part of the report says `not-configured` and nothing contacts a server. The password is read from `process.env` only; the package loads no `.env` file, so export it in the shell that runs the command. It is an app password for the account, not the account password, and the code replaces it with `***` in the login and network error it reports and in the standard.site apply error. Per-record failure messages (`failures[].error`) and the static-surface error are not scrubbed.
 
@@ -54,6 +57,8 @@ The floor is in the toolkit framework (`packages/toolkit-framework/src/publishab
 - Validation is all-or-nothing: each record is checked against the lexicon generated from its schema, and if any record fails, the plan is `ok: false`, lists the errors and nothing is written.
 - Mass delete: an apply whose selection is empty while the manifest still lists published records stops before login (`refusing to delete every published record`). That protects against an unattended `close` with a misconfigured gate or store path.
 - A public plane that cannot find its canon will plan but will not apply (set `planes.regate: false` to publish from the plane alone).
+- A visibility-gated pack's types (0.2.0): an object is published only when it holds every `publish_requires` value of its type, and its record is cut to the type's `public_fields`. Until the pack declares both, the type is withheld (`report.withheld.undeclared`). Any value in a public record that names a non-public object is removed by exact match, and the report counts what was removed (`report.scrubbed`) without naming it. See [Extension packs](KMS-EXTENSION-PACKS.md).
+- A claim publishes only through the claim floor (`report.withheld.claims` otherwise).
 - Compare-and-swap: updates send the stored `cid` as `swapRecord`, so a record changed elsewhere is not overwritten; that record fails and is reported, and the manifest keeps its previous entry.
 
 ## The records on the PDS
@@ -135,6 +140,12 @@ What it checks and withholds:
 
 **The site must point back.** For readers to trust the records, the website has to say so. `publish` writes one file for you, when the static surface is enabled and succeeded: `.well-known/site.standard.publication` (plus the path of the publication's URL, if it has one) under the static directory, containing the publication's AT-URI. That only works if the static directory is served at the root of the publication URL; otherwise copy `standardSite.publication.atUri` from the manifest to wherever the site serves `.well-known`. The per-document `<link rel="site.standard.document" href="at://...">` tag in each page's HTML is not generated; the document AT-URIs are in the manifest under `standardSite.documents` for your site generator to read.
 
+## Readable pages (`publish.pages`)
+
+By default `publish` writes only the JSON API. With `publish.pages: true` in `kms.yaml` it also writes the commons as pages people can read, under the output folder: `index.html` (the commons by kind, with search), `k/<kind>/index.html`, `k/<kind>/<id>.html` (one page per entry) and `_kms/` (the search file and the fonts). Only this instance's own published entries get a page; an entry that came from a peer is a row that links to its source, and an entry that is not published appears nowhere.
+
+kms owns `index.html`, `k/` and `_kms/` while this is on: each run removes and rewrites them, and a marker file, `_kms/.kms-pages`, records that it wrote them. Turned off, the next `publish` removes them only if the marker is there. If one of those paths exists without the marker, `publish` refuses to write pages rather than overwrite it. `render.fonts` is `house` (the default: the three house fonts are copied to `_kms/fonts/`) or `system` (no fonts written); pages never load a font from another site. `render.labels` maps a field name to the words shown for it. `render pages --preview` writes the steward's preview of the whole canon, internal titles included, under `renders/preview/`, which must stay gitignored and never be published. Source: [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md), "Readable pages"; `src/pages/`.
+
 ## The files
 
 | File | Written by | Holds |
@@ -145,6 +156,8 @@ What it checks and withholds:
 | `<static_dir>/.well-known/knowledge.json`, `dao.json` | `publish` | a manifest of published domains and sources, plus the public Geo pointers (`network`, `space`, `parent_space`; the rest of `geo:` stays out); `dao.json` is copied if present at the instance root |
 | `<static_dir>/.well-known/site.standard.publication` | `publish` | the publication's AT-URI |
 | `<static_dir>/.well-known/extensions.yaml` | `publish` | the extension-pack entity names and what they map to; written only when the instance has packs, and removed otherwise |
+| `<static_dir>/index.html`, `k/`, `_kms/` | `publish` with `publish.pages: true` | the readable pages and their marker `_kms/.kms-pages` |
+| `renders/certified-updates/<slug>.json` | `certified draft` | a Certified update record for a node to post itself |
 | source YAML under the store | `publish` | minted `id` fields, and a minted `grc20Id` for each object when `geo.space` is set in `kms.yaml` (tracked files change; review the diff) |
 
 Before the first real apply, wipe any test identity's records and reset the manifest, otherwise the manifest describes records that live on the wrong account.

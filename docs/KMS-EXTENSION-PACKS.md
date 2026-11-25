@@ -37,6 +37,34 @@ types: [territorial-unit, data-stream]   # publish-eligible types; each needs a 
 - **`profile/profile.yaml`** is read only for `registry_bindings`: where `org-os-kms bridge` writes objects of the pack's schemas.
 - **`connectors/index.mjs`** is code that gets executed (see Trust, below).
 
+### Visibility-gated packs (kms 0.2.0)
+
+A pack may set `visibility_gated: true` in `pack.yaml`. It must then declare, per type, what an object needs to be published and which of its keys may leave. The first such pack is `org-os-needs-offers` (org-os 0.7.4):
+
+```yaml
+name: org-os-needs-offers
+version: 0.1.0
+requires:
+  framework: ">=0.3.0"
+  kms: ">=0.2.0"                  # an older kms refuses to load a pack that uses these keys
+types: [need, offer]
+visibility_gated: true
+publish_requires:                 # values an object must hold to be published
+  need: { visibility: public }
+  offer: { visibility: public }
+public_fields:                    # the only keys that may reach a record
+  need: [id, title, type, public_use, maturity, subject, category, text, when, status, visibility]
+  offer: [id, title, type, public_use, maturity, subject, category, text, terms, status, visibility]
+shared_lexicon:                   # publish these types in a shared lexicon, not the instance's own namespace
+  need: lexicons/example.commons.need.json
+  offer: lexicons/example.commons.offer.json
+```
+
+- **The floor lives in core** (`packages/org-os-kms/src/visibility.mjs`); the pack only declares data. A type of a gated pack that does not declare both `publish_requires` and `public_fields` is withheld by `publish` (`report.withheld.undeclared`) and refused by `planPublish`. An object without every `publish_requires` value is withheld (`report.withheld.visibility`), in `publish`, `planPublish`, the registry bridge and `export` alike, and an instance gate can only narrow that. A published record is cut to `public_fields`.
+- **`shared_lexicon`** also runs the pack's `src/shared-map.mjs` (`src/pack-publish.mjs`), executed like a connector, to map an object onto the shared record; an object with no home there stays out of atproto but still appears in the static JSON and pages.
+- **Placeholders.** The shipped `example.commons.need|offer` lexicons are placeholders: `publish --apply` refuses to write them to a live account (`src/ops.mjs`); plan mode is unaffected. The needs/offers field list is a placeholder too, redone when the shared lexicon is agreed.
+- **`org-os-needs-offers`**: two types, `need` and `offer`, each with a required `visibility` of `private`, `matching-only` or `public`. Only `public` is ever published; `matching-only` stays in the private canon. Opt in with `extensions: [org-os-needs-offers]` and `publish.types_opt_in: [need, offer]` in `kms.yaml`. See its [README](../packages/org-os-needs-offers/README.md).
+
 ## Turning a pack on
 
 Three things have to be true: the pack is on disk, `kms.yaml` names it, and, if you want its objects published, `kms.yaml` opts its types in.
@@ -105,7 +133,7 @@ Core wins everywhere. Each of these is a load error naming the pack, never a sha
 
 A connector name that collides is caught later, when `ingest` runs, not at load: `pack connector "x" collides with core` (a core name such as `atproto` or `static-json`) or `collides with pack <other>`.
 
-A pack has no way to change core schemas, the review axes, relationships or invariants, to touch the private-field list, or to depend on another pack. `requires` can only name the framework and kms.
+A pack has no way to change core schemas, the review axes, relationships or invariants, to touch the private-field list, or to depend on another pack. That holds for a visibility-gated pack too: it declares the data the core floor enforces, never the floor. `requires` can only name the framework and kms.
 
 ## Trust
 

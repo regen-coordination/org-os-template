@@ -2,9 +2,9 @@
 
 `org-os-kms` is the part of org-os that turns an instance into a **knowledge commons**: a store of typed, reviewed, source-linked knowledge objects that lives in git next to the rest of the instance, can be pulled from and published to other instances, and can be shown on a site. It binds the `toolkit-framework` package (schemas, storage adapters, the review state model, the publication floor) into org-os's registries and session lifecycle. It does not replace the instance's own `data/*.yaml`; it adds a second store beside them.
 
-**Status:** `in-dev` (the vocabulary of [MODULES](MODULES.md)). The package and its tests run (431, one skipped, all green on this branch); it is used by the maintainer's own instances and by no one else yet, so the operator experience beyond that is untested. Every command on this page was run against a scratch instance on this branch.
+**Status:** `in-dev` (the vocabulary of [MODULES](MODULES.md)). The package is `org-os-kms` 0.2.0 since org-os 0.7.4, and its tests run (792, one skipped, all green on 2026-11-25); it is used by the maintainer's own instances and by no one else yet, so the operator experience beyond that is untested. Every command on this page was run against a scratch instance on this branch.
 
-The commands are a CLI, `packages/org-os-kms/src/cli.mjs`. It has no `--help`: an unknown verb (including `--help`) prints `{"error": "unknown verb: …"}` and exits 1. The verbs are `lifecycle`, `bridge`, `render`, `federate`, `promote`, `init`, `publish`, `ingest`, `export` and `validate`; each is described below. All take `--dir <instance>` (default `.`). Output is JSON on stdout.
+The commands are a CLI, `packages/org-os-kms/src/cli.mjs`. It has no `--help`: an unknown verb (including `--help`) prints `{"error": "unknown verb: …"}` and exits 1. The verbs are `lifecycle`, `bridge`, `render`, `federate`, `promote`, `init`, `publish`, `ingest`, `export`, `validate`, and, since 0.2.0, `claims` and `certified`; each is described below or in [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md). All take `--dir <instance>` (default `.`). Output is JSON on stdout.
 
 ```bash
 node packages/org-os-kms/src/cli.mjs <verb> [subcommand] [--flag value]
@@ -46,12 +46,13 @@ framework: '@regen-commons/toolkit-framework'
 | `self_ref`, `peers` | Adapter-issued references to the self card and to each registered peer's card. Written by `init` and `federate add`; do not edit by hand. |
 | `peer_extensions` | `{ <peer slug>: <path> }`: a peer's published `extensions.yaml`, used by `federate check`. |
 | `extensions` | List of extension pack names (sibling packages under `packages/`). Loaded before any command runs. |
-| `connectors` | List of `{ name, config, cursor? }` for `ingest`. See [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md). |
+| `connectors` | List of `{ name, config, cursor? }` for `ingest`: `atproto`, `static-json` and, since 0.2.0, `hypercerts`. See [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md). |
 | `atproto` | `did`, `handle`, `pds`, `nsid_authority`, and the opt-in `standard_site` block. Needed to publish to, or pull from, an AT Protocol server. |
-| `publish` | `apply`, `gate`, `static`, `static_dir`, `base_url`, `types_opt_in`, `types_opt_out`, `disclose_subscriptions`, and (public plane) `public_fields`, `nested_fields`. See [KMS-PLANES](KMS-PLANES.md) and [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md). |
+| `publish` | `apply`, `gate`, `static`, `static_dir`, `base_url`, `types_opt_in`, `types_opt_out`, `disclose_subscriptions`, and (public plane) `public_fields`, `nested_fields`. Since 0.2.0, all off unless set: `pages` (readable pages), `claims` and `claim_publisher` (claims for a node), `certified_drafts` (update drafts). See [KMS-PLANES](KMS-PLANES.md) and [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md). |
 | `planes` | `public: { instance, dir? }` makes this instance a canon; `role: public` makes it a public plane; `canon_dir`, `regate`. See [KMS-PLANES](KMS-PLANES.md). |
 | `geo.space` | When set, objects also get a `grc20Id` at first publish. |
 | `render.site_data` | Where `render site` and the lifecycle write the index for a site (default `src/data/kms-index.json`). |
+| `render.fonts`, `render.labels` | For the readable pages (0.2.0): `house` (default) or `system` fonts; the words shown for a field. |
 | `store.on_collision` | `merge` or `suffix` (default): read by the framework's own CLI (`toolkit-framework store`), not by `org-os-kms`. |
 
 `federation_namespace`, which the clone can copy into `kms.yaml`, is not read by any code in `org-os-kms`; the federation namespace it reports is the constant `RegenOS`.
@@ -113,6 +114,19 @@ git add -A && git commit                                       # ids, indexes, r
 
 `publish` in plan mode (no `--apply`) still mints ids into your YAML and, unless `publish.static: false`, regenerates the static surface (`public/` by default; it requires `publish.base_url`). Commit the result before anything that pushes.
 
+## What 0.2.0 adds
+
+`org-os-kms` 0.2.0 shipped with org-os 0.7.4. Every new key is off or absent by default, so an instance that sets none of them behaves as before. In brief, with the detail in [CONNECTORS](../packages/org-os-kms/docs/CONNECTORS.md):
+
+- **A read-only Hypercerts and Certified connector** (`hypercerts`). It reads the public Hypercerts API with GET requests and no login, and refuses to run unscoped: the accounts a DID follows on Certified (`follows_of`) plus listed `dids`. Organizations, activities and attachments become candidates that land `raw` and not public. An optional Constellation backlink lookup is off unless `constellation.enabled` is exactly `true`, and nothing in kms acts on what it returns yet.
+- **A matching-only floor in core** (`src/visibility.mjs`). An object of a visibility-gated pack is published only when it holds every `publish_requires` value; the floor is applied in `publish`, `planPublish`, the registry bridge and `export`, and no instance gate can widen it. A public record is cut to the pack's `public_fields`, and any value in it that names a non-public object is scrubbed by exact match. Free text is not scrubbed: a private object named in prose is published.
+- **Claims for a node** (`claims reconcile`). An object published from the instance's own account so a node appears before it has one. It publishes only with `publish.claims: true`, `publish.claim_publisher` set, `claim_status: claimed` and the node's consent date (`consent_atproto`). When the node publishes its own record, `claims reconcile` marks every claim for it superseded, and the next `publish` removes them.
+- **Certified update drafts** (`certified draft`, with `publish.certified_drafts: true`). For each eligible `signal` it writes the exact record a node would post to its own Certified feed, as `renders/certified-updates/<slug>.json`. Nothing is sent: the command takes no credentials and logs in nowhere; the node's own session posts the file.
+- **Readable pages** (`publish.pages: true`). `publish` also writes `index.html`, a page per kind and a page per entry under its output folder, for this instance's own published entries, with the house fonts (`render.fonts`) and your field words (`render.labels`). See [KMS-PUBLISHING](KMS-PUBLISHING.md).
+- **Visibility-gated packs**, and the first one, `org-os-needs-offers`. See [KMS-EXTENSION-PACKS](KMS-EXTENSION-PACKS.md).
+
+**In the Hub.** Since org-os 0.7 the admin app has the commons' pages (`/c/knowledge`): its setup and its entries, read through this package, with an edit to the canon prepared and applied in one commit. They work on a member's own machine only; the hosted image does not carry `org-os-kms`.
+
 ## Where its state lives
 
 | Path | What | Written by |
@@ -122,6 +136,8 @@ git add -A && git commit                                       # ids, indexes, r
 | `data/kb/index.json`, `data/kb/context.jsonld` | Derived index and JSON-LD context | `lifecycle initialize` (`index.rebuild`) |
 | `data/kms-published.json` | Manifest: which `id` is on the AT Protocol server at which `at://` address, with hashes. Includes the standard.site section | `publish --apply` |
 | `data/kms-cursors.json` | Ingest cursors, one per connector (`kms.yaml` is never rewritten) | `ingest` |
+| `renders/certified-updates/<slug>.json` | Certified update drafts for a node to post | `certified draft` |
+| `renders/preview/` | The steward's preview of the whole canon, internal titles included: gitignore it, never publish it | `render pages --preview` |
 | `public/` (or `publish.static_dir`) | Static JSON surface: `api/**`, `.well-known/knowledge.json` | `publish` (the whole `api/` subtree is wiped and rewritten) |
 | `src/data/kms-index.json` (or `render.site_data`) | Index copy for a site | `render site`, `lifecycle initialize` |
 | `data/resources.yaml` and other registries | Rows bridged from the store | `bridge` |
