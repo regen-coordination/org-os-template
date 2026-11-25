@@ -24,7 +24,7 @@ npm ci
 npm ci --prefix packages/admin
 ```
 
-Use `npm ci`, which installs exactly what the lockfiles say and changes no file. `npm install` rewrites the header of the root `package-lock.json` in 0.7.5 (its name and `engines` are out of date), which leaves the checkout with an uncommitted change. The second install is for `packages/admin`, which has its own dependencies. The doctor (Step 5) runs `validate:data` and `validate:governance` from this checkout, and both load the admin's schemas and modules; without that install each is reported as `validator-did-not-run`. It is also what the [Admin app](ADMIN-APP.md) needs.
+Use `npm ci`, which installs exactly what the lockfiles say and changes no file. (In 0.7.5 `npm install` also rewrote the header of the root `package-lock.json`, whose name and `engines` were out of date; the lockfile is corrected after 0.7.5.) The second install is for `packages/admin`, which has its own dependencies. The doctor (Step 5) runs `validate:data` and `validate:governance` from this checkout, and both load the admin's schemas and modules; without that install each is reported as `validator-did-not-run`. It is also what the [Admin app](ADMIN-APP.md) needs.
 
 The clone reads only **committed** files of the framework checkout (it lists `HEAD`), so an uncommitted local change in your checkout never ends up in a new instance.
 
@@ -93,7 +93,7 @@ npm run validate:schemas
 npm run validate:structure
 ```
 
-Again `npm ci`, not `npm install`: in 0.7.5 `npm install` rewrites the instance's `package-lock.json` header, and the doctor (Step 5) then reports `working-tree-dirty`. On a fresh instance `validate:schemas` passes with six warnings, one for each EIP-4824 file not yet generated (`members.json`, `projects.json`, `finances.json`, `activities.json`, `proposals.json`, `contracts.json`); its hint says to run `generate:schemas`, which writes nothing until you set a `daoURI` (below). `validate:structure` passes with seven warnings about optional files.
+Again `npm ci`, not `npm install`: the clone renames the instance's `package.json` but copies the framework's `package-lock.json` as it is, so `npm install` rewrites the lockfile's header to the new name, and the doctor (Step 5) then reports `working-tree-dirty`. On a fresh instance `validate:schemas` passes with six warnings, one for each EIP-4824 file not yet generated (`members.json`, `projects.json`, `finances.json`, `activities.json`, `proposals.json`, `contracts.json`); its hint says to run `generate:schemas`, which writes nothing until you set a `daoURI` (below). `validate:structure` passes with seven warnings about optional files.
 
 The clone ships `.well-known/` as `*.json.template` files plus the `dao.json` it rendered from your config, so it cannot publish the framework's identity as yours. A new instance publishes nothing more until you decide to:
 
