@@ -683,6 +683,7 @@ export const PUBLIC_READS: readonly string[] = [
   '/api/status', // the org's name only
   '/api/session',
   '/api/session/atproto/callback', // where a Bluesky or Certified sign-in comes back, signed out (network app B2)
+  '/api/network', // the ReFi DAO Network's live node accounts: node, DID, handle, apps; nothing pending (network app B7)
   '/api/schemas/:name', // not secret
   '/api/registries',
   '/api/registries/:name',

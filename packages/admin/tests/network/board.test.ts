@@ -255,3 +255,31 @@ describe('the export (contract C1)', () => {
     expect((await (await call(h, 'GET', '/api/network/export', h.steward)).json()).removed).toEqual([])
   })
 })
+
+describe('the public read (B7, contract C1\'s public fields)', () => {
+  it('anyone, signed out, reads the live accounts (node, DID, handle, apps) and the nodes whose account came down; cached 60 s', async () => {
+    const h = await house()
+    await h.store.putNetworkEntry(base({ addedBy: STEWARD, channel: 'telegram' }))
+    await h.store.putNetworkEntry(base({ id: 'ne-r', node: 'refi-y', did: DID_B, handle: 'refi-y.org' }))
+    await h.store.setNetworkEntryState('ne-r', 'removed', { reason: 'private words', at: '2026-12-19T08:00:00.000Z' })
+    await h.store.putNetworkEntry(base({ id: 'ne-p', node: 'refi-y', did: DID_C, handle: 'c.bsky.social', state: 'pending', why: null, reason: 'waiting note' }))
+    const res = await call(h, 'GET', '/api/network')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('public, max-age=60')
+    const body = await res.json()
+    expect(body).toEqual({
+      as_of: T0.toISOString(),
+      entries: [{ node: 'refi-x', did: DID_A, handle: 'refi-x.org', on: ['bluesky'] }],
+      removed: [{ node: 'refi-y' }],
+    })
+    expect(JSON.stringify(body)).not.toMatch(/private words|waiting note|example-steward|telegram|c\.bsky\.social|"added"|"why"|"check"/)
+  })
+
+  it('a pending account, a declined one and a Guest never appear', async () => {
+    const h = await house()
+    await h.store.putGuest(DID_C, 'guest.bsky.social', T0)
+    await h.store.putNetworkEntry(base({ id: 'ne-d', state: 'pending', why: null }))
+    await h.store.setNetworkEntryState('ne-d', 'removed', { reason: 'declined', at: T0.toISOString() })
+    expect(await (await call(h, 'GET', '/api/network')).json()).toEqual({ as_of: T0.toISOString(), entries: [], removed: [] })
+  })
+})

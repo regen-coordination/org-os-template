@@ -4,7 +4,7 @@
 //   - Waiting: the pending accounts, with Confirm, which asks which channel on the node's record the steward used
 //     (never the account being claimed), and Decline, which asks a short reason kept privately.
 // A pending account not confirmed in 30 days drops, whenever the board, an action or the export reads the store.
-// `GET /api/network/export` is contract C1 for the weekly copy (refi-dao-os scripts/nodes/pull-network.mjs). Stewards
+// `GET /api/network` is C1's public read (B7); `GET /api/network/export` is contract C1 for the weekly copy (refi-dao-os scripts/nodes/pull-network.mjs). Stewards
 // only: the person's Roles, as the records hold them now, include `steward`.
 import type { Context, Hono } from 'hono'
 import type { NetworkEntry, PrivateStore } from '../private/store.ts'
@@ -127,20 +127,37 @@ export function mountNetworkBoard(app: Hono, d: BoardDeps): void {
 
   app.get('/api/network/export', async c => {
     const refused = await gate(c); if (refused) return refused
-    const all = d.store.networkEntries()
-    const live = all.filter(e => e.state === 'live')
-    const liveNodes = new Set(live.map(e => e.node))
-    // A removed entry that was once live has a `why` (only going live sets one); a declined or closed pending has none.
-    const removed = new Map<string, string>()
-    for (const e of all) {
-      if (e.state !== 'removed' || e.why === null || liveNodes.has(e.node) || !e.decided) continue
-      const on = e.decided.slice(0, 10)
-      if ((removed.get(e.node) ?? '') < on) removed.set(e.node, on)
-    }
+    const { live, removed } = shown(d.store)
     return c.json({
       as_of: now().toISOString(),
       entries: live.map(e => ({ node: e.node, did: e.did, handle: e.handle, on: e.on, added: e.added.slice(0, 10), check: e.check, checked_on: e.checkedOn, why: e.why })),
       removed: [...removed].map(([node, on]) => ({ node, on })),
     }, 200, { 'cache-control': 'no-store' })
   })
+
+  // B7: the public read (C1's public fields only), for the network site. Anyone, signed out included.
+  app.get('/api/network', c => {
+    const { live, removed } = shown(d.store)
+    return c.json({
+      as_of: now().toISOString(),
+      entries: live.map(e => ({ node: e.node, did: e.did, handle: e.handle, on: e.on })),
+      removed: [...removed.keys()].map(node => ({ node })),
+    }, 200, { 'cache-control': 'public, max-age=60' })
+  })
+}
+
+/** The live entries, and the nodes whose live account came down (latest removal day per node), never a node that is
+ *  live again. A removed entry that was once live has a `why` (only going live sets one); a declined or closed pending
+ *  account has none, was never shown, and is never listed. */
+function shown(store: PrivateStore): { live: NetworkEntry[]; removed: Map<string, string> } {
+  const all = store.networkEntries()
+  const live = all.filter(e => e.state === 'live')
+  const liveNodes = new Set(live.map(e => e.node))
+  const removed = new Map<string, string>()
+  for (const e of all) {
+    if (e.state !== 'removed' || e.why === null || liveNodes.has(e.node) || !e.decided) continue
+    const on = e.decided.slice(0, 10)
+    if ((removed.get(e.node) ?? '') < on) removed.set(e.node, on)
+  }
+  return { live, removed }
 }
