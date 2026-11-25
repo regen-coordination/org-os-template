@@ -92,7 +92,7 @@ export function planSync(snapshot) {
       id: 'snapshot',
       title: 'Snapshot the working tree',
       detail:
-        'write refs/snapshots/<timestamp>-doctor-sync from a stash object created without touching the tree, the index or the stash list (the vault-snapshot primitive)',
+        'write refs/snapshots/<timestamp>-doctor-sync: a commit of the whole working tree (tracked, staged and untracked; not ignored), staged through a throwaway index so the tree, the index and the stash list are never touched (the vault-snapshot primitive)',
     },
     { id: 'ensure-upstream', title: 'Ensure the upstream remote', detail: upstreamDetail },
     { id: 'fetch', title: 'Fetch the framework', detail: 'git fetch upstream' },

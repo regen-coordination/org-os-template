@@ -44,17 +44,24 @@ A risky op is anything that rewrites history or sweeps the working tree: merge, 
 npm run vault:snapshot -- "before <reason>"
 ```
 
-This creates a permanent git ref at `refs/snapshots/<timestamp>-<reason>` capturing the entire working tree (tracked + untracked + ignored-but-present), without touching your tree. You stay on your current branch with all your edits intact. The snapshot is recoverable indefinitely via `git show refs/snapshots/<name>`.
+This creates a permanent git ref at `refs/snapshots/<timestamp>-<reason>` capturing the working tree (tracked + untracked; gitignored files are not captured), without touching your tree or index. You stay on your current branch with all your edits intact. The snapshot is recoverable indefinitely via `git show refs/snapshots/<name>`.
 
 ### Manual equivalent (if the script is unavailable)
 
 ```bash
-SNAP=$(git stash create --include-untracked) && \
-  git update-ref "refs/snapshots/$(date +%Y%m%d-%H%M%S)-manual" "$SNAP" && \
-  echo "Snapshot saved: refs/snapshots/$(date +%Y%m%d-%H%M%S)-manual"
+TMPIDX=$(mktemp) && rm "$TMPIDX" && \
+  GIT_INDEX_FILE="$TMPIDX" git read-tree HEAD && \
+  GIT_INDEX_FILE="$TMPIDX" git add -A -- . && \
+  TREE=$(GIT_INDEX_FILE="$TMPIDX" git write-tree) && \
+  SNAP=$(git commit-tree "$TREE" -p HEAD -m "vault-snapshot: manual") && \
+  REF="refs/snapshots/$(date +%Y%m%d-%H%M%S)-manual" && \
+  git update-ref "$REF" "$SNAP" && rm -f "$TMPIDX" && \
+  echo "Snapshot saved: $REF"
 ```
 
-`git stash create` (note: **create**, not `push`) writes a stash *object* without modifying your working tree or the stash list. Pinning it with `update-ref` makes it survive `git gc`.
+This stages the whole working tree into a throwaway index (`GIT_INDEX_FILE`), writes it as a tree and wraps it in a commit on `HEAD`. Your real index, working tree and stash list are never touched. Pinning it with `update-ref` makes it survive `git gc`.
+
+Do **not** use `git stash create --include-untracked` (or `-u`) for this: `stash create` takes no options, so the flag becomes part of the message and no untracked file is captured. Until 2026-11-07 both this pattern and the script did exactly that, so every snapshot ref made before that date holds the tracked tree only. `doctor sync`'s own snapshot stage made the same call until 2026-11-08, so its `refs/snapshots/*-doctor-sync` refs from before then hold the tracked tree only too.
 
 ### After the risky op — always verify
 
@@ -76,6 +83,8 @@ Check sources in this order. **Do not delete or skip a source until the next one
 git for-each-ref refs/snapshots/   # list all snapshots
 git ls-tree -r <snapshot-ref>      # see contents of one
 ```
+
+Snapshots made before 2026-11-07 hold tracked files only (see the note under "Manual equivalent"); for untracked notes lost before then, go straight to sources 2–4.
 
 Restore one file:
 ```bash

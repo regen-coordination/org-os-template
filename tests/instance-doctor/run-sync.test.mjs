@@ -15,7 +15,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync, copyFileSyn
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { runSync, porcelainPath, foreignDirtyEntries } from '../../packages/instance-doctor/src/run-sync.mjs';
+import { runSync, porcelainPath, foreignDirtyEntries, captureWorkingTree } from '../../packages/instance-doctor/src/run-sync.mjs';
 import { realIo } from '../../packages/instance-doctor/src/io.mjs';
 import { STAGE_IDS } from '../../packages/instance-doctor/src/sync.mjs';
 import { makeInstance, git } from '../helpers/instance-fixtures.mjs';
@@ -49,12 +49,37 @@ function fakeSnapshot(patch = {}) {
   };
 }
 
+const SNAPSHOT_HEAD = 'c'.repeat(40);
+const SNAPSHOT_HEAD_TREE = 'd'.repeat(40);
+const SNAPSHOT_TREE = 'b'.repeat(40);
+const SNAPSHOT_COMMIT = 'a'.repeat(40);
+const FAKE_TEMP = '/tmp/doctor-snapshot-fake';
+
+/**
+ * Default answers for the snapshot stage's git calls (captureWorkingTree): HEAD, the throwaway-index probe,
+ * read-tree, add -A, write-tree, HEAD's tree and commit-tree. A working tree that differs from HEAD, so a snapshot
+ * commit is made. undefined for any other call.
+ */
+function snapshotGit(args, opts) {
+  const index = opts?.env?.GIT_INDEX_FILE;
+  if (index) {
+    if (args[0] === 'rev-parse') return { ok: true, out: index }; // the --git-path index probe
+    if (args[0] === 'write-tree') return { ok: true, out: SNAPSHOT_TREE };
+    return OK; // read-tree, add -A
+  }
+  if (args[0] === 'rev-parse' && args.at(-1)?.endsWith('^{tree}')) return { ok: true, out: SNAPSHOT_HEAD_TREE };
+  if (args[0] === 'rev-parse' && args.at(-1) === 'HEAD') return { ok: true, out: SNAPSHOT_HEAD };
+  if (args[0] === 'commit-tree') return { ok: true, out: SNAPSHOT_COMMIT };
+  return undefined;
+}
+
 /**
  * An io bag that records every call and succeeds at everything.
  *
  * `gitRespond` customises git RESULTS without replacing the recorder — a test
  * that overrode `git` wholesale used to lose the call log it was asserting on.
- * Return undefined to fall through to the defaults.
+ * Return undefined to fall through to the defaults. Each git call is recorded
+ * as ['git', dir, command, env-or-null].
  */
 function fakeIo(overrides = {}) {
   const calls = [];
@@ -63,11 +88,12 @@ function fakeIo(overrides = {}) {
   return {
     calls,
     written,
-    git: (dir, args) => {
-      calls.push(['git', dir, args.join(' ')]);
-      const custom = gitRespond?.(dir, args);
+    git: (dir, args, opts) => {
+      calls.push(['git', dir, args.join(' '), opts?.env ?? null]);
+      const custom = gitRespond?.(dir, args, opts);
       if (custom !== undefined) return custom;
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'rev-list') return { ok: true, out: 'e'.repeat(40) };
       // The realistic default: machinery was just copied in, so there IS a
       // staged diff waiting to be committed.
@@ -87,6 +113,11 @@ function fakeIo(overrides = {}) {
       written[p] = contents;
     },
     exists: () => true,
+    tempDir: (prefix) => {
+      calls.push(['tempDir', prefix, '']);
+      return { ok: true, out: FAKE_TEMP };
+    },
+    removeDir: (p) => calls.push(['removeDir', p, '']),
     mkdirp: (p) => calls.push(['mkdirp', p, '']),
     copy: (from, to) => calls.push(['copy', from, to]),
     // The overlay stage enumerates framework-owned files. Default: one machinery
@@ -339,7 +370,9 @@ test('injected machinery is committed, or sync-upstream would refuse the tree it
 test('the machinery commit stages explicit paths, never -A', () => {
   const io = fakeIo();
   runSync(fakeSnapshot(), {}, io);
-  const adds = io.calls.filter(([kind, , cmd]) => kind === 'git' && cmd.startsWith('add'));
+  // Every add into the REAL index. The snapshot stage's `add -A` goes into a
+  // throwaway index (GIT_INDEX_FILE) and is pinned by its own test below.
+  const adds = io.calls.filter(([kind, , cmd, env]) => kind === 'git' && !env?.GIT_INDEX_FILE && /^(-c \S+ )*add\b/.test(cmd));
   assert.ok(adds.length > 0);
   for (const [, , cmd] of adds) {
     assert.ok(!/\s-A\b/.test(cmd), `sweeping add would capture unrelated operator work: ${cmd}`);
@@ -349,8 +382,9 @@ test('the machinery commit stages explicit paths, never -A', () => {
 
 test('no machinery commit is made when the copies are already byte-identical', () => {
   const io = fakeIo({
-    gitRespond: (dir, args) => {
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+    gitRespond: (dir, args, opts) => {
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'rev-list') return { ok: true, out: 'e'.repeat(40) };
       // An empty staged diff means the copies were byte-identical.
       if (args[0] === 'diff') return { ok: true, out: '' };
@@ -365,8 +399,9 @@ test('no machinery commit is made when the copies are already byte-identical', (
 
 test('a failed machinery commit aborts rather than proceeding into a dirty sync', () => {
   const io = fakeIo({
-    gitRespond: (dir, args) => {
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+    gitRespond: (dir, args, opts) => {
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'rev-list') return { ok: true, out: 'e'.repeat(40) };
       if (args[0] === 'diff') return { ok: true, out: 'scripts/sync-upstream.mjs' };
       if (args[0] === 'commit') return { ok: false, out: 'nothing to commit, working tree clean' };
@@ -399,8 +434,9 @@ test('the declared-upstream repair is committed, not left dirtying the tree', ()
 
 test('a failing stage stops forward motion and every later stage is skipped', () => {
   const io = fakeIo({
-    gitRespond: (dir, args) => {
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+    gitRespond: (dir, args, opts) => {
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'fetch') return { ok: false, out: 'could not resolve host' };
       if (args[0] === 'rev-list') return { ok: true, out: 'e'.repeat(40) };
       return OK;
@@ -422,8 +458,9 @@ test('a failing stage stops forward motion and every later stage is skipped', ()
 
 test('an aborted run still writes a receipt naming the stage that stopped it', () => {
   const io = fakeIo({
-    gitRespond: (dir, args) => {
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+    gitRespond: (dir, args, opts) => {
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'fetch') return { ok: false, out: 'could not resolve host' };
       return OK;
     },
@@ -443,8 +480,9 @@ test('an aborted run never re-stamps the version surfaces', () => {
   // not happen is the cross-scheme version re-stamp, which only makes sense once
   // the instance has actually pulled the framework forward.
   const io = fakeIo({
-    gitRespond: (dir, args) => {
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+    gitRespond: (dir, args, opts) => {
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'fetch') return { ok: false, out: 'nope' };
       return OK;
     },
@@ -481,8 +519,9 @@ test('an aborted run never re-stamps the version surfaces', () => {
  */
 function overlayIo({ status, instanceFiles = {}, ...rest } = {}) {
   return fakeIo({
-    gitRespond: (dir, args) => {
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+    gitRespond: (dir, args, opts) => {
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'rev-list') return { ok: true, out: 'e'.repeat(40) };
       if (args[0] === 'status') return { ok: true, out: status };
       return undefined;
@@ -578,6 +617,189 @@ test('the snapshot ref is written BEFORE the gate refuses', () => {
   assert.ok(io.calls.some(([, , cmd]) => cmd.startsWith('update-ref refs/snapshots/')));
 });
 
+// --- the snapshot primitive ----------------------------------------------
+//
+// Until 2026-11-08 the stage called `git stash create -u -m …`, which takes
+// no options: `-u` became part of the message and no untracked file was ever
+// captured. It now stages the whole tree into a throwaway index and commits it.
+
+/** The snapshot stage's calls, from tempDir to update-ref, as [what, GIT_INDEX_FILE]. */
+function snapshotCalls(io) {
+  const from = io.calls.findIndex(([k]) => k === 'tempDir');
+  const to = io.calls.findIndex(([, , cmd]) => cmd.startsWith('update-ref'));
+  return io.calls
+    .slice(from, to === -1 ? undefined : to + 1)
+    .map(([k, a, cmd, env]) => [k === 'git' ? `git ${cmd}` : `${k} ${a}`, env?.GIT_INDEX_FILE ?? null]);
+}
+
+test('the snapshot stage stages the whole tree through a throwaway index and commits it on HEAD', () => {
+  const io = fakeIo();
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(snapshotStage(r).status, 'ok', JSON.stringify(r.stages, null, 2));
+  const index = path.join(FAKE_TEMP, 'index');
+  assert.deepEqual(snapshotCalls(io), [
+    ['tempDir doctor-snapshot-', null],
+    ['git rev-parse --verify --quiet HEAD', null],
+    ['git rev-parse --git-path index', index],
+    [`git read-tree ${SNAPSHOT_HEAD}`, index],
+    ['git -c advice.addEmbeddedRepo=false add -A -- .', index],
+    ['git write-tree', index],
+    [`git rev-parse ${SNAPSHOT_HEAD}^{tree}`, null],
+    [`git commit-tree ${SNAPSHOT_TREE} -p ${SNAPSHOT_HEAD} -m doctor sync`, null],
+    [`removeDir ${FAKE_TEMP}`, null],
+    [`git update-ref refs/snapshots/20260828-120000Z-doctor-sync ${SNAPSHOT_COMMIT}`, null],
+  ]);
+  assert.match(snapshotStage(r).detail, /^snapshot ref refs\/snapshots\/20260828-120000Z-doctor-sync/);
+  assert.ok(!snapshotStage(r).detail.includes('tree matches HEAD'));
+});
+
+test('a tree that matches HEAD points the snapshot ref at HEAD, with no new commit', () => {
+  const io = fakeIo({
+    gitRespond: (dir, args, opts) =>
+      opts?.env && args[0] === 'write-tree' ? { ok: true, out: SNAPSHOT_HEAD_TREE } : undefined,
+  });
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(snapshotStage(r).status, 'ok', JSON.stringify(r.stages, null, 2));
+  assert.match(snapshotStage(r).detail, /refs\/snapshots\/20260828-120000Z-doctor-sync \(tree matches HEAD\)/);
+  assert.ok(!io.calls.some(([, , cmd]) => cmd.startsWith('commit-tree')));
+  assert.ok(io.calls.some(([, , cmd]) => cmd === `update-ref refs/snapshots/20260828-120000Z-doctor-sync ${SNAPSHOT_HEAD}`));
+});
+
+test('an unborn HEAD is snapshotted as a commit with no parent', () => {
+  const io = fakeIo({
+    gitRespond: (dir, args) => (args.join(' ') === 'rev-parse --verify --quiet HEAD' ? { ok: false, out: '' } : undefined),
+  });
+  const r = runSync(fakeSnapshot(), {}, io);
+  const calls = snapshotCalls(io).map(([c]) => c);
+  assert.ok(!calls.some((c) => c.startsWith('git read-tree')), 'nothing to read from an unborn HEAD');
+  assert.ok(calls.includes(`git commit-tree ${SNAPSHOT_TREE} -m doctor sync`), JSON.stringify(calls));
+  assert.ok(calls.includes(`git update-ref refs/snapshots/20260828-120000Z-doctor-sync ${SNAPSHOT_COMMIT}`));
+  assert.match(snapshotStage(r).detail, /no commit yet/);
+});
+
+test('a throwaway index that does not reach git is refused before anything is staged', () => {
+  // An io bag that dropped `env` would read HEAD into, and sweep the tree into,
+  // the operator's real index. The probe sees git answering with the real one.
+  const io = fakeIo({
+    gitRespond: (dir, args) => (args[0] === 'rev-parse' && args[1] === '--git-path' ? { ok: true, out: '.git/index' } : undefined),
+  });
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(r.abortStage, 'snapshot');
+  assert.match(snapshotStage(r).detail, /could not snapshot the working tree: the throwaway index did not reach git/);
+  const calls = snapshotCalls(io).map(([c]) => c);
+  assert.ok(!calls.some((c) => /read-tree|add -A|write-tree|commit-tree|update-ref/.test(c)), JSON.stringify(calls));
+  assert.ok(calls.includes(`removeDir ${FAKE_TEMP}`), 'the temp dir is removed on failure too');
+});
+
+test('a failed snapshot names the failure, writes no ref, and still removes the temp dir', () => {
+  const io = fakeIo({
+    gitRespond: (dir, args, opts) =>
+      opts?.env && args[0] === 'write-tree' ? { ok: false, out: 'fatal: unable to write new index file' } : undefined,
+  });
+  const r = runSync(fakeSnapshot(), {}, io);
+  assert.equal(r.abortStage, 'snapshot');
+  assert.match(snapshotStage(r).detail, /could not snapshot the working tree: write-tree: fatal: unable to write new index file/);
+  assert.ok(!io.calls.some(([, , cmd]) => cmd.startsWith('update-ref')));
+  assert.ok(io.calls.some(([k, p]) => k === 'removeDir' && p === FAKE_TEMP));
+});
+
+/** A fresh repository in a temp dir with one commit: tracked.md and a .gitignore for ignored.log. */
+function snapshotRepo() {
+  const repo = mkdtempSync(path.join(tmpdir(), 'doctor-snapshot-repo-'));
+  git(repo, ['init', '--quiet', '--initial-branch=main']);
+  git(repo, ['config', 'user.email', 'fixture@org-os.test']);
+  git(repo, ['config', 'user.name', 'org-os fixture']);
+  git(repo, ['config', 'commit.gpgsign', 'false']);
+  writeFileSync(path.join(repo, 'tracked.md'), 'committed\n');
+  writeFileSync(path.join(repo, '.gitignore'), 'ignored.log\n');
+  git(repo, ['add', '.']);
+  git(repo, ['commit', '--quiet', '-m', 'initial']);
+  return repo;
+}
+
+test('the real snapshot stage captures tracked edits, staged and untracked files — not ignored ones — and leaves the tree and index alone', () => {
+  const repo = snapshotRepo();
+  try {
+    writeFileSync(path.join(repo, 'tracked.md'), 'edited, not staged\n');
+    writeFileSync(path.join(repo, 'staged.md'), 'staged\n');
+    git(repo, ['add', '--', 'staged.md']);
+    mkdirSync(path.join(repo, 'notes'));
+    writeFileSync(path.join(repo, 'notes', 'untracked.md'), 'untracked\n');
+    writeFileSync(path.join(repo, 'ignored.log'), 'ignored\n');
+
+    const statusBefore = git(repo, ['status', '--porcelain', '-uall']);
+    const cachedBefore = git(repo, ['diff', '--cached', '--name-only']);
+    assert.equal(cachedBefore, 'staged.md');
+
+    const temps = [];
+    const io = {
+      ...realIo,
+      tempDir: (prefix) => {
+        const t = realIo.tempDir(prefix);
+        temps.push(t.out);
+        return t;
+      },
+      // Keep the aborted run's receipt off disk, so the status comparison is exact.
+      writeText: () => {},
+      run: () => ({ ok: true, out: 'stubbed' }),
+      reassess: () => ({ status: 'OK', summary: { blockers: 0, warnings: 0, checks: 6 } }),
+      today: () => '2026-11-08',
+    };
+    // No framework checkout, so the overlay plan cannot be computed and the gate
+    // refuses over the dirty tree: the run stops at the snapshot stage, after
+    // the ref is written, and no later stage touches the repository.
+    const snapshot = fakeSnapshot({ dir: repo, framework: { dir: path.join(repo, 'no-framework'), version: '0.5.0', headSha: 'f'.repeat(40) } });
+    const r = runSync(snapshot, {}, io);
+    assert.equal(r.abortStage, 'snapshot', JSON.stringify(r.stages, null, 2));
+
+    const ref = git(repo, ['for-each-ref', 'refs/snapshots/', '--format=%(refname)']);
+    assert.match(ref, /^refs\/snapshots\/\d{8}-\d{6}Z-doctor-sync$/);
+    assert.ok(snapshotStage(r).detail.startsWith(`snapshot ref ${ref} — `), snapshotStage(r).detail);
+
+    assert.deepEqual(
+      git(repo, ['ls-tree', '-r', '--name-only', ref]).split('\n').sort(),
+      ['.gitignore', 'notes/untracked.md', 'staged.md', 'tracked.md'],
+    );
+    assert.equal(git(repo, ['show', `${ref}:tracked.md`]), 'edited, not staged');
+    assert.equal(git(repo, ['rev-parse', `${ref}^`]), git(repo, ['rev-parse', 'HEAD']), 'the snapshot sits on HEAD');
+
+    assert.equal(git(repo, ['status', '--porcelain', '-uall']), statusBefore, 'the working tree is untouched');
+    assert.equal(git(repo, ['diff', '--cached', '--name-only']), cachedBefore, 'the real index is untouched');
+    assert.equal(temps.length, 1);
+    assert.ok(!existsSync(temps[0]), `the throwaway index was left behind in ${temps[0]}`);
+    assert.deepEqual(readdirSync(path.join(repo, '.git')).filter((f) => /index/.test(f) && f !== 'index'), []);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('the real primitive points at HEAD on a clean tree and makes a parentless commit on an unborn HEAD', () => {
+  const clean = snapshotRepo();
+  const unborn = mkdtempSync(path.join(tmpdir(), 'doctor-snapshot-unborn-'));
+  const idx = mkdtempSync(path.join(tmpdir(), 'doctor-snapshot-idx-'));
+  try {
+    const head = git(clean, ['rev-parse', 'HEAD']);
+    assert.deepEqual(captureWorkingTree(clean, realIo, path.join(idx, 'clean-index')), {
+      ok: true,
+      target: head,
+      note: ' (tree matches HEAD)',
+    });
+
+    git(unborn, ['init', '--quiet', '--initial-branch=main']);
+    git(unborn, ['config', 'user.email', 'fixture@org-os.test']);
+    git(unborn, ['config', 'user.name', 'org-os fixture']);
+    git(unborn, ['config', 'commit.gpgsign', 'false']);
+    writeFileSync(path.join(unborn, 'first.md'), 'first\n');
+    const r = captureWorkingTree(unborn, realIo, path.join(idx, 'unborn-index'));
+    assert.equal(r.ok, true, r.out);
+    assert.equal(git(unborn, ['ls-tree', '-r', '--name-only', r.target]), 'first.md');
+    assert.equal(git(unborn, ['rev-list', '--parents', '-n', '1', r.target]), r.target, 'no parent');
+    assert.equal(git(unborn, ['status', '--porcelain']), '?? first.md');
+  } finally {
+    for (const d of [clean, unborn, idx]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
 test('untracked directories are expanded, so a collapsed memory/reports/ is not read as foreign', () => {
   // git collapses a wholly-untracked directory to one entry ("?? memory/reports/")
   // unless -uall is passed. That entry matches no file path, so the doctor's own
@@ -603,8 +825,9 @@ test("the doctor's own debris from an aborted run does not block the retry", () 
   // receipt behind. Counting those as dirty meant the doctor could never retry
   // after its own failure.
   const io = fakeIo({
-    gitRespond: (dir, args) => {
-      if (args[0] === 'stash') return { ok: true, out: 'a'.repeat(40) };
+    gitRespond: (dir, args, opts) => {
+      const snap = snapshotGit(args, opts);
+      if (snap) return snap;
       if (args[0] === 'rev-list') return { ok: true, out: 'e'.repeat(40) };
       if (args[0] === 'diff') return { ok: true, out: 'scripts/sync-upstream.mjs' };
       if (args[0] === 'status') {

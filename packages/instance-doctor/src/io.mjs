@@ -11,18 +11,28 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 export const realIo = {
-  /** @returns {{ok: boolean, out: string}} */
-  git(dir, args) {
+  /**
+   * Run git in `dir`. `opts.env`, when given, is merged over process.env — the
+   * snapshot stage uses it to point GIT_INDEX_FILE at a throwaway index.
+   *
+   * @param {string} dir
+   * @param {string[]} args
+   * @param {{env?: Record<string, string>}} [opts]
+   * @returns {{ok: boolean, out: string}}
+   */
+  git(dir, args, opts = {}) {
     try {
       const out = execFileSync('git', args, {
         cwd: dir,
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'pipe'],
         maxBuffer: 256 * 1024 * 1024,
+        ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
       });
       return { ok: true, out: (out ?? '').trim() };
     } catch (e) {
@@ -53,6 +63,24 @@ export const realIo = {
   },
 
   exists: (p) => existsSync(p),
+
+  /** A fresh, empty directory under the OS temp dir. @returns {{ok: boolean, out: string}} */
+  tempDir(prefix) {
+    try {
+      return { ok: true, out: mkdtempSync(path.join(tmpdir(), prefix)) };
+    } catch (e) {
+      return { ok: false, out: e.message };
+    }
+  },
+
+  /** Remove a directory tree made by tempDir. Never throws. */
+  removeDir(p) {
+    try {
+      rmSync(p, { recursive: true, force: true });
+    } catch {
+      // Best effort: a leftover temp dir is litter, not damage.
+    }
+  },
 
   mkdirp(p) {
     mkdirSync(p, { recursive: true });
