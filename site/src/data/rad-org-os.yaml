@@ -5,15 +5,15 @@ tiers:
     desc: True today
     items:
       - title: "Substrate-agnostic core"
-        body: "Identity files, memory, registries, schemas, skills — markdown, YAML, and git. No script executes a GitHub API call: api.github.com appears nowhere in the repo. An org can seed an instance on Radicle today; nothing breaks, but nothing assists yet. What still assumes GitHub: bootstrap, sync scripts, federation transport, operator flows, and the framework's own CI in .github/workflows/."
+        body: "Identity files, memory, registries, schemas, skills — markdown, YAML, and git. No script in scripts/ calls the GitHub API; the one place that does is the Cloudflare OS integration's GitHubSubstrate. An org can seed an instance on Radicle today; nothing breaks, but nothing assists yet. What still assumes GitHub: bootstrap, sync scripts, federation transport, operator flows, and the framework's own CI in .github/workflows/."
       - title: "Radicle in the federation schema"
-        body: "schemas/federation.yaml lists radicle as a valid platforms.primary value — a declaration slot, not a feature. No code reads it yet."
+        body: "schemas/federation.yaml lists radicle as a valid platforms.primary value — a declaration slot, not a feature. No script reads it."
       - title: "KMS connector seam — on paper"
-        body: "The knowledge-management connector-layer design specifies a radicle source driver: Radicle repos as knowledge sources. Written design, not shipped code — the connector layer isn't implemented yet."
+        body: "The knowledge-management connector-layer design specifies a radicle source driver: Radicle repos as knowledge sources. The connector layer exists and registers atproto and static-json; there is no radicle connector in it, only the written design."
       - title: "Radicle supplies the primitives"
-        body: "DID identities, patches, issues, private repos, seed nodes on Raspberry-Pi-class hardware, a scriptable CLI, and node events agents can consume (Radicle 1.9.x). CI exists but is bring-your-own."
+        body: "(From the research note; not verified here.) DID identities, patches, issues, private repos, seed nodes on Raspberry-Pi-class hardware, a scriptable CLI, and node events agents can consume (Radicle 1.9.x). CI exists but is bring-your-own."
   - label: Next
-    status: in-dev
+    status: planned
     desc: Committed roadmap
     items:
       - title: "Substrate driver interface"
@@ -23,7 +23,7 @@ tiers:
       - title: "Seed-node runbook"
         body: "Home server or Raspberry Pi, systemd, seeding policy as membership, Radicle pinned ≥1.9.1."
       - title: "KMS radicle connector"
-        body: "Pull knowledge from Radicle repos via the radicle-httpd read API + rad CLI. Gated on the KMS connector layer landing first."
+        body: "Pull knowledge from Radicle repos via the radicle-httpd read API + rad CLI. The connector layer it needs now exists; the connector does not."
   - label: Later
     status: planned
     desc: Exploration — published as exploration

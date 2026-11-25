@@ -37,7 +37,7 @@ const instancesYaml = yaml.load(readFileSync(path.join(rootDir, "data", "instanc
 // `readdirSync().sort().slice(0, 12)`. The old alphabetical slice produced entries with
 // empty blurbs ("— " and nothing after it) and silently truncated anything past the
 // twelfth filename, which is why docs/MODULES.md could never appear. Mirrors the site's
-// curated set in site/src/data/docs-allowlist.ts; keep the two in step.
+// curated set in site/src/data/docs-manifest.mjs; keep the two in step.
 const DOC_SPINE = [
   { file: "ARCHITECTURE.md", title: "Architecture", blurb: "How an instance is put together" },
   { file: "MODULES.md", title: "Modules", blurb: "The v0.5 catalog — what ships, what's planned" },

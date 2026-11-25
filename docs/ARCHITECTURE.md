@@ -1,221 +1,91 @@
-# Organizational OS Architecture
+# Architecture
 
-**Version:** 3.1  
-**Date:** 2026-03-21  
-**Status:** Production-Ready
+org-os is a set of plain files in a git repository, plus scripts that read and write them. There is no server, no database and no daemon in the core. An agent host (Claude Code, OpenCode and others) reads the files, runs `npm run` scripts, and commits. Everything else on this page follows from that choice.
 
----
+This page describes how the framework repository is put together and why. For a map of what an instance contains, see [Overview](OVERVIEW.md); for how an agent behaves inside it, see [Agentic architecture](AGENTIC-ARCHITECTURE.md).
 
-## Complete System Architecture
+**Honest scope.** Every instance today is operated by the maintainer. Federation between instances is a manifest plus scripts that read it, not a running network (see [Federation](FEDERATION.md)). The "fork the repository and answer an interview" setup (`npm run setup`) does not work for a newcomer; the clone (`npm run clone:framework`) is the supported route (see [Setup](SETUP.md)).
+
+## The layers
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         ORGANIZATIONAL OS v3.1                               │
-│              Complete Architecture — Knowledge Commons at Heart             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    KNOWLEDGE COMMONS LAYER                           │   │
-│  │                    (The Memory & Nervous System)                     │   │
-│  ├─────────────────────────────────────────────────────────────────────┤   │
-│  │                                                                      │   │
-│  │  CAPTURE          STRUCTURE           DISTRIBUTE                       │   │
-│  │  ┌──────┐        ┌──────────┐       ┌──────────┐                    │   │
-│  │  │ OPAL │───────►│          │───────►│   KOI    │──► Network        │   │
-│  │  │(omni)│        │knowledge/│       │(BlockSci)│                    │   │
-│  │  └──────┘        │          │       └──────────┘                    │   │
-│  │       │          ├──────────┤            ▲                          │   │
-│  │       │          │domains/  │            │                          │   │
-│  │  ┌────▼───┐      │patterns/ │      ┌────┴────┐                     │   │
-│  │  │Egregore│──────►│insights/ │◄─────│Hub Sync │                     │   │
-│  │  │(Curve) │        │entities/ │      │(weekly) │                     │   │
-│  │  └────────┘      └──────────┘      └─────────┘                     │   │
-│  │       │               ▲                                            │   │
-│  │       └───────────────┴────────────────────────────────────────    │   │
-│  │                       Human Review (critical decisions)               │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              ↓                                            │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    OPERATIONAL LAYER                               │   │
-│  ├─────────────────────────────────────────────────────────────────────┤   │
-│  │                                                                      │   │
-│  │  GOVERNANCE        OPERATIONS           COORDINATION                 │   │
-│  │  ┌──────────┐     ┌──────────┐         ┌──────────┐                 │   │
-│  │  │EIP-4824  │     │ Projects │         │ Meetings │                 │   │
-│  │  │Stewards  │     │ (IDEA)   │         │  ( sync) │                 │   │
-│  │  │Council   │     │ Funding  │         │ Council  │                 │   │
-│  │  │ Elections│     │ Finances │         │  Calls   │                 │   │
-│  │  └──────────┘     └──────────┘         └──────────┘                 │   │
-│  │       │                │                     │                        │   │
-│  │       └────────────────┴─────────────────────┘                        │   │
-│  │                       ↓                                              │   │
-│  │              ┌──────────────────┐                                    │   │
-│  │              │ data/*.yaml     │  ← Single source of truth            │   │
-│  │              │ members/         │                                    │   │
-│  │              │ projects/        │                                    │   │
-│  │              │ meetings/        │                                    │   │
-│  │              └──────────────────┘                                    │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              ↓                                            │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    AGENT LAYER                                       │   │
-│  ├─────────────────────────────────────────────────────────────────────┤   │
-│  │                                                                      │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │   │
-│  │  │  Specialists │  │   Generalist │  │   Council    │             │   │
-│  │  │   (4 Regen)  │  │  (super-agent)│  │   (coordinator)│             │   │
-│  │  │              │  │              │  │              │             │   │
-│  │  │• Agriculture│  │• Strategy   │  │• Facilitates │             │   │
-│  │  │• Commons    │  │• Research   │  │• Decisions   │             │   │
-│  │  │• Impact     │  │• Operations │  │• Alignment   │             │   │
-│  │  │• Bioregional│  │• Creative   │  │              │             │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘             │   │
-│  │                                                                      │   │
-│  │  RUNTIMES: openclaw (DePIN) | cursor | claude | opencode            │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              ↓                                            │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    FEDERATION LAYER                                  │   │
-│  ├─────────────────────────────────────────────────────────────────────┤   │
-│  │                                                                      │   │
-│  │     HUB (regen-coordination-os)                                      │   │
-│  │         │                                                            │   │
-│  │    ┌────┴────────────────────────────────────────────────────────┐   │   │
-│  │    ↓                                                              │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────┐│   │   │
-│  │  │ refi-dao-os │  │ refi-bcn-os   │  │    NYC      │  │ Bloom││   │   │
-│  │  │ (global)    │  │ (local)       │  │  (booting)  │  │(boot)││   │   │
-│  │  │ Stewards    │  │ ESS bridge    │  │             │  │      ││   │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────┘│   │   │
-│  │         ▲                │                                      │   │   │
-│  │         └────────────────┘ (peer sync: DAO ↔ BCN)              │   │   │
-│  │                                                                      │   │
-│  │  SYNC FLOWS:                                                         │   │
-│  │  • Skills: Hub → Nodes (Mondays)                                    │   │
-│  │  • Knowledge: Nodes → Hub (Mondays 6am UTC)                         │   │
-│  │  • Council: All nodes (Fridays 2pm UTC)                               │   │
-│  │  • Peer: ReFi DAO ↔ ReFi BCN (bidirectional)                         │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              ↓                                            │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    INTEGRATION LAYER                                 │   │
-│  ├─────────────────────────────────────────────────────────────────────┤   │
-│  │                                                                      │   │
-│  │  KNOWLEDGE      BLOCKCHAIN       COMMUNICATION      DEV             │   │
-│  │  ┌──────────┐   ┌──────────┐    ┌──────────┐     ┌──────────┐     │   │
-│  │  │ OPAL     │   │ Gardens  │    │ Telegram │     │ GitHub   │     │   │
-│  │  │ Egregore │   │ Hats     │    │ Discord  │     │ Actions  │     │   │
-│  │  │ KOI      │   │ Safe     │    │ Notion   │     │ TypeScript│     │   │
-│  │  │          │   │ Celo     │    │          │     │ Node.js  │     │   │
-│  │  └──────────┘   └──────────┘    └──────────┘     └──────────┘     │   │
-│  │                                                                      │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  KEY PRINCIPLE:                                                     │   │
-│  │                                                                       │   │
-│  │  Knowledge Commons is the CENTER — everything flows through it:      │   │
-│  │                                                                       │   │
-│  │  • Decisions are captured → stored → distributed                       │   │
-│  │  • Patterns are extracted → curated → shared                          │   │
-│  │  • Agent learnings are reflected → aggregated → trained               │   │
-│  │  • Cross-instance sync is knowledge-first                             │   │
-│  │                                                                       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+ agent host:  Claude Code (.claude/)   OpenCode (.opencode/)   Cursor (.cursor/commands/)
+              Hermes (skills/commands/)   Berd (.agents/)
+                   |  reads files, runs npm scripts, commits
+ ------------------+---------------------------------------------------------------
+  1 identity   MASTERPLAN  SOUL  IDENTITY  USER  AGENTS  TOOLS
+    + memory   MEMORY  DECISIONS  HEARTBEAT  memory/YYYY-MM-DD.md
+  2 registries data/*.yaml --npm run generate:schemas--> .well-known/*.json
+                                                         (checked by validate:schemas)
+  3 skills     skills/<name>/SKILL.md          commands: .claude/commands/*.md
+                                                 --npm run sync:commands--> other hosts
+  4 federation federation.yaml (+ data/instances.yaml in the framework repository)
+                 read by analyze:instances, sync:upstream, check:divergence
+  5 knowledge  knowledge/   data/sources.yaml   graphify-out/   packages/org-os-kms
+  6 optional   packages/ (22 directories)   modules/ (5)   site/   scripts/ (the tooling)
+ ------------------+---------------------------------------------------------------
+                   git (history, branches, the vault safety guard)
 ```
 
----
+The layers are directories and conventions, not processes. A layer exists if its files exist and a script or an agent reads them. Each is described below with the check that backs it.
 
-## Layer Descriptions
+### 1. Identity and memory
 
-### 1. Knowledge Commons Layer (Center)
+Six files at the root say who the agent works for: `MASTERPLAN.md` (strategy and mandate), `SOUL.md` (mission, values, voice), `IDENTITY.md` (name, type, chain identifiers), `USER.md` (the operator), `AGENTS.md` (operating manual) and `TOOLS.md` (local environment notes, never credentials). Four more record what happened: `MEMORY.md` (index), `DECISIONS.md` (what was decided and why), `HEARTBEAT.md` (live tasks) and `memory/YYYY-MM-DD.md` (daily logs, appended, never overwritten).
 
-**Purpose:** The memory and nervous system of the organization
+`AGENTS.md` numbers a ten-step startup sequence: nine files in order (`MASTERPLAN.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `MEMORY.md`, the latest daily log, `HEARTBEAT.md`, `TOOLS.md`, `federation.yaml`) and then a parity check, `npm run validate:schemas`. `npm run initialize` gathers the same state for the session dashboard (`scripts/initialize.mjs`; the sections shown are set by `dashboard.yaml`). Why files: an agent with no memory of last week can read what happened, and a human can edit any of it with a text editor and see the change in git.
 
-**Components:**
-- **Capture:** OPAL (omniharmonic), Egregore (Curve Labs), KOI (BlockScience)
-- **Structure:** `knowledge/` directory with domains, patterns, insights, entities
-- **Distribute:** KOI network for cross-instance sharing
+### 2. Registries and generated descriptors
 
-**Flow:**
-```
-Content → AI Extraction → Human Review → Structured Storage → Network Distribution
-```
+`data/*.yaml` is the source of truth for structured facts. The framework repository has 18 registry files in `data/`: members, projects, finances, governance, meetings, ideas, funding opportunities, relationships, sources, events, channels, assets, ecosystems, knowledge gaps, knowledge manifest, and three that exist only in the framework (`instances`, `skills-matrix`, `packages-matrix`). A `data/federation/` directory holds a cache.
 
----
+An instance of 0.6 may hold more: `data/systems.yaml` (the outside systems it uses), `data/boards.yaml`, `data/proposals.yaml` (the proposals ledger), `data/library.yaml` and `data/visibility.yaml` (what is public); the one list is `packages/admin/lib/registries.mjs`. `data/governance.yaml` holds the org's roles and rules: for each class of change (`schemas/change-classes.json`), who may propose it and how it is decided. `npm run validate:data` checks every registry against the admin app's schemas, and `npm run validate:governance` checks that the rules are well formed and that no commit in the history went around them (a governed commit needs an `Org-Proposal` trailer naming a ratified proposal). Both need `packages/admin`, so an instance does not receive them: they run from the framework checkout with the instance's path, and in the framework's own `.github/workflows/validate.yml`. `npm run migrate` brings a 0.5 instance to 0.6 with the scripts in `scripts/migrations/`.
 
-### 2. Operational Layer
+`npm run generate:schemas` (`scripts/generate-all-schemas.mjs`) reads them, with `federation.yaml`, and writes into `.well-known/` the EIP-4824 documents (`dao.json`, `members.json`, `proposals.json`, `activities.json`, `contracts.json`, `governance.md`), the DAOIP-5 grant pools and applications and the DAOIP-3 attestation issuers when there are any, and `meetings.json`, `projects.json`, `finances.json`, `ideas.json` and `knowledge.json`. It writes only what `data/visibility.yaml` makes public, and nothing at all without `identity.daoURI` in `federation.yaml`. The builder is `packages/admin/lib/standards/`; an instance, which does not receive `packages/admin`, gets a copy in `scripts/lib/standards/` from the clone. The framework's own `daoURI` is empty, so here the command writes nothing, and the `.well-known/*.json` files in this repository were left by the earlier generator (`dao.json` written by hand, pointing at the raw files in this repository). `skills.json` comes from `npm run generate:skills`. `scripts/clone-framework.mjs` renders a new instance's first `dao.json` from `dao.json.template`; the builder does not read the templates. `schemas/` holds the JSON-LD and JSON Schema definitions and the change classes (ten files). A workflow (`.github/workflows/generate-schemas.yml`) runs the generator on pushes that touch `data/` and daily.
 
-**Purpose:** Day-to-day organizational functions
+Why generated, not hand-written: one place to edit, and a published descriptor that cannot drift from the registry it came from. See [Data model](DATA-MODEL.md) and [EIP-4824 guide](EIP4824-GUIDE.md).
 
-**Components:**
-- **Governance:** EIP-4824 compliance, Stewards Council elections
-- **Operations:** Projects (IDEA framework), Funding, Finances
-- **Coordination:** Meetings, Council calls
+### 3. Skills and host commands
 
-**Data:** All stored in `data/*.yaml` as single source of truth
+A skill is a directory `skills/<name>/` with a `SKILL.md`: frontmatter plus instructions an agent follows. This repository has 36. They are not code the framework runs; a host loads the file when its description matches the task. See [Skill specification](SKILL-SPECIFICATION.md) and, for the path from one instance's skill to the framework's, [Skill promotion](SKILL-PROMOTION.md).
 
----
+Slash commands (`/initialize`, `/close`, `/commit`, `/handoff`, `/skills`, `/sync`) are authored once in `.claude/commands/`. `npm run sync:commands` regenerates `.opencode/commands/`, `.cursor/commands/` and `skills/commands/` (the form Hermes reads) from them. See [Commands](COMMANDS.md) and [Host integration](HOST-INTEGRATION.md).
 
-### 3. Agent Layer
+### 4. Federation
 
-**Purpose:** AI assistance for organizational functions
+`federation.yaml` declares the instance's identity, its `peers`, `upstream` and `downstream`, the agent configuration and the `packages` it enables. What reads it: `npm run validate:structure` and `validate:schemas` (shape and lineage), `npm run initialize`, `npm run analyze:instances` (a drift report into `memory/reports/`, run weekly by `.github/workflows/drift.yml`), `npm run check:divergence` (compares scripts between the framework and instances), `npm run sync:upstream` and `npm run sync:packages`.
 
-**Components:**
-- **Specialists (4 Regen):** Agriculture, Commons, Impact, Bioregional
-- **Generalist (Super-Agent):** Strategy, Research, Operations, Creative
-- **Council Coordinator:** Facilitates, decides, aligns
+Two design choices are visible in the code. First, an instance is a clone with its own history, not a fork that tracks the framework's: `clone-framework.mjs` writes `metadata.genesis_commit`, and `sync-upstream.mjs` is pull-based (fetch, rebase, run migrations, validate, record `last_sync_commit`) and refuses to run on a dirty working tree. Second, nothing pushes to a peer: there is no skill broadcast or knowledge exchange between instances, and the trust levels in `federation.yaml` are recorded, not enforced. Details and the list of what is not built are in [Federation](FEDERATION.md); the health check and file-level sync are in [Instance doctor](INSTANCE-DOCTOR.md).
 
-**Runtimes:** openclaw (DePIN), cursor, claude, opencode
+### 5. Knowledge
 
----
+`knowledge/` holds the knowledge index (`knowledge/INDEX.md`); `data/sources.yaml` and `repos.manifest.json` register what feeds it; `npm run knowledge` compiles and lints it (`compile-knowledge.mjs`, `lint-knowledge.mjs`). `graphify-out/graph.json`, when present, is a graph built by the external `graphify` CLI and read by `scripts/graph-status.mjs` and `scripts/graph-gaps.mjs` (see [Graphify](integrations/graphify.md)). The map of an instance's federated neighbours is in [Federation map](FEDERATION-MAP.md). `packages/org-os-kms` is the optional knowledge-management system built on `packages/toolkit-framework`. See [KMS](KMS.md), [KMS planes](KMS-PLANES.md) and [KMS publishing](KMS-PUBLISHING.md); its extension packs are in [KMS extension packs](KMS-EXTENSION-PACKS.md) and [Territory pack](TERRITORY-PACK.md).
 
-### 4. Federation Layer
+### 6. Optional code: packages, modules, site
 
-**Purpose:** Multi-instance coordination
+`packages/` holds 22 directories of optional code (the [admin app](ADMIN-APP.md), a local server on `127.0.0.1` where members stage changes to the records and apply or propose them under the org's rules, with a SQLite file outside git for what only some members may read; the KMS; the [federation map](FEDERATION-MAP.md); the instance doctor; `regen-agents`, four specialist agents in TypeScript; integrations for OpenCode, Hermes, Buzz, Paper, Cloudflare and others). `federation.yaml`'s `packages:` map says which an instance enables, and `npm run sync:packages` copies them in. `modules/` has five `module.yaml` manifests (`org-os-berd`, `org-os-buzz`, `org-os-cloudflare-os`, `org-os-instance-doctor`, `org-os-paper`); `scripts/modules.mjs` validates a manifest's shape and nothing else: the engine that would install modules and write `data/modules.yaml` is not built. See [Packages](PACKAGES.md) and [Modules](MODULES.md). The core does not depend on any of them: an instance with none still has layers 1 to 4.
 
-**Topology:**
-- **Hub:** regen-coordination-os (skill distribution, knowledge aggregation)
-- **Nodes:** 9 pilot instances (refi-dao, refi-bcn, NYC, Bloom, etc.)
-- **Peer Sync:** Bidirectional between ReFi DAO and ReFi BCN
+## Design principles the code bears out
 
-**Sync Schedule:**
-- Mondays: Skills distribution + Knowledge aggregation
-- Fridays 2pm UTC: Council coordination
+1. **Files are the interface.** Agents and humans use the same files. No layer needs a running service, so any host that can read files and run a shell works.
+2. **One source of truth, generated outputs.** Registries in `data/*.yaml` are edited; `.well-known/` is generated and validated (`npm run generate:schemas && npm run validate:schemas`).
+3. **Draft and present.** `AGENTS.md` section 6 lists what an agent does without asking (read, write memory and heartbeat, generate schemas) and what needs the operator (external messages, on-chain actions, publishing, identity files, financial actions, changes to federation peers).
+4. **Git is the safety net, and it is guarded.** `.claude/settings.json` denies stash, clean and hard reset and runs `scripts/guards/deny-destructive-git.mjs` before every Bash call. `npm run vault:snapshot` pins tracked files to a ref and `npm run vault:audit` compares afterwards; neither protects untracked files (see [Vault safety](VAULT-SAFETY.md)). `scripts/operator-setup.sh` installs `scripts/hooks/pre-commit`, which blocks commits to `main`. See [Vault safety](VAULT-SAFETY.md).
+5. **Local autonomy.** An instance is complete without peers. Federation is opt-in and pull-based.
+6. **Optional means optional.** Packages and modules are enabled per instance, and the validators do not require them.
 
----
+## What earlier versions of this page described
 
-### 5. Integration Layer
+Earlier versions drew a "knowledge commons" layer at the centre of the system, with automatic capture and a weekly hub sync, a council coordinator agent, a Monday and Friday sync schedule, a network of nine pilot nodes, and an integration layer for Telegram, Discord, Gardens, Hats, Safe and Celo. Status today:
 
-**Purpose:** External tool connections
+- **Not built:** the knowledge-commons centre (`federation.yaml` has `knowledge-commons.enabled: false`), the council agent, any scheduled sync between instances (the only schedules are the weekly drift report and the daily schema regeneration above), and integrations for Telegram and Discord.
+- **Built in the admin app (0.6):** Gardens, Hats and Safe, on chains that include Celo, as outside systems in `data/systems.yaml`. Drivers in `packages/admin/server/systems/` read them, and an action on one is prepared as a Safe transaction for the Safe's signers; nothing in the framework signs or sends a transaction. See [Admin app](ADMIN-APP.md).
+- **Exists as optional code:** `packages/regen-agents` has four specialist agents (agriculture, commons governance, impact measurement, bioregional intelligence) and a coordinating "super-agent", in TypeScript, with adapters to the meeting-processor, knowledge-curator and funding-scout skills. It has no tests, and no script in the framework calls it; `data/packages-matrix.yaml` records two instances as using it, which this repository cannot confirm. See [Packages](PACKAGES.md).
+- **Dormant or draft:** `packages/koi-bridge` (a skeleton, its README says "Needs Testing"), `packages/koi-opal-bridge` and `packages/egregore-core` (an OpenCode adapter) are listed as dormant in `data/packages-matrix.yaml` with no instance using them, and have no tests. Nothing in `scripts/` calls them. See [KOI](integrations/koi.md) and [Egregore](integrations/egregore.md).
+- **Runtimes:** `federation.yaml` names `openclaw` and `regen-eliza` under `integrations.agent_runtimes`; the repository holds no configuration for either.
 
-**Categories:**
-- **Knowledge:** OPAL, Egregore, KOI
-- **Blockchain:** Gardens DAO, Hats Protocol, Safe, Celo
-- **Communication:** Telegram, Discord, Notion
-- **Development:** GitHub Actions, TypeScript, Node.js
+## Key files
 
----
-
-## Key Design Principles
-
-1. **Knowledge-First:** All organizational learning flows through knowledge commons
-2. **Human-in-the-Loop:** Critical decisions require human approval
-3. **Git-Native:** Everything versioned, auditable, forkable
-4. **Federated:** Local autonomy + network coordination
-5. **AI-Augmented:** Agents handle routine, humans handle judgment
-
----
-
-## File References
-
-- Core: `federation.yaml`, `SOUL.md`, `AGENTS.md`
-- Knowledge: `knowledge/INDEX.md`, `docs/integrations/*.md`
-- Agents: `AGENTS.md`, `MASTERPLAN.md`, `skills/*/SKILL.md`
-- Federation: `MEMBERS.md`, `docs/FEDERATION.md`
-
----
-
-*Organizational OS v3.1 — Knowledge commons at the heart of regenerative coordination*
+- Identity and rules: `federation.yaml`, `SOUL.md`, `AGENTS.md`, `MASTERPLAN.md`
+- Tooling: `scripts/` (see [Commands](COMMANDS.md))
+- Skills: `skills/*/SKILL.md`; `SKILLS.md` is generated by `npm run generate:skills`

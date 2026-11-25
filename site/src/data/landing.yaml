@@ -1,8 +1,24 @@
-# Hero copy. Canon: docs/POSITIONING.md §1 (Definition). Edit there first, mirror here.
-eyebrow: "Framework · standards · federation"
-title: "An AI chief of staff for your organization — not just for you"
-subtitle: "Your org's knowledge, data, and operations as files any agent can read, act on, and federate. Single-operator dogfood today — external pilot is the open milestone. No SaaS, no lock-in — markdown, YAML, and git."
+# Home copy. The site's audience is people who already run an org-os instance
+# (spec 2026-10-10, §1). The pitch for newcomers lives in docs/POSITIONING.md.
+# test/design-tight.test.mjs holds the lengths; test/command-where.test.mjs holds each
+# command to the place it is run.
+label: "docs for operators"
+title: "Run your organization on org-os"
+subtitle: "The documentation for people who run an org-os instance: setting one up, the daily session, keeping it current, and the reference for every file and registry."
 ctas:
-  - { label: "$ node scripts/clone-framework.mjs", href: "/get-started", variant: "solid" }
-  - { label: "/modules", href: "/modules", variant: "ghost" }
-  - { label: "/federation", href: "/federation", variant: "ghost" }
+  - { label: "Operator guide", href: "/docs/operator-guide", variant: "solid" }
+  - { label: "All docs", href: "/docs", variant: "ghost" }
+# Three commands an operator runs often. `does` follows docs/COMMANDS.md.
+# `where` is the place each is run, one of WHERE in scripts/command-where.mjs:
+#   agent      typed to the coding agent, in the instance
+#   instance   a terminal at the instance's root
+#   framework  a terminal at the framework checkout (the doctor is not shipped to an instance:
+#              docs/INSTANCE-DOCTOR.md, "Hub mode")
+# test/command-where.test.mjs fails when a command is not present where its row says.
+commands_title: "Three commands, and where to run each"
+commands:
+  - { run: "/initialize", where: "agent", does: "Open a session: pull, show the dashboard, wait for you.", doc: "/docs/commands" }
+  - { run: "npm run validate:structure", where: "instance", does: "Check the file and folder structure.", doc: "/docs/commands" }
+  - { run: "npm run doctor -- --dir ../my-instance", where: "framework", does: "A read-only scorecard of the instance at that path.", doc: "/docs/instance-doctor" }
+intro: "New to org-os? It is a git-native workspace where an organization's knowledge, data and operations live as files that people and agents both work on. Every instance today is run by the maintainer; an unaffiliated pilot is the open milestone."
+intro_link: { label: "What an instance contains", href: "/docs/overview" }

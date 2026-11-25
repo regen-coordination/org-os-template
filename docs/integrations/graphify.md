@@ -1,65 +1,59 @@
-# Graphify Integration
+# Graphify
 
-**Package:** upstream CLI (`uv tool install graphifyy`) — no vendored package
-**Source:** [Graphify](https://graphify.com/) · [GitHub](https://github.com/Graphify-Labs/graphify)
-**Status:** 🟢 **Active — phase B (knowledge substrate)**
-**Type:** Repo-local knowledge graph (AST + LLM extraction, community detection)
+Graphify is an external command-line tool that turns a repository's code and documents into a queryable knowledge graph. org-os does not vendor it. The repository's side is small and real: a skill, two read-only scripts, a session-close step, and the committed output in `graphify-out/`.
 
----
+**Status:** `live` (the vocabulary of [Modules](../MODULES.md)). The graph is committed, the dashboard reads it, and `/close` refreshes it when the CLI is installed. The committed graph is a snapshot of the last build (2026-07-22 per `cost.json`); `npm run graph:status` shows how far behind it is.
 
-## What is Graphify?
+## What must be installed outside the repository
 
-Graphify turns the org's corpus (code, docs, YAML, PDFs) into a queryable
-knowledge graph with explicit file:line citations and an honest audit trail
-(EXTRACTED / INFERRED / AMBIGUOUS). No vector store, no API key required —
-code is parsed deterministically (tree-sitter AST); docs are extracted by the
-host agent or Gemini if a key is set.
-
-## Architecture
-
-```
-  upstream graphify CLI ──builds──▶ graphify-out/graph.json  (committed, canonical)
-                                          │
-              ┌───────────────────────────┼───────────────────────┐
-         read-only                   read-only                read-only
-              ▼                           ▼                       ▼
-     scripts/graph-status.mjs    scripts/graph-gaps.mjs    graphify query
-     (/initialize dashboard)     (data/knowledge-gaps.yaml  (agents, query-first
-                                  → knowledge-curator)       protocol in AGENTS.md)
-```
-
-Core invariant: org-os never writes into the graph — it builds it (at `/close`
-via `graphify . --update`) and reads it. `graph.json` is a canonical data file
-like `data/*.yaml`.
-
-## Install (per operator/instance — never auto-installed)
+The CLI is installed per operator and never automatically:
 
 ```bash
-uv tool install graphifyy   # CLI (PyPI package is graphifyy, command is graphify)
+uv tool install graphifyy   # the PyPI package is graphifyy; the command is graphify
 graphify install            # registers the /graphify skill for Claude Code
-# optional, for SQL extraction:
-uv tool install --with 'graphifyy[sql]' graphifyy --force
 ```
 
-First build: run `/graphify .` in a Claude Code session (semantic extraction
-uses subagents). Subsequent sessions: `/close` runs `graphify . --update`
-automatically.
+Both commands are the upstream tool's instructions and were not run here. The CLI also has an optional SQL extra (`graphifyy[sql]`, upstream behaviour not verified here). Without the CLI, everything below degrades to a one-line hint and never blocks a session, commit or close.
 
-## What's committed
+## Commands
 
-`graphify-out/`: `graph.json`, `cache/` (makes clone rebuilds near-free),
-`manifest.json`, `GRAPH_REPORT.md`, `cost.json` — committed.
-`graph.html`, `.graphify_python`, `.graphify_root` — gitignored (machine-local).
+| Command | What it does |
+|---|---|
+| `/graphify .` (in Claude Code) | First full build. Semantic extraction of documents uses the host agent's subagents. |
+| `graphify . --update` | Incremental refresh. `/close` runs it (step 7 of `.claude/commands/close.md`) when the CLI is installed and `graphify-out/graph.json` exists, followed by `npm run graph:gaps`. |
+| `graphify query "<question>"` | Ask the graph. `AGENTS.md` tells agents to try this before grep-style exploration when the graph exists, citing `source_location`. |
+| `npm run graph:update` | Guarded wrapper for `graphify . --update`; prints a hint if the CLI is absent. |
+| `npm run graph:status` | Read-only summary (`scripts/graph-status.mjs`): node, edge and community counts, ambiguous edges, and how many commits the graph is behind. |
+| `npm run graph:gaps` | `scripts/graph-gaps.mjs` reads the graph and rewrites `data/knowledge-gaps.yaml`, keeping the statuses you set. `--check` prints without writing; `--test` runs its fixture assertions. |
 
-## Phase roadmap
+`graph:gaps` writes to `data/knowledge-gaps.yaml`. It proposes gaps from weak communities (cohesion below 0.15, at least 5 members) and orphan groups. Triage is by status: `open`, `curated` or `dismissed`; dismissals persist across runs. The workflow is in `skills/knowledge-graph/SKILL.md`.
 
-- **A — query layer** ✅ query-first protocol (AGENTS.md)
-- **B — knowledge substrate** ✅ dashboard section, knowledge-gaps registry, `/close` bookend
-- **B follow-ups** ⏳ graph→`knowledge/` page stubs (`compile:knowledge`), `lint:knowledge` cross-check — queued in `docs/agent-plans/QUEUE.md`
-- **C — federation** ⏳ per-instance `graph.json` as federation object; multi-repo merge at the hub; KOI RID bridge — deferred until KOI is past skeleton
+## What it writes and where
 
-## Known limitations
+org-os never writes into the graph; it builds it with the CLI and reads it.
 
-- 11 `.sql` files need the optional `graphifyy[sql]` extra to contribute AST nodes.
-- Semantic extraction of docs costs LLM tokens (~789k input for the initial 355-file build; incremental updates only re-extract changed docs).
-- Cross-chunk semantic references can produce dangling edges; `graph-gaps.mjs` skips them.
+| Path | Committed |
+|---|---|
+| `graphify-out/graph.json`, `manifest.json`, `GRAPH_REPORT.md`, `cost.json`, `.graphify_labels.json`, `cache/` | yes |
+| `graphify-out/graph.html`, `.graphify_python`, `.graphify_root` | no, gitignored (machine-local) |
+
+`/initialize` shows a graph section from `graph-status.mjs` and hides it if there is no graph. `node scripts/graph-gaps.mjs --test` passes on the fixtures in `scripts/test/graph-fixtures/`.
+
+## Current state of this repository's graph
+
+`graphify-out/graph.json` holds 2,906 nodes and 4,678 links. `cost.json` records one build run, on 355 files, with 789,296 input tokens. Semantic extraction of documents costs tokens; incremental updates re-extract only what changed. Edges carry an EXTRACTED, INFERRED or AMBIGUOUS confidence label (the status script reports the ambiguous ones).
+
+## Limits
+
+- The upstream tool is said to need its optional SQL extra for `.sql` files to contribute AST nodes. Taken from a design note, not verified.
+- Semantic extraction can leave dangling edges; `graph-gaps.mjs` skips them.
+- A committed graph goes stale between `/close` runs; `graph:status` reports how far behind it is.
+
+## Not built
+
+- Generating `knowledge/` page stubs from the graph, and a lint cross-check against the graph. These are queued follow-ups (in the queue of the framework's `agent-plans` directory under `docs/`), not part of the skill. The existing `compile:knowledge` script does not read the graph.
+- Per-instance graphs as federation objects, a multi-repo merge at the hub, and a KOI bridge for graphs. Planned only.
+
+## Not verified against the code
+
+The upstream project's name, addresses and install instructions come from the tool itself, not this repository; the CLI was not run.

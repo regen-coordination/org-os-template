@@ -1,0 +1,21 @@
+---
+// A static redirect: GitHub Pages cannot send a 301, so the page refreshes to
+// its target and names it as canonical. The link is for viewers whose browser
+// does not follow the refresh.
+import { withBase } from "../lib/base";
+interface Props { to: string; }
+const href = withBase(Astro.props.to);
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex" />
+  <meta http-equiv="refresh" content={`0; url=${href}`} />
+  <link rel="canonical" href={href} />
+  <title>Moved · org-os</title>
+</head>
+<body>
+  <p>This page has moved to <a href={href}>{href}</a>.</p>
+</body>
+</html>

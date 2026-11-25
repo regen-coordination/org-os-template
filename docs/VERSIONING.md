@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-- The framework is on the **`0.x` pre-beta line**. Current: `0.5.0`.
+- The framework is on the **`0.x` pre-beta line**. Current: `0.6.0` (tag `v0.6.0`, 2026-11-05); work since then is under `## [Unreleased]` in `CHANGELOG.md`.
 - Framework version = `package.json.version` — this is the **single source of truth**.
 - Four other surfaces mirror it and are machine-checked by `npm run version:check`.
 - `0.minor` = **milestone number**, not a semver minor. `1.0.0` is reserved.
@@ -49,8 +49,7 @@ Sorted tag lists are the practical hazard: historical tags are therefore publish
 - **`0.n.p`** — a patch: fixes and additions that break nothing.
 - **`1.0.0`** — **reserved.** Not a bigger number; a claim. It means the framework has
   been run by operators who are not its author, its interfaces have stopped moving, and
-  breaking changes have become genuinely exceptional. The v0.6 external-pilot gate is a
-  step toward it, not the thing itself.
+  breaking changes have become genuinely exceptional. No release so far has met it.
 
 ### Historical: the `1.x → 3.5` line
 
@@ -88,9 +87,11 @@ Follow [semver.org](https://semver.org) strictly. Definitions in framework conte
 - Change the federation protocol exchange format incompatibly.
 
 Breaking changes require:
-- A migration script under `scripts/migrations/vX-to-vY.mjs`.
-- A migration doc under `docs/migrations/vX-to-vY.md`.
+- A migration script under `scripts/migrations/`, named `v<from>-to-v<to>-<slug>.mjs` (on the 0.x line, for example `v0.5-to-v0.6-canonical-records.mjs`); `scripts/migrate.mjs` reads the range from the name.
+- A migration doc under `docs/migrations/`.
 - A `BREAKING CHANGES` section in the `CHANGELOG.md` entry.
+
+0.6 shipped its two migrations without a page under `docs/migrations/`; the `[0.6.0]` entry of `CHANGELOG.md` says how to run them.
 
 ### Minor (`X.Y.0`) — additive
 
@@ -112,16 +113,16 @@ Breaking changes require:
 
 - Session memory writes (`memory/`), heartbeat updates (`HEARTBEAT.md`), dated reports.
 - Content of `data/*.yaml` — only the *shape* is versioned, not the entries.
-- Plan files in `docs/agent-plans/` — those have their own lifecycle.
+- Plan files (the `agent-plans` directory under `docs/` on the older layout, `docs/plans/` in a fresh clone) — those have their own lifecycle.
 
 ## Instance migration — pull-based
 
 The framework does **not** push changes to downstream instances. Each instance pulls at its own cadence:
 
 1. Framework ships a release (version bump + CHANGELOG + migration scripts + docs).
-2. Instance operator runs `npm run sync:upstream` (or git pulls the template remote).
-3. Instance operator runs `npm run migrate` — detects local `framework_version`, applies every migration script from there to the current framework version, idempotent.
-4. Instance's `federation.yaml.metadata.framework_version` is updated to the new version.
+2. Instance operator runs `npm run sync:upstream -- --yes` (without `--yes` it prints the commit count and changes nothing; or git pulls the template remote).
+3. Instance operator runs `npm run migrate` ([`scripts/migrate.mjs`](../scripts/migrate.mjs)). It reads the instance's `framework_version` and runs, in order, every migration from there up to the target: `package.json`'s version, or `--target <version>`. In an instance `package.json` holds the instance's own version (a clone starts at `0.1.0`), which selects nothing, so pass the target: `npm run migrate -- --dry --target 0.6`, then the same without `--dry`. `--dry` lists the migrations and runs none. From the framework checkout, `node scripts/migrate.mjs <instance dir> --target 0.6` runs the framework's migrations against another instance; that is how `doctor sync` runs them. The two numbering schemes never mix: the 0.x migrations (`v0.5-to-v0.6-canonical-records.mjs`, `v0.5-to-v0.6-governance-rules.mjs`) run only between 0.x versions, and the two legacy ones (`v2-to-v3-…`, `v3-to-v3-5-…`) never run on a 0.x instance or for a 0.x target (see [the two migration guides](migrations/v3-to-v3-5.md)). An instance still stamped `1.x`–`3.5`, migrating to a 0.x target, is read as `0.5`. The governance-rules migration writes what it infers only when told to (`--confirm`), so run it directly for that part.
+4. Instance's `federation.yaml.metadata.framework_version` is updated to the new version. The migration scripts do not do this; `npm run doctor sync` re-stamps the version surfaces in its migrate stage.
 5. Framework hub (this repo) picks up the new state on next `npm run analyze:instances`.
 
 > **Note (2026-08-02):** `npm run sync:upstream` is implemented and now
@@ -134,15 +135,15 @@ The framework does **not** push changes to downstream instances. Each instance p
 
 Migrations must be:
 - **Idempotent** — running twice does nothing the second time.
-- **Additive where possible** — never delete data without a `--destructive` flag.
-- **Logged** — append a line to `memory/migrations-YYYY-MM-DD.md` on the instance.
+- **Additive where possible** — the policy is to avoid deleting data. No `--destructive` flag exists in the shipped scripts; the policy is not enforced by code.
+- **Logged** — the policy is to append to `memory/migrations-YYYY-MM-DD.md` on the instance. `v3-to-v3-5-consolidation.mjs` and both 0.6 migrations do so; `migrate.mjs` and the v2-to-v3 script do not.
 
 ## `MASTERPLAN.md` version vs framework version
 
 These are different and both matter:
 
 - `package.json.version` = framework version (shared by all instances of this codebase).
-- `MASTERPLAN.md` version header = that specific instance's agent-mandate version. A refi-bcn-os at `MASTERPLAN v2.0.0` and refi-dao-os at `v2.2.0` can both run framework `v3.0.0`. They describe the evolution of the *organization's mandate*, not the framework.
+- `MASTERPLAN.md` version header = that specific instance's agent-mandate version. Two instances at `MASTERPLAN` `v2.0.0` and `v2.2.0` can both run framework `0.6.0`. They describe the evolution of the *organization's mandate*, not the framework.
 
 Rule of thumb: if you changed how the framework works → framework version. If you changed what the organization wants its agent to do → MASTERPLAN version.
 
@@ -161,7 +162,7 @@ version: "1.2.0"
 Rules:
 - Skill version is independent of framework version.
 - A skill can bump patch without a framework release (via `patch` hotfix).
-- Promoting an instance-local skill to framework-canonical (see `docs/SKILL-PROMOTION.md`) starts it at `1.0.0` unless the source skill was already further along and well-maintained.
+- Promoting an instance-local skill to framework-canonical (see [`docs/SKILL-PROMOTION.md`](SKILL-PROMOTION.md)) starts it at `1.0.0` unless the source skill was already further along and well-maintained.
 
 ## Release process
 
@@ -184,20 +185,20 @@ gh run list --workflow=validate.yml --limit 1   # and a GREEN CI run on this com
 gh workflow disable drift.yml
 gh workflow disable generate-schemas.yml
 
-# 4. Snapshot, then bump. version:update rewrites the five version surfaces and
+# 4. Snapshot (tracked files only; protect untracked notes first), then bump. version:update rewrites the five version surfaces and
 #    promotes [Unreleased] → [<version>] — <date> with comparison links.
-npm run vault:snapshot -- "v0.5.1 release point"
-npm run version:update 0.5.1
+npm run vault:snapshot -- "v0.6.1 release point"
+npm run version:update 0.6.1
 npm run version:check                       # all five surfaces must agree
 
 # 5. Review, then commit with EXPLICIT paths (never `git add -A` here)
 git diff
 git add package.json federation.yaml CHANGELOG.md VERSION.md MASTERPLAN.md
-git commit -m "release: v0.5.1"
+git commit -m "release: v0.6.1"
 
 # 6. Re-check for a race immediately before tagging, then tag and publish
 git fetch && git merge --ff-only origin/main
-git tag -a v0.5.1 -m "org-os v0.5.1 — <one line>"
+git tag -a v0.6.1 -m "org-os v0.6.1 — <one line>"
 git push origin main --follow-tags
 
 # 7. Unpause the crons, verify nothing was lost
@@ -234,29 +235,29 @@ a marker of why `version:check` now reads every surface it can.)
 
 ## Enforcement
 
-`npm run validate:structure` fails if:
-- `package.json.version` is missing or malformed.
-- `federation.yaml.metadata.framework_version` does not equal `package.json.version` major.minor.
-- A `CHANGELOG.md` entry for the current version is missing when the tag exists.
+`npm run validate:structure` (section "Version Consistency") checks:
+- Fails if `package.json` has no `version`, or `federation.yaml` has no `metadata.framework_version`.
+- Fails if `package.json.version` major.minor differs from `framework_version`, except when `package.json.version` starts with `0.`: that case is skipped with a note, because on the `0.x` line an instance's own `package.json` version is independent of its framework pin. The cross-surface comparison is `npm run version:check`'s job.
+- Only warns (does not fail) if `CHANGELOG.md` has no `## [<version>]` heading for the current version.
 
 ## References
 
 - [semver.org](https://semver.org) — semantic versioning spec.
 - [keepachangelog.com](https://keepachangelog.com) — CHANGELOG format.
-- `docs/SKILL-PROMOTION.md` — how instance skills become canonical.
-- `docs/PACKAGE-LIFECYCLE.md` — package lifecycle states + sync mechanism.
-- `docs/DATA-MODEL.md` — registry schemas and their `schema_version` fields.
+- [`docs/SKILL-PROMOTION.md`](SKILL-PROMOTION.md) — how instance skills become canonical.
+- [`docs/PACKAGE-LIFECYCLE.md`](PACKAGE-LIFECYCLE.md) — package lifecycle states + sync mechanism.
+- [`docs/DATA-MODEL.md`](DATA-MODEL.md) — registry schemas and their `schema_version` fields.
 
 ---
 
-## Lineage stamp (v3.5+)
+## Lineage stamp (introduced on the legacy 3.5 line, still current)
 
 Every instance carries a **lineage stamp** in `federation.yaml.metadata`:
 
 ```yaml
 metadata:
-  framework_version: "0.5"       # major.minor of the framework this instance is on
-  genesis_commit: "<40-hex SHA>" # framework commit at clone time; immutable
+  framework_version: "0.6"       # major.minor of the framework this instance is on
+  genesis_commit: "<40-hex SHA>" # the framework's root commit; immutable
   last_sync_commit: "<SHA>|null" # framework commit pinned at last sync-upstream run
 ```
 
@@ -268,8 +269,8 @@ metadata:
 
 Every surface that states a framework version must agree on major.minor:
 
-1. `package.json` → `version` (semver, e.g. `0.5.0`) — the source of truth
-2. `federation.yaml` → `metadata.framework_version` (major.minor, e.g. `0.5`)
+1. `package.json` → `version` (semver, e.g. `0.6.0`) — the source of truth
+2. `federation.yaml` → `metadata.framework_version` (major.minor, e.g. `0.6`)
 3. `CHANGELOG.md` → most-recent `## [X.Y.Z]` heading
 4. `VERSION.md` → the `**Framework Version:**` line
 5. `MASTERPLAN.md` → the `**Version:**` header

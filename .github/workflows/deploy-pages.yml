@@ -30,7 +30,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Full history: the site's verify-build looks up each doc's `verified`
+      # commit (site/src/data/docs-manifest.mjs). A shallow clone has one
+      # commit and would fail every page.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

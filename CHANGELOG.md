@@ -6,7 +6,34 @@ For the policy that governs what counts as a version bump, see [`docs/VERSIONING
 
 ## [Unreleased]
 
-_(Append changes here as they land.)_
+### Added
+
+- **The site's docs, v2.** The public site publishes the 46 pages listed in
+  `site/src/data/docs-manifest.mjs`, each stamped with the commit it was last read against; every page
+  was read against the 0.6 code for this release. `npm run drift` in `site/` names a page whose covered
+  code has changed since. Tables scroll in a named region a keyboard reaches, no page scrolls sideways at
+  375 or 320px (`npm run widths`), and a doc search index covers every page.
+
+### Changed
+
+- **The site follows the registry's `listed` flag everywhere.** An entry marked `listed: false` is off
+  the federation list, out of both counts and, now, off the map, with whatever was reached only through
+  it. The map carries no `url` or `repo` that is not `https`, that is a folder inside another repository,
+  that is a private repository, or that is under a GitHub name nobody has registered
+  (`site/scripts/map-addresses.mjs`); the build fails if one gets through.
+- **The site no longer publishes the repository's `.well-known/` files.** They are the hand-written
+  0.5 files, and the generator builds every address from the `daoURI`'s origin, so it cannot write them
+  for a site served under a sub-path. The repository's `dao.json` now points at the raw files in
+  `regen-coordination/org-os-template`, not at `organizational-os.github.io`: nobody has registered
+  that GitHub name.
+- **`generate-schemas.yml` installs `packages/admin`'s dependencies in the framework**, so the generator
+  can run its schema check once `identity.daoURI` is set. An instance, which has no `packages/admin`,
+  skips the step.
+
+### Fixed
+
+- **`npm run drift` in `site/` prints its whole report into a pipe.** `process.exit` cut it at the first
+  64 KB.
 
 ## [0.7.5] — 2026-11-25
 

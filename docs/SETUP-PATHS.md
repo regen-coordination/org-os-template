@@ -1,17 +1,17 @@
 # Setup Paths for org-os
 
-**Status:** superseded 2026-08-28 (v0.5 release, WS-F5). Reduced to a stub.
+**There is one setup path.** An earlier version of this page described three; it was cut down on 2026-08-28 (v0.5 release). The step-by-step walk-through is [Setup](SETUP.md); this page covers the two config variants — a knowledge-system instance and a non-English instance.
 
 ---
 
-## There is one setup path
+## The path
 
 ```bash
 node scripts/clone-framework.mjs --target ../my-new-org --config config.yaml
+# the same thing: npm run clone:framework -- --target ../my-new-org --config config.yaml
 ```
 
-Full first-run sequence: [`BOOTSTRAP.md`](../BOOTSTRAP.md).
-Getting started as a newcomer: [`templates/GETTING-STARTED.md`](../templates/GETTING-STARTED.md).
+Full first-run sequence: [`BOOTSTRAP.md`](../BOOTSTRAP.md). The onboarding page each new instance gets is rendered from [`templates/GETTING-STARTED.md`](../templates/GETTING-STARTED.md).
 
 Verify what you got, from the framework:
 
@@ -37,7 +37,7 @@ packages:
 kms:
   instance: my-commons        # optional; defaults to a slug of org.name
   extensions: [org-os-territory]
-  store: { on_collision: merge }   # optional
+  store: { on_collision: merge }   # optional; copied into kms.yaml as given
   public_plane:                    # optional: a private canon + a separate public repository
     instance: my-commons-public    # scaffolded at repos/my-commons-public, its own git repository
     types_opt_in: [territorial-unit]   # optional: pack types the public plane publishes
@@ -54,7 +54,7 @@ publication gate. `org-os-kms export` projects what passes into the public plane
 
 A `kms:` block whose packages are not enabled is refused before anything is written.
 Fixture: `tests/fixtures/instance-config-kms.yaml`; guard: `tests/clone-kms.test.mjs`.
-What it does not do: connectors, AT Proto identity and peers stay hand-edited in
+`store` is copied into `kms.yaml` unchanged; this page does not claim `on_collision` is read by `org-os-kms` (nothing in `packages/org-os-kms` mentions it). What it does not do: connectors, AT Proto identity and peers stay hand-edited in
 `kms.yaml` (`packages/org-os-kms/docs/CONNECTORS.md`).
 
 ### An instance that works in another language
@@ -92,27 +92,17 @@ have translated and commit it — the clone reads committed content only.
 
 Fixture: `tests/fixtures/instance-config-pt-br.yaml`; guard: `tests/clone-locale.test.mjs`.
 
-The in-place alternative, `npm run setup`, is an interactive TTY-only wizard for
-converting a fork you have already made. It is not the recommended newcomer path;
-see the README for the current caveat.
+The in-place alternative, `npm run setup` (`scripts/setup-org-os.mjs`), is an interactive
+TTY-only wizard for converting a fork you have already made. Agents and CI shells cannot
+drive it, and it has not been re-tested end to end since a 2026-08-21 clean-room test found
+the newcomer path through it broken; prefer the clone. The README lists the caveat.
 
 ---
 
-## Why this file is a stub
+## Why only one path
 
-It described three setup paths — "Egregore-assisted", "Filesystem-native" and
-"Hybrid" — in 374 lines, dated 2026-03-21 and marked "applies to org-os v3.1+".
-Two of the three never existed as distinct, supported paths. It was aspirational
-architecture written before the cloning engine, and it stayed on disk long enough
-to become the most detailed setup document in the repo while describing choices a
-newcomer does not actually have.
-
-That is the failure mode the v0.5 release set out to remove: documentation that is
-confident, thorough, and not true. A newcomer following it would spend their first
-hour choosing between options rather than getting an instance running.
-
-The content is not lost — it is in git history, and the ideas that survived live on
-as real modules (`packages/egregore-core`, the Cloudflare OS module) with their own
-docs. What is gone is the claim that they are setup paths you pick between.
-
-Kept as a stub rather than deleted so existing links keep resolving.
+The page used to describe three setup paths — "Egregore-assisted", "Filesystem-native" and
+"Hybrid" — in 374 lines dated 2026-03-21. Two of the three never existed as distinct,
+supported paths: it was aspirational architecture written before the cloning engine. The
+ideas that survived live on as real modules (`packages/egregore-core`, the Cloudflare OS
+module) with their own docs. The old text is in git history.

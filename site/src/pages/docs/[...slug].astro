@@ -1,31 +1,31 @@
 ---
 import { getCollection, render } from "astro:content";
-import Layout from "../../components/Layout.astro";
-import { DOCS_ALLOWLIST, docByFile } from "../../data/docs-allowlist";
+import DocsLayout from "../../components/DocsLayout.astro";
+import { PAGES, pageBySource } from "../../data/docs-manifest.mjs";
 
 export async function getStaticPaths() {
   const all = await getCollection("docs");
-  // Only emit routes for allowlisted files; map filename id → friendly slug.
-  return all
-    .filter((entry) => docByFile(entry.id))
-    .map((entry) => {
-      const meta = docByFile(entry.id)!;
-      return { params: { slug: meta.slug }, props: { entry, meta } };
-    });
+  // The manifest decides; the loader must agree with it exactly. A source that
+  // exists but did not load (wrong case, a pattern that matched nothing) would
+  // otherwise publish one page fewer without a word.
+  const loaded = new Set(all.map((entry) => entry.id));
+  const missing = PAGES.filter((p) => !loaded.has(p.source)).map((p) => p.source);
+  if (missing.length > 0) throw new Error(`docs: in the manifest but not loaded:\n  ${missing.join("\n  ")}`);
+  // The glob loader logs a render failure (a broken link, say) and carries on,
+  // storing the entry without `rendered`. Left alone that publishes an empty page.
+  const unrendered = all.filter((entry) => entry.rendered === undefined).map((entry) => entry.id);
+  if (unrendered.length > 0) {
+    throw new Error(`docs: markdown failed to render for:\n  ${unrendered.join("\n  ")}\nSee the [glob-loader] error above; for a broken link the plugin's message is there.`);
+  }
+  return all.map((entry) => {
+    const page = pageBySource(entry.id);
+    if (!page) throw new Error(`docs: loaded ${entry.id}, which is not in the manifest`);
+    return { params: { slug: page.slug }, props: { entry, page } };
+  });
 }
-const { entry, meta } = Astro.props;
-const { Content } = await render(entry);
+const { entry, page } = Astro.props;
+const { Content, headings } = await render(entry);
 ---
-<Layout title={meta.title} current="docs">
-  <div class="container prose">
-    <p class="eyebrow">{meta.group}</p>
-    <h1>{meta.title}</h1>
-    <article class="doc"><Content /></article>
-  </div>
-</Layout>
-<style>
-.doc :global(h2) { margin-top: var(--space-8); }
-.doc :global(pre) { background: var(--color-surface); border: 1px solid var(--color-line);
-  border-radius: var(--radius); padding: var(--space-4); overflow-x: auto; }
-.doc :global(code) { font-size: var(--text-sm); }
-</style>
+<DocsLayout page={page} headings={headings}>
+  <Content />
+</DocsLayout>

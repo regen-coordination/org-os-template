@@ -1,35 +1,71 @@
 # Mirror of docs/MODULES.md — that file is canon; this one feeds /modules.
-# site/test/modules-catalog.test.mjs fails if an id here is missing from the catalog.
+# site/test/modules-catalog.test.mjs fails if the two lists differ, in either
+# direction, or if a status here disagrees with the catalog.
 # status: planned | in-dev | pilot | live
 modules:
+  - id: org-os-instance-doctor
+    name: Instance Assessment & Reliable Sync
+    status: pilot
+    summary: Is this instance healthy, and can it be updated safely? assess gives a read-only scorecard; sync repairs, then updates.
+    link: /docs/instance-doctor
   - id: org-os-cloudflare-os
     name: Cloudflare OS Integration
     status: pilot
     summary: Org data, pages, and an org-literate agent in a browser workspace — for the people who will never touch git.
-    link: /docs/modules
+    link: /docs/cloudflare-os
   - id: org-os-berd
     name: Berd Desktop Integration
     status: pilot
     summary: Canonical Berd personas plus a curated skills bridge into .agents/skills/ — built and live discovery-verified via goosed, not yet exercised under Goose.
-    link: /docs/modules
+    link: /docs/berd
   - id: org-os-buzz
     name: Buzz Agent Lane
     status: pilot
-    summary: SHA-tagged signed session digests to a local Buzz relay on /close, read back on /initialize — built and verified end-to-end against a live relay, dogfood acceptance pending.
-    link: /docs/modules
+    summary: SHA-tagged signed session digests to a Buzz relay on /close, read back on /initialize — built and verified end-to-end against a live relay, dogfood acceptance pending.
+    link: /docs/buzz
   - id: org-os-paper
     name: Paper Design Canvas
     status: in-dev
-    summary: Brand tokens pushed into a Paper design file, drift-linted; agents draft on-brand compositions a human refines by hand. Package built, live verification pending.
-    link: /docs/modules
+    summary: Brand tokens pushed into a Paper design file, drift-linted; agents draft on-brand compositions a human refines by hand. Package built; the token round trip was verified against a live Paper file on 2026-09-02, and drawing a composition is the remaining gate to pilot.
+    link: /docs/paper
   - id: org-os-federation
     name: Federation
     status: live
-    summary: Peers, trust levels, lineage and drift across a network of sovereign instances.
+    summary: Peers, lineage and drift across a network of sovereign instances. Trust levels are stored and shown; nothing enforces them yet.
     link: /docs/federation
+  - id: org-os-pm
+    name: Projects & Tasks
+    status: live
+    summary: Workstream and task tracking — the projects registry, the plans queue, and the dashboard sections that render them.
+    link: /docs/modules
+  - id: org-os-meeting-processor
+    name: Meeting Processor
+    status: live
+    summary: Transcript to structured meeting record to registry updates to knowledge base.
+    link: /docs/modules
+  - id: org-os-knowledge
+    name: Knowledge Commons
+    status: in-dev
+    summary: Compiling, linting, indexing and federating an org's knowledge.
+    link: /docs/modules
+  - id: org-os-funding
+    name: Funding
+    status: live
+    summary: Grant and funding-opportunity tracking with deadline surfacing.
+    link: /docs/modules
+  - id: org-os-heartbeat
+    name: Heartbeat
+    status: in-dev
+    summary: The instance's live pulse — the module that consumes every other module's health checks.
+    link: /docs/modules
+  - id: org-os-territory
+    name: Territory Extension Pack
+    status: pilot
+    summary: An extension pack for org-os-kms that gives a knowledge instance a sense of place — territorial units and data streams.
+    link: /docs/territory-pack
   - id: rad-org-os
     name: rad-org-os
-    status: in-dev
+    status: planned
     summary: The sovereign distribution — org-os on Radicle, peer-to-peer. And the missing org layer for Radicle.
     link: /modules/rad-org-os
   - id: org-os-standards
@@ -46,17 +82,17 @@ modules:
     name: Knowledge Management System
     status: in-dev
     summary: Compiled, indexed, linted knowledge commons across the federation.
-    link: /docs/modules
+    link: /docs/kms
   - id: org-os-admin
     name: Admin App
     status: in-dev
-    summary: Schema-driven forms over an instance's registries, committing every edit to git.
-    link: /docs/modules
+    summary: The local platform over an instance's records — stage a change, then apply it or propose it under the org's own rules.
+    link: /docs/admin-app
   - id: org-os-hermes
     name: Hermes Agent
     status: in-dev
-    summary: Local agent runtime + Telegram gateway, replacing OpenClaw.
-    link: /docs/modules
+    summary: "Integration with the Hermes agent runtime: an org-os page tool and three slash-command skills."
+    link: /docs/host-integration
   - id: org-os-members-hub
     name: Members Hub
     status: planned

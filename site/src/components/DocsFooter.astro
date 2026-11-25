@@ -1,0 +1,45 @@
+---
+// Under every doc: previous and next, where the page comes from and what it
+// was checked against, and the feedback links.
+import { withBase } from "../lib/base";
+import { neighbours } from "../data/docs-manifest.mjs";
+import { REPO_URL } from "../lib/repo.mjs";
+import { feedbackUrl } from "../lib/feedback.mjs";
+interface Props { page: { source: string; slug: string; title: string; verified: string | null }; }
+const { page } = Astro.props;
+const { prev, next } = neighbours(page.slug);
+const fb = (kind: string) => feedbackUrl({ kind, title: page.title, source: page.source, verified: page.verified, repoUrl: REPO_URL });
+---
+<footer class="docs-footer" data-pagefind-ignore>
+  <nav class="pager" aria-label="Previous and next page">
+    {prev ? <a class="prev" href={withBase(`/docs/${prev.slug}`)}><span class="label"><span class="arr" aria-hidden="true">← </span>Previous</span>{prev.title}</a> : <span></span>}
+    {next ? <a class="next" href={withBase(`/docs/${next.slug}`)}><span class="label">Next<span class="arr" aria-hidden="true"> →</span></span>{next.title}</a> : <span></span>}
+  </nav>
+  <p class="meta mono">
+    {page.verified
+      ? <span>Checked against <a class="link" href={`${REPO_URL}/commit/${page.verified}`}><code>{page.verified.slice(0, 7)}</code></a></span>
+      : <span>Not yet checked against the code</span>}
+    <span aria-hidden="true"> · </span>
+    <a class="link" href={`${REPO_URL}/edit/main/${page.source}`}>Edit this page</a>
+  </p>
+  <p class="feedback">
+    Was this page useful?
+    <a class="pill" href={fb("useful")}>Yes</a>
+    <a class="pill" href={fb("not-useful")}>No</a>
+    <span aria-hidden="true"> · </span>
+    <a class="link" href={fb("problem")}>Report a problem with this page</a>
+  </p>
+</footer>
+<style>
+.docs-footer { margin-top: var(--space-12); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--color-line-2);
+  display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--text-sm); color: var(--color-muted); max-width: var(--container-prose); }
+.pager { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.pager a { display: flex; flex-direction: column; gap: 0.15rem; padding: var(--space-3) var(--space-4);
+  border: var(--border-hair) solid var(--color-line-2); border-radius: var(--radius); color: var(--color-ink);
+  transition: border-color var(--t-fast); }
+.pager a:hover { border-color: var(--color-ink); }
+.pager .label { color: var(--color-muted); }
+.pager .next { text-align: right; }
+.meta { font-size: var(--text-xs); }
+.feedback a { margin-left: var(--space-2); }
+</style>
