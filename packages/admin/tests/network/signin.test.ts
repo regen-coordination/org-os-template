@@ -66,7 +66,7 @@ async function house(o: { signIn?: SignInConfig | null } = {}) {
     mountSession(a, { repo, store, membership, hosted: true, signIn, now, atproto: true })
     // Stands in for B2's callback, which hands the proven account to the purpose's handler.
     a.get('/api/session/atproto/proven', c => handler(c, {
-      did: c.req.query('did')!, handle: c.req.query('handle') ?? 'handle.invalid', scope: 'atproto', purpose: 'sign-in', node: null, by: null,
+      did: c.req.query('did')!, handle: c.req.query('handle') ?? 'handle.invalid', scope: 'atproto', purpose: 'sign-in', node: null, by: null, return: c.req.query('return') ?? null,
     } satisfies AtprotoIdentity))
     a.put('/api/registries/:name/:id', c => c.json({ wrote: true }))
   }, { request: withRequest({ repo, hosted: true, membership, store, signIn, now }), hosted: true })
@@ -89,6 +89,15 @@ async function proven(h: House, did: string, handle = 'someone.bsky.social') {
 }
 
 describe('a proven account signs in', () => {
+  it('goes back to where the sign-in started (B8: the network site), else to the Hub\'s home', async () => {
+    const h = await house()
+    const back = 'https://network.example.org/refi-x/'
+    const res = await call(h, 'GET', `/api/session/atproto/proven?did=${encodeURIComponent(DID_GUEST)}&handle=g.bsky.social&return=${encodeURIComponent(back)}`)
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toBe(back)
+    expect((await proven(h, DID_GUEST)).res.headers.get('location')).toBe('/')
+  })
+
   it('a linked DID signs in as that person, with their Roles and nodes', async () => {
     const h = await house()
     const { res, claims } = await proven(h, DID_LINKED)

@@ -37,6 +37,20 @@ export const WITHDRAWN = (handle: string, node: string) => `Removed. ${handle} i
 export const NOT_ON = (node: string) => `This account is not ${node}'s account on the ReFi DAO Network. Nothing was removed.`
 const NO_NODE = 'This sign-in did not say which node it was for. Start again from the node\'s page.'
 
+/** The word each outcome goes back to the network site with (B8): the site says it in its own sentence. */
+export type Outcome = 'added' | 'already' | 'pending' | 'held' | 'withdrawn' | 'no-node' | 'unknown-node' | 'person-account' | 'taken' | 'check-failed' | 'not-on'
+
+/** An outcome: back to where the round-trip started, with `network=<word>`, when it gave a return (B8); else the
+ *  Hub's own sentence. */
+function outcome(c: Context, back: string | null, word: Outcome, text: string, status: 200 | 202 | 400 | 404 | 409 | 422): Response {
+  if (back) {
+    const u = new URL(back)
+    u.searchParams.set('network', word)
+    return c.redirect(u.href, 303)
+  }
+  return c.text(text, status)
+}
+
 export interface NodeRecord extends OrgLinks { title: string }
 
 function readYamlMap(file: string): Record<string, unknown> | null {
@@ -84,24 +98,24 @@ export function addNodeAccount(d: EntryDeps): IdentityHandler {
   const check = d.check ?? (rec => checkAccount(rec))
   const resolveHandle = d.resolveHandle ?? (h => resolveByProtocol(h))
   return async (c: Context, who) => {
-    if (!who.node) return c.text(NO_NODE, 400)
+    if (!who.node) return outcome(c, who.return, 'no-node', NO_NODE, 400)
     const node = readNode(d.repo, who.node)
-    if (!node) return c.text(NODE_UNKNOWN, 404)
-    if (d.store.accountLink(who.did)) return c.text(NODE_PERSON, 409)
+    if (!node) return outcome(c, who.return, 'unknown-node', NODE_UNKNOWN, 404)
+    if (d.store.accountLink(who.did)) return outcome(c, who.return, 'person-account', NODE_PERSON, 409)
     const liveElsewhere = () => d.store.networkEntries('live').find(e => e.did === who.did && e.node !== who.node)
-    if (liveElsewhere()) return c.text(NODE_TAKEN, 409)
-    if (who.handle === HANDLE_INVALID) return c.text(CHECK_FAILED('the account has no checked handle'), 422)
+    if (liveElsewhere()) return outcome(c, who.return, 'taken', NODE_TAKEN, 409)
+    if (who.handle === HANDLE_INVALID) return outcome(c, who.return, 'check-failed', CHECK_FAILED('the account has no checked handle'), 422)
 
     const checked = await check({ handle: who.handle, did: who.did })
-    if (checked.check !== 'pass') return c.text(CHECK_FAILED(checked.reason ?? 'the check did not pass'), 422)
+    if (checked.check !== 'pass') return outcome(c, who.return, 'check-failed', CHECK_FAILED(checked.reason ?? 'the check did not pass'), 422)
     const handle = checked.handle
     const match = await matchesNode({ did: who.did, handle }, node, readKnown(d.repo, who.node), { resolveHandle })
 
     // The store as it is now, after the network calls: the decision and the write follow without another wait.
-    if (liveElsewhere()) return c.text(NODE_TAKEN, 409)
+    if (liveElsewhere()) return outcome(c, who.return, 'taken', NODE_TAKEN, 409)
     const entries = d.store.networkEntries()
     const nodeLive = entries.find(e => e.state === 'live' && e.node === who.node)
-    if (nodeLive?.did === who.did) return c.text(ALREADY(nodeLive.handle, node.title), 200)
+    if (nodeLive?.did === who.did) return outcome(c, who.return, 'already', ALREADY(nodeLive.handle, node.title), 200)
     const at = now()
     const entry = (state: NetworkEntry['state'], why: NetworkEntry['why'], reason: string | null): NetworkEntry => ({
       id: newId(), did: who.did, node: who.node!, handle, on: checked.on, state, why, added: at.toISOString(), addedBy: who.by ?? who.did,
@@ -110,16 +124,16 @@ export function addNodeAccount(d: EntryDeps): IdentityHandler {
     const pendingHere = entries.some(e => e.state === 'pending' && e.node === who.node && e.did === who.did)
     if (nodeLive) {
       if (!pendingHere) await d.store.putNetworkEntry(entry('pending', null, HELD_NOTE))
-      return c.text(PENDING_HELD(node.title), 202)
+      return outcome(c, who.return, 'held', PENDING_HELD(node.title), 202)
     }
     if (!match.match) {
       if (!pendingHere) await d.store.putNetworkEntry(entry('pending', null, null))
-      return c.text(PENDING, 202)
+      return outcome(c, who.return, 'pending', PENDING, 202)
     }
     const live = entry('live', match.why, null)
     await d.store.putNetworkEntry(live)
     await closeOthers(d.store, live, at.toISOString())
-    return c.text(ADDED(handle, node.title), 200)
+    return outcome(c, who.return, 'added', ADDED(handle, node.title), 200)
   }
 }
 
@@ -137,13 +151,13 @@ export async function closeOthers(store: PrivateStore, live: Pick<NetworkEntry, 
 export function withdrawNodeAccount(d: EntryDeps): IdentityHandler {
   const now = d.now ?? (() => new Date())
   return async (c: Context, who) => {
-    if (!who.node) return c.text(NO_NODE, 400)
+    if (!who.node) return outcome(c, who.return, 'no-node', NO_NODE, 400)
     const title = readNode(d.repo, who.node)?.title ?? who.node
     const mine = d.store.networkEntries().filter(e => e.node === who.node && e.did === who.did && e.state !== 'removed')
-    if (mine.length === 0) return c.text(NOT_ON(title), 404)
+    if (mine.length === 0) return outcome(c, who.return, 'not-on', NOT_ON(title), 404)
     const at = now().toISOString()
     for (const e of mine) await d.store.setNetworkEntryState(e.id, 'removed', { reason: 'withdrawn by the node', at })
     const shown = mine.find(e => e.state === 'live') ?? mine[0]!
-    return c.text(WITHDRAWN(shown.handle, title), 200)
+    return outcome(c, who.return, 'withdrawn', WITHDRAWN(shown.handle, title), 200)
   }
 }

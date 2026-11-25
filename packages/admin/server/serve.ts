@@ -299,6 +299,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
       const personIdOf = (c: Parameters<typeof requestPersonOf>[0]) => { const p = requestPersonOf(c); return p?.kind === 'person' ? p.person.id : null }
       mountAtproto(a, {
         config: atproto, store: privateStore, hosted, personOf: personIdOf,
+        // B8: a round-trip may go back to the org's other sites (the network site), on the emailed link's cookie domain (I6).
+        returnDomain: signIn?.cookie.domain ?? null,
         // B3: a proven account signs in (a linked member, or a Guest) with the shared cookie. B4: a member links theirs.
         // B5: a node adds or withdraws its own account (no session is made or changed).
         onIdentity: {

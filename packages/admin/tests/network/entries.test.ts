@@ -74,7 +74,7 @@ async function house(o: { checks?: Checked; resolves?: Record<string, string> } 
   const app = new Hono()
   // Stands in for B2's callback: the round-trip proved `did` (with `handle`) for `node`, started by `by` (or nobody).
   const who = (c: { req: { query(k: string): string | undefined } }, purpose: 'add-node' | 'withdraw-node'): AtprotoIdentity => ({
-    did: c.req.query('did')!, handle: c.req.query('handle')!, scope: 'atproto', purpose, node: c.req.query('node') ?? null, by: c.req.query('by') ?? null,
+    did: c.req.query('did')!, handle: c.req.query('handle')!, scope: 'atproto', purpose, node: c.req.query('node') ?? null, by: c.req.query('by') ?? null, return: c.req.query('return') ?? null,
   })
   app.get('/add', c => add(c, who(c, 'add-node')))
   app.get('/withdraw', c => withdraw(c, who(c, 'withdraw-node')))
@@ -85,7 +85,8 @@ type House = Awaited<ReturnType<typeof house>>
 const q = (p: Record<string, string | null | undefined>) => Object.entries(p).filter(([, v]) => v != null).map(([k, v]) => `${k}=${encodeURIComponent(v!)}`).join('&')
 const add = (h: House, node: string | null, did: string, handle: string, by: string | null = null) =>
   h.app.request(`http://hub.test/add?${q({ node, did, handle, by })}`)
-const withdraw = (h: House, node: string, did: string, handle: string) => h.app.request(`http://hub.test/withdraw?${q({ node, did, handle })}`)
+const withdraw = (h: House, node: string, did: string, handle: string, ret: string | null = null) => h.app.request(`http://hub.test/withdraw?${q({ node, did, handle, return: ret })}`)
+const addBack = (h: House, node: string, did: string, handle: string, ret: string) => h.app.request(`http://hub.test/add?${q({ node, did, handle, return: ret })}`)
 const only = (h: House, state?: NetworkEntry['state']) => h.store.networkEntries(state)
 
 describe('the node registry', () => {
@@ -261,5 +262,38 @@ describe('withdraw-node', () => {
     await withdraw(h, 'refi-x', DID_A, 'refi-x.org')
     expect((await add(h, 'refi-x', DID_B, 'refi-x.org')).status).toBe(200)
     expect(only(h, 'live').map(e => [e.node, e.did])).toEqual([['refi-x', DID_B]])
+  })
+})
+
+describe('coming back to the network site (B8)', () => {
+  const BACK = 'https://network.example.org/refi-x/'
+  const at = (res: Response) => { const u = new URL(res.headers.get('location')!); return [res.status, `${u.origin}${u.pathname}`, u.searchParams.get('network')] }
+
+  it('each outcome goes back to where it started, with a word the site says: added, pending, held, already, withdrawn', async () => {
+    const h = await house({ resolves: { 'refi-y.bsky.social': DID_B } })
+    expect(at(await addBack(h, 'refi-x', DID_A, 'refi-x.org', BACK))).toEqual([303, BACK, 'added'])
+    expect(at(await addBack(h, 'refi-x', DID_A, 'refi-x.org', BACK))).toEqual([303, BACK, 'already'])
+    expect(at(await addBack(h, 'refi-y', DID_C, 'someone.bsky.social', BACK))).toEqual([303, BACK, 'pending'])
+    await addBack(h, 'refi-y', DID_B, 'refi-y.org', BACK)
+    expect(at(await addBack(h, 'refi-x', DID_C, 'refi-x-two.bsky.social', BACK))).toEqual([303, BACK, 'held'])
+    expect(at(await withdraw(h, 'refi-x', DID_A, 'refi-x.org', BACK))).toEqual([303, BACK, 'withdrawn'])
+  })
+
+  it('a refusal goes back too, with its own word; nothing kept', async () => {
+    const h = await house({ checks: { [DID_B]: { check: 'fail', reason: 'handle does not resolve' } } })
+    await h.store.putAccountLink({ did: DID_C, personId: PERSON, handle: 'c.bsky.social', linked: T0.toISOString() })
+    expect(at(await addBack(h, 'nope', DID_A, 'refi-x.org', BACK))).toEqual([303, BACK, 'unknown-node'])
+    expect(at(await addBack(h, 'refi-x', DID_C, 'refi-x.org', BACK))).toEqual([303, BACK, 'person-account'])
+    expect(at(await addBack(h, 'refi-x', DID_B, 'refi-x.org', BACK))).toEqual([303, BACK, 'check-failed'])
+    expect(at(await withdraw(h, 'refi-x', DID_A, 'refi-x.org', BACK))).toEqual([303, BACK, 'not-on'])
+    await addBack(h, 'refi-x', DID_A, 'refi-x.org', BACK)
+    expect(at(await addBack(h, 'refi-y', DID_A, 'refi-y.org', BACK))).toEqual([303, BACK, 'taken'])
+    expect(only(h, 'live')).toHaveLength(1)
+  })
+
+  it('a return that already has a query keeps it', async () => {
+    const h = await house()
+    const res = await addBack(h, 'refi-x', DID_A, 'refi-x.org', 'https://network.example.org/?view=map')
+    expect(res.headers.get('location')).toBe('https://network.example.org/?view=map&network=added')
   })
 })

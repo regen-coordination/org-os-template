@@ -12,6 +12,7 @@ import { createHash, createPrivateKey, createPublicKey, randomBytes, timingSafeE
 import type { Context, Hono } from 'hono'
 import { JoseKey, NodeOAuthClient, requestLocalLock } from '@atproto/oauth-client-node'
 import type { PrivateStore } from '../private/store.ts'
+import { safeReturn } from '../../lib/return-url.mjs'
 
 /** Every variable the AT Proto sign-in reads. */
 export const ATPROTO_ENV = ['HOUSE_ATPROTO_PRIVATE_JWK'] as const
@@ -24,6 +25,8 @@ export const FLOW_COOKIE = 'atproto_flow'
 export const CERTIFIED_ENTRYWAY = 'https://certified.one'
 
 const CALLBACK_PATH = '/api/session/atproto/callback'
+/** B8: the same start by a plain link, for the network site (the Hub answers no other site's script). Never `link`. */
+const GO_PATH = '/api/session/atproto/go'
 const METADATA_PATH = '/oauth/client-metadata.json'
 const JWKS_PATH = '/oauth/jwks.json'
 const FLOW_MS = 60 * 60 * 1000
@@ -83,7 +86,11 @@ export function publicJwks(config: AtprotoConfig): { keys: Record<string, unknow
 /** Who completed a round-trip, as the client read it: the account's DID, its handle as the two-way check gives it
  *  (the handle resolves to the DID and the DID document names it back; `handle.invalid` otherwise), and what the
  *  round-trip was for. */
-export interface AtprotoIdentity { did: string; handle: string; scope: string; purpose: Purpose; node: string | null; by: string | null }
+export interface AtprotoIdentity {
+  did: string; handle: string; scope: string; purpose: Purpose; node: string | null; by: string | null
+  /** Where the browser goes back to (B8), as the I6 return rule judged it at the start; null: none was given. */
+  return: string | null
+}
 /** AT Proto's handle for an account whose handle does not check out both ways. */
 export const HANDLE_INVALID = 'handle.invalid'
 export type IdentityHandler = (c: Context, who: AtprotoIdentity) => Promise<Response> | Response
@@ -98,6 +105,16 @@ export interface AtprotoDeps {
   /** What each purpose does once the account is proven (B3 sign-in, B4 link, B5 add/withdraw); unset: not offered yet. */
   onIdentity?: Partial<Record<Purpose, IdentityHandler>>
   fetch?: typeof fetch
+  /** The org's cookie domain (the emailed link's): a return may be an https address on it (I6). Null: Hub paths only. */
+  returnDomain?: string | null
+  /** The client's two calls out, for tests; default the OAuth client itself. */
+  oauth?: AtprotoCalls
+}
+
+/** What the round-trip asks of the OAuth client: where to send the browser, and who came back. */
+export interface AtprotoCalls {
+  authorize(input: string, appState: string): Promise<URL>
+  callback(params: URLSearchParams): Promise<{ did: string; scope: string; handle: string }>
 }
 
 const hash = (s: string) => createHash('sha256').update(s).digest('base64url')
@@ -120,6 +137,7 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
   if (config === null) {
     const notOffered = (c: Context) => c.json({ error: 'Sign-in with a Bluesky or Certified account is not offered on this Hub.' }, 404)
     app.post('/api/session/atproto/start', notOffered)
+    app.get(GO_PATH, notOffered)
     app.get(CALLBACK_PATH, notOffered)
     return
   }
@@ -137,6 +155,51 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
     })
   })())
 
+  const calls: AtprotoCalls = d.oauth ?? {
+    authorize: async (input, appState) => (await clientOf()).authorize(input, { scope: 'atproto', state: appState }),
+    callback: async params => {
+      const oauth = await clientOf()
+      const { session } = await oauth.callback(params)
+      const did = session.did
+      const scope = (await session.getTokenInfo(false)).scope
+      // Identity only: nothing is kept, nothing can be written. The tokens are revoked and the session row goes.
+      await session.signOut().catch(() => {})
+      // The handle, checked both ways by the client's own resolver (`handle.invalid` when it does not check out).
+      const handle = await oauth.identityResolver.resolve(did).then(i => i.handle ?? HANDLE_INVALID, () => HANDLE_INVALID)
+      return { did, scope, handle }
+    },
+  }
+
+  /** The start, from a JSON body (POST) or a link's query (GET): the account's sign-in page, and the flow cookie. */
+  type Begun = { url: string; cookie: string } | { status: 400 | 401; error: string }
+  const begin = async (c: Context, f: { purpose?: unknown; node?: unknown; handle?: unknown; return?: unknown }, via: 'post' | 'get'): Promise<Begun> => {
+    const { purpose, node } = f
+    if (typeof purpose !== 'string' || !(PURPOSES as readonly string[]).includes(purpose)) {
+      return { status: 400, error: `Send { purpose }: one of ${PURPOSES.join(', ')}.` }
+    }
+    if (via === 'get' && purpose === 'link') return { status: 400, error: 'Linking your account starts from your page in the Hub, not from a link.' }
+    if ((purpose === 'add-node' || purpose === 'withdraw-node') && (typeof node !== 'string' || !NODE_ID.test(node))) {
+      return { status: 400, error: 'Send { node }: the id of the node whose account this is.' }
+    }
+    const by = d.personOf(c)
+    if (purpose === 'link' && !by) return { status: 401, error: 'Sign in with your emailed link first, then link your account from your page in the Hub.' }
+    const given = f.handle
+    if (given !== undefined && (typeof given !== 'string' || given.trim() === '' || given.length > 253)) {
+      return { status: 400, error: 'Send { handle } as the account\'s handle (such as you.bsky.social), or leave it out to sign in with Certified.' }
+    }
+    const back = typeof f.return === 'string' && f.return !== '' ? safeReturn(f.return, config.origin, d.returnDomain ?? null) : null
+    const input = typeof given === 'string' ? given.trim().replace(/^@/, '') : CERTIFIED_ENTRYWAY
+    const flow = randomBytes(32).toString('base64url')
+    const appState = JSON.stringify({ purpose, node: typeof node === 'string' ? node : null, by, flow: hash(flow), return: back })
+    let url: URL
+    try {
+      url = await calls.authorize(input, appState)
+    } catch {
+      return { status: 400, error: typeof given === 'string' ? `No Bluesky or Certified account answers to ${input}. Check the handle and try again.` : 'Certified\'s sign-in could not be reached just now. Try again in a minute.' }
+    }
+    return { url: url.href, cookie: flowCookie(flow, FLOW_MS / 1000) }
+  }
+
   if (config.kind === 'confidential') {
     app.get(METADATA_PATH, c => c.json(clientMetadata(config), 200, { 'cache-control': 'public, max-age=300' }))
     app.get(JWKS_PATH, c => c.json(publicJwks(config), 200, { 'cache-control': 'public, max-age=300' }))
@@ -145,31 +208,19 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
   app.post('/api/session/atproto/start', async c => {
     let body: Record<string, unknown> | null = null
     try { const b: unknown = await c.req.json(); body = b && typeof b === 'object' && !Array.isArray(b) ? b as Record<string, unknown> : null } catch { body = null }
-    const purpose = body?.purpose
-    if (typeof purpose !== 'string' || !(PURPOSES as readonly string[]).includes(purpose)) {
-      return c.json({ error: `Send { purpose }: one of ${PURPOSES.join(', ')}.` }, 400)
-    }
-    const node = body?.node
-    if ((purpose === 'add-node' || purpose === 'withdraw-node') && (typeof node !== 'string' || !NODE_ID.test(node))) {
-      return c.json({ error: 'Send { node }: the id of the node whose account this is.' }, 400)
-    }
-    const by = d.personOf(c)
-    if (purpose === 'link' && !by) return c.json({ error: 'Sign in with your emailed link first, then link your account from your page in the Hub.' }, 401)
-    const given = body?.handle
-    if (given !== undefined && (typeof given !== 'string' || given.trim() === '' || given.length > 253)) {
-      return c.json({ error: 'Send { handle } as the account\'s handle (such as you.bsky.social), or leave it out to sign in with Certified.' }, 400)
-    }
-    const input = typeof given === 'string' ? given.trim().replace(/^@/, '') : CERTIFIED_ENTRYWAY
-    const flow = randomBytes(32).toString('base64url')
-    const appState = JSON.stringify({ purpose, node: typeof node === 'string' ? node : null, by, flow: hash(flow) })
-    let url: URL
-    try {
-      url = await (await clientOf()).authorize(input, { scope: 'atproto', state: appState })
-    } catch {
-      return c.json({ error: typeof given === 'string' ? `No Bluesky or Certified account answers to ${input}. Check the handle and try again.` : 'Certified\'s sign-in could not be reached just now. Try again in a minute.' }, 400)
-    }
-    c.header('set-cookie', flowCookie(flow, FLOW_MS / 1000))
-    return c.json({ url: url.href })
+    const begun = await begin(c, body ?? {}, 'post')
+    if ('error' in begun) return c.json({ error: begun.error }, begun.status)
+    c.header('set-cookie', begun.cookie)
+    return c.json({ url: begun.url })
+  })
+
+  // B8: the same start by a link (sign-in, add-node, withdraw-node), answered by leaving for the account's sign-in.
+  app.get(GO_PATH, async c => {
+    const q = c.req.query()
+    const begun = await begin(c, { purpose: q.purpose, node: q.node, handle: q.handle, return: q.return }, 'get')
+    if ('error' in begun) return c.text(begun.error, begun.status)
+    c.header('set-cookie', begun.cookie)
+    return c.redirect(begun.url, 303)
   })
 
   app.get(CALLBACK_PATH, async c => {
@@ -181,7 +232,7 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
     const { stateStore } = d.store.oauthStores()
     const saved = await stateStore.get(state) as { appState?: string } | undefined
     if (!saved) return refuse('This sign-in was not started here, or it was started more than an hour ago. Start again from the Hub.')
-    let app: { purpose?: unknown; node?: unknown; by?: unknown; flow?: unknown }
+    let app: { purpose?: unknown; node?: unknown; by?: unknown; flow?: unknown; return?: unknown }
     try { app = JSON.parse(saved.appState ?? '') as typeof app } catch { app = {} }
     const flow = cookieValue(c.req.header('cookie'), FLOW_COOKIE)
     if (typeof app.flow !== 'string' || !flow || !sameHash(hash(flow), app.flow)) {
@@ -192,19 +243,13 @@ export function mountAtproto(app: Hono, d: AtprotoDeps): void {
     if (!(PURPOSES as readonly string[]).includes(purpose)) { await stateStore.del(state); return refuse('This sign-in was started for nothing the Hub knows. Start again.') }
     let did: string, scope: string, handle: string
     try {
-      const oauth = await clientOf()
-      const { session } = await oauth.callback(params)
-      did = session.did
-      scope = (await session.getTokenInfo(false)).scope
-      // Identity only: nothing is kept, nothing can be written. The tokens are revoked and the session row goes.
-      await session.signOut().catch(() => {})
-      // The handle, checked both ways by the client's own resolver (`handle.invalid` when it does not check out).
-      handle = await oauth.identityResolver.resolve(did).then(i => i.handle ?? HANDLE_INVALID, () => HANDLE_INVALID)
+      ({ did, scope, handle } = await calls.callback(params))
     } catch {
       return refuse('The sign-in did not complete (it was cancelled, or the account\'s server refused it). Start again from the Hub.')
     }
     const handler = d.onIdentity?.[purpose]
     if (!handler) return c.text('This part of the Hub is not open yet.', 501)
-    return handler(c, { did, handle, scope, purpose, node: typeof app.node === 'string' ? app.node : null, by: typeof app.by === 'string' ? app.by : null })
+    return handler(c, { did, handle, scope, purpose, node: typeof app.node === 'string' ? app.node : null, by: typeof app.by === 'string' ? app.by : null,
+      return: typeof app.return === 'string' ? app.return : null })
   })
 }

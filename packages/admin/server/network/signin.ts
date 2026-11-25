@@ -29,6 +29,7 @@ export function signInWithAccount(d: { store: PrivateStore; signIn: SignInConfig
       cookie = await issueSession(d.store, d.signIn, { sub: `${GUEST_PREFIX}${who.did}`, roles: [], nodes: [] }, at)
     }
     c.header('set-cookie', cookie, { append: true })
-    return c.redirect('/', 303)
+    // B8: back to where the sign-in started (the network site), as the I6 rule judged it at the start; else the Hub's home.
+    return c.redirect(who.return ?? '/', 303)
   }
 }

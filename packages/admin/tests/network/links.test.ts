@@ -74,7 +74,7 @@ async function house() {
     mountAccountLinks(a, { store, personOf: current })
     // Stands in for B2's callback: the round-trip was started by `by` and proved `did`.
     a.get('/api/session/atproto/proven', c => handler(c, {
-      did: c.req.query('did')!, handle: c.req.query('handle') ?? 'handle.invalid', scope: 'atproto', purpose: 'link', node: null, by: c.req.query('by') ?? null,
+      did: c.req.query('did')!, handle: c.req.query('handle') ?? 'handle.invalid', scope: 'atproto', purpose: 'link', node: null, by: c.req.query('by') ?? null, return: null,
     } satisfies AtprotoIdentity))
   }, { request: withRequest({ repo, hosted: true, membership, store, signIn, now }), hosted: true })
   const cookieOf = async (sub: string, roles: string[]) => /^([^;]*)/.exec(await issueSession(store, signIn, { sub, roles, nodes: [] }, T0))![1]!
