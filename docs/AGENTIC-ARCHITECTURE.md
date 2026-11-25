@@ -23,7 +23,7 @@ For the layers of the whole framework see [Architecture](ARCHITECTURE.md); for a
 10. parity check           npm run validate:schemas
 ```
 
-On a first-ever session the agent runs `BOOTSTRAP.md` instead. `npm run initialize` (or `/initialize` in a host) reads the same state and renders it as a dashboard; `dashboard.yaml` chooses the sections. `/close` ends a session: it writes `memory/YYYY-MM-DD.md`, updates `HEARTBEAT.md` and commits. `/initialize` is backed by the `initialize` skill and `/close` by the `org-os-init` skill, which covers the full session lifecycle (see [Commands](COMMANDS.md)).
+On a first-ever session the agent runs `BOOTSTRAP.md` instead. `npm run initialize` (or `/initialize` in a host) reads the same state and renders it as a dashboard; `dashboard.yaml` chooses the sections. `/close` ends a session: it writes memory, updates `HEARTBEAT.md` and commits. Since 0.7 it asks of each memory entry whether it is for members or for the Council (below). `/initialize` is backed by the `initialize` skill and `/close` by the `org-os-init` skill, which covers the full session lifecycle (see [Commands](COMMANDS.md)).
 
 ### Who writes what
 
@@ -34,9 +34,18 @@ On a first-ever session the agent runs `BOOTSTRAP.md` instead. `npm run initiali
 | `packages/operations/` meeting notes and project pages | yes | `AGENTS.md` section 6 |
 | `IDENTITY.md`, `SOUL.md`, `AGENTS.md` | no, operator approval | `AGENTS.md` section 6 |
 | `federation.yaml` peers and network relationships | no, operator approval to add or remove | `AGENTS.md` section 6 |
+| Council memory (an entry only some may read) | yes, through the running Hub only, never in `memory/`, `MEMORY.md`, `HEARTBEAT.md`, a plan or a commit message | `.claude/commands/close.md` step 2 |
 | `MASTERPLAN.md`, `USER.md`, `TOOLS.md`, `data/*.yaml` | not named in `AGENTS.md`; by convention operator-owned, edited by an agent when the task calls for it | |
 
 Human-owned files set direction (`MASTERPLAN.md`, `SOUL.md`, `IDENTITY.md`); agent-owned files record execution (`memory/`, `HEARTBEAT.md`). `MEMORY.md` is shared: agents log, humans curate. When it is unclear whether something is allowed, `AGENTS.md` says to draft and present rather than execute. (`AGENTS.md` also lists "maintain federation.yaml peer references" as autonomous while requiring approval to add or remove peers; read that as: keep existing entries current, ask before changing who the peers are.)
+
+### Who reads the agent layer (0.7)
+
+The agent layer is `memory/**`, `MEMORY.md`, `HEARTBEAT.md`, `docs/plans/**` and `docs/agent-plans/**`. It is kept in git, so every member with the repository reads it, and since 0.7 its writes through the Hub are class `workspace` in the rules (`schemas/change-classes.json`; an org's `all` rule does not reach it, and with no rule naming it a write is direct).
+
+- **On a Hub that signs people in** (0.7.1), those files are read only by the people who decide under the workspace rule that governs them, or, where the org has written no workspace rule, by its own `maintainer` role. Anyone else is answered as for a file that is not there, and sees proposals and the ledger without that file's text, path or diff. An org with neither a workspace rule nor a `maintainer` role has nobody signed in to its hosted Hub who reads them. The person at the machine reads them as before.
+- **Council memory.** What only some may read (a person's situation, pay, contact details, money owed, anything Steward-only) does not go into the agent layer at all. `npm run memory -- add --level <hat or role>` posts it to the running Hub, which keeps it as a record of the private collection `council-memory`, outside git; with no Hub running it is refused, and nothing is written elsewhere instead. `--level members` appends to `memory/<date>.md` as before. `/close` asks "members or Council?" of each entry, and when unsure it is Council (`scripts/memory.mjs`, `.claude/commands/close.md`).
+- **The doctor's agent-layer check** counts what in those files looks like personal data (e-mail addresses, `0x` addresses, phone-like numbers, the names in `data/members.yaml`), never printing a value; run it with `--before-widening` before membership widens, and the counts become blockers. See [Instance doctor](INSTANCE-DOCTOR.md).
 
 ### The safety policy
 
