@@ -10,6 +10,7 @@ import { createApp } from './app.ts'
 import { mountAtproto, readAtprotoConfig, type AtprotoConfig } from './session/atproto.ts'
 import { signInWithAccount } from './network/signin.ts'
 import { linkAccount, mountAccountLinks } from './network/links.ts'
+import { addNodeAccount, withdrawNodeAccount } from './network/entries.ts'
 import { personOf as requestPersonOf } from './request.ts'
 import { INSTANCE_SKIN_PATH, readInstanceSkin } from './instanceSkin.ts'
 import { assetHeaders, INSTANCE_ASSETS_PREFIX, readInstanceAsset } from './instanceAssets.ts'
@@ -298,7 +299,11 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
       mountAtproto(a, {
         config: atproto, store: privateStore, hosted, personOf: personIdOf,
         // B3: a proven account signs in (a linked member, or a Guest) with the shared cookie. B4: a member links theirs.
-        onIdentity: { 'sign-in': signInWithAccount({ store: privateStore, signIn }), link: linkAccount({ store: privateStore, personOf: personIdOf }) },
+        // B5: a node adds or withdraws its own account (no session is made or changed).
+        onIdentity: {
+          'sign-in': signInWithAccount({ store: privateStore, signIn }), link: linkAccount({ store: privateStore, personOf: personIdOf }),
+          'add-node': addNodeAccount({ store: privateStore, repo }), 'withdraw-node': withdrawNodeAccount({ store: privateStore, repo }),
+        },
       })
       mountAccountLinks(a, { store: privateStore, personOf: personIdOf })
     }
