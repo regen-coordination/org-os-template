@@ -32,9 +32,9 @@ The clone copies only what is committed at `HEAD` of the framework repository, a
 
 **Written fresh by the clone:** `IDENTITY.md`, `MASTERPLAN.md`, `MEMORY.md`, `HEARTBEAT.md`, `SOUL.md`, `USER.md`, `TOOLS.md`, `DECISIONS.md`, `federation.yaml` (with a lineage stamp), `README.md`, `GETTING-STARTED.md`, `CLAUDE.md`, `AGENTS.md`, `dashboard.yaml`, `memory/.gitkeep`, `knowledge/INDEX.md`, `docs/plans/QUEUE.md`, and empty `docs/superpowers/{specs,plans,research}/`.
 
-**Not copied, framework only:** `.agents/`, `.hermes/`, `CHANGELOG.md`, `VERSION.md`, `SKILLS.md` (the instance makes its own with `npm run generate:skills`), `SYNC-GUIDE.md`, `PAPERCLIP_DEPLOYMENT_GUIDE.md`, `RESEARCH_INTELLIGENCE_PLAN.md`, `graphify-out/`, `renders/`, `site/`, `integrations/`, `modules/`, and the contents of the framework's own `knowledge/` and `memory/`.
+**Not copied, framework only:** `.agents/`, `.hermes/`, `CHANGELOG.md`, `VERSION.md`, `SKILLS.md` (the instance makes its own with `npm run generate:skills`), `SYNC-GUIDE.md`, `PAPERCLIP_DEPLOYMENT_GUIDE.md`, `RESEARCH_INTELLIGENCE_PLAN.md`, `graphify-out/`, `renders/`, `site/`, `integrations/`, `modules/`, `deploy/` and `.dockerignore` (the Hub's container image: an instance runs the image, it does not build it), and the contents of the framework's own `knowledge/` and `memory/`.
 
-After the clone, the instance still needs `npm install`, `npm run generate:schemas` and `npm run validate:structure`; the clone prints that list when it finishes. On a fresh clone `generate:schemas` writes nothing (there is no `identity.daoURI` yet), and `validate:structure` does not require the generated files until there is one; it passes with warnings for the optional pieces the instance does not have.
+After the clone, the instance still needs its dependencies, `npm run generate:schemas` and `npm run validate:structure`; the clone prints that list when it finishes (it says `npm install`; use `npm ci`, which leaves the committed `package-lock.json` as it is, see [SETUP.md](SETUP.md)). On a fresh clone `generate:schemas` writes nothing (there is no `identity.daoURI` yet), and `validate:structure` does not require the generated files until there is one; it passes with warnings for the optional pieces the instance does not have.
 
 ## Root files
 
@@ -78,7 +78,7 @@ After the clone, the instance still needs `npm install`, `npm run generate:schem
 
 YAML files that hold the structured data of the organisation. The validator requires six: `members.yaml`, `projects.yaml`, `finances.yaml`, `governance.yaml`, `meetings.yaml`, `ideas.yaml`. It warns when any of these optional ones is missing: `funding-opportunities.yaml`, `relationships.yaml`, `sources.yaml`, `knowledge-manifest.yaml`, `events.yaml`, `channels.yaml`, `assets.yaml`, `knowledge-gaps.yaml`.
 
-The framework repository also has `ecosystems.yaml`, `instances.yaml`, `skills-matrix.yaml`, `packages-matrix.yaml` and `data/federation/frontier/` (a cache of what the framework knows of its peers). The 0.6 registries (`systems.yaml`, `boards.yaml`, `proposals.yaml`, `library.yaml`, `visibility.yaml`) are in neither list; `npm run validate:data` checks them when they exist. What each file holds is in [DATA-MODEL.md](DATA-MODEL.md).
+The framework repository also has `ecosystems.yaml`, `instances.yaml`, `skills-matrix.yaml`, `packages-matrix.yaml` and `data/federation/frontier/` (a cache of what the framework knows of its peers). The 0.6 registries (`systems.yaml`, `boards.yaml`, `proposals.yaml`, `library.yaml`, `visibility.yaml`) and the 0.7 ones (`tasks.yaml`, `collections.yaml`, `imports.yaml`, and on a hub `federation-requests.yaml` and `invites.yaml`) are in neither list; `npm run validate:data` checks them when they exist. A custom collection's records are in `data/collections/<id>.yaml`, and the knowledge canon, when the instance has one, in `data/kb/`. What each file holds is in [DATA-MODEL.md](DATA-MODEL.md).
 
 ### `.well-known/`: EIP-4824 files (required)
 
@@ -96,6 +96,7 @@ Without a `daoURI` the generator writes nothing, and it writes only what `data/v
 | `grant-pools.json`, `attestation-issuers.json` | Gardens pools and `grant_pool` blocks in `data/systems.yaml`; `identity.attestation_issuers`. Each only when there is one |
 | `projects.json`, `meetings.json` | `data/projects.yaml`, `data/meetings.yaml`, plus `content/projects/*.md` and `content/meetings/*.md` front matter when those directories exist |
 | `finances.json`, `ideas.json`, `knowledge.json` | `data/finances.yaml`; `data/ideas.yaml`; `data/knowledge-manifest.yaml` and `data/sources.yaml` |
+| `federation.json` | `federation.yaml`: the networks, the join terms and the public peers (see [EIP4824-GUIDE.md](EIP4824-GUIDE.md)) |
 | `skills.json` | written by `npm run generate:skills`, not by `generate:schemas` |
 
 `dao.json`, `members.json`, `proposals.json`, `activities.json`, `contracts.json` and the five org-os extras each have a `*.json.template` beside them, left from the earlier generator; only `dao.json.template` is read, by the clone. The full account is in [EIP4824-GUIDE.md](EIP4824-GUIDE.md).
@@ -114,7 +115,7 @@ One directory per skill with a `SKILL.md` that has YAML front matter. The framew
 
 ### `packages/`: operational packages (required)
 
-Self-contained packages. There is no enforced layout: of the 22 directories in the framework repository, 16 have a `package.json`, 17 have a `README.md`, 12 have a `src/` and one has a `SKILL.md`. An instance only receives the ones its clone config enables; `packages/operations/` (meeting and project templates, no `package.json`) is the usual one. See [PACKAGES.md](PACKAGES.md) for what each one does and [PACKAGE-LIFECYCLE.md](PACKAGE-LIFECYCLE.md) for their status.
+Self-contained packages. There is no enforced layout: of the 23 directories in the framework repository, 17 have a `package.json`, 18 have a `README.md`, 13 have a `src/` and one has a `SKILL.md`. An instance only receives the ones its clone config enables; `packages/operations/` (meeting and project templates, no `package.json`) is the usual one. See [PACKAGES.md](PACKAGES.md) for what each one does and [PACKAGE-LIFECYCLE.md](PACKAGE-LIFECYCLE.md) for their status.
 
 ### `scripts/`: operational scripts (required)
 
@@ -142,7 +143,21 @@ Run with `npm test` (`node --test "tests/**/*.test.mjs"`). `tests/clone-manifest
 
 ### Framework-only directories
 
-These exist in the framework repository and are not copied: `modules/` (module manifests, see [MODULES.md](MODULES.md)), `integrations/`, `site/` (this website), `graphify-out/` (the framework's knowledge graph), `renders/` (federation-map output) and `.agents/` (the maintainer's agent personas and materialised skills, kept in step by `npm run sync:agents` and `npm run sync:skills:berd`).
+These exist in the framework repository and are not copied: `modules/` (module manifests, see [MODULES.md](MODULES.md)), `integrations/`, `site/` (this website), `graphify-out/` (the framework's knowledge graph), `renders/` (federation-map output), `deploy/` (`deploy/hub/`: the Hub's `Dockerfile`, its settings in `env.example` and the runbook `RAILWAY.md`), and `.agents/` (the maintainer's agent personas and materialised skills, kept in step by `npm run sync:agents` and `npm run sync:skills:berd`).
+
+### Paths the Hub writes in an instance
+
+The admin app (the Hub, `packages/admin`, run from the framework against an instance) creates these as it is used. A fresh clone has none of them, and `validate:structure` does not look for them:
+
+| Path | What it holds |
+|---|---|
+| `pages/` | The workspace's pages, one Markdown file a page (`pages/<id>.md`), written one commit per editing session. |
+| `data/collections/<id>.yaml` | The records of the org's own collections (see [DATA-MODEL.md](DATA-MODEL.md)). |
+| `federation/outgoing/<id>.yaml` | The requests this instance sent to join a network (0.7.4). |
+| `house/` | The instance's own look, all optional: `skin.css`, `themes.yaml` and `themes.css`, `bar.yaml`, `nav.yaml` and its images (0.7.1). The Hub reads them; it does not commit them. |
+| `.org-os/private/` | The private store: what is stricter than members, and the sessions. The copied `.gitignore` names it, and the Hub refuses to open a store inside the repository that git does not ignore. Never committed. |
+
+The Hub commits only under `data/`, `pages/`, `memory/`, `docs/plans/`, `docs/agent-plans/` and `federation/outgoing/`, and to `IDENTITY.md`, `federation.yaml`, `MEMORY.md`, `HEARTBEAT.md` and (in a ratify) `DECISIONS.md` (`assertWritablePath` in `packages/admin/server/git.ts`). See [ADMIN-APP.md](ADMIN-APP.md).
 
 ### Tool configuration directories
 
