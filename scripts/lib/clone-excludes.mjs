@@ -277,6 +277,8 @@ export const EXCLUDE_FILES = new Set([
   "tests/scripts/generate-schemas.test.mjs",
   "tests/scripts/standards-vendor.test.mjs",
   "tests/clone-standards.test.mjs",
+  // The `listed` flag of the framework's own data/instances.yaml, which no instance has.
+  "tests/scripts/instances-listed.test.mjs",
   // .github/workflows/ triaged file-by-file 2026-09-13 (fix round 1, Task 7):
   // framework-project workflows excluded by full path; generic CI stays.
   // - deploy-pages.yml: builds and deploys the framework's own site/ (Astro,
