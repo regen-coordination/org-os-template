@@ -65,7 +65,7 @@ Writes to the repository are serialised by one in-memory lock. A WebSocket (`/ap
 
 ## Beyond records
 
-- **Boards** (`/b/<id>`): the 15 built-in boards in `packages/admin/boards/` and an instance's own in `data/boards.yaml`, each a layout of blocks (lists, kanban, maps, metrics, proposals, systems and the others in `app/src/blocks/`).
+- **Boards** (`/b/<id>`): the 17 built-in boards in `packages/admin/boards/` and an instance's own in `data/boards.yaml`, each a layout of blocks (lists, kanban, maps, metrics, proposals, systems and the others in `app/src/blocks/`).
 - **Systems** (`/systems`): each entry of `data/systems.yaml` is read by a driver (`server/systems/drivers.ts`: link, Safe, Hats tree, Snapshot space, Gardens community and pool, DAO URI registration) every five minutes, reaching only the hosts it declares and sending only reads. An action on a system (adding a Safe owner, giving a hat), on a proposal, is prepared as a Safe transaction for the Safe's signers (`server/proposals/prepare.ts`); the server signs, sends and writes nothing.
 - **Operations and jobs**: what a resource offers (a module's check, a fetch, a share) runs as a job with no shell, and anything that writes or reaches the network needs a single-use plan first. The server never commits for a job.
 - **Library** (`/library`): entries a shelf offers (boards, rule sets, systems), previewed, then added through your change like any other edit.
