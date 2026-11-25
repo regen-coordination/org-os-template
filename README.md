@@ -81,6 +81,9 @@ of inventing its own.
 ### You're an **operator** spinning up a new org
 
 ```bash
+# Once, in this checkout: install exactly what the lockfiles say
+npm ci && npm ci --prefix packages/admin
+
 # The one recommended path
 node scripts/clone-framework.mjs --target ../my-new-org --config config.yaml
 
@@ -89,29 +92,34 @@ npm run doctor -- --dir ../my-new-org
 ```
 
 A fresh instance should report **no blockers except `git-remote-absent`** — expected until you
-create a repository for it. Anything else is a bug, and `tests/clone-framework-health.test.mjs`
-fails the build if it reappears. That guard exists because until 2026-08-28 this path produced an
-instance with 7 blockers seconds after creation, the worst being that it published *the
-framework's* identity as its own.
+create a repository for it (the doctor exits 1 because of it) — and six warnings that are normal
+on day one; [`docs/SETUP.md`](docs/SETUP.md) lists them and walks every step. Anything else is a
+bug, and `tests/clone-framework-health.test.mjs` fails the build if it reappears.
+
+Last clean-room run: 2026-11-25, on commit `caaeedf8` of the 0.7.5 docs branch. A fresh clone of
+this repository in an empty temporary folder, `npm ci` in it and in `packages/admin`, the clone
+above with a minimal config for an invented organisation, `npm ci`, `validate:schemas` and
+`validate:structure` in the new instance (both passed, with 6 and 7 warnings), then the doctor:
+1 blocker (`git-remote-absent`) and 6 warnings (`never-synced`, `migrations-dir-missing`,
+`structure-warnings`, `schemas-warnings`, `memory-absent`, `no-sync-receipts`). `npm run open`
+built the Hub and served its launcher page at `http://localhost:4679/launch`. That run found that
+`npm install` rewrites the lockfile's header and leaves the instance dirty; the steps above now
+say `npm ci`.
 
 Driving this with an AI agent (Claude Code, Cursor, a ChatGPT connector) is the normal case —
 [`docs/ADOPT-WITH-AN-AGENT.md`](docs/ADOPT-WITH-AN-AGENT.md) is the copy-paste recipe, and
 `BOOTSTRAP.md` has the config template plus the full first-run sequence.
 
 The in-place alternative (`npm run setup`) converts a fork you have already made. It is an
-interactive **TTY-only** wizard — agents and CI shells cannot drive it — asking nine prompts:
-org type · name · description · base URL · packages · agent runtime · network · emoji · Notion.
-A 2026-08-21 clean-room test found the newcomer path through it broken in 7 Blocker-level ways —
-including leaving the fork's own identity and data in place while both validation commands
-reported a full pass. Some of those causes are fixed by the cloning-engine work above; the wizard
-itself has not been re-tested end to end, so prefer the clone. Evidence:
+interactive **TTY-only** wizard — agents and CI shells cannot drive it — and it has not been
+re-tested end to end since a test on 2026-08-21 found it broken, so prefer the clone. Evidence:
 `memory/reports/clean-room-bootstrap-2026-08-21.md`.
 
 ### You're a **contributor** to the framework
 
 ```bash
 git clone <this-repo> && cd <repo>
-npm install
+npm ci
 npm run install:hooks    # pre-commit + advisory hooks
 npm run selftest         # full reliability check
 ```
@@ -206,7 +214,7 @@ current drift state.
 
 ## Requirements
 
-- Node ≥22
+- Node ≥22.13
 - npm ≥10.9.2
 - git
 

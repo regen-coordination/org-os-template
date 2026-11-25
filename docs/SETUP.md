@@ -12,7 +12,7 @@ An AI agent can run all of this for you: see [Adopt org-os with an AI agent](ADO
 
 ## Prerequisites
 
-- Node.js 22 or higher and npm 10.9.2 or higher (the `engines` field of `package.json`)
+- Node.js 22.13 or later and npm 10.9.2 or later (the `engines` field of `package.json`; the Hub's private store needs Node 22.13)
 - Git
 
 ## Step 1: Get the framework
@@ -20,11 +20,11 @@ An AI agent can run all of this for you: see [Adopt org-os with an AI agent](ADO
 ```bash
 git clone https://github.com/regen-coordination/org-os-template.git
 cd org-os-template
-npm install
-npm install --prefix packages/admin
+npm ci
+npm ci --prefix packages/admin
 ```
 
-The second install is for `packages/admin`, which has its own dependencies. The doctor (Step 5) runs `validate:data` and `validate:governance` from this checkout, and both load the admin's schemas and modules; without that install each is reported as `validator-did-not-run`. It is also what the [Admin app](ADMIN-APP.md) needs.
+Use `npm ci`, which installs exactly what the lockfiles say and changes no file. `npm install` rewrites the header of the root `package-lock.json` in 0.7.5 (its name and `engines` are out of date), which leaves the checkout with an uncommitted change. The second install is for `packages/admin`, which has its own dependencies. The doctor (Step 5) runs `validate:data` and `validate:governance` from this checkout, and both load the admin's schemas and modules; without that install each is reported as `validator-did-not-run`. It is also what the [Admin app](ADMIN-APP.md) needs.
 
 The clone reads only **committed** files of the framework checkout (it lists `HEAD`), so an uncommitted local change in your checkout never ends up in a new instance.
 
@@ -88,10 +88,12 @@ The stages it prints: copy the committed framework files, strip the framework-on
 
 ```bash
 cd ../harbor-bakery-os
-npm install
+npm ci
 npm run validate:schemas
 npm run validate:structure
 ```
+
+Again `npm ci`, not `npm install`: in 0.7.5 `npm install` rewrites the instance's `package-lock.json` header, and the doctor (Step 5) then reports `working-tree-dirty`. On a fresh instance `validate:schemas` passes with six warnings, one for each EIP-4824 file not yet generated (`members.json`, `projects.json`, `finances.json`, `activities.json`, `proposals.json`, `contracts.json`); its hint says to run `generate:schemas`, which writes nothing until you set a `daoURI` (below). `validate:structure` passes with seven warnings about optional files.
 
 The clone ships `.well-known/` as `*.json.template` files plus the `dao.json` it rendered from your config, so it cannot publish the framework's identity as yours. A new instance publishes nothing more until you decide to:
 
@@ -108,7 +110,7 @@ From the framework directory:
 npm run doctor -- --dir ../harbor-bakery-os
 ```
 
-A fresh instance should report **no blockers except `git-remote-absent`**, which is expected until you give it a repository. Warnings such as `never-synced`, `memory-absent` and `no-sync-receipts` are normal on day one. The doctor runs four validators from the framework checkout against the instance: `validate:structure`, `validate:schemas`, `validate:data` and `validate:governance` (`packages/instance-doctor/src/snapshot.mjs`); the last two report `validator-did-not-run` if you skipped the admin install in Step 1. Any other blocker is a framework bug.
+A fresh instance should report **no blockers except `git-remote-absent`**, which is expected until you give it a repository; because of it the doctor exits with code 1. The warnings a fresh instance shows are normal on day one: `never-synced`, `migrations-dir-missing` (the first `doctor sync` creates the folder), `structure-warnings` and `schemas-warnings` (the ones from Step 4), `memory-absent` and `no-sync-receipts`. A `working-tree-dirty` warning means something changed the instance after the clone's commit; `git status` in the instance names it. The doctor runs four validators from the framework checkout against the instance: `validate:structure`, `validate:schemas`, `validate:data` and `validate:governance` (`packages/instance-doctor/src/snapshot.mjs`); the last two report `validator-did-not-run` if you skipped the admin install in Step 1. Any other blocker is a framework bug.
 
 Create a repository for the instance and connect it:
 
@@ -169,7 +171,7 @@ Set `org.language` to a BCP-47 tag and everything the clone writes comes out in 
 
 ## Troubleshooting
 
-- **Node version.** `node --version` should be 22 or higher.
+- **Node version.** `node --version` should be 22.13 or later.
 - **`Target not empty`.** The target directory must be empty; use a new directory (or `--force`, knowing what it overwrites).
 - **`validate:structure` fails after you set a `daoURI`.** It now requires `.well-known/dao.json`, `members.json` and `projects.json`; run `npm run generate:schemas`.
 - **Schema errors.** Check the YAML in `data/` is valid, then `npm run validate:schemas`.

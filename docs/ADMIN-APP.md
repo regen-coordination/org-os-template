@@ -9,7 +9,7 @@ The admin app, called the Hub, is a web app for running an instance: its `data/*
 Run it from the **framework checkout**. An instance does not receive `packages/admin` (`scripts/clone-framework.mjs` removes every package the config does not enable and vendors only the standards generator into `scripts/lib/`), so you point it at an instance with `--repo`.
 
 ```bash
-npm install --prefix packages/admin          # once: the package has its own dependencies
+npm ci --prefix packages/admin               # once: the package has its own dependencies
 npm run admin -- --repo ../my-instance        # build the UI, serve on http://localhost:4680
 npm run open                                  # or the launcher, on http://localhost:4679/launch
 ```

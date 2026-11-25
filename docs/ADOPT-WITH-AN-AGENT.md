@@ -33,8 +33,8 @@ live, not inside it:
 ```bash
 git clone https://github.com/regen-coordination/org-os-template.git
 cd org-os-template
-npm install
-npm install --prefix packages/admin   # the doctor's data and governance checks load it
+npm ci                               # npm ci, not npm install: it changes no file
+npm ci --prefix packages/admin       # the doctor's data and governance checks load it
 ```
 
 **2. Ask the operator, in conversation,** for: org name · org type
@@ -86,7 +86,7 @@ npm run clone:framework -- --target ../harbor-bakery-os --config my-org.yaml
 
 ```bash
 cd ../harbor-bakery-os
-npm install
+npm ci
 npm run validate:schemas && npm run validate:structure
 ```
 
