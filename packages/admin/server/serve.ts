@@ -11,6 +11,7 @@ import { mountAtproto, readAtprotoConfig, type AtprotoConfig } from './session/a
 import { signInWithAccount } from './network/signin.ts'
 import { linkAccount, mountAccountLinks } from './network/links.ts'
 import { addNodeAccount, withdrawNodeAccount } from './network/entries.ts'
+import { mountNetworkBoard } from './network/board.ts'
 import { personOf as requestPersonOf } from './request.ts'
 import { INSTANCE_SKIN_PATH, readInstanceSkin } from './instanceSkin.ts'
 import { assetHeaders, INSTANCE_ASSETS_PREFIX, readInstanceAsset } from './instanceAssets.ts'
@@ -306,6 +307,8 @@ export async function startServer({ repo, port, appDist, clockRefreshMs = CLOCK_
         },
       })
       mountAccountLinks(a, { store: privateStore, personOf: personIdOf })
+      // B6: the stewards' board of node accounts (New, Waiting) and the weekly copy's export.
+      mountNetworkBoard(a, { store: privateStore, repo })
     }
     emailSignIn = mountEmailSignIn(a, { repo, store: privateStore, config: signIn, mailer: signInMailer, ...(config ? { hosted: config } : {}) })
     mountResources(a, store, repo, { hosted, privateStore: ctx.privateStore })

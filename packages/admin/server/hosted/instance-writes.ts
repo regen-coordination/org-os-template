@@ -160,6 +160,11 @@ export const INSTANCE_WRITES: readonly InstanceWrite[] = [
   session('POST', '/api/session/atproto/start'),
   // A member unlinking their own network account (B4): the private store's links, never the instance.
   session('DELETE', '/api/session/atproto/links/:did'),
+  // A steward's Remove, Confirm or Decline of a node's network account (B6): the private store's network entries, never
+  // the instance, so a read-only Hub still decides them.
+  conversation('POST', '/api/network/entries/:id/remove'),
+  conversation('POST', '/api/network/entries/:id/confirm'),
+  conversation('POST', '/api/network/entries/:id/decline'),
 ]
 
 const READS = new Set(['GET', 'HEAD', 'OPTIONS'])

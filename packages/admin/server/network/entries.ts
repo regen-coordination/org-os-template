@@ -105,7 +105,7 @@ export function addNodeAccount(d: EntryDeps): IdentityHandler {
     const at = now()
     const entry = (state: NetworkEntry['state'], why: NetworkEntry['why'], reason: string | null): NetworkEntry => ({
       id: newId(), did: who.did, node: who.node!, handle, on: checked.on, state, why, added: at.toISOString(), addedBy: who.by ?? who.did,
-      check: 'pass', checkedOn: at.toISOString().slice(0, 10), reason, channel: null,
+      check: 'pass', checkedOn: at.toISOString().slice(0, 10), reason, channel: null, decided: null,
     })
     const pendingHere = entries.some(e => e.state === 'pending' && e.node === who.node && e.did === who.did)
     if (nodeLive) {
@@ -116,24 +116,33 @@ export function addNodeAccount(d: EntryDeps): IdentityHandler {
       if (!pendingHere) await d.store.putNetworkEntry(entry('pending', null, null))
       return c.text(PENDING, 202)
     }
-    await d.store.putNetworkEntry(entry('live', match.why, null))
-    for (const e of entries) {
-      if (e.state !== 'pending') continue
-      if (e.node === who.node) await d.store.setNetworkEntryState(e.id, 'removed', { reason: e.did === who.did ? 'closed: this account went live for this node' : 'closed: another account went live for this node' })
-      else if (e.did === who.did) await d.store.setNetworkEntryState(e.id, 'removed', { reason: 'closed: this account went live for another node' })
-    }
+    const live = entry('live', match.why, null)
+    await d.store.putNetworkEntry(live)
+    await closeOthers(d.store, live, at.toISOString())
     return c.text(ADDED(handle, node.title), 200)
+  }
+}
+
+/** Once `live` has gone live (a match, or a steward's Confirm): the node's other pending accounts and this account's
+ *  pending claims on other nodes close, as `removed` with a private reason, decided `at`. */
+export async function closeOthers(store: PrivateStore, live: Pick<NetworkEntry, 'id' | 'node' | 'did'>, at: string): Promise<void> {
+  for (const e of store.networkEntries('pending')) {
+    if (e.id === live.id) continue
+    if (e.node === live.node) await store.setNetworkEntryState(e.id, 'removed', { reason: e.did === live.did ? 'closed: this account went live for this node' : 'closed: another account went live for this node', at })
+    else if (e.did === live.did) await store.setNetworkEntryState(e.id, 'removed', { reason: 'closed: this account went live for another node', at })
   }
 }
 
 /** The `withdraw-node` purpose's handler: the node's own account (live or pending on that node) is removed at once. */
 export function withdrawNodeAccount(d: EntryDeps): IdentityHandler {
+  const now = d.now ?? (() => new Date())
   return async (c: Context, who) => {
     if (!who.node) return c.text(NO_NODE, 400)
     const title = readNode(d.repo, who.node)?.title ?? who.node
     const mine = d.store.networkEntries().filter(e => e.node === who.node && e.did === who.did && e.state !== 'removed')
     if (mine.length === 0) return c.text(NOT_ON(title), 404)
-    for (const e of mine) await d.store.setNetworkEntryState(e.id, 'removed', { reason: 'withdrawn by the node' })
+    const at = now().toISOString()
+    for (const e of mine) await d.store.setNetworkEntryState(e.id, 'removed', { reason: 'withdrawn by the node', at })
     const shown = mine.find(e => e.state === 'live') ?? mine[0]!
     return c.text(WITHDRAWN(shown.handle, title), 200)
   }

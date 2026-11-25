@@ -374,6 +374,10 @@ describe('every actor route refuses, or writes as, a member who holds no role (P
       'POST /api/sessions/:sid/suggest': { path: '/api/sessions/s-none/suggest', body: { markdown: 'Text.', proposal: { title: 'A suggestion' } } },
       'POST /api/workspace/records': { path: '/api/workspace/records', body: { ops: [] } },
       'POST /api/memory': { path: '/api/memory', body: { title: 'A memory' } },
+      // refi-dao-os network app B6: a steward's decisions on a node's network account (a member with no role is refused).
+      'POST /api/network/entries/:id/remove': { path: '/api/network/entries/ne-1/remove', body: { reason: 'not theirs' } },
+      'POST /api/network/entries/:id/confirm': { path: '/api/network/entries/ne-1/confirm', body: { channel: 'website' } },
+      'POST /api/network/entries/:id/decline': { path: '/api/network/entries/ne-1/decline', body: { reason: 'not theirs' } },
       'POST /api/deploy/read-back': { path: '/api/deploy/read-back', body: {} },
       'POST /api/knowledge/entry/:type/:slug/apply': { path: '/api/knowledge/entry/concept/no-such-entry/apply', body: { fields: {}, base: 'none' } },
       'POST /api/comments': { path: '/api/comments', body: { target: `record:projects:${PROJECT}`, body: 'A comment.' } },

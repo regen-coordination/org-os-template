@@ -71,7 +71,7 @@ export function websiteHost(address: string): string | null {
 }
 
 /** `<x>` from a `bsky.app/profile/<x>` or `certified.app/profile/<x>` link (a DID or a handle), else null. */
-function profileTarget(address: unknown): string | null {
+export function profileTarget(address: unknown): string | null {
   const u = parseWebAddress(address)
   if (!u || !PROFILE_HOSTS.has(bareHost(u))) return null
   const m = /^\/profile\/([^/]+)\/?$/.exec(u.pathname)

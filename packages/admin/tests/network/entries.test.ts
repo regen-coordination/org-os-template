@@ -116,7 +116,7 @@ describe('add-node', () => {
     expect(res.status).toBe(200)
     expect(await res.text()).toBe(ADDED('refi-x.org', 'ReFi X'))
     expect(only(h)).toEqual([{ id: 'ne-1', did: DID_A, node: 'refi-x', handle: 'refi-x.org', on: ['bluesky'], state: 'live', why: 'domain',
-      added: T0.toISOString(), addedBy: PERSON, check: 'pass', checkedOn: '2026-12-18', reason: null, channel: null }])
+      added: T0.toISOString(), addedBy: PERSON, check: 'pass', checkedOn: '2026-12-18', reason: null, channel: null, decided: null }])
   })
 
   it('never creates or changes a session: no cookie is set and no Guest is recorded; a signed-out lead\'s entry is added by the node\'s DID', async () => {
@@ -201,7 +201,7 @@ describe('add-node', () => {
     await add(h, 'refi-x', DID_A, 'refi-x.org')
     const byId = Object.fromEntries(only(h).map(e => [`${e.node}:${e.did}`, e]))
     expect(byId[`refi-x:${DID_A}`]?.state).toBe('live')
-    expect(byId[`refi-x:${DID_B}`]).toMatchObject({ state: 'removed', reason: 'closed: another account went live for this node' })
+    expect(byId[`refi-x:${DID_B}`]).toMatchObject({ state: 'removed', reason: 'closed: another account went live for this node', decided: T0.toISOString() })
     expect(byId[`refi-z:${DID_A}`]).toMatchObject({ state: 'removed', reason: 'closed: this account went live for another node' })
   })
 })
@@ -236,7 +236,7 @@ describe('withdraw-node', () => {
     expect(res.status).toBe(200)
     expect(await res.text()).toBe(WITHDRAWN('refi-x.org', 'ReFi X'))
     expect(res.headers.get('set-cookie')).toBe(null)
-    expect(only(h)).toMatchObject([{ state: 'removed', reason: 'withdrawn by the node' }])
+    expect(only(h)).toMatchObject([{ state: 'removed', reason: 'withdrawn by the node', decided: T0.toISOString() }])
   })
 
   it('a pending account withdraws too', async () => {

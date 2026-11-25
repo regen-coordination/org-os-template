@@ -207,7 +207,7 @@ CREATE INDEX IF NOT EXISTS account_links_person ON account_links (person_id);
 CREATE TABLE IF NOT EXISTS network_entries (id TEXT NOT NULL PRIMARY KEY, did TEXT NOT NULL, node TEXT NOT NULL, handle TEXT NOT NULL,
   on_apps TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('live', 'pending', 'removed')), why TEXT CHECK (why IN ('domain', 'record', 'steward')),
   added TEXT NOT NULL, added_by TEXT NOT NULL, check_state TEXT NOT NULL CHECK (check_state IN ('pass', 'fail')), checked_on TEXT NOT NULL,
-  reason TEXT, channel TEXT) STRICT;
+  reason TEXT, channel TEXT, decided TEXT) STRICT;
 CREATE UNIQUE INDEX IF NOT EXISTS network_entries_live_node ON network_entries (node) WHERE state = 'live';
 CREATE UNIQUE INDEX IF NOT EXISTS network_entries_live_did ON network_entries (did) WHERE state = 'live';
 CREATE TABLE IF NOT EXISTS oauth_state (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL, expires TEXT NOT NULL) STRICT;
@@ -226,6 +226,9 @@ export interface NetworkEntry {
   id: string; did: string; node: string; handle: string; on: string[]; state: NetworkEntryState
   why: 'domain' | 'record' | 'steward' | null; added: string; addedBy: string; check: 'pass' | 'fail'; checkedOn: string
   reason: string | null; channel: string | null
+  /** When a steward or the node last decided its state (Confirm, Decline, Remove, a withdrawal, a close): the export's
+   *  removal date. Null until then. */
+  decided: string | null
 }
 /** The key-value store the AT Proto OAuth client asks for (its state and its sessions). */
 export interface OAuthKv<V = unknown> { get(key: string): Promise<V | undefined>; set(key: string, value: V): Promise<void>; del(key: string): Promise<void> }
@@ -1264,18 +1267,19 @@ export class PrivateStore {
   async putNetworkEntry(e: NetworkEntry): Promise<void> {
     for (const k of ['id', 'did', 'node', 'handle', 'added', 'addedBy', 'checkedOn'] as const) nonEmpty(`a network entry's ${k}`, e[k])
     await this.locked(() => {
-      this.db.prepare(`INSERT INTO network_entries (id, did, node, handle, on_apps, state, why, added, added_by, check_state, checked_on, reason, channel)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(e.id, e.did, e.node, e.handle, JSON.stringify(e.on), e.state, e.why, e.added, e.addedBy,
-        e.check, e.checkedOn, e.reason, e.channel)
+      this.db.prepare(`INSERT INTO network_entries (id, did, node, handle, on_apps, state, why, added, added_by, check_state, checked_on, reason, channel, decided)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(e.id, e.did, e.node, e.handle, JSON.stringify(e.on), e.state, e.why, e.added, e.addedBy,
+        e.check, e.checkedOn, e.reason, e.channel, e.decided)
     })
   }
 
   /** An entry moved to `state` (a steward's Confirm, Decline or Remove, or a node's withdrawal); `why`, `reason` and
-   *  `channel` set when given. Going live is refused by the database when the node or the account is already live. */
-  async setNetworkEntryState(id: string, state: NetworkEntryState, set: { why?: NetworkEntry['why']; reason?: string; channel?: string } = {}): Promise<void> {
+   *  `channel` set when given; `decided` is `at` (default now). Going live is refused by the database when the node or the
+   *  account is already live. */
+  async setNetworkEntryState(id: string, state: NetworkEntryState, set: { why?: NetworkEntry['why']; reason?: string; channel?: string; at?: string } = {}): Promise<void> {
     await this.locked(() => {
-      const r = this.db.prepare(`UPDATE network_entries SET state = ?, why = COALESCE(?, why), reason = COALESCE(?, reason), channel = COALESCE(?, channel)
-        WHERE id = ?`).run(state, set.why ?? null, set.reason ?? null, set.channel ?? null, id)
+      const r = this.db.prepare(`UPDATE network_entries SET state = ?, why = COALESCE(?, why), reason = COALESCE(?, reason), channel = COALESCE(?, channel),
+        decided = ? WHERE id = ?`).run(state, set.why ?? null, set.reason ?? null, set.channel ?? null, set.at ?? new Date().toISOString(), id)
       if (Number(r.changes) !== 1) throw new Error(`There is no network entry ${id}; nothing was changed.`)
     })
   }
@@ -1288,7 +1292,7 @@ export class PrivateStore {
     return rows.map(r => ({
       id: r.id!, did: r.did!, node: r.node!, handle: r.handle!, on: JSON.parse(r.on_apps!) as string[], state: r.state as NetworkEntryState,
       why: r.why as NetworkEntry['why'], added: r.added!, addedBy: r.added_by!, check: r.check_state as 'pass' | 'fail', checkedOn: r.checked_on!,
-      reason: r.reason, channel: r.channel,
+      reason: r.reason, channel: r.channel, decided: r.decided ?? null,
     }))
   }
 

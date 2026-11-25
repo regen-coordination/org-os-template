@@ -59,7 +59,7 @@ async function house() {
   const store = await openPrivateStore(repo, { dir }); cleanup.push(() => store.close())
   await store.replaceRoles(DOC)
   await store.putNetworkEntry({ id: 'ne-1', did: DID_NODE, node: 'refi-n', handle: 'refi-n.org', on: ['bluesky'], state: 'live', why: 'domain',
-    added: '2026-12-18', addedBy: DID_NODE, check: 'pass', checkedOn: '2026-12-18', reason: null, channel: null })
+    added: '2026-12-18', addedBy: DID_NODE, check: 'pass', checkedOn: '2026-12-18', reason: null, channel: null, decided: null })
   const now = () => T0
   const reader = {
     wearer: vi.fn(async () => ({ ok: false as const, failed: true as const, error: 'unused' })),

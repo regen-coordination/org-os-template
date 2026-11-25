@@ -29,7 +29,7 @@ const DID_G = 'did:plc:gggggggggggggggggggggggg'
 const AT = new Date('2026-12-18T10:00:00.000Z')
 const entry = (over: Partial<NetworkEntry> = {}): NetworkEntry => ({
   id: 'ne-1', did: DID_A, node: 'refi-a', handle: 'refi-a.org', on: ['bluesky'], state: 'live', why: 'domain',
-  added: '2026-12-18', addedBy: DID_A, check: 'pass', checkedOn: '2026-12-18', reason: null, channel: null, ...over,
+  added: '2026-12-18', addedBy: DID_A, check: 'pass', checkedOn: '2026-12-18', reason: null, channel: null, decided: null, ...over,
 })
 const DOC: RolesDoc = {
   roles_version: '2026-12-01',
@@ -133,6 +133,14 @@ describe('network entries', () => {
     const live = s.networkEntries('live')
     expect(live.map(e => [e.id, e.why, e.channel])).toEqual([['ne-2', 'steward', 'website']])
     expect(s.networkEntries('removed')[0].reason).toBe('steward removed')
+  })
+
+  it('a state change records when it was decided (a removal\'s date for the export)', async () => {
+    const s = await fresh()
+    await s.putNetworkEntry(entry())
+    expect(s.networkEntries()[0].decided).toBe(null)
+    await s.setNetworkEntryState('ne-1', 'removed', { reason: 'withdrawn by the node', at: '2026-12-19T09:00:00.000Z' })
+    expect(s.networkEntries()[0]).toMatchObject({ state: 'removed', decided: '2026-12-19T09:00:00.000Z' })
   })
 
   it('a state outside live, pending, removed is refused', async () => {
