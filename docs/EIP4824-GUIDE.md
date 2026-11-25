@@ -32,10 +32,20 @@ The files, in the order the builder writes them (`STANDARD_FILES` in `build.mjs`
 | `attestation-issuers.json` | DAOIP-3 | `identity.attestation_issuers` (`name`, `issuer`); absent when there is none |
 | `meetings.json`, `projects.json` | org-os | `data/meetings.yaml`, `data/projects.yaml`, plus `content/meetings/*.md` and `content/projects/*.md` with an `id` in their front matter; people appear only as public member ids |
 | `finances.json`, `ideas.json`, `knowledge.json` | org-os | `data/finances.yaml` (`budgets`, `expenses`, `revenues`); `data/ideas.yaml`; `data/knowledge-manifest.yaml` and `data/sources.yaml` |
+| `federation.json` | org-os | `federation.yaml`: the instance's networks, its public peers and its join terms (below). Written whenever the others are |
 
-The command writes the files built and removes any of these fourteen it did not build (a pool that is gone, for example). It touches nothing else in `.well-known/`. A separate command, `npm run generate:skills`, writes `.well-known/skills.json`; it is not part of the standards.
+The command writes the files built and removes any of these fifteen it did not build (a pool that is gone, for example). It touches nothing else in `.well-known/`. A separate command, `npm run generate:skills`, writes `.well-known/skills.json`; it is not part of the standards.
 
 `*.json.template` files sit in the same directory. Only `clone:framework` (and the older `setup` script) read one, `dao.json.template`, to render a new instance's first `dao.json` from its config; the builder does not use them. The clone strips the framework's generated `.json` files, so a new instance publishes nothing more until it sets a `daoURI` (see [Setup](SETUP.md)).
+
+## federation.json
+
+Since 0.7.4 (`packages/admin/lib/standards/federation.mjs`, `spec: "org-os/federation/1"`): this instance's own public claims about its networks, its peers and how others join. It holds `name`, `type`, `scope`, `daoURI` and the org's atproto `did` when `federation.yaml` sets them; `networks` (`name`, `hub`, `role`); `peers` (`name`, `url`, `type`, `trust`, `did`); and `join` (`policy`, `types`, `asks`, `where`) when there is one.
+
+- A peer is published only when its `url` is a public `https:` address and it is not `visibility: private`. Every other peer is counted on the console, never named.
+- A network's `hub` and the `join.where` are published only as a public `https:` address (`github.com/<owner>/<repo>` written without `https://` counts as one); anything else, such as a local path, is left out, and `validate:schemas` warns.
+- A peer's `repo`, `relationship`, `since`, `decision`, notes and contacts never appear. They are added to the leak scan's list, so a built file that held one would stop the write.
+- `dao.json` does not link to it. A hub's launcher and the admin app's **Look it up** read it to see how the hub takes requests: from `https://<host>/.well-known/federation.json`, or, for a hub given as `https://github.com/<owner>/<repo>`, from that repository's raw file at `HEAD` (`wellKnownUrlOf` in `packages/admin/server/federation/remote.ts`) (see [Federation: Joining a network](FEDERATION.md#joining-a-network)).
 
 ## dao.json
 
