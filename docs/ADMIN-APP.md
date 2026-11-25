@@ -2,7 +2,7 @@
 
 The admin app is a local web server and page for running an instance: its `data/*.yaml` records, the rules that decide changes to them, the proposals those rules call for, its boards, and the outside systems it uses (a Safe, a Hats tree, a Gardens pool). It runs on your machine, reads and writes the files in the instance's working tree, and every change it makes lands as a git commit carrying `Org-*` trailers. In 0.6 it is the platform of the [0.6 architecture](superpowers/specs/2026-10-16-org-os-0.6-platform-architecture-design.md): a new client on the server that milestone M1 of the [admin design](superpowers/specs/2026-07-23-admin-app-design.md) built.
 
-**Status:** `in-dev` (the vocabulary of [Modules](MODULES.md)), in `packages/admin/`. Not built: an edit path for `data/governance.yaml`, `data/finances.yaml`, `data/knowledge-manifest.yaml`, `data/visibility.yaml`, `IDENTITY.md` and `federation.yaml` (the app shows them read only); serving on any address but `127.0.0.1`; regenerating `.well-known/` after a change. The package's vitest suite and its browser checks were not run for this page. Everything below is read from the source.
+**Status:** `in-dev` (the vocabulary of [Modules](MODULES.md)), in `packages/admin/`. Not built: an edit path for `data/governance.yaml`, `data/finances.yaml`, `data/knowledge-manifest.yaml`, `data/visibility.yaml`, `IDENTITY.md` and `federation.yaml` (the app shows them read only); regenerating `.well-known/` after a change. The package's vitest suite and its browser checks were not run for this page. Everything below is read from the source.
 
 ## Start it
 
@@ -21,7 +21,7 @@ npm run admin -- --repo ../my-instance        # build the UI, serve on http://lo
 | `--port <n>` | `4680` | the port |
 | `--hosted` (or `ORG_OS_HOSTED=1`) | off | hosted mode: with no session the caller is the public (below) |
 
-The server binds `127.0.0.1` only, in either mode; the address is fixed in `server/serve.ts` and has no option. `npm run admin:dev` runs the server alone with `tsx watch` (no UI build); pair it with `npm run dev:app` inside `packages/admin/`. If `app/dist/` is missing the server still starts and says so; only the API is served.
+Locally the server binds `127.0.0.1` only, and the address has no option. Hosted, it binds `ORG_OS_BIND`, `0.0.0.0` by default (`server/hosted/config.ts`), as the container in `deploy/hub/` runs it. `npm run admin:dev` runs the server alone with `tsx watch` (no UI build); pair it with `npm run dev:app` inside `packages/admin/`. If `app/dist/` is missing the server still starts and says so; only the API is served.
 
 ## Who is acting
 

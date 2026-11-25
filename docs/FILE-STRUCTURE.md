@@ -17,7 +17,7 @@ The clone copies only what is committed at `HEAD` of the framework repository, a
 
 | Entry | In the instance |
 |---|---|
-| `.claude/`, `.cursor/`, `.opencode/` | Slash commands, `.claude/settings.json` and `.opencode/opencode.json`. `.opencode/agents/` is not copied. |
+| `.claude/`, `.cursor/`, `.opencode/` | Slash commands, `.claude/settings.json` and `.opencode/opencode.json`. `.opencode/agents/` was removed in 0.7.4 and is kept out of new instances. |
 | `.github/` | `hooks/pre-commit.sh` and `workflows/generate-schemas.yml` only. |
 | `.well-known/` | The `*.json.template` files. Published `*.json` files are removed; `dao.json` is rendered for the new organisation. Nothing else is published until the instance sets `identity.daoURI` and says what is public in `data/visibility.yaml` (see [EIP4824-GUIDE.md](EIP4824-GUIDE.md)). |
 | `.env.example`, `.gitignore`, `.prettierignore`, `LICENSE`, `BOOTSTRAP.md` | As is (`.gitignore` gains a `docs/temp/` line). |

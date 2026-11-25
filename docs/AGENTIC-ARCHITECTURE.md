@@ -84,7 +84,7 @@ The framework's own personas are two Berd agent files. `.agents/agents/operator.
 - `npm run sync:skills:berd` (`scripts/sync-skills-berd.mjs`) mirrors five skills (`org-os-init`, `meeting-processor`, `heartbeat-monitor`, `knowledge-curator`, `funding-scout`) into `.agents/skills/`; the list is the materialization entries of `modules/org-os-berd/module.yaml`. Same marker rule; `--check` compares without writing and runs inside `npm run selftest`. `.agents/skills/feynman/` is hand-authored, git-ignored and left alone.
 - Whether Berd loads those skills in a live session was not observed; the repository's Berd page records only source-level confirmation. See [Berd](integrations/berd.md).
 
-`.opencode/agents/` also holds four OpenCode agent files. They were written for one operator's personal vault, not for the framework, and are not documented here.
+`.opencode/agents/` held four OpenCode agent files written for one operator's personal vault. They were removed in 0.7.4, and `clone-excludes` keeps the folder out of new instances.
 
 There is no framework-defined "mode" system. An earlier page described named modes (`governance-facilitator`, `content-processor`, `ideation-curator`, and instance-specific `cooperative-ops`, `aggregator-indexer`, `network-facilitator`) defined in `.claude/agents/`. That directory does not exist and no script or skill reads such files; the modes were a pattern that was never implemented. To change how an agent behaves in a context today, write it in `AGENTS.md`, `MASTERPLAN.md` or a skill.
 
@@ -117,7 +117,7 @@ The same repository works with several hosts because each reads the same files; 
 | Host | What is in the repository |
 |---|---|
 | Claude Code | `.claude/settings.json` (git guard), `.claude/commands/` (the canonical slash commands), `CLAUDE.md` |
-| OpenCode | `.opencode/commands/`, `.opencode/agents/` (four vault-specific agent files, above), `.opencode/opencode.json` (loads `AGENTS.md` and every `skills/*/SKILL.md`), `packages/opencode-integration` |
+| OpenCode | `.opencode/commands/`, `.opencode/opencode.json` (loads `AGENTS.md` and every `skills/*/SKILL.md`), `packages/opencode-integration` |
 | Cursor | `.cursor/commands/` only |
 | Hermes | `skills/commands/` and `packages/hermes-integration` |
 | Berd | `.agents/agents/`, `.agents/skills/` (above) |

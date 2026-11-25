@@ -9,7 +9,7 @@ The commands, from the instance directory (all but the frontier fetch read and w
 ```bash
 node packages/org-os-kms/src/cli.mjs render map                 # data/kb/map.json
 node packages/org-os-kms/src/cli.mjs federate frontier          # ring 2: fetch peers' manifests, one hop out
-node packages/org-os-kms/src/cli.mjs render map html            # renders/federation-map.html + renders/federation-portals.md
+node packages/org-os-kms/src/cli.mjs render map html            # renders/federation-map.html + renders/federation-links.md
 ```
 
 `render map` takes `--dir <instance>` (default `.`), `--out <path>` (default `data/kb/map.json`, relative to `--dir`) and `--surface web|vault` (default `web`). `render map html` takes `--dir` and `--out` (default `renders/federation-map.html`). Neither needs `kms.yaml`; the map degrades to what it finds. The only hard requirement is a `federation.yaml` with `identity.name`; without it the command stops with `no federation.yaml with identity in: <dir>`.
@@ -87,7 +87,7 @@ The cache files are tracked content in this repository, so commit them if you wa
 
 ## The HTML artifact
 
-`render map html` writes one self-contained file, `renders/federation-map.html` (or `--out`): the map data and the built component (`packages/org-os-federation-map/dist/federation-map.iife.js`) are both inlined, so it opens offline. It builds the map with `--surface vault`, so portal links use the vault surface (`obsidian://` links). It also writes `renders/federation-portals.md` (always at that path under `--dir`), a note listing every node grouped as Instances, Frontier, Sources and Ecosystems, each linking to `federation-map.html#node=<id>`, so a note can link into the map and the map's panel can link back out. Both files carry one shared timestamp.
+`render map html` writes one self-contained file, `renders/federation-map.html` (or `--out`): the map data and the built component (`packages/org-os-federation-map/dist/federation-map.iife.js`) are both inlined, so it opens offline. It builds the map with `--surface vault`, so portal links use the vault surface (`obsidian://` links). It also writes `renders/federation-links.md` (always at that path under `--dir`), a note listing every node grouped as Instances, One hop beyond, Sources and Ecosystems, each linking to `federation-map.html#node=<id>`, so a note can link into the map and the map's panel can link back out. Both files carry one shared timestamp.
 
 The bundle is a committed build output. If you change the component, run `npm run build` inside `packages/org-os-federation-map` (it uses `esbuild`, a dev dependency) before rendering, or the artifact inlines the old one; `test/dist.test.mjs` checks that the committed bundle exists and is self-contained.
 
@@ -118,7 +118,7 @@ Theme with custom properties on the element or an ancestor: `--fedmap-bg`, `--fe
 
 ## How the project site uses it
 
-`site/scripts/aggregate-federation.mjs` runs as `npm run aggregate` in `site/`. `npm run dev` runs it first; `npm run build` runs `npm run clean` first, then it (`site/package.json`). It does two things. Before any of them it checks that the three installs exist (the repository root, `packages/org-os-federation-map` and `site`) and, if one is missing, stops with a sentence that names it.
+`site/scripts/aggregate-federation.mjs` runs as `npm run aggregate` in `site/`. `npm run dev` runs it first; `npm run build` runs `npm run clean` first, then it (`site/package.json`). It does two things. Before any of them it checks that the two installs exist (the repository root and `site`) and, if one is missing, stops with a sentence that names it.
 
 1. It reads `data/instances.yaml`, leaves out every entry marked `listed: false`, and writes `site/src/data/federation.json`. That file holds six things: `root` (the framework's own `name`, `type` and `repo`); `nodes` (for each instance that is left, only `name`, `type` and `repo`); `registered`, the number of those instances; `operational`, the number of them whose maturity is `production` in the registry; `operationalDefinition`, one sentence that says how that count is set; and `generatedAt`, the time of the run. If an entry has a `listed` that is not `true` or `false` (for example `"false"`, `no` or `0`), the run stops with a sentence that names the entry and writes nothing, because the entry would otherwise be published. The registry's other fields, including its notes, are not published; `site/scripts/federation-aggregate.mjs` holds the three-field list (`PUBLIC_FIELDS`) and the `listed` rule (`isListed`), and `site/scripts/verify-build.mjs` fails the build if more reaches `dist/` or if an unlisted entry is in `federation.json` or in the page's list.
 2. It calls `buildMap` on the repository root with the surface set to `web`, passes the result through `quietMap` and then `publicMap`, and writes it twice: `site/src/data/map.json` and `site/public/map.json`. `quietMap` removes `live: false` and a `last_seen` of `null` from each node. A node whose checkout was not beside the repository at build time (always the case in CI) therefore carries no status, and the map prints none. A node that was read keeps `live: true` and its `last_seen`. `publicMap` (`site/scripts/map-addresses.mjs`) applies the list's rule to the map: it leaves out each node whose registry entry is marked `listed: false`, its edges, and each node that was reached from the centre only through one. A node no edge reaches, such as an ecosystem on ring 3, stays. It then drops each `url` or `repo` that is not an `https` address, that is a folder inside another GitHub repository (a `/tree/` or `/blob/` path), that is a repository on its `PRIVATE_REPOS` list, or that is under a GitHub name on its `UNREGISTERED_OWNERS` list; the node stays without it. Both lists are kept by hand in that file. `verify-build.mjs` runs the same checks on `dist/map.json` and fails the build on anything that got through.
@@ -134,5 +134,5 @@ The site does not publish the repository's `.well-known/` files. They are the ha
 | `federation.yaml`, `kms.yaml` (`peers`), `data/source-systems.yaml`, `data/ecosystems.yaml`, `data/kb/index.json`, `<peer>/.well-known/{members,projects}.json` | read by `render map` |
 | `data/federation/frontier/<id>.json` | written by `federate frontier`, read by `render map` |
 | `data/kb/map.json` | written by `render map` (ignored by git in this repository) |
-| `renders/federation-map.html`, `renders/federation-portals.md` | written by `render map html` |
+| `renders/federation-map.html`, `renders/federation-links.md` | written by `render map html` |
 | `packages/org-os-federation-map/dist/federation-map.iife.js` | the committed bundle inlined in the HTML |
