@@ -2,7 +2,7 @@
   "name": "organizational-os-template",
   "description": "GitHub-based operational workspace template with EIP-4824 compliance",
   "private": true,
-  "version": "0.7.4",
+  "version": "0.7.5",
   "type": "module",
   "license": "MIT",
   "repository": {
