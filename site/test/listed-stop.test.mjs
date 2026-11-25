@@ -6,7 +6,7 @@
 // in verify-build.mjs could be deleted and every test still passed (final review
 // of 163ffb1, low finding 1).
 //
-// They need the three installs (site/README.md), as the commands themselves do.
+// They need the two installs (site/README.md), as the commands themselves do.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -36,7 +36,7 @@ const STACK_TRACE = /^\s+at .*\(?(node:|file:|\/)/m;
 
 // A repository that holds only what the two commands read: the registry, a
 // federation.yaml for the map, a package.json for the version, the site's scripts (copied, because the
-// aggregator finds the repository from where it is), and the three installs and
+// aggregator finds the repository from where it is), and the installs and
 // packages/ as links to the real ones.
 function scratchRepo(listed) {
   const root = mkdtempSync(join(tmpdir(), "org-os-listed-stop-"));
