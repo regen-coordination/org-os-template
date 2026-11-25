@@ -96,7 +96,12 @@ function useHouseNav() {
 
   const session = useSessionView()
   // an emailed-link session has no account and no hats: the person's name and Roles (0.6.1's personIdentity)
-  const identity: Identity = session?.signedIn ? (session.via === 'email' ? personIdentity(session.person) : sessionIdentity(session))
+  // A Guest (network app B3) has neither: their handle, and the word Guest. A member whose Hub offers the Bluesky or
+  // Certified sign-in finds their linked account in the identity menu (B4).
+  const accounts = session && 'methods' in session && Array.isArray(session.methods) && (session.methods as string[]).includes('atproto')
+  const identity: Identity = session?.signedIn ? (session.via === 'email' ? { ...personIdentity(session.person), ...(accounts ? { accountsHref: '/account-links' } : {}) }
+    : session.via === 'atproto' ? { hatName: session.guest.handle, address: null, hatId: null, hats: [], note: 'Guest' }
+    : sessionIdentity(session))
     : actor === null
     ? { hatName: '…', address: null, hatId: null, hats: [] }
     : 'id' in actor ? { hatName: actor.name, address: null, hatId: null, hats: [] }

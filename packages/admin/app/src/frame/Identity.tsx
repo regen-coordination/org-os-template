@@ -31,6 +31,7 @@ export function Identity({ who, menu = true, full = false, onViewAs = openViewAs
   const roles = who.roles ?? []
   const second = who.roles
     ? roles.join(' · ')
+    : who.note !== undefined ? who.note
     : [who.address ? shortAddress(who.address) : null, who.hatId ? `hat ${who.hatId}` : null].filter(Boolean).join(' · ')
   const face = (
     <>
@@ -54,6 +55,7 @@ export function Identity({ who, menu = true, full = false, onViewAs = openViewAs
       { type: 'separator' } as const,
     ]),
     ...(who.address ? [{ type: 'item', label: 'Copy address', icon: 'copy', onSelect: () => { void copy(who.address!) } } as const] : []),
+    ...(who.accountsHref ? [{ type: 'link', label: 'Bluesky or Certified account', href: who.accountsHref, icon: 'link' } as const] : []),
     { type: 'item', label: 'View as…', icon: 'eye', onSelect: onViewAs },
     ...(signOut ? [{ type: 'separator' } as const, { type: 'item', label: 'Sign out', onSelect: () => { void signOut() } } as const] : []),
   ]

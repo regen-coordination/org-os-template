@@ -153,6 +153,7 @@ export function signInSentence(message: string, session: SessionView | null): st
 export function noStandingSentence(session: SessionView | null | undefined): string | undefined {
   if (isWalletSession(session)) return session.hats.length === 0 ? NO_HAT : undefined
   if (session?.signedIn && session.via === 'email') return session.person.roles.length === 0 ? NO_ROLE_YET : undefined
+  if (session?.signedIn && session.via === 'atproto') return NO_ROLE_YET
   return undefined
 }
 
@@ -259,7 +260,7 @@ export type SessionMode = 'local' | 'hosted'
 interface PortalField { portal?: string | null }
 /** `methods` (0.6.1, Lane 3): the ways a Hub with the email method wired offers (`email`, `wallet`); absent otherwise. */
 export interface SignedOutView extends PortalField {
-  mode: SessionMode; signIn: { chainId: string; tree: string } | null; signedIn: false; methods?: ('email' | 'wallet')[]
+  mode: SessionMode; signIn: { chainId: string; tree: string } | null; signedIn: false; methods?: ('email' | 'wallet' | 'atproto')[]
 }
 export interface SignedInView extends PortalField {
   mode: SessionMode; signedIn: true; actor: string; account: string; hats: { hat: string; name: string }[]; expiresAt: string
@@ -276,9 +277,16 @@ export interface PersonSessionView extends PortalField {
   viewer: 'member' | 'public'; expiresAt: string
   stale?: undefined; unread?: undefined; band?: undefined
 }
-export type SessionView = SignedOutView | SignedInView | PersonSessionView
-/** A session signed in with a wallet (it has an account and hats); an emailed-link session has neither. */
-export const isWalletSession = (s: SessionView | null | undefined): s is SignedInView => s?.signedIn === true && s.via !== 'email'
+/** A ReFi DAO Network Guest (refi-dao-os network app spec §5.1): signed in with a Bluesky or Certified account linked to
+ *  no person; no account address, no hats, no Roles. They read as the public. */
+export interface GuestSessionView extends PortalField {
+  mode: SessionMode; signedIn: true; via: 'atproto'; guest: { did: string; handle: string }; roles: []
+  viewer: 'public'; expiresAt: string
+  stale?: undefined; unread?: undefined; band?: undefined
+}
+export type SessionView = SignedOutView | SignedInView | PersonSessionView | GuestSessionView
+/** A session signed in with a wallet (it has an account and hats); an emailed-link session and a Guest's have neither. */
+export const isWalletSession = (s: SessionView | null | undefined): s is SignedInView => s?.signedIn === true && s.via !== 'email' && s.via !== 'atproto'
 /** POST /api/session: a session, or no hat in the tree (§4.3 step 5). */
 export type SignInAnswer = SignedInView | { signedIn: false; notMember: true }
 /** GET /api/visibility (L5 spec §11.2, §13): the tree's hats with their names and the hats above each, the hats worn, the

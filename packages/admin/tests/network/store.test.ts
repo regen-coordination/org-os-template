@@ -79,7 +79,7 @@ describe('a roles load', () => {
   it('leaves all five network tables untouched', async () => {
     const s = await fresh()
     await s.putGuest(DID_G, 'guest.bsky.social', AT)
-    await s.putAccountLink({ did: DID_B, personId: 'example-org:person:example-steward', linked: AT.toISOString() })
+    await s.putAccountLink({ did: DID_B, personId: 'example-org:person:example-steward', handle: 'steward.bsky.social', linked: AT.toISOString() })
     await s.putNetworkEntry(entry())
     const stores = s.oauthStores(() => AT)
     await stores.stateStore.set('state-key', { iss: 'x' } as never)
@@ -159,8 +159,8 @@ describe('Guests and account links', () => {
 
   it('a DID links to one person only; unlinking removes the row', async () => {
     const s = await fresh()
-    await s.putAccountLink({ did: DID_B, personId: 'org:person:one', linked: AT.toISOString() })
-    await expect(s.putAccountLink({ did: DID_B, personId: 'org:person:two', linked: AT.toISOString() })).rejects.toThrow()
+    await s.putAccountLink({ did: DID_B, personId: 'org:person:one', handle: 'one.bsky.social', linked: AT.toISOString() })
+    await expect(s.putAccountLink({ did: DID_B, personId: 'org:person:two', handle: 'one.bsky.social', linked: AT.toISOString() })).rejects.toThrow()
     expect(s.accountLinksOf('org:person:one').map(l => l.did)).toEqual([DID_B])
     await s.deleteAccountLink(DID_B)
     expect(s.accountLink(DID_B)).toBe(null)
@@ -189,11 +189,11 @@ describe('what must never be published (A5 findings)', () => {
     await s.putNetworkEntry(entry({ handle: 'refi-a-public.org' }))
     await s.putNetworkEntry(entry({ id: 'ne-p', state: 'pending', why: null, did: DID_B, handle: 'pending-claim.bsky.social', node: 'refi-b' }))
     await s.putGuest(DID_G, 'guest-person.bsky.social', AT)
-    await s.putAccountLink({ did: 'did:plc:llllllllllllllllllllllll', personId: 'org:person:one', linked: AT.toISOString() })
+    await s.putAccountLink({ did: 'did:plc:llllllllllllllllllllllll', personId: 'org:person:one', handle: 'linked-person.bsky.social', linked: AT.toISOString() })
     const all = s.allStrings()
     expect(all.has('refi-a-public.org')).toBe(false)
     expect(all.has(DID_A)).toBe(false)
-    for (const secret of ['pending-claim.bsky.social', DID_B, DID_G, 'guest-person.bsky.social', 'did:plc:llllllllllllllllllllllll']) expect(all.has(secret)).toBe(true)
+    for (const secret of ['pending-claim.bsky.social', DID_B, DID_G, 'guest-person.bsky.social', 'did:plc:llllllllllllllllllllllll', 'linked-person.bsky.social']) expect(all.has(secret)).toBe(true)
   })
 
   it('an entry\'s adder (a person id, public in git), its reason and its channel (plain words) are not taken', async () => {

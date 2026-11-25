@@ -80,6 +80,8 @@ export const HOSTED_WRITES: readonly HostedWrite[] = [
   session('POST', '/api/session/link'),
   // The ReFi DAO Network's sign-in with a Bluesky or Certified account (B2): its OAuth round-trip, signed out or in.
   session('POST', '/api/session/atproto/start'),
+  // A member unlinking their own network account (B4): the route checks the person itself.
+  session('DELETE', '/api/session/atproto/links/:did'),
   // Every other write: the route asks for its actor before it writes.
   actor('PUT', '/api/registries/:name/:id'),
   actor('POST', '/api/registries/:name'),

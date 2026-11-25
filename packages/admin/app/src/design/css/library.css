@@ -20,6 +20,11 @@
 .signin .note { margin: 0; }
 .signin-go .btn { inline-size: 100%; height: var(--h-signin-go); font-size: var(--fs-body); }
 .signin-form { display: grid; gap: var(--sp-6); min-width: 0; }
+/* refi-dao-os network app B4: a member's linked Bluesky or Certified accounts, each a handle and its Unlink. */
+.account-links { display: grid; gap: var(--sp-6); max-inline-size: var(--w-prose); min-width: 0; }
+.account-links-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-8); }
+.account-links-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-width: 0; }
+.account-links-list .who-t { overflow-wrap: anywhere; }
 .signin-label { font: var(--fw-medium) var(--fs-meta)/var(--lh-label) var(--sans); }
 .signin-hint { margin: 0; font-size: var(--fs-tiny); line-height: var(--lh-tiny); color: var(--faint); }
 /* signed in: the identity's face, flush, its two lines free to wrap */

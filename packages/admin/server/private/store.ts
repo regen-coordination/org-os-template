@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS drafts (session TEXT NOT NULL PRIMARY KEY, target TEX
 // node and one per account, held by the database itself. `added_by` is a person id or the node's own DID (§5.7).
 const SCHEMA_4 = `
 CREATE TABLE IF NOT EXISTS network_guests (did TEXT NOT NULL PRIMARY KEY, handle TEXT NOT NULL, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL) STRICT;
-CREATE TABLE IF NOT EXISTS account_links (did TEXT NOT NULL PRIMARY KEY, person_id TEXT NOT NULL, linked TEXT NOT NULL) STRICT;
+CREATE TABLE IF NOT EXISTS account_links (did TEXT NOT NULL PRIMARY KEY, person_id TEXT NOT NULL, handle TEXT NOT NULL, linked TEXT NOT NULL) STRICT;
 CREATE INDEX IF NOT EXISTS account_links_person ON account_links (person_id);
 CREATE TABLE IF NOT EXISTS network_entries (id TEXT NOT NULL PRIMARY KEY, did TEXT NOT NULL, node TEXT NOT NULL, handle TEXT NOT NULL,
   on_apps TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('live', 'pending', 'removed')), why TEXT CHECK (why IN ('domain', 'record', 'steward')),
@@ -218,8 +218,8 @@ const OAUTH_STATE_MS = 60 * 60 * 1000
 
 /** A ReFi DAO Network Guest (spec §5.1, Q9): the account's DID and handle, never an e-mail, a name or a wallet. */
 export interface NetworkGuest { did: string; handle: string; firstSeen: string; lastSeen: string }
-/** A member's own network account, linked once from the Hub (§5.3). */
-export interface AccountLink { did: string; personId: string; linked: string }
+/** A member's own network account, linked once from the Hub (§5.3), with its handle (two-way checked) to show it by. */
+export interface AccountLink { did: string; personId: string; handle: string; linked: string }
 export type NetworkEntryState = 'live' | 'pending' | 'removed'
 /** A node's network account (§5.4, §5.6): live (shown), pending (waiting for a steward) or removed. */
 export interface NetworkEntry {
@@ -1209,7 +1209,7 @@ export class PrivateStore {
     // git, or the node's own DID), its reason and channel (a steward's plain words, not identities), and the OAuth
     // tables (tokens, never page text).
     for (const g of rows('SELECT did, handle FROM network_guests')) { take(g.did); take(g.handle) }
-    for (const l of rows('SELECT did FROM account_links')) take(l.did)
+    for (const l of rows('SELECT did, handle FROM account_links')) { take(l.did); take(l.handle) }
     for (const e of rows("SELECT did, handle FROM network_entries WHERE state <> 'live'")) { take(e.did); take(e.handle) }
     for (const e of rows("SELECT did, node, handle FROM network_entries WHERE state = 'live'")) { out.delete(String(e.did)); out.delete(String(e.node)); out.delete(String(e.handle)) }
     return out
@@ -1241,18 +1241,19 @@ export class PrivateStore {
 
   /** A member's network account linked to them. A DID already linked to someone (anyone) is refused by the database. */
   async putAccountLink(l: AccountLink): Promise<void> {
-    nonEmpty('a link\'s DID', l.did); nonEmpty('a link\'s person', l.personId); nonEmpty('a link\'s time', l.linked)
-    await this.locked(() => { this.db.prepare('INSERT INTO account_links (did, person_id, linked) VALUES (?, ?, ?)').run(l.did, l.personId, l.linked) })
+    nonEmpty('a link\'s DID', l.did); nonEmpty('a link\'s person', l.personId); nonEmpty('a link\'s handle', l.handle); nonEmpty('a link\'s time', l.linked)
+    if (ADDRESS.test(l.did) || ADDRESS.test(l.handle)) throw new Error('A link is kept by the account\'s DID and handle only; nothing was written.')
+    await this.locked(() => { this.db.prepare('INSERT INTO account_links (did, person_id, handle, linked) VALUES (?, ?, ?, ?)').run(l.did, l.personId, l.handle, l.linked) })
   }
 
   accountLink(did: string): AccountLink | null {
-    const r = this.reader.prepare('SELECT did, person_id, linked FROM account_links WHERE did = ?').get(did) as { did: string; person_id: string; linked: string } | undefined
-    return r ? { did: r.did, personId: r.person_id, linked: r.linked } : null
+    const r = this.reader.prepare('SELECT did, person_id, handle, linked FROM account_links WHERE did = ?').get(did) as { did: string; person_id: string; handle: string; linked: string } | undefined
+    return r ? { did: r.did, personId: r.person_id, handle: r.handle, linked: r.linked } : null
   }
 
   accountLinksOf(personId: string): AccountLink[] {
-    return (this.reader.prepare('SELECT did, person_id, linked FROM account_links WHERE person_id = ? ORDER BY did').all(personId) as
-      { did: string; person_id: string; linked: string }[]).map(r => ({ did: r.did, personId: r.person_id, linked: r.linked }))
+    return (this.reader.prepare('SELECT did, person_id, handle, linked FROM account_links WHERE person_id = ? ORDER BY linked, did').all(personId) as
+      { did: string; person_id: string; handle: string; linked: string }[]).map(r => ({ did: r.did, personId: r.person_id, handle: r.handle, linked: r.linked }))
   }
 
   async deleteAccountLink(did: string): Promise<void> {

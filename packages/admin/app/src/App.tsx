@@ -33,6 +33,7 @@ import Systems from './pages/Systems.tsx'
 import MapTheRest from './pages/MapTheRest.tsx'
 import Federation from './pages/Federation.tsx'
 import Roles from './pages/Roles.tsx'
+import AccountLinks from './pages/AccountLinks.tsx'
 import Workspace from './pages/Workspace.tsx'
 import PagePage from './workspace/PagePage.tsx' // DAO-OS L6 Task 16: /p/:id
 import CollectionPage from './workspace/CollectionPage.tsx' // DAO-OS L6 Task 17: /c/:collection, /c/:collection/:view
@@ -240,6 +241,7 @@ function HubApp() {
           <Route path="/compose" component={Compose} />{/* DAO-OS L7 Task 17 */}
           <Route path="/deploy" component={Deploy} />{/* DAO-OS L7 Task 18 */}
           <Route path="/roles" component={Roles} />
+          <Route path="/account-links" component={AccountLinks} />{/* refi-dao-os network app B4 */}
           <Route path="/workspace"><Workspace /></Route>
           <Route path="/p/:id">{p => <PagePage key={p.id} id={safeDecode(p.id)} thread={pageThread} />}</Route>{/* DAO-OS L6 Task 16; its thread, Task 18 */}
           {/* DAO-OS L6 Task 17: a collection and its views */}

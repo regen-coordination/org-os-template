@@ -182,6 +182,34 @@ describe('Nav: the house sidebar on 0.6’s queries (§5.2)', () => {
     expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual(expect.arrayContaining(['Network Member', 'Steward']))
   })
 
+  // refi-dao-os network app B3/B4: a Guest signed in with a Bluesky or Certified account has no account address, no
+  // hats and no Roles: the frame draws their handle and the word Guest, never a wallet's face.
+  it('a Guest signed in with a network account: their handle and Guest, no address, no hats', async () => {
+    const DID = 'did:plc:gggggggggggggggggggggggg'
+    routes({
+      'GET /api/actor': null,
+      'GET /api/session': { mode: 'hosted', signedIn: true, via: 'atproto', guest: { did: DID, handle: 'guest.bsky.social' }, roles: [],
+        viewer: 'public', expiresAt: '2026-12-19T10:00:00.000Z', signIn: null, methods: ['email', 'atproto'], instanceWrites: 'on' },
+    })
+    const { container } = renderAt(<ViewAsProvider><Nav /></ViewAsProvider>)
+    await waitFor(() => expect(container.querySelector('.who-t')?.textContent).toBe('guest.bsky.social'))
+    expect(container.querySelector('.who-s')!.textContent).toBe('Guest')
+    expect(container.textContent).not.toMatch(/0x|No hats|Hats not read/)
+  })
+
+  it('a member signed in by an emailed link finds their Bluesky or Certified account in the identity menu', async () => {
+    const ID = 'example-org:person:example-steward'
+    routes({
+      'GET /api/actor': { id: ID, name: 'Example Steward', kind: 'person', via: 'email', roles: ['steward'], nodes: [] },
+      'GET /api/session': { mode: 'hosted', signedIn: true, via: 'email', actor: ID, viewer: 'member', expiresAt: '2026-10-31T10:00:00.000Z',
+        person: { id: ID, name: 'Example Steward', roles: ['steward'], nodes: [] }, signIn: null, methods: ['email', 'atproto'], instanceWrites: 'on' },
+    })
+    renderAt(<ViewAsProvider><Nav /></ViewAsProvider>)
+    fireEvent.click(await screen.findByRole('button', { name: /^Example Steward/ }))
+    const item = screen.getByRole('menuitem', { name: 'Bluesky or Certified account' })
+    expect(item.getAttribute('href')).toBe('/account-links')
+  })
+
   it('the identity is who git says you are', async () => {
     routes({ 'GET /api/actor': { id: 'steward-a', name: 'Steward A', kind: 'person' } })
     renderAt(<ViewAsProvider><Nav /></ViewAsProvider>)

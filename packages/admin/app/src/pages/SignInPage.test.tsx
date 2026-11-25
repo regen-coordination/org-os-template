@@ -11,6 +11,7 @@ import { baseRoutes, refuse } from '../test/data.ts'
 import { fetchRoutes } from '../test/fetchRoutes.ts'
 import { renderAt } from '../test/render.tsx'
 import SignInPage from './SignInPage.tsx'
+import { away } from '../session/accountSignIn.ts'
 
 const ADDRESS = fakeAddress(8)
 const ACCOUNT = `eip155:42220:${ADDRESS}`
@@ -252,5 +253,35 @@ describe('/sign-in in App', () => {
     const { loc } = renderAt(<App />, '/changes')
     await waitFor(() => expect(loc.history.at(-1)).toBe('/sign-in?next=%2Fchanges'))
     expect(await screen.findByRole('group', { name: 'Sign in with your wallet' })).toBeTruthy()
+  })
+})
+
+// refi-dao-os network app spec §5.1 (B3/B4): one more way in, beside the emailed link: a Bluesky or Certified account.
+// It starts at Certified's sign-in by default and takes a Bluesky handle; either way the browser leaves for the
+// account's own sign-in page and comes back signed in.
+describe('the sign-in page: a Bluesky or Certified account (network app B3)', () => {
+  const OFFERED: SessionView = { mode: 'hosted', signIn: null, signedIn: false, methods: ['email', 'atproto'] }
+  it('offers it when the Hub does, and leaves for Certified\'s sign-in, or the handle\'s', async () => {
+    const go = vi.spyOn(away, 'go').mockImplementation(() => {})
+    const { calls } = fetchRoutes({
+      'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': OFFERED,
+      'POST /api/session/atproto/start': { url: 'https://auth.example/authorize?y=2' },
+    })
+    renderAt(<SignInPage />, '/sign-in')
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Bluesky or Certified' }))
+    await waitFor(() => expect(go).toHaveBeenCalledWith('https://auth.example/authorize?y=2'))
+    expect(calls.filter(c => c.method === 'POST')[0]!.body).toEqual({ purpose: 'sign-in' })
+    fireEvent.change(screen.getByLabelText('Or a Bluesky handle'), { target: { value: 'me.bsky.social' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with this handle' }))
+    await waitFor(() => expect(calls.filter(c => c.method === 'POST')).toHaveLength(2))
+    expect(calls.filter(c => c.method === 'POST')[1]!.body).toEqual({ purpose: 'sign-in', handle: 'me.bsky.social' })
+    go.mockRestore()
+  })
+
+  it('is not offered when the Hub does not say so', async () => {
+    fetchRoutes({ 'GET /api/status': { org: 'Fixture Org' }, 'GET /api/session': { ...OFFERED, methods: ['email'] } })
+    renderAt(<SignInPage />, '/sign-in')
+    await screen.findByRole('button', { name: 'Email me a link' })
+    expect(screen.queryByRole('button', { name: 'Sign in with Bluesky or Certified' })).toBeNull()
   })
 })

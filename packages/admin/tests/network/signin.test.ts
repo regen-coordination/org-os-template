@@ -51,8 +51,8 @@ async function house(o: { signIn?: SignInConfig | null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'network-signin-')); cleanup.push(() => rmSync(dir, { recursive: true, force: true }))
   const store = await openPrivateStore(repo, { dir }); cleanup.push(() => store.close())
   await store.replaceRoles(DOC)
-  await store.putAccountLink({ did: DID_LINKED, personId: STEWARD, linked: T0.toISOString() })
-  await store.putAccountLink({ did: DID_GONE, personId: GONE, linked: T0.toISOString() })
+  await store.putAccountLink({ did: DID_LINKED, personId: STEWARD, handle: 'steward.bsky.social', linked: T0.toISOString() })
+  await store.putAccountLink({ did: DID_GONE, personId: GONE, handle: 'gone.bsky.social', linked: T0.toISOString() })
   const state = { clock: T0 }
   const now = () => state.clock
   const reader = {
